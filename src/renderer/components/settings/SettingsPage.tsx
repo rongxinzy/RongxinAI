@@ -23,6 +23,7 @@ import { EnterpriseSettingsPage } from '../enterprise/EnterpriseSettingsPage';
 import { localInferenceCompactButtonClass } from '../localInference/constants';
 import PageHeader from '../PageHeader';
 import AboutSettingsPanel from './about/AboutSettingsPanel';
+import { AISphereSettings } from './AISphereSettings';
 import { AppearanceSettingsPanel } from './appearance/AppearanceSettingsPanel';
 import type { EmailSettingsHandle } from './email/types';
 import { EmailSettingsPage } from './email/EmailSettingsPage';
@@ -469,6 +470,9 @@ export default function SettingsPage({
 
       case 'coworkMemory':
         return <ManagedMemorySettings workingDirectory={coworkConfig.workingDirectory} />;
+
+      case 'aisphere':
+        return <AISphereSettings />;
 
       case 'triage':
         return <TriageSettingsPanel />;

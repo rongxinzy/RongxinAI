@@ -1,5 +1,6 @@
 import { CoworkMessageType, CoworkDisplayItemType } from '../../../../shared/cowork/constants';
 import { ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
+import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { ToolOutput } from '@shared/components/ai-elements/tool';
 import { Alert, AlertDescription } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
@@ -76,12 +77,12 @@ export const isTerminalErrorItem = (item: AssistantTurnItem): boolean =>
  * generation shows elapsed time instead of looking frozen.
  */
 const ToolActivityStatusLine: React.FC<{ activity: CoworkToolActivity }> = ({ activity }) => {
-  const [firstSeen, setFirstSeen] = React.useState({
+  const firstSeenRef = React.useRef({
     toolCallId: activity.toolCallId,
     at: activity.updatedAt,
   });
-  if (firstSeen.toolCallId !== activity.toolCallId) {
-    setFirstSeen({ toolCallId: activity.toolCallId, at: activity.updatedAt });
+  if (firstSeenRef.current.toolCallId !== activity.toolCallId) {
+    firstSeenRef.current = { toolCallId: activity.toolCallId, at: activity.updatedAt };
   }
   const [now, setNow] = React.useState(() => Date.now());
 
@@ -91,7 +92,7 @@ const ToolActivityStatusLine: React.FC<{ activity: CoworkToolActivity }> = ({ ac
   }, []);
 
   const statusText = getExecutionStatusText(getToolActivityExecutionStatus(activity));
-  const elapsedSeconds = Math.max(0, Math.floor((now - firstSeen.at) / 1000));
+  const elapsedSeconds = Math.max(0, Math.floor((now - firstSeenRef.current.at) / 1000));
 
   return (
     <p role="status" className="text-sm text-muted-foreground">
@@ -105,6 +106,7 @@ const ToolActivityStatusLine: React.FC<{ activity: CoworkToolActivity }> = ({ ac
 const TurnBlockComponent: React.FC<{
   turn: ConversationTurn;
   artifacts?: Artifact[];
+  pendingArtifacts?: Artifact[];
   resolveLocalFilePath?: (href: string, text: string) => string | null;
   mapDisplayText?: (value: string) => string;
   showTypingIndicator?: boolean;
@@ -117,13 +119,14 @@ const TurnBlockComponent: React.FC<{
   onResumeTask?: (interruption: CoworkSessionInterruption) => void;
   hideDefaultAssistantHeader?: boolean;
   pendingPermission?: CoworkPermissionRequest | null;
-  onRespondToPermission?: (result: CoworkPermissionResult) => void;
+  onRespondToPermission?: (result: CoworkPermissionResult) => void | Promise<void>;
   /** Expand long tool results fully for image export. */
   expandToolResults?: boolean;
   beforeCopySlot?: React.ReactNode;
 }> = ({
   turn,
   artifacts,
+  pendingArtifacts,
   resolveLocalFilePath,
   mapDisplayText,
   showTypingIndicator = false,
@@ -201,24 +204,33 @@ const TurnBlockComponent: React.FC<{
           key={item.message.id}
           persistKey={`reasoning-${item.message.id}`}
           isStreaming={isStreaming}
-          defaultOpen={false}
+          defaultOpen={isStreaming}
           autoClose={false}
           duration={durationSeconds}
         >
           <ReasoningTrigger
-            getThinkingMessage={() =>
-              i18nService
+            getThinkingMessage={(streaming, duration) => {
+              const displayDuration = duration ?? durationSeconds;
+              const text = i18nService
                 .t(
                   isComplete
-                    ? durationSeconds
+                    ? displayDuration
                       ? 'localInferenceThoughtForSeconds'
                       : 'codingAgentReasoningComplete'
-                    : isStreaming
+                    : streaming
                       ? 'codingAgentReasoningActive'
                       : 'reasoning',
                 )
-                .replace('{seconds}', String(durationSeconds ?? 0))
-            }
+                .replace('{seconds}', String(displayDuration ?? 0));
+              if (streaming) {
+                return (
+                  <Shimmer as="span" duration={1.5}>
+                    {text}
+                  </Shimmer>
+                );
+              }
+              return <span>{text}</span>;
+            }}
           />
           <ReasoningContent>{content}</ReasoningContent>
         </PersistentReasoning>
@@ -272,10 +284,10 @@ const TurnBlockComponent: React.FC<{
     item => item.type === CoworkDisplayItemType.ToolGroup && !item.group.toolResult,
   );
   const showTransportStatus = Boolean(!isTurnComplete && latestActivity && !hasActiveTool);
-  const deliverables =
-    artifacts?.filter(
-      artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
-    ) ?? [];
+  const deliverables = [...(artifacts ?? []), ...(pendingArtifacts ?? [])].filter(
+    artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
+  );
+  const pendingArtifactIds = new Set(pendingArtifacts?.map(artifact => artifact.id));
   const copyContent = showCopyButtons
     ? [...items]
         .reverse()
@@ -313,7 +325,11 @@ const TurnBlockComponent: React.FC<{
               {deliverables.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {deliverables.map(artifact => (
-                    <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+                    <ArtifactPreviewCard
+                      key={artifact.id}
+                      artifact={artifact}
+                      disabled={pendingArtifactIds.has(artifact.id)}
+                    />
                   ))}
                 </div>
               )}

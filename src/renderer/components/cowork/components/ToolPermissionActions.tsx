@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Confirmation,
   ConfirmationAction,
@@ -14,29 +15,53 @@ export const ToolPermissionActions = ({
   onRespond,
 }: {
   permission: CoworkPermissionRequest;
-  onRespond: (result: CoworkPermissionResult) => void;
-}) => (
-  <Confirmation approval={{ id: permission.requestId }} state={ToolState.ApprovalRequested}>
-    <ConfirmationRequest>{i18nService.t('codingAgentPermissionEvent')}</ConfirmationRequest>
-    <ConfirmationActions>
-      <ConfirmationAction
-        variant="ghost"
-        onClick={() =>
-          onRespond({ behavior: CoworkPermissionBehavior.Deny, message: 'Permission denied' })
-        }
-      >
-        {i18nService.t('coworkDeny')}
-      </ConfirmationAction>
-      <ConfirmationAction
-        onClick={() =>
-          onRespond({
-            behavior: CoworkPermissionBehavior.Allow,
-            updatedInput: permission.toolInput,
-          })
-        }
-      >
-        {i18nService.t('coworkApprove')}
-      </ConfirmationAction>
-    </ConfirmationActions>
-  </Confirmation>
-);
+  onRespond: (result: CoworkPermissionResult) => void | Promise<void>;
+}) => {
+  const [isPending, setIsPending] = useState(false);
+
+  const handleDeny = async () => {
+    if (isPending) return;
+    try {
+      const response = onRespond({
+        behavior: CoworkPermissionBehavior.Deny,
+        message: 'Permission denied',
+      });
+      if (response && typeof (response as Promise<void>).then === 'function') {
+        setIsPending(true);
+        await response;
+      }
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (isPending) return;
+    try {
+      const response = onRespond({
+        behavior: CoworkPermissionBehavior.Allow,
+        updatedInput: permission.toolInput,
+      });
+      if (response && typeof (response as Promise<void>).then === 'function') {
+        setIsPending(true);
+        await response;
+      }
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <Confirmation approval={{ id: permission.requestId }} state={ToolState.ApprovalRequested}>
+      <ConfirmationRequest>{i18nService.t('codingAgentPermissionEvent')}</ConfirmationRequest>
+      <ConfirmationActions>
+        <ConfirmationAction variant="ghost" disabled={isPending} onClick={handleDeny}>
+          {i18nService.t('coworkDeny')}
+        </ConfirmationAction>
+        <ConfirmationAction disabled={isPending} onClick={handleApprove}>
+          {i18nService.t('coworkApprove')}
+        </ConfirmationAction>
+      </ConfirmationActions>
+    </Confirmation>
+  );
+};

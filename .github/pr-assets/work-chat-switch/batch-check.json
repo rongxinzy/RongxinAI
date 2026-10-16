@@ -1,0 +1,46 @@
+{
+  "checks": [
+    {
+      "step": "select-all",
+      "mode": "work",
+      "batch": true,
+      "selectedCount": 65,
+      "selectedChatCount": 0,
+      "footerChecked": "true"
+    },
+    {
+      "step": "mode-exits-batch",
+      "mode": "chat",
+      "batch": false,
+      "selectedCount": 0,
+      "selectedChatCount": 0
+    },
+    {
+      "step": "select-all",
+      "mode": "chat",
+      "batch": true,
+      "selectedCount": 20,
+      "selectedChatCount": 20,
+      "footerChecked": "true"
+    },
+    {
+      "step": "mode-exits-batch",
+      "mode": "work",
+      "batch": false,
+      "selectedCount": 0,
+      "selectedChatCount": 0
+    },
+    {
+      "step": "select-all",
+      "mode": "work",
+      "batch": true,
+      "selectedCount": 65,
+      "selectedChatCount": 0,
+      "footerChecked": "true"
+    }
+  ],
+  "restored": {
+    "sessionRestored": true,
+    "mode": "work"
+  }
+}

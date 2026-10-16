@@ -12,6 +12,7 @@ import { ActivitySource, ActivityStatus } from '../../shared/activity/constants'
 import type { Platform } from '../../shared/platform';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
 import type { ActivityService } from '../activity/activityService';
+import { getBranding } from '../../shared/branding';
 import { t } from '../i18n';
 import type { PermissionRequest, PermissionResult, PiRuntime } from '../libs/agentEngine/types';
 import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
@@ -459,17 +460,27 @@ export class IMCoworkHandler extends EventEmitter {
     // Build media instruction for IM media sending capability
     const mediaInstruction = buildIMMediaInstruction(imSettings);
 
-    const sections: string[] = [
-      [
-        'You are 知远智能体 (ZhiYuan Agent).',
-        'The official Chinese product name is 知远智能体, and the official English product name is ZhiYuan Agent.',
-        '知远智能体 (ZhiYuan Agent) is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
-        'Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
-        'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体."',
-        'Do not use any other product name, model name, runtime name, or preset role as your identity.',
-        'The execution runtime and local inference stack are fully self-developed implementation details; mention them only when the user asks about runtime, local-model, or integration details.',
-      ].join('\n'),
-    ];
+    const branding = getBranding();
+    const identityPrompt =
+      branding.editionId === 'zhiyuan'
+        ? [
+            'You are 知远智能体 (ZhiYuan Agent).',
+            'The official Chinese product name is 知远智能体, and the official English product name is ZhiYuan Agent.',
+            '知远智能体 (ZhiYuan Agent) is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
+            'Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
+            'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体."',
+            'Do not use any other product name, model name, runtime name, or preset role as your identity.',
+            'The execution runtime and local inference stack are fully self-developed implementation details; mention them only when the user asks about runtime, local-model, or integration details.',
+          ].join('\n')
+        : [
+            `You are ${branding.productName} (${branding.englishName}).`,
+            `The official Chinese product name is ${branding.productName}, and the official English product name is ${branding.englishName}.`,
+            branding.promptIdentity.instructions,
+            `When the user asks who you are, answer with the official product identity only. In Chinese, say "${branding.promptIdentity.chinese}". In English, say "${branding.promptIdentity.english}".`,
+            'Do not use any other product name, model name, runtime name, or preset role as your identity.',
+          ].join('\n');
+
+    const sections: string[] = [identityPrompt];
     if (systemPrompt) {
       sections.push(systemPrompt);
     }

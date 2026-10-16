@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../shared/contextMenu';
 import type { ApiRequestPurpose } from '../shared/ipc/apiRequest';
+import { AISphereIpc } from '../shared/aisphere';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { MemoryIpcChannel } from '../shared/memory';
 import { AgentIpcChannel } from '../shared/agent/constants';
@@ -318,6 +319,18 @@ contextBridge.exposeInMainWorld('electron', {
         readonly import('../shared/managedProviders').ManagedProviderCatalogModel[]
       >,
     onChanged: (callback: () => void) => onPushVoid(ManagedProviderIpc.Changed, callback),
+    aisphereSnapshot: () =>
+      ipcRenderer.invoke(AISphereIpc.Snapshot) as Promise<
+        import('../shared/aisphere').AISphereSnapshot
+      >,
+    aisphereConnect: (address: string) =>
+      ipcRenderer.invoke(AISphereIpc.Connect, address) as Promise<
+        import('../shared/aisphere').AISphereSnapshot
+      >,
+    aisphereRefresh: () =>
+      ipcRenderer.invoke(AISphereIpc.Refresh) as Promise<
+        import('../shared/aisphere').AISphereSnapshot
+      >,
   },
 
   api: {

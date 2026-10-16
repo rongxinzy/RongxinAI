@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { cn } from '@shared/lib/utils';
 import { MotionConfig } from 'motion/react';
-import { MessageCircle, PanelLeftClose, Trash2 } from 'lucide-react';
+import { MessageCircle, PanelLeftClose, Settings, Trash2 } from 'lucide-react';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import {
   Empty,
@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { getBranding } from '../../shared/branding';
 import { agentService } from '../services/agent';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
@@ -131,7 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         onShowCowork();
       }
       setIsBatchMode(false);
-      setSelectedIds(new Set());
+      setSelectedIds(previous => (previous.size === 0 ? previous : new Set()));
       setShowBatchDeleteConfirm(false);
       void configService.updateConfig({ workMode: mode });
     },
@@ -164,7 +165,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const agentScrollContainerRef = useRef<HTMLDivElement>(null);
   // 保存侧边栏树中所有可见 session ID（跨所有 Agent 聚合），
   // 供批量模式"全选"使用，避免因 Redux sessions 被限定到单个 Agent 而导致全选范围错误
-  const allVisibleSessionIdsRef = useRef<string[]>([]);
+  const workVisibleSessionIdsRef = useRef<string[]>([]);
+  const chatVisibleSessionIds = React.useMemo(
+    () => chatTaskNodes.map(task => task.id),
+    [chatTaskNodes],
+  );
+  const visibleSessionIds =
+    workMode === WorkMode.Chat ? chatVisibleSessionIds : workVisibleSessionIdsRef.current;
   const isMac = window.electron.platform === 'darwin';
 
   useEffect(() => {
@@ -273,18 +280,28 @@ const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const handleVisibleSessionsChange = useCallback((ids: string[]) => {
-    allVisibleSessionIdsRef.current = ids;
+    // The work tree stays mounted in chat mode. Its asynchronous preview loads
+    // must update only the work selection scope, never the chat scope.
+    workVisibleSessionIdsRef.current = ids;
   }, []);
 
-  useEffect(() => {
-    if (workMode !== WorkMode.Chat) return;
-    handleVisibleSessionsChange(chatTaskNodes.map(task => task.id));
-  }, [chatTaskNodes, handleVisibleSessionsChange, workMode]);
+  const handleDismissSearch = useCallback(() => {
+    setSearchActive(false);
+  }, []);
+
+  const handleCreateScheduledTask = useCallback(
+    (workspace: WorkspaceSidebarNode) => {
+      requestScheduledTaskCreate({ workspaceId: workspace.id });
+      onShowScheduledTasks();
+    },
+    [onShowScheduledTasks],
+  );
 
   const handleSelectAll = useCallback(() => {
-    const allIds = allVisibleSessionIdsRef.current;
+    const allIds =
+      workMode === WorkMode.Chat ? chatVisibleSessionIds : workVisibleSessionIdsRef.current;
     setSelectedIds(prev => toggleVisibleBatchSelection(prev, allIds));
-  }, []);
+  }, [chatVisibleSessionIds, workMode]);
 
   const handleBatchDeleteClick = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -406,13 +423,13 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="theme-sidebar-header draggable sidebar-header-drag flex items-center justify-between">
               <div className={cn('flex items-center gap-2', isMac && 'pl-[68px]')}>
                 <img
-                  src="zhiyuan-logo-light.svg"
-                  alt="知远"
+                  src={`${getBranding().appId}-logo-light.svg`}
+                  alt={getBranding().shortName}
                   className="logo-light w-auto select-none"
                 />
                 <img
-                  src="zhiyuan-logo-dark.svg"
-                  alt="知远"
+                  src={`${getBranding().appId}-logo-dark.svg`}
+                  alt={getBranding().shortName}
                   className="logo-dark w-auto select-none"
                 />
               </div>
@@ -465,16 +482,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                   onShowCowork={onShowCowork}
                   onToggleSelection={handleToggleSelection}
                   onEnterBatchMode={handleEnterBatchMode}
-                  onVisibleSessionsChange={
-                    workMode === WorkMode.Work ? handleVisibleSessionsChange : undefined
-                  }
-                  onDismissSearch={() => {
-                    setSearchActive(false);
-                  }}
-                  onCreateScheduledTask={(workspace: WorkspaceSidebarNode) => {
-                    requestScheduledTaskCreate({ workspaceId: workspace.id });
-                    onShowScheduledTasks();
-                  }}
+                  onVisibleSessionsChange={handleVisibleSessionsChange}
+                  onDismissSearch={handleDismissSearch}
+                  onCreateScheduledTask={handleCreateScheduledTask}
                   workMode={WorkMode.Work}
                 />
               </div>
@@ -580,8 +590,8 @@ const Sidebar: React.FC<SidebarProps> = ({
               <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
                 <Checkbox
                   checked={
-                    selectedIds.size === allVisibleSessionIdsRef.current.length &&
-                    allVisibleSessionIdsRef.current.length > 0
+                    visibleSessionIds.length > 0 &&
+                    visibleSessionIds.every(id => selectedIds.has(id))
                   }
                   onCheckedChange={handleSelectAll}
                 />
@@ -621,7 +631,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                     onShowSettings();
                   }}
                 />
-              ) : null}
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    onPrefetchView?.('settings');
+                    onShowSettings();
+                  }}
+                  data-active={activeView === 'settings' || undefined}
+                  aria-current={activeView === 'settings' ? 'page' : undefined}
+                  className="theme-action-row w-full justify-start gap-2"
+                >
+                  <Settings data-icon="inline-start" />
+                  <span>{i18nService.t('settings')}</span>
+                </Button>
+              )}
             </div>
           )}
           <DestructiveConfirmDialog

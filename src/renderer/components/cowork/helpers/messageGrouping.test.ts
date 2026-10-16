@@ -7,6 +7,7 @@ import {
   buildDisplayItems,
   buildTurnRailIndices,
   getVisibleAssistantItems,
+  hasActiveTurnStreamingContent,
   omitSupersededSessionInterruptions,
   stabilizeConversationTurns,
 } from './messageGrouping';
@@ -304,4 +305,112 @@ test('marks commands before a pause as interrupted and leaves the resumed comman
   expect(groups).toHaveLength(2);
   expect(groups[0]?.toolResult?.metadata?.error).toBe('interrupted');
   expect(groups[1]?.toolResult).toBeUndefined();
+});
+
+test('hasActiveTurnStreamingContent detects live streaming vs idle waiting state', () => {
+  // Empty turn: idle waiting for model response
+  expect(
+    hasActiveTurnStreamingContent({ id: 'turn-1', userMessage: null, assistantItems: [] }),
+  ).toBe(false);
+
+  // Active toolActivity: preparing or executing
+  expect(
+    hasActiveTurnStreamingContent({ id: 'turn-1', userMessage: null, assistantItems: [] }, [
+      { toolCallId: 'call-1', toolName: 'read', phase: 'preparing', updatedAt: 1 } as any,
+    ]),
+  ).toBe(true);
+
+  // Pending permission: waiting for user
+  expect(
+    hasActiveTurnStreamingContent({ id: 'turn-1', userMessage: null, assistantItems: [] }, [], {
+      requestId: 'req-1',
+    } as any),
+  ).toBe(true);
+
+  // Running tool (no toolResult): actively executing
+  expect(
+    hasActiveTurnStreamingContent({
+      id: 'turn-1',
+      userMessage: null,
+      assistantItems: [
+        {
+          type: 'tool_group',
+          group: {
+            type: 'tool_group',
+            toolUse: message('t1', 'tool_use', 'read'),
+            toolResult: undefined,
+          },
+        },
+      ],
+    }),
+  ).toBe(true);
+
+  // Completed tool (has toolResult): finished, engine is waiting for model's next action
+  expect(
+    hasActiveTurnStreamingContent({
+      id: 'turn-1',
+      userMessage: null,
+      assistantItems: [
+        {
+          type: 'tool_group',
+          group: {
+            type: 'tool_group',
+            toolUse: message('t1', 'tool_use', 'read'),
+            toolResult: message('tr1', 'tool_result', 'file content'),
+          },
+        },
+      ],
+    }),
+  ).toBe(false);
+
+  // Live thinking stream: actively streaming
+  expect(
+    hasActiveTurnStreamingContent({
+      id: 'turn-1',
+      userMessage: null,
+      assistantItems: [
+        {
+          type: 'assistant',
+          message: {
+            ...message('a1', 'assistant', 'thinking...'),
+            metadata: { isThinking: true, isStreaming: true, isFinal: false },
+          },
+        },
+      ],
+    }),
+  ).toBe(true);
+
+  // Completed thinking stream: finished thinking, waiting for next action
+  expect(
+    hasActiveTurnStreamingContent({
+      id: 'turn-1',
+      userMessage: null,
+      assistantItems: [
+        {
+          type: 'assistant',
+          message: {
+            ...message('a1', 'assistant', 'thinking...'),
+            metadata: { isThinking: true, isStreaming: false, isFinal: true },
+          },
+        },
+      ],
+    }),
+  ).toBe(false);
+
+  // Live answer stream: actively streaming
+  expect(
+    hasActiveTurnStreamingContent({
+      id: 'turn-1',
+      userMessage: null,
+      assistantItems: [
+        {
+          type: 'assistant',
+          message: {
+            ...message('a1', 'assistant', 'answering...'),
+            metadata: { isStreaming: true, isFinal: false },
+          },
+        },
+      ],
+    }),
+  ).toBe(true);
 });
