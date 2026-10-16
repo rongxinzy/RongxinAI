@@ -34,6 +34,7 @@ test('opening settings only reads catalog and requires informed explicit activat
   expect(api.start).not.toHaveBeenCalled();
   expect(api.openManagement).not.toHaveBeenCalled();
   expect(screen.getByText('magpieCatalogConsent')).toBeTruthy();
+  expect(screen.getByText('magpieLicenseNotice')).toBeTruthy();
   api.start.mockResolvedValue(running.status);
   api.catalog.mockResolvedValue(running);
   await waitFor(() =>
