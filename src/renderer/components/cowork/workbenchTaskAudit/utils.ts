@@ -85,6 +85,7 @@ const artifactProvenanceTranslationKeys: Record<string, string> = {
   [WorkbenchArtifactProvenance.Workspace]: 'workbenchTaskProvenanceWorkspace',
   [WorkbenchArtifactProvenance.Message]: 'workbenchTaskProvenanceMessage',
   [WorkbenchArtifactProvenance.Controller]: 'workbenchTaskProvenanceController',
+  [WorkbenchArtifactProvenance.External]: 'workbenchTaskProvenanceExternal',
 };
 
 const verificationOutcomeTranslationKeys: Record<string, string> = {

@@ -117,6 +117,7 @@ export const WorkbenchArtifactProvenance = {
   Workspace: 'workspace',
   Message: 'message',
   Controller: 'controller',
+  External: 'external',
 } as const;
 export type WorkbenchArtifactProvenance =
   (typeof WorkbenchArtifactProvenance)[keyof typeof WorkbenchArtifactProvenance];
