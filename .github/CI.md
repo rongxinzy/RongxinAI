@@ -20,8 +20,9 @@ or diff failures stop the planner; no API pagination or 300-file filter limit ap
 
 `merge-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped
 required jobs. Path-owned checks (channel runtime smoke, Python runtime containment,
-installer preview) now run as conditional jobs inside CI instead of separate pull
-request workflows. Linux and Windows install workflows remain reusable/manual workflows.
+installer preview, browser preview) now run as conditional jobs inside CI instead of separate pull
+request workflows. Browser preview runs when the renderer, shared contracts, or
+`scripts/preview` change. Linux and Windows install workflows remain reusable/manual workflows.
 The parent CI owns concurrency cancellation and exposes the required `ci-gate` check
 after PR metadata validation and merge-gate succeed.
 

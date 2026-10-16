@@ -35,6 +35,7 @@ jobs:
       python-runtime-linux: ${{ steps.plan.outputs.python-runtime-linux }}
       python-runtime-windows: ${{ steps.plan.outputs.python-runtime-windows }}
       installer-preview: ${{ steps.plan.outputs.installer-preview }}
+      browser-preview: ${{ steps.plan.outputs.browser-preview }}
       enterprise: ${{ steps.plan.outputs.enterprise }}
     steps:
       - uses: actions/checkout@v6
@@ -167,6 +168,10 @@ jobs:
           name: electron-dist-${{ github.run_id }}
       - name: Install Electron for native ABI integration tests
         run: node node_modules/electron/install.js
+      - name: Rebuild native modules skipped by ignore-scripts
+        # node-pty has no Linux prebuild. Compiling Electron used to rebuild it
+        # in this job; that compile now runs elsewhere, so tests must rebuild it.
+        run: bun run rebuild:electron-native
       - name: Run tests
         run: bun run test -- --shard=${{ matrix.shard }}/2
       - name: Verify Presentation Studio compiler and validator
@@ -340,6 +345,32 @@ jobs:
       - name: Verify Windows standalone Python and real uv wheel environments
         run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
 
+  browser-preview:
+    needs: changes
+    if: needs.changes.outputs.browser-preview == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Restore Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run web:preview:codegen:check
+      - run: bun run web:preview:check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-preview-screenshots
+          path: .github/pr-assets/browser-preview
+          retention-days: 7
+
   installer-preview:
     needs: changes
     if: needs.changes.outputs.installer-preview == 'true'
@@ -397,6 +428,7 @@ jobs:
         python-runtime-linux,
         python-runtime-windows,
         installer-preview,
+        browser-preview,
         memory-leak,
         linux-install,
         windows-install,

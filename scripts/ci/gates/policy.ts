@@ -19,6 +19,8 @@ const pythonRuntimeChange =
   /^(?:src\/main\/pythonRuntime\/|src\/main\/libs\/agentEngine\/piPythonTools|scripts\/python-runtime\/|\.github\/workflows\/(?:python-runtime|ci)\.ya?ml$)/;
 const installerPreviewChange =
   /^(?:scripts\/installer-shell\/preview\/|scripts\/installer-shell\/preview-ui\.test\.ts$|scripts\/ci\/installer-style-preview\.py$|\.github\/workflows\/(?:installer-style-preview|ci)\.ya?ml$)/;
+const browserPreviewChange =
+  /^(?:src\/renderer\/|src\/shared\/|vite\.config\.browser\.ts$|scripts\/preview\/|\.github\/workflows\/ci\.ya?ml$)/;
 
 export function enterpriseRequired(paths: string[], event: string): boolean {
   if (event === CiEvent.Manual) return true;
@@ -33,11 +35,13 @@ export function planPathJobs(paths: string[], event: string): PathPlan {
   const channel = full || unknown || paths.some(file => channelRuntimeChange.test(file));
   const python = full || unknown || paths.some(file => pythonRuntimeChange.test(file));
   const installer = full || unknown || paths.some(file => installerPreviewChange.test(file));
+  const browserPreview = full || unknown || paths.some(file => browserPreviewChange.test(file));
   return {
     [PathJob.ChannelRuntime]: channel,
     [PathJob.PythonRuntimeLinux]: python,
     [PathJob.PythonRuntimeWindows]: python,
     [PathJob.InstallerPreview]: installer,
+    [PathJob.BrowserPreview]: browserPreview,
   };
 }
 

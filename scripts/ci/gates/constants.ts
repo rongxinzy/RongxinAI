@@ -31,6 +31,7 @@ export const PathJob = {
   PythonRuntimeLinux: 'python-runtime-linux',
   PythonRuntimeWindows: 'python-runtime-windows',
   InstallerPreview: 'installer-preview',
+  BrowserPreview: 'browser-preview',
 } as const;
 
 export const TestShardCount = 2;

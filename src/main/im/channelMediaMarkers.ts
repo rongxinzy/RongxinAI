@@ -40,7 +40,10 @@ const FILE_EXTENSIONS = new Set([
   'php',
   'sh',
 ]);
-const LOCAL_PATH_SOURCE = String.raw`(?:file:\/\/\/(?:[^)\s]+)|\/(?:tmp|var|private|Users|home|root)\/[^)\s]+|~\/[^)\s]+|[A-Za-z]:[\\/][^)\s]+)`;
+// Absolute local paths are not limited to /tmp, /home, or /Users. Channel replies are
+// instructed to use any absolute path, including workspace roots such as /workspace or /opt.
+// A second slash is rejected so protocol-relative URLs (//host/file.png) stay in the text.
+const LOCAL_PATH_SOURCE = String.raw`(?:file:\/\/\/(?:[^)\s]+)|\/(?!\/)[^)\s]+|~\/[^)\s]+|[A-Za-z]:[\\/][^)\s]+)`;
 const MARKDOWN_IMAGE_RE = new RegExp(String.raw`!\[([^\]]*)\]\((${LOCAL_PATH_SOURCE})\)`, 'g');
 const MARKDOWN_LINK_RE = new RegExp(String.raw`\[([^\]]*)\]\((${LOCAL_PATH_SOURCE})\)`, 'g');
 const BARE_PATH_RE = new RegExp(

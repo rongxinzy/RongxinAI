@@ -12,7 +12,8 @@
 
 ```bash
 bun run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
-bun run web:preview        # 浏览器预览模式（端口 5176，无需 Electron，有模拟数据）
+bun run web:preview        # 浏览器预览（端口 5176，无需 Electron）
+bun run web:preview:check  # 浅色/深色走查主要界面，console error 即失败
 bun run build              # 生产构建（TS + Vite）
 bun run lint               # oxlint，含 theme:check / theme:audit
 bun run format             # oxfmt；提交前 bun run format:check
@@ -25,12 +26,12 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 
 ### 浏览器预览模式
 
-`bun run web:preview` 在普通浏览器（不依赖 Electron）中预览渲染器主要界面，用于快速 UI 迭代与截图。
+改渲染器 UI 时，用浏览器预览代替 Electron 做调试。`bun run web:preview` 在端口 5176 启动 Vite；`bun run web:preview:check` 会自己拉起 preview，用浅色和深色走查主要界面。
 
-- 仅在 `import.meta.env.DEV` 且无 preload bridge 时由 `main.tsx` 动态加载 `src/renderer/browserMock/`；生产构建不含 mock。
-- Mock 与 fixture 均以 `Window['electron']`（`src/renderer/types/electron.d.ts`）为类型契约；契约变更会让 mock 报类型错误。
-- 只为主界面所需调用提供 fixture；其余调用返回 `{ success: false }`，订阅返回空取消函数。新界面需要数据时在 `browserMock/index.ts` 补充有类型的 override。
-- `bun run preview:screenshots [dir]`（需先 `bunx playwright install chromium` 并启动 preview）生成工作台、对话、设置的明暗截图。
+- 仅在 `import.meta.env.DEV` 且没有 preload bridge 时，`main.tsx` 才动态加载 `src/renderer/browserMock/`。生产构建不含 mock。
+- 完整表面由 `scripts/preview/generate-browser-mock.ts` 按 `Window['electron']`（`src/renderer/types/electron.d.ts`）生成。没有单独实现的方法返回类型上合法的默认值，每个路径只 `console.warn` 一次，不抛异常。`on*` 订阅注册到进程内事件总线，fixture 用同一条总线回放流式事件。
+- 会话、流式回复、设置、Skills、MCP、自动化、本地推理和 IM 的数据在 `browserMock/interactive.ts` 与 `browserMock/fixtures/`。改了 preload 契约后跑 `bun run web:preview:codegen`，并提交 `src/renderer/browserMock/generated/`。`bun run web:preview:codegen:check` 会在生成结果过期时失败。
+- `bun run web:preview:check`（先 `bunx playwright install chromium`）会打开会话、发送一条消息并等待流式回复、打开每个设置页、Skills、MCP、自动化、本地推理、IM、编程、待办、活动和对话框。任何 `console.error`、`pageerror` 或未处理拒绝都让命令失败，截图写到 `.github/pr-assets/browser-preview/`。改 UI 后用它确认没有缺 API 或控制台报错，再看截图。CI 在渲染器、共享契约或 `scripts/preview` 变更时跑同一条检查。
 
 Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
 
