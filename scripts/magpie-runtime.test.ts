@@ -15,6 +15,7 @@ const {
   contextTargets,
   configureMagpieResources,
   verifyPackagedMagpie,
+  signPackagedWindowsMagpie,
 } = require('./magpie-runtime.cjs');
 const { buildArguments, cleanGoEnvironment, treeDigest } = require('./build-magpie-runtime.cjs');
 const { signWithRuntimeManifest } = require('./sign-magpie-macos.cjs');
@@ -211,6 +212,115 @@ describe('pinned Magpie runtime build', () => {
     expect(result.buildSha256).toBe(x64.manifest.buildSha256);
     expect(result.sha256).not.toBe(result.buildSha256);
     expect(() => verifyRuntime(root, 'darwin-x64')).toThrow('unmodified compiler output');
+  });
+
+  test('adds the hardened runtime to each macOS helper', async () => {
+    const app = path.join(temporaryRoot(), 'Test.app');
+    const root = path.join(app, 'Contents', 'Resources', 'magpie');
+    const x64 = fixture(root, 'darwin-x64');
+    const arm64 = fixture(root, 'darwin-arm64');
+    await signWithRuntimeManifest(
+      { app, optionsForFile: () => ({ entitlements: 'kept.plist' }) },
+      async (received: {
+        hardenedRuntime?: boolean;
+        optionsForFile: (filename: string) => { entitlements?: string; hardenedRuntime?: boolean };
+      }) => {
+        expect(received.hardenedRuntime).toBe(true);
+        expect(received.optionsForFile(x64.binary)).toEqual({
+          entitlements: 'kept.plist',
+          hardenedRuntime: true,
+        });
+        expect(received.optionsForFile(arm64.binary).hardenedRuntime).toBe(true);
+        fs.appendFileSync(x64.binary, 'test-signature');
+        fs.appendFileSync(arm64.binary, 'test-signature');
+        received.optionsForFile(app);
+      },
+    );
+  });
+
+  test('rejects a macOS helper signed without the hardened runtime', async () => {
+    const app = path.join(temporaryRoot(), 'Test.app');
+    const root = path.join(app, 'Contents', 'Resources', 'magpie');
+    const x64 = fixture(root, 'darwin-x64');
+    fixture(root, 'darwin-arm64');
+    await expect(
+      signWithRuntimeManifest(
+        { app, hardenedRuntime: false, optionsForFile: () => ({ hardenedRuntime: true }) },
+        async (received: { optionsForFile: (filename: string) => unknown }) => {
+          received.optionsForFile(x64.binary);
+        },
+      ),
+    ).rejects.toThrow('hardened runtime');
+  });
+
+  test('signs the Windows helper with the Certum script and seals the shipped digest', () => {
+    const app = path.join(temporaryRoot(), 'win-unpacked');
+    const root = path.join(app, 'resources', 'magpie');
+    const { binary, manifest } = fixture(root, 'win32-x64');
+    const context = { electronPlatformName: 'win32', arch: 1, appOutDir: app };
+    const env = { CERTUM_CERT_THUMBPRINT: 'ab'.repeat(20) };
+    const calls: Array<{ command: string; args: string[] }> = [];
+    signPackagedWindowsMagpie(context, {
+      env,
+      spawn: (command: string, args: string[]) => {
+        calls.push({ command, args });
+        fs.appendFileSync(binary, 'authenticode');
+        return { status: 0 };
+      },
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.command).toBe('powershell.exe');
+    expect(calls[0]?.args.join(' ')).toContain('sign-runtime.ps1');
+    expect(calls[0]?.args).toContain(binary);
+    const signed = verifyRuntime(root, 'win32-x64', { allowSigned: true });
+    expect(signed.buildSha256).toBe(manifest.buildSha256);
+    expect(signed.sha256).not.toBe(signed.buildSha256);
+    expect(signed.signing).toEqual({ platform: 'win32', format: 'authenticode' });
+    expect(signed.sizeBytes).toBe(fs.statSync(binary).size);
+    signPackagedWindowsMagpie(context, {
+      env,
+      spawn: () => {
+        throw new Error('signed twice');
+      },
+    });
+  });
+
+  test('leaves an unsigned Windows helper on its compiler digest', () => {
+    const app = path.join(temporaryRoot(), 'win-unpacked');
+    const root = path.join(app, 'resources', 'magpie');
+    const { binary, manifest } = fixture(root, 'win32-x64');
+    signPackagedWindowsMagpie(
+      { electronPlatformName: 'win32', arch: 1, appOutDir: app },
+      {
+        env: {},
+        spawn: () => {
+          throw new Error('must not sign');
+        },
+      },
+    );
+    expect(verifyRuntime(root, 'win32-x64').sha256).toBe(manifest.sha256);
+    expect(fs.readFileSync(binary, 'utf8')).not.toContain('authenticode');
+  });
+
+  test('fails when Windows signing does not change the helper bytes', () => {
+    const app = path.join(temporaryRoot(), 'win-unpacked');
+    const root = path.join(app, 'resources', 'magpie');
+    fixture(root, 'win32-x64');
+    expect(() =>
+      signPackagedWindowsMagpie(
+        { electronPlatformName: 'win32', arch: 1, appOutDir: app },
+        {
+          env: { CERTUM_CERT_THUMBPRINT: 'cd'.repeat(20) },
+          spawn: () => ({ status: 0 }),
+        },
+      ),
+    ).toThrow('compiler bytes unchanged');
+    expect(() =>
+      signPackagedWindowsMagpie(
+        { electronPlatformName: 'win32', arch: 1, appOutDir: app },
+        { env: { CERTUM_CERT_THUMBPRINT: 'cd'.repeat(20) }, spawn: () => ({ status: 3 }) },
+      ),
+    ).toThrow('exit code 3');
   });
 
   test('fails signing when the outer manifest seal callback never runs', async () => {

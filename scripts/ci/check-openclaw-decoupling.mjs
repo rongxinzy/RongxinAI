@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { isPinnedMagpieGatewayBinary } from './magpie-gateway-allowlist.mjs';
 
 const root = process.cwd();
 const expectedSidecarVersion = 'zhiyuan-sidecar-v4';
@@ -53,6 +54,14 @@ function walk(relativeRoot) {
 }
 
 function checkFile(relativePath, patterns) {
+  // The pinned gateway executable is an unchanged Go build. Upstream's provider
+  // importer links the CC Switch app label "openclaw" ("OpenClaw") into the
+  // binary next to other external coding-agent names. Reading those bytes as
+  // text matches the retired-runtime pattern even though this tree does not
+  // ship that runtime, its storage, or its connectors. "cfmind" is not in the
+  // pinned source. Exempt only the expected binary path when the manifest pins
+  // upstream.json's version and commit and the hash is the compiler digest.
+  if (isPinnedMagpieGatewayBinary(root, relativePath)) return;
   const content = fs.readFileSync(path.join(root, relativePath), 'utf8');
   for (const pattern of patterns) {
     if (pattern.test(content)) {
