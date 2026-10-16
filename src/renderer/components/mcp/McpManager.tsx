@@ -17,8 +17,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 
 import { mcpCategories, mcpRegistry } from '../../data/mcpRegistry';
-import gitlabIcon from '../../assets/mcp-icons/gitlab.png';
-import tavilyIcon from '../../assets/mcp-icons/tavily.png';
+import gitlabIcon from '../../assets/mcp-icons/gitlab.webp';
+import tavilyIcon from '../../assets/mcp-icons/tavily.webp';
 import { i18nService } from '../../services/i18n';
 import { mcpService } from '../../services/mcp';
 import { RootState } from '../../store';

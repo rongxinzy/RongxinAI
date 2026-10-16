@@ -19,6 +19,24 @@ function createTempDir(): string {
   return dir;
 }
 
+test('createModelScopeTokenPool returns null when every source is missing', () => {
+  const pool = createModelScopeTokenPool({ env: {}, cwd: createTempDir() });
+
+  expect(pool.size()).toBe(0);
+  expect(pool.nextToken()).toBeNull();
+});
+
+test('createModelScopeTokenPool uses caller tokens when the resource file is absent', () => {
+  const pool = createModelScopeTokenPool({
+    env: {},
+    cwd: createTempDir(),
+    extraTokens: ['user-config-token'],
+  });
+
+  expect(pool.size()).toBe(1);
+  expect(pool.nextToken()).toBe('user-config-token');
+});
+
 test('createModelScopeTokenPool reads comma-separated env tokens and rotates them', () => {
   const pool = createModelScopeTokenPool({
     env: { MODELSCOPE_TOKENS: 'one, two, one' },

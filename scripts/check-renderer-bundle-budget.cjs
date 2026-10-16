@@ -15,6 +15,7 @@
  * remaining #141 phases land (target: startup ≤ 2.0 MiB raw / 700 KiB gzip).
  */
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -97,6 +98,25 @@ console.log(
 );
 
 const failures = [];
+const duplicateGroups = new Map();
+for (const file of allFiles.filter(name => name.endsWith('.js'))) {
+  const fullPath = path.join(assetsDir, file);
+  if (fs.statSync(fullPath).size < 4096) continue;
+  const hash = crypto.createHash('sha256').update(fs.readFileSync(fullPath)).digest('hex');
+  const group = duplicateGroups.get(hash) ?? [];
+  group.push(file);
+  duplicateGroups.set(hash, group);
+}
+const duplicatedChunks = [...duplicateGroups.values()].filter(group => group.length > 1);
+if (duplicatedChunks.length > 0) {
+  const sample = duplicatedChunks
+    .slice(0, 5)
+    .map(group => group.join(' == '))
+    .join('; ');
+  failures.push(
+    `identical renderer chunks (>= 4 KiB): ${duplicatedChunks.length} group(s); ${sample}`,
+  );
+}
 if (mapCount > BUDGETS.maxSourcemaps) {
   failures.push(`sourcemaps in bundle: ${mapCount} > ${BUDGETS.maxSourcemaps}`);
 }

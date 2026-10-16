@@ -6,6 +6,9 @@ const path = require('path');
 
 const EXCLUDED_FILE_PATTERNS = [
   /\.map$/i,
+  /\.local\.json$/i,
+  /(?:^|[._-])tokens?\.json$/i,
+  /^modelscope\.tokens.*\.json$/i,
   /\.d\.(ts|cts|mts)$/i,
   /^(readme|changelog|history)(\.(md|txt|rst))?$/i,
   /^(license|licence|authors|contributors)(\.(md|txt))?$/i,
