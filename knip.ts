@@ -35,6 +35,8 @@ const config: KnipConfig = {
         'scripts/write-windows-dev-shortcut.cjs',
         'scripts/prepare-visual-blind-review.mjs',
         'scripts/ci/validate-docx-smoke.mjs',
+        // Invoked from tests/e2e/packaged-linux/run-with-headless-deps.sh.
+        'tests/e2e/packaged-linux/run-packaged-smoke.mjs',
         // Manual installer and preview harnesses. Workflows do not call them.
         'scripts/installer-shell/assert-e2e.cjs',
         'scripts/installer-shell/e2e-sfx.cjs',
@@ -81,6 +83,8 @@ const config: KnipConfig = {
     // Operating-system commands, not npm packages.
     'openssl',
     'reg',
+    // Packaged Linux e2e seeds and reads SQLite through the sqlite3 CLI.
+    'sqlite3',
     'taskkill.exe',
     'wscript.exe',
     // Binary shipped by electron-builder's @electron/rebuild.
