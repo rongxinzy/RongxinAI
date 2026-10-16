@@ -8,172 +8,170 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 13px; line-height: 1.5;
-  color: #E8EBF0;
-  background: #0A0E1A;
+  font-size: 13px; line-height: 1.45;
+  color: #E2E8F0;
+  background: #0C0F14;
   min-height: 100vh;
 }
 .mono { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 12px; }
-.app { max-width: 1280px; margin: 0 auto; padding: 24px 32px 48px; }
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.header h1 { font-size: 20px; font-weight: 600; }
-.header-actions { display: flex; gap: 8px; align-items: center; }
+.app { max-width: 1180px; margin: 0 auto; padding: 12px 20px 32px; }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.toolbar h1 { font-size: 18px; font-weight: 600; flex: 1; }
 .search {
-  width: 280px; height: 32px; padding: 0 12px; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(30,35,50,0.9);
-  color: inherit;
+  width: 240px; height: 30px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid #252A35; background: #151922; color: inherit; font-size: 12px;
 }
 .btn {
-  height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 500;
+  height: 30px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;
 }
-.btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
-  box-shadow: 0 4px 12px rgba(96,165,250,0.3);
+.btn-solid {
+  background: #3B82F6; color: #fff; border: none;
 }
-.btn-outline {
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.12);
-  color: inherit;
+.btn-ghost {
+  background: #151922; border: 1px solid #252A35; color: inherit;
 }
-.glass {
-  background: rgba(20,24,36,0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+.panel {
+  background: #151922; border: 1px solid #252A35; border-radius: 8px;
 }
-.profile { padding: 16px 20px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
-.profile-meta { display: flex; flex-wrap: wrap; gap: 16px 24px; }
-.profile-item label { display: block; font-size: 11px; color: #4A5568; margin-bottom: 4px; }
-.profile-item strong { font-size: 13px; }
-.gpu-bars { display: flex; gap: 12px; }
-.gpu-mini { width: 140px; }
-.bar-track { height: 6px; border-radius: 3px; background: #1E293B; overflow: hidden; margin-top: 6px; }
-.bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3B82F6, #8B5CF6); }
-.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.profile {
+  padding: 10px 14px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
+}
+.profile-row { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 12px; }
+.profile-row dt { color: #94A3B8; margin-bottom: 2px; }
+.gpu-alloc { margin-top: 10px; width: 100%; }
+.gpu-alloc table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.gpu-alloc th { text-align: left; color: #94A3B8; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid #252A35; }
+.gpu-alloc td { padding: 8px; border-bottom: 1px solid #252A35; vertical-align: middle; }
+.vram-bar { height: 5px; border-radius: 2px; background: #334155; margin-top: 4px; overflow: hidden; }
+.vram-bar i { display: block; height: 100%; background: #60A5FA; border-radius: 2px; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
 .tab {
-  height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(30,35,50,0.6);
-  color: #A0AEC0;
+  height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px;
+  border: 1px solid #252A35; background: #151922; color: #94A3B8;
 }
-.tab.active {
-  background: rgba(96,165,250,0.15);
-  color: #E8EBF0;
-  border-color: rgba(96,165,250,0.4);
+.tab.on { background: #1E3A5F; color: #93C5FD; border-color: #2563EB; }
+.tab.dim { opacity: 0.5; }
+.section-h { font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: none; margin: 12px 0 6px; letter-spacing: 0.02em; }
+.pick-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 6px; }
+.pick {
+  flex: 0 0 220px; padding: 10px 12px; border: 1px solid #252A35; border-radius: 8px; background: #151922;
 }
-.tab.disabled { opacity: 0.45; }
-.section-title { font-size: 15px; font-weight: 600; margin: 20px 0 12px; }
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.card { padding: 16px 18px; }
-.card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-.card .sub { font-size: 12px; color: #A0AEC0; margin-bottom: 10px; }
-.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #1E293B; color: #A0AEC0; }
-.fit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.fit-bar { flex: 1; height: 8px; border-radius: 4px; background: #1E293B; overflow: hidden; display: flex; }
-.seg-w { width: 45%; background: #3B82F6; }
-.seg-k { width: 30%; background: #8B5CF6; }
-.seg-b { width: 10%; background: #94A3B8; }
-.badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
-.badge-ok { background: rgba(52,211,153,0.15); color: #34D399; }
-.badge-warn { background: rgba(251,191,36,0.15); color: #FBBF24; }
-.badge-muted { background: #1E293B; color: #94A3B8; }
-.carousel { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
-.carousel .card { min-width: 260px; flex-shrink: 0; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-th { font-size: 11px; font-weight: 500; color: #64748B; }
-.stack-bar { height: 24px; border-radius: 8px; overflow: hidden; display: flex; margin: 12px 0; }
-.stack-bar span { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
-.s-w { background: #3B82F6; flex: 4.2; }
-.s-k { background: #8B5CF6; flex: 2.1; }
-.s-b { background: #64748B; flex: 0.5; }
-.s-free { flex: 1.2; background: #334155; color: #94A3B8; }
-.two-col { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
-.sidebar-panel { padding: 20px; position: sticky; top: 24px; }
-.steps { list-style: none; }
-.steps li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.step-num { width: 24px; height: 24px; border-radius: 50%; background: rgba(96,165,250,0.2); color: #60A5FA; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
-.step-num.done { background: rgba(52,211,153,0.2); color: #34D399; }
-.progress { height: 8px; border-radius: 4px; background: #1E293B; overflow: hidden; margin-top: 8px; }
-.progress > div { height: 100%; background: linear-gradient(90deg, #3B82F6, #8B5CF6); width: 67%; }
-.radio-group { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-.radio { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
-.radio.selected { border-color: rgba(96,165,250,0.5); background: rgba(96,165,250,0.08); }
-.banner { padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.banner-warn { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); }
-.banner-info { background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.3); }
-.empty { text-align: center; padding: 48px 24px; }
-.empty h2 { font-size: 17px; margin-bottom: 8px; }
-.empty p { color: #A0AEC0; max-width: 420px; margin: 0 auto 20px; }
-.footer-sticky { margin-top: 24px; padding: 16px 20px; display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; }
-.mock-label { position: fixed; top: 8px; right: 8px; font-size: 10px; opacity: 0.5; }
+.pick strong { font-size: 13px; display: block; }
+.pick p { font-size: 11px; color: #94A3B8; margin: 4px 0 6px; line-height: 1.35; }
+.model-list { border: 1px solid #252A35; border-radius: 8px; overflow: hidden; background: #151922; }
+.model-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid #252A35; font-size: 12px;
+}
+.model-row:last-child { border-bottom: none; }
+.model-row:hover { background: #1A2030; }
+.model-name { font-weight: 600; font-size: 13px; }
+.model-meta { color: #94A3B8; font-size: 11px; margin-top: 2px; }
+.tags { display: inline-flex; gap: 4px; margin-top: 4px; }
+.tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #1E293B; color: #94A3B8; }
+.badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.b-ok { background: #14532D; color: #86EFAC; }
+.b-mid { background: #713F12; color: #FDE047; }
+.b-no { background: #7F1D1D; color: #FCA5A5; }
+.link { color: #60A5FA; font-size: 12px; text-decoration: none; }
+.conclusion-box { padding: 14px 16px; margin-bottom: 10px; }
+.conclusion-box h2 { font-size: 16px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.conclusion-box .lead { font-size: 13px; margin-bottom: 8px; }
+.conclusion-box .speed { font-size: 14px; font-weight: 600; }
+.conclusion-box .hint { font-size: 11px; color: #94A3B8; margin-top: 4px; }
+details { margin-top: 10px; border: 1px solid #252A35; border-radius: 8px; padding: 0 12px 12px; background: #151922; }
+summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 12px; color: #94A3B8; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.stack { height: 18px; border-radius: 4px; overflow: hidden; display: flex; margin: 8px 0; font-size: 9px; color: #fff; }
+.sw { background: #2563EB; flex: 5; display:flex;align-items:center;justify-content:center; }
+.sk { background: #6366F1; flex: 1; display:flex;align-items:center;justify-content:center; }
+.sb { background: #64748B; flex: 0.3; }
+table.data { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid #252A35; text-align: left; }
+table.data th { color: #94A3B8; font-weight: 500; }
+.two { display: grid; grid-template-columns: 1fr 280px; gap: 12px; }
+.side { padding: 12px 14px; }
+.steps { list-style: none; font-size: 12px; }
+.steps li { padding: 8px 0; border-bottom: 1px solid #252A35; display: flex; gap: 8px; }
+.progress { height: 6px; background: #334155; border-radius: 3px; margin-top: 6px; }
+.progress i { display: block; height: 100%; width: 67%; background: #2563EB; border-radius: 3px; }
+.radio { border: 1px solid #252A35; border-radius: 6px; padding: 10px; margin: 6px 0; font-size: 12px; }
+.radio.on { border-color: #2563EB; background: #172554; }
+.banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
+.banner-info { background: #1E3A5F; border: 1px solid #2563EB; }
+.banner-warn { background: #422006; border: 1px solid #CA8A04; }
+.empty { text-align: center; padding: 36px 20px; }
+.mock-label { position: fixed; top: 6px; right: 8px; font-size: 10px; color: #94A3B8; }
 </style>
 </head>
 <body>
-<span class="mock-label">静态稿 · 深色</span>
+<span class="mock-label">静态稿 · 深色 · dual-4060ti-16g</span>
 <div class="app">
-<div class="header"><h1>Qwen3-8B-Instruct · GGUF</h1><button class="btn btn-outline">← 返回市场</button></div>
+<div class="toolbar"><h1>Qwen3-8B-Instruct</h1><button class="btn btn-ghost">← 返回</button></div>
 
-<div class="glass profile">
-  <div class="profile-meta">
-    <div class="profile-item"><label>推理后端</label><strong>CUDA · llama-server b9244 · sm_89</strong></div>
-    <div class="profile-item"><label>系统内存</label><strong class="mono">64 GB</strong></div>
-    <div class="profile-item"><label>Work 模式建议上下文</label><strong class="mono">32K</strong></div>
-    <div class="gpu-bars">
-      <div class="gpu-mini"><label style="font-size:11px;color:var(--m,#888)">GPU 0 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:18%"></div></div><span class="mono" style="font-size:11px">2.9 / 16 GB 空闲</span></div>
-      <div class="gpu-mini"><label style="font-size:11px">GPU 1 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:12%"></div></div><span class="mono" style="font-size:11px">14.1 / 16 GB 空闲</span></div>
+<div class="panel profile">
+  <div>
+    <div class="profile-row">
+      <div><dt>推理引擎</dt><dd>CUDA · b9244</dd></div>
+      <div><dt>内存</dt><dd class="mono">64 GB</dd></div>
+      <div><dt>常用上下文</dt><dd class="mono">32K</dd></div>
+    </div>
+    <div class="gpu-alloc">
+      <div class="section-h" style="margin-top:8px">GPU 分配</div>
+      <table>
+        <tr><th>显卡</th><th>模型</th><th>占用</th><th>说明</th></tr>
+        <tr>
+          <td>GPU 0 · 4060 Ti 16GB<div class="vram-bar"><i style="width:39%"></i></div></td>
+          <td>Qwen3-8B Q4_K_M</td>
+          <td class="mono">6.3 / 16 GB</td>
+          <td>单卡加载，无跨卡切分</td>
+        </tr>
+        <tr>
+          <td>GPU 1 · 4060 Ti 16GB<div class="vram-bar"><i style="width:4%"></i></div></td>
+          <td>Qwen3-Embedding-0.6B</td>
+          <td class="mono">0.6 / 16 GB</td>
+          <td>并行向量模型</td>
+        </tr>
+      </table>
     </div>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="btn btn-outline">重新检测</button>
-    <button class="btn btn-outline">一键诊断</button>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <button class="btn btn-ghost">重新检测</button>
+    <button class="btn btn-ghost">诊断</button>
   </div>
 </div>
-<div class="two-col">
-  <div>
-    <div class="glass card" style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
-        <div><h3 style="font-size:17px">本机流畅度</h3><p class="sub">基于权重 + KV cache + 32K 上下文 · 双卡 tensor split</p></div>
-        <span class="badge badge-ok">流畅</span>
-      </div>
-      <div class="stack-bar"><span class="s-w">权重 4.2G</span><span class="s-k">KV 2.1G</span><span class="s-b">缓冲</span><span class="s-free">余量 9.7G</span></div>
-      <table>
-        <tr><th>项目</th><th>估算</th><th>说明</th></tr>
-        <tr><td>GPU 显存合计</td><td class="mono">6.8 GB</td><td>GPU0 3.6G + GPU1 3.2G 层切分</td></tr>
-        <tr><td>系统内存</td><td class="mono">1.4 GB</td><td>CPU offload 余量</td></tr>
-        <tr><td>上下文</td><td class="mono">32,768</td><td>符合 Work 模式守卫</td></tr>
-        <tr><td>tokens/s</td><td class="mono">22 – 30</td><td>置信度 B · 目录 benchmark</td></tr>
-      </table>
-      <p style="margin-top:12px;font-size:12px;color:#888">拖动上下文滑块可实时重算 KV 段（实现时绑定 ggufKvCacheEstimate）</p>
-      <input type="range" min="4096" max="131072" value="32768" style="width:100%;margin-top:8px" />
-    </div>
-    <div class="glass card">
-      <h3>量化版本</h3>
-      <table style="margin-top:12px">
-        <tr><th>量化</th><th>大小</th><th>VRAM</th><th>流畅度</th><th></th></tr>
-        <tr><td>Q4_K_M ★</td><td class="mono">5.1 GB</td><td class="mono">6.8 GB</td><td><span class="badge badge-ok">流畅</span></td><td><button class="btn btn-primary">下载</button></td></tr>
-        <tr><td>Q5_K_M</td><td class="mono">6.0 GB</td><td class="mono">7.9 GB</td><td><span class="badge badge-ok">流畅</span></td><td><button class="btn btn-outline">下载</button></td></tr>
-        <tr><td>Q8_0</td><td class="mono">8.4 GB</td><td class="mono">10.6 GB</td><td><span class="badge badge-warn">可玩</span></td><td><button class="btn btn-outline">下载</button></td></tr>
-      </table>
-    </div>
-  </div>
-  <div class="glass sidebar-panel">
-    <h3>运行时证据</h3>
-    <ul style="list-style:none;margin-top:12px;font-size:12px;line-height:2">
-      <li>✓ GGUF SHA256 已校验</li>
-      <li>✓ chat template 已文档化</li>
-      <li>◐ 工具调用 · 待探针</li>
-      <li>— mmproj 不适用</li>
-    </ul>
-    <div class="footer-sticky" style="position:static;padding:16px 0 0">
-      <button class="btn btn-primary" style="flex:1">下载并安装</button>
-    </div>
-  </div>
+<div class="panel conclusion-box">
+  <h2><span class="badge b-ok">流畅</span> 本机运行结论</h2>
+  <p class="lead">可在 <strong>GPU 0 单卡</strong>完整加载；GPU 1 仍可同时运行向量等小模型，<strong>无需跨显卡切分</strong>。</p>
+  <p class="speed">预计速度：约 35–45 tok/s（估算）</p>
+  <p class="hint">推荐 Q4_K_M · 文件 5.0 GB · 上下文 32K · CPU 卸载：无</p>
+</div>
+<details>
+  <summary>详细：显存、GPU 与速度计算</summary>
+  <p style="font-size:11px;color:#64748B;margin-top:8px">GPU 0 单卡 · split-mode none · main-gpu 0</p>
+  <div class="stack"><span class="sw">权重 5.0G</span><span class="sk">KV 1.0G</span><span class="sb"></span></div>
+  <table class="data">
+    <tr><th>项目</th><th>数值</th></tr>
+    <tr><td>GGUF 文件</td><td class="mono">5.0 GB（= GPU 权重）</td></tr>
+    <tr><td>KV（32K）</td><td class="mono">~1.0 GB</td></tr>
+    <tr><td>缓冲</td><td class="mono">~0.3 GB</td></tr>
+    <tr><td>GPU 0 合计</td><td class="mono">~6.3 GB</td></tr>
+    <tr><td>系统内存 offload</td><td>未使用 CPU 卸载</td></tr>
+  </table>
+  <p style="font-size:11px;margin-top:10px;line-height:1.5;color:#64748B">
+    速度估算：4060 Ti 带宽 288 GB/s × 效率 0.6 → 172.8 GB/s 有效；decode ≈ 172.8×1024³÷(5.0×1024³)≈34.6 tok/s，展示区间 35–45（估算）。
+  </p>
+  <p style="font-size:11px;margin-top:6px;color:#64748B">文件校验已通过 · 对话模板已收录 · 工具调用：待验证</p>
+</details>
+<div class="panel" style="margin-top:10px;padding:12px 14px">
+  <div class="section-h" style="margin:0 0 8px">量化版本</div>
+  <table class="data">
+    <tr><th>量化</th><th>文件</th><th>结论</th><th>速度（估算）</th><th></th></tr>
+    <tr><td>Q4_K_M ★</td><td class="mono">5.0 GB</td><td><span class="badge b-ok">流畅</span></td><td class="mono">35–45</td><td><button class="btn btn-ghost">下载</button></td></tr>
+    <tr><td>Q5_K_M</td><td class="mono">5.9 GB</td><td><span class="badge b-ok">流畅</span></td><td class="mono">30–38</td><td><button class="btn btn-ghost">下载</button></td></tr>
+    <tr><td>Q8_0</td><td class="mono">8.2 GB</td><td><span class="badge b-mid">可用</span></td><td class="mono">20–26</td><td><button class="btn btn-ghost">下载</button></td></tr>
+  </table>
+  <div style="margin-top:12px;text-align:right"><button class="btn btn-solid">下载并安装</button></div>
 </div></div>
 </body>
 </html>

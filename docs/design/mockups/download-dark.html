@@ -8,141 +8,126 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 13px; line-height: 1.5;
-  color: #E8EBF0;
-  background: #0A0E1A;
+  font-size: 13px; line-height: 1.45;
+  color: #E2E8F0;
+  background: #0C0F14;
   min-height: 100vh;
 }
 .mono { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 12px; }
-.app { max-width: 1280px; margin: 0 auto; padding: 24px 32px 48px; }
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.header h1 { font-size: 20px; font-weight: 600; }
-.header-actions { display: flex; gap: 8px; align-items: center; }
+.app { max-width: 1180px; margin: 0 auto; padding: 12px 20px 32px; }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.toolbar h1 { font-size: 18px; font-weight: 600; flex: 1; }
 .search {
-  width: 280px; height: 32px; padding: 0 12px; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(30,35,50,0.9);
-  color: inherit;
+  width: 240px; height: 30px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid #252A35; background: #151922; color: inherit; font-size: 12px;
 }
 .btn {
-  height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 500;
+  height: 30px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;
 }
-.btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, #60A5FA 0%, #A78BFA 100%);
-  box-shadow: 0 4px 12px rgba(96,165,250,0.3);
+.btn-solid {
+  background: #3B82F6; color: #fff; border: none;
 }
-.btn-outline {
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.12);
-  color: inherit;
+.btn-ghost {
+  background: #151922; border: 1px solid #252A35; color: inherit;
 }
-.glass {
-  background: rgba(20,24,36,0.88);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+.panel {
+  background: #151922; border: 1px solid #252A35; border-radius: 8px;
 }
-.profile { padding: 16px 20px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
-.profile-meta { display: flex; flex-wrap: wrap; gap: 16px 24px; }
-.profile-item label { display: block; font-size: 11px; color: #4A5568; margin-bottom: 4px; }
-.profile-item strong { font-size: 13px; }
-.gpu-bars { display: flex; gap: 12px; }
-.gpu-mini { width: 140px; }
-.bar-track { height: 6px; border-radius: 3px; background: #1E293B; overflow: hidden; margin-top: 6px; }
-.bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3B82F6, #8B5CF6); }
-.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.profile {
+  padding: 10px 14px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
+}
+.profile-row { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 12px; }
+.profile-row dt { color: #94A3B8; margin-bottom: 2px; }
+.gpu-alloc { margin-top: 10px; width: 100%; }
+.gpu-alloc table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.gpu-alloc th { text-align: left; color: #94A3B8; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid #252A35; }
+.gpu-alloc td { padding: 8px; border-bottom: 1px solid #252A35; vertical-align: middle; }
+.vram-bar { height: 5px; border-radius: 2px; background: #334155; margin-top: 4px; overflow: hidden; }
+.vram-bar i { display: block; height: 100%; background: #60A5FA; border-radius: 2px; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
 .tab {
-  height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: rgba(30,35,50,0.6);
-  color: #A0AEC0;
+  height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px;
+  border: 1px solid #252A35; background: #151922; color: #94A3B8;
 }
-.tab.active {
-  background: rgba(96,165,250,0.15);
-  color: #E8EBF0;
-  border-color: rgba(96,165,250,0.4);
+.tab.on { background: #1E3A5F; color: #93C5FD; border-color: #2563EB; }
+.tab.dim { opacity: 0.5; }
+.section-h { font-size: 12px; font-weight: 600; color: #94A3B8; text-transform: none; margin: 12px 0 6px; letter-spacing: 0.02em; }
+.pick-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 6px; }
+.pick {
+  flex: 0 0 220px; padding: 10px 12px; border: 1px solid #252A35; border-radius: 8px; background: #151922;
 }
-.tab.disabled { opacity: 0.45; }
-.section-title { font-size: 15px; font-weight: 600; margin: 20px 0 12px; }
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.card { padding: 16px 18px; }
-.card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-.card .sub { font-size: 12px; color: #A0AEC0; margin-bottom: 10px; }
-.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #1E293B; color: #A0AEC0; }
-.fit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.fit-bar { flex: 1; height: 8px; border-radius: 4px; background: #1E293B; overflow: hidden; display: flex; }
-.seg-w { width: 45%; background: #3B82F6; }
-.seg-k { width: 30%; background: #8B5CF6; }
-.seg-b { width: 10%; background: #94A3B8; }
-.badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
-.badge-ok { background: rgba(52,211,153,0.15); color: #34D399; }
-.badge-warn { background: rgba(251,191,36,0.15); color: #FBBF24; }
-.badge-muted { background: #1E293B; color: #94A3B8; }
-.carousel { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
-.carousel .card { min-width: 260px; flex-shrink: 0; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-th { font-size: 11px; font-weight: 500; color: #64748B; }
-.stack-bar { height: 24px; border-radius: 8px; overflow: hidden; display: flex; margin: 12px 0; }
-.stack-bar span { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
-.s-w { background: #3B82F6; flex: 4.2; }
-.s-k { background: #8B5CF6; flex: 2.1; }
-.s-b { background: #64748B; flex: 0.5; }
-.s-free { flex: 1.2; background: #334155; color: #94A3B8; }
-.two-col { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
-.sidebar-panel { padding: 20px; position: sticky; top: 24px; }
-.steps { list-style: none; }
-.steps li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
-.step-num { width: 24px; height: 24px; border-radius: 50%; background: rgba(96,165,250,0.2); color: #60A5FA; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
-.step-num.done { background: rgba(52,211,153,0.2); color: #34D399; }
-.progress { height: 8px; border-radius: 4px; background: #1E293B; overflow: hidden; margin-top: 8px; }
-.progress > div { height: 100%; background: linear-gradient(90deg, #3B82F6, #8B5CF6); width: 67%; }
-.radio-group { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-.radio { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
-.radio.selected { border-color: rgba(96,165,250,0.5); background: rgba(96,165,250,0.08); }
-.banner { padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.banner-warn { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); }
-.banner-info { background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.3); }
-.empty { text-align: center; padding: 48px 24px; }
-.empty h2 { font-size: 17px; margin-bottom: 8px; }
-.empty p { color: #A0AEC0; max-width: 420px; margin: 0 auto 20px; }
-.footer-sticky { margin-top: 24px; padding: 16px 20px; display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; }
-.mock-label { position: fixed; top: 8px; right: 8px; font-size: 10px; opacity: 0.5; }
+.pick strong { font-size: 13px; display: block; }
+.pick p { font-size: 11px; color: #94A3B8; margin: 4px 0 6px; line-height: 1.35; }
+.model-list { border: 1px solid #252A35; border-radius: 8px; overflow: hidden; background: #151922; }
+.model-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid #252A35; font-size: 12px;
+}
+.model-row:last-child { border-bottom: none; }
+.model-row:hover { background: #1A2030; }
+.model-name { font-weight: 600; font-size: 13px; }
+.model-meta { color: #94A3B8; font-size: 11px; margin-top: 2px; }
+.tags { display: inline-flex; gap: 4px; margin-top: 4px; }
+.tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #1E293B; color: #94A3B8; }
+.badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.b-ok { background: #14532D; color: #86EFAC; }
+.b-mid { background: #713F12; color: #FDE047; }
+.b-no { background: #7F1D1D; color: #FCA5A5; }
+.link { color: #60A5FA; font-size: 12px; text-decoration: none; }
+.conclusion-box { padding: 14px 16px; margin-bottom: 10px; }
+.conclusion-box h2 { font-size: 16px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.conclusion-box .lead { font-size: 13px; margin-bottom: 8px; }
+.conclusion-box .speed { font-size: 14px; font-weight: 600; }
+.conclusion-box .hint { font-size: 11px; color: #94A3B8; margin-top: 4px; }
+details { margin-top: 10px; border: 1px solid #252A35; border-radius: 8px; padding: 0 12px 12px; background: #151922; }
+summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 12px; color: #94A3B8; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.stack { height: 18px; border-radius: 4px; overflow: hidden; display: flex; margin: 8px 0; font-size: 9px; color: #fff; }
+.sw { background: #2563EB; flex: 5; display:flex;align-items:center;justify-content:center; }
+.sk { background: #6366F1; flex: 1; display:flex;align-items:center;justify-content:center; }
+.sb { background: #64748B; flex: 0.3; }
+table.data { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid #252A35; text-align: left; }
+table.data th { color: #94A3B8; font-weight: 500; }
+.two { display: grid; grid-template-columns: 1fr 280px; gap: 12px; }
+.side { padding: 12px 14px; }
+.steps { list-style: none; font-size: 12px; }
+.steps li { padding: 8px 0; border-bottom: 1px solid #252A35; display: flex; gap: 8px; }
+.progress { height: 6px; background: #334155; border-radius: 3px; margin-top: 6px; }
+.progress i { display: block; height: 100%; width: 67%; background: #2563EB; border-radius: 3px; }
+.radio { border: 1px solid #252A35; border-radius: 6px; padding: 10px; margin: 6px 0; font-size: 12px; }
+.radio.on { border-color: #2563EB; background: #172554; }
+.banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
+.banner-info { background: #1E3A5F; border: 1px solid #2563EB; }
+.banner-warn { background: #422006; border: 1px solid #CA8A04; }
+.empty { text-align: center; padding: 36px 20px; }
+.mock-label { position: fixed; top: 6px; right: 8px; font-size: 10px; color: #94A3B8; }
 </style>
 </head>
 <body>
-<span class="mock-label">静态稿 · 深色</span>
+<span class="mock-label">静态稿 · 深色 · dual-4060ti-16g</span>
 <div class="app">
-<div class="header"><h1>下载 Qwen3-8B · Q4_K_M</h1></div>
-<div class="two-col">
-  <div class="glass card">
-    <h3>选择下载源</h3>
-    <div class="radio-group">
-      <div class="radio selected"><input type="radio" checked /> <div><strong>ModelScope</strong><p class="sub" style="margin:0">国内访问稳定，推荐大多数用户</p></div></div>
-      <div class="radio"><input type="radio" /> <div><strong>hf-mirror</strong><p class="sub" style="margin:0">无需访问 huggingface.co，与目录 revision 对齐</p></div></div>
-    </div>
-    <h3 style="margin-top:20px">文件</h3>
-    <table style="margin-top:8px">
-      <tr><td class="mono">Qwen3-8B-Q4_K_M.gguf</td><td class="mono">5.1 GB</td><td><span class="badge badge-muted">等待</span></td></tr>
-    </table>
-    <h3 style="margin-top:20px">进度</h3>
-    <p class="mono">3.42 / 5.10 GB · 断点续传已启用</p>
-    <div class="progress"><div></div></div>
-    <p style="font-size:12px;margin-top:8px;color:#888">下一步：SHA256 校验 → 写入 模型库/modelscope/Qwen/…</p>
+<div class="toolbar"><h1>下载 · Qwen3-8B Q4_K_M</h1></div>
+<div class="two">
+  <div class="panel" style="padding:14px">
+    <div class="section-h" style="margin-top:0">下载源</div>
+    <div class="radio on"><strong>ModelScope</strong> — 国内访问推荐</div>
+    <div class="radio"><strong>hf-mirror</strong> — 无需访问 Hugging Face 官网</div>
+    <div class="section-h">文件 · 5.0 GB</div>
+    <p class="mono" style="font-size:11px">Qwen3-8B-Q4_K_M.gguf</p>
+    <div class="section-h">进度</div>
+    <p class="mono" style="font-size:11px">3.35 / 5.00 GB · 支持断点续传</p>
+    <div class="progress"><i></i></div>
   </div>
-  <div class="glass sidebar-panel">
-    <h3>步骤</h3>
+  <div class="panel side">
+    <div class="section-h" style="margin-top:0">步骤</div>
     <ol class="steps">
-      <li><span class="step-num done">✓</span><div><strong>选择源</strong><p class="sub">ModelScope</p></div></li>
-      <li><span class="step-num">2</span><div><strong>下载</strong><p class="sub">67% · 可取消</p></div></li>
-      <li><span class="step-num">3</span><div><strong>校验 SHA256</strong></div></li>
-      <li><span class="step-num">4</span><div><strong>加载模型</strong></div></li>
+      <li><span>✓</span> 已选 ModelScope</li>
+      <li><span>2</span> 下载中 67%</li>
+      <li><span>3</span> 校验文件</li>
+      <li><span>4</span> 加入本地模型库</li>
     </ol>
-    <button class="btn btn-outline" style="width:100%;margin-top:12px">取消下载</button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:8px">取消</button>
   </div>
 </div></div>
 </body>

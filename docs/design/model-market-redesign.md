@@ -1,9 +1,9 @@
 # 模型市场与本地模型管理 — 重设计规格
 
-> **版本**：2026-10-16-draft  
+> **版本**：2026-10-16-rev2（推理工程师把关修订）  
 > **范围**：仅设计交付（`docs/design/` + 静态 HTML 稿），不含应用实现。  
-> **设计系统**：沿用 [DESIGN.md](../DESIGN.md) Zenith v3.0（Inter、8px 栅格、玻璃态卡片、蓝紫渐变主色）。  
-> **关联能力（本分支）**：`ggufKvCacheEstimate.ts`、`modelMemoryEstimate.ts`、`kvCacheTypes.ts`、工作模式上下文守卫、llama.cpp 后端 lite/cpu/cuda 策略。
+> **设计系统**：沿用 [DESIGN.md](../DESIGN.md) Zenith v3.0；本模块视觉密度参考 **LM Studio / Ollama 桌面端**（紧凑列表、少大面积留白、主操作每屏 1 个强调色按钮即可）。  
+> **实现可复用（不对用户暴露名词）**：客户端显存/KV 估算与 GPU 放置策略（`modelMemoryEstimate`、`llamacppModelGpuPlacement` 等）。
 
 ---
 
@@ -36,9 +36,9 @@
 | 问题 | 证据 / 影响 |
 | --- | --- |
 | **目录侧 deviceFit 过粗** | 用户反馈权重×1.3 估显存；客户端虽有 `estimateLlamaCppModelMemory`，UI 未展示 KV cache 量化（cache_type_k/v）与 GGUF 元数据置信度。 |
-| **双 GPU 未进入用户叙事** | `MarketplaceHardwareProfile.isDualGpu` 与 `llamacppModelGpuPlacement` 存在，市场 UI 仅显示 GPU 数量与总显存字符串。 |
-| **tokens/s 缺失** | 无「预估区间 + 实测校准」展示位；不利于对比量化档与硬件档。 |
-| **工作模式上下文守卫不可见** | `llamacppWorkModeContextGuard` 在 Agent 选模型时提示，本地推理页未前置「Work 模式建议 ≥32K」等约束。 |
+| **双 GPU 叙事错误风险** | 易误导为默认 tensor/layer split；正确策略是 **单卡能放下则不分卡**，第二卡留给并行第二模型。 |
+| **tokens/s 缺失或随意** | 需基于显存带宽公式估算并标注「估算」，禁止拍脑袋区间。 |
+| **技术术语直出 UI** | 内部模块名、守卫、探针等不应出现在默认视图。 |
 | **能力扩展点未预留** | mmproj、语音、视频生成等无统一 **Capability Rail**（图标 + 依赖说明 + 最低显存档）。 |
 
 ### 0.4 视觉与一致性
@@ -54,12 +54,12 @@
 
 ## 1. 设计目标与原则
 
-1. **先读懂本机，再推荐模型**：首页顶部固定「本机推理档案」（硬件、后端版本、空闲显存、推荐工作模式上下文）。
-2. **可解释的流畅度**：任何「能跑/不能跑」必须展开为 **权重显存 + KV cache + 上下文 + 双卡切分 + 余量**；tokens/s 给区间并标注置信度。
-3. **任务优先，能力可扩展**：市场按 **任务/能力** 分区，预留 OCR/VLM、ASR/TTS、视频（16GB 档）栏目。
-4. **下载路径国情化**：默认 ModelScope，可选 hf-mirror；展示断点续传、校验、磁盘路径。
-5. **管理页像「控制台」**：已装模型 = 资产清单 + 运行态 + 参数预设 + 一键诊断。
-6. **视觉**：Zenith 玻璃态 + 紧凑桌面密度；技术数据用 **等宽数字列 + 横向堆叠条**，避免 Popover 藏关键信息。
+1. **先读懂本机，再推荐模型**：顶部「本机档案」+ **GPU 分配视图**（哪张卡跑哪个模型、各占多少）。
+2. **默认人话，详细折叠**：结论三件套 — **流畅 / 可用 / 不推荐** + 一句理由 + **预计速度（估算）**；技术分解仅在「详细」内。
+3. **双卡策略（P0）**：单卡可放下 → `split-mode: none` + 指定 `main-gpu`；第二卡预留给 **并行** 的 embedding / OCR / ASR 或第二个对话实例；**仅当单卡显存不足** 才跨卡 layer split（并明确提示速度会受 PCIe 影响）。
+4. **tokens/s**：按显存带宽公式计算，UI 一律带「估算」；安装后可写入实测校准。
+5. **精选来自硬件档策展表**（SQLite 种子），示例族以 **Qwen3** 等当前主流为主，不用过时型号充精选。
+6. **视觉**：紧凑列表 + 均衡信息密度；渐变主按钮仅保留每页 1 个主 CTA，其余 outline/ghost。
 
 ---
 
@@ -78,8 +78,9 @@
 │   │   ├── 「为本机推荐」列表（fit ≥ good）
 │   │   └── 全库搜索 + 筛选
 │   ├── 模型详情（全页或宽 Drawer，非 Popover）
-│   │   ├── 概述 / 许可 / 运行时证据
-│   │   ├── 量化版本表 + 流畅度估算
+│   │   ├── 默认：结论 + 预计速度（估算）
+│   │   ├── 「详细」：显存分解、GPU 放置、带宽公式说明
+│   │   ├── 量化版本表
 │   │   └── 下载 CTA
 │   └── 下载面板（侧栏或步骤页）
 │       ├── 源：ModelScope | hf-mirror
@@ -104,11 +105,26 @@
 | --- | --- |
 | 后端 | `CPU + Vulkan/Metal` / `CUDA sm_89 (RTX 40)` / `Lite（未安装）` |
 | GPU | 名称 × 数量；每卡 **总/已用/空闲** 显存条 |
-| 内存 | 64 GB 总量 + 可用于 CPU offload 提示 |
-| 工作模式 | Work 建议上下文（如 32K）与当前守卫状态 |
+| 内存 | 64 GB 总量；**仅当存在 CPU offload 时** 显示 offload 占用，全 GPU 时写「未使用 CPU 卸载」 |
+| 常用上下文 | 用户上次或推荐值（如 32K），不用内部模式名 |
 | 操作 | 「重新检测」「运行时设置」「诊断」 |
 
-**双卡展示**：两块 GPU 迷你卡并列；模型详情中的切分策略标注 **Tensor Split / 按层**（与 `llamacppModelGpuPlacement` 对齐）。
+### 3.1 GPU 分配视图（双卡 P0）
+
+**本地模型页与市场详情「详细」区必含**，Ollama 式「哪张卡在跑什么」：
+
+| GPU | 当前模型 | 占用 | 策略 |
+| --- | --- | --- | --- |
+| GPU 0 · RTX 4060 Ti 16GB | Qwen3-8B-Instruct Q4_K_M | 6.3 / 16 GB | 单卡完整加载（无跨卡切分） |
+| GPU 1 · RTX 4060 Ti 16GB | Qwen3-Embedding-0.6B | 0.6 / 16 GB | 并行第二模型 |
+| GPU 1 | （空闲） | 0.1 / 16 GB | 可再加载一个 7B 级模型 |
+
+**放置规则（实现）**：
+
+1. 若 `weights + KV(context) + buffer ≤ 单卡可用显存` → 整模上 **一张卡**，`split-mode none`，记录 `main-gpu`。
+2. 若双卡且第二任务为 embedding/OCR/ASR 等 → **独立进程/实例** 绑 GPU1，不与主模型争用 PCIe split。
+3. 若仅当步骤 1 失败 → **layer split** 跨卡，UI 结论降为「可用」并提示：「跨显卡切分，生成速度可能下降」。
+4. **禁止**在步骤 1 成立时默认 tensor split（跨卡通信拖慢 decode）。
 
 ---
 
@@ -121,12 +137,12 @@
 - **能力分区（Capability Rail）** — `FluidTabs` 大号 + 横向滚动 chip：
   - 对话 · 推理 · 代码 · **视觉/OCR** · 向量 · **语音 ASR/TTS** · **视频生成（16GB+）**
   - 未支持的能力：chip 置灰 + 「即将推出」；点击仍可见预告说明（非空页）。
-- **「为本机精选」**：横向卡片 carousel（3–4 张），每张含：适配徽章、推荐量化、预估 tokens/s 区间。
-- **主列表**：双列网格（≥1280）/ 单列（窄窗）；卡片简化：
-  - 行1：图标 + 名称 + 发布者
-  - 行2：能力 tags（最多 3）
-  - 行3：**流畅度条**（绿/黄/红）+ 推荐量化 + 主按钮「查看详情」
-  - 移除：Popover 详情、卡片内量化下拉（下沉到详情页）
+- **「为本机精选」**：数据来自 **硬件档策展表**（见 §14），横向紧凑条（3–4 项），每项：结论徽章 + 一句理由 + `约 XX–YY tok/s（估算）` + 推荐量化。
+- **主列表**：**高密度行列表**（LM Studio 风格，≥1280 可双列行块），每行：
+  - 左：名称 + 参数量 · 发布者
+  - 中：能力 tags（≤3）+ 推荐量化
+  - 右：结论 + 预计速度（估算）+ 文本链「详情」
+  - 无 Popover、无卡片内量化下拉
 
 ### 4.2 筛选
 
@@ -150,31 +166,34 @@
 
 ## 5. 模型详情页
 
-### 5.1 结构
+### 5.1 默认视图（非技术用户）
 
-1. **Hero**：名称、参数量、架构、许可、星级（可选折叠「为何推荐」）。
-2. **本机流畅度（核心）**
-   - 总评：流畅 / 需降上下文 / 不支持
-   - **显存预算堆叠条**（水平 100% = 可用 VRAM）：
-     - 段1：权重（GPU 驻留比例，可拖 gpu-layers 预设：全 GPU / 混合 / CPU）
-     - 段2：KV cache（随上下文滑块 4K–128K 变化，读 `estimateKvBytesPerTokenFromGgufShape`）
-     - 段3：运行时缓冲（~3% + 固定底）
-   - **数字表**：VRAM 估算 / 系统内存 / 推荐上下文 / 双卡切分说明
-   - **tokens/s 区间**：如「18–28 tok/s（Q4_K_M，双 4060 Ti 16GB，置信度 B）」— 目录 benchmark + 实测占位
-3. **量化版本表**（默认 sort：推荐 > 体积）
+1. **Hero**：名称、参数量、许可。
+2. **本机结论（首屏唯一重点）**
+   - 徽章：**流畅** / **可用** / **不推荐**
+   - **一句人话**：例：「在 GPU 0 单卡可完整加载，GPU 1 仍可同时跑向量模型。」
+   - **预计速度**：`约 35–45 tok/s（估算）` — 必须来自 §8.3 公式
+   - 次要：推荐量化 · 推荐上下文 · 文件大小
+3. **量化版本表**（推荐行标 ★）
 
-| 量化 | 文件大小 | 本机 VRAM | 流畅度 | 操作 |
+| 量化 | 文件大小 | 结论 | 预计速度（估算） |  |
 | --- | --- | --- | --- | --- |
-| Q4_K_M ★ | 5.1 GB | 6.2 GB | 流畅 | 下载 |
-| Q5_K_M | 6.0 GB | … | 可玩 | 下载 |
+| Q4_K_M ★ | 5.0 GB | 流畅 | 35–45 tok/s | 下载 |
 
-4. **运行时证据**：GGUF 校验、chat template、tool calling、mmproj 行
-5. **Sticky Footer**：主按钮「下载并安装」· 次按钮「仅加入愿望单」（可选）
+4. **Sticky Footer**：唯一渐变/实心主色按钮「下载并安装」
 
-### 5.2 上下文交互
+### 5.2 「详细」折叠区（技术）
 
-- 滑块联动 KV 段与 `recommendedContext`
-- 超出工作模式守卫时显示 inline warning（链接到 Work 模式说明）
+- **GPU 分配**：每卡模型名 + 权重/KV/缓冲堆叠条（权重 GB ≈ GGUF 文件大小，不另造「4.2G 权重 + 5.1G 文件」）
+- **放置策略**：单卡 / 跨卡 layer split（及原因）
+- **系统内存**：全 GPU 时显示「未使用 CPU 卸载」；有 offload 才列出 MiB
+- **上下文滑块**：联动 KV 重新估算
+- **速度怎么来的**：展示带宽公式与代入值（见 §8.3）
+- **兼容与校验**（原「运行时证据」改名）：文件校验、对话模板、工具调用、视觉附件等 — 不用「探针」「GGUF 元数据 API」等措辞
+
+### 5.3 上下文过长时
+
+- 人话提示：「上下文调太高可能装不下，建议降到 XXK。」
 
 静态稿：`mockups/model-detail-*.html`。
 
@@ -236,23 +255,56 @@
 
 ## 8. 估算与数据契约（实现指引）
 
-### 8.1 流畅度引擎（客户端）
+### 8.1 显存与放置（客户端）
 
-复用并暴露 UI：
+- **权重大小**：默认等于所选 GGUF **文件大小**（分片则求和）；全 GPU 加载时 **权重显存 ≈ 文件大小**。
+- **KV + 缓冲**：由上下文长度、KV 量化与模型结构估算（实现复用现有 memory estimate，不对用户展示模块名）。
+- **放置**：先判单卡是否足够 → 足够则 `split-mode none`；不足再 layer split 并降级结论文案。
+
+### 8.2 示例数字自洽（双 4060 Ti 16GB · Qwen3-8B-Instruct · Q4_K_M · 32K）
+
+| 项 | 值 |
+| --- | --- |
+| 文件大小 | 5.0 GB |
+| GPU0 权重 | 5.0 GB |
+| GPU0 KV（32K） | ~1.0 GB |
+| GPU0 缓冲 | ~0.3 GB |
+| GPU0 合计 | ~6.3 GB / 16 GB → **流畅**，单卡 |
+| GPU1 | Embedding 0.6B ~0.6 GB 或空闲 |
+| CPU 卸载 | **无**（0） |
+
+### 8.3 tokens/s 带宽估算（UI 必须标注「估算」）
+
+**Decode 阶段近似（带宽受限）**：
 
 ```text
-estimateLlamaCppModelMemory({
-  modelSizeBytes,
-  contextSize,
-  cacheTypeK, cacheTypeV,
-  kvBytesPerToken,  // from GGUF when available
-  gpuWeightFraction // from placement policy
-})
+effective_bandwidth_GBps = gpu_memory_bandwidth_GBps × η
+decode_tok_per_s ≈ effective_bandwidth_GBps × 1024³ / bytes_read_per_token
 ```
 
-**双卡**：`totalVramMiB` 求和用于 fit ratio；详情页展示 **per-GPU 分配**（来自 `llamacppModelGpuPlacement`）。
+- **η（效率系数）**：默认 **0.6**（内核/量化/批大小等综合折损，可随实测校准）。
+- **bytes_read_per_token**：带宽瓶颈时近似取 **当前加载的 GGUF 权重体积（字节）**（与文件大小一致；更精细实现可按层/缓存命中修正，但 UI 仍标「估算」）。
+- **硬件峰值带宽（GDDR6 参考）**：
 
-### 8.2 目录增强（zhiyuanBackend / 种子 SQLite）
+| GPU 档 | 带宽 (GB/s) | η=0.6 有效带宽 |
+| --- | --- | --- |
+| RTX 4060M | 256 | 153.6 |
+| RTX 4060 Ti 16GB | 288 | 172.8 |
+| RTX 4090M | 576 | 345.6 |
+
+**示例（Qwen3-8B Q4_K_M，文件 5.0 GB，单卡 4060 Ti）**：
+
+```text
+decode_tok_per_s ≈ 172.8 × 1024³ / (5.0 × 1024³) ≈ 34.6 tok/s
+```
+
+UI 展示区间 **35–45 tok/s（估算）**：中心值 ±~15% 覆盖 KV/批大小/驱动波动；**禁止**无公式依据的整数。
+
+**跨卡 layer split**：在带宽估算基础上再乘 **0.55–0.75** 惩罚系数（PCIe），结论文案同步降级。
+
+**有实测**：安装后 benchmark 写入 `measured_tok_per_s`，UI 优先显示「实测 XX tok/s」，估算退居次要。
+
+### 8.4 目录增强（zhiyuanBackend / 种子 SQLite）
 
 建议扩展 `CatalogModel`（设计层，非本 PR 实现）：
 
@@ -261,11 +313,12 @@ estimateLlamaCppModelMemory({
 - `benchmarkTokensPerSec[]`：`{ quant, hardwareTier, p50, p90, source }`
 - `ggufMeta`: layer/head 供 KV 精确估算
 
-### 8.3 tokens/s 展示规则
+### 8.5 tokens/s 展示规则（产品）
 
-- 有 benchmark → 显示区间 `[p50, p90]`，置信度 A/B
-- 无 benchmark →  heuristic 区间 + 置信度 C + 「安装后实测」CTA
-- 禁止伪造精确单值
+- 默认：**带宽公式区间 + 「估算」** 后缀
+- 有实测：**实测优先**，估算折叠
+- 跨卡 split：必须提示速度可能下降
+- 禁止精确单值冒充实测
 
 ---
 
@@ -307,9 +360,10 @@ estimateLlamaCppModelMemory({
 
 ## 11. 无障碍与 i18n
 
-- 流畅度不仅靠颜色：图标 + 文案（流畅/可玩/勉强）
-- 所有估算附「如何计算」链接（打开解释 Drawer，非外链 HF）
-- 用户可见字符串走 `t()`；技术单位 GB/MiB 与现有 `formatBytes` 一致
+- 结论不仅靠颜色：图标 + **流畅 / 可用 / 不推荐** 文案
+- 「估算」速度在默认视图可见；公式仅在「详细 → 速度怎么来的」
+- 禁止用户可见 copy 出现：Work 模式守卫、ggufKvCacheEstimate、tensor split、运行时证据 等内部词；改用「跨显卡切分」「文件校验」「对话模板」等
+- 用户可见字符串走 `t()`；GB 与 `formatBytes` 一致
 
 ---
 
@@ -335,7 +389,9 @@ estimateLlamaCppModelMemory({
 ## 13. 落地检查清单（实现 PR 时用）
 
 - [ ] 进入市场即见精选，无需先搜索
-- [ ] 详情页可解释显存分解与双卡
+- [ ] 单卡可放时不跨卡；GPU 分配视图正确
+- [ ] 详情默认人话；技术仅在「详细」
+- [ ] tokens/s 来自带宽公式且标「估算」
 - [ ] 下载可选 ModelScope / hf-mirror
 - [ ] 本地模型页展示运行显存与诊断
 - [ ] lite / 无 GPU / 目录失败 空态齐全
@@ -344,12 +400,29 @@ estimateLlamaCppModelMemory({
 
 ---
 
-## 14. 附录：典型硬件预设（产品档）
+## 14. 附录：硬件档与精选策展表
 
-| 档位 ID | 配置 | 市场默认筛选 |
+客户端检测硬件 → **映射最近档位** → 市场「为本机精选」**只读该表**，不临时打分凑数。
+
+### 14.1 档位定义
+
+| 档位 ID | 配置 | 带宽 (GB/s) ×2 |
 | --- | --- | --- |
-| `dual-mobile-4060-8g` | 64GB + 2×RTX 4060M 8GB | 7B–14B Q4；32K 上下文需提示 KV |
-| `dual-4090-16g` | 64GB + 2×4090M 16GB | 32B Q4/Q5；Work 32K 流畅 |
-| `dual-4060ti-16g` | 64GB + 2×16GB 4060 Ti 级 | 中间档推荐 |
+| `dual-mobile-4060-8g` | 64GB + 2×RTX 4060M 8GB | 256 |
+| `dual-4060ti-16g` | 64GB + 2×16GB 4060 Ti 级 | 288 |
+| `dual-4090-16g` | 64GB + 2×4090M 16GB | 576 |
 
-客户端检测到的硬件 **映射到最近档位**，用于 benchmark 与 copy 文案，而非仅 base/pro。
+### 14.2 策展表示例（`dual-4060ti-16g`）
+
+| 槽位 | 模型（目录 ID 占位） | 角色 | 推荐量化 | 默认 GPU |
+| --- | --- | --- | --- | --- |
+| 主对话 | `qwen3-8b-instruct-gguf` | 通用对话/代码 | Q4_K_M | GPU 0 单卡 |
+| 并行向量 | `qwen3-embedding-0.6b-gguf` | 记忆/检索 embedding | Q8_0 | GPU 1 |
+| 进阶对话 | `qwen3-14b-instruct-gguf` | 更强推理 | Q4_K_M | GPU 0 单卡（~10GB 级） |
+| 小模型 | `qwen3-4b-instruct-gguf` | 低延迟 | Q4_K_M | GPU 0 或 1 |
+
+**4060M 8GB 档**：主槽推荐 `qwen3-4b` / `qwen3-8b` Q4；`qwen3-14b` 标 **可用** 且提示「需跨卡切分或降上下文」— 非精选首屏。
+
+### 14.3 静态稿示例硬件
+
+静态 HTML 统一模拟 **`dual-4060ti-16g`**，数字与 §8.2、§8.3 一致。

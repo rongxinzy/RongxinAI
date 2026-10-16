@@ -8,164 +8,177 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 13px; line-height: 1.5;
-  color: #0A1628;
-  background: #FAFBFD;
+  font-size: 13px; line-height: 1.45;
+  color: #0F172A;
+  background: #F4F5F7;
   min-height: 100vh;
 }
 .mono { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 12px; }
-.app { max-width: 1280px; margin: 0 auto; padding: 24px 32px 48px; }
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.header h1 { font-size: 20px; font-weight: 600; }
-.header-actions { display: flex; gap: 8px; align-items: center; }
+.app { max-width: 1180px; margin: 0 auto; padding: 12px 20px 32px; }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.toolbar h1 { font-size: 18px; font-weight: 600; flex: 1; }
 .search {
-  width: 280px; height: 32px; padding: 0 12px; border-radius: 8px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: rgba(255,255,255,0.9);
-  color: inherit;
+  width: 240px; height: 30px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid #E2E5EB; background: #FFFFFF; color: inherit; font-size: 12px;
 }
 .btn {
-  height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 500;
+  height: 30px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;
 }
-.btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
-  box-shadow: 0 4px 12px rgba(59,130,246,0.25);
+.btn-solid {
+  background: #2563EB; color: #fff; border: none;
 }
-.btn-outline {
-  background: transparent;
-  border: 1px solid rgba(0,0,0,0.1);
-  color: inherit;
+.btn-ghost {
+  background: #FFFFFF; border: 1px solid #E2E5EB; color: inherit;
 }
-.glass {
-  background: rgba(255,255,255,0.92);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(0,0,0,0.06);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+.panel {
+  background: #FFFFFF; border: 1px solid #E2E5EB; border-radius: 8px;
 }
-.profile { padding: 16px 20px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
-.profile-meta { display: flex; flex-wrap: wrap; gap: 16px 24px; }
-.profile-item label { display: block; font-size: 11px; color: #A0AEC0; margin-bottom: 4px; }
-.profile-item strong { font-size: 13px; }
-.gpu-bars { display: flex; gap: 12px; }
-.gpu-mini { width: 140px; }
-.bar-track { height: 6px; border-radius: 3px; background: #E2E8F0; overflow: hidden; margin-top: 6px; }
-.bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3B82F6, #8B5CF6); }
-.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.profile {
+  padding: 10px 14px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
+}
+.profile-row { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 12px; }
+.profile-row dt { color: #64748B; margin-bottom: 2px; }
+.gpu-alloc { margin-top: 10px; width: 100%; }
+.gpu-alloc table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.gpu-alloc th { text-align: left; color: #64748B; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid #E2E5EB; }
+.gpu-alloc td { padding: 8px; border-bottom: 1px solid #E2E5EB; vertical-align: middle; }
+.vram-bar { height: 5px; border-radius: 2px; background: #E2E8F0; margin-top: 4px; overflow: hidden; }
+.vram-bar i { display: block; height: 100%; background: #2563EB; border-radius: 2px; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
 .tab {
-  height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px;
-  border: 1px solid rgba(0,0,0,0.08);
-  background: rgba(255,255,255,0.6);
-  color: #4A5568;
+  height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px;
+  border: 1px solid #E2E5EB; background: #FFFFFF; color: #64748B;
 }
-.tab.active {
-  background: #fff;
-  color: #0A1628;
-  border-color: rgba(59,130,246,0.35);
+.tab.on { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+.tab.dim { opacity: 0.5; }
+.section-h { font-size: 12px; font-weight: 600; color: #64748B; text-transform: none; margin: 12px 0 6px; letter-spacing: 0.02em; }
+.pick-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 6px; }
+.pick {
+  flex: 0 0 220px; padding: 10px 12px; border: 1px solid #E2E5EB; border-radius: 8px; background: #FFFFFF;
 }
-.tab.disabled { opacity: 0.45; }
-.section-title { font-size: 15px; font-weight: 600; margin: 20px 0 12px; }
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.card { padding: 16px 18px; }
-.card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-.card .sub { font-size: 12px; color: #4A5568; margin-bottom: 10px; }
-.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: #F1F5F9; color: #4A5568; }
-.fit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.fit-bar { flex: 1; height: 8px; border-radius: 4px; background: #E2E8F0; overflow: hidden; display: flex; }
-.seg-w { width: 45%; background: #3B82F6; }
-.seg-k { width: 30%; background: #8B5CF6; }
-.seg-b { width: 10%; background: #94A3B8; }
-.badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
-.badge-ok { background: #D1FAE5; color: #047857; }
-.badge-warn { background: #FEF3C7; color: #B45309; }
-.badge-muted { background: #F1F5F9; color: #64748B; }
-.carousel { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
-.carousel .card { min-width: 260px; flex-shrink: 0; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,0.06); }
-th { font-size: 11px; font-weight: 500; color: #A0AEC0; }
-.stack-bar { height: 24px; border-radius: 8px; overflow: hidden; display: flex; margin: 12px 0; }
-.stack-bar span { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
-.s-w { background: #3B82F6; flex: 4.2; }
-.s-k { background: #8B5CF6; flex: 2.1; }
-.s-b { background: #64748B; flex: 0.5; }
-.s-free { flex: 1.2; background: #E2E8F0; color: #64748B; }
-.two-col { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
-.sidebar-panel { padding: 20px; position: sticky; top: 24px; }
-.steps { list-style: none; }
-.steps li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(0,0,0,0.06); }
-.step-num { width: 24px; height: 24px; border-radius: 50%; background: #EFF6FF; color: #2563EB; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
-.step-num.done { background: #D1FAE5; color: #059669; }
-.progress { height: 8px; border-radius: 4px; background: #E2E8F0; overflow: hidden; margin-top: 8px; }
-.progress > div { height: 100%; background: linear-gradient(90deg, #3B82F6, #8B5CF6); width: 67%; }
-.radio-group { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-.radio { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.08); }
-.radio.selected { border-color: rgba(59,130,246,0.5); background: rgba(59,130,246,0.04); }
-.banner { padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.banner-warn { background: #FFFBEB; border: 1px solid #FDE68A; }
+.pick strong { font-size: 13px; display: block; }
+.pick p { font-size: 11px; color: #64748B; margin: 4px 0 6px; line-height: 1.35; }
+.model-list { border: 1px solid #E2E5EB; border-radius: 8px; overflow: hidden; background: #FFFFFF; }
+.model-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid #E2E5EB; font-size: 12px;
+}
+.model-row:last-child { border-bottom: none; }
+.model-row:hover { background: #F8FAFC; }
+.model-name { font-weight: 600; font-size: 13px; }
+.model-meta { color: #64748B; font-size: 11px; margin-top: 2px; }
+.tags { display: inline-flex; gap: 4px; margin-top: 4px; }
+.tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: #F1F5F9; color: #64748B; }
+.badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.b-ok { background: #DCFCE7; color: #166534; }
+.b-mid { background: #FEF9C3; color: #854D0E; }
+.b-no { background: #FEE2E2; color: #B91C1C; }
+.link { color: #2563EB; font-size: 12px; text-decoration: none; }
+.conclusion-box { padding: 14px 16px; margin-bottom: 10px; }
+.conclusion-box h2 { font-size: 16px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.conclusion-box .lead { font-size: 13px; margin-bottom: 8px; }
+.conclusion-box .speed { font-size: 14px; font-weight: 600; }
+.conclusion-box .hint { font-size: 11px; color: #64748B; margin-top: 4px; }
+details { margin-top: 10px; border: 1px solid #E2E5EB; border-radius: 8px; padding: 0 12px 12px; background: #FFFFFF; }
+summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 12px; color: #64748B; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.stack { height: 18px; border-radius: 4px; overflow: hidden; display: flex; margin: 8px 0; font-size: 9px; color: #fff; }
+.sw { background: #2563EB; flex: 5; display:flex;align-items:center;justify-content:center; }
+.sk { background: #6366F1; flex: 1; display:flex;align-items:center;justify-content:center; }
+.sb { background: #64748B; flex: 0.3; }
+table.data { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid #E2E5EB; text-align: left; }
+table.data th { color: #64748B; font-weight: 500; }
+.two { display: grid; grid-template-columns: 1fr 280px; gap: 12px; }
+.side { padding: 12px 14px; }
+.steps { list-style: none; font-size: 12px; }
+.steps li { padding: 8px 0; border-bottom: 1px solid #E2E5EB; display: flex; gap: 8px; }
+.progress { height: 6px; background: #E2E8F0; border-radius: 3px; margin-top: 6px; }
+.progress i { display: block; height: 100%; width: 67%; background: #2563EB; border-radius: 3px; }
+.radio { border: 1px solid #E2E5EB; border-radius: 6px; padding: 10px; margin: 6px 0; font-size: 12px; }
+.radio.on { border-color: #2563EB; background: #F0F7FF; }
+.banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
 .banner-info { background: #EFF6FF; border: 1px solid #BFDBFE; }
-.empty { text-align: center; padding: 48px 24px; }
-.empty h2 { font-size: 17px; margin-bottom: 8px; }
-.empty p { color: #4A5568; max-width: 420px; margin: 0 auto 20px; }
-.footer-sticky { margin-top: 24px; padding: 16px 20px; display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; }
-.mock-label { position: fixed; top: 8px; right: 8px; font-size: 10px; opacity: 0.5; }
+.banner-warn { background: #FFFBEB; border: 1px solid #FDE68A; }
+.empty { text-align: center; padding: 36px 20px; }
+.mock-label { position: fixed; top: 6px; right: 8px; font-size: 10px; color: #64748B; }
 </style>
 </head>
 <body>
-<span class="mock-label">静态稿 · 浅色</span>
+<span class="mock-label">静态稿 · 浅色 · dual-4060ti-16g</span>
 <div class="app">
-<div class="header">
+<div class="toolbar">
   <h1>本地模型</h1>
-  <div class="header-actions">
-    <span class="mono" style="color:#888">磁盘占用 42.3 GB</span>
-    <button class="btn btn-outline">导入 GGUF</button>
-    <button class="btn btn-primary">前往模型市场</button>
-  </div>
+  <span class="mono" style="font-size:11px;color:#64748B">磁盘 38.2 GB</span>
+  <button class="btn btn-ghost">导入</button>
+  <button class="btn btn-ghost">模型市场</button>
 </div>
 
-<div class="glass profile">
-  <div class="profile-meta">
-    <div class="profile-item"><label>推理后端</label><strong>CUDA · llama-server b9244 · sm_89</strong></div>
-    <div class="profile-item"><label>系统内存</label><strong class="mono">64 GB</strong></div>
-    <div class="profile-item"><label>Work 模式建议上下文</label><strong class="mono">32K</strong></div>
-    <div class="gpu-bars">
-      <div class="gpu-mini"><label style="font-size:11px;color:var(--m,#888)">GPU 0 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:18%"></div></div><span class="mono" style="font-size:11px">2.9 / 16 GB 空闲</span></div>
-      <div class="gpu-mini"><label style="font-size:11px">GPU 1 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:12%"></div></div><span class="mono" style="font-size:11px">14.1 / 16 GB 空闲</span></div>
+<div class="panel profile">
+  <div>
+    <div class="profile-row">
+      <div><dt>推理引擎</dt><dd>CUDA · b9244</dd></div>
+      <div><dt>内存</dt><dd class="mono">64 GB</dd></div>
+      <div><dt>常用上下文</dt><dd class="mono">32K</dd></div>
+    </div>
+    <div class="gpu-alloc">
+      <div class="section-h" style="margin-top:8px">GPU 分配</div>
+      <table>
+        <tr><th>显卡</th><th>模型</th><th>占用</th><th>说明</th></tr>
+        <tr>
+          <td>GPU 0 · 4060 Ti 16GB<div class="vram-bar"><i style="width:39%"></i></div></td>
+          <td>Qwen3-8B Q4_K_M</td>
+          <td class="mono">6.3 / 16 GB</td>
+          <td>单卡加载，无跨卡切分</td>
+        </tr>
+        <tr>
+          <td>GPU 1 · 4060 Ti 16GB<div class="vram-bar"><i style="width:4%"></i></div></td>
+          <td>Qwen3-Embedding-0.6B</td>
+          <td class="mono">0.6 / 16 GB</td>
+          <td>并行向量模型</td>
+        </tr>
+      </table>
     </div>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="btn btn-outline">重新检测</button>
-    <button class="btn btn-outline">诊断 · 导出 JSON</button>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <button class="btn btn-ghost">重新检测</button>
+    <button class="btn btn-ghost">诊断</button>
   </div>
 </div>
-<div class="glass card">
-  <table>
-    <tr><th>模型</th><th>大小</th><th>状态</th><th>显存</th><th>上下文</th><th>操作</th></tr>
+<div class="panel">
+  <table class="data">
+    <tr><th>模型</th><th>文件</th><th>状态</th><th>显卡</th><th>占用</th><th>上下文</th><th></th></tr>
     <tr>
-      <td><strong>Qwen3-8B-Instruct</strong><br/><span class="mono" style="font-size:11px;color:#888">Q4_K_M</span></td>
-      <td class="mono">5.1 GB</td>
-      <td><span class="badge badge-ok">运行中</span></td>
-      <td class="mono">6.8 / 32 GB</td>
+      <td><strong>Qwen3-8B-Instruct</strong><br/><span style="font-size:11px;color:#64748B">Q4_K_M</span></td>
+      <td class="mono">5.0 GB</td>
+      <td><span class="badge b-ok">运行中</span></td>
+      <td class="mono">GPU 0</td>
+      <td class="mono">6.3 GB</td>
       <td class="mono">32K</td>
-      <td><button class="btn btn-outline">卸载</button> <button class="btn btn-primary">设置</button></td>
+      <td><button class="btn btn-ghost">卸载</button></td>
     </tr>
     <tr>
-      <td><strong>DeepSeek-R1-7B</strong></td>
-      <td class="mono">4.8 GB</td>
-      <td><span class="badge badge-muted">未加载</span></td>
-      <td class="mono">—</td>
-      <td class="mono">16K</td>
-      <td><button class="btn btn-primary">加载</button></td>
+      <td><strong>Qwen3-Embedding-0.6B</strong></td>
+      <td class="mono">0.6 GB</td>
+      <td><span class="badge b-ok">运行中</span></td>
+      <td class="mono">GPU 1</td>
+      <td class="mono">0.6 GB</td>
+      <td class="mono">8K</td>
+      <td><button class="btn btn-ghost">卸载</button></td>
+    </tr>
+    <tr>
+      <td><strong>Qwen3-14B-Instruct</strong></td>
+      <td class="mono">8.6 GB</td>
+      <td><span class="badge" style="background:#334155;color:#94A3B8">未加载</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td class="mono">32K</td>
+      <td><button class="btn btn-solid">加载</button></td>
     </tr>
   </table>
 </div>
-<div class="glass card" style="margin-top:16px">
-  <h3>服务与并发</h3>
-  <p class="sub">llama-server · 端口 8081 · 并发 slot 2 · 默认 keep-alive 30 分钟</p>
-  <button class="btn btn-outline" style="margin-top:8px">打开启动日志</button>
+<div class="panel" style="margin-top:10px;padding:12px 14px;font-size:12px;color:#64748B">
+  本地服务运行中 · 已加载 2 个模型 · 第二卡可用于并行小模型，无需把主模型切到两张卡
 </div></div>
 </body>
 </html>

@@ -6,114 +6,108 @@ const dir = path.dirname(new URL(import.meta.url).pathname);
 
 function css(theme) {
   const light = theme === 'light';
+  const bg = light ? '#F4F5F7' : '#0C0F14';
+  const surface = light ? '#FFFFFF' : '#151922';
+  const border = light ? '#E2E5EB' : '#252A35';
+  const muted = light ? '#64748B' : '#94A3B8';
   return `
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: Inter, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  font-size: 13px; line-height: 1.5;
-  color: ${light ? '#0A1628' : '#E8EBF0'};
-  background: ${light ? '#FAFBFD' : '#0A0E1A'};
+  font-size: 13px; line-height: 1.45;
+  color: ${light ? '#0F172A' : '#E2E8F0'};
+  background: ${bg};
   min-height: 100vh;
 }
 .mono { font-family: 'JetBrains Mono', Menlo, monospace; font-size: 12px; }
-.app { max-width: 1280px; margin: 0 auto; padding: 24px 32px 48px; }
-.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-.header h1 { font-size: 20px; font-weight: 600; }
-.header-actions { display: flex; gap: 8px; align-items: center; }
+.app { max-width: 1180px; margin: 0 auto; padding: 12px 20px 32px; }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.toolbar h1 { font-size: 18px; font-weight: 600; flex: 1; }
 .search {
-  width: 280px; height: 32px; padding: 0 12px; border-radius: 8px;
-  border: 1px solid ${light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'};
-  background: ${light ? 'rgba(255,255,255,0.9)' : 'rgba(30,35,50,0.9)'};
-  color: inherit;
+  width: 240px; height: 30px; padding: 0 10px; border-radius: 6px;
+  border: 1px solid ${border}; background: ${surface}; color: inherit; font-size: 12px;
 }
 .btn {
-  height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer;
-  font-size: 13px; font-weight: 500;
+  height: 30px; padding: 0 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;
 }
-.btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, ${light ? '#3B82F6' : '#60A5FA'} 0%, ${light ? '#8B5CF6' : '#A78BFA'} 100%);
-  box-shadow: 0 4px 12px ${light ? 'rgba(59,130,246,0.25)' : 'rgba(96,165,250,0.3)'};
+.btn-solid {
+  background: ${light ? '#2563EB' : '#3B82F6'}; color: #fff; border: none;
 }
-.btn-outline {
-  background: transparent;
-  border: 1px solid ${light ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)'};
-  color: inherit;
+.btn-ghost {
+  background: ${surface}; border: 1px solid ${border}; color: inherit;
 }
-.glass {
-  background: ${light ? 'rgba(255,255,255,0.92)' : 'rgba(20,24,36,0.88)'};
-  backdrop-filter: blur(12px);
-  border: 1px solid ${light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'};
-  border-radius: 12px;
-  box-shadow: 0 4px 12px ${light ? 'rgba(0,0,0,0.06)' : 'rgba(0,0,0,0.35)'};
+.panel {
+  background: ${surface}; border: 1px solid ${border}; border-radius: 8px;
 }
-.profile { padding: 16px 20px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
-.profile-meta { display: flex; flex-wrap: wrap; gap: 16px 24px; }
-.profile-item label { display: block; font-size: 11px; color: ${light ? '#A0AEC0' : '#4A5568'}; margin-bottom: 4px; }
-.profile-item strong { font-size: 13px; }
-.gpu-bars { display: flex; gap: 12px; }
-.gpu-mini { width: 140px; }
-.bar-track { height: 6px; border-radius: 3px; background: ${light ? '#E2E8F0' : '#1E293B'}; overflow: hidden; margin-top: 6px; }
-.bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3B82F6, #8B5CF6); }
-.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.profile {
+  padding: 10px 14px; margin-bottom: 10px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start;
+}
+.profile-row { display: flex; flex-wrap: wrap; gap: 14px 20px; font-size: 12px; }
+.profile-row dt { color: ${muted}; margin-bottom: 2px; }
+.gpu-alloc { margin-top: 10px; width: 100%; }
+.gpu-alloc table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.gpu-alloc th { text-align: left; color: ${muted}; font-weight: 500; padding: 6px 8px; border-bottom: 1px solid ${border}; }
+.gpu-alloc td { padding: 8px; border-bottom: 1px solid ${border}; vertical-align: middle; }
+.vram-bar { height: 5px; border-radius: 2px; background: ${light ? '#E2E8F0' : '#334155'}; margin-top: 4px; overflow: hidden; }
+.vram-bar i { display: block; height: 100%; background: ${light ? '#2563EB' : '#60A5FA'}; border-radius: 2px; }
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 10px; }
 .tab {
-  height: 28px; padding: 0 12px; border-radius: 999px; font-size: 12px;
-  border: 1px solid ${light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'};
-  background: ${light ? 'rgba(255,255,255,0.6)' : 'rgba(30,35,50,0.6)'};
-  color: ${light ? '#4A5568' : '#A0AEC0'};
+  height: 26px; padding: 0 10px; border-radius: 6px; font-size: 12px;
+  border: 1px solid ${border}; background: ${surface}; color: ${muted};
 }
-.tab.active {
-  background: ${light ? '#fff' : 'rgba(96,165,250,0.15)'};
-  color: ${light ? '#0A1628' : '#E8EBF0'};
-  border-color: ${light ? 'rgba(59,130,246,0.35)' : 'rgba(96,165,250,0.4)'};
+.tab.on { background: ${light ? '#EFF6FF' : '#1E3A5F'}; color: ${light ? '#1D4ED8' : '#93C5FD'}; border-color: ${light ? '#BFDBFE' : '#2563EB'}; }
+.tab.dim { opacity: 0.5; }
+.section-h { font-size: 12px; font-weight: 600; color: ${muted}; text-transform: none; margin: 12px 0 6px; letter-spacing: 0.02em; }
+.pick-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 6px; }
+.pick {
+  flex: 0 0 220px; padding: 10px 12px; border: 1px solid ${border}; border-radius: 8px; background: ${surface};
 }
-.tab.disabled { opacity: 0.45; }
-.section-title { font-size: 15px; font-weight: 600; margin: 20px 0 12px; }
-.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.card { padding: 16px 18px; }
-.card h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-.card .sub { font-size: 12px; color: ${light ? '#4A5568' : '#A0AEC0'}; margin-bottom: 10px; }
-.tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.tag { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: ${light ? '#F1F5F9' : '#1E293B'}; color: ${light ? '#4A5568' : '#A0AEC0'}; }
-.fit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.fit-bar { flex: 1; height: 8px; border-radius: 4px; background: ${light ? '#E2E8F0' : '#1E293B'}; overflow: hidden; display: flex; }
-.seg-w { width: 45%; background: #3B82F6; }
-.seg-k { width: 30%; background: #8B5CF6; }
-.seg-b { width: 10%; background: #94A3B8; }
-.badge { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 6px; }
-.badge-ok { background: ${light ? '#D1FAE5' : 'rgba(52,211,153,0.15)'}; color: ${light ? '#047857' : '#34D399'}; }
-.badge-warn { background: ${light ? '#FEF3C7' : 'rgba(251,191,36,0.15)'}; color: ${light ? '#B45309' : '#FBBF24'}; }
-.badge-muted { background: ${light ? '#F1F5F9' : '#1E293B'}; color: ${light ? '#64748B' : '#94A3B8'}; }
-.carousel { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
-.carousel .card { min-width: 260px; flex-shrink: 0; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid ${light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}; }
-th { font-size: 11px; font-weight: 500; color: ${light ? '#A0AEC0' : '#64748B'}; }
-.stack-bar { height: 24px; border-radius: 8px; overflow: hidden; display: flex; margin: 12px 0; }
-.stack-bar span { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; }
-.s-w { background: #3B82F6; flex: 4.2; }
-.s-k { background: #8B5CF6; flex: 2.1; }
-.s-b { background: #64748B; flex: 0.5; }
-.s-free { flex: 1.2; background: ${light ? '#E2E8F0' : '#334155'}; color: ${light ? '#64748B' : '#94A3B8'}; }
-.two-col { display: grid; grid-template-columns: 1fr 320px; gap: 20px; }
-.sidebar-panel { padding: 20px; position: sticky; top: 24px; }
-.steps { list-style: none; }
-.steps li { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid ${light ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.08)'}; }
-.step-num { width: 24px; height: 24px; border-radius: 50%; background: ${light ? '#EFF6FF' : 'rgba(96,165,250,0.2)'}; color: ${light ? '#2563EB' : '#60A5FA'}; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
-.step-num.done { background: ${light ? '#D1FAE5' : 'rgba(52,211,153,0.2)'}; color: ${light ? '#059669' : '#34D399'}; }
-.progress { height: 8px; border-radius: 4px; background: ${light ? '#E2E8F0' : '#1E293B'}; overflow: hidden; margin-top: 8px; }
-.progress > div { height: 100%; background: linear-gradient(90deg, #3B82F6, #8B5CF6); width: 67%; }
-.radio-group { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
-.radio { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 8px; border: 1px solid ${light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)'}; }
-.radio.selected { border-color: ${light ? 'rgba(59,130,246,0.5)' : 'rgba(96,165,250,0.5)'}; background: ${light ? 'rgba(59,130,246,0.04)' : 'rgba(96,165,250,0.08)'}; }
-.banner { padding: 14px 18px; border-radius: 10px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.banner-warn { background: ${light ? '#FFFBEB' : 'rgba(251,191,36,0.12)'}; border: 1px solid ${light ? '#FDE68A' : 'rgba(251,191,36,0.3)'}; }
-.banner-info { background: ${light ? '#EFF6FF' : 'rgba(96,165,250,0.12)'}; border: 1px solid ${light ? '#BFDBFE' : 'rgba(96,165,250,0.3)'}; }
-.empty { text-align: center; padding: 48px 24px; }
-.empty h2 { font-size: 17px; margin-bottom: 8px; }
-.empty p { color: ${light ? '#4A5568' : '#A0AEC0'}; max-width: 420px; margin: 0 auto 20px; }
-.footer-sticky { margin-top: 24px; padding: 16px 20px; display: flex; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; }
-.mock-label { position: fixed; top: 8px; right: 8px; font-size: 10px; opacity: 0.5; }
+.pick strong { font-size: 13px; display: block; }
+.pick p { font-size: 11px; color: ${muted}; margin: 4px 0 6px; line-height: 1.35; }
+.model-list { border: 1px solid ${border}; border-radius: 8px; overflow: hidden; background: ${surface}; }
+.model-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center;
+  padding: 10px 14px; border-bottom: 1px solid ${border}; font-size: 12px;
+}
+.model-row:last-child { border-bottom: none; }
+.model-row:hover { background: ${light ? '#F8FAFC' : '#1A2030'}; }
+.model-name { font-weight: 600; font-size: 13px; }
+.model-meta { color: ${muted}; font-size: 11px; margin-top: 2px; }
+.tags { display: inline-flex; gap: 4px; margin-top: 4px; }
+.tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: ${light ? '#F1F5F9' : '#1E293B'}; color: ${muted}; }
+.badge { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; white-space: nowrap; }
+.b-ok { background: ${light ? '#DCFCE7' : '#14532D'}; color: ${light ? '#166534' : '#86EFAC'}; }
+.b-mid { background: ${light ? '#FEF9C3' : '#713F12'}; color: ${light ? '#854D0E' : '#FDE047'}; }
+.b-no { background: ${light ? '#FEE2E2' : '#7F1D1D'}; color: ${light ? '#B91C1C' : '#FCA5A5'}; }
+.link { color: ${light ? '#2563EB' : '#60A5FA'}; font-size: 12px; text-decoration: none; }
+.conclusion-box { padding: 14px 16px; margin-bottom: 10px; }
+.conclusion-box h2 { font-size: 16px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.conclusion-box .lead { font-size: 13px; margin-bottom: 8px; }
+.conclusion-box .speed { font-size: 14px; font-weight: 600; }
+.conclusion-box .hint { font-size: 11px; color: ${muted}; margin-top: 4px; }
+details { margin-top: 10px; border: 1px solid ${border}; border-radius: 8px; padding: 0 12px 12px; background: ${surface}; }
+summary { cursor: pointer; padding: 10px 0; font-weight: 600; font-size: 12px; color: ${muted}; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+.stack { height: 18px; border-radius: 4px; overflow: hidden; display: flex; margin: 8px 0; font-size: 9px; color: #fff; }
+.sw { background: #2563EB; flex: 5; display:flex;align-items:center;justify-content:center; }
+.sk { background: #6366F1; flex: 1; display:flex;align-items:center;justify-content:center; }
+.sb { background: #64748B; flex: 0.3; }
+table.data { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+table.data th, table.data td { padding: 8px 10px; border-bottom: 1px solid ${border}; text-align: left; }
+table.data th { color: ${muted}; font-weight: 500; }
+.two { display: grid; grid-template-columns: 1fr 280px; gap: 12px; }
+.side { padding: 12px 14px; }
+.steps { list-style: none; font-size: 12px; }
+.steps li { padding: 8px 0; border-bottom: 1px solid ${border}; display: flex; gap: 8px; }
+.progress { height: 6px; background: ${light ? '#E2E8F0' : '#334155'}; border-radius: 3px; margin-top: 6px; }
+.progress i { display: block; height: 100%; width: 67%; background: #2563EB; border-radius: 3px; }
+.radio { border: 1px solid ${border}; border-radius: 6px; padding: 10px; margin: 6px 0; font-size: 12px; }
+.radio.on { border-color: #2563EB; background: ${light ? '#F0F7FF' : '#172554'}; }
+.banner { padding: 10px 14px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; }
+.banner-info { background: ${light ? '#EFF6FF' : '#1E3A5F'}; border: 1px solid ${light ? '#BFDBFE' : '#2563EB'}; }
+.banner-warn { background: ${light ? '#FFFBEB' : '#422006'}; border: 1px solid ${light ? '#FDE68A' : '#CA8A04'}; }
+.empty { text-align: center; padding: 36px 20px; }
+.mock-label { position: fixed; top: 6px; right: 8px; font-size: 10px; color: ${muted}; }
 `;
 }
 
@@ -127,218 +121,233 @@ function wrap(theme, title, body) {
 <style>${css(theme)}</style>
 </head>
 <body>
-<span class="mock-label">静态稿 · ${theme === 'light' ? '浅色' : '深色'}</span>
+<span class="mock-label">静态稿 · ${theme === 'light' ? '浅色' : '深色'} · dual-4060ti-16g</span>
 <div class="app">${body}</div>
 </body>
 </html>`;
 }
 
-const profileBlock = `
-<div class="glass profile">
-  <div class="profile-meta">
-    <div class="profile-item"><label>推理后端</label><strong>CUDA · llama-server b9244 · sm_89</strong></div>
-    <div class="profile-item"><label>系统内存</label><strong class="mono">64 GB</strong></div>
-    <div class="profile-item"><label>Work 模式建议上下文</label><strong class="mono">32K</strong></div>
-    <div class="gpu-bars">
-      <div class="gpu-mini"><label style="font-size:11px;color:var(--m,#888)">GPU 0 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:18%"></div></div><span class="mono" style="font-size:11px">2.9 / 16 GB 空闲</span></div>
-      <div class="gpu-mini"><label style="font-size:11px">GPU 1 · RTX 4060 Ti 16GB</label><div class="bar-track"><div class="bar-fill" style="width:12%"></div></div><span class="mono" style="font-size:11px">14.1 / 16 GB 空闲</span></div>
+const gpuAllocBlock = `
+<div class="panel profile">
+  <div>
+    <div class="profile-row">
+      <div><dt>推理引擎</dt><dd>CUDA · b9244</dd></div>
+      <div><dt>内存</dt><dd class="mono">64 GB</dd></div>
+      <div><dt>常用上下文</dt><dd class="mono">32K</dd></div>
+    </div>
+    <div class="gpu-alloc">
+      <div class="section-h" style="margin-top:8px">GPU 分配</div>
+      <table>
+        <tr><th>显卡</th><th>模型</th><th>占用</th><th>说明</th></tr>
+        <tr>
+          <td>GPU 0 · 4060 Ti 16GB<div class="vram-bar"><i style="width:39%"></i></div></td>
+          <td>Qwen3-8B Q4_K_M</td>
+          <td class="mono">6.3 / 16 GB</td>
+          <td>单卡加载，无跨卡切分</td>
+        </tr>
+        <tr>
+          <td>GPU 1 · 4060 Ti 16GB<div class="vram-bar"><i style="width:4%"></i></div></td>
+          <td>Qwen3-Embedding-0.6B</td>
+          <td class="mono">0.6 / 16 GB</td>
+          <td>并行向量模型</td>
+        </tr>
+      </table>
     </div>
   </div>
-  <div style="display:flex;gap:8px">
-    <button class="btn btn-outline">重新检测</button>
-    <button class="btn btn-outline">一键诊断</button>
+  <div style="display:flex;flex-direction:column;gap:6px">
+    <button class="btn btn-ghost">重新检测</button>
+    <button class="btn btn-ghost">诊断</button>
   </div>
 </div>`;
 
 const pages = {
-  'marketplace-home': (theme) =>
+  'marketplace-home': theme =>
     wrap(
       theme,
-      '模型市场首页',
+      '模型市场',
       `
-<div class="header">
+<div class="toolbar">
   <h1>模型市场</h1>
-  <div class="header-actions">
-    <input class="search" placeholder="搜索模型、发布者、标签…" />
-    <button class="btn btn-outline">下载队列 · 1</button>
-  </div>
+  <input class="search" placeholder="搜索模型…" />
+  <button class="btn btn-ghost">下载 1</button>
 </div>
-${profileBlock}
+${gpuAllocBlock}
 <div class="tabs">
-  <span class="tab active">全部</span><span class="tab">对话</span><span class="tab">推理</span><span class="tab">代码</span>
-  <span class="tab">视觉 / OCR</span><span class="tab">向量</span><span class="tab disabled">语音 · 即将推出</span>
-  <span class="tab disabled">视频 · 16GB+</span>
+  <span class="tab on">全部</span><span class="tab">对话</span><span class="tab">推理</span><span class="tab">代码</span>
+  <span class="tab">视觉</span><span class="tab">向量</span><span class="tab dim">语音</span><span class="tab dim">视频</span>
 </div>
-<p class="section-title">为本机精选</p>
-<div class="carousel">
-  <div class="glass card"><h3>Qwen3-8B-Instruct</h3><p class="sub">Qwen · 对话 / 代码</p><span class="badge badge-ok">流畅</span> <span class="mono" style="margin-left:8px">22–30 tok/s · Q4_K_M</span></div>
-  <div class="glass card"><h3>DeepSeek-R1-Distill-7B</h3><p class="sub">推理专用</p><span class="badge badge-ok">流畅</span> <span class="mono" style="margin-left:8px">18–26 tok/s</span></div>
-  <div class="glass card"><h3>Qwen2.5-VL-7B</h3><p class="sub">视觉 · 需 mmproj</p><span class="badge badge-warn">可玩</span> <span class="mono" style="margin-left:8px">12–18 tok/s</span></div>
+<div class="section-h">为本机精选 · 档 dual-4060ti-16g</div>
+<div class="pick-row">
+  <div class="pick"><strong>Qwen3-8B-Instruct</strong><p>主对话；GPU 0 单卡即可。</p><span class="badge b-ok">流畅</span> <span class="mono" style="margin-left:6px;font-size:11px">约 35–45 tok/s（估算）</span></div>
+  <div class="pick"><strong>Qwen3-Embedding-0.6B</strong><p>放 GPU 1，与主模型并行。</p><span class="badge b-ok">流畅</span></div>
+  <div class="pick"><strong>Qwen3-14B-Instruct</strong><p>更强；单卡约 10GB 级占用。</p><span class="badge b-mid">可用</span> <span class="mono" style="font-size:11px">约 18–24 tok/s（估算）</span></div>
+  <div class="pick"><strong>Qwen3-4B-Instruct</strong><p>低延迟备选。</p><span class="badge b-ok">流畅</span></div>
 </div>
-<p class="section-title">全部模型</p>
-<div class="grid">
-  <div class="glass card">
-    <h3>Qwen3-14B-GGUF</h3><p class="sub">ModelScope · Apache-2.0</p>
-    <div class="tags"><span class="tag">对话</span><span class="tag">工具调用</span></div>
-    <div class="fit-row"><div class="fit-bar"><div class="seg-w"></div><div class="seg-k"></div><div class="seg-b"></div></div><span class="badge badge-warn">可玩</span></div>
-    <p class="mono" style="font-size:11px;color:#888;margin-bottom:12px">推荐 Q4_K_M · 预估 VRAM 11.2 GB / 32K 上下文</p>
-    <button class="btn btn-primary" style="width:100%">查看详情</button>
+<div class="section-h">全部模型</div>
+<div class="model-list">
+  <div class="model-row">
+    <div><div class="model-name">Qwen3-8B-Instruct</div><div class="model-meta">8B · Qwen · 推荐 Q4_K_M · 5.0 GB</div><div class="tags"><span class="tag">对话</span><span class="tag">代码</span></div></div>
+    <div><span class="badge b-ok">流畅</span><div class="mono" style="font-size:11px;color:#64748B;margin-top:4px">35–45 tok/s（估算）</div></div>
+    <a class="link" href="#">详情 →</a>
   </div>
-  <div class="glass card">
-    <h3>Llama-3.1-8B-Instruct</h3><p class="sub">hf-mirror 同步</p>
-    <div class="tags"><span class="tag">对话</span></div>
-    <div class="fit-row"><div class="fit-bar"><div class="seg-w" style="width:35%"></div><div class="seg-k" style="width:25%"></div></div><span class="badge badge-ok">流畅</span></div>
-    <button class="btn btn-primary" style="width:100%">查看详情</button>
+  <div class="model-row">
+    <div><div class="model-name">Qwen3-14B-Instruct</div><div class="model-meta">14B · 推荐 Q4_K_M · 8.6 GB</div><div class="tags"><span class="tag">对话</span><span class="tag">推理</span></div></div>
+    <div><span class="badge b-mid">可用</span><div class="mono" style="font-size:11px;margin-top:4px">18–24 tok/s（估算）</div></div>
+    <a class="link" href="#">详情 →</a>
+  </div>
+  <div class="model-row">
+    <div><div class="model-name">Qwen3-4B-Instruct</div><div class="model-meta">4B · 推荐 Q4_K_M · 2.6 GB</div></div>
+    <div><span class="badge b-ok">流畅</span><div class="mono" style="font-size:11px;margin-top:4px">55–70 tok/s（估算）</div></div>
+    <a class="link" href="#">详情 →</a>
+  </div>
+  <div class="model-row">
+    <div><div class="model-name">Qwen3-32B-Instruct</div><div class="model-meta">32B · Q4_K_M · 19 GB</div></div>
+    <div><span class="badge b-no">不推荐</span><div class="mono" style="font-size:11px;margin-top:4px">单卡放不下</div></div>
+    <a class="link" href="#">详情 →</a>
   </div>
 </div>`,
     ),
 
-  'model-detail': (theme) =>
+  'model-detail': theme =>
     wrap(
       theme,
       '模型详情',
       `
-<div class="header"><h1>Qwen3-8B-Instruct · GGUF</h1><button class="btn btn-outline">← 返回市场</button></div>
-${profileBlock}
-<div class="two-col">
-  <div>
-    <div class="glass card" style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
-        <div><h3 style="font-size:17px">本机流畅度</h3><p class="sub">基于权重 + KV cache + 32K 上下文 · 双卡 tensor split</p></div>
-        <span class="badge badge-ok">流畅</span>
-      </div>
-      <div class="stack-bar"><span class="s-w">权重 4.2G</span><span class="s-k">KV 2.1G</span><span class="s-b">缓冲</span><span class="s-free">余量 9.7G</span></div>
-      <table>
-        <tr><th>项目</th><th>估算</th><th>说明</th></tr>
-        <tr><td>GPU 显存合计</td><td class="mono">6.8 GB</td><td>GPU0 3.6G + GPU1 3.2G 层切分</td></tr>
-        <tr><td>系统内存</td><td class="mono">1.4 GB</td><td>CPU offload 余量</td></tr>
-        <tr><td>上下文</td><td class="mono">32,768</td><td>符合 Work 模式守卫</td></tr>
-        <tr><td>tokens/s</td><td class="mono">22 – 30</td><td>置信度 B · 目录 benchmark</td></tr>
-      </table>
-      <p style="margin-top:12px;font-size:12px;color:#888">拖动上下文滑块可实时重算 KV 段（实现时绑定 ggufKvCacheEstimate）</p>
-      <input type="range" min="4096" max="131072" value="32768" style="width:100%;margin-top:8px" />
-    </div>
-    <div class="glass card">
-      <h3>量化版本</h3>
-      <table style="margin-top:12px">
-        <tr><th>量化</th><th>大小</th><th>VRAM</th><th>流畅度</th><th></th></tr>
-        <tr><td>Q4_K_M ★</td><td class="mono">5.1 GB</td><td class="mono">6.8 GB</td><td><span class="badge badge-ok">流畅</span></td><td><button class="btn btn-primary">下载</button></td></tr>
-        <tr><td>Q5_K_M</td><td class="mono">6.0 GB</td><td class="mono">7.9 GB</td><td><span class="badge badge-ok">流畅</span></td><td><button class="btn btn-outline">下载</button></td></tr>
-        <tr><td>Q8_0</td><td class="mono">8.4 GB</td><td class="mono">10.6 GB</td><td><span class="badge badge-warn">可玩</span></td><td><button class="btn btn-outline">下载</button></td></tr>
-      </table>
-    </div>
-  </div>
-  <div class="glass sidebar-panel">
-    <h3>运行时证据</h3>
-    <ul style="list-style:none;margin-top:12px;font-size:12px;line-height:2">
-      <li>✓ GGUF SHA256 已校验</li>
-      <li>✓ chat template 已文档化</li>
-      <li>◐ 工具调用 · 待探针</li>
-      <li>— mmproj 不适用</li>
-    </ul>
-    <div class="footer-sticky" style="position:static;padding:16px 0 0">
-      <button class="btn btn-primary" style="flex:1">下载并安装</button>
-    </div>
-  </div>
+<div class="toolbar"><h1>Qwen3-8B-Instruct</h1><button class="btn btn-ghost">← 返回</button></div>
+${gpuAllocBlock}
+<div class="panel conclusion-box">
+  <h2><span class="badge b-ok">流畅</span> 本机运行结论</h2>
+  <p class="lead">可在 <strong>GPU 0 单卡</strong>完整加载；GPU 1 仍可同时运行向量等小模型，<strong>无需跨显卡切分</strong>。</p>
+  <p class="speed">预计速度：约 35–45 tok/s（估算）</p>
+  <p class="hint">推荐 Q4_K_M · 文件 5.0 GB · 上下文 32K · CPU 卸载：无</p>
+</div>
+<details>
+  <summary>详细：显存、GPU 与速度计算</summary>
+  <p style="font-size:11px;color:#64748B;margin-top:8px">GPU 0 单卡 · split-mode none · main-gpu 0</p>
+  <div class="stack"><span class="sw">权重 5.0G</span><span class="sk">KV 1.0G</span><span class="sb"></span></div>
+  <table class="data">
+    <tr><th>项目</th><th>数值</th></tr>
+    <tr><td>GGUF 文件</td><td class="mono">5.0 GB（= GPU 权重）</td></tr>
+    <tr><td>KV（32K）</td><td class="mono">~1.0 GB</td></tr>
+    <tr><td>缓冲</td><td class="mono">~0.3 GB</td></tr>
+    <tr><td>GPU 0 合计</td><td class="mono">~6.3 GB</td></tr>
+    <tr><td>系统内存 offload</td><td>未使用 CPU 卸载</td></tr>
+  </table>
+  <p style="font-size:11px;margin-top:10px;line-height:1.5;color:#64748B">
+    速度估算：4060 Ti 带宽 288 GB/s × 效率 0.6 → 172.8 GB/s 有效；decode ≈ 172.8×1024³÷(5.0×1024³)≈34.6 tok/s，展示区间 35–45（估算）。
+  </p>
+  <p style="font-size:11px;margin-top:6px;color:#64748B">文件校验已通过 · 对话模板已收录 · 工具调用：待验证</p>
+</details>
+<div class="panel" style="margin-top:10px;padding:12px 14px">
+  <div class="section-h" style="margin:0 0 8px">量化版本</div>
+  <table class="data">
+    <tr><th>量化</th><th>文件</th><th>结论</th><th>速度（估算）</th><th></th></tr>
+    <tr><td>Q4_K_M ★</td><td class="mono">5.0 GB</td><td><span class="badge b-ok">流畅</span></td><td class="mono">35–45</td><td><button class="btn btn-ghost">下载</button></td></tr>
+    <tr><td>Q5_K_M</td><td class="mono">5.9 GB</td><td><span class="badge b-ok">流畅</span></td><td class="mono">30–38</td><td><button class="btn btn-ghost">下载</button></td></tr>
+    <tr><td>Q8_0</td><td class="mono">8.2 GB</td><td><span class="badge b-mid">可用</span></td><td class="mono">20–26</td><td><button class="btn btn-ghost">下载</button></td></tr>
+  </table>
+  <div style="margin-top:12px;text-align:right"><button class="btn btn-solid">下载并安装</button></div>
 </div>`,
     ),
 
-  download: (theme) =>
+  download: theme =>
     wrap(
       theme,
       '下载',
       `
-<div class="header"><h1>下载 Qwen3-8B · Q4_K_M</h1></div>
-<div class="two-col">
-  <div class="glass card">
-    <h3>选择下载源</h3>
-    <div class="radio-group">
-      <div class="radio selected"><input type="radio" checked /> <div><strong>ModelScope</strong><p class="sub" style="margin:0">国内访问稳定，推荐大多数用户</p></div></div>
-      <div class="radio"><input type="radio" /> <div><strong>hf-mirror</strong><p class="sub" style="margin:0">无需访问 huggingface.co，与目录 revision 对齐</p></div></div>
-    </div>
-    <h3 style="margin-top:20px">文件</h3>
-    <table style="margin-top:8px">
-      <tr><td class="mono">Qwen3-8B-Q4_K_M.gguf</td><td class="mono">5.1 GB</td><td><span class="badge badge-muted">等待</span></td></tr>
-    </table>
-    <h3 style="margin-top:20px">进度</h3>
-    <p class="mono">3.42 / 5.10 GB · 断点续传已启用</p>
-    <div class="progress"><div></div></div>
-    <p style="font-size:12px;margin-top:8px;color:#888">下一步：SHA256 校验 → 写入 模型库/modelscope/Qwen/…</p>
+<div class="toolbar"><h1>下载 · Qwen3-8B Q4_K_M</h1></div>
+<div class="two">
+  <div class="panel" style="padding:14px">
+    <div class="section-h" style="margin-top:0">下载源</div>
+    <div class="radio on"><strong>ModelScope</strong> — 国内访问推荐</div>
+    <div class="radio"><strong>hf-mirror</strong> — 无需访问 Hugging Face 官网</div>
+    <div class="section-h">文件 · 5.0 GB</div>
+    <p class="mono" style="font-size:11px">Qwen3-8B-Q4_K_M.gguf</p>
+    <div class="section-h">进度</div>
+    <p class="mono" style="font-size:11px">3.35 / 5.00 GB · 支持断点续传</p>
+    <div class="progress"><i></i></div>
   </div>
-  <div class="glass sidebar-panel">
-    <h3>步骤</h3>
+  <div class="panel side">
+    <div class="section-h" style="margin-top:0">步骤</div>
     <ol class="steps">
-      <li><span class="step-num done">✓</span><div><strong>选择源</strong><p class="sub">ModelScope</p></div></li>
-      <li><span class="step-num">2</span><div><strong>下载</strong><p class="sub">67% · 可取消</p></div></li>
-      <li><span class="step-num">3</span><div><strong>校验 SHA256</strong></div></li>
-      <li><span class="step-num">4</span><div><strong>加载模型</strong></div></li>
+      <li><span>✓</span> 已选 ModelScope</li>
+      <li><span>2</span> 下载中 67%</li>
+      <li><span>3</span> 校验文件</li>
+      <li><span>4</span> 加入本地模型库</li>
     </ol>
-    <button class="btn btn-outline" style="width:100%;margin-top:12px">取消下载</button>
+    <button class="btn btn-ghost" style="width:100%;margin-top:8px">取消</button>
   </div>
 </div>`,
     ),
 
-  'local-models': (theme) =>
+  'local-models': theme =>
     wrap(
       theme,
       '本地模型',
       `
-<div class="header">
+<div class="toolbar">
   <h1>本地模型</h1>
-  <div class="header-actions">
-    <span class="mono" style="color:#888">磁盘占用 42.3 GB</span>
-    <button class="btn btn-outline">导入 GGUF</button>
-    <button class="btn btn-primary">前往模型市场</button>
-  </div>
+  <span class="mono" style="font-size:11px;color:#64748B">磁盘 38.2 GB</span>
+  <button class="btn btn-ghost">导入</button>
+  <button class="btn btn-ghost">模型市场</button>
 </div>
-${profileBlock.replace('一键诊断', '诊断 · 导出 JSON')}
-<div class="glass card">
-  <table>
-    <tr><th>模型</th><th>大小</th><th>状态</th><th>显存</th><th>上下文</th><th>操作</th></tr>
+${gpuAllocBlock}
+<div class="panel">
+  <table class="data">
+    <tr><th>模型</th><th>文件</th><th>状态</th><th>显卡</th><th>占用</th><th>上下文</th><th></th></tr>
     <tr>
-      <td><strong>Qwen3-8B-Instruct</strong><br/><span class="mono" style="font-size:11px;color:#888">Q4_K_M</span></td>
-      <td class="mono">5.1 GB</td>
-      <td><span class="badge badge-ok">运行中</span></td>
-      <td class="mono">6.8 / 32 GB</td>
+      <td><strong>Qwen3-8B-Instruct</strong><br/><span style="font-size:11px;color:#64748B">Q4_K_M</span></td>
+      <td class="mono">5.0 GB</td>
+      <td><span class="badge b-ok">运行中</span></td>
+      <td class="mono">GPU 0</td>
+      <td class="mono">6.3 GB</td>
       <td class="mono">32K</td>
-      <td><button class="btn btn-outline">卸载</button> <button class="btn btn-primary">设置</button></td>
+      <td><button class="btn btn-ghost">卸载</button></td>
     </tr>
     <tr>
-      <td><strong>DeepSeek-R1-7B</strong></td>
-      <td class="mono">4.8 GB</td>
-      <td><span class="badge badge-muted">未加载</span></td>
-      <td class="mono">—</td>
-      <td class="mono">16K</td>
-      <td><button class="btn btn-primary">加载</button></td>
+      <td><strong>Qwen3-Embedding-0.6B</strong></td>
+      <td class="mono">0.6 GB</td>
+      <td><span class="badge b-ok">运行中</span></td>
+      <td class="mono">GPU 1</td>
+      <td class="mono">0.6 GB</td>
+      <td class="mono">8K</td>
+      <td><button class="btn btn-ghost">卸载</button></td>
+    </tr>
+    <tr>
+      <td><strong>Qwen3-14B-Instruct</strong></td>
+      <td class="mono">8.6 GB</td>
+      <td><span class="badge" style="background:#334155;color:#94A3B8">未加载</span></td>
+      <td>—</td>
+      <td>—</td>
+      <td class="mono">32K</td>
+      <td><button class="btn btn-solid">加载</button></td>
     </tr>
   </table>
 </div>
-<div class="glass card" style="margin-top:16px">
-  <h3>服务与并发</h3>
-  <p class="sub">llama-server · 端口 8081 · 并发 slot 2 · 默认 keep-alive 30 分钟</p>
-  <button class="btn btn-outline" style="margin-top:8px">打开启动日志</button>
+<div class="panel" style="margin-top:10px;padding:12px 14px;font-size:12px;color:#64748B">
+  本地服务运行中 · 已加载 2 个模型 · 第二卡可用于并行小模型，无需把主模型切到两张卡
 </div>`,
     ),
 
-  'empty-states': (theme) =>
+  'empty-states': theme =>
     wrap(
       theme,
-      '空态与引导',
+      '空态',
       `
-<div class="header"><h1>模型市场</h1></div>
+<div class="toolbar"><h1>模型市场</h1></div>
 <div class="banner banner-info">
-  <div><strong>Lite 版 · 尚未安装本地推理运行时</strong><p style="font-size:12px;margin-top:4px;opacity:0.85">仍可浏览目录；下载与加载需先安装 CPU 或 CUDA 版 llama.cpp b9244</p></div>
-  <button class="btn btn-primary">安装运行时</button>
+  <div>尚未安装本地推理组件，可先浏览精选；下载与运行需安装 CPU 或 CUDA 引擎。</div>
+  <button class="btn btn-solid">安装引擎</button>
 </div>
-<div class="glass empty">
-  <h2>目录暂时不可用</h2>
-  <p>无法连接 models.rongxzyai.com。您仍可使用内置 SQLite 精选包离线浏览；恢复后将自动同步更新。</p>
-  <button class="btn btn-primary">使用内置精选</button>
-  <button class="btn btn-outline" style="margin-left:8px">重试</button>
+<div class="panel empty">
+  <h2 style="font-size:16px;margin-bottom:8px">暂时连不上模型目录</h2>
+  <p style="font-size:12px;color:#64748B;max-width:400px;margin:0 auto 16px">可使用本机内置精选包继续浏览；网络恢复后会自动同步。</p>
+  <button class="btn btn-solid">使用内置精选</button>
+  <button class="btn btn-ghost" style="margin-left:6px">重试</button>
 </div>
-<div class="banner banner-warn" style="margin-top:24px">
-  <div><strong>未检测到 NVIDIA GPU</strong><p style="font-size:12px;margin-top:4px">CUDA 版模型无法加速；建议切换 CPU+Vulkan 后端或选择更小量化。</p></div>
-  <button class="btn btn-outline">切换 CPU 后端</button>
+<div class="banner banner-warn" style="margin-top:12px">
+  <div>未检测到 NVIDIA 显卡，CUDA 加速不可用。可改用 CPU 引擎或选择更小模型。</div>
+  <button class="btn btn-ghost">改用 CPU 引擎</button>
 </div>`,
     ),
 };
