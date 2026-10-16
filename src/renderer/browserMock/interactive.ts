@@ -19,7 +19,6 @@ import { LlamaCppModelLaunchLogSessionStatus } from '../../shared/llamacpp';
 import {
   mockActivityRuns,
   mockAgents,
-  mockApiConfig,
   mockCoworkConfig,
   mockMagpieCatalog,
   mockMcpServers,
@@ -229,8 +228,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime) {
         Promise.resolve(typeof navigator === 'undefined' ? 'en-US' : navigator.language),
       consumePendingLocalInferenceInstall: () => Promise.resolve(null),
     },
-    getApiConfig: () => Promise.resolve(mockApiConfig),
-    checkApiConfig: () => Promise.resolve({ hasConfig: true, config: mockApiConfig }),
+    checkApiConfig: () => Promise.resolve({ hasConfig: true, config: null }),
     getRecentCwds: () => Promise.resolve(mockWorkspaces.map(workspace => workspace.path)),
     window: {
       minimize: () => undefined,

@@ -14,13 +14,5 @@ export function createApi(runtime: BrowserMockRuntime): Window['electron']['api'
         data: null,
       };
     },
-    fetchModels: async _p0 => {
-      void _p0;
-      runtime.warnOnce('api.fetchModels');
-      return {
-        success: true,
-        models: [],
-      };
-    },
   };
 }

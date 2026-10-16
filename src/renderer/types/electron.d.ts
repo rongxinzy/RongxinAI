@@ -13,10 +13,6 @@ import type {
 } from '../../shared/cowork/constants';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import type {
-  ProviderModelDiscoveryRequest,
-  ProviderModelDiscoveryResult,
-} from '../../shared/providers';
-import type {
   LlamaCppCancelModelLoadResult,
   LlamaCppCancelInstallResult,
   LlamaCppGatewayLanTokenResult,
@@ -217,13 +213,6 @@ type CoworkConfigUpdate = Partial<
     | 'mcpNativeBridge'
   >
 >;
-
-interface CoworkApiConfig {
-  apiKey: string;
-  baseURL: string;
-  model: string;
-  apiType?: 'anthropic' | 'openai';
-}
 
 interface WindowState {
   isMaximized: boolean;
@@ -658,13 +647,10 @@ interface IElectronAPI {
       timeoutMs?: number;
       purpose?: import('../../shared/ipc/apiRequest').ApiRequestPurpose;
     }) => Promise<ApiResponse>;
-    fetchModels: (input: ProviderModelDiscoveryRequest) => Promise<ProviderModelDiscoveryResult>;
   };
-  getApiConfig: () => Promise<CoworkApiConfig | null>;
   checkApiConfig: (options?: {
     probeModel?: boolean;
-  }) => Promise<{ hasConfig: boolean; config: CoworkApiConfig | null; error?: string }>;
-  saveApiConfig: (config: CoworkApiConfig) => Promise<{ success: boolean; error?: string }>;
+  }) => Promise<{ hasConfig: boolean; config: null; error?: string }>;
   generateSessionTitle: (userInput: string | null) => Promise<string>;
   getRecentCwds: (limit?: number) => Promise<string[]>;
   appEvents: {

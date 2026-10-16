@@ -9,11 +9,7 @@ export function createCheckApiConfig(
     runtime.warnOnce('checkApiConfig');
     return {
       hasConfig: true,
-      config: {
-        apiKey: '',
-        baseURL: 'https://api.example.com/v1',
-        model: 'preview-model',
-      },
+      config: null,
     };
   };
 }
