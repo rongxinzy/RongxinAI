@@ -288,6 +288,38 @@ export function buildFallbackManifest(version = DEFAULT_RUNTIME_VERSION): LlamaC
         'cpu',
         `llama-${version}-bin-win-opencl-adreno-arm64.tar.gz`,
       ),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.MacX64,
+        'darwin',
+        'x64',
+        'cpu',
+        `llama-${version}-bin-macos-x64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.MacArm64,
+        'darwin',
+        'arm64',
+        'cpu',
+        `llama-${version}-bin-macos-arm64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.LinuxX64,
+        'linux',
+        'x64',
+        'cpu',
+        `llama-${version}-bin-ubuntu-x64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.LinuxArm64,
+        'linux',
+        'arm64',
+        'cpu',
+        `llama-${version}-bin-ubuntu-arm64.tar.gz`,
+      ),
     ],
   };
 }
