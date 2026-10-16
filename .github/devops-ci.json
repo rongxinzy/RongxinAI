@@ -1,16 +1,6 @@
 {
   "workflows": [
     {
-      "name": "Browser Preview Tests",
-      "path": ".github/workflows/browser-preview-test.yml",
-      "paths": [
-        "src/renderer/**",
-        "src/shared/**",
-        "vite.config.browser.ts",
-        "tests/browserPreview.test.ts"
-      ]
-    },
-    {
       "name": "Channel runtime smoke",
       "path": ".github/workflows/channel-runtime-smoke.yml",
       "branches": [
