@@ -68,6 +68,24 @@ jobs:
       - run: bun run apply:patches
       - name: Install Electron runtime
         run: node node_modules/electron/install.js
+      - name: Read pinned model runtime toolchain
+        id: model-runtime
+        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.model-runtime.outputs.go-version }}
+          cache: false
+      - name: Restore pinned model runtime build cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/magpie/modules
+            .cache/magpie/go-build
+          key: memory-model-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs') }}
+      - name: Build and verify pinned model runtime
+        run: |
+          bun run magpie:build --target linux-x64
+          bun run magpie:verify --target linux-x64
       - name: Build application for the memory regression scenario
         # Drop restored JS so Vite can emit a clean renderer, but keep the
         # TypeScript build info so the following compile reuses typecheck work.

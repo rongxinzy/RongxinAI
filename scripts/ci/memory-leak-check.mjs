@@ -1,4 +1,5 @@
-import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, readdir, copyFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -29,6 +30,9 @@ const thresholdFor = (baseline, absoluteTolerance) =>
   baseline + Math.max(absoluteTolerance, Math.round(baseline * 0.25));
 
 const resolveElectronExecutable = () => {
+  if (process.platform === 'win32') {
+    return path.join(projectDirectory, 'node_modules/electron/dist/electron.exe');
+  }
   if (process.platform === 'darwin') {
     return path.join(
       projectDirectory,
@@ -109,45 +113,83 @@ const runCycles = async page => {
 
 await mkdir(diagnosticsDirectory, { recursive: true });
 const isolatedHome = await mkdtemp(path.join(os.tmpdir(), 'zhiyuan-memory-leak-'));
-const electronApp = await electron.launch({
-  executablePath: resolveElectronExecutable(),
-  args: [projectDirectory, '--no-sandbox', '--js-flags=--expose-gc'],
-  env: {
-    ...process.env,
-    HOME: isolatedHome,
-    XDG_CACHE_HOME: path.join(isolatedHome, '.cache'),
-    XDG_CONFIG_HOME: path.join(isolatedHome, '.config'),
-    XDG_DATA_HOME: path.join(isolatedHome, '.local', 'share'),
-    ZHIYUAN_MEMORY_LEAK_TEST: '1',
-    ZHIYUAN_MEMORY_LEAK_TEST_USER_DATA: path.join(isolatedHome, 'user-data'),
-  },
+await Promise.all(
+  ['AppData/Roaming', 'AppData/Local', 'user-data'].map(directory =>
+    mkdir(path.join(isolatedHome, directory), { recursive: true }),
+  ),
+);
+const provider = createServer((request, response) => {
+  response.setHeader('Content-Type', 'application/json');
+  if (request.method === 'GET' && request.url === '/v1/models') {
+    response.end(JSON.stringify({ data: [{ id: 'memory-test-model', object: 'model' }] }));
+  } else {
+    response.writeHead(404);
+    response.end('{}');
+  }
 });
-
+await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve));
+let electronApp;
 try {
+  electronApp = await electron.launch({
+    executablePath: resolveElectronExecutable(),
+    args: [projectDirectory, '--no-sandbox', '--js-flags=--expose-gc'],
+    env: {
+      ...process.env,
+      HOME: isolatedHome,
+      USERPROFILE: isolatedHome,
+      APPDATA: path.join(isolatedHome, 'AppData', 'Roaming'),
+      LOCALAPPDATA: path.join(isolatedHome, 'AppData', 'Local'),
+      XDG_CACHE_HOME: path.join(isolatedHome, '.cache'),
+      XDG_CONFIG_HOME: path.join(isolatedHome, '.config'),
+      XDG_DATA_HOME: path.join(isolatedHome, '.local', 'share'),
+      ZHIYUAN_MEMORY_LEAK_TEST: '1',
+      ZHIYUAN_MEMORY_LEAK_TEST_USER_DATA: path.join(isolatedHome, 'user-data'),
+    },
+  });
+
   const page = await electronApp.firstWindow();
   await page
     .getByTestId('sidebar-new-conversation')
     .waitFor({ state: 'visible', timeout: 120_000 });
 
-  // The isolated profile has no model. Seed a local test-only model so the
-  // Cowork onboarding redirect does not replace the view-cycle benchmark.
-  const readiness = await page.evaluate(async () => {
-    const config = await window.electron.store.get('app_config');
-    await window.electron.store.set('app_config', {
-      ...config,
-      model: { defaultModel: 'memory-test-model', defaultModelProvider: 'custom_memorytest' },
-      providers: {
-        custom_memorytest: {
-          enabled: true,
-          apiKey: 'memory-test-key',
-          baseUrl: 'http://127.0.0.1:1/v1',
-          apiFormat: 'openai',
-          models: [{ id: 'memory-test-model', name: 'Memory Test Model' }],
-        },
-      },
+  // Use the same verified runtime, provider management API and selected catalog
+  // model as the product. No legacy config or readiness bypass is seeded.
+  const started = await page.evaluate(() => window.electron.magpie.start());
+  if (started.state !== 'running') throw new Error('Memory test model service did not start.');
+  const managementWindow = electronApp.waitForEvent('window');
+  await page.evaluate(() => window.electron.magpie.openManagement());
+  const management = await managementWindow;
+  await management.waitForLoadState('domcontentloaded');
+  const saved = await management.evaluate(async baseUrl => {
+    const response = await fetch('/api/provider/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 'memory-test',
+        from: 'memory-test',
+        name: 'Memory Test',
+        new: true,
+        chat: baseUrl,
+        responses: '',
+        anthropic: '',
+        key: 'memory-test-key',
+        models: ['memory-test-model'],
+        proxy: 'direct',
+        unredacted: true,
+        contexts: {},
+        outputs: {},
+        modelPrefs: {},
+        headers: {},
+        extraBody: {},
+        fallback: [],
+      }),
     });
-    return window.electron.checkApiConfig();
-  });
+    return response.ok;
+  }, `http://127.0.0.1:${provider.address().port}/v1`);
+  if (!saved) throw new Error('Memory test provider registration failed.');
+  await management.close();
+  await page.evaluate(() => window.electron.magpie.selectDefault('memory-test/memory-test-model'));
+  const readiness = await page.evaluate(() => window.electron.checkApiConfig());
   if (!readiness.hasConfig) throw new Error(`Memory test model setup failed: ${readiness.error}`);
 
   const baselineSnapshots = await takeSnapshots(electronApp, 'before');
@@ -194,6 +236,21 @@ try {
   }
 
   console.log(`Memory leak check passed after ${CYCLE_COUNT} Cowork view cycles.`);
+} catch (error) {
+  for (const entry of await readdir(isolatedHome, { recursive: true })) {
+    if (/main(?:-dev)?-.*\.log$/.test(entry)) {
+      await copyFile(
+        path.join(isolatedHome, entry),
+        path.join(diagnosticsDirectory, path.basename(entry)),
+      );
+    }
+  }
+  throw error;
 } finally {
-  await electronApp.close();
+  try {
+    await electronApp?.close();
+  } finally {
+    await new Promise(resolve => provider.close(resolve));
+    await rm(isolatedHome, { recursive: true, force: true });
+  }
 }
