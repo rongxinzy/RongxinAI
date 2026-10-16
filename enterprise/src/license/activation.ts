@@ -19,6 +19,7 @@ export class ZhiyuanLicenseActivation {
   #unsubscribe: (() => void) | null = null;
   #activationPromise: Promise<EntitlementTokenResponse | null> | null = null;
   #entitlement: EntitlementTokenResponse | null = null;
+  #generation = 0;
   #snapshot: LicenseSnapshot = emptySnapshot();
   readonly #listeners = new Set<() => void>();
 
@@ -35,8 +36,8 @@ export class ZhiyuanLicenseActivation {
   start(): void {
     if (this.#unsubscribe) return;
     this.#unsubscribe = this.#session.onDidChange(() => {
+      this.#clearEntitlement();
       if (this.#session.snapshot().status === 'authenticated') void this.activate();
-      else this.#clearEntitlement();
     });
     if (this.#session.snapshot().status === 'authenticated') void this.activate();
   }
@@ -61,14 +62,29 @@ export class ZhiyuanLicenseActivation {
 
   entitlement(): EntitlementTokenResponse | null {
     return this.#entitlement
-      ? { ...this.#entitlement, features: [...this.#entitlement.features] }
+      ? {
+          ...this.#entitlement,
+          features: [...this.#entitlement.features],
+          modelScopes: [...this.#entitlement.modelScopes],
+        }
       : null;
   }
 
-  refreshIfNeeded(now = Date.now()): Promise<EntitlementTokenResponse | null> {
+  async refreshIfNeeded(
+    now = Date.now(),
+    modelScopes: readonly string[] = [],
+  ): Promise<EntitlementTokenResponse | null> {
+    // A login-time exchange may still contain the previous catalog. Wait for
+    // it, then check its scopes before deciding whether to reuse it.
+    if (this.#activationPromise) await this.#activationPromise;
     const expiresAt = Date.parse(this.#entitlement?.expiresAt ?? '');
-    if (Number.isFinite(expiresAt) && expiresAt > now + ZHIYUAN_ENTITLEMENT_REFRESH_WINDOW_MS) {
-      return Promise.resolve(this.entitlement());
+    const coversModels = modelScopes.every(scope => this.#entitlement?.modelScopes.includes(scope));
+    if (
+      Number.isFinite(expiresAt) &&
+      expiresAt > now + ZHIYUAN_ENTITLEMENT_REFRESH_WINDOW_MS &&
+      coversModels
+    ) {
+      return this.entitlement();
     }
     return this.activate();
   }
@@ -76,9 +92,12 @@ export class ZhiyuanLicenseActivation {
   async activate(): Promise<EntitlementTokenResponse | null> {
     if (this.#session.snapshot().status !== 'authenticated') return null;
     if (this.#activationPromise) return this.#activationPromise;
+    const generation = this.#generation;
     this.#activationPromise = (async () => {
       try {
         const entitlement = await this.#client.activateEnterpriseLicense({});
+        if (generation !== this.#generation || this.#session.snapshot().status !== 'authenticated')
+          return null;
         this.#entitlement = entitlement;
         this.#snapshot = Object.freeze({
           status: LicenseStatus.Active,
@@ -93,17 +112,21 @@ export class ZhiyuanLicenseActivation {
         this.#emitChanged();
         return entitlement;
       } catch (error) {
-        this.#clearEntitlement();
-        this.#onError(error);
+        if (generation === this.#generation) {
+          this.#clearEntitlement();
+          this.#onError(error);
+        }
         return null;
       } finally {
-        this.#activationPromise = null;
+        if (generation === this.#generation) this.#activationPromise = null;
       }
     })();
     return this.#activationPromise;
   }
 
   #clearEntitlement(): void {
+    this.#generation++;
+    this.#activationPromise = null;
     this.#entitlement = null;
     this.#snapshot = emptySnapshot();
     this.#emitChanged();
