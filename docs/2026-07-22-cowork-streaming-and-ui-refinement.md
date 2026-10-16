@@ -1,5 +1,7 @@
 # 会话切换、流式输出与界面细节优化说明
 
+> **历史文档（2026-07-22）**：下文部分模块路径指当时并存的旧版 Agent runtime adapter；该路径已在后续迁移中删除，当前 Work/Chat 流式语义由 `piRuntimeAdapter.ts` 承担。保留原文供变更追溯。
+
 ## 1. 文档信息
 
 | 项目 | 内容 |
@@ -142,8 +144,7 @@
 
 | 模块 | 主要职责 |
 | --- | --- |
-| `src/main/libs/agentEngine/openclawRuntimeAdapter.ts` | 最终回答标记、最终同步元数据 |
-| `src/main/libs/agentEngine/piRuntimeAdapter.ts` | 思考/正文时序、独立计时、最终回答提升 |
+| `src/main/libs/agentEngine/piRuntimeAdapter.ts` | 思考/正文时序、独立计时、最终回答标记与提升（2026-08 起为唯一 Work runtime） |
 | `src/renderer/services/rafMessageUpdateBatcher.ts` | 按消息键合并单帧更新 |
 | `src/renderer/components/cowork/CoworkView.tsx` | Chat 流控制、取消、快照持久化 |
 | `src/renderer/store/slices/coworkSlice.ts` | 会话加载态与按会话流状态衔接 |
@@ -160,7 +161,7 @@
 - 思考耗时追踪器的分段累计、重复开始和未开始完成行为。
 - RAF 批处理器对不同消息、同一消息覆盖、丢弃和释放的行为。
 - Pi 运行时的思考结束前正文暂存、多个中间回答及最终回答提升。
-- OpenClaw 最终消息同步和最终回答元数据。
+- Pi runtime 最终回答元数据（撰写时另有已退役 adapter 路径，见文首说明）。
 - 执行状态识别、最终回答定位、思考/工具次数摘要。
 - 思考消息的流式、完成与耗时展示状态。
 - Chat IPC 对思考事件和正文事件的映射。
