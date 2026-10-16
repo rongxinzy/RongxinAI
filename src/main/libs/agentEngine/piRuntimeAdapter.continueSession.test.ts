@@ -70,10 +70,12 @@ describe('PiRuntimeAdapter', () => {
 
       adapter.stopSession('stopped-session');
 
-      const queuedControlActions = (
-        adapter as unknown as { queuedControlActions: Map<string, Array<() => Promise<void>>> }
-      ).queuedControlActions;
-      expect(queuedControlActions.has('stopped-session')).toBe(false);
+      const queue = (
+        adapter as unknown as {
+          queue: { queuedControlActions: Map<string, Array<() => Promise<void>>> };
+        }
+      ).queue;
+      expect(queue.queuedControlActions.has('stopped-session')).toBe(false);
       expect(action).not.toHaveBeenCalled();
     });
 
@@ -84,17 +86,19 @@ describe('PiRuntimeAdapter', () => {
 
       const sessions = adapter as unknown as {
         activeSessions: Map<string, { turnFailed: boolean }>;
-        flushFollowUpQueue(sessionId: string, active: unknown): Promise<void>;
-        queuedControlActions: Map<string, Array<() => Promise<void>>>;
+        queue: {
+          queuedControlActions: Map<string, Array<() => Promise<void>>>;
+          flushFollowUpQueue(sessionId: string, active: unknown): Promise<void>;
+        };
       };
       const active = sessions.activeSessions.get('failed-session');
       if (!active) throw new Error('The test session was not registered.');
       // Pi sets turnFailed when a settled run surfaces a deferred error.
       active.turnFailed = true;
 
-      await sessions.flushFollowUpQueue('failed-session', active);
+      await sessions.queue.flushFollowUpQueue('failed-session', active);
 
-      expect(sessions.queuedControlActions.has('failed-session')).toBe(false);
+      expect(sessions.queue.queuedControlActions.has('failed-session')).toBe(false);
       expect(action).not.toHaveBeenCalled();
     });
   });

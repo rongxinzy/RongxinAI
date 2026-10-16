@@ -12,7 +12,6 @@
     "src/main/coworkStore.ts": 2066,
     "src/main/im/imCoworkHandler.ts": 1319,
     "src/main/ipcHandlers/llamacpp.ts": 1592,
-    "src/main/libs/agentEngine/piRuntimeAdapter.ts": 2664,
     "src/main/libs/coworkUtil.ts": 1672,
     "src/main/libs/llamacppBackendManager.ts": 1722,
     "src/main/libs/llamacppManager.test.ts": 1157,
