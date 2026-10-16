@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "f074996d93b87b17ea682c4b5951d52794bb28cb",
+  "toolchain": "go1.26.8",
+  "targets": {
+    "linux-x64": {
+      "sha256": "03b780f1348934c5afbc91f6cc405d7b89e9defa8fd59bd960eaae61c7d9b0d2",
+      "sizeBytes": 46719138
+    },
+    "linux-arm64": {
+      "sha256": "e234b38725ea6ec06445f9dbd2ab3ecfe85b8ddcdbee53000183ad44c98237bf",
+      "sizeBytes": 42664098
+    },
+    "darwin-x64": {
+      "sha256": "0b9d23e5a932bcd61414bb6ec6bff8f923ab851dcbaee47e561fd6a30aa13f8b",
+      "sizeBytes": 47354704
+    },
+    "darwin-arm64": {
+      "sha256": "0afeb478147a192675c5f3d7de925d18ca7d667c9c41f54fdee616ca35db3fce",
+      "sizeBytes": 43613170
+    },
+    "win32-x64": {
+      "sha256": "d078b41bf02af2cbfb6401f68c6fb19d0833ff1f261822012329984f80ed3cee",
+      "sizeBytes": 47214592
+    },
+    "win32-arm64": {
+      "sha256": "fe716e7a2f31afa0f368e4a7e1f576ae1a5d23863ebec844bd6c746d001be3ec",
+      "sizeBytes": 42749440
+    }
+  }
+}

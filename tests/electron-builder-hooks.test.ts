@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import {
+  beforePack,
   configureMacAutoUpdateMetadata,
   packWindowsResourceComponent7z,
 } from '../scripts/electron-builder-hooks.cjs';
@@ -19,6 +20,21 @@ afterEach(() => {
 });
 
 describe('electron-builder packaging hooks', () => {
+  test.each(['darwin', 'linux'])(
+    'refuses %s packaging when the pinned gateway resource is missing',
+    async electronPlatformName => {
+      const context = {
+        electronPlatformName,
+        arch: 1,
+        packager: {
+          config: {},
+          projectDir: fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-hook-test-')),
+        },
+      };
+      temporaryDirectories.push(context.packager.projectDir);
+      await expect(beforePack(context)).rejects.toThrow('Magpie');
+    },
+  );
   test('marks macOS automatic installation disabled unless signing explicitly enables it', () => {
     const context = {
       electronPlatformName: 'darwin',

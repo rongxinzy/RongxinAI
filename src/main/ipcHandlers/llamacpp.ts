@@ -38,7 +38,6 @@ import {
   type ModelCapabilities,
 } from '../../shared/providers';
 import { t } from '../i18n';
-import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import { LlamaCppManager, resolveLlamaCppDeviceSelection } from '../libs/llamacppManager';
 import { createLlamaCppModelLaunchLogger } from '../libs/llamacppModelLaunchLog';
 import {
@@ -55,12 +54,7 @@ import {
   type LlamaCppModelResidencySnapshot,
 } from '../libs/llamacppModelResidencyManager';
 import { createLlamaCppRuntimeInstallState } from '../libs/llamacppRuntimeInstallState';
-import {
-  buildLlamaCppRunningModelBinding,
-  type LlamaCppAgentAppConfig,
-  removeLlamaCppModelFromAppConfig,
-  upsertLlamaCppProviderInAppConfig,
-} from '../libs/llamacppAgentBinding';
+import { buildLlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
 import { applyLlamaCppServiceTransition } from '../libs/llamacppServiceTransition';
 import { LlamaCppServiceTransitionLock } from '../libs/llamacppServiceTransitionLock';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
@@ -253,6 +247,10 @@ export function registerLlamaCppIpcHandlers(
   manager: LlamaCppManager,
   options: {
     getStore: () => SqliteStore;
+    onModelBindingsChanged?: (
+      baseUrl: string | null,
+      models: readonly import('../libs/llamacppAgentBinding').LlamaCppRunningModelBinding[],
+    ) => void | Promise<void>;
   },
 ): LlamaCppModelDaemonController {
   const broadcast = (channel: string, payload: unknown): void => {
@@ -300,23 +298,9 @@ export function registerLlamaCppIpcHandlers(
         }),
       )
     ).filter((model): model is NonNullable<typeof model> => Boolean(model));
-    const cacheChanged = updateLlamaCppRunningModels(bindingModels);
-    const current = store.get<LlamaCppAgentAppConfig>('app_config') ?? {};
-    // Persist the same endpoint that the managed service uses, including a user-selected port.
-    const appConfigUpdate = upsertLlamaCppProviderInAppConfig(
-      current,
-      bindingModels,
-      getLlamaCppServiceConfig(store),
-      daemon.gatewayBaseUrl() ?? undefined,
-    );
-    if (appConfigUpdate.changed) {
-      store.set('app_config', appConfigUpdate.config);
-    }
-    const changed = cacheChanged || appConfigUpdate.changed;
-    if (changed) {
-      broadcast(LlamaCppIpcChannel.ModelBindingsChanged, undefined);
-    }
-    return changed;
+    await options.onModelBindingsChanged?.(daemon.gatewayBaseUrl(), bindingModels);
+    broadcast(LlamaCppIpcChannel.ModelBindingsChanged, undefined);
+    return true;
   };
 
   const refreshRunningModelBindings = async (
@@ -350,7 +334,8 @@ export function registerLlamaCppIpcHandlers(
       if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) {
         return { changed: false, hasRunningModels: false };
       }
-      // A transient runtime read failure must not erase persisted model settings.
+      // Fail closed in the unified catalog while the local runtime cannot be reached.
+      await options.onModelBindingsChanged?.(null, []);
       console.warn(
         '[LlamaCpp] skipped model binding refresh because running models could not be read:',
         error,
@@ -469,6 +454,7 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => {
     await daemon.stopService();
+    await updateRunningModelBindings([]);
     return await manager.uninstallRuntime();
   });
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async (_event, input: unknown) => {
@@ -656,17 +642,8 @@ export function registerLlamaCppIpcHandlers(
         modelPreferences;
       store.set(LLAMACPP_MODEL_PREFERENCES_KEY, nextPreferences);
     }
-    const current = store.get<LlamaCppAgentAppConfig>('app_config');
-    if (!current) return result;
-
-    const next = removeLlamaCppModelFromAppConfig(current, result.removedModelName);
-    store.set('app_config', next.config);
     await refreshRunningModelBindings();
-
-    return {
-      ...result,
-      clearedDefaultModel: next.clearedDefaultModel,
-    };
+    return result;
   });
   ipcMain.handle(LlamaCppIpcChannel.ShowModel, async (_event, name: string) => {
     const modelName = name.trim();

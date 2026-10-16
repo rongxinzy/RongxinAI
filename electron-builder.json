@@ -89,6 +89,10 @@
       "to": "acp/registry.json"
     },
     {
+      "from": "resources/magpie/upstream.json",
+      "to": "magpie/upstream.json"
+    },
+    {
       "from": "vendor/engram-runtime/current",
       "to": "memory",
       "filter": ["engram", "engram.exe", "runtime-build-info.json", "LICENSE"]
@@ -111,6 +115,8 @@
     "icon": "build/icons/mac/icon.icns",
     "category": "public.app-category.productivity",
     "hardenedRuntime": true,
+    "sign": "scripts/sign-magpie-macos.cjs",
+    "x64ArchFiles": "**/magpie/darwin-*/magpie",
     "gatekeeperAssess": false,
     "entitlements": "build/entitlements.mac.plist",
     "entitlementsInherit": "build/entitlements.mac.plist",
@@ -209,7 +215,7 @@
     "sign": false
   },
   "win": {
-    "signExts": ["!engram.exe"],
+    "signExts": ["!engram.exe", "!magpie.exe"],
     "target": ["nsis"],
     "publish": [
       {

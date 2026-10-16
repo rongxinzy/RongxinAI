@@ -23,7 +23,7 @@ export function AISphereSettings() {
   const [address, setAddress] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [selected, setSelected] = useState(configService.getConfig().model.defaultModel ?? '');
+  const [selected, setSelected] = useState(configService.getConfig().model?.defaultModel ?? '');
   const t = (key: string) => i18nService.t(key);
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export function AISphereSettings() {
       setSnapshot(value);
       setAddress(value.address);
       const config = await configService.reload();
-      setSelected(config.model.defaultModel ?? '');
+      setSelected(config.model?.defaultModel ?? '');
       window.dispatchEvent(new CustomEvent('config-updated'));
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : '';
@@ -75,7 +75,7 @@ export function AISphereSettings() {
     try {
       await configService.updateConfig({
         model: {
-          ...configService.getConfig().model,
+          ...(configService.getConfig().model ?? {}),
           defaultModel: value,
           defaultModelProvider: AISphere.Provider,
         },
