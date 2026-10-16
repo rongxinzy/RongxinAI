@@ -114,6 +114,14 @@ The development command prepares the channel and memory runtimes, then starts Vi
 bun run llamacpp:runtime:download
 ```
 
+To develop the enterprise client from the same clone, run:
+
+```bash
+bun run electron:dev:enterprise
+```
+
+This builds `enterprise/`, loads this worktree's extension, and starts the same Vite/Electron development flow. Start AEP separately; the default endpoint is `http://localhost:8080`. Set `ZHIYUAN_AEP_BASE_URL` to use another endpoint and optionally `ZHIYUAN_AGENT_CONTROL_BASE_URL` for split deployments. The command generates development configuration under the ignored `.work/enterprise-dev/` directory. To use an existing configuration file instead, set `ZHIYUAN_ENTERPRISE_CONFIG_DEV_PATH`. Packaged applications always use their bundled configuration and ignore this development override. Rerun the command after changing enterprise sources to rebuild the extension and its renderer.
+
 ### Useful commands
 
 | Command | Purpose |

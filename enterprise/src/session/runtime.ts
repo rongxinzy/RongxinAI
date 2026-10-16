@@ -44,7 +44,10 @@ export async function createZhiyuanSessionRuntimeComponents(
 ): Promise<ZhiyuanSessionRuntimeComponents> {
   const platform = mapPlatform(context.platform);
   const [config, agentId, safeStorage] = await Promise.all([
-    loadZhiyuanEnterpriseConfig(context.paths.resources),
+    loadZhiyuanEnterpriseConfig(context.paths.resources, {
+      isPackaged: context.isPackaged,
+      developmentConfigPath: process.env.ZHIYUAN_ENTERPRISE_CONFIG_DEV_PATH,
+    }),
     resolveZhiyuanAgentId(context.paths.userData),
     (dependencies.loadSafeStorage ?? loadElectronSafeStorage)(),
   ]);
