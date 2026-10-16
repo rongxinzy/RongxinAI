@@ -40,7 +40,8 @@ test('Git diff includes deleted and renamed sensitive paths beyond 300 files', (
         GITHUB_STEP_SUMMARY: join(dir, 'summary'),
       },
     });
-    expect(readFileSync(output, 'utf8')).toContain(`${HeavyJob.Linux}=true`);
+    expect(readFileSync(output, 'utf8')).toContain(`${HeavyJob.Linux}=false`);
+    expect(readFileSync(output, 'utf8')).toContain(`${HeavyJob.Memory}=true`);
     expect(readFileSync(join(dir, 'summary'), 'utf8')).toContain('352 changed paths');
     expect(() =>
       execFileSync(process.execPath, [planner], {

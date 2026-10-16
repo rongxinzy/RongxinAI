@@ -223,6 +223,10 @@
       {
         "from": "resources/vc_redist.x64.exe",
         "to": "vc_redist.x64.exe"
+      },
+      {
+        "from": "resources/python-runtime/job-runner.exe",
+        "to": "python-runtime/job-runner.exe"
       }
     ]
   },

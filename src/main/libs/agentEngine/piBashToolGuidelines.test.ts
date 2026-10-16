@@ -45,25 +45,13 @@ describe('piBashToolGuidelines', () => {
     );
   });
 
-  it('blocks pip installs that would target the managed interpreters', () => {
-    expect(getPiBashPythonEnvViolation('pip install pandas')).toContain('managed Python');
-    expect(getPiBashPythonEnvViolation('pip3 install --user requests')).toContain('managed Python');
-    expect(getPiBashPythonEnvViolation('python3 -m pip install openpyxl')).toContain(
-      'managed Python',
-    );
-    expect(
-      getPiBashPythonEnvViolation('python -m pip install pandas && python check.py'),
-    ).toContain('managed Python');
-  });
-
-  it('allows project-local environment installs and read-only pip usage', () => {
+  it('does not block pip or uv commands in bash', () => {
+    expect(getPiBashPythonEnvViolation('pip install pandas')).toBeUndefined();
+    expect(getPiBashPythonEnvViolation('pip3 install --user requests')).toBeUndefined();
+    expect(getPiBashPythonEnvViolation('python3 -m pip install openpyxl')).toBeUndefined();
     expect(getPiBashPythonEnvViolation('.venv/bin/pip install pandas')).toBeUndefined();
-    expect(
-      getPiBashPythonEnvViolation('source .venv/bin/activate && pip install pandas'),
-    ).toBeUndefined();
     expect(getPiBashPythonEnvViolation('uv add pandas')).toBeUndefined();
     expect(getPiBashPythonEnvViolation('pip list')).toBeUndefined();
-    expect(getPiBashPythonEnvViolation('python3 -m pip --version')).toBeUndefined();
   });
 
   it('redirects direct python invocations of bundled Skill scripts', () => {
@@ -82,9 +70,13 @@ describe('piBashToolGuidelines', () => {
     ).toBeUndefined();
   });
 
-  it('evaluates Python environment violations on every platform', () => {
-    expect(getPiBashCommandViolation('pip install pandas', 'linux')).toContain('managed Python');
-    expect(getPiBashCommandViolation('pip install pandas', 'win32')).toContain('managed Python');
+  it('evaluates bundled Skill script violations on every platform', () => {
+    expect(
+      getPiBashCommandViolation('python "$SKILLS_ROOT/pdf/scripts/render.py"', 'linux'),
+    ).toContain('run_skill_script');
+    expect(
+      getPiBashCommandViolation('python "$SKILLS_ROOT/pdf/scripts/render.py"', 'win32'),
+    ).toContain('run_skill_script');
     expect(getPiBashCommandViolation('ls -la', 'win32')).toBeUndefined();
   });
 });

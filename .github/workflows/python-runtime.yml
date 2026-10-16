@@ -1,0 +1,65 @@
+name: Python runtime process containment
+on:
+  push:
+    branches: [main]
+    paths: ['src/main/pythonRuntime/**', 'src/main/libs/agentEngine/piPythonTools*', 'scripts/python-runtime/**', '.github/workflows/python-runtime.yml']
+  pull_request:
+    paths: ['src/main/pythonRuntime/**', 'src/main/libs/agentEngine/piPythonTools*', 'scripts/python-runtime/**', '.github/workflows/python-runtime.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: python-runtime-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows-job-object:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      HUSKY: '0'
+      PYTHON_RUNTIME_INTEGRATION: '1'
+      PYTHON_RUNTIME_RUNNER: '${{ github.workspace }}/dist-electron/python-runtime-runner.js'
+      PYTHON_RUNTIME_JOB_HELPER: '${{ github.workspace }}/resources/python-runtime/job-runner.exe'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build actual Job Object helper
+        shell: pwsh
+        run: ./scripts/python-runtime/build-job-runner.ps1
+      - name: Verify descendant containment and parent-death cleanup
+        run: node --test scripts/python-runtime/job-runner.test.cjs
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Bundle the independent Runner
+        run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
+      - name: Verify Windows standalone Python and real uv wheel environments
+        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
+  linux-standalone-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      HUSKY: '0'
+      PYTHON_RUNTIME_INTEGRATION: '1'
+      PYTHON_RUNTIME_RUNNER: '${{ github.workspace }}/dist-electron/python-runtime-runner.js'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Bundle the independent Runner
+        run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
+      - name: Verify pinned Python, isolated packages, rebuild and process cancellation
+        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1

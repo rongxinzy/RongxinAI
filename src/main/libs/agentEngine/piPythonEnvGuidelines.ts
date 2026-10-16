@@ -1,20 +1,16 @@
 /**
- * System-prompt policy for the application-managed Python environment.
+ * System-prompt policy for the workspace-isolated Python runtime and tools.
  *
- * The agent shell exposes several interpreters (shared dependency layer,
- * bare base runtime, ephemeral uv environments); models trained on generic
- * setups habitually pip-install, create venvs, or `uv run`, all of which
- * lose the preinstalled Skill dependencies. This policy is registered in
- * piSystemPromptContributions so it survives user system-prompt overrides,
- * and is enforced mechanically by the bash command violations in
- * piBashToolGuidelines.
+ * Workspace Python execution and package installation go through the native
+ * `python_execute` and `python_install` tools (backed by an isolated Python 3.12
+ * + uv venv per workspace and supervised Runner process), while bundled Skill
+ * scripts run through `run_skill_script`.
  */
 export const PiPythonEnvSystemPrompt = [
   '## Managed Python environment',
   '',
-  "- `python` and `python3` resolve to the same managed interpreter with pandas, numpy, openpyxl, matplotlib, and the bundled Skills' dependencies preinstalled. Import them directly; do not probe for or switch to another environment first.",
-  '- Never repair or rebuild the managed environment: `pip`/`pip3 install` and `python -m pip` target the wrong interpreter, `uv run`/`uv pip` resolve a bare base interpreter without the preinstalled packages, and a fresh venv hides them. `uv` is reserved for application-internal use.',
+  '- Prefer `python_execute` to run Python code in the current workspace using its isolated Python 3.12 environment, and `python_install` to atomically install exact pinned PyPI wheel packages (such as `numpy==2.2.6`) into this workspace.',
+  "- In Bash, `python` and `python3` also resolve to the application-managed interpreter with pandas, numpy, openpyxl, matplotlib, and bundled Skills' dependencies preinstalled.",
   "- Inside a user project that pins its own toolchain (venv, uv, poetry, ...), follow that project's commands instead.",
   '- Bundled Skill scripts run through the `run_skill_script` tool; never invoke them with `python`/`python3` on a Skills directory path.',
-  "- When an import fails, switch to `run_skill_script` (it resolves that Skill's requirements automatically) or report the missing library to the user.",
 ].join('\n');
