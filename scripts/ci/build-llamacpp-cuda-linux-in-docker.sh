@@ -26,11 +26,11 @@ docker run --rm \
   "${IMAGE}" \
   bash -lc '
     set -euo pipefail
-    git config --global --add safe.directory "*"
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
     apt-get install -y --no-install-recommends cmake ninja-build git ca-certificates
     rm -rf /var/lib/apt/lists/*
+    git config --global --add safe.directory "*"
     nvcc --version
     bash scripts/build-llamacpp-cuda-rtx40.sh linux
   '
