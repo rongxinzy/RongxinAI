@@ -81,6 +81,7 @@ import {
 } from '../shared/cowork/sessionExperts';
 import {
   ApiIpc,
+  AppConfigIpc,
   AppIpc,
   CommunityAuthIpc,
   CoworkPermissionIpc,
@@ -6912,17 +6913,7 @@ if (!gotTheLock) {
     return getCurrentApiConfig();
   });
 
-  ipcMain.handle('check-api-config', async (_event, options?: { probeModel?: boolean }) => {
-    // Pi and managed Model Pool requests do not depend on the compatibility proxy.
-    const { config, error } = resolveRawApiConfig();
-    if (config && options?.probeModel) {
-      const probe = await probeCoworkModelReadiness();
-      if (probe.ok === false) {
-        return { hasConfig: false, config: null, error: probe.error };
-      }
-    }
-    return { hasConfig: config !== null, config, error };
-  });
+  ipcMain.handle(AppConfigIpc.CheckApiConfig, () => modelService.checkReadiness());
 
   ipcMain.handle(
     'save-api-config',
