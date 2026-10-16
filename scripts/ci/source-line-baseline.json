@@ -28,7 +28,6 @@
     "src/renderer/components/coding/CodingWorkbenchView.tsx": 1482,
     "src/renderer/components/cowork/CoworkSessionDetail.tsx": 1302,
     "src/renderer/components/localInference/LocalInferenceView.tsx": 1418,
-    "src/renderer/components/mcp/McpManager.tsx": 1250,
     "src/renderer/components/skills/SkillsManager.tsx": 1158,
     "src/renderer/theme/components/contract.ts": 1143,
     "src/renderer/types/electron.d.ts": 2082,
