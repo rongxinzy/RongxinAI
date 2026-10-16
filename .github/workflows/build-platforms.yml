@@ -69,9 +69,8 @@ jobs:
   build-platforms:
     needs: plan-platforms
     strategy:
-      # A manual platform build is a single release unit; cancel sibling builds
-      # as soon as one selected platform fails.
-      fail-fast: true
+      # Let lite/cpu/cuda matrix legs finish independently during manual validation.
+      fail-fast: false
       matrix: ${{ fromJSON(needs.plan-platforms.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     environment: release
@@ -148,31 +147,30 @@ jobs:
           path: .cache/llama.cpp-src
           key: llamacpp-cuda-src-b9244-v1
           restore-keys: llamacpp-cuda-src-b9244-
-      - name: Install Linux build tools for CUDA llama.cpp
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake ninja-build git
-      - name: Set up CUDA 12.4 toolkit
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+      - name: Set up CUDA 12.4 toolkit (Windows)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         uses: Jimver/cuda-toolkit@v0.2.22
         id: cuda-toolkit
         with:
           cuda: '12.4.1'
           method: network
           sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
-      - name: Verify CUDA compiler
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+      - name: Verify CUDA compiler (Windows)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         shell: bash
         run: nvcc --version
-      - name: Prepare llama.cpp CUDA source
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+      - name: Prepare llama.cpp CUDA source (Windows)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         shell: bash
         run: bash scripts/ensure-llamacpp-cuda-source.sh
-      - name: Build RTX 40 CUDA llama.cpp runtime
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+      - name: Build RTX 40 CUDA llama.cpp runtime (Windows)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         shell: bash
-        run: bash scripts/build-llamacpp-cuda-rtx40.sh ${{ matrix.platform == 'windows' && 'win' || 'linux' }}
+        run: bash scripts/build-llamacpp-cuda-rtx40.sh win
+      - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
+        shell: bash
+        run: bash scripts/ci/build-llamacpp-cuda-linux-in-docker.sh
       - name: Finalize CUDA llama.cpp edition bundle
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
         run: node scripts/finalize-llamacpp-cuda-edition.cjs
