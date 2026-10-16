@@ -114,6 +114,10 @@ export function registerMagpieIpc(
       },
     });
     window = current;
+    // Keep the host title so the upstream document title cannot rename this window.
+    current.on('page-title-updated', event => {
+      event.preventDefault();
+    });
     let opening: string | undefined;
     current.webContents.setWindowOpenHandler(({ url }) => {
       // The upstream page opens immediately, then polls its flow at 800 ms. Wait briefly

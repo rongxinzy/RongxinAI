@@ -182,7 +182,7 @@ export default function ModelSettingsPanel() {
           }}
         />
       )}
-      <p className="text-xs text-muted-foreground">Magpie · MIT · © 2026 yetone</p>
+      <p className="text-xs text-muted-foreground">{i18nService.t('magpieLicenseNotice')}</p>
     </section>
   );
 }

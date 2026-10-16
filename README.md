@@ -144,7 +144,7 @@ Preview the renderer in a plain browser without Electron:
 bun run web:preview
 ```
 
-This starts a Vite dev server on port 5176 with a typed mock of the Electron preload API. Use it for rapid UI iteration and screenshots (`bun run preview:screenshots`). Main screens (workbench, chat, settings, skills, MCP) are backed by fixture data; other IPC calls return a structured "not available in browser preview" failure.
+This starts a Vite dev server on port 5176 with a typed mock of the Electron preload API. `bun run web:preview:check` starts that server, walks the main screens in light and dark (sessions, a streamed reply, every settings panel, skills, MCP, automation, local inference, IM, and dialogs), fails on any console error, and writes screenshots to `.github/pr-assets/browser-preview/`. The mock covers the full preload contract: unimplemented calls return a typed default and warn once.
 
 The mock is only active in browser mode (`import.meta.env.DEV` + no `window.electron`). Production builds and Electron runs use the real preload bridge.
 

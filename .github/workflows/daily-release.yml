@@ -8,9 +8,7 @@ name: Daily release (auto)
 # manual candidate + promotion pair stays available as a fallback.
 
 on:
-  schedule:
-    # 01:23 UTC = 09:23 Beijing, off the hour to dodge fleet spikes.
-    - cron: '23 1 * * *'
+  # Scheduled releases are paused until the ongoing refactor is complete.
   workflow_dispatch:
     inputs:
       release_version:
