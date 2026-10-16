@@ -7,6 +7,7 @@ import {
 } from './constants';
 import type { ProviderConfig } from './types';
 import { resolveCodingPlanBaseUrl } from './codingPlan';
+import { findConfiguredProviderModel } from './configuredModels';
 
 export type RuntimeModelKind = 'cloud' | 'ollama' | 'llamacpp';
 export type RuntimeModelStatus = 'unknown' | 'stopped' | 'running' | 'loaded';
@@ -179,10 +180,7 @@ export function resolveModelEndpoint(
   const catalogModel = ProviderRegistry.getModel(normalizedProviderId, requestedModelId);
   const userModel =
     options.modelConfig ??
-    providerConfig?.models?.find(model => {
-      if (model.id.trim().toLowerCase() === requestedModelId.toLowerCase()) return true;
-      return ProviderRegistry.getModel(normalizedProviderId, model.id)?.id === catalogModel?.id;
-    });
+    findConfiguredProviderModel(normalizedProviderId, requestedModelId, providerConfig?.models);
   const runtime = normalizeRuntime(
     normalizedProviderId,
     options.runtimeSnapshot ?? options.runtime,
