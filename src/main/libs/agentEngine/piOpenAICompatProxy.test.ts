@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   registerPiOpenAICompatTokenRefresher,
   registerPiOpenAICompatUpstream,
+  remapDeveloperRolesForOpenAICompletions,
   stopPiOpenAICompatProxyForTests,
 } from './piOpenAICompatProxy';
 
@@ -13,7 +14,31 @@ describe('piOpenAICompatProxy', () => {
     await stopPiOpenAICompatProxyForTests();
   });
 
-  it('forwards chat payloads unchanged, including developer roles', async () => {
+  it('rewrites a Kimi developer role to system and leaves other roles alone', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        model: 'kimi-for-coding',
+        messages: [
+          { role: 'developer', content: 'You are a helpful assistant.' },
+          { role: 'user', content: 'Hi' },
+          { role: 'assistant', content: 'Hello' },
+        ],
+      }),
+      'utf8',
+    );
+
+    const remapped = JSON.parse(remapDeveloperRolesForOpenAICompletions(body).toString('utf8')) as {
+      messages: Array<{ role: string; content: string }>;
+    };
+
+    expect(remapped.messages.map(message => message.role)).toEqual(['system', 'user', 'assistant']);
+    expect(remapped.messages[0]?.content).toBe('You are a helpful assistant.');
+    expect(
+      remapDeveloperRolesForOpenAICompletions(Buffer.from('not-json', 'utf8')).toString(),
+    ).toBe('not-json');
+  });
+
+  it('rewrites developer roles before forwarding a chat completion', async () => {
     let receivedBody = '';
     const upstream = http.createServer(async (request, response) => {
       for await (const chunk of request) {
@@ -59,7 +84,7 @@ describe('piOpenAICompatProxy', () => {
       expect(response.ok).toBe(true);
 
       const parsed = JSON.parse(receivedBody) as { messages: Array<{ role: string }> };
-      expect(parsed.messages.map(message => message.role)).toEqual(['developer', 'user']);
+      expect(parsed.messages.map(message => message.role)).toEqual(['system', 'user']);
     } finally {
       upstream.close();
     }

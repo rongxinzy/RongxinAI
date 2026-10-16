@@ -3,8 +3,8 @@
  *
  * The unified gateway accepts only a loopback base URL and a local capability
  * key. This process holds the upstream token, injects it on the way out, and
- * refreshes it after a 401 or 403. Request and response bytes are forwarded
- * unchanged: the gateway already accepts the developer role as a system message.
+ * refreshes it after a 401 or 403. OpenAI chat completions rewrite a developer
+ * role to system on the way out; Kimi rejects that role. Other bytes pass through.
  */
 import http, { type IncomingMessage, type ServerResponse } from 'http';
 
@@ -185,6 +185,30 @@ async function readRequestBody(request: IncomingMessage): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
+/**
+ * Kimi rejects OpenAI's developer role. system is the spelling both Kimi and
+ * the gateway accept.
+ */
+export function remapDeveloperRolesForOpenAICompletions(body: Buffer): Buffer {
+  try {
+    const parsed = JSON.parse(body.toString('utf8')) as Record<string, unknown>;
+    const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+    let changed = false;
+    for (const message of messages) {
+      if (typeof message !== 'object' || message === null || Array.isArray(message)) continue;
+      const record = message as Record<string, unknown>;
+      if (record.role === 'developer') {
+        record.role = 'system';
+        changed = true;
+      }
+    }
+    if (!changed) return body;
+    return Buffer.from(JSON.stringify(parsed), 'utf8');
+  } catch {
+    return body;
+  }
+}
+
 function copyResponseHeaders(response: Response, serverResponse: ServerResponse): void {
   const headers: Record<string, string> = {};
   response.headers.forEach((value, key) => {
@@ -253,7 +277,8 @@ async function handleProxyRequest(
     return;
   }
 
-  const body = await readRequestBody(request);
+  const rawBody = await readRequestBody(request);
+  const body = openAICompletions ? remapDeveloperRolesForOpenAICompletions(rawBody) : rawBody;
   const upstreamURL = openAICompletions
     ? buildOpenAIChatCompletionsURL(upstream.baseURL)
     : buildAnthropicMessagesUrl(upstream.baseURL);
