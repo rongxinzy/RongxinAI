@@ -7,6 +7,7 @@ import { afterEach, expect, test } from 'vitest';
 import { MemoryKind, MemorySensitivity } from '../../shared/memory';
 import { resolveEngramBinary } from './binaryResolver';
 import { EngramManager } from './engramManager';
+import { EXPLICIT_MEMORY_SOURCE } from './explicitUserRequestedMemory';
 import { buildKeywordQuery } from './recallQueryPlanner';
 import { resolveProjectIdentity } from './projectIdentity';
 import { ProjectMemoryService } from './projectMemoryService';
@@ -79,6 +80,8 @@ test('integration: buildProjectContext finds saved memory for paraphrased EN/CN 
     importance: 0.8,
     confidence: 0.75,
     sensitivity: MemorySensitivity.Normal,
+    // Same metadata the pi memory tool attaches to explicit "remember this" saves.
+    metadata: { source: EXPLICIT_MEMORY_SOURCE },
   });
   expect(memoryId).not.toBeNull();
 

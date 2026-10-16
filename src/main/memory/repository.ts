@@ -20,6 +20,7 @@ import {
   type MemoryRecordStorageKind as MemoryRecordStorageKindValue,
   type MemorySourceKind,
 } from './constants';
+import { EXPLICIT_MEMORY_SOURCE } from './explicitUserRequestedMemory';
 import { migrateLegacyMemoryTimestamps } from './memoryTimestampMigration';
 
 export interface MemoryProjectionInput {
@@ -890,6 +891,8 @@ function isCurrentSemanticSessionMetadata(metadata: Record<string, unknown>): bo
 
 function isCurrentAtomicMetadata(metadata: Record<string, unknown>): boolean {
   if (metadata.manual === true) return true;
+  // Explicit "remember this" saves (pi memory tool) are user-confirmed, not extractor output.
+  if (metadata.source === EXPLICIT_MEMORY_SOURCE) return true;
   const candidate =
     metadata.extractorKind === MemoryExtractorKind.Atomic ? metadata : metadata.extraction;
   return Boolean(
