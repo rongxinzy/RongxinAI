@@ -56,6 +56,6 @@ resource-loader 在**会话启动时** `reload()` 一次，因此：
 
 ## 影响面
 
-- 仅影响 Pi runtime 的系统提示构建；OpenClaw 链路（`openclawRuntimeAdapter` / `openclawConfigSync`）的技能机制独立，不受影响。
+- 仅影响 Pi runtime 的系统提示构建。产品已移除旧版独立 Agent runtime；Work/Chat/Channel 的技能作用域均由 Pi `ResourceLoader` 与 `SkillManager` 统一管理。
 - Subagent（Team Lead 成员会话）复用同一个 `createPiResourceLoader()`，自动继承相同技能作用域；不传 `skillIds` 时暴露全部技能，行为与修复前一致。
 - Chat 直答模式（`chatDirect`）不走 resource-loader，不受影响。
