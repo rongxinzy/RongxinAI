@@ -4,12 +4,14 @@
 `main.tsx` dynamically imports `installMock.ts` (behind `import.meta.env.DEV`, so production
 bundles never contain this folder) and installs `browserMockElectron` as `window.electron`.
 
-- `index.ts` — typed overrides (`DeepPartial<Window['electron']>`) plus a fallback proxy:
-  `onX` subscriptions return a no-op unsubscribe, every other unmocked call resolves to
-  `{ success: false, error: 'Not available in browser preview' }`.
-- `fixtures/index.ts` — sessions, messages, workspaces, skills, MCP servers, agents and config.
-  Fixture types are derived from the preload contract, so contract changes surface as type errors.
+- `generated/` — emitted by `scripts/preview/generate-browser-mock.ts` from `IElectronAPI`.
+  Every method exists. Unimplemented calls warn once and return a typed default; `on*`
+  methods subscribe to `runtime.ts`. Do not edit these files. Regenerate with
+  `bun run web:preview:codegen`.
+- `interactive.ts` — fixture-backed sessions, a streamed mock reply, skills, MCP, scheduled
+  tasks, local inference, and dialogs. These replace generated methods and do not warn.
+- `fixtures/` — sessions, messages, workspaces, skills, MCP servers, agents, and config.
 - `installMock.ts` — installs the mock when `window.electron` is missing.
 
-To support a new screen, add a typed override for the IPC calls it needs in `index.ts`.
-Screenshots: `bun run preview:screenshots [outDir]` against a running preview.
+`bun run web:preview:check` walks the main screens in light and dark and fails on console
+errors. See AGENTS.md.
