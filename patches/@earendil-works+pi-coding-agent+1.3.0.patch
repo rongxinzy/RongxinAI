@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index 1da213f..a2dddfc 100644
+index 0000000..1111111 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -1816,6 +1816,9 @@ export class AgentSession {
+@@ -1885,6 +1885,9 @@ export class AgentSession {
          if (typeof content === "string") {
              text = content;
          }
@@ -12,7 +12,7 @@ index 1da213f..a2dddfc 100644
          else {
              const textParts = [];
              images = [];
-@@ -3497,12 +3500,14 @@ export class AgentSession {
+@@ -3568,12 +3571,14 @@ export class AgentSession {
                  return false;
              const msg = m;
              // Skip aborted messages with no content
@@ -29,7 +29,7 @@ index 1da213f..a2dddfc 100644
          for (const content of lastAssistant.content) {
              if (content.type === "text") {
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
-index e4992e8..0dde47e 100644
+index 0000000..1111111 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
 @@ -183,6 +183,9 @@ function estimateTextAndImageContentChars(content) {
@@ -52,15 +52,15 @@ index e4992e8..0dde47e 100644
                  if (block.type === "text") {
                      chars += block.text.length;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
-index 92ee18e..0c77592 100644
+index 0000000..1111111 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
-@@ -107,6 +107,8 @@ export function serializeConversation(messages) {
+@@ -113,6 +113,8 @@ export function serializeConversation(messages) {
                  parts.push(`[User]: ${content}`);
          }
          else if (msg.role === "assistant") {
 +            if (!msg.content || typeof msg.content[Symbol.iterator] !== "function")
 +                continue;
-             const thinkingParts = [];
              const toolCalls = [];
              for (const block of msg.content) {
+                 if (block.type === "toolCall") {
