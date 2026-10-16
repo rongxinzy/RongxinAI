@@ -1455,6 +1455,24 @@ class ProviderRegistryImpl {
     return this.defs.find(def => def.agentProviderId === agentProviderId)?.id;
   }
 
+  /**
+   * Map a caller-supplied provider key (canonical id, AgentProviderId alias, or
+   * a case variant of either) to the canonical provider id. Registry model
+   * lookups are exact-key, so callers must normalize before resolving aliases.
+   */
+  resolveProviderId(name: string): string | undefined {
+    const trimmed = name.trim();
+    if (!trimmed) return undefined;
+    const direct = this.idIndex.get(trimmed);
+    if (direct) return direct.id;
+    const byAgentProviderId = this.getProviderNameByAgentProviderId(trimmed);
+    if (byAgentProviderId) return byAgentProviderId;
+    const lowered = trimmed.toLowerCase();
+    return this.defs.find(
+      def => def.id.toLowerCase() === lowered || def.agentProviderId.toLowerCase() === lowered,
+    )?.id;
+  }
+
   getProviderModelSupportsImage(providerName: string, modelId: string): boolean | undefined {
     const model = this.getModel(providerName, modelId);
     return model?.supportsImage;

@@ -8,6 +8,7 @@ import {
   ModelCapabilityStatus,
   parseLlamaCppRuntimeCapabilities,
   ProviderName,
+  ProviderRegistry,
   resolveModelEndpoint,
 } from './index';
 
@@ -394,4 +395,54 @@ test('local runtime adapters expose loaded state and detected metadata', () => {
     runtimeContextWindow: 4096,
     trainedContextWindow: 8192,
   });
+});
+
+// ── Provider-key normalization for the alias fallback ──
+
+test('normalizes a case-variant provider key before the alias fallback', () => {
+  const endpoint = resolveModelEndpoint('OpenAI', 'gpt-5.6', {
+    providerConfig: {
+      apiFormat: ApiFormat.OpenAI,
+      models: [{ id: 'gpt-5.6-sol', name: 'Configured Sol', contextWindow: 123_456 }],
+    },
+  });
+
+  // Without normalization the exact-key registry lookup misses and the
+  // configured entry silently loses its alias resolution.
+  expect(endpoint.modelId).toBe('gpt-5.6-sol');
+  expect(endpoint.displayName).toBe('Configured Sol');
+  expect(endpoint.contextWindow).toBe(123_456);
+});
+
+test('matches a configured entry stored under an alias id through a case-variant key', () => {
+  const endpoint = resolveModelEndpoint('OpenAI', 'gpt-5.6-sol', {
+    providerConfig: {
+      apiFormat: ApiFormat.OpenAI,
+      models: [{ id: 'gpt-5.6', name: 'Alias entry', contextWindow: 65_536 }],
+    },
+  });
+
+  expect(endpoint.modelId).toBe('gpt-5.6');
+  expect(endpoint.displayName).toBe('Alias entry');
+  expect(endpoint.contextWindow).toBe(65_536);
+});
+
+test('maps AgentProviderId and case variants to the canonical provider id', () => {
+  expect(ProviderRegistry.resolveProviderId('qwen-portal')).toBe('qwen');
+  expect(ProviderRegistry.resolveProviderId('OpenAI')).toBe('openai');
+  expect(ProviderRegistry.resolveProviderId('deepseek')).toBe('deepseek');
+  expect(ProviderRegistry.resolveProviderId('  ')).toBeUndefined();
+  expect(ProviderRegistry.resolveProviderId('not-a-provider')).toBeUndefined();
+});
+
+test('unknown provider keys still fall through without alias resolution', () => {
+  const endpoint = resolveModelEndpoint('not-a-provider', 'gpt-5.6', {
+    providerConfig: {
+      apiFormat: ApiFormat.OpenAI,
+      models: [{ id: 'gpt-5.6-sol', name: 'Configured Sol', contextWindow: 123_456 }],
+    },
+  });
+
+  expect(endpoint.modelId).toBe('gpt-5.6');
+  expect(endpoint.contextWindow).toBeUndefined();
 });

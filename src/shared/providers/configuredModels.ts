@@ -12,10 +12,13 @@ export function findConfiguredProviderModel<T extends { id: string }>(
   const exact = models?.find(model => model.id.trim() === requestedId);
   if (exact) return exact;
 
-  const catalogModel = ProviderRegistry.getModel(providerName, requestedId);
+  // Registry lookups are exact-key: normalize the caller's provider key first,
+  // or an AgentProviderId alias / case variant silently kills the alias fallback.
+  const registryProviderId = ProviderRegistry.resolveProviderId(providerName) ?? providerName;
+  const catalogModel = ProviderRegistry.getModel(registryProviderId, requestedId);
   if (!catalogModel) return undefined;
   return models?.find(
-    model => ProviderRegistry.getModel(providerName, model.id)?.id === catalogModel.id,
+    model => ProviderRegistry.getModel(registryProviderId, model.id)?.id === catalogModel.id,
   );
 }
 
