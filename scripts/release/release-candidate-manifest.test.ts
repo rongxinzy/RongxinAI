@@ -5,6 +5,10 @@ import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import {
+  candidateTargetFromReleaseTarget,
+  listRequiredReleaseTargets,
+} from './inference-edition-targets.mjs';
+import {
   CandidateTarget,
   createCandidateManifest,
   verifyCandidateManifests,
@@ -76,28 +80,17 @@ describe('release candidate manifest', () => {
   });
 
   test('accepts only a complete multi-architecture candidate', async () => {
-    const manifests = [
-      {
-        target: CandidateTarget.WindowsX64Lite,
-        kinds: ['installer', 'updater', 'blockmap', 'metadata'],
-      },
-      {
-        target: CandidateTarget.MacX64Default,
-        kinds: ['installer', 'updater', 'blockmap', 'metadata'],
-      },
-      {
-        target: CandidateTarget.MacArm64Default,
-        kinds: ['installer', 'updater', 'blockmap', 'metadata'],
-      },
-      {
-        target: CandidateTarget.LinuxX64AppImage,
-        kinds: ['installer', 'updater', 'metadata'],
-      },
-      {
-        target: CandidateTarget.LinuxX64Deb,
-        kinds: ['installer', 'updater', 'metadata'],
-      },
-    ].map(({ target, kinds }) => {
+    const manifests = listRequiredReleaseTargets()
+      .map(releaseTarget => {
+        const target = candidateTargetFromReleaseTarget(releaseTarget);
+        const [platform] = releaseTarget.split(':');
+        const kinds =
+          platform === 'linux'
+            ? ['installer', 'updater', 'metadata']
+            : ['installer', 'updater', 'blockmap', 'metadata'];
+        return { target, kinds };
+      })
+      .map(({ target, kinds }) => {
       const [platform, arch, ...variantParts] = target.split('-');
       const variant = variantParts.join('-');
       return {

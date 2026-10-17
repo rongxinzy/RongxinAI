@@ -23,6 +23,14 @@ export function createAppInfo(runtime: BrowserMockRuntime): Window['electron']['
       runtime.warnOnce('appInfo.consumePendingLocalInferenceInstall');
       return '';
     },
+    getInferenceEdition: async () => {
+      runtime.warnOnce('appInfo.getInferenceEdition');
+      return 'cpu';
+    },
+    usesBundledLlamaCppRuntime: async () => {
+      runtime.warnOnce('appInfo.usesBundledLlamaCppRuntime');
+      return false;
+    },
     relaunch: async () => {
       runtime.warnOnce('appInfo.relaunch');
     },

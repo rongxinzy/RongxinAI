@@ -105,8 +105,16 @@ function contextTargets(context) {
       ? context.arch
       : { 1: 'x64', 3: 'arm64', 4: 'universal' }[context.arch];
   const platform = context.electronPlatformName;
-  if (platform === 'darwin' && ['x64', 'arm64', 'universal'].includes(arch)) {
-    return ['darwin-x64', 'darwin-arm64'];
+  if (platform === 'darwin') {
+    if (arch === 'universal' || arch === 4) {
+      return ['darwin-x64', 'darwin-arm64'];
+    }
+    if (arch === 'x64' || arch === 1) {
+      return ['darwin-x64'];
+    }
+    if (arch === 'arm64' || arch === 3) {
+      return ['darwin-arm64'];
+    }
   }
   const key = `${platform}-${arch}`;
   targetFor(key);

@@ -30,10 +30,14 @@ const { verifyRetainedHost } = require('./retain-uninstaller.cjs');
 const {
   MAX_COMPONENT_BYTES,
   MAX_NON_COMPONENT_BYTES,
+  MAX_NSIS_BYTES,
+  MAX_NSIS_NON_COMPONENT_BYTES,
+  resolveEditionSetupBudget,
   assertSetupBudget,
   assertPayloadDeduplication,
 } = require('./distribution-budget.cjs');
 const { sha256File } = require('../windows-resource-pack.cjs');
+const { resolveInferenceEdition } = require('../resolve-nsis-offline-components.cjs');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
 const shellExe = path.join(
@@ -117,9 +121,10 @@ try {
     // component-<key>.* when staging for the shared validator).
     const manifestPath = path.join(componentsDir, 'manifest.json');
     if (!fs.existsSync(manifestPath)) fail(`component manifest missing: ${manifestPath}`);
-    const targets = JSON.parse(
-      fs.readFileSync(path.join(projectRoot, 'scripts', 'nsis-offline-components.json'), 'utf8'),
-    );
+    const {
+      resolveNsisOfflineComponentTargets,
+    } = require('../resolve-nsis-offline-components.cjs');
+    const targets = resolveNsisOfflineComponentTargets();
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     if (!Array.isArray(manifest.components) || manifest.components.length !== targets.length) {
       fail('component manifest must contain every bundled Windows component');
@@ -157,9 +162,9 @@ try {
     }
 
     fs.copyFileSync(manifestPath, path.join(payloadDir, 'component-manifest.json'));
-    fs.copyFileSync(
-      path.join(projectRoot, 'scripts', 'nsis-offline-components.json'),
+    fs.writeFileSync(
       path.join(payloadDir, 'component-targets.json'),
+      `${JSON.stringify(targets, null, 2)}\n`,
     );
     for (const script of [
       'validate-offline-components.ps1',
@@ -210,6 +215,8 @@ try {
     `${config.productName}-Setup-${packageVersion}.exe`,
   );
   const nsisUpdaterBytes = fs.existsSync(updater) ? fs.statSync(updater).size : null;
+  const setupBudgetEdition = resolveInferenceEdition();
+  const setupBudget = resolveEditionSetupBudget(setupBudgetEdition);
   const sizeReport = {
     shellBytes,
     payloadBytes,
@@ -224,25 +231,36 @@ try {
       componentArchiveBytes === null || nsisUpdaterBytes === null
         ? null
         : nsisUpdaterBytes - componentArchiveBytes,
-    maxSetupBytes: MAX_SETUP_BYTES,
-    maxComponentBytes: MAX_COMPONENT_BYTES,
-    maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
-    remainingSigningBytes: MAX_SETUP_BYTES - unsignedSetupBytes,
-    // Existing NSIS gate values are reported for comparison, never increased.
-    legacyBudgetSource: 'scripts/ci/windows-installer-size-smoke.ps1',
-    legacyInstallerCeilingBytes: 450 * 1024 * 1024,
-    legacyComponentCeilingBytes: 300 * 1024 * 1024,
-    legacyNonComponentCeilingBytes: 150 * 1024 * 1024,
+    // Per-edition limits (distribution-budget.cjs): lite keeps the original
+    // ceilings; cpu/cuda are report-only (null limits) until measured.
+    edition: setupBudgetEdition,
+    maxSetupBytes: setupBudget.maxInstallerBytes,
+    maxComponentBytes: setupBudget.maxComponentBytes,
+    maxNonComponentBytes: setupBudget.maxNonComponentBytes,
+    remainingSigningBytes:
+      setupBudget.maxInstallerBytes == null
+        ? null
+        : setupBudget.maxInstallerBytes - unsignedSetupBytes,
+    liteBaseline: {
+      maxSetupBytes: MAX_SETUP_BYTES,
+      maxComponentBytes: MAX_COMPONENT_BYTES,
+      maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
+      maxNsisBytes: MAX_NSIS_BYTES,
+      maxNsisNonComponentBytes: MAX_NSIS_NON_COMPONENT_BYTES,
+    },
   };
   console.log(`[pack-setup] budget ${JSON.stringify(sizeReport)}`);
   fs.writeFileSync(
     path.join(path.dirname(shellExe), 'setup-size.json'),
     `${JSON.stringify(sizeReport, null, 2)}\n`,
   );
-  if (componentArchiveBytes !== null) assertSetupBudget(unsignedSetupBytes, componentArchiveBytes);
+  if (componentArchiveBytes !== null)
+    assertSetupBudget(unsignedSetupBytes, componentArchiveBytes, setupBudgetEdition);
   const outPath = path.resolve(outArg || `ZhiYuanAgent-Setup-${packageVersion}.exe`);
-  appendPayload(shellExe, payloadZip, outPath);
-  const report = writeSetupManifest(outPath, packageVersion);
+  appendPayload(shellExe, payloadZip, outPath, { maxBytes: setupBudget.maxInstallerBytes });
+  const report = writeSetupManifest(outPath, packageVersion, {
+    maxBytes: setupBudget.maxInstallerBytes,
+  });
   console.log(`[pack-setup] wrote ${outPath} (${report.installerBytes} bytes, ${report.sha256})`);
 } finally {
   fs.rmSync(staging, { recursive: true, force: true });

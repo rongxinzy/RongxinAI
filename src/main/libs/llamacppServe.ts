@@ -70,6 +70,8 @@ export function buildLlamaServerArgs(
   appendArg(args, '--split-mode', config.splitMode);
   appendArg(args, '--tensor-split', config.tensorSplit);
   appendArg(args, '--flash-attn', config.flashAttn);
+  appendArg(args, '--cache-type-k', config.cacheTypeK);
+  appendArg(args, '--cache-type-v', config.cacheTypeV);
   if (config.jinja === 'on') args.push('--jinja');
   if (config.jinja === 'off') args.push('--no-jinja');
   appendArg(args, '--reasoning', config.reasoning);
@@ -136,6 +138,8 @@ function appendSharedLlamaServerArgs(args: string[], config: LlamaCppServiceConf
   appendArg(args, '--split-mode', config.splitMode);
   appendArg(args, '--tensor-split', config.tensorSplit);
   appendArg(args, '--flash-attn', config.flashAttn);
+  appendArg(args, '--cache-type-k', config.cacheTypeK);
+  appendArg(args, '--cache-type-v', config.cacheTypeV);
   if (config.jinja === 'on') args.push('--jinja');
   if (config.jinja === 'off') args.push('--no-jinja');
   appendArg(args, '--reasoning', config.reasoning);
@@ -173,6 +177,7 @@ function applyModelLaunchOptions(
     ...(options.splitMode ? { splitMode: options.splitMode } : {}),
     ...(options.tensorSplit ? { tensorSplit: options.tensorSplit } : {}),
     ...(options.flashAttn ? { flashAttn: options.flashAttn } : {}),
+    ...(options.mmap === false ? { noMmap: true } : {}),
     ...(options.reasoningFormat ? { reasoningFormat: options.reasoningFormat } : {}),
     ...(options.chatTemplate ? { chatTemplate: options.chatTemplate } : {}),
   };
@@ -209,6 +214,8 @@ export function filterLlamaCppServiceConfigByRuntimeCapabilities(
   clearWhenUnsupported('tensorSplit', LlamaCppServiceConfigFieldKey.TensorSplit);
   clearWhenUnsupported('mainGpu', LlamaCppServiceConfigFieldKey.MainGpu);
   clearWhenUnsupported('flashAttn', LlamaCppServiceConfigFieldKey.FlashAttn);
+  clearWhenUnsupported('cacheTypeK', LlamaCppServiceConfigFieldKey.CacheTypeK);
+  clearWhenUnsupported('cacheTypeV', LlamaCppServiceConfigFieldKey.CacheTypeV);
   clearWhenUnsupported('jinja', LlamaCppServiceConfigFieldKey.Jinja);
   clearWhenUnsupported('mlock', LlamaCppServiceConfigFieldKey.Mlock);
 
@@ -382,6 +389,10 @@ export function buildLlamaCppServiceConfigFieldSupport(input: {
       hasMultiGpu && (unknownHelpSupport || hasFlag('--main-gpu')),
     [LlamaCppServiceConfigFieldKey.FlashAttn]:
       hasGpu && (unknownHelpSupport || hasFlag('--flash-attn')),
+    [LlamaCppServiceConfigFieldKey.CacheTypeK]:
+      hasGpu && (unknownHelpSupport || hasFlag('--cache-type-k')),
+    [LlamaCppServiceConfigFieldKey.CacheTypeV]:
+      hasGpu && (unknownHelpSupport || hasFlag('--cache-type-v')),
     [LlamaCppServiceConfigFieldKey.Jinja]: unknownHelpSupport || hasFlag('--jinja', '--no-jinja'),
     [LlamaCppServiceConfigFieldKey.Mlock]: unknownHelpSupport || hasFlag('--mlock'),
   };

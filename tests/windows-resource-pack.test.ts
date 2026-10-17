@@ -38,8 +38,12 @@ afterEach(() => {
 });
 
 describe('Windows offline component identity', () => {
-  test('uses cc-connect as the first of exactly seven cached components', () => {
+  test('uses cc-connect as the first cached component (llamacpp optional by edition)', () => {
+    const previous = process.env.ZHIYUAN_UPDATE_VARIANT;
+    delete process.env.ZHIYUAN_UPDATE_VARIANT;
     const components = getWindowsResourceComponents(process.cwd());
+    if (previous === undefined) delete process.env.ZHIYUAN_UPDATE_VARIANT;
+    else process.env.ZHIYUAN_UPDATE_VARIANT = previous;
     expect(components).toHaveLength(7);
     expect(components[0]).toMatchObject({
       key: 'channel-runtime',
@@ -50,7 +54,11 @@ describe('Windows offline component identity', () => {
   });
 
   test('uses solid compression only for benchmarked multi-file runtimes', () => {
+    const previous = process.env.ZHIYUAN_UPDATE_VARIANT;
+    delete process.env.ZHIYUAN_UPDATE_VARIANT;
     const components = getWindowsResourceComponents(process.cwd());
+    if (previous === undefined) delete process.env.ZHIYUAN_UPDATE_VARIANT;
+    else process.env.ZHIYUAN_UPDATE_VARIANT = previous;
     const compressionByKey = Object.fromEntries(
       components.map(component => [
         component.key,

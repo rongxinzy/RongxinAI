@@ -97,7 +97,9 @@ describe('post-install cleanup ownership contract', () => {
 
   test('limits component reclamation to the current contract and owned completion records', () => {
     const source = fs.readFileSync(scriptPath, 'utf8');
-    expect(source).toContain('$rows.Count -ne 7');
+    // Seven fixed components are required; only 'llamacpp-bundled' may be added.
+    expect(source).toContain("$optionalKeys = @('llamacpp-bundled')");
+    expect(source).not.toContain('$rows.Count -ne 7');
     expect(source).toContain("($completion -split '\\|', 2)[0] -cne $version.Name");
     expect(source).not.toContain("'runtime-packs'");
   });

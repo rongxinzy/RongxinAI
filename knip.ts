@@ -35,6 +35,13 @@ const config: KnipConfig = {
         'scripts/write-windows-dev-shortcut.cjs',
         'scripts/prepare-visual-blind-review.mjs',
         'scripts/ci/validate-docx-smoke.mjs',
+        // Invoked from release.yml and publish workflows, not static imports.
+        'scripts/release/print-electron-updater-verify-specs.mjs',
+        'scripts/release/print-release-candidate-layout.mjs',
+        'scripts/release/print-required-release-targets.mjs',
+        'scripts/release/stage-downloaded-release-candidates.sh',
+        'scripts/release/upload-update-artifacts.mjs',
+        'tests/setup/rebuild-sqlite-for-node.cjs',
         // Bundled by `bun build` in the bench:stream script; Knip does not parse that form.
         'scripts/bench/streamBench.ts',
         // Invoked from tests/e2e/packaged-linux/run-with-headless-deps.sh.
@@ -124,10 +131,20 @@ const config: KnipConfig = {
   ignoreIssues: {
     'src/main/llamacppModelDaemonEntry.ts': ['exports', 'types', 'files'],
     'src/main/libs/llamacpp*.ts': ['exports', 'types', 'files'],
+    'src/main/libs/llamacppManager/**/*.ts': ['exports', 'types', 'files'],
+    'src/main/libs/llamacppBackendManager/**/*.ts': ['exports', 'types', 'files'],
     'src/main/ipcHandlers/llamacpp.ts': ['exports', 'types', 'files'],
+    'src/main/ipcHandlers/llamacpp/**/*.ts': ['exports', 'types', 'files'],
     'src/shared/llamacpp/**': ['exports', 'types', 'files'],
     'src/renderer/utils/llamacppAgentEligibility.ts': ['exports', 'types', 'files'],
     'scripts/**/*llamacpp*': ['exports', 'types', 'files'],
+    'scripts/installer-shell/distribution-budget.cjs': ['exports'],
+    'scripts/packaging/**': ['exports'],
+    'scripts/release/**': ['exports'],
+    'scripts/resolve-nsis-offline-components.cjs': ['exports'],
+    'scripts/stage-linux-cuda-runtime-libs.cjs': ['exports'],
+    'src/main/libs/ggufMetadata.ts': ['exports'],
+    'src/main/libs/inferenceEditionPolicy.ts': ['exports'],
   },
   // @knipignore marks a dynamic import() type query Knip cannot see.
   tags: ['-knipignore'],

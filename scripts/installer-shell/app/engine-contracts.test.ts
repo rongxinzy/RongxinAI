@@ -15,7 +15,9 @@ const argumentsSource = read('SetupArguments.cs');
 test('engine checks extraction and retains all main repository runtime features', () => {
   expect(installer).toContain('failureMessage: "应用程序解包失败"');
   expect(installer).toContain('File.ReadAllText(TargetsPath)');
-  expect(installer).toContain('targets.RootElement.GetArrayLength() != 7');
+  // Required fixed set + optional llama.cpp runtime; never a fixed count.
+  expect(installer).toContain('OptionalComponentKeys = { "llamacpp-bundled" }');
+  expect(installer).not.toContain('GetArrayLength() != 7');
   expect(installer).toContain('target.GetProperty("sentinel")');
   expect(installer).toContain('"resources", "app.asar"');
   expect(installer).toContain('StepWritePendingInferenceMarker(localInference)');

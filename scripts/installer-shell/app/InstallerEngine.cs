@@ -111,6 +111,9 @@ public sealed class InstallerEngine
     private string SevenZipPath => Path.Combine(payloadDir!, "tools", "7za.exe");
     private string ManifestPath => Path.Combine(payloadDir!, "component-manifest.json");
     private string TargetsPath => Path.Combine(payloadDir!, "component-targets.json");
+    private static readonly string[] RequiredComponentKeys =
+        { "channel-runtime", "skills", "mcps", "portable-git", "python", "skill-python", "uv" };
+    private static readonly string[] OptionalComponentKeys = { "llamacpp-bundled" };
 
     private string? extractedPayloadDir;
     private readonly InstallDirectoryTransaction transaction;
@@ -608,7 +611,15 @@ public sealed class InstallerEngine
         ReportPhase("正在校验运行环境");
         var resources = Path.Combine(installDir, "resources");
         using var targets = JsonDocument.Parse(File.ReadAllText(TargetsPath));
-        if (targets.RootElement.GetArrayLength() != 7)
+        // The seven fixed components are always required; cpu/cuda editions
+        // add only the bundled llama.cpp runtime. The count is not fixed.
+        var keys = targets.RootElement.EnumerateArray()
+            .Select(t => t.GetProperty("key").GetString() ?? "")
+            .ToList();
+        if (RequiredComponentKeys.Any(k => !keys.Contains(k, StringComparer.Ordinal)) ||
+            keys.Any(k => !RequiredComponentKeys.Contains(k, StringComparer.Ordinal) &&
+                          !OptionalComponentKeys.Contains(k, StringComparer.Ordinal)) ||
+            keys.Distinct(StringComparer.Ordinal).Count() != keys.Count)
             throw new EngineException("安装包组件配置不完整。");
         foreach (var target in targets.RootElement.EnumerateArray())
         {

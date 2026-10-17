@@ -1,5 +1,6 @@
 import type { NvidiaSmiSnapshot } from '../hardware';
 import { LlamaCppMemoryPolicy } from './constants';
+import { LlamaCppKvCacheType } from './kvCacheTypes';
 import type { LlamaCppServiceConfig } from './types';
 
 const LLAMACPP_DEFAULT_CONTEXT_HIGH_VRAM_MIB = 20 * 1024;
@@ -36,10 +37,16 @@ export function applyAutomaticLlamaCppServiceDefaults(
   config: LlamaCppServiceConfig,
   input: { nvidiaSnapshot?: NvidiaSmiSnapshot | null } = {},
 ): LlamaCppServiceConfig {
+  const hasNvidiaGpu = Boolean(
+    input.nvidiaSnapshot?.available && input.nvidiaSnapshot.gpus.length > 0,
+  );
   return {
     ...config,
     ...(config.ctxSize?.trim()
       ? {}
       : { ctxSize: resolveAutomaticLlamaCppContextSize(input.nvidiaSnapshot) }),
+    ...(hasNvidiaGpu && !config.flashAttn?.trim() ? { flashAttn: 'on' as const } : {}),
+    ...(hasNvidiaGpu && !config.cacheTypeK?.trim() ? { cacheTypeK: LlamaCppKvCacheType.Q8_0 } : {}),
+    ...(hasNvidiaGpu && !config.cacheTypeV?.trim() ? { cacheTypeV: LlamaCppKvCacheType.Q8_0 } : {}),
   };
 }

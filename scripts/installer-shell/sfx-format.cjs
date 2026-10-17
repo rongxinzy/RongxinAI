@@ -66,10 +66,19 @@ function inspectPe(fd, size) {
   return { headerEnd, certificateOffset, certificateBytes, contentEnd: certificateOffset };
 }
 
-function inspectSetup(file) {
+// maxBytes is the edition's WebView2 setup ceiling (see distribution-budget.cjs);
+// null means the edition has no size cap (cuda). The footer offsets are 64-bit.
+function assertSetupSize(bytes, maxBytes) {
+  if (maxBytes != null && bytes > maxBytes) {
+    throw new Error(
+      `Final setup exceeds the ${maxBytes / 1024 / 1024} MiB WebView2 installer budget`,
+    );
+  }
+}
+
+function inspectSetup(file, { maxBytes = MAX_SETUP_BYTES } = {}) {
   const size = fs.statSync(file).size;
-  if (size > MAX_SETUP_BYTES)
-    throw new Error('Final setup exceeds the 500 MiB WebView2 installer budget');
+  assertSetupSize(size, maxBytes);
   const fd = fs.openSync(file, 'r');
   try {
     const pe = inspectPe(fd, size);
@@ -115,16 +124,14 @@ function inspectSetup(file) {
   }
 }
 
-function appendPayload(shell, zip, output) {
+function appendPayload(shell, zip, output, { maxBytes = MAX_SETUP_BYTES } = {}) {
   if ([shell, zip].some(file => path.resolve(file) === path.resolve(output))) {
     throw new Error('Setup output must not overwrite its inputs');
   }
   const shellBytes = fs.statSync(shell).size;
   const payloadBytes = fs.statSync(zip).size;
   const padding = (8 - ((shellBytes + payloadBytes + FOOTER_BYTES) % 8)) % 8;
-  if (shellBytes + payloadBytes + padding + FOOTER_BYTES > MAX_SETUP_BYTES) {
-    throw new Error('Final setup exceeds the 500 MiB WebView2 installer budget');
-  }
+  assertSetupSize(shellBytes + payloadBytes + padding + FOOTER_BYTES, maxBytes);
   const shellFd = fs.openSync(shell, 'r');
   try {
     if (inspectPe(shellFd, shellBytes).certificateBytes !== 0) {
@@ -154,11 +161,11 @@ function appendPayload(shell, zip, output) {
     fs.closeSync(input);
     fs.closeSync(target);
   }
-  return inspectSetup(output);
+  return inspectSetup(output, { maxBytes });
 }
 
-function writeSetupManifest(file, version) {
-  const manifest = { ...inspectSetup(file), version, sha256: sha256File(file) };
+function writeSetupManifest(file, version, { maxBytes = MAX_SETUP_BYTES } = {}) {
+  const manifest = { ...inspectSetup(file, { maxBytes }), version, sha256: sha256File(file) };
   fs.writeFileSync(`${file}.manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
 }

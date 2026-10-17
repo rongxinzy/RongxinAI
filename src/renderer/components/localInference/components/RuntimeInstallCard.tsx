@@ -87,6 +87,7 @@ export function RuntimeInstallCard({
   onInstallRequestHandled,
   onNotify,
 }: RuntimeInstallCardProps) {
+  const [usesBundledRuntime, setUsesBundledRuntime] = useState<boolean | null>(null);
   const [backends, setBackends] = useState<LlamaCppBackendInfo[]>([]);
   const [selectedKey, setSelectedKey] = useState('');
   // Keep an unresolved backend list distinct from a confirmed empty list.
@@ -237,6 +238,17 @@ export function RuntimeInstallCard({
       notify(i18nService.t('localInferenceRuntimeInstallCancelled'), LocalInferenceToastKind.Info);
     }
   };
+
+  useEffect(() => {
+    void window.electron.appInfo
+      .usesBundledLlamaCppRuntime()
+      .then(setUsesBundledRuntime)
+      .catch(() => setUsesBundledRuntime(false));
+  }, []);
+
+  if (usesBundledRuntime) {
+    return null;
+  }
 
   return (
     <Card className="theme-page-runtime-install-card-card-1 relative">

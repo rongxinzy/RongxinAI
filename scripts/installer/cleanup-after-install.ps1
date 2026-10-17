@@ -30,8 +30,16 @@ function Assert-PhysicalDirectoryPath([string]$Path) {
 # and malformed content IDs must never turn a manifest into arbitrary paths.
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 $rows = @($manifest.components)
-$expectedKeys = @('channel-runtime', 'mcps', 'portable-git', 'python', 'skill-python', 'skills', 'uv')
-if ($rows.Count -ne 7 -or (@($rows | ForEach-Object { [string]$_.key } | Sort-Object) -join ',') -cne ($expectedKeys -join ',')) {
+# Component contract: the seven fixed application components are always
+# required. The cpu/cuda editions' WebView2 setup additionally carries the
+# bundled llama.cpp runtime ('llamacpp-bundled'); no other key is accepted.
+# The count is therefore not fixed (lite 7, cpu/cuda 8).
+$requiredKeys = @('channel-runtime', 'mcps', 'portable-git', 'python', 'skill-python', 'skills', 'uv')
+$optionalKeys = @('llamacpp-bundled')
+$rowKeys = @($rows | ForEach-Object { [string]$_.key })
+if (@($requiredKeys | Where-Object { $rowKeys -cnotcontains $_ }).Count -gt 0 -or
+    @($rowKeys | Where-Object { $requiredKeys -cnotcontains $_ -and $optionalKeys -cnotcontains $_ }).Count -gt 0 -or
+    @($rowKeys | Sort-Object -Unique).Count -ne $rows.Count) {
   throw 'Invalid cleanup manifest: component set does not match this application'
 }
 foreach ($row in $rows) {

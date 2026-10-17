@@ -1,0 +1,14 @@
+{
+  "version": "b9244",
+  "repository": "ggml-org/llama.cpp",
+  "sha256": {
+    "llama-b9244-bin-macos-arm64.tar.gz": "34751cb15c05d843daf40ede43a92c3f49a2d9b25347acb8552606d6e24a4551",
+    "llama-b9244-bin-macos-x64.tar.gz": "e4e86b96f2fc4000afe303cd275c56371d64b642052d1ac5ab6e5548958232ab",
+    "llama-b9244-bin-ubuntu-arm64.tar.gz": "61734cd2b4abae46885da2738778b50ff023f5df00e210205a0d16b83ab61681",
+    "llama-b9244-bin-ubuntu-vulkan-arm64.tar.gz": "4ca46add3bcb86e2acd4edd3a6f3ac9c4dc8fea94cbfad58ed4791204feec88f",
+    "llama-b9244-bin-ubuntu-vulkan-x64.tar.gz": "665e1d09107d35224e18034ba8764ebaddf0d6ab0fa66e1871f9d06ae6466567",
+    "llama-b9244-bin-ubuntu-x64.tar.gz": "9d8d29dbeb91204a6bee85b5c3f0eef46ce41737e4a920d845d6b8b1c1207c97",
+    "llama-b9244-bin-win-cpu-x64.zip": "e60c6f089316dfa38e3c6f612ae42d39cde240777e129ab865229ef5796ee1bf",
+    "llama-b9244-bin-win-vulkan-x64.zip": "d32f078dc7c130210e483c66bcef03f2b9ec9874925e94682afa07f9c4a0822a"
+  }
+}

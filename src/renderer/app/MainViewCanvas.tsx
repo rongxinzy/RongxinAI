@@ -5,6 +5,7 @@ import type { CodingSidebarSelection } from '../components/coding/CodingWorkspac
 import type { ExpertTab } from '../components/expert/ExpertView';
 import { LazyChunkErrorBoundary } from '../components/LazyChunkErrorBoundary';
 import type { McpRegistryId } from '../components/mcp/constants';
+import type { InferenceEdition } from '../../shared/inferenceEdition';
 import type { SettingsEnterpriseConfig, SettingsOpenOptions } from '../components/settings/types';
 import type { CoworkPermissionRequest, CoworkPermissionResult } from '../types/cowork';
 import { MainView } from './constants';
@@ -34,6 +35,8 @@ export interface MainViewCanvasProps {
   enterpriseConfig: SettingsEnterpriseConfig | null;
   appUpdateState: AppUpdateRuntimeState;
   managedModelsOnly: boolean;
+  inferenceEdition: InferenceEdition;
+  localInferenceEnabled: boolean;
   /** Skills / expert */
   onShowSkills: () => void;
   onCreateSkillByChat: () => void;
@@ -79,6 +82,8 @@ export function MainViewCanvas({
   enterpriseConfig,
   appUpdateState,
   managedModelsOnly,
+  inferenceEdition,
+  localInferenceEnabled,
   onShowSkills,
   onCreateSkillByChat,
   onTrySkill,
@@ -108,30 +113,33 @@ export function MainViewCanvas({
         data-main-canvas
         className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]"
       >
-        {hasMountedLocalInference && !isLocalInferenceDormant && !managedModelsOnly && (
-          <div
-            className={
-              mainView === MainView.LocalInference ? 'h-full min-h-0' : 'hidden h-full min-h-0'
-            }
-          >
-            {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
-            <LazyChunkErrorBoundary resetKey={mainView}>
-              <React.Suspense fallback={null}>
-                <LocalInferenceView
-                  installRequestId={localInferenceInstallRequestId}
-                  onInstallRequestHandled={onLocalInferenceInstallRequestHandled}
-                  refreshRequestId={localInferenceRefreshRequestId}
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  isVisible={mainView === MainView.LocalInference}
-                  onToggleSidebar={onToggleSidebar}
-                  onNewChat={onNewChat}
-                  onOpenModelSettings={onOpenModelSettings}
-                  updateBadge={null}
-                />
-              </React.Suspense>
-            </LazyChunkErrorBoundary>
-          </div>
-        )}
+        {hasMountedLocalInference &&
+          !isLocalInferenceDormant &&
+          localInferenceEnabled &&
+          !managedModelsOnly && (
+            <div
+              className={
+                mainView === MainView.LocalInference ? 'h-full min-h-0' : 'hidden h-full min-h-0'
+              }
+            >
+              {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
+              <LazyChunkErrorBoundary resetKey={mainView}>
+                <React.Suspense fallback={null}>
+                  <LocalInferenceView
+                    installRequestId={localInferenceInstallRequestId}
+                    onInstallRequestHandled={onLocalInferenceInstallRequestHandled}
+                    refreshRequestId={localInferenceRefreshRequestId}
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    isVisible={mainView === MainView.LocalInference}
+                    onToggleSidebar={onToggleSidebar}
+                    onNewChat={onNewChat}
+                    onOpenModelSettings={onOpenModelSettings}
+                    updateBadge={null}
+                  />
+                </React.Suspense>
+              </LazyChunkErrorBoundary>
+            </div>
+          )}
         <LazyChunkErrorBoundary resetKey={mainView}>
           <React.Suspense fallback={lazyViewFallback}>
             {mainView === MainView.Settings ? (
@@ -143,6 +151,7 @@ export function MainViewCanvas({
                 enterpriseConfig={enterpriseConfig}
                 appUpdateState={appUpdateState}
                 managedModelsOnly={managedModelsOnly}
+                inferenceEdition={inferenceEdition}
                 isSidebarCollapsed={isSidebarCollapsed}
                 onToggleSidebar={onToggleSidebar}
                 onNewChat={onNewChat}

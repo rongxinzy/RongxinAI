@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import yaml from 'js-yaml';
 
+import { parseLinuxReleaseVariant, resolveReleaseArtifactFormat } from './inference-edition-targets.mjs';
+
 const [releaseVersion, platform, arch, variant, inputPath, outputPath] = process.argv.slice(2);
 if (!releaseVersion || !platform || !arch || !variant || !inputPath || !outputPath) {
   throw new Error(
@@ -12,16 +14,19 @@ if (!/^[0-9A-Za-z][0-9A-Za-z.+-]*$/.test(releaseVersion)) {
   throw new Error(`Invalid release version: ${releaseVersion}`);
 }
 
-const expectedExtension =
-  platform === 'win32'
-    ? '.exe'
-    : platform === 'darwin'
-      ? '.zip'
-      : platform === 'linux' && variant === 'appimage'
-        ? '.appimage'
-        : platform === 'linux' && variant === 'deb'
-          ? '.deb'
-          : null;
+let expectedExtension;
+try {
+  expectedExtension = resolveReleaseArtifactFormat(platform, variant, 'updater').extension;
+} catch {
+  try {
+    expectedExtension = resolveReleaseArtifactFormat(platform, variant).extension;
+  } catch {
+    expectedExtension = null;
+  }
+}
+if (platform === 'linux' && !parseLinuxReleaseVariant(variant)) {
+  throw new Error(`Unsupported electron-updater target: ${platform}:${arch}:${variant}`);
+}
 if (!expectedExtension) throw new Error(`Unsupported electron-updater target: ${platform}:${arch}:${variant}`);
 
 function artifactFilename(value) {

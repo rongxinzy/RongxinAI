@@ -151,6 +151,8 @@ export const appSystemApi = {
     getSystemLocale: () => ipcRenderer.invoke(AppIpc.GetSystemLocale),
     consumePendingLocalInferenceInstall: () =>
       ipcRenderer.invoke(AppIpc.ConsumePendingLocalInferenceInstall),
+    getInferenceEdition: () => ipcRenderer.invoke(AppIpc.GetInferenceEdition),
+    usesBundledLlamaCppRuntime: () => ipcRenderer.invoke(AppIpc.UsesBundledLlamaCppRuntime),
     relaunch: () => ipcRenderer.invoke(AppIpc.Relaunch),
   },
 

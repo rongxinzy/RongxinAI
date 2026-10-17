@@ -636,6 +636,8 @@ export function registerLlamaCppIpcHandlers(
               memoryPolicy: serviceConfig.memoryPolicy,
               memoryBudgetPercent: serviceConfig.memoryBudgetPercent,
               modelSizeBytes: targetModel.size,
+              cacheTypeK: serviceConfig.cacheTypeK,
+              cacheTypeV: serviceConfig.cacheTypeV,
               signal: controller.signal,
               onLog: launchLogger.report,
               loadModel: async launchInput => {
@@ -827,3 +829,12 @@ export function registerLlamaCppIpcHandlers(
   });
   return daemon;
 }
+
+export {
+  enforceLlamaCppParallelTwo,
+  getLlamaCppModelPreferences,
+  getLlamaCppServiceConfig,
+  sanitizeLlamaCppModelPreference,
+  sanitizeLlamaCppServiceConfig,
+  shouldRefreshLlamaCppModelBindings,
+} from './config';

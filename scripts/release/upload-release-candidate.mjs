@@ -5,27 +5,18 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+import { resolveReleaseArtifactFormat } from './inference-edition-targets.mjs';
 import { verifyCandidateManifests } from './release-candidate-manifest.mjs';
 
 export function artifactFormat(platform, variant, kind) {
-  if (kind === 'metadata') return { extension: '.yml', contentType: 'application/x-yaml' };
-  if (kind === 'blockmap') return { extension: '.blockmap', contentType: 'application/octet-stream' };
-  if (kind === 'updater' && platform === 'darwin' && variant === 'default') {
-    return { extension: '.zip', contentType: 'application/zip' };
-  }
-  if (platform === 'win32' && variant === 'lite') {
-    return { extension: '.exe', contentType: 'application/vnd.microsoft.portable-executable' };
-  }
-  if (platform === 'darwin' && variant === 'default') {
-    return { extension: '.dmg', contentType: 'application/x-apple-diskimage' };
-  }
-  if (platform === 'linux' && variant === 'deb') {
-    return { extension: '.deb', contentType: 'application/vnd.debian.binary-package' };
-  }
-  if (platform === 'linux' && variant === 'appimage') {
-    return { extension: '.appimage', contentType: 'application/vnd.appimage' };
-  }
-  throw new Error(`Unsupported release candidate artifact: ${platform}:${variant}:${kind}`);
+  const format = resolveReleaseArtifactFormat(platform, variant, kind);
+  const contentType =
+    kind === 'metadata'
+      ? 'application/x-yaml'
+      : kind === 'blockmap'
+        ? 'application/octet-stream'
+        : format.contentType;
+  return { extension: format.extension, contentType };
 }
 
 function runAwsCommand(commandArgs, stdio = 'inherit') {

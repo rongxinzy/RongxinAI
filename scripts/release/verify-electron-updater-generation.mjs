@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import yaml from 'js-yaml';
 
+import { ELECTRON_UPDATER_METADATA_FILENAMES } from './inference-edition-targets.mjs';
+
 const args = process.argv.slice(2);
 const metadataFlag = args.indexOf('--artifact-metadata');
 const [releaseVersion, ...metadataSpecs] = metadataFlag === -1 ? args : args.slice(0, metadataFlag);
@@ -12,13 +14,7 @@ if (!releaseVersion || metadataSpecs.length === 0 || artifactMetadataPaths.lengt
   );
 }
 
-const expectedMetadataNames = new Map([
-  ['win32:x64:lite', 'latest.yml'],
-  ['darwin:x64:default', 'latest-mac.yml'],
-  ['darwin:arm64:default', 'latest-mac.yml'],
-  ['linux:x64:appimage', 'latest-linux.yml'],
-  ['linux:x64:deb', 'latest-linux.yml'],
-]);
+const expectedMetadataNames = ELECTRON_UPDATER_METADATA_FILENAMES;
 const artifacts = (
   await Promise.all(
     artifactMetadataPaths.map(async metadataPath => {

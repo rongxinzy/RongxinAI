@@ -1,5 +1,10 @@
 import fs from 'fs';
 
+import {
+  estimateKvBytesPerTokenFromGgufShape,
+  resolveGgufKvCacheShapeFromMetadata,
+} from '../../shared/llamacpp/ggufKvCacheEstimate';
+
 const GGUF_MAGIC = 0x46554747;
 const MAX_METADATA_STRING_BYTES = 4 * 1024 * 1024;
 const METADATA_READ_BUFFER_BYTES = 64 * 1024;
@@ -24,29 +29,51 @@ const GgufValueType = {
  * Reads GGUF metadata only. Models whose chat template declares
  * `enable_thinking` can expose a safe on/off control in the chat UI.
  */
-export function ggufSupportsThinkingToggle(filePath: string): boolean {
+export function readGgufMetadataMap(filePath: string): Map<string, unknown> | undefined {
   let descriptor: number | undefined;
   try {
     descriptor = fs.openSync(filePath, 'r');
     const reader = new GgufReader(descriptor);
-    if (reader.readUint32() !== GGUF_MAGIC) return false;
+    if (reader.readUint32() !== GGUF_MAGIC) return undefined;
 
     reader.readUint32(); // GGUF version
     reader.readUint64(); // tensor count
     const metadataCount = reader.readUint64();
+    const metadata = new Map<string, unknown>();
 
     for (let index = 0; index < metadataCount; index += 1) {
       const key = reader.readString();
       const valueType = reader.readUint32();
-      const value = reader.readValue(valueType, key.startsWith('tokenizer.chat_template'));
-      if (key.startsWith('tokenizer.chat_template') && containsThinkingToggle(value)) {
-        return true;
-      }
+      metadata.set(key, reader.readTypedValue(valueType));
     }
+    return metadata;
   } catch {
-    return false;
+    return undefined;
   } finally {
     if (descriptor !== undefined) fs.closeSync(descriptor);
+  }
+}
+
+export function readGgufKvBytesPerToken(
+  filePath: string,
+  cacheTypeK?: string,
+  cacheTypeV?: string,
+): number | undefined {
+  const metadata = readGgufMetadataMap(filePath);
+  if (!metadata) return undefined;
+  const shape = resolveGgufKvCacheShapeFromMetadata(metadata);
+  if (!shape) return undefined;
+  const bytes = estimateKvBytesPerTokenFromGgufShape({ shape, cacheTypeK, cacheTypeV });
+  return bytes > 0 ? bytes : undefined;
+}
+
+export function ggufSupportsThinkingToggle(filePath: string): boolean {
+  const metadata = readGgufMetadataMap(filePath);
+  if (!metadata) return false;
+  for (const [key, value] of metadata.entries()) {
+    if (key.startsWith('tokenizer.chat_template') && containsThinkingToggle(value)) {
+      return true;
+    }
   }
   return false;
 }
@@ -83,40 +110,45 @@ class GgufReader {
     return this.readBuffer(length).toString('utf8');
   }
 
-  readValue(valueType: number, retainStrings: boolean): unknown {
+  readTypedValue(valueType: number): unknown {
     switch (valueType) {
       case GgufValueType.Uint8:
+        return this.readBuffer(1).readUInt8(0);
       case GgufValueType.Int8:
+        return this.readBuffer(1).readInt8(0);
       case GgufValueType.Bool:
-        return this.skip(1);
+        return this.readBuffer(1).readUInt8(0) !== 0;
       case GgufValueType.Uint16:
+        return this.readBuffer(2).readUInt16LE(0);
       case GgufValueType.Int16:
-        return this.skip(2);
+        return this.readBuffer(2).readInt16LE(0);
       case GgufValueType.Uint32:
+        return this.readBuffer(4).readUInt32LE(0);
       case GgufValueType.Int32:
+        return this.readBuffer(4).readInt32LE(0);
       case GgufValueType.Float32:
-        return this.skip(4);
+        return this.readBuffer(4).readFloatLE(0);
       case GgufValueType.Uint64:
+        return this.readUint64();
       case GgufValueType.Int64:
+        return this.readBuffer(8).readBigInt64LE(0);
       case GgufValueType.Float64:
-        return this.skip(8);
-      case GgufValueType.String: {
-        return retainStrings ? this.readString() : this.skipString();
-      }
+        return this.readBuffer(8).readDoubleLE(0);
+      case GgufValueType.String:
+        return this.readString();
       case GgufValueType.Array:
-        return this.readArray(retainStrings);
+        return this.readArray();
       default:
         throw new Error(`Unsupported GGUF metadata value type: ${valueType}`);
     }
   }
 
-  private readArray(retainStrings: boolean): unknown[] | undefined {
+  private readArray(): unknown[] {
     const valueType = this.readUint32();
     const length = this.readUint64();
-    const values = retainStrings ? ([] as unknown[]) : undefined;
+    const values: unknown[] = [];
     for (let index = 0; index < length; index += 1) {
-      const value = this.readValue(valueType, retainStrings);
-      if (values) values.push(value);
+      values.push(this.readTypedValue(valueType));
     }
     return values;
   }

@@ -1,0 +1,55 @@
+name: Verify inference edition builds (manual)
+
+# Branch validation: pull_request runs the same reusable build as tag release (verify mode).
+# workflow_dispatch exists for post-merge manual runs on the default branch only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_macos:
+        description: 'Build macOS'
+        required: true
+        default: true
+        type: boolean
+      build_windows:
+        description: 'Build Windows'
+        required: true
+        default: true
+        type: boolean
+      build_linux:
+        description: 'Build Linux'
+        required: true
+        default: true
+        type: boolean
+  pull_request:
+    paths:
+      - '.github/workflows/build-inference-editions.yml'
+      - '.github/workflows/build-platforms.yml'
+      - '.github/workflows/release.yml'
+      - 'package.json'
+      - 'bun.lock'
+      - 'electron-builder*.json'
+      - 'electron-builder*.cjs'
+      - 'scripts/**'
+      - 'resources/**'
+      - 'vendor/llamacpp/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-inference-editions-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-inference-editions:
+    uses: ./.github/workflows/build-inference-editions.yml
+    with:
+      source-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      mode: verify
+      fail-fast: false
+      build-macos: ${{ github.event_name != 'workflow_dispatch' || inputs.build_macos }}
+      build-windows: ${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}
+      build-linux: ${{ github.event_name != 'workflow_dispatch' || inputs.build_linux }}
+    secrets:
+      MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}

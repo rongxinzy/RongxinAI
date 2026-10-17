@@ -24,8 +24,6 @@ export function resolveBundledLlamaCppBackendManifestPath(): string {
 }
 
 export function readBundledLlamaCppBackendManifest(): LlamaCppBackendManifest | undefined {
-  if (process.platform !== 'win32') return undefined;
-
   const manifestPath = resolveBundledLlamaCppBackendManifestPath();
   if (!fs.existsSync(manifestPath)) return undefined;
 

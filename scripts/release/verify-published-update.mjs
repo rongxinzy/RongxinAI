@@ -10,6 +10,8 @@ import {
 } from './published-update-smoke-lib.mjs';
 import yaml from 'js-yaml';
 
+import { ELECTRON_UPDATER_METADATA_FILENAMES } from './inference-edition-targets.mjs';
+
 const args = process.argv.slice(2);
 let channel = 'stable';
 let argIndex = 0;
@@ -83,13 +85,7 @@ for (const target of targets) {
   console.log(`[UpdateRelease] ${target} passed manifest and artifact smoke tests`);
 }
 
-const electronMetadataNames = new Map([
-  ['win32:x64:lite', 'latest.yml'],
-  ['darwin:x64:default', 'latest-mac.yml'],
-  ['darwin:arm64:default', 'latest-mac.yml'],
-  ['linux:x64:appimage', 'latest-linux.yml'],
-  ['linux:x64:deb', 'latest-linux.yml'],
-]);
+const electronMetadataNames = ELECTRON_UPDATER_METADATA_FILENAMES;
 for (const target of targets) {
   const [platform, arch, variant] = target.split(':');
   const metadataName = electronMetadataNames.get(target);

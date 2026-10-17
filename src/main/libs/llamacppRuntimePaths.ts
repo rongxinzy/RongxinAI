@@ -91,6 +91,8 @@ export function buildLlamaCppExecutableCandidates(input: {
     join(input.userRuntimeRoot, 'current', `llama-server${extension}`),
     join(input.resourceRoot, 'llamacpp', `llama-server${extension}`),
     join(input.resourceRoot, 'llamacpp', 'bin', `llama-server${extension}`),
+    join(input.resourceRoot, 'llamacpp-bundled', 'bin', `llama-server${extension}`),
+    join(input.resourceRoot, 'llamacpp-bundled', `llama-server${extension}`),
   ];
 
   if (!input.isPackaged) {
@@ -161,6 +163,32 @@ export function selectLlamaCppRuntimeTarget(input: {
     return {
       ok: false,
       error: `Unsupported platform for llama.cpp runtime: ${input.platform}/${input.arch}.`,
+    };
+  }
+
+  if (input.platform === 'linux' && baseTargetId === LlamaCppRuntimeTargetId.LinuxX64) {
+    if (input.runtimeBackend === LlamaCppRuntimeBackend.Cpu) {
+      return { ok: true, targetId: LlamaCppRuntimeTargetId.LinuxX64 };
+    }
+    if (input.runtimeBackend === LlamaCppRuntimeBackend.Cuda) {
+      if (!input.hasNvidiaGpu) {
+        return { ok: false, error: 'CUDA runtime requires an NVIDIA GPU on Linux.' };
+      }
+      return {
+        ok: true,
+        targetId:
+          input.runtimeCudaMajor === LlamaCppRuntimeCudaMajor.Cuda13
+            ? LlamaCppRuntimeTargetId.LinuxX64Cuda13
+            : LlamaCppRuntimeTargetId.LinuxX64Cuda12,
+      };
+    }
+    return {
+      ok: true,
+      targetId: input.hasNvidiaGpu
+        ? input.runtimeCudaMajor === LlamaCppRuntimeCudaMajor.Cuda13
+          ? LlamaCppRuntimeTargetId.LinuxX64Cuda13
+          : LlamaCppRuntimeTargetId.LinuxX64Cuda12
+        : LlamaCppRuntimeTargetId.LinuxX64,
     };
   }
 
@@ -272,10 +300,19 @@ function readRuntimeBuildMetadata(runtimeRoot: string):
 function runtimeBackendFieldsFromTargetId(
   targetId: string | undefined,
 ): Pick<Partial<LlamaCppStatusSnapshot>, 'runtimeBackend' | 'runtimeCudaMajor'> {
-  if (targetId === LlamaCppRuntimeTargetId.WinX64Cuda12) {
+  if (
+    targetId === LlamaCppRuntimeTargetId.WinX64Cuda12 ||
+    targetId === LlamaCppRuntimeTargetId.LinuxX64Cuda12
+  ) {
     return {
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
       runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
+    };
+  }
+  if (targetId === LlamaCppRuntimeTargetId.LinuxX64Cuda13 || targetId === 'win-x64-cuda-13') {
+    return {
+      runtimeBackend: LlamaCppRuntimeBackend.Cuda,
+      runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda13,
     };
   }
   if (targetId?.includes('cuda')) {

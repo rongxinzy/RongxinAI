@@ -75,7 +75,7 @@ test('signed releases check the packaged Magpie helper signature and sealed dige
   expect(authenticode).toContain("Join-Path $magpieDirectory 'magpie.exe'");
   expect(authenticode).toContain('Magpie SHA-256 does not match the sealed manifest');
   expect(authenticode).toContain("signing.format -ne 'authenticode'");
-  for (const filename of ['release.yml']) {
+  for (const filename of ['build-inference-editions.yml']) {
     const workflow = read(`.github/workflows/${filename}`);
     const staple = workflow.indexOf('xcrun stapler validate "$app_path"');
     const helper = workflow.indexOf(

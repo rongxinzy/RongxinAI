@@ -6,7 +6,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { writeSetupManifest } = require('./sfx-format.cjs');
 const { verifyRetainedHost } = require('./retain-uninstaller.cjs');
-const { verifyFinalSetupBudget, verifyFinalNsisBudget } = require('./distribution-budget.cjs');
+const {
+  verifyFinalSetupBudget,
+  verifyFinalNsisBudget,
+  describeEditionByteBreakdown,
+  resolveEditionSetupBudget,
+  reportMeasurement,
+} = require('./distribution-budget.cjs');
+const { resolveInferenceEdition } = require('../resolve-nsis-offline-components.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const signed = process.argv.includes('--signed');
@@ -57,12 +64,34 @@ const finalBudget = verifyFinalSetupBudget(
   path.join(root, 'build-tar', 'windows-components'),
 );
 console.log(`[installer-shell] final signed-byte budget ${JSON.stringify(finalBudget)}`);
+const edition = resolveInferenceEdition();
+console.log(
+  `[installer-shell] NSIS byte budget profile ${JSON.stringify(describeEditionByteBreakdown(edition))}`,
+);
 const nsisBudget = verifyFinalNsisBudget(
   path.join(root, 'release'),
   finalBudget.componentArchiveBytes,
+  edition,
 );
 console.log(`[installer-shell] final NSIS updater budget ${JSON.stringify(nsisBudget)}`);
+// Always measured; for report-only editions (cpu/cuda) these lines are the
+// input for the follow-up limits PR (measured value + explicit margin).
+reportMeasurement(`windows-webview2-setup edition=${edition}`, {
+  reportOnly: finalBudget.reportOnly,
+  installerBytes: finalBudget.installerBytes,
+  componentArchiveBytes: finalBudget.componentArchiveBytes,
+  nonComponentBytes: finalBudget.nonComponentBytes,
+});
+reportMeasurement(`windows-nsis-updater edition=${edition}`, {
+  reportOnly: nsisBudget.reportOnly,
+  file: nsisBudget.file,
+  installerBytes: nsisBudget.installerBytes,
+  componentArchiveBytes: nsisBudget.componentArchiveBytes,
+  nonComponentBytes: nsisBudget.nonComponentBytes,
+});
 // The report must describe the final signed bytes, never the pre-signing file.
-const report = writeSetupManifest(setup, version);
+const report = writeSetupManifest(setup, version, {
+  maxBytes: resolveEditionSetupBudget(edition).maxInstallerBytes,
+});
 if (report.signed !== signed) throw new Error('Unexpected setup signature state');
 console.log(`[installer-shell] distribution ready: ${setup} (${report.sha256})`);

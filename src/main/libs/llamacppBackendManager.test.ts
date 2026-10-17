@@ -8,7 +8,7 @@ import { app } from 'electron';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ZipFile } from 'yazl';
 
-vi.mock('./llamacppManager', () => ({
+vi.mock('./llamacppRuntimeDeviceProbe', () => ({
   listLlamaCppRuntimeDevices: vi.fn(async (input: { executablePath: string }) => ({
     success: true,
     executablePath: input.executablePath,
@@ -200,6 +200,7 @@ describe('llamacpp backend manager', () => {
       arch: 'x64',
       hasNvidiaGpu: true,
       config: {},
+      driverVersion: '580.42.01',
     });
 
     expect(ref?.versionBackend).toBe('b9505/win-x64-cuda-13');
@@ -249,9 +250,23 @@ describe('llamacpp backend manager', () => {
       arch: 'x64',
       hasNvidiaGpu: true,
       config: {},
+      driverVersion: '580.42.01',
     });
 
     expect(ref?.versionBackend).toBe('b9518/win-x64-cuda-13');
+  });
+
+  test('recommends Linux x64 CUDA when NVIDIA GPU is available', () => {
+    const manifest = buildFallbackManifest('b9505');
+    const ref = recommendLlamaCppBackend({
+      manifest,
+      platform: 'linux',
+      arch: 'x64',
+      hasNvidiaGpu: true,
+      config: {},
+      driverVersion: '550.54.15',
+    });
+    expect(ref?.versionBackend).toBe('b9505/linux-x64-cuda-12');
   });
 
   test('recommends Vulkan for Windows x64 without NVIDIA when available', () => {

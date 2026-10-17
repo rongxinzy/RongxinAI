@@ -8,6 +8,7 @@ import type {
   AppUpdateCheckResult,
   AppUpdateRuntimeState,
 } from '../../../shared/appUpdate/constants';
+import type { InferenceEdition } from '../../../shared/inferenceEdition';
 
 export interface DialogApi {
   selectDirectory: (options?: {
@@ -67,6 +68,8 @@ export interface AppInfoApi {
   isEnterprise: () => Promise<boolean>;
   getSystemLocale: () => Promise<string>;
   consumePendingLocalInferenceInstall: () => Promise<string | null>;
+  getInferenceEdition: () => Promise<InferenceEdition>;
+  usesBundledLlamaCppRuntime: () => Promise<boolean>;
   relaunch: () => Promise<void>;
 }
 

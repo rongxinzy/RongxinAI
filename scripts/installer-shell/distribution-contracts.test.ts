@@ -57,15 +57,15 @@ test('community builds keep the full NSIS updater and then assemble the WebView2
   expect(hook).toContain('"${UNINSTALLER_OUT_FILE}"\' = 0');
 });
 
-test.each(['release.yml'])(
+test.each(['build-inference-editions.yml'])(
   '%s publishes the final signed, interactively tested shell separately from NSIS updates',
   name => {
     const workflow = read(`.github/workflows/${name}`);
     expect(workflow).toContain('actions/setup-dotnet@v5');
     expect(workflow).toContain('uses: ./.github/actions/setup-certum-signing');
     expect(workflow).toContain('bun run dist:win:signed');
-    expect(workflow).toContain('"${installers[0]}:win32:x64:lite:installer"');
-    expect(workflow).toContain('"${updaters[0]}:win32:x64:lite:updater"');
+    expect(workflow).toContain(':win32:x64:${EDITION}:installer');
+    expect(workflow).toContain(':win32:x64:${EDITION}:updater');
     expect(workflow).toContain('"${blockmaps[0]}" == "${updaters[0]}.blockmap"');
     const signed = workflow.indexOf('bun run dist:win:signed');
     const signature = workflow.indexOf('verify-windows-authenticode.ps1');

@@ -885,7 +885,12 @@ export class AppUpdateCoordinator {
       const packageJson = JSON.parse(
         fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'),
       ) as { zhiyuanUpdateVariant?: unknown };
-      return packageJson.zhiyuanUpdateVariant === 'full' ? 'full' : 'lite';
+      const variant =
+        typeof packageJson.zhiyuanUpdateVariant === 'string'
+          ? packageJson.zhiyuanUpdateVariant.trim().toLowerCase()
+          : 'lite';
+      if (variant === 'full' || variant === 'cpu' || variant === 'cuda') return variant;
+      return 'lite';
     } catch {
       return 'lite';
     }

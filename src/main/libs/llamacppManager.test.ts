@@ -1,6 +1,6 @@
 /**
  * Vitest entry for llama.cpp manager tests (issue #1069).
  */
-import './llamacppManager/serve.test';
-import './llamacppManager/models.test';
-import './llamacppManager/install.test';
+import './llamacppManager/serve.test.ts';
+import './llamacppManager/models.test.ts';
+import './llamacppManager/install.test.ts';

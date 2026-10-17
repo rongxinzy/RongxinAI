@@ -40,3 +40,14 @@ test('recognizes standard-library imports used by bundled skill launchers', () =
 
   expect(validateSkillDependencyDeclarations(skillsRoot)).toEqual({ ok: true, missing: [] });
 });
+
+test('treats local Python packages (directories with __init__.py) as local modules', () => {
+  const skillsRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-python-declarations-'));
+  temporaryDirectories.push(skillsRoot);
+  const scriptsRoot = path.join(skillsRoot, 'fixture', 'scripts');
+  fs.mkdirSync(path.join(scriptsRoot, 'cover_lib'), { recursive: true });
+  fs.writeFileSync(path.join(scriptsRoot, 'cover_lib', '__init__.py'), '');
+  fs.writeFileSync(path.join(scriptsRoot, 'cover.py'), 'from cover_lib import render\n');
+
+  expect(validateSkillDependencyDeclarations(skillsRoot)).toEqual({ ok: true, missing: [] });
+});

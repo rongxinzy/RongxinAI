@@ -29,6 +29,7 @@ import {
   resolveProjectMemoryContextForPiPrompt,
 } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { applyApplicationRuntimeEnv } from '../coworkUtil';
+import { assertLlamaCppWorkModeContext } from '../llamacppWorkModeContextGuard';
 import { PiPlanModePrompt } from './piPlanTool';
 import { resolvePiTurnWorkflowSkills } from './piTurnWorkflow';
 import { isAcademicResearchSkillSet } from './piResearchRun';
@@ -238,6 +239,12 @@ export async function startPiRuntimeSession(
       typeof resolvedModel.model.id === 'string'
         ? resolvedModel.model.id
         : options.modelOverride || 'unknown';
+    if (options.sessionMode === CoworkSessionMode.Work) {
+      assertLlamaCppWorkModeContext({
+        providerName: resolvedModel.providerName,
+        modelId,
+      });
+    }
     const reasoning = resolvedModel.model.reasoning;
     const harnessModelProfile: HarnessModelProfileInput = {
       provider: resolvedModel.providerName,

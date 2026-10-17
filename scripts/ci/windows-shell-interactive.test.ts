@@ -385,18 +385,13 @@ test('drives real visible pointer input and screenshots without synthetic comple
 });
 
 test('requires full main-repository components, local inference and actual failure recovery', () => {
-  for (const key of [
-    'channel-runtime',
-    'skills',
-    'mcps',
-    'portable-git',
-    'python',
-    'skill-python',
-    'uv',
-  ])
-    expect(script).toContain(`'${key}'`);
+  // The fixed component set is read from the file the installers embed, not
+  // hard-coded; lite must match it exactly, cpu/cuda must contain it.
+  expect(script).toContain('scripts/nsis-offline-components.json');
   for (const marker of [
-    'Main installer acceptance must retain all seven offline components',
+    'Main installer acceptance must retain fixed offline component',
+    'lite installer must carry only the fixed offline components',
+    '[measure] windows-shell-components',
     'pending-local-inference-install',
     'Opening/cancelling setup terminated the existing application',
     'Cancelled upgrade did not restore the previous installation',

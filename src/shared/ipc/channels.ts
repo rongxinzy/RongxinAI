@@ -232,6 +232,8 @@ export const AppIpc = {
   GetPreventSleep: 'app:getPreventSleep',
   SetPreventSleep: 'app:setPreventSleep',
   GetVersion: 'app:getVersion',
+  GetInferenceEdition: 'app:getInferenceEdition',
+  UsesBundledLlamaCppRuntime: 'app:usesBundledLlamaCppRuntime',
   IsDev: 'app:isDev',
   IsEnterprise: 'app:isEnterprise',
   GetSystemLocale: 'app:getSystemLocale',

@@ -73,6 +73,9 @@ test('applyAutomaticLlamaCppServiceDefaults fills ctxSize only when unset', () =
   ).toEqual({
     host: '127.0.0.1',
     ctxSize: '8192',
+    flashAttn: 'on',
+    cacheTypeK: 'q8_0',
+    cacheTypeV: 'q8_0',
   });
 
   expect(
@@ -93,5 +96,8 @@ test('applyAutomaticLlamaCppServiceDefaults fills ctxSize only when unset', () =
   ).toEqual({
     host: '127.0.0.1',
     ctxSize: '8192',
+    flashAttn: 'on',
+    cacheTypeK: 'q8_0',
+    cacheTypeV: 'q8_0',
   });
 });

@@ -7,6 +7,10 @@ const { binaryName, sha256File, verifyRuntime } = require('./magpie-runtime.cjs'
 
 const MAC_TARGETS = ['darwin-x64', 'darwin-arm64'];
 
+function listPackagedMacMagpieTargets(root) {
+  return MAC_TARGETS.filter(key => fs.existsSync(path.join(root, key)));
+}
+
 function isMagpieHelper(filename) {
   return /\/magpie\/darwin-(?:x64|arm64)\/magpie$/.test(filename.split(path.sep).join('/'));
 }
@@ -22,7 +26,13 @@ function optionsForSignedFile(options, filename) {
 
 async function signWithRuntimeManifest(options, signer = signAsync) {
   const root = path.join(options.app, 'Contents', 'Resources', 'magpie');
-  const manifests = new Map(MAC_TARGETS.map(key => [key, verifyRuntime(root, key)]));
+  const packagedTargets = listPackagedMacMagpieTargets(root);
+  if (packagedTargets.length === 0) {
+    throw new Error(
+      'macOS signing expected at least one packaged Magpie helper under Resources/magpie',
+    );
+  }
+  const manifests = new Map(packagedTargets.map(key => [key, verifyRuntime(root, key)]));
   let manifestSealed = false;
   await signer({
     ...options,
@@ -55,10 +65,11 @@ async function signWithRuntimeManifest(options, signer = signAsync) {
     },
   });
   if (!manifestSealed) throw new Error('macOS signing never sealed the Magpie runtime manifests');
-  for (const key of MAC_TARGETS) verifyRuntime(root, key, { allowSigned: true });
+  for (const key of packagedTargets) verifyRuntime(root, key, { allowSigned: true });
 }
 
 // electron-builder has already resolved identity, keychain and entitlements.
 // Preserve all of those options rather than selecting a new signing identity.
 module.exports = options => signWithRuntimeManifest(options);
 module.exports.signWithRuntimeManifest = signWithRuntimeManifest;
+module.exports.listPackagedMacMagpieTargets = listPackagedMacMagpieTargets;
