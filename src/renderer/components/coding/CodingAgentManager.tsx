@@ -173,7 +173,7 @@ export const CodingAgentManager = ({
               <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
               <DialogDescription>
                 {activeTab === CodingAgentManagerTab.Magpie
-                  ? i18nService.t('magpieManagerDescription')
+                  ? i18nService.t('magpieExternalPanelDescription')
                   : summary}
               </DialogDescription>
             </div>

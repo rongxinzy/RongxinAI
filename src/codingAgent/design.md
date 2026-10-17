@@ -226,6 +226,14 @@ Codex 与 Claude Code 作为首批一等外部 Agent，采用“用户安装 Age
 - 旧版 `needs_adapter` Profile 原地升级并保留 Profile ID，避免已有 Lane 失去引用；Adapter 版本或 CLI 路径变化后重新 Probe。
 - UI 只展示用户安装的 Agent 路径和“检测连接”，不暴露桥接器安装概念。
 
+**可选：经 Magpie 接入统一模型网关（用户显式开启）**
+
+- 编程工作台与模型设置提供「接入外部 Agent」入口；默认不写入任何本机 CLI 配置。
+- 用户确认后，宿主通过 Magpie 官方 HTTP API 对 Claude Code、OpenCode、Gemini CLI、Pi、Codex 执行 connect / disconnect / setModel；断开或「全部断开」从 stash 恢复原始文件。
+- 接入后这些 CLI 的模型请求走路由到知远已配置的 Magpie 网关；**ACP 桥接路径不受影响**，仍使用各自 CLI 与账号。Codex 不启用 ChatGPT 订阅接入或账号 failover。
+- 内置知远编程 Agent 使用应用私有 `PI_CODING_AGENT_DIR`，与用户经 Magpie 接入的 Pi CLI（`~/.pi/agent`）隔离。
+- 外部 Agent 需知远保持运行；可选「退出时断开所有外部 Agent」在退出前恢复配置。
+
 ## 7. 内置知远编程 Agent
 
 ### 7.1 定位
@@ -1097,7 +1105,7 @@ src/renderer/store/slices/
 
 第一版明确不做：
 
-- 把知远模型注入 Claude Code、Codex 或 OpenCode。
+- 默认或静默把知远模型注入 Claude Code、Codex、OpenCode 或其他外部 CLI（用户可在「接入外部 Agent」中显式 opt-in）。
 - 用 WebView 嵌入外部 Agent 的 CLI TUI。
 - 默认广播 Prompt 给所有 Agent。
 - 在运行时下载或安装任何外部 Agent；Codex 与 Claude Code 的固定版本 ACP 桥接器随应用交付。

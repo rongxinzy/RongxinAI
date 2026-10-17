@@ -44,6 +44,10 @@ export function registerMagpieIpc(
   handle(MagpieIpc.models, () => manager.models());
   handle(MagpieIpc.agents, () => manager.agents());
   handle(MagpieIpc.setModel, (selection: MagpieModelSelection) => manager.setModel(selection));
+  handle(MagpieIpc.previewAgent, (agentId: string) => manager.previewAgent(agentId));
+  handle(MagpieIpc.connectAgent, (agentId: string) => manager.connectAgent(agentId));
+  handle(MagpieIpc.disconnectAgent, (agentId: string) => manager.disconnectAgent(agentId));
+  handle(MagpieIpc.disconnectAllAgents, () => manager.disconnectAllAgents());
   handle(MagpieIpc.providers, () => manager.providers());
   handle(MagpieIpc.saveProvider, (input: MagpieSaveProviderInput) => {
     if (input?.id && typeof input.id === 'string' && input.id.startsWith(HOST_PROVIDER_PREFIX)) {
@@ -101,6 +105,8 @@ export function registerMagpieIpc(
         }
         const body = Buffer.concat(chunks).toString('utf8');
         if (route === '/api/signin') {
+          // Subscription sign-in stays behind the explicit opt-in switch and oauthPolicy;
+          // Codex ChatGPT join is still off by default via MAGPIE_NO_ACCOUNTS / noAccountDiscovery.
           try {
             const request = JSON.parse(body) as { agent?: unknown; site?: unknown };
             const agent = request.agent;
