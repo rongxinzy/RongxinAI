@@ -8,7 +8,6 @@ import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import {
   COWORK_MESSAGE_HISTORY_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
-  CoworkPermissionOrigin,
   CoworkSessionMode,
   type CoworkSessionSource,
 } from '../../shared/cowork/constants';
@@ -24,7 +23,6 @@ import {
   deleteSession as deleteSessionAction,
   deleteSessions as deleteSessionsAction,
   dequeuePendingPermission,
-  enqueuePendingPermission,
   prependMessages,
   recoverSession,
   setConfig,
@@ -33,8 +31,6 @@ import {
   setHasMoreSessions,
   setRemoteManaged,
   setSessions,
-  updateMessageContents,
-  updateToolActivity,
   updateSessionPinned,
   updateCurrentSessionModelOverride,
   updateSessionStatus,
@@ -60,18 +56,11 @@ import {
   hasMatchingLatestTerminalError,
   resolveCoworkTerminalError,
 } from './coworkTerminalError';
-import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
-import { RafStreamPartBatcher } from './rafStreamPartBatcher';
 import { workspaceService } from './workspace';
-import { CoworkContentBuffer } from './coworkContentBuffer';
 import { coworkLiveTextStore } from './liveTextStore';
 import { CoworkRunSync } from './coworkRunSync';
 import { PiUiRecovery } from './piUiRecovery';
-import {
-  PiUiEventSequenceTracker,
-  PiUiEventType,
-  type PiUiEvent,
-} from '../../shared/cowork/piUiEvent';
+import { createCoworkStreamPipeline, type CoworkStreamPipeline } from './coworkStreamPipeline';
 
 const classifyError = (error: string | CoworkError): string => {
   if (typeof error === 'object' && 'kind' in error) {
@@ -120,22 +109,11 @@ class CoworkService {
 
     // Clean up any existing listeners
     this.cleanupListeners();
-    const updateBatcher = new RafMessageUpdateBatcher(updates => {
-      for (const update of updates) {
-        coworkLiveTextStore.clear(update.messageId);
-      }
-      store.dispatch(updateMessageContents(updates));
-    });
-    const liveTextBatcher = new RafStreamPartBatcher(parts => {
-      for (const part of parts) {
-        coworkLiveTextStore.applyChunk(part.messageId, part.chunk);
-      }
-    });
-    const messageUpdateRafCleanup = () => {
-      updateBatcher.dispose();
-      liveTextBatcher.dispose();
-    };
-    this.streamListenerCleanups.push(messageUpdateRafCleanup);
+
+    // Recovery flushes the pipeline's pending batches, while the pipeline
+    // reports gaps/content gaps back into recovery through its deps callbacks.
+    // Declare the pipeline first so both sides can reference it safely.
+    let pipeline: CoworkStreamPipeline | undefined;
 
     const recovery = new PiUiRecovery({
       readRuntime: sessionId => cowork.getRuntimeSnapshots(sessionId),
@@ -150,155 +128,50 @@ class CoworkService {
       applySession: (session, preserveLiveContent) =>
         store.dispatch(recoverSession({ session, preserveLiveContent })),
       flush: () => {
-        liveTextBatcher.flush();
-        updateBatcher.flush();
+        pipeline?.flush();
       },
     });
     this.streamListenerCleanups.push(() => recovery.dispose());
     const runSync = new CoworkRunSync(
       () => {
-        liveTextBatcher.flush();
-        updateBatcher.flush();
+        pipeline?.flush();
       },
       id => recovery.recover(id),
     );
     this.runSync = runSync;
-    const contentBuffer = new CoworkContentBuffer(id => runSync.requestRecovery(id));
-    this.streamListenerCleanups.push(runSync.start());
-    this.streamListenerCleanups.push(
-      cowork.onStreamContentPatch(patch => {
-        const update = contentBuffer.apply(patch);
-        const live = contentBuffer.live(patch.messageId);
-        if (live !== undefined) coworkLiveTextStore.setSnapshot(patch.messageId, live);
-        if (update) updateBatcher.enqueue(update);
-      }),
-    );
 
-    const sequenceTracker = new PiUiEventSequenceTracker();
-    const uiEventCleanup = cowork.onStreamUiEvent((event: PiUiEvent) => {
-      if (!sequenceTracker.accept(event)) return;
-      const applyEvent = recovery.observe(event);
-      if (sequenceTracker.consumeGap(event.sessionId) > 0 && event.sessionId) {
+    pipeline = createCoworkStreamPipeline({
+      dispatch: action => store.dispatch(action),
+      getCoworkState: () => store.getState().cowork,
+      liveText: coworkLiveTextStore,
+      shouldApply: event => recovery.observe(event),
+      onSequenceGap: sessionId => {
         console.warn('[CoworkService] detected a Pi UI event sequence gap, reloading the session');
-        runSync.requestRecovery(event.sessionId);
+        runSync.requestRecovery(sessionId);
         void recovery
-          .recover(event.sessionId)
+          .recover(sessionId)
           .catch(error =>
             console.error(
               '[CoworkService] failed to recover after a UI event sequence gap:',
               error,
             ),
           );
-      }
-      if (!applyEvent) return;
-      switch (event.type) {
-        case PiUiEventType.Message: {
-          const { sessionId, message } = event;
-          const state = store.getState().cowork;
-          const sessionExists = [...state.sessions, ...state.chatSessions].some(
-            session => session.id === sessionId,
-          );
-          if (!sessionExists) {
-            void Promise.all([this.loadSessions(), this.loadChatSessions()]).catch(error =>
-              console.error('[CoworkService] failed to refresh an unknown stream session:', error),
-            );
-          }
-          store.dispatch(addMessage({ sessionId, message }));
-          const content = contentBuffer.latest(message.id);
-          if (content !== undefined)
-            updateBatcher.enqueue({ sessionId, messageId: message.id, content });
-          break;
-        }
-        case PiUiEventType.Started:
-          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'running' }));
-          break;
-        case PiUiEventType.ContentPatch: {
-          const update = contentBuffer.apply(event.patch);
-          const live = contentBuffer.live(event.patch.messageId);
-          if (live !== undefined) coworkLiveTextStore.setSnapshot(event.patch.messageId, live);
-          if (update) updateBatcher.enqueue(update);
-          break;
-        }
-        case PiUiEventType.StreamPart:
-          liveTextBatcher.enqueue({
-            sessionId: event.sessionId,
-            messageId: event.messageId,
-            chunk: event.chunk,
-          });
-          break;
-        case PiUiEventType.MessageUpdate:
-          if (event.metadata?.isFinal === true) {
-            updateBatcher.enqueue({
-              sessionId: event.sessionId,
-              messageId: event.messageId,
-              content: event.content,
-              metadata: event.metadata,
-            });
-          } else {
-            coworkLiveTextStore.setSnapshot(event.messageId, event.content);
-          }
-          break;
-        case PiUiEventType.ToolActivity:
-          store.dispatch(updateToolActivity({ sessionId: event.sessionId, event: event.event }));
-          break;
-        case PiUiEventType.PermissionRequest:
-          store.dispatch(
-            enqueuePendingPermission({
-              origin: CoworkPermissionOrigin.PiWorkbench,
-              sessionId: event.sessionId,
-              toolName: event.request.toolName,
-              toolInput: event.request.toolInput,
-              requestId: event.request.requestId,
-              toolUseId: event.request.toolUseId ?? null,
-            }),
-          );
-          break;
-        case PiUiEventType.PermissionDismiss:
-          store.dispatch(dequeuePendingPermission({ requestId: event.requestId }));
-          break;
-        case PiUiEventType.Interrupted:
-          updateBatcher.flush();
-          store.dispatch(clearPendingPermissionsForSession(event.sessionId));
-          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'idle' }));
-          break;
-        case PiUiEventType.Completed:
-          updateBatcher.flush();
-          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'completed' }));
-          break;
-        case PiUiEventType.Error: {
-          updateBatcher.flush();
-          const stateBeforeStatusUpdate = store.getState().cowork;
-          const terminalMessageAlreadyReceived = hasMatchingLatestTerminalError(
-            [
-              stateBeforeStatusUpdate.currentSession,
-              stateBeforeStatusUpdate.streamingSessions[event.sessionId],
-            ],
-            event.sessionId,
-            event.error,
-          );
-          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'error' }));
-          if (event.error.message && !terminalMessageAlreadyReceived) {
-            store.dispatch(
-              addMessage({
-                sessionId: event.sessionId,
-                message: createCoworkTerminalErrorMessage(event.error),
-              }),
-            );
-          }
-          break;
-        }
-        case PiUiEventType.QueueUpdated:
-          break;
-        case PiUiEventType.Stopped:
-          updateBatcher.flush();
-          store.dispatch(clearPendingPermissionsForSession(event.sessionId));
-          store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'idle' }));
-          break;
-        default:
-          break;
-      }
+      },
+      onContentGap: sessionId => runSync.requestRecovery(sessionId),
+      onUnknownSession: () => {
+        void Promise.all([this.loadSessions(), this.loadChatSessions()]).catch(error =>
+          console.error('[CoworkService] failed to refresh an unknown stream session:', error),
+        );
+      },
     });
-    this.streamListenerCleanups.push(uiEventCleanup);
+    this.streamListenerCleanups.push(() => pipeline?.dispose());
+    this.streamListenerCleanups.push(runSync.start());
+    this.streamListenerCleanups.push(
+      cowork.onStreamContentPatch(patch => pipeline?.handleContentPatch(patch)),
+    );
+    this.streamListenerCleanups.push(
+      cowork.onStreamUiEvent(event => pipeline?.handleUiEvent(event)),
+    );
     void recovery
       .bootstrap()
       .catch(error =>

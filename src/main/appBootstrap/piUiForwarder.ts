@@ -28,7 +28,7 @@ import {
 } from '../../shared/cowork/piUiEvent';
 import type { UIMessageChunk } from 'ai';
 
-const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
+export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
   const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
   const runtimeSnapshots = new PiUiRuntimeSnapshots();
   const replayBuffer = new PiUiStreamReplayBuffer();
