@@ -3,8 +3,11 @@ export const zhSettings: Record<string, string> = {
   // 设置
   settings: '设置',
   settingsGroupGeneral: '通用',
-  settingsGroupModel: '模型',
+  settingsGroupModel: '模型与记忆',
   settingsGroupChannels: '渠道',
+  imChannelSettingsTitle: '{name} 设置',
+  settingsGeneralSectionApplication: '应用',
+  settingsGeneralSectionAgentRuntime: 'Agent 运行时',
   general: '通用',
   shortcuts: '快捷键',
   about: '关于',
@@ -40,10 +43,12 @@ export const zhSettings: Record<string, string> = {
   // 快捷键
   keyboardShortcuts: '键盘快捷键',
   shortcutNotSet: '未设置',
+  shortcutRecorderHint: '点击快捷键后按下新的组合键；Esc 取消，Backspace 清除。',
   shortcutConflict: '快捷键 "{0}" 已被 "{1}" 使用',
   settingsPartiallySaved: '基础设置已保存，但后续同步失败：{0}',
   systemPrompt: '系统提示词',
   systemPromptPlaceholder: '为 IM 机器人设置自定义指令...',
   settingsLoadFailed: '加载设置失败',
+  settingsSaveFailed: '保存设置失败',
   'settings.enterprise.managed': '由企业统一管理',
 };

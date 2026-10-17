@@ -6,13 +6,12 @@ import {
   MailCheck,
   MessageCircleMore,
   Network,
-  Route,
   SlidersHorizontal,
   SunMedium,
   type LucideIcon,
 } from 'lucide-react';
 
-import type { TabType } from './types';
+import type { SettingsTabType, TabType } from './types';
 
 export interface SettingsTabMeta {
   labelKey: string;
@@ -25,7 +24,6 @@ export const SETTINGS_TAB_METAS: Record<TabType, SettingsTabMeta> = {
   shortcuts: { labelKey: 'shortcuts', icon: Keyboard },
   model: { labelKey: 'model', icon: Box },
   aisphere: { labelKey: 'aisphereTab', icon: Network },
-  triage: { labelKey: 'modelTriageTitle', icon: Route },
   coworkMemory: { labelKey: 'coworkMemoryTitle', icon: Brain },
   im: { labelKey: 'imBot', icon: MessageCircleMore },
   email: { labelKey: 'emailTab', icon: MailCheck },
@@ -45,10 +43,22 @@ export interface SettingsNavGroupDef {
  */
 export const SETTINGS_NAV_GROUPS: SettingsNavGroupDef[] = [
   { titleKey: 'settingsGroupGeneral', tabs: ['general', 'appearance', 'shortcuts'] },
-  { titleKey: 'settingsGroupModel', tabs: ['model', 'aisphere', 'triage', 'coworkMemory'] },
+  { titleKey: 'settingsGroupModel', tabs: ['model', 'aisphere', 'coworkMemory'] },
   { titleKey: 'settingsGroupChannels', tabs: ['im', 'email'] },
   { titleKey: null, tabs: ['about'] },
 ];
+
+/**
+ * Wide canvases are reserved for list/workspace panels that need to show a
+ * second navigation column (IM) or a two-column card surface (memory). Every
+ * other settings page shares the compact reading column.
+ */
+const WIDE_SETTINGS_TABS: readonly SettingsTabType[] = ['coworkMemory', 'im'];
+
+export function settingsContentWidthClass(tab: SettingsTabType): string {
+  if (WIDE_SETTINGS_TABS.includes(tab)) return 'max-w-5xl';
+  return 'max-w-3xl';
+}
 
 export const SEND_SHORTCUT_OPTIONS = [
   { value: 'Enter', label: 'Enter', labelMac: 'Enter' },

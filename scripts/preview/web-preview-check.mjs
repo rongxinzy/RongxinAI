@@ -37,7 +37,6 @@ const settingsTabs = [
   ['settings-shortcuts', 'Shortcuts'],
   ['settings-model', 'Model'],
   ['settings-platform-models', 'Platform Models'],
-  ['settings-model-routing', 'Model Routing'],
   ['settings-memory', 'Memory'],
   ['settings-im', 'IM Bot'],
   ['settings-email', 'Email'],

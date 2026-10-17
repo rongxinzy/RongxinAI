@@ -169,32 +169,6 @@ export const enModelProviders: Record<string, string> = {
   apiKeyNotConfigured: 'API key not configured. Please set up your API key in settings.',
   modelSelectorNoModels: 'Please configure models in settings first',
   customCreate: 'Custom Create',
-  // Model Routing
-  modelTriageTitle: 'Model Routing',
-  modelTriageGlobalHint:
-    'Automatically switch between lightweight and heavyweight models based on message complexity. Global parameters, off by default.',
-  modelTriageGlobalDefaults: 'Global Defaults',
-  modelTriageCooldownLabel: 'Cooldown Rounds',
-  modelTriageCooldownHint:
-    'After a switch, wait N rounds before switching again to prevent flapping',
-  modelTriageMaxRoundsLabel: 'Chat Routing Limit',
-  modelTriageMaxRoundsHint:
-    'Beyond this many rounds, the conversation is treated as deep and uses the default model',
-  modelTriageRoundsUnit: 'rounds',
-  modelTriageLocalClassifierTitle: 'Local Model Classification (Experimental)',
-  modelTriageLocalClassifierHint:
-    'When rules cannot determine a routing target, call a local small model to classify',
-  modelTriageUseLocalModelLabel: 'Use a local small model to assist classification',
-  modelTriageUseLocalModelHint:
-    'Start the service and load a model on the Local Inference page first',
-  modelTriageModelNameLabel: 'Classifier Model Name',
-  modelTriageModelNamePlaceholder: 'e.g. qwen2.5-0.5b',
-  modelTriageModelNameNote:
-    'The model must be loaded in Local Inference first. A lightweight 0.5B–1B model is recommended.',
-  modelTriageClassifierBaseUrlLabel: 'Classifier Server Address',
-  modelTriageClassifierBaseUrlPlaceholder: 'http://127.0.0.1:8000',
-  modelTriageClassifierBaseUrlNote:
-    'Root address of the local inference server (without /v1). Leave empty to use the enabled endpoint.',
   githubCopilotAuth: 'GitHub Account Authentication',
   githubCopilotSignIn: 'Sign in with GitHub',
   githubCopilotSignOut: 'Sign Out',

@@ -41,14 +41,19 @@ export const ChannelWorkspaceField: React.FC<ChannelWorkspaceFieldProps> = ({
   );
 
   return (
-    <Field data-invalid={!workspaceId || undefined}>
-      <FieldLabel htmlFor={inputId}>{i18nService.t('imChannelWorkspace')}</FieldLabel>
+    <Field>
+      <FieldLabel htmlFor={inputId}>
+        {i18nService.t('imChannelWorkspace')}
+        <span aria-hidden="true" className="text-destructive">
+          *
+        </span>
+      </FieldLabel>
       <Select
         items={workspaceLabels}
         value={workspaceId}
         onValueChange={value => onChange(value ?? '')}
       >
-        <SelectTrigger id={inputId} className="w-full" aria-invalid={!workspaceId}>
+        <SelectTrigger id={inputId} className="w-full" aria-required="true">
           <SelectValue placeholder={i18nService.t('imChannelWorkspacePlaceholder')} />
         </SelectTrigger>
         <SelectContent>

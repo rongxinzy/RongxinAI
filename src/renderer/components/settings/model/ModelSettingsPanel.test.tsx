@@ -10,7 +10,6 @@ const api = {
   status: vi.fn(),
   start: vi.fn(),
   selectDefault: vi.fn(),
-  openManagement: vi.fn(),
 };
 const stopped = { status: { state: 'stopped', version: '1' }, models: [], defaultModelId: null };
 const running = {
@@ -28,21 +27,12 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
 });
-test('opens official management only after an explicit button click', async () => {
-  api.catalog.mockResolvedValue(running);
-  render(<ModelSettingsPanel />);
-  await screen.findByRole('searchbox');
-  fireEvent.click(screen.getByRole('button', { name: 'magpieOpenManagement' }));
-  expect(api.openManagement).toHaveBeenCalledTimes(1);
-});
-
 test('opening settings only reads catalog and requires informed explicit activation', async () => {
   render(<ModelSettingsPanel />);
   await waitFor(() => expect(api.catalog).toHaveBeenCalledTimes(1));
   expect(api.start).not.toHaveBeenCalled();
-  expect(api.openManagement).not.toHaveBeenCalled();
+  expect(screen.queryByRole('button', { name: /official management/i })).toBeNull();
   expect(screen.getByText('magpieCatalogConsent')).toBeTruthy();
-  expect(screen.getByText('magpieLicenseNotice')).toBeTruthy();
   api.start.mockResolvedValue(running.status);
   api.catalog.mockResolvedValue(running);
   await waitFor(() =>

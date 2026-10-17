@@ -80,7 +80,9 @@ export function classicSurfaces(): SurfaceAppearances {
       base: {
         ...popup,
         'border-radius': 'var(--zy-style-radius-xl)',
-        'background-color': 'var(--zy-surface)',
+        // Dialogs must read as a solid layer above the page; `--zy-surface` is
+        // intentionally translucent for cards and lets page content ghost through.
+        'background-color': 'var(--zy-surface-overlay)',
         color: 'var(--zy-surface-foreground)',
         'box-shadow': 'var(--zy-style-shadow-modal)',
         padding: '1rem',
@@ -92,7 +94,8 @@ export function classicSurfaces(): SurfaceAppearances {
     'dialog-overlay': recipe({
       base: {
         'background-color':
-          'color-mix(in oklab, var(--zy-component-palette-black) 10%, transparent)',
+          'color-mix(in oklab, var(--zy-component-palette-black) 20%, transparent)',
+        'backdrop-filter': 'blur(6px)',
         opacity: '1',
         'transition-property': 'opacity',
         'transition-duration': '100ms',

@@ -147,6 +147,7 @@ export const enMarketplace: Record<string, string> = {
   managedMemoryRetryFailed: 'Failed to retry memory propagation',
   managedMemoryRetryPending: 'Retry pending ({count})',
   managedMemoryEmptyTitle: 'No controlled memories yet',
+  managedMemorySessionEmptyTitle: 'No session summaries yet',
   managedMemoryEmptyDescription:
     'Explicit workspace memories and personal memories awaiting confirmation appear here.',
   managedMemorySessionEmptyDescription:

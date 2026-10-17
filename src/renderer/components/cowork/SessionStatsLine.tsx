@@ -19,7 +19,7 @@ export function SessionStatsLine({ messages }: SessionStatsLineProps) {
   if (stats.turns > 0 || stats.steps > 0) {
     groups.push(
       i18nService
-        .t('coworkStatsCounts')
+        .t(stats.turns === 1 ? 'coworkStatsCountsOneTurn' : 'coworkStatsCounts')
         .replace('{turns}', String(stats.turns))
         .replace('{steps}', String(stats.steps)),
     );

@@ -112,9 +112,9 @@ export const zenithDark: ThemeDefinition = {
     'style-switch-press-extend': '2px',
     'style-switch-press-shrink': '1px',
     'style-switch-motion-ms': '150',
-    'style-switch-thumb': 'rgba(30, 35, 50, 0.95)',
+    'style-switch-thumb': '#FFFFFF',
     'style-work-chat-thumb-radius': '8px',
-    'style-work-chat-thumb': 'rgba(30, 35, 50, 0.95)',
+    'style-work-chat-thumb': 'color-mix(in oklab, var(--zy-foreground) 20%, var(--zy-background))',
     'style-work-chat-track': 'rgba(96, 165, 250, 0.12)',
 
     // ── Brand Colors (Gradient primary) ──

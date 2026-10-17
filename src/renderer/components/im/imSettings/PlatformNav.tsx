@@ -224,7 +224,7 @@ export const IMPlatformNav: React.FC<IMPlatformNavProps> = ({
   onSelectInstance,
   onPlatformToggle,
 }) => (
-  <div className="w-48 shrink-0 border-r border-border pr-3 flex flex-col gap-2 overflow-y-auto">
+  <div className="flex w-44 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border pr-3 xl:w-48">
     {platforms.map(platform => {
       const logo = imPlatformLogo(platform);
       const platformEnabled = isEnabled(platform);

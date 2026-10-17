@@ -114,20 +114,6 @@ export const enWorkbench: Record<string, string> = {
   agentTabBasic: 'Basic Info',
   agentTabSkills: 'Skills',
   agentTabIM: 'IM Channels',
-  agentTabTriage: 'Routing',
-  agentTriageEnable: 'Enable auto model routing',
-  agentTriageEnableHint:
-    'Automatically select lightweight, standard, or reasoning models based on message complexity. Global parameters (cooldown etc.) are in Settings → Model Routing.',
-  agentTriageLightModel: 'Lightweight model',
-  agentTriageLightModelHint:
-    'For greetings, simple Q&A, translations and other low-complexity messages',
-  agentTriageHeavyModel: 'Reasoning model',
-  agentTriageHeavyModelHint:
-    'For coding, architecture design, debugging and other complex tasks (optional, defaults to Agent model)',
-  agentTriageStandardNote:
-    "Standard messages use this Agent's default model — no extra configuration needed.",
-  agentTriageCrossProvider: 'Allow cross-provider switching',
-  agentTriageNoProviderModels: 'Select a model for this Agent and configure its provider first',
   agentIMConfigured: 'Configured',
   agentCreateFailed: 'Failed to create project',
   agentNameDuplicate: 'This project name already exists. Please use a different name.',

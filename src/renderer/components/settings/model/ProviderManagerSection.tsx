@@ -1,8 +1,7 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Card, CardContent } from '@shared/components/ui/card';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
-import { Lock, Plus, Settings, Trash2, Power, RefreshCw } from 'lucide-react';
+import { Lock, Plus, Power, RefreshCw, Settings, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 
 import type {
@@ -61,119 +60,121 @@ export const ProviderManagerSection: React.FC<ProviderManagerSectionProps> = ({
   };
 
   return (
-    <div className="space-y-4 pt-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h3 className="text-sm font-semibold">{i18nService.t('magpieProvidersTitle')}</h3>
-          <p className="text-xs text-muted-foreground">
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold">{i18nService.t('magpieProvidersTitle')}</h2>
+          <p className="text-sm text-muted-foreground">
             {i18nService.t('magpieProvidersDescription')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1">
           <Button
             type="button"
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={() => void onRefresh()}
             disabled={disabled || loading}
             aria-label={i18nService.t('magpieRefreshProviders')}
+            title={i18nService.t('magpieRefreshProviders')}
           >
-            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           <Button
             type="button"
             variant="outline"
-            size="sm"
             onClick={handleOpenAdd}
             disabled={disabled || loading}
             className="gap-1.5"
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-4" />
             <span>{i18nService.t('magpieAddProvider')}</span>
           </Button>
         </div>
       </div>
 
       {!providers.length && !loading && (
-        <Card className="border-dashed p-6 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
           {i18nService.t('magpieNoProviders')}
-        </Card>
+        </div>
       )}
 
-      <div className="flex flex-col gap-2.5">
-        {providers.map(provider => {
-          const isHost = provider.isHostManaged === true;
-          const isActive = !provider.off;
+      {providers.length > 0 && (
+        <div className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          {providers.map(provider => {
+            const isHost = provider.isHostManaged === true;
+            const isActive = !provider.off;
 
-          return (
-            <Card
-              key={provider.id}
-              className={`p-3.5 transition-colors ${
-                !isActive ? 'opacity-65' : ''
-              } border-border bg-card`}
-            >
-              <CardContent className="flex flex-col gap-2 p-0 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex min-w-0 flex-1 flex-col gap-1">
+            return (
+              <div
+                key={provider.id}
+                className={`flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${
+                  isActive ? '' : 'opacity-60'
+                }`}
+              >
+                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate text-sm font-medium">{provider.name}</span>
-                    <Badge variant="outline" className="text-[11px] font-normal">
+                    <Badge variant="outline" className="font-normal">
                       {provider.api}
                     </Badge>
                     {isHost ? (
-                      <Badge variant="secondary" className="gap-1 text-[11px]">
+                      <Badge variant="secondary" className="gap-1">
                         <Lock className="size-3" />
                         <span>{i18nService.t('magpieHostManaged')}</span>
                       </Badge>
                     ) : (
-                      <Badge variant={isActive ? 'default' : 'secondary'} className="text-[11px]">
-                        {isActive
-                          ? i18nService.t('magpieProviderEnabled')
-                          : i18nService.t('magpieProviderDisabled')}
+                      <Badge variant={isActive ? 'default' : 'secondary'}>
+                        {i18nService.t(
+                          isActive ? 'magpieProviderEnabled' : 'magpieProviderDisabled',
+                        )}
                       </Badge>
                     )}
                   </div>
 
-                  <p className="truncate text-xs text-muted-foreground">
-                    {provider.baseUrl || 'Loopback Gateway'}
+                  <p className="truncate text-sm text-muted-foreground">
+                    {provider.baseUrl || i18nService.t('magpieLoopbackGateway')}
                   </p>
 
                   {provider.models.length > 0 && (
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {provider.models.slice(0, 4).map(m => (
                         <span
                           key={m}
-                          className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                          className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
                         >
                           {m}
                         </span>
                       ))}
                       {provider.models.length > 4 && (
-                        <span className="text-[10px] text-muted-foreground">
-                          +{provider.models.length - 4} more
+                        <span className="text-xs text-muted-foreground">
+                          {i18nService
+                            .t('magpieProviderMoreModels')
+                            .replace('{count}', String(provider.models.length - 4))}
                         </span>
                       )}
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center gap-1 self-end sm:self-center">
+                <div className="flex shrink-0 items-center gap-1 self-end sm:self-center">
                   {!isHost && (
                     <>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="size-8"
                         onClick={() => void onToggleProvider(provider.id, provider.off)}
                         disabled={disabled || loading}
-                        title={
-                          isActive
-                            ? i18nService.t('magpieProviderDisabled')
-                            : i18nService.t('magpieProviderEnabled')
-                        }
+                        aria-label={i18nService.t(
+                          isActive ? 'magpieDisableProvider' : 'magpieEnableProvider',
+                        )}
+                        title={i18nService.t(
+                          isActive ? 'magpieDisableProvider' : 'magpieEnableProvider',
+                        )}
                       >
                         <Power
-                          className={`size-3.5 ${
+                          className={`size-4 ${
                             isActive ? 'text-foreground' : 'text-muted-foreground'
                           }`}
                         />
@@ -182,32 +183,33 @@ export const ProviderManagerSection: React.FC<ProviderManagerSectionProps> = ({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="size-8"
                         onClick={() => handleOpenEdit(provider)}
                         disabled={disabled || loading}
+                        aria-label={i18nService.t('magpieEditProvider')}
                         title={i18nService.t('magpieEditProvider')}
                       >
-                        <Settings className="size-3.5 text-muted-foreground" />
+                        <Settings className="size-4 text-muted-foreground" />
                       </Button>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="size-8 text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive"
                         onClick={() => setDeletingId(provider.id)}
                         disabled={disabled || loading}
+                        aria-label={i18nService.t('magpieDeleteProviderTitle')}
                         title={i18nService.t('magpieDeleteProviderTitle')}
                       >
-                        <Trash2 className="size-3.5" />
+                        <Trash2 className="size-4" />
                       </Button>
                     </>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <ProviderEditDialog
         open={isDialogOpen}
@@ -227,6 +229,6 @@ export const ProviderManagerSection: React.FC<ProviderManagerSectionProps> = ({
         onCancel={() => setDeletingId(null)}
         onConfirm={() => void confirmDelete()}
       />
-    </div>
+    </section>
   );
 };

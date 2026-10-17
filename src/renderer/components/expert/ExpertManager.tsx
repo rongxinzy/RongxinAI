@@ -431,6 +431,10 @@ const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
                   {i18nService.t('expertPresetsRetry')}
                 </Button>
               </div>
+            ) : filteredPresetExperts.length === 0 ? (
+              <p className="py-6 text-sm text-muted-foreground">
+                {i18nService.t('expertPresetsEmpty')}
+              </p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                 {filteredPresetExperts.map(expert => {

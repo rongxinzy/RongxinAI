@@ -298,7 +298,7 @@ const App: React.FC = () => {
     if (managedModelsOnly || !localInferenceEnabled) return;
     setLocalInferenceRefreshRequestId(current => current + 1);
     setMainView(MainView.LocalInference);
-  }, [managedModelsOnly]);
+  }, [localInferenceEnabled, managedModelsOnly]);
 
   const handleShowExpert = useCallback(() => {
     setExpertInitialTab(undefined);
