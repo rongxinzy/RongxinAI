@@ -152,11 +152,7 @@ export function useCoworkPromptSubmission({
     )
       return;
     if (hasUnavailableLlamaCppModel) {
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', {
-          detail: i18nService.t('agentLlamaCppModelNotRunningBlocked'),
-        }),
-      );
+      showAppToast(i18nService.t('agentLlamaCppModelNotRunningBlocked'));
       return;
     }
     setShowFolderRequiredWarning(false);
@@ -275,14 +271,10 @@ export function useCoworkPromptSubmission({
     ) {
       // 2026/09/28 之前这里是静默 return：按钮看起来可用，点下去却什么都不发生。
       const unusableImage = attachments.some(a => a.isImage || isImagePath(a.path));
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', {
-          detail: {
-            message: i18nService.t(unusableImage ? 'imageReadError' : 'coworkSubmitEmptyContent'),
-            isError: true,
-          },
-        }),
-      );
+      showAppToast({
+        message: i18nService.t(unusableImage ? 'imageReadError' : 'coworkSubmitEmptyContent'),
+        isError: true,
+      });
       return;
     }
 

@@ -3,6 +3,7 @@ import { act, fireEvent, render } from '@testing-library/react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { i18nService } from '../../services/i18n';
+import { resetAppToastDedupeForTests } from '../../services/toastNotification';
 import type { RootState } from '../../store';
 import { clearDraftAttachments, type DraftAttachment } from '../../store/slices/coworkSlice';
 import { WorkMode } from '../../store/workMode/constants';
@@ -14,7 +15,10 @@ const toastMessages = (dispatch: Dispatcher): string[] =>
   dispatch.mock.calls
     .map(([event]) => event as Event)
     .filter(event => event.type === 'app:showToast')
-    .map(event => (event as CustomEvent<{ message?: string }>).detail?.message ?? '');
+    .map(event => {
+      const detail = (event as CustomEvent<{ message?: string } | string>).detail;
+      return typeof detail === 'string' ? detail : (detail?.message ?? '');
+    });
 
 const fixture = vi.hoisted(() => ({
   dispatch: vi.fn(),
@@ -61,6 +65,7 @@ vi.mock('./PromptPlusMenu', () => ({ default: () => null }));
 vi.mock('./ResumeTaskContextBadge', () => ({ ResumeTaskContextBadge: () => null }));
 
 beforeEach(() => {
+  resetAppToastDedupeForTests();
   fixture.dispatch.mockClear();
   fixture.state.cowork.draftPrompts.__home__ = '';
   fixture.state.cowork.draftAttachments = {};

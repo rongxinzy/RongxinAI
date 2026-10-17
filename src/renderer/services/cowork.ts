@@ -1,7 +1,6 @@
 import { expectRunStart } from '../store/slices/coworkRunSlice';
 import {
   type CoworkError,
-  CoworkErrorKind,
   ENGINE_NOT_READY_CODE,
   getUserErrorI18nKey,
 } from '../../common/coworkError';
@@ -53,6 +52,7 @@ import type {
   CoworkStartOptions,
 } from '../types/cowork';
 import { i18nService } from './i18n';
+import { showAppToast } from './toastNotification';
 import { respondToPermissionByOrigin } from './coworkPermissionRouting';
 import { prepareCoworkSessionRender } from './coworkSessionRenderPreparation';
 import {
@@ -277,9 +277,6 @@ class CoworkService {
             event.error,
           );
           store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'error' }));
-          if (event.error.kind === CoworkErrorKind.AuthExpired) {
-            window.dispatchEvent(new CustomEvent('core-rpc-auth-expired'));
-          }
           if (event.error.message && !terminalMessageAlreadyReceived) {
             store.dispatch(
               addMessage({
@@ -486,7 +483,7 @@ class CoworkService {
         result.code === ENGINE_NOT_READY_CODE
           ? i18nService.t('coworkErrorEngineNotReady')
           : classifyError(result.error);
-      window.dispatchEvent(new CustomEvent('app:showToast', { detail: errorContent }));
+      showAppToast(errorContent);
     }
 
     console.error('Failed to start session:', result.error);

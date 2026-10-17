@@ -13,6 +13,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 
 import { i18nService } from '../services/i18n';
+import { showAppToast } from '../services/toastNotification';
 import CodeBlock from './CodeBlock';
 
 const SAFE_URL_PROTOCOLS = new Set(['http', 'https', 'mailto', 'tel', 'file']);
@@ -169,7 +170,7 @@ const openExternalViaAnchorFallback = (url: string): void => {
 };
 
 const dispatchAppToast = (message: string): void => {
-  window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
+  showAppToast(message);
 };
 
 const safeDecodeURIComponent = (value: string): string => {
