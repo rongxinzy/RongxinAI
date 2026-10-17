@@ -26,6 +26,10 @@ import {
 import { PiResearchRunController } from './piResearchRun';
 import { PiShortcutWorkflowController } from './piShortcutWorkflow';
 import { PiStreamAccumulator } from './piStreamAccumulator';
+import {
+  createPiTranslatorState,
+  type PiTranslatorState,
+} from './piTranslate/piTranslateUiMessageChunk';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import type { PiStartOptions } from './piRuntimeTypes';
 import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
@@ -153,6 +157,7 @@ export interface ActivePiSession {
   /** Latest full snapshot of thinking text for the current turn. */
   thinkingText: string;
   streamAccumulator: PiStreamAccumulator;
+  piTranslatorState: PiTranslatorState;
   thinkingLifecycle: PiThinkingLifecycle;
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
@@ -527,8 +532,6 @@ export async function getPiModules(): Promise<PiModules> {
 
 // ── Constants ──
 
-/** How often the renderer receives streaming content updates. */
-export const MESSAGE_UPDATE_THROTTLE_MS = 200;
 /**
  * How often streaming content is written to SQLite. better-sqlite3 is synchronous
  * and blocks the main-process event loop, so writing on every Pi frame causes

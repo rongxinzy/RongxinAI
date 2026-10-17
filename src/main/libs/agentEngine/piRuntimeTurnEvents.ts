@@ -32,6 +32,9 @@ import {
 } from './piImageInputFallback';
 import { getPiPreparingToolActivity, toToolActivityInput } from './toolActivity';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
+import { resolveCoworkStreamMessageId } from './piStreamChunkEmit';
+import type { PiSessionEvent } from './piTranslate/piEvents';
+import { translatePiSessionEventToUiChunks } from './piTranslate/piTranslateUiMessageChunk';
 import { ProviderName } from '../../../shared/providers';
 import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
 import type { ActivePiSession, PiEvent, PiStartupLatency } from './piRuntimeSessionState';
@@ -65,6 +68,23 @@ export interface PiRuntimeTurnHost {
 
 export class PiRuntimeTurnEvents {
   constructor(private readonly host: PiRuntimeTurnHost) {}
+
+  private emitTranslatedPiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
+    const chunks = translatePiSessionEventToUiChunks(
+      event as unknown as PiSessionEvent,
+      active.piTranslatorState,
+    );
+    for (const chunk of chunks) {
+      const messageId = resolveCoworkStreamMessageId(
+        sessionId,
+        active,
+        chunk,
+        this.host.transcript,
+      );
+      if (!messageId) continue;
+      this.host.emit('uiStreamChunk', sessionId, messageId, chunk);
+    }
+  }
 
   // ── Private: event mapping ──
 
@@ -132,12 +152,14 @@ export class PiRuntimeTurnEvents {
         active.answerText = '';
         active.thinkingText = '';
         active.streamAccumulator.reset();
+        this.emitTranslatedPiEvent(sessionId, active, { type: 'turn_start' });
         active.thinkingLifecycle.reset();
         break;
 
       case 'message_start':
         active.requestStartedAt = Date.now();
         active.firstVisibleTextAt = null;
+        this.emitTranslatedPiEvent(sessionId, active, event);
         break;
 
       case 'message_update': {
@@ -161,6 +183,8 @@ export class PiRuntimeTurnEvents {
         }
         // Pi 0.84 emits fine-grained assistantMessageEvent deltas. Keep support
         // for older cumulative snapshots, then reconcile against message_end.
+        const priorAnswer = active.answerText;
+        const priorThinking = active.thinkingText;
         const { text, thinking } = active.streamAccumulator.update(
           event.assistantMessageEvent,
           event.message,
@@ -172,11 +196,22 @@ export class PiRuntimeTurnEvents {
         } else if (thinkingEnded) {
           active.thinkingLifecycle.finish();
         }
+
         if (thinking && thinking !== active.thinkingText) {
           active.thinkingText = thinking;
           if (!thinkingEnded) active.thinkingLifecycle.start();
+          const thinkingId = this.host.transcript.ensureMessage(
+            sessionId,
+            active,
+            'thinking',
+            thinking,
+          );
+          if (priorThinking.length > 0 && !thinking.startsWith(priorThinking)) {
+            this.host.emit('uiStreamSnapshot', sessionId, thinkingId, thinking);
+          }
           this.host.transcript.streamInto(sessionId, active, 'thinking', thinking);
         }
+
         if (thinkingEnded) {
           this.host.transcript.finalizeActiveThinking(sessionId, active);
         }
@@ -184,8 +219,13 @@ export class PiRuntimeTurnEvents {
           this.recordFirstVisibleToken(sessionId, active);
           this.host.transcript.finalizeActiveThinking(sessionId, active);
           active.answerText = text;
+          const answerId = this.host.transcript.ensureMessage(sessionId, active, 'answer', text);
+          if (priorAnswer.length > 0 && !text.startsWith(priorAnswer)) {
+            this.host.emit('uiStreamSnapshot', sessionId, answerId, text);
+          }
           this.host.transcript.streamInto(sessionId, active, 'answer', text);
         }
+        this.emitTranslatedPiEvent(sessionId, active, event);
         break;
       }
 
@@ -321,6 +361,8 @@ export class PiRuntimeTurnEvents {
               startupLatency,
             );
           }
+
+          this.emitTranslatedPiEvent(sessionId, active, event);
 
           // A turn can finish without any text (it answered with a tool call).
           // Its placeholder bubbles must still be closed: they were created with

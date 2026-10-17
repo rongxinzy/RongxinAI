@@ -36,6 +36,7 @@ import { resolveShortcutWorkflowKind } from './piShortcutWorkflow';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
+import { createPiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
 import { PiEventProjectionQueue } from './piEventProjectionQueue';
 import { ToolActivityTracker } from './toolActivity';
 import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
@@ -429,6 +430,7 @@ export async function startPiRuntimeSession(
       answerText: '',
       thinkingText: '',
       streamAccumulator: new PiStreamAccumulator(),
+      piTranslatorState: createPiTranslatorState(),
       thinkingLifecycle: new PiThinkingLifecycle(),
       lastCompletedAnswerMessageId: null,
       lastCompletedAnswerText: '',

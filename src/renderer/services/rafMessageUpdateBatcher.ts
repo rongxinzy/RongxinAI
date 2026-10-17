@@ -10,7 +10,7 @@ export type AnimationFrameScheduler = {
   cancel: (id: number) => void;
 };
 
-const browserAnimationFrameScheduler: AnimationFrameScheduler = {
+export const browserAnimationFrameScheduler: AnimationFrameScheduler = {
   request: callback => requestAnimationFrame(callback),
   cancel: id => cancelAnimationFrame(id),
 };

@@ -1,3 +1,7 @@
+/**
+ * Cowork streaming — main-process IPC gateway (coalescer → sequencer → ring buffer → webContents).
+ * See docs/architecture/streaming.md for end-to-end flow and prohibitions.
+ */
 import crypto from 'crypto';
 
 import { BrowserWindow, ipcMain } from 'electron';
@@ -11,7 +15,9 @@ import { bindCoworkRunBridge } from '../coworkRunBridge';
 import { slimQueuedMessagesForIpc } from '../coworkImageAttachments';
 import { persistCoworkTerminalError } from '../coworkTerminalErrorPersistence';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
-import { createPiUiEventBatcher } from '../piUiEventBatcher';
+import { UiMessageChunkCoalescer } from '../streaming/uiMessageChunkCoalescer';
+import { PiUiStreamReplayBuffer } from '../piUiStreamReplayBuffer';
+import { snapshotToContentPatches } from '../piUiStreamGateway';
 import { PiUiRuntimeSnapshots } from '../../shared/cowork/piUiRuntimeSnapshot';
 import {
   type PiUiEvent,
@@ -20,15 +26,31 @@ import {
   PiUiEventType,
   PiUiEventSequencer,
 } from '../../shared/cowork/piUiEvent';
+import type { UIMessageChunk } from 'ai';
 
 const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
   const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
   const runtimeSnapshots = new PiUiRuntimeSnapshots();
+  const replayBuffer = new PiUiStreamReplayBuffer();
+  const revisionByMessage = new Map<string, number>();
+
   ipcMain.handle(CoworkStreamIpc.RuntimeSnapshots, (_event, sessionId?: string) =>
     runtimeSnapshots.read(sessionId),
   );
+
+  ipcMain.handle(
+    CoworkStreamIpc.UiEventReplay,
+    (_event, sessionId: unknown, afterSequence: unknown) => {
+      if (typeof sessionId !== 'string' || sessionId.length === 0) return [];
+      const after =
+        typeof afterSequence === 'number' && Number.isInteger(afterSequence) ? afterSequence : 0;
+      return replayBuffer.replay(sessionId, after);
+    },
+  );
+
   const broadcastUiEvent = (event: PiUiEvent): void => {
     runtimeSnapshots.observe(event);
+    replayBuffer.observe(event);
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -39,11 +61,48 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
       }
     });
   };
-  const emitUiEvent = createPiUiEventBatcher((payload: PiUiEventPayload) => {
+
+  const emitUiEvent = (payload: PiUiEventPayload): void => {
+    coalescer.flush();
     broadcastUiEvent(sequencer.next(payload));
+  };
+
+  const coalescer = new UiMessageChunkCoalescer(({ sessionId, messageId, chunk }) => {
+    broadcastUiEvent(
+      sequencer.next({
+        type: PiUiEventType.StreamPart,
+        sessionId,
+        messageId,
+        chunk,
+      }),
+    );
   });
 
-  const contentProjection = bindCoworkRunBridge(
+  const emitStreamChunk = (sessionId: string, messageId: string, chunk: UIMessageChunk): void => {
+    coalescer.push(sessionId, messageId, chunk);
+  };
+
+  const emitStreamSnapshot = (
+    sessionId: string,
+    messageId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+  ): void => {
+    coalescer.flush();
+    const revision = (revisionByMessage.get(messageId) ?? 0) + 1;
+    revisionByMessage.set(messageId, revision);
+    const truncated = content.length > 0; // visible content already clipped upstream
+    for (const patch of snapshotToContentPatches(
+      sessionId,
+      { messageId, content, truncated: false },
+      revision,
+      metadata,
+    )) {
+      emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId, patch });
+    }
+  };
+
+  bindCoworkRunBridge(
     runtime,
     () => getStore().getDatabase(),
     patch => emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
@@ -62,16 +121,14 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     });
   });
 
+  runtime.on('uiStreamChunk', (sessionId: string, messageId: string, chunk: UIMessageChunk) => {
+    emitStreamChunk(sessionId, messageId, chunk);
+  });
+
   runtime.on(
-    'messageUpdate',
+    'uiStreamSnapshot',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
-      void contentProjection
-        .project(sessionId, messageId, content, metadata)
-        .then(patches => {
-          for (const patch of patches)
-            emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId, patch });
-        })
-        .catch(error => console.error('[PiWorkbenchForwarder] content projection failed:', error));
+      emitStreamSnapshot(sessionId, messageId, content, metadata);
     },
   );
 
@@ -126,10 +183,13 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
   });
 
   runtime.on('sessionStopped', (sessionId: string) => {
+    coalescer.flush();
+    replayBuffer.clearSession(sessionId);
     emitUiEvent({ type: PiUiEventType.Stopped, sessionId });
   });
 
   runtime.on('complete', (sessionId: string) => {
+    coalescer.flush();
     emitUiEvent({
       type: PiUiEventType.Completed,
       sessionId,
@@ -153,8 +213,7 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
           persistenceError,
         );
       }
-      // Persisting the terminal message emits the canonical `message` event
-      // first. The UI protocol keeps that ordering before the terminal error.
+      coalescer.flush();
       emitUiEvent({ type: PiUiEventType.Error, sessionId, error });
     },
   );

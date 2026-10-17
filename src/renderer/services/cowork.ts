@@ -61,8 +61,10 @@ import {
   resolveCoworkTerminalError,
 } from './coworkTerminalError';
 import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
+import { RafStreamPartBatcher } from './rafStreamPartBatcher';
 import { workspaceService } from './workspace';
 import { CoworkContentBuffer } from './coworkContentBuffer';
+import { coworkLiveTextStore } from './liveTextStore';
 import { CoworkRunSync } from './coworkRunSync';
 import { PiUiRecovery } from './piUiRecovery';
 import {
@@ -119,10 +121,19 @@ class CoworkService {
     // Clean up any existing listeners
     this.cleanupListeners();
     const updateBatcher = new RafMessageUpdateBatcher(updates => {
+      for (const update of updates) {
+        coworkLiveTextStore.clear(update.messageId);
+      }
       store.dispatch(updateMessageContents(updates));
+    });
+    const liveTextBatcher = new RafStreamPartBatcher(parts => {
+      for (const part of parts) {
+        coworkLiveTextStore.applyChunk(part.messageId, part.chunk);
+      }
     });
     const messageUpdateRafCleanup = () => {
       updateBatcher.dispose();
+      liveTextBatcher.dispose();
     };
     this.streamListenerCleanups.push(messageUpdateRafCleanup);
 
@@ -138,11 +149,17 @@ class CoworkService {
         store.dispatch(updateSessionStatus({ ...snapshot, recovered: true })),
       applySession: (session, preserveLiveContent) =>
         store.dispatch(recoverSession({ session, preserveLiveContent })),
-      flush: () => updateBatcher.flush(),
+      flush: () => {
+        liveTextBatcher.flush();
+        updateBatcher.flush();
+      },
     });
     this.streamListenerCleanups.push(() => recovery.dispose());
     const runSync = new CoworkRunSync(
-      () => updateBatcher.flush(),
+      () => {
+        liveTextBatcher.flush();
+        updateBatcher.flush();
+      },
       id => recovery.recover(id),
     );
     this.runSync = runSync;
@@ -151,6 +168,8 @@ class CoworkService {
     this.streamListenerCleanups.push(
       cowork.onStreamContentPatch(patch => {
         const update = contentBuffer.apply(patch);
+        const live = contentBuffer.live(patch.messageId);
+        if (live !== undefined) coworkLiveTextStore.setSnapshot(patch.messageId, live);
         if (update) updateBatcher.enqueue(update);
       }),
     );
@@ -195,16 +214,29 @@ class CoworkService {
           break;
         case PiUiEventType.ContentPatch: {
           const update = contentBuffer.apply(event.patch);
+          const live = contentBuffer.live(event.patch.messageId);
+          if (live !== undefined) coworkLiveTextStore.setSnapshot(event.patch.messageId, live);
           if (update) updateBatcher.enqueue(update);
           break;
         }
-        case PiUiEventType.MessageUpdate:
-          updateBatcher.enqueue({
+        case PiUiEventType.StreamPart:
+          liveTextBatcher.enqueue({
             sessionId: event.sessionId,
             messageId: event.messageId,
-            content: event.content,
-            metadata: event.metadata,
+            chunk: event.chunk,
           });
+          break;
+        case PiUiEventType.MessageUpdate:
+          if (event.metadata?.isFinal === true) {
+            updateBatcher.enqueue({
+              sessionId: event.sessionId,
+              messageId: event.messageId,
+              content: event.content,
+              metadata: event.metadata,
+            });
+          } else {
+            coworkLiveTextStore.setSnapshot(event.messageId, event.content);
+          }
           break;
         case PiUiEventType.ToolActivity:
           store.dispatch(updateToolActivity({ sessionId: event.sessionId, event: event.event }));

@@ -6,6 +6,7 @@ import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
 import { StreamingMarkdownResponse } from './StreamingMarkdownResponse';
+import { useLiveMessageText } from '../../../services/useLiveMessageText';
 
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
@@ -20,9 +21,11 @@ export const AssistantBubble: React.FC<{
   turnMetadata?: CoworkMessageMetadata | null;
 }> = ({ message, mapDisplayText, resolveLocalFilePath, turnMetadata }) => {
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
-  const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
-  // An empty streaming bubble is a leftover placeholder, not an in-flight answer.
-  const isStreaming = Boolean(message.metadata?.isStreaming) && rawContent.trim().length > 0;
+  const isStreaming = Boolean(message.metadata?.isStreaming);
+  const liveContent = useLiveMessageText(message.id, isStreaming);
+  const displayContent = liveContent ?? message.content;
+  const rawContent = mapDisplayText ? mapDisplayText(displayContent) : displayContent;
+  const showStreaming = isStreaming && (rawContent.trim().length > 0 || liveContent !== undefined);
   const modelLabel = getMessageModelLabel(turnMetadata);
 
   return (
@@ -32,7 +35,7 @@ export const AssistantBubble: React.FC<{
           {/* 2026/09/20 lixiang  下传本地路径解析，使盘符路径可点打开（issue #805） */}
           <StreamingMarkdownResponse
             content={rawContent}
-            isStreaming={isStreaming}
+            isStreaming={showStreaming}
             resolveLocalFilePath={resolveLocalFilePath}
           />
           <CoworkContentNotice truncated={message.metadata?.contentTruncated} />

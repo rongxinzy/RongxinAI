@@ -1,8 +1,8 @@
 /**
  * Assistant and thinking bubbles for one Pi turn.
  *
- * Streaming updates are throttled twice: the renderer emit, and the
- * synchronous store write. Finalizing a bubble flushes both.
+ * Streaming store writes stay throttled; IPC to the renderer uses delta stream
+ * parts. messageUpdate remains for IM and other full-text consumers.
  */
 
 import { randomUUID } from 'crypto';
@@ -10,7 +10,7 @@ import { randomUUID } from 'crypto';
 import type { CoworkMessage, CoworkStore } from '../../coworkStore';
 import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import type { ActivePiSession, PiStartupLatency, PiUsage } from './piRuntimeSessionState';
-import { MESSAGE_UPDATE_THROTTLE_MS, STORE_UPDATE_THROTTLE_MS } from './piRuntimeSessionState';
+import { STORE_UPDATE_THROTTLE_MS } from './piRuntimeSessionState';
 
 export interface PiAssistantTranscriptHost {
   getStore(): CoworkStore | null;
@@ -25,12 +25,6 @@ export interface PiAssistantTranscriptHost {
 }
 
 export class PiAssistantTranscript {
-  private readonly lastMessageUpdateEmitTime = new Map<string, number>();
-  private readonly pendingMessageUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly pendingMessageUpdate = new Map<
-    string,
-    { content: string; metadata?: Record<string, unknown> }
-  >();
   private readonly lastStoreUpdateTime = new Map<string, number>();
   private readonly pendingStoreUpdate = new Map<
     string,
@@ -112,7 +106,7 @@ export class PiAssistantTranscript {
     // Throttle the synchronous SQLite write separately from the IPC emit so a
     // fast Pi stream doesn't block the main-process event loop every frame.
     this.throttledStoreUpdate(sessionId, messageId, content, metadata);
-    this.throttledEmitMessageUpdate(sessionId, messageId, content, metadata);
+    this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
   }
 
   /** Finalize the answer/thinking message: flush throttles, mark final, emit last update. */
@@ -123,7 +117,6 @@ export class PiAssistantTranscript {
     content: string,
   ): void {
     const messageId = this.ensureMessage(sessionId, active, kind, content);
-    this.clearPendingMessageUpdate(messageId);
     this.clearPendingStoreUpdate(messageId);
     const thinkingDurationMs = kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
     const metadata =
@@ -157,7 +150,6 @@ export class PiAssistantTranscript {
       (messageId): messageId is string => Boolean(messageId),
     );
     for (const messageId of placeholderIds) {
-      this.clearPendingMessageUpdate(messageId);
       this.clearPendingStoreUpdate(messageId);
     }
     if (!this.host.getStore() || placeholderIds.length === 0) return;
@@ -285,56 +277,6 @@ export class PiAssistantTranscript {
     }, 0);
   }
 
-  // ── Private: throttling ──
-
-  private throttledEmitMessageUpdate(
-    sessionId: string,
-    messageId: string,
-    content: string,
-    metadata?: Record<string, unknown>,
-  ): void {
-    this.noteThrottleMessage(sessionId, messageId);
-    const now = Date.now();
-    const lastEmit = this.lastMessageUpdateEmitTime.get(messageId) ?? 0;
-    const elapsed = now - lastEmit;
-
-    if (elapsed >= MESSAGE_UPDATE_THROTTLE_MS) {
-      this.clearPendingMessageUpdate(messageId);
-      this.lastMessageUpdateEmitTime.set(messageId, now);
-      this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
-      return;
-    }
-
-    // Within the throttle window: record the latest content and arm a single
-    // trailing emit at the window's end. Do NOT re-arm on every frame, or a
-    // continuous fast stream keeps pushing the deadline back and the UI freezes
-    // until the stream pauses ("burst-freeze" jank).
-    this.pendingMessageUpdate.set(messageId, { content, metadata });
-    if (!this.pendingMessageUpdateTimer.has(messageId)) {
-      this.pendingMessageUpdateTimer.set(
-        messageId,
-        setTimeout(() => {
-          this.pendingMessageUpdateTimer.delete(messageId);
-          const pending = this.pendingMessageUpdate.get(messageId);
-          this.pendingMessageUpdate.delete(messageId);
-          this.lastMessageUpdateEmitTime.set(messageId, Date.now());
-          if (pending) {
-            this.host.emitMessageUpdate(sessionId, messageId, pending.content, pending.metadata);
-          }
-        }, MESSAGE_UPDATE_THROTTLE_MS - elapsed),
-      );
-    }
-  }
-
-  private clearPendingMessageUpdate(messageId: string): void {
-    const timer = this.pendingMessageUpdateTimer.get(messageId);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingMessageUpdateTimer.delete(messageId);
-    }
-    this.pendingMessageUpdate.delete(messageId);
-  }
-
   /**
    * Throttle synchronous SQLite writes. Leading write fires immediately; further
    * writes within the window are coalesced into a single trailing write that
@@ -397,20 +339,7 @@ export class PiAssistantTranscript {
         const pending = this.pendingStoreUpdate.get(messageId);
         if (pending) this.host.getStore().updateMessage(sessionId, messageId, pending);
       }
-      if (flush) {
-        const pendingEmit = this.pendingMessageUpdate.get(messageId);
-        if (pendingEmit) {
-          this.host.emitMessageUpdate(
-            sessionId,
-            messageId,
-            pendingEmit.content,
-            pendingEmit.metadata,
-          );
-        }
-      }
-      this.clearPendingMessageUpdate(messageId);
       this.clearPendingStoreUpdate(messageId);
-      this.lastMessageUpdateEmitTime.delete(messageId);
       this.lastStoreUpdateTime.delete(messageId);
       this.throttleSessionByMessageId.delete(messageId);
     }

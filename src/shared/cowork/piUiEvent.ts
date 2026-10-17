@@ -3,11 +3,13 @@ import type { CoworkPendingMessage } from './pendingMessageQueue';
 import type { CoworkSessionInterruption } from './interruption';
 import type { CoworkToolActivityEvent } from './toolActivity';
 import { CoworkRunPolicy, type CoworkContentPatch } from './runState';
+import type { UIMessageChunk } from 'ai';
 
 export const PiUiEventType = {
   Started: 'started',
   Message: 'message',
   MessageUpdate: 'message_update',
+  StreamPart: 'stream_part',
   ContentPatch: 'content_patch',
   ToolActivity: 'tool_activity',
   PermissionRequest: 'permission_request',
@@ -59,6 +61,12 @@ export type PiUiEvent =
       messageId: string;
       content: string;
       metadata?: Record<string, unknown>;
+    })
+  | (PiUiEventBase & {
+      type: typeof PiUiEventType.StreamPart;
+      sessionId: string;
+      messageId: string;
+      chunk: UIMessageChunk;
     })
   | (PiUiEventBase & {
       type: typeof PiUiEventType.ToolActivity;
@@ -262,6 +270,15 @@ export const isPiUiEvent = (value: unknown): value is PiUiEvent => {
         typeof candidate.content === 'string' &&
         (candidate.metadata === undefined || isRecord(candidate.metadata))
       );
+    case PiUiEventType.StreamPart: {
+      const chunk = candidate.chunk;
+      return (
+        isSessionId(candidate.sessionId) &&
+        isNonEmptyString(candidate.messageId) &&
+        isRecord(chunk) &&
+        typeof chunk.type === 'string'
+      );
+    }
     case PiUiEventType.ToolActivity:
       return isSessionId(candidate.sessionId) && isToolActivityEvent(candidate.event);
     case PiUiEventType.PermissionRequest: {
