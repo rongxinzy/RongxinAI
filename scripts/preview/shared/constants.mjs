@@ -8,8 +8,3 @@ export const PreviewScenario = {
   Error: 'error',
   Loading: 'loading',
 };
-
-export const PreviewEdition = {
-  Zhiyuan: 'zhiyuan',
-  Xiaoruan: 'xiaoruan',
-};
