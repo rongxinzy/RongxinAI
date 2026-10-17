@@ -7,10 +7,7 @@ import {
   mockSession,
   setupPiRuntimeAdapterSuite,
 } from './src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
-import {
-  createHarnessCoworkStore,
-  ensureHarnessCoworkSession,
-} from './helpers/harnessCoworkStore';
+import { createHarnessCoworkStore, ensureHarnessCoworkSession } from './helpers/harnessCoworkStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 describe('streaming retry store guards', () => {
@@ -26,7 +23,7 @@ describe('streaming retry store guards', () => {
       listener = callback;
       return () => {};
     });
-    const { store, cleanup } = await createHarnessCoworkStore();
+    const { store, cleanup } = createHarnessCoworkStore();
     try {
       adapter.setCoworkStore(store);
       ensureHarnessCoworkSession(store, 'a9-session', 'work');
@@ -50,7 +47,9 @@ describe('streaming retry store guards', () => {
       listener!({ type: 'agent_end' });
       listener!({ type: 'agent_settled' });
 
-      const afterError = store.getSession('a9-session', null, { includeArtifacts: false })?.messages;
+      const afterError = store.getSession('a9-session', null, {
+        includeArtifacts: false,
+      })?.messages;
       const firstAssistant = afterError?.find(message => message.type === 'assistant');
       expect(firstAssistant?.content).toBe('Partial one');
       expect(firstAssistant?.metadata?.isStreaming).not.toBe(true);
@@ -97,7 +96,7 @@ describe('streaming retry store guards', () => {
       listener = callback;
       return () => {};
     });
-    const { store, cleanup } = await createHarnessCoworkStore();
+    const { store, cleanup } = createHarnessCoworkStore();
     const updates: Array<{ messageId: string; content: string }> = [];
     adapter.on('messageUpdate', (_sid, messageId, content) => {
       updates.push({ messageId, content });

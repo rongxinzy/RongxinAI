@@ -383,7 +383,7 @@ export class StreamingHarness {
   /** @internal — invoked by createStreamingHarness after construction. */
   async start(): Promise<void> {
     ensureForwarderBound(adapter);
-    this.coworkStoreHandle = await createHarnessCoworkStore();
+    this.coworkStoreHandle = createHarnessCoworkStore();
     ensureHarnessCoworkSession(this.coworkStoreHandle.store, this.sessionId, 'chat');
     adapter.setCoworkStore(this.coworkStoreHandle.store);
     this.messageUpdateCounter = messageUpdateCounterFor(adapter);

@@ -1,10 +1,9 @@
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
-
 import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
-import { CoworkStore } from '../../src/main/coworkStore';
-import { SqliteStore } from '../../src/main/sqliteStore';
+import {
+  createCoworkStoreHarness,
+  type CoworkStoreTestHarness,
+} from '../../src/main/coworkStore/coworkStore.testHarness';
+import type { CoworkStore } from '../../src/main/coworkStore';
 import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/schema';
 
 export interface HarnessCoworkStoreHandle {
@@ -12,17 +11,14 @@ export interface HarnessCoworkStoreHandle {
   cleanup: () => void;
 }
 
-/** SQLite-backed CoworkStore for streaming harness / adapter integration tests. */
-export async function createHarnessCoworkStore(): Promise<HarnessCoworkStoreHandle> {
-  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'streaming-harness-cowork-'));
-  const sqlite = await SqliteStore.create(userData);
-  initializeWorkbenchTaskSchema(sqlite.getDatabase());
-  const store = new CoworkStore(sqlite.getDatabase());
+/** In-memory SQLite CoworkStore for streaming harness / adapter integration tests. */
+export function createHarnessCoworkStore(): HarnessCoworkStoreHandle {
+  const harness: CoworkStoreTestHarness = createCoworkStoreHarness();
+  initializeWorkbenchTaskSchema(harness.db);
   return {
-    store,
+    store: harness.store,
     cleanup: () => {
-      sqlite.close();
-      fs.rmSync(userData, { recursive: true, force: true });
+      harness.db.close();
     },
   };
 }
@@ -32,7 +28,7 @@ export function ensureHarnessCoworkSession(
   sessionId: string,
   mode: 'work' | 'chat' = 'chat',
 ): void {
-  if (store.getSession(sessionId, 0, { includeArtifacts: false })) return;
+  if (store.getSession(sessionId, null, { includeArtifacts: false })) return;
   store.createSession(
     sessionId,
     process.cwd(),
