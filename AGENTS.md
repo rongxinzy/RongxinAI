@@ -44,7 +44,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 ## 架构
 
-目录导览、Pi/llama.cpp 模块拆分、IPC 约定与发版摘要见 [docs/architecture/overview.zh-CN.md](docs/architecture/overview.zh-CN.md)。Cowork **流式**细节见 [docs/architecture/streaming.md](docs/architecture/streaming.md)（PR #1119 待补）。
+目录导览、Pi/llama.cpp 模块拆分、IPC 约定与发版摘要见 [docs/architecture/overview.zh-CN.md](docs/architecture/overview.zh-CN.md)。Cowork **流式**细节见 [docs/architecture/streaming.md](docs/architecture/streaming.md)：全链路增量 UIMessageChunk（translator → 16ms coalescer 单点合并 → 序列化 IPC → rAF 批处理 → LiveTextStore），全文快照仅限非前缀改写/2M 截断/断档重同步/终态。
 
 ### 进程
 
@@ -71,7 +71,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 - **流式链路**：改动 translator / coalescer / `piUiForwarder` / `LiveTextStore` / `StreamingMarkdownResponse` / 相关 IPC 前，必须先读 [docs/architecture/streaming.md](docs/architecture/streaming.md)。禁止发送端拼全文再 diff、禁止第二层发送端节流、禁止 IPC 常规推送全文快照；守护测试见 `tests/streamingGuards.test.ts`。
 - `App.tsx` → `coworkService.init()` → IPC 加载配置/会话 → 流监听；`startSession()` → IPC → `PiRuntimeAdapter` → 流事件 → Redux。
-- 流式 IPC/渲染细节不在此维护，见 [docs/architecture/streaming.md](docs/architecture/streaming.md)（#1119）。
+- 流式 IPC/渲染细节不在此维护，见 [docs/architecture/streaming.md](docs/architecture/streaming.md)（Pi 事件翻译为增量 UIMessageChunk，主进程仅 coalescer 一处合并，终态才落 Redux，快照只走异常路径）。
 - 流事件：`message` / `messageUpdate` / `permissionRequest` / `complete` / `error`。权限请求经 `CoworkPermissionModal` 回传引擎。
 - IPC：`cowork:startSession`、`continueSession`、`stopSession`、`getSession`、`listSessions`、`deleteSession`、`respondToPermission`、`getConfig`、`setConfig`。`cowork:stream:*` 承载 Work/Chat；Channel/Cron run 以只读 activity 投影暴露。
 - 执行模式 `CoworkExecutionMode`：`auto` / `local`。
