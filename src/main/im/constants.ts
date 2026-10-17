@@ -10,3 +10,11 @@ export const ConnectivityCheckLevel = {
   Warn: 'warn',
   Fail: 'fail',
 } as const;
+
+const DingTalkRegistrationEnvKey = 'DINGTALK_REGISTRATION_SOURCE';
+
+/** Default `source` for DingTalk `/app/registration/init` (override via env). */
+export function resolveDingTalkRegistrationSource(): string {
+  const fromEnv = process.env[DingTalkRegistrationEnvKey]?.trim();
+  return fromEnv && fromEnv.length > 0 ? fromEnv : 'zhiyuan-agent';
+}
