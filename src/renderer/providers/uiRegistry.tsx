@@ -48,7 +48,3 @@ export function ProviderIcon({ id, className }: { id: string; className?: string
   const Icon = PROVIDER_ICON_MAP[id] ?? CustomProviderIcon;
   return <Icon className={className} />;
 }
-
-export function getProviderIcon(id: string): React.ReactNode {
-  return <ProviderIcon id={id} />;
-}

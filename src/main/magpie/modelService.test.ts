@@ -31,6 +31,39 @@ function fixture() {
   };
 }
 describe('single authoritative model service', () => {
+  it('accepts a selected unified model without a legacy provider configuration or credential projection', async () => {
+    const f = fixture();
+    await f.service.selectDefault('vendor/model');
+    expect(await f.service.checkReadiness()).toEqual({ hasConfig: true, config: null });
+  });
+  it('fails readiness when the selected model is revoked by the managed policy', async () => {
+    const f = fixture();
+    await f.service.selectDefault('vendor/model');
+    f.backend.models.mockResolvedValue([{ id: 'private/model' }]);
+    expect(await f.service.checkReadiness()).toEqual({
+      hasConfig: false,
+      config: null,
+      error: expect.stringContaining('no longer available'),
+    });
+  });
+  it('requires an explicit default model for readiness', async () => {
+    const f = fixture();
+    expect(await f.service.checkReadiness()).toEqual({
+      hasConfig: false,
+      config: null,
+      error: expect.stringContaining('default model'),
+    });
+  });
+  it('rejects readiness when the service is disabled without reading providers', async () => {
+    const f = fixture();
+    f.setState({ state: 'stopped', version: 'test' });
+    expect(await f.service.checkReadiness()).toEqual({
+      hasConfig: false,
+      config: null,
+      error: expect.stringContaining('Enable'),
+    });
+    expect(f.backend.models).not.toHaveBeenCalled();
+  });
   it('requires an explicit selection and never falls back to the first or a legacy provider', async () => {
     const f = fixture();
     await expect(f.service.resolve()).rejects.toThrow('default model');

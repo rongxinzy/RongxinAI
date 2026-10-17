@@ -36,9 +36,15 @@ const renderView = (runs: readonly ActivityRun[], onShowScheduledTasks?: () => v
   );
 };
 
-/** Source filter uses PageTabs; status filter is the pill buttons below it. */
+/** Source filter uses PageTabs; status filter uses FluidTabs. */
 const clickStatusPill = (label: string): void => {
-  fireEvent.click(screen.getByRole('button', { name: label }));
+  const tabs = screen.queryAllByRole('tab', { name: new RegExp(label) });
+  if (tabs.length > 0) {
+    fireEvent.click(tabs[tabs.length - 1]);
+    return;
+  }
+  const buttons = screen.getAllByRole('button', { name: new RegExp(label) });
+  fireEvent.click(buttons[buttons.length - 1]);
 };
 
 beforeEach(() => {

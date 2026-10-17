@@ -35,7 +35,7 @@ if (packageDirectory) {
 
 const evidence = {
   status: 'passed',
-  stage: 'release-candidate',
+  stage: 'release',
   generatedAt: new Date().toISOString(),
   packageDirectory: packageDirectory ?? null,
   checks,

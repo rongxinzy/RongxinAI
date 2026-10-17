@@ -94,7 +94,7 @@ const DEFINITIONS = [
 // ═══════════════════════════════════════════════════════
 
 export type Platform = (typeof DEFINITIONS)[number]['id'];
-export type ChannelName =
+type ChannelName =
   | (typeof DEFINITIONS)[number]['channel']
   | (typeof DEFINITIONS)[number]['channelAliases'][number];
 
@@ -102,7 +102,7 @@ export type ChannelName =
 // 4. Platform Definition Interface (public)
 // ═══════════════════════════════════════════════════════
 
-export interface PlatformDef {
+interface PlatformDef {
   /** Internal platform identifier */
   readonly id: Platform;
   /** UI display name (for non-i18n contexts like scheduled task dropdowns) */

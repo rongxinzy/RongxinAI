@@ -8,10 +8,7 @@ import {
 export {
   ArtifactPreviewMode,
   getArtifactPreviewMode,
-  getArtifactTypeByExtension,
   isBinaryArtifactFile,
-  resolveCoworkArtifactType,
-  type ArtifactPreviewMode as ArtifactPreviewModeValue,
 } from '../../shared/cowork/artifactPreview';
 
 export type ArtifactType = CoworkArtifactType;
@@ -29,7 +26,7 @@ export const PREVIEWABLE_ARTIFACT_TYPES = new Set<ArtifactType>([
   'unsupported',
 ]);
 
-export type ArtifactSource = CoworkArtifactSource;
+type ArtifactSource = CoworkArtifactSource;
 
 export const ArtifactRole = CoworkArtifactRole;
 
@@ -51,12 +48,4 @@ export interface Artifact {
   role: ArtifactRole;
   declared?: boolean;
   createdAt: number;
-}
-
-export interface ArtifactMarker {
-  type: ArtifactType;
-  title: string;
-  content: string;
-  language?: string;
-  fullMatch: string;
 }

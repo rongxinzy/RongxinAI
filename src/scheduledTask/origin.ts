@@ -8,8 +8,6 @@ import { BindingKind, DeliveryChannel, DeliveryMode, OriginKind } from './consta
 // Re-declare origin/binding types here so common/ doesn't depend on renderer/
 // These MUST be kept in sync with src/renderer/types/scheduledTask.ts
 
-export type TaskOriginKind = OriginKind;
-
 export type TaskOrigin =
   | { kind: typeof OriginKind.Legacy }
   | { kind: typeof OriginKind.IM; platform: string; conversationId: string }

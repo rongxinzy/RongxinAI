@@ -1,11 +1,8 @@
-export const AgentAvatarIconFormat = {
+const AgentAvatarIconFormat = {
   Svg: 'agent-avatar-svg',
 } as const;
 
-export type AgentAvatarIconFormat =
-  (typeof AgentAvatarIconFormat)[keyof typeof AgentAvatarIconFormat];
-
-export const AgentAvatarIconSeparator = {
+const AgentAvatarIconSeparator = {
   Value: ':',
 } as const;
 
@@ -56,7 +53,7 @@ export const DefaultAgentAvatar = {
   svg: AgentAvatarSvg.Zhiyuan,
 } as const satisfies DesignedAgentAvatar;
 
-export const isAgentAvatarSvg = (value: string): value is AgentAvatarSvg => {
+const isAgentAvatarSvg = (value: string): value is AgentAvatarSvg => {
   return AGENT_AVATAR_SVGS.has(value);
 };
 

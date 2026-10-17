@@ -26,7 +26,7 @@ export type EnterpriseSessionSnapshot =
   | { readonly status: 'recoverable' }
   | { readonly status: 'authenticated'; readonly identity: EnterpriseSessionIdentity };
 
-export type EnterpriseSessionErrorCode = 'UNAVAILABLE' | 'INVALID_INPUT' | 'OPERATION_FAILED';
+type EnterpriseSessionErrorCode = 'UNAVAILABLE' | 'INVALID_INPUT' | 'OPERATION_FAILED';
 
 export type EnterpriseSessionResult =
   | { readonly ok: true; readonly snapshot: EnterpriseSessionSnapshot }

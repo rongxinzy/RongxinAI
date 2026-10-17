@@ -66,6 +66,7 @@ export interface TodoUpdateInput {
   myDayDate?: string | null;
 }
 
+/** @knipignore Referenced only by a dynamic import() type query in preload and electron.d.ts. */
 export interface TodoListCreateInput {
   name: string;
 }

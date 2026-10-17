@@ -8,7 +8,7 @@ import type { CoworkSessionSummary } from '../../types/cowork';
  * keys on its last activity, which means starting or stopping a conversation —
  * including pausing a run — puts it on top, and nothing else ever moves.
  */
-export const agentSidebarSortKey = (session: CoworkSessionSummary): number =>
+const agentSidebarSortKey = (session: CoworkSessionSummary): number =>
   session.runStartedAt ?? (session.updatedAt || session.createdAt);
 
 /**

@@ -2,7 +2,7 @@ export const magpieTranslations = {
   zh: {
     magpieSubscriptionsOn: '订阅账号已启用',
     magpieSubscriptionsOff: '订阅账号已关闭',
-    magpieSubscriptionsHint: '订阅账号由 Magpie 官方管理界面维护，凭据不会返回应用页面。',
+    magpieSubscriptionsHint: '订阅账号由官方管理界面维护，凭据不会返回应用页面。',
     magpieSubscriptionsEnable: '启用订阅账号',
     magpieSubscriptionsDisable: '关闭订阅账号',
     magpieSubscriptionsEnableConsent:
@@ -23,13 +23,13 @@ export const magpieTranslations = {
     magpieCatalogEmpty: '目录暂无模型。请在管理界面配置 Provider，或启动本地模型后刷新。',
     magpieCatalogEnable: '启用模型服务',
     magpieCatalogConsent:
-      '启用会启动 Magpie，并读取及自动同步已连接的本机 Agent 配置。订阅账号需单独启用，遥测与局域网访问关闭。',
+      '启用会启动模型服务，并读取及自动同步已连接的本机 Agent 配置。订阅账号需单独启用，遥测与局域网访问关闭。',
     magpieSetDefault: '设为默认',
 
     magpieTitle: '本机 CLI 模型管理',
-    magpieManagerDescription: '通过独立的 Magpie 管理本机 Agent 模型配置。',
+    magpieManagerDescription: '通过独立的模型服务管理本机 Agent 模型配置。',
     magpieActivationNotice:
-      '启用后，Magpie 会读取并自动同步本机 Agent 配置。刷新管理状态也可能同步配置；选择模型后需点击“应用到 CLI”写入。',
+      '启用后，模型服务会读取并自动同步本机 Agent 配置。刷新管理状态也可能同步配置；选择模型后需点击“应用到 CLI”写入。',
     magpiePrivacyNotice:
       '默认不启动。自动订阅发现、遥测与局域网访问关闭。停止服务不会撤销已经写入的 Agent 配置。',
     magpieEnable: '启用本机 CLI 管理',
@@ -40,7 +40,7 @@ export const magpieTranslations = {
     magpieApplyModel: '应用到 CLI',
     magpieSelectModel: '选择模型',
     magpieApplyNotice:
-      '应用会通过官方 Magpie 接口修改对应 Agent 的模型配置。请在该 Agent 中开启新会话以使用新配置。',
+      '应用会通过模型服务修改对应 Agent 的模型配置。请在该 Agent 中开启新会话以使用新配置。',
     magpieNotLoaded: '点击“刷新管理状态”读取本机 Agent；此操作可能同步配置。',
     magpieDiscoveryPending: '部分 CLI 版本仍在查询中，可稍后刷新。',
     magpieNoAgents: '尚未发现本机 Agent。这里不会自动安装 CLI。',
@@ -56,10 +56,11 @@ export const magpieTranslations = {
     magpieState_running: '运行中',
     magpieState_stopping: '停止中',
     magpieState_failed: '启动失败',
+    magpieLicenseNotice: 'MIT · © 2026 yetone',
 
     magpieProvidersTitle: '模型渠道管理',
     magpieProvidersDescription:
-      '管理连接到 Magpie 统一网关的模型渠道。企业与本地 GPU 渠道由系统托管。',
+      '管理连接到统一网关的模型渠道。企业与本地 GPU 渠道由系统托管。',
     magpieAddProvider: '添加渠道',
     magpieRefreshProviders: '刷新渠道',
     magpieEditProvider: '编辑渠道',
@@ -97,7 +98,7 @@ export const magpieTranslations = {
     magpieDiagnosticsNoErrors: '近期无上游请求异常',
     magpieDirectMode: '直连独立模式',
     magpieWiredGateway: '已接入统一网关',
-    magpieModelConfigTitle: 'Magpie 本地模型配置',
+    magpieModelConfigTitle: '本地模型配置',
     magpieWireConfirmTitle: '接入统一网关确认',
     magpieWireConfirmDesc:
       '此操作将配置该 Agent 的 CLI 使用知远统一网关分发模型请求。原有本机凭据不会被删除，随时可恢复。',
@@ -110,7 +111,7 @@ export const magpieTranslations = {
     magpieSubscriptionsOn: 'Subscription accounts enabled',
     magpieSubscriptionsOff: 'Subscription accounts disabled',
     magpieSubscriptionsHint:
-      'Manage subscription accounts in the official Magpie UI. Credentials are not returned to this app page.',
+      'Manage subscription accounts in the official management UI. Credentials are not returned to this app page.',
     magpieSubscriptionsEnable: 'Enable subscription accounts',
     magpieSubscriptionsDisable: 'Disable subscription accounts',
     magpieSubscriptionsEnableConsent:
@@ -132,14 +133,14 @@ export const magpieTranslations = {
       'No models in the catalog. Configure a provider in management, or start a local model and refresh.',
     magpieCatalogEnable: 'Enable model service',
     magpieCatalogConsent:
-      'Enabling starts Magpie and reads and automatically synchronizes connected local Agent configuration. Subscription accounts require separate opt-in. Telemetry and LAN access are disabled.',
+      'Enabling starts the model service and reads and automatically synchronizes connected local Agent configuration. Subscription accounts require separate opt-in. Telemetry and LAN access are disabled.',
     magpieSetDefault: 'Set as default',
 
     magpieTitle: 'Local CLI model management',
     magpieManagerDescription:
-      'Manage local Agent model configuration through the standalone Magpie runtime.',
+      'Manage local Agent model configuration through the standalone model service.',
     magpieActivationNotice:
-      'Enabling Magpie reads and automatically synchronizes local Agent configuration. Refreshing management state may also synchronize configuration. A model selection made here is submitted when you click Apply to CLI.',
+      'Enabling the model service reads and automatically synchronizes local Agent configuration. Refreshing management state may also synchronize configuration. A model selection made here is submitted when you click Apply to CLI.',
     magpiePrivacyNotice:
       'Off by default. Automatic subscription discovery, telemetry, and LAN access are disabled. Stopping does not undo Agent configuration already written.',
     magpieEnable: 'Enable local CLI management',
@@ -150,7 +151,7 @@ export const magpieTranslations = {
     magpieApplyModel: 'Apply to CLI',
     magpieSelectModel: 'Choose a model',
     magpieApplyNotice:
-      'Applying uses the official Magpie API to change this Agent’s model configuration. Start a new session in that Agent to use it.',
+      'Applying uses the model service to change this Agent’s model configuration. Start a new session in that Agent to use it.',
     magpieNotLoaded:
       'Refresh management state to read local Agents. This may synchronize configuration.',
     magpieDiscoveryPending: 'Some CLI versions are still being checked. Refresh again later.',
@@ -170,10 +171,11 @@ export const magpieTranslations = {
     magpieState_running: 'Running',
     magpieState_stopping: 'Stopping',
     magpieState_failed: 'Failed',
+    magpieLicenseNotice: 'MIT · © 2026 yetone',
 
     magpieProvidersTitle: 'Model Providers',
     magpieProvidersDescription:
-      'Manage model providers connected to Magpie gateway. Enterprise and local GPU providers are managed by system.',
+      'Manage model providers connected to the gateway. Enterprise and local GPU providers are managed by system.',
     magpieAddProvider: 'Add Provider',
     magpieRefreshProviders: 'Refresh providers',
     magpieEditProvider: 'Edit Provider',
@@ -211,11 +213,11 @@ export const magpieTranslations = {
     magpieDiagnosticsErrors: 'Recent Errors',
     magpieDiagnosticsNoErrors: 'No recent upstream errors',
     magpieDirectMode: 'Direct Standalone',
-    magpieWiredGateway: 'Wired to Magpie',
-    magpieModelConfigTitle: 'Magpie Model Configuration',
+    magpieWiredGateway: 'Wired to Gateway',
+    magpieModelConfigTitle: 'Local Model Configuration',
     magpieWireConfirmTitle: 'Confirm Gateway Configuration',
     magpieWireConfirmDesc:
-      'This will configure the agent CLI to route model requests through the unified Magpie gateway. Existing credentials are not deleted and can be reverted at any time.',
+      'This will configure the agent CLI to route model requests through the unified gateway. Existing credentials are not deleted and can be reverted at any time.',
     magpieWireTargetAgent: 'Target Agent',
     magpieWireTargetModel: 'Target Model',
     magpieProbeGuideNoModel:

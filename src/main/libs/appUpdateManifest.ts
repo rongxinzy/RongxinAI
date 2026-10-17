@@ -6,6 +6,13 @@ const DOWNLOAD_HOST = 'downloads.rongxzyai.com';
 
 export type UpdateTarget = { platform: string; arch: string; variant: string };
 
+export const AppUpdateReleaseChannel = {
+  Stable: 'stable',
+  Beta: 'beta',
+} as const;
+export type AppUpdateReleaseChannel =
+  (typeof AppUpdateReleaseChannel)[keyof typeof AppUpdateReleaseChannel];
+
 export type UpdatePayload = {
   channel?: unknown;
   version?: unknown;
@@ -31,10 +38,11 @@ export function toUpdateInfo(
   payload: UpdatePayload,
   target: UpdateTarget,
   electronUpdaterEnabled: boolean,
+  expectedChannel: AppUpdateReleaseChannel = AppUpdateReleaseChannel.Stable,
 ): AppUpdateInfo {
   const artifact = payload.artifact;
   if (
-    payload.channel !== 'stable' ||
+    payload.channel !== expectedChannel ||
     typeof payload.version !== 'string' ||
     !valid(payload.version) ||
     !artifact ||

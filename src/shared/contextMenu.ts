@@ -13,7 +13,7 @@ const contextMenuActionValues = new Set<string>(Object.values(ContextMenuAction)
 export const isContextMenuAction = (value: unknown): value is ContextMenuAction =>
   typeof value === 'string' && contextMenuActionValues.has(value);
 
-export interface ContextMenuEditFlags {
+interface ContextMenuEditFlags {
   canUndo: boolean;
   canRedo: boolean;
   canCut: boolean;

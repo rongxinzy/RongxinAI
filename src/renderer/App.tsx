@@ -1,15 +1,17 @@
-import { Button } from '@shared/components/ui/button';
 import { TooltipProvider } from '@shared/components/ui/tooltip';
-import { MessageCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { type AppUpdateRuntimeState, AppUpdateStatus } from '../shared/appUpdate/constants';
-import {
-  ManagedProviderAccessMode,
-  type ManagedProviderAccessPolicy,
-} from '../shared/managedProviders';
+import { AppUpdateStatus } from '../shared/appUpdate/constants';
+import { ManagedProviderAccessMode } from '../shared/managedProviders';
 import { getBranding } from '../shared/branding';
+import { InitErrorView } from './app/InitErrorView';
+import { MainViewCanvas } from './app/MainViewCanvas';
+import { MainView } from './app/constants';
+import { useAppBootstrap } from './app/useAppBootstrap';
+import { useAppKeyboardShortcuts } from './app/useAppKeyboardShortcuts';
+import { useAppUpdateState } from './app/useAppUpdateState';
+import { useNetworkStatusForwarder } from './app/useNetworkStatusForwarder';
 import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
@@ -20,12 +22,10 @@ import type { McpRegistryId } from './components/mcp/constants';
 import type { SettingsOpenOptions } from './components/settings/types';
 import { prefetchFeatureView } from './components/featureViewPrefetch';
 import { ParticleBootScreen } from './components/boot/ParticleBootScreen';
-import { LazyChunkErrorBoundary } from './components/LazyChunkErrorBoundary';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
 import WindowTitleBar from './components/window/WindowTitleBar';
-import { defaultConfig } from './config';
 import { agentService } from './services/agent';
 import {
   refreshMagpieModels,
@@ -37,14 +37,12 @@ import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
 import { TOAST_DEFAULT_DURATION_MS, TOAST_MAX_DURATION_MS } from './services/errorNormalization';
-import { matchesShortcut } from './services/shortcuts';
 import {
   resolveToastMessage,
   resolveToastNotification,
   type ToastNotificationDetail,
   type ToastNotificationOptions,
 } from './services/toastNotification';
-import { themeService } from './services/theme';
 import { workspaceService } from './services/workspace';
 import { RootState, store } from './store';
 import {
@@ -58,70 +56,10 @@ import { WorkMode } from './store/workMode/constants';
 import { setWorkMode } from './store/workMode/workModeSlice';
 import type { CoworkPermissionResult } from './types/cowork';
 
-/** Used for config + i18n init; longer on Windows where main-process IPC can stall during cold start. */
-const INIT_STEP_TIMEOUT_MS_WINDOWS = 24_000;
-const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
-
-// Feature areas outside the default cowork view are code-split so they stay
-// out of the initial preload graph (see issue #141).
-const loadCoworkView = () =>
-  import('./components/cowork').then(module => ({ default: module.CoworkView }));
-// Start the default view chunk during the boot animation so first paint isn't waiting on it.
-const coworkViewPromise = loadCoworkView();
-const CoworkView = React.lazy(() => coworkViewPromise);
-const SettingsPage = React.lazy(() => import('./components/settings/SettingsPage'));
-const SkillsView = React.lazy(() =>
-  import('./components/skills').then(module => ({ default: module.SkillsView })),
-);
-const ScheduledTasksView = React.lazy(() =>
-  import('./components/scheduledTasks').then(module => ({ default: module.ScheduledTasksView })),
-);
-const ActivityView = React.lazy(() =>
-  import('./components/activity').then(module => ({ default: module.ActivityView })),
-);
-const McpView = React.lazy(() =>
-  import('./components/mcp').then(module => ({ default: module.McpView })),
-);
-const LocalInferenceView = React.lazy(() =>
-  import('./components/localInference').then(module => ({ default: module.LocalInferenceView })),
-);
-const ExpertView = React.lazy(() => import('./components/expert/ExpertView'));
-const CodingWorkbenchView = React.lazy(() =>
-  import('./components/coding').then(module => ({ default: module.CodingWorkbenchView })),
-);
-const TodoView = React.lazy(() => import('./components/todo/TodoView'));
-
-/**
- * Full-area fallback shown while a lazily loaded feature chunk downloads.
- * Content-shaped skeleton blocks with a soft staggered pulse communicate
- * "view is loading" and keep the layout stable when the real view mounts.
- */
-const lazyViewFallback = (
-  <div className="flex h-full min-h-0 flex-col gap-4 p-6">
-    <div className="h-9 w-48 animate-pulse rounded-lg bg-muted/40" />
-    <div className="flex flex-1 flex-col gap-3">
-      <div className="h-28 animate-pulse rounded-xl bg-muted/30" />
-      <div className="h-28 animate-pulse rounded-xl bg-muted/30 [animation-delay:150ms]" />
-      <div className="h-28 animate-pulse rounded-xl bg-muted/30 [animation-delay:300ms]" />
-    </div>
-  </div>
-);
-
 const App: React.FC = () => {
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
   const [initErrorSettingsOpen, setInitErrorSettingsOpen] = useState(false);
-  const [mainView, setMainView] = useState<
-    | 'cowork'
-    | 'settings'
-    | 'skills'
-    | 'scheduledTasks'
-    | 'activity'
-    | 'mcp'
-    | 'localInference'
-    | 'expert'
-    | 'coding'
-    | 'todo'
-  >('cowork');
+  const [mainView, setMainView] = useState<MainView>(MainView.Cowork);
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
   const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);
@@ -132,9 +70,7 @@ const App: React.FC = () => {
   const LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS = 10 * 60 * 1000;
   const [localInferenceInstallRequestId, setLocalInferenceInstallRequestId] = useState<string>();
   const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [bootScreenVisible, setBootScreenVisible] = useState(true);
-  const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isToastError, setIsToastError] = useState(false);
   const [isToastSuccess, setIsToastSuccess] = useState(false);
@@ -146,27 +82,16 @@ const App: React.FC = () => {
     laneId: null,
     draft: null,
   });
-  const [appUpdateState, setAppUpdateState] = useState<AppUpdateRuntimeState>({
-    status: AppUpdateStatus.Idle,
-    source: null,
-    info: null,
-    progress: null,
-    readyFilePath: null,
-    readyFileHash: null,
-    errorMessage: null,
-    lastCheckedAt: null,
-    failureStage: null,
-    lastInstallResult: null,
-  });
-  const [enterpriseConfig, setEnterpriseConfig] = useState<{
-    ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
-    disableUpdate?: boolean;
-  } | null>(null);
-  const [managedProviderPolicy, setManagedProviderPolicy] =
-    useState<ManagedProviderAccessPolicy | null>(null);
+  const {
+    isInitialized,
+    initError,
+    enterpriseConfig,
+    managedProviderPolicy,
+    setManagedProviderPolicy,
+  } = useAppBootstrap();
+  const appUpdateState = useAppUpdateState();
   const toastTimerRef = useRef<number | null>(null);
   const toastOnCloseRef = useRef<(() => void) | null>(null);
-  const hasInitialized = useRef(false);
   const appShellRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const currentSessionId = useSelector(selectCurrentSessionId);
@@ -181,105 +106,6 @@ const App: React.FC = () => {
   );
   const isWindows = window.electron.platform === 'win32';
   const managedModelsOnly = managedProviderPolicy?.mode === ManagedProviderAccessMode.Exclusive;
-
-  const waitWithTimeout = useCallback(
-    async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
-      return await new Promise<T>((resolve, reject) => {
-        const timer = window.setTimeout(() => {
-          reject(new Error(`${label} timed out after ${timeoutMs}ms`));
-        }, timeoutMs);
-
-        promise.then(
-          value => {
-            window.clearTimeout(timer);
-            resolve(value);
-          },
-          error => {
-            window.clearTimeout(timer);
-            reject(error);
-          },
-        );
-      });
-    },
-    [],
-  );
-
-  // 鍒濆鍖栧簲鐢?
-  useEffect(() => {
-    if (hasInitialized.current) {
-      return;
-    }
-    hasInitialized.current = true;
-
-    const initializeApp = async () => {
-      const t0 = performance.now();
-      const mark = (label: string) => {
-        const elapsed = Math.round(performance.now() - t0);
-        const msg = `initializeApp: ${label} (+${elapsed}ms)`;
-        console.info(`[App] ${msg}`);
-        try {
-          window.electron?.log?.fromRenderer?.('info', 'App', msg);
-        } catch {
-          /* preload may not expose this yet */
-        }
-      };
-
-      try {
-        mark('start');
-        document.documentElement.classList.add(`platform-${window.electron.platform}`);
-
-        const initTimeoutMs =
-          window.electron.platform === 'win32'
-            ? INIT_STEP_TIMEOUT_MS_WINDOWS
-            : INIT_STEP_TIMEOUT_MS_DEFAULT;
-        mark('configService.init begin');
-        await waitWithTimeout(configService.init(), initTimeoutMs, 'configService.init');
-        mark('configService.init done');
-
-        const config = configService.getConfig();
-        themeService.initialize();
-        mark('themeService done');
-
-        // Enterprise and i18n only depend on config initialization.
-        mark('enterprise/i18n init begin');
-        const [entConfig, , providerPolicy] = await Promise.all([
-          window.electron.enterprise.getConfig(),
-          waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize'),
-          window.electron.managedProviders.policy(),
-        ]);
-        setEnterpriseConfig(entConfig);
-        setManagedProviderPolicy(providerPolicy);
-        mark('enterprise/i18n init done');
-
-        dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
-
-        // Catalog access never starts Magpie; unavailable models do not block the shell.
-        await waitWithTimeout(refreshMagpieModels(), initTimeoutMs, 'magpie.catalog').catch(
-          error => {
-            console.error('[App] model catalog unavailable:', error);
-          },
-        );
-        mark('model resolution done');
-
-        setIsInitialized(true);
-        mark('shell ready');
-      } catch (error) {
-        const elapsed = Math.round(performance.now() - t0);
-        const msg = error instanceof Error ? error.message : String(error);
-        const detail = `initializeApp FAILED after ${elapsed}ms: ${msg}`;
-        console.error(`[App] ${detail}`);
-        try {
-          window.electron?.log?.fromRenderer?.('error', 'App', detail);
-        } catch {
-          /* best-effort */
-        }
-        setInitError(i18nService.t('initializationError'));
-        setIsInitialized(true);
-      }
-    };
-
-    void initializeApp();
-  }, [dispatch, waitWithTimeout]);
 
   useEffect(() => {
     if (!isInitialized || initError) return;
@@ -306,12 +132,14 @@ const App: React.FC = () => {
       setManagedProviderPolicy(policy);
       if (policy.mode === ManagedProviderAccessMode.Exclusive) {
         setLocalInferenceInstallRequestId(undefined);
-        setMainView(currentView => (currentView === 'localInference' ? 'cowork' : currentView));
+        setMainView(currentView =>
+          currentView === MainView.LocalInference ? MainView.Cowork : currentView,
+        );
       }
     } catch (error) {
       console.error('[App] failed to refresh available models:', error);
     }
-  }, []);
+  }, [setManagedProviderPolicy]);
 
   useEffect(() => {
     if (!isInitialized) {
@@ -374,7 +202,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (mainView === 'localInference') {
+    if (mainView === MainView.LocalInference) {
       setHasMountedLocalInference(true);
       setIsLocalInferenceDormant(false);
       return;
@@ -397,7 +225,7 @@ const App: React.FC = () => {
       .then(requestId => {
         if (!active || !requestId) return;
         setLocalInferenceInstallRequestId(requestId);
-        setMainView('localInference');
+        setMainView(MainView.LocalInference);
       })
       .catch(error => {
         console.warn('[Renderer] Failed to read local inference installer request:', error);
@@ -407,26 +235,7 @@ const App: React.FC = () => {
     };
   }, [managedProviderPolicy, managedModelsOnly]);
 
-  // Network status monitoring
-  useEffect(() => {
-    const handleOnline = () => {
-      console.log('[Renderer] Network online');
-      window.electron.networkStatus.send('online');
-    };
-
-    const handleOffline = () => {
-      console.log('[Renderer] Network offline');
-      window.electron.networkStatus.send('offline');
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  useNetworkStatusForwarder();
 
   const handleShowSettings = useCallback((options?: SettingsOpenOptions) => {
     setSettingsOptions({
@@ -434,7 +243,7 @@ const App: React.FC = () => {
       initialProvider: options?.initialProvider,
       notice: options?.notice,
     });
-    setMainView('settings');
+    setMainView(MainView.Settings);
   }, []);
 
   const handleOpenLocalModelSettings = useCallback(() => {
@@ -442,50 +251,50 @@ const App: React.FC = () => {
   }, [handleShowSettings]);
 
   const handleShowSkills = useCallback(() => {
-    setMainView('skills');
+    setMainView(MainView.Skills);
   }, []);
 
   const handleShowCowork = useCallback(() => {
-    setMainView('cowork');
+    setMainView(MainView.Cowork);
   }, []);
 
   const handleShowScheduledTasks = useCallback(() => {
-    setMainView('scheduledTasks');
+    setMainView(MainView.ScheduledTasks);
   }, []);
 
   const handleShowActivity = useCallback(() => {
-    setMainView('activity');
+    setMainView(MainView.Activity);
   }, []);
 
   const handleShowMcp = useCallback((registryId?: McpRegistryId) => {
     setMcpOpenRegistryId(registryId);
     setMcpOpenMarketplace(false);
-    setMainView('mcp');
+    setMainView(MainView.Mcp);
   }, []);
 
   const handleShowMcpMarketplace = useCallback(() => {
     setMcpOpenRegistryId(undefined);
     setMcpOpenMarketplace(true);
-    setMainView('mcp');
+    setMainView(MainView.Mcp);
   }, []);
 
   const handleShowLocalInference = useCallback(() => {
     if (managedModelsOnly) return;
     setLocalInferenceRefreshRequestId(current => current + 1);
-    setMainView('localInference');
+    setMainView(MainView.LocalInference);
   }, [managedModelsOnly]);
 
   const handleShowExpert = useCallback(() => {
     setExpertInitialTab(undefined);
-    setMainView('expert');
+    setMainView(MainView.Expert);
   }, []);
 
   const handleShowCoding = useCallback(() => {
-    setMainView('coding');
+    setMainView(MainView.Coding);
   }, []);
 
   const handleShowTodo = useCallback(() => {
-    setMainView('todo');
+    setMainView(MainView.Todo);
   }, []);
 
   const handleToggleSidebar = useCallback(() => {
@@ -495,11 +304,11 @@ const App: React.FC = () => {
   const openNewConversation = useCallback(
     (options?: { clearExperts?: boolean }) => {
       // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
-      const shouldClearInput = mainView === 'cowork' && !currentSessionId;
+      const shouldClearInput = mainView === MainView.Cowork && !currentSessionId;
       if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
       coworkService.clearSession();
       dispatch(clearSelection());
-      setMainView('cowork');
+      setMainView(MainView.Cowork);
       window.setTimeout(() => {
         window.dispatchEvent(
           new CustomEvent('cowork:focus-input', {
@@ -607,32 +416,6 @@ const App: React.FC = () => {
     [dismissToast],
   );
 
-  useEffect(() => {
-    let mounted = true;
-
-    const loadInitialUpdateState = async () => {
-      try {
-        const state = await window.electron.appUpdate.getState();
-        if (mounted) {
-          setAppUpdateState(state);
-        }
-      } catch (error) {
-        console.error('[App] failed to load initial app update state:', error);
-      }
-    };
-
-    void loadInitialUpdateState();
-
-    const unsubscribe = window.electron.appUpdate.onStateChanged(state => {
-      setAppUpdateState(state);
-    });
-
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
-  }, [showToast]);
-
   const updateInfo = appUpdateState.info;
 
   const handleUpdateAction = useCallback(() => {
@@ -649,61 +432,25 @@ const App: React.FC = () => {
 
   const isInlineAskUserQuestion = Boolean(
     pendingPermission &&
-    mainView === 'cowork' &&
+    mainView === MainView.Cowork &&
     pendingPermission.sessionId === currentSessionId &&
     isAskUserQuestionPermission(pendingPermission) &&
     hasAskUserQuestions(pendingPermission),
   );
 
   const handleLeaveSettings = useCallback(() => {
-    setMainView('cowork');
+    setMainView(MainView.Cowork);
   }, []);
 
   const previousMainViewRef = useRef(mainView);
   useEffect(() => {
     const previousView = previousMainViewRef.current;
     previousMainViewRef.current = mainView;
-    if (previousView !== 'settings' || mainView === 'settings') return;
+    if (previousView !== MainView.Settings || mainView === MainView.Settings) return;
     void refreshAvailableModels();
   }, [mainView, refreshAvailableModels]);
 
-  const isShortcutInputActive = () => {
-    const activeElement = document.activeElement;
-    if (!(activeElement instanceof HTMLElement)) return false;
-    return activeElement.dataset.shortcutInput === 'true';
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || isShortcutInputActive()) return;
-
-      const { shortcuts } = configService.getConfig();
-      const activeShortcuts = {
-        ...defaultConfig.shortcuts,
-        ...(shortcuts ?? {}),
-      };
-
-      if (matchesShortcut(event, activeShortcuts.newChat)) {
-        event.preventDefault();
-        handleNewChat();
-        return;
-      }
-
-      if (matchesShortcut(event, activeShortcuts.search)) {
-        event.preventDefault();
-        window.dispatchEvent(new CustomEvent('cowork:shortcut:search'));
-        return;
-      }
-
-      if (matchesShortcut(event, activeShortcuts.settings)) {
-        event.preventDefault();
-        handleShowSettings();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleShowSettings, handleNewChat]);
+  useAppKeyboardShortcuts({ onNewChat: handleNewChat, onShowSettings: handleShowSettings });
 
   useEffect(() => {
     return () => {
@@ -729,7 +476,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handler = (e: Event) => {
       const text = (e as CustomEvent<string>).detail;
-      setMainView('cowork');
+      setMainView(MainView.Cowork);
       window.setTimeout(() => {
         window.dispatchEvent(
           new CustomEvent('cowork:focus-input', {
@@ -745,7 +492,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handler = () => {
       if (managedModelsOnly) return;
-      setMainView('localInference');
+      setMainView(MainView.LocalInference);
     };
     window.addEventListener('app:show-local-inference', handler);
     return () => window.removeEventListener('app:show-local-inference', handler);
@@ -799,43 +546,17 @@ const App: React.FC = () => {
 
   if (initError) {
     return (
-      <div className="h-screen overflow-hidden flex flex-col">
-        {windowsStandaloneTitleBar}
-        {initErrorSettingsOpen ? (
-          <div className="flex-1 flex min-h-0">
-            <LazyChunkErrorBoundary>
-              <React.Suspense fallback={null}>
-                <SettingsPage
-                  onClose={() => setInitErrorSettingsOpen(false)}
-                  initialTab={settingsOptions.initialTab}
-                  initialProvider={settingsOptions.initialProvider}
-                  notice={settingsOptions.notice}
-                  enterpriseConfig={enterpriseConfig}
-                  appUpdateState={appUpdateState}
-                  managedModelsOnly={managedModelsOnly}
-                />
-              </React.Suspense>
-            </LazyChunkErrorBoundary>
-          </div>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-background">
-            <div className="flex flex-col items-center space-y-6 max-w-md px-6">
-              <div className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-lg">
-                <MessageCircle className="h-8 w-8 text-destructive-foreground" />
-              </div>
-              <div className="text-foreground text-xl font-medium text-center">{initError}</div>
-              <div className="flex items-center gap-3">
-                <Button onClick={() => window.electron.appInfo.relaunch()}>
-                  {i18nService.t('restartApp')}
-                </Button>
-                <Button variant="outline" onClick={() => setInitErrorSettingsOpen(true)}>
-                  {i18nService.t('openSettings')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <InitErrorView
+        initError={initError}
+        titleBar={windowsStandaloneTitleBar}
+        isSettingsOpen={initErrorSettingsOpen}
+        onOpenSettings={() => setInitErrorSettingsOpen(true)}
+        onCloseSettings={() => setInitErrorSettingsOpen(false)}
+        settingsOptions={settingsOptions}
+        enterpriseConfig={enterpriseConfig}
+        appUpdateState={appUpdateState}
+        managedModelsOnly={managedModelsOnly}
+      />
     );
   }
 
@@ -872,148 +593,40 @@ const App: React.FC = () => {
             managedModelsOnly={managedModelsOnly}
             onPrefetchView={prefetchFeatureView}
           />
-          <div
-            className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}
-          >
-            <div
-              data-main-canvas
-              className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]"
-            >
-              {hasMountedLocalInference && !isLocalInferenceDormant && !managedModelsOnly && (
-                <div
-                  className={
-                    mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'
-                  }
-                >
-                  {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
-                  <LazyChunkErrorBoundary resetKey={mainView}>
-                    <React.Suspense fallback={null}>
-                      <LocalInferenceView
-                        installRequestId={localInferenceInstallRequestId}
-                        onInstallRequestHandled={handleLocalInferenceInstallRequestHandled}
-                        refreshRequestId={localInferenceRefreshRequestId}
-                        isSidebarCollapsed={isSidebarCollapsed}
-                        isVisible={mainView === 'localInference'}
-                        onToggleSidebar={handleToggleSidebar}
-                        onNewChat={handleNewChat}
-                        onOpenModelSettings={handleOpenLocalModelSettings}
-                        updateBadge={null}
-                      />
-                    </React.Suspense>
-                  </LazyChunkErrorBoundary>
-                </div>
-              )}
-              <LazyChunkErrorBoundary resetKey={mainView}>
-                <React.Suspense fallback={lazyViewFallback}>
-                  {mainView === 'settings' ? (
-                    <SettingsPage
-                      onClose={handleLeaveSettings}
-                      initialTab={settingsOptions.initialTab}
-                      initialProvider={settingsOptions.initialProvider}
-                      notice={settingsOptions.notice}
-                      enterpriseConfig={enterpriseConfig}
-                      appUpdateState={appUpdateState}
-                      managedModelsOnly={managedModelsOnly}
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                      onNewChat={handleNewChat}
-                    />
-                  ) : mainView === 'skills' ? (
-                    <SkillsView
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                      onNewChat={handleNewChat}
-                      onCreateSkillByChat={handleCreateSkillByChat}
-                      onTrySkill={handleTrySkill}
-                      updateBadge={null}
-                      readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                    />
-                  ) : mainView === 'scheduledTasks' ? (
-                    <ScheduledTasksView
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                      onNewChat={handleNewChat}
-                      updateBadge={null}
-                    />
-                  ) : mainView === 'activity' ? (
-                    <ActivityView
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                      onNewChat={handleNewChat}
-                      updateBadge={null}
-                      onShowScheduledTasks={handleShowScheduledTasks}
-                    />
-                  ) : mainView === 'mcp' ? (
-                    <McpView
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                      onNewChat={handleNewChat}
-                      onUseMcp={handleTryMcp}
-                      updateBadge={null}
-                      openRegistryId={mcpOpenRegistryId}
-                      openMarketplace={mcpOpenMarketplace}
-                    />
-                  ) : mainView === 'expert' ? (
-                    <ExpertView
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                      onNewChat={handleNewChat}
-                      updateBadge={null}
-                      readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                      onCreateSkillByChat={handleCreateSkillByChat}
-                      onTrySkill={handleTrySkill}
-                      onChatWithExpert={handleChatWithExpert}
-                      onUseMcp={handleTryMcp}
-                      initialTab={expertInitialTab}
-                    />
-                  ) : mainView === 'coding' ? (
-                    <CodingWorkbenchView
-                      workspaceRoot={codingSelection.workspaceRoot}
-                      selectedLaneId={codingSelection.laneId}
-                      draftSession={codingSelection.draft}
-                      onSessionDraftCreated={setCodingSelection}
-                      onSessionCreated={laneId =>
-                        setCodingSelection(current => ({ ...current, laneId, draft: null }))
-                      }
-                      onLaneSelected={laneId =>
-                        setCodingSelection(current => ({ ...current, laneId, draft: null }))
-                      }
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                    />
-                  ) : mainView === 'todo' ? (
-                    <TodoView
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                      onNewChat={handleNewChat}
-                      updateBadge={null}
-                    />
-                  ) : mainView === 'localInference' ? null : (
-                    <CoworkView
-                      onRequestAppSettings={handleShowSettings}
-                      onShowSkills={handleShowSkills}
-                      onShowConnectors={handleShowMcpMarketplace}
-                      isSidebarCollapsed={isSidebarCollapsed}
-                      onToggleSidebar={handleToggleSidebar}
-                      onNewChat={handleNewChat}
-                      updateBadge={null}
-                      inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
-                      onRespondToInlineQuestion={handlePermissionResponse}
-                      inlinePermission={
-                        pendingPermission &&
-                        mainView === 'cowork' &&
-                        pendingPermission.sessionId === currentSessionId &&
-                        !isInlineAskUserQuestion
-                          ? pendingPermission
-                          : null
-                      }
-                      onRespondToInlinePermission={handlePermissionResponse}
-                    />
-                  )}
-                </React.Suspense>
-              </LazyChunkErrorBoundary>
-            </div>
-          </div>
+          <MainViewCanvas
+            mainView={mainView}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebar={handleToggleSidebar}
+            onNewChat={handleNewChat}
+            settingsOptions={settingsOptions}
+            onLeaveSettings={handleLeaveSettings}
+            onRequestAppSettings={handleShowSettings}
+            enterpriseConfig={enterpriseConfig}
+            appUpdateState={appUpdateState}
+            managedModelsOnly={managedModelsOnly}
+            onShowSkills={handleShowSkills}
+            onCreateSkillByChat={handleCreateSkillByChat}
+            onTrySkill={handleTrySkill}
+            onChatWithExpert={handleChatWithExpert}
+            expertInitialTab={expertInitialTab}
+            onUseMcp={handleTryMcp}
+            onShowConnectors={handleShowMcpMarketplace}
+            mcpOpenRegistryId={mcpOpenRegistryId}
+            mcpOpenMarketplace={mcpOpenMarketplace}
+            onShowScheduledTasks={handleShowScheduledTasks}
+            codingSelection={codingSelection}
+            onCodingSelectionChange={setCodingSelection}
+            hasMountedLocalInference={hasMountedLocalInference}
+            isLocalInferenceDormant={isLocalInferenceDormant}
+            localInferenceInstallRequestId={localInferenceInstallRequestId}
+            localInferenceRefreshRequestId={localInferenceRefreshRequestId}
+            onLocalInferenceInstallRequestHandled={handleLocalInferenceInstallRequestHandled}
+            onOpenModelSettings={handleOpenLocalModelSettings}
+            currentSessionId={currentSessionId}
+            pendingPermission={pendingPermission}
+            isInlineAskUserQuestion={isInlineAskUserQuestion}
+            onRespondToPermission={handlePermissionResponse}
+          />
         </div>
       </div>
     </TooltipProvider>

@@ -1,12 +1,13 @@
 import { access, constants as FsConstants } from 'node:fs/promises';
 
-export const DeclareArtifactToolName = 'declare_artifact';
+const DeclareArtifactToolName = 'declare_artifact';
 
 export const DeclareArtifactSystemPrompt = [
   '## Artifact declaration',
   '',
   '- After creating or modifying a file, call `declare_artifact` with the absolute file path.',
   '- Set `role` to "intermediate" for work-in-progress files and "deliverable" for final outputs.',
+  '- Deliverables default to the current workspace; when the user asks for an output at a specific location outside the workspace, declare that absolute path directly — it is accepted and recorded as an external deliverable. Intermediate files always stay in the workspace.',
   '- Prefer `declare_artifact` over mentioning file paths in prose — the UI reads tool calls, not text.',
   '- Declare only after the write has completed; the tool briefly waits for a file that is still being written.',
 ].join('\n');

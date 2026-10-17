@@ -84,6 +84,7 @@ export interface MagpieModelCatalog {
   models: MagpieModel[];
   defaultModelId: string | null;
 }
+/** @knipignore Referenced only by a dynamic import() type query in electron.d.ts. */
 export interface MagpieApi {
   status(): Promise<MagpieStatus>;
   start(): Promise<MagpieStatus>;

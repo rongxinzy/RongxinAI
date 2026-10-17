@@ -21,7 +21,7 @@ export interface EmailFormState {
   mailbox: string;
 }
 
-export interface EmailConnectivityCheck {
+interface EmailConnectivityCheck {
   code: EmailConnectivityCheckCode;
   level: EmailConnectivityLevel;
   message: string;

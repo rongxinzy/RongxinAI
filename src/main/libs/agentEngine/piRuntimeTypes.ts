@@ -82,7 +82,7 @@ export const PiThinkingLevel = {
 } as const;
 export type PiThinkingLevel = (typeof PiThinkingLevel)[keyof typeof PiThinkingLevel];
 
-export type PiImageAttachment = {
+type PiImageAttachment = {
   name: string;
   mimeType: string;
   /** Present only for the in-flight model request. Persisted copies keep `path`. */
@@ -90,7 +90,7 @@ export type PiImageAttachment = {
   path?: string;
 };
 
-export type PiConversationHistoryMessage = {
+type PiConversationHistoryMessage = {
   role: 'user' | 'assistant';
   content: string;
 };
@@ -140,8 +140,6 @@ export type PiStartOptions = {
   _workflowSkillIdsOverride?: string[];
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
-  /** Internal: automatic resume after a stream stall; keeps the stall budget. */
-  _streamStallResume?: boolean;
 };
 
 export type PiContinueOptions = {
@@ -189,8 +187,6 @@ export type PiContinueOptions = {
   _queueDelivery?: CoworkQueueDelivery;
   /** Internal: tells Pi how to queue a prompt while the agent is settling. */
   _streamingBehavior?: 'steer' | 'followUp';
-  /** Internal: automatic resume after a stream stall; keeps the stall budget. */
-  _streamStallResume?: boolean;
 };
 
 /** Workbench session patch; Pi supports switching the model and thinking level. */

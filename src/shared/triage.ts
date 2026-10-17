@@ -1,4 +1,4 @@
-export const TRIAGE_TIERS = ['light', 'standard', 'heavy'] as const;
+const TRIAGE_TIERS = ['light', 'standard', 'heavy'] as const;
 export type TriageTier = (typeof TRIAGE_TIERS)[number];
 
 export const TRIAGE_TIER_ORDER: Record<TriageTier, number> = {
@@ -63,10 +63,3 @@ export interface AgentTriageOverride {
   heavyModelRef?: string;
   allowCrossProviderSwitch?: boolean;
 }
-
-export const EMPTY_AGENT_TRIAGE_OVERRIDE: AgentTriageOverride = {
-  enabled: undefined,
-  lightModelRef: undefined,
-  heavyModelRef: undefined,
-  allowCrossProviderSwitch: undefined,
-};

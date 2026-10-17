@@ -302,7 +302,7 @@ export const buildTurnRailIndices = (turns: ConversationTurn[]): TurnRailIndices
 
 // ── Filter helpers ──
 
-export const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean => {
+const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean => {
   if (message.type === 'system' && message.metadata?.interruption) return true;
   if (hasText(message.content) || hasText(message.metadata?.error)) return true;
   if (message.metadata?.isThinking)
@@ -310,7 +310,7 @@ export const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): bo
   return false;
 };
 
-export const isVisibleAssistantTurnItem = (item: AssistantTurnItem): boolean => {
+const isVisibleAssistantTurnItem = (item: AssistantTurnItem): boolean => {
   if (item.type === 'assistant' || item.type === 'system')
     return isRenderableAssistantOrSystemMessage(item.message);
   if (item.type === 'tool_result')
@@ -321,9 +321,6 @@ export const isVisibleAssistantTurnItem = (item: AssistantTurnItem): boolean => 
 export const getVisibleAssistantItems = (
   assistantItems: AssistantTurnItem[],
 ): AssistantTurnItem[] => assistantItems.filter(isVisibleAssistantTurnItem);
-
-export const hasRenderableAssistantContent = (turn: ConversationTurn): boolean =>
-  getVisibleAssistantItems(turn.assistantItems).length > 0;
 
 /**
  * Checks whether an in-progress turn has any live streaming bubble, active tool execution,
@@ -349,9 +346,4 @@ export const hasActiveTurnStreamingContent = (
     }
   }
   return false;
-};
-
-export const getToolResultLineCount = (result: string): number => {
-  if (!result) return 0;
-  return result.split('\n').length;
 };

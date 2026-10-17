@@ -66,6 +66,7 @@ export class ZhiyuanPasswordSession {
   #operationTail: Promise<void> = Promise.resolve();
   readonly #listeners = new Set<() => void | Promise<void>>();
   #modelAccessExpiresAt = 0;
+  #modelCatalogScopes: string | null = null;
   #discoveredAgentControlBaseUrl: string | null = null;
 
   constructor(client: PasswordSessionClient, clientFactory?: PasswordSessionClientFactory) {
@@ -140,6 +141,7 @@ export class ZhiyuanPasswordSession {
         username: input.username,
         password: input.password,
       });
+      this.#modelCatalogScopes = null;
       this.#recordTokens(tokens);
       this.#initialized = true;
       try {
@@ -169,19 +171,48 @@ export class ZhiyuanPasswordSession {
 
   logout(): Promise<ZhiyuanSessionSnapshot> {
     return this.#enqueue(async () => {
-      await this.#client.logout();
-      this.#snapshot = Object.freeze({ status: 'signed-out' });
-      this.#modelAccessExpiresAt = 0;
-      this.#initialized = true;
-      await this.#publishChanged();
+      try {
+        await this.#client.logout();
+      } finally {
+        // The SDK clears local tokens even when remote logout fails.
+        this.#snapshot = Object.freeze({ status: 'signed-out' });
+        this.#modelAccessExpiresAt = 0;
+        this.#modelCatalogScopes = null;
+        this.#initialized = true;
+        await this.#publishChanged();
+      }
       return this.snapshot();
+    });
+  }
+
+  activateEnterpriseLicense(input: LicenseActivationRequest): Promise<EntitlementTokenResponse> {
+    return this.#enqueue(async () => {
+      if (this.#snapshot.status !== 'authenticated') {
+        throw new Error('Zhiyuan enterprise session is not authenticated.');
+      }
+      if (!this.#client.activateEnterpriseLicense) {
+        throw new Error('Zhiyuan enterprise License activation is not supported.');
+      }
+      return this.#client.activateEnterpriseLicense(input);
     });
   }
 
   listAgentModels(): Promise<AgentModelList> {
     return this.#enqueue(async () => {
       if (this.#snapshot.status !== 'authenticated') return { models: [] };
-      return this.#client.listAgentModels();
+      const catalog = await this.#client.listAgentModels();
+      const scopes = JSON.stringify(
+        catalog.models
+          .filter(model => model.enabled && model.sourceType === 'gateway')
+          .map(model => model.id)
+          .sort(),
+      );
+      if (scopes !== this.#modelCatalogScopes) {
+        // A token's embedded scopes do not grow when assignments change.
+        this.#modelAccessExpiresAt = 0;
+        this.#modelCatalogScopes = scopes;
+      }
+      return catalog;
     });
   }
 
@@ -239,12 +270,35 @@ export class ZhiyuanPasswordSession {
   }
 
   #enqueue<T>(operation: () => Promise<T>): Promise<T> {
-    const result = this.#operationTail.then(operation, operation);
+    const run = async () => {
+      try {
+        return await operation();
+      } catch (error) {
+        await this.#synchronizeSessionState();
+        throw error;
+      }
+    };
+    const result = this.#operationTail.then(run, run);
     this.#operationTail = result.then(
       () => undefined,
       () => undefined,
     );
     return result;
+  }
+
+  async #synchronizeSessionState(): Promise<void> {
+    // Use the SDK's token-store state, not error strings: transport failures
+    // retain credentials, while terminal refresh rejection clears them.
+    const state = await this.#client
+      .getSessionState()
+      .catch(() => ({ status: 'recoverable' as const }));
+    if (state.status === 'authenticated') return;
+    const changed = this.#snapshot.status !== state.status;
+    this.#snapshot = Object.freeze({ status: state.status });
+    this.#modelAccessExpiresAt = 0;
+    this.#modelCatalogScopes = null;
+    this.#initialized = state.status === 'signed-out';
+    if (changed) await this.#publishChanged();
   }
 
   async #publishChanged(): Promise<void> {

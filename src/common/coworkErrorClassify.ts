@@ -8,17 +8,6 @@
 
 import { classifyCoworkError, getUserErrorI18nKey } from './coworkError';
 
-export type { CoworkError, ErrorLogLevel } from './coworkError';
-export {
-  classifyCoworkError,
-  CoworkErrorKind,
-  ENGINE_NOT_READY_CODE,
-  getErrorLogLevel,
-  getUserErrorI18nKey,
-  isTransient,
-  makeCoworkError,
-} from './coworkError';
-
 /**
  * Classify an error string and return the matching i18n key.
  * Returns null if no rule matches (caller should fall back to the original error).

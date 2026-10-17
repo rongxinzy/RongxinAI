@@ -41,14 +41,8 @@ import {
 
 export {
   isAcademicResearchSkillSet,
-  MIN_PRIMARY_SOURCE_RATIO,
-  MIN_RESEARCH_ITERATIONS,
   MIN_RESEARCH_SUBQUESTIONS,
   MIN_VERIFIED_SOURCES,
-  PiResearchStateAction,
-  PiResearchStateToolName,
-  RESEARCH_MAX_ITERATIONS,
-  ResearchRunStatus,
   ResearchSourceType,
 } from './piResearchTypes';
 

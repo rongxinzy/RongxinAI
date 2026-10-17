@@ -14,9 +14,9 @@ import {
   type LocalInferenceToastKind as LocalInferenceToastKindType,
 } from '../types';
 
-export const LLAMACPP_LOCALHOST_HOST = '127.0.0.1';
-export const LLAMACPP_LAN_HOST = '0.0.0.0';
-export const LLAMACPP_DEFAULT_PORT = '8080';
+const LLAMACPP_LOCALHOST_HOST = '127.0.0.1';
+const LLAMACPP_LAN_HOST = '0.0.0.0';
+const LLAMACPP_DEFAULT_PORT = '8080';
 
 export function isValidLlamaCppPort(value: string): boolean {
   const trimmed = value.trim();

@@ -29,3 +29,23 @@ test('converts file URLs into native absolute paths', () => {
   const markers = parseMediaMarkers(`![chart](${fileUrl})`);
   expect(markers[0]?.path).toBe(fileURLToPath(fileUrl));
 });
+
+test('extracts absolute paths outside the historical home and temp prefixes', () => {
+  const text = [
+    'Done',
+    '![result](/workspace/project/result.png)',
+    '[notes](/opt/data/notes.pdf)',
+    '/opt/data/shot.png',
+    'see https://example.com/result.png',
+    '![remote](//cdn.example.com/a.png)',
+  ].join('\n');
+  const markers = parseMediaMarkers(text);
+  expect(markers).toMatchObject([
+    { type: 'image', path: '/workspace/project/result.png', name: 'result' },
+    { type: 'file', path: '/opt/data/notes.pdf', name: 'notes' },
+    { type: 'image', path: '/opt/data/shot.png' },
+  ]);
+  expect(stripMediaMarkers(text, markers)).toBe(
+    'Done\n\nsee https://example.com/result.png\n![remote](//cdn.example.com/a.png)',
+  );
+});

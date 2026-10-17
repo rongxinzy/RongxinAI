@@ -1,4 +1,4 @@
-export const ARTIFACT_PANEL_KEYBOARD_RESIZE_STEP = 32;
+const ARTIFACT_PANEL_KEYBOARD_RESIZE_STEP = 32;
 
 /** Minimum width the conversation column keeps when the artifact panel is at
  * its drag maximum — the panel must never swallow the chat area. */

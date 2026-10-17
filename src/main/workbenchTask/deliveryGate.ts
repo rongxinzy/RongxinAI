@@ -9,8 +9,6 @@ import {
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 
-export { isWorkbenchDeliverable } from '../../shared/workbenchTask';
-
 export function applyWorkbenchDeliveryGate(
   result: WorkbenchVerificationResult,
   artifacts: WorkbenchArtifact[],

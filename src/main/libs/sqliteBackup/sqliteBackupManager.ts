@@ -477,7 +477,7 @@ export class SqliteBackupManager {
   }
 }
 
-export const getSqliteMainDbPath = (userDataPath: string): string => {
+const getSqliteMainDbPath = (userDataPath: string): string => {
   return path.join(userDataPath, DB_FILENAME);
 };
 

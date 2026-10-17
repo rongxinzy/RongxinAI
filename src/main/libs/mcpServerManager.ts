@@ -389,7 +389,7 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
     }
 
     if (nodeCommandType) {
-      const enhancedEnv = await getEnhancedEnv('local', { includePackageMirrors: true });
+      const enhancedEnv = await getEnhancedEnv({ includePackageMirrors: true });
       const bundledNpm = resolveBundledNpmRuntime(
         nodeCommandType === 'npx' ? NpmCli.Npx : NpmCli.Npm,
         stdioArgs,

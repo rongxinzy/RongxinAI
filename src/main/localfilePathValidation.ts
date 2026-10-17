@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-export const ALLOWED_LOCALFILE_EXTENSIONS = new Set([
+const ALLOWED_LOCALFILE_EXTENSIONS = new Set([
   '.png',
   '.jpg',
   '.jpeg',

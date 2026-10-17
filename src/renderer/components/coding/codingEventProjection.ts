@@ -15,7 +15,7 @@ import {
   type CodingConversationTurnStatus as CodingConversationTurnStatusType,
 } from './constants';
 
-export interface CodingConversationMessage {
+interface CodingConversationMessage {
   id: string;
   content: string;
   createdAt: number;
@@ -23,7 +23,7 @@ export interface CodingConversationMessage {
   isFinalAnswer: boolean;
 }
 
-export interface CodingConversationReasoning {
+interface CodingConversationReasoning {
   id: string;
   content: string;
   createdAt: number;
@@ -35,7 +35,7 @@ export interface CodingConversationActivity {
   event: CodingEvent;
 }
 
-export type CodingConversationSegment =
+type CodingConversationSegment =
   | {
       kind: typeof CodingConversationSegmentKind.Reasoning;
       id: string;

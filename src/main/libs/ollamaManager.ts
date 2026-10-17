@@ -310,7 +310,7 @@ function buildOllamaServeEnv(
   };
 }
 
-export async function findOllamaExecutable(): Promise<string | null> {
+async function findOllamaExecutable(): Promise<string | null> {
   const envPath = process.env.OLLAMA_BIN?.trim();
   if (envPath && fs.existsSync(envPath)) return envPath;
 

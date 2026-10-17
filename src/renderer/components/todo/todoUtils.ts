@@ -12,7 +12,7 @@ const endOfDay = (date: Date): number => {
   return result.getTime();
 };
 
-export const formatDateKey = (date: Date): string => {
+const formatDateKey = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -182,24 +182,8 @@ export const validateTodoSchedule = (
 };
 
 /** 原生 date / datetime-local 的 min 值（本地时区） */
-export const toDateInputMinValue = (now = new Date()): string => formatDateKey(now);
-
-export const toDateTimeInputMinValue = (now = new Date()): string => {
-  const nextMinute = new Date(now);
-  nextMinute.setSeconds(0, 0);
-  nextMinute.setMinutes(nextMinute.getMinutes() + 1);
-  const dateKey = formatDateKey(nextMinute);
-  const hours = String(nextMinute.getHours()).padStart(2, '0');
-  const minutes = String(nextMinute.getMinutes()).padStart(2, '0');
-  return `${dateKey}T${hours}:${minutes}`;
-};
 
 /** 提醒时间的上限：有截止日期时取当天 23:59 */
-export const toDateTimeInputMaxValue = (dueAt: number | null): string | undefined => {
-  if (dueAt === null) return undefined;
-  const date = new Date(dueAt);
-  return `${formatDateKey(date)}T23:59`;
-};
 
 export const countTodosByView = (
   activeTodos: Todo[],

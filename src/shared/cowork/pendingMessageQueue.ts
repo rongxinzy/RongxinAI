@@ -25,14 +25,14 @@ export const CoworkQueueAttachmentLimit = {
   MaxImageBase64Chars: 20 * 1024 * 1024,
 } as const;
 
-export interface CoworkQueuedImageAttachment {
+interface CoworkQueuedImageAttachment {
   name: string;
   mimeType: string;
   base64Data?: string;
   path?: string;
 }
 
-export interface CoworkQueuedFileAttachment {
+interface CoworkQueuedFileAttachment {
   name: string;
   path: string;
   extension: string;

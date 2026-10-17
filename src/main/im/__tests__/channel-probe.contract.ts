@@ -59,7 +59,7 @@ const VALID_VERDICTS: ReadonlySet<string> = new Set<IMConnectivityVerdict>([
 
 // ── Individual check validators ──
 
-export function validateCheckShape(check: IMConnectivityCheck): void {
+function validateCheckShape(check: IMConnectivityCheck): void {
   expect(check, 'each check must have a code').toHaveProperty('code');
   expect(typeof check.code, 'check.code must be a string').toBe('string');
   expect(VALID_CHECK_CODES.has(check.code), `unknown check code: ${check.code}`).toBe(true);
@@ -86,7 +86,7 @@ const AUTH_EQUIVALENT_CODES: ReadonlySet<string> = new Set([
   'channel_runtime_not_running',
 ]);
 
-export function validateAuthCoverage(checks: IMConnectivityCheck[]): void {
+function validateAuthCoverage(checks: IMConnectivityCheck[]): void {
   const codes = checks.map(c => c.code);
   const hasAuth = codes.some(c => AUTH_EQUIVALENT_CODES.has(c));
   expect(
@@ -95,7 +95,7 @@ export function validateAuthCoverage(checks: IMConnectivityCheck[]): void {
   ).toBe(true);
 }
 
-export function validateJsonSerializable(result: IMConnectivityTestResult): void {
+function validateJsonSerializable(result: IMConnectivityTestResult): void {
   let roundTripped: IMConnectivityTestResult;
   expect(() => {
     const json = JSON.stringify(result);
@@ -123,7 +123,7 @@ export function validateJsonSerializable(result: IMConnectivityTestResult): void
 }
 
 /** Validate the verdict is consistent with the worst check level. */
-export function validateVerdictConsistency(result: IMConnectivityTestResult): void {
+function validateVerdictConsistency(result: IMConnectivityTestResult): void {
   const { checks, verdict } = result;
 
   // Verdict must be a recognised value

@@ -8,7 +8,7 @@ export { CoworkPermissionBehavior, CoworkPermissionToolName };
 
 export const AskUserQuestionAnswerDelimiter = '|||';
 
-export interface AskUserQuestionOption {
+interface AskUserQuestionOption {
   label: string;
   description?: string;
 }

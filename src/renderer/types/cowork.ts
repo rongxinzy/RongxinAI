@@ -41,10 +41,9 @@ export type CoworkSessionStatus =
   (typeof CoworkSessionStatusValue)[keyof typeof CoworkSessionStatusValue];
 
 // Cowork message types
-export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
+type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
 
 // Cowork execution mode
-export type { CoworkExecutionMode } from '../../shared/cowork/constants';
 
 // Cowork message metadata
 export interface CoworkMessageMetadata {
@@ -178,13 +177,6 @@ export type CoworkConfigUpdate = Partial<
   >
 >;
 
-export interface CoworkApiConfig {
-  apiKey: string;
-  baseURL: string;
-  model: string;
-  apiType?: 'anthropic' | 'openai';
-}
-
 // Cowork pending permission request
 export interface CoworkPermissionRequest {
   origin: CoworkPermissionOrigin;
@@ -210,10 +202,6 @@ export type CoworkPermissionResult =
     };
 
 // Cowork permission response
-export interface CoworkPermissionResponse {
-  requestId: string;
-  result: CoworkPermissionResult;
-}
 
 // Session summary for list display (without full messages)
 export interface CoworkSessionSummary {
@@ -279,21 +267,5 @@ export interface CoworkSessionListResult {
   sessions?: CoworkSessionSummary[];
   /** Whether more sessions exist beyond the currently loaded set. */
   hasMore?: boolean;
-  error?: string;
-}
-
-export interface CoworkMessageListResult {
-  success: boolean;
-  messages?: CoworkMessage[];
-  /** Offset of the first returned message. */
-  offset?: number;
-  /** Total message count for the session. */
-  total?: number;
-  error?: string;
-}
-
-export interface CoworkConfigResult {
-  success: boolean;
-  config?: CoworkConfig;
   error?: string;
 }

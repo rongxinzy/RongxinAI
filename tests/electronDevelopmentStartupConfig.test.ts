@@ -6,6 +6,22 @@ import { test } from 'vitest';
 
 const root = path.resolve(__dirname, '..');
 
+test('standalone development build includes every worker from the Vite build', () => {
+  const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
+  const developmentBuild = readFileSync(
+    path.join(root, 'scripts', 'build-electron-development.mjs'),
+    'utf8',
+  );
+  const workers = [...viteConfig.matchAll(/entry: '(src\/main\/[^']*Worker\.ts)'/g)];
+  assert.ok(workers.length > 0, 'the production worker inventory must not be empty');
+  for (const [, entry] of workers) {
+    assert.ok(
+      developmentBuild.includes(`createBuildOptions('${entry}')`),
+      `standalone development startup is missing worker ${entry}`,
+    );
+  }
+});
+
 test('development startup waits for Vite readiness before launching Electron', () => {
   const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
   const rendererStyles = readFileSync(path.join(root, 'src', 'renderer', 'index.css'), 'utf8');
