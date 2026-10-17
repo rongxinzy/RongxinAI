@@ -78,15 +78,6 @@ const piSessionEventSchema = z.looseObject({
 export type PiSessionEvent = z.infer<typeof piSessionEventSchema>;
 
 /**
- * Decode an unknown raw event into a `PiSessionEvent` if it looks like one.
- * Returns `undefined` if it doesn't parse so the caller can skip it.
- */
-export function parseNativeEvent(raw: unknown): PiSessionEvent | undefined {
-  const parsed = piSessionEventSchema.safeParse(raw);
-  return parsed.success ? parsed.data : undefined;
-}
-
-/**
  * Detect whether a Pi event signals a terminal error for the current turn.
  * Returns the error message if so. Mirrors the original adapter's
  * `getPiTerminalError`.

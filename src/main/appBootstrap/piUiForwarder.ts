@@ -48,15 +48,39 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
   const truncatedMessages = new Set<string>();
   const sessionByMessageId = new Map<string, string>();
 
+  // Terminal-channel dedup: the last final body already forwarded per
+  // message. finalizeMessage and markFinalAnswer both publish the same final
+  // text after message_end; the repeat must not re-send the whole body (and
+  // its ContentPatch fan-out), so it degrades to a metadata-only
+  // MessageUpdate. Entries are owned by session via sessionByMessageId and
+  // cleared with the session, plus a FIFO cap as a hard bound.
+  // **禁止**把同一条消息的终态正文整段下发两遍。
+  const finalContentByMessage = new Map<string, string>();
+  const FINAL_CONTENT_TRACK_LIMIT = 1024;
+
+  const rememberFinalContent = (messageId: string, content: string): void => {
+    finalContentByMessage.set(messageId, content);
+    while (finalContentByMessage.size > FINAL_CONTENT_TRACK_LIMIT) {
+      const oldest = finalContentByMessage.keys().next().value;
+      if (oldest === undefined) break;
+      finalContentByMessage.delete(oldest);
+    }
+  };
+
   const clearTruncationForMessage = (messageId: string): void => {
     sentCharsByMessage.delete(messageId);
     truncatedMessages.delete(messageId);
   };
 
-  const clearTruncationForSession = (sessionId: string): void => {
+  // Session teardown (sessionStopped / complete / error) drops every
+  // per-message bookkeeping entry owned by that session — truncation
+  // accounting, stream ownership and the terminal-dedup memory — so nothing
+  // leaks across sessions.
+  const clearSessionStreamBookkeeping = (sessionId: string): void => {
     for (const [messageId, owner] of sessionByMessageId) {
       if (owner !== sessionId) continue;
       clearTruncationForMessage(messageId);
+      finalContentByMessage.delete(messageId);
       sessionByMessageId.delete(messageId);
     }
   };
@@ -210,11 +234,34 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     ) => {
       if (metadata?.isStreaming !== false) return;
       coalescer.flush();
+      sessionByMessageId.set(messageId, sessionId);
       const truncated = content.length > CoworkRunPolicy.MaximumContentCharacters;
       const visible = truncated
         ? content.slice(0, CoworkRunPolicy.MaximumContentCharacters)
         : content;
       const finalMetadata = truncated ? { ...metadata, contentTruncated: true } : { ...metadata };
+      // Terminal dedup: when this final body is byte-identical to the
+      // one already forwarded for the message (finalizeMessage →
+      // markFinalAnswer), emit a metadata-only MessageUpdate instead of
+      // re-sending the full body (or its ContentPatch fan-out). Compare
+      // length first, then the string, to keep the check cheap.
+      const lastFinalContent = finalContentByMessage.get(messageId);
+      const duplicateFinal =
+        lastFinalContent !== undefined &&
+        lastFinalContent.length === visible.length &&
+        lastFinalContent === visible;
+      if (duplicateFinal) {
+        emitUiEvent({
+          type: PiUiEventType.MessageUpdate,
+          sessionId,
+          messageId,
+          content: '',
+          metadata: { ...finalMetadata, metadataOnly: true },
+        });
+        clearTruncationForMessage(messageId);
+        return;
+      }
+      rememberFinalContent(messageId, visible);
       if (visible.length <= CoworkRunPolicy.ContentChunkCharacters) {
         emitUiEvent({
           type: PiUiEventType.MessageUpdate,
@@ -289,13 +336,13 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
 
   runtime.on('sessionStopped', (sessionId: string) => {
     coalescer.flush();
-    clearTruncationForSession(sessionId);
+    clearSessionStreamBookkeeping(sessionId);
     emitUiEvent({ type: PiUiEventType.Stopped, sessionId });
   });
 
   runtime.on('complete', (sessionId: string) => {
     coalescer.flush();
-    clearTruncationForSession(sessionId);
+    clearSessionStreamBookkeeping(sessionId);
     emitUiEvent({
       type: PiUiEventType.Completed,
       sessionId,
@@ -320,7 +367,7 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
         );
       }
       coalescer.flush();
-      clearTruncationForSession(sessionId);
+      clearSessionStreamBookkeeping(sessionId);
       emitUiEvent({ type: PiUiEventType.Error, sessionId, error });
     },
   );

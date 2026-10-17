@@ -226,8 +226,25 @@ const carryRunStartedAt = (
 type MessageContentUpdate = {
   sessionId: string;
   messageId: string;
-  content: string;
+  /**
+   * Full message content. Absent on metadata-only updates (terminal
+   * dedup): those merge metadata alone and never replace the committed body.
+   */
+  content?: string;
   metadata?: Record<string, unknown>;
+  /** True when only metadata should be applied (no content replacement). */
+  metadataOnly?: boolean;
+};
+
+/**
+ * `metadataOnly` is main→renderer transport bookkeeping for the terminal
+ * dedup; it must never be persisted onto message.metadata.
+ */
+const omitTransportFlag = (metadata: Record<string, unknown>): Record<string, unknown> => {
+  if (metadata.metadataOnly === undefined) return metadata;
+  const copy = { ...metadata };
+  delete copy.metadataOnly;
+  return copy;
 };
 
 /**
@@ -238,17 +255,22 @@ type MessageContentUpdate = {
  */
 const applyMessageContentUpdate = (state: CoworkState, update: MessageContentUpdate): void => {
   const { sessionId, messageId, content, metadata } = update;
+  const metadataOnly = update.metadataOnly === true;
+  const metadataToMerge = metadata === undefined ? undefined : omitTransportFlag(metadata);
   const updatedAt = Date.now();
 
   const streamingSession = state.streamingSessions[sessionId];
   if (streamingSession) {
     const messageIndex = streamingSession.messages.findIndex(m => m.id === messageId);
     if (messageIndex !== -1) {
-      streamingSession.messages[messageIndex].content = content;
-      if (metadata) {
+      // 禁止 metadata-only 终态更新清空已提交正文。
+      if (content !== undefined && !metadataOnly) {
+        streamingSession.messages[messageIndex].content = content;
+      }
+      if (metadataToMerge) {
         streamingSession.messages[messageIndex].metadata = {
           ...streamingSession.messages[messageIndex].metadata,
-          ...metadata,
+          ...metadataToMerge,
         };
       }
       streamingSession.updatedAt = updatedAt;
@@ -258,11 +280,13 @@ const applyMessageContentUpdate = (state: CoworkState, update: MessageContentUpd
   if (state.currentSession?.id === sessionId) {
     const messageIndex = state.currentSession.messages.findIndex(m => m.id === messageId);
     if (messageIndex !== -1) {
-      state.currentSession.messages[messageIndex].content = content;
-      if (metadata) {
+      if (content !== undefined && !metadataOnly) {
+        state.currentSession.messages[messageIndex].content = content;
+      }
+      if (metadataToMerge) {
         state.currentSession.messages[messageIndex].metadata = {
           ...state.currentSession.messages[messageIndex].metadata,
-          ...metadata,
+          ...metadataToMerge,
         };
       }
       state.currentSession.updatedAt = updatedAt;

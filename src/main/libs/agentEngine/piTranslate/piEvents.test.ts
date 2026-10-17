@@ -4,25 +4,7 @@
  * License: Apache-2.0
  */
 import { describe, expect, it } from 'vitest';
-import { extractAssistantText, getPiTerminalError, parseNativeEvent } from './piEvents';
-
-describe('parseNativeEvent', () => {
-  it('parses a well-formed event', () => {
-    const event = parseNativeEvent({ type: 'turn_start' });
-    expect(event?.type).toBe('turn_start');
-  });
-
-  it('passes unknown fields through', () => {
-    const event = parseNativeEvent({ type: 'custom', extra: { nested: true } });
-    expect(event).toMatchObject({ type: 'custom', extra: { nested: true } });
-  });
-
-  it('returns undefined for malformed input', () => {
-    expect(parseNativeEvent(null)).toBeUndefined();
-    expect(parseNativeEvent({})).toBeUndefined();
-    expect(parseNativeEvent({ type: 42 })).toBeUndefined();
-  });
-});
+import { extractAssistantText, getPiTerminalError } from './piEvents';
 
 describe('getPiTerminalError', () => {
   it('extracts a string error', () => {

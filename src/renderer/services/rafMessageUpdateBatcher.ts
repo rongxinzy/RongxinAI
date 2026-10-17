@@ -1,8 +1,18 @@
 export type StreamMessageUpdate = {
   sessionId: string;
   messageId: string;
-  content: string;
+  /**
+   * Full message content. Absent on metadata-only updates (terminal
+   * dedup): those merge metadata alone and never replace the committed body.
+   */
+  content?: string;
   metadata?: Record<string, unknown>;
+  /**
+   * True when this update only merges metadata (terminal dedup). Such an
+   * update must never clobber a pending full-content update for the same
+   * message within the same frame.
+   */
+  metadataOnly?: boolean;
 };
 
 export type AnimationFrameScheduler = {
@@ -19,6 +29,35 @@ const getUpdateKey = ({ sessionId, messageId }: StreamMessageUpdate): string =>
   `${sessionId}:${messageId}`;
 
 /**
+ * Merges a metadata-only update into the pending update for the same
+ * message: the earlier content (if any) survives and the new metadata is
+ * layered on top, so a duplicate terminal emission cannot blank the body
+ * committed earlier in the same frame. Updates that carry content still
+ * replace the pending entry wholesale (last write wins), preserving the
+ * pre-existing behavior.
+ */
+const mergeIntoPending = (
+  previous: StreamMessageUpdate,
+  next: StreamMessageUpdate,
+): StreamMessageUpdate => {
+  if (next.metadataOnly !== true) return next;
+  const metadata =
+    previous.metadata === undefined
+      ? next.metadata
+      : next.metadata === undefined
+        ? previous.metadata
+        : { ...previous.metadata, ...next.metadata };
+  const content = previous.content;
+  return {
+    sessionId: next.sessionId,
+    messageId: next.messageId,
+    ...(content === undefined ? {} : { content }),
+    ...(metadata === undefined ? {} : { metadata }),
+    ...(content === undefined ? { metadataOnly: true } : {}),
+  };
+};
+
+/**
  * Limits rendering updates to one batch per frame without allowing different
  * messages in the same turn to overwrite one another.
  */
@@ -32,7 +71,9 @@ export class RafMessageUpdateBatcher {
   ) {}
 
   enqueue(update: StreamMessageUpdate): void {
-    this.pending.set(getUpdateKey(update), update);
+    const key = getUpdateKey(update);
+    const previous = this.pending.get(key);
+    this.pending.set(key, previous === undefined ? update : mergeIntoPending(previous, update));
     if (this.frameId !== null) return;
 
     this.frameId = this.scheduler.request(() => {
@@ -42,7 +83,7 @@ export class RafMessageUpdateBatcher {
   }
 
   discard(sessionId: string, messageId: string): void {
-    this.pending.delete(getUpdateKey({ sessionId, messageId, content: '' }));
+    this.pending.delete(getUpdateKey({ sessionId, messageId }));
     this.cancelFrameWhenIdle();
   }
 

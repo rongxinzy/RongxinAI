@@ -8,7 +8,10 @@
  *
  * Invariants: StreamPart events carry deltas only; full snapshots are limited
  * to ContentPatch base sync (metadata.isStreaming === true, complete patch),
- * the final MessageUpdate and terminal/error states.
+ * the final MessageUpdate and terminal/error states. Duplicate terminal
+ * emissions arrive as metadata-only MessageUpdates (empty content,
+ * metadata.metadataOnly === true): they merge metadata alone and never touch
+ * the committed body.
  * **禁止**把全文快照当作常规流式增量分发；非 final 的全文 MessageUpdate 在此丢弃（S6）。
  * Architecture: docs/architecture/streaming.md
  */
@@ -102,6 +105,9 @@ export function createCoworkStreamPipeline(
   const updateBatcher = new RafMessageUpdateBatcher(
     updates => {
       for (const update of updates) {
+        // Metadata-only updates carry no content and therefore must not
+        // clear a live-text entry either.
+        if (update.metadataOnly === true) continue;
         deps.liveText.clear(update.messageId);
       }
       deps.dispatch(updateMessageContents(updates));
@@ -131,7 +137,7 @@ export function createCoworkStreamPipeline(
       // first so they land on the old base, then replace it wholesale. It is
       // never written to Redux — that would be a full-snapshot "streaming"
       // update, which the architecture forbids.
-      if (update) {
+      if (update?.content !== undefined) {
         liveTextBatcher.flush();
         deps.liveText.setSnapshot(patch.messageId, update.content, patch.sessionId);
       }
@@ -216,12 +222,26 @@ export function createCoworkStreamPipeline(
             // before the committed Redux update clears the live entry.
             liveTextBatcher.flush();
             finalizedMessageIds.add(event.messageId);
-            updateBatcher.enqueue({
-              sessionId: event.sessionId,
-              messageId: event.messageId,
-              content: event.content,
-              metadata: event.metadata,
-            });
+            if (event.metadata?.metadataOnly === true) {
+              // Duplicate terminal emission whose body was already
+              // committed — merge the metadata only, never touch content.
+              // The transport flag itself must not reach Redux metadata.
+              const metadata = { ...event.metadata };
+              delete metadata.metadataOnly;
+              updateBatcher.enqueue({
+                sessionId: event.sessionId,
+                messageId: event.messageId,
+                metadata,
+                metadataOnly: true,
+              });
+            } else {
+              updateBatcher.enqueue({
+                sessionId: event.sessionId,
+                messageId: event.messageId,
+                content: event.content,
+                metadata: event.metadata,
+              });
+            }
           } else {
             // S6: a full-body MessageUpdate while the message is still
             // streaming is the forbidden "send full text, fake the stream"
