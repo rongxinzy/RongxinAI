@@ -35,7 +35,7 @@
       "cudaMajor": "12",
       "archive": {
         "assetName": "llama-b9244-bin-win-cuda-12.4-x64.zip",
-        "sha256": "ccce2e334df5679755b17228025ea475551e374a4a135e7925aaea6420db106a"
+        "sha256": "c51dbbc1c55fdb3a1bcf25eefcdac4e4829e5d165438a2f2516bb78455c4483a"
       }
     },
     {
