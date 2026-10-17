@@ -200,6 +200,34 @@ jobs:
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - name: Read pinned Magpie Go toolchain
+        id: magpie-toolchain
+        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
+          cache: false
+      - name: Restore pinned Magpie build cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/magpie/modules
+            .cache/magpie/go-build
+          key: release-magpie-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs') }}
+      - name: Build and verify pinned Magpie gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          case '${{ matrix.platform }}' in
+            windows) targets=(win32-x64) ;;
+            linux) targets=(linux-x64) ;;
+            macos) targets=(darwin-x64 darwin-arm64) ;;
+            *) echo "Unknown platform: ${{ matrix.platform }}" >&2; exit 1 ;;
+          esac
+          for target in "${targets[@]}"; do
+            bun run magpie:build --target "$target"
+            bun run magpie:verify --target "$target"
+          done
       - name: Set up installer shell SDK
         if: ${{ matrix.platform == 'windows' }}
         uses: actions/setup-dotnet@v5
