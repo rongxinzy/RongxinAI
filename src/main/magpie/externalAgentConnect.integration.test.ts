@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { it, expect, beforeAll } from 'vitest';
+import { it, expect } from 'vitest';
 import fsSync from 'node:fs';
 import { projectMagpieCatalog } from './catalog';
 import { MagpieManager } from './manager';
@@ -12,10 +12,7 @@ import { verifyMagpieBinary } from './integrity';
 const magpieResources = path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie');
 const magpiePlatformDir = path.join(magpieResources, `${process.platform}-${process.arch}`);
 const magpieBinaryName = process.platform === 'win32' ? 'magpie.exe' : 'magpie';
-let magpieBinaryPresent = false;
-beforeAll(() => {
-  magpieBinaryPresent = fsSync.existsSync(path.join(magpiePlatformDir, magpieBinaryName));
-});
+const magpieBinaryPresent = fsSync.existsSync(path.join(magpiePlatformDir, magpieBinaryName));
 
 it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1' || !magpieBinaryPresent)(
   'connect and disconnect restore Claude Code and Pi configs byte-for-byte',
