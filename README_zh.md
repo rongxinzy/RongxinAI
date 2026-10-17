@@ -126,7 +126,27 @@ bun run llamacpp:runtime:download
 | `bun run theme:generate` | 修改主题定义后重新生成 CSS |
 | `bun run compile:electron` | 编译 Electron 主进程，含原生依赖准备 |
 
-发行打包命令为 `bun run dist:mac`、`bun run dist:win`、`bun run dist:linux`。它们还涉及平台运行时、资源与签名配置，详见[贡献指南](CONTRIBUTING.md)及 [`package.json`](package.json)。
+### 打包
+
+所有安装包都内置固定版本的 Magpie 模型网关，打包前需先构建。构建要求 [`resources/magpie/upstream.json`](resources/magpie/upstream.json) 中锁定的 Go SDK 精确版本（当前为 Go 1.26.8），以及 Git 和 tar。构建脚本拒绝其他 Go 版本，也不会自动下载工具链：
+
+```bash
+bun run magpie:build --target <平台-架构> --go /path/to/go   # 如 win32-x64、darwin-arm64、linux-x64 或 all
+bun run magpie:verify --target <平台-架构>
+```
+
+目标平台的 Magpie 二进制缺失或与 manifest 不符时，打包会直接报错。详见 [`resources/magpie/README.md`](resources/magpie/README.md)。
+
+| 命令 | 产物 |
+| --- | --- |
+| `bun run dist:win` | `dist:win:offline` 的别名 |
+| `bun run dist:win:offline` | 未签名 Windows x64 构建，内置全部离线组件：WebView2 安装器 `ZhiYuanAgent-Setup-<version>.exe` 与 NSIS 更新器 |
+| `bun run dist:win:lite` | `dist:win:offline` 的别名 |
+| `bun run dist:win:signed` | 产物相同，使用 Certum 签名；需要 `CERTUM_CERT_THUMBPRINT`，由发布流水线使用 |
+| `bun run dist:mac` / `dist:mac:x64` / `dist:mac:arm64` / `dist:mac:universal` | macOS 安装包 |
+| `bun run dist:linux` | Linux 安装包 |
+
+打包还涉及平台运行时、资源与签名配置，详见[贡献指南](CONTRIBUTING.md)、[RELEASING.md](RELEASING.md) 及 [`package.json`](package.json)。
 
 ### 项目结构
 
@@ -135,7 +155,7 @@ bun run llamacpp:runtime:download
 | [`src/renderer`](src/renderer) | 工作台、会话、设置、本地推理等 React 界面 |
 | [`src/shared`](src/shared) | 共享 UI、类型与通信契约 |
 | [`src/main`](src/main) | 桌面生命周期、任务执行、存储与系统服务 |
-| [`src/main/preload.ts`](src/main/preload.ts) | 通过 `contextBridge` 暴露受控 IPC |
+| [`src/main/preload.ts`](src/main/preload.ts) / [`src/main/preload/`](src/main/preload) | 通过 `contextBridge` 暴露受控 IPC，按领域拆分在 `preload/` 下 |
 | [`src/renderer/theme`](src/renderer/theme) | 主题契约、组件外观、背景与生成器 |
 | [`SKILLs`](SKILLs) / [`MCPs`](MCPs) | 内置技能与工具集成 |
 | [`.github/workflows`](.github/workflows) | 测试、安装验收和发布流程 |
