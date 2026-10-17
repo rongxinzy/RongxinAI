@@ -92,7 +92,7 @@ export const zhChannels: Record<string, string> = {
   feishuBotCreateWizardDone: '完成',
   feishuBotCreateWizardAppIdPlaceholder: '输入 App ID',
   feishuBotCreateWizardAppSecretPlaceholder: '输入 App Secret',
-  email: '龙虾邮箱',
+  email: '邮箱',
   // Email Channel
   channelPrefixEmail: '邮件',
   emailSettings: '邮件设置',
