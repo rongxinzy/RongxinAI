@@ -211,6 +211,61 @@ export class SkillManager implements SkillManagerContext {
     return this.listSkills();
   }
 
+  async createCustomSkill(params: {
+    id: string;
+    name: string;
+    description: string;
+    content: string;
+  }): Promise<{ success: boolean; skill?: SkillRecord; error?: string }> {
+    try {
+      const root = this.ensureSkillsRoot();
+      const sanitizedId = params.id
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, '-')
+        .replace(/^-|-$/g, '');
+      if (!sanitizedId) {
+        return { success: false, error: 'Skill ID cannot be empty' };
+      }
+      if (this.isBuiltInSkillId(sanitizedId)) {
+        return { success: false, error: `Skill "${sanitizedId}" conflicts with a built-in skill` };
+      }
+      const targetDir = resolveWithin(root, sanitizedId);
+      if (fs.existsSync(targetDir)) {
+        return { success: false, error: `Skill "${sanitizedId}" already exists` };
+      }
+      await fs.promises.mkdir(targetDir, { recursive: true });
+      const markdown = `---
+name: ${sanitizedId}
+description: ${params.description.trim().replace(/\r?\n/g, ' ')}
+---
+
+# ${params.name.trim()}
+
+${params.content.trim()}
+`;
+      await fs.promises.writeFile(path.join(targetDir, 'SKILL.md'), markdown, 'utf-8');
+
+      const state = this.loadSkillStateMap();
+      state[sanitizedId] = {
+        enabled: true,
+        userInstalled: true,
+      };
+      this.saveSkillStateMap(state);
+      this.notifySkillsChanged();
+
+      const skills = this.listSkills();
+      const created = skills.find(s => s.id === sanitizedId);
+      return { success: true, skill: created };
+    } catch (error) {
+      console.error('[skills] createCustomSkill failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to create skill',
+      };
+    }
+  }
+
   async deleteSkill(id: string): Promise<SkillRecord[]> {
     return deleteSkillImpl(this, id);
   }

@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "description": "Evidence-led equity research expert covering company analysis, valuation, catalysts, pitches, and portfolio risk.",
   "author": {
-    "name": "CodeBuddy Teams"
+    "name": "ZhiYuan Agent"
   },
   "expertType": "agent",
   "agentName": "equity-research-expert",

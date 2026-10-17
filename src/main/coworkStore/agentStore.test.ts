@@ -40,6 +40,19 @@ test('agent CRUD stores working directory independently', () => {
   expect(store.getAgent(agent.id)?.workingDirectory).toBe('/tmp/docs-next');
 });
 
+test('agent CRUD stores bound MCP connector ids', () => {
+  const { store } = harness;
+  const agent = store.createAgent({ name: 'Connector Agent', mcpIds: ['github'] });
+
+  expect(agent.mcpIds).toEqual(['github']);
+  expect(store.updateAgent(agent.id, { mcpIds: ['github', 'feishu'] })?.mcpIds).toEqual([
+    'github',
+    'feishu',
+  ]);
+  expect(store.getAgent(agent.id)?.mcpIds).toEqual(['github', 'feishu']);
+  expect(store.createAgent({ name: 'Plain Agent' }).mcpIds).toEqual([]);
+});
+
 test('agent CRUD normalizes legacy icons to the default svg avatar', () => {
   const { store } = harness;
   const designedIcon = encodeAgentAvatarIcon({

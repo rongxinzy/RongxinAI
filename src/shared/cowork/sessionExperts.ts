@@ -1,6 +1,7 @@
 export const CoworkSessionExpertSource = {
   Package: 'expert-package',
   Member: 'expert-package-member',
+  Custom: 'custom',
 } as const;
 
 export type CoworkSessionExpertSource =

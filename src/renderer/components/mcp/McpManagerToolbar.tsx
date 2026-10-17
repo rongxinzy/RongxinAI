@@ -1,4 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
+import { Button } from '@shared/components/ui/button';
 import {
   InputGroup,
   InputGroupAddon,
@@ -6,7 +7,7 @@ import {
   InputGroupText,
 } from '@shared/components/ui/input-group';
 import { PageTabs } from '@shared/components/ui/page-tabs';
-import { Cable, Search } from 'lucide-react';
+import { Cable, Cloud, FileUp, Search, Terminal } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import { McpTab, type McpTab as McpTabType } from './constants';
@@ -20,6 +21,9 @@ interface McpManagerToolbarProps {
   showTabs: boolean;
   onTabChange: (tab: McpTabType) => void;
   onSearchQueryChange: (searchQuery: string) => void;
+  onConfigureLocal?: () => void;
+  onConfigureCloud?: () => void;
+  onImportConfig?: () => void;
 }
 
 const MCP_TAB_ITEMS = [
@@ -53,6 +57,9 @@ export function McpManagerToolbar({
   showTabs,
   onTabChange,
   onSearchQueryChange,
+  onConfigureLocal,
+  onConfigureCloud,
+  onImportConfig,
 }: McpManagerToolbarProps) {
   return (
     <header className="flex flex-col gap-4 border-b border-border">
@@ -65,19 +72,62 @@ export function McpManagerToolbar({
         </p>
       </div>
 
-      <InputGroup className="w-full">
-        <InputGroupAddon>
-          <InputGroupText>
-            <Search />
-          </InputGroupText>
-        </InputGroupAddon>
-        <InputGroupInput
-          value={searchQuery}
-          onChange={event => onSearchQueryChange(event.target.value)}
-          placeholder={i18nService.t('searchMcpServers')}
-          aria-label={i18nService.t('searchMcpServers')}
-        />
-      </InputGroup>
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center justify-between">
+        <InputGroup className="flex-1 max-w-md">
+          <InputGroupAddon>
+            <InputGroupText>
+              <Search />
+            </InputGroupText>
+          </InputGroupAddon>
+          <InputGroupInput
+            value={searchQuery}
+            onChange={event => onSearchQueryChange(event.target.value)}
+            placeholder={i18nService.t('searchMcpServers')}
+            aria-label={i18nService.t('searchMcpServers')}
+          />
+        </InputGroup>
+
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {onConfigureLocal && (
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={onConfigureLocal}
+              className="gap-1.5 h-9"
+            >
+              <Terminal className="size-4" />
+              {i18nService.t('configureLocalMcp')}
+            </Button>
+          )}
+
+          {onConfigureCloud && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onConfigureCloud}
+              className="gap-1.5 h-9"
+            >
+              <Cloud className="size-4" />
+              {i18nService.t('configureCloudMcp')}
+            </Button>
+          )}
+
+          {onImportConfig && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onImportConfig}
+              className="gap-1.5 h-9"
+            >
+              <FileUp className="size-4" />
+              {i18nService.t('importMcpConfigJson')}
+            </Button>
+          )}
+        </div>
+      </div>
 
       {showTabs ? (
         <PageTabs

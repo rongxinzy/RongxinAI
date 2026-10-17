@@ -28,6 +28,7 @@ interface McpServerFormModalProps {
   isOpen: boolean;
   server?: McpServerConfig | null; // null = create mode, defined = edit mode
   registryEntry?: McpRegistryEntry | null; // install from registry mode
+  initialTransportType?: 'stdio' | 'sse' | 'http';
   existingNames: string[];
   onClose: () => void;
   onSave: (data: McpServerFormData) => Promise<{ success: boolean; error?: string }>;
@@ -37,6 +38,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
   isOpen,
   server,
   registryEntry,
+  initialTransportType,
   existingNames,
   onClose,
   onSave,
@@ -126,7 +128,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       // Create mode
       setName('');
       setDescription('');
-      setTransportType('stdio');
+      setTransportType(initialTransportType ?? 'stdio');
       setCommand('');
       setArgsText('');
       setEnvRows([]);
@@ -136,7 +138,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
     }
     setError('');
     setEnvErrors({});
-  }, [isOpen, server, registryEntry]);
+  }, [isOpen, server, registryEntry, initialTransportType]);
 
   const buildValidatedFormData = (): McpServerFormData | null => {
     const trimmedName = name.trim();
@@ -356,6 +358,11 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                 </SelectGroup>
               </SelectContent>
             </Select>
+            <span className="text-[11px] text-muted-foreground mt-1">
+              {transportType === 'stdio'
+                ? i18nService.t('localMcpDesc')
+                : i18nService.t('cloudMcpDesc')}
+            </span>
           </Field>
 
           {/* stdio fields */}
