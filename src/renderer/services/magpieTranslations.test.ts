@@ -21,7 +21,7 @@ test('model service copy does not name the internal runtime', () => {
     '订阅账号由官方管理界面维护，凭据不会返回应用页面。',
   );
   expect(magpieTranslations.zh.magpieCatalogConsent).toBe(
-    '启用会启动模型服务，并读取及自动同步已连接的本机 Agent 配置。订阅账号需单独启用，遥测与局域网访问关闭。',
+    '启用后会启动本机模型服务，并读取、同步已连接 Agent 的模型配置。订阅账号需单独启用；遥测与局域网访问默认关闭。',
   );
   expect(magpieTranslations.zh.magpieManagerDescription).toBe(
     '通过独立的模型服务管理本机 Agent 模型配置。',
@@ -36,7 +36,7 @@ test('model service copy does not name the internal runtime', () => {
     'Manage subscription accounts in the official management UI. Credentials are not returned to this app page.',
   );
   expect(magpieTranslations.en.magpieCatalogConsent).toBe(
-    'Enabling starts the model service and reads and automatically synchronizes connected local Agent configuration. Subscription accounts require separate opt-in. Telemetry and LAN access are disabled.',
+    'Enabling starts the local model service and reads and synchronizes connected Agent configuration. Subscription accounts need separate opt-in; telemetry and LAN access stay off.',
   );
   expect(magpieTranslations.en.magpieManagerDescription).toBe(
     'Manage local Agent model configuration through the standalone model service.',

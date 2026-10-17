@@ -29,14 +29,18 @@ import ImSettingsPanel from './im/ImSettingsPanel';
 import { ManagedMemorySettings } from './memory/ManagedMemorySettings';
 import ModelSettingsPanel from './model/ModelSettingsPanel';
 import ShortcutsSettingsPanel from './shortcuts/ShortcutsSettingsPanel';
-import TriageSettingsPanel from './triage/TriageSettingsPanel';
 import {
   fromEnterpriseTab,
   isEnterpriseTab,
   type SettingsPageProps,
   type SettingsTabType,
 } from './types';
-import { isCompactSettingsTab } from './constants';
+import {
+  settingsContentWidthClass,
+  settingsFooterMode,
+  settingsFooterSecondaryLabel,
+  type SettingsFooterMode,
+} from './constants';
 import { useSettingsTabs } from './useSettingsTabs';
 
 export default function SettingsPage({
@@ -64,6 +68,16 @@ export default function SettingsPage({
   const [language, setLanguage] = useState<LanguageType>('zh');
   const [useSystemProxy, setUseSystemProxy] = useState(false);
   const [sqliteAutoBackupEnabled, setSqliteAutoBackupEnabled] = useState(false);
+  const [autoLaunch, setAutoLaunch] = useState(false);
+  const [preventSleep, setPreventSleep] = useState(false);
+  const [codemodeEnabled, setCodemodeEnabled] = useState(false);
+  const [mcpNativeBridge, setMcpNativeBridge] = useState(false);
+  const initialGeneralRef = useRef({
+    autoLaunch: false,
+    preventSleep: false,
+    codemodeEnabled: false,
+    mcpNativeBridge: false,
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const buildNoticeMessage = useCallback((): string | null => {
@@ -180,6 +194,32 @@ export default function SettingsPage({
   }, []);
 
   useEffect(() => {
+    let active = true;
+    void (async () => {
+      const [autoLaunchResult, preventSleepResult, coworkConfigResult] = await Promise.all([
+        window.electron.autoLaunch.get().catch(() => null),
+        window.electron.preventSleep.get().catch(() => null),
+        window.electron.cowork.getConfig().catch(() => null),
+      ]);
+      if (!active) return;
+      const next = {
+        autoLaunch: autoLaunchResult?.enabled === true,
+        preventSleep: preventSleepResult?.enabled === true,
+        codemodeEnabled: coworkConfigResult?.config?.codemodeEnabled === true,
+        mcpNativeBridge: coworkConfigResult?.config?.mcpNativeBridge === true,
+      };
+      initialGeneralRef.current = next;
+      setAutoLaunch(next.autoLaunch);
+      setPreventSleep(next.preventSleep);
+      setCodemodeEnabled(next.codemodeEnabled);
+      setMcpNativeBridge(next.mcpNativeBridge);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const initialTheme = initialThemeRef.current;
     const initialThemeStyle = initialThemeStyleRef.current;
     const initialLanguage = initialLanguageRef.current;
@@ -234,14 +274,14 @@ export default function SettingsPage({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (settingsFooterMode(activeTab) === 'close') {
+      onClose();
+      return;
+    }
     setIsSaving(true);
     setError(null);
     let appConfigSaved = false;
 
-    if (activeTab === 'model') {
-      onClose();
-      return;
-    }
     try {
       const emailSaved = (await emailSettingsRef.current?.saveIfDirty()) ?? true;
       if (!emailSaved) {
@@ -263,6 +303,33 @@ export default function SettingsPage({
         await configService.updateConfig(appConfigPatch);
         appConfigSaved = true;
       }
+
+      const initialGeneral = initialGeneralRef.current;
+      if (autoLaunch !== initialGeneral.autoLaunch) {
+        const result = await window.electron.autoLaunch.set(autoLaunch);
+        if (!result.success) {
+          throw new Error(result.error || i18nService.t('autoLaunchUpdateFailed'));
+        }
+        appConfigSaved = true;
+      }
+      if (preventSleep !== initialGeneral.preventSleep) {
+        const result = await window.electron.preventSleep.set(preventSleep);
+        if (!result.success) {
+          throw new Error(result.error || i18nService.t('preventSleepUpdateFailed'));
+        }
+        appConfigSaved = true;
+      }
+      if (
+        codemodeEnabled !== initialGeneral.codemodeEnabled ||
+        mcpNativeBridge !== initialGeneral.mcpNativeBridge
+      ) {
+        const updated = await coworkService.updateConfig({ codemodeEnabled, mcpNativeBridge });
+        if (!updated) {
+          throw new Error(i18nService.t('coworkConfigSaveFailed'));
+        }
+        appConfigSaved = true;
+      }
+      initialGeneralRef.current = { autoLaunch, preventSleep, codemodeEnabled, mcpNativeBridge };
 
       // 应用主题
       themeService.setStyle(themeStyle);
@@ -355,6 +422,9 @@ export default function SettingsPage({
   const activeTabLabel = useMemo(() => {
     return sidebarTabs.find(t => t.key === activeTab)?.label ?? '';
   }, [activeTab, sidebarTabs]);
+  const contentWidthClass = settingsContentWidthClass(activeTab);
+  const footerMode: SettingsFooterMode = settingsFooterMode(activeTab);
+  const footerSecondaryLabel = settingsFooterSecondaryLabel(activeTab);
 
   const renderTabContent = () => {
     if (isEnterpriseTab(activeTab)) {
@@ -371,11 +441,18 @@ export default function SettingsPage({
               setLanguage(nextLanguage);
               i18nService.setLanguage(nextLanguage, { persist: false });
             }}
+            autoLaunch={autoLaunch}
+            onAutoLaunchChange={setAutoLaunch}
+            preventSleep={preventSleep}
+            onPreventSleepChange={setPreventSleep}
             useSystemProxy={useSystemProxy}
             onUseSystemProxyChange={next => setUseSystemProxy(next)}
             sqliteAutoBackupEnabled={sqliteAutoBackupEnabled}
             onSqliteAutoBackupEnabledChange={next => setSqliteAutoBackupEnabled(next)}
-            setError={setError}
+            codemodeEnabled={codemodeEnabled}
+            onCodemodeEnabledChange={setCodemodeEnabled}
+            mcpNativeBridge={mcpNativeBridge}
+            onMcpNativeBridgeChange={setMcpNativeBridge}
           />
         );
 
@@ -400,9 +477,6 @@ export default function SettingsPage({
 
       case 'aisphere':
         return <AISphereSettings />;
-
-      case 'triage':
-        return <TriageSettingsPanel />;
 
       case 'shortcuts':
         return (
@@ -435,32 +509,38 @@ export default function SettingsPage({
         onNewChat={onNewChat}
       />
 
-      <div className="flex min-h-0 flex-1">
-        {/* Category sidebar */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        {/* Category sidebar; wraps into a tab strip when the window is narrow. */}
         <nav
           aria-label={i18nService.t('settings')}
-          className="theme-shell-sidebar flex w-[220px] shrink-0 flex-col gap-4 overflow-y-auto px-2 py-4"
+          className="theme-shell-sidebar flex w-full shrink-0 flex-wrap items-center gap-1 px-2 py-2 lg:w-[220px] lg:flex-col lg:items-stretch lg:gap-4 lg:overflow-x-hidden lg:overflow-y-auto lg:px-2 lg:py-4"
         >
           {navGroups.map((group, groupIndex) => (
-            <div key={group.title ?? groupIndex} className="flex flex-col gap-1">
+            <div
+              key={group.title ?? groupIndex}
+              className="flex shrink-0 flex-row flex-wrap gap-1 lg:w-full lg:flex-col lg:gap-1"
+            >
               {group.title ? (
-                <div className="theme-shell-sidebar-section flex items-center">{group.title}</div>
+                <div className="theme-shell-sidebar-section hidden items-center lg:flex">
+                  {group.title}
+                </div>
               ) : null}
               {group.tabs.map(tab => (
-                <Button
-                  type="button"
-                  key={tab.key}
-                  variant="navigation"
-                  size="navigation"
-                  data-active={activeTab === tab.key || undefined}
-                  aria-current={activeTab === tab.key ? 'page' : undefined}
-                  onClick={() => handleTabChange(tab.key)}
-                >
-                  <div className="flex size-4 shrink-0 items-center justify-center">
-                    <tab.icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
-                  </div>
-                  <span className="min-w-0 truncate">{tab.label}</span>
-                </Button>
+                <div key={tab.key} className="shrink-0 lg:w-full">
+                  <Button
+                    type="button"
+                    variant="navigation"
+                    size="navigation"
+                    data-active={activeTab === tab.key || undefined}
+                    aria-current={activeTab === tab.key ? 'page' : undefined}
+                    onClick={() => handleTabChange(tab.key)}
+                  >
+                    <div className="flex size-4 shrink-0 items-center justify-center">
+                      <tab.icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+                    </div>
+                    <span className="min-w-0 truncate">{tab.label}</span>
+                  </Button>
+                </div>
               ))}
             </div>
           ))}
@@ -469,14 +549,18 @@ export default function SettingsPage({
         {/* Right content */}
         <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {noticeMessage && (
-            <div className="px-4 sm:px-6">
-              <ErrorMessage message={noticeMessage} onClose={() => setNoticeMessage(null)} />
+            <div className="px-4 pt-4 sm:px-6">
+              <div className={cn('w-full', contentWidthClass)}>
+                <ErrorMessage message={noticeMessage} onClose={() => setNoticeMessage(null)} />
+              </div>
             </div>
           )}
 
           {error && (
-            <div className="px-4 sm:px-6">
-              <ErrorMessage message={error} onClose={() => setError(null)} />
+            <div className="px-4 pt-4 sm:px-6">
+              <div className={cn('w-full', contentWidthClass)}>
+                <ErrorMessage message={error} onClose={() => setError(null)} />
+              </div>
             </div>
           )}
 
@@ -488,23 +572,42 @@ export default function SettingsPage({
             {/* Tab content */}
             <div
               ref={contentRef}
+              role="region"
+              aria-label={activeTabLabel}
+              tabIndex={0}
               className={cn(
                 'flex-1',
                 isEnterpriseTab(activeTab)
                   ? 'overflow-hidden'
-                  : 'overflow-y-auto px-4 py-4 sm:px-6',
+                  : 'overflow-y-auto px-4 py-6 sm:px-6',
               )}
               style={{ scrollbarGutter: 'stable' }}
             >
-              <div className={activeTab === 'email' ? 'block' : 'hidden'}>
+              <div
+                className={cn(
+                  'w-full min-w-0',
+                  contentWidthClass,
+                  activeTab === 'email' ? 'block' : 'hidden',
+                )}
+              >
                 <EmailSettingsPage ref={emailSettingsRef} />
               </div>
-              <div className={activeTab === 'model' ? 'block h-full' : 'hidden'}>
+              <div
+                className={cn(
+                  'w-full min-w-0',
+                  contentWidthClass,
+                  activeTab === 'model' ? 'block h-full' : 'hidden',
+                )}
+              >
                 {activeTab === 'model' && <ModelSettingsPanel />}
               </div>
               {activeTab !== 'email' && activeTab !== 'model' && (
                 <div
-                  className={cn('w-full min-w-0', isCompactSettingsTab(activeTab) && 'max-w-3xl')}
+                  className={cn(
+                    'w-full min-w-0',
+                    !isEnterpriseTab(activeTab) && contentWidthClass,
+                    activeTab === 'im' && 'h-full',
+                  )}
                 >
                   {renderTabContent()}
                 </div>
@@ -513,26 +616,33 @@ export default function SettingsPage({
 
             {/* Footer buttons */}
             {!isEnterpriseTab(activeTab) && (
-              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-background p-4">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="theme-confirm-cancel min-w-16"
-                  onClick={onClose}
-                  disabled={isSaving}
+              <div className="shrink-0 border-t border-border bg-background">
+                <div
+                  className={cn(
+                    'flex flex-wrap items-center justify-end gap-2 px-4 py-3 sm:px-6',
+                    contentWidthClass,
+                  )}
                 >
-                  {i18nService.t(activeTab === 'model' ? 'close' : 'cancel')}
-                </Button>
-                {activeTab !== 'model' && (
                   <Button
-                    type="submit"
-                    variant="default"
-                    className={localInferenceCompactButtonClass}
+                    type="button"
+                    variant="ghost"
+                    className="theme-confirm-cancel min-w-16"
+                    onClick={onClose}
                     disabled={isSaving}
                   >
-                    {isSaving ? i18nService.t('saving') : i18nService.t('save')}
+                    {i18nService.t(footerSecondaryLabel)}
                   </Button>
-                )}
+                  {footerMode === 'draft' && (
+                    <Button
+                      type="submit"
+                      variant="default"
+                      className={localInferenceCompactButtonClass}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? i18nService.t('saving') : i18nService.t('save')}
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </form>

@@ -192,7 +192,7 @@ export const EmailSettingsPage = forwardRef<EmailSettingsHandle>(
     const canTest = !hasErrors(validateEmailForm(form));
 
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
+      <div className="flex w-full flex-col gap-6">
         {saveError && (
           <Alert variant="destructive">
             <CircleAlert />

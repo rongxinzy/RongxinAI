@@ -18,6 +18,7 @@ export const modelBrowseTranslations = {
     modelBrowseProtocol: '原生协议',
     modelBrowseSaved: '已保存的默认模型',
     modelBrowseSelection: '当前选择与能力',
+    modelBrowseDetails: '能力详情',
     modelBrowseUnsaved: '待保存，尚未更改默认',
     modelBrowseMissingDefault: '已保存的模型不在当前目录中，请明确选择新的默认模型。',
     modelBrowseConnectionHint:
@@ -46,6 +47,7 @@ export const modelBrowseTranslations = {
     modelBrowseProtocol: 'Native protocol',
     modelBrowseSaved: 'Saved default model',
     modelBrowseSelection: 'Current selection and capabilities',
+    modelBrowseDetails: 'Capabilities',
     modelBrowseUnsaved: 'Unsaved; default unchanged',
     modelBrowseMissingDefault:
       'The saved model is missing from this catalog. Explicitly select a new default.',

@@ -1,8 +1,9 @@
-import { useId, useMemo, useState } from 'react';
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Input } from '@shared/components/ui/input';
 import { Field, FieldLabel } from '@shared/components/ui/field';
+import { Input } from '@shared/components/ui/input';
+import { ChevronDown } from 'lucide-react';
+import { useId, useMemo, useState } from 'react';
 import type { MagpieModel } from '../../../../shared/magpie/types';
 import { i18nService } from '../../../services/i18n';
 
@@ -31,11 +32,11 @@ function ModelCapabilities({ model }: { model: MagpieModel }) {
     ],
   ];
   return (
-    <dl className="grid min-w-0 grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+    <dl className="grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">
       {fields.map(([label, value]) => (
         <div key={label} className="min-w-0">
           <dt className="text-muted-foreground">{i18nService.t(label)}</dt>
-          <dd className="break-all">{value}</dd>
+          <dd className="break-words">{value}</dd>
         </div>
       ))}
     </dl>
@@ -74,35 +75,6 @@ export function ModelCatalogBrowser({
   const selected = models.find(model => model.id === selection);
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <div className="flex flex-col gap-2 text-sm">
-        <p className="break-all">
-          {i18nService.t('modelBrowseSaved')}:{' '}
-          {saved?.display_name || saved?.id || i18nService.t('magpieModelUnset')}
-        </p>
-        {saved?.display_name && <p className="break-all text-muted-foreground">{saved.id}</p>}
-        {defaultModelId && !saved && (
-          <p role="status">{i18nService.t('modelBrowseMissingDefault')}</p>
-        )}
-        {selected && (
-          <section
-            aria-label={i18nService.t('modelBrowseSelection')}
-            className="flex min-w-0 flex-col gap-3"
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="min-w-0 break-all font-medium">
-                {selected.display_name || selected.id}
-              </p>
-              <Badge variant="outline">
-                {i18nService.t(
-                  selection === defaultModelId ? 'modelBrowseSaved' : 'modelBrowseUnsaved',
-                )}
-              </Badge>
-            </div>
-            <p className="break-all text-muted-foreground">{selected.id}</p>
-            <ModelCapabilities model={selected} />
-          </section>
-        )}
-      </div>
       <Field>
         <FieldLabel htmlFor={searchId}>{i18nService.t('modelBrowseSearch')}</FieldLabel>
         <Input
@@ -120,36 +92,83 @@ export function ModelCatalogBrowser({
       <p role="status" className="text-sm text-muted-foreground">
         {i18nService.t('modelBrowseMatches')}: {filtered.length}
       </p>
+      {defaultModelId && !saved && (
+        <p role="status" className="text-sm text-muted-foreground">
+          {i18nService.t('modelBrowseMissingDefault')}
+        </p>
+      )}
       {query && !filtered.length && (
         <p className="text-sm">{i18nService.t('modelBrowseNoMatches')}</p>
       )}
-      <ul className="divide-y divide-border">
-        {visible.map(model => (
-          <li
-            key={model.id}
-            className="flex min-w-0 flex-wrap items-start justify-between gap-3 py-3"
-          >
-            <div className="min-w-0 flex-1">
-              <p className="break-all text-sm font-medium">{model.display_name || model.id}</p>
-              <p className="break-all text-sm text-muted-foreground">{model.id}</p>
-              <p className="break-all text-sm text-muted-foreground">
-                {i18nService.t('modelBrowseSource')}:{' '}
-                {model.owned_by || i18nService.t('modelBrowseUnknown')}
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={disabled}
-              aria-pressed={selection === model.id}
-              aria-label={`${i18nService.t('modelBrowseSelect')} ${model.id}`}
-              onClick={() => onSelect(model.id)}
-            >
-              {i18nService.t(selection === model.id ? 'modelBrowseSelected' : 'modelBrowseSelect')}
-            </Button>
-          </li>
-        ))}
+      <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+        {visible.map(model => {
+          const isSelected = selection === model.id;
+          const isSaved = defaultModelId === model.id;
+          return (
+            <li key={model.id} className="flex min-w-0 flex-col gap-3 px-4 py-3">
+              <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <p className="min-w-0 break-words text-sm font-medium">
+                      {model.display_name || model.id}
+                    </p>
+                    {isSaved && (
+                      <Badge variant="secondary" className="font-normal">
+                        {i18nService.t('modelBrowseSaved')}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="break-all text-sm text-muted-foreground">{model.id}</p>
+                  <p className="break-all text-sm text-muted-foreground">
+                    {i18nService.t('modelBrowseSource')}:{' '}
+                    {model.owned_by || i18nService.t('modelBrowseUnknown')}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant={isSelected ? 'secondary' : 'outline'}
+                  disabled={disabled}
+                  aria-pressed={isSelected}
+                  aria-label={`${i18nService.t('modelBrowseSelect')} ${model.id}`}
+                  onClick={() => onSelect(model.id)}
+                >
+                  {i18nService.t(isSelected ? 'modelBrowseSelected' : 'modelBrowseSelect')}
+                </Button>
+              </div>
+            </li>
+          );
+        })}
       </ul>
+      {selected && (
+        <section
+          aria-label={i18nService.t('modelBrowseSelection')}
+          className="min-w-0 overflow-hidden rounded-lg border border-border-subtle"
+        >
+          <details className="group">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3">
+              <span className="text-sm font-medium">{i18nService.t('modelBrowseDetails')}</span>
+              <ChevronDown
+                aria-hidden="true"
+                className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <div className="flex min-w-0 flex-col gap-3 border-t border-border-subtle px-4 py-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <p className="min-w-0 break-all text-sm font-medium">
+                  {selected.display_name || selected.id}
+                </p>
+                <Badge variant="outline" className="font-normal">
+                  {i18nService.t(
+                    selection === defaultModelId ? 'modelBrowseSaved' : 'modelBrowseUnsaved',
+                  )}
+                </Badge>
+              </div>
+              <p className="break-all text-sm text-muted-foreground">{selected.id}</p>
+              <ModelCapabilities model={selected} />
+            </div>
+          </details>
+        </section>
+      )}
       {filtered.length > PAGE_SIZE && (
         <div className="flex flex-wrap items-center gap-2">
           <Button

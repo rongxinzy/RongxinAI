@@ -406,7 +406,7 @@ Before committing Zenith redesign:
 
 ### 布局契约
 
-- **设置页行式面板**（General / Appearance / Shortcuts / Model Routing）内容最大宽度 768px；主题卡片用 auto-fill、单列最小 13rem 排布，单张卡片不得拉伸占满整行。
+- **设置页行式面板**（General / Appearance / Shortcuts）内容最大宽度 768px；Model、Platform Models、Email、About 同样使用 768px 阅读列，Memory 与 IM 使用 1024px 画布；主题卡片用 auto-fill、单列最小 13rem 排布，单张卡片不得拉伸占满整行。
 - **首页快捷动作**：≥1280px 保持单行居中；更窄时使用 2/3 列网格，保持两行平衡，不得出现右侧孤立末项。
 - **会话阅读列**：对话与输入区共享 `max-w-4xl`（896px）并居中；首页输入岛仍为 `max-w-3xl`（768px）。长文行宽优先保证可读性，工具卡片在列内自适应。
 - **表单弹窗**：至少 448px，字段间距 16px；内容不足时优先加宽（512px）而不是压缩字号或控件。项目名与路径都必须有可见标签。
@@ -424,8 +424,52 @@ Before committing Zenith redesign:
 
 ---
 
+## 十三、2026-10-17 设置页重构
+
+本轮重做设置页的信息架构、页脚语义与模型页层级，移除已由 Magpie 模型服务取代的旧路由入口。
+
+### 信息架构
+
+- 设置侧栏分组固定为 General / Models & memory / Channels；`Model Routing` 页删除，Memory 归入 Models & memory，不再单列在模型组末尾。
+- 每页标题只由 PageHeader 提供；内容区从第一个设置分组或说明开始，不重复页面标题。
+- General 页分为 Application（语言、登录启动、防休眠、系统代理、自动备份）与 Agent runtime（Codemode、MCP native bridge）两组。设置行不卡片化。
+
+### 页脚契约
+
+- **草稿页**（General / Appearance / Shortcuts / Email）：`Cancel` 丢弃未提交状态，`Save` 提交。General 的所有开关在 Save 时统一落盘，不得再出现「切换即生效但 Cancel 无法撤销」的混合语义。
+- **IM**：字段在失焦时已持久化，`Save` 只负责把待同步配置应用到网关；次要动作使用 `Close`，不得标成 `Cancel`。
+- **自动保存页**（Model / Platform Models / Memory / About）：只显示 `Close`，不得出现没有可提交内容的 `Save`。
+- 页脚与当前内容列同宽、右对齐；内容列切换时页脚按钮随之对齐，不固定在窗口最右缘。
+
+### 宽度与间距
+
+- 行式设置页（General / Appearance / Shortcuts / Model / Platform Models / Email / About）使用 768px 阅读列；Memory 与 IM 使用 1024px 画布。
+- 页面自身不再叠加 `p-4`、`max-w-xl`、`max-w-2xl` 等内层宽度；宽度只由 SettingsPage 的内容列决定。
+- 页面内容顶部统一 24px，页脚 12px 垂直内边距；分组之间 32px，组内行 16px。
+
+### 模型页层级
+
+- 顶部只保留一个 `Model service` 区：状态徽标、简短说明、刷新/管理/启用动作；启用说明只在未运行时出现。
+- Provider 使用带分隔线的行式列表，不再为每个 Provider 套 Card；服务商模型标签使用 `text-xs`，不得出现 10px/11px 字号。
+- Default model 显示当前已保存默认模型；`Set as default` 只在用户选择了不同模型时出现，不展示长期禁用的主按钮。
+- 外部 Agent 与订阅账号收在服务运行后的次级区块；未运行时隐藏，不展示禁用按钮。
+- 页面内不得再出现重复的 `Models` 标题或 `MIT · © 2026 yetone` 之外的新版权行。
+
+### 其他修订
+
+- 快捷键页增加录制说明；设置开关通过 `aria-labelledby`/`aria-describedby` 关联标签与描述。
+- IM 渠道标题使用 `{name} Settings / {name} 设置`，不得拼接出 `WeChatSettings`。
+- IM 项目必填字段默认使用中性样式与必填标记，不得在用户尚未操作时显示红色 invalid 态。
+
+### 验收补充
+
+- 设置页每个 tab 在 1440×900 与 1024×768 下检查浅色/深色、页脚对齐、无横向溢出；760×700 下检查侧栏与内容仍可用。
+- 删除页、`Close` 页、`Cancel/Save` 页分别验证页脚按钮不再出现「点了没反应」或「Cancel 不撤销」的行为。
+
+---
+
 **Design Authority**: This specification is the single source of truth for Zenith design system. Any deviation requires explicit approval and documentation update.
 
-**Version**: 3.1.0-zenith
+**Version**: 3.2.0-zenith
 **Last Updated**: 2026-10-17
 **Next Review**: Q1 2027

@@ -15,15 +15,16 @@ export const magpieTranslations = {
     magpiePrivacyWithAccounts:
       '已允许订阅账号发现与使用。遥测和局域网访问关闭。停止服务不会撤销已写入的 Agent 配置。',
 
-    magpieCatalogTitle: '模型',
+    magpieCatalogTitle: '模型服务',
     magpieCatalogHint:
-      '聊天、计划任务与 Coding 使用同一模型目录。Provider、凭据与路由在官方管理界面维护；本地 GPU 和企业模型由应用注册。订阅账号默认关闭。',
+      '聊天、计划任务与 Coding 共享同一模型目录。服务商、凭据与路由在管理界面维护，默认模型在这里选择。',
     magpieCatalogRefresh: '刷新目录',
     magpieDefaultModel: '默认模型',
-    magpieCatalogEmpty: '目录暂无模型。请在管理界面配置 Provider，或启动本地模型后刷新。',
+    magpieDefaultModelHint: '新会话以及使用默认模型的请求会解析到该模型。',
+    magpieCatalogEmpty: '目录暂无模型。请在管理界面配置服务商，或启动本地模型后刷新。',
     magpieCatalogEnable: '启用模型服务',
     magpieCatalogConsent:
-      '启用会启动模型服务，并读取及自动同步已连接的本机 Agent 配置。订阅账号需单独启用，遥测与局域网访问关闭。',
+      '启用后会启动本机模型服务，并读取、同步已连接 Agent 的模型配置。订阅账号需单独启用；遥测与局域网访问默认关闭。',
     magpieSetDefault: '设为默认',
 
     magpieTitle: '接入外部 Agent',
@@ -50,6 +51,7 @@ export const magpieTranslations = {
     magpieExternalGatewayTarget: '网关地址：{url}',
     magpieExternalSettingsLink: '接入外部 Agent',
     magpieExternalSettingsLinkHint: '让本机 CLI 使用知远已配置的模型。',
+    magpieExternalManage: '管理接入',
     magpieExternalAgentClaude: 'Claude Code',
     magpieExternalAgentOpenCode: 'OpenCode',
     magpieExternalAgentGemini: 'Gemini CLI',
@@ -127,6 +129,10 @@ export const magpieTranslations = {
     magpieNoProviders: '尚未配置任何外部模型渠道。点击“添加渠道”接入更多模型。',
     magpieProviderEnabled: '已启用',
     magpieProviderDisabled: '已停用',
+    magpieEnableProvider: '启用渠道',
+    magpieDisableProvider: '停用渠道',
+    magpieLoopbackGateway: '本机网关',
+    magpieProviderMoreModels: '另有 {count} 个',
     magpieDiagnosticsTitle: '网关健康状态',
     magpieDiagnosticsActive: '活跃渠道',
     magpieDiagnosticsLatency: '网关延迟',
@@ -160,16 +166,18 @@ export const magpieTranslations = {
     magpiePrivacyWithAccounts:
       'Subscription account discovery and use are enabled. Telemetry and LAN access are disabled. Stopping does not undo Agent configuration already written.',
 
-    magpieCatalogTitle: 'Models',
+    magpieCatalogTitle: 'Model service',
     magpieCatalogHint:
-      'Chat, scheduled work and Coding share one model catalog. Manage providers, credentials and routing in the official management UI. Local GPU and enterprise models are registered by the app. Subscription accounts are off by default.',
+      'Chat, scheduled work, and Coding share one model catalog. Manage providers, credentials, and routing in the management UI; choose the default model here.',
     magpieCatalogRefresh: 'Refresh catalog',
     magpieDefaultModel: 'Default model',
+    magpieDefaultModelHint:
+      'New sessions and requests that resolve the default model use this model.',
     magpieCatalogEmpty:
       'No models in the catalog. Configure a provider in management, or start a local model and refresh.',
     magpieCatalogEnable: 'Enable model service',
     magpieCatalogConsent:
-      'Enabling starts the model service and reads and automatically synchronizes connected local Agent configuration. Subscription accounts require separate opt-in. Telemetry and LAN access are disabled.',
+      'Enabling starts the local model service and reads and synchronizes connected Agent configuration. Subscription accounts need separate opt-in; telemetry and LAN access stay off.',
     magpieSetDefault: 'Set as default',
 
     magpieTitle: 'Connect external Agents',
@@ -200,6 +208,7 @@ export const magpieTranslations = {
     magpieExternalGatewayTarget: 'Gateway: {url}',
     magpieExternalSettingsLink: 'Connect external Agents',
     magpieExternalSettingsLinkHint: 'Route local CLIs through models configured in ZhiYuan.',
+    magpieExternalManage: 'Manage connections',
     magpieExternalAgentClaude: 'Claude Code',
     magpieExternalAgentOpenCode: 'OpenCode',
     magpieExternalAgentGemini: 'Gemini CLI',
@@ -283,6 +292,10 @@ export const magpieTranslations = {
     magpieNoProviders: 'No external model providers configured. Click "Add Provider" to connect.',
     magpieProviderEnabled: 'Active',
     magpieProviderDisabled: 'Disabled',
+    magpieEnableProvider: 'Enable provider',
+    magpieDisableProvider: 'Disable provider',
+    magpieLoopbackGateway: 'Local gateway',
+    magpieProviderMoreModels: '{count} more',
     magpieDiagnosticsTitle: 'Gateway Health',
     magpieDiagnosticsActive: 'Active Providers',
     magpieDiagnosticsLatency: 'Gateway Latency',

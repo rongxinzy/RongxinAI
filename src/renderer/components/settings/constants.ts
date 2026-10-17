@@ -6,7 +6,6 @@ import {
   MailCheck,
   MessageCircleMore,
   Network,
-  Route,
   SlidersHorizontal,
   SunMedium,
   type LucideIcon,
@@ -25,7 +24,6 @@ export const SETTINGS_TAB_METAS: Record<TabType, SettingsTabMeta> = {
   shortcuts: { labelKey: 'shortcuts', icon: Keyboard },
   model: { labelKey: 'model', icon: Box },
   aisphere: { labelKey: 'aisphereTab', icon: Network },
-  triage: { labelKey: 'modelTriageTitle', icon: Route },
   coworkMemory: { labelKey: 'coworkMemoryTitle', icon: Brain },
   im: { labelKey: 'imBot', icon: MessageCircleMore },
   email: { labelKey: 'emailTab', icon: MailCheck },
@@ -45,25 +43,49 @@ export interface SettingsNavGroupDef {
  */
 export const SETTINGS_NAV_GROUPS: SettingsNavGroupDef[] = [
   { titleKey: 'settingsGroupGeneral', tabs: ['general', 'appearance', 'shortcuts'] },
-  { titleKey: 'settingsGroupModel', tabs: ['model', 'aisphere', 'triage', 'coworkMemory'] },
+  { titleKey: 'settingsGroupModel', tabs: ['model', 'aisphere', 'coworkMemory'] },
   { titleKey: 'settingsGroupChannels', tabs: ['im', 'email'] },
   { titleKey: null, tabs: ['about'] },
 ];
 
 /**
- * Panels made of short label/control rows and a single reading column. Capping
- * them keeps the control within a comfortable scan distance instead of pinning
- * it to the far edge of a wide window.
+ * Wide canvases are reserved for list/workspace panels that need to show a
+ * second navigation column (IM) or a two-column card surface (memory). Every
+ * other settings page shares the compact reading column.
  */
-const COMPACT_SETTINGS_TABS: readonly SettingsTabType[] = [
-  'general',
-  'appearance',
-  'shortcuts',
-  'triage',
+const WIDE_SETTINGS_TABS: readonly SettingsTabType[] = ['coworkMemory', 'im'];
+
+export function settingsContentWidthClass(tab: SettingsTabType): string {
+  if (WIDE_SETTINGS_TABS.includes(tab)) return 'max-w-5xl';
+  return 'max-w-3xl';
+}
+
+/**
+ * Draft tabs keep local state until Save. Auto-saved tabs write immediately
+ * through their own actions, so their footer must not offer a Save button that
+ * has nothing left to persist.
+ */
+const AUTO_SAVED_SETTINGS_TABS: readonly SettingsTabType[] = [
+  'model',
+  'aisphere',
+  'coworkMemory',
+  'about',
 ];
 
-export function isCompactSettingsTab(tab: SettingsTabType): boolean {
-  return COMPACT_SETTINGS_TABS.includes(tab);
+export type SettingsFooterMode = 'draft' | 'close';
+
+export function settingsFooterMode(tab: SettingsTabType): SettingsFooterMode {
+  return AUTO_SAVED_SETTINGS_TABS.includes(tab) ? 'close' : 'draft';
+}
+
+/**
+ * IM fields persist on blur; the footer Save only applies pending config to the
+ * gateway. Labelling the secondary action "Cancel" would promise a rollback the
+ * page cannot perform, so it closes instead.
+ */
+export function settingsFooterSecondaryLabel(tab: SettingsTabType): 'cancel' | 'close' {
+  if (tab === 'im') return 'close';
+  return settingsFooterMode(tab) === 'close' ? 'close' : 'cancel';
 }
 
 export const SEND_SHORTCUT_OPTIONS = [

@@ -34,7 +34,6 @@ export const enCommon: Record<string, string> = {
   helpCenter: 'Help Center',
   inDevelopment: 'In development',
   refresh: 'Refresh',
-  triageTab: 'Model Routing',
   testMode: 'Test Mode',
   getApiKey: 'Get API Key',
   visitOfficialSite: 'Visit official site',

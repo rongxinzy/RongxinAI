@@ -34,7 +34,6 @@ export const zhCommon: Record<string, string> = {
   helpCenter: '帮助中心',
   inDevelopment: '正在开发中',
   refresh: '刷新',
-  triageTab: '模型路由',
   testMode: '测试模式',
   getApiKey: '获取 API Key',
   visitOfficialSite: '访问官网',
