@@ -37,6 +37,8 @@ import type { PiSessionEvent } from './piTranslate/piEvents';
 import {
   closeOpenTextAndReasoningParts,
   setStreamedAssistantText,
+  synthesizeReasoningDeltaChunks,
+  synthesizeTextDeltaChunks,
   translatePiSessionEventToUiChunks,
 } from './piTranslate/piTranslateUiMessageChunk';
 import type { UIMessageChunk } from 'ai';
@@ -205,15 +207,19 @@ export class PiRuntimeTurnEvents {
         }
         // Translate this event before touching session state: its delta
         // lengths let us classify the new accumulated text as an append with
-        // an O(1) length check (no startsWith scan over the whole transcript,
-        // so per-delta CPU stays independent of content length). message_end
-        // remains the final authority for the complete text.
+        // an O(segment count) structural check over the accumulator's segment
+        // tables — no character access that would flatten the accumulated cons
+        // strings, so per-delta CPU stays independent of content length.
+        // message_end remains the final authority for the complete text.
         const chunks = this.translatePiEvent(active, event);
         let textDeltaLen = 0;
         let reasoningDeltaLen = 0;
         for (const chunk of chunks) {
-          if (chunk.type === 'text-delta') textDeltaLen += chunk.delta.length;
-          else if (chunk.type === 'reasoning-delta') reasoningDeltaLen += chunk.delta.length;
+          if (chunk.type === 'text-delta') {
+            textDeltaLen += chunk.delta.length;
+          } else if (chunk.type === 'reasoning-delta') {
+            reasoningDeltaLen += chunk.delta.length;
+          }
         }
         // Pi 0.84 emits fine-grained assistantMessageEvent deltas. Keep support
         // for older cumulative snapshots, then reconcile against message_end.
@@ -245,6 +251,31 @@ export class PiRuntimeTurnEvents {
             chunk => chunk.type !== 'reasoning-start' && chunk.type !== 'reasoning-delta',
           );
         };
+        // Both snapshot paths share this shape: close open stream parts,
+        // reseed the renderer with one authoritative full-text snapshot, and
+        // drop this event's start/delta chunks for that part — the snapshot
+        // already contains their content.
+        const emitReasoningSnapshot = (messageId: string, content: string): void => {
+          this.emitChunks(
+            sessionId,
+            active,
+            closeOpenTextAndReasoningParts(active.piTranslatorState),
+          );
+          this.host.emit('uiStreamSnapshot', sessionId, messageId, content);
+          dropReasoningStartAndDelta();
+        };
+        const emitAnswerSnapshot = (messageId: string, content: string): void => {
+          this.emitChunks(
+            sessionId,
+            active,
+            closeOpenTextAndReasoningParts(active.piTranslatorState),
+          );
+          // Reseed the translator so later deltas are relative to the
+          // rewritten text; message_end gap-fill compares against this value.
+          setStreamedAssistantText(active.piTranslatorState, content);
+          this.host.emit('uiStreamSnapshot', sessionId, messageId, content);
+          dropTextStartAndDelta();
+        };
 
         if (thinking && thinking !== active.thinkingText) {
           active.thinkingText = thinking;
@@ -255,20 +286,40 @@ export class PiRuntimeTurnEvents {
             'thinking',
             thinking,
           );
+          // B1: the append classification uses only lengths and segment
+          // structure (O(segment count)); reading characters (endsWith,
+          // charCodeAt, ===) would flatten the accumulated cons strings in
+          // O(N) per delta. This is a structural check, not a byte-by-byte
+          // comparison: an equal-length rewrite inside a single segment is not
+          // detectable, but Pi's delta events are by definition prior+delta,
+          // genuine rewrites arrive as delta-less message_updates, and
+          // message_end re-asserts the authoritative full text over the
+          // terminal channel — so a miss only affects the live view mid-stream
+          // and the final state corrects it.
           const thinkingAppendOnly =
-            reasoningDeltaLen > 0 && thinking.length === priorThinking.length + reasoningDeltaLen;
-          if (priorThinking.length > 0 && !thinkingAppendOnly) {
-            // Non-prefix rewrite of the thinking text: close the open stream
-            // parts first, then reseed the renderer with one snapshot. The
-            // snapshot already contains this event's reasoning deltas, so they
-            // are dropped here instead of being sent twice.
-            this.emitChunks(
-              sessionId,
-              active,
-              closeOpenTextAndReasoningParts(active.piTranslatorState),
-            );
-            this.host.emit('uiStreamSnapshot', sessionId, thinkingId, thinking);
-            dropReasoningStartAndDelta();
+            reasoningDeltaLen > 0 &&
+            thinking.length === priorThinking.length + reasoningDeltaLen &&
+            active.streamAccumulator.lastUpdateAppendedOnly('thinking', reasoningDeltaLen);
+          if (reasoningDeltaLen === 0) {
+            // B2: delta-less cumulative snapshot. The equal case
+            // (`thinking === prior`) is excluded by the guard above and sends
+            // nothing. A pure suffix extension is converted into synthesized
+            // reasoning increments (reasoning-start when no part is open, then
+            // the real suffix delta); only a genuine non-prefix rewrite falls
+            // back to a snapshot. startsWith is O(N) but runs only on
+            // delta-less events, never per delta.
+            const thinkingExtendsPrior =
+              (priorThinking.length === 0 && thinking.length > 0) ||
+              (thinking.length > priorThinking.length && thinking.startsWith(priorThinking));
+            if (thinkingExtendsPrior) {
+              outgoing = outgoing.concat(
+                synthesizeReasoningDeltaChunks(active.piTranslatorState, priorThinking, thinking),
+              );
+            } else {
+              emitReasoningSnapshot(thinkingId, thinking);
+            }
+          } else if (priorThinking.length > 0 && !thinkingAppendOnly) {
+            emitReasoningSnapshot(thinkingId, thinking);
           }
           this.host.transcript.streamInto(sessionId, active, 'thinking', thinking);
         }
@@ -281,22 +332,32 @@ export class PiRuntimeTurnEvents {
           this.host.transcript.finalizeActiveThinking(sessionId, active);
           active.answerText = text;
           const answerId = this.host.transcript.ensureMessage(sessionId, active, 'answer', text);
+          // B1: same structural length/segment check as the thinking side;
+          // see the comment above.
           const answerAppendOnly =
-            textDeltaLen > 0 && text.length === priorAnswer.length + textDeltaLen;
-          if (priorAnswer.length > 0 && !answerAppendOnly) {
-            // Non-prefix rewrite of the answer: close the open stream parts,
-            // reseed the translator so later deltas are relative to the
-            // rewritten text, then reseed the renderer with one snapshot.
-            // This event's text start/deltas are already inside the snapshot
-            // and are dropped to avoid duplicating them.
-            this.emitChunks(
-              sessionId,
-              active,
-              closeOpenTextAndReasoningParts(active.piTranslatorState),
-            );
-            setStreamedAssistantText(active.piTranslatorState, text);
-            this.host.emit('uiStreamSnapshot', sessionId, answerId, text);
-            dropTextStartAndDelta();
+            textDeltaLen > 0 &&
+            text.length === priorAnswer.length + textDeltaLen &&
+            active.streamAccumulator.lastUpdateAppendedOnly('text', textDeltaLen);
+          if (textDeltaLen === 0) {
+            // B2: delta-less cumulative snapshot of the answer. Equal text is
+            // excluded above (nothing is sent). A pure suffix extension is
+            // synthesized as increments — text-start when the translator has
+            // no open text part, then the real suffix delta — and
+            // streamedAssistantText is advanced so message_end gap-fill only
+            // appends the true trailing suffix. startsWith stays O(N) but is
+            // confined to delta-less events.
+            const answerExtendsPrior =
+              (priorAnswer.length === 0 && text.length > 0) ||
+              (text.length > priorAnswer.length && text.startsWith(priorAnswer));
+            if (answerExtendsPrior) {
+              outgoing = outgoing.concat(
+                synthesizeTextDeltaChunks(active.piTranslatorState, priorAnswer, text),
+              );
+            } else {
+              emitAnswerSnapshot(answerId, text);
+            }
+          } else if (priorAnswer.length > 0 && !answerAppendOnly) {
+            emitAnswerSnapshot(answerId, text);
           }
           this.host.transcript.streamInto(sessionId, active, 'answer', text);
         }

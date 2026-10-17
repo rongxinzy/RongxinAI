@@ -96,6 +96,14 @@ export class LiveTextStore {
   }
 
   applyChunk(messageId: string, chunk: UIMessageChunk, sessionId?: string): void {
+    // N4 hardening: a malformed delta payload (delta not a string) must not
+    // create or mutate an entry — drop it before any state is touched.
+    if (
+      (chunk.type === 'text-delta' || chunk.type === 'reasoning-delta') &&
+      typeof chunk.delta !== 'string'
+    ) {
+      return;
+    }
     const entry = this.ensureEntry(messageId, sessionId);
     // After a gap we wait for the resync base snapshot; increments would
     // otherwise render text that is missing its prefix.

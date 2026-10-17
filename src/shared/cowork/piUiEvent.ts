@@ -272,12 +272,29 @@ export const isPiUiEvent = (value: unknown): value is PiUiEvent => {
       );
     case PiUiEventType.StreamPart: {
       const chunk = candidate.chunk;
-      return (
-        isSessionId(candidate.sessionId) &&
-        isNonEmptyString(candidate.messageId) &&
-        isRecord(chunk) &&
-        typeof chunk.type === 'string'
-      );
+      if (
+        !isSessionId(candidate.sessionId) ||
+        !isNonEmptyString(candidate.messageId) ||
+        !isRecord(chunk) ||
+        typeof chunk.type !== 'string'
+      ) {
+        return false;
+      }
+      // Part-scoped chunks must carry a part id; deltas additionally must
+      // carry their incremental payload as a string. Other chunk types keep
+      // the previous lenient shape check.
+      switch (chunk.type) {
+        case 'text-start':
+        case 'text-end':
+        case 'reasoning-start':
+        case 'reasoning-end':
+          return isNonEmptyString(chunk.id);
+        case 'text-delta':
+        case 'reasoning-delta':
+          return isNonEmptyString(chunk.id) && typeof chunk.delta === 'string';
+        default:
+          return true;
+      }
     }
     case PiUiEventType.ToolActivity:
       return isSessionId(candidate.sessionId) && isToolActivityEvent(candidate.event);

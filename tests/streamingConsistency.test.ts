@@ -27,6 +27,7 @@ import {
   type PiStreamEvent,
   type StreamingHarness,
 } from './helpers/streamingPipelineHarness';
+import { PiUiEventType } from '../src/shared/cowork/piUiEvent';
 import { CoworkRunPolicy } from '../src/shared/cowork/runState';
 import { describe, expect, it } from 'vitest';
 
@@ -441,5 +442,93 @@ describe('Cowork streaming consistency C1–C4 (real end-to-end pipeline)', () =
       expect(answer?.metadata?.isStreaming, 'C4: isStreaming').toBe(false);
       expect(framesChecked, 'C4: mid-stream frame coverage').toBeGreaterThan(0);
     });
+  }, 60_000);
+
+  it('C8/B2: delta-less cumulative snapshots stream incrementally, never as snapshots (20 seeds)', async () => {
+    const seedCount = 20;
+    for (let seed = 0; seed < seedCount; seed += 1) {
+      const sessionId = `seed-c8-${seed}`;
+      await withStreamingHarness(sessionId, harness => {
+        const random = mulberry32(0x5eed_c800 + seed * 101);
+        const builder = new PiTurnBuilder(random);
+        const finalText = buildCorpus(420 + Math.floor(random() * 580), random);
+        const updates = 30 + Math.floor(random() * 31); // 30–60 snapshots
+        // Cumulative prefixes: strictly growing, each one a prefix of the
+        // next and of the final text.
+        const prefixes: string[] = [];
+        for (let i = 1; i <= updates; i += 1) {
+          prefixes.push(finalText.slice(0, Math.floor((finalText.length * i) / updates)));
+        }
+        const streamEvents: PiStreamEvent[] = [
+          builder.agentStart(),
+          builder.turnStart(),
+          builder.messageStart(),
+          // Establish the (empty) text part first; its text_start may be
+          // emitted. All content below arrives WITHOUT assistantMessageEvent.
+          builder.beginTextPart(0),
+        ];
+        for (const prefix of prefixes) {
+          // rewriteText emits a message_update with NO assistantMessageEvent —
+          // exactly the delta-less cumulative snapshot shape B2 must handle.
+          streamEvents.push(builder.rewriteText(prefix));
+        }
+        const endEvents: PiStreamEvent[] = [
+          builder.messageEnd('stop'),
+          builder.turnEnd(),
+          builder.agentEnd(),
+          builder.agentSettled(),
+        ];
+
+        // (b) every rendered frame must stay a prefix of the final text.
+        let framesChecked = 0;
+        harness.onFrame(() => {
+          const answerId = harness.answerMessageIds()[0];
+          if (answerId === undefined) return;
+          const shown = harness.displayed(answerId);
+          if (shown === undefined) return;
+          framesChecked += 1;
+          assertPrefixOf(shown, finalText, `C8 seed ${seed} frame`);
+        });
+
+        // First batch: scaffolding + the first cumulative snapshots. Live
+        // text must already be non-empty — snapshots may not sit idle until
+        // message_end.
+        harness.emitBatch(streamEvents.slice(0, 6), 16);
+        harness.runFrames();
+        const answerId = requireFirstId(
+          harness.answerMessageIds(),
+          `C8 seed ${seed}: answer message`,
+        );
+        const earlyShown = harness.displayed(answerId);
+        expect(
+          earlyShown,
+          `C8 seed ${seed}: live text non-empty after the first batch`,
+        ).toBeTruthy();
+        assertPrefixOf(earlyShown ?? '', finalText, `C8 seed ${seed}: early live text`);
+
+        // Remaining snapshots in grouped coalescer windows.
+        emitGrouped(harness, streamEvents.slice(6), random, 3, 9);
+        harness.runFrames();
+        expect(
+          harness.displayed(answerId),
+          `C8 seed ${seed}: full text live before message_end`,
+        ).toBe(finalText);
+        expect(framesChecked, `C8 seed ${seed}: frame coverage`).toBeGreaterThan(0);
+
+        // (a) the stream must be incremental: no full-text ContentPatch may
+        // have crossed IPC for this session before message_end.
+        expect(
+          harness.sessionIpcEvents().filter(event => event.type === PiUiEventType.ContentPatch),
+          `C8 seed ${seed}: no ContentPatch before message_end`,
+        ).toHaveLength(0);
+
+        // (c) terminal state: authoritative content, not streaming.
+        harness.emitBatch(endEvents, 16);
+        harness.settle();
+        const answer = harness.message(answerId);
+        expect(answer?.content, `C8 seed ${seed}: final content`).toBe(finalText);
+        expect(answer?.metadata?.isStreaming, `C8 seed ${seed}: isStreaming`).toBe(false);
+      });
+    }
   }, 60_000);
 });

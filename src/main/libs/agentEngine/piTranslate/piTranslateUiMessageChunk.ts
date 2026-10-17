@@ -176,6 +176,66 @@ export function setStreamedAssistantText(state: PiTranslatorState, text: string)
 }
 
 /**
+ * Stream increments for a delta-less cumulative `message_update` whose text
+ * extends the prior text by a pure suffix (older Pi builds send these). Part
+ * transitions mirror the `text_delta` branch of the translator: an open
+ * reasoning part is closed and a text part is opened with `newId()` when none
+ * is open. `streamedAssistantText` advances so `message_end` gap-fill only
+ * sends the real trailing suffix. Callers guarantee `text` starts with
+ * `priorText` and is longer.
+ */
+export function synthesizeTextDeltaChunks(
+  state: PiTranslatorState,
+  priorText: string,
+  text: string,
+): UIMessageChunk[] {
+  const parts: UIMessageChunk[] = [];
+  if (state.reasoningStarted && state.currentReasoningId) {
+    parts.push({ type: 'reasoning-end', id: state.currentReasoningId });
+    state.reasoningStarted = false;
+    state.currentReasoningId = undefined;
+  }
+  if (!state.currentTextId) {
+    state.currentTextId = newId();
+    parts.push({ type: 'text-start', id: state.currentTextId });
+  }
+  parts.push({ type: 'text-delta', id: state.currentTextId, delta: text.slice(priorText.length) });
+  setStreamedAssistantText(state, text);
+  return parts;
+}
+
+/**
+ * Reasoning counterpart of `synthesizeTextDeltaChunks`, mirroring the
+ * translator's `thinking_delta` branch (close an open text part, then open or
+ * reuse the reasoning part). The translator keeps no streamed-reasoning
+ * record, so only part state advances.
+ */
+export function synthesizeReasoningDeltaChunks(
+  state: PiTranslatorState,
+  priorText: string,
+  text: string,
+): UIMessageChunk[] {
+  const parts: UIMessageChunk[] = [];
+  if (state.currentTextId) {
+    parts.push({ type: 'text-end', id: state.currentTextId });
+    state.currentTextId = undefined;
+  }
+  if (!state.currentReasoningId) {
+    state.currentReasoningId = newId();
+  }
+  if (!state.reasoningStarted) {
+    state.reasoningStarted = true;
+    parts.push({ type: 'reasoning-start', id: state.currentReasoningId });
+  }
+  parts.push({
+    type: 'reasoning-delta',
+    id: state.currentReasoningId,
+    delta: text.slice(priorText.length),
+  });
+  return parts;
+}
+
+/**
  * Pi's `tool_execution_end` event payload (`result`) is a Pi `AgentToolResult`
  * envelope `{ content: (TextContent | ImageContent)[], details, terminate? }`.
  * The `tool_result` event uses a flat shape with `content` and `details` at

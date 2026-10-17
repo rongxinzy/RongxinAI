@@ -31,18 +31,106 @@ interface PiStreamSegment {
   content: string;
 }
 
+/** [contentIndex, contentLength] pairs, kept sorted by ascending contentIndex. */
+type PiStreamSegmentLengths = ReadonlyArray<readonly [number, number]>;
+
+/** Per-kind segment length tables captured around a single mutation. */
+interface PiStreamLengthTables {
+  text: PiStreamSegmentLengths;
+  thinking: PiStreamSegmentLengths;
+}
+
+const EMPTY_LENGTH_TABLES: PiStreamLengthTables = { text: [], thinking: [] };
+
+function sameSegmentLengths(a: PiStreamSegmentLengths, b: PiStreamSegmentLengths): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const entryA = a[i];
+    const entryB = b[i];
+    if (entryA === undefined || entryB === undefined) return false;
+    if (entryA[0] !== entryB[0] || entryA[1] !== entryB[1]) return false;
+  }
+  return true;
+}
+
+function lastSegmentEntry(lengths: PiStreamSegmentLengths): readonly [number, number] | undefined {
+  return lengths.length > 0 ? lengths[lengths.length - 1] : undefined;
+}
+
 /**
  * Accumulates Pi 0.84 delta-only message updates while retaining a snapshot
  * fallback for older embedded event producers. message_end remains authoritative.
+ *
+ * The append-only bookkeeping reads only segment indices and string lengths,
+ * never character content. The accumulated text is assembled by
+ * `content + delta` and snapshot()'s `text += segment.content`, i.e. V8 cons
+ * strings; any character access (charCodeAt, startsWith, endsWith, ===) first
+ * flattens the whole rope, which is O(N) per delta. `.length` is a header
+ * read on a cons string, so the recorded length tables cost O(segment count)
+ * per update and stay independent of content size.
  */
 export class PiStreamAccumulator {
   private readonly segments = new Map<number, PiStreamSegment>();
+  private priorLengthTables: PiStreamLengthTables = EMPTY_LENGTH_TABLES;
+  private currentLengthTables: PiStreamLengthTables = EMPTY_LENGTH_TABLES;
 
   reset(): void {
     this.segments.clear();
+    this.priorLengthTables = EMPTY_LENGTH_TABLES;
+    this.currentLengthTables = EMPTY_LENGTH_TABLES;
   }
 
   update(
+    event: PiAssistantMessageEvent | undefined,
+    snapshotMessage?: PiStreamMessage,
+  ): PiStreamSnapshot {
+    const before = this.captureLengthTables();
+    const result = this.applyUpdate(event, snapshotMessage);
+    this.priorLengthTables = before;
+    this.currentLengthTables = this.captureLengthTables();
+    return result;
+  }
+
+  reconcile(message?: PiStreamMessage): PiStreamSnapshot {
+    const before = this.captureLengthTables();
+    this.replaceFromSnapshot(message);
+    this.priorLengthTables = before;
+    this.currentLengthTables = this.captureLengthTables();
+    return this.snapshot();
+  }
+
+  /**
+   * Structural append-only verdict for the most recent update()/reconcile().
+   * True iff every segment of `kind` except the last one kept its index and
+   * length, and the last one either is the previous last segment grown by
+   * exactly `deltaLength`, or is a brand-new trailing segment holding exactly
+   * `deltaLength` characters with the previous last segment untouched. Only
+   * numbers are compared; segment content is never read (see the class
+   * comment for why).
+   */
+  lastUpdateAppendedOnly(kind: 'text' | 'thinking', deltaLength: number): boolean {
+    if (deltaLength <= 0) return false;
+    const before = this.priorLengthTables[kind];
+    const after = this.currentLengthTables[kind];
+    const lastBefore = lastSegmentEntry(before);
+    const lastAfter = lastSegmentEntry(after);
+    if (lastAfter === undefined) return false;
+    if (lastBefore !== undefined && lastAfter[0] === lastBefore[0]) {
+      return (
+        after.length === before.length &&
+        lastAfter[1] === lastBefore[1] + deltaLength &&
+        sameSegmentLengths(before.slice(0, -1), after.slice(0, -1))
+      );
+    }
+    return (
+      after.length === before.length + 1 &&
+      (lastBefore === undefined || lastAfter[0] > lastBefore[0]) &&
+      lastAfter[1] === deltaLength &&
+      sameSegmentLengths(before, after.slice(0, -1))
+    );
+  }
+
+  private applyUpdate(
     event: PiAssistantMessageEvent | undefined,
     snapshotMessage?: PiStreamMessage,
   ): PiStreamSnapshot {
@@ -87,9 +175,21 @@ export class PiStreamAccumulator {
     return this.snapshot();
   }
 
-  reconcile(message?: PiStreamMessage): PiStreamSnapshot {
-    this.replaceFromSnapshot(message);
-    return this.snapshot();
+  private captureLengthTables(): PiStreamLengthTables {
+    const text: Array<[number, number]> = [];
+    const thinking: Array<[number, number]> = [];
+    for (const [index, segment] of this.segments) {
+      // Reading `.length` on a cons string is a header read; it never
+      // flattens the content.
+      if (segment.kind === PiStreamSegmentKind.Text) {
+        text.push([index, segment.content.length]);
+      } else {
+        thinking.push([index, segment.content.length]);
+      }
+    }
+    text.sort(([a], [b]) => a - b);
+    thinking.sort(([a], [b]) => a - b);
+    return { text, thinking };
   }
 
   private startSegment(index: number, kind: PiStreamSegmentKindType): void {
