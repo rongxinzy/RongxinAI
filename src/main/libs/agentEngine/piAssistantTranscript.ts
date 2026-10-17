@@ -75,12 +75,7 @@ export class PiAssistantTranscript {
       if (this.host.getStore()) {
         this.host
           .getStore()
-          .updateMessage(
-            sessionId,
-            messageId,
-            { metadata },
-            { touchUpdatedAt: false },
-          );
+          .updateMessage(sessionId, messageId, { metadata }, { touchUpdatedAt: false });
       }
       this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
     }
