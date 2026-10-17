@@ -70,11 +70,7 @@ source line-limit gate (1000 lines; shrinking-only baseline for legacy files), a
 binary size gate with an explicit asset allowlist. Do not require conditional platform jobs
 directly on branch protection.
 
-All PRs, including documentation, require one independent GitHub approval. New
-commits dismiss stale approvals; the latest push must be approved by another person.
-Resolve review threads before merging. Only repository administrators may bypass review through a pull request; other
-roles may not. CI, force-push and deletion rules have no administrator bypass. The former author-specific
-`author-review-gate` is replaced by these uniform server-side review requirements.
+Default-branch PRs require **`ci-gate` only**; formal GitHub approval is **not** required (see [DEVOPS.md](../DEVOPS.md)). Review threads are not a merge blocker on the default branch. Force-push and branch deletion remain disallowed; CI has no administrator bypass for those rules.
 
 See [DEVOPS.md](../DEVOPS.md) for PR titles, descriptions, bug-fix evidence and the
 [team Project](https://github.com/orgs/rongxinzy/projects/2) for owners and status.
