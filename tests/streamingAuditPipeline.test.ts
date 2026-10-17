@@ -275,9 +275,35 @@ describe('streaming audit pipeline', () => {
     }
   });
 
+  it('A17 exhausted retry without a second message_end clears streaming via flushPendingError', async () => {
+    const sessionId = 'audit-a17';
+    const { store, cleanup, harness } = await createAuditHarness(sessionId);
+    const partial = 'Partial before retry exhausts';
+    try {
+      const b1 = new PiTurnBuilder();
+      harness.emitPi(b1.agentStart());
+      harness.emitPi(b1.turnStart());
+      harness.emitPi(b1.messageStart());
+      streamText(harness, b1, 0, partial);
+      emitAssistantError(harness, b1, '503 Service Unavailable');
+      harness.emitPi({ type: 'agent_end', messages: [], willRetry: true });
+      harness.emitPi({ type: 'auto_retry_start', attempt: 1 });
+      const b2 = new PiTurnBuilder();
+      harness.emitPi(b2.turnStart());
+      harness.emitPi({ type: 'agent_end', messages: [], willRetry: false });
+      harness.emitPi({ type: 'auto_retry_end', success: false, attempt: 1, finalError: '503' });
+      harness.emitPi(b2.agentSettled());
+      harness.settle();
+      expect(dbAssistants(store, sessionId).every(row => !row.streaming)).toBe(true);
+    } finally {
+      harness.dispose();
+      cleanup();
+    }
+  });
+
   it('retry turn_start keeps visible text before new deltas arrive', async () => {
     const sessionId = 'audit-retry-visible';
-    const { harness } = await createAuditHarness(sessionId);
+    const { harness, store, cleanup } = await createAuditHarness(sessionId);
     const partial = 'Part';
     const recovered = 'Recovered';
     try {
@@ -305,6 +331,8 @@ describe('streaming audit pipeline', () => {
       harness.runFrames();
       const shownAtRetry = assistantRows(harness).find(row => !row.thinking)?.shown ?? '';
       expect(shownAtRetry).toBe(partial);
+      const dbAtRetry = dbAssistants(store, sessionId).find(row => !row.thinking);
+      expect(dbAtRetry?.content).toBe(partial);
       harness.emitPi({
         type: 'message_update',
         message: { role: 'assistant', content: [{ type: 'text', text: recovered }] },
@@ -330,6 +358,7 @@ describe('streaming audit pipeline', () => {
       ).toBe(true);
     } finally {
       harness.dispose();
+      cleanup();
     }
   });
 });

@@ -161,6 +161,15 @@ describe('GLM Pi replay fixtures', () => {
         harness.emitPi(event);
         harness.tick(2);
         harness.runFrames();
+        if (
+          seenRetry &&
+          (event as { type?: string }).type === 'turn_start' &&
+          harness.dbMessages().filter(message => message.type === 'assistant').length === 1
+        ) {
+          expect(
+            harness.dbMessages().find(message => message.type === 'assistant')?.content,
+          ).toBe('Part');
+        }
         for (const messageId of harness.answerMessageIds()) {
           const length = (harness.displayed(messageId) ?? '').length;
           if (

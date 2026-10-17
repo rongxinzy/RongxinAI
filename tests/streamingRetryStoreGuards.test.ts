@@ -44,8 +44,7 @@ describe('streaming retry store guards', () => {
           errorMessage: '401 Unauthorized: invalid api key',
         },
       });
-      listener!({ type: 'agent_end' });
-      listener!({ type: 'agent_settled' });
+      listener!({ type: 'turn_end' });
 
       const afterError = store.getSession('a9-session', null, {
         includeArtifacts: false,
