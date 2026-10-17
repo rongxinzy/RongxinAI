@@ -23,15 +23,6 @@ export function registerTriageIpcHandlers(options: { getStore: () => SqliteStore
   });
 }
 
-export function getTriageConfig(store: SqliteStore): TriageConfig {
-  const stored = store.get<TriageConfig>(TRIAGE_CONFIG_KEY);
-  if (stored && typeof stored === 'object' && typeof stored.enabled === 'boolean') {
-    return sanitizeTriageConfig(stored);
-  }
-  store.set(TRIAGE_CONFIG_KEY, DEFAULT_TRIAGE_CONFIG);
-  return DEFAULT_TRIAGE_CONFIG;
-}
-
 function sanitizeTriageConfig(raw: unknown): TriageConfig {
   if (!raw || typeof raw !== 'object') return DEFAULT_TRIAGE_CONFIG;
   const input = raw as Record<string, unknown>;

@@ -1,2 +1,2 @@
-export type { ChannelName, Platform, PlatformDef } from './constants';
+export type { Platform } from './constants';
 export { PlatformRegistry } from './constants';

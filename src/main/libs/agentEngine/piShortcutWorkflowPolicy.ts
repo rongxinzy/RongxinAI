@@ -16,7 +16,7 @@ export type ShortcutWorkflowKind = (typeof ShortcutWorkflowKind)[keyof typeof Sh
 
 export type WorkflowFileRole = 'deliverable' | 'validation' | 'preview';
 
-export interface WorkflowFile {
+interface WorkflowFile {
   path: string;
   role: WorkflowFileRole;
   /** The deliverable a QA record or rendered preview attests to. */

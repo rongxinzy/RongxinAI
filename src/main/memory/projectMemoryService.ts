@@ -17,8 +17,6 @@ import {
 } from '../../shared/memory';
 import {
   EngramSearchMatchMode,
-  LEGACY_MEMORY_FILE_SESSION_ID,
-  LEGACY_MEMORY_SQLITE_SESSION_ID,
   MANUAL_MEMORY_SESSION_ID,
   MemoryOutboxOperation,
   PERSONAL_MEMORY_SESSION_PREFIX,
@@ -140,41 +138,6 @@ export class ProjectMemoryService {
     });
     await this.confirmMemoryCandidate(replacementId);
     return this.requireCandidateOrLink(replacementId);
-  }
-
-  importLegacyPersonalMemoryCandidate(input: {
-    id: string;
-    title: string;
-    content: string;
-    sourceKind:
-      | typeof MemorySourceKind.LegacyFileImport
-      | typeof MemorySourceKind.LegacySqliteImport;
-    metadata: Record<string, unknown>;
-  }): boolean {
-    if (
-      this.repository.hasImportRejection(input.id) ||
-      this.repository.getCandidate(input.id) ||
-      this.repository.getLink(input.id)
-    ) {
-      return false;
-    }
-    this.repository.createPersonalCandidate({
-      id: input.id,
-      projectId: PERSONAL_MEMORY_PROJECT_ID,
-      projectRoot: this.personalDirectory,
-      scope: MemoryScope.Personal,
-      sessionId:
-        input.sourceKind === MemorySourceKind.LegacyFileImport
-          ? LEGACY_MEMORY_FILE_SESSION_ID
-          : LEGACY_MEMORY_SQLITE_SESSION_ID,
-      sourceKind: input.sourceKind,
-      title: input.title,
-      content: input.content,
-      kind: MemoryKind.Preference,
-      sensitivity: MemorySensitivity.Normal,
-      metadata: input.metadata,
-    });
-    return true;
   }
 
   async recallProject(input: { workingDirectory: string; query: string; limit?: number }) {
@@ -554,11 +517,6 @@ export class ProjectMemoryService {
       : null;
   }
 
-  listMigrationRecordsForContext(workingDirectory: string): MemoryMigrationRecord[] {
-    const project = this.resolveIdentity(workingDirectory);
-    return this.repository.listMigrationRecordsForContext(project.id);
-  }
-
   listSessionSummaryBackfillRecords(): MemoryMigrationRecord[] {
     return this.repository.listSessionSummaryBackfillRecords();
   }
@@ -568,10 +526,6 @@ export class ProjectMemoryService {
     metadata: Record<string, unknown>,
   ): void {
     this.repository.updateMigrationRecordMetadata(record.memory.id, record.storageKind, metadata);
-  }
-
-  deleteMigrationCandidate(id: string): void {
-    this.repository.deleteCandidate(id);
   }
 
   listManagedMemories(input: ManagedMemoryListInput = {}): ManagedMemoryRecord[] {
@@ -696,7 +650,7 @@ export class ProjectMemoryService {
         }),
       );
     }
-    if (observations.length === 0 && plan.explicitMemoryIntent) {
+    if (observations.length === 0 && plan.allowRecentFallback) {
       observations = this.filterRecallable(
         input,
         await this.adapter.recent({
@@ -714,7 +668,7 @@ export class ProjectMemoryService {
       input.projectId,
       unique.map(observation => observation.id),
     );
-    return rankRecallResults(plan.exactQuery, unique, metadata).slice(0, limit);
+    return rankRecallResults(plan.broadQuery ?? plan.exactQuery, unique, metadata).slice(0, limit);
   }
 
   private filterRecallable<T extends { id: number; type?: string; session_id?: string }>(

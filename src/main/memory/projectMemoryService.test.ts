@@ -320,32 +320,6 @@ test('records an import rejection before permanently forgetting a confirmed lega
   expect(repository.deleteLink).toHaveBeenCalledWith(link.id);
 });
 
-test('does not reimport a legacy entry with a rejection receipt', () => {
-  const repository = {
-    hasImportRejection: vi.fn(() => true),
-    getCandidate: vi.fn(),
-    getLink: vi.fn(),
-    createPersonalCandidate: vi.fn(),
-  };
-  const service = new ProjectMemoryService(
-    repository as never,
-    {} as never,
-    identityFor,
-    TEST_PERSONAL_DIRECTORY,
-  );
-
-  expect(
-    service.importLegacyPersonalMemoryCandidate({
-      id: 'legacy-memory:rejected',
-      title: 'Rejected memory',
-      content: 'Do not import this again.',
-      sourceKind: MemorySourceKind.LegacySqliteImport,
-      metadata: {},
-    }),
-  ).toBe(false);
-  expect(repository.createPersonalCandidate).not.toHaveBeenCalled();
-});
-
 test('edits active manual memory by confirming a superseding candidate', async () => {
   const current = {
     id: 'current-link',

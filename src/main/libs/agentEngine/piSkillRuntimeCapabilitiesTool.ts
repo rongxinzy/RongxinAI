@@ -3,7 +3,7 @@ import {
   type SkillRuntimeCapabilities,
 } from '../skillRuntimeCapabilities';
 
-export const PiSkillRuntimeCapabilitiesToolName = 'skill_runtime_capabilities';
+const PiSkillRuntimeCapabilitiesToolName = 'skill_runtime_capabilities';
 
 type SkillRuntimeCapabilitiesToolResult = {
   content: Array<{ type: 'text'; text: string }>;

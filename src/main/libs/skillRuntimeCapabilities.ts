@@ -11,7 +11,7 @@ import { getManagedPythonExecutable } from './pythonRuntime';
 import { findSkillPythonExecutable } from './skillPythonRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
 
-export type SkillRuntimeCapability = {
+type SkillRuntimeCapability = {
   available: boolean;
   executable: string | null;
   version: string | null;

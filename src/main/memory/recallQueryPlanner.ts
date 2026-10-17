@@ -30,6 +30,52 @@ const STOP_WORDS = new Set([
   'do',
   'the',
   'what',
+  'which',
+  'who',
+  'when',
+  'where',
+  'how',
+  'does',
+  'this',
+  'that',
+  'for',
+  'on',
+  'to',
+  'a',
+  'an',
+  'in',
+  'is',
+  'are',
+  'was',
+  'were',
+  'have',
+  'has',
+  'had',
+  'will',
+  'would',
+  'could',
+  'should',
+  'can',
+  'any',
+  'only',
+  'using',
+  'prior',
+  'context',
+  'call',
+  'tools',
+  'not',
+  'with',
+  'from',
+  'into',
+  'your',
+  'our',
+  'their',
+  'already',
+  'one',
+  'short',
+  'sentence',
+  'answer',
+  'team',
 ]);
 
 interface SegmentData {
@@ -49,6 +95,7 @@ export interface RecallQueryPlan {
   exactQuery: string;
   broadQuery: string | null;
   explicitMemoryIntent: boolean;
+  allowRecentFallback: boolean;
 }
 
 export interface RecallRankingMetadata {
@@ -58,14 +105,27 @@ export interface RecallRankingMetadata {
 
 export function planRecallQuery(query: string): RecallQueryPlan {
   const exactQuery = query.trim();
-  const broadQuery = CJK_PATTERN.test(exactQuery) ? buildBroadQuery(exactQuery) : null;
+  if (!exactQuery) {
+    return {
+      exactQuery: '',
+      broadQuery: null,
+      explicitMemoryIntent: false,
+      allowRecentFallback: false,
+    };
+  }
+  const keywordQuery = buildKeywordQuery(exactQuery);
+  const broadQuery =
+    keywordQuery &&
+    (normalizeForComparison(keywordQuery) !== normalizeForComparison(exactQuery) ||
+      countWordLikeTokens(exactQuery) >= 5)
+      ? keywordQuery
+      : null;
+  const explicitMemoryIntent = MEMORY_INTENT_PATTERN.test(exactQuery);
   return {
     exactQuery,
-    broadQuery:
-      broadQuery && normalizeForComparison(broadQuery) !== normalizeForComparison(exactQuery)
-        ? broadQuery
-        : null,
-    explicitMemoryIntent: MEMORY_INTENT_PATTERN.test(exactQuery),
+    broadQuery,
+    explicitMemoryIntent,
+    allowRecentFallback: shouldAllowRecentFallback(exactQuery, explicitMemoryIntent, keywordQuery),
   };
 }
 
@@ -86,25 +146,43 @@ export function rankRecallResults(
   });
 }
 
-function buildBroadQuery(query: string): string | null {
+export function buildKeywordQuery(query: string): string | null {
   const segmenterConstructor = (Intl as typeof Intl & { Segmenter?: SegmenterConstructor })
     .Segmenter;
-  const rawSegments = segmenterConstructor
-    ? [...new segmenterConstructor(['zh', 'ja', 'ko'], { granularity: 'word' }).segment(query)]
-        .filter(item => item.isWordLike !== false)
-        .map(item => item.segment)
+  const rawSegments = CJK_PATTERN.test(query)
+    ? segmenterConstructor
+      ? [...new segmenterConstructor(['zh', 'ja', 'ko'], { granularity: 'word' }).segment(query)]
+          .filter(item => item.isWordLike !== false)
+          .map(item => item.segment)
+      : (query.match(TOKEN_PATTERN) ?? [])
     : (query.match(TOKEN_PATTERN) ?? []);
   const terms = rawSegments
     .flatMap((segment): string[] => [...(segment.match(TOKEN_PATTERN) ?? [])])
     .map(segment => segment.toLocaleLowerCase())
-    .filter(segment => segment.length > 0 && !STOP_WORDS.has(segment));
+    .filter(segment => segment.length > 1 && !STOP_WORDS.has(segment));
   const uniqueTerms = [...new Set(terms)];
   return uniqueTerms.length > 0 ? uniqueTerms.join(' ') : null;
 }
 
+function shouldAllowRecentFallback(
+  query: string,
+  explicitMemoryIntent: boolean,
+  keywordQuery: string | null,
+): boolean {
+  if (explicitMemoryIntent) return true;
+  if (/[?？]/.test(query)) return true;
+  const keywordCount = keywordQuery ? keywordQuery.split(/\s+/).filter(Boolean).length : 0;
+  return keywordCount >= 2 && countWordLikeTokens(query) >= 6;
+}
+
+function countWordLikeTokens(query: string): number {
+  return (query.match(TOKEN_PATTERN) ?? []).length;
+}
+
 function tokenizeForRanking(query: string): string[] {
-  const plan = CJK_PATTERN.test(query) ? buildBroadQuery(query) : query;
-  return [...new Set((plan?.match(TOKEN_PATTERN) ?? []).map(term => term.toLocaleLowerCase()))];
+  const keywordQuery = buildKeywordQuery(query);
+  const source = keywordQuery ?? query;
+  return [...new Set((source.match(TOKEN_PATTERN) ?? []).map(term => term.toLocaleLowerCase()))];
 }
 
 function scoreObservation(

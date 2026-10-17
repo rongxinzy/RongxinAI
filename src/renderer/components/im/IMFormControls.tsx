@@ -1,13 +1,8 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Alert, AlertDescription } from '@shared/components/ui/alert';
 import { Checkbox } from '@shared/components/ui/checkbox';
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from '@shared/components/ui/field';
+import { Field, FieldContent, FieldDescription, FieldLabel } from '@shared/components/ui/field';
+
 import {
   InputGroup,
   InputGroupAddon,
@@ -27,7 +22,7 @@ import { Textarea } from '@shared/components/ui/textarea';
 import { CheckCircle, Eye, EyeOff, XCircle } from 'lucide-react';
 import React from 'react';
 
-export interface IMSelectOption {
+interface IMSelectOption {
   label: string;
   value: string;
 }
@@ -247,10 +242,6 @@ export function IMCheckboxField({
       </FieldContent>
     </Field>
   );
-}
-
-export function IMFormGroup({ children }: { children: React.ReactNode }) {
-  return <FieldGroup className="gap-3">{children}</FieldGroup>;
 }
 
 export function IMConnectionBadge({

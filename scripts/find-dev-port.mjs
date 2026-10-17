@@ -1,7 +1,7 @@
 import net from 'node:net';
 
 export const DEFAULT_DEV_PORT = 5175;
-export const MAX_PORT_ATTEMPTS = 100;
+const MAX_PORT_ATTEMPTS = 100;
 
 /**
  * True when something already accepts connections on the port.

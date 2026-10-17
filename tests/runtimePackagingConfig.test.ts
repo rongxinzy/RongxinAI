@@ -82,6 +82,45 @@ test('unpacks npm for connector installation without a system Node.js runtime', 
   assert.ok(config.asarUnpack?.includes('node_modules/npm/**'));
 });
 
+test('does not package ModelScope token files or source maps', () => {
+  const config = JSON.parse(readFileSync(path.join(root, 'electron-builder.json'), 'utf8')) as {
+    files?: Array<string | { filter?: string[] }>;
+    extraResources?: Array<{ from?: string; to?: string }>;
+  };
+  assert.equal(
+    (config.extraResources ?? []).some(entry =>
+      `${entry.from ?? ''} ${entry.to ?? ''}`.includes('modelscope.tokens'),
+    ),
+    false,
+  );
+
+  const patterns = [
+    '!**/*.map',
+    '!*.map',
+    '!**/*.local.json',
+    '!**/token.json',
+    '!**/tokens.json',
+    '!**/modelscope.tokens*.json',
+  ];
+  for (const pattern of patterns) {
+    assert.equal(config.files?.includes(pattern), true, pattern);
+  }
+  for (const entry of config.files ?? []) {
+    if (typeof entry === 'string' || !entry.filter) continue;
+    assert.equal(entry.filter.includes('!**/*.map'), true);
+    assert.equal(entry.filter.includes('!*.map'), true);
+    assert.equal(entry.filter.includes('!**/*.local.json'), true);
+  }
+
+  const hooks = readFileSync(path.join(root, 'scripts', 'electron-builder-hooks.cjs'), 'utf8');
+  assert.match(hooks, /pinElectronLanguages\(context\.packager\.config\)/);
+  assert.match(hooks, /applyPackagingExcludes\(context\.packager\.config\)/);
+  assert.match(hooks, /assertPackagedApp\(/);
+
+  const packageJson = readFileSync(path.join(root, 'package.json'), 'utf8');
+  assert.doesNotMatch(packageJson, /prepare:modelscope-tokens &&/);
+});
+
 test('unpacks ACP adapters without bundling external agent binaries', () => {
   const config = JSON.parse(readFileSync(path.join(root, 'electron-builder.json'), 'utf8')) as {
     files?: string[];

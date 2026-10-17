@@ -49,7 +49,7 @@ export const AppUpdateIpc = {
   StateChanged: 'appUpdate:stateChanged',
 } as const;
 
-export interface AppUpdateDownloadProgress {
+interface AppUpdateDownloadProgress {
   received: number;
   total: number | undefined;
   percent: number | undefined;
@@ -108,14 +108,3 @@ export interface AppUpdateCheckResult {
 export const APP_UPDATE_POLL_INTERVAL_MS = 12 * 60 * 60 * 1000;
 export const APP_UPDATE_STARTUP_DELAY_MIN_MS = 30 * 1000;
 export const APP_UPDATE_STARTUP_DELAY_JITTER_MS = 60 * 1000;
-
-export const AppUpdateAction = {
-  OpenDownloadPage: 'openDownloadPage',
-  InstallReady: 'installReady',
-  Downloading: 'downloading',
-  RetryDownload: 'retryDownload',
-  RetryInstall: 'retryInstall',
-  None: 'none',
-} as const;
-
-export type AppUpdateAction = (typeof AppUpdateAction)[keyof typeof AppUpdateAction];

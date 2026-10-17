@@ -2,7 +2,6 @@
 
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
 import { cn } from '@shared/lib/utils';
-import * as React from 'react';
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
@@ -43,16 +42,6 @@ function PopoverContent({
   );
 }
 
-function PopoverHeader({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="popover-header"
-      className={cn('theme-popover-header flex flex-col gap-0.5', className)}
-      {...props}
-    />
-  );
-}
-
 function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
   return (
     <PopoverPrimitive.Title
@@ -63,14 +52,4 @@ function PopoverTitle({ className, ...props }: PopoverPrimitive.Title.Props) {
   );
 }
 
-function PopoverDescription({ className, ...props }: PopoverPrimitive.Description.Props) {
-  return (
-    <PopoverPrimitive.Description
-      data-slot="popover-description"
-      className={cn('theme-popover-description', className)}
-      {...props}
-    />
-  );
-}
-
-export { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger };
+export { Popover, PopoverContent, PopoverTitle, PopoverTrigger };

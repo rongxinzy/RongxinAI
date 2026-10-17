@@ -83,13 +83,10 @@ const recipePrimitives = [
   'separator',
   'empty',
   'label',
-  'breadcrumb',
   'scroll-area',
   'avatar',
   'spinner',
   'field',
-  'sonner',
-  'sidebar',
   'progress',
 ];
 const stateAppearance =
@@ -104,7 +101,10 @@ for (const primitive of recipePrimitives) {
       }
     });
 }
-const editorSource = readFileSync(resolve(root, 'src/renderer/components/CodeBlock.tsx'), 'utf8');
+const editorSource = readFileSync(
+  resolve(root, 'src/renderer/components/codeblock/editorTheme.ts'),
+  'utf8',
+);
 for (const match of editorSource.matchAll(/'(\.cm-search-[^']+)'\s*:\s*\{([^}]+)\}/g)) {
   if (
     /\b(?:background(?:Color)?|color|border(?:Color|Radius|Bottom)?|font(?:Size|Family|VariantNumeric)|outline|accentColor|transition)\s*:/.test(
@@ -112,7 +112,7 @@ for (const match of editorSource.matchAll(/'(\.cm-search-[^']+)'\s*:\s*\{([^}]+)
     )
   ) {
     violations.push(
-      `CodeBlock.tsx ${match[1]}: search control appearance must belong to an editor recipe`,
+      `codeblock/editorTheme.ts ${match[1]}: search control appearance must belong to an editor recipe`,
     );
   }
 }

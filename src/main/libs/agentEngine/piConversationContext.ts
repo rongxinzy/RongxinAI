@@ -117,7 +117,7 @@ export const buildPiConversationPrompt = (
 };
 
 /** Default page size for tail-first history reads during session restore. */
-export const PI_HISTORY_RESTORE_PAGE_SIZE = 100;
+const PI_HISTORY_RESTORE_PAGE_SIZE = 100;
 
 /**
  * Same output as buildPiConversationPrompt, but pulls history newest-first in

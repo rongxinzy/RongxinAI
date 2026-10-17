@@ -4,7 +4,7 @@ import path from 'path';
 
 import type { SqliteStore } from '../sqliteStore';
 
-export type EnterpriseUIAction = 'hide' | 'disable' | 'readonly';
+type EnterpriseUIAction = 'hide' | 'disable' | 'readonly';
 
 export type EnterpriseManifest = {
   version: string;

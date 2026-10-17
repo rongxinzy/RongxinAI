@@ -2,7 +2,7 @@ import { request as httpRequest } from 'node:http';
 import { request as httpsRequest, type RequestOptions } from 'node:https';
 import { Readable } from 'node:stream';
 
-export interface PlatformRequest {
+interface PlatformRequest {
   method?: string;
   headers?: Record<string, string>;
   body?: string;

@@ -34,12 +34,6 @@ export interface WireTask {
   updatedAt: string;
 }
 
-export interface TaskModelMapperResult {
-  wire: WireTask;
-  origin: TaskOrigin;
-  binding: ExecutionBinding;
-}
-
 export class TaskModelMapper {
   fromWire(
     wire: WireTask,

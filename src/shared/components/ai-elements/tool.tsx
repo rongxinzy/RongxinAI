@@ -70,7 +70,7 @@ const statusIcons: Record<ToolPart['state'], ReactNode> = {
   [ToolState.OutputError]: <XCircleIcon />,
 };
 
-export const getStatusBadge = (
+const getStatusBadge = (
   status: ToolPart['state'],
   label = i18nService.t(statusLabelKeys[status]),
 ) => (

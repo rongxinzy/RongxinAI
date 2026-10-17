@@ -51,11 +51,6 @@ export interface CoworkContentPatch {
   metadata?: Record<string, unknown>;
 }
 
-export const isTerminalRunPhase = (phase: CoworkRunPhase): boolean =>
-  phase === CoworkRunPhase.Completed ||
-  phase === CoworkRunPhase.Error ||
-  phase === CoworkRunPhase.Stopped;
-
 export const PiRunEvent = {
   AgentStart: 'agent_start',
   AgentEnd: 'agent_end',

@@ -17,9 +17,6 @@ export const CcConnectProtocol = {
   },
 } as const;
 
-export type CcConnectCapability =
-  (typeof CcConnectProtocol.Capability)[keyof typeof CcConnectProtocol.Capability];
-
 export type CcConnectHealth = {
   protocolVersion: string;
   pid: number;

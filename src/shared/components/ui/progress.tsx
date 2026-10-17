@@ -46,24 +46,4 @@ function ProgressIndicator({ className, ...props }: ProgressPrimitive.Indicator.
   );
 }
 
-function ProgressLabel({ className, ...props }: ProgressPrimitive.Label.Props) {
-  return (
-    <ProgressPrimitive.Label
-      className={cn('theme-progress-label', className)}
-      data-slot="progress-label"
-      {...props}
-    />
-  );
-}
-
-function ProgressValue({ className, ...props }: ProgressPrimitive.Value.Props) {
-  return (
-    <ProgressPrimitive.Value
-      className={cn('theme-progress-value ml-auto', className)}
-      data-slot="progress-value"
-      {...props}
-    />
-  );
-}
-
-export { Progress, ProgressIndicator, ProgressLabel, ProgressTrack, ProgressValue };
+export { Progress };

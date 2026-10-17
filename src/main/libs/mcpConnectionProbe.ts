@@ -98,7 +98,7 @@ export async function probeMcpConnection(
   try {
     if (record.transportType === 'stdio') {
       const resolved = await resolveStdioCommand(record);
-      const enhancedEnv = await getEnhancedEnv('local', { includePackageMirrors: true });
+      const enhancedEnv = await getEnhancedEnv({ includePackageMirrors: true });
       const spawnEnv = mergeMcpSpawnEnv(enhancedEnv, resolved.env);
 
       transport = new StdioClientTransport({

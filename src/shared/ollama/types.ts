@@ -1,4 +1,4 @@
-export type OllamaServerStatus =
+type OllamaServerStatus =
   | 'unknown'
   | 'not-installed'
   | 'installing'
@@ -18,7 +18,7 @@ export type OllamaStatusSnapshot = {
   checkedAt: string;
 };
 
-export type OllamaInstallProgressPhase =
+type OllamaInstallProgressPhase =
   | 'detecting'
   | 'preset-found'
   | 'downloading'
@@ -91,7 +91,7 @@ export type OllamaModelLaunchResult = {
   runningModels: OllamaRunningModel[];
 };
 
-export type OllamaChatMessage = {
+type OllamaChatMessage = {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   thinking?: string;

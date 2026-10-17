@@ -19,7 +19,7 @@ import { serializeForLog } from './sanitizeForLog';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
+type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
 export interface StructuredLogger {
   debug: (message: string, extra?: Record<string, unknown>) => void;

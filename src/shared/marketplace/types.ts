@@ -1,10 +1,10 @@
 import type { MarketplaceDeviceProfile } from './constants';
 
-export type MarketplaceSource = 'modelscope-gguf';
+type MarketplaceSource = 'modelscope-gguf';
 
 export type MarketplaceTaskFilter = 'all' | 'chat' | 'reasoning' | 'embedding' | 'code' | 'vision';
 
-export type MarketplaceSizeFilter = 'all' | 'small' | 'desktop' | 'workstation' | 'large';
+type MarketplaceSizeFilter = 'all' | 'small' | 'desktop' | 'workstation' | 'large';
 
 export const MarketplaceCapability = {
   Chat: 'chat',
@@ -54,7 +54,7 @@ export type MarketplaceModel = {
   metadataStatus?: 'verified' | 'pending' | 'unavailable';
 };
 
-export type MarketplaceRuntimeEvidence = {
+type MarketplaceRuntimeEvidence = {
   format: 'gguf';
   status: 'documented' | 'candidate' | 'verified' | 'unsupported';
   architecture?: string;
@@ -69,7 +69,7 @@ export type MarketplaceRuntimeEvidence = {
   reasons: string[];
 };
 
-export type MarketplaceEvidence = {
+type MarketplaceEvidence = {
   source: string;
   kind: 'modelscope' | 'benchmark' | 'runtime' | 'community' | 'license';
   label: string;

@@ -58,7 +58,7 @@ export function assertAncestor(comparison) {
     throw new Error('Source commit is not reachable from main.');
   }
 }
-export async function githubApi(repo, suffix, token = process.env.RUNTIME_ARTIFACT_READ_TOKEN) {
+async function githubApi(repo, suffix, token = process.env.RUNTIME_ARTIFACT_READ_TOKEN) {
   if (!token)
     throw new Error('RUNTIME_ARTIFACT_READ_TOKEN is required for cross-repository artifacts.');
   const response = await fetch(`https://api.github.com/repos/${repo}/${suffix}`, {

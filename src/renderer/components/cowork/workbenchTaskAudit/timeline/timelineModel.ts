@@ -27,7 +27,7 @@ export interface TimelineChapter {
 export const CLUSTER_THRESHOLD = 3;
 
 /** Low-signal event types that collapse into a cluster when they repeat consecutively. */
-export const MINOR_EVENT_TYPES: ReadonlySet<WorkbenchRunEventType> = new Set([
+const MINOR_EVENT_TYPES: ReadonlySet<WorkbenchRunEventType> = new Set([
   WorkbenchRunEventType.ToolRead,
   WorkbenchRunEventType.HarnessProfiled,
   WorkbenchRunEventType.HarnessActivation,

@@ -1,5 +1,3 @@
-import { ModelCapabilityStatus, type ModelCapabilities } from './constants';
-
 export const ProviderModelPiApi = {
   AnthropicMessages: 'anthropic-messages',
   OpenAICompletions: 'openai-completions',
@@ -7,14 +5,14 @@ export const ProviderModelPiApi = {
 } as const;
 export type ProviderModelPiApi = (typeof ProviderModelPiApi)[keyof typeof ProviderModelPiApi];
 
-export const ProviderModelPiMaxTokensField = {
+const ProviderModelPiMaxTokensField = {
   MaxCompletionTokens: 'max_completion_tokens',
   MaxTokens: 'max_tokens',
 } as const;
-export type ProviderModelPiMaxTokensField =
+type ProviderModelPiMaxTokensField =
   (typeof ProviderModelPiMaxTokensField)[keyof typeof ProviderModelPiMaxTokensField];
 
-export const ProviderModelPiThinkingFormat = {
+const ProviderModelPiThinkingFormat = {
   OpenAI: 'openai',
   OpenRouter: 'openrouter',
   DeepSeek: 'deepseek',
@@ -27,44 +25,35 @@ export const ProviderModelPiThinkingFormat = {
   StringThinking: 'string-thinking',
   AntLing: 'ant-ling',
 } as const;
-export type ProviderModelPiThinkingFormat =
+type ProviderModelPiThinkingFormat =
   (typeof ProviderModelPiThinkingFormat)[keyof typeof ProviderModelPiThinkingFormat];
 
-export const ProviderModelPiThinkingBudgetField = {
+const ProviderModelPiThinkingBudgetField = {
   Vllm: 'thinking_token_budget',
   QwenSglang: 'thinking_budget',
   LlamaCpp: 'thinking_budget_tokens',
 } as const;
-export type ProviderModelPiThinkingBudgetField =
+type ProviderModelPiThinkingBudgetField =
   (typeof ProviderModelPiThinkingBudgetField)[keyof typeof ProviderModelPiThinkingBudgetField];
 
-export const ProviderModelPiSessionAffinityFormat = {
+const ProviderModelPiSessionAffinityFormat = {
   OpenAI: 'openai',
   OpenAINoSession: 'openai-nosession',
   OpenRouter: 'openrouter',
 } as const;
-export type ProviderModelPiSessionAffinityFormat =
+type ProviderModelPiSessionAffinityFormat =
   (typeof ProviderModelPiSessionAffinityFormat)[keyof typeof ProviderModelPiSessionAffinityFormat];
 
-export type ProviderModelPiThinkingLevel =
-  | 'off'
-  | 'minimal'
-  | 'low'
-  | 'medium'
-  | 'high'
-  | 'xhigh'
-  | 'max';
-export type ProviderModelPiThinkingLevelMap = Partial<
-  Record<ProviderModelPiThinkingLevel, string | null>
->;
+type ProviderModelPiThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+type ProviderModelPiThinkingLevelMap = Partial<Record<ProviderModelPiThinkingLevel, string | null>>;
 
-export const ProviderModelPiCacheControlFormat = {
+const ProviderModelPiCacheControlFormat = {
   Anthropic: 'anthropic',
 } as const;
-export type ProviderModelPiCacheControlFormat =
+type ProviderModelPiCacheControlFormat =
   (typeof ProviderModelPiCacheControlFormat)[keyof typeof ProviderModelPiCacheControlFormat];
 
-export interface ProviderModelPiRuntimeCompat {
+interface ProviderModelPiRuntimeCompat {
   readonly supportsDeveloperRole?: boolean;
   readonly supportsReasoningEffort?: boolean;
   readonly supportsUsageInStreaming?: boolean;
@@ -93,7 +82,7 @@ export interface ProviderModelPiRuntimeCompat {
 }
 
 /** Cache-safe image preprocessing profile (pi-ai ModelImageResizeOptions). */
-export interface ProviderModelPiImageResize {
+interface ProviderModelPiImageResize {
   readonly maxWidth?: number;
   readonly maxHeight?: number;
   readonly maxBytes?: number;
@@ -101,7 +90,7 @@ export interface ProviderModelPiImageResize {
 }
 
 /** Per-model provider input limits (pi-ai ModelInputLimits). */
-export interface ProviderModelPiInputLimits {
+interface ProviderModelPiInputLimits {
   readonly maxRequestBytes?: number;
   readonly images?: {
     readonly resize?: ProviderModelPiImageResize;
@@ -406,11 +395,4 @@ export function normalizeProviderModelPiRuntimeConfig(
   };
 
   return hasKeys(config) ? config : undefined;
-}
-
-export function resolveProviderModelPiReasoning(
-  piRuntime?: ProviderModelPiRuntimeConfig,
-  capabilities?: Partial<ModelCapabilities>,
-): boolean {
-  return piRuntime?.reasoning ?? capabilities?.reasoning === ModelCapabilityStatus.Supported;
 }

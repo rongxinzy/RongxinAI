@@ -1,7 +1,7 @@
 /** Dev-only: mirror main-process HTTP into renderer DevTools Network via xr-net:// beacons. */
 
 export const DEV_NETWORK_SCHEME = 'xr-net';
-export const DEV_NETWORK_BODY_MAX_CHARS = 16_000;
+const DEV_NETWORK_BODY_MAX_CHARS = 16_000;
 
 export type DevNetworkLogSource = 'api-fetch' | 'page';
 

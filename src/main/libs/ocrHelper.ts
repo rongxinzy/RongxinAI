@@ -21,7 +21,7 @@ export interface BundledOcrHelper {
 }
 
 /** Candidate locations, most specific first: packaged, then dev checkouts. */
-export function resolveBundledOcrScriptCandidates(): string[] {
+function resolveBundledOcrScriptCandidates(): string[] {
   const candidates: string[] = [];
   const packagedRoot = process.resourcesPath;
   if (typeof packagedRoot === 'string' && packagedRoot.length > 0) {

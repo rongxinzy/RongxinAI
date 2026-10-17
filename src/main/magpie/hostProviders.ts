@@ -16,7 +16,7 @@ export interface MagpieHostProvider {
   }[];
 }
 export const HOST_PROVIDER_PREFIX = 'zhiyuan-host-';
-export function assertHostProviderId(id: string): void {
+function assertHostProviderId(id: string): void {
   if (!/^zhiyuan-host-[a-z0-9][a-z0-9-]{0,80}$/.test(id))
     throw new Error('Invalid host model provider id');
 }

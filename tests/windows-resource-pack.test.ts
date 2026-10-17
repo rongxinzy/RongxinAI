@@ -74,6 +74,9 @@ describe('Windows offline component identity', () => {
     expect(shouldExclude('feishu/runtime/win32-x64/lark-cli.exe')).toBe(true);
     expect(shouldExclude('SKILLs/example/node_modules/.bin/example.cmd')).toBe(true);
     expect(shouldExclude('feishu/skills/document/SKILL.md')).toBe(false);
+    expect(shouldExclude('resources/modelscope.tokens.local.json')).toBe(true);
+    expect(shouldExclude('secrets/api.token.json')).toBe(true);
+    expect(shouldExclude('site-packages/patsy/tokens.py')).toBe(false);
   });
 
   test('is stable when only source mtimes change', () => {

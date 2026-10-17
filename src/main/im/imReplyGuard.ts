@@ -71,7 +71,7 @@ export interface IMReplyAnalysis {
   guardApplied: boolean;
 }
 
-export function hasUnbackedReminderCommitment(text: string): boolean {
+function hasUnbackedReminderCommitment(text: string): boolean {
   const normalized = normalizeReplyText(text).toLowerCase();
   if (!normalized) return false;
   if (normalized.includes(REFERENCE_UNSCHEDULED_REMINDER_NOTE.toLowerCase())) return false;
