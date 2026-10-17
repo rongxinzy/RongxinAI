@@ -141,6 +141,7 @@ export const zhMarketplace: Record<string, string> = {
   managedMemoryRetryFailed: '重试记忆传播失败',
   managedMemoryRetryPending: '重试待传播项（{count}）',
   managedMemoryEmptyTitle: '暂无受控记忆',
+  managedMemorySessionEmptyTitle: '暂无会话摘要',
   managedMemoryEmptyDescription: '明确保存的工作区记忆和待确认的个人记忆会显示在这里。',
   managedMemorySessionEmptyDescription: '完成一次有实质内容的对话后，会话摘要会显示在这里。',
   managedMemoryColumnMemory: '记忆',

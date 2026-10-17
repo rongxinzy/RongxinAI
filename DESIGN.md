@@ -1,8 +1,8 @@
 # DESIGN.md - 知远智能体 (ZhiYuan Agent) Zenith Design System
 
-> **Version**: v3.0 (Zenith - Premium Futuristic)  
-> **Date**: 2026-10-16  
-> **Positioning**: P0 mandatory constraint for all frontend work, paired with `AGENTS.md` engineering rules.  
+> **Version**: v3.1 (Zenith - Premium Futuristic, 2026-10-17 polish)
+> **Date**: 2026-10-17
+> **Positioning**: P0 mandatory constraint for all frontend work, paired with `AGENTS.md` engineering rules.
 > **Philosophy**: 清新 (fresh) · 轻盈 (light/airy) · 畅快 (smooth, fluid) · 科技感 (tech-forward)
 
 Zenith is a modern premium design system that balances futuristic aesthetics with desktop efficiency, characterized by subtle glassmorphism, clean typography, efficient spacing, and smooth interactions. Surfaces have depth without distraction, typography is crisp and readable, and the interface feels light yet information-dense.
@@ -394,8 +394,38 @@ Before committing Zenith redesign:
 
 ---
 
+## 十二、2026-10-17 体验修订
+
+本轮修复 Zenith 主题落地后暴露的可见性、层级与密度问题，不改变信息架构。
+
+### 控件可见性
+
+- **开关**：未选中轨道使用 `color-mix(in oklab, var(--zy-foreground) 14%, var(--zy-background))`，描边 `var(--zy-input-border)`，滑块统一为白色；选中轨道使用 `--zy-switch-track-checked`。未选中开关不得再用 `--zy-surface-raised` 作为轨道，滑块不得与轨道同色。
+- **对话框**：内容面使用 `--zy-surface-overlay`，不得使用半透明 `--zy-surface`，避免页面内容透出；遮罩为 20% 黑 + 6px backdrop blur。菜单与弹层继续使用 `--popover`。
+- **侧栏分界**：侧栏 header/footer 的 hairline 使用 `--border`，不得退回到几乎不可见的 `--border-subtle`。
+
+### 布局契约
+
+- **设置页行式面板**（General / Appearance / Shortcuts / Model Routing）内容最大宽度 768px；主题卡片用 auto-fill、单列最小 13rem 排布，单张卡片不得拉伸占满整行。
+- **首页快捷动作**：≥1280px 保持单行居中；更窄时使用 2/3 列网格，保持两行平衡，不得出现右侧孤立末项。
+- **会话阅读列**：对话与输入区共享 `max-w-4xl`（896px）并居中；首页输入岛仍为 `max-w-3xl`（768px）。长文行宽优先保证可读性，工具卡片在列内自适应。
+- **表单弹窗**：至少 448px，字段间距 16px；内容不足时优先加宽（512px）而不是压缩字号或控件。项目名与路径都必须有可见标签。
+
+### 文案与空状态
+
+- 自动化页的新建动作使用「New automation / 新建自动化」，与全局「New Task / 新建任务」区分。
+- 空状态必须有对象与下一步，不能只留空白容器；空状态动作使用共享 Button，不另造控件。
+- 英文计数在单数时使用单数文案（如 `1 turn`，不是 `1 turns`）。
+
+### 验收补充
+
+- 除 1280×800 / 1920×1080 外，另在 1440×900、1024×768、940×700、760×700 检查：无横向溢出、无孤立掉行、输入区控件仍可达。
+- 开关、对话框、空状态、设置行式面板必须浅色/深色成对截图验收；页面内不得出现裸 i18n key 或重复空状态标题。
+
+---
+
 **Design Authority**: This specification is the single source of truth for Zenith design system. Any deviation requires explicit approval and documentation update.
 
-**Version**: 3.0.0-zenith  
-**Last Updated**: 2026-10-16  
+**Version**: 3.1.0-zenith
+**Last Updated**: 2026-10-17
 **Next Review**: Q1 2027

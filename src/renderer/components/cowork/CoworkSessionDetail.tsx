@@ -453,10 +453,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   scrollClassName="cowork-conversation-scroll"
                 >
                   <div ref={scrollContainerRef}>
-                    {renderConversationTurns()}
+                    <div className="mx-auto w-full max-w-4xl">{renderConversationTurns()}</div>
                     {inlineQuestionPermission && onRespondToInlineQuestion && (
                       <div className="px-3 pt-3">
-                        <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
+                        <div className="mx-auto w-full max-w-4xl min-w-[320px] pl-4">
                           <AskUserQuestionCard
                             permission={inlineQuestionPermission}
                             onRespond={onRespondToInlineQuestion}
@@ -469,7 +469,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                       onRespondToInlinePermission &&
                       !hasInlineToolPermissionCard && (
                         <div className="px-3 pt-3">
-                          <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
+                          <div className="mx-auto w-full max-w-4xl min-w-[320px] pl-4">
                             <CoworkPermissionModal
                               permission={inlinePermission}
                               onRespond={onRespondToInlinePermission}
@@ -489,7 +489,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             ref={composerOverlayRef}
             className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"
           >
-            <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
+            <div className="mx-auto w-full max-w-4xl min-w-[320px] pl-4">
               <div className="pointer-events-auto relative min-w-0 rounded-t-3xl bg-background pb-4">
                 <CoworkPromptInput
                   ref={promptInputRef}

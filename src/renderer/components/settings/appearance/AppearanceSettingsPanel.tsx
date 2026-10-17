@@ -100,7 +100,7 @@ export function AppearanceSettingsPanel({
     <div className="space-y-6">
       <section className="space-y-3" aria-label={i18nService.t('themeStyle')}>
         <h4 className="text-base font-semibold">{i18nService.t('themeStyle')}</h4>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,12rem),1fr))] gap-3">
+        <div className="grid max-w-3xl grid-cols-[repeat(auto-fill,minmax(min(100%,13rem),1fr))] gap-3">
           {themePlugins.map(plugin => {
             const isPending = pendingStyleId === plugin.id;
             const isActive = styleId === plugin.id || isPending;

@@ -36,6 +36,7 @@ import {
   type SettingsPageProps,
   type SettingsTabType,
 } from './types';
+import { isCompactSettingsTab } from './constants';
 import { useSettingsTabs } from './useSettingsTabs';
 
 export default function SettingsPage({
@@ -501,7 +502,13 @@ export default function SettingsPage({
               <div className={activeTab === 'model' ? 'block h-full' : 'hidden'}>
                 {activeTab === 'model' && <ModelSettingsPanel />}
               </div>
-              {activeTab !== 'email' && activeTab !== 'model' && renderTabContent()}
+              {activeTab !== 'email' && activeTab !== 'model' && (
+                <div
+                  className={cn('w-full min-w-0', isCompactSettingsTab(activeTab) && 'max-w-3xl')}
+                >
+                  {renderTabContent()}
+                </div>
+              )}
             </div>
 
             {/* Footer buttons */}

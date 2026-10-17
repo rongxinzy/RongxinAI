@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import type { TabType } from './types';
+import type { SettingsTabType, TabType } from './types';
 
 export interface SettingsTabMeta {
   labelKey: string;
@@ -49,6 +49,22 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroupDef[] = [
   { titleKey: 'settingsGroupChannels', tabs: ['im', 'email'] },
   { titleKey: null, tabs: ['about'] },
 ];
+
+/**
+ * Panels made of short label/control rows and a single reading column. Capping
+ * them keeps the control within a comfortable scan distance instead of pinning
+ * it to the far edge of a wide window.
+ */
+const COMPACT_SETTINGS_TABS: readonly SettingsTabType[] = [
+  'general',
+  'appearance',
+  'shortcuts',
+  'triage',
+];
+
+export function isCompactSettingsTab(tab: SettingsTabType): boolean {
+  return COMPACT_SETTINGS_TABS.includes(tab);
+}
 
 export const SEND_SHORTCUT_OPTIONS = [
   { value: 'Enter', label: 'Enter', labelMac: 'Enter' },

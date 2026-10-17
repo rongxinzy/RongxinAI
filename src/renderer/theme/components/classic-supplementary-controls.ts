@@ -13,16 +13,21 @@ export function classicSupplementaryControls(dark: boolean) {
   return {
     switch: recipe({
       base: {
-        'background-color': 'var(--zy-surface-raised)',
-        'box-shadow': 'var(--zy-style-shadow-inset)',
+        // An unchecked switch must stay legible on every surface: a surface-raised
+        // track disappears into white cards and its thumb matched the track in dark.
+        'background-color': 'color-mix(in oklab, var(--zy-foreground) 14%, var(--zy-background))',
+        'box-shadow': 'none',
         'transition-property': 'background-color, box-shadow',
         'transition-duration': '200ms',
         'transition-timing-function': 'ease',
         'border-radius': '9999px',
         'border-width': '1px',
         'border-style': 'solid',
-        'border-color': 'transparent',
+        'border-color': 'var(--zy-input-border)',
         'outline-style': 'none',
+      },
+      hover: {
+        'background-color': 'color-mix(in oklab, var(--zy-foreground) 20%, var(--zy-background))',
       },
       focus,
       invalid: {
@@ -43,13 +48,16 @@ export function classicSupplementaryControls(dark: boolean) {
       },
     }),
     'switch-thumb': recipe({
-      base: { 'border-radius': '9999px', 'background-color': 'var(--zy-style-switch-thumb)' },
+      base: {
+        'border-radius': '9999px',
+        'background-color': 'var(--zy-style-switch-thumb)',
+        'box-shadow': 'var(--zy-style-shadow-xs)',
+      },
     }),
     'switch-checked': recipe({ base: { 'background-color': 'var(--zy-switch-track-checked)' } }),
     'switch-fluid': recipe({
       hover: {
-        'background-color':
-          'color-mix(in oklab, var(--zy-surface-raised), var(--zy-text-primary) 8%)',
+        'background-color': 'color-mix(in oklab, var(--zy-foreground) 20%, var(--zy-background))',
       },
     }),
     'switch-fluid-checked': recipe({

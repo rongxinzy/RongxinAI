@@ -24,6 +24,7 @@ export const enCowork: Record<string, string> = {
   coworkContextUsageTools: 'Tools',
   coworkContextUsageMessages: 'Conversation',
   coworkStatsCounts: '{turns} turns · {steps} steps',
+  coworkStatsCountsOneTurn: '{turns} turn · {steps} steps',
   coworkStatsLlm: 'LLM {duration}',
   coworkStatsTool: 'Tool call {duration}',
   coworkStatsTtft: 'TTFT avg {duration}',
@@ -49,6 +50,9 @@ export const enCowork: Record<string, string> = {
   coworkSystemPromptPlaceholder: 'Set custom instructions for ZhiYuan Agent...',
   coworkSystemPromptHint: "Optional system prompt to customize ZhiYuan Agent's behavior",
   coworkModelSettingsRequired: 'Please configure models and API keys in Model Settings first.',
+  coworkLocalModelsHeading: 'Local models',
+  coworkUseLocalModel: 'Use local model',
+  coworkLocalModelNotReady: 'No local model ready',
   coworkModelSettingsTitle: 'Model Settings',
   coworkModelSettingsHint:
     'ZhiYuan Agent uses the current model and provider configuration from Model Settings.',

@@ -380,6 +380,7 @@ const InlineSkillPromptEditor = forwardRef<HTMLDivElement, InlineSkillPromptEdit
         contentEditable={!disabled}
         suppressContentEditableWarning
         role="textbox"
+        aria-label={placeholder}
         aria-multiline="true"
         aria-placeholder={placeholder}
         data-placeholder={placeholder}
