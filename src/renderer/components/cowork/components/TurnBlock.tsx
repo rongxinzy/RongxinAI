@@ -18,6 +18,7 @@ import {
 import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity';
 import { i18nService } from '../../../services/i18n';
 import { isCoworkTerminalErrorMessage } from '../../../services/coworkTerminalError';
+import { useLiveMessageText } from '../../../services/useLiveMessageText';
 import { ArtifactRole, type Artifact } from '../../../types/artifact';
 import type {
   CoworkMessage,
@@ -52,6 +53,63 @@ const getInterruptionMessage = (interruption: CoworkSessionInterruption): string
     default:
       return i18nService.t('coworkInterruptionUserStop');
   }
+};
+
+/**
+ * Thinking (reasoning) item. Reasoning deltas stream into the LiveTextStore
+ * under the thinking message id (see piRuntimeTurnEvents); Redux only carries
+ * the committed content, so while streaming the live text wins.
+ */
+const ThinkingItem: React.FC<{
+  message: CoworkMessage;
+  isTurnComplete: boolean;
+  mapDisplayText?: (value: string) => string;
+}> = ({ message, isTurnComplete, mapDisplayText }) => {
+  const messageIsStreaming = Boolean(message.metadata?.isStreaming);
+  const liveContent = useLiveMessageText(message.id, messageIsStreaming);
+  const content = liveContent ?? message.content;
+  const { durationSeconds, isComplete, isStreaming } = getThinkingPresentation(
+    message.metadata,
+    isTurnComplete,
+    hasText(content),
+  );
+  const displayContent = mapDisplayText ? mapDisplayText(content) : content;
+  return (
+    <PersistentReasoning
+      persistKey={`reasoning-${message.id}`}
+      isStreaming={isStreaming}
+      defaultOpen={isStreaming}
+      autoClose={false}
+      showConnector
+      duration={durationSeconds}
+    >
+      <ReasoningTrigger
+        getThinkingMessage={(streaming, duration) => {
+          const displayDuration = duration ?? durationSeconds;
+          const text = i18nService
+            .t(
+              isComplete
+                ? displayDuration
+                  ? 'localInferenceThoughtForSeconds'
+                  : 'codingAgentReasoningComplete'
+                : streaming
+                  ? 'codingAgentReasoningActive'
+                  : 'reasoning',
+            )
+            .replace('{seconds}', String(displayDuration ?? 0));
+          if (streaming) {
+            return (
+              <Shimmer as="span" duration={1.5}>
+                {text}
+              </Shimmer>
+            );
+          }
+          return <span>{text}</span>;
+        }}
+      />
+      <ReasoningContent>{displayContent}</ReasoningContent>
+    </PersistentReasoning>
+  );
 };
 
 export const getTurnPrimaryExpert = (
@@ -193,48 +251,13 @@ const TurnBlockComponent: React.FC<{
 
   const renderItem = (item: AssistantTurnItem, index: number) => {
     if (item.type === CoworkMessageType.Assistant && item.message.metadata?.isThinking) {
-      const { durationSeconds, isComplete, isStreaming } = getThinkingPresentation(
-        item.message.metadata,
-        isTurnComplete,
-        hasText(item.message.content),
-      );
-      const content = mapDisplayText ? mapDisplayText(item.message.content) : item.message.content;
       return (
-        <PersistentReasoning
+        <ThinkingItem
           key={item.message.id}
-          persistKey={`reasoning-${item.message.id}`}
-          isStreaming={isStreaming}
-          defaultOpen={isStreaming}
-          autoClose={false}
-          showConnector
-          duration={durationSeconds}
-        >
-          <ReasoningTrigger
-            getThinkingMessage={(streaming, duration) => {
-              const displayDuration = duration ?? durationSeconds;
-              const text = i18nService
-                .t(
-                  isComplete
-                    ? displayDuration
-                      ? 'localInferenceThoughtForSeconds'
-                      : 'codingAgentReasoningComplete'
-                    : streaming
-                      ? 'codingAgentReasoningActive'
-                      : 'reasoning',
-                )
-                .replace('{seconds}', String(displayDuration ?? 0));
-              if (streaming) {
-                return (
-                  <Shimmer as="span" duration={1.5}>
-                    {text}
-                  </Shimmer>
-                );
-              }
-              return <span>{text}</span>;
-            }}
-          />
-          <ReasoningContent>{content}</ReasoningContent>
-        </PersistentReasoning>
+          message={item.message}
+          isTurnComplete={isTurnComplete}
+          mapDisplayText={mapDisplayText}
+        />
       );
     }
     if (item.type === CoworkDisplayItemType.ToolGroup) {
@@ -264,7 +287,13 @@ const TurnBlockComponent: React.FC<{
       );
     }
     if (item.type === CoworkMessageType.System) return renderSystemMessage(item.message);
-    if (item.type === CoworkMessageType.Assistant && hasText(item.message.content)) {
+    // B2: while streaming the answer body lives in the LiveTextStore, so a
+    // streaming answer renders even though its Redux content is still empty.
+    // AssistantBubble hides itself while its display content is blank.
+    if (
+      item.type === CoworkMessageType.Assistant &&
+      (hasText(item.message.content) || Boolean(item.message.metadata?.isStreaming))
+    ) {
       return (
         <AssistantBubble
           key={item.message.id}

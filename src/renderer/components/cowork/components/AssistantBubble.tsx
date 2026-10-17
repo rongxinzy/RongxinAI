@@ -6,6 +6,7 @@ import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
 import { StreamingMarkdownResponse } from './StreamingMarkdownResponse';
+import { useLiveMessageText } from '../../../services/useLiveMessageText';
 
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
@@ -20,10 +21,17 @@ export const AssistantBubble: React.FC<{
   turnMetadata?: CoworkMessageMetadata | null;
 }> = ({ message, mapDisplayText, resolveLocalFilePath, turnMetadata }) => {
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
-  const rawContent = mapDisplayText ? mapDisplayText(message.content) : message.content;
-  // An empty streaming bubble is a leftover placeholder, not an in-flight answer.
-  const isStreaming = Boolean(message.metadata?.isStreaming) && rawContent.trim().length > 0;
+  const isStreaming = Boolean(message.metadata?.isStreaming);
+  const liveContent = useLiveMessageText(message.id, isStreaming);
+  // While streaming the body lives in the LiveTextStore; Redux only carries
+  // the committed content after the final update.
+  const displayContent = (isStreaming ? liveContent : undefined) ?? message.content;
+  const rawContent = mapDisplayText ? mapDisplayText(displayContent) : displayContent;
   const modelLabel = getMessageModelLabel(turnMetadata);
+
+  // S7: an empty streaming bubble is only a placeholder for text that has not
+  // arrived yet; render nothing instead of an empty shell.
+  if (rawContent.trim().length === 0) return null;
 
   return (
     <div className="py-1 focus:outline-none">

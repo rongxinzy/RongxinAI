@@ -85,4 +85,9 @@ export class CoworkContentBuffer {
     const entry = this.entries.get(messageId);
     return entry?.complete ? entry.content : undefined;
   }
+
+  /** Current reconstructed content, including in-flight streaming patches. */
+  live(messageId: string): string | undefined {
+    return this.entries.get(messageId)?.content;
+  }
 }

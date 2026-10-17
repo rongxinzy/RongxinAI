@@ -91,6 +91,7 @@ beforeEach(() => {
         onStreamContentPatch: () => () => {},
         getSession,
         getRuntimeSnapshots: async (id?: string) => snapshots.read(id),
+        requestStreamResync: async () => true,
         getConfig: async () => ({ success: false }),
         listSessions: async () => ({ success: true, sessions: [] }),
       },

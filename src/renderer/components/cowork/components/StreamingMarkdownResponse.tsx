@@ -1,8 +1,20 @@
+/**
+ * Cowork streaming — render entry (single downstream throttle for Markdown cost).
+ *
+ * Flow: Pi delta → translator → coalescer → IPC → LiveTextStore → **this file** (Streamdown stable blocks + plain tail).
+ * While streaming: parse only closed prefix; growing tail is plain text (no per-token Shiki/Markdown).
+ *
+ * Invariants: one render-side throttle; finalized messages use full StaticMarkdownBlock.
+ * History: per-token full Markdown parse caused renderer jank; full-snapshot IPC (#1115) caused O(N²) main→renderer bytes.
+ *
+ * **禁止**流式期间对每个 token 全量 Markdown 重解析；**禁止**依赖 IPC 全文快照驱动本组件更新。
+ * Architecture: docs/architecture/streaming.md
+ */
 import { MessageResponse } from '@shared/components/ai-elements/message';
 import { useStreamingTextSegments } from '@shared/components/ai-elements/streamingText';
 
 import type { StreamingTextSegments } from '@shared/components/ai-elements/streamingText';
-import type { ComponentProps, MouseEvent, ReactNode } from 'react';
+import type { ComponentProps, MouseEvent } from 'react';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { StreamdownContext } from 'streamdown';
 
@@ -150,27 +162,37 @@ const LocalAwareAnchor = ({
   );
 };
 
-const renderMessage = (
-  content: string,
+const buildAnchorComponent = (
   resolveLocalFilePath?: (href: string, text: string) => string | null,
   skipPathExistsCheck = false,
-): ReactNode => {
-  const linkified = linkifyLocalPathsInMarkdown(content);
-  return (
-    <MessageResponse
-      components={{
-        a: (props: AnchorProps) => (
-          <LocalAwareAnchor
-            {...props}
-            resolveLocalFilePath={resolveLocalFilePath}
-            skipPathExistsCheck={skipPathExistsCheck}
-          />
-        ),
-      }}
-    >
-      {linkified}
-    </MessageResponse>
+) => {
+  const Anchor = (props: AnchorProps) => (
+    <LocalAwareAnchor
+      {...props}
+      resolveLocalFilePath={resolveLocalFilePath}
+      skipPathExistsCheck={skipPathExistsCheck}
+    />
   );
+  return Anchor;
+};
+
+const StaticMarkdownBlock = ({
+  content,
+  resolveLocalFilePath,
+  skipPathExistsCheck,
+}: {
+  content: string;
+  resolveLocalFilePath?: (href: string, text: string) => string | null;
+  skipPathExistsCheck?: boolean;
+}) => {
+  // Committed Markdown only changes when a block closes; avoid re-running the
+  // path regex on every streaming frame.
+  const prepared = useMemo(() => linkifyLocalPathsInMarkdown(content), [content]);
+  const components = useMemo(
+    () => ({ a: buildAnchorComponent(resolveLocalFilePath, skipPathExistsCheck) }),
+    [resolveLocalFilePath, skipPathExistsCheck],
+  );
+  return <MessageResponse components={components}>{prepared}</MessageResponse>;
 };
 
 /** 流式尾段：纯文本，不做 Markdown/Shiki 重解析。 */
@@ -192,7 +214,7 @@ export const StreamingMarkdownResponse = ({
 
   // 流结束后整段走完整 Markdown（含代码高亮 / 本地路径检查）。
   if (!isStreaming) {
-    return <>{renderMessage(content, resolve)}</>;
+    return <StaticMarkdownBlock content={content} resolveLocalFilePath={resolve} />;
   }
 
   // 流式中：只对已闭合的稳定块跑 Streamdown；正在增长的 tail 用纯文本。
@@ -203,7 +225,13 @@ export const StreamingMarkdownResponse = ({
 
   return (
     <div className="flex flex-col gap-4">
-      {committed ? renderMessage(committed, resolve, true) : null}
+      {committed ? (
+        <StaticMarkdownBlock
+          content={committed}
+          resolveLocalFilePath={resolve}
+          skipPathExistsCheck
+        />
+      ) : null}
       {tail ? <StreamingPlainTail content={tail} /> : null}
     </div>
   );

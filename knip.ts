@@ -42,6 +42,8 @@ const config: KnipConfig = {
         'scripts/release/stage-downloaded-release-candidates.sh',
         'scripts/release/upload-update-artifacts.mjs',
         'tests/setup/rebuild-sqlite-for-node.cjs',
+        // Bundled by `bun build` in the bench:stream script; Knip does not parse that form.
+        'scripts/bench/streamBench.ts',
         // Invoked from tests/e2e/packaged-linux/run-with-headless-deps.sh.
         'tests/e2e/packaged-linux/run-packaged-smoke.mjs',
         // Manual installer and preview harnesses. Workflows do not call them.
