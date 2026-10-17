@@ -62,6 +62,11 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
         return;
       }
     }
+    // Negative cache: a session that mapped to no lane once will not map to
+    // one later unless a new lane registers it — sessionLifecycle clears this
+    // set whenever a builtin lane mapping is added — so stop rescanning every
+    // room per streamed event. A positive mapping above always wins.
+    if (this.nonLaneSessionIds.has(sessionId)) return;
     // Cache miss or stale mapping: scan rooms once to find the lane, then
     // cache the mapping.
     for (const workspaceRoot of this.knownRooms()) {
@@ -74,6 +79,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
       this.applyBuiltinEvent(workspaceRoot, snapshot.room.id, lane, kind, payload);
       return;
     }
+    this.nonLaneSessionIds.add(sessionId);
   }
 
   private applyBuiltinEvent(

@@ -349,6 +349,11 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
       runtime.warnOnce('cowork.getRuntimeSnapshots');
       return [];
     },
+    requestStreamResync: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.requestStreamResync');
+      return false;
+    },
     remoteManaged: async _p0 => {
       void _p0;
       runtime.warnOnce('cowork.remoteManaged');

@@ -48,6 +48,8 @@ export abstract class CodingRoomServiceFoundation extends EventEmitter {
   protected readonly inFlightTurns = new Set<Promise<void>>();
   /** Maps builtin sessionId → laneId to avoid scanning all rooms per event. */
   protected readonly builtinSessionLaneMap = new Map<string, string>();
+  /** Sessions known to map to no builtin lane; guards recordBuiltinEvent room scans. */
+  protected readonly nonLaneSessionIds = new Set<string>();
 
   constructor(
     protected readonly repository: CodingRoomRepository,

@@ -1,7 +1,6 @@
 import { boundWorkerInput } from './boundedWorkerInput';
 import {
   boundToolResult,
-  TextWorkerKind,
   type TextWorkerInput,
   type TextWorkerOutput,
 } from './textWorkerOperations';
@@ -63,20 +62,11 @@ export class WorkbenchArtifactWorkerPool {
   }
 
   transform(input: TextWorkerInput, signal?: AbortSignal): Promise<TextWorkerOutput> {
-    if (
-      input.kind === TextWorkerKind.Content &&
-      (input.content.length > CoworkRunPolicy.MaximumContentCharacters + 1 ||
-        input.previous.length > CoworkRunPolicy.MaximumContentCharacters)
-    )
-      return Promise.reject(new Error('Content input limit exceeded.'));
     try {
       return this.enqueue(
         {
           kind: ArtifactWorkerTask.TransformText,
-          input:
-            input.kind === TextWorkerKind.Tool
-              ? { ...input, result: boundToolResult(input.result) }
-              : input,
+          input: { ...input, result: boundToolResult(input.result) },
         },
         signal,
       ) as Promise<TextWorkerOutput>;

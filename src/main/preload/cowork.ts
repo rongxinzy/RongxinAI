@@ -124,6 +124,8 @@ export const coworkApi = {
       ipcRenderer.invoke(CoworkSessionIpc.Get, sessionId, options),
     getRuntimeSnapshots: (sessionId?: string) =>
       ipcRenderer.invoke(CoworkStreamIpc.RuntimeSnapshots, sessionId),
+    requestStreamResync: (sessionId: string) =>
+      ipcRenderer.invoke(CoworkStreamIpc.StreamResync, sessionId),
     remoteManaged: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.RemoteManaged, sessionId),
     listSessions: (options?: {

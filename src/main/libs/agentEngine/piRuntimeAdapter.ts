@@ -438,6 +438,40 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
     return Boolean(active && active.isRunning && !active.aborted);
   }
 
+  /**
+   * Live (not yet finalized) streaming texts for a session, backing the
+   * renderer-initiated resync IPC: after a sequence gap or a mid-stream
+   * attach, the renderer asks for one full snapshot per open message and then
+   * keeps consuming deltas on top of it. Read-only — never mutates state.
+   */
+  getLiveStreamTexts(
+    sessionId: string,
+  ): Array<{ messageId: string; content: string; metadata: Record<string, unknown> }> {
+    const active = this.activeSessions.get(sessionId);
+    if (!active) return [];
+    const texts: Array<{ messageId: string; content: string; metadata: Record<string, unknown> }> =
+      [];
+    if (
+      active.thinkingMessageId &&
+      !active.thinkingLifecycle.isMessageFinalized &&
+      active.thinkingText.length > 0
+    ) {
+      texts.push({
+        messageId: active.thinkingMessageId,
+        content: active.thinkingText,
+        metadata: { isStreaming: true, isFinal: false, isThinking: true },
+      });
+    }
+    if (active.assistantMessageId && active.answerText.length > 0) {
+      texts.push({
+        messageId: active.assistantMessageId,
+        content: active.answerText,
+        metadata: { isStreaming: true, isFinal: false },
+      });
+    }
+    return texts;
+  }
+
   hasRunningSessions(): boolean {
     return (
       this.initializingSessions.size > 0 ||

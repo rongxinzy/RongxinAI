@@ -1,10 +1,8 @@
 import { boundWorkerInput } from './boundedWorkerInput';
 import { CoworkRunPolicy } from '../../shared/cowork/runState';
 
-export const TextWorkerKind = { Content: 'content', Tool: 'tool' } as const;
-export type TextWorkerInput =
-  | { kind: 'content'; content: string; previous: string; reset: boolean }
-  | { kind: 'tool'; result: unknown };
+export const TextWorkerKind = { Tool: 'tool' } as const;
+export type TextWorkerInput = { kind: 'tool'; result: unknown };
 export type TextWorkerOutput = { content: string; offset: number; truncated: boolean };
 
 /** Bound structured-clone cost before crossing the worker boundary. No serialization on main. */
@@ -18,15 +16,6 @@ export function boundToolResult(value: unknown): unknown {
 }
 
 export function runTextWorkerOperation(input: TextWorkerInput): TextWorkerOutput {
-  if (input.kind === TextWorkerKind.Content) {
-    const content = input.content.slice(0, CoworkRunPolicy.MaximumContentCharacters);
-    const offset = !input.reset && content.startsWith(input.previous) ? input.previous.length : 0;
-    return {
-      content: content.slice(offset),
-      offset,
-      truncated: content.length < input.content.length,
-    };
-  }
   const extract = (result: unknown): string => {
     if (result === undefined || result === null) return '';
     if (typeof result === 'string') return result;

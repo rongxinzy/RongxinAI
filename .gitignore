@@ -131,3 +131,6 @@ preview-screenshots/
 /.vite/
 /.turbo/
 /*.log
+
+# bench:stream output (default --out)
+bench-results/

@@ -150,34 +150,55 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       }
       // Emit a copy. Redux freezes the object it stores, so the fixture must not mutate it later.
       emitUi({ type: PiUiEventType.Message, sessionId, message: { ...assistant } });
+      // Mirror production streaming: one StreamPart per chunk
+      // (text-start → text-delta… → text-end) plus a single final
+      // MessageUpdate. **禁止**用逐段全文 MessageUpdate 模拟流式（S6）。
+      const partId = 'preview-reply-text';
       const chunks = [
         PREVIEW_REPLY.slice(0, 28),
         PREVIEW_REPLY.slice(28, 70),
         PREVIEW_REPLY.slice(70),
       ];
-      let accumulated = '';
+      emitUi({
+        type: PiUiEventType.StreamPart,
+        sessionId,
+        messageId: assistantId,
+        chunk: { type: 'text-start', id: partId },
+      });
       chunks.forEach((chunk, index) => {
         setTimeout(
           () => {
-            accumulated += chunk;
             emitUi({
-              type: PiUiEventType.MessageUpdate,
+              type: PiUiEventType.StreamPart,
               sessionId,
               messageId: assistantId,
-              content: accumulated,
+              chunk: { type: 'text-delta', id: partId, delta: chunk },
             });
             if (index !== chunks.length - 1) return;
+            emitUi({
+              type: PiUiEventType.StreamPart,
+              sessionId,
+              messageId: assistantId,
+              chunk: { type: 'text-end', id: partId },
+            });
             const current = sessions.get(sessionId);
             if (current) {
               current.session = {
                 ...current.session,
                 messages: current.session.messages.map(item =>
-                  item.id === assistantId ? { ...item, content: accumulated } : item,
+                  item.id === assistantId ? { ...item, content: PREVIEW_REPLY } : item,
                 ),
                 status: CoworkSessionStatus.Completed,
                 updatedAt: Date.now(),
               };
             }
+            emitUi({
+              type: PiUiEventType.MessageUpdate,
+              sessionId,
+              messageId: assistantId,
+              content: PREVIEW_REPLY,
+              metadata: { isStreaming: false, isFinal: true },
+            });
             emitUi({ type: PiUiEventType.Completed, sessionId });
           },
           70 * (index + 1),
@@ -393,6 +414,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
         });
       },
       getRuntimeSnapshots: () => Promise.resolve([]),
+      requestStreamResync: () => Promise.resolve(true),
       listPendingMessages: () => Promise.resolve({ success: true, items: [] }),
       startSession: (options: StartOptions) => {
         liveCount += 1;

@@ -9,7 +9,6 @@ import { collectWorkbenchArtifacts } from './artifactCollector';
 import { WorkbenchArtifactWorkerPool } from './artifactWorkerPool';
 import { ArtifactWorkerLimit } from './artifactWorkerConstants';
 import { TextWorkerKind } from './textWorkerOperations';
-import { CoworkRunPolicy } from '../../shared/cowork/runState';
 
 const fixture = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-worker-test-')));
 const compiled = path.join(fixture, 'compiled');
@@ -168,16 +167,7 @@ test('file hashing leaves the main event loop responsive compared with the synch
   }
 });
 
-test('tool display and content comparison share the bounded worker pool and support cancellation', async () => {
-  const content = '中文\n'.repeat(60_000) + 'END';
-  expect(
-    await pool.transform({
-      kind: TextWorkerKind.Content,
-      content,
-      previous: content.slice(0, 90_000),
-      reset: false,
-    }),
-  ).toMatchObject({ content: content.slice(90_000), offset: 90_000, truncated: false });
+test('tool display transforms share the bounded worker pool and support cancellation', async () => {
   expect(
     await pool.transform({
       kind: TextWorkerKind.Tool,
@@ -186,17 +176,12 @@ test('tool display and content comparison share the bounded worker pool and supp
   ).toMatchObject({ content: 'first\nlast' });
   const cancellation = new AbortController();
   const pending = pool.transform(
-    { kind: TextWorkerKind.Content, content, previous: content, reset: false },
+    { kind: TextWorkerKind.Tool, result: { text: 'pending' } },
     cancellation.signal,
   );
   cancellation.abort();
   await expect(pending).rejects.toThrow('cancelled');
-  await expect(
-    pool.transform({
-      kind: TextWorkerKind.Content,
-      content: 'x'.repeat(CoworkRunPolicy.MaximumContentCharacters + 2),
-      previous: '',
-      reset: false,
-    }),
-  ).rejects.toThrow('input limit');
+  expect(await pool.transform({ kind: TextWorkerKind.Tool, result: 'recovered' })).toMatchObject({
+    content: 'recovered',
+  });
 });
