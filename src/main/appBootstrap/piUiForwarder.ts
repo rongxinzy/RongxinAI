@@ -1,5 +1,5 @@
 /**
- * Cowork streaming — main-process IPC gateway (coalescer → sequencer → ring buffer → webContents).
+ * Cowork streaming — main-process IPC gateway (coalescer → sequencer → webContents).
  * See docs/architecture/streaming.md for end-to-end flow and prohibitions.
  */
 import crypto from 'crypto';
@@ -14,9 +14,9 @@ import { CoworkStreamIpc } from '../../shared/ipc/channels';
 import { bindCoworkRunBridge } from '../coworkRunBridge';
 import { slimQueuedMessagesForIpc } from '../coworkImageAttachments';
 import { persistCoworkTerminalError } from '../coworkTerminalErrorPersistence';
+import { CoworkRunPolicy } from '../../shared/cowork/runState';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { UiMessageChunkCoalescer } from '../streaming/uiMessageChunkCoalescer';
-import { PiUiStreamReplayBuffer } from '../piUiStreamReplayBuffer';
 import { snapshotToContentPatches } from '../piUiStreamGateway';
 import { PiUiRuntimeSnapshots } from '../../shared/cowork/piUiRuntimeSnapshot';
 import {
@@ -31,26 +31,42 @@ import type { UIMessageChunk } from 'ai';
 export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
   const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
   const runtimeSnapshots = new PiUiRuntimeSnapshots();
-  const replayBuffer = new PiUiStreamReplayBuffer();
-  const revisionByMessage = new Map<string, number>();
+
+  // ContentPatch revisions only need to be monotonic per message. A single
+  // global counter is monotonic for every message at once, and avoids keeping
+  // per-message revision state alive beyond a message's lifecycle.
+  let contentPatchRevision = 0;
+  const nextRevision = (): number => {
+    contentPatchRevision += 1;
+    return contentPatchRevision;
+  };
+
+  // 2M guard bookkeeping (CoworkRunPolicy.MaximumContentCharacters): how many
+  // characters each message has already streamed, and which messages are over
+  // the cap and therefore drop every further delta.
+  const sentCharsByMessage = new Map<string, number>();
+  const truncatedMessages = new Set<string>();
+  const sessionByMessageId = new Map<string, string>();
+
+  const clearTruncationForMessage = (messageId: string): void => {
+    sentCharsByMessage.delete(messageId);
+    truncatedMessages.delete(messageId);
+  };
+
+  const clearTruncationForSession = (sessionId: string): void => {
+    for (const [messageId, owner] of sessionByMessageId) {
+      if (owner !== sessionId) continue;
+      clearTruncationForMessage(messageId);
+      sessionByMessageId.delete(messageId);
+    }
+  };
 
   ipcMain.handle(CoworkStreamIpc.RuntimeSnapshots, (_event, sessionId?: string) =>
     runtimeSnapshots.read(sessionId),
   );
 
-  ipcMain.handle(
-    CoworkStreamIpc.UiEventReplay,
-    (_event, sessionId: unknown, afterSequence: unknown) => {
-      if (typeof sessionId !== 'string' || sessionId.length === 0) return [];
-      const after =
-        typeof afterSequence === 'number' && Number.isInteger(afterSequence) ? afterSequence : 0;
-      return replayBuffer.replay(sessionId, after);
-    },
-  );
-
   const broadcastUiEvent = (event: PiUiEvent): void => {
     runtimeSnapshots.observe(event);
-    replayBuffer.observe(event);
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
@@ -79,9 +95,37 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
   });
 
   const emitStreamChunk = (sessionId: string, messageId: string, chunk: UIMessageChunk): void => {
+    sessionByMessageId.set(messageId, sessionId);
+    if (chunk.type === 'text-delta' || chunk.type === 'reasoning-delta') {
+      // 2M guard: once a message's streamed length reaches the cap, every
+      // later delta is dropped; the terminal snapshot still delivers the
+      // clipped full text.
+      if (truncatedMessages.has(messageId)) return;
+      const sent = sentCharsByMessage.get(messageId) ?? 0;
+      const budget = CoworkRunPolicy.MaximumContentCharacters - sent;
+      if (budget <= 0) {
+        truncatedMessages.add(messageId);
+        return;
+      }
+      if (chunk.delta.length > budget) {
+        // Clip this delta to the remaining budget (nothing to send when the
+        // budget is zero) and mark the message truncated.
+        sentCharsByMessage.set(messageId, CoworkRunPolicy.MaximumContentCharacters);
+        truncatedMessages.add(messageId);
+        coalescer.push(sessionId, messageId, { ...chunk, delta: chunk.delta.slice(0, budget) });
+        return;
+      }
+      sentCharsByMessage.set(messageId, sent + chunk.delta.length);
+    }
     coalescer.push(sessionId, messageId, chunk);
   };
 
+  /**
+   * Full-text snapshot on exceptional paths only (non-prefix rewrite, gap
+   * resync, terminal state). The patch metadata is forced to
+   * `isStreaming: true` so the renderer treats it as a streaming base and
+   * appends following deltas, never as a terminal/restore snapshot.
+   */
   const emitStreamSnapshot = (
     sessionId: string,
     messageId: string,
@@ -89,18 +133,37 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     metadata?: Record<string, unknown>,
   ): void => {
     coalescer.flush();
-    const revision = (revisionByMessage.get(messageId) ?? 0) + 1;
-    revisionByMessage.set(messageId, revision);
-    const truncated = content.length > 0; // visible content already clipped upstream
+    sessionByMessageId.set(messageId, sessionId);
+    const truncated = content.length > CoworkRunPolicy.MaximumContentCharacters;
+    const visible = truncated
+      ? content.slice(0, CoworkRunPolicy.MaximumContentCharacters)
+      : content;
+    // Reseed the streamed-length accounting from the snapshot so later deltas
+    // keep respecting the same cap.
+    sentCharsByMessage.set(messageId, visible.length);
+    if (truncated) truncatedMessages.add(messageId);
+    else truncatedMessages.delete(messageId);
     for (const patch of snapshotToContentPatches(
       sessionId,
-      { messageId, content, truncated: false },
-      revision,
-      metadata,
+      { messageId, content: visible, truncated },
+      nextRevision(),
+      { ...metadata, isStreaming: true },
     )) {
       emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId, patch });
     }
   };
+
+  // Renderer-initiated resync (delta-sequence gap or mid-stream attach):
+  // flush pending deltas, then reseed every live (unfinalized) message with
+  // one full snapshot; subsequent deltas append onto that base.
+  ipcMain.handle(CoworkStreamIpc.StreamResync, (_event, sessionId: unknown) => {
+    if (typeof sessionId !== 'string' || sessionId.length === 0) return false;
+    coalescer.flush();
+    for (const live of runtime.getLiveStreamTexts(sessionId)) {
+      emitStreamSnapshot(sessionId, live.messageId, live.content, live.metadata);
+    }
+    return true;
+  });
 
   bindCoworkRunBridge(
     runtime,
@@ -129,6 +192,48 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     'uiStreamSnapshot',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
       emitStreamSnapshot(sessionId, messageId, content, metadata);
+    },
+  );
+
+  // Terminal channel (B2): finalizeMessage / markFinalAnswer /
+  // closeIdlePlaceholders / context-usage sync publish their final content and
+  // `isStreaming: false` here. Non-final messageUpdate is a throttled
+  // in-process bus event for IM and the coding room; forwarding it would
+  // reintroduce full-text snapshots on the UI IPC path, so it is dropped.
+  runtime.on(
+    'messageUpdate',
+    (
+      sessionId: string,
+      messageId: string,
+      content: string,
+      metadata?: Record<string, unknown>,
+    ) => {
+      if (metadata?.isStreaming !== false) return;
+      coalescer.flush();
+      const truncated = content.length > CoworkRunPolicy.MaximumContentCharacters;
+      const visible = truncated
+        ? content.slice(0, CoworkRunPolicy.MaximumContentCharacters)
+        : content;
+      const finalMetadata = truncated ? { ...metadata, contentTruncated: true } : { ...metadata };
+      if (visible.length <= CoworkRunPolicy.ContentChunkCharacters) {
+        emitUiEvent({
+          type: PiUiEventType.MessageUpdate,
+          sessionId,
+          messageId,
+          content: visible,
+          metadata: finalMetadata,
+        });
+      } else {
+        for (const patch of snapshotToContentPatches(
+          sessionId,
+          { messageId, content: visible, truncated },
+          nextRevision(),
+          finalMetadata,
+        )) {
+          emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId, patch });
+        }
+      }
+      clearTruncationForMessage(messageId);
     },
   );
 
@@ -184,12 +289,13 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
 
   runtime.on('sessionStopped', (sessionId: string) => {
     coalescer.flush();
-    replayBuffer.clearSession(sessionId);
+    clearTruncationForSession(sessionId);
     emitUiEvent({ type: PiUiEventType.Stopped, sessionId });
   });
 
   runtime.on('complete', (sessionId: string) => {
     coalescer.flush();
+    clearTruncationForSession(sessionId);
     emitUiEvent({
       type: PiUiEventType.Completed,
       sessionId,
@@ -214,6 +320,7 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
         );
       }
       coalescer.flush();
+      clearTruncationForSession(sessionId);
       emitUiEvent({ type: PiUiEventType.Error, sessionId, error });
     },
   );

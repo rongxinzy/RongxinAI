@@ -351,20 +351,18 @@ export class StreamingHarness {
       liveText: this.live,
       scheduler: this.frames,
       shouldApply: () => true,
-      onSequenceGap: sessionId => {
+      // Production wires these to session recovery (reload from the DB), not
+      // to the stream resync; the pipeline itself requests the resync.
+      onSequenceGap: () => {
         this.stats.sequenceGaps += 1;
-        this.requestStreamResync(sessionId);
       },
-      onContentGap: sessionId => {
+      onContentGap: () => {
         this.stats.contentGaps += 1;
-        this.requestStreamResync(sessionId);
       },
       onUnknownSession: () => {
         this.stats.unknownSessions += 1;
       },
-      requestStreamResync: sessionId => {
-        this.requestStreamResync(sessionId);
-      },
+      requestStreamResync: sessionId => this.requestStreamResync(sessionId),
     };
     this.pipeline = createCoworkStreamPipeline(pipelineDeps);
 
@@ -528,14 +526,18 @@ export class StreamingHarness {
     return this.store.getState().cowork.currentSession?.messages ?? [];
   }
 
-  /** Assistant answer bubbles ('answer', with 'assistant' kept as legacy alias). */
+  /** Assistant answer bubbles: type 'assistant' without metadata.isThinking. */
   answerMessageIds(): string[] {
-    return this.messageIdsOfType('answer', 'assistant');
+    return this.currentMessages()
+      .filter(message => message.type === 'assistant' && !message.metadata?.isThinking)
+      .map(message => message.id);
   }
 
-  /** Reasoning bubbles ('thinking', with 'reasoning' kept as legacy alias). */
+  /** Reasoning bubbles: type 'assistant' with metadata.isThinking (see piAssistantTranscript). */
   thinkingMessageIds(): string[] {
-    return this.messageIdsOfType('thinking', 'reasoning');
+    return this.currentMessages()
+      .filter(message => message.type === 'assistant' && Boolean(message.metadata?.isThinking))
+      .map(message => message.id);
   }
 
   messageIdsOfType(...types: string[]): string[] {
@@ -662,16 +664,21 @@ export class StreamingHarness {
     return control?.(index, event) === true;
   }
 
-  private requestStreamResync(sessionId: string): void {
+  /**
+   * Mirrors `ipcRenderer.invoke`: the main-process handler runs in a LATER task
+   * (never inside the main-process call stack that emitted the event which
+   * revealed the gap), and the returned promise settles after the handler has
+   * pushed its snapshots through webContents.send.
+   */
+  private requestStreamResync(sessionId: string): Promise<unknown> {
     this.stats.resyncRequests += 1;
-    if (typeof streamResyncChannel !== 'string') return;
-    const handler = this.handlers.get(streamResyncChannel);
-    if (handler) {
-      // Synchronous on purpose: the fixed main-process handler answers with a
-      // resync snapshot over webContents.send, which the non-reentrant delivery
-      // queue defers until the in-flight delivery completes.
-      handler({}, sessionId);
-    }
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const handler =
+          typeof streamResyncChannel === 'string' ? this.handlers.get(streamResyncChannel) : undefined;
+        resolve(handler ? handler({}, sessionId) : false);
+      }, 0);
+    });
   }
 }
 

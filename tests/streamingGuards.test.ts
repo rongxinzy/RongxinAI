@@ -155,6 +155,7 @@ describe('streaming guards (Cowork end-to-end IPC pipeline)', () => {
 
       // (e) Terminal snapshots are rare and bounded (message_end full state and
       // turn-completion bookkeeping only).
+      process.stderr.write(JSON.stringify(terminal.map(e => { const p = (e as {patch?: Record<string, unknown>}).patch; return p ? Object.fromEntries(Object.entries(p).map(([k, v]) => [k, typeof v === 'string' && v.length > 40 ? v.length : v])) : e.type; }))+'\n');
       expect(terminal.length).toBeLessThanOrEqual(8);
       const terminalBytes = terminal.reduce((total, event) => total + jsonByteLength(event), 0);
       expect(terminalBytes).toBeLessThanOrEqual(3 * bodyBytes + 8_000);

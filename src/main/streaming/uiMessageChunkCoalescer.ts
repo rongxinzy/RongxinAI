@@ -1,7 +1,7 @@
 /**
  * Cowork streaming — coalescer entry (single upstream merge before IPC).
  *
- * Flow: Pi delta → translator → **this file** → sequencer/ring buffer → IPC → LiveTextStore → StreamingMarkdownResponse.
+ * Flow: Pi delta → translator → **this file** → sequencer → IPC → LiveTextStore → StreamingMarkdownResponse.
  * Merges consecutive deltas for the same stream part within time/size bounds; emits non-delta chunks immediately.
  *
  * Invariants: only this coalescer may batch outbound stream parts; renderer owns the sole display throttle.
@@ -11,7 +11,7 @@
  *
  * **禁止**在 coalescer 外再合并/节流；**禁止**先累积全文再 diff；**禁止**IPC 常规推送全文快照。
  *
- * Design reference: CherryHQ/cherry-studio WebContentsListener.ts (AGPL-3.0 — design only, no code copy).
+ * Algorithm inspired by the CherryHQ/cherry-studio WebContentsListener design (AGPL-3.0); this code is an independent implementation and copies no code.
  * Architecture: docs/architecture/streaming.md
  */
 import type { UIMessageChunk } from 'ai';
@@ -107,10 +107,6 @@ export class UiMessageChunkCoalescer {
   }
 
   flush(): void {
-    if (this.timer !== undefined) {
-      clearTimeout(this.timer);
-      this.timer = undefined;
-    }
     this.flushPending();
   }
 
@@ -119,6 +115,13 @@ export class UiMessageChunkCoalescer {
   }
 
   private flushPending(): void {
+    // The timer must die with the pending entry: a size/age-triggered or
+    // external flush already emitted it, and a late timer firing into an
+    // empty slot would be a stray wakeup (N1).
+    if (this.timer !== undefined) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
     if (!this.pending) return;
     const { sessionId, messageId, chunk } = this.pending;
     this.emit({ sessionId, messageId, chunk });

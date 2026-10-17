@@ -540,6 +540,13 @@ export async function getPiModules(): Promise<PiModules> {
  */
 export const STORE_UPDATE_THROTTLE_MS = 250;
 
+/**
+ * This throttles the in-process bus event `messageUpdate` for IM/coding-room
+ * consumers only. It never reaches renderer IPC (piUiForwarder drops
+ * non-final messageUpdate), so it is not a second UI throttle.
+ */
+export const MESSAGE_UPDATE_THROTTLE_MS = 200;
+
 export const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined =>
   skillIds === undefined
     ? undefined

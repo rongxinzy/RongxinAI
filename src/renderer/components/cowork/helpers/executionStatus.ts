@@ -52,12 +52,13 @@ export const getFinalAnswerIndex = (
       return index;
     }
   }
+  // B2: a streaming answer's body lives in the LiveTextStore, not Redux, so
+  // an empty-content streaming answer still blocks the completed fallback.
   const hasStreamingAnswer = items.some(
     item =>
       item.type === 'assistant' &&
       !item.message.metadata?.isThinking &&
-      item.message.metadata?.isStreaming &&
-      hasText(item.message.content),
+      Boolean(item.message.metadata?.isStreaming),
   );
   // 2026/09/20 lixiang  轮次已结束时即使仍有未回填的 tool_result，也兜底展示最后一条回答，
   // 避免卡在「Running」工具态、用户看不到结果（issue #805）

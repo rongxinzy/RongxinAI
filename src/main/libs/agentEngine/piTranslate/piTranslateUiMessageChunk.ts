@@ -12,18 +12,19 @@
  * **禁止**发送端先拼全文再算增量；**禁止**第二层发送端节流；**禁止**用 IPC 全文快照作常规更新。
  *
  * Source: vercel/ai @ai-sdk/harness-pi@1.0.156 — packages/harness-pi/src/pi-translate.ts (Apache-2.0).
- * Adapted: output mapped to `UIMessageChunk` from `ai`; finish-step/compaction omitted from Cowork IPC.
+ * Adapted: output mapped to `UIMessageChunk` from `ai`.
+ *
+ * Not ported from upstream: the finish-step / compaction machinery (`toHarnessUsage`, `ZERO_PI_USAGE`,
+ * `createInferredFinishStep`, `finishStep`, `takePiEarlyFinishStep`) and the state that only fed it (`stepOpen`,
+ * `stepUsage`, `pendingStepToolCallIds`, `earlyFinishStepToolCallIds`, `turnReasoningTokens`). The Cowork IPC stream
+ * never carries finish-step / compaction chunks — the session layer owns the turn lifecycle itself — so none of that
+ * upstream state is observable through this translator and porting it would be dead code.
+ *
  * Architecture: docs/architecture/streaming.md
  */
 import { randomBytes } from 'node:crypto';
 import type { UIMessageChunk } from 'ai';
-import { secureJsonParse } from '@ai-sdk/provider-utils';
-import {
-  extractAssistantText,
-  getPiTerminalError,
-  type PiSessionEvent,
-  type PiUsage,
-} from './piEvents';
+import { extractAssistantText, getPiTerminalError, type PiSessionEvent } from './piEvents';
 import { serializeToolOutput } from './piTranslateUtils';
 
 type DynamicToolKind = 'mcp' | 'extension';
@@ -51,17 +52,20 @@ export interface PiTranslatorState {
   currentReasoningId: string | undefined;
   /** Whether a `reasoning-start` event has already been emitted. */
   reasoningStarted: boolean;
-  /** Tool-call id → tool name (used to fill in `toolName` on results). */
+  /**
+   * Tool-call id → wire tool name, recorded at `tool_execution_start`. Result
+   * events do not always repeat `toolName`; the recorded name resolves the
+   * dispatch flags of the result, and results for calls we never observed are
+   * dropped because there is nothing to correlate them with.
+   */
   observedToolNames: Map<string, string>;
   /**
    * Content-block index → tool-call id for tool inputs that are still
    * streaming. Pi addresses `toolcall_*` events by `contentIndex`, while the
-   * harness stream parts are keyed by the tool call id, so the id is resolved
-   * once at `toolcall_start` and reused for the deltas that follow.
+   * UI chunks are keyed by the tool call id, so the id is resolved once at
+   * `toolcall_start` and reused for the deltas that follow.
    */
   streamingToolInputIds: Map<number, string>;
-  /** Tool ids requested by the current assistant message but not yet completed. */
-  pendingStepToolCallIds: Set<string>;
   /**
    * Id of the first tool call the current assistant message streamed. Pi
    * always starts that call first, so its input streams live. Inputs of later
@@ -71,16 +75,6 @@ export interface PiTranslatorState {
   firstStreamedToolCallId: string | undefined;
   /** Tool-call id -> buffered `tool-input-*` parts for not-yet-started calls. */
   bufferedToolInputParts: Map<string, UIMessageChunk[]>;
-  /**
-   * Tool calls already covered by an early `finish-step` of the current step
-   * (see `takePiEarlyFinishStep`).
-   */
-  earlyFinishStepToolCallIds: Set<string>;
-  /** Whether the current assistant message has opened a visible step. */
-  stepOpen: boolean;
-  stepUsage: PiUsage | undefined;
-  /** Pi's session stats do not track reasoning. */
-  turnReasoningTokens: number | undefined;
   /**
    * Pi retries a failed request itself (rate limits, overloads, a context
    * overflow after compaction), and the failed attempt still reports
@@ -102,9 +96,9 @@ export interface PiTranslatorState {
   dynamicToolCalls: Map<string, DynamicToolKind>;
   /**
    * Names of tools that Pi executes natively (read/write/edit/bash/grep/
-   * find/ls). `tool-call` events for these get `providerExecuted: true`
-   * so the harness host doesn't try to dispatch them. User-registered
-   * tools are not in this set.
+   * find/ls). Chunks for these get `providerExecuted: true` so the UI does
+   * not treat them as host-dispatched calls. User-registered tools are not in
+   * this set.
    */
   readonly builtinToolNames: ReadonlySet<string>;
   readonly hostToolNames: ReadonlySet<string>;
@@ -135,13 +129,8 @@ export function createPiTranslatorState(options: PiTranslatorStateOptions = {}):
     reasoningStarted: false,
     observedToolNames: new Map(),
     streamingToolInputIds: new Map(),
-    pendingStepToolCallIds: new Set(),
     firstStreamedToolCallId: undefined,
     bufferedToolInputParts: new Map(),
-    earlyFinishStepToolCallIds: new Set(),
-    stepOpen: false,
-    stepUsage: undefined,
-    turnReasoningTokens: undefined,
     lastAssistantError: undefined,
     hostToolResults: new Map(),
     dynamicToolCalls: new Map(),
@@ -156,15 +145,46 @@ function newId(): string {
 }
 
 /**
+ * End the currently open text / reasoning parts (if any) and clear their ids,
+ * so the next delta opens a fresh part id. The turn bridge calls this before
+ * sending a non-prefix snapshot: the renderer replaces the message text
+ * wholesale there, and any later increment must start a new part instead of
+ * appending to one whose prefix no longer matches. Returns the closing chunks.
+ */
+export function closeOpenTextAndReasoningParts(state: PiTranslatorState): UIMessageChunk[] {
+  const parts: UIMessageChunk[] = [];
+  if (state.currentTextId !== undefined) {
+    parts.push({ type: 'text-end', id: state.currentTextId });
+    state.currentTextId = undefined;
+  }
+  if (state.reasoningStarted && state.currentReasoningId !== undefined) {
+    parts.push({ type: 'reasoning-end', id: state.currentReasoningId });
+    state.reasoningStarted = false;
+    state.currentReasoningId = undefined;
+  }
+  return parts;
+}
+
+/**
+ * Align the accumulated assistant text with a snapshot the turn bridge sent
+ * after a non-prefix rewrite. `message_end` gap-fill compares against this
+ * value, so it must reflect what the renderer already has — otherwise the
+ * closing event would re-send the whole snapshot as a "missing" suffix.
+ */
+export function setStreamedAssistantText(state: PiTranslatorState, text: string): void {
+  state.streamedAssistantText = text;
+}
+
+/**
  * Pi's `tool_execution_end` event payload (`result`) is a Pi `AgentToolResult`
  * envelope `{ content: (TextContent | ImageContent)[], details, terminate? }`.
  * The `tool_result` event uses a flat shape with `content` and `details` at
  * the top level. Text-only results without details retain the string projection,
  * including empty text. Preserve envelopes carrying details or non-text content.
  */
-function unwrapPiToolResult(event: PiSessionEvent): never {
+function unwrapPiToolResult(event: PiSessionEvent): unknown {
   const candidates: unknown[] = [];
-  const result = event.result as unknown;
+  const result = event.result;
   if (result && typeof result === 'object') {
     const inner = (result as { content?: unknown }).content;
     if (Array.isArray(inner)) {
@@ -179,9 +199,9 @@ function unwrapPiToolResult(event: PiSessionEvent): never {
       ) {
         if (envelope.details === undefined) {
           const { details: _details, ...preserved } = envelope;
-          return preserved as never;
+          return preserved;
         }
-        return envelope as never;
+        return envelope;
       }
       candidates.push(inner);
     }
@@ -197,7 +217,7 @@ function unwrapPiToolResult(event: PiSessionEvent): never {
       return {
         content: event.content,
         ...(event.details === undefined ? {} : { details: event.details }),
-      } as never;
+      };
     }
     candidates.push(event.content);
   }
@@ -212,20 +232,62 @@ function unwrapPiToolResult(event: PiSessionEvent): never {
         typeof (p as { text?: unknown }).text === 'string',
     );
     if (textParts.length > 0) {
-      return textParts.map(p => p.text).join('') as never;
+      return textParts.map(p => p.text).join('');
     }
   }
 
-  if (typeof event.result === 'string') return event.result as never;
-  if (typeof event.content === 'string') return event.content as never;
-  return (event.result ?? event.content ?? null) as never;
+  if (typeof event.result === 'string') return event.result;
+  if (typeof event.content === 'string') return event.content;
+  return event.result ?? event.content ?? null;
+}
+
+/**
+ * Parse JSON while refusing prototype-pollution payloads.
+ *
+ * Semantics follow fastify/secure-json-parse (BSD-3-Clause) — the same rules
+ * `@ai-sdk/provider-utils`'s `secureJsonParse` implements: a parsed value is
+ * rejected when it contains a `__proto__` key, or a `constructor` key whose
+ * value is an object that carries a `prototype` key. This is an independent
+ * implementation (no runtime dependency added). Throws on invalid JSON or
+ * forbidden keys; callers catch and fall back to the raw text.
+ */
+function safeJsonParse(text: string): unknown {
+  const parsed: unknown = JSON.parse(text);
+  rejectPrototypePollution(parsed);
+  return parsed;
+}
+
+function rejectPrototypePollution(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      rejectPrototypePollution(item);
+    }
+    return;
+  }
+  if (value === null || typeof value !== 'object') {
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (key === '__proto__') {
+      throw new SyntaxError('Object contains forbidden prototype property');
+    }
+    if (
+      key === 'constructor' &&
+      child !== null &&
+      typeof child === 'object' &&
+      'prototype' in child
+    ) {
+      throw new SyntaxError('Object contains forbidden prototype property');
+    }
+    rejectPrototypePollution(child);
+  }
 }
 
 function parseMcpToolResult(result: unknown): unknown {
   const text = typeof result === 'string' ? result : mcpResultText(result);
   if (text === undefined) return result;
   try {
-    return secureJsonParse(text);
+    return safeJsonParse(text);
   } catch {
     return text;
   }
@@ -250,6 +312,17 @@ function mcpResultText(result: unknown): string | undefined {
   return texts.join('');
 }
 
+/**
+ * `errorText` for `tool-output-error`: the projected result when it is already
+ * a string, its JSON serialization otherwise, and a generic placeholder when
+ * both are empty (mirrors the upstream `isError` semantics of preserving the
+ * result payload).
+ */
+function toToolErrorText(result: unknown): string {
+  const text = typeof result === 'string' ? result : (JSON.stringify(result) ?? '');
+  return text.length > 0 ? text : 'Tool execution failed';
+}
+
 function resolveToolName(
   state: PiTranslatorState,
   nativeName: string,
@@ -261,10 +334,10 @@ function resolveToolName(
 /**
  * How a tool call is dispatched, from the native tool name. Pi runs its
  * builtin, MCP and extension tools itself; only host tools are handed back to
- * the harness host. Pi's native MCP names every server tool
- * `mcp__<server>__<tool>`. `tool-input-start` reports the same flags as the
- * `tool-call` that follows it so a consumer does not have to wait for the call
- * to know who will execute it.
+ * the host. Pi's native MCP names every server tool `mcp__<server>__<tool>`.
+ * `tool-input-start` reports the same flags as the `tool-input-available` that
+ * follows it so a consumer does not have to wait for the call to know who will
+ * execute it.
  */
 function resolveToolKind(state: PiTranslatorState, nativeName: string): ToolKind {
   if (state.hostToolNames.has(nativeName)) return 'host';
@@ -280,7 +353,8 @@ function isDynamicToolKind(kind: ToolKind): kind is DynamicToolKind {
  * The `{ id, name }` of the tool call a `toolcall_*` event refers to, read out
  * of the partial assistant message it carries. Returns undefined when the
  * block is missing or not a tool call yet, in which case the input is left
- * unstreamed — the complete `tool-call` still arrives at `tool_execution_start`.
+ * unstreamed — the complete `tool-input-available` still arrives at
+ * `tool_execution_start`.
  */
 function readStreamingToolCall(
   event: PiSessionEvent,
@@ -298,83 +372,21 @@ function readStreamingToolCall(
   return { contentIndex, id, name };
 }
 
-function toHarnessUsage(usage: PiUsage): Extract<UIMessageChunk, { type: 'finish-step' }>['usage'] {
-  return {
-    inputTokens: {
-      total: usage.input + usage.cacheRead + usage.cacheWrite,
-      noCache: usage.input,
-      cacheRead: usage.cacheRead,
-      cacheWrite: usage.cacheWrite,
-    },
-    outputTokens: {
-      total: usage.output,
-      text: usage.reasoning === undefined ? undefined : usage.output - usage.reasoning,
-      reasoning: usage.reasoning,
-    },
-  };
-}
-
-const ZERO_PI_USAGE: PiUsage = {
-  input: 0,
-  output: 0,
-  cacheRead: 0,
-  cacheWrite: 0,
-  reasoning: 0,
-};
-
-function createInferredFinishStep(): UIMessageChunk[] {
-  return [];
-}
-
-function finishStep(_state: PiTranslatorState): UIMessageChunk[] {
-  return [];
-}
-
-/**
- * Emit an early `finish-step` when Pi cannot make progress on the current
- * tool batch without host input, while keeping the step open: the regular
- * `finish-step` follows once every call of the batch has settled.
- *
- * In a parallel batch Pi waits on every unsettled call, so all of them must
- * be waiting on host input. In a sequential batch Pi waits on the first
- * unsettled call only; later calls have not started yet. A call that was
- * already covered by an earlier early `finish-step` of the same step does
- * not trigger another one, so a waiting set that only shrinks (results
- * arriving one by one) never produces an extra step boundary.
- */
-function takePiEarlyFinishStep(): UIMessageChunk[] {
-  return [];
-}
-
 type ToolInputStreamChunk = Extract<
   UIMessageChunk,
   { type: 'tool-input-start' | 'tool-input-delta' }
 >;
 
-const toolInputCallId = (part: ToolInputStreamChunk): string => part.toolCallId;
-
 function bufferToolInputPart(
   state: PiTranslatorState,
   part: ToolInputStreamChunk,
 ): UIMessageChunk[] {
-  const toolCallId = toolInputCallId(part);
+  const toolCallId = part.toolCallId;
   if (toolCallId === state.firstStreamedToolCallId) return [part];
   const buffered = state.bufferedToolInputParts.get(toolCallId) ?? [];
   buffered.push(part);
   state.bufferedToolInputParts.set(toolCallId, buffered);
   return [];
-}
-
-function extractPiToolCallIds(message: PiSessionEvent['message']): string[] {
-  if (!message || message.role !== 'assistant') return [];
-  if (!Array.isArray(message.content)) return [];
-  return message.content.flatMap(part => {
-    if (!part || typeof part !== 'object') return [];
-    const block = part as Record<string, unknown>;
-    if (block.type !== 'toolCall') return [];
-    const id = block.id ?? block.toolCallId;
-    return typeof id === 'string' && id.length > 0 ? [id] : [];
-  });
 }
 
 /**
@@ -398,10 +410,8 @@ export function translatePiSessionEventToUiChunks(
       }
       state.promptStarted = true;
       if (event.type === 'message_start') {
-        state.stepOpen = true;
-        state.pendingStepToolCallIds.clear();
-        state.earlyFinishStepToolCallIds.clear();
-        state.stepUsage = undefined;
+        // A new assistant message cannot reuse the previous message's
+        // buffered tool input (content-block ids and call order restart).
         state.firstStreamedToolCallId = undefined;
         state.bufferedToolInputParts.clear();
       }
@@ -489,9 +499,15 @@ export function translatePiSessionEventToUiChunks(
         if (typeof contentIndex !== 'number') return [];
         const id = state.streamingToolInputIds.get(contentIndex);
         // Without a start there is no id to attach the input to. Dropping it
-        // is safe: the complete input still arrives with the `tool-call`.
+        // is safe: the complete input still arrives with the
+        // `tool-input-available`.
         if (id === undefined) return [];
         if (update.type === 'toolcall_end') {
+          // Unlike upstream, no `tool-input-end` is emitted here: the Cowork
+          // renderer does not consume the tool-input stream, and
+          // `tool-input-available` (sent at `tool_execution_start`) carries
+          // the complete input. The mapping is only cleared so a reused
+          // content index cannot leak the previous call's id.
           state.streamingToolInputIds.delete(contentIndex);
           return [];
         }
@@ -523,35 +539,9 @@ export function translatePiSessionEventToUiChunks(
           delta: missing,
         });
       }
-      if (state.currentTextId) {
-        parts.push({ type: 'text-end', id: state.currentTextId });
-        state.currentTextId = undefined;
-      }
-      if (state.reasoningStarted && state.currentReasoningId) {
-        parts.push({ type: 'reasoning-end', id: state.currentReasoningId });
-        state.reasoningStarted = false;
-        state.currentReasoningId = undefined;
-      }
-      if (event.type === 'message_end') {
-        if (event.message?.role === 'assistant') {
-          state.lastAssistantError = getPiTerminalError(event);
-        }
-        const usage = event.message?.role === 'assistant' ? event.message.usage : undefined;
-        if (usage) {
-          state.stepUsage = usage;
-          if (usage.reasoning !== undefined) {
-            state.turnReasoningTokens = (state.turnReasoningTokens ?? 0) + usage.reasoning;
-          }
-        }
-        const toolCallIds = extractPiToolCallIds(event.message);
-        for (const toolCallId of toolCallIds) {
-          state.pendingStepToolCallIds.add(toolCallId);
-        }
-      } else {
-        state.pendingStepToolCallIds.clear();
-        if (!getPiTerminalError(event)) {
-          parts.push(...finishStep(state));
-        }
+      parts.push(...closeOpenTextAndReasoningParts(state));
+      if (event.type === 'message_end' && event.message?.role === 'assistant') {
+        state.lastAssistantError = getPiTerminalError(event);
       }
       return parts;
     }
@@ -598,22 +588,41 @@ export function translatePiSessionEventToUiChunks(
        * reports as text, are not in the map and fall back to unwrapping the
        * event's text payload.
        */
-      const result = state.hostToolResults.has(event.toolCallId)
-        ? ((state.hostToolResults.get(event.toolCallId) ?? null) as unknown)
-        : dynamicKind === 'mcp'
-          ? parseMcpToolResult(unwrapPiToolResult(event))
-          : unwrapPiToolResult(event);
+      const hasSubmitted = state.hostToolResults.has(event.toolCallId);
+      const submitted = state.hostToolResults.get(event.toolCallId);
       state.hostToolResults.delete(event.toolCallId);
-      state.pendingStepToolCallIds.delete(event.toolCallId);
+      const unwrapped = unwrapPiToolResult(event);
+      const result: unknown = hasSubmitted
+        ? submitted === undefined
+          ? null
+          : submitted
+        : dynamicKind === 'mcp'
+          ? parseMcpToolResult(unwrapped)
+          : unwrapped;
+      const dispatchFlags = {
+        ...(kind !== 'host' ? { providerExecuted: true } : {}),
+        ...(dynamicKind !== undefined ? { dynamic: true } : {}),
+      };
+      // Pi reports tool failures with `isError: true`; map those to
+      // `tool-output-error` so the UI can render the failure, with the
+      // projected result as the error text.
+      if (event.isError === true) {
+        return [
+          {
+            type: 'tool-output-error',
+            toolCallId: event.toolCallId,
+            errorText: toToolErrorText(result),
+            ...dispatchFlags,
+          },
+        ];
+      }
       return [
         {
           type: 'tool-output-available',
           toolCallId: event.toolCallId,
           output: result,
-          ...(kind !== 'host' ? { providerExecuted: true } : {}),
-          ...(dynamicKind ? { dynamic: true } : {}),
+          ...dispatchFlags,
         },
-        ...finishStep(state),
       ];
     }
 

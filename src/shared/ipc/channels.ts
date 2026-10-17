@@ -188,7 +188,7 @@ export const CoworkStreamIpc = {
   ContentPatch: 'cowork:stream:contentPatch',
   RuntimeSnapshots: 'cowork:stream:runtimeSnapshots',
   UiEvent: 'cowork:stream:uiEvent',
-  UiEventReplay: 'cowork:stream:uiEventReplay',
+  StreamResync: 'cowork:stream:resync',
   SessionsChanged: 'cowork:sessions:changed',
 } as const;
 export type CoworkStreamIpc = (typeof CoworkStreamIpc)[keyof typeof CoworkStreamIpc];

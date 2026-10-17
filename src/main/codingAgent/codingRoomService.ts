@@ -425,6 +425,7 @@ export class CodingRoomService extends CodingRoomServiceBuiltinAgentEvents {
     this.driverSessionPromises.clear();
     this.authTerminals.dispose();
     this.builtinSessionLaneMap.clear();
+    this.nonLaneSessionIds.clear();
     // Disposing the drivers terminates their streams, which settles in-flight
     // turns. Wait for those turns so their completion/failure handlers finish
     // writing to the repository before callers close the database.

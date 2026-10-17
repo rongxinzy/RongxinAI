@@ -307,6 +307,9 @@ const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean =
   if (hasText(message.content) || hasText(message.metadata?.error)) return true;
   if (message.metadata?.isThinking)
     return hasText(message.content) || Boolean(message.metadata?.isStreaming);
+  // B2: streaming answer bodies live in the LiveTextStore, not Redux; a
+  // streaming answer with empty Redux content still renders.
+  if (message.type === 'assistant' && message.metadata?.isStreaming) return true;
   return false;
 };
 

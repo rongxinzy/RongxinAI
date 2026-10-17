@@ -23,10 +23,15 @@ export const AssistantBubble: React.FC<{
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const isStreaming = Boolean(message.metadata?.isStreaming);
   const liveContent = useLiveMessageText(message.id, isStreaming);
-  const displayContent = liveContent ?? message.content;
+  // While streaming the body lives in the LiveTextStore; Redux only carries
+  // the committed content after the final update.
+  const displayContent = (isStreaming ? liveContent : undefined) ?? message.content;
   const rawContent = mapDisplayText ? mapDisplayText(displayContent) : displayContent;
-  const showStreaming = isStreaming && (rawContent.trim().length > 0 || liveContent !== undefined);
   const modelLabel = getMessageModelLabel(turnMetadata);
+
+  // S7: an empty streaming bubble is only a placeholder for text that has not
+  // arrived yet; render nothing instead of an empty shell.
+  if (rawContent.trim().length === 0) return null;
 
   return (
     <div className="py-1 focus:outline-none">
@@ -35,7 +40,7 @@ export const AssistantBubble: React.FC<{
           {/* 2026/09/20 lixiang  下传本地路径解析，使盘符路径可点打开（issue #805） */}
           <StreamingMarkdownResponse
             content={rawContent}
-            isStreaming={showStreaming}
+            isStreaming={isStreaming}
             resolveLocalFilePath={resolveLocalFilePath}
           />
           <CoworkContentNotice truncated={message.metadata?.contentTruncated} />

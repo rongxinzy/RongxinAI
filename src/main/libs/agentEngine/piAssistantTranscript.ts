@@ -1,8 +1,10 @@
 /**
  * Assistant and thinking bubbles for one Pi turn.
  *
- * Streaming store writes stay throttled; IPC to the renderer uses delta stream
- * parts. messageUpdate remains for IM and other full-text consumers.
+ * Streaming store writes and the in-process `messageUpdate` bus emit stay
+ * throttled; the renderer streams from delta stream parts instead.
+ * messageUpdate remains for IM and coding-room full-text consumers only —
+ * piUiForwarder drops every non-final messageUpdate on the IPC path.
  */
 
 import { randomUUID } from 'crypto';
@@ -10,7 +12,7 @@ import { randomUUID } from 'crypto';
 import type { CoworkMessage, CoworkStore } from '../../coworkStore';
 import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import type { ActivePiSession, PiStartupLatency, PiUsage } from './piRuntimeSessionState';
-import { STORE_UPDATE_THROTTLE_MS } from './piRuntimeSessionState';
+import { MESSAGE_UPDATE_THROTTLE_MS, STORE_UPDATE_THROTTLE_MS } from './piRuntimeSessionState';
 
 export interface PiAssistantTranscriptHost {
   getStore(): CoworkStore | null;
@@ -31,6 +33,12 @@ export class PiAssistantTranscript {
     { content: string; metadata: Record<string, unknown> }
   >();
   private readonly pendingStoreUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly lastMessageUpdateEmitAt = new Map<string, number>();
+  private readonly pendingMessageUpdate = new Map<
+    string,
+    { content: string; metadata: Record<string, unknown> }
+  >();
+  private readonly pendingMessageUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly throttleSessionByMessageId = new Map<string, string>();
 
   constructor(private readonly host: PiAssistantTranscriptHost) {}
@@ -84,7 +92,11 @@ export class PiAssistantTranscript {
     return created.id;
   }
 
-  /** Push a streaming (non-final) content snapshot to the answer/thinking message. */
+  /**
+   * Push a streaming (non-final) content snapshot to the answer/thinking
+   * message. Both the SQLite write and the bus emit are throttled — the bus
+   * event feeds IM/coding-room consumers only, never the renderer stream.
+   */
   streamInto(
     sessionId: string,
     active: ActivePiSession,
@@ -103,10 +115,10 @@ export class PiAssistantTranscript {
     if (kind === 'thinking') {
       active.thinkingLifecycle.markContentStreaming();
     }
-    // Throttle the synchronous SQLite write separately from the IPC emit so a
+    // Throttle the synchronous SQLite write separately from the bus emit so a
     // fast Pi stream doesn't block the main-process event loop every frame.
     this.throttledStoreUpdate(sessionId, messageId, content, metadata);
-    this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
+    this.throttledEmitMessageUpdate(sessionId, messageId, content, metadata);
   }
 
   /** Finalize the answer/thinking message: flush throttles, mark final, emit last update. */
@@ -118,6 +130,7 @@ export class PiAssistantTranscript {
   ): void {
     const messageId = this.ensureMessage(sessionId, active, kind, content);
     this.clearPendingStoreUpdate(messageId);
+    this.clearPendingMessageUpdate(messageId);
     const thinkingDurationMs = kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
     const metadata =
       kind === 'thinking'
@@ -151,6 +164,7 @@ export class PiAssistantTranscript {
     );
     for (const messageId of placeholderIds) {
       this.clearPendingStoreUpdate(messageId);
+      this.clearPendingMessageUpdate(messageId);
     }
     if (!this.host.getStore() || placeholderIds.length === 0) return;
 
@@ -323,6 +337,46 @@ export class PiAssistantTranscript {
     }
   }
 
+  /**
+   * Leading+trailing throttle for the in-process `messageUpdate` bus event
+   * (IM / coding-room consumers; the renderer stream path drops non-final
+   * messageUpdate). The leading call emits immediately; calls inside the
+   * window collapse into a single trailing emit of the latest content, and an
+   * armed trailing timer is never re-armed or duplicated.
+   */
+  private throttledEmitMessageUpdate(
+    sessionId: string,
+    messageId: string,
+    content: string,
+    metadata: Record<string, unknown>,
+  ): void {
+    this.noteThrottleMessage(sessionId, messageId);
+    const now = Date.now();
+    const lastEmit = this.lastMessageUpdateEmitAt.get(messageId) ?? 0;
+    const elapsed = now - lastEmit;
+
+    if (elapsed >= MESSAGE_UPDATE_THROTTLE_MS) {
+      this.clearPendingMessageUpdate(messageId);
+      this.lastMessageUpdateEmitAt.set(messageId, now);
+      this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
+      return;
+    }
+
+    this.pendingMessageUpdate.set(messageId, { content, metadata });
+    if (this.pendingMessageUpdateTimer.has(messageId)) return;
+    this.pendingMessageUpdateTimer.set(
+      messageId,
+      setTimeout(() => {
+        this.pendingMessageUpdateTimer.delete(messageId);
+        const pending = this.pendingMessageUpdate.get(messageId);
+        this.pendingMessageUpdate.delete(messageId);
+        if (!pending) return;
+        this.lastMessageUpdateEmitAt.set(messageId, Date.now());
+        this.host.emitMessageUpdate(sessionId, messageId, pending.content, pending.metadata);
+      }, MESSAGE_UPDATE_THROTTLE_MS - elapsed),
+    );
+  }
+
   private clearPendingStoreUpdate(messageId: string): void {
     const timer = this.pendingStoreUpdateTimer.get(messageId);
     if (timer) {
@@ -332,15 +386,38 @@ export class PiAssistantTranscript {
     this.pendingStoreUpdate.delete(messageId);
   }
 
+  private clearPendingMessageUpdate(messageId: string): void {
+    const timer = this.pendingMessageUpdateTimer.get(messageId);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingMessageUpdateTimer.delete(messageId);
+    }
+    this.pendingMessageUpdate.delete(messageId);
+  }
+
   clearThrottleStateBySession(sessionId: string, flush: boolean): void {
     for (const [messageId, owner] of this.throttleSessionByMessageId) {
       if (owner !== sessionId) continue;
-      if (flush && this.host.getStore()) {
-        const pending = this.pendingStoreUpdate.get(messageId);
-        if (pending) this.host.getStore().updateMessage(sessionId, messageId, pending);
+      if (flush) {
+        const pendingStore = this.pendingStoreUpdate.get(messageId);
+        if (pendingStore && this.host.getStore()) {
+          this.host.getStore().updateMessage(sessionId, messageId, pendingStore);
+        }
+        const pendingMessage = this.pendingMessageUpdate.get(messageId);
+        if (pendingMessage) {
+          this.lastMessageUpdateEmitAt.set(messageId, Date.now());
+          this.host.emitMessageUpdate(
+            sessionId,
+            messageId,
+            pendingMessage.content,
+            pendingMessage.metadata,
+          );
+        }
       }
       this.clearPendingStoreUpdate(messageId);
+      this.clearPendingMessageUpdate(messageId);
       this.lastStoreUpdateTime.delete(messageId);
+      this.lastMessageUpdateEmitAt.delete(messageId);
       this.throttleSessionByMessageId.delete(messageId);
     }
   }

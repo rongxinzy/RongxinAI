@@ -257,7 +257,10 @@ describe('Cowork streaming consistency C5–C7 (recovery through the real pipeli
         await withStreamingHarness(`seed-c5b-${seed}`, harness => {
           lastSeenResyncRequests = harness.stats.resyncRequests;
           const controls: DeliveryControls = {
-            dropWhen: (index: number): boolean => index < skipCount,
+            // The attaching window loads the session (message rows) from the
+            // database, so only the stream traffic before attach is missed.
+            dropWhen: (index: number, event): boolean =>
+              index < skipCount && event.type !== PiUiEventType.Message,
             onDelivered: (): void => {
               deliveriesAfterSkip += 1;
               if (resyncPending) {

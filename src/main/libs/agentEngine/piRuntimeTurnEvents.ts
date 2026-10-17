@@ -34,7 +34,12 @@ import { getPiPreparingToolActivity, toToolActivityInput } from './toolActivity'
 import type { PiAssistantTranscript } from './piAssistantTranscript';
 import { resolveCoworkStreamMessageId } from './piStreamChunkEmit';
 import type { PiSessionEvent } from './piTranslate/piEvents';
-import { translatePiSessionEventToUiChunks } from './piTranslate/piTranslateUiMessageChunk';
+import {
+  closeOpenTextAndReasoningParts,
+  setStreamedAssistantText,
+  translatePiSessionEventToUiChunks,
+} from './piTranslate/piTranslateUiMessageChunk';
+import type { UIMessageChunk } from 'ai';
 import { ProviderName } from '../../../shared/providers';
 import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
 import type { ActivePiSession, PiEvent, PiStartupLatency } from './piRuntimeSessionState';
@@ -69,11 +74,24 @@ export interface PiRuntimeTurnHost {
 export class PiRuntimeTurnEvents {
   constructor(private readonly host: PiRuntimeTurnHost) {}
 
-  private emitTranslatedPiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
-    const chunks = translatePiSessionEventToUiChunks(
+  /** Translate a Pi session event into UI stream chunks (stateful translator). */
+  private translatePiEvent(active: ActivePiSession, event: PiEvent): UIMessageChunk[] {
+    return translatePiSessionEventToUiChunks(
       event as unknown as PiSessionEvent,
       active.piTranslatorState,
     );
+  }
+
+  /**
+   * Emit already-translated chunks. Chunks that resolve to no Cowork message
+   * (tool streams, envelope start/finish) are dropped here — the renderer
+   * never consumes them on the stream path (S2/N3).
+   */
+  private emitChunks(
+    sessionId: string,
+    active: ActivePiSession,
+    chunks: readonly UIMessageChunk[],
+  ): void {
     for (const chunk of chunks) {
       const messageId = resolveCoworkStreamMessageId(
         sessionId,
@@ -84,6 +102,10 @@ export class PiRuntimeTurnEvents {
       if (!messageId) continue;
       this.host.emit('uiStreamChunk', sessionId, messageId, chunk);
     }
+  }
+
+  private emitTranslatedPiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
+    this.emitChunks(sessionId, active, this.translatePiEvent(active, event));
   }
 
   // ── Private: event mapping ──
@@ -181,6 +203,18 @@ export class PiRuntimeTurnEvents {
             if (activityEvent) this.host.emit('toolActivity', sessionId, activityEvent);
           }
         }
+        // Translate this event before touching session state: its delta
+        // lengths let us classify the new accumulated text as an append with
+        // an O(1) length check (no startsWith scan over the whole transcript,
+        // so per-delta CPU stays independent of content length). message_end
+        // remains the final authority for the complete text.
+        const chunks = this.translatePiEvent(active, event);
+        let textDeltaLen = 0;
+        let reasoningDeltaLen = 0;
+        for (const chunk of chunks) {
+          if (chunk.type === 'text-delta') textDeltaLen += chunk.delta.length;
+          else if (chunk.type === 'reasoning-delta') reasoningDeltaLen += chunk.delta.length;
+        }
         // Pi 0.84 emits fine-grained assistantMessageEvent deltas. Keep support
         // for older cumulative snapshots, then reconcile against message_end.
         const priorAnswer = active.answerText;
@@ -197,6 +231,21 @@ export class PiRuntimeTurnEvents {
           active.thinkingLifecycle.finish();
         }
 
+        // Chunks this event still emits itself. A snapshot path drops the
+        // start/delta chunks of the part its snapshot already covers, so the
+        // same content is never streamed twice.
+        let outgoing = chunks;
+        const dropTextStartAndDelta = (): void => {
+          outgoing = outgoing.filter(
+            chunk => chunk.type !== 'text-start' && chunk.type !== 'text-delta',
+          );
+        };
+        const dropReasoningStartAndDelta = (): void => {
+          outgoing = outgoing.filter(
+            chunk => chunk.type !== 'reasoning-start' && chunk.type !== 'reasoning-delta',
+          );
+        };
+
         if (thinking && thinking !== active.thinkingText) {
           active.thinkingText = thinking;
           if (!thinkingEnded) active.thinkingLifecycle.start();
@@ -206,8 +255,20 @@ export class PiRuntimeTurnEvents {
             'thinking',
             thinking,
           );
-          if (priorThinking.length > 0 && !thinking.startsWith(priorThinking)) {
+          const thinkingAppendOnly =
+            reasoningDeltaLen > 0 && thinking.length === priorThinking.length + reasoningDeltaLen;
+          if (priorThinking.length > 0 && !thinkingAppendOnly) {
+            // Non-prefix rewrite of the thinking text: close the open stream
+            // parts first, then reseed the renderer with one snapshot. The
+            // snapshot already contains this event's reasoning deltas, so they
+            // are dropped here instead of being sent twice.
+            this.emitChunks(
+              sessionId,
+              active,
+              closeOpenTextAndReasoningParts(active.piTranslatorState),
+            );
             this.host.emit('uiStreamSnapshot', sessionId, thinkingId, thinking);
+            dropReasoningStartAndDelta();
           }
           this.host.transcript.streamInto(sessionId, active, 'thinking', thinking);
         }
@@ -220,12 +281,26 @@ export class PiRuntimeTurnEvents {
           this.host.transcript.finalizeActiveThinking(sessionId, active);
           active.answerText = text;
           const answerId = this.host.transcript.ensureMessage(sessionId, active, 'answer', text);
-          if (priorAnswer.length > 0 && !text.startsWith(priorAnswer)) {
+          const answerAppendOnly =
+            textDeltaLen > 0 && text.length === priorAnswer.length + textDeltaLen;
+          if (priorAnswer.length > 0 && !answerAppendOnly) {
+            // Non-prefix rewrite of the answer: close the open stream parts,
+            // reseed the translator so later deltas are relative to the
+            // rewritten text, then reseed the renderer with one snapshot.
+            // This event's text start/deltas are already inside the snapshot
+            // and are dropped to avoid duplicating them.
+            this.emitChunks(
+              sessionId,
+              active,
+              closeOpenTextAndReasoningParts(active.piTranslatorState),
+            );
+            setStreamedAssistantText(active.piTranslatorState, text);
             this.host.emit('uiStreamSnapshot', sessionId, answerId, text);
+            dropTextStartAndDelta();
           }
           this.host.transcript.streamInto(sessionId, active, 'answer', text);
         }
-        this.emitTranslatedPiEvent(sessionId, active, event);
+        this.emitChunks(sessionId, active, outgoing);
         break;
       }
 
@@ -244,6 +319,10 @@ export class PiRuntimeTurnEvents {
               active.answerText = text;
               this.recordFirstVisibleToken(sessionId, active);
             }
+            // Close the open stream parts on the IPC path before any terminal
+            // state (finalize / closeIdlePlaceholders below) reaches the
+            // renderer — a finalized message must not receive further deltas.
+            this.emitTranslatedPiEvent(sessionId, active, event);
             this.host.transcript.finalizeActiveThinking(sessionId, active);
             const errMsg = event.message.errorMessage || 'Pi agent error';
             const errDetail = event.message.content
@@ -332,6 +411,11 @@ export class PiRuntimeTurnEvents {
             active.lastCompletedAnswerText = '';
           }
 
+          // Emit the translated terminal chunks (trailing suffix deltas and
+          // part ends) BEFORE any finalize: once a message turns final, the
+          // renderer must never receive another delta for it.
+          this.emitTranslatedPiEvent(sessionId, active, event);
+
           // Finalize thinking bubble (if any) on its own id.
           if (finalThinking.trim()) {
             if (finalThinking !== active.thinkingText) {
@@ -361,8 +445,6 @@ export class PiRuntimeTurnEvents {
               startupLatency,
             );
           }
-
-          this.emitTranslatedPiEvent(sessionId, active, event);
 
           // A turn can finish without any text (it answered with a tool call).
           // Its placeholder bubbles must still be closed: they were created with

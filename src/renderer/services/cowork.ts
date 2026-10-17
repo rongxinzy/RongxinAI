@@ -144,6 +144,7 @@ class CoworkService {
       dispatch: action => store.dispatch(action),
       getCoworkState: () => store.getState().cowork,
       liveText: coworkLiveTextStore,
+      requestStreamResync: sessionId => cowork.requestStreamResync(sessionId),
       shouldApply: event => recovery.observe(event),
       onSequenceGap: sessionId => {
         console.warn('[CoworkService] detected a Pi UI event sequence gap, reloading the session');
