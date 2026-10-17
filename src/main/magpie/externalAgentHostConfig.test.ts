@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   clearLegacyHostAgentStorage,
+  collectDirectorySnapshot,
   mergeOpenCodeConfigToUser,
   revertOpenCodeConfigFromUser,
   stripCodexMagpieProviderBlock,
@@ -48,6 +49,15 @@ describe('externalAgentHostConfig', () => {
     await fs.writeFile(path.join(legacyDir, 'settings.json'), '{"secret":true}\n');
     await clearLegacyHostAgentStorage(privateHome);
     expect(await fs.readdir(path.join(privateHome, 'host-agent-stash'))).toEqual([]);
+  });
+
+  it('collectDirectorySnapshot returns relative paths without deleting anything', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'magpie-snapshot-read-'));
+    roots.push(root);
+    await fs.mkdir(path.join(root, 'nested'), { recursive: true });
+    await fs.writeFile(path.join(root, 'nested', 'note.txt'), 'keep\n');
+    const snapshot = await collectDirectorySnapshot(root);
+    expect([...snapshot.keys()]).toEqual(['nested/note.txt']);
   });
 
   it('strips Codex magpie provider blocks and stray magpie keys', async () => {
