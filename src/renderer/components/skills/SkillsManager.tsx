@@ -6,6 +6,11 @@ import { useDispatch } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
 import { resolveLocalizedText, skillService } from '../../services/skill';
+import {
+  showAppErrorToast,
+  showAppSuccessToast,
+  showAppToast,
+} from '../../services/toastNotification';
 import { setSkills } from '../../store/slices/skillSlice';
 import { MarketplaceSkill, Skill } from '../../types/skill';
 import ErrorMessage from '../ErrorMessage';
@@ -73,9 +78,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
 
   const importInputRef = useRef<HTMLInputElement>(null);
 
-  const showToast = (message: string) => {
-    window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
-  };
+  const showToast = showAppToast;
 
   const {
     installedSkills,
@@ -231,14 +234,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
 
   const handleRequestDeleteSkill = (skill: Skill) => {
     if (skill.isBuiltIn) {
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', {
-          detail: {
-            message: i18nService.t('skillBuiltInCannotDelete'),
-            isError: true,
-          },
-        }),
-      );
+      showAppErrorToast(i18nService.t('skillBuiltInCannotDelete'));
       return;
     }
     setSkillActionError('');
@@ -275,11 +271,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
         const deletedIds = new Set(skillsPendingDelete.map(skill => skill.id));
         return new Set([...current].filter(id => !deletedIds.has(id)));
       });
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', {
-          detail: { message: i18nService.t('skillDeleted'), isSuccess: true },
-        }),
-      );
+      showAppSuccessToast(i18nService.t('skillDeleted'));
       setSkillsPendingDelete([]);
     } catch (error) {
       setSkillActionError(
@@ -368,18 +360,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
       // Not installed → switch to marketplace tab and search
       setActiveTab(SkillTab.Marketplace);
       setSkillSearchQuery('skill-creator');
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', { detail: i18nService.t('skillCreatorNotInstalled') }),
-      );
+      showAppToast(i18nService.t('skillCreatorNotInstalled'));
       return;
     }
 
     if (!skillCreator.enabled) {
       // Installed but disabled → switch to the local installed view.
       setActiveTab(SkillTab.Installed);
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', { detail: i18nService.t('skillCreatorNotEnabled') }),
-      );
+      showAppToast(i18nService.t('skillCreatorNotEnabled'));
       return;
     }
 

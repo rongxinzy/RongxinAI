@@ -12,6 +12,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
+import { showAppToast } from '../../services/toastNotification';
 import { mcpService, normalizeMcpErrorMessage } from '../../services/mcp';
 import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
@@ -111,11 +112,7 @@ const ActiveMcpBadge: React.FC = () => {
       if (!awaitingBridgeSyncRef.current) return;
       awaitingBridgeSyncRef.current = false;
       if (!error) return;
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', {
-          detail: `${i18nService.t('mcpBridgeSyncError')}: ${normalizeMcpErrorMessage(error)}`,
-        }),
-      );
+      showAppToast(`${i18nService.t('mcpBridgeSyncError')}: ${normalizeMcpErrorMessage(error)}`);
     });
   }, []);
 
@@ -129,16 +126,12 @@ const ActiveMcpBadge: React.FC = () => {
         dispatch(setMcpServers(updatedServers));
       } catch (error) {
         awaitingBridgeSyncRef.current = false;
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', {
-            detail: {
-              message: normalizeError(
-                error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
-              ),
-              isError: true,
-            },
-          }),
-        );
+        showAppToast({
+          message: normalizeError(
+            error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
+          ),
+          isError: true,
+        });
       } finally {
         setPendingServerId(null);
       }

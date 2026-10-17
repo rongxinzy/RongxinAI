@@ -162,7 +162,8 @@ test('runManually rolls back the optimistic state and toasts when the run fails 
   expect(state.tasks.find(t => t.id === 'task-2')?.state.runningAtMs).toBeNull();
   expect(state.error).toBe('gateway offline');
   expect(dispatchEvent).toHaveBeenCalledOnce();
-  const event = dispatchEvent.mock.calls[0]?.[0] as CustomEvent<string>;
+  const event = dispatchEvent.mock.calls[0]?.[0] as CustomEvent<string | { message: string }>;
   expect(event.type).toBe('app:showToast');
-  expect(event.detail.length).toBeGreaterThan(0);
+  const detail = typeof event.detail === 'string' ? event.detail : event.detail.message;
+  expect(detail.length).toBeGreaterThan(0);
 });

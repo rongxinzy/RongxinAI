@@ -12,6 +12,7 @@ import { Label } from '@shared/components/ui/label';
 import { FolderOpen, LoaderCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 
+import { showAppToast } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
 import { localInferenceCompactButtonClass } from '../localInference/constants';
 
@@ -21,10 +22,6 @@ interface CreateProjectDialogProps {
   /** Called with the selected project directory and its independent display name. */
   onCreated: (path: string, name: string) => Promise<boolean>;
 }
-
-const showToast = (message: string) => {
-  window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
-};
 
 /**
  * 「创建项目」dialog: registers the selected project directory with an
@@ -86,13 +83,13 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
     try {
       const created = await onCreated(selectedPath, trimmedName);
       if (!created) {
-        showToast(i18nService.t('projectCreateFailed'));
+        showAppToast(i18nService.t('projectCreateFailed'));
         return;
       }
       onOpenChange(false);
     } catch (error) {
       console.error('[CreateProjectDialog] Failed to create project:', error);
-      showToast(i18nService.t('projectCreateFailed'));
+      showAppToast(i18nService.t('projectCreateFailed'));
     } finally {
       setIsSaving(false);
     }

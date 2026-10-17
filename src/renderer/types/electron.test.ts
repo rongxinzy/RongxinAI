@@ -55,7 +55,6 @@ const ELECTRON_MEMBERS = [
   'managedProviders',
   'networkStatus',
   'devNetwork',
-  'qwen',
   'feishu',
   'dingtalk',
   'githubCopilot',

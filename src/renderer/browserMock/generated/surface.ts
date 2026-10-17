@@ -41,7 +41,6 @@ import { createEnterprise } from './createEnterprise';
 import { createManagedProviders } from './createManagedProviders';
 import { createNetworkStatus } from './createNetworkStatus';
 import { createDevNetwork } from './createDevNetwork';
-import { createQwen } from './createQwen';
 import { createFeishu } from './createFeishu';
 import { createDingtalk } from './createDingtalk';
 import { createGithubCopilot } from './createGithubCopilot';
@@ -92,7 +91,6 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     managedProviders: createManagedProviders(runtime),
     networkStatus: createNetworkStatus(runtime),
     devNetwork: createDevNetwork(runtime),
-    qwen: createQwen(runtime),
     feishu: createFeishu(runtime),
     dingtalk: createDingtalk(runtime),
     githubCopilot: createGithubCopilot(runtime),

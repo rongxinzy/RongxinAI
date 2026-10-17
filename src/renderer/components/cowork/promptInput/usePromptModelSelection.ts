@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { agentService } from '../../../services/agent';
 import { coworkService } from '../../../services/cowork';
 import { i18nService } from '../../../services/i18n';
+import { showAppToast } from '../../../services/toastNotification';
 import { updateCurrentSessionModelOverride } from '../../../store/slices/coworkSlice';
 import { type Model, setSelectedModel } from '../../../store/slices/modelSlice';
 import type { CoworkSession } from '../../../types/cowork';
@@ -85,11 +86,7 @@ export function usePromptModelSelection({
           if (reqId !== modelPatchRequestIdRef.current) return;
           if (!ok) {
             dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: prev }));
-            window.dispatchEvent(
-              new CustomEvent('app:showToast', {
-                detail: i18nService.t('coworkModelSwitchFailed'),
-              }),
-            );
+            showAppToast(i18nService.t('coworkModelSwitchFailed'));
           } else if (currentAgent && agentModelIsInvalid) {
             void agentService.updateAgent(currentAgent.id, { model: modelRef });
           }

@@ -20,6 +20,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
+import { showAppToast } from '../../services/toastNotification';
 import { mcpService, normalizeMcpErrorMessage } from '../../services/mcp';
 import { skillService } from '../../services/skill';
 import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
@@ -182,11 +183,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
       if (!awaitingBridgeSyncRef.current) return;
       awaitingBridgeSyncRef.current = false;
       if (!error) return;
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', {
-          detail: `${i18nService.t('mcpBridgeSyncError')}: ${normalizeMcpErrorMessage(error)}`,
-        }),
-      );
+      showAppToast(`${i18nService.t('mcpBridgeSyncError')}: ${normalizeMcpErrorMessage(error)}`);
     });
   }, []);
 
@@ -200,16 +197,12 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
         dispatch(setMcpServers(updatedServers));
       } catch (error) {
         awaitingBridgeSyncRef.current = false;
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', {
-            detail: {
-              message: normalizeError(
-                error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
-              ),
-              isError: true,
-            },
-          }),
-        );
+        showAppToast({
+          message: normalizeError(
+            error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
+          ),
+          isError: true,
+        });
       } finally {
         setPendingServerId(null);
       }
