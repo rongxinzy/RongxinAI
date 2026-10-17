@@ -85,7 +85,10 @@ describe('Magpie isolation and integrity', () => {
   });
 });
 describe('Magpie owned lifecycle', () => {
-  async function setup(serviceEnabled?: { read(): boolean; write(enabled: boolean): void }) {
+  async function setup(
+    serviceEnabled?: { read(): boolean; write(enabled: boolean): void },
+    gatewayPort?: { read(): number | undefined; write(port: number): void },
+  ) {
     const root = await temporary();
     let port = 21000;
     const child = Object.assign(new EventEmitter(), {
@@ -155,6 +158,7 @@ describe('Magpie owned lifecycle', () => {
         url.endsWith('/api/provider/off')
       )
         return Response.json({ ok: true });
+      if (url.includes('/api/agents/reapply/')) return Response.json({ ok: true });
       return Response.json({});
     });
     const manager = new MagpieManager({
@@ -168,6 +172,7 @@ describe('Magpie owned lifecycle', () => {
       spawn: spawn as never,
       fetch: fetcher as never,
       port: async () => ++port,
+      ...(gatewayPort ? { gatewayPort } : {}),
     });
     return { root, child, spawn, fetcher, manager };
   }
@@ -181,7 +186,11 @@ describe('Magpie owned lifecycle', () => {
       expect(first.state).toBe('running');
       expect(second).toEqual(first);
       expect(spawn).toHaveBeenCalledTimes(1);
-      expect(fetcher.mock.calls.some(([url]) => url.endsWith('/api/state'))).toBe(false);
+      expect(
+        fetcher.mock.calls.some(
+          ([url, init]) => url.endsWith('/api/state') && init?.method === 'POST',
+        ),
+      ).toBe(false);
       expect(JSON.stringify(await manager.agents())).not.toContain('secret');
       expect(await manager.models()).toMatchObject([{ id: 'm1', owned_by: 'test' }]);
       await manager.setModel({ agentId: 'codex', field: 'model', value: 'm2' });
@@ -358,6 +367,79 @@ describe('Magpie owned lifecycle', () => {
       expect(body.name).toBe('My OpenAI Renamed');
       // Key retained from existing provider in upstream state
       expect(body.key).toBe('sk-secret123456789');
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('reapplies wired managed agents after startup and persists the gateway port', async () => {
+    let gatewayPort = 0;
+    const store = {
+      read: () => gatewayPort || undefined,
+      write: (port: number) => {
+        gatewayPort = port;
+      },
+    };
+    const { manager, root, fetcher } = await setup(undefined, store);
+    try {
+      const started = Date.now();
+      await manager.start();
+      expect(Date.now() - started).toBeLessThan(5_000);
+      expect(gatewayPort).toBeGreaterThan(0);
+      await new Promise(resolve => setTimeout(resolve, 50));
+      expect(
+        fetcher.mock.calls.some(
+          ([url, init]) => url.includes('/api/agents/reapply/codex') && init?.method === 'POST',
+        ),
+      ).toBe(true);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not call ensureRunning for disconnectAll when the service is stopped', async () => {
+    const { manager, root } = await setup();
+    try {
+      const ensureRunning = vi.spyOn(manager, 'ensureRunning');
+      await expect(manager.disconnectAllAgents()).resolves.toEqual({ agents: [], pending: false });
+      expect(ensureRunning).not.toHaveBeenCalled();
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('disconnectAll is a no-op when no managed agents are wired', async () => {
+    const { manager, root, fetcher } = await setup();
+    try {
+      await manager.start();
+      const prior = fetcher.getMockImplementation();
+      fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url.includes('/api/agents/disconnect/')) {
+          throw new Error('unexpected disconnect call');
+        }
+        if (url.endsWith('/api/state')) {
+          return Response.json({
+            settings: {},
+            agents: [
+              {
+                id: 'codex',
+                name: 'Codex',
+                wired: false,
+                fields: [{ key: 'model', label: 'Model', value: 'm1', options: [] }],
+              },
+            ],
+          });
+        }
+        return prior!(url, init);
+      });
+      fetcher.mockClear();
+      await manager.disconnectAllAgents();
+      expect(fetcher.mock.calls.some(([url]) => url.includes('/api/agents/disconnect/'))).toBe(
+        false,
+      );
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });

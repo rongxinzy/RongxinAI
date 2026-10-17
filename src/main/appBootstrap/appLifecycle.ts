@@ -32,6 +32,14 @@ const runAppCleanup = async (): Promise<void> => {
   destroyTray();
   rt.skillManager?.stopWatching();
 
+  if (getStore().get<boolean>('magpie_disconnect_external_on_quit') === true) {
+    try {
+      await rt.magpieManager?.disconnectAllAgents();
+    } catch (error) {
+      console.warn('[Magpie] Failed to disconnect external agents before quit:', error);
+    }
+  }
+
   await rt.disposeMagpie?.();
   rt.disposeMagpie = undefined;
 
