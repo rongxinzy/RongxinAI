@@ -31,7 +31,7 @@ export function shellSidebarAppearances() {
         'padding-inline': '0.5rem',
         'border-bottom-width': '1px',
         'border-style': 'solid',
-        'border-color': 'var(--zy-border-subtle)',
+        'border-color': 'var(--border)',
       },
     }),
     'shell-sidebar-logo': recipe({ base: { height: '1rem' } }),
@@ -54,7 +54,7 @@ export function shellSidebarAppearances() {
         'padding-block': '0.5rem',
         'border-top-width': '1px',
         'border-style': 'solid',
-        'border-color': 'var(--zy-border-subtle)',
+        'border-color': 'var(--border)',
       },
     }),
     'shell-sidebar-nav': recipe({

@@ -16,9 +16,8 @@ XDG_CONFIG_HOME puts Magpie's own files below the supplied app-private directory
 Account discovery defaults off via MAGPIE_NO_ACCOUNTS=1; telemetry is disabled by
 DO_NOT_TRACK=1 and upstream settings. The gateway and Web UI bind to loopback.
 The host does not copy application provider credentials into Magpie. Its ephemeral
-Web key remains in Main and the separate in-memory management-window cookie jar.
-This window has no application preload, cannot open other windows, and denies
-external navigation and permission requests. External OAuth opens only through the controlled active-flow gate described below.
+Web key remains in Main; renderer IPC receives only projected preferences and
+provider summaries, never the key or the full upstream settings document.
 
 The host verifies source pin/platform/version and the packaged binary SHA256 in
 a cancellable worker before spawning. macOS and Windows manifests include the
@@ -29,15 +28,19 @@ No Windows Job Object or descendant cleanup is claimed for this Go process.
 
 ## Narrow renderer contract
 
-`src/shared/magpie/types.ts` defines status/start/stop/models/agents/setModel and
-openManagement. The IPC registrar requires the application's existing trusted
-main-frame predicate. It does not provide a generic URL or HTTP proxy.
+`src/shared/magpie/types.ts` defines status/start/stop/models/agents/setModel,
+providers CRUD and preferences. `src/shared/magpie/preferences.ts` defines the
+renderer-safe preference projection and patch. The IPC registrar requires the
+application's existing trusted main-frame predicate. It does not provide a
+generic URL or HTTP proxy.
 
 - models: official GET /v1/models, projected id/owned_by only
 - agents: official GET /api/state + GET /api/agents/cli, projected identity,
   missing-CLI flag, connection flag, versions and model fields only
 - setModel: explicit user apply action, official POST /api/set with Agent/Field/Value
-- openManagement: sandboxed official local Web UI, only after explicit start
+- preferences: official GET /api/settings projected to non-secret fields
+- updatePreferences: official POST /api/settings, merged inside Main from a
+  fresh full document so secrets and host-owned fields stay in Main
 
 The caller registers `registerMagpieIpc` once and awaits its returned disposer
 before application shutdown. The shared MagpieApi is exposed as
@@ -90,9 +93,9 @@ The configured model and policy are revalidated before each native request.
 URLs. The enterprise bridge retains its short-lived upstream tokens; Magpie sees
 only the host's local capability. GPU bindings describe a running llama-server;
 Magpie does not own downloads, GPU allocation or model loading. Reserved entries
-absent from the authoritative host snapshot are disabled. The official management
-window blocks editing these host entries. Private management responses are never
-forwarded to the main application renderer.
+absent from the authoritative host snapshot are disabled. Main rejects editing
+these host entries before calling upstream. Private upstream settings and provider
+responses are never forwarded to the application renderer.
 
 Public model response reads are capped at 2 MB before JSON parsing; parsing and
 projection run in one cancellable worker, with concurrent reads coalesced. A
@@ -118,22 +121,23 @@ persists the explicit preference, then restarts its process with the correspondi
 `MAGPIE_NO_ACCOUNTS` setting. Disabling forgets upstream account caches and stops
 subscription access but never deletes login files. A failed stop retains process
 ownership and reports a failed state instead of pretending the process stopped.
-The official window cannot independently change this host-owned privacy choice.
+The host-owned switch
+cannot be changed independently by the upstream Web UI.
 
 `oauthPolicy.ts` allows the fixed upstream's Codex, public GitHub Copilot, Gemini,
 Antigravity, and current Claude authorization route. An external URL must match
 an observed sign-in id belonging to the current explicitly started flow, read
 back from the authenticated upstream API, still be waiting, and pass exact HTTPS
 origin/path, client, PKCE and callback checks. Cancellation, expiry, disabling
-subscriptions or closing the management window invalidates pending opens. OAuth
+subscriptions or ending the flow invalidates pending opens. OAuth
 state/callback validation and token exchange remain upstream-owned. No arbitrary
 external links, credentials, callback codes or URLs enter application renderer IPC.
 
 Coverage boundaries: enterprise/custom GitHub domains, older Claude authorization
 domains, plugin login flows, and flows which require installing another CLI are
 not enabled by this bridge. Claude requires an already installed Claude Code CLI
-and the current official authorization route. Other management-window external
-links remain blocked. These are explicit unsupported cases, not successful logins.
+and the current official authorization route. Other external links remain blocked.
+These are explicit unsupported cases, not successful logins.
 
 Validation uses fake flows and disposable HOME with invalid, non-credential
 fixtures and no executable discovery. The real pinned binary passed default-off,

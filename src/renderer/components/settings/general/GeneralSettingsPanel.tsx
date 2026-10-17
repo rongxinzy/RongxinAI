@@ -1,136 +1,101 @@
 import { FieldGroup } from '@shared/components/ui/field';
-import { useEffect, useState } from 'react';
 
 import { i18nService, type LanguageType } from '../../../services/i18n';
 import { SettingsToggleRow } from '../../common/SettingsToggleRow';
-import { CodemodeToggleRow } from './CodemodeToggleRow';
 import { GeneralLanguageField } from './GeneralLanguageField';
-import { McpNativeBridgeToggleRow } from './McpNativeBridgeToggleRow';
 
 interface GeneralSettingsPanelProps {
   language: LanguageType;
   onLanguageChange: (nextLanguage: LanguageType) => void;
+  autoLaunch: boolean;
+  onAutoLaunchChange: (next: boolean) => void;
+  preventSleep: boolean;
+  onPreventSleepChange: (next: boolean) => void;
   useSystemProxy: boolean;
   onUseSystemProxyChange: (next: boolean) => void;
   sqliteAutoBackupEnabled: boolean;
   onSqliteAutoBackupEnabledChange: (next: boolean) => void;
-  setError: (message: string | null) => void;
+  codemodeEnabled: boolean;
+  onCodemodeEnabledChange: (next: boolean) => void;
+  mcpNativeBridge: boolean;
+  onMcpNativeBridgeChange: (next: boolean) => void;
 }
 
 export default function GeneralSettingsPanel({
   language,
   onLanguageChange,
+  autoLaunch,
+  onAutoLaunchChange,
+  preventSleep,
+  onPreventSleepChange,
   useSystemProxy,
   onUseSystemProxyChange,
   sqliteAutoBackupEnabled,
   onSqliteAutoBackupEnabledChange,
-  setError,
+  codemodeEnabled,
+  onCodemodeEnabledChange,
+  mcpNativeBridge,
+  onMcpNativeBridgeChange,
 }: GeneralSettingsPanelProps) {
-  const [autoLaunch, setAutoLaunchState] = useState(false);
-  const [isUpdatingAutoLaunch, setIsUpdatingAutoLaunch] = useState(false);
-  const [preventSleep, setPreventSleepState] = useState(false);
-  const [isUpdatingPreventSleep, setIsUpdatingPreventSleep] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    // Load auto-launch setting
-    window.electron.autoLaunch
-      .get()
-      .then(({ enabled }) => {
-        if (active) {
-          setAutoLaunchState(enabled);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load auto-launch setting:', err);
-      });
-
-    // Load prevent-sleep setting
-    window.electron.preventSleep
-      .get()
-      .then(({ enabled }) => {
-        if (active) {
-          setPreventSleepState(enabled);
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load prevent-sleep setting:', err);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
   return (
-    <FieldGroup className="gap-4">
-      <GeneralLanguageField value={language} onValueChange={onLanguageChange} />
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold text-foreground">
+          {i18nService.t('settingsGeneralSectionApplication')}
+        </h2>
+        <FieldGroup className="gap-4">
+          <GeneralLanguageField value={language} onValueChange={onLanguageChange} />
 
-      <SettingsToggleRow
-        label={i18nService.t('autoLaunch')}
-        description={i18nService.t('autoLaunchDescription')}
-        checked={autoLaunch}
-        onCheckedChange={async next => {
-          if (isUpdatingAutoLaunch) return;
-          setIsUpdatingAutoLaunch(true);
-          try {
-            const result = await window.electron.autoLaunch.set(next);
-            if (result.success) {
-              setAutoLaunchState(next);
-            } else {
-              setError(result.error || i18nService.t('autoLaunchUpdateFailed'));
-            }
-          } catch (err) {
-            console.error('Failed to set auto-launch:', err);
-            setError(i18nService.t('autoLaunchUpdateFailed'));
-          } finally {
-            setIsUpdatingAutoLaunch(false);
-          }
-        }}
-        disabled={isUpdatingAutoLaunch}
-      />
+          <SettingsToggleRow
+            label={i18nService.t('autoLaunch')}
+            description={i18nService.t('autoLaunchDescription')}
+            checked={autoLaunch}
+            onCheckedChange={onAutoLaunchChange}
+          />
 
-      <CodemodeToggleRow />
+          <SettingsToggleRow
+            label={i18nService.t('preventSleep')}
+            description={i18nService.t('preventSleepDescription')}
+            checked={preventSleep}
+            onCheckedChange={onPreventSleepChange}
+          />
 
-      <McpNativeBridgeToggleRow />
+          <SettingsToggleRow
+            label={i18nService.t('useSystemProxy')}
+            description={i18nService.t('useSystemProxyDescription')}
+            checked={useSystemProxy}
+            onCheckedChange={onUseSystemProxyChange}
+          />
 
-      <SettingsToggleRow
-        label={i18nService.t('preventSleep')}
-        description={i18nService.t('preventSleepDescription')}
-        checked={preventSleep}
-        onCheckedChange={async next => {
-          if (isUpdatingPreventSleep) return;
-          setIsUpdatingPreventSleep(true);
-          try {
-            const result = await window.electron.preventSleep.set(next);
-            if (result.success) {
-              setPreventSleepState(next);
-            } else {
-              setError(result.error || i18nService.t('preventSleepUpdateFailed'));
-            }
-          } catch (err) {
-            console.error('Failed to set prevent-sleep:', err);
-            setError(i18nService.t('preventSleepUpdateFailed'));
-          } finally {
-            setIsUpdatingPreventSleep(false);
-          }
-        }}
-        disabled={isUpdatingPreventSleep}
-      />
+          <SettingsToggleRow
+            label={i18nService.t('sqliteAutoBackupEnabled')}
+            description={i18nService.t('sqliteAutoBackupEnabledDescription')}
+            checked={sqliteAutoBackupEnabled}
+            onCheckedChange={onSqliteAutoBackupEnabledChange}
+          />
+        </FieldGroup>
+      </section>
 
-      <SettingsToggleRow
-        label={i18nService.t('useSystemProxy')}
-        description={i18nService.t('useSystemProxyDescription')}
-        checked={useSystemProxy}
-        onCheckedChange={next => onUseSystemProxyChange(next)}
-      />
+      <section className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold text-foreground">
+          {i18nService.t('settingsGeneralSectionAgentRuntime')}
+        </h2>
+        <FieldGroup className="gap-4">
+          <SettingsToggleRow
+            label={i18nService.t('codemodeEnabled')}
+            description={i18nService.t('codemodeEnabledDescription')}
+            checked={codemodeEnabled}
+            onCheckedChange={onCodemodeEnabledChange}
+          />
 
-      <SettingsToggleRow
-        label={i18nService.t('sqliteAutoBackupEnabled')}
-        description={i18nService.t('sqliteAutoBackupEnabledDescription')}
-        checked={sqliteAutoBackupEnabled}
-        onCheckedChange={next => onSqliteAutoBackupEnabledChange(next)}
-      />
-    </FieldGroup>
+          <SettingsToggleRow
+            label={i18nService.t('mcpNativeBridge')}
+            description={i18nService.t('mcpNativeBridgeDescription')}
+            checked={mcpNativeBridge}
+            onCheckedChange={onMcpNativeBridgeChange}
+          />
+        </FieldGroup>
+      </section>
+    </div>
   );
 }

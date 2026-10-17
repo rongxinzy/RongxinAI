@@ -34,7 +34,9 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center justify-center gap-2">
+    // One centered row on wide screens; below the composer width the actions
+    // become a balanced grid so a wrapped tail never leaves a lonely pill.
+    <div className="mx-auto grid w-full max-w-4xl grid-cols-2 gap-2 md:grid-cols-3 xl:flex xl:flex-wrap xl:items-center xl:justify-center">
       {actions.map(action => {
         const IconComponent = iconMap[action.icon];
 
@@ -44,7 +46,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect
             type="button"
             variant="outline"
             onClick={() => onActionSelect(action.id)}
-            className="theme-page-quick-action-bar-button-1 flex items-center whitespace-nowrap"
+            className="theme-page-quick-action-bar-button-1 flex items-center justify-center whitespace-nowrap"
           >
             {IconComponent && <IconComponent />}
             <span>{action.label}</span>

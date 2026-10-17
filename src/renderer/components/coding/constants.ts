@@ -4,6 +4,7 @@ import { ToolState } from '../../../shared/components/ai-elements/constants';
 export const CodingUiEvent = {
   CreateSession: 'coding:create-session',
   ManageAgents: 'coding:manage-agents',
+  OpenWorkspaceDialog: 'coding:open-workspace-dialog',
 } as const;
 
 export interface CodingCreateSessionEventDetail {

@@ -3,8 +3,11 @@ export const enSettings: Record<string, string> = {
   // Settings
   settings: 'Settings',
   settingsGroupGeneral: 'General',
-  settingsGroupModel: 'Models',
+  settingsGroupModel: 'Models & memory',
   settingsGroupChannels: 'Channels',
+  imChannelSettingsTitle: '{name} Settings',
+  settingsGeneralSectionApplication: 'Application',
+  settingsGeneralSectionAgentRuntime: 'Agent runtime',
   general: 'General',
   shortcuts: 'Shortcuts',
   about: 'About',
@@ -42,10 +45,12 @@ export const enSettings: Record<string, string> = {
   // Shortcuts
   keyboardShortcuts: 'Keyboard Shortcuts',
   shortcutNotSet: 'Not set',
+  shortcutRecorderHint: 'Click a shortcut and press the new keys; Esc cancels, Backspace clears.',
   shortcutConflict: 'Shortcut "{0}" is already used by "{1}"',
   settingsPartiallySaved: 'Base settings were saved, but a later sync failed: {0}',
   systemPrompt: 'System Prompt',
   systemPromptPlaceholder: 'Set custom instructions for IM bot...',
   settingsLoadFailed: 'Failed to load settings',
+  settingsSaveFailed: 'Failed to save settings',
   'settings.enterprise.managed': 'Managed by enterprise',
 };

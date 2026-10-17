@@ -7,7 +7,7 @@ export const zhScheduledTask: Record<string, string> = {
   scheduledTasksCreateByChat: '通过会话创建',
   scheduledTasksCreateByChatPrompt:
     '我想通过对话创建一个定时任务，请先询问我执行内容、执行时间和通知方式，然后帮我完成配置。',
-  scheduledTasksNewTask: '新建任务',
+  scheduledTasksNewTask: '新建自动化',
   scheduledTasksNewTab: '新建',
   scheduledTasksEmptyState: '暂无定时任务',
   scheduledTasksEmptyHint: '创建定时任务，让 AI 按计划自动执行',

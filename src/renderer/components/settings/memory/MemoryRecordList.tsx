@@ -325,7 +325,13 @@ function MemoryRows(props: {
           <EmptyMedia variant="icon">
             <Brain />
           </EmptyMedia>
-          <EmptyTitle>{i18nService.t('managedMemoryEmptyTitle')}</EmptyTitle>
+          <EmptyTitle>
+            {i18nService.t(
+              view === ManagedMemoryView.Session
+                ? 'managedMemorySessionEmptyTitle'
+                : 'managedMemoryEmptyTitle',
+            )}
+          </EmptyTitle>
           <EmptyDescription>
             {view === ManagedMemoryView.Session
               ? i18nService.t('managedMemorySessionEmptyDescription')

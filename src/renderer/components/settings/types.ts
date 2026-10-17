@@ -6,7 +6,6 @@ export type TabType =
   | 'appearance'
   | 'model'
   | 'aisphere'
-  | 'triage'
   | 'coworkMemory'
   | 'shortcuts'
   | 'im'

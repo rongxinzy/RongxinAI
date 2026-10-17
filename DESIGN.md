@@ -1,8 +1,8 @@
 # DESIGN.md - 知远智能体 (ZhiYuan Agent) Zenith Design System
 
-> **Version**: v3.0 (Zenith - Premium Futuristic)  
-> **Date**: 2026-10-16  
-> **Positioning**: P0 mandatory constraint for all frontend work, paired with `AGENTS.md` engineering rules.  
+> **Version**: v3.1 (Zenith - Premium Futuristic, 2026-10-17 polish)
+> **Date**: 2026-10-17
+> **Positioning**: P0 mandatory constraint for all frontend work, paired with `AGENTS.md` engineering rules.
 > **Philosophy**: 清新 (fresh) · 轻盈 (light/airy) · 畅快 (smooth, fluid) · 科技感 (tech-forward)
 
 Zenith is a modern premium design system that balances futuristic aesthetics with desktop efficiency, characterized by subtle glassmorphism, clean typography, efficient spacing, and smooth interactions. Surfaces have depth without distraction, typography is crisp and readable, and the interface feels light yet information-dense.
@@ -394,8 +394,86 @@ Before committing Zenith redesign:
 
 ---
 
+## 十二、2026-10-17 体验修订
+
+本轮修复 Zenith 主题落地后暴露的可见性、层级与密度问题，不改变信息架构。
+
+### 控件可见性
+
+- **开关**：未选中轨道使用 `color-mix(in oklab, var(--zy-foreground) 14%, var(--zy-background))`，描边 `var(--zy-input-border)`，滑块统一为白色；选中轨道使用 `--zy-switch-track-checked`。未选中开关不得再用 `--zy-surface-raised` 作为轨道，滑块不得与轨道同色。
+- **对话框**：内容面使用 `--zy-surface-overlay`，不得使用半透明 `--zy-surface`，避免页面内容透出；遮罩为 20% 黑 + 6px backdrop blur。菜单与弹层继续使用 `--popover`。
+- **侧栏分界**：侧栏 header/footer 的 hairline 使用 `--border`，不得退回到几乎不可见的 `--border-subtle`。
+
+### 布局契约
+
+- **设置页行式面板**（General / Appearance / Shortcuts）内容最大宽度 768px；Model、Platform Models、Email、About 同样使用 768px 阅读列，Memory 与 IM 使用 1024px 画布；主题卡片用 auto-fill、单列最小 13rem 排布，单张卡片不得拉伸占满整行。
+- **首页快捷动作**：≥1280px 保持单行居中；更窄时使用 2/3 列网格，保持两行平衡，不得出现右侧孤立末项。
+- **会话阅读列**：对话与输入区共享 `max-w-4xl`（896px）并居中；首页输入岛仍为 `max-w-3xl`（768px）。长文行宽优先保证可读性，工具卡片在列内自适应。
+- **表单弹窗**：至少 448px，字段间距 16px；内容不足时优先加宽（512px）而不是压缩字号或控件。项目名与路径都必须有可见标签。
+
+### 文案与空状态
+
+- 自动化页的新建动作使用「New automation / 新建自动化」，与全局「New Task / 新建任务」区分。
+- 空状态必须有对象与下一步，不能只留空白容器；空状态动作使用共享 Button，不另造控件。
+- 英文计数在单数时使用单数文案（如 `1 turn`，不是 `1 turns`）。
+
+### 验收补充
+
+- 除 1280×800 / 1920×1080 外，另在 1440×900、1024×768、940×700、760×700 检查：无横向溢出、无孤立掉行、输入区控件仍可达。
+- 开关、对话框、空状态、设置行式面板必须浅色/深色成对截图验收；页面内不得出现裸 i18n key 或重复空状态标题。
+
+---
+
+## 十三、2026-10-17 设置页重构
+
+本轮重做设置页的信息架构、页脚语义与模型页层级，移除已由 Magpie 模型服务取代的旧路由入口。
+
+### 信息架构
+
+- 设置侧栏分组固定为 General / Models & memory / Channels；`Model Routing` 页删除，Memory 归入 Models & memory，不再单列在模型组末尾。
+- 每页标题只由 PageHeader 提供；内容区从第一个设置分组或说明开始，不重复页面标题。
+- General 页分为 Application（语言、登录启动、防休眠、系统代理、自动备份）与 Agent runtime（Codemode、MCP native bridge）两组。设置行不卡片化。
+
+### 页脚契约
+
+- **全部设置页自动保存**：页脚只保留 `Close`，不出现 `Save` / `Cancel`。切换、选择、开关在操作后立即写入；文本输入使用失焦或 600ms 防抖写入。
+- **General / Appearance / Shortcuts**：语言、主题、快捷键在变更时立即持久化；不得再出现「切换后还要点 Save」或关闭时回滚已生效设置。
+- **Email**：表单通过本地校验后自动写入 Skill 配置；关闭页面时冲刷未提交的有效表单。校验失败时不写入、不弹出自动错误。
+- **IM**：字段在失焦时持久化，800ms 防抖后自动同步网关；关闭页面时冲刷待同步配置。不得要求用户再点 `Save`。
+- 页脚与当前内容列同宽、右对齐；内容列切换时页脚按钮随之对齐，不固定在窗口最右缘。
+
+### 宽度与间距
+
+- 行式设置页（General / Appearance / Shortcuts / Model / Platform Models / Email / About）使用 768px 阅读列；Memory 与 IM 使用 1024px 画布。
+- 页面自身不再叠加 `p-4`、`max-w-xl`、`max-w-2xl` 等内层宽度；宽度只由 SettingsPage 的内容列决定。
+- 页面内容顶部统一 24px，页脚 12px 垂直内边距；分组之间 32px，组内行 16px。
+
+### 模型页层级
+
+- 模型页按官方 Magpie 设置的信息架构分为 Service / Agents / Providers / Models / Network & sharing / Privacy / About 七个分段，使用分段控件切换；窄窗口下改为下拉选择，不得横向裁切分段标签。
+- 页面顶部只保留一个 `Model service` 区：状态徽标、简短说明、刷新/启用动作；启用说明只在未运行时出现。不得再出现打开官方管理页面的入口。
+- Provider 使用带分隔线的行式列表，不再为每个 Provider 套 Card；服务商模型标签使用 `text-xs`，不得出现 10px/11px 字号。
+- Default model 显示当前已保存默认模型；`Set as default` 只在用户选择了不同模型时出现，不展示长期禁用的主按钮。
+- Models / Network / Privacy 使用自动保存行：切换即写入，行内显示当前值；不得再引入页面级 Save。Network 的端口、局域网共享、CORS 与允许来源由宿主托管，只读展示并说明原因。
+- Privacy 的脱敏分类使用行式开关，不套嵌套卡片；订阅账号控制放在隐私分段底部。
+- 外部 Agent 是模型页的一级分段 `Agents`，直接展示接入列表与刷新/断开动作；不得收在 Service 底部，也不得再通过“管理接入”弹窗承载。
+- 页面内不得再出现重复的 `Models` 标题；许可证只在 About 分段出现一次。
+
+### 其他修订
+
+- 快捷键页增加录制说明；设置开关通过 `aria-labelledby`/`aria-describedby` 关联标签与描述。
+- IM 渠道标题使用 `{name} Settings / {name} 设置`，不得拼接出 `WeChatSettings`。
+- IM 项目必填字段默认使用中性样式与必填标记，不得在用户尚未操作时显示红色 invalid 态。
+
+### 验收补充
+
+- 设置页每个 tab 在 1440×900 与 1024×768 下检查浅色/深色、页脚对齐、无横向溢出；760×700 下检查侧栏与内容仍可用。
+- 每个设置页切换、关闭、重开，确认变更已自动落盘且页脚只有 `Close`；不得出现 `Save`/`Cancel` 或关闭后回滚。
+
+---
+
 **Design Authority**: This specification is the single source of truth for Zenith design system. Any deviation requires explicit approval and documentation update.
 
-**Version**: 3.0.0-zenith  
-**Last Updated**: 2026-10-16  
+**Version**: 3.4.0-zenith
+**Last Updated**: 2026-10-17
 **Next Review**: Q1 2027

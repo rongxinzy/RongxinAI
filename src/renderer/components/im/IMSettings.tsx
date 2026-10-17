@@ -318,7 +318,9 @@ const IMSettings: React.FC = () => {
                 />
               </div>
               <h3 className="text-sm font-medium text-foreground">
-                {`${i18nService.t(activePlatform)}${i18nService.t('settings')}`}
+                {i18nService
+                  .t('imChannelSettingsTitle')
+                  .replace('{name}', i18nService.t(activePlatform))}
               </h3>
             </div>
             <Badge

@@ -7,7 +7,7 @@ export const enScheduledTask: Record<string, string> = {
   scheduledTasksCreateByChat: 'Create via conversation',
   scheduledTasksCreateByChatPrompt:
     'I want to create a scheduled task through conversation. Please ask me for the task, schedule, and notification method, then help me configure it.',
-  scheduledTasksNewTask: 'New Task',
+  scheduledTasksNewTask: 'New automation',
   scheduledTasksNewTab: 'New',
   scheduledTasksEmptyState: 'No scheduled tasks',
   scheduledTasksEmptyHint: 'Create scheduled tasks to automate AI execution on a schedule',

@@ -1,6 +1,14 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { FileDiff, PanelRight } from 'lucide-react';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
+import { FileDiff, FolderGit2, FolderPlus, PanelRight } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -36,7 +44,7 @@ import {
   CodingSessionRecoveryDialog,
 } from './codingWorkbenchDialogs';
 import { CodingSidePanelBottomSheet, CodingSidePanelFrame } from './codingWorkbenchSidePanel';
-import { CodingAgentStatusI18nKey, CodingSidePanelView } from './constants';
+import { CodingAgentStatusI18nKey, CodingSidePanelView, CodingUiEvent } from './constants';
 import { findPendingCodingPermission } from './codingPermission';
 import { useCodingAgentManager } from './useCodingAgentManager';
 import { useCodingArtifactPanel } from './useCodingArtifactPanel';
@@ -370,19 +378,48 @@ export const CodingWorkbenchView = ({
     />
   );
 
+  const codingHeader = (
+    <PageHeader
+      title={i18nService.t('codingAgent')}
+      isSidebarCollapsed={isSidebarCollapsed}
+      onToggleSidebar={onToggleSidebar}
+    />
+  );
+
   if (!workspaceRoot)
     return (
-      <>
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          {i18nService.t('codingAgentSelectWorkspace')}
+      <div data-page-canvas className="flex h-full min-h-0 flex-col bg-background">
+        {codingHeader}
+        <div className="flex min-h-0 flex-1 items-center justify-center px-6">
+          <Empty className="max-w-md">
+            <EmptyMedia variant="icon">
+              <FolderGit2 />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle>{i18nService.t('codingWorkspaceSection')}</EmptyTitle>
+              <EmptyDescription>{i18nService.t('codingWorkspaceEmpty')}</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button
+                type="button"
+                onClick={() =>
+                  window.dispatchEvent(new CustomEvent(CodingUiEvent.OpenWorkspaceDialog))
+                }
+              >
+                <FolderPlus />
+                {i18nService.t('codingWorkspaceAdd')}
+              </Button>
+            </EmptyContent>
+          </Empty>
         </div>
         {agentManagerElement}
-      </>
+      </div>
     );
   if (!snapshot)
     return (
-      <>
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div data-page-canvas className="flex h-full min-h-0 flex-col bg-background">
+        {codingHeader}
+        <div className="flex min-h-0 flex-1 items-center justify-center px-6">
           {bootstrapError ? (
             <div className="flex flex-col items-center gap-3 text-center">
               <p>{bootstrapError}</p>
@@ -399,7 +436,7 @@ export const CodingWorkbenchView = ({
           )}
         </div>
         {agentManagerElement}
-      </>
+      </div>
     );
 
   return (

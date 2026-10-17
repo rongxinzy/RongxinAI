@@ -68,7 +68,12 @@ const TodoNavigationPanel: React.FC<TodoNavigationPanelProps> = ({
   onDeleteList,
 }) => (
   <div className="flex min-h-0 flex-1 flex-col">
-    <Button type="button" onClick={onFocusNewTask} className="w-full justify-start">
+    <Button
+      type="button"
+      variant="outline"
+      onClick={onFocusNewTask}
+      className="w-full justify-start"
+    >
       <Plus />
       {i18nService.t('todoNewTask')}
     </Button>

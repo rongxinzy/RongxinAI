@@ -73,9 +73,6 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
       runtime.warnOnce('magpie.models');
       return [];
     },
-    openManagement: async () => {
-      runtime.warnOnce('magpie.openManagement');
-    },
     catalog: async () => {
       runtime.warnOnce('magpie.catalog');
       return {
@@ -139,6 +136,77 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
       return {
         activeProviderCount: 0,
         recentErrors: [],
+      };
+    },
+    preferences: async () => {
+      runtime.warnOnce('magpie.preferences');
+      return {
+        version: '0.0.0-preview',
+        dataDir: '',
+        gateway: '',
+        proxy: '',
+        proxyNow: '',
+        proxySource: '',
+        bareModelIDs: false,
+        port: 0,
+        lan: false,
+        onNetwork: false,
+        lanUrls: [],
+        vision: '',
+        visionEffort: '',
+        visionEfforts: [],
+        visionModels: [],
+        imageGen: '',
+        imageGenModels: [],
+        searcher: '',
+        searcherEffort: '',
+        searchFirst: '',
+        searchEfforts: [],
+        searchChoices: [],
+        searchRelays: [],
+        disabledModels: [],
+        redact: false,
+        redactPersonal: false,
+        redactKinds: {},
+        redactWords: [],
+        noAccountDiscovery: false,
+        noAccountsEnv: false,
+      };
+    },
+    updatePreferences: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.updatePreferences');
+      return {
+        version: '0.0.0-preview',
+        dataDir: '',
+        gateway: '',
+        proxy: '',
+        proxyNow: '',
+        proxySource: '',
+        bareModelIDs: false,
+        port: 0,
+        lan: false,
+        onNetwork: false,
+        lanUrls: [],
+        vision: '',
+        visionEffort: '',
+        visionEfforts: [],
+        visionModels: [],
+        imageGen: '',
+        imageGenModels: [],
+        searcher: '',
+        searcherEffort: '',
+        searchFirst: '',
+        searchEfforts: [],
+        searchChoices: [],
+        searchRelays: [],
+        disabledModels: [],
+        redact: false,
+        redactPersonal: false,
+        redactKinds: {},
+        redactWords: [],
+        noAccountDiscovery: false,
+        noAccountsEnv: false,
       };
     },
   };

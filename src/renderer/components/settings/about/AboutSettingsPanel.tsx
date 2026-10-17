@@ -146,6 +146,7 @@ export default function AboutSettingsPanel({
               </div>
               <Switch
                 checked={betaChannelEnabled}
+                aria-label={i18nService.t('aboutUpdateBetaChannel')}
                 onCheckedChange={checked => {
                   const channel = checked
                     ? AppUpdateChannelPreference.Beta

@@ -89,7 +89,7 @@ export function AISphereSettings() {
   };
 
   return (
-    <div className="max-w-xl space-y-6 p-4">
+    <div className="flex flex-col gap-6">
       <div className="space-y-2">
         <Label htmlFor="aisphere-address">{t('aisphereAddress')}</Label>
         <Input

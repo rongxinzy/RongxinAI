@@ -17,6 +17,7 @@ import {
   type MagpieModelSelection,
   type MagpieSaveProviderInput,
 } from '../../shared/magpie/types';
+import type { MagpiePreferencesPatch } from '../../shared/magpie/preferences';
 import { onPush, onPushVoid } from './pushChannel';
 
 // Model providers, agent profiles, enterprise, and OAuth integrations.
@@ -135,7 +136,6 @@ export const providersApi = {
     models: () => ipcRenderer.invoke(MagpieIpc.models),
     catalog: () => ipcRenderer.invoke(MagpieIpc.catalog),
     selectDefault: (modelId: string) => ipcRenderer.invoke(MagpieIpc.selectDefault, modelId),
-    openManagement: () => ipcRenderer.invoke(MagpieIpc.openManagement),
     providers: () => ipcRenderer.invoke(MagpieIpc.providers),
     saveProvider: (input: MagpieSaveProviderInput) =>
       ipcRenderer.invoke(MagpieIpc.saveProvider, input),
@@ -145,6 +145,9 @@ export const providersApi = {
     testProvider: (input: MagpieSaveProviderInput) =>
       ipcRenderer.invoke(MagpieIpc.testProvider, input),
     diagnostics: () => ipcRenderer.invoke(MagpieIpc.diagnostics),
+    preferences: () => ipcRenderer.invoke(MagpieIpc.preferences),
+    updatePreferences: (patch: MagpiePreferencesPatch) =>
+      ipcRenderer.invoke(MagpieIpc.updatePreferences, patch),
   },
 
   auth: {

@@ -97,12 +97,16 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={nextOpen => !isSaving && onOpenChange(nextOpen)}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{i18nService.t('createProjectTitle')}</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-3 py-1">
+        <div className="flex flex-col gap-4 py-2">
           <div className="flex flex-col gap-1.5">
+            <Label htmlFor="create-project-name">
+              {i18nService.t('projectNameLabel')}
+              <span className="text-destructive"> *</span>
+            </Label>
             <Input
               id="create-project-name"
               value={name}
@@ -153,13 +157,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
           >
             {i18nService.t('cancel')}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className={localInferenceCompactButtonClass}
-            onClick={() => void handleSave()}
-            disabled={isSaving}
-          >
+          <Button type="button" onClick={() => void handleSave()} disabled={isSaving}>
             {isSaving && <LoaderCircle className="size-4 animate-spin" />}
             {i18nService.t('save')}
           </Button>

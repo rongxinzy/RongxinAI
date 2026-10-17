@@ -155,41 +155,44 @@ export default function ShortcutsSettingsPanel({
   onShortcutChange,
 }: ShortcutsSettingsPanelProps) {
   return (
-    <FieldGroup className="gap-4">
-      <Field orientation="horizontal">
-        <FieldLabel htmlFor="shortcut-new-chat">{i18nService.t('newChat')}</FieldLabel>
-        <ShortcutRecorder
-          id="shortcut-new-chat"
-          value={shortcuts.newChat}
-          onChange={v => onShortcutChange('newChat', v)}
-        />
-      </Field>
-      <Field orientation="horizontal">
-        <FieldLabel htmlFor="shortcut-search">{i18nService.t('search')}</FieldLabel>
-        <ShortcutRecorder
-          id="shortcut-search"
-          value={shortcuts.search}
-          onChange={v => onShortcutChange('search', v)}
-        />
-      </Field>
-      <Field orientation="horizontal">
-        <FieldLabel htmlFor="shortcut-open-settings">{i18nService.t('openSettings')}</FieldLabel>
-        <ShortcutRecorder
-          id="shortcut-open-settings"
-          value={shortcuts.settings}
-          onChange={v => onShortcutChange('settings', v)}
-        />
-      </Field>
-      <Field orientation="horizontal">
-        <FieldLabel htmlFor="shortcut-send-message">
-          {i18nService.t('sendMessageShortcut')}
-        </FieldLabel>
-        <SendShortcutSelect
-          id="shortcut-send-message"
-          value={shortcuts.sendMessage}
-          onChange={v => onShortcutChange('sendMessage', v)}
-        />
-      </Field>
-    </FieldGroup>
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">{i18nService.t('shortcutRecorderHint')}</p>
+      <FieldGroup className="gap-4">
+        <Field orientation="horizontal">
+          <FieldLabel htmlFor="shortcut-new-chat">{i18nService.t('newChat')}</FieldLabel>
+          <ShortcutRecorder
+            id="shortcut-new-chat"
+            value={shortcuts.newChat}
+            onChange={v => onShortcutChange('newChat', v)}
+          />
+        </Field>
+        <Field orientation="horizontal">
+          <FieldLabel htmlFor="shortcut-search">{i18nService.t('search')}</FieldLabel>
+          <ShortcutRecorder
+            id="shortcut-search"
+            value={shortcuts.search}
+            onChange={v => onShortcutChange('search', v)}
+          />
+        </Field>
+        <Field orientation="horizontal">
+          <FieldLabel htmlFor="shortcut-open-settings">{i18nService.t('openSettings')}</FieldLabel>
+          <ShortcutRecorder
+            id="shortcut-open-settings"
+            value={shortcuts.settings}
+            onChange={v => onShortcutChange('settings', v)}
+          />
+        </Field>
+        <Field orientation="horizontal">
+          <FieldLabel htmlFor="shortcut-send-message">
+            {i18nService.t('sendMessageShortcut')}
+          </FieldLabel>
+          <SendShortcutSelect
+            id="shortcut-send-message"
+            value={shortcuts.sendMessage}
+            onChange={v => onShortcutChange('sendMessage', v)}
+          />
+        </Field>
+      </FieldGroup>
+    </div>
   );
 }

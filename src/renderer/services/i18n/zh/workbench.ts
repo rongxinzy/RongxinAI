@@ -111,18 +111,6 @@ export const zhWorkbench: Record<string, string> = {
   agentTabBasic: '基础信息',
   agentTabSkills: '技能',
   agentTabIM: 'IM 渠道',
-  agentTabTriage: '路由',
-  agentTriageEnable: '启用自动模型路由',
-  agentTriageEnableHint:
-    '根据消息复杂度自动选择轻量、标准或强推理模型。冷却轮次等全局参数在设置 → 模型路由中配置。',
-  agentTriageLightModel: '轻量模型',
-  agentTriageLightModelHint: '用于问候语、简单问答、翻译等低复杂度消息',
-  agentTriageHeavyModel: '强推理模型',
-  agentTriageHeavyModelHint:
-    '用于代码编写、架构设计、调试等复杂任务（可选，不选则使用 Agent 默认模型）',
-  agentTriageStandardNote: '标准消息使用此 Agent 的默认模型，无需额外配置。',
-  agentTriageCrossProvider: '允许跨服务商切换',
-  agentTriageNoProviderModels: '需要先为此 Agent 选择模型并配置对应的服务商',
   agentIMConfigured: '已配置',
   agentCreateFailed: '创建项目失败',
   agentNameDuplicate: '该项目名称已存在，请修改后重试',

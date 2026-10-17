@@ -167,6 +167,19 @@ export const CodingWorkspaceSidebar = ({
     };
   }, [invalidateRefresh, refresh, selection.workspaceRoot]);
 
+  // The workbench empty state offers the same "Add workspace" entry as the
+  // sidebar header; the dialog lives here so both entry points share one form.
+  useEffect(() => {
+    const handleOpenWorkspaceDialog = () => {
+      setError(null);
+      setEditingWorkspace(null);
+      setWorkspaceDialogOpen(true);
+    };
+    window.addEventListener(CodingUiEvent.OpenWorkspaceDialog, handleOpenWorkspaceDialog);
+    return () =>
+      window.removeEventListener(CodingUiEvent.OpenWorkspaceDialog, handleOpenWorkspaceDialog);
+  }, []);
+
   const startSession = (workspace: CodingWorkspaceSummary, profileId?: string) => {
     setExpandedIds(current => new Set(current).add(workspace.id));
     const detail: CodingCreateSessionEventDetail = profileId
