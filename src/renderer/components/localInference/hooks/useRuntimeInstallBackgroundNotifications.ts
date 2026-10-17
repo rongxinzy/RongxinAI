@@ -2,6 +2,7 @@ import type { LlamaCppRuntimeInstallSnapshot } from '../../../../shared/llamacpp
 import { useCallback, useEffect, useRef } from 'react';
 
 import { i18nService } from '../../../services/i18n';
+import { showAppToast } from '../../../services/toastNotification';
 import { isInstallTerminalPhase } from '../utils/progress';
 import { isRuntimeInstallActive } from './useRuntimeInstallProgress';
 
@@ -17,11 +18,7 @@ type RuntimeInstallBackgroundNotificationsInput = {
 };
 
 function showGlobalToast(message: string, isError = false): void {
-  window.dispatchEvent(
-    new CustomEvent('app:showToast', {
-      detail: { message, durationMs: 4_000, isError },
-    }),
-  );
+  showAppToast({ message, durationMs: 4_000, isError });
 }
 
 function getRuntimeVersion(snapshot: LlamaCppRuntimeInstallSnapshot): string | undefined {

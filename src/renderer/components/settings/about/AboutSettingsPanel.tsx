@@ -12,6 +12,7 @@ import {
 } from '../../../../shared/appUpdate/constants';
 import { normalizeError } from '../../../services/errorNormalization';
 import { i18nService } from '../../../services/i18n';
+import { showAppToast } from '../../../services/toastNotification';
 import { useIsEnterpriseBuild } from '../useIsEnterpriseBuild';
 
 const OFFICIAL_WEBSITE_URL = 'https://www.rongxzyai.com';
@@ -227,16 +228,12 @@ export default function AboutSettingsPanel({
                     onClick={() => {
                       void window.electron.appUpdate.installReady().then(result => {
                         if (!result.success) {
-                          window.dispatchEvent(
-                            new CustomEvent('app:showToast', {
-                              detail: {
-                                message: normalizeError(
-                                  result.error || i18nService.t('updateInstallFailed'),
-                                ),
-                                isError: true,
-                              },
-                            }),
-                          );
+                          showAppToast({
+                            message: normalizeError(
+                              result.error || i18nService.t('updateInstallFailed'),
+                            ),
+                            isError: true,
+                          });
                         }
                       });
                     }}
@@ -257,14 +254,10 @@ export default function AboutSettingsPanel({
                         onClick={() => {
                           void window.electron.appUpdate.revealDownload().then(result => {
                             if (!result.success) {
-                              window.dispatchEvent(
-                                new CustomEvent('app:showToast', {
-                                  detail: {
-                                    message: result.error || i18nService.t('updateRevealFailed'),
-                                    isError: true,
-                                  },
-                                }),
-                              );
+                              showAppToast({
+                                message: result.error || i18nService.t('updateRevealFailed'),
+                                isError: true,
+                              });
                             }
                           });
                         }}

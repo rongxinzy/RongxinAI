@@ -32,6 +32,15 @@ export interface ResolvedToastNotification {
 const LIKELY_ERROR_TEXT_PATTERN =
   /(failed|failure|error|unable|cannot|could not|invalid|denied|timeout|timed out|not found|失败|错误|无法|不允许|超时|拒绝|不存在)/i;
 
+/** Repeating the same sentence is noise, not news (periodic refresh paths). */
+const REPEAT_WINDOW_MS = 5_000;
+const lastShownAt = new Map<string, number>();
+
+/** @internal test harness only */
+export function resetAppToastDedupeForTests(): void {
+  lastShownAt.clear();
+}
+
 export function isLikelyErrorNotification(message: string): boolean {
   return LIKELY_ERROR_TEXT_PATTERN.test(message);
 }
@@ -59,11 +68,44 @@ export function resolveToastNotification(
   return { message, options: isError ? { ...options, isError: true } : options };
 }
 
+function dedupeKeyForDetail(detail: ToastNotificationDetail): string | null {
+  const resolved = resolveToastNotification(detail);
+  if (!resolved) return null;
+  const text = resolved.message.trim();
+  if (!text) return null;
+  const severity = resolved.options.isError
+    ? 'error'
+    : resolved.options.isSuccess
+      ? 'success'
+      : 'neutral';
+  return `${severity}:${text}`;
+}
+
+function shouldSuppressRepeat(key: string): boolean {
+  const now = Date.now();
+  const last = lastShownAt.get(key);
+  if (last !== undefined && now - last < REPEAT_WINDOW_MS) return true;
+  lastShownAt.set(key, now);
+  for (const [seen, at] of lastShownAt) {
+    if (now - at >= REPEAT_WINDOW_MS) lastShownAt.delete(seen);
+  }
+  return false;
+}
+
 /**
  * 派发全局提示的唯一入口。App 里的 Toast 是唯一渲染者（DESIGN.md「全局提示与错误文案」），
  * 组件不要直接使用 sonner 的 toast：共享宿主没有挂载时，调用会被静默丢弃，用户什么也看不到。
  */
-export function showAppToast(detail: ToastNotificationDetail): void {
+export function showAppToast(detail: ToastNotificationDetail): void;
+export function showAppToast(message: string, options?: ToastNotificationOptions): void;
+export function showAppToast(
+  detailOrMessage: ToastNotificationDetail,
+  options: ToastNotificationOptions = {},
+): void {
+  const detail: ToastNotificationDetail =
+    typeof detailOrMessage === 'string' ? { message: detailOrMessage, ...options } : detailOrMessage;
+  const key = dedupeKeyForDetail(detail);
+  if (!key || shouldSuppressRepeat(key)) return;
   window.dispatchEvent(new CustomEvent('app:showToast', { detail }));
 }
 

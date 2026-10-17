@@ -1,6 +1,9 @@
 /**
  * Consolidated Domain Facades over `window.electron`.
  *
+ * **Experimental:** optional typed grouping for IPC access. New code may keep using
+ * `window.electron` directly; this module is not a required layer.
+ *
  * Provides high-cohesion, typed access to IPC APIs across 5 primary architectural domains:
  * - System: Host environment, OS info, windows, native dialogs, shell, logs.
  * - Inference: Local and remote inference runtimes (llama.cpp, ollama, magpie, model pool, providers).

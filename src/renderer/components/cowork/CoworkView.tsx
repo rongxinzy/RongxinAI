@@ -21,7 +21,7 @@ import { coworkService } from '../../services/cowork';
 import { coworkQueueService } from '../../services/coworkQueue';
 import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
-import { showAppErrorToast } from '../../services/toastNotification';
+import { showAppErrorToast, showAppToast } from '../../services/toastNotification';
 import { quickActionService } from '../../services/quickAction';
 import { workspaceService } from '../../services/workspace';
 import { RootState, store } from '../../store';
@@ -372,11 +372,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       // the configured default working directory. Bail out early with a toast
       // when no working directory is available at all.
       if (isChatAgentExecution && !currentWorkspacePath) {
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', {
-            detail: i18nService.t('chatAgentWorkingDirectoryRequired'),
-          }),
-        );
+        showAppToast(i18nService.t('chatAgentWorkingDirectoryRequired'));
         dispatch(clearCurrentSession());
         return;
       }
@@ -517,14 +513,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         [...activeSkillIds],
       );
       if (!result.success) {
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', {
-            detail: {
-              message: normalizeError(result.error || i18nService.t('coworkQueueEnqueueFailed')),
-              isError: true,
-            },
-          }),
-        );
+        showAppToast({
+          message: normalizeError(result.error || i18nService.t('coworkQueueEnqueueFailed')),
+          isError: true,
+        });
         return false;
       }
       return true;
