@@ -19,8 +19,17 @@ import type {
   MagpieDiagnosticSummary,
   MagpieProviderApi,
 } from '../../shared/magpie/types';
+import {
+  magpieAgentConnect,
+  magpieAgentDisconnect,
+  magpieAgentPreview,
+  magpieDisconnectAllManaged,
+  magpieReapplyConnectedAgents,
+} from './agentControl';
 import { isolatedMagpieEnvironment, prepareMagpieHome } from './environment';
+import { resolveMagpieGatewayPort, type MagpieGatewayPortStore } from './gatewayPort';
 import { MAGPIE_VERSION, verifyMagpieBinary } from './integrity';
+import type { MagpieAgentConnectPreview } from '../../shared/magpie/types';
 const MODEL_FIELDS = new Set(['model', 'large', 'small', 'executor', 'planner']);
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 function maskApiKey(key: string | undefined): string | undefined {
@@ -47,6 +56,7 @@ export interface MagpieManagerOptions {
   spawn?: typeof spawn;
   fetch?: typeof fetch;
   port?: () => Promise<number>;
+  gatewayPort?: MagpieGatewayPortStore;
   startupTimeoutMs?: number;
   parseCatalog?: typeof parseMagpieCatalog;
   serviceEnabled?: { read(): boolean; write(enabled: boolean): void };
@@ -123,7 +133,10 @@ export class MagpieManager {
         this.options.subscriptionAccounts?.read() === true,
       );
       const port = this.options.port ?? freePort;
-      const gatewayPort = await port();
+      const gatewayPort =
+        this.options.gatewayPort !== undefined
+          ? await resolveMagpieGatewayPort(this.options.gatewayPort)
+          : await port();
       this.webPort = await port();
       while (this.webPort === gatewayPort) this.webPort = await port();
       this.webKey = randomBytes(32).toString('hex');
@@ -176,6 +189,7 @@ export class MagpieManager {
           const web = await this.webRequest('/', { signal });
           if (data.name === 'magpie' && data.version === MAGPIE_VERSION && web.ok && !exited) {
             this.state = { state: 'running', version: MAGPIE_VERSION, gatewayUrl };
+            await this.reapplyManagedAgentsAfterStart(signal);
             return this.status();
           }
         } catch {
@@ -680,6 +694,43 @@ export class MagpieManager {
         }),
     };
   }
+  private agentClient(): {
+    managementJson(route: string, init?: RequestInit): Promise<Record<string, unknown>>;
+    agents(): Promise<MagpieAgents>;
+  } {
+    return {
+      managementJson: (route, init) => this.managementJson(route, init),
+      agents: () => this.agents(),
+    };
+  }
+
+  private async reapplyManagedAgentsAfterStart(signal: AbortSignal): Promise<void> {
+    signal.throwIfAborted();
+    if (this.state.state !== 'running') return;
+    const snapshot = await this.agents();
+    await magpieReapplyConnectedAgents(this.agentClient(), snapshot);
+  }
+
+  async previewAgent(agentId: string): Promise<MagpieAgentConnectPreview> {
+    await this.ensureRunning();
+    return magpieAgentPreview(this.agentClient(), agentId);
+  }
+
+  async connectAgent(agentId: string): Promise<MagpieAgents> {
+    await this.ensureRunning();
+    return magpieAgentConnect(this.agentClient(), agentId);
+  }
+
+  async disconnectAgent(agentId: string): Promise<MagpieAgents> {
+    await this.ensureRunning();
+    return magpieAgentDisconnect(this.agentClient(), agentId);
+  }
+
+  async disconnectAllAgents(): Promise<MagpieAgents> {
+    await this.ensureRunning();
+    return magpieDisconnectAllManaged(this.agentClient());
+  }
+
   async setModel(selection: MagpieModelSelection): Promise<MagpieAgents> {
     if (
       !selection ||

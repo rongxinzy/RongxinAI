@@ -128,6 +128,10 @@ export const providersApi = {
     agents: () => ipcRenderer.invoke(MagpieIpc.agents),
     setModel: (selection: MagpieModelSelection) =>
       ipcRenderer.invoke(MagpieIpc.setModel, selection),
+    previewAgent: (agentId: string) => ipcRenderer.invoke(MagpieIpc.previewAgent, agentId),
+    connectAgent: (agentId: string) => ipcRenderer.invoke(MagpieIpc.connectAgent, agentId),
+    disconnectAgent: (agentId: string) => ipcRenderer.invoke(MagpieIpc.disconnectAgent, agentId),
+    disconnectAllAgents: () => ipcRenderer.invoke(MagpieIpc.disconnectAllAgents),
     models: () => ipcRenderer.invoke(MagpieIpc.models),
     catalog: () => ipcRenderer.invoke(MagpieIpc.catalog),
     selectDefault: (modelId: string) => ipcRenderer.invoke(MagpieIpc.selectDefault, modelId),

@@ -44,6 +44,10 @@ export function registerMagpieIpc(
   handle(MagpieIpc.models, () => manager.models());
   handle(MagpieIpc.agents, () => manager.agents());
   handle(MagpieIpc.setModel, (selection: MagpieModelSelection) => manager.setModel(selection));
+  handle(MagpieIpc.previewAgent, (agentId: string) => manager.previewAgent(agentId));
+  handle(MagpieIpc.connectAgent, (agentId: string) => manager.connectAgent(agentId));
+  handle(MagpieIpc.disconnectAgent, (agentId: string) => manager.disconnectAgent(agentId));
+  handle(MagpieIpc.disconnectAllAgents, () => manager.disconnectAllAgents());
   handle(MagpieIpc.providers, () => manager.providers());
   handle(MagpieIpc.saveProvider, (input: MagpieSaveProviderInput) => {
     if (input?.id && typeof input.id === 'string' && input.id.startsWith(HOST_PROVIDER_PREFIX)) {
@@ -108,6 +112,7 @@ export function registerMagpieIpc(
               cancel:
                 !manager.status().subscriptionAccountsEnabled ||
                 typeof agent !== 'string' ||
+                agent === 'codex' ||
                 (agent === 'copilot' &&
                   request.site !== undefined &&
                   request.site !== '' &&

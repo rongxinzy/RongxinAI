@@ -4,6 +4,10 @@ export const MagpieIpc = {
   stop: 'magpie:stop',
   agents: 'magpie:agents',
   setModel: 'magpie:setModel',
+  previewAgent: 'magpie:previewAgent',
+  connectAgent: 'magpie:connectAgent',
+  disconnectAgent: 'magpie:disconnectAgent',
+  disconnectAllAgents: 'magpie:disconnectAllAgents',
   models: 'magpie:models',
   openManagement: 'magpie:openManagement',
   catalog: 'magpie:catalog',
@@ -91,6 +95,10 @@ export interface MagpieApi {
   stop(): Promise<MagpieStatus>;
   agents(): Promise<MagpieAgents>;
   setModel(selection: MagpieModelSelection): Promise<MagpieAgents>;
+  previewAgent(agentId: string): Promise<MagpieAgentConnectPreview>;
+  connectAgent(agentId: string): Promise<MagpieAgents>;
+  disconnectAgent(agentId: string): Promise<MagpieAgents>;
+  disconnectAllAgents(): Promise<MagpieAgents>;
   models(): Promise<MagpieModel[]>;
   openManagement(): Promise<void>;
   catalog(): Promise<MagpieModelCatalog>;
@@ -126,4 +134,17 @@ export interface MagpieModelSelection {
   agentId: string;
   field: string;
   value: string;
+}
+
+export interface MagpieAgentFileChange {
+  path: string;
+  removed?: boolean;
+  created?: boolean;
+  lines?: { op?: string; text?: string; was?: string }[];
+}
+
+export interface MagpieAgentConnectPreview {
+  changes: MagpieAgentFileChange[];
+  error?: string;
+  revision?: string;
 }
