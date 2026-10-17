@@ -43,6 +43,7 @@ export class PiAssistantTranscript {
   /** Latest in-memory stream body per message id (avoids stale DB reads on close). */
   private readonly lastStreamedContentByMessageId = new Map<string, string>();
   private readonly finalizedMessageIds = new Set<string>();
+  private readonly finalizedMessageIdsBySession = new Map<string, Set<string>>();
   private readonly pendingContextUsageBySession = new Map<
     string,
     {
@@ -65,7 +66,7 @@ export class PiAssistantTranscript {
     ]) {
       if (!entry.messageId) continue;
       const messageId = entry.messageId;
-      this.finalizedMessageIds.delete(messageId);
+      this.unnoteFinalized(sessionId, messageId);
       const content = this.resolveStreamedContent(messageId, active, entry.kind);
       this.rememberStreamedContent(messageId, content);
       const metadata =
@@ -121,6 +122,41 @@ export class PiAssistantTranscript {
 
   private noteThrottleMessage(sessionId: string, messageId: string): void {
     this.throttleSessionByMessageId.set(messageId, sessionId);
+  }
+
+  private noteFinalized(sessionId: string, messageId: string): void {
+    this.finalizedMessageIds.add(messageId);
+    let ids = this.finalizedMessageIdsBySession.get(sessionId);
+    if (!ids) {
+      ids = new Set();
+      this.finalizedMessageIdsBySession.set(sessionId, ids);
+    }
+    ids.add(messageId);
+  }
+
+  private unnoteFinalized(sessionId: string, messageId: string): void {
+    this.finalizedMessageIds.delete(messageId);
+    this.finalizedMessageIdsBySession.get(sessionId)?.delete(messageId);
+  }
+
+  private pruneFinalizedForSession(sessionId: string): void {
+    const ids = this.finalizedMessageIdsBySession.get(sessionId);
+    if (!ids) return;
+    for (const messageId of ids) {
+      this.finalizedMessageIds.delete(messageId);
+    }
+    this.finalizedMessageIdsBySession.delete(sessionId);
+  }
+
+  private removeEmptyAnswerPlaceholder(sessionId: string, messageId: string): void {
+    const store = this.host.getStore();
+    if (!store) return;
+    const existing = store
+      .getSession(sessionId)
+      ?.messages.find(message => message.id === messageId);
+    if (!existing || existing.metadata?.isThinking) return;
+    if (existing.content.trim().length > 0) return;
+    store.deleteMessage(sessionId, messageId);
   }
   // ── Private: assistant message lifecycle ──
 
@@ -205,6 +241,17 @@ export class PiAssistantTranscript {
     kind: 'answer' | 'thinking',
     content: string,
   ): void {
+    if (kind === 'answer' && !content.trim()) {
+      const emptyId = active.assistantMessageId;
+      if (emptyId) {
+        this.flushPendingStoreUpdate(sessionId, emptyId);
+        this.flushPendingMessageUpdate(sessionId, emptyId);
+        this.clearThrottleMapsForMessage(emptyId);
+        this.removeEmptyAnswerPlaceholder(sessionId, emptyId);
+        active.assistantMessageId = null;
+      }
+      return;
+    }
     const messageId = this.ensureMessage(sessionId, active, kind, content);
     this.rememberStreamedContent(messageId, content);
     this.flushPendingStoreUpdate(sessionId, messageId);
@@ -228,7 +275,7 @@ export class PiAssistantTranscript {
       this.host.getStore().updateMessage(sessionId, messageId, { content, metadata });
     }
     this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
-    this.finalizedMessageIds.add(messageId);
+    this.noteFinalized(sessionId, messageId);
     if (kind === 'thinking') {
       active.thinkingLifecycle.markMessageFinalized();
     }
@@ -287,6 +334,13 @@ export class PiAssistantTranscript {
         continue;
       }
       this.clearThrottleMapsForMessage(entry.messageId);
+      if (entry.kind === 'answer' && !content.trim()) {
+        this.removeEmptyAnswerPlaceholder(sessionId, entry.messageId);
+        if (active.assistantMessageId === entry.messageId) {
+          active.assistantMessageId = null;
+        }
+        continue;
+      }
       if (!this.host.getStore()) continue;
       const existing = this.host
         .getStore()
@@ -305,7 +359,7 @@ export class PiAssistantTranscript {
           { touchUpdatedAt: false },
         );
       this.host.emitMessageUpdate(sessionId, entry.messageId, content, mergedMetadata);
-      this.finalizedMessageIds.add(entry.messageId);
+      this.noteFinalized(sessionId, entry.messageId);
     }
   }
 
@@ -602,7 +656,6 @@ export class PiAssistantTranscript {
   clearThrottleStateBySession(sessionId: string, flush: boolean): void {
     for (const [messageId, owner] of this.throttleSessionByMessageId) {
       if (owner !== sessionId) continue;
-      this.finalizedMessageIds.delete(messageId);
       if (flush) {
         const pendingStore = this.pendingStoreUpdate.get(messageId);
         if (pendingStore && this.host.getStore()) {
@@ -625,5 +678,6 @@ export class PiAssistantTranscript {
       this.lastMessageUpdateEmitAt.delete(messageId);
       this.throttleSessionByMessageId.delete(messageId);
     }
+    this.pruneFinalizedForSession(sessionId);
   }
 }

@@ -167,12 +167,17 @@ export class PiRuntimeTurnEvents {
         if (active.retryStreamReusePending) {
           // Auto-retry continues in the same assistant/thinking bubbles.
           active.retryStreamReusePending = false;
+          const priorAnswer = active.answerText;
+          const priorThinking = active.thinkingText;
+          this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);
           active.answerText = '';
           active.thinkingText = '';
           active.streamAccumulator.reset();
           active.thinkingLifecycle.reset();
-          this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);
-          setStreamedAssistantText(active.piTranslatorState, '');
+          setStreamedAssistantText(active.piTranslatorState, priorAnswer);
+          if (priorThinking) {
+            active.thinkingText = priorThinking;
+          }
         } else {
           // New turn → fresh answer + thinking messages, created lazily on first content.
           active.assistantMessageId = null;
@@ -425,10 +430,8 @@ export class PiRuntimeTurnEvents {
             };
             active.turnFailed = true;
             active.retryStreamReusePending = false;
-            const mayAutoRetry =
-              classified.kind === CoworkErrorKind.Unknown || isTransient(classified.kind);
             this.host.transcript.closeIdlePlaceholders(sessionId, active, {
-              finalize: !mayAutoRetry,
+              finalize: true,
             });
             if (
               !active.errorSurfaced &&
