@@ -53,10 +53,7 @@ export async function magpieAgentDisconnect(
   return client.agents();
 }
 
-async function magpieAgentReapply(
-  client: MagpieManagementClient,
-  agentId: string,
-): Promise<void> {
+async function magpieAgentReapply(client: MagpieManagementClient, agentId: string): Promise<void> {
   assertManagedMagpieAgentId(agentId);
   const encoded = encodeURIComponent(agentId);
   await client.managementJson(`/api/agents/reapply/${encoded}`, { method: 'POST' });
