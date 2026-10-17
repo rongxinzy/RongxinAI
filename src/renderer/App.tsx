@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { AppUpdateStatus } from '../shared/appUpdate/constants';
 import { ManagedProviderAccessMode } from '../shared/managedProviders';
 import { getBranding } from '../shared/branding';
+import { shouldSkipPreviewBoot } from './browserMock/previewQuery';
 import { InitErrorView } from './app/InitErrorView';
 import { MainViewCanvas } from './app/MainViewCanvas';
 import { MainView } from './app/constants';
@@ -75,7 +76,9 @@ const App: React.FC = () => {
   const LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS = 10 * 60 * 1000;
   const [localInferenceInstallRequestId, setLocalInferenceInstallRequestId] = useState<string>();
   const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
-  const [bootScreenVisible, setBootScreenVisible] = useState(true);
+  const [bootScreenVisible, setBootScreenVisible] = useState(
+    () => !(import.meta.env.DEV && shouldSkipPreviewBoot()),
+  );
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isToastError, setIsToastError] = useState(false);
   const [isToastSuccess, setIsToastSuccess] = useState(false);

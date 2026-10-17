@@ -213,6 +213,7 @@ export class SqliteStore {
         working_directory TEXT NOT NULL DEFAULT '',
         icon TEXT NOT NULL DEFAULT '',
         skill_ids TEXT NOT NULL DEFAULT '[]',
+        mcp_ids TEXT NOT NULL DEFAULT '[]',
         enabled INTEGER NOT NULL DEFAULT 1,
         pinned INTEGER NOT NULL DEFAULT 0,
         pin_order INTEGER,
@@ -422,6 +423,10 @@ export class SqliteStore {
       }
       if (!agentColNames.includes('triage_override')) {
         this.db.exec('ALTER TABLE agents ADD COLUMN triage_override TEXT;');
+        this.didRunMigration = true;
+      }
+      if (!agentColNames.includes('mcp_ids')) {
+        this.db.exec("ALTER TABLE agents ADD COLUMN mcp_ids TEXT NOT NULL DEFAULT '[]';");
         this.didRunMigration = true;
       }
     } catch {

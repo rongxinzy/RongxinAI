@@ -1,18 +1,12 @@
 import { randomUUID } from 'crypto';
-import { mkdir, readFile, stat, writeFile } from 'fs/promises';
-import path from 'path';
-import { pathToFileURL } from 'url';
 
 import {
   CodingErrorMessage,
   CodingEventKind,
   CodingPermissionOutcome,
-  CodingStreamUpdateMode,
   type CodingAgentAvailableCommand,
   type CodingAgentCapabilities,
   type CodingAgentConfigOption,
-  type CodingAgentConfigOptionValue,
-  type CodingEvent,
   type CodingPermissionResponse,
   type CodingPromptAttachment,
 } from '../../../shared/codingAgent';
@@ -31,8 +25,30 @@ import {
   AcpStopReason,
 } from '../acp/protocol';
 import { t } from '../../i18n';
-import { TerminalBroker } from '../terminalBroker';
-import { WorkspaceBroker } from '../workspaceBroker';
+import { AcpAgentRequestBroker } from './acpDriverAgentRequests';
+import { promptAttachmentBlocks } from './acpDriverAttachments';
+import {
+  normalizeAvailableCommands,
+  normalizeCapabilities,
+  normalizeConfigOptions,
+} from './acpDriverProtocol';
+import {
+  ACP_FIRST_OUTPUT_TIMEOUT_MS,
+  ACP_SESSION_LIFECYCLE_TIMEOUT_MS,
+  DEFAULT_CAPABILITIES,
+  DEFAULT_TURN_TIMEOUTS,
+  OPEN_TOOL_CALL_STATUSES,
+  asRecord,
+  mergeAdjacentDriverEvents,
+  type AcpAuthMethod,
+  type AcpInitializeResult,
+  type AcpSessionResult,
+  type AcpTurnTimeouts,
+  type DriverEvent,
+  type EventStream,
+  type PendingPermission,
+} from './acpDriverSupport';
+import { AcpSessionUpdateNormalizer } from './acpDriverUpdates';
 import type {
   CodingAgentAuthRequest,
   CodingAgentAuthState,
@@ -40,338 +56,7 @@ import type {
   CodingAgentSession,
 } from './codingAgentDriver';
 
-type DriverEvent = Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>;
-type AcpAuthMethod = { id: string; type?: string };
-type AcpInitializeResult = {
-  protocolVersion?: unknown;
-  agentCapabilities?: Record<string, unknown>;
-  capabilities?: Record<string, unknown>;
-  authMethods?: AcpAuthMethod[];
-};
-type AcpSessionResult = { sessionId?: string; configOptions?: unknown };
-type EventStream = {
-  events: AcpEventQueue<DriverEvent>;
-  waiters: Array<{
-    resolve: (result: IteratorResult<DriverEvent>) => void;
-    reject: (error: Error) => void;
-  }>;
-  done: boolean;
-  error: Error | null;
-};
-
-const mergeAdjacentDriverEvents = (
-  previous: DriverEvent,
-  next: DriverEvent,
-): DriverEvent | null => {
-  if (
-    previous.kind === CodingEventKind.MessageDelta &&
-    next.kind === CodingEventKind.MessageDelta
-  ) {
-    const previousMessageId = previous.payload.messageId;
-    if (previousMessageId !== next.payload.messageId || typeof previousMessageId !== 'string') {
-      return null;
-    }
-    if (next.payload.streamUpdateMode === CodingStreamUpdateMode.Replace) return next;
-    return {
-      ...next,
-      payload: {
-        ...previous.payload,
-        ...next.payload,
-        content: `${typeof previous.payload.content === 'string' ? previous.payload.content : ''}${typeof next.payload.content === 'string' ? next.payload.content : ''}`,
-      },
-    };
-  }
-  if (previous.kind === CodingEventKind.ToolCall && next.kind === CodingEventKind.ToolCall) {
-    return previous.payload.toolCallId === next.payload.toolCallId
-      ? { ...next, payload: { ...previous.payload, ...next.payload } }
-      : null;
-  }
-  return null;
-};
-type PendingPermission = {
-  streamSessionId: string;
-  resolve: (result: Record<string, unknown>) => void;
-  reject: (error: Error) => void;
-};
-
-/** Turn watchdog policy: renewed by progress, paused by legitimate waiting. */
-export interface AcpTurnTimeouts {
-  /** Silence budget for one turn; every `session/update` renews it. */
-  inactivityMs: number;
-  /** Hard ceiling for one turn that no progress or approval may extend. */
-  absoluteMs: number;
-}
-
-const DEFAULT_TURN_TIMEOUTS: AcpTurnTimeouts = {
-  inactivityMs: 5 * 60 * 1000,
-  absoluteMs: 60 * 60 * 1000,
-};
-
-/** ACP tool call statuses that mean the agent is still running the tool. */
-const OPEN_TOOL_CALL_STATUSES = new Set(['pending', 'in_progress']);
-
-const DEFAULT_CAPABILITIES: CodingAgentCapabilities = {
-  supportsLoadSession: false,
-  supportsResumeSession: false,
-  supportsPlans: false,
-  supportsPermissions: false,
-  supportsFilesystem: false,
-  supportsTerminal: false,
-  supportsConfigOptions: false,
-  supportsUsage: false,
-  supportsElicitation: false,
-};
-
-// Starting or restoring a real coding-agent session may include launching the
-// agent's own backend, loading account state, scanning skills, and enumerating
-// models. Keep the short transport timeout for ordinary ACP control requests,
-// but give lifecycle requests enough time to complete on a cold start.
-const ACP_SESSION_LIFECYCLE_TIMEOUT_MS = 60_000;
-
-/**
- * How long a prompt may stay completely silent before the turn is failed.
- *
- * An ACP agent that cannot run the prompt — no signed-in account, missing or
- * invalid API key, unreachable model endpoint — does not report an error: Kimi
- * Code answers such a prompt with a bare `end_turn` after ~100s and writes
- * nothing to stderr, so the user would otherwise stare at a spinner until the
- * five-minute request cap. Any first event (thought, tool call, message) clears
- * the watchdog, so only a totally silent agent is cut short.
- */
-const ACP_FIRST_OUTPUT_TIMEOUT_MS = 90_000;
-
-const asRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-
-// Base64 media payloads above this size are replaced with a placeholder so a
-// single screenshot cannot blow up the event stream, persistence, and the
-// markdown renderer.
-const MAX_INLINE_DATA_LENGTH = 200_000;
-const MAX_PROMPT_IMAGE_BYTES = 10 * 1024 * 1024;
-const IMAGE_MIME_TYPES: Record<string, string> = {
-  '.gif': 'image/gif',
-  '.jpeg': 'image/jpeg',
-  '.jpg': 'image/jpeg',
-  '.png': 'image/png',
-  '.webp': 'image/webp',
-};
-const TEXT_EXTENSIONS = new Set([
-  '.c',
-  '.cc',
-  '.css',
-  '.csv',
-  '.go',
-  '.html',
-  '.java',
-  '.js',
-  '.json',
-  '.jsx',
-  '.md',
-  '.py',
-  '.rb',
-  '.rs',
-  '.sh',
-  '.sql',
-  '.toml',
-  '.ts',
-  '.tsx',
-  '.txt',
-  '.xml',
-  '.yaml',
-  '.yml',
-]);
-
-const contentBlockToMarkdown = (block: Record<string, unknown>): string | null => {
-  switch (block.type) {
-    case 'text':
-      return typeof block.text === 'string' ? block.text : null;
-    case 'image': {
-      const uri = typeof block.uri === 'string' && block.uri ? block.uri : null;
-      if (uri) return `![${uri}](${uri})`;
-      if (typeof block.data === 'string' && typeof block.mimeType === 'string') {
-        return block.data.length <= MAX_INLINE_DATA_LENGTH
-          ? `![image](data:${block.mimeType};base64,${block.data})`
-          : `[image: ${block.mimeType}]`;
-      }
-      return null;
-    }
-    case 'audio': {
-      const uri = typeof block.uri === 'string' && block.uri ? block.uri : null;
-      const mimeType = typeof block.mimeType === 'string' ? block.mimeType : 'audio';
-      return uri ? `[audio (${mimeType})](${uri})` : `[audio: ${mimeType}]`;
-    }
-    case 'resource_link': {
-      const uri = typeof block.uri === 'string' && block.uri ? block.uri : null;
-      const label =
-        (typeof block.title === 'string' && block.title.trim()) ||
-        (typeof block.name === 'string' && block.name.trim()) ||
-        uri;
-      if (!label) return null;
-      return uri ? `[${label}](${uri})` : label;
-    }
-    case 'resource': {
-      const resource = asRecord(block.resource);
-      if (typeof resource.text === 'string') return resource.text;
-      const uri = typeof resource.uri === 'string' && resource.uri ? resource.uri : null;
-      return uri ? `[${uri}](${uri})` : null;
-    }
-    default:
-      return null;
-  }
-};
-
-/**
- * Flattens ACP content blocks (text, image, audio, resource_link, resource)
- * into markdown so no block type is silently dropped from the transcript.
- * Adjacent text blocks join directly; non-text blocks are separated by a
- * blank line so they render as distinct markdown elements.
- */
-const readContentText = (value: unknown): string | null => {
-  if (typeof value === 'string') return value;
-  if (!Array.isArray(value)) return contentBlockToMarkdown(asRecord(value));
-  let text = '';
-  let previousWasText = true;
-  for (const item of value) {
-    const block = asRecord(item);
-    const markdown = contentBlockToMarkdown(block);
-    if (markdown === null) continue;
-    const isTextBlock = block.type === 'text';
-    if (text && (!isTextBlock || !previousWasText)) text += '\n\n';
-    text += markdown;
-    previousWasText = isTextBlock;
-  }
-  return text || null;
-};
-
-const normalizeCapabilities = (result: AcpInitializeResult): CodingAgentCapabilities => {
-  const capabilities = result.agentCapabilities ?? result.capabilities ?? {};
-  const sessionCapabilities = asRecord(capabilities.sessionCapabilities);
-  const promptCapabilities = asRecord(capabilities.promptCapabilities);
-  return {
-    ...DEFAULT_CAPABILITIES,
-    supportsLoadSession: capabilities.loadSession === true,
-    supportsResumeSession: Boolean(sessionCapabilities.resume),
-    // ACP advertises these as client capabilities or session updates, not agent capabilities.
-    // The driver implements them locally and accepts updates opportunistically.
-    supportsPlans: true,
-    supportsPermissions: true,
-    supportsFilesystem: true,
-    supportsTerminal: true,
-    supportsConfigOptions: false,
-    supportsUsage: true,
-    supportsElicitation: false,
-    supportsPromptImages: promptCapabilities.image === true,
-    supportsEmbeddedContext: promptCapabilities.embeddedContext === true,
-  };
-};
-
-const promptAttachmentBlocks = async (
-  attachments: CodingPromptAttachment[] | undefined,
-  capabilities: CodingAgentCapabilities,
-): Promise<Record<string, unknown>[]> => {
-  if (!attachments?.length) return [];
-  if (attachments.length > 8) throw new Error(CodingErrorMessage.AttachmentLimit);
-  const blocks: Record<string, unknown>[] = [];
-  for (const attachment of attachments) {
-    if (!path.isAbsolute(attachment.path)) {
-      throw new Error(CodingErrorMessage.AttachmentPathAbsolute);
-    }
-    const filePath = path.resolve(attachment.path);
-    const fileInfo = await stat(filePath);
-    if (!fileInfo.isFile()) throw new Error(CodingErrorMessage.AttachmentNotFile);
-    const extension = path.extname(filePath).toLowerCase();
-    const name = path.basename(filePath);
-    const uri = pathToFileURL(filePath).toString();
-    const imageMimeType = IMAGE_MIME_TYPES[extension];
-    if (imageMimeType && capabilities.supportsPromptImages) {
-      const data = await readFile(filePath);
-      if (data.byteLength > MAX_PROMPT_IMAGE_BYTES) {
-        throw new Error(CodingErrorMessage.AttachmentImageTooLarge);
-      }
-      blocks.push({ type: 'image', uri, mimeType: imageMimeType, data: data.toString('base64') });
-      continue;
-    }
-    if (capabilities.supportsEmbeddedContext && TEXT_EXTENSIONS.has(extension)) {
-      const data = await readFile(filePath);
-      if (data.byteLength <= MAX_INLINE_DATA_LENGTH) {
-        blocks.push({
-          type: 'resource',
-          resource: { uri, mimeType: 'text/plain', text: data.toString('utf8') },
-        });
-        continue;
-      }
-    }
-    blocks.push({ type: 'resource_link', uri, name });
-  }
-  return blocks;
-};
-
-const normalizeConfigOptions = (value: unknown): CodingAgentConfigOption[] => {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap(item => {
-    const option = asRecord(item);
-    const type = option.type;
-    const currentValue = option.currentValue;
-    if (
-      typeof option.id !== 'string' ||
-      typeof option.name !== 'string' ||
-      (type !== 'select' && type !== 'boolean') ||
-      (typeof currentValue !== 'string' && typeof currentValue !== 'boolean')
-    ) {
-      return [];
-    }
-    if (type === 'boolean' && typeof currentValue !== 'boolean') return [];
-    const options =
-      type === 'select'
-        ? (Array.isArray(option.options) ? option.options : []).flatMap(configValue => {
-            const parsed = asRecord(configValue);
-            if (typeof parsed.value !== 'string' || typeof parsed.name !== 'string') return [];
-            return [
-              {
-                value: parsed.value,
-                name: parsed.name,
-                ...(typeof parsed.description === 'string'
-                  ? { description: parsed.description }
-                  : {}),
-              } satisfies CodingAgentConfigOptionValue,
-            ];
-          })
-        : undefined;
-    if (type === 'select' && !options?.some(optionValue => optionValue.value === currentValue)) {
-      return [];
-    }
-    return [
-      {
-        id: option.id,
-        name: option.name,
-        ...(typeof option.description === 'string' ? { description: option.description } : {}),
-        ...(typeof option.category === 'string' ? { category: option.category } : {}),
-        type,
-        currentValue,
-        ...(options ? { options } : {}),
-      } satisfies CodingAgentConfigOption,
-    ];
-  });
-};
-
-const normalizeAvailableCommands = (value: unknown): CodingAgentAvailableCommand[] => {
-  if (!Array.isArray(value)) return [];
-  const commands = new Map<string, CodingAgentAvailableCommand>();
-  for (const item of value) {
-    const command = asRecord(item);
-    const name = typeof command.name === 'string' ? command.name.trim().replace(/^\/+/, '') : '';
-    if (!name || /\s/.test(name) || typeof command.description !== 'string') continue;
-    const input = asRecord(command.input);
-    const meta = asRecord(command._meta);
-    commands.set(name, {
-      name,
-      description: command.description,
-      ...(typeof input.hint === 'string' ? { input: { hint: input.hint } } : {}),
-      ...(Object.keys(meta).length > 0 ? { _meta: meta } : {}),
-    });
-  }
-  return [...commands.values()];
-};
+export type { AcpTurnTimeouts } from './acpDriverSupport';
 
 /** ACP stdio driver that exposes normalized coding-room events to its caller. */
 export class AcpCodingDriver implements CodingAgentDriver {
@@ -386,18 +71,16 @@ export class AcpCodingDriver implements CodingAgentDriver {
   private readonly permissions = new Map<string, PendingPermission>();
   private readonly openToolCalls = new Map<string, Set<string>>();
   private watchdogsHeld = false;
-  private readonly fallbackMessageIds = new Map<string, string>();
   /** Per-turn bookkeeping: a prompt that yields nothing is a credential problem, not a slow model. */
   private readonly turns = new Map<string, { hasOutput: boolean }>();
   private readonly firstOutputTimers = new Map<string, NodeJS.Timeout>();
+  private readonly updateNormalizer = new AcpSessionUpdateNormalizer();
   private capabilities = DEFAULT_CAPABILITIES;
   private readonly authMethods = new Map<string, AcpAuthMethod>();
   private initialized = false;
   private initializedGeneration = 0;
   private supportsSessionClose = false;
-  private workspaceRoot = '';
-  private workspaceBroker: WorkspaceBroker | null = null;
-  private readonly terminalBroker = new TerminalBroker();
+  private readonly agentRequests: AcpAgentRequestBroker;
 
   constructor(
     private readonly launch: {
@@ -407,6 +90,9 @@ export class AcpCodingDriver implements CodingAgentDriver {
     },
     private readonly turnTimeouts: AcpTurnTimeouts = DEFAULT_TURN_TIMEOUTS,
   ) {
+    this.agentRequests = new AcpAgentRequestBroker(launch.environment, (sessionId, kind, payload) =>
+      this.pushToolEvent(sessionId, kind, payload),
+    );
     this.supervisor.onNotification((method, params) => this.receiveNotification(method, params));
     this.supervisor.onRequest((method, params) => this.receiveRequest(method, params));
   }
@@ -502,8 +188,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     modelOverride?: string | null;
   }): AsyncIterable<DriverEvent> {
     await this.ensureConnected(input.workspaceRoot);
-    this.fallbackMessageIds.delete(this.messageFallbackKey(input.sessionId, 'assistant'));
-    this.fallbackMessageIds.delete(this.messageFallbackKey(input.sessionId, 'user'));
+    this.updateNormalizer.forgetMessageFallbacks(input.sessionId);
     const stream: EventStream = {
       events: new AcpEventQueue(mergeAdjacentDriverEvents),
       waiters: [],
@@ -660,7 +345,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     this.availableCommandsBySession.clear();
     this.availableCommandListeners.clear();
     this.sessionTitleListeners.clear();
-    this.terminalBroker.dispose();
+    this.agentRequests.dispose();
     await this.supervisor.dispose();
   }
 
@@ -689,8 +374,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
   }
 
   private async ensureConnected(workspaceRoot: string): Promise<void> {
-    this.workspaceRoot = workspaceRoot;
-    this.workspaceBroker = new WorkspaceBroker(workspaceRoot);
+    this.agentRequests.setWorkspace(workspaceRoot);
     const wasRunning = this.supervisor.isRunning();
     await this.supervisor.start({
       executable: this.launch.executable,
@@ -759,7 +443,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     // Any session update proves the agent is alive; one lane runs one turn at a
     // time, so renewing every prompt request of this connection is exact.
     this.supervisor.touchRequestTimeouts(AcpMethod.SessionPrompt);
-    for (const event of this.normalizeUpdate(params.sessionId, update))
+    for (const event of this.updateNormalizer.normalizeUpdate(params.sessionId, update))
       this.pushEvent(params.sessionId, event);
   }
 
@@ -768,17 +452,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     params: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
     if (method === AcpMethod.SessionRequestPermission) return await this.requestPermission(params);
-    if (method === AcpMethod.FsReadTextFile) return await this.readWorkspaceFile(params);
-    if (method === AcpMethod.FsWriteTextFile) return await this.writeWorkspaceFile(params);
-    if (method === AcpMethod.TerminalCreate) return await this.createTerminal(params);
-    if (method === AcpMethod.TerminalOutput) return this.getTerminalOutput(params);
-    if (method === AcpMethod.TerminalWaitForExit) return await this.waitForTerminal(params);
-    if (method === AcpMethod.TerminalKill) return this.killTerminal(params);
-    if (method === AcpMethod.TerminalRelease) return this.releaseTerminal(params);
-    throw new AcpRequestError(
-      AcpErrorCode.MethodNotFound,
-      `Unsupported ACP agent request: ${method}.`,
-    );
+    return await this.agentRequests.handle(method, params);
   }
 
   /**
@@ -844,254 +518,12 @@ export class AcpCodingDriver implements CodingAgentDriver {
     return await permission;
   }
 
-  private async readWorkspaceFile(
-    params: Record<string, unknown>,
-  ): Promise<Record<string, unknown>> {
-    const target = await this.resolveWorkspacePath(params.path);
-    const content = await readFile(target, 'utf8').catch(error => {
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        throw new AcpRequestError(AcpErrorCode.ResourceNotFound, `File not found: ${target}.`);
-      }
-      throw error;
-    });
-    this.pushToolEvent(params.sessionId, CodingEventKind.FileChange, {
-      action: 'read',
-      path: target,
-    });
-    const line =
-      typeof params.line === 'number' && Number.isInteger(params.line) && params.line > 0
-        ? params.line
-        : 1;
-    const limit =
-      typeof params.limit === 'number' && Number.isInteger(params.limit) && params.limit > 0
-        ? params.limit
-        : undefined;
-    if (line === 1 && limit === undefined) return { content };
-    const lines = content.split(/\r?\n/);
-    return {
-      content: lines.slice(line - 1, limit === undefined ? undefined : line - 1 + limit).join('\n'),
-    };
-  }
-
-  private async writeWorkspaceFile(
-    params: Record<string, unknown>,
-  ): Promise<Record<string, unknown>> {
-    if (typeof params.content !== 'string') {
-      throw new AcpRequestError(
-        AcpErrorCode.InvalidParams,
-        CodingErrorMessage.AcpFileWriteNoContent,
-      );
-    }
-    const target = await this.resolveWorkspacePath(params.path);
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, params.content, 'utf8');
-    this.pushToolEvent(params.sessionId, CodingEventKind.FileChange, {
-      action: 'write',
-      path: target,
-    });
-    return {};
-  }
-
-  private async createTerminal(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-    if (typeof params.command !== 'string' || !params.command) {
-      throw new AcpRequestError(
-        AcpErrorCode.InvalidParams,
-        CodingErrorMessage.AcpTerminalNoCommand,
-      );
-    }
-    const cwd = await this.resolveWorkspacePath(
-      typeof params.cwd === 'string' ? params.cwd : this.workspaceRoot,
-    );
-    const args = Array.isArray(params.args)
-      ? params.args.filter((arg): arg is string => typeof arg === 'string')
-      : [];
-    const environment = this.terminalEnvironment(params.env);
-    const outputByteLimit =
-      typeof params.outputByteLimit === 'number' && Number.isSafeInteger(params.outputByteLimit)
-        ? params.outputByteLimit
-        : undefined;
-    const terminal = this.terminalBroker.start({
-      command: params.command,
-      args,
-      cwd,
-      env: environment,
-      outputByteLimit,
-    });
-    this.pushToolEvent(params.sessionId, CodingEventKind.Terminal, {
-      terminalId: terminal.id,
-      command: params.command,
-      args,
-      cwd,
-    });
-    return { terminalId: terminal.id };
-  }
-
-  private getTerminalOutput(params: Record<string, unknown>): Record<string, unknown> {
-    const terminal = this.requireTerminal(params.terminalId);
-    return this.toTerminalOutput(terminal);
-  }
-
-  private async waitForTerminal(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const terminal = await this.terminalBroker.wait(this.requireTerminalId(params.terminalId));
-    return { exitCode: terminal.exitCode, signal: terminal.signal };
-  }
-
-  private killTerminal(params: Record<string, unknown>): Record<string, unknown> {
-    this.terminalBroker.kill(this.requireTerminalId(params.terminalId));
-    return {};
-  }
-
-  private releaseTerminal(params: Record<string, unknown>): Record<string, unknown> {
-    this.terminalBroker.release(this.requireTerminalId(params.terminalId));
-    return {};
-  }
-
-  private async resolveWorkspacePath(value: unknown): Promise<string> {
-    if (typeof value !== 'string' || !value) {
-      throw new AcpRequestError(AcpErrorCode.InvalidParams, CodingErrorMessage.AcpFilesystemNoPath);
-    }
-    if (!this.workspaceBroker) throw new Error(CodingErrorMessage.AcpWorkspaceBrokerMissing);
-    try {
-      return await this.workspaceBroker.resolveTarget(value);
-    } catch (error) {
-      throw new AcpRequestError(
-        AcpErrorCode.InvalidParams,
-        error instanceof Error ? error.message : String(error),
-      );
-    }
-  }
-
-  private terminalEnvironment(value: unknown): Record<string, string> {
-    const environment = Object.fromEntries(
-      Object.entries(this.launch.environment).filter(
-        (entry): entry is [string, string] => typeof entry[1] === 'string',
-      ),
-    );
-    if (!Array.isArray(value)) return environment;
-    for (const variable of value) {
-      if (!variable || typeof variable !== 'object') continue;
-      const { name, value: variableValue } = variable as { name?: unknown; value?: unknown };
-      if (
-        typeof name === 'string' &&
-        /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
-        typeof variableValue === 'string'
-      ) {
-        environment[name] = variableValue;
-      }
-    }
-    return environment;
-  }
-
   private pushToolEvent(
     sessionId: unknown,
     kind: CodingEventKind,
     payload: Record<string, unknown>,
   ): void {
     if (typeof sessionId === 'string') this.pushEvent(sessionId, { kind, payload });
-  }
-
-  private requireTerminalId(value: unknown): string {
-    if (typeof value !== 'string' || !value) {
-      throw new AcpRequestError(AcpErrorCode.InvalidParams, CodingErrorMessage.AcpTerminalNoId);
-    }
-    return value;
-  }
-
-  private requireTerminal(value: unknown) {
-    const terminal = this.terminalBroker.output(this.requireTerminalId(value));
-    if (!terminal) {
-      throw new AcpRequestError(AcpErrorCode.ResourceNotFound, CodingErrorMessage.AcpTerminalGone);
-    }
-    return terminal;
-  }
-
-  private toTerminalOutput(terminal: {
-    output: string;
-    truncated: boolean;
-    exitCode: number | null;
-    signal: NodeJS.Signals | null;
-  }): Record<string, unknown> {
-    return {
-      output: terminal.output,
-      truncated: terminal.truncated,
-      exitStatus:
-        terminal.exitCode !== null || terminal.signal !== null
-          ? { exitCode: terminal.exitCode, signal: terminal.signal }
-          : null,
-    };
-  }
-
-  private normalizeUpdate(sessionId: string, update: Record<string, unknown>): DriverEvent[] {
-    const kind = update.sessionUpdate ?? update.kind;
-    if (
-      kind === AcpSessionUpdateKind.AgentMessageChunk ||
-      kind === AcpSessionUpdateKind.UserMessageChunk
-    ) {
-      const text = readContentText(update.content);
-      return text === null
-        ? []
-        : [
-            {
-              kind: CodingEventKind.MessageDelta,
-              payload: {
-                content: text,
-                messageId:
-                  typeof update.messageId === 'string'
-                    ? update.messageId
-                    : this.fallbackMessageId(
-                        sessionId,
-                        kind === AcpSessionUpdateKind.UserMessageChunk ? 'user' : 'assistant',
-                      ),
-                role: kind === AcpSessionUpdateKind.UserMessageChunk ? 'user' : 'assistant',
-                streamUpdateMode: CodingStreamUpdateMode.Append,
-              },
-            },
-          ];
-    }
-    if (kind === AcpSessionUpdateKind.AgentThoughtChunk) {
-      const text = readContentText(update.content);
-      return text === null ? [] : [{ kind: CodingEventKind.Reasoning, payload: { content: text } }];
-    }
-    if (
-      kind === AcpSessionUpdateKind.Plan ||
-      kind === AcpSessionUpdateKind.PlanUpdate ||
-      kind === AcpSessionUpdateKind.PlanRemoved
-    ) {
-      return [{ kind: CodingEventKind.Plan, payload: update }];
-    }
-    if (kind === AcpSessionUpdateKind.ToolCall || kind === AcpSessionUpdateKind.ToolCallUpdate) {
-      const events: DriverEvent[] = [{ kind: CodingEventKind.ToolCall, payload: update }];
-      for (const item of Array.isArray(update.content) ? update.content : []) {
-        const content = asRecord(item);
-        if (content.type === 'diff') {
-          events.push({ kind: CodingEventKind.FileChange, payload: content });
-        }
-        if (content.type === 'terminal') {
-          events.push({ kind: CodingEventKind.Terminal, payload: content });
-        }
-      }
-      return events;
-    }
-    if (kind === AcpSessionUpdateKind.UsageUpdate) {
-      return [{ kind: CodingEventKind.Usage, payload: update }];
-    }
-    if (typeof update.content === 'string') {
-      return [{ kind: CodingEventKind.Message, payload: { content: update.content } }];
-    }
-    return [];
-  }
-
-  private messageFallbackKey(sessionId: string, role: 'assistant' | 'user'): string {
-    return `${sessionId}:${role}`;
-  }
-
-  private fallbackMessageId(sessionId: string, role: 'assistant' | 'user'): string {
-    const key = this.messageFallbackKey(sessionId, role);
-    const existing = this.fallbackMessageIds.get(key);
-    if (existing) return existing;
-    const messageId = randomUUID();
-    this.fallbackMessageIds.set(key, messageId);
-    return messageId;
   }
 
   /**

@@ -114,6 +114,25 @@ export function createSkills(runtime: BrowserMockRuntime): Window['electron']['s
         success: true,
       };
     },
+    createCustom: async _p0 => {
+      void _p0;
+      runtime.warnOnce('skills.createCustom');
+      return {
+        success: true,
+        skill: {
+          id: 'preview',
+          name: 'Preview',
+          description: '',
+          enabled: false,
+          pinned: false,
+          isOfficial: false,
+          isBuiltIn: false,
+          updatedAt: 1792108800000,
+          prompt: '',
+          skillPath: '',
+        },
+      };
+    },
     onChanged: _p0 => {
       return runtime.subscribe('skills.onChanged', _p0);
     },

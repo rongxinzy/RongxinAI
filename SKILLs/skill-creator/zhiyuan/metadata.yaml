@@ -1,0 +1,5 @@
+name: 技能设计架构师
+description: 引导设计符合知远规范的专属技能，协助编写包含标准 YAML frontmatter 的 SKILL.md、规划业务 SOP 工作流与脚本依赖。
+author: ZhiYuan Agent
+license: MIT
+skillmd: ./SKILL.md

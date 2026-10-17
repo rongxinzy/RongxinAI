@@ -122,6 +122,8 @@ scripts/
   cover.py                    ← tokens.json → cover.html     [CREATE, REFORMAT]
   render_cover.js             ← cover.html → cover.pdf       [CREATE, REFORMAT]
   render_body.py              ← tokens + content → body.pdf  [CREATE, REFORMAT]
+                                 (split into body_flowables / body_styles /
+                                  body_png / body_blocks modules)
   merge.py                    ← cover + body → final.pdf     [CREATE, REFORMAT]
   fill_inspect.py             ← PDF → field list             [FILL]
   fill_write.py               ← PDF + values → filled PDF    [FILL]

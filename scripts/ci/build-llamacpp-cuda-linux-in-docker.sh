@@ -15,6 +15,9 @@ fi
 
 bash "${ROOT_DIR}/scripts/ensure-llamacpp-cuda-source.sh"
 
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
+
 echo "[build-llamacpp-cuda-linux-in-docker] Pulling ${IMAGE}"
 docker pull "${IMAGE}"
 
@@ -23,6 +26,8 @@ docker run --rm \
   -v "${ROOT_DIR}:/workspace" \
   -w /workspace \
   -e LLAMACPP_SRC=/workspace/.cache/llama.cpp-src \
+  -e HOST_UID="${HOST_UID}" \
+  -e HOST_GID="${HOST_GID}" \
   "${IMAGE}" \
   bash -lc '
     set -euo pipefail
@@ -34,6 +39,7 @@ docker run --rm \
     nvcc --version
     bash scripts/build-llamacpp-cuda-rtx40.sh linux
     bash scripts/ci/stage-linux-cuda-runtime-libs.sh /workspace/vendor/llamacpp/cuda/bin/llama-server
+    chown -R "${HOST_UID}:${HOST_GID}" /workspace/vendor/llamacpp/cuda
   '
 
 server="${ROOT_DIR}/vendor/llamacpp/cuda/bin/llama-server"

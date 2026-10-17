@@ -43,16 +43,13 @@ export const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessio
   const snapshots: CoworkSessionExpertInput[] = [];
   for (const expertId of normalizedExpertIds) {
     const expert = getAgentManager().getAgent(expertId);
-    if (
-      !expert ||
-      (expert.source !== CoworkSessionExpertSource.Package &&
-        expert.source !== CoworkSessionExpertSource.Member)
-    ) {
-      throw new Error(`Expert '${expertId}' is not installed or is not an expert package agent`);
+    if (!expert) {
+      throw new Error(`Expert '${expertId}' is not found`);
     }
     let promptSnapshot = expert.systemPrompt.trim();
     const packageId = expert.presetId.trim() || expert.id;
     let skillIds = [...expert.skillIds];
+    const mcpIds = Array.isArray(expert.mcpIds) ? expert.mcpIds : [];
 
     // Bundled presets are file-sourced like regular skills: the preset
     // markdown is read live on every session so editing the preset takes
@@ -78,16 +75,22 @@ export const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessio
     }
     const contentHash = crypto
       .createHash('sha256')
-      .update(JSON.stringify({ packageId, expertId: expert.id, promptSnapshot, skillIds }))
+      .update(JSON.stringify({ packageId, expertId: expert.id, promptSnapshot, skillIds, mcpIds }))
       .digest('hex');
+    const source: CoworkSessionExpertSource =
+      expert.source === 'expert-package-member'
+        ? CoworkSessionExpertSource.Member
+        : expert.source === 'expert-package' || expert.source === 'preset'
+          ? CoworkSessionExpertSource.Package
+          : CoworkSessionExpertSource.Custom;
     snapshots.push({
       expertId: expert.id,
       packageId,
       expertName: expert.name,
-      source: expert.source,
+      source,
       promptSnapshot,
       skillIds,
-      capabilityPolicy: {},
+      capabilityPolicy: mcpIds.length > 0 ? { mcpIds } : {},
       contentHash,
     });
   }

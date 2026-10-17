@@ -7,14 +7,6 @@ export function createAppInfo(runtime: BrowserMockRuntime): Window['electron']['
       runtime.warnOnce('appInfo.getVersion');
       return '';
     },
-    getInferenceEdition: async () => {
-      runtime.warnOnce('appInfo.getInferenceEdition');
-      return 'cpu';
-    },
-    usesBundledLlamaCppRuntime: async () => {
-      runtime.warnOnce('appInfo.usesBundledLlamaCppRuntime');
-      return false;
-    },
     isDev: async () => {
       runtime.warnOnce('appInfo.isDev');
       return true;
@@ -30,6 +22,14 @@ export function createAppInfo(runtime: BrowserMockRuntime): Window['electron']['
     consumePendingLocalInferenceInstall: async () => {
       runtime.warnOnce('appInfo.consumePendingLocalInferenceInstall');
       return '';
+    },
+    getInferenceEdition: async () => {
+      runtime.warnOnce('appInfo.getInferenceEdition');
+      return 'cpu';
+    },
+    usesBundledLlamaCppRuntime: async () => {
+      runtime.warnOnce('appInfo.usesBundledLlamaCppRuntime');
+      return false;
     },
     relaunch: async () => {
       runtime.warnOnce('appInfo.relaunch');

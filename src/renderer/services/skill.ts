@@ -130,6 +130,28 @@ class SkillService {
     }
   }
 
+  async createCustomSkill(params: {
+    id: string;
+    name: string;
+    description: string;
+    content: string;
+  }): Promise<{ success: boolean; skill?: Skill; error?: string }> {
+    try {
+      if (!window.electron?.skills?.createCustom) {
+        throw new Error('createCustom not supported');
+      }
+      const result = await window.electron.skills.createCustom(params);
+      if (result.success) {
+        await this.loadSkills();
+      }
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create skill';
+      console.error('Failed to create custom skill:', error);
+      return { success: false, error: message };
+    }
+  }
+
   async downloadSkill(
     source: string,
     options: { iconUrl?: string; displayName?: string } = {},

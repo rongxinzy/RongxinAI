@@ -33,6 +33,7 @@ import {
 
 type MockSkill = (typeof mockSkills)[number];
 import type { BrowserMockRuntime } from './runtime';
+import type { DeepPartial } from './scenarioTypes';
 
 type ElectronApi = Window['electron'];
 type StartOptions = Parameters<ElectronApi['cowork']['startSession']>[0];
@@ -62,7 +63,7 @@ function sessionMode(options: object): CoworkSessionMode {
   return CoworkSessionMode.Work;
 }
 
-export function createInteractiveOverrides(runtime: BrowserMockRuntime) {
+export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPartial<ElectronApi> {
   const store = new Map<string, unknown>();
   const sessions = new Map<string, PreviewEntry>();
   for (const summary of mockSessionSummaries) {
@@ -224,8 +225,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime) {
       getVersion: () => Promise.resolve('0.0.0-preview'),
       isDev: () => Promise.resolve(true),
       isEnterprise: () => Promise.resolve(false),
-      getSystemLocale: () =>
-        Promise.resolve(typeof navigator === 'undefined' ? 'en-US' : navigator.language),
+      getSystemLocale: () => Promise.resolve('en-US'),
       consumePendingLocalInferenceInstall: () => Promise.resolve(null),
     },
     checkApiConfig: () => Promise.resolve({ hasConfig: true, config: null }),
@@ -338,7 +338,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime) {
     },
     cowork: {
       getConfig: () => Promise.resolve({ success: true, config: mockCoworkConfig }),
-      updateConfig: () => Promise.resolve({ success: true }),
+      setConfig: () => Promise.resolve({ success: true }),
       listWorkspaces: () => Promise.resolve({ success: true, workspaces: mockWorkspaces }),
       listSessions: (options?: ListOptions) => {
         const matched = [...sessions.values()].filter(entry => {

@@ -12,11 +12,21 @@ import yaml from 'js-yaml';
 
 import { ELECTRON_UPDATER_METADATA_FILENAMES } from './inference-edition-targets.mjs';
 
-const [expectedVersion, ...targets] = process.argv.slice(2);
+const args = process.argv.slice(2);
+let channel = 'stable';
+let argIndex = 0;
+if (args[0] === '--channel') {
+  channel = args[1];
+  argIndex = 2;
+}
+const [expectedVersion, ...targets] = args.slice(argIndex);
 if (!expectedVersion || targets.length === 0) {
   throw new Error(
-    'usage: verify-published-update.mjs <version> <platform:arch:variant>...',
+    'usage: verify-published-update.mjs [--channel stable|beta] <version> <platform:arch:variant>...',
   );
+}
+if (channel !== 'stable' && channel !== 'beta') {
+  throw new Error(`Unsupported update channel: ${channel}`);
 }
 
 const trustedKey = loadTrustedReleaseKey();
@@ -26,7 +36,7 @@ for (const target of targets) {
   if (!platform || !arch || !variant) throw new Error(`Invalid update target: ${target}`);
 
   const endpoint = new URL('https://updates.rongxzyai.com/v1/updates/latest');
-  endpoint.searchParams.set('channel', 'stable');
+  endpoint.searchParams.set('channel', channel);
   endpoint.searchParams.set('platform', platform);
   endpoint.searchParams.set('arch', arch);
   endpoint.searchParams.set('variant', variant);

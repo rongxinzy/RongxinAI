@@ -1,11 +1,13 @@
 import { Button } from '@shared/components/ui/button';
 import { Progress } from '@shared/components/ui/progress';
+import { Switch } from '@shared/components/ui/switch';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
   AppUpdateFailureStage,
   AppUpdateInstallOutcome,
   type AppUpdateRuntimeState,
+  AppUpdateChannelPreference,
   AppUpdateStatus,
 } from '../../../../shared/appUpdate/constants';
 import { normalizeError } from '../../../services/errorNormalization';
@@ -29,9 +31,14 @@ export default function AboutSettingsPanel({
   const [isDevBuild, setIsDevBuild] = useState(false);
   const isEnterpriseBuild = useIsEnterpriseBuild();
   const [isExportingLogs, setIsExportingLogs] = useState(false);
+  const [betaChannelEnabled, setBetaChannelEnabled] = useState(false);
 
   useEffect(() => {
     void window.electron.appInfo.getVersion().then(setAppVersion);
+    void window.electron.appUpdate
+      .getChannel()
+      .then(channel => setBetaChannelEnabled(channel === AppUpdateChannelPreference.Beta))
+      .catch(() => setBetaChannelEnabled(false));
     // Preload may lag behind Vite HMR after adding appInfo.isDev; never crash Settings on mount.
     const isDev = window.electron.appInfo.isDev;
     if (typeof isDev === 'function') {
@@ -127,6 +134,28 @@ export default function AboutSettingsPanel({
         </div>
         {!isEnterpriseBuild && (
           <>
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
+              <div className="min-w-0">
+                <div className="text-sm text-foreground">
+                  {i18nService.t('aboutUpdateBetaChannel')}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {i18nService.t('aboutUpdateBetaChannelHint')}
+                </div>
+              </div>
+              <Switch
+                checked={betaChannelEnabled}
+                onCheckedChange={checked => {
+                  const channel = checked
+                    ? AppUpdateChannelPreference.Beta
+                    : AppUpdateChannelPreference.Stable;
+                  void window.electron.appUpdate.setChannel(channel).then(next => {
+                    setBetaChannelEnabled(next === AppUpdateChannelPreference.Beta);
+                    void window.electron.appUpdate.checkNow({ manual: true });
+                  });
+                }}
+              />
+            </div>
             <div className="px-4 py-3 border-b border-border space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm text-foreground">

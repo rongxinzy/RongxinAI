@@ -90,7 +90,6 @@ export interface LlamaCppApi {
   install: () => Promise<LlamaCppRuntimeInstallResult>;
   cancelRuntimeInstall: () => Promise<LlamaCppCancelInstallResult>;
   importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
-  fetchWindowsRuntimeManifest: (url: string) => Promise<unknown | null>;
   listRuntimeDevices: (
     input?: import('../../../shared/llamacpp').LlamaCppBackendRef,
   ) => Promise<LlamaCppRuntimeListDevicesResult>;

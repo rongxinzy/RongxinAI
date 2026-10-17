@@ -97,6 +97,9 @@ function buildMagpiePiModel(
       ...(modelPoolRequestContext?.conversationId
         ? {
             'X-Magpie-Session': modelPoolRequestContext.conversationId,
+            ...(modelPoolRequestContext.workload
+              ? { 'X-Magpie-Workload': modelPoolRequestContext.workload }
+              : {}),
             [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
             [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
           }

@@ -151,10 +151,15 @@ export const appSystemApi = {
     getSystemLocale: () => ipcRenderer.invoke(AppIpc.GetSystemLocale),
     consumePendingLocalInferenceInstall: () =>
       ipcRenderer.invoke(AppIpc.ConsumePendingLocalInferenceInstall),
+    getInferenceEdition: () => ipcRenderer.invoke(AppIpc.GetInferenceEdition),
+    usesBundledLlamaCppRuntime: () => ipcRenderer.invoke(AppIpc.UsesBundledLlamaCppRuntime),
     relaunch: () => ipcRenderer.invoke(AppIpc.Relaunch),
   },
 
   appUpdate: {
+    getChannel: () => ipcRenderer.invoke(AppUpdateIpc.GetChannel),
+    setChannel: (channel: 'stable' | 'beta') =>
+      ipcRenderer.invoke(AppUpdateIpc.SetChannel, channel),
     getState: () => ipcRenderer.invoke(AppUpdateIpc.GetState),
     checkNow: (options?: { manual?: boolean; userId?: string | null }) =>
       ipcRenderer.invoke(AppUpdateIpc.CheckNow, options),

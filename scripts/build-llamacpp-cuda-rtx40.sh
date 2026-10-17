@@ -12,6 +12,11 @@ if [[ ! -f "${SRC_DIR}/CMakeLists.txt" ]]; then
   bash "${ROOT_DIR}/scripts/ensure-llamacpp-cuda-source.sh"
 fi
 
+if [[ "${PLATFORM}" == 'win' || "${PLATFORM}" == 'windows' ]]; then
+  unset CMAKE_GENERATOR CMAKE_GENERATOR_PLATFORM || true
+  rm -rf "${BUILD_DIR}"
+fi
+
 CMAKE_ARGS=(
   -S "${SRC_DIR}"
   -B "${BUILD_DIR}"
@@ -54,6 +59,7 @@ case "${PLATFORM}" in
     ;;
 esac
 
+echo "[build-llamacpp-cuda-rtx40] Running: cmake ${CMAKE_ARGS[*]}"
 cmake "${CMAKE_ARGS[@]}"
 cmake --build "${BUILD_DIR}" "${BUILD_CONFIG[@]}" --target llama-server -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 

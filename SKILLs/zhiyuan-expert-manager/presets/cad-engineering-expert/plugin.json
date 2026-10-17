@@ -3,8 +3,7 @@
   "version": "0.4.28",
   "description": "CAD engineering expert for validated parametric modeling, robot descriptions, fabrication checks, slicing, and local artifact review.",
   "author": {
-    "name": "earthtojake",
-    "email": ""
+    "name": "ZhiYuan Agent"
   },
   "license": "MIT",
   "expertType": "agent",

@@ -57,7 +57,7 @@ test('community builds keep the full NSIS updater and then assemble the WebView2
   expect(hook).toContain('"${UNINSTALLER_OUT_FILE}"\' = 0');
 });
 
-test.each(['daily-release.yml', 'release-candidate.yml', 'online-update-release.yml'])(
+test.each(['release.yml'])(
   '%s publishes the final signed, interactively tested shell separately from NSIS updates',
   name => {
     const workflow = read(`.github/workflows/${name}`);

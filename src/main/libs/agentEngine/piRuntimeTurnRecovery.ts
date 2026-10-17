@@ -9,7 +9,7 @@ import { randomUUID } from 'crypto';
 
 import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
 import type { CoworkMessage, CoworkStore } from '../../coworkStore';
-import { ModelCapabilityStatus } from '../../../shared/providers';
+import { ModelCapabilityStatus, ProviderName } from '../../../shared/providers';
 import { t } from '../../i18n';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
@@ -306,6 +306,13 @@ export class PiRuntimeTurnRecovery {
     classified: CoworkError,
     rawMessage: string,
   ): void {
+    if (active.harnessModelProfile?.provider === ProviderName.Magpie && hasMagpieModelService()) {
+      try {
+        getMagpieModelService().recordError(rawMessage);
+      } catch {
+        /* ignore */
+      }
+    }
     active.errorSurfaced = true;
     active.turnFailed = true;
     active.isRunning = false;
@@ -342,6 +349,13 @@ export class PiRuntimeTurnRecovery {
   endTerminatedWorkbenchTurn(sessionId: string, message: string): void {
     const active = this.host.getActiveSession(sessionId);
     if (!active || active.aborted || active.turnFailed) return;
+    if (active.harnessModelProfile?.provider === ProviderName.Magpie && hasMagpieModelService()) {
+      try {
+        getMagpieModelService().recordError(message);
+      } catch {
+        /* ignore */
+      }
+    }
     console.warn(`[PiRuntime] ending the turn of session ${sessionId}: ${message}`);
     active.pendingError = { message, classified: classifyCoworkError(message) };
     active.piSession.abortBash();

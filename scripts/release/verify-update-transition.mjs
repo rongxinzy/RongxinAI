@@ -42,8 +42,14 @@ if (currentPath !== '-') {
   const currentVersion = collectionVersion(currentEntries);
   const ordering = compareVersions(candidateVersion, currentVersion);
   if (ordering < 0) {
-    throw new Error(
-      `Refusing to replace newer stable version ${currentVersion} with ${candidateVersion}`,
+    const allowRollback = process.env.ALLOW_STABLE_ROLLBACK === 'true';
+    if (!allowRollback) {
+      throw new Error(
+        `Refusing to replace newer stable version ${currentVersion} with ${candidateVersion}`,
+      );
+    }
+    console.log(
+      `[UpdateRelease] ALLOW_STABLE_ROLLBACK enabled: replacing ${currentVersion} with ${candidateVersion}`,
     );
   }
   if (ordering === 0) {

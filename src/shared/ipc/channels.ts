@@ -34,6 +34,7 @@ export const SkillsIpc = {
   TestEmailConnectivity: 'skills:testEmailConnectivity',
   FetchMarketplace: 'skills:fetchMarketplace',
   FetchMarketplaceContent: 'skills:fetchMarketplaceContent',
+  CreateCustom: 'skills:createCustom',
   Changed: 'skills:changed',
 } as const;
 export type SkillsIpc = (typeof SkillsIpc)[keyof typeof SkillsIpc];
@@ -55,6 +56,7 @@ export const McpIpc = {
   LoadIcon: 'mcp:loadIcon',
   ExportConfig: 'mcp:exportConfig',
   ImportConfig: 'mcp:importConfig',
+  ImportConfigContent: 'mcp:importConfigContent',
   BridgeSyncStart: 'mcp:bridge:syncStart',
   BridgeSyncDone: 'mcp:bridge:syncDone',
 } as const;

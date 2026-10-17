@@ -84,18 +84,18 @@ Tool execution follows the selected permission mode. Operations requiring approv
 
 ## Choose your workspace appearance
 
-ZhiYuan includes **Codex**, **Daming Fenghua**, **Changan Fengwu**, and **Weiyang Jinshi** themes. Codex uses neutral surfaces and compact controls. Daming Fenghua combines paper white, cinnabar, and ink. Changan Fengwu adds silk white, peacock green, warm bronze, rounder controls, and a deep green night appearance. Weiyang Jinshi combines lacquer black, stone white, antique gold, and static cloud-scroll corner ornament.
+ZhiYuan ships one registered theme plugin, **Zenith**, with paired **light** and **dark** appearances. Zenith is a premium futuristic design system: subtle glassmorphism, crisp typography, efficient spacing, and semantic tokens that define backgrounds, control recipes, and interaction states as a single package.
 
-In **Settings → Appearance**, select a theme preview card and choose light, dark, or system mode. Every card updates with the selected mode. Backgrounds, textures, typography, shapes, controls, and interaction states belong to the complete theme package.
+In **Settings → Appearance**, pick the Zenith preview card (shown when only one plugin is bundled) and choose light, dark, or system mode. The preview follows the selected mode. Configurations that still reference removed theme IDs (Codex, Daming Fenghua, Changan Fengwu, Weiyang Jinshi, and earlier styles) resolve to Zenith automatically.
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/theme-previews/appearance-settings-dark.png">
-    <img src="docs/theme-previews/appearance-settings-light.png" alt="Appearance settings component: theme preview cards above a shared light, dark, and system selector; Chinese UI shown" width="760">
+    <img src="docs/theme-previews/appearance-settings-light.png" alt="Appearance settings: Zenith style preview card and light, dark, and system mode selector" width="760">
   </picture>
 </p>
 
-To create a theme, start with the [theme authoring guide](src/renderer/theme/README.md) and [design specification](DESIGN.md). Packages supply presentation data; shared components retain interaction and state ownership.
+To add another bundled theme later, start with the [theme authoring guide](src/renderer/theme/README.md) and [design specification](DESIGN.md). Theme plugins supply presentation data; shared components retain interaction and state ownership.
 
 ## Developer quick start
 

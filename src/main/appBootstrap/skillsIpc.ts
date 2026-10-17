@@ -65,6 +65,13 @@ export const registerSkillsIpc = (): void => {
     }
   });
 
+  ipcMain.handle(
+    SkillsIpc.CreateCustom,
+    async (_event, params: { id: string; name: string; description: string; content: string }) => {
+      return getSkillManager().createCustomSkill(params);
+    },
+  );
+
   ipcMain.handle('skills:delete', async (_event, id: string) => {
     try {
       const skills = await getSkillManager().deleteSkill(id);

@@ -182,13 +182,11 @@ jobs:
       - name: Install Ninja (Windows CUDA)
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         run: choco install ninja -y
-      - name: Build RTX 40 CUDA llama.cpp runtime (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        uses: ilammy/msvc-dev-cmd@v1
       - name: Compile llama-server (Windows CUDA)
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: bash scripts/build-llamacpp-cuda-rtx40.sh win
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          cmd: bash scripts/build-llamacpp-cuda-rtx40.sh win
       - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
         shell: bash

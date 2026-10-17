@@ -32,6 +32,7 @@ import type {
   PiSettingsManager,
 } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
+import { filterExpertMcpRecords } from './expertMcpFilter';
 
 export interface PiResourceLoaderApprovalContext {
   sessionId: string;
@@ -42,6 +43,8 @@ export interface PiResourceLoaderApprovalContext {
   enableCodemode?: boolean;
   /** Register pi's builtin MCP extension, replacing the gateway tool. */
   enableMcpNative?: boolean;
+  /** Explicit MCP server IDs bound to the active session expert. */
+  expertMcpIds?: string[];
 }
 
 export async function createPiRuntimeResourceLoader(
@@ -199,9 +202,17 @@ export async function createPiRuntimeResourceLoader(
         ? [
             pi.createMcpExtension({
               loadConfig: () =>
-                buildPiLoadedMcpConfig(host.getMcpServerManager()?.lastEnabledRecords ?? []),
-              createTransport: buildPiMcpTransportFactory(
-                () => host.getMcpServerManager()?.lastEnabledRecords ?? [],
+                buildPiLoadedMcpConfig(
+                  filterExpertMcpRecords(
+                    host.getMcpServerManager()?.lastEnabledRecords ?? [],
+                    approvalContext?.expertMcpIds,
+                  ),
+                ),
+              createTransport: buildPiMcpTransportFactory(() =>
+                filterExpertMcpRecords(
+                  host.getMcpServerManager()?.lastEnabledRecords ?? [],
+                  approvalContext?.expertMcpIds,
+                ),
               ),
             }),
           ]

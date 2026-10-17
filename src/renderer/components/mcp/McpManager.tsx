@@ -20,6 +20,7 @@ import { McpManagerToolbar } from './McpManagerToolbar';
 import { McpOfficialConnectDialog } from './McpOfficialConnectDialog';
 import { McpTokenConnectDialog } from './McpTokenConnectDialog';
 import McpServerFormModal from './McpServerFormModal';
+import ImportMcpDialog from './ImportMcpDialog';
 import { McpCustomTab } from './mcpManager/McpCustomTab';
 import { McpInstalledTab } from './mcpManager/McpInstalledTab';
 import { McpMarketplaceTab } from './mcpManager/McpMarketplaceTab';
@@ -64,6 +65,10 @@ const McpManager: React.FC<McpManagerProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deletingServerId, setDeletingServerId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formInitialTransportType, setFormInitialTransportType] = useState<
+    'stdio' | 'sse' | 'http'
+  >('stdio');
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<McpServerConfig | null>(null);
   const [installingRegistry, setInstallingRegistry] = useState<McpRegistryEntry | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
@@ -365,11 +370,14 @@ const McpManager: React.FC<McpManagerProps> = ({
     return { success: true };
   };
 
-  const handleOpenCreateForm = () => {
+  const openCreateForm = (transportType: 'stdio' | 'sse') => {
     setEditingServer(null);
     setInstallingRegistry(null);
+    setFormInitialTransportType(transportType);
     setIsFormOpen(true);
   };
+
+  const handleOpenCreateForm = () => openCreateForm('stdio');
 
   const handleImportConfig = async () => {
     setActionError('');
@@ -444,6 +452,9 @@ const McpManager: React.FC<McpManagerProps> = ({
           showTabs={!hideTabControl}
           onTabChange={setActiveTab}
           onSearchQueryChange={setSearchQuery}
+          onConfigureLocal={handleOpenCreateForm}
+          onConfigureCloud={() => openCreateForm('sse')}
+          onImportConfig={() => setIsImportDialogOpen(true)}
         />
 
         {activeTab === McpTabValue.Marketplace && (
@@ -535,10 +546,14 @@ const McpManager: React.FC<McpManagerProps> = ({
         isOpen={isFormOpen}
         server={editingServer}
         registryEntry={installingRegistry}
+        initialTransportType={formInitialTransportType}
         existingNames={existingNames}
         onClose={handleCloseForm}
         onSave={handleSaveForm}
       />
+
+      {/* JSON / File import modal */}
+      <ImportMcpDialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen} />
       <McpOfficialConnectDialog
         entry={officialConnectEntry}
         iconSrc={officialConnectEntry ? officialIcons[officialConnectEntry.id] : undefined}
