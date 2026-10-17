@@ -5,9 +5,7 @@ import path from 'node:path';
 import { parseSync } from 'oxc-parser';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
-const ALLOWED = new Set([
-  path.join(ROOT, 'src/renderer/services/toastNotification.ts'),
-]);
+const ALLOWED = new Set([path.join(ROOT, 'src/renderer/services/toastNotification.ts')]);
 
 const SOURCE_PATTERN = /\.(ts|tsx)$/;
 

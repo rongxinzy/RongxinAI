@@ -103,7 +103,9 @@ export function showAppToast(
   options: ToastNotificationOptions = {},
 ): void {
   const detail: ToastNotificationDetail =
-    typeof detailOrMessage === 'string' ? { message: detailOrMessage, ...options } : detailOrMessage;
+    typeof detailOrMessage === 'string'
+      ? { message: detailOrMessage, ...options }
+      : detailOrMessage;
   const key = dedupeKeyForDetail(detail);
   if (!key || shouldSuppressRepeat(key)) return;
   window.dispatchEvent(new CustomEvent('app:showToast', { detail }));
