@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import sfx from '../installer-shell/sfx-format.cjs';
+import distributionBudget from '../installer-shell/distribution-budget.cjs';
 
 export const shellChecks = [
   'fullOfflineComponentSet',
@@ -129,7 +130,11 @@ export async function verifyShellEvidence({
   commit,
   runId,
 }) {
-  const framing = sfx.inspectSetup(installer);
+  // Per-edition ceiling (distribution-budget.cjs): lite keeps the original
+  // 500 MiB limit; report-only editions (cpu/cuda) pass null (no size limit).
+  const framing = sfx.inspectSetup(installer, {
+    maxBytes: distributionBudget.resolveEditionSetupBudget().maxInstallerBytes,
+  });
   const manifest = JSON.parse(await readFile(`${installer}.manifest.json`, 'utf8'));
   for (const key of [
     'kind',
