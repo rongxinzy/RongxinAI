@@ -12,6 +12,9 @@ const {
   MAX_NON_COMPONENT_BYTES,
   MAX_NSIS_BYTES,
   MAX_NSIS_NON_COMPONENT_BYTES,
+  MAGPIE_GATEWAY_COMPRESSED_BYTES,
+  MAGPIE_GATEWAY_MARGIN_BYTES,
+  MAGPIE_GATEWAY_NSIS_ALLOWANCE_BYTES,
   LLAMACPP_CPU_RUNTIME_COMPONENT_BYTES,
   LLAMACPP_CPU_RUNTIME_MARGIN_BYTES,
   LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES,
@@ -59,27 +62,38 @@ test('the real Windows build fits and signature bytes consume the remaining budg
   expect(() => assertSetupBudget(220 * MiB + 100 + 16, 100)).toThrow(/220 MiB/);
 });
 
-test('NSIS budgets: lite keeps the original limits, cpu equals lite, cuda is uncapped', () => {
+test('NSIS budgets: lite = original limits + Magpie allowance only, cpu equals lite, cuda uncapped', () => {
   expect(MAX_NSIS_BYTES).toBe(450 * MiB);
   expect(MAX_NSIS_NON_COMPONENT_BYTES).toBe(150 * MiB);
-  expect(assertNsisBudget(450 * MiB, 300 * MiB, 'lite')).toMatchObject({
-    installerBytes: 450 * MiB,
-    componentArchiveBytes: 300 * MiB,
-    nonComponentBytes: 150 * MiB,
-    edition: 'lite',
+  expect(MAGPIE_GATEWAY_COMPRESSED_BYTES).toBe(12_334_542);
+  expect(MAGPIE_GATEWAY_MARGIN_BYTES).toBe(1 * MiB);
+  expect(MAGPIE_GATEWAY_NSIS_ALLOWANCE_BYTES).toBe(12_334_542 + MiB);
+  const nonComponentLimit = 150 * MiB + MAGPIE_GATEWAY_NSIS_ALLOWANCE_BYTES;
+  expect(resolveEditionNsisBudget('lite')).toMatchObject({
+    maxInstallerBytes: 450 * MiB,
+    maxComponentBytes: 300 * MiB,
+    maxNonComponentBytes: nonComponentLimit,
   });
+  expect(assertNsisBudget(450 * MiB, 300 * MiB, 'lite')).toMatchObject({ edition: 'lite' });
   expect(() => assertNsisBudget(450 * MiB + 1, 300 * MiB, 'lite')).toThrow(/450 MiB/);
-  expect(() => assertNsisBudget(400 * MiB, 250 * MiB - 1, 'lite')).toThrow(/150 MiB/);
-  expect(assertNsisBudget(439_171_500, 288_626_662, 'lite').nonComponentBytes).toBe(150_544_838);
+  expect(() => assertNsisBudget(400 * MiB, 400 * MiB - nonComponentLimit - 1, 'lite')).toThrow(
+    /non-component/,
+  );
+  // Real CI measurement with Magpie (run 39020915246): lite updater now fits.
+  expect(assertNsisBudget(449_974_289, 288_942_645, 'lite').nonComponentBytes).toBe(161_031_644);
   // The NSIS updater never carries llama.cpp, so cpu gets no extra NSIS room.
   const { measured: _liteMeasured, ...liteNsis } = resolveEditionNsisBudget('lite');
   const { measured: _cpuMeasured, ...cpuNsis } = resolveEditionNsisBudget('cpu');
   expect(cpuNsis).toEqual(liteNsis);
-  expect(() => assertNsisBudget(400 * MiB, 250 * MiB - 1, 'cpu')).toThrow(/150 MiB/);
   expect(assertNsisBudget(2048 * MiB, 300 * MiB, 'cuda')).toMatchObject({
     skipped: true,
     edition: 'cuda',
   });
+});
+
+test('the Magpie allowance does not leak into WebView2 limits', () => {
+  expect(resolveEditionSetupBudget('lite').maxNonComponentBytes).toBe(220 * MiB);
+  expect(resolveEditionSetupBudget('cpu').maxNonComponentBytes).toBe(220 * MiB);
 });
 
 test('WebView2 setup budget selection is per edition and derived from the llama.cpp component', () => {

@@ -16,8 +16,9 @@ const MiB = 1024 * 1024;
 //
 // lite is the product baseline and keeps the ORIGINAL limits unchanged:
 //   WebView2 setup: total 500 MiB, components 300 MiB, non-component 220 MiB
-//   NSIS updater:   total 450 MiB, non-component 150 MiB (components 300 MiB)
-// Never loosen lite to absorb growth: find and remove the growth instead.
+//   NSIS updater:   total 450 MiB, non-component 150 MiB + the Magpie gateway
+//                   allowance below (components 300 MiB)
+// Never loosen lite to absorb other growth: find and remove the growth instead.
 //
 // cpu = lite + exactly the bundled CPU+Vulkan llama.cpp runtime. On Windows that
 // runtime ships only as the eighth offline component of the WebView2 setup
@@ -69,9 +70,23 @@ const EDITION_SETUP_BUDGETS = {
   cuda: UNCAPPED_BUDGET,
 };
 
+// Magpie gateway allowance (#1021 made Magpie the model execution path; #1122
+// builds and ships its pinned binary in every edition). It lives in the NSIS
+// app payload, so it is non-component bytes. Measured: resources/magpie/
+// win32-x64/magpie.exe 47,214,592 B (already -trimpath -ldflags "-s -w"),
+// 7z -mx=9 compressed 12,334,542 B; plus an explicit 1 MiB margin.
+// This allowance exists solely for the Magpie gateway. Do not raise it, or the
+// 150 MiB base, for anything else: find and remove other growth instead.
+// The WebView2 non-component gate (220 MiB) still fits (211.3 MB measured), so
+// it is not given this allowance.
+const MAGPIE_GATEWAY_COMPRESSED_BYTES = 12_334_542;
+const MAGPIE_GATEWAY_MARGIN_BYTES = 1 * MiB;
+const MAGPIE_GATEWAY_NSIS_ALLOWANCE_BYTES =
+  MAGPIE_GATEWAY_COMPRESSED_BYTES + MAGPIE_GATEWAY_MARGIN_BYTES;
+
 const LITE_NSIS_BUDGET = {
   maxInstallerBytes: MAX_NSIS_BYTES,
-  maxNonComponentBytes: MAX_NSIS_NON_COMPONENT_BYTES,
+  maxNonComponentBytes: MAX_NSIS_NON_COMPONENT_BYTES + MAGPIE_GATEWAY_NSIS_ALLOWANCE_BYTES,
   maxComponentBytes: MAX_COMPONENT_BYTES,
 };
 
@@ -308,6 +323,9 @@ module.exports = {
   LLAMACPP_CPU_RUNTIME_COMPONENT_BYTES,
   LLAMACPP_CPU_RUNTIME_MARGIN_BYTES,
   LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES,
+  MAGPIE_GATEWAY_COMPRESSED_BYTES,
+  MAGPIE_GATEWAY_MARGIN_BYTES,
+  MAGPIE_GATEWAY_NSIS_ALLOWANCE_BYTES,
   EDITION_SETUP_BUDGETS,
   EDITION_NSIS_BUDGETS,
   resolveEditionSetupBudget,

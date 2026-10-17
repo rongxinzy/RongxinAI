@@ -48,6 +48,9 @@ if ($null -eq $budgets.nsis.maxInstallerBytes) {
   $MaximumInstallerBytes = [int64]::MaxValue
   $MaximumComponentBytes = [int64]::MaxValue
   $MaximumNonComponentBytes = [int64]::MaxValue
+} else {
+  # Includes the Magpie gateway allowance defined in distribution-budget.cjs.
+  $MaximumNonComponentBytes = [int64]$budgets.nsis.maxNonComponentBytes
 }
 if ($null -eq $budgets.setup.maxInstallerBytes) {
   $MaximumShellBytes = [int64]::MaxValue

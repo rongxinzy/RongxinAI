@@ -73,6 +73,14 @@ fi
 
 BIN_DIR="${EDITION_ROOT}/bin"
 mkdir -p "${BIN_DIR}"
+if [[ "${PLATFORM}" == 'win' || "${PLATFORM}" == 'windows' ]]; then
+  # BUILD_SHARED_LIBS is on: llama-server.exe imports the llama/ggml DLLs built
+  # alongside it (including the sm_89 ggml-cuda.dll). Ship exactly those; never
+  # mix in DLLs from an official release build (different ABI and CUDA archs).
+  rm -rf "${BIN_DIR}"
+  mkdir -p "${BIN_DIR}"
+  cp "$(dirname "${BUILT_SERVER}")"/*.dll "${BIN_DIR}/"
+fi
 cp "${BUILT_SERVER}" "${BIN_DIR}/${EXECUTABLE_NAME}"
 chmod +x "${BIN_DIR}/${EXECUTABLE_NAME}" 2>/dev/null || true
 

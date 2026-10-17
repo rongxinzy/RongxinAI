@@ -6,8 +6,9 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+const { verifyWindowsDllClosure } = require('./windows-pe-imports.cjs');
 const {
-  resolveRuntimeDownloadSources,
+  resolveAssetDownloadSources,
   resolveRuntimeReleaseTag,
   resolveExecutableName,
   extractArchiveToDirectory,
@@ -194,42 +195,52 @@ async function finalizeLinuxEdition(hostTargetId, cudaBackendId, executableName,
   );
 }
 
-async function finalizeWindowsEdition(
-  hostTargetId,
-  cudaBackendId,
-  executableName,
-  builtServerBytes,
-) {
+function readPinnedCudaRuntimeArchive(backendId) {
+  const manifest = JSON.parse(fs.readFileSync(BUNDLED_MANIFEST_PATH, 'utf8'));
+  const entry = manifest.backends?.find(item => item.backend === backendId);
+  const archive = entry?.cudaRuntimeArchive;
+  if (!archive?.assetName || !/^[0-9a-f]{64}$/.test(archive.sha256 || '')) {
+    throw new Error(`Missing pinned cudaRuntimeArchive (assetName + sha256) for ${backendId}`);
+  }
+  return archive;
+}
+
+// Windows CUDA edition layout (bin/):
+//   llama-server.exe + llama/ggml DLLs  - self-built by build-llamacpp-cuda-rtx40.sh (sm_89)
+//   cudart64_12 / cublas64_12 / cublasLt64_12.dll - official llama.cpp cudart asset, sha256-pinned
+// Everything the server imports must sit beside it: users have the NVIDIA driver
+// (nvcuda.dll) but no CUDA toolkit and nothing useful on PATH.
+async function finalizeWindowsEdition(hostTargetId, cudaBackendId, executableName) {
   ensureCpuEditionStaged(hostTargetId);
 
-  const urls = resolveRuntimeDownloadSources(cudaBackendId, { rootDir: ROOT });
+  const binDir = path.join(CUDA_EDITION_ROOT, 'bin');
+  const runtime = readPinnedCudaRuntimeArchive(cudaBackendId);
+  const urls = resolveAssetDownloadSources(hostTargetId, runtime.assetName, { rootDir: ROOT });
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-cuda-edition-'));
-  const archiveName = path.basename(new URL(urls[0]).pathname);
-  const archivePath = path.join(tempDir, archiveName);
+  const archivePath = path.join(tempDir, runtime.assetName);
   const extractDir = path.join(tempDir, 'extract');
 
   try {
     await downloadToFile(urls, archivePath);
-    const expectedSha256 = readExpectedArchiveSha256(cudaBackendId);
-    if (expectedSha256) {
-      const actualSha256 = sha256File(archivePath);
-      if (actualSha256 !== expectedSha256) {
-        throw new Error(
-          `CUDA archive SHA-256 mismatch: expected ${expectedSha256}, got ${actualSha256}`,
-        );
-      }
+    const actualSha256 = sha256File(archivePath);
+    if (actualSha256 !== runtime.sha256) {
+      throw new Error(
+        `CUDA runtime archive SHA-256 mismatch: expected ${runtime.sha256}, got ${actualSha256}`,
+      );
     }
-
     fs.mkdirSync(extractDir, { recursive: true });
     await extractArchiveToDirectory(archivePath, extractDir);
-
-    const payloadDir = findRuntimePayloadDirectory(extractDir);
-    const binDir = path.join(CUDA_EDITION_ROOT, 'bin');
-    fs.rmSync(binDir, { recursive: true, force: true });
-    copyDirectoryContents(payloadDir, binDir);
+    copyDirectoryContents(findRuntimePayloadDirectory(extractDir), binDir);
     assertNoNvidiaDriverLibraries(binDir);
-    fs.writeFileSync(path.join(binDir, executableName), builtServerBytes);
-    fs.chmodSync(path.join(binDir, executableName), 0o755);
+
+    const bundledDlls = verifyWindowsDllClosure(binDir, executableName, {
+      extraRoots: fs.readdirSync(binDir).filter(name => /^ggml-.*\.dll$/i.test(name)),
+    });
+    for (const required of ['cudart64_12.dll', 'cublas64_12.dll', 'cublaslt64_12.dll']) {
+      if (!bundledDlls.includes(required)) {
+        throw new Error(`CUDA edition does not load ${required}; ggml-cuda was not linked`);
+      }
+    }
 
     const cpuFallbackExecutable = writeCpuFallback(hostTargetId, executableName);
     const releaseTag = resolveRuntimeReleaseTag(ROOT);
@@ -239,11 +250,11 @@ async function finalizeWindowsEdition(
       executableName,
       cpuFallbackExecutable,
       cudaLibraries: 'bundled-full',
-      archiveSha256: expectedSha256 || sha256File(archivePath),
+      archiveSha256: runtime.sha256,
       releaseTag,
     });
     console.log(
-      `[finalize-llamacpp-cuda-edition] Staged Windows CUDA edition with full runtime libs and embedded CPU fallback (${manifest.sha256.slice(0, 12)}…).`,
+      `[finalize-llamacpp-cuda-edition] Staged Windows CUDA edition: self-built server, ${bundledDlls.length} bundled DLLs (${bundledDlls.join(', ')}), CPU fallback (${manifest.sha256.slice(0, 12)}…).`,
     );
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
@@ -281,7 +292,7 @@ async function main() {
     return;
   }
 
-  await finalizeWindowsEdition(hostTargetId, cudaBackendId, executableName, builtServerBytes);
+  await finalizeWindowsEdition(hostTargetId, cudaBackendId, executableName);
 }
 
 module.exports = {

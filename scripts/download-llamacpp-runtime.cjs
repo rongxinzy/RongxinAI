@@ -537,6 +537,7 @@ if (require.main === module && process.argv[2] === '--extract-only') {
 
 module.exports = {
   extractArchiveToDirectory,
+  resolveAssetDownloadSources,
   formatDownloadFailureMessage,
   resolveArchiveExtension,
   resolveExecutableName,

@@ -70,8 +70,19 @@ if (@($componentManifest.components).Count -ne $expectedComponentCount) {
   throw "Windows component manifest must contain exactly $expectedComponentCount components for edition $InferenceEdition"
 }
 
-$systemTar = Join-Path $env:SystemRoot 'System32\tar.exe'
-Assert-Path $systemTar 'Windows system tar.exe'
+# Extract with the same pinned 7za.exe the NSIS and WebView2 installers embed
+# (node_modules/7zip-bin, hash recorded in windows-components/7za.sha256).
+# System32 tar.exe is not used: its LZMA support differs per Windows image
+# (windows-2022 lacks it), and end users never extract components with it.
+$sevenZip = Join-Path $ProjectRoot 'node_modules\7zip-bin\win\x64\7za.exe'
+Assert-Path $sevenZip 'pinned 7za.exe'
+$sevenZipHashPath = Join-Path $ComponentsDir '7za.sha256'
+Assert-Path $sevenZipHashPath 'pinned 7za.exe SHA-256'
+$expectedSevenZipHash = (Get-Content -LiteralPath $sevenZipHashPath -Raw).Trim().ToLowerInvariant()
+$actualSevenZipHash = (Get-FileHash -LiteralPath $sevenZip -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualSevenZipHash -ne $expectedSevenZipHash) {
+  throw "SHA-256 mismatch for pinned 7za.exe"
+}
 
 $smokeRoot = Join-Path $env:TEMP ("zhiyuan-runtime-smoke-{0}-{1}" -f $PID, [guid]::NewGuid().ToString('N'))
 $oldPath = $env:PATH
@@ -91,7 +102,7 @@ try {
     if ((Get-Item -LiteralPath $archivePath).Length -ne $component.archiveSizeBytes) {
       throw "Size mismatch for Windows component $($component.key)"
     }
-    Invoke-Checked $systemTar @('-xf', $archivePath, '-C', $smokeRoot) "Windows component extraction: $($component.key)"
+    Invoke-Checked $sevenZip @('x', '-y', "-o$smokeRoot", $archivePath) "Windows component extraction: $($component.key)"
     $sentinelPath = Join-Path $smokeRoot $component.sentinel
     Assert-Path $sentinelPath "Windows component sentinel $($component.key)"
     if ($component.sentinelSha256 -notmatch '^[0-9a-f]{64}$') {
