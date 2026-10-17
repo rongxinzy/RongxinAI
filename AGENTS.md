@@ -31,7 +31,7 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 - 仅在 `import.meta.env.DEV` 且没有 preload bridge 时，`main.tsx` 才动态加载 `src/renderer/browserMock/`。生产构建不含 mock。
 - 完整表面由 `scripts/preview/generate-browser-mock.ts` 按 `Window['electron']`（`src/renderer/types/electron.d.ts`）生成。没有单独实现的方法返回类型上合法的默认值，每个路径只 `console.warn` 一次，不抛异常。`on*` 订阅注册到进程内事件总线，fixture 用同一条总线回放流式事件。
 - 会话、流式回复、设置、Skills、MCP、自动化、本地推理和 IM 的数据在 `browserMock/interactive.ts` 与 `browserMock/fixtures/`。改了 preload 契约后跑 `bun run web:preview:codegen`，并提交 `src/renderer/browserMock/generated/`。`bun run web:preview:codegen:check` 会在生成结果过期时失败。
-- `bun run web:preview:check`（先 `bunx playwright install chromium`）会打开会话、发送一条消息并等待流式回复、打开每个设置页、Skills、MCP、自动化、本地推理、IM、编程、待办、活动和对话框。任何 `console.error`、`pageerror` 或未处理拒绝都让命令失败，截图写到 `.github/pr-assets/browser-preview/`。改 UI 后用它确认没有缺 API 或控制台报错，再看截图。CI 在渲染器、共享契约或 `scripts/preview` 变更时跑同一条检查。
+- `bun run web:preview:check`（先 `bunx playwright install chromium`）在 headless Chromium 中跑 Playwright 交互测试与 warn-only 的 axe 抽检；mock 仍支持 URL 参数 `previewScenario` / `previewEdition` / `previewSkipBoot` 供本地走查。`console.error` 与 `pageerror` 会让检查失败。Preload 契约：`bun run web:preview:contract`；生成面校验：`bun run web:preview:codegen:check`（与 `web:preview:check` 一起在 CI 的 `browser-preview` job 运行）。CI 在渲染器、共享契约或 `scripts/preview` 变更时跑上述检查。
 
 Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
 
@@ -155,8 +155,9 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 1. **改前**：列出涉及的 DESIGN.md 章节、复用组件、token/recipe 入口、受影响页面/状态。
 2. **委派**：传递规范、范例与验收条件；委派方负责最终逐项验收，不只接受「已完成」。
 3. **改后**：逐项完成 DESIGN.md「十、落地检查清单」，每项标「通过 / 不适用（理由）/ 未通过（问题）」，未通过继续修。
-4. **实际渲染**（`bun run electron:dev`）：light/dark；适用状态（hover/pressed/selected/disabled/invalid/open）；键盘焦点；窄窗口、长文本、动态内容、portal；reduced-motion；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留；检查实际尺寸与溢出。
-5. **自查要点**：视觉中心与主动作是否清楚、分组是否靠留白与字阶；是否新增多余颜色/边框/阴影/动效/卡片层/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
+4. **实际渲染**：先用 `bun run web:preview` 在浏览器中迭代和检查 light/dark、适用状态（hover/pressed/selected/disabled/invalid/open）、键盘焦点、窄窗口、长文本、动态内容、portal、reduced-motion、实际尺寸与溢出；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留。运行 `bun run web:preview:check` 确认交互与控制台；mock 未覆盖的行为如实记为未验证。
+5. **Electron 验证**：涉及真实 IPC、主进程、文件/系统能力、原生窗口或完整业务流程时，用 `bun run electron:dev` 复验受影响操作；浏览器 mock 不能证明这些行为。
+6. **自查要点**：视觉中心与主动作是否清楚、分组是否靠留白与字阶；是否新增多余颜色/边框/阴影/动效/卡片层/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
 
 截图、测试、lint 各证明不同事项，互不替代；自动检查不覆盖设计判断。纯文档改动只做一致性与链接检查，不宣称 UI 验收。
 
