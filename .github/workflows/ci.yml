@@ -354,13 +354,8 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bunx playwright install --with-deps chromium
       - run: bun run web:preview:codegen:check
+      - run: bun run web:preview:contract
       - run: bun run web:preview:check
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: browser-preview-screenshots
-          path: .github/pr-assets/browser-preview
-          retention-days: 7
 
   installer-preview:
     needs: changes
