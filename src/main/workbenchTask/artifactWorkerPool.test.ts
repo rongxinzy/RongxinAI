@@ -181,7 +181,7 @@ test('tool display transforms share the bounded worker pool and support cancella
   );
   cancellation.abort();
   await expect(pending).rejects.toThrow('cancelled');
-  expect(
-    await pool.transform({ kind: TextWorkerKind.Tool, result: 'recovered' }),
-  ).toMatchObject({ content: 'recovered' });
+  expect(await pool.transform({ kind: TextWorkerKind.Tool, result: 'recovered' })).toMatchObject({
+    content: 'recovered',
+  });
 });

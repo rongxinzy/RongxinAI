@@ -122,11 +122,7 @@ export class LiveTextStore {
   private appendDelta(entry: LiveTextEntry, partId: string, delta: string): void {
     // The main process already truncates at the cap; this is a belt-and-braces
     // renderer bound — text is clipped to the cap and later deltas dropped.
-    if (
-      delta.length === 0 ||
-      entry.text.length >= CoworkRunPolicy.MaximumContentCharacters
-    )
-      return;
+    if (delta.length === 0 || entry.text.length >= CoworkRunPolicy.MaximumContentCharacters) return;
     const room = CoworkRunPolicy.MaximumContentCharacters - entry.text.length;
     const applied = delta.length > room ? delta.slice(0, room) : delta;
     const isNewPart = !entry.parts.has(partId);

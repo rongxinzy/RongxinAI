@@ -226,12 +226,7 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
   // reintroduce full-text snapshots on the UI IPC path, so it is dropped.
   runtime.on(
     'messageUpdate',
-    (
-      sessionId: string,
-      messageId: string,
-      content: string,
-      metadata?: Record<string, unknown>,
-    ) => {
+    (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
       if (metadata?.isStreaming !== false) return;
       coalescer.flush();
       sessionByMessageId.set(messageId, sessionId);

@@ -131,308 +131,290 @@ function buildFinalStateTurn(seed: number): TurnPlan {
 describe('Cowork streaming consistency C5–C7 (recovery through the real pipeline)', () => {
   setupPiRuntimeAdapterSuite();
 
-  it(
-    'C5/B7: a mid-stream IPC gap recovers via resync and stays prefix-exact (80 seeds)',
-    async () => {
-      const seedCount = 80;
-      let aggregateGapDetections = 0;
-      for (let seed = 0; seed < seedCount; seed += 1) {
-        const random = mulberry32(0x5eed_c5a0 + seed * 37);
-        const turn = buildTextTurn({
-          text: buildCorpus(900 + Math.floor(random() * 500), random),
-          random,
-          minDelta: 8,
-          maxDelta: 16,
-          emitStartEnd: true,
+  it('C5/B7: a mid-stream IPC gap recovers via resync and stays prefix-exact (80 seeds)', async () => {
+    const seedCount = 80;
+    let aggregateGapDetections = 0;
+    for (let seed = 0; seed < seedCount; seed += 1) {
+      const random = mulberry32(0x5eed_c5a0 + seed * 37);
+      const turn = buildTextTurn({
+        text: buildCorpus(900 + Math.floor(random() * 500), random),
+        random,
+        minDelta: 8,
+        maxDelta: 16,
+        emitStartEnd: true,
+      });
+      // Drop a contiguous run of 3..20 IPC events, armed at a text-delta
+      // once `warmup` events were delivered (guarantees a CONTENT gap).
+      const warmup = 3 + Math.floor(random() * 6);
+      const runLength = 3 + Math.floor(random() * 18);
+      let deliveredCount = 0;
+      let droppedRun = 0;
+      let dropRemaining = 0;
+      let armed = false;
+      let resyncPending = false;
+      let gapPassed = false;
+      let lastSeenResyncRequests = 0;
+
+      await withStreamingHarness(`seed-c5a-${seed}`, harness => {
+        lastSeenResyncRequests = harness.stats.resyncRequests;
+        const controls: DeliveryControls = {
+          dropWhen: (_index: number, event: PiUiEvent): boolean => {
+            if (dropRemaining > 0) {
+              dropRemaining -= 1;
+              droppedRun += 1;
+              return true;
+            }
+            if (!armed && deliveredCount >= warmup && isTextDeltaEvent(event)) {
+              armed = true;
+              dropRemaining = runLength - 1;
+              droppedRun += 1;
+              return true;
+            }
+            return false;
+          },
+          onDelivered: (): void => {
+            deliveredCount += 1;
+            if (resyncPending) {
+              // This delivery followed a resync request — post-fix it IS
+              // the resync snapshot arriving.
+              gapPassed = true;
+              resyncPending = false;
+            }
+            if (harness.stats.resyncRequests > lastSeenResyncRequests) {
+              lastSeenResyncRequests = harness.stats.resyncRequests;
+              resyncPending = true;
+            }
+          },
+        };
+        harness.setDeliveryControls(controls);
+
+        harness.onFrame(() => {
+          if (!gapPassed) return;
+          const answerId = harness.answerMessageIds()[0];
+          if (answerId === undefined) return;
+          const shown = harness.displayed(answerId);
+          if (shown === undefined) return;
+          assertPrefixOf(shown, turn.finalText, `C5a seed ${seed} post-resync frame`);
         });
-        // Drop a contiguous run of 3..20 IPC events, armed at a text-delta
-        // once `warmup` events were delivered (guarantees a CONTENT gap).
-        const warmup = 3 + Math.floor(random() * 6);
-        const runLength = 3 + Math.floor(random() * 18);
-        let deliveredCount = 0;
-        let droppedRun = 0;
-        let dropRemaining = 0;
-        let armed = false;
-        let resyncPending = false;
-        let gapPassed = false;
-        let lastSeenResyncRequests = 0;
 
-        await withStreamingHarness(`seed-c5a-${seed}`, harness => {
-          lastSeenResyncRequests = harness.stats.resyncRequests;
-          const controls: DeliveryControls = {
-            dropWhen: (_index: number, event: PiUiEvent): boolean => {
-              if (dropRemaining > 0) {
-                dropRemaining -= 1;
-                droppedRun += 1;
-                return true;
-              }
-              if (!armed && deliveredCount >= warmup && isTextDeltaEvent(event)) {
-                armed = true;
-                dropRemaining = runLength - 1;
-                droppedRun += 1;
-                return true;
-              }
-              return false;
-            },
-            onDelivered: (): void => {
-              deliveredCount += 1;
-              if (resyncPending) {
-                // This delivery followed a resync request — post-fix it IS
-                // the resync snapshot arriving.
-                gapPassed = true;
-                resyncPending = false;
-              }
-              if (harness.stats.resyncRequests > lastSeenResyncRequests) {
-                lastSeenResyncRequests = harness.stats.resyncRequests;
-                resyncPending = true;
-              }
-            },
-          };
-          harness.setDeliveryControls(controls);
+        for (const event of turn.streamEvents) {
+          harness.emitPi(event);
+          harness.tick(16);
+          harness.runFrames();
+        }
+        harness.emitBatch(turn.endEvents, 16);
+        harness.settle();
 
-          harness.onFrame(() => {
-            if (!gapPassed) return;
-            const answerId = harness.answerMessageIds()[0];
-            if (answerId === undefined) return;
+        // Statistics: the gap branch really executed for this seed.
+        expect(armed, `C5a seed ${seed}: gap armed`).toBe(true);
+        expect(droppedRun, `C5a seed ${seed}: dropped run length`).toBe(runLength);
+        expect(gapPassed, `C5a seed ${seed}: delivery resumed after the gap`).toBe(true);
+        const gapDetections = harness.stats.sequenceGaps + harness.stats.contentGaps;
+        expect(gapDetections, `C5a seed ${seed}: renderer detected the gap`).toBeGreaterThan(0);
+        aggregateGapDetections += gapDetections;
+
+        const answerId = requireFirstId(
+          harness.answerMessageIds(),
+          `C5a seed ${seed}: answer message`,
+        );
+        expect(harness.displayed(answerId), `C5a seed ${seed}: final displayed`).toBe(
+          turn.finalText,
+        );
+        const answer = harness.message(answerId);
+        expect(answer?.content, `C5a seed ${seed}: final content`).toBe(turn.finalText);
+        expect(answer?.metadata?.isStreaming, `C5a seed ${seed}: isStreaming`).toBe(false);
+      });
+    }
+    expect(aggregateGapDetections, 'C5a: aggregate gap detections').toBeGreaterThan(0);
+  }, 180_000);
+
+  it('C5/B7: late attach (first N IPC events never delivered) rebuilds the full prefix (80 seeds)', async () => {
+    const seedCount = 80;
+    let aggregateGapDetections = 0;
+    for (let seed = 0; seed < seedCount; seed += 1) {
+      const random = mulberry32(0x5eed_c5b0 + seed * 41);
+      const turn = buildTextTurn({
+        text: buildCorpus(700 + Math.floor(random() * 300), random),
+        random,
+        minDelta: 8,
+        maxDelta: 16,
+        emitStartEnd: true,
+      });
+      // New window attaching mid-stream: the first 4..15 IPC events are
+      // never delivered to the renderer pipeline.
+      const skipCount = 4 + Math.floor(random() * 12);
+      let deliveriesAfterSkip = 0;
+      let resyncPending = false;
+      let gapPassed = false;
+      let lastSeenResyncRequests = 0;
+
+      await withStreamingHarness(`seed-c5b-${seed}`, harness => {
+        lastSeenResyncRequests = harness.stats.resyncRequests;
+        const controls: DeliveryControls = {
+          // The attaching window loads the session (message rows) from the
+          // database, so only the stream traffic before attach is missed.
+          dropWhen: (index: number, event): boolean =>
+            index < skipCount && event.type !== PiUiEventType.Message,
+          onDelivered: (): void => {
+            deliveriesAfterSkip += 1;
+            if (resyncPending) {
+              gapPassed = true;
+              resyncPending = false;
+            }
+            if (harness.stats.resyncRequests > lastSeenResyncRequests) {
+              lastSeenResyncRequests = harness.stats.resyncRequests;
+              resyncPending = true;
+            }
+          },
+        };
+        harness.setDeliveryControls(controls);
+
+        harness.onFrame(() => {
+          if (!gapPassed) return;
+          const answerId = harness.answerMessageIds()[0];
+          if (answerId === undefined) return;
+          const shown = harness.displayed(answerId);
+          if (shown === undefined) return;
+          assertPrefixOf(shown, turn.finalText, `C5b seed ${seed} post-attach frame`);
+        });
+
+        for (const event of turn.streamEvents) {
+          harness.emitPi(event);
+          harness.tick(16);
+          harness.runFrames();
+        }
+        harness.emitBatch(turn.endEvents, 16);
+        harness.settle();
+
+        expect(deliveriesAfterSkip, `C5b seed ${seed}: deliveries after attach`).toBeGreaterThan(0);
+        expect(gapPassed, `C5b seed ${seed}: attach recovery snapshot observed`).toBe(true);
+        const gapDetections = harness.stats.sequenceGaps + harness.stats.contentGaps;
+        expect(gapDetections, `C5b seed ${seed}: renderer detected the attach gap`).toBeGreaterThan(
+          0,
+        );
+        aggregateGapDetections += gapDetections;
+
+        const answerId = requireFirstId(
+          harness.answerMessageIds(),
+          `C5b seed ${seed}: answer message`,
+        );
+        expect(harness.displayed(answerId), `C5b seed ${seed}: final displayed`).toBe(
+          turn.finalText,
+        );
+        const answer = harness.message(answerId);
+        expect(answer?.content, `C5b seed ${seed}: final content`).toBe(turn.finalText);
+        expect(answer?.metadata?.isStreaming, `C5b seed ${seed}: isStreaming`).toBe(false);
+      });
+    }
+    expect(aggregateGapDetections, 'C5b: aggregate gap detections').toBeGreaterThan(0);
+  }, 180_000);
+
+  it('C6: duplicated and adjacent-swapped IPC deliveries keep every frame consistent (80 seeds)', async () => {
+    const seedCount = 80;
+    let totalSwapped = 0;
+    let totalDuplicated = 0;
+    let aggregateGapDetections = 0;
+    for (let seed = 0; seed < seedCount; seed += 1) {
+      const random = mulberry32(0x5eed_c600 + seed * 53);
+      const turn = buildTextTurn({
+        text: buildCorpus(500 + Math.floor(random() * 300), random),
+        random,
+        minDelta: 8,
+        maxDelta: 16,
+        emitStartEnd: true,
+      });
+
+      await withStreamingHarness(`seed-c6-${seed}`, harness => {
+        const controls: DeliveryControls = {
+          // 5% of deliveries are duplicated, 5% swapped with the next one.
+          duplicateWhen: (): boolean => random() < 0.05,
+          swapWithNextWhen: (): boolean => random() < 0.05,
+        };
+        harness.setDeliveryControls(controls);
+
+        harness.onFrame(() => {
+          const answerId = harness.answerMessageIds()[0];
+          if (answerId === undefined) return;
+          const shown = harness.displayed(answerId);
+          if (shown === undefined) return;
+          assertPrefixOf(shown, turn.finalText, `C6 seed ${seed} frame`);
+        });
+
+        for (const event of turn.streamEvents) {
+          harness.emitPi(event);
+          harness.tick(16);
+          harness.runFrames();
+        }
+        harness.emitBatch(turn.endEvents, 16);
+        harness.settle();
+
+        totalSwapped += harness.stats.swapped;
+        totalDuplicated += harness.stats.duplicated;
+        aggregateGapDetections += harness.stats.sequenceGaps + harness.stats.contentGaps;
+
+        const answerId = requireFirstId(
+          harness.answerMessageIds(),
+          `C6 seed ${seed}: answer message`,
+        );
+        expect(harness.displayed(answerId), `C6 seed ${seed}: final displayed`).toBe(
+          turn.finalText,
+        );
+        const answer = harness.message(answerId);
+        expect(answer?.content, `C6 seed ${seed}: final content`).toBe(turn.finalText);
+        expect(answer?.metadata?.isStreaming, `C6 seed ${seed}: isStreaming`).toBe(false);
+      });
+    }
+    // Statistics: both anomaly branches actually exercised.
+    expect(totalSwapped, 'C6: adjacent swaps exercised').toBeGreaterThan(0);
+    expect(totalDuplicated, 'C6: duplicate deliveries exercised').toBeGreaterThan(0);
+    expect(aggregateGapDetections, 'C6: sequence gaps from swaps observed').toBeGreaterThan(0);
+  }, 150_000);
+
+  it('C7: every intermediate frame renders a prefix of the final answer text (120 seeds)', async () => {
+    const seedCount = 120;
+    let aggregateFramesChecked = 0;
+    for (let seed = 0; seed < seedCount; seed += 1) {
+      await withStreamingHarness(`seed-c7-${seed}`, harness => {
+        const plan = buildFinalStateTurn(seed);
+        const { turn } = plan;
+
+        let framesChecked = 0;
+        harness.onFrame(() => {
+          const answerId = harness.answerMessageIds()[0];
+          if (answerId !== undefined) {
             const shown = harness.displayed(answerId);
-            if (shown === undefined) return;
-            assertPrefixOf(shown, turn.finalText, `C5a seed ${seed} post-resync frame`);
-          });
-
-          for (const event of turn.streamEvents) {
-            harness.emitPi(event);
-            harness.tick(16);
-            harness.runFrames();
+            if (shown !== undefined) {
+              framesChecked += 1;
+              assertPrefixOf(shown, turn.finalText, `C7 seed ${seed} answer frame`);
+            }
           }
-          harness.emitBatch(turn.endEvents, 16);
-          harness.settle();
-
-          // Statistics: the gap branch really executed for this seed.
-          expect(armed, `C5a seed ${seed}: gap armed`).toBe(true);
-          expect(droppedRun, `C5a seed ${seed}: dropped run length`).toBe(runLength);
-          expect(gapPassed, `C5a seed ${seed}: delivery resumed after the gap`).toBe(true);
-          const gapDetections = harness.stats.sequenceGaps + harness.stats.contentGaps;
-          expect(gapDetections, `C5a seed ${seed}: renderer detected the gap`).toBeGreaterThan(0);
-          aggregateGapDetections += gapDetections;
-
-          const answerId = requireFirstId(
-            harness.answerMessageIds(),
-            `C5a seed ${seed}: answer message`,
-          );
-          expect(harness.displayed(answerId), `C5a seed ${seed}: final displayed`).toBe(
-            turn.finalText,
-          );
-          const answer = harness.message(answerId);
-          expect(answer?.content, `C5a seed ${seed}: final content`).toBe(turn.finalText);
-          expect(answer?.metadata?.isStreaming, `C5a seed ${seed}: isStreaming`).toBe(false);
-        });
-      }
-      expect(aggregateGapDetections, 'C5a: aggregate gap detections').toBeGreaterThan(0);
-    },
-    180_000,
-  );
-
-  it(
-    'C5/B7: late attach (first N IPC events never delivered) rebuilds the full prefix (80 seeds)',
-    async () => {
-      const seedCount = 80;
-      let aggregateGapDetections = 0;
-      for (let seed = 0; seed < seedCount; seed += 1) {
-        const random = mulberry32(0x5eed_c5b0 + seed * 41);
-        const turn = buildTextTurn({
-          text: buildCorpus(700 + Math.floor(random() * 300), random),
-          random,
-          minDelta: 8,
-          maxDelta: 16,
-          emitStartEnd: true,
-        });
-        // New window attaching mid-stream: the first 4..15 IPC events are
-        // never delivered to the renderer pipeline.
-        const skipCount = 4 + Math.floor(random() * 12);
-        let deliveriesAfterSkip = 0;
-        let resyncPending = false;
-        let gapPassed = false;
-        let lastSeenResyncRequests = 0;
-
-        await withStreamingHarness(`seed-c5b-${seed}`, harness => {
-          lastSeenResyncRequests = harness.stats.resyncRequests;
-          const controls: DeliveryControls = {
-            // The attaching window loads the session (message rows) from the
-            // database, so only the stream traffic before attach is missed.
-            dropWhen: (index: number, event): boolean =>
-              index < skipCount && event.type !== PiUiEventType.Message,
-            onDelivered: (): void => {
-              deliveriesAfterSkip += 1;
-              if (resyncPending) {
-                gapPassed = true;
-                resyncPending = false;
-              }
-              if (harness.stats.resyncRequests > lastSeenResyncRequests) {
-                lastSeenResyncRequests = harness.stats.resyncRequests;
-                resyncPending = true;
-              }
-            },
-          };
-          harness.setDeliveryControls(controls);
-
-          harness.onFrame(() => {
-            if (!gapPassed) return;
-            const answerId = harness.answerMessageIds()[0];
-            if (answerId === undefined) return;
-            const shown = harness.displayed(answerId);
-            if (shown === undefined) return;
-            assertPrefixOf(shown, turn.finalText, `C5b seed ${seed} post-attach frame`);
-          });
-
-          for (const event of turn.streamEvents) {
-            harness.emitPi(event);
-            harness.tick(16);
-            harness.runFrames();
-          }
-          harness.emitBatch(turn.endEvents, 16);
-          harness.settle();
-
-          expect(deliveriesAfterSkip, `C5b seed ${seed}: deliveries after attach`).toBeGreaterThan(
-            0,
-          );
-          expect(gapPassed, `C5b seed ${seed}: attach recovery snapshot observed`).toBe(true);
-          const gapDetections = harness.stats.sequenceGaps + harness.stats.contentGaps;
-          expect(gapDetections, `C5b seed ${seed}: renderer detected the attach gap`).toBeGreaterThan(
-            0,
-          );
-          aggregateGapDetections += gapDetections;
-
-          const answerId = requireFirstId(
-            harness.answerMessageIds(),
-            `C5b seed ${seed}: answer message`,
-          );
-          expect(harness.displayed(answerId), `C5b seed ${seed}: final displayed`).toBe(
-            turn.finalText,
-          );
-          const answer = harness.message(answerId);
-          expect(answer?.content, `C5b seed ${seed}: final content`).toBe(turn.finalText);
-          expect(answer?.metadata?.isStreaming, `C5b seed ${seed}: isStreaming`).toBe(false);
-        });
-      }
-      expect(aggregateGapDetections, 'C5b: aggregate gap detections').toBeGreaterThan(0);
-    },
-    180_000,
-  );
-
-  it(
-    'C6: duplicated and adjacent-swapped IPC deliveries keep every frame consistent (80 seeds)',
-    async () => {
-      const seedCount = 80;
-      let totalSwapped = 0;
-      let totalDuplicated = 0;
-      let aggregateGapDetections = 0;
-      for (let seed = 0; seed < seedCount; seed += 1) {
-        const random = mulberry32(0x5eed_c600 + seed * 53);
-        const turn = buildTextTurn({
-          text: buildCorpus(500 + Math.floor(random() * 300), random),
-          random,
-          minDelta: 8,
-          maxDelta: 16,
-          emitStartEnd: true,
-        });
-
-        await withStreamingHarness(`seed-c6-${seed}`, harness => {
-          const controls: DeliveryControls = {
-            // 5% of deliveries are duplicated, 5% swapped with the next one.
-            duplicateWhen: (): boolean => random() < 0.05,
-            swapWithNextWhen: (): boolean => random() < 0.05,
-          };
-          harness.setDeliveryControls(controls);
-
-          harness.onFrame(() => {
-            const answerId = harness.answerMessageIds()[0];
-            if (answerId === undefined) return;
-            const shown = harness.displayed(answerId);
-            if (shown === undefined) return;
-            assertPrefixOf(shown, turn.finalText, `C6 seed ${seed} frame`);
-          });
-
-          for (const event of turn.streamEvents) {
-            harness.emitPi(event);
-            harness.tick(16);
-            harness.runFrames();
-          }
-          harness.emitBatch(turn.endEvents, 16);
-          harness.settle();
-
-          totalSwapped += harness.stats.swapped;
-          totalDuplicated += harness.stats.duplicated;
-          aggregateGapDetections += harness.stats.sequenceGaps + harness.stats.contentGaps;
-
-          const answerId = requireFirstId(
-            harness.answerMessageIds(),
-            `C6 seed ${seed}: answer message`,
-          );
-          expect(harness.displayed(answerId), `C6 seed ${seed}: final displayed`).toBe(
-            turn.finalText,
-          );
-          const answer = harness.message(answerId);
-          expect(answer?.content, `C6 seed ${seed}: final content`).toBe(turn.finalText);
-          expect(answer?.metadata?.isStreaming, `C6 seed ${seed}: isStreaming`).toBe(false);
-        });
-      }
-      // Statistics: both anomaly branches actually exercised.
-      expect(totalSwapped, 'C6: adjacent swaps exercised').toBeGreaterThan(0);
-      expect(totalDuplicated, 'C6: duplicate deliveries exercised').toBeGreaterThan(0);
-      expect(aggregateGapDetections, 'C6: sequence gaps from swaps observed').toBeGreaterThan(0);
-    },
-    150_000,
-  );
-
-  it(
-    'C7: every intermediate frame renders a prefix of the final answer text (120 seeds)',
-    async () => {
-      const seedCount = 120;
-      let aggregateFramesChecked = 0;
-      for (let seed = 0; seed < seedCount; seed += 1) {
-        await withStreamingHarness(`seed-c7-${seed}`, harness => {
-          const plan = buildFinalStateTurn(seed);
-          const { turn } = plan;
-
-          let framesChecked = 0;
-          harness.onFrame(() => {
-            const answerId = harness.answerMessageIds()[0];
-            if (answerId !== undefined) {
-              const shown = harness.displayed(answerId);
+          if (plan.hasThinking) {
+            const thinkingId = harness.thinkingMessageIds()[0];
+            if (thinkingId !== undefined) {
+              const shown = harness.displayed(thinkingId);
               if (shown !== undefined) {
-                framesChecked += 1;
-                assertPrefixOf(shown, turn.finalText, `C7 seed ${seed} answer frame`);
+                assertPrefixOf(shown, turn.finalThinking, `C7 seed ${seed} thinking frame`);
               }
             }
-            if (plan.hasThinking) {
-              const thinkingId = harness.thinkingMessageIds()[0];
-              if (thinkingId !== undefined) {
-                const shown = harness.displayed(thinkingId);
-                if (shown !== undefined) {
-                  assertPrefixOf(shown, turn.finalThinking, `C7 seed ${seed} thinking frame`);
-                }
-              }
-            }
-          });
-
-          // Small groups → many frames across the whole stream.
-          emitGrouped(harness, turn.streamEvents, mulberry32(0x5eed_c7f0 + seed), 1, 3);
-          harness.emitBatch(turn.endEvents, 16);
-          harness.settle();
-
-          const answerId = requireFirstId(
-            harness.answerMessageIds(),
-            `C7 seed ${seed}: answer message`,
-          );
-          expect(harness.displayed(answerId), `C7 seed ${seed}: final displayed`).toBe(
-            turn.finalText,
-          );
-          expect(framesChecked, `C7 seed ${seed}: frame coverage`).toBeGreaterThan(0);
-          aggregateFramesChecked += framesChecked;
+          }
         });
-      }
-      expect(aggregateFramesChecked, 'C7: aggregate per-frame assertions').toBeGreaterThan(0);
-    },
-    180_000,
-  );
+
+        // Small groups → many frames across the whole stream.
+        emitGrouped(harness, turn.streamEvents, mulberry32(0x5eed_c7f0 + seed), 1, 3);
+        harness.emitBatch(turn.endEvents, 16);
+        harness.settle();
+
+        const answerId = requireFirstId(
+          harness.answerMessageIds(),
+          `C7 seed ${seed}: answer message`,
+        );
+        expect(harness.displayed(answerId), `C7 seed ${seed}: final displayed`).toBe(
+          turn.finalText,
+        );
+        expect(framesChecked, `C7 seed ${seed}: frame coverage`).toBeGreaterThan(0);
+        aggregateFramesChecked += framesChecked;
+      });
+    }
+    expect(aggregateFramesChecked, 'C7: aggregate per-frame assertions').toBeGreaterThan(0);
+  }, 180_000);
 });

@@ -348,9 +348,7 @@ describe('streaming guards (Cowork end-to-end IPC pipeline)', () => {
       harness.tick(1);
 
       for (let index = 0; index < 320; index += 1) {
-        harness.emitPi(
-          builder.appendText(0, `${String(index % 10_000).padStart(4, '0')}-abc`),
-        );
+        harness.emitPi(builder.appendText(0, `${String(index % 10_000).padStart(4, '0')}-abc`));
         harness.tick(1); // exactly 1 delta per ms; NO manual flush in this test
       }
 

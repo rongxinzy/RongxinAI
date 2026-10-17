@@ -98,30 +98,22 @@ const createBoundedIdSet = (capacity: number): BoundedIdSet => {
 
 const FINALIZED_MESSAGE_LIMIT = 1024;
 
-export function createCoworkStreamPipeline(
-  deps: CoworkStreamPipelineDeps,
-): CoworkStreamPipeline {
+export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): CoworkStreamPipeline {
   const scheduler = deps.scheduler ?? browserAnimationFrameScheduler;
-  const updateBatcher = new RafMessageUpdateBatcher(
-    updates => {
-      for (const update of updates) {
-        // Metadata-only updates carry no content and therefore must not
-        // clear a live-text entry either.
-        if (update.metadataOnly === true) continue;
-        deps.liveText.clear(update.messageId);
-      }
-      deps.dispatch(updateMessageContents(updates));
-    },
-    scheduler,
-  );
-  const liveTextBatcher = new RafStreamPartBatcher(
-    parts => {
-      for (const part of parts) {
-        deps.liveText.applyChunk(part.messageId, part.chunk, part.sessionId);
-      }
-    },
-    scheduler,
-  );
+  const updateBatcher = new RafMessageUpdateBatcher(updates => {
+    for (const update of updates) {
+      // Metadata-only updates carry no content and therefore must not
+      // clear a live-text entry either.
+      if (update.metadataOnly === true) continue;
+      deps.liveText.clear(update.messageId);
+    }
+    deps.dispatch(updateMessageContents(updates));
+  }, scheduler);
+  const liveTextBatcher = new RafStreamPartBatcher(parts => {
+    for (const part of parts) {
+      deps.liveText.applyChunk(part.messageId, part.chunk, part.sessionId);
+    }
+  }, scheduler);
   const contentBuffer = new CoworkContentBuffer(sessionId => deps.onContentGap(sessionId));
   const sequenceTracker = new PiUiEventSequenceTracker();
   // Finalized messages are committed to Redux; late StreamPart deltas for them

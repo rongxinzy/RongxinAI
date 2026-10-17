@@ -21,7 +21,7 @@ const piUsageSchema = z
   .optional()
   .catch(undefined);
 
-export type PiUsage = NonNullable<z.infer<typeof piUsageSchema>>;
+type PiUsage = NonNullable<z.infer<typeof piUsageSchema>>;
 
 /**
  * Pi `session.subscribe` emits a discriminated union of events. The exact

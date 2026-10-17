@@ -185,295 +185,261 @@ function buildRewriteTurn(
 describe('Cowork streaming consistency C1–C4 (real end-to-end pipeline)', () => {
   setupPiRuntimeAdapterSuite();
 
-  it(
-    'C1/B2: terminal answer/thinking content and isStreaming=false reach renderer Redux (120 seeds)',
-    async () => {
-      const seedCount = 120;
-      for (let seed = 0; seed < seedCount; seed += 1) {
-        await withStreamingHarness(`seed-c1-${seed}`, harness => {
-          const plan = buildFinalStateTurn(seed);
-          const { turn } = plan;
-          // Grouped batches exercise the coalescer (several deltas per window).
-          emitGrouped(harness, turn.streamEvents, mulberry32(0x5eed_c1f0 + seed), 3, 9);
-          harness.emitBatch(turn.endEvents, 16);
-          harness.settle();
-
-          const answerId = requireFirstId(
-            harness.answerMessageIds(),
-            `C1 seed ${seed}: answer message`,
-          );
-          const answer = harness.message(answerId);
-          expect(answer?.content, `C1 seed ${seed}: final answer content`).toBe(turn.finalText);
-          expect(answer?.metadata?.isStreaming, `C1 seed ${seed}: answer isStreaming`).toBe(false);
-
-          if (plan.hasThinking) {
-            const thinkingId = requireFirstId(
-              harness.thinkingMessageIds(),
-              `C1 seed ${seed}: thinking message`,
-            );
-            const thinking = harness.message(thinkingId);
-            expect(thinking?.content, `C1 seed ${seed}: final thinking content`).toBe(
-              turn.finalThinking,
-            );
-            expect(thinking?.metadata?.isStreaming, `C1 seed ${seed}: thinking isStreaming`).toBe(
-              false,
-            );
-          }
-        });
-      }
-    },
-    120_000,
-  );
-
-  it(
-    "C2/B5: a non-prefix rewrite keeps the rewritten text live ('hello wrld' → 'hello world' → '!')",
-    async () => {
-      await withStreamingHarness('seed-c2-rewrite', harness => {
-        const turn = buildRewriteTurn(
-          'hello wrld',
-          'hello world',
-          '!',
-          mulberry32(0x5eed_c2d0),
-        );
-        emitGrouped(harness, turn.streamEvents, mulberry32(0x5eed_c2d1), 2, 4);
-        harness.runFrames();
-
-        const answerId = requireFirstId(harness.answerMessageIds(), 'C2 fixed: answer message');
-        // BEFORE message_end: rewrite + trailing delta must both be live. This
-        // is exactly what B5 breaks (snapshot wiped by the next delta).
-        expect(harness.displayed(answerId), 'C2 fixed: displayed before message_end').toBe(
-          'hello world!',
-        );
-
+  it('C1/B2: terminal answer/thinking content and isStreaming=false reach renderer Redux (120 seeds)', async () => {
+    const seedCount = 120;
+    for (let seed = 0; seed < seedCount; seed += 1) {
+      await withStreamingHarness(`seed-c1-${seed}`, harness => {
+        const plan = buildFinalStateTurn(seed);
+        const { turn } = plan;
+        // Grouped batches exercise the coalescer (several deltas per window).
+        emitGrouped(harness, turn.streamEvents, mulberry32(0x5eed_c1f0 + seed), 3, 9);
         harness.emitBatch(turn.endEvents, 16);
         harness.settle();
-        expect(harness.displayed(answerId), 'C2 fixed: displayed after settle').toBe(
-          'hello world!',
+
+        const answerId = requireFirstId(
+          harness.answerMessageIds(),
+          `C1 seed ${seed}: answer message`,
         );
         const answer = harness.message(answerId);
-        expect(answer?.content, 'C2 fixed: final content').toBe('hello world!');
-        expect(answer?.metadata?.isStreaming, 'C2 fixed: isStreaming').toBe(false);
-      });
-    },
-    15_000,
-  );
+        expect(answer?.content, `C1 seed ${seed}: final answer content`).toBe(turn.finalText);
+        expect(answer?.metadata?.isStreaming, `C1 seed ${seed}: answer isStreaming`).toBe(false);
 
-  it(
-    'C2/B5: randomized rewrite positions stay consistent (60 seeds)',
-    async () => {
-      const seedCount = 60;
-      for (let seed = 0; seed < seedCount; seed += 1) {
-        await withStreamingHarness(`seed-c2r-${seed}`, harness => {
-          const random = mulberry32(0x5eed_c250 + seed * 131);
-          const initialText = buildCorpus(40 + Math.floor(random() * 260), random);
-          // '#' is never a corpus first character, so neither text can be a
-          // prefix of the other → the rewrite is guaranteed non-prefix.
-          const rewrittenText = `#${buildCorpus(80 + Math.floor(random() * 200), random)}`;
-          const continuation = buildCorpus(10 + Math.floor(random() * 190), random);
-          const turn = buildRewriteTurn(initialText, rewrittenText, continuation, random);
-          const rewriteIndex = turn.rewriteEventIndex ?? 0;
-
-          // Phase 1 — everything up to and including the rewrite.
-          emitGrouped(harness, turn.streamEvents.slice(0, rewriteIndex + 1), random, 3, 8);
-          const answerId = requireFirstId(
-            harness.answerMessageIds(),
-            `C2r seed ${seed}: answer message`,
-          );
-          expect(
-            harness.displayed(answerId),
-            `C2r seed ${seed}: displayed right after the rewrite`,
-          ).toBe(rewrittenText);
-
-          // Phase 2 — continuation deltas; every frame must stay a prefix.
-          let framesChecked = 0;
-          harness.onFrame(() => {
-            const shown = harness.displayed(answerId);
-            if (shown === undefined) return;
-            framesChecked += 1;
-            assertPrefixOf(shown, turn.finalText, `C2r seed ${seed} frame`);
-          });
-          emitGrouped(harness, turn.streamEvents.slice(rewriteIndex + 1), random, 3, 8);
-
-          expect(harness.displayed(answerId), `C2r seed ${seed}: displayed before message_end`).toBe(
-            turn.finalText,
-          );
-          expect(framesChecked, `C2r seed ${seed}: frame coverage`).toBeGreaterThan(0);
-
-          harness.emitBatch(turn.endEvents, 16);
-          harness.settle();
-          const answer = harness.message(answerId);
-          expect(answer?.content, `C2r seed ${seed}: final content`).toBe(turn.finalText);
-          expect(answer?.metadata?.isStreaming, `C2r seed ${seed}: isStreaming`).toBe(false);
-        });
-      }
-    },
-    90_000,
-  );
-
-  it(
-    'C3/B6: interleaved text→thinking→text parts keep answer text ordered (200 iterations)',
-    async () => {
-      const iterations = 200;
-      for (let iteration = 0; iteration < iterations; iteration += 1) {
-        await withStreamingHarness(`seed-c3-${iteration}`, harness => {
-          const random = mulberry32(0x5eed_c300 + iteration * 17);
-          const turn = buildInterleavedThinkingTurn({
-            textBefore: buildCorpus(30 + Math.floor(random() * 60), random),
-            thinking: buildCorpus(20 + Math.floor(random() * 50), random),
-            textAfter: buildCorpus(30 + Math.floor(random() * 60), random),
-            random,
-            minDelta: 4,
-            maxDelta: 18,
-            emitStartEnd: true,
-          });
-
-          // One Pi event per coalescer window: every delta lands in its own
-          // frame, so part-id ordering bugs show up as non-prefix frames.
-          let framesChecked = 0;
-          harness.onFrame(() => {
-            const answerId = harness.answerMessageIds()[0];
-            if (answerId !== undefined) {
-              const shown = harness.displayed(answerId);
-              if (shown !== undefined) {
-                framesChecked += 1;
-                assertPrefixOf(shown, turn.finalText, `C3 iter ${iteration} answer frame`);
-              }
-            }
-            const thinkingId = harness.thinkingMessageIds()[0];
-            if (thinkingId !== undefined) {
-              const shown = harness.displayed(thinkingId);
-              if (shown !== undefined) {
-                assertPrefixOf(shown, turn.finalThinking, `C3 iter ${iteration} thinking frame`);
-              }
-            }
-          });
-
-          for (const event of turn.streamEvents) {
-            harness.emitPi(event);
-            harness.tick(16);
-            harness.runFrames();
-          }
-
-          const answerId = requireFirstId(
-            harness.answerMessageIds(),
-            `C3 iter ${iteration}: answer message`,
-          );
-          expect(
-            harness.displayed(answerId),
-            `C3 iter ${iteration}: displayed before message_end`,
-          ).toBe(turn.finalText);
+        if (plan.hasThinking) {
           const thinkingId = requireFirstId(
             harness.thinkingMessageIds(),
-            `C3 iter ${iteration}: thinking message`,
+            `C1 seed ${seed}: thinking message`,
           );
-          expect(harness.displayed(thinkingId), `C3 iter ${iteration}: thinking before end`).toBe(
-            turn.finalThinking,
-          );
-
-          harness.emitBatch(turn.endEvents, 16);
-          harness.settle();
-          const answer = harness.message(answerId);
-          expect(answer?.content, `C3 iter ${iteration}: final content`).toBe(turn.finalText);
-          expect(answer?.metadata?.isStreaming, `C3 iter ${iteration}: isStreaming`).toBe(false);
           const thinking = harness.message(thinkingId);
-          expect(thinking?.content, `C3 iter ${iteration}: final thinking`).toBe(
+          expect(thinking?.content, `C1 seed ${seed}: final thinking content`).toBe(
             turn.finalThinking,
           );
-          expect(framesChecked, `C3 iter ${iteration}: frame coverage`).toBeGreaterThan(0);
-        });
-      }
-    },
-    240_000,
-  );
-
-  it(
-    'C4/B4: content truncates at CoworkRunPolicy.MaximumContentCharacters (2M cap)',
-    async () => {
-      await withStreamingHarness('seed-c4-truncate', harness => {
-        const random = mulberry32(0x5eed_c400);
-        const max = CoworkRunPolicy.MaximumContentCharacters;
-        const overflow = 5_000;
-        const totalLength = max + overflow;
-        expect(totalLength, 'C4: streamed body must exceed the cap').toBeGreaterThan(max);
-
-        // BMP-only filler: code points === UTF-16 units, so the cap is
-        // unambiguous regardless of how production counts "characters".
-        const fillerPiece = '流式streaming一致性测试тестテスト한국어 truncate-2M 0123456789 ';
-        const filler = fillerPiece.repeat(200);
-        const body = filler.repeat(Math.ceil(totalLength / filler.length)).slice(0, totalLength);
-        expect(body.length).toBe(totalLength);
-
-        // Big deltas keep the event count low (this is a policy test, not a
-        // batching test). String building below happens outside any timing.
-        const builder = new PiTurnBuilder(random);
-        const streamEvents: PiStreamEvent[] = [
-          builder.agentStart(),
-          builder.turnStart(),
-          builder.messageStart(),
-          builder.beginTextPart(0),
-        ];
-        let sent = 0;
-        while (sent < totalLength) {
-          const size = Math.min(60_000 + Math.floor(random() * 60_000), totalLength - sent);
-          streamEvents.push(builder.appendText(0, body.slice(sent, sent + size)));
-          sent += size;
+          expect(thinking?.metadata?.isStreaming, `C1 seed ${seed}: thinking isStreaming`).toBe(
+            false,
+          );
         }
-        streamEvents.push(builder.endTextPart(0));
-        const expectedFinal = builder.textSoFar().slice(0, max);
+      });
+    }
+  }, 120_000);
 
+  it("C2/B5: a non-prefix rewrite keeps the rewritten text live ('hello wrld' → 'hello world' → '!')", async () => {
+    await withStreamingHarness('seed-c2-rewrite', harness => {
+      const turn = buildRewriteTurn('hello wrld', 'hello world', '!', mulberry32(0x5eed_c2d0));
+      emitGrouped(harness, turn.streamEvents, mulberry32(0x5eed_c2d1), 2, 4);
+      harness.runFrames();
+
+      const answerId = requireFirstId(harness.answerMessageIds(), 'C2 fixed: answer message');
+      // BEFORE message_end: rewrite + trailing delta must both be live. This
+      // is exactly what B5 breaks (snapshot wiped by the next delta).
+      expect(harness.displayed(answerId), 'C2 fixed: displayed before message_end').toBe(
+        'hello world!',
+      );
+
+      harness.emitBatch(turn.endEvents, 16);
+      harness.settle();
+      expect(harness.displayed(answerId), 'C2 fixed: displayed after settle').toBe('hello world!');
+      const answer = harness.message(answerId);
+      expect(answer?.content, 'C2 fixed: final content').toBe('hello world!');
+      expect(answer?.metadata?.isStreaming, 'C2 fixed: isStreaming').toBe(false);
+    });
+  }, 15_000);
+
+  it('C2/B5: randomized rewrite positions stay consistent (60 seeds)', async () => {
+    const seedCount = 60;
+    for (let seed = 0; seed < seedCount; seed += 1) {
+      await withStreamingHarness(`seed-c2r-${seed}`, harness => {
+        const random = mulberry32(0x5eed_c250 + seed * 131);
+        const initialText = buildCorpus(40 + Math.floor(random() * 260), random);
+        // '#' is never a corpus first character, so neither text can be a
+        // prefix of the other → the rewrite is guaranteed non-prefix.
+        const rewrittenText = `#${buildCorpus(80 + Math.floor(random() * 200), random)}`;
+        const continuation = buildCorpus(10 + Math.floor(random() * 190), random);
+        const turn = buildRewriteTurn(initialText, rewrittenText, continuation, random);
+        const rewriteIndex = turn.rewriteEventIndex ?? 0;
+
+        // Phase 1 — everything up to and including the rewrite.
+        emitGrouped(harness, turn.streamEvents.slice(0, rewriteIndex + 1), random, 3, 8);
+        const answerId = requireFirstId(
+          harness.answerMessageIds(),
+          `C2r seed ${seed}: answer message`,
+        );
+        expect(
+          harness.displayed(answerId),
+          `C2r seed ${seed}: displayed right after the rewrite`,
+        ).toBe(rewrittenText);
+
+        // Phase 2 — continuation deltas; every frame must stay a prefix.
         let framesChecked = 0;
         harness.onFrame(() => {
-          const answerId = harness.answerMessageIds()[0];
-          if (answerId === undefined) return;
           const shown = harness.displayed(answerId);
           if (shown === undefined) return;
           framesChecked += 1;
-          if (shown.length > max) {
-            throw new Error(
-              `C4: displayed length ${shown.length} exceeded the cap ${max} mid-stream`,
-            );
+          assertPrefixOf(shown, turn.finalText, `C2r seed ${seed} frame`);
+        });
+        emitGrouped(harness, turn.streamEvents.slice(rewriteIndex + 1), random, 3, 8);
+
+        expect(harness.displayed(answerId), `C2r seed ${seed}: displayed before message_end`).toBe(
+          turn.finalText,
+        );
+        expect(framesChecked, `C2r seed ${seed}: frame coverage`).toBeGreaterThan(0);
+
+        harness.emitBatch(turn.endEvents, 16);
+        harness.settle();
+        const answer = harness.message(answerId);
+        expect(answer?.content, `C2r seed ${seed}: final content`).toBe(turn.finalText);
+        expect(answer?.metadata?.isStreaming, `C2r seed ${seed}: isStreaming`).toBe(false);
+      });
+    }
+  }, 90_000);
+
+  it('C3/B6: interleaved text→thinking→text parts keep answer text ordered (200 iterations)', async () => {
+    const iterations = 200;
+    for (let iteration = 0; iteration < iterations; iteration += 1) {
+      await withStreamingHarness(`seed-c3-${iteration}`, harness => {
+        const random = mulberry32(0x5eed_c300 + iteration * 17);
+        const turn = buildInterleavedThinkingTurn({
+          textBefore: buildCorpus(30 + Math.floor(random() * 60), random),
+          thinking: buildCorpus(20 + Math.floor(random() * 50), random),
+          textAfter: buildCorpus(30 + Math.floor(random() * 60), random),
+          random,
+          minDelta: 4,
+          maxDelta: 18,
+          emitStartEnd: true,
+        });
+
+        // One Pi event per coalescer window: every delta lands in its own
+        // frame, so part-id ordering bugs show up as non-prefix frames.
+        let framesChecked = 0;
+        harness.onFrame(() => {
+          const answerId = harness.answerMessageIds()[0];
+          if (answerId !== undefined) {
+            const shown = harness.displayed(answerId);
+            if (shown !== undefined) {
+              framesChecked += 1;
+              assertPrefixOf(shown, turn.finalText, `C3 iter ${iteration} answer frame`);
+            }
+          }
+          const thinkingId = harness.thinkingMessageIds()[0];
+          if (thinkingId !== undefined) {
+            const shown = harness.displayed(thinkingId);
+            if (shown !== undefined) {
+              assertPrefixOf(shown, turn.finalThinking, `C3 iter ${iteration} thinking frame`);
+            }
           }
         });
 
-        for (const event of streamEvents) {
+        for (const event of turn.streamEvents) {
           harness.emitPi(event);
           harness.tick(16);
           harness.runFrames();
         }
-        harness.emitBatch(
-          [
-            builder.messageEnd('stop'),
-            builder.turnEnd(),
-            builder.agentEnd(),
-            builder.agentSettled(),
-          ],
-          16,
+
+        const answerId = requireFirstId(
+          harness.answerMessageIds(),
+          `C3 iter ${iteration}: answer message`,
         );
+        expect(
+          harness.displayed(answerId),
+          `C3 iter ${iteration}: displayed before message_end`,
+        ).toBe(turn.finalText);
+        const thinkingId = requireFirstId(
+          harness.thinkingMessageIds(),
+          `C3 iter ${iteration}: thinking message`,
+        );
+        expect(harness.displayed(thinkingId), `C3 iter ${iteration}: thinking before end`).toBe(
+          turn.finalThinking,
+        );
+
+        harness.emitBatch(turn.endEvents, 16);
         harness.settle();
-
-        const answerId = requireFirstId(harness.answerMessageIds(), 'C4: answer message');
-        const deltaChars = harness.textDeltaIpcEvents(answerId).reduce((sum, event) => {
-          return sum + textDeltaLength((event as { chunk?: unknown }).chunk);
-        }, 0);
-        // No text-delta bytes may cross the cap...
-        expect(deltaChars, 'C4: text-delta characters over IPC').toBeLessThanOrEqual(max);
-        // ...and truncation must engage AT the cap, not early.
-        expect(deltaChars, 'C4: truncation engaged near the cap').toBeGreaterThan(max - 130_000);
-
         const answer = harness.message(answerId);
-        expect(answer?.content?.length, 'C4: final content length').toBe(max);
-        // Compare without a multi-megabyte diff on failure.
-        const content = answer?.content ?? '';
-        if (content !== expectedFinal) {
-          let firstDiff = 0;
-          while (firstDiff < max && content[firstDiff] === expectedFinal[firstDiff]) firstDiff += 1;
-          throw new Error(`C4: final content differs from the truncated expectation at ${firstDiff}`);
-        }
-        expect(answer?.metadata?.contentTruncated, 'C4: contentTruncated metadata').toBe(true);
-        expect(answer?.metadata?.isStreaming, 'C4: isStreaming').toBe(false);
-        expect(framesChecked, 'C4: mid-stream frame coverage').toBeGreaterThan(0);
+        expect(answer?.content, `C3 iter ${iteration}: final content`).toBe(turn.finalText);
+        expect(answer?.metadata?.isStreaming, `C3 iter ${iteration}: isStreaming`).toBe(false);
+        const thinking = harness.message(thinkingId);
+        expect(thinking?.content, `C3 iter ${iteration}: final thinking`).toBe(turn.finalThinking);
+        expect(framesChecked, `C3 iter ${iteration}: frame coverage`).toBeGreaterThan(0);
       });
-    },
-    60_000,
-  );
+    }
+  }, 240_000);
+
+  it('C4/B4: content truncates at CoworkRunPolicy.MaximumContentCharacters (2M cap)', async () => {
+    await withStreamingHarness('seed-c4-truncate', harness => {
+      const random = mulberry32(0x5eed_c400);
+      const max = CoworkRunPolicy.MaximumContentCharacters;
+      const overflow = 5_000;
+      const totalLength = max + overflow;
+      expect(totalLength, 'C4: streamed body must exceed the cap').toBeGreaterThan(max);
+
+      // BMP-only filler: code points === UTF-16 units, so the cap is
+      // unambiguous regardless of how production counts "characters".
+      const fillerPiece = '流式streaming一致性测试тестテスト한국어 truncate-2M 0123456789 ';
+      const filler = fillerPiece.repeat(200);
+      const body = filler.repeat(Math.ceil(totalLength / filler.length)).slice(0, totalLength);
+      expect(body.length).toBe(totalLength);
+
+      // Big deltas keep the event count low (this is a policy test, not a
+      // batching test). String building below happens outside any timing.
+      const builder = new PiTurnBuilder(random);
+      const streamEvents: PiStreamEvent[] = [
+        builder.agentStart(),
+        builder.turnStart(),
+        builder.messageStart(),
+        builder.beginTextPart(0),
+      ];
+      let sent = 0;
+      while (sent < totalLength) {
+        const size = Math.min(60_000 + Math.floor(random() * 60_000), totalLength - sent);
+        streamEvents.push(builder.appendText(0, body.slice(sent, sent + size)));
+        sent += size;
+      }
+      streamEvents.push(builder.endTextPart(0));
+      const expectedFinal = builder.textSoFar().slice(0, max);
+
+      let framesChecked = 0;
+      harness.onFrame(() => {
+        const answerId = harness.answerMessageIds()[0];
+        if (answerId === undefined) return;
+        const shown = harness.displayed(answerId);
+        if (shown === undefined) return;
+        framesChecked += 1;
+        if (shown.length > max) {
+          throw new Error(
+            `C4: displayed length ${shown.length} exceeded the cap ${max} mid-stream`,
+          );
+        }
+      });
+
+      for (const event of streamEvents) {
+        harness.emitPi(event);
+        harness.tick(16);
+        harness.runFrames();
+      }
+      harness.emitBatch(
+        [builder.messageEnd('stop'), builder.turnEnd(), builder.agentEnd(), builder.agentSettled()],
+        16,
+      );
+      harness.settle();
+
+      const answerId = requireFirstId(harness.answerMessageIds(), 'C4: answer message');
+      const deltaChars = harness.textDeltaIpcEvents(answerId).reduce((sum, event) => {
+        return sum + textDeltaLength((event as { chunk?: unknown }).chunk);
+      }, 0);
+      // No text-delta bytes may cross the cap...
+      expect(deltaChars, 'C4: text-delta characters over IPC').toBeLessThanOrEqual(max);
+      // ...and truncation must engage AT the cap, not early.
+      expect(deltaChars, 'C4: truncation engaged near the cap').toBeGreaterThan(max - 130_000);
+
+      const answer = harness.message(answerId);
+      expect(answer?.content?.length, 'C4: final content length').toBe(max);
+      // Compare without a multi-megabyte diff on failure.
+      const content = answer?.content ?? '';
+      if (content !== expectedFinal) {
+        let firstDiff = 0;
+        while (firstDiff < max && content[firstDiff] === expectedFinal[firstDiff]) firstDiff += 1;
+        throw new Error(`C4: final content differs from the truncated expectation at ${firstDiff}`);
+      }
+      expect(answer?.metadata?.contentTruncated, 'C4: contentTruncated metadata').toBe(true);
+      expect(answer?.metadata?.isStreaming, 'C4: isStreaming').toBe(false);
+      expect(framesChecked, 'C4: mid-stream frame coverage').toBeGreaterThan(0);
+    });
+  }, 60_000);
 });

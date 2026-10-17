@@ -42,42 +42,39 @@ function callIds(parts: UIMessageChunk[]): Array<[string, string | undefined]> {
 }
 
 describe('translatePiSessionEventToUiChunks', () => {
-  it.each(['', 'native output'])(
-    'projects text %j tool results as the output string',
-    text => {
-      const state = createPiTranslatorState({ builtinToolNames: ['ls'] });
-      emit(
-        [
-          { type: 'turn_start' } as PiSessionEvent,
-          {
-            type: 'tool_execution_start',
-            toolCallId: 'file-call',
-            toolName: 'ls',
-            args: {},
-          } as PiSessionEvent,
-        ],
-        state,
-      );
-      const result = { content: [{ type: 'text', text }], details: undefined };
-      const chunks = translatePiSessionEventToUiChunks(
+  it.each(['', 'native output'])('projects text %j tool results as the output string', text => {
+    const state = createPiTranslatorState({ builtinToolNames: ['ls'] });
+    emit(
+      [
+        { type: 'turn_start' } as PiSessionEvent,
         {
-          type: 'tool_execution_end',
+          type: 'tool_execution_start',
           toolCallId: 'file-call',
           toolName: 'ls',
-          result,
+          args: {},
         } as PiSessionEvent,
-        state,
-      );
-
-      expect(chunks[0]).toMatchObject({
-        type: 'tool-output-available',
+      ],
+      state,
+    );
+    const result = { content: [{ type: 'text', text }], details: undefined };
+    const chunks = translatePiSessionEventToUiChunks(
+      {
+        type: 'tool_execution_end',
         toolCallId: 'file-call',
-        output: text,
-      });
-      expect(JSON.parse(JSON.stringify(chunks[0]))).toEqual(chunks[0]);
-      expect(Object.prototype.hasOwnProperty.call(result, 'details')).toBe(true);
-    },
-  );
+        toolName: 'ls',
+        result,
+      } as PiSessionEvent,
+      state,
+    );
+
+    expect(chunks[0]).toMatchObject({
+      type: 'tool-output-available',
+      toolCallId: 'file-call',
+      output: text,
+    });
+    expect(JSON.parse(JSON.stringify(chunks[0]))).toEqual(chunks[0]);
+    expect(Object.prototype.hasOwnProperty.call(result, 'details')).toBe(true);
+  });
 
   it.each([
     {
@@ -595,5 +592,4 @@ describe('translatePiSessionEventToUiChunks', () => {
     expect(closing.find(p => p.type === 'text-delta')).toBeUndefined();
     expect(closing.find(p => p.type === 'text-end')).toBeDefined();
   });
-
 });

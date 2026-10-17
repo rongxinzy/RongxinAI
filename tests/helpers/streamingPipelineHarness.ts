@@ -76,16 +76,14 @@
  * - `buildTextTurn(options): BuiltTurn` — single text part, randomly split deltas.
  * - `buildInterleavedThinkingTurn(options): BuiltTurn` — text(ci 0) → thinking(ci 1) →
  *   text(ci 2) inside ONE assistant message (drives part-ordering behavior).
- * - `buildNonPrefixRewriteTurn(options): BuiltTurn` — deltas → delta-less
- *   `message_update` carrying a non-prefix rewrite → more deltas on the new text.
  *
  * Delivery model: every `webContents.send(UiEvent, …)` is recorded in `ipcEvents`
- * and delivered to `pipeline.handleUiEvent` through a NON-REENTRANT queue. When the
- * pipeline synchronously requests a resync (`requestStreamResync` → ipcMain handler →
- * `webContents.send`), the new event joins the queue and is delivered only after the
- * in-flight delivery finishes; a synchronously re-entered snapshot would apply
- * duplicate deltas mid-delivery. **禁止** letting resync snapshots re-enter the
- * pipeline synchronously while a delta delivery is on the stack.
+ * and delivered to `pipeline.handleUiEvent` through a NON-REENTRANT queue.
+ * `requestStreamResync` mirrors `ipcRenderer.invoke`: the main-process handler
+ * runs in a later (fake-timer) task, never inside the main-process call stack
+ * that emitted the event which revealed the gap, and its promise settles after
+ * the handler has pushed the base snapshots. **禁止** letting resync snapshots
+ * re-enter the pipeline (or the main process) synchronously.
  */
 
 // IMPORTANT: keep this import first — it registers the Pi SDK mocks before any
@@ -117,7 +115,6 @@ export type { PiUiEvent };
 // ─── Deterministic randomness ────────────────────────────────────────────────
 
 export * from './piTurnBuilders';
-
 
 /**
  * rAF queue the tests drive by hand. `request` enqueues (returning a handle),
@@ -197,13 +194,11 @@ function installElectronInterception(): void {
   // The window list is indirection so each harness swaps its fake window in
   // without re-spying (repeat spyOn on the same property is fragile).
   vi.spyOn(BrowserWindow, 'getAllWindows').mockImplementation(() => activeWindows as never);
-  vi.spyOn(ipcMain, 'handle').mockImplementation(
-    ((channel: unknown, handler: unknown) => {
-      if (typeof channel === 'string' && typeof handler === 'function') {
-        ipcHandlers.set(channel, handler as IpcHandler);
-      }
-    }) as unknown as () => void,
-  );
+  vi.spyOn(ipcMain, 'handle').mockImplementation(((channel: unknown, handler: unknown) => {
+    if (typeof channel === 'string' && typeof handler === 'function') {
+      ipcHandlers.set(channel, handler as IpcHandler);
+    }
+  }) as unknown as () => void);
 }
 
 /**
@@ -213,8 +208,9 @@ function installElectronInterception(): void {
  * something stripped the adapter's listeners between tests.
  */
 function ensureForwarderBound(runtime: object): void {
-  const listenerCount = (runtime as { listenerCount?: (eventName: string) => number })
-    .listenerCount?.('uiStreamChunk');
+  const listenerCount = (
+    runtime as { listenerCount?: (eventName: string) => number }
+  ).listenerCount?.('uiStreamChunk');
   if (forwardersByRuntime.has(runtime) && (listenerCount ?? 0) > 0) return;
   forwardPiWorkbenchRuntimeToRenderer(runtime as PiRuntimeAdapter);
   forwardersByRuntime.set(runtime, true);
@@ -675,7 +671,9 @@ export class StreamingHarness {
     return new Promise(resolve => {
       setTimeout(() => {
         const handler =
-          typeof streamResyncChannel === 'string' ? this.handlers.get(streamResyncChannel) : undefined;
+          typeof streamResyncChannel === 'string'
+            ? this.handlers.get(streamResyncChannel)
+            : undefined;
         resolve(handler ? handler({}, sessionId) : false);
       }, 0);
     });

@@ -3,7 +3,6 @@
  * harness (split out of streamingPipelineHarness.ts to respect the 1000-line cap).
  */
 
-
 /** mulberry32 PRNG: deterministic, fast, returns floats in [0, 1). */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -71,7 +70,7 @@ export type PiContentBlock =
   | { type: 'text'; text: string }
   | { type: 'thinking'; thinking: string };
 
-export interface PiMessageSnapshot {
+interface PiMessageSnapshot {
   role: 'assistant';
   content: PiContentBlock[];
   stopReason?: string;
@@ -85,7 +84,7 @@ export type PiAssistantMessageEventKind =
   | 'thinking_delta'
   | 'thinking_end';
 
-export interface PiAssistantMessageEvent {
+interface PiAssistantMessageEvent {
   type: PiAssistantMessageEventKind;
   contentIndex: number;
   delta?: string;
@@ -374,44 +373,3 @@ export function buildInterleavedThinkingTurn(
   if (emitStartEnd) events.push(builder.endTextPart(2));
   return finishBuiltTurn(builder, events, options.stopReason);
 }
-
-export interface BuildNonPrefixRewriteTurnOptions {
-  /** Streamed before the rewrite; must NOT be a prefix of `rewrittenText`. */
-  initialText: string;
-  /** Full content delivered by the delta-less rewrite message_update. */
-  rewrittenText: string;
-  /** Streamed after the rewrite, appended on top of `rewrittenText`. */
-  continuation: string;
-  random: () => number;
-  minDelta?: number;
-  maxDelta?: number;
-  stopReason?: string;
-}
-
-/**
- * Deltas building `initialText` → delta-less non-prefix rewrite to
- * `rewrittenText` → deltas appending `continuation`. `finalText` is
- * `rewrittenText + continuation`.
- */
-export function buildNonPrefixRewriteTurn(
-  options: BuildNonPrefixRewriteTurnOptions,
-): BuiltTurn {
-  const { min, max } = clampDeltaRange(options.minDelta, options.maxDelta);
-  const builder = new PiTurnBuilder(options.random);
-  const events: PiStreamEvent[] = [
-    builder.agentStart(),
-    builder.turnStart(),
-    builder.messageStart(),
-  ];
-  for (const delta of splitIntoDeltas(options.initialText, min, max, options.random)) {
-    events.push(builder.appendText(0, delta));
-  }
-  const rewriteEventIndex = events.length;
-  events.push(builder.rewriteText(options.rewrittenText));
-  for (const delta of splitIntoDeltas(options.continuation, min, max, options.random)) {
-    events.push(builder.appendText(0, delta));
-  }
-  return { ...finishBuiltTurn(builder, events, options.stopReason), rewriteEventIndex };
-}
-
-// ─── Manual rAF scheduler ────────────────────────────────────────────────────
