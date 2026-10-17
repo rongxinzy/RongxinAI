@@ -79,7 +79,11 @@ jobs:
 
           if [[ "$BUILD_WINDOWS" == "true" ]]; then
             for edition in lite cpu cuda; do
-              matrix+="${separator}{\"platform\":\"windows\",\"runner\":\"windows-latest\",\"artifact\":\"windows-${edition}-build\",\"runtime_target\":\"win-x64\",\"inference_edition\":\"${edition}\",\"target\":\"win32-x64-${edition}\"}"
+              # CUDA 12.4 nvcc rejects the VS 2026 (MSVC 14.5x) toolchain on
+              # windows-latest; the CUDA leg builds on windows-2022 (VS 2022).
+              runner='windows-latest'
+              if [[ "$edition" == 'cuda' ]]; then runner='windows-2022'; fi
+              matrix+="${separator}{\"platform\":\"windows\",\"runner\":\"${runner}\",\"artifact\":\"windows-${edition}-build\",\"runtime_target\":\"win-x64\",\"inference_edition\":\"${edition}\",\"target\":\"win32-x64-${edition}\"}"
               separator=','
             done
           fi
@@ -348,14 +352,22 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Linux (verify)
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'linux' }}
-        run: bun run dist:linux:${{ matrix.inference_edition }}
+        # The CUDA llama-server is already built in Docker, finalized and staged
+        # above; dist:linux:cuda would rebuild it on the host against the
+        # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
+        run: ${{ matrix.inference_edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', matrix.inference_edition) }}
         env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
           NODE_OPTIONS: '--max-old-space-size=4096'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Linux release
         if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
-        run: bun run dist:linux:${{ matrix.inference_edition }}
+        # The CUDA llama-server is already built in Docker, finalized and staged
+        # above; dist:linux:cuda would rebuild it on the host against the
+        # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
+        run: ${{ matrix.inference_edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', matrix.inference_edition) }}
         env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
           NODE_OPTIONS: '--max-old-space-size=4096'
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}

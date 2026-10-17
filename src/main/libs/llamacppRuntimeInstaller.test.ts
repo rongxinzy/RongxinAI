@@ -1,7 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import {
   createLlamaCppRuntimeInstallPlan,
@@ -14,7 +14,17 @@ import {
 
 const tempDirs: string[] = [];
 
+// Download source selection prefers GitHub when CI/GITHUB_ACTIONS is set, so
+// pin the end-user (non-CI) environment for these planning expectations.
+beforeEach(() => {
+  vi.stubEnv('CI', '');
+  vi.stubEnv('GITHUB_ACTIONS', '');
+  vi.stubEnv('LLAMACPP_RUNTIME_URL', '');
+  vi.stubEnv('LLAMACPP_RUNTIME_BASE_URL', '');
+});
+
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const dir of tempDirs.splice(0)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
