@@ -3,12 +3,21 @@ import { createReadStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { it, expect } from 'vitest';
+import { it, expect, beforeAll } from 'vitest';
+import fsSync from 'node:fs';
 import { projectMagpieCatalog } from './catalog';
 import { MagpieManager } from './manager';
 import { verifyMagpieBinary } from './integrity';
 
-it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
+const magpieResources = path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie');
+const magpiePlatformDir = path.join(magpieResources, `${process.platform}-${process.arch}`);
+const magpieBinaryName = process.platform === 'win32' ? 'magpie.exe' : 'magpie';
+let magpieBinaryPresent = false;
+beforeAll(() => {
+  magpieBinaryPresent = fsSync.existsSync(path.join(magpiePlatformDir, magpieBinaryName));
+});
+
+it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1' || !magpieBinaryPresent)(
   'connect and disconnect restore Claude Code and Pi configs byte-for-byte',
   async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-external-agent-'));
@@ -24,7 +33,7 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
 
     let gatewayPort = 0;
     const manager = new MagpieManager({
-      resourcesRoot: path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie'),
+      resourcesRoot: magpieResources,
       parseCatalog: async bytes =>
         projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
       privateHome: path.join(root, 'service'),
