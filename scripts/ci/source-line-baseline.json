@@ -9,7 +9,6 @@
     "SKILLs/pdf/scripts/render_body.py": 1039,
     "src/main/codingAgent/codingRoomService.ts": 2509,
     "src/main/codingAgent/drivers/acpCodingDriver.ts": 1231,
-    "src/main/coworkStore.ts": 2066,
     "src/main/im/imCoworkHandler.ts": 1319,
     "src/main/ipcHandlers/llamacpp.ts": 1592,
     "src/main/libs/coworkUtil.ts": 1672,
