@@ -140,11 +140,15 @@ Packaging is platform-specific. Build and verify the bundled Magpie gateway for 
 ```bash
 bun run magpie:build --target win32-x64 --go /path/to/go
 bun run magpie:verify --target win32-x64
-bun run dist:win          # = dist:win:offline, unsigned
-bun run dist:win:signed   # Certum-signed, needs CERTUM_CERT_THUMBPRINT
-bun run dist:mac
-bun run dist:linux
+bun run dist:win               # lite edition (= dist:win:offline / dist:win:lite), unsigned
+bun run dist:win:cpu           # cpu edition: bundled llama.cpp CPU + Vulkan
+bun run dist:win:cuda          # cuda edition: RTX 40 / CUDA 12.4 llama.cpp + CPU fallback
+bun run dist:win:signed        # Certum-signed lite; :cpu / :cuda suffixes for the other editions
+bun run dist:linux:cpu         # or dist:linux:cuda; Linux has no lite edition
+bun run dist:mac:arm64         # or dist:mac:x64; macOS ships the cpu edition only
 ```
+
+See [README.md](README.md#editions) for the edition matrix.
 
 You normally do not need to create an installer for a small change. If packaging behavior changed, test it on the target operating system and describe the result in the pull request.
 
