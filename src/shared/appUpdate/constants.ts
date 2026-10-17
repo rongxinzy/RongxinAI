@@ -28,7 +28,16 @@ export const AppUpdateSource = {
 
 export type AppUpdateSource = (typeof AppUpdateSource)[keyof typeof AppUpdateSource];
 
+export const AppUpdateChannelPreference = {
+  Stable: 'stable',
+  Beta: 'beta',
+} as const;
+export type AppUpdateChannelPreference =
+  (typeof AppUpdateChannelPreference)[keyof typeof AppUpdateChannelPreference];
+
 export const AppUpdateIpc = {
+  GetChannel: 'appUpdate:getChannel',
+  SetChannel: 'appUpdate:setChannel',
   GetState: 'appUpdate:getState',
   CheckNow: 'appUpdate:checkNow',
   RetryDownload: 'appUpdate:retryDownload',

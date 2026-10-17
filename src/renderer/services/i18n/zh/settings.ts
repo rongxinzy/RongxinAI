@@ -12,6 +12,8 @@ export const zhSettings: Record<string, string> = {
   aboutUsLabel: '关于我们',
   aboutCompanyName: '北京容芯致远科技有限公司',
   aboutVersion: '版本',
+  aboutUpdateBetaChannel: 'Beta 更新通道',
+  aboutUpdateBetaChannelHint: '开启后从 Beta 通道检查更新；默认 Stable 通道。',
   aboutOfficialWebsite: '官网链接',
   aboutContactEmail: '联系邮箱',
   aboutUserManual: '用户手册',

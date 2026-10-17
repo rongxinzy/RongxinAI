@@ -4,10 +4,29 @@ import { ipcMain, shell } from 'electron';
 import { rt } from './runtimeState';
 
 import { getAppUpdateCoordinator } from './runtimeServices';
-import { AppUpdateIpc, AppUpdateStatus } from '../../shared/appUpdate/constants';
+import {
+  AppUpdateChannelPreference,
+  AppUpdateIpc,
+  AppUpdateStatus,
+} from '../../shared/appUpdate/constants';
 import { t } from '../i18n';
 
 export const registerAppUpdateIpc = (): void => {
+  ipcMain.handle(AppUpdateIpc.GetChannel, async () => {
+    return getAppUpdateCoordinator().getChannelPreference();
+  });
+
+  ipcMain.handle(AppUpdateIpc.SetChannel, async (_event, channel: unknown) => {
+    if (
+      channel !== AppUpdateChannelPreference.Stable &&
+      channel !== AppUpdateChannelPreference.Beta
+    ) {
+      throw new Error('Invalid update channel preference');
+    }
+    getAppUpdateCoordinator().setChannelPreference(channel);
+    return getAppUpdateCoordinator().getChannelPreference();
+  });
+
   ipcMain.handle(AppUpdateIpc.GetState, async () => {
     return getAppUpdateCoordinator().getState();
   });

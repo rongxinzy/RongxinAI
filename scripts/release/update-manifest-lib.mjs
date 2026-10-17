@@ -51,7 +51,7 @@ export function verifyEnvelope(envelope, trustedKey = loadTrustedReleaseKey()) {
   if (
     !payload ||
     typeof payload !== 'object' ||
-    payload.channel !== 'stable' ||
+    (payload.channel !== 'stable' && payload.channel !== 'beta') ||
     typeof payload.version !== 'string' ||
     !valid(payload.version) ||
     !payload.artifact ||

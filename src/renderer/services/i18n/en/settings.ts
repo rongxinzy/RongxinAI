@@ -14,6 +14,8 @@ export const enSettings: Record<string, string> = {
   // TODO: translate
   aboutCompanyName: 'Beijing Rongxin Zhiyuan Technology Co., Ltd.',
   aboutVersion: 'Version',
+  aboutUpdateBetaChannel: 'Beta update channel',
+  aboutUpdateBetaChannelHint: 'When enabled, checks the beta feed; default is stable.',
   aboutOfficialWebsite: 'Official website',
   aboutContactEmail: 'Contact Email',
   aboutUserManual: 'User Manual',

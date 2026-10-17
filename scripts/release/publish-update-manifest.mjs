@@ -158,8 +158,9 @@ const manifests = installerArtifacts.map(({ platform, arch, variant, filename, s
     throw new Error(`Release target ${target} must contain exactly one updater artifact`);
   }
   const updaterArtifact = updaterArtifacts[0] ?? { filename, size, sha512 };
+  const releaseChannel = process.env.UPDATE_RELEASE_CHANNEL === 'beta' ? 'beta' : 'stable';
   const payload = {
-    channel: 'stable',
+    channel: releaseChannel,
     version: releaseVersion,
     publishedAt: new Date().toISOString(),
     minimumSupportedVersion: '2026.7.1',
