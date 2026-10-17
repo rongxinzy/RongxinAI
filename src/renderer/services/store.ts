@@ -1,4 +1,9 @@
-// 删除重复的类型声明，使用全局类型定义
+/**
+ * Persistent Key-Value store adapter for Electron's main process SQLite KV store (`window.electron.store`).
+ *
+ * NOTE: This is an asynchronous persistent storage service, completely separate and distinct from
+ * the in-memory synchronous Redux state store located in `src/renderer/store/`.
+ */
 interface LocalStore {
   getItem<T>(key: string): Promise<T | null>;
   setItem<T>(key: string, value: T): Promise<void>;

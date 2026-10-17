@@ -1,7 +1,6 @@
 import { expectRunStart } from '../store/slices/coworkRunSlice';
 import {
   type CoworkError,
-  CoworkErrorKind,
   ENGINE_NOT_READY_CODE,
   getUserErrorI18nKey,
 } from '../../common/coworkError';
@@ -245,9 +244,6 @@ class CoworkService {
             event.error,
           );
           store.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'error' }));
-          if (event.error.kind === CoworkErrorKind.AuthExpired) {
-            window.dispatchEvent(new CustomEvent('core-rpc-auth-expired'));
-          }
           if (event.error.message && !terminalMessageAlreadyReceived) {
             store.dispatch(
               addMessage({

@@ -23,7 +23,6 @@ import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
 import { showAppErrorToast } from '../../services/toastNotification';
 import { quickActionService } from '../../services/quickAction';
-import { RafMessageUpdateBatcher } from '../../services/rafMessageUpdateBatcher';
 import { workspaceService } from '../../services/workspace';
 import { RootState, store } from '../../store';
 import {
@@ -33,12 +32,7 @@ import {
   selectIsStreaming,
 } from '../../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../../store/selectors/workModeSelectors';
-import {
-  addMessage,
-  addSession,
-  clearCurrentSession,
-  updateMessageContents,
-} from '../../store/slices/coworkSlice';
+import { addMessage, addSession, clearCurrentSession } from '../../store/slices/coworkSlice';
 import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
@@ -95,15 +89,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 }) => {
   const dispatch = useDispatch();
 
-  const contentBatcherRef = useRef<RafMessageUpdateBatcher | null>(null);
-  if (!contentBatcherRef.current) {
-    contentBatcherRef.current = new RafMessageUpdateBatcher(updates => {
-      dispatch(updateMessageContents(updates));
-    });
-  }
-  const contentBatcher = contentBatcherRef.current;
-
-  useEffect(() => () => contentBatcher.dispose(), [contentBatcher]);
   const [isInitialized, setIsInitialized] = useState(false);
   const startingSessionIdsRef = useRef(new Set<string>());
   const continuingSessionIdsRef = useRef(new Set<string>());

@@ -3,6 +3,7 @@ import { AgentId } from '@shared/agent';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
 
 import { store } from '../store';
+import { coworkService } from './cowork';
 import {
   addAgent,
   removeAgent,
@@ -171,7 +172,6 @@ class AgentService {
       store.dispatch(clearAgentSelectedModel(id));
       if (wasCurrentAgent) {
         this.switchAgent(AgentId.Main);
-        const { coworkService } = await import('./cowork');
         coworkService.loadSessions(AgentId.Main);
       }
       return true;

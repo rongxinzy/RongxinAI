@@ -12,6 +12,7 @@ import { slimQueuedMessagesForIpc } from '../coworkImageAttachments';
 import { persistCoworkTerminalError } from '../coworkTerminalErrorPersistence';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { createPiUiEventBatcher } from '../piUiEventBatcher';
+import { getCoworkStreamMetadata } from '../coworkStreamMetadata';
 import { PiUiRuntimeSnapshots } from '../../shared/cowork/piUiRuntimeSnapshot';
 import {
   type PiUiEvent,
@@ -43,7 +44,7 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     broadcastUiEvent(sequencer.next(payload));
   });
 
-  const contentProjection = bindCoworkRunBridge(
+  bindCoworkRunBridge(
     runtime,
     () => getStore().getDatabase(),
     patch => emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
@@ -65,13 +66,13 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
   runtime.on(
     'messageUpdate',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
-      void contentProjection
-        .project(sessionId, messageId, content, metadata)
-        .then(patches => {
-          for (const patch of patches)
-            emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId, patch });
-        })
-        .catch(error => console.error('[PiWorkbenchForwarder] content projection failed:', error));
+      emitUiEvent({
+        type: PiUiEventType.MessageUpdate,
+        sessionId,
+        messageId,
+        content,
+        metadata: getCoworkStreamMetadata(metadata),
+      });
     },
   );
 
