@@ -45,10 +45,18 @@ case "${PLATFORM}" in
     ;;
   win|windows)
     # Match ggml-org/llama.cpp release.yml windows-cuda: Ninja + MSVC toolset (not VS CUDA integration).
+    # LLAMA_OPENSSL=OFF: otherwise CMake picks up whatever OpenSSL the runner
+    # has (e.g. Strawberry Perl's) and llama-common.dll imports
+    # libssl-3-x64.dll / libcrypto-3-x64.dll, which we do not ship (the PE
+    # import-closure gate in finalize-llamacpp-cuda-edition.cjs rejects it).
+    # HTTPS is only for llama-server's own -hf/URL model downloads; the app
+    # always launches it on a local model file (downloads go through
+    # ModelScope/hf-mirror in the app), so the server needs no TLS stack.
     CMAKE_ARGS+=(
       -G Ninja
       -DCMAKE_BUILD_TYPE=Release
       -DGGML_METAL=OFF
+      -DLLAMA_OPENSSL=OFF
     )
     EXECUTABLE_NAME=llama-server.exe
     BUILD_CONFIG=(--config Release)

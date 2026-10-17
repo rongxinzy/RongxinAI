@@ -232,7 +232,7 @@ try {
         ? null
         : nsisUpdaterBytes - componentArchiveBytes,
     // Per-edition limits (distribution-budget.cjs): lite keeps the original
-    // ceilings, cpu adds only the measured llama.cpp component, cuda is uncapped.
+    // ceilings; cpu/cuda are report-only (null limits) until measured.
     edition: setupBudgetEdition,
     maxSetupBytes: setupBudget.maxInstallerBytes,
     maxComponentBytes: setupBudget.maxComponentBytes,

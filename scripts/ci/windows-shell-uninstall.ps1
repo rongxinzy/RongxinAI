@@ -95,9 +95,21 @@ Assert-SameAcceptancePath (Get-ItemProperty -LiteralPath $registrationKeys[0]).I
 
 $preserveFiles = @((Join-Path $customData 'history.sqlite'), (Join-Path $customData 'settings.json'), (Join-Path $customRuntime 'preserved-user-marker'))
 $components = (Get-Content -LiteralPath (Join-Path $ProjectRoot 'build-tar/windows-components/manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json).components
-if (@($components).Count -ne 7) { throw 'All seven main application components must remain represented' }
+# Fixed component keys come from scripts/nsis-offline-components.json (the file
+# the installers embed). lite must match it exactly; the new cpu/cuda editions
+# must contain it and may add components (llamacpp-bundled), which are
+# reported rather than counted. Every listed component is preserved/verified.
+$baseKeys = @((Get-Content -LiteralPath (Join-Path $ProjectRoot 'scripts/nsis-offline-components.json') -Raw -Encoding UTF8 | ConvertFrom-Json) | ForEach-Object { $_.key })
+$componentKeys = @($components | ForEach-Object { $_.key })
+foreach ($key in $baseKeys) {
+  if (@($componentKeys | Where-Object { $_ -ceq $key }).Count -ne 1) { throw "Fixed offline component must be represented exactly once: $key" }
+}
+$edition = if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT.Trim().ToLowerInvariant() } else { 'lite' }
+$extraKeys = @($componentKeys | Where-Object { $baseKeys -cnotcontains $_ })
+if ($edition -eq 'lite' -and $extraKeys.Count -gt 0) { throw "lite must carry only the fixed offline components: $($extraKeys -join ', ')" }
+Write-Host ("[measure] windows-uninstall-components edition={0} count={1} keys={2}" -f $edition, $componentKeys.Count, ($componentKeys -join ','))
 foreach ($component in $components) {
-  if ($component.key -notin @('channel-runtime','skills','mcps','portable-git','python','skill-python','uv') -or
+  if ($component.key -cnotmatch '^[a-z0-9][a-z0-9-]*$' -or
       $component.contentId -cnotmatch '^[0-9a-f]{64}$') { throw 'Invalid offline component identity' }
   $version = Join-Path (Join-Path $customRuntime $component.key) $component.contentId
   $preserveFiles += @((Join-Path $version '.complete'), (Join-Path $version $component.sentinel))

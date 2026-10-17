@@ -11,6 +11,7 @@ const {
   verifyFinalNsisBudget,
   describeEditionByteBreakdown,
   resolveEditionSetupBudget,
+  reportMeasurement,
 } = require('./distribution-budget.cjs');
 const { resolveInferenceEdition } = require('../resolve-nsis-offline-components.cjs');
 
@@ -73,6 +74,21 @@ const nsisBudget = verifyFinalNsisBudget(
   edition,
 );
 console.log(`[installer-shell] final NSIS updater budget ${JSON.stringify(nsisBudget)}`);
+// Always measured; for report-only editions (cpu/cuda) these lines are the
+// input for the follow-up limits PR (measured value + explicit margin).
+reportMeasurement(`windows-webview2-setup edition=${edition}`, {
+  reportOnly: finalBudget.reportOnly,
+  installerBytes: finalBudget.installerBytes,
+  componentArchiveBytes: finalBudget.componentArchiveBytes,
+  nonComponentBytes: finalBudget.nonComponentBytes,
+});
+reportMeasurement(`windows-nsis-updater edition=${edition}`, {
+  reportOnly: nsisBudget.reportOnly,
+  file: nsisBudget.file,
+  installerBytes: nsisBudget.installerBytes,
+  componentArchiveBytes: nsisBudget.componentArchiveBytes,
+  nonComponentBytes: nsisBudget.nonComponentBytes,
+});
 // The report must describe the final signed bytes, never the pre-signing file.
 const report = writeSetupManifest(setup, version, {
   maxBytes: resolveEditionSetupBudget(edition).maxInstallerBytes,

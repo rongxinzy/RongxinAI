@@ -123,7 +123,14 @@ jobs:
       - name: Resolve immutable source commit
         id: source-commit
         shell: bash
-        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        # pull_request runs check out the PR head (source-ref), while GITHUB_SHA
+        # is the synthetic merge commit. Every acceptance script that binds
+        # evidence to "this build" (uninstall lease, retained-uninstaller
+        # manifest, shell evidence) must use the commit actually built.
+        run: |
+          commit="$(git rev-parse HEAD)"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "ZHIYUAN_SOURCE_COMMIT=$commit" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
@@ -378,14 +385,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          server="$(find resources/llamacpp-bundled -name 'llama-server*' -type f | head -n 1)"
-          if [[ -z "$server" ]]; then
-            echo "Bundled llama-server not found under resources/llamacpp-bundled" >&2
-            exit 1
-          fi
-          chmod +x "$server" 2>/dev/null || true
-          "$server" --version || "$server" --help | head -n 5
-          du -sh resources/llamacpp-bundled vendor/llamacpp/* 2>/dev/null || true
+          root=resources/llamacpp-bundled
+          test -f "$root/manifest.json" || { echo "Missing $root/manifest.json" >&2; exit 1; }
+          # Launch the server the manifest names, never an arbitrary find hit.
+          # Hosted runners have no GPU driver (the Windows CUDA server imports
+          # nvcuda.dll), so the portable CPU fallback is launched when declared;
+          # every other declared executable must exist.
+          node -e "const fs=require('fs');const m=require('./$root/manifest.json');for(const k of ['executable','vulkanExecutable','cpuFallbackExecutable'])if(m[k]&&!fs.existsSync('$root/'+m[k])){console.error('Declared '+k+' missing: '+m[k]);process.exit(1)}"
+          launch="$(node -e "const m=require('./$root/manifest.json');process.stdout.write(m.cpuFallbackExecutable||m.executable)")"
+          chmod +x "$root/$launch" 2>/dev/null || true
+          "$root/$launch" --version
+          node scripts/ci/measure-llamacpp-bundled.cjs "$root" "${{ matrix.target }}" "$launch"
       - name: Verify packaged ACP registry and bridges
         run: node scripts/ci/verify-packaged-acp-resources.mjs
       - name: Verify packaged release version

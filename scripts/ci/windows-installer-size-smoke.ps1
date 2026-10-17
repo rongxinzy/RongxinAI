@@ -33,9 +33,11 @@ if ($null -eq $componentBytes -or $componentBytes -le 0) {
 }
 
 # Per-edition budgets live in scripts/installer-shell/distribution-budget.cjs:
-# lite keeps the parameters above unchanged, cpu adds only the measured
-# llama.cpp component to the WebView2 setup, cuda is uncapped. The NSIS
-# updater never carries llama.cpp, so it is deducted with the lite components.
+# lite keeps the parameters above unchanged (plus the Magpie NSIS allowance).
+# cpu/cuda are REPORT-ONLY (null limits): sizes are measured and printed as
+# [measure] lines but never fail, until a follow-up PR sets measured + margin.
+# The NSIS updater never carries llama.cpp, so it is deducted with the lite
+# components.
 $edition = if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT.Trim().ToLowerInvariant() } else { 'lite' }
 $budgetModule = (Join-Path $ProjectRoot 'scripts\installer-shell\distribution-budget.cjs') | ConvertTo-Json
 $budgetScript = "const b=require($budgetModule);" +
@@ -60,9 +62,12 @@ if ($null -eq $budgets.setup.maxInstallerBytes) {
   $MaximumShellNonComponentBytes = [int64]$budgets.setup.maxNonComponentBytes
 }
 
+$reportOnly = ($null -eq $budgets.nsis.maxInstallerBytes) -and ($null -eq $budgets.setup.maxInstallerBytes)
+
 $installer = $installers[0]
 $installerBytes = [int64]$installer.Length
 $nonComponentBytes = $installerBytes - $nsisComponentBytes
+Write-Host ("[measure] windows-nsis-updater edition={0} reportOnly={1} installerBytes={2} componentArchiveBytes={3} nonComponentBytes={4}" -f $edition, $reportOnly, $installerBytes, $nsisComponentBytes, $nonComponentBytes)
 if ($nsisComponentBytes -gt $MaximumComponentBytes) {
   throw "Windows component archives are unexpectedly large: $componentBytes bytes (maximum $MaximumComponentBytes bytes)"
 }
@@ -79,6 +84,7 @@ $shellSummary = @()
 if ($shells.Count -eq 1) {
   $shellBytes = [int64]$shells[0].Length
   $shellNonComponentBytes = $shellBytes - $componentBytes
+  Write-Host ("[measure] windows-webview2-setup edition={0} reportOnly={1} installerBytes={2} componentArchiveBytes={3} nonComponentBytes={4}" -f $edition, $reportOnly, $shellBytes, $componentBytes, $shellNonComponentBytes)
   if ($shellBytes -gt $MaximumShellBytes -or $shellNonComponentBytes -gt $MaximumShellNonComponentBytes) {
     throw "WebView2 installer exceeds its kind-specific budget: total=$shellBytes (maximum $MaximumShellBytes), non-component=$shellNonComponentBytes (maximum $MaximumShellNonComponentBytes)"
   }
@@ -91,11 +97,15 @@ if ($shells.Count -eq 1) {
 }
 
 $componentSummary = @($manifest.components | ForEach-Object {
+  Write-Host ("[measure] windows-component edition={0} key={1} archiveSizeBytes={2}" -f $edition, $_.key, [int64]$_.archiveSizeBytes)
   "- component ``$($_.key)``: $([int64]$_.archiveSizeBytes) bytes ($($_.archiveCompression))"
 })
+$ceilingNote = if ($reportOnly) { "- edition ``$edition``: REPORT-ONLY (measured, no size limit yet)" } else { "- edition ``$edition``: enforced limits" }
 $summary = @(
   '### Windows installer size',
   '',
+  $ceilingNote,
+  "- component count: $(@($manifest.components).Count)",
   "- installer: ``$($installer.Name)``",
   "- installer bytes: $installerBytes",
   "- component archive bytes: $componentBytes",
