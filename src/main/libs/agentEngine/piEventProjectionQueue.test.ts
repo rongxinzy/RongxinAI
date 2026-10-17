@@ -37,6 +37,30 @@ test('large structured tool results still yield display text immediately', async
   expect(consumed[0]?.displayResultText?.length).toBe(70_000);
 });
 
+test('skips image blocks when extracting tool display text', () => {
+  const controller = new AbortController();
+  const queue = new PiEventProjectionQueue<{
+    type: string;
+    result?: unknown;
+    displayResultText?: string;
+  }>(
+    event => {
+      expect(event.displayResultText).toBe('caption only');
+    },
+    controller.signal,
+    vi.fn(),
+  );
+  queue.push({
+    type: PiRunEvent.ToolEnd,
+    result: {
+      content: [
+        { type: 'text', text: 'caption only' },
+        { type: 'image', data: 'a'.repeat(1000) },
+      ],
+    },
+  });
+});
+
 test('deltas after a slow tool path are not delayed by a pending transform', async () => {
   vi.useFakeTimers();
   const consumed: string[] = [];

@@ -187,6 +187,7 @@ describe('PiRuntimeAdapter', () => {
         addMessage: (_sessionId: string, message: unknown) => message,
         getSession: () => ({ messages: seededMessageIds.map(id => ({ id, metadata: {} })) }),
         updateMessage,
+        updateSession: vi.fn(),
       } as unknown as CoworkStore);
       mockSession.getContextUsage.mockReturnValue({ tokens: 1_200, contextWindow: 262_144 });
 
@@ -207,6 +208,8 @@ describe('PiRuntimeAdapter', () => {
             usage,
           },
         });
+        listener!({ type: 'agent_end' });
+        listener!({ type: 'agent_settled' });
       };
 
       // The deferred context-usage sync is the last writer per turn; select its

@@ -144,14 +144,14 @@ export class PiTurnBuilder {
     return { type: 'message_start', message: { role: 'assistant', content: [] } };
   }
 
-  beginTextPart(contentIndex: number): PiStreamEvent {
+  beginTextPart(contentIndex: number, snapshotAhead?: string): PiStreamEvent {
     this.parts.push({ kind: 'text', contentIndex, text: '' });
-    return this.updateEvent(contentIndex, 'text_start');
+    return this.updateEvent(contentIndex, 'text_start', { snapshotAhead });
   }
 
-  beginThinkingPart(contentIndex: number): PiStreamEvent {
+  beginThinkingPart(contentIndex: number, snapshotAhead = 'The user'): PiStreamEvent {
     this.parts.push({ kind: 'thinking', contentIndex, text: '' });
-    return this.updateEvent(contentIndex, 'thinking_start');
+    return this.updateEvent(contentIndex, 'thinking_start', { snapshotAhead });
   }
 
   appendText(contentIndex: number, delta: string): PiStreamEvent {
@@ -275,17 +275,45 @@ export class PiTurnBuilder {
     return part;
   }
 
+  private blocksForStartSnapshot(
+    contentIndex: number,
+    eventType: PiAssistantMessageEventKind,
+    snapshotAhead: string,
+  ): PiContentBlock[] {
+    if (!this.messageSnapshotLeadsDelta) return this.blocks();
+    const kind = eventType.startsWith('thinking') ? 'thinking' : 'text';
+    return this.sortedParts().map(part => {
+      if (part.contentIndex === contentIndex && part.kind === kind) {
+        return part.kind === 'text'
+          ? { type: 'text', text: snapshotAhead }
+          : { type: 'thinking', thinking: snapshotAhead };
+      }
+      return part.kind === 'text'
+        ? { type: 'text', text: part.text }
+        : { type: 'thinking', thinking: part.text };
+    });
+  }
+
   private updateEvent(
     contentIndex: number,
     eventType: PiAssistantMessageEventKind,
-    extra?: { delta?: string; content?: string },
+    extra?: { delta?: string; content?: string; snapshotAhead?: string },
   ): PiStreamEvent {
     const part = this.parts.find(candidate => candidate.contentIndex === contentIndex);
     const delta = extra?.delta;
-    const content =
-      delta !== undefined && (eventType === 'text_delta' || eventType === 'thinking_delta') && part
-        ? this.blocksForDeltaSnapshot(delta, part.kind, contentIndex)
-        : this.blocks();
+    let content = this.blocks();
+    if (
+      (eventType === 'text_start' || eventType === 'thinking_start') &&
+      extra?.snapshotAhead !== undefined
+    ) {
+      content = this.blocksForStartSnapshot(contentIndex, eventType, extra.snapshotAhead);
+    } else if (
+      delta !== undefined &&
+      (eventType === 'text_delta' || eventType === 'thinking_delta') &&
+      part
+    ) {
+      content = this.blocksForDeltaSnapshot(delta, part.kind, contentIndex);
+    }
     return {
       type: 'message_update',
       message: { role: 'assistant', content },

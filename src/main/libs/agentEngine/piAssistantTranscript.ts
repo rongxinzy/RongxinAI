@@ -42,8 +42,61 @@ export class PiAssistantTranscript {
   private readonly throttleSessionByMessageId = new Map<string, string>();
   /** Latest in-memory stream body per message id (avoids stale DB reads on close). */
   private readonly lastStreamedContentByMessageId = new Map<string, string>();
+  private readonly finalizedMessageIds = new Set<string>();
+  private readonly pendingContextUsageBySession = new Map<
+    string,
+    {
+      messageId: string;
+      piUsage: PiUsage | undefined;
+      model: string | undefined;
+      requestStartedAt: number | null;
+      firstVisibleTextAt: number | null;
+      startupLatency?: PiStartupLatency;
+    }
+  >();
 
   constructor(private readonly host: PiAssistantTranscriptHost) {}
+
+  /** Clears streaming/finalized bookkeeping so a retry can reuse the same ids. */
+  reopenStreamingMessagesForRetry(sessionId: string, active: ActivePiSession): void {
+    for (const messageId of [active.assistantMessageId, active.thinkingMessageId].filter(
+      (id): id is string => Boolean(id),
+    )) {
+      this.finalizedMessageIds.delete(messageId);
+      this.rememberStreamedContent(messageId, '');
+      const metadata =
+        messageId === active.thinkingMessageId
+          ? { isStreaming: true, isFinal: false, isThinking: true, streamReopen: true }
+          : { isStreaming: true, isFinal: false, streamReopen: true };
+      if (this.host.getStore()) {
+        this.host
+          .getStore()
+          .updateMessage(
+            sessionId,
+            messageId,
+            { content: '', metadata },
+            { touchUpdatedAt: false },
+          );
+      }
+      this.host.emitMessageUpdate(sessionId, messageId, '', metadata);
+    }
+  }
+
+  /** Runs at most one deferred context-usage sync per session per settled turn. */
+  flushContextUsageSync(sessionId: string): void {
+    const pending = this.pendingContextUsageBySession.get(sessionId);
+    this.pendingContextUsageBySession.delete(sessionId);
+    if (!pending) return;
+    this.runContextUsageSync(
+      sessionId,
+      pending.messageId,
+      pending.piUsage,
+      pending.model,
+      pending.requestStartedAt,
+      pending.firstVisibleTextAt,
+      pending.startupLatency,
+    );
+  }
 
   private rememberStreamedContent(messageId: string, content: string): void {
     this.lastStreamedContentByMessageId.set(messageId, content);
@@ -172,6 +225,7 @@ export class PiAssistantTranscript {
       this.host.getStore().updateMessage(sessionId, messageId, { content, metadata });
     }
     this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
+    this.finalizedMessageIds.add(messageId);
     if (kind === 'thinking') {
       active.thinkingLifecycle.markMessageFinalized();
     }
@@ -181,17 +235,31 @@ export class PiAssistantTranscript {
    * Closes placeholder bubbles that never received text, so a finished turn can
    * no longer look like it is still streaming.
    */
-  closeIdlePlaceholders(sessionId: string, active: ActivePiSession): void {
+  closeIdlePlaceholders(
+    sessionId: string,
+    active: ActivePiSession,
+    options?: { finalize?: boolean },
+  ): void {
+    const finalize = options?.finalize ?? true;
     const entries: Array<{ messageId: string; kind: 'answer' | 'thinking' }> = [];
-    if (active.thinkingMessageId) {
+    if (active.thinkingMessageId && !active.thinkingLifecycle.isMessageFinalized) {
       entries.push({ messageId: active.thinkingMessageId, kind: 'thinking' });
     }
     if (active.assistantMessageId) {
       entries.push({ messageId: active.assistantMessageId, kind: 'answer' });
     }
     for (const entry of entries) {
+      if (finalize && this.finalizedMessageIds.has(entry.messageId)) continue;
       const content = this.resolveStreamedContent(entry.messageId, active, entry.kind);
-      const metadata =
+      const streamingMetadata =
+        entry.kind === 'thinking'
+          ? { isStreaming: true, isFinal: false, isThinking: true }
+          : {
+              isStreaming: true,
+              isFinal: false,
+              ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+            };
+      const finalMetadata =
         entry.kind === 'thinking'
           ? { isStreaming: false, isFinal: true, isThinking: true }
           : {
@@ -199,19 +267,42 @@ export class PiAssistantTranscript {
               isFinal: true,
               ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
             };
+      const metadata = finalize ? finalMetadata : streamingMetadata;
       this.flushPendingStoreUpdate(sessionId, entry.messageId, content, metadata);
       this.flushPendingMessageUpdate(sessionId, entry.messageId, content, metadata);
+      if (!finalize) {
+        if (this.host.getStore()) {
+          this.host
+            .getStore()
+            .updateMessage(
+              sessionId,
+              entry.messageId,
+              { content, metadata },
+              { touchUpdatedAt: false },
+            );
+        }
+        continue;
+      }
       this.clearThrottleMapsForMessage(entry.messageId);
       if (!this.host.getStore()) continue;
+      const existing = this.host
+        .getStore()
+        .getSession(sessionId)
+        ?.messages.find(message => message.id === entry.messageId);
+      const mergedMetadata = {
+        ...existing?.metadata,
+        ...metadata,
+      };
       this.host
         .getStore()
         .updateMessage(
           sessionId,
           entry.messageId,
-          { content, metadata },
+          { content, metadata: mergedMetadata },
           { touchUpdatedAt: false },
         );
-      this.host.emitMessageUpdate(sessionId, entry.messageId, content, metadata);
+      this.host.emitMessageUpdate(sessionId, entry.messageId, content, mergedMetadata);
+      this.finalizedMessageIds.add(entry.messageId);
     }
   }
 
@@ -258,6 +349,25 @@ export class PiAssistantTranscript {
     startupLatency?: PiStartupLatency,
   ): void {
     if (!messageId) return;
+    this.pendingContextUsageBySession.set(sessionId, {
+      messageId,
+      piUsage,
+      model,
+      requestStartedAt,
+      firstVisibleTextAt,
+      startupLatency,
+    });
+  }
+
+  private runContextUsageSync(
+    sessionId: string,
+    messageId: string,
+    piUsage: PiUsage | undefined,
+    model: string | undefined,
+    requestStartedAt: number | null,
+    firstVisibleTextAt: number | null,
+    startupLatency?: PiStartupLatency,
+  ): void {
     setTimeout(() => {
       const active = this.host.getActiveSession(sessionId);
       const contextUsage = active?.piSession.getContextUsage?.();

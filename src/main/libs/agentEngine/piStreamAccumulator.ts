@@ -134,11 +134,11 @@ export class PiStreamAccumulator {
     event: PiAssistantMessageEvent | undefined,
     snapshotMessage?: PiStreamMessage,
   ): PiStreamSnapshot {
-    // Pi 1.x emits fine-grained deltas alongside a shared partial message that
-    // may already include the delta (and sometimes more). When a delta is
-    // present, apply ONLY the delta — never the live snapshot.
-    if (event && this.eventUsesDeltaOnly(event)) {
-      return this.applyDeltaEvent(event, snapshotMessage);
+    // Pi 1.x shares a mutable partial on every message_update. Incremental
+    // assistant events (*_start / *_delta / *_end / toolcall_*) must never
+    // read it — only delta-less snapshots and message_end reconciliation do.
+    if (event && this.eventUsesIncrementalOnly(event)) {
+      return this.applyDeltaEvent(event);
     }
     // Delta-less updates (legacy cumulative snapshots) still replace from message.
     if (this.hasUsableSnapshot(snapshotMessage)) {
@@ -149,24 +149,25 @@ export class PiStreamAccumulator {
       return this.snapshot();
     }
 
-    return this.applyDeltaEvent(event, snapshotMessage);
+    return this.applyDeltaEvent(event);
   }
 
-  private eventUsesDeltaOnly(event: PiAssistantMessageEvent): boolean {
+  private eventUsesIncrementalOnly(event: PiAssistantMessageEvent): boolean {
+    if (event.type.startsWith('toolcall_')) return true;
     return (
+      event.type === PiAssistantEventType.TextStart ||
       event.type === PiAssistantEventType.TextDelta ||
-      event.type === PiAssistantEventType.ThinkingDelta
+      event.type === PiAssistantEventType.TextEnd ||
+      event.type === PiAssistantEventType.ThinkingStart ||
+      event.type === PiAssistantEventType.ThinkingDelta ||
+      event.type === PiAssistantEventType.ThinkingEnd
     );
   }
 
-  private applyDeltaEvent(
-    event: PiAssistantMessageEvent,
-    snapshotMessage?: PiStreamMessage,
-  ): PiStreamSnapshot {
+  private applyDeltaEvent(event: PiAssistantMessageEvent): PiStreamSnapshot {
     const contentIndex = event.contentIndex ?? 0;
     switch (event.type) {
       case PiAssistantEventType.Start:
-        if (this.segments.size === 0) this.replaceFromSnapshot(snapshotMessage);
         break;
       case PiAssistantEventType.TextStart:
         this.startSegment(contentIndex, PiStreamSegmentKind.Text);
@@ -187,7 +188,6 @@ export class PiStreamAccumulator {
         this.finishSegment(contentIndex, PiStreamSegmentKind.Thinking, event.content);
         break;
       default:
-        if (this.segments.size === 0) this.replaceFromSnapshot(snapshotMessage);
         break;
     }
     return this.snapshot();

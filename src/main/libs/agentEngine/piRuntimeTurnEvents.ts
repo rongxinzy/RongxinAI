@@ -33,6 +33,7 @@ import {
 import { getPiPreparingToolActivity, toToolActivityInput } from './toolActivity';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
 import { clonePiStreamMessage } from './piStreamMessageClone';
+import { piAssistantEventIgnoresSnapshot } from './piStreamSnapshotPolicy';
 import { syncPiToolResultDisplayText } from './piToolResultDisplayText';
 import { resolveCoworkStreamMessageId } from './piStreamChunkEmit';
 import type { PiSessionEvent } from './piTranslate/piEvents';
@@ -170,6 +171,13 @@ export class PiRuntimeTurnEvents {
           active.thinkingText = '';
           active.streamAccumulator.reset();
           active.thinkingLifecycle.reset();
+          this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);
+          setStreamedAssistantText(active.piTranslatorState, '');
+          for (const messageId of [active.assistantMessageId, active.thinkingMessageId].filter(
+            (id): id is string => Boolean(id),
+          )) {
+            this.host.emit('uiStreamSnapshot', sessionId, messageId, '');
+          }
         } else {
           // New turn → fresh answer + thinking messages, created lazily on first content.
           active.assistantMessageId = null;
@@ -228,12 +236,11 @@ export class PiRuntimeTurnEvents {
         const priorAnswer = active.answerText;
         const priorThinking = active.thinkingText;
         const segmentEventType = event.assistantMessageEvent?.type;
-        const deltaOnlyUpdate =
-          segmentEventType === PiAssistantEventType.TextDelta ||
-          segmentEventType === PiAssistantEventType.ThinkingDelta;
         const { text, thinking } = active.streamAccumulator.update(
           event.assistantMessageEvent,
-          deltaOnlyUpdate ? undefined : clonePiStreamMessage(event.message),
+          piAssistantEventIgnoresSnapshot(segmentEventType)
+            ? undefined
+            : clonePiStreamMessage(event.message),
         );
         const thinkingEnded = segmentEventType === PiAssistantEventType.ThinkingEnd;
         if (segmentEventType === PiAssistantEventType.ThinkingDelta) {
@@ -425,7 +432,9 @@ export class PiRuntimeTurnEvents {
             if (active.assistantMessageId || active.thinkingMessageId) {
               active.retryStreamReusePending = true;
             }
-            this.host.transcript.closeIdlePlaceholders(sessionId, active);
+            this.host.transcript.closeIdlePlaceholders(sessionId, active, {
+              finalize: !active.retryStreamReusePending,
+            });
             if (
               !active.errorSurfaced &&
               active.pendingError.classified.kind !== CoworkErrorKind.Unknown &&
@@ -780,6 +789,7 @@ export class PiRuntimeTurnEvents {
       return;
     }
     this.host.transcript.markFinalAnswer(sessionId, active);
+    this.host.transcript.flushContextUsageSync(sessionId);
     this.host.transcript.clearThrottleStateBySession(sessionId, false);
     active.lastUsedAt = Date.now();
     agentResourceDiagnostics.finishPiTurn(
