@@ -134,7 +134,27 @@ This builds `enterprise/`, loads this worktree's extension, and starts the same 
 | `bun run theme:generate` | Regenerate CSS after changing theme definitions |
 | `bun run compile:electron` | Compile the Electron main process, including native dependency preparation |
 
-Release packaging uses `bun run dist:mac`, `bun run dist:win`, or `bun run dist:linux`. These also involve platform runtimes, resources, and signing configuration; see [CONTRIBUTING.md](CONTRIBUTING.md) and [`package.json`](package.json).
+### Packaging
+
+Every installer bundles the pinned Magpie model gateway. Build it before packaging; this needs the exact Go SDK pinned in [`resources/magpie/upstream.json`](resources/magpie/upstream.json) (currently Go 1.26.8), plus Git and tar. The builder rejects any other Go version and never downloads a toolchain:
+
+```bash
+bun run magpie:build --target <platform-arch> --go /path/to/go   # e.g. win32-x64, darwin-arm64, linux-x64, or all
+bun run magpie:verify --target <platform-arch>
+```
+
+Packaging fails with an explicit error when the Magpie binary for the target is missing or does not match its manifest. See [`resources/magpie/README.md`](resources/magpie/README.md).
+
+| Command | Output |
+| --- | --- |
+| `bun run dist:win` | Alias of `dist:win:offline` |
+| `bun run dist:win:offline` | Unsigned Windows x64 build with all offline components bundled: the WebView2 installer `ZhiYuanAgent-Setup-<version>.exe` plus the NSIS updater |
+| `bun run dist:win:lite` | Alias of `dist:win:offline` |
+| `bun run dist:win:signed` | Same output, Certum-signed; requires `CERTUM_CERT_THUMBPRINT` and is used by the release workflow |
+| `bun run dist:mac` / `dist:mac:x64` / `dist:mac:arm64` / `dist:mac:universal` | macOS packages |
+| `bun run dist:linux` | Linux packages |
+
+Packaging also involves platform runtimes, resources, and signing configuration; see [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md), and [`package.json`](package.json).
 
 ### Project map
 
@@ -143,7 +163,7 @@ Release packaging uses `bun run dist:mac`, `bun run dist:win`, or `bun run dist:
 | [`src/renderer`](src/renderer) | React workspace, conversations, settings, and local inference UI |
 | [`src/shared`](src/shared) | Shared UI, types, and communication contracts |
 | [`src/main`](src/main) | Desktop lifecycle, task execution, storage, and system services |
-| [`src/main/preload.ts`](src/main/preload.ts) | Controlled IPC through `contextBridge` |
+| [`src/main/preload.ts`](src/main/preload.ts) / [`src/main/preload/`](src/main/preload) | Controlled IPC through `contextBridge`, grouped by domain under `preload/` |
 | [`src/renderer/theme`](src/renderer/theme) | Theme contracts, component appearance, backgrounds, and generation |
 | [`SKILLs`](SKILLs) / [`MCPs`](MCPs) | Bundled skills and tool integrations |
 | [`.github/workflows`](.github/workflows) | Tests, installer validation, and releases |

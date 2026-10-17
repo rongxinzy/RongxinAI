@@ -20,6 +20,7 @@ Please read this guide and [`AGENTS.md`](AGENTS.md) before making a code change.
 - Git
 - Node.js `>=24 <25`
 - Bun `>=1.4 <1.5`
+- Go: only for packaging. The exact SDK version pinned in `resources/magpie/upstream.json` (currently Go 1.26.8) is required by `bun run magpie:build`
 
 Windows release builds also require PortableGit. Native dependencies such as `better-sqlite3` may require Python and a supported C/C++ build toolchain when a prebuilt binary is unavailable.
 
@@ -124,11 +125,20 @@ bun test -- <name>
 
 For UI changes, manually exercise the affected flow in browser preview first. Check both light and dark themes, relevant states and viewport sizes, and both supported languages when relevant. Run `bun run web:preview:check` and inspect its screenshots. Use Electron for affected real IPC, native, and end-to-end behavior. Include screenshots or a short recording in the pull request, and identify which checks used browser fixtures versus Electron.
 
-Packaging is platform-specific:
+CI also enforces these gates on every pull request:
+
+- `bun run knip` fails on unused files, exports, and dependencies. Delete dead code instead of adding ignores.
+- `node scripts/ci/check-source-line-limit.mjs` fails on hand-written source files over 1000 lines. The baseline in `scripts/ci/source-line-baseline.json` only ratchets down: CI rejects new entries, raised caps, and a raised limit. The baseline is currently empty, so split a file before it reaches the limit.
+- `bun run check:python-dead-code`, `bun run format:check`, `bun run lint`, and `bun run check:openclaw-decoupling`.
+
+Packaging is platform-specific. Build and verify the bundled Magpie gateway for the target first (requires the pinned Go SDK, see [README.md](README.md#packaging)):
 
 ```bash
+bun run magpie:build --target win32-x64 --go /path/to/go
+bun run magpie:verify --target win32-x64
+bun run dist:win          # = dist:win:offline, unsigned
+bun run dist:win:signed   # Certum-signed, needs CERTUM_CERT_THUMBPRINT
 bun run dist:mac
-bun run dist:win
 bun run dist:linux
 ```
 
