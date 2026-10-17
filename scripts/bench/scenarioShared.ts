@@ -135,7 +135,7 @@ export class StreamLatencyTracker {
   visible(cumulativeChars: number, atTime: number): void {
     while (this.head < this.queue.length) {
       const entry = this.queue[this.head]!;
-      if (this.consumedBefore + this.headConsumed + entry.chars > cumulativeChars) break;
+      if (this.consumedBefore + entry.chars > cumulativeChars) break;
       this.consumedBefore += entry.chars;
       this.headConsumed = 0;
       this.head += 1;

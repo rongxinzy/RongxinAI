@@ -12,7 +12,8 @@ piTranslate/piTranslateUiMessageChunk.ts   translate → UIMessageChunk[] (delta
         │
         ▼
 piRuntimeTurnEvents.ts   resolveCoworkStreamMessageId (text-*/reasoning-* only, tool-* dropped)
-                         O(1) append check; snapshot only on non-prefix rewrite;
+                         O(segments) append check; delta-less cumulative updates → synthesized deltas;
+                         snapshot only on non-prefix rewrite;
                          message_end: closing chunks first, then finalize
         │  uiStreamChunk (delta chunks) · uiStreamSnapshot (exception paths only)
         ▼
@@ -43,7 +44,8 @@ Stateful per turn; emits incremental `UIMessageChunk`s (`text-*`, `reasoning-*`,
 ### Turn bridge — `src/main/libs/agentEngine/piRuntimeTurnEvents.ts`
 
 - `resolveCoworkStreamMessageId` maps only `text-*` / `reasoning-*` chunks onto the Cowork answer/thinking message; `tool-*` chunks are dropped here, so a tool-only turn never creates an empty answer row.
-- Append detection is **O(1)**: translate the event first, then check `text.length === prior.length + deltaLen` (same for thinking). No prefix scan over the transcript, so per-delta CPU is independent of message length (guard G3).
+- Append detection reads **lengths only**: translate the event first, then require `text.length === prior.length + deltaLen` **and** `PiStreamAccumulator.lastUpdateAppendedOnly(kind, deltaLen)` — every segment except the last kept its index and length, and the last one grew by exactly `deltaLen` (or is a new trailing segment of that length). Cost is O(segment count). No character is read: the accumulated text is a V8 cons string, and any `charCodeAt` / `endsWith` / `startsWith` flattens it in O(N) per delta (measured: G3 ratio ≈ 40). The check is structural, not byte-exact — an equal-length rewrite inside one segment is not detected; Pi delta events are prior+delta by definition, real rewrites arrive as delta-less updates, and `message_end` corrects the final text.
+- Delta-less cumulative `message_update` (older producers; no `assistantMessageEvent`): if the new text extends the prior one (`startsWith`, O(N) but only on these events), `synthesizeTextDeltaChunks` / `synthesizeReasoningDeltaChunks` emit ordinary start/delta chunks (part transitions mirror the translator) and advance `streamedAssistantText`; an unchanged text emits nothing; anything else is a non-prefix rewrite (C8).
 - Non-prefix rewrite: emit `closeOpenTextAndReasoningParts(...)`, reseed the translator with `setStreamedAssistantText`, emit one `uiStreamSnapshot` with the full rewritten text, then drop this event's `text-start` / `text-delta` (likewise reasoning) so no content is sent twice.
 - `message_end`: forward the translator's closing chunks **before** finalizing; `message_end` remains the final authority for the complete text.
 
@@ -90,7 +92,7 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 | Issue | What happened | Reference |
 | --- | --- | --- |
 | 200 ms full-text `messageUpdate` driving the UI | Whole assistant text re-emitted on a timer for Cowork rendering — O(N²) bytes per turn, fighting the delta path. | Dropped from UI IPC; the throttle survives only on the in-process IM/coding-room bus and SQLite store writes (`piAssistantTranscript.ts`). |
-| Worker prefix diff on snapshots | Full snapshot strings were diffed to synthesize "deltas"; CPU grew with message length. | `TextWorkerKind.Content` deleted; append detection is the O(1) length check in `piRuntimeTurnEvents.ts`. |
+| Worker prefix diff on snapshots | Full snapshot strings were diffed to synthesize "deltas"; CPU grew with message length. | `TextWorkerKind.Content` deleted; append detection is the length/segment-structure check in `piRuntimeTurnEvents.ts` + `piStreamAccumulator.ts`. |
 | PR #1115 full snapshot IPC | Complete message body sent on every update. | Replaced by `StreamPart` deltas plus the single coalescer. |
 | Pre-fix #1119 replay stack | Replay buffer, compact replay, and a second batcher layered replay/merge onto the send path. | Deleted; recovery is now delta-sequence-based resync via `CoworkStreamIpc.StreamResync`. |
 
@@ -101,7 +103,7 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 - **禁止**通过 IPC 把全文快照当作常规流式更新（非终态 `MessageUpdate` / 逐 token 大段 `ContentPatch`）。
 - **禁止**把 runtime 非终态 `messageUpdate` 转发到 UI IPC（forwarder 必须丢弃）。
 - **禁止**在渲染端对每个 token 全量重跑 Markdown/Shiki（稳定块 + plain tail 是唯一节流）。
-- **禁止**放宽 G1–G4 / C1–C7 断言来掩盖回归；修链路，不修测试。
+- **禁止**放宽 G1–G4 / C1–C10 断言来掩盖回归；修链路，不修测试。
 
 ## Porting notes
 
@@ -116,18 +118,26 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 
 ## Tests
 
-All streaming tests are behavioral (no source-text scanning) and drive **production code** through `tests/helpers/streamingPipelineHarness.ts` (PiRuntimeAdapter testHarness → real forwarder → real renderer pipeline / LiveTextStore / Redux), ≥400 seeds in total. G3 and C1–C7 fail on the pre-fix code and pass after this PR.
+All streaming tests are behavioral (no source-text scanning) and drive **production code** through `tests/helpers/streamingPipelineHarness.ts` (PiRuntimeAdapter testHarness → real forwarder → real renderer pipeline / LiveTextStore / Redux), ≥400 seeds in total. G3, C1–C7, C8 and C9 fail on the code before their respective fixes (C10 guards the rewrite path) and pass after this PR.
 
 | File | Coverage |
 | --- | --- |
 | `tests/streamingGuards.test.ts` | G1: whole-turn IPC bytes ≤ 1.3× body + 400× events (the event count itself proves coalescing); G2: no `MessageUpdate`/`ContentPatch` on IPC before `message_end`, and runtime non-final `messageUpdate` never reaches IPC; G3: 10 KB vs 1 MB per-delta main-process CPU median ratio < 1.5; G4: 16 ms window merge upper/lower bounds |
-| `tests/streamingConsistency.test.ts` | C1: terminal text, 120 seeds; C2: non-prefix rewrite; C3: interleaved thinking ×200; C4: 2M truncation |
+| `tests/streamingConsistency.test.ts` | C1: terminal text, 120 seeds; C2: non-prefix rewrite; C3: interleaved thinking ×200; C4: 2M truncation; C8: delta-less cumulative updates stream as deltas (no `ContentPatch` before `message_end`), 20 seeds |
 | `tests/streamingConsistencyRecovery.test.ts` | C5: gap resync / mid-stream attach; C6: duplicate & out-of-order delivery; C7: per-frame prefix property |
+| `tests/streamingConsistencyDeltaless.test.ts` | C9: delta-less thinking + answer growth stays on deltas (no `ContentPatch`); C10: delta-less non-prefix rewrite sends only `isStreaming: true` base patches, then streams on |
 | `src/main/libs/agentEngine/piTranslate/*.test.ts` | Ported translator cases |
 
 ## Bench
 
-`bun run bench:stream` (virtual clock) compares A (main's pre-fix chain fixture) vs C (stage 1) vs D (stage 1+2) and writes JSON results — see `scripts/bench/`.
+`bun run bench:stream [--render]` (virtual clock) compares A (main's pre-fix chain fixture) vs C (stage 1) vs D (stage 1+2) and writes JSON results (default `bench-results/stream-bench.json`, git-ignored) — see `scripts/bench/`. Group A is capped at 500 KB by default (`--a-max-size`) because its per-update full-text diff is quadratic. At low token rates D sends more IPC events and bytes than A (one sequenced event per token vs one 200 ms patch; the per-event envelope dominates), in exchange for ~30 ms instead of ~200 ms end-to-end latency and per-event cost independent of message length.
+
+## Known limitations
+
+- The append check is conservative: one event that grows the last segment **and** opens a new one is classified as a rewrite and sends a base snapshot (Pi's embedded session never does this; correctness is unaffected).
+- Terminal de-duplication compares against the last forwarded final body only: an A → B → A sequence re-sends A.
+- `ContentPatch` revisions come from two sources (the forwarder and `CoworkContentProjection` for `coworkRunBridge`); this is safe only because the two paths never share a messageId.
+- Resync relies on Electron delivering the `webContents.send` events issued inside the `cowork:stream:resync` handler before the invoke reply; an explicit resync-done event would remove that dependency.
 
 ## Related IPC
 

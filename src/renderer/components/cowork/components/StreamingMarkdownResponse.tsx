@@ -180,14 +180,14 @@ const StaticMarkdownBlock = ({
   content,
   resolveLocalFilePath,
   skipPathExistsCheck,
-  skipLinkify,
 }: {
   content: string;
   resolveLocalFilePath?: (href: string, text: string) => string | null;
   skipPathExistsCheck?: boolean;
-  skipLinkify?: boolean;
 }) => {
-  const prepared = skipLinkify ? content : linkifyLocalPathsInMarkdown(content);
+  // Committed Markdown only changes when a block closes; avoid re-running the
+  // path regex on every streaming frame.
+  const prepared = useMemo(() => linkifyLocalPathsInMarkdown(content), [content]);
   const components = useMemo(
     () => ({ a: buildAnchorComponent(resolveLocalFilePath, skipPathExistsCheck) }),
     [resolveLocalFilePath, skipPathExistsCheck],
@@ -230,7 +230,6 @@ export const StreamingMarkdownResponse = ({
           content={committed}
           resolveLocalFilePath={resolve}
           skipPathExistsCheck
-          skipLinkify
         />
       ) : null}
       {tail ? <StreamingPlainTail content={tail} /> : null}

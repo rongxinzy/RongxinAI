@@ -176,6 +176,14 @@ export class PiTurnBuilder {
     return { type: 'message_update', message: { role: 'assistant', content: this.blocks() } };
   }
 
+  /** Delta-less rewrite of the thinking part (symmetric to `rewriteText`). */
+  rewriteThinking(newText: string): PiStreamEvent {
+    const thinkingPart = this.parts.find(part => part.kind === 'thinking');
+    if (!thinkingPart) throw new Error('rewriteThinking requires an existing thinking part');
+    thinkingPart.text = newText;
+    return { type: 'message_update', message: { role: 'assistant', content: this.blocks() } };
+  }
+
   messageEnd(stopReason = 'stop'): PiStreamEvent {
     return {
       type: 'message_end',
