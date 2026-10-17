@@ -1,7 +1,6 @@
 {
   "limit": 1000,
   "caps": {
-    "MCPs/feishu/skills/lark-slides/scripts/xml_text_overlap_lint_test.py": 1229,
     "src/main/ipcHandlers/llamacpp.ts": 1592,
     "src/main/libs/llamacppBackendManager.ts": 1722,
     "src/main/libs/llamacppManager.test.ts": 1157,
