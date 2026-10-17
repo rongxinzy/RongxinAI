@@ -32,10 +32,35 @@ if ($null -eq $componentBytes -or $componentBytes -le 0) {
   throw 'Windows component manifest did not report component archive bytes'
 }
 
+# Per-edition budgets live in scripts/installer-shell/distribution-budget.cjs:
+# lite keeps the parameters above unchanged, cpu adds only the measured
+# llama.cpp component to the WebView2 setup, cuda is uncapped. The NSIS
+# updater never carries llama.cpp, so it is deducted with the lite components.
+$edition = if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT.Trim().ToLowerInvariant() } else { 'lite' }
+$budgetModule = (Join-Path $ProjectRoot 'scripts\installer-shell\distribution-budget.cjs') | ConvertTo-Json
+$budgetScript = "const b=require($budgetModule);" +
+  "process.stdout.write(JSON.stringify({setup:b.resolveEditionSetupBudget('$edition'),nsis:b.resolveEditionNsisBudget('$edition')}))"
+$budgets = (& node -e $budgetScript) | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0 -or $null -eq $budgets) { throw "Unable to resolve installer budgets for edition $edition" }
+$nsisComponentBytes = @($manifest.components | Where-Object { $_.key -ne 'llamacpp-bundled' } |
+  ForEach-Object { [int64]$_.archiveSizeBytes } | Measure-Object -Sum).Sum
+if ($null -eq $budgets.nsis.maxInstallerBytes) {
+  $MaximumInstallerBytes = [int64]::MaxValue
+  $MaximumComponentBytes = [int64]::MaxValue
+  $MaximumNonComponentBytes = [int64]::MaxValue
+}
+if ($null -eq $budgets.setup.maxInstallerBytes) {
+  $MaximumShellBytes = [int64]::MaxValue
+  $MaximumShellNonComponentBytes = [int64]::MaxValue
+} elseif ($edition -ne 'lite') {
+  $MaximumShellBytes = [int64]$budgets.setup.maxInstallerBytes
+  $MaximumShellNonComponentBytes = [int64]$budgets.setup.maxNonComponentBytes
+}
+
 $installer = $installers[0]
 $installerBytes = [int64]$installer.Length
-$nonComponentBytes = $installerBytes - $componentBytes
-if ($componentBytes -gt $MaximumComponentBytes) {
+$nonComponentBytes = $installerBytes - $nsisComponentBytes
+if ($nsisComponentBytes -gt $MaximumComponentBytes) {
   throw "Windows component archives are unexpectedly large: $componentBytes bytes (maximum $MaximumComponentBytes bytes)"
 }
 if ($nonComponentBytes -gt $MaximumNonComponentBytes) {

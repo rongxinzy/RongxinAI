@@ -1,6 +1,9 @@
 param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
-  [string]$ComponentsDir = ''
+  [string]$ComponentsDir = '',
+  # lite ships the seven fixed runtime components; cpu/cuda add exactly one
+  # llamacpp-bundled component (the bundled llama.cpp runtime).
+  [string]$InferenceEdition = $(if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT } else { 'lite' })
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,8 +63,11 @@ $componentManifest = Get-Content -LiteralPath $componentManifestPath -Raw -Encod
 if ($componentManifest.offline -ne $true) {
   throw 'Windows component manifest must declare offline=true'
 }
-if (@($componentManifest.components).Count -ne 7) {
-  throw "Windows component manifest must contain exactly 7 components"
+$InferenceEdition = $InferenceEdition.Trim().ToLowerInvariant()
+$bundlesLlamaCpp = $InferenceEdition -eq 'cpu' -or $InferenceEdition -eq 'cuda'
+$expectedComponentCount = if ($bundlesLlamaCpp) { 8 } else { 7 }
+if (@($componentManifest.components).Count -ne $expectedComponentCount) {
+  throw "Windows component manifest must contain exactly $expectedComponentCount components for edition $InferenceEdition"
 }
 
 $systemTar = Join-Path $env:SystemRoot 'System32\tar.exe'
@@ -72,8 +78,9 @@ $oldPath = $env:PATH
 try {
   New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
   foreach ($component in @($componentManifest.components)) {
-    if ($component.key -match 'llama' -or $component.prefix -match 'llama') {
-      throw "The offline component manifest must not include llama.cpp: $($component.key)"
+    $isLlamaComponent = $component.key -match 'llama' -or $component.prefix -match 'llama'
+    if ($isLlamaComponent -and -not ($bundlesLlamaCpp -and $component.key -eq 'llamacpp-bundled' -and $component.prefix -eq 'llamacpp-bundled')) {
+      throw "The offline component manifest must not include llama.cpp for edition ${InferenceEdition}: $($component.key)"
     }
     $archivePath = Join-Path $ComponentsDir $component.archive
     Assert-Path $archivePath "Windows component archive $($component.key)"

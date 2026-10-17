@@ -420,12 +420,16 @@ jobs:
       - name: Verify Windows release size and runtimes
         if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
         shell: powershell
+        env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
       - name: Verify Windows package runtimes with a clean PATH
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
         shell: powershell
+        env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-runtime-smoke.ps1
