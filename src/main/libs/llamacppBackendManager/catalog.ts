@@ -55,13 +55,6 @@ type LlamaCppBackendRootManifest = {
   publicBaseUrl?: string;
 };
 
-export type LlamaCppBackendSelectionInput = {
-  platform: NodeJS.Platform;
-  arch: string;
-  hasNvidiaGpu: boolean;
-  config?: LlamaCppServiceConfig;
-};
-
 export async function fetchLlamaCppBackendManifest(
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<LlamaCppBackendManifest> {
@@ -372,7 +365,7 @@ export function recommendLlamaCppBackend(input: {
   return selected ? toBackendRef(selected.version, selected.backend) : undefined;
 }
 
-export function selectBackendByPriority(
+function selectBackendByPriority(
   compatible: LlamaCppBackendManifestEntry[],
   input: {
     platform: NodeJS.Platform;

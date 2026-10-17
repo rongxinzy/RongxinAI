@@ -146,7 +146,7 @@ export function removeCurrentBackendLink(runtimeRoot: string): void {
   }
 }
 
-export function assertSafeBackendRef(ref: LlamaCppBackendRef): void {
+function assertSafeBackendRef(ref: LlamaCppBackendRef): void {
   for (const value of [ref.version, ref.backend]) {
     if (!/^[A-Za-z0-9._-]+$/.test(value) || value.includes('..')) {
       throw new Error(`Unsafe llama.cpp backend path segment: ${value}`);

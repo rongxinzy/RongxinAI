@@ -16,7 +16,7 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
-import { LlamaCppBackendError, LlamaCppRuntimeBackend } from '../../../shared/llamacpp';
+import { LlamaCppBackendError } from '../../../shared/llamacpp';
 import { LlamaCppRuntimeTargetId } from '../llamacppRuntimeConstants';
 import { resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
 import { listLlamaCppRuntimeDevices } from '../llamacppManager';
@@ -284,10 +284,7 @@ export function inferBackendDirectoryMetadata(input: {
   };
 }
 
-export function inferDirectoryVersion(
-  sourceDir: string,
-  executablePath: string,
-): string | undefined {
+function inferDirectoryVersion(sourceDir: string, executablePath: string): string | undefined {
   const candidates = [
     path.basename(sourceDir),
     path.basename(path.dirname(executablePath)),
@@ -300,7 +297,7 @@ export function inferDirectoryVersion(
   return undefined;
 }
 
-export function inferDirectoryBackendId(
+function inferDirectoryBackendId(
   sourceDir: string,
   executableDir: string,
   platform: NodeJS.Platform,
@@ -337,30 +334,30 @@ export function inferDirectoryBackendId(
     : LlamaCppRuntimeTargetId.WinX64;
 }
 
-export function hasAnyCudaRuntimeMarkers(rootDir: string): boolean {
+function hasAnyCudaRuntimeMarkers(rootDir: string): boolean {
   return hasMarker(rootDir, /(?:ggml-cuda|cudart64_|cublas64_|cublasLt64_|cuda_runtime)/i);
 }
 
-export function hasCuda12RuntimeMarkers(rootDir: string): boolean {
+function hasCuda12RuntimeMarkers(rootDir: string): boolean {
   return hasMarker(rootDir, /(?:cudart64_12|cublas64_12|cublasLt64_12|cuda-12\.4|win-cuda-12\.)/i);
 }
 
-export function hasCuda13RuntimeMarkers(rootDir: string): boolean {
+function hasCuda13RuntimeMarkers(rootDir: string): boolean {
   return hasMarker(
     rootDir,
     /(?:cudart64_13|cublas64_13|cublasLt64_13|cuda-13\.[13]|win-cuda-13\.)/i,
   );
 }
 
-export function hasVulkanRuntimeMarkers(rootDir: string): boolean {
+function hasVulkanRuntimeMarkers(rootDir: string): boolean {
   return hasMarker(rootDir, /(?:ggml-vulkan|vulkan-1\.dll|win-vulkan)/i);
 }
 
-export function hasHipRuntimeMarkers(rootDir: string): boolean {
+function hasHipRuntimeMarkers(rootDir: string): boolean {
   return hasMarker(rootDir, /(?:ggml-hip|hipblas|rocblas|amdhip64|win-hip)/i);
 }
 
-export function hasMarker(rootDir: string, pattern: RegExp): boolean {
+function hasMarker(rootDir: string, pattern: RegExp): boolean {
   const queue = [rootDir];
   while (queue.length > 0) {
     const currentDir = queue.shift();
@@ -396,55 +393,6 @@ export function compareVersionDesc(a: string | undefined, b: string | undefined)
   const left = Number.parseInt(a?.replace(/^b/, '') || '0', 10);
   const right = Number.parseInt(b?.replace(/^b/, '') || '0', 10);
   return right - left;
-}
-
-export function selectBackendByPriority(
-  compatible: LlamaCppBackendManifestEntry[],
-  input: {
-    platform: NodeJS.Platform;
-    arch: string;
-    hasNvidiaGpu: boolean;
-    desiredBackend: LlamaCppRuntimeBackend;
-  },
-): LlamaCppBackendManifestEntry | undefined {
-  if (input.platform === 'win32' && input.arch === 'x64') {
-    if (input.desiredBackend === LlamaCppRuntimeBackend.Cpu) {
-      return compatible.find(entry => entry.accelerator === 'cpu');
-    }
-    if (input.desiredBackend === LlamaCppRuntimeBackend.Cuda) {
-      return (
-        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13') ??
-        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12')
-      );
-    }
-    if (input.hasNvidiaGpu) {
-      return (
-        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13') ??
-        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12') ??
-        compatible.find(entry => entry.accelerator === 'vulkan') ??
-        compatible.find(entry => entry.accelerator === 'cpu')
-      );
-    }
-    return (
-      compatible.find(entry => entry.accelerator === 'vulkan') ??
-      compatible.find(entry => entry.accelerator === 'cpu')
-    );
-  }
-  if (input.platform === 'win32' && input.arch === 'arm64') {
-    return (
-      compatible.find(entry => entry.backend === LlamaCppRuntimeTargetId.WinArm64) ??
-      compatible.find(entry => entry.accelerator === 'cpu') ??
-      compatible[0]
-    );
-  }
-  return (
-    compatible.find(entry => entry.accelerator === 'metal') ??
-    compatible.find(entry => entry.accelerator === 'cuda') ??
-    compatible.find(entry => entry.accelerator === 'vulkan') ??
-    compatible.find(entry => entry.accelerator === 'hip') ??
-    compatible.find(entry => entry.accelerator === 'cpu') ??
-    compatible[0]
-  );
 }
 
 export async function downloadArchive(
@@ -535,7 +483,7 @@ export function resolvePartUrl(
   return `${(manifest.releaseBaseUrl || DEFAULT_RELEASE_BASE_URL).replace(/\/$/, '')}/${part.assetName}`;
 }
 
-export async function downloadFile(
+async function downloadFile(
   url: string,
   outputPath: string,
   expectedSize?: number,
@@ -569,7 +517,7 @@ export async function downloadFile(
   throw new Error(`Download failed: ${errors.join('; ')}`);
 }
 
-export async function copyLocalFileWithProgress(
+async function copyLocalFileWithProgress(
   sourcePath: string,
   outputPath: string,
   onProgress?: (completed: number, total?: number, speed?: number) => void,
