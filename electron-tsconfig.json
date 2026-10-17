@@ -21,6 +21,8 @@
   "exclude": [
     "src/**/*.test.*",
     "src/**/*.spec.*",
+    // Test-only shared harness modules; never part of the main-process build.
+    "src/**/*.testHarness.*",
     // Renderer-only chat UI; never imported by the main process. Excluding
     // it lets the renderer use extensionless dynamic imports that NodeNext
     // resolution would otherwise reject.

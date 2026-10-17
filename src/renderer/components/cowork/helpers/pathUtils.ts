@@ -27,7 +27,7 @@ const isRelativePath = (value: string): boolean => !isAbsolutePath(value) && !ha
  * Parse `file:///root/path::relative/path` syntax into a single absolute path.
  * Returns null if the input does not match this format.
  */
-export const parseRootRelativePath = (value: string): string | null => {
+const parseRootRelativePath = (value: string): string | null => {
   const trimmed = value.trim();
   if (!/^file:\/\//i.test(trimmed)) return null;
   const separatorIndex = trimmed.indexOf('::');
@@ -47,7 +47,7 @@ export const parseRootRelativePath = (value: string): string | null => {
 /**
  * Normalize a potentially-file-scheme path string into its decoded local form.
  */
-export const normalizeLocalPath = (
+const normalizeLocalPath = (
   value: string,
 ): { path: string; isRelative: boolean; isAbsolute: boolean } | null => {
   const trimmed = value.trim();
@@ -66,7 +66,51 @@ export const normalizeLocalPath = (
   return { path, isRelative, isAbsolute };
 };
 
-export const toAbsolutePathFromCwd = (filePath: string, cwd: string): string => {
+const toAbsolutePathFromCwd = (filePath: string, cwd: string): string => {
   if (isAbsolutePath(filePath)) return filePath;
   return `${cwd.replace(/\/$/, '')}/${filePath.replace(/^\.\//, '')}`;
+};
+
+/**
+ * Resolve a link href (or its label text) against the session cwd into an
+ * absolute local path, or null when neither side looks like a local path.
+ * Priority: root-relative `file://` href, href path, root-relative text,
+ * text path.
+ */
+export const resolveLocalFilePath = (href: string, text: string, cwd?: string): string | null => {
+  const hrefValue = typeof href === 'string' ? href.trim() : '';
+  const textValue = typeof text === 'string' ? text.trim() : '';
+  if (!hrefValue && !textValue) return null;
+
+  const hrefRootRelative = hrefValue ? parseRootRelativePath(hrefValue) : null;
+  if (hrefRootRelative) {
+    return hrefRootRelative;
+  }
+
+  const hrefPath = hrefValue ? normalizeLocalPath(hrefValue) : null;
+  if (hrefPath) {
+    if (hrefPath.isRelative && cwd) {
+      return toAbsolutePathFromCwd(hrefPath.path, cwd);
+    }
+    if (hrefPath.isAbsolute) {
+      return hrefPath.path;
+    }
+  }
+
+  const textRootRelative = textValue ? parseRootRelativePath(textValue) : null;
+  if (textRootRelative) {
+    return textRootRelative;
+  }
+
+  const textPath = textValue ? normalizeLocalPath(textValue) : null;
+  if (textPath) {
+    if (textPath.isRelative && cwd) {
+      return toAbsolutePathFromCwd(textPath.path, cwd);
+    }
+    if (textPath.isAbsolute) {
+      return textPath.path;
+    }
+  }
+
+  return null;
 };

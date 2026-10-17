@@ -17,7 +17,6 @@ import {
   E2E_LLAMA_MODEL_FILENAME,
   E2E_LLAMA_MODEL_URL,
   E2E_LLAMACPP_BIN,
-  GLM_BASE_URL,
   GLM_MODEL,
 } from './constants.mjs';
 import { existsSync } from 'node:fs';
@@ -31,6 +30,9 @@ import {
   downloadFile,
   findActiveMemoryRow,
   launchPackagedApp,
+  readMemoryPromptCapture,
+  redactE2eText,
+  summarizeInjectionSession,
   resolveGlmApiKey,
   resolvePackagedExecutable,
   screenshot,
@@ -50,8 +52,14 @@ const unpackedInput = process.argv[2] || DEFAULT_LINUX_UNPACKED_DIR;
 /** @type {Array<{ id: string, status: 'pass'|'fail'|'skip', detail: string, evidence?: string[] }>} */
 const results = [];
 
-function record(id, status, detail, evidence = []) {
-  results.push({ id, status, detail, evidence });
+function record(id, status, detail, evidence = [], diagnostics = undefined) {
+  results.push({
+    id,
+    status,
+    detail,
+    evidence,
+    ...(diagnostics ? { diagnostics } : {}),
+  });
   const prefix = status === 'pass' ? 'PASS' : status === 'skip' ? 'SKIP' : 'FAIL';
   console.log(`[${prefix}] ${id}: ${detail}`);
   for (const item of evidence) console.log(`  evidence: ${item}`);
@@ -209,13 +217,16 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
   let electronApp;
   let page;
   const decisionToken = `packaged-e2e-decision-${Date.now()}`;
-  const teamDecisionFact = `Team decision (${decisionToken}): standardize on SQLite for workspace persistence in packaged Linux E2E.`;
+  const memoryInjectionMarker =
+    'standardize on SQLite for workspace persistence in packaged Linux E2E';
+  const memoryInjectionDistinctiveWord = 'packaged';
+  const teamDecisionFact = `Team decision (${decisionToken}): ${memoryInjectionMarker}.`;
   try {
     ({ electronApp, page } = await launchPackagedApp(
       executablePath,
       buildLaunchEnv(profile.home, profile.userDataPath),
     ));
-    await configureGlmProvider(page, glmKey, { baseURL: GLM_BASE_URL, model: GLM_MODEL });
+    await configureGlmProvider(page, { model: GLM_MODEL });
 
     const session = await page.evaluate(
       async ({ cwd, teamDecisionFact: fact }) => {
@@ -254,11 +265,11 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
     );
 
     const injectionSession = await page.evaluate(
-      async ({ cwd, token }) => {
+      async ({ cwd }) => {
         const started = await window.electron.cowork.startSession({
           prompt:
-            `What team decision about SQLite workspace persistence is recorded for this workspace (${token})? ` +
-            'Quote the stored decision verbatim if you have it in context.',
+            'What persistence technology did the team decide to standardize on for this workspace? ' +
+            'Answer in one short sentence using only prior context. Do not call any tools.',
           cwd,
           mode: 'work',
         });
@@ -267,16 +278,36 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
         }
         return started.session.id;
       },
-      { cwd: workspaceDir, token: decisionToken },
+      { cwd: workspaceDir },
     );
     const injectionSnapshot = await waitForRunCompletion(page, injectionSession, 480_000);
-    const injectionMessages = await page.evaluate(async sessionId => {
-      const result = await window.electron.cowork.getSession(sessionId);
-      const sessionRecord = result.session ?? result;
-      const messageList = sessionRecord?.messages ?? [];
-      return messageList.map(message => message.content).join('\n');
-    }, injectionSession);
-    const injected = injectionMessages.includes(decisionToken);
+    const injectionSummary = await summarizeInjectionSession(page, injectionSession, {
+      distinctiveWord: memoryInjectionDistinctiveWord,
+    });
+    const promptCapture = readMemoryPromptCapture(profile.userDataPath, injectionSession);
+    const memoryContext = promptCapture?.memoryContext ?? '';
+    const promptHasInjectionBlock =
+      memoryContext.includes('Relevant memory') &&
+      (memoryContext.includes(memoryInjectionMarker) || memoryContext.includes('SQLite'));
+    const injected =
+      !injectionSummary.memoryToolUsed &&
+      (promptHasInjectionBlock ||
+        (injectionSummary.assistantHasDistinctiveWord &&
+          !injectionSummary.userQuestionHasDistinctiveWord));
+    const injectionDiagnostics = {
+      injectionSessionId: injectionSession,
+      memoryContextExcerpt: redactE2eText(memoryContext.slice(0, 800), [glmKey]),
+      initialPromptExcerpt: redactE2eText(
+        String(promptCapture?.initialPromptExcerpt ?? '').slice(0, 800),
+        [glmKey],
+      ),
+      assistantAnswerRedacted: redactE2eText(injectionSummary.assistantText.slice(0, 800), [
+        glmKey,
+      ]),
+      promptHasInjectionBlock,
+      memoryToolUsed: injectionSummary.memoryToolUsed,
+      assistantHasDistinctiveWord: injectionSummary.assistantHasDistinctiveWord,
+    };
 
     const shot = await screenshot(page, 'glm-work-memory-tool');
     const ok =
@@ -285,13 +316,15 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
       recalled &&
       injected &&
       injectionSnapshot.phase === 'completed';
+    const glmWorkDetail = ok
+      ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified via captured Pi prompt or "${memoryInjectionDistinctiveWord}"`
+      : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}; promptHasInjectionBlock=${promptHasInjectionBlock}`;
     record(
       'glm-work-memory-tool',
       ok ? 'pass' : 'fail',
-      ok
-        ? `Work-mode save persisted to sqlite (${dbRow.id}); recall and prompt injection verified for ${decisionToken}`
-        : `Run phase=${snapshot.phase}; dbRow=${Boolean(dbRow)}; recalled=${recalled}; injected=${injected}; injectionPhase=${injectionSnapshot.phase}`,
+      glmWorkDetail,
       [shot, `session:${session.sessionId}`, `injection:${injectionSession}`],
+      injectionDiagnostics,
     );
   } catch (error) {
     const shot = page
@@ -324,7 +357,7 @@ async function scenarioImBridgeReply(executablePath, glmKey) {
       executablePath,
       buildLaunchEnv(profile.home, profile.userDataPath),
     ));
-    await configureGlmProvider(page, glmKey, { baseURL: GLM_BASE_URL, model: GLM_MODEL });
+    await configureGlmProvider(page, { model: GLM_MODEL });
 
     const imSetup = await page.evaluate(async workspacePath => {
       const ensured = await window.electron.cowork.ensureWorkspace({

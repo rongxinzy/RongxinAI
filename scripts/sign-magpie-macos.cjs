@@ -11,6 +11,19 @@ function listPackagedMacMagpieTargets(root) {
   return MAC_TARGETS.filter(key => fs.existsSync(path.join(root, key)));
 }
 
+function isMagpieHelper(filename) {
+  return /\/magpie\/darwin-(?:x64|arm64)\/magpie$/.test(filename.split(path.sep).join('/'));
+}
+
+function optionsForSignedFile(options, filename) {
+  const perFile = options.optionsForFile ? options.optionsForFile(filename) : {};
+  if (!isMagpieHelper(filename)) return perFile;
+  if (perFile.hardenedRuntime === false || options.hardenedRuntime === false) {
+    throw new Error('Magpie macOS signing requires the hardened runtime');
+  }
+  return perFile.hardenedRuntime === true ? perFile : { ...perFile, hardenedRuntime: true };
+}
+
 async function signWithRuntimeManifest(options, signer = signAsync) {
   const root = path.join(options.app, 'Contents', 'Resources', 'magpie');
   const packagedTargets = listPackagedMacMagpieTargets(root);
@@ -21,6 +34,10 @@ async function signWithRuntimeManifest(options, signer = signAsync) {
   let manifestSealed = false;
   await signer({
     ...options,
+    // Developer ID comes from electron-builder's resolved identity. Hardened
+    // runtime is required for notarization; the whole .app, including these
+    // helpers, is submitted by the afterSign notarization hook.
+    hardenedRuntime: options.hardenedRuntime !== false,
     optionsForFile: filename => {
       // osx-sign signs children first and the outer .app last. Updating this
       // resource after the outer signature would invalidate the app seal.
@@ -42,7 +59,7 @@ async function signWithRuntimeManifest(options, signer = signAsync) {
         }
         manifestSealed = true;
       }
-      return options.optionsForFile ? options.optionsForFile(filename) : {};
+      return optionsForSignedFile(options, filename);
     },
   });
   if (!manifestSealed) throw new Error('macOS signing never sealed the Magpie runtime manifests');
