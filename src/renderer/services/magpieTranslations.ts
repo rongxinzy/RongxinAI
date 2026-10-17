@@ -59,8 +59,7 @@ export const magpieTranslations = {
     magpieLicenseNotice: 'MIT · © 2026 yetone',
 
     magpieProvidersTitle: '模型渠道管理',
-    magpieProvidersDescription:
-      '管理连接到统一网关的模型渠道。企业与本地 GPU 渠道由系统托管。',
+    magpieProvidersDescription: '管理连接到统一网关的模型渠道。企业与本地 GPU 渠道由系统托管。',
     magpieAddProvider: '添加渠道',
     magpieRefreshProviders: '刷新渠道',
     magpieEditProvider: '编辑渠道',
