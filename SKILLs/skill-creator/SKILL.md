@@ -1,8 +1,9 @@
 ---
 name: skill-creator
 description: 创建新技能、修改和迭代优化已有技能、编写标准 SKILL.md 文档与规划技能目录结构。当用户提出创建新技能、编写技能模板、增强智能体专业能力或将工作流固化为 Skill 时使用本技能。
-author: ZhiYuan Agent
 license: MIT
+metadata:
+  author: ZhiYuan Agent
 ---
 
 # 技能架构师 (Skill Creator)

@@ -50,6 +50,4 @@ export function getBranding(editionId?: string): ProductBrandingConfig {
   return registeredEditions[id] || zhiyuanBranding;
 }
 
-export { zhiyuanBranding } from './defaultBranding';
-export { xiaoruanBranding } from './editions/xiaoruan';
 export type { ProductBrandingConfig } from './types';

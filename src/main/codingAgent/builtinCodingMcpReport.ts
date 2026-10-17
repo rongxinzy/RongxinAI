@@ -5,7 +5,7 @@ import { t } from '../i18n';
  * the tools the gateway discovered. Everything is plain data so the formatter
  * stays testable without Electron or a live MCP connection.
  */
-export interface BuiltinCodingMcpServer {
+interface BuiltinCodingMcpServer {
   name: string;
   enabled: boolean;
   connected: boolean;
@@ -13,7 +13,7 @@ export interface BuiltinCodingMcpServer {
   error?: string;
 }
 
-export interface BuiltinCodingMcpTool {
+interface BuiltinCodingMcpTool {
   server: string;
   name: string;
 }
@@ -28,7 +28,7 @@ export interface BuiltinCodingMcpSnapshot {
 }
 
 /** Tool names are listed up to this many entries; the rest is summarized. */
-export const BUILTIN_CODING_MCP_TOOL_LIMIT = 40;
+const BUILTIN_CODING_MCP_TOOL_LIMIT = 40;
 
 const MAX_ERROR_LENGTH = 200;
 const MAX_NAME_LENGTH = 120;

@@ -14,15 +14,25 @@
  *   2. The editor owns its DOM selection, avoiding resize/dynamic-padding
  *      token implementations that break input focus.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
-const source = readFileSync(
-  fileURLToPath(new URL('./CoworkPromptInput.tsx', import.meta.url)),
-  'utf8',
-);
+const readModule = (relativePath: string): string =>
+  readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8');
+
+// CoworkPromptInput.tsx was split into the component file plus the sibling
+// promptInput/ modules; the guard pins facts across the whole composer
+// implementation, with the component file first so positional assertions
+// keep referring to its JSX.
+const source = [
+  readModule('./CoworkPromptInput.tsx'),
+  ...readdirSync(fileURLToPath(new URL('./promptInput', import.meta.url)))
+    .filter(name => /\.(ts|tsx)$/.test(name) && !/\.test\./.test(name))
+    .sort()
+    .map(name => readModule(`./promptInput/${name}`)),
+].join('\n');
 
 test('mounts the inline skill editor inside the prompt body', () => {
   expect(source).toContain('<InlineSkillPromptEditor');

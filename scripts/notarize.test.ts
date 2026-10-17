@@ -34,6 +34,14 @@ afterEach(() => {
 
 test('非 darwin 平台与缺少凭据时都不触发公证', async () => {
   const notarizeApp = vi.fn();
+  const signWindowsMagpie = vi.fn();
+  await notarizing(
+    { ...context, electronPlatformName: 'win32' },
+    { notarize: notarizeApp, signWindowsMagpie },
+  );
+  expect(signWindowsMagpie).toHaveBeenCalledOnce();
+  expect(notarizeApp).not.toHaveBeenCalled();
+
   await notarizing({ ...context, electronPlatformName: 'linux' }, { notarize: notarizeApp });
   expect(notarizeApp).not.toHaveBeenCalled();
 

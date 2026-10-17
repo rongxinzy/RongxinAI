@@ -47,7 +47,7 @@ export function exprToCronBuilder(expr: string): CronBuilderValue | null {
 }
 
 /** Subset of the task form fields this component is allowed to patch. */
-export interface CronFormPatch {
+interface CronFormPatch {
   cronMode?: CronMode;
   cronExpr?: string;
   cronTz?: string;

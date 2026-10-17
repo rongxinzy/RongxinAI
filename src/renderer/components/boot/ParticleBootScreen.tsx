@@ -10,31 +10,31 @@ import { i18nService } from '../../services/i18n';
  * Honors prefers-reduced-motion with a static logo fallback.
  */
 
-export const Phase = {
+const Phase = {
   Assemble: 'assemble',
   Disperse: 'disperse',
 } as const;
-export type Phase = (typeof Phase)[keyof typeof Phase];
+type Phase = (typeof Phase)[keyof typeof Phase];
 
-export const MAX_PARTICLES = 4200;
-export const ALPHA_THRESHOLD = 140;
-export const MIN_ASSEMBLE_MS = 1200;
-export const BLOOM_HOLD_MS = 160;
-export const MAX_ASSEMBLE_MS = 2200;
-export const ASSEMBLE_RATIO_TARGET = 0.85;
-export const DISPERSE_DURATION_MS = 420;
-export const FADE_IN_MS = 380;
-export const TARGET_FRAME_MS = 1000 / 60;
-export const MAX_PHYSICS_STEPS = 2;
-export const LOGO_WIDTH_RATIO = 0.42;
-export const LOGO_WIDTH_MAX_PX = 440;
-export const ANALYSIS_WIDTH_PX = 480;
+const MAX_PARTICLES = 4200;
+const ALPHA_THRESHOLD = 140;
+const MIN_ASSEMBLE_MS = 1200;
+const BLOOM_HOLD_MS = 160;
+const MAX_ASSEMBLE_MS = 2200;
+const ASSEMBLE_RATIO_TARGET = 0.85;
+const DISPERSE_DURATION_MS = 420;
+const FADE_IN_MS = 380;
+const TARGET_FRAME_MS = 1000 / 60;
+const MAX_PHYSICS_STEPS = 2;
+const LOGO_WIDTH_RATIO = 0.42;
+const LOGO_WIDTH_MAX_PX = 440;
+const ANALYSIS_WIDTH_PX = 480;
 
 export const BRAND_ACCENT = 'rgb(22,119,255)';
 export const BODY_COLOR_DARK = '#ffffff';
 export const BODY_COLOR_LIGHT = '#141820';
 
-export interface SampledPoint {
+interface SampledPoint {
   x: number;
   y: number;
   isAccent: boolean;
@@ -78,7 +78,7 @@ export const resolveIsDark = (): boolean => {
   return root.classList.contains('dark') || themeId === 'classic-dark' || themeId.endsWith('-dark');
 };
 
-export const logoSourceForTheme = (isDark: boolean): string =>
+const logoSourceForTheme = (isDark: boolean): string =>
   isDark ? 'zhiyuan-logo-dark-1600.png' : 'zhiyuan-logo-light-1600.png';
 
 export interface ExitEvaluationParams {

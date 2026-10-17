@@ -14,7 +14,7 @@ import type React from 'react';
  * parent re-renders and grid reloads can never make it flicker or jump.
  */
 
-export interface FluidTabItem<Value extends string> {
+interface FluidTabItem<Value extends string> {
   label: React.ReactNode;
   value: Value;
 }

@@ -1,5 +1,6 @@
-import { COMPONENT_STATES } from './contract';
-import type { AppearanceStyle, ComponentAppearance } from './contract';
+import { COMPONENT_STATES } from './contract/component-states';
+import type { AppearanceStyle } from './contract/appearance-properties';
+import type { ComponentAppearance } from './contract/types';
 
 /** Omitted states inherit the base; typography retains its paired theme line-height. */
 export function recipe(overrides: Partial<ComponentAppearance>): ComponentAppearance {

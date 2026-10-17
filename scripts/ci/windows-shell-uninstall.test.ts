@@ -67,7 +67,7 @@ test('native uninstall gate runs only after real shell evidence and protects the
 });
 
 test('internal and unsigned artifact delivery also require fresh lease and real uninstall before upload', () => {
-  const workflow = fs.readFileSync('.github/workflows/build-platforms.yml', 'utf8');
+  const workflow = fs.readFileSync('.github/workflows/release.yml', 'utf8');
   expect(workflow.indexOf('windows-shell-uninstall.ps1 -Action prepare')).toBeLessThan(
     workflow.indexOf('node scripts/ci/windows-shell-interactive.mjs'),
   );

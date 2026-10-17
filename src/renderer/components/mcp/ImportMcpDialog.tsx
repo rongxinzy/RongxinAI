@@ -38,11 +38,7 @@ const SAMPLE_MCP_JSON = `{
   }
 }`;
 
-export const ImportMcpDialog: React.FC<ImportMcpDialogProps> = ({
-  open,
-  onOpenChange,
-  onSuccess,
-}) => {
+const ImportMcpDialog: React.FC<ImportMcpDialogProps> = ({ open, onOpenChange, onSuccess }) => {
   const dispatch = useDispatch();
   const [jsonText, setJsonText] = useState('');
   const [error, setError] = useState('');
@@ -188,9 +184,7 @@ export const ImportMcpDialog: React.FC<ImportMcpDialogProps> = ({
             onClick={() => void handleImportText()}
             disabled={isSubmitting || !jsonText.trim()}
           >
-            {isSubmitting
-              ? i18nService.t('importing') || '导入中...'
-              : i18nService.t('import') || '导入'}
+            {isSubmitting ? i18nService.t('importingSkill') : i18nService.t('import') || '导入'}
           </Button>
         </DialogFooter>
       </DialogContent>

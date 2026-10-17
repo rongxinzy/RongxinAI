@@ -234,6 +234,122 @@ describe('Zhiyuan password session', () => {
     expect(client.getModelConnection).toHaveBeenCalledOnce();
   });
 
+  test('signs out and notifies projections even when SDK logout rejects', async () => {
+    const failure = new Error('logout unavailable');
+    const client = mockClient({
+      logout: vi.fn(async () => {
+        throw failure;
+      }),
+    });
+    const session = new ZhiyuanPasswordSession(client);
+    await session.login({
+      aepBaseUrl: 'https://aep.example.test',
+      username: 'admin',
+      password: 'secret',
+    });
+    const changed = vi.fn();
+    session.onDidChange(changed);
+
+    await expect(session.logout()).rejects.toBe(failure);
+    expect(session.snapshot()).toEqual({ status: 'signed-out' });
+    expect(changed).toHaveBeenCalledOnce();
+    await expect(session.listAgentModels()).resolves.toEqual({ models: [] });
+    await expect(session.getModelConnection()).rejects.toThrow('not authenticated');
+    await expect(
+      session.login({
+        aepBaseUrl: 'https://aep.example.test',
+        username: 'admin',
+        password: 'secret',
+      }),
+    ).resolves.toMatchObject({ status: 'authenticated' });
+  });
+
+  test('follows SDK token invalidation after a terminal refresh rejection', async () => {
+    const failure = new Error('REFRESH_TOKEN_INVALID');
+    const client = mockClient({
+      loginWithPassword: vi.fn(async () => ({ ...tokens(), modelAccessExpiresIn: 0 })),
+      refreshSession: vi.fn(async () => {
+        throw failure;
+      }),
+    });
+    const session = new ZhiyuanPasswordSession(client);
+    await session.login({
+      aepBaseUrl: 'https://aep.example.test',
+      username: 'admin',
+      password: 'secret',
+    });
+    const changed = vi.fn();
+    session.onDidChange(changed);
+
+    await expect(session.getModelConnection()).rejects.toBe(failure);
+    expect(session.snapshot()).toEqual({ status: 'signed-out' });
+    expect(changed).toHaveBeenCalledOnce();
+    expect(client.getModelConnection).not.toHaveBeenCalled();
+  });
+
+  test('retains authentication after a transport failure while SDK tokens remain valid', async () => {
+    const client = mockClient({
+      getSessionState: vi.fn(
+        async (): Promise<AepSessionState> => ({
+          status: 'authenticated',
+          passwordChangeRequired: false,
+        }),
+      ),
+      loginWithPassword: vi.fn(async () => ({ ...tokens(), modelAccessExpiresIn: 0 })),
+      refreshSession: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('network unavailable'))
+        .mockResolvedValue(tokens()),
+    });
+    const session = new ZhiyuanPasswordSession(client);
+    await session.login({
+      aepBaseUrl: 'https://aep.example.test',
+      username: 'admin',
+      password: 'secret',
+    });
+    await expect(session.getModelConnection()).rejects.toThrow('network unavailable');
+    expect(session.snapshot().status).toBe('authenticated');
+    await expect(session.getModelConnection()).resolves.toMatchObject({ apiKey: 'model-token' });
+  });
+
+  test('clears authentication when catalog auto-refresh invalidates SDK tokens', async () => {
+    const client = mockClient({
+      listAgentModels: vi.fn(async () => {
+        throw new Error('NO_SESSION');
+      }),
+    });
+    const session = new ZhiyuanPasswordSession(client);
+    await session.login({
+      aepBaseUrl: 'https://aep.example.test',
+      username: 'admin',
+      password: 'secret',
+    });
+    await expect(session.listAgentModels()).rejects.toThrow('NO_SESSION');
+    expect(session.snapshot().status).toBe('signed-out');
+  });
+
+  test('refreshes model credentials when catalog scopes change, but not on reordering', async () => {
+    let models = [{ id: 'first', enabled: true, sourceType: 'gateway' }];
+    const client = mockClient({ listAgentModels: vi.fn(async () => ({ models }) as never) });
+    const session = new ZhiyuanPasswordSession(client);
+    await session.login({
+      aepBaseUrl: 'https://aep.example.test',
+      username: 'admin',
+      password: 'secret',
+    });
+    await session.listAgentModels();
+    await session.getModelConnection();
+    expect(client.refreshSession).toHaveBeenCalledTimes(1);
+    models = [...models, { id: 'new-grant', enabled: true, sourceType: 'gateway' }];
+    await session.listAgentModels();
+    await session.getModelConnection();
+    expect(client.refreshSession).toHaveBeenCalledTimes(2);
+    models.reverse();
+    await session.listAgentModels();
+    await session.getModelConnection();
+    expect(client.refreshSession).toHaveBeenCalledTimes(2);
+  });
+
   test('waits for asynchronous session listeners before completing a transition', async () => {
     const session = new ZhiyuanPasswordSession(mockClient());
     let releaseListener: () => void = () => {};

@@ -81,13 +81,6 @@ export function clearCopilotTokenState(): void {
  * Get the current Copilot token if available and not expired.
  * Returns null if no token or if expired.
  */
-export function getCurrentCopilotToken(): TokenState | null {
-  if (!tokenState) {
-    return null;
-  }
-  // Still return it even if "close" to expiry — the scheduled refresh handles proactive renewal.
-  return tokenState;
-}
 
 /**
  * Attempt to refresh the Copilot token on demand (e.g. after an auth error).

@@ -2,6 +2,7 @@ import { MemoryScope } from '../../shared/memory';
 import type { CoworkMessage } from '../coworkStore';
 import { AtomicMemorySourceKind, EngramObservationType, PiMemoryAction } from './constants';
 import { AtomicMemoryExtractor, type AtomicMemoryExtractionResult } from './atomicMemoryExtractor';
+import { prepareExplicitUserRequestedMemory } from './explicitUserRequestedMemory';
 import type { ProjectMemoryService } from './projectMemoryService';
 import { buildSessionMemorySource, type SessionMemoryCompletion } from './sessionMemoryExtractor';
 
@@ -13,7 +14,7 @@ export function buildPiProjectMemoryTool(input: {
   complete: SessionMemoryCompletion;
   extractor?: AtomicMemoryExtractor;
 }): Record<string, unknown> {
-  const extractor = input.extractor ?? new AtomicMemoryExtractor();
+  void input.extractor;
   return {
     name: 'memory',
     label: 'Memory',
@@ -98,19 +99,14 @@ export function buildPiProjectMemoryTool(input: {
             content: requiredString(params.content, 'content'),
             kind: normalizeKind(params.kind),
           };
-          const extracted = await extractRequestedMemory(
-            extractor,
-            MemoryScope.Personal,
-            requestedMemory,
-            input,
-            [params.supersedesMemoryId, params.promotesMemoryId],
-          );
-          if (!extracted) {
-            return toolResult('The proposed personal memory was not durable enough to save.', {
-              skipped: true,
+          const prepared = prepareExplicitUserRequestedMemory(requestedMemory);
+          if (prepared.ok === false) {
+            return toolResult(prepared.message, {
+              isError: true,
+              reason: prepared.reason,
             });
           }
-          const memory = extracted.memories[0];
+          const memory = prepared.memory;
           const candidateId = input.service.proposePersonalMemory({
             sessionId: input.sessionId,
             workingDirectory: input.workingDirectory,
@@ -125,7 +121,7 @@ export function buildPiProjectMemoryTool(input: {
               typeof params.supersedesMemoryId === 'number' ? params.supersedesMemoryId : undefined,
             promotesMemoryId:
               typeof params.promotesMemoryId === 'number' ? params.promotesMemoryId : undefined,
-            metadata: extracted.metadataFor(memory),
+            metadata: memory.metadata,
           });
           return toolResult('Personal memory was proposed and requires user confirmation.', {
             candidateId,
@@ -138,18 +134,14 @@ export function buildPiProjectMemoryTool(input: {
             content: requiredString(params.content, 'content'),
             kind: normalizeKind(params.kind),
           };
-          const extracted = await extractRequestedMemory(
-            extractor,
-            MemoryScope.Project,
-            requestedMemory,
-            input,
-          );
-          if (!extracted) {
-            return toolResult('The proposed project memory was not durable enough to save.', {
-              skipped: true,
+          const prepared = prepareExplicitUserRequestedMemory(requestedMemory);
+          if (prepared.ok === false) {
+            return toolResult(prepared.message, {
+              isError: true,
+              reason: prepared.reason,
             });
           }
-          const memory = extracted.memories[0];
+          const memory = prepared.memory;
           const memoryId = await input.service.saveProjectMemory({
             sessionId: input.sessionId,
             workingDirectory: input.workingDirectory,
@@ -160,25 +152,30 @@ export function buildPiProjectMemoryTool(input: {
             importance: memory.importance,
             confidence: memory.confidence,
             sensitivity: memory.sensitivity,
-            metadata: extracted.metadataFor(memory),
+            metadata: memory.metadata,
           });
           return memoryId === null
             ? toolResult('Project memory was queued and will retry when memory is available.', {
                 queued: true,
+                reason: 'memory_unavailable',
               })
             : toolResult(`Saved workspace memory ${memoryId}.`, { memoryId });
         }
-        return toolResult('Unsupported memory action.', { isError: true });
+        return toolResult('Unsupported memory action.', {
+          isError: true,
+          reason: 'unsupported_action',
+        });
       } catch (error) {
         return toolResult(error instanceof Error ? error.message : String(error), {
           isError: true,
+          reason: 'invalid_request',
         });
       }
     },
   };
 }
 
-async function extractRequestedMemory(
+export async function extractRequestedMemoryForAutomaticSave(
   extractor: AtomicMemoryExtractor,
   scope: typeof MemoryScope.Project | typeof MemoryScope.Personal,
   requestedMemory: {

@@ -55,7 +55,7 @@ export interface WorkbenchToolAuthorizationResult {
   terminateRun?: boolean;
 }
 
-export interface VerifiedWorkbenchRunEvent {
+interface VerifiedWorkbenchRunEvent {
   task: WorkbenchTask;
   run: WorkbenchRun;
   artifacts: WorkbenchTaskDetail['artifacts'];

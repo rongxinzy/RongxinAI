@@ -117,6 +117,14 @@ export function createMcp(runtime: BrowserMockRuntime): Window['electron']['mcp'
         servers: [],
       };
     },
+    importConfigContent: async _p0 => {
+      void _p0;
+      runtime.warnOnce('mcp.importConfigContent');
+      return {
+        success: true,
+        servers: [],
+      };
+    },
     onBridgeSyncStart: _p0 => {
       return runtime.subscribe('mcp.onBridgeSyncStart', _p0);
     },

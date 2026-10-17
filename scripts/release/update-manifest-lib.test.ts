@@ -240,6 +240,14 @@ describe('online update release tools', () => {
     expect(downgradeResult.status).not.toBe(0);
     expect(downgradeResult.stderr).toContain('Refusing to replace newer stable version');
 
+    const rollbackResult = runScript(
+      'verify-update-transition.mjs',
+      [currentManifest, olderManifest, '2026.7.2'],
+      { ...releaseEnvironment, ALLOW_STABLE_ROLLBACK: 'true' },
+    );
+    expect(rollbackResult.status).toBe(0);
+    expect(rollbackResult.stdout).toContain('ALLOW_STABLE_ROLLBACK enabled');
+
     const conflictingManifest = createManifest('2026.7.3', 'conflict');
     const conflictResult = runScript(
       'verify-update-transition.mjs',

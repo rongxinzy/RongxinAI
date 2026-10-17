@@ -18,8 +18,17 @@ export interface ZhiyuanEnterpriseConfig {
 
 export async function loadZhiyuanEnterpriseConfig(
   resourcesPath: string,
+  options: { isPackaged: boolean; developmentConfigPath?: string | undefined } = {
+    isPackaged: true,
+  },
 ): Promise<ZhiyuanEnterpriseConfig> {
-  const configPath = path.join(path.resolve(resourcesPath), 'zhiyuan-enterprise', 'config.json');
+  const developmentConfigPath = !options.isPackaged ? options.developmentConfigPath : undefined;
+  if (developmentConfigPath && !path.isAbsolute(developmentConfigPath)) {
+    throw new Error('Zhiyuan enterprise development configuration path must be absolute.');
+  }
+  const configPath =
+    developmentConfigPath ??
+    path.join(path.resolve(resourcesPath), 'zhiyuan-enterprise', 'config.json');
   const file = await fs.readFile(configPath);
   if (file.byteLength === 0 || file.byteLength > MAX_CONFIG_BYTES) {
     throw new Error('Zhiyuan enterprise configuration size is invalid.');

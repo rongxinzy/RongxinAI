@@ -4,8 +4,6 @@ import {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalRiskLevel,
   WorkbenchArtifactKind,
-  WorkbenchArtifactProvenance,
-  WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
   WorkbenchRunStatus,
@@ -17,6 +15,7 @@ import {
   type WorkbenchArtifact,
   type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
+
 import { i18nService } from '../../../services/i18n';
 import { WorkbenchTaskRunFilter } from './constants';
 
@@ -75,19 +74,6 @@ const artifactKindTranslationKeys: Record<string, string> = {
   [WorkbenchArtifactKind.Evidence]: 'workbenchTaskArtifactEvidence',
 };
 
-const artifactVerificationTranslationKeys: Record<string, string> = {
-  [WorkbenchArtifactVerificationStatus.Pending]: 'workbenchTaskArtifactPending',
-  [WorkbenchArtifactVerificationStatus.Verified]: 'workbenchTaskArtifactVerified',
-  [WorkbenchArtifactVerificationStatus.Failed]: 'workbenchTaskArtifactFailed',
-};
-
-const artifactProvenanceTranslationKeys: Record<string, string> = {
-  [WorkbenchArtifactProvenance.Workspace]: 'workbenchTaskProvenanceWorkspace',
-  [WorkbenchArtifactProvenance.Message]: 'workbenchTaskProvenanceMessage',
-  [WorkbenchArtifactProvenance.Controller]: 'workbenchTaskProvenanceController',
-  [WorkbenchArtifactProvenance.External]: 'workbenchTaskProvenanceExternal',
-};
-
 const verificationOutcomeTranslationKeys: Record<string, string> = {
   [WorkbenchVerificationOutcome.Passed]: 'workbenchTaskVerificationPassed',
   [WorkbenchVerificationOutcome.Failed]: 'workbenchTaskVerificationFailed',
@@ -139,10 +125,6 @@ export const riskLabel = (value: string): string => translated(riskTranslationKe
 export const effectLabel = (value: string): string => translated(effectTranslationKeys, value);
 export const artifactKindLabel = (value: string): string =>
   translated(artifactKindTranslationKeys, value);
-export const artifactVerificationLabel = (value: string): string =>
-  translated(artifactVerificationTranslationKeys, value);
-export const artifactProvenanceLabel = (value: string): string =>
-  translated(artifactProvenanceTranslationKeys, value);
 export const verificationOutcomeLabel = (value: string): string =>
   translated(verificationOutcomeTranslationKeys, value);
 export const verificationCheckLabel = (value: string): string =>

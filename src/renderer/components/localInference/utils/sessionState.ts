@@ -23,6 +23,6 @@ export function writeLocalInferenceSessionState(state: LocalInferenceSessionStat
   }
 }
 
-export function isLocalInferenceTab(value: unknown): value is LocalInferenceTab {
+function isLocalInferenceTab(value: unknown): value is LocalInferenceTab {
   return value === 'models' || value === 'marketplace';
 }

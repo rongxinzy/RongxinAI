@@ -28,7 +28,7 @@ const MAX_MODELS = 256;
 const MAX_TEXT_LENGTH = 16_384;
 type Registrar = (providerId: string, refresher: PiOpenAICompatTokenRefresher) => () => void;
 
-/** Enterprise credentials remain in Main's existing loopback proxy, never AppConfig or Magpie. */
+/** Enterprise credentials stay in the loopback bridge, never in app config or the gateway catalog. */
 export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostCapability {
   readonly apiVersion = ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION;
   readonly #listeners = new Set<() => void>();

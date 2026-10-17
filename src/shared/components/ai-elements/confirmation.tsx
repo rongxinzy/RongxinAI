@@ -1,6 +1,7 @@
 'use client';
 
-import { Alert, AlertDescription } from '@shared/components/ui/alert';
+import { Alert } from '@shared/components/ui/alert';
+
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
 import type { ToolUIPart } from 'ai';
@@ -71,12 +72,6 @@ export const Confirmation = ({ className, approval, state, ...props }: Confirmat
   );
 };
 
-export type ConfirmationTitleProps = ComponentProps<typeof AlertDescription>;
-
-export const ConfirmationTitle = ({ className, ...props }: ConfirmationTitleProps) => (
-  <AlertDescription className={cn('inline', className)} {...props} />
-);
-
 export interface ConfirmationRequestProps {
   children?: ReactNode;
 }
@@ -86,42 +81,6 @@ export const ConfirmationRequest = ({ children }: ConfirmationRequestProps) => {
 
   // Only show when approval is requested
   if (state !== 'approval-requested') {
-    return null;
-  }
-
-  return children;
-};
-
-export interface ConfirmationAcceptedProps {
-  children?: ReactNode;
-}
-
-export const ConfirmationAccepted = ({ children }: ConfirmationAcceptedProps) => {
-  const { approval, state } = useConfirmation();
-
-  // Only show when approved and in response states
-  if (
-    !approval?.approved ||
-    (state !== 'approval-responded' && state !== 'output-denied' && state !== 'output-available')
-  ) {
-    return null;
-  }
-
-  return children;
-};
-
-export interface ConfirmationRejectedProps {
-  children?: ReactNode;
-}
-
-export const ConfirmationRejected = ({ children }: ConfirmationRejectedProps) => {
-  const { approval, state } = useConfirmation();
-
-  // Only show when rejected and in response states
-  if (
-    approval?.approved !== false ||
-    (state !== 'approval-responded' && state !== 'output-denied' && state !== 'output-available')
-  ) {
     return null;
   }
 

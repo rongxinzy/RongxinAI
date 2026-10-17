@@ -206,8 +206,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imErrorStreamInterrupted: '与模型的连接中断，本次任务已停止。请重新发送消息。',
     imErrorUnknown: '处理消息时遇到错误: {error}。请稍后重试。',
 
-    workbenchStreamStallResumeGoal: '流中断后自动续跑',
-
     // Image input fallback (see libs/agentEngine/piImageInputFallback.ts)
     coworkImageNotSentNotice:
       '本条消息包含图片，但图片未发送给模型。已把图片文件路径交给模型，它会尝试用本机工具读取其中的文字。若该模型支持图片输入，可在模型设置中开启。',
@@ -637,8 +635,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'The connection to the model was interrupted and this task was stopped. Please send your message again.',
     imErrorUnknown: 'Error processing message: {error}. Please try again.',
 
-    workbenchStreamStallResumeGoal: 'Automatic resume after stream interruption',
-
     // Image input fallback (see libs/agentEngine/piImageInputFallback.ts)
     coworkImageNotSentNotice:
       'This message included an image, but it was not sent to the model. The model received the image file path and will try local tools to read any text in it. If the model supports images, you can enable image input in the model settings.',
@@ -877,10 +873,6 @@ let currentLanguage: LanguageType = 'zh';
 /** Set the active language. Call this when app_config.language changes. */
 export function setLanguage(language: LanguageType): void {
   currentLanguage = language;
-}
-
-export function getLanguage(): LanguageType {
-  return currentLanguage;
 }
 
 /**

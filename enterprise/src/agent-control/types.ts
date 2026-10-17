@@ -51,7 +51,7 @@ export interface ManagedSkill {
   readonly path: string;
 }
 
-export interface SkillSyncItem {
+interface SkillSyncItem {
   readonly skillId: string;
   readonly version: string;
   readonly status: SkillSyncStatus;

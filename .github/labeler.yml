@@ -38,14 +38,6 @@
           - 'src/common/**'
           - 'electron-tsconfig.json'
 
-'area: openclaw':
-  - changed-files:
-      - any-glob-to-any-file:
-          - 'src/main/libs/*openclaw*'
-          - 'scripts/*openclaw*'
-          - 'scripts/ensure-openclaw-version.cjs'
-          - 'scripts/apply-openclaw-patches.cjs'
-
 'area: skills':
   - changed-files:
       - any-glob-to-any-file:

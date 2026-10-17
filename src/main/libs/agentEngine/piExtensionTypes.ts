@@ -3,20 +3,20 @@ export const PiExtensionEventType = {
   ToolResult: 'tool_result',
 } as const;
 
-export interface PiToolCallEvent {
+interface PiToolCallEvent {
   toolCallId: string;
   toolName: string;
   input?: unknown;
 }
 
-export interface PiToolResultEvent {
+interface PiToolResultEvent {
   toolCallId: string;
   toolName: string;
   input?: unknown;
   isError: boolean;
 }
 
-export interface PiToolCallEventResult {
+interface PiToolCallEventResult {
   block: true;
   reason: string;
 }

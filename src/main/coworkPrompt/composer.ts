@@ -52,7 +52,7 @@ const managedBlock = (start: string, content: string, end: string): string =>
 const EXPERT_IDENTITY_PRECEDENCE =
   '以下专家身份优先于任何默认身份设定。当用户询问你的身份、名字或角色时，一律以本专家身份回答。';
 
-export const stripManagedCoworkPrompt = (
+const stripManagedCoworkPrompt = (
   systemPrompt: string | undefined,
   previousExpertSnapshots: ExpertPromptSnapshot[] = [],
 ): string => {

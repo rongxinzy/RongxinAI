@@ -5,10 +5,10 @@ import { i18nService } from '../../../services/i18n';
 export const hasText = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
-export const toTrimmedString = (value: unknown): string | null =>
+const toTrimmedString = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() ? value.trim() : null;
 
-export const getStringArray = (value: unknown): string | null => {
+const getStringArray = (value: unknown): string | null => {
   if (!Array.isArray(value)) return null;
   const lines = value.filter(item => typeof item === 'string') as string[];
   return lines.length > 0 ? lines.join('\n') : null;
@@ -18,10 +18,10 @@ export const truncatePreview = (value: string, maxLength = 120): string =>
   value.length <= maxLength ? value : `${value.slice(0, maxLength - 3)}...`;
 
 const MAX_STRUCTURED_FORMAT_CHARS = 100_000;
-export const TOOL_RESULT_COLLAPSE_LINE_LIMIT = 200;
-export const TOOL_RESULT_COLLAPSE_CHAR_LIMIT = 12_000;
+const TOOL_RESULT_COLLAPSE_LINE_LIMIT = 200;
+const TOOL_RESULT_COLLAPSE_CHAR_LIMIT = 12_000;
 
-export const formatStructuredText = (value: string): string => {
+const formatStructuredText = (value: string): string => {
   const trimmed = value.trim();
   if (
     trimmed.length > MAX_STRUCTURED_FORMAT_CHARS ||
@@ -82,7 +82,7 @@ export const collapseToolText = (
 const TOOL_USE_ERROR_TAG_PATTERN = /^<tool_use_error>([\s\S]*?)<\/tool_use_error>$/i;
 const ANSI_ESCAPE_PATTERN = /\[[0-?]*[ -/]*[@-~]/g;
 
-export const normalizeToolResultText = (value: string): string => {
+const normalizeToolResultText = (value: string): string => {
   const withoutAnsi = value.replace(ANSI_ESCAPE_PATTERN, '');
   const errorTagMatch = withoutAnsi.trim().match(TOOL_USE_ERROR_TAG_PATTERN);
   return errorTagMatch ? errorTagMatch[1].trim() : withoutAnsi;
@@ -130,17 +130,14 @@ export const getToolDisplayName = (toolName: string | undefined): string => {
   }
 };
 
-export const isTodoWriteToolName = (toolName: string | undefined): boolean => {
+const isTodoWriteToolName = (toolName: string | undefined): boolean => {
   if (!toolName) return false;
   return normalizeToolName(toolName) === 'todowrite';
 };
 
 // ── Tool input extraction ──
 
-export const getToolInputString = (
-  input: Record<string, unknown>,
-  keys: string[],
-): string | null => {
+const getToolInputString = (input: Record<string, unknown>, keys: string[]): string | null => {
   for (const key of keys) {
     const value = input[key];
     if (typeof value === 'string' && value.trim()) return value;
@@ -176,9 +173,9 @@ const getCronToolSummary = (input: Record<string, unknown>): string | null => {
 
 // ── TodoWrite ──
 
-export type TodoStatus = 'completed' | 'in_progress' | 'pending' | 'unknown';
+type TodoStatus = 'completed' | 'in_progress' | 'pending' | 'unknown';
 
-export type ParsedTodoItem = {
+type ParsedTodoItem = {
   primaryText: string;
   secondaryText: string | null;
   status: TodoStatus;

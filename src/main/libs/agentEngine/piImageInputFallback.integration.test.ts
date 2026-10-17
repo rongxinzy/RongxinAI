@@ -13,6 +13,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 
 import type { CoworkStore } from '../../coworkStore';
+import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
 
 const VISION_400 =
   '{"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images","type":"invalid_request_error","param":"","code":null}';
@@ -117,49 +118,12 @@ vi.mock('../../workbenchTask/artifactWorkerPool', async () => {
   };
 });
 
-vi.mock('./piOpenAICompatProxy', () => ({
-  registerPiOpenAICompatTokenRefresher: vi.fn(),
-  // The adapter routes OpenAI-protocol providers through this "proxy" URL; point
-  // it at the fake gateway so the real SDK performs real HTTP against it.
-  registerPiOpenAICompatUpstream: vi.fn(async () => `http://127.0.0.1:${port}/v1`),
-}));
-
-vi.mock('../../communityAuthSession', () => ({
-  getModelPoolAccessToken: vi.fn(async () => ''),
-}));
-
 vi.mock('../coworkUtil', async importOriginal => {
   const actual = await importOriginal<typeof import('../coworkUtil')>();
   return {
     ...actual,
     applyApplicationRuntimeEnv: vi.fn(),
     resolveGitBashPathForPi: vi.fn(() => undefined),
-  };
-});
-
-vi.mock('../claudeSettings', () => {
-  const providerMetadata = {
-    providerName: 'custom_0',
-    modelName: 'GLM-5.3-Flash',
-    supportsImage: true,
-    capabilities: {
-      toolCalling: 'supported',
-      imageInput: 'supported',
-      videoInput: 'unknown',
-      audioInput: 'unknown',
-      documentInput: 'unknown',
-      reasoning: 'supported',
-    },
-  };
-  const config = () => ({
-    apiKey: 'sk-e2e',
-    baseURL: `http://127.0.0.1:${port}/v1`,
-    model: 'GLM-5.3-Flash',
-    apiType: 'openai' as const,
-  });
-  return {
-    resolveRawApiConfig: () => ({ config: config(), providerMetadata }),
-    resolveRawApiConfigForModelRef: () => ({ config: config(), providerMetadata }),
   };
 });
 
@@ -177,13 +141,22 @@ const fakeStore = {
 const readRecord = (value: unknown, key: string): unknown =>
   typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
 
+let disposeMagpie: (() => void) | undefined;
+
 beforeAll(async () => {
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const address = server.address();
   port = typeof address === 'object' && address ? address.port : 0;
+  const gateway = installTestMagpie({
+    gatewayUrl: `http://127.0.0.1:${port}`,
+    defaultModelId: 'GLM-5.3-Flash',
+  });
+  gateway.setImage('GLM-5.3-Flash', true);
+  disposeMagpie = gateway.dispose;
 });
 
 afterAll(() => {
+  disposeMagpie?.();
   server.close();
   fs.rmSync(imageDir, { recursive: true, force: true });
 });

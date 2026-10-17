@@ -22,7 +22,7 @@ type ResolveAgentModelSelectionResult = {
   hasIneligibleLlamaCppModel: boolean;
 };
 
-export function isLlamaCppModelRef(modelRef: string): boolean {
+function isLlamaCppModelRef(modelRef: string): boolean {
   return modelRef.trim().startsWith(`${AgentProviderId.LlamaCpp}/`);
 }
 

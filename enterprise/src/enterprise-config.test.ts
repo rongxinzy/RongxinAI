@@ -15,6 +15,32 @@ afterEach(() => {
 });
 
 describe('Zhiyuan enterprise configuration', () => {
+  test('allows an absolute development config only in an unpackaged host', async () => {
+    const packagedResources = writeConfig({
+      schemaVersion: 1,
+      aepBaseUrl: 'https://packaged.example.test',
+      allowInsecureHttp: false,
+    });
+    const devResources = writeConfig({
+      schemaVersion: 1,
+      aepBaseUrl: 'http://localhost:8080',
+      allowInsecureHttp: true,
+    });
+    const developmentConfigPath = path.join(devResources, 'zhiyuan-enterprise', 'config.json');
+    await expect(
+      loadZhiyuanEnterpriseConfig(packagedResources, { isPackaged: false, developmentConfigPath }),
+    ).resolves.toMatchObject({ aepBaseUrl: 'http://localhost:8080' });
+    await expect(
+      loadZhiyuanEnterpriseConfig(packagedResources, { isPackaged: true, developmentConfigPath }),
+    ).resolves.toMatchObject({ aepBaseUrl: 'https://packaged.example.test' });
+    await expect(
+      loadZhiyuanEnterpriseConfig(packagedResources, {
+        isPackaged: false,
+        developmentConfigPath: 'relative.json',
+      }),
+    ).rejects.toThrow('must be absolute');
+  });
+
   test('loads and normalizes the fixed HTTPS configuration resource', async () => {
     const resources = writeConfig({
       schemaVersion: 1,

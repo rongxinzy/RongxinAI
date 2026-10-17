@@ -21,7 +21,6 @@ vi.mock('./uvRuntime', () => ({
 vi.mock('electron', () => ({
   app: { isPackaged: false, getAppPath: () => process.cwd(), getPath: () => '/nonexistent' },
 }));
-vi.mock('./claudeSettings', () => ({}));
 vi.mock('./systemProxy', () => ({}));
 vi.mock('./coworkLogger', () => ({ coworkLog: vi.fn() }));
 

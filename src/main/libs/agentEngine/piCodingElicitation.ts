@@ -1,8 +1,8 @@
 import { Type } from 'typebox';
 
-export const PiCodingElicitationToolName = 'RequestCodingInput' as const;
+const PiCodingElicitationToolName = 'RequestCodingInput' as const;
 
-export const PiCodingElicitationParameters = Type.Object({
+const PiCodingElicitationParameters = Type.Object({
   question: Type.String({ minLength: 1, maxLength: 4000 }),
 });
 

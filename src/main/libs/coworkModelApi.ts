@@ -1,12 +1,5 @@
 export { buildAnthropicMessagesUrl } from '../../shared/providers';
 
-export const CoworkModelProtocol = {
-  Anthropic: 'anthropic',
-  GeminiNative: 'gemini_native',
-} as const;
-
-export type CoworkModelProtocol = (typeof CoworkModelProtocol)[keyof typeof CoworkModelProtocol];
-
 const API_ERROR_SNIPPET_MAX_CHARS = 240;
 
 const toRecord = (value: unknown): Record<string, unknown> | null =>

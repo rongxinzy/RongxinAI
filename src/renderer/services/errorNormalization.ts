@@ -66,7 +66,7 @@ const APP_COPY_KEYS = [
  * instead of being wrapped a second time ("操作失败：加载待发送消息失败。").
  * Templates with a `{detail}` placeholder are compared on their fixed head.
  */
-export function isLocalizedAppErrorText(message: string): boolean {
+function isLocalizedAppErrorText(message: string): boolean {
   const trimmed = message.trim();
   if (!trimmed) return false;
   return APP_COPY_KEYS.some(key => {

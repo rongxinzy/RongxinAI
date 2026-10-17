@@ -2,12 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 
-export interface McpPresentationSection {
+interface McpPresentationSection {
   title?: string;
   description?: string;
 }
 
-export interface McpPresentationLocale {
+interface McpPresentationLocale {
   description?: string;
   examples?: string[];
   connect?: {
@@ -18,7 +18,7 @@ export interface McpPresentationLocale {
   };
 }
 
-export interface McpPresentation {
+interface McpPresentation {
   name?: string;
   authorization?: string;
   zh?: McpPresentationLocale;

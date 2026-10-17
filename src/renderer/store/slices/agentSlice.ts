@@ -2,8 +2,6 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import type { Agent } from '../../types/agent';
 
-export type AgentSummary = Agent;
-
 interface AgentState {
   agents: Agent[];
   currentAgentId: string;
@@ -20,7 +18,7 @@ const agentSlice = createSlice({
   name: 'agent',
   initialState,
   reducers: {
-    setAgents(state, action: PayloadAction<AgentSummary[]>) {
+    setAgents(state, action: PayloadAction<Agent[]>) {
       state.agents = action.payload;
     },
 
@@ -32,11 +30,11 @@ const agentSlice = createSlice({
       state.loading = action.payload;
     },
 
-    addAgent(state, action: PayloadAction<AgentSummary>) {
+    addAgent(state, action: PayloadAction<Agent>) {
       state.agents.push(action.payload);
     },
 
-    updateAgent(state, action: PayloadAction<{ id: string; updates: Partial<AgentSummary> }>) {
+    updateAgent(state, action: PayloadAction<{ id: string; updates: Partial<Agent> }>) {
       const index = state.agents.findIndex(a => a.id === action.payload.id);
       if (index !== -1) {
         state.agents[index] = { ...state.agents[index], ...action.payload.updates };

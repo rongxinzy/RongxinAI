@@ -25,7 +25,7 @@ interface PermissionDangerBannerProps {
  * the theme `permission-danger-banner*` hooks, so every theme and mode renders
  * the same structure with its own palette.
  */
-export const PermissionDangerBanner = ({ level, reasonText }: PermissionDangerBannerProps) => {
+const PermissionDangerBanner = ({ level, reasonText }: PermissionDangerBannerProps) => {
   if (level === PermissionDangerLevel.Safe) return null;
   return (
     <div

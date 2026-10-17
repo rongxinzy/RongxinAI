@@ -23,12 +23,6 @@ function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
   return <tbody data-slot="table-body" className={cn('theme-table-body', className)} {...props} />;
 }
 
-function TableFooter({ className, ...props }: React.ComponentProps<'tfoot'>) {
-  return (
-    <tfoot data-slot="table-footer" className={cn('theme-table-footer', className)} {...props} />
-  );
-}
-
 function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
   return <tr data-slot="table-row" className={cn('theme-table-row', className)} {...props} />;
 }
@@ -53,14 +47,4 @@ function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
   );
 }
 
-function TableCaption({ className, ...props }: React.ComponentProps<'caption'>) {
-  return (
-    <caption
-      data-slot="table-caption"
-      className={cn('theme-table-caption mt-4', className)}
-      {...props}
-    />
-  );
-}
-
-export { Table, TableBody, TableCaption, TableCell, TableFooter, TableHead, TableHeader, TableRow };
+export { Table, TableBody, TableCell, TableHead, TableHeader, TableRow };

@@ -67,7 +67,7 @@ export interface CodingAgentAvailableCommandOption {
   description?: string;
 }
 
-export interface CodingAgentAvailableCommandInput {
+interface CodingAgentAvailableCommandInput {
   hint: string;
   /** Choices offered as a second-level menu once the command is typed. */
   options?: CodingAgentAvailableCommandOption[];
@@ -206,22 +206,6 @@ export interface CodingElicitation {
 export interface CodingElicitationResponse {
   requestId: string;
   answer: string;
-}
-
-export interface CodingWorkspaceLease {
-  roomId: string;
-  sourceRoot: string;
-  laneId: string | null;
-  acquiredAt: number | null;
-}
-
-export interface CodingHandoffPackage {
-  id: string;
-  missionId: string;
-  sourceLaneId: string;
-  targetLaneId: string;
-  content: Record<string, unknown>;
-  createdAt: number;
 }
 
 export interface CodingRoomSnapshot {

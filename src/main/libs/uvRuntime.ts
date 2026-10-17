@@ -65,7 +65,7 @@ function findExecutable(rootDir: string, name: string): string | null {
   return null;
 }
 
-export function getBundledUvRoot(): string | null {
+function getBundledUvRoot(): string | null {
   for (const candidate of resolveBundledCandidates()) {
     if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
       return candidate;
@@ -74,7 +74,7 @@ export function getBundledUvRoot(): string | null {
   return null;
 }
 
-export function getUserUvRoot(): string {
+function getUserUvRoot(): string {
   return path.join(app.getPath('userData'), 'runtimes', UV_RUNTIME_DIR_NAME);
 }
 

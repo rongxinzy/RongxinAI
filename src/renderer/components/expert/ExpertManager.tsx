@@ -37,7 +37,7 @@ interface ExpertManagerProps {
 
 type ExpertTabFilter = 'all' | 'custom' | 'preset';
 
-export const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
+const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
   const dispatch = useDispatch();
   const agents = useSelector((state: RootState) => state.agent.agents);
 
@@ -287,9 +287,11 @@ export const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }
               <div className="flex flex-col items-center justify-center gap-2.5 rounded-xl border border-dashed border-border/80 bg-muted/20 py-10 text-center">
                 <Users className="size-8 text-muted-foreground/60" />
                 <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium text-foreground">还没有自定义专家</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {i18nService.t('expertCustomEmptyTitle')}
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    组合你的专属技能、MCP 与系统提示词，快速构建针对性智能体
+                    {i18nService.t('expertCustomEmptyDescription')}
                   </p>
                 </div>
                 <Button
@@ -332,7 +334,7 @@ export const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }
                           )}
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                          {agent.description || '自定义专家智能体'}
+                          {agent.description || i18nService.t('expertCustomFallbackDescription')}
                         </p>
                       </div>
                     </div>
@@ -343,7 +345,9 @@ export const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }
                         {agent.skillIds && agent.skillIds.length > 0 && (
                           <span className="inline-flex items-center gap-1 rounded bg-secondary/70 px-1.5 py-0.5 text-[11px] text-secondary-foreground font-medium">
                             <Sparkles className="size-3" />
-                            {agent.skillIds.length} 技能
+                            {i18nService
+                              .t('expertSkillCount')
+                              .replace('{count}', String(agent.skillIds.length))}
                           </span>
                         )}
                         {agent.mcpIds && agent.mcpIds.length > 0 && (
@@ -368,17 +372,19 @@ export const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }
                         >
                           <Pencil className="size-3.5 text-muted-foreground" />
                         </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-xs"
-                          onClick={() => setExpertToDelete(agent)}
-                          title={i18nService.t('deleteExpert')}
-                          aria-label={i18nService.t('deleteExpert')}
-                          className="hover:text-destructive"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
+                        {!agent.isDefault && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-xs"
+                            onClick={() => setExpertToDelete(agent)}
+                            title={i18nService.t('deleteExpert')}
+                            aria-label={i18nService.t('deleteExpert')}
+                            className="hover:text-destructive"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        )}
                         <Button
                           type="button"
                           variant="secondary"
@@ -387,7 +393,7 @@ export const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }
                           className="ml-1 gap-1"
                         >
                           <MessageCircle className="size-3" />
-                          对话
+                          {i18nService.t('expertChat')}
                         </Button>
                       </div>
                     </div>
@@ -480,12 +486,13 @@ export const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }
                         <div className="flex items-center gap-1 overflow-hidden">
                           {expert.workflow && expert.workflow.length > 0 ? (
                             <span className="text-[11px] text-muted-foreground truncate">
-                              流程：{expert.workflow.slice(0, 2).join(' → ')}
+                              {i18nService.t('expertWorkflowPrefix')}
+                              {expert.workflow.slice(0, 2).join(' → ')}
                               {expert.workflow.length > 2 && '...'}
                             </span>
                           ) : (
                             <span className="text-[11px] text-muted-foreground">
-                              内置高阶工作流
+                              {i18nService.t('expertBuiltInWorkflow')}
                             </span>
                           )}
                         </div>
@@ -497,7 +504,7 @@ export const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }
                             size="xs"
                             onClick={() => setSelectedPresetExpert(expert)}
                           >
-                            详情
+                            {i18nService.t('expertDetails')}
                           </Button>
 
                           {installedAgent ? (

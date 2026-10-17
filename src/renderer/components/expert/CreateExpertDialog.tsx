@@ -156,7 +156,7 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
   const handleSave = async (startChat = false) => {
     const trimmedName = name.trim();
     if (!trimmedName) {
-      setError(i18nService.t('nameRequired') || '专家名称不能为空');
+      setError(i18nService.t('expertNameRequired'));
       return;
     }
     if (!systemPrompt.trim()) {

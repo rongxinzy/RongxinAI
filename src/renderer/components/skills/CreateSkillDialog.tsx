@@ -44,11 +44,7 @@ description: ${description || '简要描述该技能的作用与触发时机，�
 - 重点信息使用结构化表格或条目列出。
 `;
 
-export const CreateSkillDialog: React.FC<CreateSkillDialogProps> = ({
-  open,
-  onOpenChange,
-  onSuccess,
-}) => {
+const CreateSkillDialog: React.FC<CreateSkillDialogProps> = ({ open, onOpenChange, onSuccess }) => {
   const dispatch = useDispatch();
   const [skillId, setSkillId] = useState('');
   const [name, setName] = useState('');

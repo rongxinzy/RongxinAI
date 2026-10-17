@@ -4,9 +4,9 @@
  */
 import DOMPurify from 'dompurify';
 
-export type DxfPoint = { x: number; y: number };
+type DxfPoint = { x: number; y: number };
 
-export type DxfSegment =
+type DxfSegment =
   | { kind: 'line'; from: DxfPoint; to: DxfPoint }
   | { kind: 'circle'; center: DxfPoint; radius: number }
   | { kind: 'arc'; center: DxfPoint; radius: number; startDeg: number; endDeg: number }

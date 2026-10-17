@@ -145,7 +145,7 @@ const BINARY_ARTIFACT_EXTENSIONS = new Set([
   '.pdf',
 ]);
 
-export function getArtifactExtension(filePath: string): string {
+function getArtifactExtension(filePath: string): string {
   const lastDot = filePath.lastIndexOf('.');
   return lastDot === -1 ? '' : filePath.slice(lastDot).toLowerCase();
 }

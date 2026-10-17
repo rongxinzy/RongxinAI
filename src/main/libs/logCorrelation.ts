@@ -33,7 +33,7 @@ export function generateCorrelationId(): string {
  * Get the correlation ID for the current async context.
  * Returns undefined if called outside a runWithCorrelationId scope.
  */
-export function getCurrentCorrelationId(): string | undefined {
+function getCurrentCorrelationId(): string | undefined {
   return storage.getStore();
 }
 

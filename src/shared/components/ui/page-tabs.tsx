@@ -3,7 +3,7 @@ import { cn } from '@shared/lib/utils';
 import { motion, useReducedMotion } from 'motion/react';
 import React, { useId } from 'react';
 
-export interface PageTabItem<Value extends string> {
+interface PageTabItem<Value extends string> {
   value: Value;
   label: React.ReactNode;
   /** Optional trailing content, e.g. a count Badge. */

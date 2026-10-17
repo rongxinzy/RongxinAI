@@ -205,6 +205,18 @@ describe('llamacpp backend manager', () => {
     expect(ref?.versionBackend).toBe('b9505/win-x64-cuda-13');
   });
 
+  test('recommends linux x64 cpu backend from fallback manifest', () => {
+    const manifest = buildFallbackManifest('b9505');
+    const ref = recommendLlamaCppBackend({
+      manifest,
+      platform: 'linux',
+      arch: 'x64',
+      hasNvidiaGpu: false,
+      config: {},
+    });
+    expect(ref?.versionBackend).toBe('b9505/linux-x64');
+  });
+
   test('recommends CUDA 13 before CUDA 12 for Windows x64 with NVIDIA', () => {
     const manifest = {
       schemaVersion: 1 as const,

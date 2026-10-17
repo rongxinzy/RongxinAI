@@ -8,7 +8,7 @@ const normalizeAgentId = (agentId?: string) => agentId?.trim() || 'main';
  * A session shows the running indicator only while its Pi event stream is
  * registered as live. Persisted status is historical and may be stale.
  */
-export const isSessionExecuting = (
+const isSessionExecuting = (
   session: CoworkSessionSummary,
   streamingSessionIds?: ReadonlySet<string>,
 ): boolean => streamingSessionIds?.has(session.id) ?? false;

@@ -123,7 +123,7 @@ export function McpManagerToolbar({
               className="gap-1.5 h-9"
             >
               <FileUp className="size-4" />
-              {i18nService.t('importMcpConfig')}
+              {i18nService.t('importMcpConfigJson')}
             </Button>
           )}
         </div>
