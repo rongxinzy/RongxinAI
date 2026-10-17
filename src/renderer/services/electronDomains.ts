@@ -10,7 +10,7 @@
  */
 import type { IElectronAPI } from '../types/electron';
 
-export interface SystemDomainApi {
+interface SystemDomainApi {
   platform: string;
   arch: string;
   hardware: IElectronAPI['hardware'];
@@ -28,7 +28,7 @@ export interface SystemDomainApi {
   runtimeNotices: IElectronAPI['runtimeNotices'];
 }
 
-export interface InferenceDomainApi {
+interface InferenceDomainApi {
   llamacpp: IElectronAPI['llamacpp'];
   ollama: IElectronAPI['ollama'];
   magpie: IElectronAPI['magpie'];
@@ -38,7 +38,7 @@ export interface InferenceDomainApi {
   marketplace: IElectronAPI['marketplace'];
 }
 
-export interface AgentDomainApi {
+interface AgentDomainApi {
   cowork: IElectronAPI['cowork'];
   agents: IElectronAPI['agents'];
   skills: IElectronAPI['skills'];
@@ -48,14 +48,14 @@ export interface AgentDomainApi {
   workbenchTask: IElectronAPI['workbenchTask'];
 }
 
-export interface WorkspaceDomainApi {
+interface WorkspaceDomainApi {
   project: IElectronAPI['project'];
   memory: IElectronAPI['memory'];
   store: IElectronAPI['store'];
   getRecentCwds: IElectronAPI['getRecentCwds'];
 }
 
-export interface IntegrationDomainApi {
+interface IntegrationDomainApi {
   im: IElectronAPI['im'];
   scheduledTasks: IElectronAPI['scheduledTasks'];
   auth: IElectronAPI['auth'];
