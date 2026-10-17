@@ -15,6 +15,7 @@ import type { ScheduledTask } from '../../../scheduledTask/types';
 import { ActivitySource, ActivityStatus } from '../../../shared/activity/constants';
 import type { ActivityRun } from '../../../shared/activity/types';
 import type { MagpieModelCatalog } from '../../../shared/magpie/types';
+import type { MagpiePreferences } from '../../../shared/magpie/preferences';
 import type { Agent } from '../../types/agent';
 import type { Skill } from '../../types/skill';
 
@@ -215,6 +216,40 @@ export const mockMcpServers: MockMcpServer[] = [
     updatedAt: NOW - 48 * HOUR,
   },
 ];
+
+export const mockMagpiePreferences: MagpiePreferences = {
+  version: 'preview',
+  dataDir: '~/.zhiyuan/magpie',
+  gateway: 'http://127.0.0.1:3425',
+  proxy: '',
+  proxyNow: '',
+  proxySource: 'none',
+  bareModelIDs: false,
+  port: 3425,
+  lan: false,
+  onNetwork: false,
+  lanUrls: [],
+  vision: '',
+  visionAuto: 'preview-model',
+  visionEffort: '',
+  visionEfforts: [],
+  visionModels: [{ id: 'preview-model', name: 'Preview model', providerName: 'preview' }],
+  imageGen: 'off',
+  imageGenModels: [],
+  searcher: '',
+  searcherEffort: '',
+  searchFirst: '',
+  searchEfforts: [],
+  searchChoices: [],
+  searchRelays: [],
+  disabledModels: [],
+  redact: true,
+  redactPersonal: true,
+  redactKinds: {},
+  redactWords: [],
+  noAccountDiscovery: false,
+  noAccountsEnv: false,
+};
 
 export const mockMagpieCatalog: MagpieModelCatalog = {
   status: { state: 'running', version: 'preview', enabled: true },

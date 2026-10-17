@@ -18,7 +18,7 @@ test('model service copy does not name the internal runtime', () => {
     }
   }
   expect(magpieTranslations.zh.magpieSubscriptionsHint).toBe(
-    '订阅账号由官方管理界面维护，凭据不会返回应用页面。',
+    '订阅账号从本机已登录的 Claude Code、Codex、Copilot 等读取；凭据不会返回应用页面。',
   );
   expect(magpieTranslations.zh.magpieCatalogConsent).toBe(
     '启用后会启动本机模型服务，并读取、同步已连接 Agent 的模型配置。订阅账号需单独启用；遥测与局域网访问默认关闭。',
@@ -33,7 +33,7 @@ test('model service copy does not name the internal runtime', () => {
     '应用会通过模型服务修改对应 Agent 的模型配置。请在该 Agent 中开启新会话以使用新配置。',
   );
   expect(magpieTranslations.en.magpieSubscriptionsHint).toBe(
-    'Manage subscription accounts in the official management UI. Credentials are not returned to this app page.',
+    'Subscription accounts are read from local Claude Code, Codex, Copilot, and other agent sign-ins; credentials never return to this page.',
   );
   expect(magpieTranslations.en.magpieCatalogConsent).toBe(
     'Enabling starts the local model service and reads and synchronizes connected Agent configuration. Subscription accounts need separate opt-in; telemetry and LAN access stay off.',

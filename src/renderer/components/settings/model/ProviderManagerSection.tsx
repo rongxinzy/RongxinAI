@@ -63,7 +63,7 @@ export const ProviderManagerSection: React.FC<ProviderManagerSectionProps> = ({
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-base font-semibold">{i18nService.t('magpieProvidersTitle')}</h3>
+          <h2 className="text-base font-semibold">{i18nService.t('magpieProvidersTitle')}</h2>
           <p className="text-sm text-muted-foreground">
             {i18nService.t('magpieProvidersDescription')}
           </p>

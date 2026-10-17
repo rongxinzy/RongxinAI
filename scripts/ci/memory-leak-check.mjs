@@ -156,39 +156,21 @@ try {
   // model as the product. No legacy config or readiness bypass is seeded.
   const started = await page.evaluate(() => window.electron.magpie.start());
   if (started.state !== 'running') throw new Error('Memory test model service did not start.');
-  const managementWindow = electronApp.waitForEvent('window');
-  await page.evaluate(() => window.electron.magpie.openManagement());
-  const management = await managementWindow;
-  await management.waitForLoadState('domcontentloaded');
-  const saved = await management.evaluate(async baseUrl => {
-    const response = await fetch('/api/provider/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: 'memory-test',
-        from: 'memory-test',
-        name: 'Memory Test',
-        new: true,
-        chat: baseUrl,
-        responses: '',
-        anthropic: '',
-        key: 'memory-test-key',
-        models: ['memory-test-model'],
-        proxy: 'direct',
-        unredacted: true,
-        contexts: {},
-        outputs: {},
-        modelPrefs: {},
-        headers: {},
-        extraBody: {},
-        fallback: [],
-      }),
+  const savedProvider = await page.evaluate(async baseUrl => {
+    const providers = await window.electron.magpie.saveProvider({
+      name: 'Memory Test',
+      api: 'openai-completions',
+      baseUrl,
+      key: 'memory-test-key',
+      models: ['memory-test-model'],
     });
-    return response.ok;
+    return providers.find(item => item.name === 'Memory Test' && item.baseUrl === baseUrl) ?? null;
   }, `http://127.0.0.1:${provider.address().port}/v1`);
-  if (!saved) throw new Error('Memory test provider registration failed.');
-  await management.close();
-  await page.evaluate(() => window.electron.magpie.selectDefault('memory-test/memory-test-model'));
+  if (!savedProvider) throw new Error('Memory test provider registration failed.');
+  await page.evaluate(
+    id => window.electron.magpie.selectDefault(`${id}/memory-test-model`),
+    savedProvider.id,
+  );
   const readiness = await page.evaluate(() => window.electron.checkApiConfig());
   if (!readiness.hasConfig) throw new Error(`Memory test model setup failed: ${readiness.error}`);
 

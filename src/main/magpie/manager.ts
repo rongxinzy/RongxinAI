@@ -31,6 +31,8 @@ import { resolveMagpieGatewayPort, type MagpieGatewayPortStore } from './gateway
 import { MAGPIE_VERSION, verifyMagpieBinary } from './integrity';
 import type { MagpieAgentConnectPreview } from '../../shared/magpie/types';
 import { formatMagpieManagementError } from './managementErrors';
+import { mergeMagpiePreferences, projectMagpiePreferences } from './preferences';
+import type { MagpiePreferences, MagpiePreferencesPatch } from '../../shared/magpie/preferences';
 import {
   clearLegacyHostAgentStorage,
   mergeOpenCodeConfigToUser,
@@ -233,6 +235,19 @@ export class MagpieManager {
       ...init,
       headers: { ...init.headers, Cookie: `magpie_web_${this.webPort}=${this.webKey}` },
     });
+  }
+  preferences(): Promise<MagpiePreferences> {
+    return this.managementJson('/api/settings').then(projectMagpiePreferences);
+  }
+  async updatePreferences(patch: MagpiePreferencesPatch): Promise<MagpiePreferences> {
+    const raw = await this.managementJson('/api/settings');
+    const merged = mergeMagpiePreferences(raw, patch);
+    const saved = await this.managementJson('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(merged),
+    });
+    return projectMagpiePreferences(saved);
   }
   /** Main-only descriptor: never send this key through renderer IPC or logs. */
   managementConnection(): { url: string; cookieName: string; key: string } {

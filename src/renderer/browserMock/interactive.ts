@@ -21,6 +21,7 @@ import {
   mockAgents,
   mockCoworkConfig,
   mockMagpieCatalog,
+  mockMagpiePreferences,
   mockMcpServers,
   mockScheduledTasks,
   mockSession,
@@ -64,6 +65,7 @@ function sessionMode(options: object): CoworkSessionMode {
 }
 
 export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPartial<ElectronApi> {
+  let preferences = { ...mockMagpiePreferences };
   const store = new Map<string, unknown>();
   const sessions = new Map<string, PreviewEntry>();
   for (const summary of mockSessionSummaries) {
@@ -279,6 +281,15 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       selectDefault: () => Promise.resolve(mockMagpieCatalog),
       status: () => Promise.resolve(mockMagpieCatalog.status),
       models: () => Promise.resolve(mockMagpieCatalog.models),
+      preferences: () => Promise.resolve(preferences),
+      updatePreferences: patch => {
+        preferences = { ...preferences, ...patch };
+        if (patch.proxy !== undefined) {
+          preferences.proxyNow = patch.proxy;
+          preferences.proxySource = patch.proxy ? 'settings' : 'none';
+        }
+        return Promise.resolve(preferences);
+      },
     },
     llamacpp: {
       status: () =>

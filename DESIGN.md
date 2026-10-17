@@ -449,11 +449,14 @@ Before committing Zenith redesign:
 
 ### 模型页层级
 
-- 顶部只保留一个 `Model service` 区：状态徽标、简短说明、刷新/管理/启用动作；启用说明只在未运行时出现。
+- 模型页按官方 Magpie 设置的信息架构分为 Service / Providers / Models / Network & sharing / Privacy / About 六个分段，使用分段控件切换；窄窗口下改为下拉选择，不得横向裁切分段标签。
+- 页面顶部只保留一个 `Model service` 区：状态徽标、简短说明、刷新/启用动作；启用说明只在未运行时出现。不得再出现打开官方管理页面的入口。
 - Provider 使用带分隔线的行式列表，不再为每个 Provider 套 Card；服务商模型标签使用 `text-xs`，不得出现 10px/11px 字号。
 - Default model 显示当前已保存默认模型；`Set as default` 只在用户选择了不同模型时出现，不展示长期禁用的主按钮。
-- 外部 Agent 与订阅账号收在服务运行后的次级区块；未运行时隐藏，不展示禁用按钮。
-- 页面内不得再出现重复的 `Models` 标题或 `MIT · © 2026 yetone` 之外的新版权行。
+- Models / Network / Privacy 使用自动保存行：切换即写入，行内显示当前值；不得再引入页面级 Save。Network 的端口、局域网共享、CORS 与允许来源由宿主托管，只读展示并说明原因。
+- Privacy 的脱敏分类使用行式开关，不套嵌套卡片；订阅账号控制放在隐私分段底部。
+- 外部 Agent 收在 Service 的次级区块；未运行时隐藏，不展示禁用按钮。
+- 页面内不得再出现重复的 `Models` 标题；许可证只在 About 分段出现一次。
 
 ### 其他修订
 
@@ -470,6 +473,6 @@ Before committing Zenith redesign:
 
 **Design Authority**: This specification is the single source of truth for Zenith design system. Any deviation requires explicit approval and documentation update.
 
-**Version**: 3.2.0-zenith
+**Version**: 3.3.0-zenith
 **Last Updated**: 2026-10-17
 **Next Review**: Q1 2027

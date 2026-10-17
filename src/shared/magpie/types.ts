@@ -1,3 +1,5 @@
+import type { MagpiePreferences, MagpiePreferencesPatch } from './preferences';
+
 export const MagpieIpc = {
   status: 'magpie:status',
   start: 'magpie:start',
@@ -9,7 +11,6 @@ export const MagpieIpc = {
   disconnectAgent: 'magpie:disconnectAgent',
   disconnectAllAgents: 'magpie:disconnectAllAgents',
   models: 'magpie:models',
-  openManagement: 'magpie:openManagement',
   catalog: 'magpie:catalog',
   selectDefault: 'magpie:selectDefault',
   setSubscriptionAccounts: 'magpie:setSubscriptionAccounts',
@@ -19,6 +20,8 @@ export const MagpieIpc = {
   deleteProvider: 'magpie:deleteProvider',
   testProvider: 'magpie:testProvider',
   diagnostics: 'magpie:diagnostics',
+  preferences: 'magpie:preferences',
+  updatePreferences: 'magpie:updatePreferences',
 } as const;
 
 export type MagpieProviderApi = 'openai-completions' | 'openai-responses' | 'anthropic-messages';
@@ -100,7 +103,6 @@ export interface MagpieApi {
   disconnectAgent(agentId: string): Promise<MagpieAgents>;
   disconnectAllAgents(): Promise<MagpieAgents>;
   models(): Promise<MagpieModel[]>;
-  openManagement(): Promise<void>;
   catalog(): Promise<MagpieModelCatalog>;
   selectDefault(modelId: string): Promise<MagpieModelCatalog>;
   setSubscriptionAccounts(enabled: boolean): Promise<MagpieStatus>;
@@ -110,6 +112,8 @@ export interface MagpieApi {
   deleteProvider(id: string): Promise<MagpieProviderSummary[]>;
   testProvider(input: MagpieSaveProviderInput): Promise<MagpieTestProviderResult>;
   diagnostics(): Promise<MagpieDiagnosticSummary>;
+  preferences(): Promise<MagpiePreferences>;
+  updatePreferences(patch: MagpiePreferencesPatch): Promise<MagpiePreferences>;
 }
 
 export interface MagpieAgent {

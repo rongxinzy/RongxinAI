@@ -22,7 +22,7 @@ export const modelBrowseTranslations = {
     modelBrowseUnsaved: '待保存，尚未更改默认',
     modelBrowseMissingDefault: '已保存的模型不在当前目录中，请明确选择新的默认模型。',
     modelBrowseConnectionHint:
-      '来源和能力由目录提供；目录收录不代表已验证连接或凭据有效。可在官方管理界面检查配置，返回后刷新目录。',
+      '来源和能力由目录提供；目录收录不代表已验证连接或凭据有效。可在「渠道」中检查配置，返回后刷新目录。',
     modelBrowseSelect: '选择',
     modelBrowseSelected: '已选择',
     modelBrowsePrevious: '上一页',
@@ -52,7 +52,7 @@ export const modelBrowseTranslations = {
     modelBrowseMissingDefault:
       'The saved model is missing from this catalog. Explicitly select a new default.',
     modelBrowseConnectionHint:
-      'Sources and capabilities come from the catalog. Listing does not verify connectivity or credentials. Check configuration in the official management window, then refresh the catalog.',
+      'Sources and capabilities come from the catalog. Listing does not verify connectivity or credentials. Check provider configuration, then refresh the catalog.',
     modelBrowseSelect: 'Select',
     modelBrowseSelected: 'Selected',
     modelBrowsePrevious: 'Previous page',
