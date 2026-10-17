@@ -315,7 +315,7 @@ function parseSkillName(skillDir: string): string {
 
 // ── Main scanner ─────────────────────────────────────────────────────────────
 
-export async function scanSkillSecurity(skillDir: string): Promise<SkillSecurityReport> {
+async function scanSkillSecurity(skillDir: string): Promise<SkillSecurityReport> {
   const startTime = Date.now();
   const allFindings: SecurityFinding[] = [];
   const skillName = parseSkillName(skillDir);

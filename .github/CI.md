@@ -1,36 +1,39 @@
 # CI gate ownership
 
-Every PR runs workflow validation, lint, renderer type checking/build/bundle budgets, Electron compilation,
-unit tests, and Presentation Studio tests. Documentation-only PRs retain these baseline
-checks in this first rollout. Unknown paths never skip the baseline.
+Every PR runs workflow validation, lint (including Knip unused-code and `scripts/` Python dead-code checks),
+renderer type checking/build/bundle budgets, Electron compilation, unit tests, and Presentation Studio tests.
+Documentation-only and website-only PRs keep these baseline checks. They do not run install, memory,
+enterprise toolchain, or channel-runtime smoke jobs. Unknown paths never skip the baseline. Unit tests run
+as two shards of one `test` job; `ci-gate` still requires that job to succeed.
 
 `scripts/ci/gates/policy.ts` owns expensive-check selection:
 
 | Change                                                                                                      | Additional PR checks                                                        |
 | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Dependencies, patches, build/configuration, workflows, scripts, bundled runtimes, Skills/MCPs, main process | Linux install/startup, Windows install/upgrade/uninstall, memory regression |
+| Dependencies, patches, build/configuration, workflows, scripts, bundled runtimes, Skills/MCPs, main process | Memory regression. Linux and Windows install run on tags, manual dispatch, and release workflows |
 | Renderer services, hooks, store, application entry points, cowork UI, shared conversation components        | Memory regression                                                           |
-| Other renderer UI, styles, documentation                                                                    | None                                                                        |
+| Other renderer UI, styles, documentation, website                                                           | None                                                                        |
 
 The planner uses the full Git merge-base diff, with NUL-separated paths and rename
 detection disabled. Deleted paths and both sides of renames participate. Invalid SHAs
 or diff failures stop the planner; no API pagination or 300-file filter limit applies.
 
-`merge-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped
-required jobs. Linux and Windows workflows are reusable/manual workflows, so they do
-not create duplicate PR runs. The parent CI owns concurrency cancellation.
+`ci-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped required
+jobs. Path-owned checks (channel runtime smoke, Python runtime containment, installer preview,
+browser preview) run as conditional jobs inside CI. Browser preview runs when the renderer, shared
+contracts, or `scripts/preview` change. Linux and Windows install workflows remain reusable/manual
+workflows. The parent CI owns concurrency cancellation and exposes `ci-gate` as the sole required
+GitHub check for pull requests.
 
 ## Release and nightly checks
 
-Candidate builds run memory regression against the resolved candidate commit before
-platform packaging. Candidate quality also runs renderer type checking/bundle budgets
-and Presentation Studio tests. The Linux job installs and starts the exact candidate
-deb before assembling its payload; unpacked renderer verification is retained.
-Windows signing, runtime, install/upgrade/uninstall checks remain mandatory.
+Tag releases (`release.yml`) run memory regression, full quality gates, and platform
+packaging with Linux deb install smoke, Windows signing/install/uninstall checks, and
+beta-channel publish. Stable promotion is manual via `promote.yml` (no rebuild). See
+[RELEASING.md](../RELEASING.md).
 
-Nightly uses the same memory scenario with additional MemLab analysis. Tag publishing
-retains mandatory memory regression through reusable CI; its own platform jobs still
-own packaging. Main pushes repeat baseline checks without duplicate installation jobs.
+Nightly uses the same memory scenario with additional MemLab analysis. Main pushes
+repeat baseline checks without duplicate installation jobs.
 
 After this workflow is available on main, use **CI → Run workflow** on a selected branch
 to force all expensive checks. Individual Linux/Windows manual workflows remain available.
@@ -60,11 +63,12 @@ the miss and investigate the measured bottleneck without relaxing installation t
 
 ## Required-check rollout and measurement
 
-The default branch requires `ci-gate` and retains `merge-gate` from GitHub Actions
-(app ID 15368), with the branch up to date before merging. `ci-gate` validates the
-PR title/body and aggregates applicable workflows at the current head;
-`.github/devops-ci.json` records their triggers. `merge-gate` retains application
-job validation. Do not require conditional platform jobs directly.
+The default branch requires `ci-gate` from GitHub Actions (app ID 15368), with the branch up to
+date before merging. The `ci-gate` job aggregates every baseline and path-selected job via
+`scripts/ci/gates/verify.ts`. Lint also runs Knip, Python dead-code (scripts/), and a 2 MiB
+source line-limit gate (1000 lines; shrinking-only baseline for legacy files), and a diff-only
+binary size gate with an explicit asset allowlist. Do not require conditional platform jobs
+directly on branch protection.
 
 All PRs, including documentation, require one independent GitHub approval. New
 commits dismiss stale approvals; the latest push must be approved by another person.
@@ -102,9 +106,18 @@ Reproduce child audits with `bash scripts/ci/audit-npm-projects.sh /tmp/npm-audi
 
 ## Latency measurement
 
-Before rollout, the sampled successful PR runs had Linux median 16.2 minutes and CI
-median 6.3 minutes (short sample from September 4, 2026; queue time included). These
-are reference observations, not a performance guarantee.
+Before the October 16, 2026 dead-code and gate streamlining, successful PR CI runs on
+main (for example run 38931409654) took about 330 seconds wall clock. The critical path
+was `test` (about 218 seconds across two shards after `electron-compile`) plus
+`ci-gate` (about 8 seconds). Baseline jobs (`lint`, former standalone `knip`,
+`bundle-budget`, `electron-compile`) ran in parallel and were not on the critical path.
+Removing the standalone `pr-metadata` and `knip` jobs saves one runner bootstrap each
+(typically 10–20 seconds of queue plus checkout per job) without weakening gates: Knip
+and Python dead-code checks now run inside `lint`.
+
+These are measured samples, not a performance guarantee. Sharding and TypeScript
+cache hits change the critical path; a cold TypeScript cache still pays for one
+full Electron compile on each shard.
 
 Compare one week before/after, separately for ordinary and packaging/lifecycle PRs:
 

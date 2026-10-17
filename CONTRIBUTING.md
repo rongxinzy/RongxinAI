@@ -31,7 +31,15 @@ cd ZhiYuanAgent
 bun install
 ```
 
-Start the Electron application for normal UI development:
+For day-to-day renderer UI iteration, start the browser preview and use its Vite hot reload:
+
+```bash
+bun run web:preview
+```
+
+The preview uses typed fixture data in place of the Electron preload bridge. Inspect layouts, interactions, themes, responsive states, and console output in the browser. Run `bun run web:preview:check` for a light/dark walkthrough and screenshots in `.github/pr-assets/browser-preview/` (install Playwright Chromium first with `bunx playwright install chromium`). See [README.md](README.md#browser-preview-mode) for its scope.
+
+Start Electron when verifying real IPC, native-window or system behavior, and affected end-to-end flows:
 
 ```bash
 bun run electron:dev
@@ -114,7 +122,7 @@ For a focused test run:
 bun test -- <name>
 ```
 
-For UI changes, also run the application and manually exercise the affected flow. Check both light and dark themes and both supported languages when relevant. Include screenshots or a short recording in the pull request.
+For UI changes, manually exercise the affected flow in browser preview first. Check both light and dark themes, relevant states and viewport sizes, and both supported languages when relevant. Run `bun run web:preview:check` and inspect its screenshots. Use Electron for affected real IPC, native, and end-to-end behavior. Include screenshots or a short recording in the pull request, and identify which checks used browser fixtures versus Electron.
 
 Packaging is platform-specific:
 

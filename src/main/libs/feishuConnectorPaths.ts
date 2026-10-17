@@ -1,6 +1,6 @@
 import path from 'path';
 
-export const FeishuConnectorPath = {
+const FeishuConnectorPath = {
   McpsDirectory: 'MCPs',
   FeishuDirectory: 'feishu',
   CliDirectory: 'cli',

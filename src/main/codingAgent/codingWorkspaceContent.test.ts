@@ -1,5 +1,7 @@
+import { execFileSync } from 'node:child_process';
 import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -10,12 +12,45 @@ import { CodingRoomRepository } from './codingRoomRepository';
 import { CodingRoomService } from './codingRoomService';
 import { initializeCodingAgentSchema } from './schema';
 
-const workerFixture = vi.hoisted(() => ({ dispose: undefined as (() => void) | undefined }));
+const workerFixture = vi.hoisted(() => ({
+  dispose: undefined as (() => void) | undefined,
+  compiledRoot: undefined as string | undefined,
+}));
 
 vi.mock('../workbenchTask/artifactWorkerPool', async importOriginal => {
   const actual = await importOriginal<typeof import('../workbenchTask/artifactWorkerPool')>();
+  // Compile the worker in-process. A clean checkout has no dist-electron bundle,
+  // and CI only supplies that bundle by downloading a previous compile job.
+  const compiledRoot = fs.realpathSync(
+    fs.mkdtempSync(path.join(tmpdir(), 'coding-content-worker-build-')),
+  );
+  workerFixture.compiledRoot = compiledRoot;
+  const compiled = path.join(compiledRoot, 'compiled');
+  execFileSync(
+    process.execPath,
+    [
+      path.resolve('node_modules/typescript/bin/tsc'),
+      '--ignoreConfig',
+      '--module',
+      'NodeNext',
+      '--moduleResolution',
+      'NodeNext',
+      '--target',
+      'ESNext',
+      '--types',
+      'node',
+      '--skipLibCheck',
+      '--esModuleInterop',
+      '--rootDir',
+      'src',
+      '--outDir',
+      compiled,
+      'src/main/workbenchTask/artifactWorker.ts',
+    ],
+    { stdio: 'inherit' },
+  );
   const pool = new actual.WorkbenchArtifactWorkerPool(
-    path.resolve('dist-electron/main/workbenchTask/artifactWorker.js'),
+    path.join(compiled, 'main/workbenchTask/artifactWorker.js'),
   );
   workerFixture.dispose = () => pool.dispose();
   return {
@@ -33,7 +68,12 @@ afterEach(async () => {
   db?.close();
   if (root) await rm(root, { recursive: true, force: true });
 });
-afterAll(() => workerFixture.dispose?.());
+afterAll(() => {
+  workerFixture.dispose?.();
+  if (workerFixture.compiledRoot) {
+    fs.rmSync(workerFixture.compiledRoot, { recursive: true, force: true });
+  }
+});
 
 test('real worker inspection preserves preview hashes, save results and external-edit protection', async () => {
   root = await mkdtemp(path.join(tmpdir(), 'coding-content-worker-'));

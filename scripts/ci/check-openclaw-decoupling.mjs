@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { isPinnedMagpieGatewayBinary } from './magpie-gateway-allowlist.mjs';
 
 const root = process.cwd();
 const expectedSidecarVersion = 'zhiyuan-sidecar-v4';
@@ -8,6 +9,7 @@ const expectedSidecarRevision = 'ecf720f875e31b3df3464d820e6c485775719abe';
 const forbiddenRuntimePattern = /openclaw|cfmind/i;
 const forbiddenStoragePattern =
   /(?:\.openclaw|openclaw\.json|im_session_mappings|openclaw_session_key|telegramOpenClaw|feishuOpenClaw|dingtalkOpenClaw)/i;
+const forbiddenBrandingPattern = /龙虾|clawEmail|popo\.png|moltbot|DING_DWS_CLAW/i;
 const failures = [];
 
 const productionRoots = [
@@ -18,11 +20,13 @@ const productionRoots = [
   'src/shared',
 ];
 
+const brandingScanRoots = [...productionRoots, 'SKILLs', 'public'];
+const forbiddenPublicAssets = ['public/popo.png', 'public/love.png', 'public/hand.png'];
+
 const buildRoots = ['scripts', 'resources'];
 const workflowFiles = [
-  '.github/workflows/build-platforms.yml',
   '.github/workflows/linux-install-pr.yml',
-  '.github/workflows/online-update-release.yml',
+  '.github/workflows/release.yml',
   '.github/workflows/windows-installer-pr.yml',
 ];
 
@@ -53,6 +57,14 @@ function walk(relativeRoot) {
 }
 
 function checkFile(relativePath, patterns) {
+  // The pinned gateway executable is an unchanged Go build. Upstream's provider
+  // importer links the CC Switch app label "openclaw" ("OpenClaw") into the
+  // binary next to other external coding-agent names. Reading those bytes as
+  // text matches the retired-runtime pattern even though this tree does not
+  // ship that runtime, its storage, or its connectors. "cfmind" is not in the
+  // pinned source. Exempt only the expected binary path when the manifest pins
+  // upstream.json's version and commit and the hash is the compiler digest.
+  if (isPinnedMagpieGatewayBinary(root, relativePath)) return;
   const content = fs.readFileSync(path.join(root, relativePath), 'utf8');
   for (const pattern of patterns) {
     if (pattern.test(content)) {
@@ -84,6 +96,20 @@ for (const buildRoot of buildRoots) {
   for (const relativePath of walk(buildRoot)) {
     if (relativePath.endsWith('check-openclaw-decoupling.mjs')) continue;
     checkFile(relativePath, [forbiddenRuntimePattern, forbiddenStoragePattern]);
+  }
+}
+
+for (const sourceRoot of brandingScanRoots) {
+  for (const relativePath of walk(sourceRoot)) {
+    if (/\.test\.[cm]?[jt]sx?$/i.test(relativePath)) continue;
+    if (/[/\\]design\.md$/i.test(relativePath)) continue;
+    checkFile(relativePath, [forbiddenBrandingPattern]);
+  }
+}
+
+for (const relativePath of forbiddenPublicAssets) {
+  if (fs.existsSync(path.join(root, relativePath))) {
+    failures.push(`${relativePath} must not exist`);
   }
 }
 

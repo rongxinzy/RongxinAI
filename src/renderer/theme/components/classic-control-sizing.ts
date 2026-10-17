@@ -32,7 +32,7 @@ export function classicControlSizing() {
     }),
     // src/renderer/components/Settings.tsx:3428, src/renderer/components/Settings.tsx:3863, src/renderer/components/Settings.tsx:3945
     'control-sizing-3': recipe({ base: { 'padding-right': '5rem' } }),
-    // src/renderer/components/coding/CodingAgentManager.tsx:121, src/renderer/components/coding/CodingAgentPicker.tsx:82, src/renderer/components/coding/CodingWorkbenchView.tsx:888, src/renderer/components/coding/CodingWorkbenchView.tsx:933, src/renderer/components/expert/ExpertDetailDialog.tsx:55, src/renderer/components/im/DingTalkInstanceSettings.tsx:232, src/renderer/components/im/DiscordInstanceSettings.tsx:127, src/renderer/components/im/FeishuInstanceSettings.tsx:137, src/renderer/components/im/QQInstanceSettings.tsx:107, src/renderer/components/im/TelegramInstanceSettings.tsx:110, src/renderer/components/im/WecomInstanceSettings.tsx:117, src/renderer/components/mcp/McpOfficialConnectDialog.tsx:74, src/renderer/components/scheduledTasks/ScheduledTasksView.tsx:210, src/renderer/components/scheduledTasks/ScheduledTasksView.tsx:237, src/renderer/components/scheduledTasks/TaskList.tsx:48, src/renderer/components/settings/memory/MemoryRecordList.tsx:352, src/renderer/components/skills/MarketplaceSkillDocumentDialog.tsx:128, src/shared/components/ai-elements/context.tsx:153, src/shared/components/ai-elements/model-selector.tsx:38
+    // src/renderer/components/coding/CodingAgentManager.tsx:121, src/renderer/components/coding/CodingAgentPicker.tsx:82, src/renderer/components/coding/codingWorkbenchSidePanel.tsx:234, src/renderer/components/expert/ExpertDetailDialog.tsx:55, src/renderer/components/im/DingTalkInstanceSettings.tsx:232, src/renderer/components/im/DiscordInstanceSettings.tsx:127, src/renderer/components/im/FeishuInstanceSettings.tsx:137, src/renderer/components/im/QQInstanceSettings.tsx:107, src/renderer/components/im/TelegramInstanceSettings.tsx:110, src/renderer/components/im/WecomInstanceSettings.tsx:117, src/renderer/components/mcp/McpOfficialConnectDialog.tsx:74, src/renderer/components/scheduledTasks/ScheduledTasksView.tsx:210, src/renderer/components/scheduledTasks/ScheduledTasksView.tsx:237, src/renderer/components/scheduledTasks/TaskList.tsx:48, src/renderer/components/settings/memory/MemoryRecordList.tsx:352, src/renderer/components/skills/MarketplaceSkillDocumentDialog.tsx:128, src/shared/components/ai-elements/context.tsx:153, src/shared/components/ai-elements/model-selector.tsx:38
     'control-sizing-4': recipe({ base: { padding: '0rem' } }),
     // src/renderer/components/coding/CodingAgentManager.tsx:271, src/renderer/components/scheduledTasks/TaskFormBody.tsx:244
     'control-sizing-5': recipe({ base: { 'min-height': '5rem' } }),
@@ -40,7 +40,7 @@ export function classicControlSizing() {
     'control-sizing-6': recipe({ base: { 'padding-inline': '0rem' } }),
     // src/renderer/components/coding/CodingGitPanel.tsx:534, src/renderer/components/coding/CodingTaskList.tsx:29
     'control-sizing-7': recipe({ base: { 'padding-inline': '0.5rem', 'padding-block': '0.5rem' } }),
-    // src/renderer/components/coding/CodingWorkbenchView.tsx:1032
+    // src/renderer/components/coding/CodingWorkbenchView.tsx:596
     'control-sizing-8': recipe({ base: { height: '1.5rem', 'padding-inline': '0.5rem' } }),
     // src/renderer/components/coding/CodingWorkspaceDialog.tsx:171, src/renderer/components/cowork/TodoQueue.tsx:103
     'control-sizing-9': recipe({ base: { 'padding-inline': '0.75rem' } }),
@@ -60,11 +60,11 @@ export function classicControlSizing() {
     'control-sizing-16': recipe({ base: { 'padding-block': '0.625rem' } }),
     // src/renderer/components/im/IMSettings.tsx:1203, src/shared/components/ai-elements/attachments.tsx:381
     'control-sizing-17': recipe({ base: { padding: '0.5rem' } }),
-    // src/renderer/components/localInference/LocalInferenceView.tsx:1315
+    // src/renderer/components/localInference/components/ModelStartedDialog.tsx:48
     'control-sizing-18': recipe({ base: { 'padding-top': '0rem' } }),
-    // src/renderer/components/localInference/LocalInferenceView.tsx:1341, src/renderer/components/localInference/components/LocalInferenceAccessSettingsDialog.tsx:67, src/renderer/components/localInference/components/LocalInferenceMemorySettingsDialog.tsx:62, src/renderer/components/localInference/components/ModelLibrarySettingsModal.tsx:44, src/renderer/components/mcp/McpServerFormModal.tsx:292, src/renderer/components/settings/memory/MemoryRecordList.tsx:545
+    // src/renderer/components/localInference/LocalInferenceView.tsx:683, src/renderer/components/localInference/components/LocalInferenceAccessSettingsDialog.tsx:67, src/renderer/components/localInference/components/LocalInferenceMemorySettingsDialog.tsx:62, src/renderer/components/localInference/components/ModelLibrarySettingsModal.tsx:44, src/renderer/components/mcp/McpServerFormModal.tsx:292, src/renderer/components/settings/memory/MemoryRecordList.tsx:545
     'control-sizing-19': recipe({ base: { 'padding-right': '2rem' } }),
-    // src/renderer/components/localInference/components/MarketplaceCardLayout.tsx:23, src/shared/components/ai-elements/prompt-input.tsx:983
+    // src/renderer/components/localInference/components/MarketplaceCardLayout.tsx:23, src/shared/components/ai-elements/prompt-input/controls.tsx:125
     'control-sizing-20': recipe({ base: { 'min-height': '4rem' } }),
     // src/renderer/components/localInference/components/MarketplaceModelDetails.tsx:68, src/renderer/components/localInference/panels/ModelsPanel.tsx:533
     'control-sizing-21': recipe({ base: { padding: '1rem' } }),
@@ -88,7 +88,6 @@ export function classicControlSizing() {
     'control-sizing-29': recipe({ base: { height: '20rem' } }),
     // src/renderer/components/todo/TodoView.tsx:311
     'control-sizing-30': recipe({ base: { 'padding-left': '2rem' } }),
-    // src/shared/components/ai-elements/model-selector.tsx:56
     'control-sizing-31': recipe({ base: { 'padding-block': '0.875rem' } }),
     // src/shared/components/ui/input-group.tsx:126
     'control-sizing-32': recipe({ base: { 'padding-block': '0.5rem' } }),

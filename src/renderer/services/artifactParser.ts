@@ -35,7 +35,7 @@ export function normalizeFilePathForDedup(p: string): string {
 const LANGUAGE_TO_ARTIFACT_TYPE = ArtifactTypeByLanguage;
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.bmp', '.ico', '.jpg', '.jpeg', '.gif', '.webp']);
-export function getArtifactTypeFromLanguage(lang: string): ArtifactType | null {
+function getArtifactTypeFromLanguage(lang: string): ArtifactType | null {
   return LANGUAGE_TO_ARTIFACT_TYPE[lang.toLowerCase()] ?? null;
 }
 
@@ -43,11 +43,11 @@ export function getArtifactTypeFromExtension(ext: string): ArtifactType | null {
   return getArtifactTypeByExtension(ext) as ArtifactType | null;
 }
 
-export function isImageExtension(ext: string): boolean {
+function isImageExtension(ext: string): boolean {
   return IMAGE_EXTENSIONS.has(ext.toLowerCase());
 }
 
-export function isBinaryDocumentExtension(ext: string): boolean {
+function isBinaryDocumentExtension(ext: string): boolean {
   return isBinaryArtifactFile(`artifact${ext}`);
 }
 

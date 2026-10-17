@@ -14,18 +14,6 @@ export function resolveLocalizedText(text: string | LocalizedText): string {
   return text[lang] || text.en || '';
 }
 
-export function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map(s => parseInt(s, 10) || 0);
-  const pb = b.split('.').map(s => parseInt(s, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const na = pa[i] || 0;
-    const nb = pb[i] || 0;
-    if (na > nb) return 1;
-    if (na < nb) return -1;
-  }
-  return 0;
-}
-
 type EmailConnectivityCheck = {
   code: 'imap_connection' | 'smtp_connection';
   level: 'pass' | 'fail';

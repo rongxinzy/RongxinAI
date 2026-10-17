@@ -10,7 +10,11 @@ import {
   resolveConnectivityAccount,
   selectConnectivityInstance,
 } from './channelConnectivity';
-import { ConnectivityCheckCode, ConnectivityCheckLevel } from './constants';
+import {
+  ConnectivityCheckCode,
+  ConnectivityCheckLevel,
+  resolveDingTalkRegistrationSource,
+} from './constants';
 import type { IMGatewayConfigPatch } from './configPatch';
 import type {
   IMConnectivityCheck,
@@ -299,7 +303,7 @@ export class ChannelAccountManager {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'DING_DWS_CLAW' }),
+        body: JSON.stringify({ source: resolveDingTalkRegistrationSource() }),
       },
       CONNECTIVITY_TIMEOUT_MS,
     );

@@ -1,5 +1,8 @@
+import { Badge } from '@shared/components/ui/badge';
+import { Button } from '@shared/components/ui/button';
+import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { CalendarClock, ChevronDown, MessageSquare } from 'lucide-react';
+import { AlertCircle, CalendarClock, CheckCircle2, ChevronDown, MessageSquare } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -12,16 +15,17 @@ import { extractUserFacingErrorMessage } from '../../services/coworkTerminalErro
 import type { ActivityRun } from '../../../shared/activity/types';
 import { compactMarkdownClass } from '../compactMarkdownClass';
 import MarkdownContent from '../MarkdownContent';
-import { formatActivityClockTime, formatActivityError } from './utils';
+import { formatActivityClockTime, formatActivityError, formatActivityTime } from './utils';
 
 interface ActivityRunRowProps {
   run: ActivityRun;
   /** Play the entrance spring — reserved for runs arriving while the feed is open. */
   animateEntrance: boolean;
+  currentTime?: number;
 }
 
-/** text-sm + leading-5 / max-h-5 — one-line budget for overflow detection */
-const ACTIVITY_BODY_LINE_PX = 20;
+/** Threshold height in px beyond which response content becomes expandable (approx 2 lines). */
+const EXPANDABLE_THRESHOLD_PX = 46;
 
 /** Resolve the quiet left-hand label: cron runs name the trigger, channel runs name the platform. */
 const sourceLabel = (run: ActivityRun): string => {
@@ -31,10 +35,9 @@ const sourceLabel = (run: ActivityRun): string => {
   return run.platform ? i18nService.t(run.platform) : i18nService.t('activityTriggerChannel');
 };
 
-const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance }) => {
+const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, currentTime }) => {
   const prefersReducedMotion = useReducedMotion();
   const [bodyExpanded, setBodyExpanded] = useState(false);
-  // 仅当正文固有高度超过一行时才可展开
   const [isBodyOverflowing, setIsBodyOverflowing] = useState(false);
   const bodyTextRef = useRef<HTMLDivElement>(null);
 
@@ -65,10 +68,9 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
     if (!element) return;
 
     const measure = () => {
-      // 量 markdown 内容固有高度，避免 line-clamp / 外层 max-height 干扰
       const content = element.querySelector('.markdown-content');
       const height = content instanceof HTMLElement ? content.scrollHeight : element.scrollHeight;
-      const overflowing = height > ACTIVITY_BODY_LINE_PX + 1;
+      const overflowing = height > EXPANDABLE_THRESHOLD_PX;
       setIsBodyOverflowing(overflowing);
       if (!overflowing) {
         setBodyExpanded(false);
@@ -83,9 +85,9 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
     return () => observer.disconnect();
   }, [hasBody, bodyText]);
 
-  const toggleBodyExpanded = () => {
+  const toggleBodyExpanded = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setBodyExpanded(open => {
-      // 收起时归零滚动，避免 line-clamp 裁到中间一段
       if (open && bodyTextRef.current) {
         bodyTextRef.current.scrollTop = 0;
       }
@@ -95,105 +97,157 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
 
   const row = (
     <div
-      role={hasExpandableBody ? 'button' : undefined}
-      tabIndex={hasExpandableBody ? 0 : undefined}
-      aria-expanded={hasExpandableBody ? bodyExpanded : undefined}
-      onClick={hasExpandableBody ? toggleBodyExpanded : undefined}
-      onKeyDown={
-        hasExpandableBody
-          ? event => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                toggleBodyExpanded();
-              }
-            }
-          : undefined
-      }
       className={cn(
-        'theme-surface-activity-row flex gap-3 px-3 py-2.5',
-        hasExpandableBody && 'theme-surface-activity-expandable cursor-pointer',
+        'theme-surface-activity-row group relative flex flex-col p-4 transition-all duration-200',
+        isRunning && 'border-primary/40 bg-primary/[0.02]',
+        isFailed && 'border-destructive/30 bg-destructive/[0.01]',
       )}
     >
-      {/* Status: one quiet dot. Running breathes with a slow pulse. */}
-      <span className="flex w-3 shrink-0 items-start justify-center pt-[7px]">
-        <span className="sr-only">
-          {i18nService.t(
+      {/* Top Header Row */}
+      <div className="flex items-start gap-3.5 min-w-0">
+        {/* Icon Tile */}
+        <div
+          className={cn(
+            'flex size-9 shrink-0 items-center justify-center rounded-lg border',
             isRunning
-              ? 'activityStatusRunning'
+              ? 'border-primary/30 bg-primary/10 text-primary'
               : isFailed
-                ? 'activityStatusFailed'
-                : 'activityStatusCompleted',
+                ? 'border-destructive/30 bg-destructive/10 text-destructive'
+                : 'border-border/60 bg-surface-raised text-muted-foreground',
           )}
-        </span>
-        {isRunning ? (
-          <span
-            className="size-1.5 rounded-full bg-primary motion-safe:animate-pulse"
-            aria-hidden="true"
-          />
-        ) : isFailed ? (
-          <span className="size-1.5 rounded-full bg-destructive" aria-hidden="true" />
-        ) : (
-          <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
-        )}
-      </span>
-
-      {platform ? (
-        <img
-          src={imPlatformLogo(platform)}
-          alt={i18nService.t(platform)}
-          className="mt-0.5 size-4 shrink-0 rounded object-contain"
-        />
-      ) : (
-        <TriggerIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-      )}
-
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-3 min-w-0">
-          <span className="truncate text-sm text-foreground">{sourceLabel(run)}</span>
-          <span className="shrink-0 text-xs text-muted-foreground">
-            {formatActivityClockTime(run.updatedAt)}
-          </span>
+        >
+          {platform ? (
+            <img
+              src={imPlatformLogo(platform)}
+              alt={i18nService.t(platform)}
+              className="size-5 rounded object-contain"
+            />
+          ) : (
+            <TriggerIcon className="size-4" />
+          )}
         </div>
-        {hasBody && (
-          <div className="mt-0.5 flex items-start gap-1">
-            {/* 收起限高一行；展开可滚动。不用 truncate(nowrap)，以兼容 Markdown 块级结构。 */}
-            <div
-              ref={bodyTextRef}
-              className={cn(
-                'min-w-0 flex-1 overflow-hidden',
-                'transition-[max-height] duration-200 ease-out motion-reduce:transition-none',
-                bodyExpanded ? 'max-h-64 overflow-y-auto' : 'max-h-5',
-              )}
-              onClick={event => {
-                if ((event.target as HTMLElement).closest('a, button')) {
-                  event.stopPropagation();
-                }
-              }}
-            >
-              <MarkdownContent
-                content={bodyText}
-                className={compactMarkdownClass(isFailed ? 'destructive' : 'muted')}
-              />
-            </div>
 
-            {hasExpandableBody && (
+        {/* Title and Meta Information */}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="truncate text-sm font-semibold text-foreground">
+              {sourceLabel(run)}
+            </span>
+            <span className="inline-flex items-center rounded-md border border-border/50 bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground shrink-0">
+              {run.source === ActivitySource.ScheduledTask
+                ? i18nService.t('activityTriggerCron')
+                : i18nService.t('activityTriggerChannel')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>{formatActivityClockTime(run.updatedAt)}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span>{formatActivityTime(run.updatedAt, currentTime)}</span>
+          </div>
+        </div>
+
+        {/* Status Badge & Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Badge
+            variant="outline"
+            className={cn(
+              'gap-1.5 px-2.5 py-0.5 text-xs font-medium',
+              isRunning && 'border-primary/40 bg-primary/10 text-primary',
+              isFailed && 'border-destructive/40 bg-destructive/10 text-destructive',
+              !isRunning && !isFailed && 'border-success/40 bg-success/10 text-success',
+            )}
+          >
+            {isRunning ? (
+              <Spinner className="size-3 text-primary" />
+            ) : isFailed ? (
+              <AlertCircle className="size-3 text-destructive" />
+            ) : (
+              <CheckCircle2 className="size-3 text-success" />
+            )}
+            <span>
+              {i18nService.t(
+                isRunning
+                  ? 'activityStatusRunning'
+                  : isFailed
+                    ? 'activityStatusFailed'
+                    : 'activityStatusCompleted',
+              )}
+            </span>
+          </Badge>
+
+          {hasExpandableBody && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7 text-muted-foreground hover:text-foreground"
+              onClick={toggleBodyExpanded}
+              aria-expanded={bodyExpanded}
+              aria-label={
+                bodyExpanded ? i18nService.t('activityCollapse') : i18nService.t('activityExpand')
+              }
+            >
               <ChevronDown
                 className={cn(
-                  'mt-0.5 size-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ease-out motion-reduce:transition-none',
+                  'size-4 transition-transform duration-200 ease-out',
                   bodyExpanded && 'rotate-180',
                 )}
               />
-            )}
-          </div>
-        )}
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Body / Result Preview Box */}
+      {hasBody && (
+        <div
+          className={cn(
+            'mt-3 rounded-lg border border-border/50 bg-muted/20 px-3.5 py-2.5 transition-colors',
+            isFailed && 'border-destructive/20 bg-destructive/5',
+            hasExpandableBody && 'cursor-pointer hover:bg-muted/30',
+          )}
+          onClick={hasExpandableBody ? toggleBodyExpanded : undefined}
+        >
+          <div
+            ref={bodyTextRef}
+            className={cn(
+              'min-w-0 overflow-hidden text-xs leading-relaxed transition-[max-height] duration-200 ease-out motion-reduce:transition-none',
+              bodyExpanded ? 'max-h-96 overflow-y-auto' : 'max-h-12',
+            )}
+            onClick={event => {
+              if ((event.target as HTMLElement).closest('a, button')) {
+                event.stopPropagation();
+              }
+            }}
+          >
+            <MarkdownContent
+              content={bodyText}
+              className={compactMarkdownClass(isFailed ? 'destructive' : 'muted')}
+            />
+          </div>
+
+          {hasExpandableBody && (
+            <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>
+                {bodyExpanded ? i18nService.t('activityCollapse') : i18nService.t('activityExpand')}
+              </span>
+              <ChevronDown
+                className={cn(
+                  'size-3.5 transition-transform duration-200 ease-out',
+                  bodyExpanded && 'rotate-180',
+                )}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
   if (prefersReducedMotion) {
     return row;
   }
-  // 仅新 run 入场做 opacity/y；不使用 layout，避免展开正文时兄弟行弹簧位移发飘
   return (
     <motion.div
       initial={animateEntrance ? { opacity: 0, y: -8 } : false}

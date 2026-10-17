@@ -4,7 +4,7 @@ export interface McpConfigDocument {
   mcpServers: Record<string, McpConfigServer>;
 }
 
-export interface McpConfigServer {
+interface McpConfigServer {
   command?: string;
   args?: string[];
   env?: Record<string, string>;

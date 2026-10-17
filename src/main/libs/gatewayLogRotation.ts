@@ -2,9 +2,9 @@ import fs from 'fs';
 import path from 'path';
 
 export const GATEWAY_LOG_RETENTION_DAYS = 3;
-export const GATEWAY_LOG_PREFIX = 'gateway';
-export const GATEWAY_LOG_SUFFIX = '.log';
-export const LEGACY_GATEWAY_LOG_FILE_NAME = 'gateway.log';
+const GATEWAY_LOG_PREFIX = 'gateway';
+const GATEWAY_LOG_SUFFIX = '.log';
+const LEGACY_GATEWAY_LOG_FILE_NAME = 'gateway.log';
 
 const GATEWAY_DAILY_LOG_RE = /^gateway-\d{4}-\d{2}-\d{2}\.log$/;
 
@@ -13,7 +13,7 @@ export type GatewayLogEntry = {
   filePath: string;
 };
 
-export function formatGatewayLogDateKey(date = new Date()): string {
+function formatGatewayLogDateKey(date = new Date()): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');

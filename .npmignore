@@ -51,3 +51,10 @@ tailwind.config.js
 postcss.config.js
 .eslintrc.cjs
 CLAUDE.md
+
+# Local build intermediates. Source maps are already excluded by electron-builder.json.
+*.tsbuildinfo
+/coverage/
+/.vite/
+/.turbo/
+/*.log

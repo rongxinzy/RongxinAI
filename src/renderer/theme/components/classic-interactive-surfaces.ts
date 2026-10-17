@@ -115,7 +115,16 @@ export function classicInteractiveSurfaces(dark: boolean) {
       hover: { color: 'var(--primary)', 'text-decoration': 'underline' },
     }),
     'surface-activity-row': recipe({
-      base: { ...transition, 'border-radius': 'var(--zy-style-radius-lg)' },
+      base: {
+        ...transition,
+        ...border,
+        'border-color': 'var(--zy-border-subtle)',
+        'border-radius': 'var(--zy-style-radius-lg)',
+        'background-color': 'var(--card)',
+      },
+      hover: { 'background-color': 'var(--zy-surface-raised)' },
+      focus,
+      pressed,
     }),
     'surface-activity-expandable': recipe({
       hover: { 'background-color': 'var(--zy-surface-raised)' },

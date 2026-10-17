@@ -65,7 +65,7 @@ const SessionMemoryDigestCandidateSchema = z
   })
   .strict();
 
-export const SessionMemoryDigestSchema = z
+const SessionMemoryDigestSchema = z
   .object({
     shouldSave: z.boolean(),
     goal: SessionMemoryEvidenceSchema.nullable(),
@@ -251,7 +251,7 @@ function normalizeEvidence(
   };
 }
 
-export function renderSessionMemoryDigest(digest: SessionMemoryDigest): string {
+function renderSessionMemoryDigest(digest: SessionMemoryDigest): string {
   if (!digest.goal || !digest.currentState) {
     throw new Error('Cannot render semantic session memory without a goal and current state.');
   }

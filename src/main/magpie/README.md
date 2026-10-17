@@ -21,8 +21,8 @@ This window has no application preload, cannot open other windows, and denies
 external navigation and permission requests. External OAuth opens only through the controlled active-flow gate described below.
 
 The host verifies source pin/platform/version and the packaged binary SHA256 in
-a cancellable worker before spawning. macOS manifests include the post-signing
-binary digest; build provenance retains the pre-signing digest. Missing or changed
+a cancellable worker before spawning. macOS and Windows manifests include the
+post-signing binary digest; build provenance retains the pre-signing digest. Missing or changed
 resources fail closed. Start is single-flight; quit first requests upstream's
 POST /api/window/quit, then terminates only the process it owns if needed.
 No Windows Job Object or descendant cleanup is claimed for this Go process.

@@ -4,7 +4,6 @@ import * as React from 'react';
 import { cn } from '@shared/lib/utils';
 
 import { Label } from './label';
-import { Separator } from './separator';
 
 function FieldSet({ className, ...props }: React.ComponentProps<'fieldset'>) {
   return (
@@ -128,34 +127,6 @@ function FieldDescription({ className, ...props }: React.ComponentProps<'p'>) {
   );
 }
 
-function FieldSeparator({
-  children,
-  className,
-  ...props
-}: React.ComponentProps<'div'> & { children?: React.ReactNode }) {
-  return (
-    <div
-      data-slot="field-separator"
-      data-content={Boolean(children)}
-      className={cn(
-        'theme-field-separator relative -my-2 group-data-[variant=outline]/field-group:-mb-2',
-        className,
-      )}
-      {...props}
-    >
-      <Separator className="absolute inset-0 top-1/2" />
-      {children ? (
-        <span
-          data-slot="field-separator-content"
-          className="theme-field-separator-content relative mx-auto block w-fit"
-        >
-          {children}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function FieldError({
   className,
   children,
@@ -200,7 +171,6 @@ export {
   FieldGroup,
   FieldLabel,
   FieldLegend,
-  FieldSeparator,
   FieldSet,
   FieldTitle,
 };

@@ -16,7 +16,7 @@ export type PiPythonToolAuthorizationCall = {
   signal?: AbortSignal;
 };
 
-export type PiPythonToolAuthorizationResult = {
+type PiPythonToolAuthorizationResult = {
   allow: boolean;
   reason?: string;
   updatedInput?: Record<string, unknown>;
@@ -33,12 +33,12 @@ type PiPythonToolResult = {
   details: PythonExecutionResult;
 };
 
-export const PiPythonExecuteParameters = Type.Object({
+const PiPythonExecuteParameters = Type.Object({
   code: Type.String({ maxLength: 1048576 }),
   timeoutMs: Type.Optional(Type.Integer({ minimum: 100, maximum: 600000 })),
 });
 
-export const PiPythonInstallParameters = Type.Object({
+const PiPythonInstallParameters = Type.Object({
   packages: Type.Array(Type.String({ maxLength: 200 }), { maxItems: 40 }),
   rebuild: Type.Optional(Type.Boolean()),
 });

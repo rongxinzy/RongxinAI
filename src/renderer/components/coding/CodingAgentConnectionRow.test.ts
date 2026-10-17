@@ -256,7 +256,7 @@ test('allows selecting and applying model with explicit confirmation (A4 complia
 
   // Expand details
   fireEvent.click(screen.getByRole('button', { name: '查看连接详情' }));
-  expect(screen.getByText('Magpie 本地模型配置')).toBeVisible();
+  expect(screen.getByText('本地模型配置')).toBeVisible();
 
   // The apply button is initially disabled because current selection matches existing value
   const applyBtn = screen.getByRole('button', { name: '应用到 CLI' });

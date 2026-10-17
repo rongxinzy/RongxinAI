@@ -28,7 +28,7 @@ test('Git diff includes deleted and renamed sensitive paths beyond 300 files', (
     git('add', ...docs);
     git('-c', 'commit.gpgsign=false', 'commit', '-qm', 'rename with many docs');
     const output = join(dir, 'output');
-    execFileSync(process.execPath, [planner], {
+    execFileSync(process.env.BUN_PATH ?? 'bun', [planner], {
       cwd: dir,
       env: {
         ...process.env,
@@ -42,9 +42,10 @@ test('Git diff includes deleted and renamed sensitive paths beyond 300 files', (
     });
     expect(readFileSync(output, 'utf8')).toContain(`${HeavyJob.Linux}=false`);
     expect(readFileSync(output, 'utf8')).toContain(`${HeavyJob.Memory}=true`);
+    expect(readFileSync(output, 'utf8')).toContain('enterprise=false');
     expect(readFileSync(join(dir, 'summary'), 'utf8')).toContain('352 changed paths');
     expect(() =>
-      execFileSync(process.execPath, [planner], {
+      execFileSync(process.env.BUN_PATH ?? 'bun', [planner], {
         cwd: dir,
         stdio: 'pipe',
         env: {

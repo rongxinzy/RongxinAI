@@ -78,7 +78,7 @@ export function getNvidiaSmiExecutableCandidates(
   return [...new Set(candidates.filter((candidate): candidate is string => Boolean(candidate)))];
 }
 
-export function parseNvidiaSmiCsv(output: string): NvidiaGpuInfo[] {
+function parseNvidiaSmiCsv(output: string): NvidiaGpuInfo[] {
   return output
     .split(/\r?\n/)
     .map(line => parseNvidiaSmiLine(line))

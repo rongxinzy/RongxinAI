@@ -16,16 +16,24 @@ import {
   type MemorySourceKind as MemorySourceKindValue,
 } from '../../shared/memory';
 import {
-  EngramSearchMatchMode,
-  LEGACY_MEMORY_FILE_SESSION_ID,
-  LEGACY_MEMORY_SQLITE_SESSION_ID,
   MANUAL_MEMORY_SESSION_ID,
   MemoryOutboxOperation,
   PERSONAL_MEMORY_SESSION_PREFIX,
   SESSION_SUMMARY_TTL_DAYS,
 } from './constants';
+import {
+  assertCanPromote,
+  assertCanSupersede,
+  normalizeManualMemoryInput,
+  type MemoryRelationshipIdentity,
+} from './memoryRelationshipRules';
+import {
+  resolveReferencedMemoryLink,
+  validateMemoryCandidateRelationships,
+} from './memoryRelationshipResolution';
+import { fitObservations, recallMemoryScope } from './memoryRecallSupport';
+import { processMemoryOutboxItem } from './memoryOutboxProcessor';
 import type { ProjectIdentity } from './projectIdentity';
-import { planRecallQuery, rankRecallResults } from './recallQueryPlanner';
 import type { MemoryMigrationRecord, MemoryOutboxItem } from './repository';
 import { MemoryRepository } from './repository';
 import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
@@ -34,42 +42,6 @@ import { redactPrivateBlocks } from './zhiyuanEngramAdapter';
 const DEFAULT_PROJECT_RECALL_TOKEN_BUDGET = 900;
 const DEFAULT_PERSONAL_RECALL_TOKEN_BUDGET = 250;
 const DEFAULT_SESSION_RECALL_TOKEN_BUDGET = 350;
-const MAX_ENGRAM_RECALL_LIMIT = 20;
-
-interface ConfirmPayload {
-  sessionId: string;
-  projectId: string;
-  projectRoot: string;
-  type: MemoryKindValue;
-  title: string;
-  content: string;
-  topicKey?: string;
-  sourceKind: MemorySourceKindValue;
-  scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
-  linkId: string;
-  taskId?: string;
-  runId?: string;
-  artifactId?: string;
-  approvalId?: string;
-  importance?: number;
-  confidence?: number;
-  sensitivity?: MemorySensitivityValue;
-  expiresAt?: string;
-  supersedesLinkId?: string;
-  supersededObservationId?: number;
-  promotedFromLinkId?: string;
-  promotionSourceProjectId?: string;
-  promotionSourceSessionId?: string;
-  promotionOriginSessionId?: string;
-  candidateBacked?: boolean;
-  metadata?: Record<string, unknown>;
-}
-
-interface ForgetPayload {
-  linkId: string;
-  observationId: number;
-  hardDelete: boolean;
-}
 
 export interface ActiveSessionSummary {
   content: string;
@@ -140,41 +112,6 @@ export class ProjectMemoryService {
     });
     await this.confirmMemoryCandidate(replacementId);
     return this.requireCandidateOrLink(replacementId);
-  }
-
-  importLegacyPersonalMemoryCandidate(input: {
-    id: string;
-    title: string;
-    content: string;
-    sourceKind:
-      | typeof MemorySourceKind.LegacyFileImport
-      | typeof MemorySourceKind.LegacySqliteImport;
-    metadata: Record<string, unknown>;
-  }): boolean {
-    if (
-      this.repository.hasImportRejection(input.id) ||
-      this.repository.getCandidate(input.id) ||
-      this.repository.getLink(input.id)
-    ) {
-      return false;
-    }
-    this.repository.createPersonalCandidate({
-      id: input.id,
-      projectId: PERSONAL_MEMORY_PROJECT_ID,
-      projectRoot: this.personalDirectory,
-      scope: MemoryScope.Personal,
-      sessionId:
-        input.sourceKind === MemorySourceKind.LegacyFileImport
-          ? LEGACY_MEMORY_FILE_SESSION_ID
-          : LEGACY_MEMORY_SQLITE_SESSION_ID,
-      sourceKind: input.sourceKind,
-      title: input.title,
-      content: input.content,
-      kind: MemoryKind.Preference,
-      sensitivity: MemorySensitivity.Normal,
-      metadata: input.metadata,
-    });
-    return true;
   }
 
   async recallProject(input: { workingDirectory: string; query: string; limit?: number }) {
@@ -554,11 +491,6 @@ export class ProjectMemoryService {
       : null;
   }
 
-  listMigrationRecordsForContext(workingDirectory: string): MemoryMigrationRecord[] {
-    const project = this.resolveIdentity(workingDirectory);
-    return this.repository.listMigrationRecordsForContext(project.id);
-  }
-
   listSessionSummaryBackfillRecords(): MemoryMigrationRecord[] {
     return this.repository.listSessionSummaryBackfillRecords();
   }
@@ -568,10 +500,6 @@ export class ProjectMemoryService {
     metadata: Record<string, unknown>,
   ): void {
     this.repository.updateMigrationRecordMetadata(record.memory.id, record.storageKind, metadata);
-  }
-
-  deleteMigrationCandidate(id: string): void {
-    this.repository.deleteCandidate(id);
   }
 
   listManagedMemories(input: ManagedMemoryListInput = {}): ManagedMemoryRecord[] {
@@ -670,74 +598,7 @@ export class ProjectMemoryService {
     sessionId?: string;
     limit?: number;
   }) {
-    const plan = planRecallQuery(input.query);
-    if (!plan.exactQuery) return [];
-    const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
-    const retrievalLimit = input.scope === MemoryScope.Session ? MAX_ENGRAM_RECALL_LIMIT : limit;
-    let observations = this.filterRecallable(
-      input,
-      await this.adapter.recall({
-        query: plan.exactQuery,
-        project: input.projectId,
-        scope: input.scope,
-        limit: retrievalLimit,
-        matchMode: EngramSearchMatchMode.All,
-      }),
-    );
-    if (observations.length === 0 && plan.broadQuery) {
-      observations = this.filterRecallable(
-        input,
-        await this.adapter.recall({
-          query: plan.broadQuery,
-          project: input.projectId,
-          scope: input.scope,
-          limit: retrievalLimit,
-          matchMode: EngramSearchMatchMode.Any,
-        }),
-      );
-    }
-    if (observations.length === 0 && plan.explicitMemoryIntent) {
-      observations = this.filterRecallable(
-        input,
-        await this.adapter.recent({
-          project: input.projectId,
-          scope: input.scope,
-          limit: retrievalLimit,
-        }),
-      );
-    }
-    const unique = [
-      ...new Map(observations.map(observation => [observation.id, observation])).values(),
-    ];
-    if (unique.length === 0) return [];
-    const metadata = this.repository.getRecallMetadata(
-      input.projectId,
-      unique.map(observation => observation.id),
-    );
-    return rankRecallResults(plan.exactQuery, unique, metadata).slice(0, limit);
-  }
-
-  private filterRecallable<T extends { id: number; type?: string; session_id?: string }>(
-    input: {
-      projectId: string;
-      scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
-      sessionId?: string;
-    },
-    observations: T[],
-  ): T[] {
-    const observationsInScope = observations.filter(observation => {
-      if (input.scope === MemoryScope.Session) {
-        return Boolean(input.sessionId) && observation.session_id === input.sessionId;
-      }
-      return observation.type !== MemoryKind.SessionSummary;
-    });
-    const allowed = this.repository.filterRecallableMemoryIds({
-      projectId: input.projectId,
-      memoryIds: observationsInScope.map(observation => observation.id),
-      scope: input.scope,
-      sessionId: input.sessionId,
-    });
-    return observationsInScope.filter(observation => allowed.has(observation.id));
+    return await recallMemoryScope(this.repository, this.adapter, input);
   }
 
   private findPending(id: string): MemoryOutboxItem | null {
@@ -749,15 +610,7 @@ export class ProjectMemoryService {
     linkId: string | undefined,
     memoryId: number | undefined,
   ): ManagedMemoryRecord | null {
-    if (!linkId && memoryId === undefined) return null;
-    const byLinkId = linkId ? this.repository.getLink(linkId) : null;
-    const byMemoryId = memoryId === undefined ? null : this.repository.findLinkByMemoryId(memoryId);
-    if (linkId && !byLinkId) throw new Error(`${label} was not found.`);
-    if (memoryId !== undefined && !byMemoryId) throw new Error(`${label} was not found.`);
-    if (byLinkId && byMemoryId && byLinkId.id !== byMemoryId.id) {
-      throw new Error(`${label} references do not identify the same memory.`);
-    }
-    return byLinkId ?? byMemoryId;
+    return resolveReferencedMemoryLink(this.repository, label, linkId, memoryId);
   }
 
   private validateCandidateRelationships(
@@ -769,306 +622,12 @@ export class ProjectMemoryService {
       promotionSourceSessionId: string | null;
     },
   ): { superseded: ManagedMemoryRecord | null; promotedFrom: ManagedMemoryRecord | null } {
-    const superseded = details.supersedesLinkId
-      ? this.repository.getLink(details.supersedesLinkId)
-      : null;
-    if (details.supersedesLinkId && !superseded) {
-      throw new Error('Superseded memory was not found.');
-    }
-    if (superseded) assertCanSupersede(candidate, superseded);
-
-    const promotedFrom = this.validatePromotionRelationship({
-      destination: candidate,
-      promotedFromLinkId: details.promotedFromLinkId,
-      sourceProjectId: details.promotionSourceProjectId,
-      sourceSessionId: details.promotionSourceSessionId,
-      originSessionId: candidate.sessionId,
-    });
-    return { superseded, promotedFrom };
-  }
-
-  private validatePromotionRelationship(input: {
-    destination: MemoryRelationshipIdentity;
-    promotedFromLinkId: string | null | undefined;
-    sourceProjectId: string | null | undefined;
-    sourceSessionId: string | null | undefined;
-    originSessionId: string | undefined;
-  }): ManagedMemoryRecord | null {
-    const hasPromotionProvenance = Boolean(
-      input.promotedFromLinkId || input.sourceProjectId || input.sourceSessionId,
-    );
-    if (!hasPromotionProvenance) return null;
-    if (!input.promotedFromLinkId || !input.sourceProjectId || !input.originSessionId) {
-      throw new Error('Promotion provenance is incomplete.');
-    }
-    const promotedFrom = this.repository.getLink(input.promotedFromLinkId);
-    if (!promotedFrom) throw new Error('Promotion source was not found.');
-    assertCanPromote(input.destination, promotedFrom, input.sourceProjectId, input.originSessionId);
-    const sourceSessionId =
-      promotedFrom.scope === MemoryScope.Session ? promotedFrom.sessionId : null;
-    if (sourceSessionId !== (input.sourceSessionId ?? null)) {
-      throw new Error('Promotion source provenance no longer matches the source memory.');
-    }
-    return promotedFrom;
-  }
-
-  private validateOutboxRelationships(payload: ConfirmPayload): {
-    superseded: ManagedMemoryRecord | null;
-  } {
-    const identity: MemoryRelationshipIdentity = payload;
-    const superseded = this.resolveReferencedLink(
-      'Superseded memory',
-      payload.supersedesLinkId,
-      payload.supersededObservationId,
-    );
-    if (superseded) assertCanSupersede(identity, superseded);
-
-    this.validatePromotionRelationship({
-      destination: identity,
-      promotedFromLinkId: payload.promotedFromLinkId,
-      sourceProjectId: payload.promotionSourceProjectId,
-      sourceSessionId: payload.promotionSourceSessionId,
-      originSessionId: payload.promotionOriginSessionId,
-    });
-    return { superseded };
+    return validateMemoryCandidateRelationships(this.repository, candidate, details);
   }
 
   private async processOutboxItem(item: MemoryOutboxItem | null): Promise<number | null> {
-    if (!item) return null;
-    if (item.operation === MemoryOutboxOperation.Forget) {
-      return await this.processForget(item);
-    }
-    if (
-      item.operation !== MemoryOutboxOperation.Confirm &&
-      item.operation !== MemoryOutboxOperation.SessionSummary &&
-      item.operation !== MemoryOutboxOperation.Supersede
-    ) {
-      return null;
-    }
-    const payload = parseConfirmPayload(item.payload);
-    if (!payload) return this.retryInvalid(item);
-    try {
-      const { superseded } = this.validateOutboxRelationships(payload);
-      const candidate = this.adapter.saveCandidate({
-        sessionId: payload.sessionId,
-        project: payload.projectId,
-        scope: payload.scope,
-        type: payload.type,
-        title: payload.title,
-        content: payload.content,
-        topicKey: payload.topicKey,
-      });
-      const memoryId =
-        item.operation === MemoryOutboxOperation.Supersede && payload.supersededObservationId
-          ? await this.adapter.supersede({
-              observationId: payload.supersededObservationId,
-              replacementCandidateId: candidate.id,
-              workingDirectory: payload.projectRoot,
-            })
-          : await this.adapter.confirmMemory(candidate.id, payload.projectRoot);
-      if (memoryId === null) {
-        this.adapter.discardCandidate(candidate.id);
-        this.repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
-        return null;
-      }
-      this.repository.createLink({
-        id: payload.linkId,
-        memoryId,
-        projectId: payload.projectId,
-        scope: payload.scope,
-        sessionId: payload.sessionId,
-        sourceKind: payload.sourceKind,
-        taskId: payload.taskId,
-        runId: payload.runId,
-        artifactId: payload.artifactId,
-        approvalId: payload.approvalId,
-        title: payload.title,
-        content: payload.content,
-        kind: payload.type,
-        topicKey: payload.topicKey,
-        importance: payload.importance,
-        confidence: payload.confidence,
-        sensitivity: payload.sensitivity,
-        expiresAt: payload.expiresAt,
-        promotedFromLinkId: payload.promotedFromLinkId,
-        promotionSourceProjectId: payload.promotionSourceProjectId,
-        promotionSourceSessionId: payload.promotionSourceSessionId,
-        metadata: payload.metadata,
-      });
-      if (superseded) {
-        this.repository.setLinkStatus(
-          superseded.id,
-          MemoryLifecycleStatus.Superseded,
-          payload.linkId,
-        );
-      }
-      if (payload.topicKey) {
-        this.repository.supersedeActiveTopic(
-          payload.projectId,
-          payload.scope,
-          payload.topicKey,
-          payload.linkId,
-        );
-      }
-      if (payload.candidateBacked) this.repository.deleteCandidate(payload.linkId);
-      this.repository.markCompleted(item.id);
-      return memoryId;
-    } catch (error) {
-      this.repository.markRetry(
-        item.id,
-        item.attempts + 1,
-        error instanceof Error ? error.message : String(error),
-      );
-      return null;
-    }
+    return await processMemoryOutboxItem(this.repository, this.adapter, item);
   }
-
-  private async processForget(item: MemoryOutboxItem): Promise<number | null> {
-    const payload = parseForgetPayload(item.payload);
-    if (!payload) return this.retryInvalid(item);
-    try {
-      const forgotten = await this.adapter.forget(payload.observationId, payload.hardDelete);
-      if (!forgotten) {
-        this.repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
-        return null;
-      }
-      this.repository.markCompleted(item.id);
-      if (payload.hardDelete) this.repository.deleteLink(payload.linkId);
-      return payload.observationId;
-    } catch (error) {
-      this.repository.markRetry(
-        item.id,
-        item.attempts + 1,
-        error instanceof Error ? error.message : String(error),
-      );
-      return null;
-    }
-  }
-
-  private retryInvalid(item: MemoryOutboxItem): null {
-    this.repository.markRetry(item.id, item.attempts + 1, 'Invalid memory outbox payload.');
-    return null;
-  }
-}
-
-function parseConfirmPayload(payload: Record<string, unknown>): ConfirmPayload | null {
-  const required = [
-    'sessionId',
-    'projectId',
-    'projectRoot',
-    'type',
-    'title',
-    'content',
-    'sourceKind',
-    'scope',
-    'linkId',
-  ] as const;
-  if (required.some(key => typeof payload[key] !== 'string' || !payload[key])) return null;
-  return payload as unknown as ConfirmPayload;
-}
-
-function parseForgetPayload(payload: Record<string, unknown>): ForgetPayload | null {
-  if (
-    typeof payload.linkId !== 'string' ||
-    typeof payload.observationId !== 'number' ||
-    typeof payload.hardDelete !== 'boolean'
-  ) {
-    return null;
-  }
-  return payload as unknown as ForgetPayload;
-}
-
-interface MemoryRelationshipIdentity {
-  scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
-  projectId: string;
-  sessionId: string;
-}
-
-function assertCanSupersede(
-  replacement: MemoryRelationshipIdentity,
-  target: ManagedMemoryRecord,
-): void {
-  if (target.status !== MemoryLifecycleStatus.Active) {
-    throw new Error('Superseded memory must be active.');
-  }
-  if (replacement.scope !== target.scope || replacement.projectId !== target.projectId) {
-    throw new Error('A memory can supersede only an active memory in the same scope.');
-  }
-  if (replacement.scope === MemoryScope.Session && replacement.sessionId !== target.sessionId) {
-    throw new Error('A session memory can supersede only a memory in the same session.');
-  }
-}
-
-function assertCanPromote(
-  destination: MemoryRelationshipIdentity,
-  source: ManagedMemoryRecord,
-  sourceProjectId: string,
-  originSessionId = destination.sessionId,
-): void {
-  if (
-    destination.scope !== MemoryScope.Personal ||
-    destination.projectId !== PERSONAL_MEMORY_PROJECT_ID
-  ) {
-    throw new Error('Only Personal memory candidates can promote scoped memory.');
-  }
-  if (source.status !== MemoryLifecycleStatus.Active) {
-    throw new Error('Promotion source must be active.');
-  }
-  if (source.scope !== MemoryScope.Project && source.scope !== MemoryScope.Session) {
-    throw new Error('Only Project or Session memory can be promoted to Personal memory.');
-  }
-  if (source.projectId !== sourceProjectId) {
-    throw new Error('Promotion source must belong to the current workspace.');
-  }
-  if (source.scope === MemoryScope.Session && source.sessionId !== originSessionId) {
-    throw new Error('Session memory can be promoted only from the current session.');
-  }
-}
-
-function fitObservations(
-  observations: Array<{ id: number; title: string; content: string }>,
-  budget: number,
-): string[] {
-  let usedTokens = 0;
-  const lines: string[] = [];
-  for (const observation of observations) {
-    const line = `- [memory:${observation.id}] ${observation.title}: ${observation.content}`;
-    const estimatedTokens = estimateMemoryTokens(line);
-    if (usedTokens + estimatedTokens > budget) continue;
-    lines.push(line);
-    usedTokens += estimatedTokens;
-  }
-  return lines;
-}
-
-function estimateMemoryTokens(value: string): number {
-  const cjkCharacters =
-    value.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu)
-      ?.length ?? 0;
-  return Math.ceil(cjkCharacters + (value.length - cjkCharacters) / 4);
-}
-
-function normalizeManualMemoryInput(
-  input: ManualMemoryCreateInput | ManualMemoryUpdateInput,
-): Pick<ManualMemoryCreateInput, 'scope' | 'title' | 'content' | 'kind' | 'sensitivity'> {
-  const title = input.title.trim();
-  const content = input.content.trim();
-  if (!title) throw new Error('Memory title is required.');
-  if (!content) throw new Error('Memory content is required.');
-  const scope = 'scope' in input ? input.scope : undefined;
-  return {
-    scope:
-      scope === MemoryScope.Project || scope === MemoryScope.Personal
-        ? scope
-        : MemoryScope.Personal,
-    title,
-    content,
-    kind: input.kind === MemoryKind.Preference ? MemoryKind.Preference : MemoryKind.Decision,
-    sensitivity:
-      input.sensitivity === MemorySensitivity.Sensitive
-        ? MemorySensitivity.Sensitive
-        : MemorySensitivity.Normal,
-  };
 }
 
 export async function buildProjectMemoryContextSafe(

@@ -2,14 +2,7 @@ import {
   type ModelCapabilities,
   ModelCapabilityStatus,
   parseLlamaCppRuntimeCapabilities,
-  ProviderName,
 } from '../../shared/providers';
-import { apiFetch } from './visibleApiTransport';
-
-type CapabilityProbeConfig = {
-  apiKey: string;
-  baseUrl: string;
-};
 
 type MutableModelCapabilities = {
   -readonly [Key in keyof ModelCapabilities]?: ModelCapabilities[Key];
@@ -85,48 +78,4 @@ export function buildOpenRouterModelsUrl(baseUrl: string): string {
   if (normalized.endsWith('/api')) return `${normalized}/v1/models`;
   if (/\/v\d+$/.test(normalized)) return `${normalized}/models`;
   return `${normalized}/v1/models`;
-}
-
-export async function probeRuntimeModelCapabilities(
-  provider: string,
-  modelId: string,
-  config: CapabilityProbeConfig,
-): Promise<Partial<ModelCapabilities>> {
-  try {
-    if (provider === ProviderName.OpenRouter) {
-      const response = await apiFetch({
-        url: buildOpenRouterModelsUrl(config.baseUrl),
-        method: 'GET',
-        headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
-      });
-      if (!response.ok) return {};
-      return parseOpenRouterModelCapabilities(response.data, modelId);
-    }
-
-    if (provider === ProviderName.Ollama) {
-      return parseOllamaModelCapabilities(await window.electron.ollama.showModel(modelId));
-    }
-
-    if (provider === ProviderName.LlamaCpp) {
-      const declaredCapabilities = parseLlamaCppModelCapabilities(
-        await window.electron.llamacpp.showModel(modelId),
-      );
-      if (declaredCapabilities.toolCalling) return declaredCapabilities;
-
-      const [status, serviceConfig] = await Promise.all([
-        window.electron.llamacpp.status(),
-        window.electron.llamacpp.getServiceConfig(),
-      ]);
-      if (status.managedByApp && serviceConfig.jinja !== 'on') {
-        return {
-          ...declaredCapabilities,
-          toolCalling: ModelCapabilityStatus.Unsupported,
-        };
-      }
-      return declaredCapabilities;
-    }
-  } catch (error) {
-    console.warn(`[model-capability] failed to inspect ${provider}/${modelId}:`, error);
-  }
-  return {};
 }

@@ -20,6 +20,7 @@ import {
   type MemoryRecordStorageKind as MemoryRecordStorageKindValue,
   type MemorySourceKind,
 } from './constants';
+import { EXPLICIT_MEMORY_SOURCE } from './explicitUserRequestedMemory';
 import { migrateLegacyMemoryTimestamps } from './memoryTimestampMigration';
 
 export interface MemoryProjectionInput {
@@ -473,53 +474,6 @@ export class MemoryRepository {
     return records.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
-  listMigrationRecordsForContext(projectId: string): MemoryMigrationRecord[] {
-    const links = this.db
-      .prepare(
-        `SELECT * FROM memory_links
-         WHERE status = ?
-           AND ((scope = ? AND project_id = ?) OR (scope = ? AND project_id = ?))
-         ORDER BY created_at`,
-      )
-      .all(
-        MemoryLifecycleStatus.Active,
-        MemoryScope.Project,
-        projectId,
-        MemoryScope.Personal,
-        PERSONAL_MEMORY_PROJECT_ID,
-      ) as SqlRow[];
-    const candidates = this.db
-      .prepare(
-        `SELECT * FROM memory_candidates
-         WHERE status = ?
-           AND ((scope = ? AND project_id = ?) OR (scope = ? AND project_id = ?))
-         ORDER BY created_at`,
-      )
-      .all(
-        MemoryLifecycleStatus.NeedsReview,
-        MemoryScope.Project,
-        projectId,
-        MemoryScope.Personal,
-        PERSONAL_MEMORY_PROJECT_ID,
-      ) as SqlRow[];
-    return [
-      ...links.map<MemoryMigrationRecord>(row => ({
-        memory: mapLink(row, this.getDelivery(String(row.id))),
-        storageKind: MemoryRecordStorageKind.Link,
-        metadata: parseMetadata(row.metadata_json),
-        supersedesLinkId: null,
-        promotedFromLinkId: nullableString(row.promoted_from_link_id),
-      })),
-      ...candidates.map<MemoryMigrationRecord>(row => ({
-        memory: mapCandidate(row, this.getDelivery(String(row.id))),
-        storageKind: MemoryRecordStorageKind.Candidate,
-        metadata: parseMetadata(row.metadata_json),
-        supersedesLinkId: nullableString(row.supersedes_link_id),
-        promotedFromLinkId: nullableString(row.promoted_from_link_id),
-      })),
-    ];
-  }
-
   listSessionSummaryBackfillRecords(): MemoryMigrationRecord[] {
     this.expireDue();
     const rows = this.db
@@ -937,6 +891,8 @@ function isCurrentSemanticSessionMetadata(metadata: Record<string, unknown>): bo
 
 function isCurrentAtomicMetadata(metadata: Record<string, unknown>): boolean {
   if (metadata.manual === true) return true;
+  // Explicit "remember this" saves (pi memory tool) are user-confirmed, not extractor output.
+  if (metadata.source === EXPLICIT_MEMORY_SOURCE) return true;
   const candidate =
     metadata.extractorKind === MemoryExtractorKind.Atomic ? metadata : metadata.extraction;
   return Boolean(

@@ -1,14 +1,16 @@
 name: Channel runtime smoke
 
+# Pull request and main-branch checks run inside CI. This workflow remains for manual reruns.
+
 on:
-  pull_request:
-    branches: [main]
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: channel-runtime-manual-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -22,7 +24,21 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
+      - name: Restore channel runtime download
+        id: channel-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: vendor/channel-runtime
+          key: channel-runtime-${{ runner.os }}-${{ hashFiles('package.json', 'scripts/download-channel-runtime.cjs') }}
+          restore-keys: |
+            channel-runtime-${{ runner.os }}-
       - name: Download the pinned channel runtime
         run: npm run channel:runtime:linux-x64
       - name: Verify channel transport and QQ Bot support
         run: npm run channel:runtime:smoke
+      - name: Save channel runtime download
+        if: steps.channel-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: vendor/channel-runtime
+          key: ${{ steps.channel-cache.outputs.cache-primary-key }}

@@ -16,14 +16,13 @@ export interface Model {
   llamaCppRuntimeContextWindow?: number;
   llamaCppTrainedContextWindow?: number;
 }
-export const EMPTY_MODEL: Model = { id: '', name: '' };
+const EMPTY_MODEL: Model = { id: '', name: '' };
 export function getModelIdentityKey(model: Pick<Model, 'id'>): string {
   return model.id;
 }
 export function isSameModelIdentity(a: Pick<Model, 'id'>, b: Pick<Model, 'id'>): boolean {
   return a.id === b.id;
 }
-export let availableModels: Model[] = [];
 interface ModelState {
   defaultSelectedModel: Model;
   selectedModelByAgent: Record<string, Model>;
@@ -53,7 +52,6 @@ const modelSlice = createSlice({
       action: PayloadAction<{ models: Model[]; defaultModelId: string | null }>,
     ) {
       state.availableModels = action.payload.models;
-      availableModels = action.payload.models;
       state.defaultSelectedModel =
         action.payload.models.find(model => model.id === action.payload.defaultModelId) ??
         EMPTY_MODEL;

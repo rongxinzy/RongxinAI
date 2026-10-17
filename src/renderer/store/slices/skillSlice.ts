@@ -64,16 +64,7 @@ const skillSlice = createSlice({
   },
 });
 
-export const {
-  setSkills,
-  addSkill,
-  updateSkill,
-  deleteSkill,
-  toggleSkill,
-  toggleActiveSkill,
-  activateSkill,
-  setActiveSkillIds,
-  clearActiveSkills,
-} = skillSlice.actions;
+export const { setSkills, toggleActiveSkill, activateSkill, setActiveSkillIds, clearActiveSkills } =
+  skillSlice.actions;
 
 export default skillSlice.reducer;

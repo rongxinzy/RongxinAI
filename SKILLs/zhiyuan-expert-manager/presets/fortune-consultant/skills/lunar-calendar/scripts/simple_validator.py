@@ -314,7 +314,7 @@ class SimpleLunarValidator:
 
         print("\n🌐 发布目标:")
         print(f"  - GitHub: https://github.com/yourusername/{skill_name}")
-        print(f"  - 小龙虾社区: https://clawhub.com/skills/{skill_name}")
+        print(f"  - Skill marketplace: bundled distribution for {skill_name}")
         print(f"  - Skill package distribution")
 
         print("\n📝 下一步:")

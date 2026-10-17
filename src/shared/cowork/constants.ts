@@ -116,10 +116,6 @@ export const CoworkPermissionToolName = {
 export type CoworkPermissionToolName =
   (typeof CoworkPermissionToolName)[keyof typeof CoworkPermissionToolName];
 
-export const CoworkPermissionSessionId = {
-  LegacyBridge: 'legacy-bridge',
-} as const;
-
 /**
  * Why a `/compact` request did not compact. Classified in the main process so
  * the renderer can show a localized toast instead of raw adapter messages.

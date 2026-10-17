@@ -4,10 +4,13 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
+  EmptyTitle,
 } from '@shared/components/ui/empty';
 import { Button } from '@shared/components/ui/button';
+import { Badge } from '@shared/components/ui/badge';
+import { FluidTabs, FluidTabsSize } from '@shared/components/ui/fluid-tabs';
 import { PageTabs } from '@shared/components/ui/page-tabs';
-import { Activity } from 'lucide-react';
+import { Activity, X } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -18,7 +21,7 @@ import type { ActivityRun } from '../../../shared/activity/types';
 import PageHeader from '../PageHeader';
 import ActivityRunRow from './ActivityRunRow';
 import { ActivityStatusFilter, ActivityTriggerFilter } from './constants';
-import { formatActivityDayLabel } from './utils';
+import { formatActivityDayLabel, tpl } from './utils';
 
 interface ActivityViewProps {
   isSidebarCollapsed?: boolean;
@@ -60,6 +63,15 @@ const ActivityView: React.FC<ActivityViewProps> = ({
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => i18nService.subscribe(() => setLanguage(i18nService.getLanguage())), []);
+
+  const channelCount = useMemo(
+    () => runs.filter(run => run.source === ActivityTriggerFilter.Channel).length,
+    [runs],
+  );
+  const cronCount = useMemo(
+    () => runs.filter(run => run.source === ActivityTriggerFilter.Cron).length,
+    [runs],
+  );
 
   const filteredRuns = useMemo(
     () =>
@@ -106,11 +118,41 @@ const ActivityView: React.FC<ActivityViewProps> = ({
     { value: ActivityStatusFilter.Failed, labelKey: 'activityStatusFailed' },
   ] as const;
 
-  const triggerOptions = [
-    { value: ActivityTriggerFilter.All, labelKey: 'activityFilterAll' },
-    { value: ActivityTriggerFilter.Channel, labelKey: 'activityTriggerChannel' },
-    { value: ActivityTriggerFilter.Cron, labelKey: 'activityTriggerCron' },
-  ] as const;
+  const triggerOptions = useMemo(
+    () => [
+      {
+        value: ActivityTriggerFilter.All,
+        label: i18nService.t('activityFilterAll'),
+        badge:
+          runs.length > 0 ? (
+            <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
+              {runs.length}
+            </Badge>
+          ) : undefined,
+      },
+      {
+        value: ActivityTriggerFilter.Channel,
+        label: i18nService.t('activityTriggerChannel'),
+        badge:
+          channelCount > 0 ? (
+            <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
+              {channelCount}
+            </Badge>
+          ) : undefined,
+      },
+      {
+        value: ActivityTriggerFilter.Cron,
+        label: i18nService.t('activityTriggerCron'),
+        badge:
+          cronCount > 0 ? (
+            <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
+              {cronCount}
+            </Badge>
+          ) : undefined,
+      },
+    ],
+    [runs.length, channelCount, cronCount],
+  );
 
   return (
     <div data-page-canvas className="flex h-full min-h-0 flex-col bg-background">
@@ -121,42 +163,35 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         onNewChat={onNewChat}
         updateBadge={updateBadge}
         tabs={
-          <PageTabs
-            value={triggerFilter}
-            onValueChange={setTriggerFilter}
-            items={triggerOptions.map(option => ({
-              value: option.value,
-              label: i18nService.t(option.labelKey),
-            }))}
-          />
+          <PageTabs value={triggerFilter} onValueChange={setTriggerFilter} items={triggerOptions} />
         }
       />
 
       <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-        <div className="mx-auto flex h-full w-full max-w-4xl flex-col px-4 pt-4 pb-8 sm:px-6">
-          {/* Status filter pills */}
-          <div className="flex shrink-0 items-center justify-between gap-2 pb-3">
-            <div className="flex items-center gap-1.5">
-              {statusOptions.map(option => {
-                const active = statusFilter === option.value;
-                return (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant={active ? 'secondary' : 'ghost'}
-                    size="xs"
-                    onClick={() =>
-                      setStatusFilter(active ? ActivityStatusFilter.All : option.value)
-                    }
-                  >
-                    {i18nService.t(option.labelKey)}
-                  </Button>
-                );
-              })}
-            </div>
+        <div className="mx-auto flex h-full w-full max-w-4xl flex-col px-4 pt-5 pb-8 sm:px-6">
+          {/* Status filter toolbar with FluidTabs */}
+          <div className="flex shrink-0 items-center justify-between gap-3 pb-4">
+            <FluidTabs
+              aria-label={i18nService.t('activityTitle')}
+              size={FluidTabsSize.Small}
+              value={statusFilter}
+              onValueChange={setStatusFilter}
+              items={statusOptions.map(option => ({
+                value: option.value,
+                label: i18nService.t(option.labelKey),
+              }))}
+            />
+
             {hasActiveFilters && !isFilterEmpty && (
-              <Button type="button" variant="ghost" size="xs" onClick={clearFilters}>
-                {i18nService.t('activityFilterClear')}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="h-7 gap-1.5 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <X className="size-3.5" />
+                <span>{i18nService.t('activityFilterClear')}</span>
               </Button>
             )}
           </div>
@@ -165,12 +200,15 @@ const ActivityView: React.FC<ActivityViewProps> = ({
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
             {!hasAnyRun || dayGroups.length === 0 ? (
               <Empty className="min-h-[18rem] gap-2 px-6 py-20">
-                <EmptyHeader className="gap-1">
-                  <EmptyMedia className="mb-2 size-10 rounded-xl bg-surface-raised flex items-center justify-center text-muted-foreground overflow-clip">
+                <EmptyHeader className="gap-1.5">
+                  <EmptyMedia className="mb-2 size-10 rounded-xl bg-surface-raised flex items-center justify-center text-muted-foreground overflow-clip border border-border/60">
                     <Activity className="size-5" />
                   </EmptyMedia>
-                  <EmptyDescription className="text-sm text-muted-foreground">
+                  <EmptyTitle>
                     {i18nService.t(hasAnyRun ? 'activityFilterEmpty' : 'activityEmpty')}
+                  </EmptyTitle>
+                  <EmptyDescription className="text-xs text-muted-foreground">
+                    {hasAnyRun ? i18nService.t('activityHeroDesc') : ''}
                   </EmptyDescription>
                 </EmptyHeader>
                 {isFilterEmpty && hasActiveFilters ? (
@@ -188,18 +226,27 @@ const ActivityView: React.FC<ActivityViewProps> = ({
                 ) : null}
               </Empty>
             ) : (
-              <div className="pb-6">
+              <div className="pb-8">
                 {dayGroups.map(group => (
-                  <section key={group.label} className="pb-4">
-                    <h2 className="px-1 pb-2 text-xs font-medium text-muted-foreground">
-                      {group.label}
-                    </h2>
-                    <div className="flex flex-col gap-1.5">
+                  <section key={group.label} className="pb-6">
+                    <div className="sticky top-0 z-10 mb-3 flex items-center gap-3 py-1.5 backdrop-blur-md bg-background/90">
+                      <span className="text-xs font-semibold text-foreground tracking-wide">
+                        {group.label}
+                      </span>
+                      <span className="h-px flex-1 bg-border/60" />
+                      <span className="text-[11px] text-muted-foreground">
+                        {tpl(i18nService.t('activityRunsCount'), {
+                          count: String(group.runs.length),
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-2.5">
                       {group.runs.map(run => (
                         <ActivityRunRow
                           key={run.id}
                           run={run}
                           animateEntrance={run.updatedAt > openedAtRef.current}
+                          currentTime={currentTime}
                         />
                       ))}
                     </div>

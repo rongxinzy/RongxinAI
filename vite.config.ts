@@ -52,6 +52,50 @@ function isElectronDevelopmentExternal(id: string): boolean {
   return !id.startsWith('@shared/') && !id.startsWith('@/');
 }
 
+const DEDUPED_RENDERER_PACKAGES = [
+  'shiki',
+  '@shikijs/core',
+  '@shikijs/engine-javascript',
+  '@shikijs/engine-oniguruma',
+  '@shikijs/langs',
+  '@shikijs/themes',
+  '@shikijs/types',
+  '@shikijs/vscode-textmate',
+  'mermaid',
+];
+
+function highlighterModuleKey(id: string): string | null {
+  const clean = id.split('\0').pop()?.split('?')[0] ?? id;
+  const match = clean.match(/node_modules\/((?:@shikijs\/[^/]+|shiki|mermaid))\/(.+)$/);
+  if (!match) return null;
+  return `${match[1]}/${match[2]}`;
+}
+
+// @streamdown/code and @streamdown/mermaid nest their own shiki/mermaid majors.
+// Forcing one resolution keeps language grammars and diagram chunks from being
+// emitted twice.
+const rejectDuplicateHighlighterModules = () => ({
+  name: 'reject-duplicate-highlighter-modules',
+  generateBundle(
+    _options: unknown,
+    bundle: Record<string, { type: string; modules?: Record<string, unknown> }>,
+  ) {
+    const owners = new Map<string, string>();
+    for (const [fileName, output] of Object.entries(bundle)) {
+      if (output.type !== 'chunk' || !output.modules) continue;
+      for (const id of Object.keys(output.modules)) {
+        const key = highlighterModuleKey(id);
+        if (!key) continue;
+        const previous = owners.get(key);
+        if (previous && previous !== fileName) {
+          throw new Error(`Renderer bundle emitted ${key} in both ${previous} and ${fileName}`);
+        }
+        owners.set(key, fileName);
+      }
+    }
+  },
+});
+
 const copyPhotonWasmPlugin = () => ({
   name: 'copy-photon-wasm',
   closeBundle() {
@@ -95,6 +139,7 @@ export default defineConfig(async ({ command }) => {
   }
 
   return {
+    cacheDir: process.env.VITE_CACHE_DIR || 'node_modules/.vite',
     define: {
       // KaTeX ESM bundle references this compile-time constant.
       __VERSION__: JSON.stringify(katexVersion),
@@ -102,6 +147,7 @@ export default defineConfig(async ({ command }) => {
     plugins: [
       (await import('@tailwindcss/vite')).default(),
       react(),
+      rejectDuplicateHighlighterModules(),
       babel({
         presets: [reactCompilerPreset({ compilationMode: 'annotation' })],
       }),
@@ -261,6 +307,7 @@ export default defineConfig(async ({ command }) => {
         '@shared': path.resolve(projectRoot, './src/shared'),
         '@': path.resolve(projectRoot, './src/renderer'),
       },
+      dedupe: DEDUPED_RENDERER_PACKAGES,
     },
     build: {
       outDir: 'dist',

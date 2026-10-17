@@ -131,7 +131,8 @@ export class ZhiyuanAaaSExtension implements ZhiyuanEnterpriseExtension {
               ? {
                   onEntitlementChange: (listener: () => void) =>
                     runtime.licenseActivation!.onDidChange(listener),
-                  refreshEntitlement: () => runtime.licenseActivation!.refreshIfNeeded(),
+                  refreshEntitlement: (modelScopes: readonly string[]) =>
+                    runtime.licenseActivation!.refreshIfNeeded(Date.now(), modelScopes),
                 }
               : {}),
           }),

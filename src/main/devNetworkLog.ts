@@ -10,7 +10,7 @@ import { DevNetworkIpc } from '../shared/ipc/channels';
 
 const isDevNetworkEnabled = (): boolean => process.env.NODE_ENV === 'development';
 
-export function publishDevNetworkLog(entry: DevNetworkLogEntry): void {
+function publishDevNetworkLog(entry: DevNetworkLogEntry): void {
   if (!isDevNetworkEnabled()) return;
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed() && !win.webContents.isDestroyed()) {

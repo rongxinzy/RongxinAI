@@ -16,55 +16,36 @@ import {
   TooltipTrigger,
 } from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
-import { Target, TriangleAlert, X } from 'lucide-react';
+import { TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import {
   DEFAULT_COWORK_PERMISSION_MODE,
   CoworkSessionMode,
-  type CoworkPermissionMode,
 } from '../../../shared/cowork/constants';
-import {
-  hasCoworkSubmissionContent,
-  hasVisiblePromptContent,
-} from '../../../shared/cowork/submissionContent';
-import { agentService } from '../../services/agent';
-import { showAppToast } from '../../services/appToast';
-import { configService } from '../../services/config';
-import { coworkService } from '../../services/cowork';
+import { hasVisiblePromptContent } from '../../../shared/cowork/submissionContent';
 import { i18nService } from '../../services/i18n';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
 import { selectDraftPrompts } from '../../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../../store/selectors/workModeSelectors';
 import {
-  addDraftAttachment,
   clearDraftAttachments,
-  type DraftAttachment,
   setDraftAttachments,
   setDraftPrompt,
-  updateCurrentSessionModelOverride,
 } from '../../store/slices/coworkSlice';
 import { clearSelection } from '../../store/slices/quickActionSlice';
-import { type Model, setSelectedModel } from '../../store/slices/modelSlice';
-import { activateSkill, clearActiveSkills, setSkills } from '../../store/slices/skillSlice';
+import { clearActiveSkills, setSkills } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
-import { CoworkFileAttachment, CoworkImageAttachment } from '../../types/cowork';
-import { toAgentModelRef } from '../../utils/agentModelRef';
+import { CoworkImageAttachment } from '../../types/cowork';
 import ActiveMcpBadge from '../mcp/ActiveMcpBadge';
 import { SlashCommandMenu } from '../common/SlashCommandMenu';
-import {
-  resolveAgentModelSelection,
-  resolveEffectiveModel,
-  useAgentSelectedModel,
-} from './agentModelSelection';
 import ActiveExpertBadge from './ActiveExpertBadge';
 import { CoworkInlineAttachments } from './CoworkInlineAttachments';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { SessionStatsLine } from './SessionStatsLine';
 import { CoworkModelPicker } from './CoworkModelPicker';
-import { parseCoworkSlashSubmission } from './coworkSlashCommands';
 import { useCoworkSlashMenu } from './useCoworkSlashMenu';
 import { PromptWorkspaceSelector } from './PromptWorkspaceSelector';
 import InlineSkillPromptEditor from './InlineSkillPromptEditor';
@@ -73,128 +54,26 @@ import PromptPlusMenu from './PromptPlusMenu';
 import { ResumeTaskContextBadge } from './ResumeTaskContextBadge';
 import { usePromptSubmissionLock } from './usePromptSubmissionLock';
 import { resolveInitialSelectedExpertIds } from './resolveInitialSelectedExpertIds';
-import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
+import GoalModeChip from './promptInput/GoalModeChip';
+import { EMPTY_ATTACHMENTS } from './promptInput/promptInputUtils';
+import {
+  type CoworkAttachment,
+  type CoworkPromptInputProps,
+  type CoworkPromptInputRef,
+} from './promptInput/types';
+import { useCoworkPromptSubmission } from './promptInput/useCoworkPromptSubmission';
+import { usePromptAttachments } from './promptInput/usePromptAttachments';
+import { usePromptDraftSync } from './promptInput/usePromptDraftSync';
+import { usePromptFileDrop } from './promptInput/usePromptFileDrop';
+import { usePromptKeyDown } from './promptInput/usePromptKeyDown';
+import { usePromptModelSelection } from './promptInput/usePromptModelSelection';
 
-// CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
-// so that attachment state survives view switches (cowork ↔ skills, etc.)
-type CoworkAttachment = DraftAttachment;
+export type { CoworkPromptInputRef } from './promptInput/types';
 
-const GoalModeChip: React.FC<{ onRemove: () => void; compact?: boolean }> = ({
-  onRemove,
-  compact = false,
-}) => (
-  <span
-    className={cn(
-      'inline-flex h-6 items-center gap-1.5 rounded-full px-1.5 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)',
-      compact && 'px-1',
-    )}
-    title={i18nService.t('goalMode')}
-  >
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon-xs"
-      onClick={onRemove}
-      aria-label={i18nService.t('clearGoalMode')}
-      title={i18nService.t('clearGoalMode')}
-      className="theme-page-cowork-prompt-input-button-1 group/goal relative ml-0.5"
-    >
-      <Target className="size-3.5 transition-opacity group-hover/goal:opacity-0" />
-      <X className="absolute size-3.5 opacity-0 transition-opacity group-hover/goal:opacity-100" />
-    </Button>
-    {!compact && <span className="max-w-24 truncate">{i18nService.t('goalMode')}</span>}
-  </span>
-);
-
-// Stable empty array reference to avoid unnecessary re-renders from useSelector
-// returning a new [] on every call (when draftAttachments[draftKey] is undefined).
-const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
-const IMAGE_EXTENSIONS = new Set([
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.webp',
-  '.bmp',
-  '.svg',
-  '.tiff',
-  '.tif',
-  '.ico',
-  '.avif',
-]);
-
-const isImagePath = (filePath: string): boolean => {
-  const dotIndex = filePath.lastIndexOf('.');
-  if (dotIndex === -1) return false;
-  const ext = filePath.slice(dotIndex).toLowerCase();
-  return IMAGE_EXTENSIONS.has(ext);
-};
-const isImageMimeType = (mimeType: string): boolean => {
-  return mimeType.startsWith('image/');
-};
-const extractBase64FromDataUrl = (
-  dataUrl: string,
-): { mimeType: string; base64Data: string } | null => {
-  const match = /^data:(.+);base64,(.*)$/.exec(dataUrl);
-  if (!match) return null;
-  return { mimeType: match[1], base64Data: match[2] };
-};
-const getFileNameFromPath = (filePath: string): string => {
-  const parts = filePath.split(/[/\\]/);
-  return parts[parts.length - 1] || filePath;
-};
-
-const isMacPlatform = navigator.platform.includes('Mac');
 // Only collapse secondary controls when the chat column is genuinely narrow.
 // A split pane around 700px still has room for the full permission/model row.
 const COMPACT_TOOLBAR_MAX_WIDTH = 480;
 const TIGHT_TOOLBAR_MAX_WIDTH = 760;
-
-export interface CoworkPromptInputRef {
-  /** 设置输入框值 */
-  setValue: (value: string) => void;
-  /** 设置图片附件（用于重新编辑消息时还原图片） */
-  setImageAttachments: (images: CoworkImageAttachment[]) => void;
-  /** 聚焦输入框 */
-  focus: () => void;
-}
-
-interface CoworkPromptInputProps {
-  onSubmit: (
-    prompt: string,
-    imageAttachments?: CoworkImageAttachment[],
-    fileAttachments?: CoworkFileAttachment[],
-    expertIds?: string[],
-    goalMode?: boolean,
-  ) => boolean | void | Promise<boolean | void>;
-  onStop?: () => void;
-  isStreaming?: boolean;
-  placeholder?: string;
-  disabled?: boolean;
-  /** Keeps text editing available while session-bound actions wait for the target session. */
-  sessionContextPending?: boolean;
-  size?: 'normal' | 'large';
-  workingDirectory?: string;
-  workingDirectoryName?: string;
-  onWorkingDirectoryChange?: (dir: string) => void;
-  onCreateProject?: (dir: string, name: string) => Promise<boolean>;
-  onUseNoFolder?: (dir: string) => void | Promise<void>;
-  showFolderSelector?: boolean;
-  showNoFolderAction?: boolean;
-  showModelSelector?: boolean;
-  onManageSkills?: () => void;
-  onManageConnectors?: () => void;
-  /** Work mode: show the 请求权限/全部允许 selector in the toolbar */
-  showPermissionModeSelector?: boolean;
-  permissionMode?: CoworkPermissionMode;
-  onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
-  sessionId?: string;
-  /** When true, hides attachment/skill buttons but keeps the input box visible (disabled) */
-  remoteManaged?: boolean;
-  topAccessory?: React.ReactNode;
-  resumeTaskActive?: boolean;
-  onCancelTaskResume?: () => void;
-}
 
 const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkPromptInputProps>(
   (props, ref) => {
@@ -261,35 +140,14 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const [value, setValue] = useState(draftPrompt);
     const [goalMode, setGoalMode] = useState(false);
 
-    // Keep a stable ref to the controller to avoid [controller] dep in the sync effect.
-    // Without this, every controller reference change triggers a re-render cascade
-    // which can cause OOM when switching to sessions with large message histories.
-    const controllerRef = useRef(controller);
-    controllerRef.current = controller;
-
-    // Sync local value to PromptInput's controller on all changes
-    // (clear on submit, external setValue, session switch, etc.)
-    useEffect(() => {
-      const ctrl = controllerRef.current;
-      if (ctrl.textInput.value !== value) {
-        ctrl.textInput.setInput(value);
-      }
-    }, [value]);
-
     const [showFolderRequiredWarning, setShowFolderRequiredWarning] = useState(false);
-    const [isDraggingFiles, setIsDraggingFiles] = useState(false);
-    const [isAddingFile, setIsAddingFile] = useState(false);
     const [imageVisionHint, setImageVisionHint] = useState(false);
-    const [isPatchingModel, setIsPatchingModel] = useState(false);
     const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
     const [isCompactToolbar, setIsCompactToolbar] = useState(false);
     const [isTightToolbar, setIsTightToolbar] = useState(false);
 
     const textareaRef = useRef<HTMLDivElement>(null);
     const promptRootRef = useRef<HTMLDivElement>(null);
-    const dragDepthRef = useRef(0);
-    const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const modelPatchRequestIdRef = useRef(0);
     // 暴露方法给父组件
     React.useImperativeHandle(ref, () => ({
       setValue: (newValue: string) => {
@@ -315,81 +173,31 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     }));
 
     const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
-    const currentAgentSelectedModel = useAgentSelectedModel(
-      currentAgentId,
-      currentAgent?.model ?? '',
-    );
-    const { isPersistingAgentModel, persistAgentModelSelection } = usePersistAgentModelSelection({
-      agentId: currentAgentId,
-      syncDefaultModel: currentAgentId === 'main' || currentAgent?.isDefault === true,
-    });
 
     const {
-      selectedModel: agentSelectedModel,
-      hasInvalidExplicitModel: agentModelIsInvalid,
+      effectiveSelectedModel,
+      modelSupportsImage,
+      isPatchingModel,
       hasUnavailableLlamaCppModel,
-    } = resolveAgentModelSelection({
-      sessionModel:
-        currentSession && currentSession.id === sessionId ? currentSession.modelOverride : '',
-      agentModel: currentAgent?.model ?? '',
-      availableModels,
-      fallbackModel: currentAgentSelectedModel,
-    });
-
-    const handleModelSelect = useCallback(
-      async (nextModel: Model) => {
-        if (isPatchingModel || isPersistingAgentModel) return;
-        const modelRef = toAgentModelRef(nextModel);
-        // Keep the agent selection aligned with model changes inside a session.
-        dispatch(setSelectedModel({ agentId: currentAgentId, model: nextModel }));
-        if (sessionId) {
-          const reqId = modelPatchRequestIdRef.current + 1;
-          modelPatchRequestIdRef.current = reqId;
-          const prev = currentSession?.id === sessionId ? currentSession.modelOverride : '';
-          setIsPatchingModel(true);
-          dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: modelRef }));
-          try {
-            const ok = await coworkService.updateSessionModel(sessionId, modelRef);
-            if (reqId !== modelPatchRequestIdRef.current) return;
-            if (!ok) {
-              dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: prev }));
-              window.dispatchEvent(
-                new CustomEvent('app:showToast', {
-                  detail: i18nService.t('coworkModelSwitchFailed'),
-                }),
-              );
-            } else if (currentAgent && agentModelIsInvalid) {
-              void agentService.updateAgent(currentAgent.id, { model: modelRef });
-            }
-          } catch {
-            if (reqId === modelPatchRequestIdRef.current)
-              dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: prev }));
-          } finally {
-            if (reqId === modelPatchRequestIdRef.current) setIsPatchingModel(false);
-          }
-          return;
-        }
-        await persistAgentModelSelection(nextModel);
-      },
-      [
-        isPatchingModel,
-        isPersistingAgentModel,
-        sessionId,
-        currentSession,
-        currentAgentId,
-        dispatch,
-        currentAgent,
-        agentModelIsInvalid,
-        persistAgentModelSelection,
-      ],
-    );
-
-    const effectiveSelectedModel = resolveEffectiveModel({
+      handleModelSelect,
+    } = usePromptModelSelection({
       sessionId,
-      agentSelectedModel,
-      globalSelectedModel: currentAgentSelectedModel,
+      currentAgentId,
+      currentAgent,
+      currentSession,
+      availableModels,
     });
-    const modelSupportsImage = !!effectiveSelectedModel?.supportsImage;
+
+    usePromptDraftSync({
+      draftKey,
+      draftPrompt,
+      value,
+      setValue,
+      attachments,
+      modelSupportsImage,
+      setImageVisionHint,
+      controller,
+    });
 
     // Load skills on mount
     useEffect(() => {
@@ -443,6 +251,93 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     }, [syncSkills]);
 
     useEffect(() => {
+      if (workingDirectory?.trim()) {
+        setShowFolderRequiredWarning(false);
+      }
+    }, [workingDirectory]);
+
+    useEffect(() => {
+      const element = promptRootRef.current;
+      if (!element || typeof ResizeObserver === 'undefined') return;
+      const updateCompactState = () => {
+        const width = element.clientWidth;
+        setIsCompactToolbar(width <= COMPACT_TOOLBAR_MAX_WIDTH);
+        setIsTightToolbar(width <= TIGHT_TOOLBAR_MAX_WIDTH);
+      };
+      updateCompactState();
+      const observer = new ResizeObserver(updateCompactState);
+      observer.observe(element);
+      return () => observer.disconnect();
+    }, []);
+
+    // Slash command menu (`/skill`, `/compact`). State and filtering live in
+    // the hook; submitPrompt decides what the text actually does.
+    const slashMenu = useCoworkSlashMenu({
+      value,
+      disabled,
+      remoteManaged,
+      sessionId,
+      setValue,
+      focusEditor: () => textareaRef.current?.focus(),
+    });
+    const {
+      enabledSkills: slashEnabledSkills,
+      findEnabledSkill: findSlashSkill,
+      runCompact: runSlashCompact,
+    } = slashMenu;
+
+    const { isAddingFile, handleIncomingFiles, handleAddFile, handleRemoveAttachment } =
+      usePromptAttachments({
+        draftKey,
+        attachments,
+        disabled,
+        isStreaming,
+        workingDirectory,
+        modelSupportsImage,
+        effectiveSelectedModel,
+        setImageVisionHint,
+      });
+
+    const {
+      isDraggingFiles,
+      handleDragEnter,
+      handleDragOver,
+      handleDragLeave,
+      handleDrop,
+      handlePaste,
+    } = usePromptFileDrop({ disabled, isStreaming, handleIncomingFiles });
+
+    const { submitPrompt, cancelFolderWarningTimer } = useCoworkPromptSubmission({
+      onSubmit,
+      value,
+      setValue,
+      attachments,
+      draftKey,
+      sessionId,
+      disabled,
+      sessionContextPending,
+      isStreaming,
+      canQueueWhileStreaming,
+      isPatchingModel,
+      hasUnavailableLlamaCppModel,
+      resumeTaskActive,
+      showFolderSelector,
+      workingDirectory,
+      setShowFolderRequiredWarning,
+      effectiveSelectedModel,
+      modelSupportsImage,
+      selectedExpertIds,
+      goalMode,
+      activeSkillIds,
+      slashEnabledSkills,
+      findSlashSkill,
+      runSlashCompact,
+      setImageVisionHint,
+    });
+
+    const handleSubmit = usePromptSubmissionLock(submitPrompt);
+
+    useEffect(() => {
       const handleFocusInput = (event: Event) => {
         const detail = (
           event as CustomEvent<{ clear?: boolean; clearExperts?: boolean; text?: string }>
@@ -468,362 +363,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       window.addEventListener('cowork:focus-input', handleFocusInput);
       return () => {
         window.removeEventListener('cowork:focus-input', handleFocusInput);
-        if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+        cancelFolderWarningTimer();
       };
-    }, [dispatch, draftKey]);
-
-    useEffect(() => {
-      if (workingDirectory?.trim()) {
-        setShowFolderRequiredWarning(false);
-      }
-    }, [workingDirectory]);
-
-    useEffect(() => {
-      modelPatchRequestIdRef.current += 1;
-      setIsPatchingModel(false);
-    }, [sessionId]);
-
-    useEffect(() => {
-      const element = promptRootRef.current;
-      if (!element || typeof ResizeObserver === 'undefined') return;
-      const updateCompactState = () => {
-        const width = element.clientWidth;
-        setIsCompactToolbar(width <= COMPACT_TOOLBAR_MAX_WIDTH);
-        setIsTightToolbar(width <= TIGHT_TOOLBAR_MAX_WIDTH);
-      };
-      updateCompactState();
-      const observer = new ResizeObserver(updateCompactState);
-      observer.observe(element);
-      return () => observer.disconnect();
-    }, []);
-
-    const previousDraftKeyRef = useRef(draftKey);
-    // Sync value from draft when sessionId changes
-    useEffect(() => {
-      const previousDraftKey = previousDraftKeyRef.current;
-      previousDraftKeyRef.current = draftKey;
-      const isTempPromotion =
-        previousDraftKey.startsWith('temp-') &&
-        draftKey !== '__home__' &&
-        !draftKey.startsWith('temp-');
-      if (!isTempPromotion) {
-        setValue(draftPrompt);
-        // Re-derive imageVisionHint from the new session's draft attachments
-        const hasImageWithoutVision =
-          !modelSupportsImage && attachments.some(a => a.isImage || isImagePath(a.path));
-        setImageVisionHint(hasImageWithoutVision);
-      }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [draftKey]); // intentionally omit other deps to only trigger on session switch
-
-    useEffect(() => {
-      if (value !== draftPrompt) {
-        const timer = setTimeout(() => {
-          dispatch(setDraftPrompt({ sessionId: draftKey, draft: value }));
-        }, 300);
-        return () => clearTimeout(timer);
-      }
-    }, [value, draftPrompt, dispatch, draftKey]);
-
-    // Flush the pending debounced draft on unmount so navigating away (e.g.
-    // opening the full-page settings) does not lose the last keystrokes.
-    const latestDraftRef = useRef({ value, draftPrompt, draftKey });
-    latestDraftRef.current = { value, draftPrompt, draftKey };
-    useEffect(() => {
-      return () => {
-        const latest = latestDraftRef.current;
-        if (latest.value !== latest.draftPrompt) {
-          dispatch(setDraftPrompt({ sessionId: latest.draftKey, draft: latest.value }));
-        }
-      };
-    }, [dispatch]);
-
-    // Slash command menu (`/skill`, `/compact`). State and filtering live in
-    // the hook; submitPrompt decides what the text actually does.
-    const slashMenu = useCoworkSlashMenu({
-      value,
-      disabled,
-      remoteManaged,
-      sessionId,
-      setValue,
-      focusEditor: () => textareaRef.current?.focus(),
-    });
-    const {
-      enabledSkills: slashEnabledSkills,
-      findEnabledSkill: findSlashSkill,
-      runCompact: runSlashCompact,
-    } = slashMenu;
-
-    const submitPrompt = useCallback(async () => {
-      if (showFolderSelector && !workingDirectory?.trim()) {
-        setShowFolderRequiredWarning(true);
-        if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-        warningTimerRef.current = setTimeout(() => {
-          setShowFolderRequiredWarning(false);
-          warningTimerRef.current = null;
-        }, 3000);
-        return;
-      }
-
-      const trimmedValue = hasVisiblePromptContent(value) ? value.trim() : '';
-
-      // Slash commands are resolved before the normal submission guards: a
-      // control command (`/compact`) and a bare selection (`/skill <id>`)
-      // never become model input, and a selection with a body replaces the
-      // prompt text with that body. Unknown slash text falls through
-      // unchanged so it still reaches the model.
-      let promptText = trimmedValue;
-      if (trimmedValue) {
-        const slashSubmission = parseCoworkSlashSubmission(trimmedValue, {
-          skillIds: slashEnabledSkills.map(skill => skill.id),
-          compactAvailable: !!sessionId,
-        });
-        if (slashSubmission.kind === 'compact') {
-          if (disabled || sessionContextPending) return;
-          setValue('');
-          dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
-          void runSlashCompact();
-          return;
-        }
-        if (slashSubmission.kind === 'skill') {
-          const skill = findSlashSkill(slashSubmission.skillId);
-          if (skill) {
-            dispatch(activateSkill(skill.id));
-            if (!slashSubmission.body) {
-              setValue('');
-              dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
-              showAppToast(
-                `${i18nService.t('coworkSlashSkillActivated')}: ${skill.displayName || skill.name}`,
-              );
-              return;
-            }
-            promptText = slashSubmission.body;
-          }
-        }
-      }
-
-      if (
-        (!trimmedValue && attachments.length === 0 && !resumeTaskActive) ||
-        (isStreaming && !canQueueWhileStreaming) ||
-        disabled ||
-        sessionContextPending ||
-        isPatchingModel
-      )
-        return;
-      if (hasUnavailableLlamaCppModel) {
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', {
-            detail: i18nService.t('agentLlamaCppModelNotRunningBlocked'),
-          }),
-        );
-        return;
-      }
-      setShowFolderRequiredWarning(false);
-
-      // Skills stay visible to the model through the session's capability set
-      // (Pi renders them into the system prompt from their directories), so the
-      // submission never inlines skill text.
-
-      // Extract image attachments (with base64 data) for vision-capable models
-      console.log('[CoworkPromptInput] handleSubmit: attachment diagnosis', {
-        totalAttachments: attachments.length,
-        modelSupportsImage,
-        effectiveModelId: effectiveSelectedModel?.id ?? null,
-        attachmentDetails: attachments.map(a => ({
-          path: a.path,
-          name: a.name,
-          isImage: a.isImage,
-          hasDataUrl: !!a.dataUrl,
-          dataUrlLength: a.dataUrl?.length ?? 0,
-        })),
-      });
-      const imageAtts: CoworkImageAttachment[] = [];
-      const fileAtts: CoworkFileAttachment[] = [];
-      for (const attachment of attachments) {
-        if (attachment.isImage && attachment.dataUrl) {
-          const extracted = extractBase64FromDataUrl(attachment.dataUrl);
-          if (extracted) {
-            imageAtts.push({
-              name: attachment.name,
-              mimeType: extracted.mimeType,
-              base64Data: extracted.base64Data,
-              // 保留真实磁盘路径,气泡侧才能把正文里的「输入文件: 路径」行与
-              // 该图片识别为同一附件,避免一张图渲染成两张(inline: 伪路径除外)。
-              ...(attachment.path && !attachment.path.startsWith('inline:')
-                ? { path: attachment.path }
-                : {}),
-            });
-          } else {
-            console.warn(
-              '[CoworkPromptInput] handleSubmit: extractBase64FromDataUrl returned null',
-              {
-                name: attachment.name,
-                dataUrlPrefix: attachment.dataUrl.slice(0, 60),
-              },
-            );
-          }
-        } else if (
-          attachment.isImage &&
-          attachment.path &&
-          !attachment.path.startsWith('inline:')
-        ) {
-          const readResult = await window.electron?.dialog?.readFileAsDataUrl(attachment.path);
-          const extracted =
-            readResult?.success && readResult.dataUrl
-              ? extractBase64FromDataUrl(readResult.dataUrl)
-              : null;
-          if (extracted) {
-            imageAtts.push({
-              name: attachment.name,
-              mimeType: extracted.mimeType,
-              base64Data: extracted.base64Data,
-              path: attachment.path,
-            });
-          } else {
-            const dotIndex = attachment.name.lastIndexOf('.');
-            fileAtts.push({
-              name: attachment.name,
-              path: attachment.path,
-              extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
-              isImage: true,
-            });
-          }
-        } else if (attachment.isImage) {
-          console.warn('[CoworkPromptInput] handleSubmit: image attachment missing dataUrl', {
-            path: attachment.path,
-            name: attachment.name,
-            isImage: attachment.isImage,
-            hasDataUrl: !!attachment.dataUrl,
-          });
-          const dotIndex = attachment.name.lastIndexOf('.');
-          fileAtts.push({
-            name: attachment.name,
-            path: attachment.path,
-            extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
-            isImage: true,
-          });
-        } else {
-          const dotIndex = attachment.name.lastIndexOf('.');
-          fileAtts.push({
-            name: attachment.name,
-            path: attachment.path,
-            extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
-          });
-        }
-      }
-
-      // Build prompt with ALL attachments that have real file paths (both regular files and images).
-      // Image attachments also need their file paths in the prompt so the model knows
-      // where the original files are located (e.g., for skills like seedream that need --image <path>).
-      // Note: inline/clipboard images have pseudo-paths starting with 'inline:' and are excluded.
-      // Note: image attachments that already carry base64 data are excluded — their content
-      // is delivered via the attachments parameter of chat.send. Including the file path
-      // would trigger native image-path detection, which rejects paths outside allowed
-      // directories and can drop the base64 image during sanitization (macOS-only bug).
-      const attachmentLines = attachments
-        .filter(
-          a =>
-            hasVisiblePromptContent(a.path) &&
-            !a.path.startsWith('inline:') &&
-            !(a.isImage && a.dataUrl),
-        )
-        .map(attachment => `${i18nService.t('inputFileLabel')}: ${attachment.path}`)
-        .join('\n');
-      const finalPrompt = promptText
-        ? attachmentLines
-          ? `${attachmentLines}\n\n${promptText}`
-          : promptText
-        : attachmentLines;
-
-      if (
-        !resumeTaskActive &&
-        !hasCoworkSubmissionContent({ prompt: finalPrompt, imageAttachments: imageAtts })
-      ) {
-        // 2026/09/28 之前这里是静默 return：按钮看起来可用，点下去却什么都不发生。
-        const unusableImage = attachments.some(a => a.isImage || isImagePath(a.path));
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', {
-            detail: {
-              message: i18nService.t(unusableImage ? 'imageReadError' : 'coworkSubmitEmptyContent'),
-              isError: true,
-            },
-          }),
-        );
-        return;
-      }
-
-      if (imageAtts.length > 0) {
-        console.log('[CoworkPromptInput] handleSubmit: passing imageAtts to onSubmit', {
-          count: imageAtts.length,
-          names: imageAtts.map(a => a.name),
-          base64Lengths: imageAtts.map(a => a.base64Data?.length ?? 0),
-        });
-      } else if (attachments.some(a => a.isImage || isImagePath(a.path))) {
-        console.warn(
-          '[CoworkPromptInput] handleSubmit: has image-like attachments but imageAtts is EMPTY — images will NOT be sent as base64',
-          {
-            imageAttachments: attachments
-              .filter(a => a.isImage || isImagePath(a.path))
-              .map(a => ({
-                path: a.path,
-                isImage: a.isImage,
-                hasDataUrl: !!a.dataUrl,
-              })),
-          },
-        );
-      }
-      // Clear input immediately; don't wait for the AI response.
-      setValue('');
-      dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
-      dispatch(clearDraftAttachments(draftKey));
-      setImageVisionHint(false);
-      const result = await onSubmit(
-        finalPrompt,
-        imageAtts.length > 0 ? imageAtts : undefined,
-        fileAtts.length > 0 ? fileAtts : undefined,
-        selectedExpertIds,
-        goalMode,
-      );
-      if (result === false) {
-        // Submission rejected — restore the prompt so the user can retry.
-        setValue(finalPrompt);
-        dispatch(setDraftPrompt({ sessionId: draftKey, draft: finalPrompt }));
-        dispatch(setDraftAttachments({ draftKey, attachments }));
-      } else if (activeSkillIds.length > 0) {
-        // Keyed on the selection itself: an id that no longer resolves to a
-        // loaded skill would otherwise keep the selection alive for the next turn.
-        // Skills describe this one input only. Clear their selection after a
-        // successful send so the next message starts with a clean context.
-        dispatch(clearActiveSkills());
-        dispatch(clearSelection());
-      }
-    }, [
-      value,
-      isStreaming,
-      disabled,
-      sessionContextPending,
-      isPatchingModel,
-      hasUnavailableLlamaCppModel,
-      onSubmit,
-      activeSkillIds,
-      attachments,
-      showFolderSelector,
-      workingDirectory,
-      dispatch,
-      draftKey,
-      effectiveSelectedModel?.id,
-      modelSupportsImage,
-      selectedExpertIds,
-      goalMode,
-      canQueueWhileStreaming,
-      resumeTaskActive,
-      sessionId,
-      slashEnabledSkills,
-      findSlashSkill,
-      runSlashCompact,
-    ]);
-
-    const handleSubmit = usePromptSubmissionLock(submitPrompt);
+    }, [dispatch, draftKey, cancelFolderWarningTimer]);
 
     const handleManageSkills = useCallback(() => {
       if (onManageSkills) {
@@ -831,97 +373,15 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       }
     }, [onManageSkills]);
 
-    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-      const isComposing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
-      if (isComposing) return;
-
-      // While the slash menu is open it owns navigation keys; Enter either
-      // inserts the highlighted entry or, when the text already is that
-      // entry, dismisses the menu and falls through to the send logic.
-      if (slashMenu.open) {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          slashMenu.dismiss();
-          return;
-        }
-        if (slashMenu.items.length > 0) {
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            const selectedIndex = slashMenu.items.findIndex(
-              item => item.key === slashMenu.activeItemKey,
-            );
-            const offset = event.key === 'ArrowDown' ? 1 : -1;
-            const nextIndex =
-              (Math.max(selectedIndex, 0) + offset + slashMenu.items.length) %
-              slashMenu.items.length;
-            slashMenu.setMenuSelection(slashMenu.items[nextIndex].key);
-            return;
-          }
-          if (event.key === 'Tab') {
-            event.preventDefault();
-            slashMenu.selectMenuChoice(slashMenu.activeItemKey);
-            return;
-          }
-          if (event.key === 'Enter') {
-            const matchesSelection =
-              slashMenu.activeSelectionPrompt !== null && value === slashMenu.activeSelectionPrompt;
-            const fallsThrough = slashMenu.choiceMenuOpen
-              ? matchesSelection
-              : matchesSelection && !slashMenu.selectedCommand?.hint;
-            if (!fallsThrough) {
-              event.preventDefault();
-              slashMenu.selectMenuChoice(slashMenu.activeItemKey);
-              return;
-            }
-            slashMenu.dismiss();
-          }
-        }
-      }
-
-      if (event.key !== 'Enter') return;
-
-      // Use synced state (kept up-to-date via config-updated event) so that
-      // changes made in the Settings panel are reflected immediately without
-      // requiring a configService read at event time.
-      const sendKey = currentSendShortcut;
-
-      let isSendCombo = false;
-      switch (sendKey) {
-        case 'Enter':
-          isSendCombo = !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey;
-          break;
-        case 'Shift+Enter':
-          isSendCombo = event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey;
-          break;
-        case 'Ctrl+Enter':
-          isSendCombo = isMacPlatform
-            ? event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
-            : event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey;
-          break;
-        case 'Alt+Enter':
-          isSendCombo = event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
-          break;
-        default:
-          // Unknown config value — fall back to bare Enter so the user can always send
-          isSendCombo = !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey;
-          break;
-      }
-
-      if (
-        isSendCombo &&
-        (!isStreaming || canQueueWhileStreaming) &&
-        !disabled &&
-        !isPatchingModel
-      ) {
-        event.preventDefault();
-        handleSubmit();
-      } else {
-        // Keep newlines as text nodes. Letting contenteditable create block
-        // elements makes the serialized prompt browser-dependent.
-        event.preventDefault();
-        document.execCommand('insertText', false, '\n');
-      }
-    };
+    const handleKeyDown = usePromptKeyDown({
+      value,
+      disabled,
+      isStreaming,
+      isPatchingModel,
+      canQueueWhileStreaming,
+      slashMenu,
+      handleSubmit,
+    });
 
     const handleFolderSelect = (path: string) => {
       if (onWorkingDirectoryChange) {
@@ -934,336 +394,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       return onCreateProject(path, name);
     };
 
-    const addAttachment = useCallback(
-      (filePath: string, imageInfo?: { isImage: boolean; dataUrl?: string }) => {
-        if (!filePath) return;
-        dispatch(
-          addDraftAttachment({
-            draftKey,
-            attachment: {
-              path: filePath,
-              name: getFileNameFromPath(filePath),
-              isImage: imageInfo?.isImage,
-              dataUrl: imageInfo?.dataUrl,
-            },
-          }),
-        );
-      },
-      [dispatch, draftKey],
-    );
-
-    const addImageAttachmentFromDataUrl = useCallback(
-      (name: string, dataUrl: string) => {
-        // Use the dataUrl as the unique key (no file path for inline images)
-        const pseudoPath = `inline:${name}:${Date.now()}`;
-        dispatch(
-          addDraftAttachment({
-            draftKey,
-            attachment: {
-              path: pseudoPath,
-              name,
-              isImage: true,
-              dataUrl,
-            },
-          }),
-        );
-      },
-      [dispatch, draftKey],
-    );
-
-    const fileToDataUrl = useCallback((file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result;
-          if (typeof result !== 'string') {
-            reject(new Error('Failed to read file'));
-            return;
-          }
-          resolve(result);
-        };
-        reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
-    }, []);
-
-    const fileToBase64 = useCallback((file: File): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result;
-          if (typeof result !== 'string') {
-            reject(new Error('Failed to read file'));
-            return;
-          }
-          const commaIndex = result.indexOf(',');
-          resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-        };
-        reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
-    }, []);
-
-    const getNativeFilePath = useCallback((file: File): string | null => {
-      const maybePath = (file as File & { path?: string }).path;
-      if (typeof maybePath === 'string' && maybePath.trim()) {
-        return maybePath;
-      }
-      return null;
-    }, []);
-
-    const saveInlineFile = useCallback(
-      async (file: File): Promise<string | null> => {
-        try {
-          const dataBase64 = await fileToBase64(file);
-          if (!dataBase64) {
-            return null;
-          }
-          const result = await window.electron.dialog.saveInlineFile({
-            dataBase64,
-            fileName: file.name,
-            mimeType: file.type,
-            cwd: workingDirectory,
-          });
-          if (result.success && result.path) {
-            return result.path;
-          }
-          return null;
-        } catch (error) {
-          console.error('Failed to save inline file:', error);
-          return null;
-        }
-      },
-      [fileToBase64, workingDirectory],
-    );
-
-    const handleIncomingFiles = useCallback(
-      async (fileList: FileList | File[]) => {
-        if (disabled || isStreaming) return;
-        const files = Array.from(fileList ?? []);
-        if (files.length === 0) return;
-
-        let hasImageWithoutVision = false;
-        for (const file of files) {
-          const nativePath = getNativeFilePath(file);
-
-          // Check if this is an image file and model supports images
-          const fileIsImage = nativePath ? isImagePath(nativePath) : isImageMimeType(file.type);
-
-          console.log('[CoworkPromptInput] handleIncomingFiles: processing file', {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            nativePath,
-            fileIsImage,
-            modelSupportsImage,
-            effectiveModelId: effectiveSelectedModel?.id ?? null,
-            effectiveModelSupportsImage: effectiveSelectedModel?.supportsImage ?? null,
-          });
-
-          if (fileIsImage) {
-            if (modelSupportsImage) {
-              // Path-based images preview via localfile:// — keep Redux free of base64 dataUrls.
-              if (nativePath) {
-                addAttachment(nativePath, { isImage: true });
-              } else {
-                // Clipboard/browser drag: stage to disk when possible; only keep dataUrl
-                // for true in-memory fallbacks with no path.
-                let dataUrl: string | null = null;
-                try {
-                  dataUrl = await fileToDataUrl(file);
-                  console.log(
-                    '[CoworkPromptInput] handleIncomingFiles: clipboard fileToDataUrl OK',
-                    { dataUrlLength: dataUrl?.length ?? 0 },
-                  );
-                } catch (error) {
-                  console.error(
-                    '[CoworkPromptInput] handleIncomingFiles: clipboard fileToDataUrl FAILED:',
-                    error,
-                  );
-                }
-
-                const stagedPath = await saveInlineFile(file);
-                console.log(
-                  '[CoworkPromptInput] handleIncomingFiles: clipboard saveInlineFile result',
-                  { stagedPath, hasDataUrl: !!dataUrl },
-                );
-
-                if (stagedPath) {
-                  addAttachment(stagedPath, { isImage: true });
-                } else if (dataUrl) {
-                  console.warn('Clipboard image saved only in memory (disk save failed)');
-                  addImageAttachmentFromDataUrl(file.name, dataUrl);
-                } else {
-                  console.error(
-                    'Failed to process clipboard image: both dataUrl and disk save failed',
-                  );
-                }
-              }
-              continue;
-            }
-            // Model doesn't support image input — add as file path and show hint
-            console.warn(
-              '[CoworkPromptInput] handleIncomingFiles: image skipped vision path because modelSupportsImage=false',
-              {
-                fileName: file.name,
-                effectiveModelId: effectiveSelectedModel?.id ?? null,
-                effectiveModelSupportsImage: effectiveSelectedModel?.supportsImage ?? null,
-              },
-            );
-            hasImageWithoutVision = true;
-          }
-
-          // Non-image file or model doesn't support images: use original flow
-          if (nativePath) {
-            addAttachment(nativePath, fileIsImage ? { isImage: true } : undefined);
-            continue;
-          }
-
-          const stagedPath = await saveInlineFile(file);
-          if (stagedPath) {
-            addAttachment(stagedPath, fileIsImage ? { isImage: true } : undefined);
-          }
-        }
-        if (hasImageWithoutVision) {
-          setImageVisionHint(true);
-        }
-      },
-      [
-        addAttachment,
-        addImageAttachmentFromDataUrl,
-        disabled,
-        effectiveSelectedModel,
-        fileToDataUrl,
-        getNativeFilePath,
-        isStreaming,
-        modelSupportsImage,
-        saveInlineFile,
-      ],
-    );
-
-    const handleAddFile = useCallback(async () => {
-      if (isAddingFile || disabled || isStreaming) return;
-      setIsAddingFile(true);
-      try {
-        const result = await window.electron.dialog.selectFiles({
-          title: i18nService.t('coworkAddFile'),
-        });
-        if (!result.success || result.paths.length === 0) return;
-        let hasImageWithoutVision = false;
-        for (const filePath of result.paths) {
-          if (isImagePath(filePath)) {
-            if (!modelSupportsImage) {
-              console.warn(
-                '[CoworkPromptInput] handleAddFile: image skipped vision path because modelSupportsImage=false',
-                {
-                  filePath,
-                  effectiveModelId: effectiveSelectedModel?.id ?? null,
-                },
-              );
-              hasImageWithoutVision = true;
-            }
-            addAttachment(filePath, { isImage: true });
-            continue;
-          }
-          addAttachment(filePath);
-        }
-        if (hasImageWithoutVision) {
-          setImageVisionHint(true);
-        }
-      } catch (error) {
-        console.error('Failed to select file:', error);
-      } finally {
-        setIsAddingFile(false);
-      }
-    }, [
-      addAttachment,
-      effectiveSelectedModel,
-      isAddingFile,
-      disabled,
-      isStreaming,
-      modelSupportsImage,
-    ]);
-
-    const handleRemoveAttachment = useCallback(
-      (path: string) => {
-        dispatch(
-          setDraftAttachments({
-            draftKey,
-            attachments: attachments.filter(attachment => attachment.path !== path),
-          }),
-        );
-      },
-      [attachments, dispatch, draftKey],
-    );
-
-    const hasFileTransfer = (dataTransfer: DataTransfer | null): boolean => {
-      if (!dataTransfer) return false;
-      if (dataTransfer.files.length > 0) return true;
-      return Array.from(dataTransfer.types).includes('Files');
-    };
-
-    const handleDragEnter = (event: React.DragEvent<HTMLElement>) => {
-      if (!hasFileTransfer(event.dataTransfer)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      dragDepthRef.current += 1;
-      if (!disabled && !isStreaming) {
-        setIsDraggingFiles(true);
-      }
-    };
-
-    const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
-      if (!hasFileTransfer(event.dataTransfer)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      event.dataTransfer.dropEffect = disabled || isStreaming ? 'none' : 'copy';
-    };
-
-    const handleDragLeave = (event: React.DragEvent<HTMLElement>) => {
-      if (!hasFileTransfer(event.dataTransfer)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-      if (dragDepthRef.current === 0) {
-        setIsDraggingFiles(false);
-      }
-    };
-
-    const handleDrop = (event: React.DragEvent<HTMLElement>) => {
-      if (!hasFileTransfer(event.dataTransfer)) return;
-      event.preventDefault();
-      event.stopPropagation();
-      dragDepthRef.current = 0;
-      setIsDraggingFiles(false);
-      if (disabled || isStreaming) return;
-      void handleIncomingFiles(event.dataTransfer.files);
-    };
-
-    const handlePaste = useCallback(
-      (event: React.ClipboardEvent<HTMLDivElement>) => {
-        if (disabled || isStreaming) return;
-        const files = Array.from(event.clipboardData?.files ?? []);
-        if (files.length === 0) return;
-        event.preventDefault();
-        void handleIncomingFiles(files);
-      },
-      [disabled, handleIncomingFiles, isStreaming],
-    );
-
-    const [currentSendShortcut, setCurrentSendShortcut] = useState(
-      () => configService.getConfig().shortcuts?.sendMessage ?? 'Enter',
-    );
-
-    // Sync when config is updated elsewhere (e.g. Settings panel)
-    useEffect(() => {
-      const syncFromConfig = () => {
-        const latest = configService.getConfig().shortcuts?.sendMessage ?? 'Enter';
-        setCurrentSendShortcut(latest);
-      };
-      window.addEventListener('config-updated', syncFromConfig);
-      return () => window.removeEventListener('config-updated', syncFromConfig);
-    }, []);
     // Unified Kimi-style toolbar: "+" menu (+ permission selector in work mode)
     // on the left, model picker + submit on the right. remoteManaged sessions
     // keep the minimal read-only layout with the model picker.

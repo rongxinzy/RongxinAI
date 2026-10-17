@@ -18,13 +18,13 @@ export const IntegrationAuthenticationMode = {
 export type IntegrationAuthenticationMode =
   (typeof IntegrationAuthenticationMode)[keyof typeof IntegrationAuthenticationMode];
 
-export const ConnectorToolRisk = {
+const ConnectorToolRisk = {
   Read: 'read',
   Write: 'write',
 } as const;
-export type ConnectorToolRisk = (typeof ConnectorToolRisk)[keyof typeof ConnectorToolRisk];
+type ConnectorToolRisk = (typeof ConnectorToolRisk)[keyof typeof ConnectorToolRisk];
 
-export interface ConnectorToolManifestEntry {
+interface ConnectorToolManifestEntry {
   id: string;
   risk: ConnectorToolRisk;
   description: string;

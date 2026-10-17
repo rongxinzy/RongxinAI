@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { CiEvent } from './constants.ts';
-import { planGates } from './policy.ts';
+import { enterpriseRequired, planGates, planPathJobs } from './policy.ts';
 
 const event = process.env.GITHUB_EVENT_NAME ?? '';
 let paths: string[] = [];
@@ -23,13 +23,27 @@ if (event === CiEvent.PullRequest) {
   )
     .split('\0')
     .filter(Boolean);
+} else if (event === CiEvent.Push) {
+  paths = execFileSync('git', ['show', '--name-only', '--pretty=format:', '-z', 'HEAD'], {
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  })
+    .split('\0')
+    .filter(Boolean);
 }
 const plan = planGates(paths, event, process.env.GITHUB_REF ?? '');
+const pathPlan = planPathJobs(paths, event);
+const enterprise = enterpriseRequired(paths, event);
 if (!process.env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required');
 appendFileSync(process.env.GITHUB_OUTPUT, `plan=${JSON.stringify(plan)}\n`);
+appendFileSync(process.env.GITHUB_OUTPUT, `path-plan=${JSON.stringify(pathPlan)}\n`);
 for (const [name, enabled] of Object.entries(plan)) {
   appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${enabled}\n`);
 }
+for (const [name, enabled] of Object.entries(pathPlan)) {
+  appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${enabled}\n`);
+}
+appendFileSync(process.env.GITHUB_OUTPUT, `enterprise=${enterprise}\n`);
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(
     process.env.GITHUB_STEP_SUMMARY,
@@ -37,6 +51,10 @@ if (process.env.GITHUB_STEP_SUMMARY) {
       Object.entries(plan)
         .map(([name, enabled]) => `- ${name}: ${enabled ? 'required' : 'not required'}`)
         .join('\n') +
-      '\n',
+      '\n\nPath-owned checks:\n\n' +
+      Object.entries(pathPlan)
+        .map(([name, enabled]) => `- ${name}: ${enabled ? 'required' : 'not required'}`)
+        .join('\n') +
+      `\n- enterprise: ${enterprise ? 'required' : 'not required'}\n`,
   );
 }

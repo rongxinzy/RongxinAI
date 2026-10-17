@@ -20,9 +20,9 @@ import {
 } from '../ui/empty.js';
 import { Skeleton } from '../ui/skeleton.js';
 
-export const ZHIYUAN_MODEL_PROVIDER_KEY = 'custom_enterprise';
+const ZHIYUAN_MODEL_PROVIDER_KEY = 'custom_enterprise';
 
-export const ManagedModelLoadStatus = {
+const ManagedModelLoadStatus = {
   Loading: 'loading',
   Ready: 'ready',
   Error: 'error',

@@ -35,7 +35,7 @@ const persistValue = (scoped: string, next: boolean): void => {
  * Associates a temporary session id (`temp-*`) with its persisted backend
  * session id and copies any already-recorded toggle states across namespaces.
  */
-export const promotePersistentToggleNamespace = (
+const promotePersistentToggleNamespace = (
   temporaryNamespace: string,
   realNamespace: string,
 ): void => {

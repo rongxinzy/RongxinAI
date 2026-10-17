@@ -7,51 +7,45 @@
 
 <h1 align="center">知远智能体</h1>
 
-<p align="center"><strong>把任务交给 AI，在自己的电脑上完成工作。</strong></p>
-<p align="center">开源 · 本地优先 · 文件与浏览器操作 · 本地模型 · 可复用工作流</p>
+<p align="center"><strong>开源、本地优先的桌面 AI 智能体：内置免费模型开箱即用，支持本地 GGUF 模型，还能在微信、飞书、钉钉里直接派活。</strong></p>
 
 <p align="center">
-  <a href="https://www.rongxzyai.com/#download">下载安装</a> ·
-  <a href="#开始使用">开始使用</a> ·
-  <a href="#开发者快速开始">本地开发</a> ·
-  <a href="https://github.com/rongxinzy/RongxinAI/issues">反馈问题</a> ·
+  <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat&logo=github" alt="Stars"></a>
+  <a href="https://github.com/rongxinzy/RongxinAI/releases"><img src="https://img.shields.io/github/v/release/rongxinzy/RongxinAI?include_prereleases" alt="Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rongxinzy/RongxinAI" alt="AGPL-3.0"></a>
+  <a href="https://github.com/rongxinzy/RongxinAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rongxinzy/RongxinAI/ci.yml?branch=main&label=CI" alt="CI"></a>
+  <img src="https://img.shields.io/badge/平台-Windows-lightgrey" alt="平台">
+</p>
+
+<p align="center">
+  <a href="https://www.rongxzyai.com/#download"><b>⬇️ 下载安装</b></a> ·
+  <a href="#开始使用">快速开始</a> ·
+  <a href="#开发者快速开始">源码运行</a> ·
   <a href="README.md">English</a>
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0"></a>
-  <a href="https://github.com/rongxinzy/RongxinAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rongxinzy/RongxinAI/ci.yml?branch=main&amp;label=CI" alt="CI"></a>
-  <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat" alt="GitHub Stars"></a>
+  <img src="public/readme/zhiyuan-ppt-demo.gif" alt="知远根据自然语言任务制作演示文稿" width="960">
 </p>
 
-知远智能体是北京容芯致远推出的桌面 AI 工作台，由李可然维护。你可以让它整理资料、制作文档、分析表格、研究代码或执行周期任务。它能读写文件、运行命令、操作浏览器，并在工作过程中展示消息、工具调用与结果。
+## 为什么选知远
 
-<p align="center">
-  <img src="public/readme/zhiyuan-ppt-demo.gif" alt="知远根据自然语言任务制作演示文稿的操作录屏" width="960">
-</p>
-<p align="center"><sub>从任务描述到演示文稿，查看执行过程并取得生成文件。</sub></p>
-
-## 用知远完成什么
-
-| 场景 | 工作方式 |
-| --- | --- |
-| 资料研究 | 检索网页、阅读本地资料，整理带来源的研究结果 |
-| 文档与表格 | 制作演示文稿，处理 Word、PDF、Excel，分析数据并生成文件 |
-| 代码工作 | 选择项目目录，阅读仓库、修改代码、运行命令并检查产物 |
-| 日常任务 | 用待办记录工作，通过定时任务安排简报、报告和其他重复流程 |
-| 浏览器操作 | 让智能体在浏览器中查找信息、操作页面，并展示执行进度 |
-| 消息协作 | 配置微信、企业微信、钉钉、飞书/Lark、QQ 或邮箱，在已接入的渠道中使用智能体 |
-
-专家提供面向具体工作的预设；技能封装可复用的方法和工具；MCP 用于连接外部服务。你可以使用内置内容，也可以扩展自己的工作流。
+- 🆓 **免费上手**：内置知远免费模型，无需第三方 API Key（需联网，额度以应用内为准），也可接入自己的模型服务。
+- 💻 **本地模型**：模型市场一键选择 GGUF 模型与量化版本，可调上下文、GPU、线程（基于 llama.cpp 运行时）。
+- 🛠️ **真能干活**：读写文件、运行命令、操作浏览器；产出 PPT、Word、PDF、Excel。
+- 💬 **接入常用 IM**：微信、企业微信、钉钉、飞书/Lark、QQ、邮箱。
+- 🧩 **可扩展**：专家、技能（Skills）、MCP，支持定时任务。
+- 🔒 **本地优先**：会话、配置、任务数据存本地；工具执行有授权模式。
 
 ## 开始使用
 
-1. 从[官网](https://www.rongxzyai.com/#download)选择适合自己系统的安装包。发布记录和可下载附件见 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases)。
-2. 打开应用，使用内置的**知远免费模型**开始对话，无需先填写第三方 API Key。也可以在模型设置中配置自己的服务。
-3. 处理本地文件或代码时，选择对应项目目录，描述任务，并按需附上资料。
-4. 查看执行过程、处理授权请求，检查生成结果后继续追问或修改。
+1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包。GitHub Releases 目前仅提供 **Windows** 安装包；macOS / Linux 安装包尚未确认，请以下载页为准。
+2. **打开应用**：直接用内置免费模型对话，无需 API Key。
+3. **派任务**：选择项目目录、描述任务，查看执行过程并处理授权请求。
 
-免费模型需要联网，服务可用性及额度以应用内提示为准。桌面工程支持 macOS、Windows 和 Linux；具体安装包与架构以下载页为准，也可以[从源码运行](#开发者快速开始)。
+开发者：`git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent && cd ZhiYuanAgent && bun install && bun run electron:dev`（Node 24.x、Bun 1.4.0）。前置条件与更多命令见[开发者快速开始](#开发者快速开始)。
+
+免费模型需要联网，服务可用性及额度以应用内提示为准。其他平台也可[从源码运行](#开发者快速开始)。
 
 ### 使用本地模型
 
@@ -65,20 +59,43 @@
 
 工具执行遵循当前权限模式。需要审批的操作会显示授权请求；开启自动授权后，部分操作可直接执行。任务执行过程和结果可以在工作台中查看。
 
+## 横向对比
+
+| | 知远 | Manus | Claude Desktop | Cherry Studio | Open Interpreter |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| 在微信/飞书/钉钉里直接派任务 | ✅（另有企业微信、QQ、邮箱） | ❌（连接器有 Slack、Gmail） | ❌（有 Slack 连接器） | ❌ | ❌ |
+| 开源桌面应用 | ✅ AGPL-3.0 | ❌ 闭源 | ❌ 闭源 | ✅ AGPL-3.0 | ❌ 开源（Apache-2.0）但为终端工具，图形界面是另一个项目 |
+| 内置 GGUF 模型市场（无需 Ollama） | ✅ 基于 llama.cpp | ❌ 仅云端 | ❌ 仅云端 | ❌ 需借助 Ollama / LM Studio | ❌ 需借助 Ollama / LM Studio |
+| 免费模型 + 本地模型 + 完全开源 | ✅ 三者兼具 | ❌ 仅免费额度（每日 300 积分） | ❌ 仅免费版 | ✅ CherryAI 免费（Qwen3-8B）+ Ollama/LM Studio | ❌ 无内置免费模型 |
+| 智能体：文件 + 命令 + 浏览器 | ✅ | ✅ | ✅ 仅付费版（Cowork） | ? | ✅（浏览器经 QA 技能） |
+
+---
+
+<p align="center">⭐ <b>觉得有用就点个 Star 吧</b>，这能帮更多人发现知远，也是我们持续更新的动力。</p>
+
+## Star History
+
+<a href="https://star-history.com/#rongxinzy/RongxinAI&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=rongxinzy/RongxinAI&type=Date&theme=dark">
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=rongxinzy/RongxinAI&type=Date">
+  </picture>
+</a>
+
 ## 选择一套喜欢的界面
 
-知远提供 **Codex**、**大明风华**、**长安风物** 与 **未央金石** 四套主题。Codex 使用中性色与紧凑控件；大明风华以纸白、朱红与墨色为主；长安风物采用绢白、孔雀青、暖金和圆润控件，并提供墨青色的夜间外观；未央金石采用黑金、石白与静态云气纹。
+知远当前内置一套主题插件 **Zenith**，提供 **浅色** 与 **深色** 两种外观。Zenith 是面向桌面效率的未来感设计体系：轻量玻璃质感、清晰字阶、紧凑留白，以及统一定义背景、控件 recipe 与交互状态的语义 token。
 
-在「设置 → 外观」直接选择主题预览卡片，再选择浅色、深色或跟随系统。所有卡片随模式同步更新。背景、纹理、字体、圆角、控件与交互状态由整套主题统一定义。
+在「设置 → 外观」中选择 Zenith 预览卡片（仅注册一套主题时仍保留该入口），再选择浅色、深色或跟随系统；预览会随模式同步更新。仍保存旧主题 ID（Codex、大明风华、长安风物、未央金石等）的配置会自动回落到 Zenith。
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/theme-previews/appearance-settings-dark.png">
-    <img src="docs/theme-previews/appearance-settings-light.png" alt="外观设置组件：上方选择主题预览卡片，下方统一切换明暗模式" width="760">
+    <img src="docs/theme-previews/appearance-settings-light.png" alt="外观设置：Zenith 风格预览卡片与浅色、深色、跟随系统切换" width="760">
   </picture>
 </p>
 
-主题作者可从[主题开发文档](src/renderer/theme/README.md)和[设计规范](DESIGN.md)开始。主题包提供展示数据，业务组件继续负责交互与状态。
+若要新增可打包的主题插件，可从[主题开发文档](src/renderer/theme/README.md)和[设计规范](DESIGN.md)开始。主题包提供展示数据，业务组件继续负责交互与状态。
 
 ## 开发者快速开始
 

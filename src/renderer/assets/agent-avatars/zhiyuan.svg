@@ -21,7 +21,7 @@
   <path d="M400 310c128-71 319-39 407 57 32 35 18 91-28 106L481 566" stroke="black" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
   <path d="M485 568c61-20 153-49 269-87" stroke="black" stroke-width="54" stroke-linecap="round"/>
   <circle cx="646" cy="374" r="24" fill="black"/>
-  <!-- Circuit claw / legs -->
+  <!-- Circuit traces / legs -->
   <path d="M535 682l87-88M582 746l101-102" stroke="black" stroke-width="38" stroke-linecap="round"/>
   <circle cx="646" cy="570" r="26" fill="black"/>
   <circle cx="710" cy="634" r="26" fill="black"/>

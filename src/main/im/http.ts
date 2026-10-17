@@ -8,10 +8,7 @@ function linkAbortSignal(source: AbortSignal, controller: AbortController): void
   source.addEventListener('abort', () => controller.abort(), { once: true });
 }
 
-export async function fetchWithSystemProxy(
-  url: string,
-  options: RequestInit = {},
-): Promise<Response> {
+async function fetchWithSystemProxy(url: string, options: RequestInit = {}): Promise<Response> {
   if (app.isReady()) {
     try {
       return await session.defaultSession.fetch(url, options);

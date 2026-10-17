@@ -31,7 +31,7 @@ import type {
 } from '../../types/im';
 import { DEFAULT_IM_CONFIG, DEFAULT_IM_STATUS } from '../../types/im';
 
-export interface IMState {
+interface IMState {
   config: IMGatewayConfig;
   status: IMGatewayStatus;
   isLoading: boolean;
@@ -257,44 +257,25 @@ const imSlice = createSlice({
 
 export const {
   setConfig,
-  setDingTalkConfig,
-  setDingTalkInstances,
-  setDingTalkMultiInstanceConfig,
   setDingTalkInstanceConfig,
   addDingTalkInstance,
   removeDingTalkInstance,
-  setFeishuConfig,
-  setFeishuInstances,
-  setFeishuMultiInstanceConfig,
   setFeishuInstanceConfig,
   addFeishuInstance,
   removeFeishuInstance,
-  setTelegramChannelConfig,
-  setTelegramInstances,
-  setTelegramMultiInstanceConfig,
   setTelegramInstanceConfig,
   addTelegramInstance,
   removeTelegramInstance,
-  setQQConfig,
-  setQQInstances,
-  setQQMultiInstanceConfig,
   setQQInstanceConfig,
   addQQInstance,
   removeQQInstance,
-  setDiscordConfig,
-  setDiscordInstances,
-  setDiscordMultiInstanceConfig,
   setDiscordInstanceConfig,
   addDiscordInstance,
   removeDiscordInstance,
-  setWecomConfig,
-  setWecomInstances,
-  setWecomMultiInstanceConfig,
   setWecomInstanceConfig,
   addWecomInstance,
   removeWecomInstance,
   setWeixinConfig,
-  setIMSettings,
   setStatus,
   setLoading,
   setError,

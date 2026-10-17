@@ -13,7 +13,7 @@ export const checkPhaseLabels: Record<CodingAgentCheckPhase, string> = {
   [CodingAgentCheckPhase.Failed]: 'codingAgentCheckFailed',
 };
 
-export const checkFailureLabels: Record<CodingAgentCheckFailure, string> = {
+const checkFailureLabels: Record<CodingAgentCheckFailure, string> = {
   [CodingAgentCheckFailure.Authentication]: 'codingAgentCheckAuthHelp',
   [CodingAgentCheckFailure.Startup]: 'codingAgentCheckStartupHelp',
   [CodingAgentCheckFailure.Protocol]: 'codingAgentCheckProtocolHelp',

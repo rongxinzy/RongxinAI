@@ -158,7 +158,7 @@ test:
 #
 # 缓存策略：
 #   - node_modules：按分支 + lockfile hash 缓存，减少重复安装
-#   - OpenClaw 运行时：按 OpenClaw 版本号缓存，避免每次完整构建
+#   - channel-runtime / engram-runtime：按 sidecar 版本缓存，避免重复下载
 #   - Python 运行时：按 Python 版本号缓存
 # ═══════════════════════════════════════════════════════
 
@@ -181,10 +181,10 @@ build-windows-lite:
     - key: 'win-python-3.11.9'
       paths:
         - resources/python-win/
-    - key: 'win-openclaw-v2026.4.14'
+    - key: 'win-channel-runtime-zhiyuan-sidecar-v4'
       paths:
-        - vendor/openclaw-runtime/win-x64/
-        - build-tar/win-resources.tar
+        - vendor/channel-runtime/
+        - build-tar/
     - key: 'win-llamacpp-backends-b9244'
       paths:
         - build/win-lite/
@@ -215,10 +215,10 @@ build-windows-full:
     - key: 'win-python-3.11.9'
       paths:
         - resources/python-win/
-    - key: 'win-openclaw-v2026.4.14'
+    - key: 'win-channel-runtime-zhiyuan-sidecar-v4'
       paths:
-        - vendor/openclaw-runtime/win-x64/
-        - build-tar/win-resources.tar
+        - vendor/channel-runtime/
+        - build-tar/
     - key: 'win-llamacpp-backends-b9244'
       paths:
         - build/win-lite/
@@ -254,17 +254,14 @@ build-linux:
     GIT_CLEAN_FLAGS: none
     # 跳过 Electron postinstall 下载
     ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-    # 从内网 GitLab 镜像拉取 OpenClaw 源码（避免 GitHub 不可达）
-    OPENCLAW_REPO: 'http://172.18.5.179:8180/rxzy-opensource/openclaw-mirror.git'
-    OPENCLAW_SRC: '${CI_PROJECT_DIR}/vendor/openclaw-src'
   cache:
     - key: 'linux-npm-release-1-0'
       paths:
         - node_modules/
-    - key: 'linux-openclaw-v2026.4.14'
+    - key: 'linux-channel-runtime-zhiyuan-sidecar-v4'
       paths:
-        - vendor/openclaw-runtime/linux-x64/
-        - vendor/openclaw-src/
+        - vendor/channel-runtime/
+        - vendor/engram-runtime/
   script:
     # 清理构建输出（不删 node_modules，保留缓存命中的依赖）
     - rm -rf dist dist-electron release
@@ -301,9 +298,11 @@ build-linux:
         export APP_BUILD_VERSION="$PKG_VERSION-$CI_COMMIT_SHORT_SHA"
         echo "Dev build: version=$APP_BUILD_VERSION"
       fi
-    # 完整打包：OpenClaw 运行时 → 编译 → skills → electron-builder
-    - npm run openclaw:runtime:linux-x64
-    - DEBUG=electron-builder npm run dist:linux
+    # 完整打包：POSIX 运行时 → channel/engram sidecar → dist:linux（含 predist 钩子）
+    - bun run apply:patches
+    - bun run setup:posix-uv-runtime
+    - bun run setup:posix-python-runtime
+    - DEBUG=electron-builder bun run dist:linux
     # 验证产物
     - |
       echo "=== Release directory contents ==="
@@ -322,16 +321,16 @@ build-linux:
           SIZE=$(du -h "$pkg" | cut -f1)
           echo "Package: $pkg ($SIZE)"
           ENCODED_NAME=$(python3 -c "import urllib.parse; print(urllib.parse.quote_plus('$(basename "$pkg")'))")
-          UPLOAD_URL="http://172.18.5.249:8081/artifactory/ZhiYuanAgent/linux/$ENCODED_NAME"
-          if [ -n "$ARTIFACTORY_USER" ] && [ -n "$ARTIFACTORY_PASSWORD" ]; then
+          if [ -z "$ARTIFACTORY_BASE_URL" ] || [ -z "$ARTIFACTORY_USER" ] || [ -z "$ARTIFACTORY_PASSWORD" ]; then
+            echo "Skipping upload: ARTIFACTORY_BASE_URL, ARTIFACTORY_USER, or ARTIFACTORY_PASSWORD not set"
+          else
+            UPLOAD_URL="${ARTIFACTORY_BASE_URL%/}/linux/$ENCODED_NAME"
             echo "Uploading to $UPLOAD_URL ..."
             curl -sS --fail --connect-timeout 10 --max-time 900 \
               -u "$ARTIFACTORY_USER:$ARTIFACTORY_PASSWORD" \
               -T "$pkg" "$UPLOAD_URL" \
               && echo "Uploaded to Artifactory" \
               || echo "Artifactory upload failed (non-fatal)"
-          else
-            echo "Skipping upload: ARTIFACTORY_USER or ARTIFACTORY_PASSWORD not set"
           fi
         fi
       done

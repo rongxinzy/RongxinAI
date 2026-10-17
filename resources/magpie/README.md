@@ -57,13 +57,15 @@ These hashes protect integrity against accidental replacement. A manifest beside
 a binary is not an independent authenticity signature.
 
 Mac codesigning changes executable bytes. The custom signing hook preserves the
-electron-builder identity/keychain/entitlement options, signs child binaries via
-`@electron/osx-sign`, refreshes shipped hashes just before the final outer `.app`
-signature, and retains `buildSha256`. Universal packaging explicitly excludes
-these already per-architecture helpers from lipo. Windows packaging preserves the
-compiled helper bytes rather than applying the application's Authenticode pass.
-The enclosing Windows installer can still be signed. Validate signed macOS and
-Windows installers on their native operating systems before release; Linux
+electron-builder identity, keychain, and entitlement options, signs each helper
+with Developer ID and the hardened runtime, refreshes shipped hashes just before
+the final outer `.app` signature, and retains `buildSha256`. Notarization submits
+that sealed `.app`, so the helpers are included in the ticket. Universal packaging
+explicitly excludes these already per-architecture helpers from lipo. Windows
+packaging signs `magpie.exe` with the same Certum signtool pass as the application
+(`scripts/runtime-signing/sign-runtime.ps1`), then refreshes the shipped hash and
+retains `buildSha256`. The enclosing installer is signed as before. Validate signed
+macOS and Windows installers on their native operating systems before release; Linux
 cross-compilation alone does not establish codesign, Gatekeeper, or installer
 acceptance.
 
