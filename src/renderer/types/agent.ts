@@ -10,6 +10,7 @@ export interface Agent {
   workingDirectory: string;
   icon: string;
   skillIds: string[];
+  mcpIds?: string[];
   enabled: boolean;
   pinned: boolean;
   pinOrder?: number | null;
@@ -19,4 +20,33 @@ export interface Agent {
   triageOverride?: import('../../shared/triage').AgentTriageOverride;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface CreateAgentRequest {
+  id?: string;
+  name: string;
+  description?: string;
+  systemPrompt?: string;
+  identity?: string;
+  model?: string;
+  workingDirectory?: string;
+  icon?: string;
+  skillIds?: string[];
+  mcpIds?: string[];
+  source?: string;
+  presetId?: string;
+}
+
+export interface UpdateAgentRequest {
+  name?: string;
+  description?: string;
+  systemPrompt?: string;
+  identity?: string;
+  model?: string;
+  workingDirectory?: string;
+  icon?: string;
+  skillIds?: string[];
+  mcpIds?: string[];
+  enabled?: boolean;
+  pinned?: boolean;
 }

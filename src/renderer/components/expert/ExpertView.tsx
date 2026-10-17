@@ -7,7 +7,7 @@ import { i18nService } from '../../services/i18n';
 import McpManager from '../mcp/McpManager';
 import PageHeader from '../PageHeader';
 import SkillsManager from '../skills/SkillsManager';
-import PresetExpertList from './PresetExpertList';
+import ExpertManager from './ExpertManager';
 
 interface ExpertViewProps {
   isSidebarCollapsed?: boolean;
@@ -87,8 +87,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           contentClassName="h-full"
         >
           <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 pt-4 pb-8 sm:px-6">
-            <p className="text-sm text-muted-foreground">{i18nService.t('expertsDescription')}</p>
-            <PresetExpertList onChatWithExpert={onChatWithExpert} />
+            <ExpertManager onChatWithExpert={onChatWithExpert} />
           </div>
         </LayeredTabsContent>
 

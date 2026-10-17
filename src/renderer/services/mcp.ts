@@ -273,6 +273,19 @@ class McpService {
     return result;
   }
 
+  async importConfigContent(jsonContent: string): Promise<{
+    success: boolean;
+    servers?: McpServerConfig[];
+    error?: string;
+  }> {
+    if (!window.electron.mcp.importConfigContent) {
+      return { success: false, error: 'importConfigContent not supported' };
+    }
+    const result = await window.electron.mcp.importConfigContent(jsonContent);
+    if (result.success && result.servers) this.servers = result.servers;
+    return result;
+  }
+
   onBridgeSyncStart(callback: () => void): () => void {
     return window.electron.mcp.onBridgeSyncStart(callback);
   }

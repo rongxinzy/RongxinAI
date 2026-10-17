@@ -121,6 +121,7 @@ export function createCoworkStoreHarness(): CoworkStoreTestHarness {
       working_directory TEXT NOT NULL DEFAULT '',
       icon TEXT NOT NULL DEFAULT '',
       skill_ids TEXT NOT NULL DEFAULT '[]',
+      mcp_ids TEXT NOT NULL DEFAULT '[]',
       enabled INTEGER NOT NULL DEFAULT 1,
       pinned INTEGER NOT NULL DEFAULT 0,
       pin_order INTEGER,

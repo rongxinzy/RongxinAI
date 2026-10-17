@@ -165,6 +165,12 @@ export interface SkillsApi {
     content?: string | null;
     error?: string;
   }>;
+  createCustom: (params: {
+    id: string;
+    name: string;
+    description: string;
+    content: string;
+  }) => Promise<{ success: boolean; skill?: Skill; error?: string }>;
   onChanged: (callback: () => void) => () => void;
 }
 
@@ -202,6 +208,11 @@ export interface McpApi {
   importConfig: () => Promise<{
     success: boolean;
     cancelled?: boolean;
+    servers?: McpServerConfigIPC[];
+    error?: string;
+  }>;
+  importConfigContent: (jsonContent: string) => Promise<{
+    success: boolean;
     servers?: McpServerConfigIPC[];
     error?: string;
   }>;

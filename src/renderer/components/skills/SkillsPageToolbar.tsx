@@ -20,7 +20,9 @@ import {
   ExternalLink,
   FolderOpen,
   Link,
+  MessageSquare,
   Pencil,
+  Plus,
   PlusCircle,
   Search,
   Upload,
@@ -46,6 +48,7 @@ interface SkillsPageToolbarProps {
   onOpenRemoteImport: () => void;
   onCreateByChat: () => void;
   onOpenMarketplace: () => void;
+  onCreateCustomSkill?: () => void;
 }
 
 export function SkillsPageToolbar({
@@ -63,6 +66,7 @@ export function SkillsPageToolbar({
   onOpenRemoteImport,
   onCreateByChat,
   onOpenMarketplace,
+  onCreateCustomSkill,
 }: SkillsPageToolbarProps) {
   return (
     <header className="flex flex-col gap-4">
@@ -100,40 +104,73 @@ export function SkillsPageToolbar({
           )}
         </InputGroup>
 
-        <DropdownMenu open={isAddMenuOpen} onOpenChange={onAddMenuOpenChange}>
-          <DropdownMenuTrigger render={<Button type="button" variant="outline" />}>
-            <PlusCircle data-icon="inline-start" />
-            {i18nService.t('addSkill')}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-64">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>{i18nService.t('addSkillSecurityTip')}</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onUploadZip} disabled={isDownloading}>
-                <Upload />
-                {i18nService.t('uploadSkillZip')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onUploadFolder} disabled={isDownloading}>
-                <FolderOpen />
-                {i18nService.t('uploadSkillFolder')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onOpenRemoteImport} disabled={isDownloading}>
-                <Link />
-                {i18nService.t('remoteImport')}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onCreateByChat} disabled={isDownloading}>
-                <Pencil />
-                {i18nService.t('createSkillByChat')}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {activeTab === SkillTab.Marketplace && (
-          <Button type="button" variant="outline" onClick={onOpenMarketplace}>
-            <ExternalLink data-icon="inline-start" />
-            {i18nService.t('skillMarketplaceOpenExternal')}
+        <div className="flex flex-wrap items-center gap-2">
+          {onCreateCustomSkill && (
+            <Button
+              type="button"
+              variant="default"
+              onClick={onCreateCustomSkill}
+              className="gap-1.5"
+            >
+              <Plus data-icon="inline-start" />
+              {i18nService.t('createCustomSkill')}
+            </Button>
+          )}
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCreateByChat}
+            disabled={isDownloading}
+            className="gap-1.5"
+          >
+            <MessageSquare data-icon="inline-start" />
+            {i18nService.t('createSkillByChat')}
           </Button>
-        )}
+
+          <DropdownMenu open={isAddMenuOpen} onOpenChange={onAddMenuOpenChange}>
+            <DropdownMenuTrigger render={<Button type="button" variant="outline" />}>
+              <PlusCircle data-icon="inline-start" />
+              {i18nService.t('addSkill')}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-64">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{i18nService.t('addSkillSecurityTip')}</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {onCreateCustomSkill && (
+                  <DropdownMenuItem onClick={onCreateCustomSkill}>
+                    <Plus />
+                    {i18nService.t('createCustomSkill')}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={onCreateByChat} disabled={isDownloading}>
+                  <Pencil />
+                  {i18nService.t('createSkillByChat')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onUploadZip} disabled={isDownloading}>
+                  <Upload />
+                  {i18nService.t('uploadSkillZip')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onUploadFolder} disabled={isDownloading}>
+                  <FolderOpen />
+                  {i18nService.t('uploadSkillFolder')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onOpenRemoteImport} disabled={isDownloading}>
+                  <Link />
+                  {i18nService.t('remoteImport')}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {activeTab === SkillTab.Marketplace && (
+            <Button type="button" variant="outline" onClick={onOpenMarketplace}>
+              <ExternalLink data-icon="inline-start" />
+              {i18nService.t('skillMarketplaceOpenExternal')}
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="border-b border-border">

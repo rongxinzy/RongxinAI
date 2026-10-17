@@ -360,6 +360,37 @@ export const registerMcpIpc = (): void => {
     }
   });
 
+  ipcMain.handle(McpIpc.ImportConfigContent, async (_event, jsonContent: string) => {
+    try {
+      const input = JSON.parse(jsonContent) as unknown;
+      const servers = importMcpConfig(input);
+      const existingNames = new Set(
+        getMcpStore()
+          .listServers()
+          .map(server => server.name),
+      );
+      for (const server of servers) {
+        if (existingNames.has(server.name)) {
+          return { success: false, error: `MCP server "${server.name}" already exists.` };
+        }
+        const validationError = await validateMcpServerConfig(server);
+        if (validationError) return { success: false, error: validationError };
+      }
+      for (const server of servers) getMcpStore().createServer(server);
+      const refreshed = await refreshMcpBridge();
+      return {
+        success: !refreshed.error,
+        servers: getMcpStore().listServers(),
+        error: refreshed.error,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to import MCP configuration',
+      };
+    }
+  });
+
   ipcMain.handle(McpIpc.CancelAuthorize, (_event, requestId: string) => {
     rt.activeMcpAuthorizations.get(requestId)?.abort();
     return { success: true };

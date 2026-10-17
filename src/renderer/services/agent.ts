@@ -37,6 +37,10 @@ class AgentService {
           presetId: a.presetId ?? '',
           systemPrompt: a.systemPrompt ?? '',
           skillIds: a.skillIds ?? [],
+          mcpIds: a.mcpIds ?? [],
+          identity: a.identity ?? '',
+          createdAt: a.createdAt,
+          updatedAt: a.updatedAt,
         }));
         store.dispatch(setAgents(mappedAgents));
       }
@@ -44,6 +48,16 @@ class AgentService {
       console.error('Failed to load agents:', error);
     } finally {
       store.dispatch(setLoading(false));
+    }
+  }
+
+  async listAgents(): Promise<{ success: boolean; agents?: Agent[] }> {
+    try {
+      const agents = await window.electron?.agents?.list();
+      return { success: true, agents: agents ?? [] };
+    } catch (error) {
+      console.error('Failed to list agents:', error);
+      return { success: false };
     }
   }
 
@@ -56,6 +70,7 @@ class AgentService {
     workingDirectory?: string;
     icon?: string;
     skillIds?: string[];
+    mcpIds?: string[];
   }): Promise<Agent | null> {
     try {
       const agent = await window.electron?.agents?.create(request);
@@ -76,6 +91,10 @@ class AgentService {
             presetId: agent.presetId ?? '',
             systemPrompt: agent.systemPrompt ?? '',
             skillIds: agent.skillIds ?? [],
+            mcpIds: agent.mcpIds ?? [],
+            identity: agent.identity ?? '',
+            createdAt: agent.createdAt,
+            updatedAt: agent.updatedAt,
           }),
         );
         return agent;
@@ -98,6 +117,7 @@ class AgentService {
       workingDirectory?: string;
       icon?: string;
       skillIds?: string[];
+      mcpIds?: string[];
       enabled?: boolean;
       pinned?: boolean;
       triageOverride?: import('../../shared/triage').AgentTriageOverride | null;
@@ -119,6 +139,8 @@ class AgentService {
               pinned: agent.pinned ?? false,
               pinOrder: agent.pinOrder ?? null,
               skillIds: agent.skillIds ?? [],
+              mcpIds: agent.mcpIds ?? [],
+              identity: agent.identity,
             },
           }),
         );

@@ -169,10 +169,22 @@ export async function startPiRuntimeSession(
     // pi's formatSkillsForPrompt — no manual injection here to avoid
     // duplicating the skills section.
     const basePrompt = options.systemPrompt?.trim() || '';
+    const expertStore = host.getStore();
+    const expertSession =
+      options.expertIds?.length && expertStore
+        ? expertStore
+            .getSession(sessionId, 0, { includeArtifacts: false })
+            ?.experts?.find(e => options.expertIds!.includes(e.expertId))
+        : null;
+    // Experts bind skills as part of their definition; load them alongside
+    // the caller's picks without changing sessions that have no expert.
+    const effectiveSkillIds = expertSession?.skillIds?.length
+      ? normalizeSkillIds([...(options.skillIds ?? []), ...expertSession.skillIds])
+      : normalizeSkillIds(options.skillIds);
     const chatMode = options.sessionMode === CoworkSessionMode.Chat;
     const resourceState: PiResourceState = {
       systemPrompt: basePrompt,
-      skillIds: normalizeSkillIds(options.skillIds),
+      skillIds: effectiveSkillIds,
       maxOutputTokens: DEFAULT_PI_LOCAL_MAX_TOKENS,
       fileToolsEnabled: options.confirmationMode !== 'text',
       unattended: options.unattended === true,
@@ -286,8 +298,11 @@ export async function startPiRuntimeSession(
         : undefined;
     const codemodeEnabled =
       options.codemode === true && !resourceState.chatMode && options.confirmationMode !== 'text';
+    const expertMcpIds = Array.isArray(expertSession?.capabilityPolicy?.mcpIds)
+      ? (expertSession.capabilityPolicy.mcpIds as string[])
+      : [];
     const mcpNativeBridge =
-      options.mcpNativeBridge === true &&
+      (options.mcpNativeBridge === true || expertMcpIds.length > 0) &&
       !resourceState.chatMode &&
       Boolean(host.getMcpServerManager());
     const resourceLoader = await createPiRuntimeResourceLoader(
@@ -305,6 +320,7 @@ export async function startPiRuntimeSession(
           WorkbenchApprovalMode.Ask,
         enableCodemode: codemodeEnabled,
         enableMcpNative: mcpNativeBridge,
+        expertMcpIds,
       },
     );
     applyPiCompactionOverrides(
