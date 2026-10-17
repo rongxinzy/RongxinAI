@@ -12,6 +12,11 @@ const {
   MAX_NON_COMPONENT_BYTES,
   MAX_NSIS_BYTES,
   MAX_NSIS_NON_COMPONENT_BYTES,
+  LLAMACPP_CPU_RUNTIME_COMPONENT_BYTES,
+  LLAMACPP_CPU_RUNTIME_MARGIN_BYTES,
+  LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES,
+  resolveEditionSetupBudget,
+  resolveEditionNsisBudget,
   assertSetupBudget,
   assertNsisBudget,
   readComponentArchiveBytes,
@@ -53,7 +58,7 @@ test('the real Windows build fits and signature bytes consume the remaining budg
   expect(() => assertSetupBudget(220 * MiB + 100 + 16, 100)).toThrow(/220 MiB/);
 });
 
-test('NSIS budgets are edition-specific (lite/cpu/cuda)', () => {
+test('NSIS budgets: lite keeps the original limits, cpu equals lite, cuda is uncapped', () => {
   expect(MAX_NSIS_BYTES).toBe(450 * MiB);
   expect(MAX_NSIS_NON_COMPONENT_BYTES).toBe(150 * MiB);
   expect(assertNsisBudget(450 * MiB, 300 * MiB, 'lite')).toMatchObject({
@@ -65,13 +70,52 @@ test('NSIS budgets are edition-specific (lite/cpu/cuda)', () => {
   expect(() => assertNsisBudget(450 * MiB + 1, 300 * MiB, 'lite')).toThrow(/450 MiB/);
   expect(() => assertNsisBudget(400 * MiB, 250 * MiB - 1, 'lite')).toThrow(/150 MiB/);
   expect(assertNsisBudget(439_171_500, 288_626_662, 'lite').nonComponentBytes).toBe(150_544_838);
-  expect(assertNsisBudget(378 * MiB, 288_626_662, 'cpu')).toMatchObject({ edition: 'cpu' });
-  expect(() => assertNsisBudget(479_234_525, 288_626_662, 'cpu')).toThrow(/450 MiB/);
-  expect(assertNsisBudget(500 * MiB, 300 * MiB, 'cuda')).toMatchObject({
+  // The NSIS updater never carries llama.cpp, so cpu gets no extra NSIS room.
+  const { measured: _liteMeasured, ...liteNsis } = resolveEditionNsisBudget('lite');
+  const { measured: _cpuMeasured, ...cpuNsis } = resolveEditionNsisBudget('cpu');
+  expect(cpuNsis).toEqual(liteNsis);
+  expect(() => assertNsisBudget(400 * MiB, 250 * MiB - 1, 'cpu')).toThrow(/150 MiB/);
+  expect(assertNsisBudget(2048 * MiB, 300 * MiB, 'cuda')).toMatchObject({
     skipped: true,
     edition: 'cuda',
   });
-  expect(() => assertSetupBudget(491_244_872, 288_626_662)).not.toThrow();
+});
+
+test('WebView2 setup budget selection is per edition and derived from the llama.cpp component', () => {
+  expect(LLAMACPP_CPU_RUNTIME_COMPONENT_BYTES).toBe(316_378_462 - 288_942_645);
+  expect(LLAMACPP_CPU_RUNTIME_MARGIN_BYTES).toBe(2 * MiB);
+  expect(LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES).toBe(
+    LLAMACPP_CPU_RUNTIME_COMPONENT_BYTES + LLAMACPP_CPU_RUNTIME_MARGIN_BYTES,
+  );
+  expect(resolveEditionSetupBudget('lite')).toEqual({
+    maxInstallerBytes: 500 * MiB,
+    maxComponentBytes: 300 * MiB,
+    maxNonComponentBytes: 220 * MiB,
+  });
+  expect(resolveEditionSetupBudget('cpu')).toEqual({
+    maxInstallerBytes: 500 * MiB + LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES,
+    maxComponentBytes: 300 * MiB + LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES,
+    maxNonComponentBytes: 220 * MiB,
+  });
+  expect(resolveEditionSetupBudget('cuda')).toEqual({
+    maxInstallerBytes: null,
+    maxComponentBytes: null,
+    maxNonComponentBytes: null,
+  });
+  expect(resolveEditionSetupBudget('unknown')).toEqual(resolveEditionSetupBudget('lite'));
+
+  // Real CI measurements (run 39014993557).
+  expect(() => assertSetupBudget(527_632_536, 316_378_462, 'lite')).toThrow(/300 MiB/);
+  expect(assertSetupBudget(527_632_536, 316_378_462, 'cpu')).toMatchObject({ edition: 'cpu' });
+  expect(assertSetupBudget(500_213_656, 288_942_645, 'lite')).toMatchObject({ edition: 'lite' });
+  // cpu only gains the llama.cpp allowance: anything beyond it still fails.
+  const cpu = resolveEditionSetupBudget('cpu');
+  expect(() => assertSetupBudget(400 * MiB, cpu.maxComponentBytes + 1, 'cpu')).toThrow(
+    /component|Component/,
+  );
+  expect(() => assertSetupBudget(cpu.maxInstallerBytes + 1, 300 * MiB, 'cpu')).toThrow(/MiB/);
+  expect(() => assertSetupBudget(220 * MiB + 1 + 10, 10, 'cpu')).toThrow(/220 MiB/);
+  expect(assertSetupBudget(4096 * MiB, 3000 * MiB, 'cuda')).toMatchObject({ edition: 'cuda' });
 });
 
 test('the NSIS final gate reads the sole updater without modifying its bytes', () => {

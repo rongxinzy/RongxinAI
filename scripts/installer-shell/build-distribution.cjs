@@ -10,6 +10,7 @@ const {
   verifyFinalSetupBudget,
   verifyFinalNsisBudget,
   describeEditionByteBreakdown,
+  resolveEditionSetupBudget,
 } = require('./distribution-budget.cjs');
 const { resolveInferenceEdition } = require('../resolve-nsis-offline-components.cjs');
 
@@ -73,6 +74,8 @@ const nsisBudget = verifyFinalNsisBudget(
 );
 console.log(`[installer-shell] final NSIS updater budget ${JSON.stringify(nsisBudget)}`);
 // The report must describe the final signed bytes, never the pre-signing file.
-const report = writeSetupManifest(setup, version);
+const report = writeSetupManifest(setup, version, {
+  maxBytes: resolveEditionSetupBudget(edition).maxInstallerBytes,
+});
 if (report.signed !== signed) throw new Error('Unexpected setup signature state');
 console.log(`[installer-shell] distribution ready: ${setup} (${report.sha256})`);

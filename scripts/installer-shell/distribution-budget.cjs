@@ -10,18 +10,72 @@ const {
 } = require('../resolve-nsis-offline-components.cjs');
 
 const MiB = 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// Windows installer byte budgets, per inference edition.
+//
+// lite is the product baseline and keeps the ORIGINAL limits unchanged:
+//   WebView2 setup: total 500 MiB, components 300 MiB, non-component 220 MiB
+//   NSIS updater:   total 450 MiB, non-component 150 MiB (components 300 MiB)
+// Never loosen lite to absorb growth: find and remove the growth instead.
+//
+// cpu = lite + exactly the bundled CPU+Vulkan llama.cpp runtime. On Windows that
+// runtime ships only as the eighth offline component of the WebView2 setup
+// (llamacpp-bundled.7z); the NSIS updater does not carry it, so cpu NSIS limits
+// are identical to lite. The allowance is the measured component archive plus
+// an explicit margin, so any other growth in a cpu build still fails the gate.
+//
+// cuda is a factory-preinstall edition (CUDA 12.4 runtime + cuBLAS is ~1 GiB),
+// so it has no size cap. Its integrity is still enforced: the llama.cpp archive
+// is pinned by sha256 in resources/llamacpp-backends/manifest.json
+// (finalize-llamacpp-cuda-edition.cjs) and every component archive is checked
+// against its manifest size and sha256 by readComponentArchiveBytes().
+// ---------------------------------------------------------------------------
 const MAX_COMPONENT_BYTES = 300 * MiB;
 const MAX_NON_COMPONENT_BYTES = 220 * MiB;
 const MAX_NSIS_BYTES = 450 * MiB;
 const MAX_NSIS_NON_COMPONENT_BYTES = 150 * MiB;
 
-/** Measured on CI (build-platforms @ 558d5243): cpu NSIS updater with in-app llamacpp. */
-const CPU_NSIS_MEASURED = {
-  installerBytes: 479_234_525,
-  componentArchiveBytes: 288_626_662,
-  nonComponentBytes: 190_607_863,
+/**
+ * llamacpp-bundled.7z for win-x64 cpu (llama.cpp b9244 CPU + Vulkan), measured on
+ * CI verify run 39014993557 (job 117345181236): cpu componentArchiveBytes
+ * 316_378_462 - lite componentArchiveBytes 288_942_645 = 27_435_817 bytes.
+ */
+const LLAMACPP_CPU_RUNTIME_COMPONENT_BYTES = 27_435_817;
+/** ~7% headroom for llama.cpp build-to-build drift; re-measure when bumping the tag. */
+const LLAMACPP_CPU_RUNTIME_MARGIN_BYTES = 2 * MiB;
+const LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES =
+  LLAMACPP_CPU_RUNTIME_COMPONENT_BYTES + LLAMACPP_CPU_RUNTIME_MARGIN_BYTES;
+
+const LITE_SETUP_BUDGET = {
+  maxInstallerBytes: MAX_SETUP_BYTES,
+  maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
+  maxComponentBytes: MAX_COMPONENT_BYTES,
 };
-/** Baseline lite/cpu app payload inside NSIS (seven fixed components deducted). */
+const UNCAPPED_BUDGET = {
+  maxInstallerBytes: null,
+  maxNonComponentBytes: null,
+  maxComponentBytes: null,
+};
+
+const EDITION_SETUP_BUDGETS = {
+  lite: LITE_SETUP_BUDGET,
+  cpu: {
+    maxInstallerBytes: MAX_SETUP_BYTES + LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES,
+    // The runtime is a component archive, so non-component bytes stay at lite.
+    maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
+    maxComponentBytes: MAX_COMPONENT_BYTES + LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES,
+  },
+  cuda: UNCAPPED_BUDGET,
+};
+
+const LITE_NSIS_BUDGET = {
+  maxInstallerBytes: MAX_NSIS_BYTES,
+  maxNonComponentBytes: MAX_NSIS_NON_COMPONENT_BYTES,
+  maxComponentBytes: MAX_COMPONENT_BYTES,
+};
+
+/** lite NSIS updater measured on main #988 (072068ff), before the Magpie gateway shipped. */
 const LITE_NSIS_MEASURED = {
   installerBytes: 439_171_500,
   componentArchiveBytes: 288_626_662,
@@ -29,27 +83,15 @@ const LITE_NSIS_MEASURED = {
 };
 
 const EDITION_NSIS_BUDGETS = {
-  lite: {
-    maxInstallerBytes: MAX_NSIS_BYTES,
-    maxNonComponentBytes: MAX_NSIS_NON_COMPONENT_BYTES,
-    maxComponentBytes: MAX_COMPONENT_BYTES,
-    measured: LITE_NSIS_MEASURED,
-  },
-  cpu: {
-    // NSIS gate keeps the seven fixed runtime components as the deduction baseline; llama.cpp
-    // ships as an eighth offline component in the WebView2 setup payload only.
-    maxInstallerBytes: MAX_NSIS_BYTES,
-    maxNonComponentBytes: MAX_NSIS_NON_COMPONENT_BYTES,
-    maxComponentBytes: 400 * MiB,
-    measured: CPU_NSIS_MEASURED,
-  },
-  cuda: {
-    maxInstallerBytes: null,
-    maxNonComponentBytes: null,
-    maxComponentBytes: null,
-    measured: null,
-  },
+  lite: { ...LITE_NSIS_BUDGET, measured: LITE_NSIS_MEASURED },
+  // The NSIS updater never contains llama.cpp, so cpu is held to lite exactly.
+  cpu: { ...LITE_NSIS_BUDGET, measured: LITE_NSIS_MEASURED },
+  cuda: { ...UNCAPPED_BUDGET, measured: null },
 };
+
+function resolveEditionSetupBudget(edition = resolveInferenceEdition()) {
+  return EDITION_SETUP_BUDGETS[edition] || EDITION_SETUP_BUDGETS.lite;
+}
 
 function resolveEditionNsisBudget(edition = resolveInferenceEdition()) {
   return EDITION_NSIS_BUDGETS[edition] || EDITION_NSIS_BUDGETS.lite;
@@ -88,17 +130,20 @@ function assertBudget(installerBytes, componentArchiveBytes, limits, label) {
   };
 }
 
-function assertSetupBudget(installerBytes, componentArchiveBytes) {
-  return assertBudget(
-    installerBytes,
-    componentArchiveBytes,
-    {
-      maxInstallerBytes: MAX_SETUP_BYTES,
-      maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
-      maxComponentBytes: MAX_COMPONENT_BYTES,
-    },
-    'WebView2 installer',
-  );
+function assertSetupBudget(
+  installerBytes,
+  componentArchiveBytes,
+  edition = resolveInferenceEdition(),
+) {
+  return {
+    edition,
+    ...assertBudget(
+      installerBytes,
+      componentArchiveBytes,
+      resolveEditionSetupBudget(edition),
+      'WebView2 installer',
+    ),
+  };
 }
 
 function assertNsisBudget(
@@ -151,9 +196,15 @@ function readComponentArchiveBytes(componentsDir, edition = resolveInferenceEdit
   return total;
 }
 
-function verifyFinalSetupBudget(setup, componentsDir) {
-  const final = inspectSetup(setup);
-  return assertSetupBudget(final.installerBytes, readComponentArchiveBytes(componentsDir));
+function verifyFinalSetupBudget(setup, componentsDir, edition = resolveInferenceEdition()) {
+  const final = inspectSetup(setup, {
+    maxBytes: resolveEditionSetupBudget(edition).maxInstallerBytes,
+  });
+  return assertSetupBudget(
+    final.installerBytes,
+    readComponentArchiveBytes(componentsDir, edition),
+    edition,
+  );
 }
 
 function readNsisUpdaterComponentDeductionBytes(componentsDir) {
@@ -243,7 +294,12 @@ module.exports = {
   MAX_NON_COMPONENT_BYTES,
   MAX_NSIS_BYTES,
   MAX_NSIS_NON_COMPONENT_BYTES,
+  LLAMACPP_CPU_RUNTIME_COMPONENT_BYTES,
+  LLAMACPP_CPU_RUNTIME_MARGIN_BYTES,
+  LLAMACPP_CPU_RUNTIME_ALLOWANCE_BYTES,
+  EDITION_SETUP_BUDGETS,
   EDITION_NSIS_BUDGETS,
+  resolveEditionSetupBudget,
   resolveEditionNsisBudget,
   assertSetupBudget,
   assertNsisBudget,
