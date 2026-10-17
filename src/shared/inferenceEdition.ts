@@ -24,7 +24,7 @@ export function isBundledRuntimeEdition(edition: InferenceEdition): boolean {
   return isLocalInferenceEnabledForEdition(edition);
 }
 
-/** CUDA edition only ships on Windows/Linux x64; macOS uses cpu (Metal) or lite. */
+/** CUDA edition only ships on Windows/Linux x64; macOS ships cpu (Metal) only, lite is Windows-only. */
 export function isCudaInferenceEditionSupported(
   edition: InferenceEdition,
   platform: NodeJS.Platform,

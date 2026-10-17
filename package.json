@@ -150,7 +150,6 @@
     "finalize:vendor-llamacpp-cuda": "node scripts/finalize-llamacpp-cuda-edition.cjs",
     "predist:linux": "npm run channel:runtime:linux-x64 && npm run engram:runtime:linux-x64 && node scripts/ensure-build-version.js && npm run prepare:update-release",
     "dist:linux": "npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:linux-x64 && electron-builder --linux --publish never",
-    "dist:linux:lite": "cross-env ZHIYUAN_UPDATE_VARIANT=lite npm run dist:linux",
     "dist:linux:cpu": "cross-env ZHIYUAN_UPDATE_VARIANT=cpu npm run sync:vendor-llamacpp-cpu && cross-env ZHIYUAN_UPDATE_VARIANT=cpu npm run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cpu npm run dist:linux",
     "dist:linux:cuda": "cross-env ZHIYUAN_UPDATE_VARIANT=cuda npm run sync:vendor-llamacpp-cpu && bash scripts/build-llamacpp-cuda-rtx40.sh linux && cross-env ZHIYUAN_UPDATE_VARIANT=cuda npm run finalize:vendor-llamacpp-cuda && cross-env ZHIYUAN_UPDATE_VARIANT=cuda npm run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cuda npm run dist:linux",
     "clean:release": "rimraf release",

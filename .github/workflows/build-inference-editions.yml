@@ -20,7 +20,7 @@ on:
         type: boolean
         default: false
       build-macos:
-        description: 'Include macOS lite/cpu matrix legs'
+        description: 'Include macOS cpu matrix legs (arm64 + x64; lite is Windows-only)'
         type: boolean
         default: true
       build-windows:
@@ -28,7 +28,7 @@ on:
         type: boolean
         default: true
       build-linux:
-        description: 'Include Linux lite/cpu/cuda matrix legs'
+        description: 'Include Linux cpu/cuda matrix legs (lite is Windows-only)'
         type: boolean
         default: true
     secrets:
@@ -87,8 +87,11 @@ jobs:
               separator=','
             done
           fi
+          # Edition matrix (krli, 2026-10-17): lite is Windows-only. Windows
+          # lite/cpu/cuda, Linux cpu/cuda, macOS cpu (arm64 + x64) = 7 legs.
+          # Keep in sync with scripts/release/inference-edition-targets.mjs.
           if [[ "$BUILD_LINUX" == "true" ]]; then
-            for edition in lite cpu cuda; do
+            for edition in cpu cuda; do
               matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-${edition}-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"${edition}\",\"target\":\"linux-x64-${edition}\"}"
               separator=','
             done
@@ -97,10 +100,6 @@ jobs:
             matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-latest\",\"artifact\":\"macos-arm64-cpu-build\",\"runtime_target\":\"mac-arm64\",\"arch\":\"arm64\",\"inference_edition\":\"cpu\",\"target\":\"darwin-arm64-cpu\"}"
             separator=','
             matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-15-intel\",\"artifact\":\"macos-x64-cpu-build\",\"runtime_target\":\"mac-x64\",\"arch\":\"x64\",\"inference_edition\":\"cpu\",\"target\":\"darwin-x64-cpu\"}"
-            separator=','
-            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-latest\",\"artifact\":\"macos-arm64-lite-build\",\"runtime_target\":\"mac-arm64\",\"arch\":\"arm64\",\"inference_edition\":\"lite\",\"target\":\"darwin-arm64-lite\"}"
-            separator=','
-            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-15-intel\",\"artifact\":\"macos-x64-lite-build\",\"runtime_target\":\"mac-x64\",\"arch\":\"x64\",\"inference_edition\":\"lite\",\"target\":\"darwin-x64-lite\"}"
           fi
 
           matrix+=']}'

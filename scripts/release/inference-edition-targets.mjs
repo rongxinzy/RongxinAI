@@ -3,15 +3,18 @@
 /** @type {InferenceEditionVariant[]} */
 export const WINDOWS_INFERENCE_VARIANTS = ['lite', 'cpu', 'cuda'];
 
+// Edition matrix (krli, 2026-10-17): lite is Windows-only. macOS ships only cpu
+// (Metal) per arch; Linux ships cpu + cuda; Windows ships lite + cpu + cuda.
 /** @type {InferenceEditionVariant[]} */
-export const LINUX_INFERENCE_VARIANTS = ['lite', 'cpu', 'cuda'];
+export const LINUX_INFERENCE_VARIANTS = ['cpu', 'cuda'];
 
 /** @type {InferenceEditionVariant[]} */
-export const MACOS_INFERENCE_VARIANTS = ['lite', 'cpu'];
+export const MACOS_INFERENCE_VARIANTS = ['cpu'];
 
 /**
  * Stable release targets for signed update manifests.
- * Linux ships deb + AppImage per inference edition; macOS has lite/cpu per arch.
+ * Linux ships deb + AppImage per inference edition (cpu, cuda); macOS ships
+ * cpu per arch; Windows ships lite, cpu and cuda.
  */
 export function listRequiredReleaseTargets() {
   /** @type {string[]} */
@@ -38,7 +41,7 @@ export function isWindowsInferenceVariant(variant) {
 }
 
 export function parseLinuxReleaseVariant(variant) {
-  const match = /^(deb|appimage)-(lite|cpu|cuda)$/.exec(variant ?? '');
+  const match = /^(deb|appimage)-(cpu|cuda)$/.exec(variant ?? '');
   if (!match) return null;
   return { format: match[1], edition: match[2] };
 }
