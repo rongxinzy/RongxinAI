@@ -31,6 +31,8 @@ case "${PLATFORM}" in
     CMAKE_ARGS+=(
       -DGGML_METAL=OFF
       -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined
+      -DCMAKE_BUILD_RPATH='$ORIGIN'
+      -DCMAKE_INSTALL_RPATH='$ORIGIN'
     )
     EXECUTABLE_NAME=llama-server
     ;;

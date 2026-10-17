@@ -1,6 +1,5 @@
 'use strict';
 
-const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -12,6 +11,11 @@ const {
   resolveExecutableName,
   extractArchiveToDirectory,
 } = require('./download-llamacpp-runtime.cjs');
+const {
+  assertNoNvidiaDriverLibraries,
+  NVIDIA_DRIVER_CUDA_LIB,
+} = require('./finalize-llamacpp-cuda-edition.lib.cjs');
+const { verifyLinuxCudaServerLdd } = require('./stage-linux-cuda-runtime-libs.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const BUNDLED_MANIFEST_PATH = path.join(ROOT, 'resources', 'llamacpp-backends', 'manifest.json');
@@ -71,27 +75,6 @@ function findRuntimePayloadDirectory(rootDir) {
   return fallback || rootDir;
 }
 
-const NVIDIA_DRIVER_CUDA_LIB = /^libcuda\.so(\.|$)/i;
-
-function assertNoNvidiaDriverLibraries(rootDir) {
-  const queue = [rootDir];
-  while (queue.length > 0) {
-    const currentDir = queue.shift();
-    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
-      const absolutePath = path.join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        queue.push(absolutePath);
-        continue;
-      }
-      if (NVIDIA_DRIVER_CUDA_LIB.test(entry.name)) {
-        throw new Error(
-          `[finalize-llamacpp-cuda-edition] Refusing to bundle NVIDIA driver library ${entry.name}; runtime must use the host driver.`,
-        );
-      }
-    }
-  }
-}
-
 function copyDirectoryContents(sourceDir, targetDir) {
   fs.mkdirSync(targetDir, { recursive: true });
   for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
@@ -125,24 +108,92 @@ function ensureCpuEditionStaged(targetId) {
   }
 }
 
-async function main() {
-  const platform = (process.env.LLAMACPP_CUDA_PLATFORM || process.argv[2] || process.platform).trim();
-  const hostTargetId =
-    platform === 'win' || platform === 'win32' ? 'win-x64' : platform === 'linux' ? 'linux-x64' : null;
-  if (!hostTargetId) {
-    throw new Error(`Unsupported LLAMACPP_CUDA_PLATFORM: ${platform}`);
-  }
+function writeCpuFallback(hostTargetId, executableName) {
+  const cpuFallbackRoot = path.join(CUDA_EDITION_ROOT, 'cpu-fallback');
+  fs.rmSync(cpuFallbackRoot, { recursive: true, force: true });
+  const releaseTag = resolveRuntimeReleaseTag(ROOT);
+  const cpuBackendDir = path.join(CPU_EDITION_ROOT, 'backends', releaseTag, hostTargetId, 'bin');
+  const cpuBinSource = fs.existsSync(cpuBackendDir)
+    ? cpuBackendDir
+    : path.join(CPU_EDITION_ROOT, 'bin');
+  copyDirectoryContents(cpuBinSource, cpuFallbackRoot);
+  assertNoNvidiaDriverLibraries(cpuFallbackRoot);
+  return path.join('cpu-fallback', executableName).replace(/\\/g, '/');
+}
 
-  const cudaBackendId = resolveCudaBackendId(platform);
-  const executableName = resolveExecutableName(hostTargetId);
-  const builtServerPath = path.join(CUDA_EDITION_ROOT, 'bin', executableName);
+function writeManifest(input) {
+  const manifest = {
+    schemaVersion: 1,
+    backend: {
+      version: 'bundled',
+      backend: `${input.hostTargetId}-cuda-rtx40-sm89`,
+      versionBackend: `${input.releaseTag}/${input.cudaBackendId}-sm89`,
+    },
+    executable: `bin/${input.executableName}`,
+    cpuFallbackExecutable: input.cpuFallbackExecutable,
+    cudaLibraries: input.cudaLibraries,
+    archiveSha256: input.archiveSha256,
+  };
+  if (input.cudaRuntimeLibrariesDigest) {
+    manifest.cudaRuntimeLibrariesDigest = input.cudaRuntimeLibrariesDigest;
+  }
+  if (input.cpuFallbackArchiveSha256) {
+    manifest.cpuFallbackArchiveSha256 = input.cpuFallbackArchiveSha256;
+  }
+  manifest.sha256 = sha256File(path.join(CUDA_EDITION_ROOT, manifest.executable));
+  manifest.cpuFallbackSha256 = sha256File(
+    path.join(CUDA_EDITION_ROOT, input.cpuFallbackExecutable),
+  );
+  fs.writeFileSync(
+    path.join(CUDA_EDITION_ROOT, 'manifest.json'),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
+  return manifest;
+}
+
+async function finalizeLinuxEdition(hostTargetId, cudaBackendId, executableName, builtServerBytes) {
+  ensureCpuEditionStaged(hostTargetId);
+  const binDir = path.join(CUDA_EDITION_ROOT, 'bin');
+  const builtServerPath = path.join(binDir, executableName);
   if (!fs.existsSync(builtServerPath)) {
     throw new Error(
       `Missing self-built CUDA llama-server at ${builtServerPath}. Run build-llamacpp-cuda-rtx40.sh first.`,
     );
   }
-  const builtServerBytes = fs.readFileSync(builtServerPath);
 
+  const buildInfoPath = path.join(binDir, 'runtime-build-info.json');
+  if (!fs.existsSync(buildInfoPath)) {
+    throw new Error(
+      'Missing staged CUDA runtime libraries. Run scripts/stage-linux-cuda-runtime-libs.cjs inside the CUDA devel container after building llama-server.',
+    );
+  }
+  const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf8'));
+  assertNoNvidiaDriverLibraries(binDir);
+  fs.writeFileSync(builtServerPath, builtServerBytes);
+  if (process.platform === 'linux') {
+    verifyLinuxCudaServerLdd(builtServerPath);
+  }
+
+  const cpuFallbackExecutable = writeCpuFallback(hostTargetId, executableName);
+  const releaseTag = resolveRuntimeReleaseTag(ROOT);
+  const cpuArchiveSha256 = readExpectedArchiveSha256('linux-x64');
+  const manifest = writeManifest({
+    hostTargetId,
+    cudaBackendId,
+    executableName,
+    cpuFallbackExecutable,
+    cudaLibraries: 'cuda-toolkit-staged',
+    archiveSha256: buildInfo.librariesDigest,
+    cudaRuntimeLibrariesDigest: buildInfo.librariesDigest,
+    cpuFallbackArchiveSha256: cpuArchiveSha256,
+    releaseTag,
+  });
+  console.log(
+    `[finalize-llamacpp-cuda-edition] Staged Linux CUDA edition with toolkit libraries and CPU fallback (${manifest.sha256.slice(0, 12)}…).`,
+  );
+}
+
+async function finalizeWindowsEdition(hostTargetId, cudaBackendId, executableName, builtServerBytes) {
   ensureCpuEditionStaged(hostTargetId);
 
   const urls = resolveRuntimeDownloadSources(cudaBackendId, { rootDir: ROOT });
@@ -172,48 +223,59 @@ async function main() {
     copyDirectoryContents(payloadDir, binDir);
     assertNoNvidiaDriverLibraries(binDir);
     fs.writeFileSync(path.join(binDir, executableName), builtServerBytes);
-    if (process.platform !== 'win32') {
-      fs.chmodSync(path.join(binDir, executableName), 0o755);
-    }
+    fs.chmodSync(path.join(binDir, executableName), 0o755);
 
-    const cpuFallbackRoot = path.join(CUDA_EDITION_ROOT, 'cpu-fallback');
-    fs.rmSync(cpuFallbackRoot, { recursive: true, force: true });
+    const cpuFallbackExecutable = writeCpuFallback(hostTargetId, executableName);
     const releaseTag = resolveRuntimeReleaseTag(ROOT);
-    const cpuBackendDir = path.join(CPU_EDITION_ROOT, 'backends', releaseTag, hostTargetId, 'bin');
-    const cpuBinSource = fs.existsSync(cpuBackendDir)
-      ? cpuBackendDir
-      : path.join(CPU_EDITION_ROOT, 'bin');
-    copyDirectoryContents(cpuBinSource, cpuFallbackRoot);
-    assertNoNvidiaDriverLibraries(cpuFallbackRoot);
-
-    const cpuFallbackExecutable = path
-      .join('cpu-fallback', executableName)
-      .replace(/\\/g, '/');
-    const manifest = {
-      schemaVersion: 1,
-      backend: {
-        version: 'bundled',
-        backend: `${hostTargetId}-cuda-rtx40-sm89`,
-        versionBackend: `${releaseTag}/${cudaBackendId}-sm89`,
-      },
-      executable: `bin/${executableName}`,
+    const manifest = writeManifest({
+      hostTargetId,
+      cudaBackendId,
+      executableName,
       cpuFallbackExecutable,
       cudaLibraries: 'bundled-full',
       archiveSha256: expectedSha256 || sha256File(archivePath),
-    };
-    manifest.sha256 = sha256File(path.join(CUDA_EDITION_ROOT, manifest.executable));
-    manifest.cpuFallbackSha256 = sha256File(path.join(CUDA_EDITION_ROOT, cpuFallbackExecutable));
-    fs.writeFileSync(
-      path.join(CUDA_EDITION_ROOT, 'manifest.json'),
-      `${JSON.stringify(manifest, null, 2)}\n`,
-    );
-
+      releaseTag,
+    });
     console.log(
-      `[finalize-llamacpp-cuda-edition] Staged CUDA edition with full runtime libs and embedded CPU fallback (${manifest.sha256.slice(0, 12)}…).`,
+      `[finalize-llamacpp-cuda-edition] Staged Windows CUDA edition with full runtime libs and embedded CPU fallback (${manifest.sha256.slice(0, 12)}…).`,
     );
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
+}
+
+async function main() {
+  const platform = (
+    process.env.LLAMACPP_CUDA_PLATFORM ||
+    process.argv[2] ||
+    process.platform
+  ).trim();
+  const hostTargetId =
+    platform === 'win' || platform === 'win32'
+      ? 'win-x64'
+      : platform === 'linux'
+        ? 'linux-x64'
+        : null;
+  if (!hostTargetId) {
+    throw new Error(`Unsupported LLAMACPP_CUDA_PLATFORM: ${platform}`);
+  }
+
+  const cudaBackendId = resolveCudaBackendId(platform);
+  const executableName = resolveExecutableName(hostTargetId);
+  const builtServerPath = path.join(CUDA_EDITION_ROOT, 'bin', executableName);
+  if (!fs.existsSync(builtServerPath)) {
+    throw new Error(
+      `Missing self-built CUDA llama-server at ${builtServerPath}. Run build-llamacpp-cuda-rtx40.sh first.`,
+    );
+  }
+  const builtServerBytes = fs.readFileSync(builtServerPath);
+
+  if (platform === 'linux') {
+    await finalizeLinuxEdition(hostTargetId, cudaBackendId, executableName, builtServerBytes);
+    return;
+  }
+
+  await finalizeWindowsEdition(hostTargetId, cudaBackendId, executableName, builtServerBytes);
 }
 
 module.exports = {

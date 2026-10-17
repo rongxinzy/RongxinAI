@@ -28,11 +28,12 @@ docker run --rm \
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
     apt-get update
-    apt-get install -y --no-install-recommends cmake ninja-build git ca-certificates
+    apt-get install -y --no-install-recommends cmake ninja-build git ca-certificates patchelf binutils
     rm -rf /var/lib/apt/lists/*
     git config --global --add safe.directory "*"
     nvcc --version
     bash scripts/build-llamacpp-cuda-rtx40.sh linux
+    node scripts/stage-linux-cuda-runtime-libs.cjs /workspace/vendor/llamacpp/cuda/bin/llama-server
   '
 
 server="${ROOT_DIR}/vendor/llamacpp/cuda/bin/llama-server"

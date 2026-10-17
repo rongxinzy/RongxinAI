@@ -5,8 +5,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { verifyPackagedMagpie } = require('../magpie-runtime.cjs');
+const { verifyWindowsCompressedChannelRuntime } = require('./verify-windows-packaged-components.cjs');
 
-const RETIRED_RUNTIME_IN_PATH = /(?:^|[/\\])\.openclaw(?:[/\\]|$)|(?:^|[/\\])(?:openclaw|cfmind)(?:[/\\]|$)/i;
+const RETIRED_RUNTIME_IN_PATH =
+  /(?:^|[/\\])\.openclaw(?:[/\\]|$)|(?:^|[/\\])(?:openclaw|cfmind)(?:[/\\]|$)/i;
 
 function sha256File(filePath) {
   const hash = crypto.createHash('sha256');
@@ -18,9 +20,7 @@ function resolveTargetArch(context) {
   if (context?.arch === 3) return 'arm64';
   if (context?.arch === 0) return 'ia32';
   if (context?.arch === 1) return 'x64';
-  throw new Error(
-    `[PackagedRuntimeVerify] Unknown packaging arch: ${String(context?.arch)}`,
-  );
+  throw new Error(`[PackagedRuntimeVerify] Unknown packaging arch: ${String(context?.arch)}`);
 }
 
 function packagedResourcesRoot(context) {
@@ -50,9 +50,7 @@ function verifySha256(relativeLabel, filePath, expectedSha256) {
 
 function verifyPackagedChannelRuntime(context) {
   const projectRoot = context.packager.projectDir;
-  const packageJson = JSON.parse(
-    fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'),
-  );
+  const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
   const config = packageJson.channelRuntime;
   const platform = context.electronPlatformName;
   const arch = resolveTargetArch(context);
@@ -64,6 +62,11 @@ function verifyPackagedChannelRuntime(context) {
     throw new Error(
       `[PackagedRuntimeVerify] package.json is missing channelRuntime pin for ${targetId}`,
     );
+  }
+
+  if (platform === 'win32') {
+    verifyWindowsCompressedChannelRuntime(context, targetId, expectedChecksum, binaryName);
+    return;
   }
 
   const runtimeDir = path.join(packagedResourcesRoot(context), 'channel-runtime');

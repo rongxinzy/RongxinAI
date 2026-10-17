@@ -2,9 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/bash-windows-path.sh
+source "${ROOT_DIR}/scripts/bash-windows-path.sh"
+PACKAGE_JSON_FOR_NODE="$(to_windows_node_path "${ROOT_DIR}/package.json")"
 SRC_DIR="${LLAMACPP_SRC:-${ROOT_DIR}/.cache/llama.cpp-src}"
 RELEASE_TAG="$(
-  node -p "JSON.parse(require('fs').readFileSync('${ROOT_DIR}/package.json','utf8')).llamacpp?.runtimeReleaseTag || 'b9244'"
+  node -p "JSON.parse(require('fs').readFileSync('${PACKAGE_JSON_FOR_NODE}','utf8')).llamacpp?.runtimeReleaseTag || 'b9244'"
 )"
 
 if [[ -f "${SRC_DIR}/CMakeLists.txt" ]]; then
