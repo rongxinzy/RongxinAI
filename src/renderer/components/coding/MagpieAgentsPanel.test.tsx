@@ -5,9 +5,9 @@ import { MagpieAgentsPanel } from './MagpieAgentsPanel';
 
 vi.mock('../../services/i18n', () => ({ i18nService: { t: (key: string) => key } }));
 vi.mock('../../services/store', () => ({
-  appStore: {
-    get: vi.fn(async () => false),
-    set: vi.fn(async () => undefined),
+  localStore: {
+    getItem: vi.fn(async () => false),
+    setItem: vi.fn(async () => undefined),
   },
 }));
 

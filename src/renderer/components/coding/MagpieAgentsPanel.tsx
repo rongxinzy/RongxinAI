@@ -25,7 +25,7 @@ import type {
   MagpieModelSelection,
   MagpieStatus,
 } from '../../../shared/magpie/types';
-import { appStore } from '../../services/store';
+import { localStore } from '../../services/store';
 import { i18nService } from '../../services/i18n';
 import { ExternalAgentRow } from './ExternalAgentRow';
 
@@ -114,7 +114,7 @@ export function MagpieAgentsPanel() {
     epoch.current += 1;
     if (!api) setError('magpieUnavailable');
     else void readStatus();
-    void appStore.get<boolean>(STORE_DISCONNECT_ON_QUIT).then(value => {
+    void localStore.getItem<boolean>(STORE_DISCONNECT_ON_QUIT).then(value => {
       if (mounted.current) setDisconnectOnQuit(value === true);
     });
     const timer = window.setInterval(() => {
@@ -277,7 +277,7 @@ export function MagpieAgentsPanel() {
             onCheckedChange={checked => {
               const value = checked === true;
               setDisconnectOnQuit(value);
-              void appStore.set(STORE_DISCONNECT_ON_QUIT, value);
+              void localStore.setItem(STORE_DISCONNECT_ON_QUIT, value);
             }}
           />
           <div className="space-y-1">
