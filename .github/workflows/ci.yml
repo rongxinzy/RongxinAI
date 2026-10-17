@@ -349,6 +349,8 @@ jobs:
       HUSKY: '0'
     steps:
       - uses: actions/checkout@v6
+      - name: Install OS packages required by setup-bun in the Playwright image
+        run: apt-get update && apt-get install -y unzip
       - uses: ./.github/actions/setup-bun-workspace
       - run: bun run web:preview:contract
       - run: bun run web:preview:check
