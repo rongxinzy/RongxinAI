@@ -11,7 +11,6 @@
     "src/main/libs/llamacppBackendManager.ts": 1722,
     "src/main/libs/llamacppManager.test.ts": 1157,
     "src/main/libs/llamacppManager.ts": 1740,
-    "src/main/memory/projectMemoryService.ts": 1041,
     "src/main/workbenchTask/taskService.test.ts": 1124
   }
 }
