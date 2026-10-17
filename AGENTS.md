@@ -221,12 +221,9 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 **提交**：Conventional Commits，全英文 `type(scope): summary`。type ∈ `feat|fix|refactor|chore|docs|test|perf|style|ci|build|revert`；subject 小写祈使、≤72 字符、无句号；body 写 why；破坏性变更加 `!` 与 `BREAKING CHANGE:` footer；关联 issue 每个都写关键词（`closes #1, closes #2`）。不用 emoji、不写客套话。
 
-**PR**：标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)：改动、原因、验证；bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，不强制为小修复新建 issue。所有 PR（含文档）需非作者的一次正式 GitHub approval，新提交使旧 approval 失效；不按作者姓名指定特殊评审人。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
+**PR**：标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)：改动、原因、验证；bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，不强制为小修复新建 issue。必需检查 `ci-gate` 通过后，作者或 agent 可自行 squash 合并；高影响变更仍建议维护者确认。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
 
-> [!IMPORTANT]
-> **代码冻结期约束（Code Freeze）**：当前仓库进入代码冻结期。CI 门禁已开启强校验，**仅允许 `fix` 开头的 PR 合并入 main 分支**（如 `fix(cowork): ...`、`fix: ...`）。其余任何新功能（feat）、重构（refactor）、架构调整等均禁止合入；此类工作转移至 fork 仓库推进。
-
-**CI**：统一必需检查 `ci-gate`（`scripts/ci/gates/verify.ts` 汇总全部 baseline 与路径归属 job）；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint，含 Knip 与 `scripts/` Python 死代码 / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）。独立 approval 由服务端分支规则统一强制，管理员可通过 PR 绕过 review，其余角色不允许；CI、禁止强推和删除仍适用管理员，合并前解决评审讨论。发布流水线（`release.yml` 打 tag 发 beta、`promote.yml` 晋升 stable）独立于 PR 门禁；见 [RELEASING.md](RELEASING.md)。
+**CI**：统一必需检查 `ci-gate`（`scripts/ci/gates/verify.ts` 汇总全部 baseline 与路径归属 job）；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint，含 Knip 与 `scripts/` Python 死代码 / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）。默认分支保护：须经 PR、不要求 approval、不要求解决评审讨论、必需检查仅 `ci-gate`、禁止强推与删除。发布流水线（`release.yml` 打 tag 发 beta、`promote.yml` 晋升 stable）独立于 PR 门禁；见 [RELEASING.md](RELEASING.md)。
 
 **项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 

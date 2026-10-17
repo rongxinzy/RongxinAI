@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { app, BrowserWindow, shell } from 'electron';
 import {
   autoUpdater,
@@ -12,7 +11,7 @@ import { gt, lt, valid } from 'semver';
 
 import {
   type AppUpdateCheckResult,
-  AppUpdateChannelPreference,
+  type AppUpdateChannelPreference,
   AppUpdateFailureStage,
   type AppUpdateInfo,
   AppUpdateInstallOutcome,
@@ -21,7 +20,6 @@ import {
   AppUpdateSource,
   AppUpdateStatus,
 } from '../../shared/appUpdate/constants';
-import { APP_UPDATE_TRUSTED_KEYS } from '../../shared/appUpdate/trustedKeys';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import type { SqliteStore } from '../sqliteStore';
 import { installWindowsNsis } from './appUpdateInstaller';
@@ -31,25 +29,20 @@ import {
   AppUpdateReleaseChannel,
   isSha512,
   toUpdateInfo,
-  type UpdatePayload,
   type UpdateTarget,
 } from './appUpdateManifest';
+import {
+  electronUpdaterFeedUrl,
+  manifestCacheKeyForChannel,
+  readChannelPreference,
+  writeChannelPreference,
+} from './appUpdateChannelPreference';
+import { verifyAndDecodeUpdateManifest } from './appUpdateSignedManifest';
 
 const UPDATE_ENDPOINT = 'https://updates.rongxzyai.com/v1/updates/latest';
-const ELECTRON_UPDATE_FEED_BASE = 'https://updates.rongxzyai.com/v2/electron';
-const MANIFEST_CACHE_KEY_PREFIX = 'app_update_manifest_cache';
-const APP_UPDATE_CHANNEL_STORE_KEY = 'app_update_channel';
 const READY_UPDATE_CACHE_KEY = 'app_update_ready_v2';
 const SUPPORTED_UPDATE_PLATFORMS = new Set(['win32', 'darwin', 'linux']);
 const SUPPORTED_UPDATE_ARCHITECTURES = new Set(['x64', 'arm64']);
-
-type SignedManifest = {
-  schemaVersion?: unknown;
-  keyId?: unknown;
-  algorithm?: unknown;
-  payload?: unknown;
-  signature?: unknown;
-};
 
 type CachedSignedManifest = {
   etag: string;
@@ -109,11 +102,6 @@ const initialState = (): AppUpdateRuntimeState => ({
   failureStage: null,
   lastInstallResult: null,
 });
-
-function base64UrlToBuffer(value: string): Buffer {
-  if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new Error('Invalid base64url value');
-  return Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-}
 
 /**
  * Authorizes electron-updater with the existing signed v1 manifest before it
@@ -706,44 +694,27 @@ export class AppUpdateCoordinator {
   }
 
   getChannelPreference(): AppUpdateReleaseChannel {
-    const stored = this.store.get<string>(APP_UPDATE_CHANNEL_STORE_KEY);
-    return stored === AppUpdateChannelPreference.Beta
-      ? AppUpdateReleaseChannel.Beta
-      : AppUpdateReleaseChannel.Stable;
+    return readChannelPreference(this.store);
   }
 
   setChannelPreference(channel: AppUpdateChannelPreference): void {
-    if (
-      channel !== AppUpdateChannelPreference.Stable &&
-      channel !== AppUpdateChannelPreference.Beta
-    ) {
-      throw new Error('Unsupported update channel preference');
-    }
-    const releaseChannel =
-      channel === AppUpdateChannelPreference.Beta
-        ? AppUpdateReleaseChannel.Beta
-        : AppUpdateReleaseChannel.Stable;
-    this.store.set(APP_UPDATE_CHANNEL_STORE_KEY, releaseChannel);
+    writeChannelPreference(this.store, channel);
     this.clearTransientUpdateState();
   }
 
   private resolveReleaseChannel(): AppUpdateReleaseChannel {
-    return this.getChannelPreference();
+    return readChannelPreference(this.store);
   }
 
   private manifestCacheKey(target: UpdateTarget): string {
-    const channel = this.resolveReleaseChannel();
-    const { platform, arch, variant } = target;
-    return `${MANIFEST_CACHE_KEY_PREFIX}:${channel}:${platform}:${arch}:${variant}`;
+    return manifestCacheKeyForChannel(this.resolveReleaseChannel(), target);
   }
 
   private configureUpdater(target: UpdateTarget): void {
-    const channel = this.resolveReleaseChannel();
-    const feedUrl = new URL(
-      `${target.platform}/${target.arch}/${target.variant}/`,
-      `${ELECTRON_UPDATE_FEED_BASE}/${channel}/`,
-    );
-    this.updater.setFeedURL({ provider: 'generic', url: feedUrl.toString() });
+    this.updater.setFeedURL({
+      provider: 'generic',
+      url: electronUpdaterFeedUrl(this.resolveReleaseChannel(), target),
+    });
   }
 
   private clearTransientUpdateState(): void {
@@ -802,7 +773,7 @@ export class AppUpdateCoordinator {
       const target = this.resolveUpdateTarget();
       const info = target
         ? toUpdateInfo(
-            this.verifyAndDecodeManifest(ready.envelope),
+            verifyAndDecodeUpdateManifest(ready.envelope),
             target,
             this.isElectronUpdaterEnabled(target),
             this.resolveReleaseChannel(),
@@ -872,7 +843,7 @@ export class AppUpdateCoordinator {
     }
     const envelope: unknown =
       response.status === 304 ? cachedManifest?.envelope : await response.json();
-    const payload = this.verifyAndDecodeManifest(envelope);
+    const payload = verifyAndDecodeUpdateManifest(envelope);
     const info = toUpdateInfo(payload, target, this.isElectronUpdaterEnabled(target), channel);
     if (response.status !== 304) {
       const receivedEtag = response.headers.get('etag');
@@ -905,37 +876,6 @@ export class AppUpdateCoordinator {
       return null;
     }
     return value as CachedSignedManifest;
-  }
-
-  private verifyAndDecodeManifest(value: unknown): UpdatePayload {
-    if (!value || typeof value !== 'object') throw new Error('Invalid update manifest');
-    const envelope = value as SignedManifest;
-    if (
-      envelope.schemaVersion !== 1 ||
-      envelope.algorithm !== 'Ed25519' ||
-      typeof envelope.keyId !== 'string' ||
-      typeof envelope.payload !== 'string' ||
-      typeof envelope.signature !== 'string'
-    ) {
-      throw new Error('Unsupported update manifest');
-    }
-    const trustedKey = APP_UPDATE_TRUSTED_KEYS[envelope.keyId];
-    if (!trustedKey) throw new Error(`Unknown update signing key: ${envelope.keyId}`);
-    const payloadBytes = base64UrlToBuffer(envelope.payload);
-    const isValid = crypto.verify(
-      null,
-      payloadBytes,
-      crypto.createPublicKey({
-        key: Buffer.from(trustedKey, 'base64'),
-        format: 'der',
-        type: 'spki',
-      }),
-      base64UrlToBuffer(envelope.signature),
-    );
-    if (!isValid) throw new Error('Update manifest signature verification failed');
-    const payload: unknown = JSON.parse(payloadBytes.toString('utf8'));
-    if (!payload || typeof payload !== 'object') throw new Error('Invalid update manifest payload');
-    return payload as UpdatePayload;
   }
 
   private resolveBuildVariant(): string {
