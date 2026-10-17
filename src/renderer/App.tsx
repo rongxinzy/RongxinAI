@@ -41,6 +41,7 @@ import { TOAST_DEFAULT_DURATION_MS, TOAST_MAX_DURATION_MS } from './services/err
 import {
   resolveToastMessage,
   resolveToastNotification,
+  showAppToast,
   type ToastNotificationDetail,
   type ToastNotificationOptions,
 } from './services/toastNotification';
@@ -352,9 +353,7 @@ const App: React.FC = () => {
     (skillId: string) => {
       const skill = store.getState().skill.skills.find(candidate => candidate.id === skillId);
       if (!skill?.enabled) {
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', { detail: i18nService.t('chatSkillUnavailable') }),
-        );
+        showAppToast(i18nService.t('chatSkillUnavailable'));
         return;
       }
       dispatch(setActiveSkillIds([skillId]));

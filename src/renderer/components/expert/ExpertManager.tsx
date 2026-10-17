@@ -19,13 +19,12 @@ import {
   Users,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
-import { setAgents } from '../../store/slices/agentSlice';
 import type { Agent } from '../../types/agent';
 import { CreateExpertDialog } from './CreateExpertDialog';
 import { ExpertDetailDialog, type PresetExpertSummary } from './ExpertDetailDialog';
@@ -38,7 +37,6 @@ interface ExpertManagerProps {
 type ExpertTabFilter = 'all' | 'custom' | 'preset';
 
 const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
-  const dispatch = useDispatch();
   const agents = useSelector((state: RootState) => state.agent.agents);
 
   const [activeFilter, setActiveFilter] = useState<ExpertTabFilter>('all');
@@ -84,14 +82,11 @@ const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
   // Refresh agents from store
   const refreshAgents = useCallback(async () => {
     try {
-      const res = await agentService.listAgents();
-      if (res.success && res.agents) {
-        dispatch(setAgents(res.agents));
-      }
+      await agentService.loadAgents();
     } catch (e) {
       console.warn('[ExpertManager] failed to refresh agents:', e);
     }
-  }, [dispatch]);
+  }, []);
 
   useEffect(() => {
     void loadPresetExperts();

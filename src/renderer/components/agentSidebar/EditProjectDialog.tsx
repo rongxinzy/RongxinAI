@@ -12,6 +12,7 @@ import { Label } from '@shared/components/ui/label';
 import { Folder, FolderInput, FolderOpen, FolderPlus, LoaderCircle, X } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 
+import { showAppToast } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
 import type { WorkspaceSidebarNode } from './types';
 
@@ -28,10 +29,6 @@ interface EditProjectDialogProps {
   onRemove: (workspace: WorkspaceSidebarNode) => void;
 }
 
-const showToast = (message: string) => {
-  window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
-};
-
 const pathsEqual = (a: string, b: string): boolean =>
   window.electron.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
 
@@ -39,7 +36,7 @@ const openInFileExplorer = (folderPath: string) => {
   void window.electron.shell.openPath(folderPath).then(result => {
     if (!result.success) {
       console.warn('[EditProjectDialog] Failed to open folder in file explorer:', result.error);
-      showToast(i18nService.t('openFolderFailed'));
+      showAppToast(i18nService.t('openFolderFailed'));
     }
   });
 };
@@ -109,7 +106,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
         folders,
       });
       if (!saved) {
-        showToast(i18nService.t('editProjectFailed'));
+        showAppToast(i18nService.t('editProjectFailed'));
         return;
       }
       onOpenChange(false);

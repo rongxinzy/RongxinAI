@@ -9,7 +9,7 @@ import {
   CoworkQueueItemStatus,
   type CoworkPendingMessage,
 } from '../../../shared/cowork/pendingMessageQueue';
-import { reportAppError } from '../../services/appErrorText';
+import { showAppError } from '../../services/appToast';
 import { coworkQueueService } from '../../services/coworkQueue';
 import { i18nService } from '../../services/i18n';
 
@@ -23,10 +23,6 @@ interface PendingMessageQueueProps {
 }
 
 const QUEUE_LOG_TAG = 'Queue';
-
-const showQueueToast = (message: string): void => {
-  window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
-};
 
 const PendingMessageQueue = ({
   sessionId,
@@ -49,7 +45,7 @@ const PendingMessageQueue = ({
       .load(sessionId)
       .catch(error => {
         if (!disposed) {
-          showQueueToast(reportAppError(error, 'operationFailed', QUEUE_LOG_TAG));
+          showAppError(error, 'operationFailed', QUEUE_LOG_TAG);
         }
       })
       .finally(() => {
@@ -76,7 +72,7 @@ const PendingMessageQueue = ({
     if (!text) return;
     const result = await queueService.update(sessionId, itemId, text);
     if (!result.success) {
-      showQueueToast(reportAppError(result.error, 'coworkQueueUpdateFailed', QUEUE_LOG_TAG));
+      showAppError(result.error, 'coworkQueueUpdateFailed', QUEUE_LOG_TAG);
       return;
     }
     cancelEdit();
@@ -84,15 +80,14 @@ const PendingMessageQueue = ({
 
   const removeItem = async (itemId: string): Promise<void> => {
     const result = await queueService.remove(sessionId, itemId);
-    if (!result.success)
-      showQueueToast(reportAppError(result.error, 'coworkQueueDeleteFailed', QUEUE_LOG_TAG));
+    if (!result.success) showAppError(result.error, 'coworkQueueDeleteFailed', QUEUE_LOG_TAG);
   };
 
   const steerItem = useCallback(
     async (itemId: string): Promise<void> => {
       const result = await queueService.steer(sessionId, itemId);
       if (!result.success) {
-        showQueueToast(reportAppError(result.error, 'coworkQueueSteerFailed', QUEUE_LOG_TAG));
+        showAppError(result.error, 'coworkQueueSteerFailed', QUEUE_LOG_TAG);
       }
     },
     [queueService, sessionId],
@@ -107,7 +102,7 @@ const PendingMessageQueue = ({
           ? await queueService.followUp(sessionId, itemId)
           : await queueService.steer(sessionId, itemId);
       if (!result.success) {
-        showQueueToast(reportAppError(result.error, 'coworkQueueRetryFailed', QUEUE_LOG_TAG));
+        showAppError(result.error, 'coworkQueueRetryFailed', QUEUE_LOG_TAG);
       }
     },
     [items, queueService, sessionId],

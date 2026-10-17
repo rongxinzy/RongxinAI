@@ -25,6 +25,7 @@ import {
   type TodoList,
 } from '../../../shared/todo';
 import { i18nService } from '../../services/i18n';
+import { showAppToast } from '../../services/toastNotification';
 import { todoService } from '../../services/todo';
 import PageHeader from '../PageHeader';
 import TodoNavigationPanel, { todoNavigationItems } from './TodoNavigationPanel';
@@ -174,9 +175,7 @@ const TodoView: React.FC<TodoViewProps> = ({
   useEffect(() => i18nService.subscribe(() => setLanguage(i18nService.getLanguage())), []);
 
   const showError = useCallback(() => {
-    window.dispatchEvent(
-      new CustomEvent('app:showToast', { detail: i18nService.t('todoSaveError') }),
-    );
+    showAppToast(i18nService.t('todoSaveError'));
   }, []);
 
   const handleCreateTodo = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
