@@ -246,8 +246,3 @@ export const inspectWorkspaceContentAsync = (
   // unrelated contents, and main still owns the bytes used for the file write.
   return pool.inspectContent(Uint8Array.from(content).buffer, signal);
 };
-
-export const transformCoworkTextAsync = (
-  input: TextWorkerInput,
-  signal?: AbortSignal,
-): Promise<TextWorkerOutput> => pool.transform(input, signal);

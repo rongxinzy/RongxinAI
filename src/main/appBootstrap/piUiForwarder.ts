@@ -227,6 +227,18 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
   runtime.on(
     'messageUpdate',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
+      if (metadata?.streamReopen === true) {
+        coalescer.flush();
+        sessionByMessageId.set(messageId, sessionId);
+        emitUiEvent({
+          type: PiUiEventType.MessageUpdate,
+          sessionId,
+          messageId,
+          content,
+          metadata,
+        });
+        return;
+      }
       if (metadata?.isStreaming !== false) return;
       coalescer.flush();
       sessionByMessageId.set(messageId, sessionId);

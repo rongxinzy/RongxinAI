@@ -40,11 +40,123 @@ export class PiAssistantTranscript {
   >();
   private readonly pendingMessageUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
   private readonly throttleSessionByMessageId = new Map<string, string>();
+  /** Latest in-memory stream body per message id (avoids stale DB reads on close). */
+  private readonly lastStreamedContentByMessageId = new Map<string, string>();
+  private readonly finalizedMessageIds = new Set<string>();
+  private readonly finalizedMessageIdsBySession = new Map<string, Set<string>>();
+  private readonly pendingContextUsageBySession = new Map<
+    string,
+    {
+      messageId: string;
+      piUsage: PiUsage | undefined;
+      model: string | undefined;
+      requestStartedAt: number | null;
+      firstVisibleTextAt: number | null;
+      startupLatency?: PiStartupLatency;
+    }
+  >();
 
   constructor(private readonly host: PiAssistantTranscriptHost) {}
 
+  /** Clears streaming/finalized bookkeeping so a retry can reuse the same ids. */
+  reopenStreamingMessagesForRetry(sessionId: string, active: ActivePiSession): void {
+    for (const entry of [
+      { messageId: active.assistantMessageId, kind: 'answer' as const },
+      { messageId: active.thinkingMessageId, kind: 'thinking' as const },
+    ]) {
+      if (!entry.messageId) continue;
+      const messageId = entry.messageId;
+      this.unnoteFinalized(sessionId, messageId);
+      const content = this.resolveStreamedContent(messageId, active, entry.kind);
+      this.rememberStreamedContent(messageId, content);
+      const metadata =
+        entry.kind === 'thinking'
+          ? { isStreaming: true, isFinal: false, isThinking: true, streamReopen: true }
+          : { isStreaming: true, isFinal: false, streamReopen: true };
+      if (this.host.getStore()) {
+        this.host
+          .getStore()
+          .updateMessage(sessionId, messageId, { metadata }, { touchUpdatedAt: false });
+      }
+      this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
+    }
+  }
+
+  clearPendingContextUsage(sessionId: string): void {
+    this.pendingContextUsageBySession.delete(sessionId);
+  }
+
+  /** Runs at most one deferred context-usage sync per session per settled turn. */
+  flushContextUsageSync(sessionId: string): void {
+    const pending = this.pendingContextUsageBySession.get(sessionId);
+    this.pendingContextUsageBySession.delete(sessionId);
+    if (!pending) return;
+    this.runContextUsageSync(
+      sessionId,
+      pending.messageId,
+      pending.piUsage,
+      pending.model,
+      pending.requestStartedAt,
+      pending.firstVisibleTextAt,
+      pending.startupLatency,
+    );
+  }
+
+  private rememberStreamedContent(messageId: string, content: string): void {
+    this.lastStreamedContentByMessageId.set(messageId, content);
+  }
+
+  private resolveStreamedContent(
+    messageId: string,
+    active: ActivePiSession,
+    kind: 'answer' | 'thinking',
+  ): string {
+    if (kind === 'answer' && active.assistantMessageId === messageId) {
+      return active.answerText;
+    }
+    if (kind === 'thinking' && active.thinkingMessageId === messageId) {
+      return active.thinkingText;
+    }
+    return this.lastStreamedContentByMessageId.get(messageId) ?? '';
+  }
+
   private noteThrottleMessage(sessionId: string, messageId: string): void {
     this.throttleSessionByMessageId.set(messageId, sessionId);
+  }
+
+  private noteFinalized(sessionId: string, messageId: string): void {
+    this.finalizedMessageIds.add(messageId);
+    let ids = this.finalizedMessageIdsBySession.get(sessionId);
+    if (!ids) {
+      ids = new Set();
+      this.finalizedMessageIdsBySession.set(sessionId, ids);
+    }
+    ids.add(messageId);
+  }
+
+  private unnoteFinalized(sessionId: string, messageId: string): void {
+    this.finalizedMessageIds.delete(messageId);
+    this.finalizedMessageIdsBySession.get(sessionId)?.delete(messageId);
+  }
+
+  private pruneFinalizedForSession(sessionId: string): void {
+    const ids = this.finalizedMessageIdsBySession.get(sessionId);
+    if (!ids) return;
+    for (const messageId of ids) {
+      this.finalizedMessageIds.delete(messageId);
+    }
+    this.finalizedMessageIdsBySession.delete(sessionId);
+  }
+
+  private removeEmptyAnswerPlaceholder(sessionId: string, messageId: string): void {
+    const store = this.host.getStore();
+    if (!store) return;
+    const existing = store
+      .getSession(sessionId)
+      ?.messages.find(message => message.id === messageId);
+    if (!existing || existing.metadata?.isThinking) return;
+    if (existing.content.trim().length > 0) return;
+    store.deleteMessage(sessionId, messageId);
   }
   // ── Private: assistant message lifecycle ──
 
@@ -117,6 +229,7 @@ export class PiAssistantTranscript {
     }
     // Throttle the synchronous SQLite write separately from the bus emit so a
     // fast Pi stream doesn't block the main-process event loop every frame.
+    this.rememberStreamedContent(messageId, content);
     this.throttledStoreUpdate(sessionId, messageId, content, metadata);
     this.throttledEmitMessageUpdate(sessionId, messageId, content, metadata);
   }
@@ -128,9 +241,22 @@ export class PiAssistantTranscript {
     kind: 'answer' | 'thinking',
     content: string,
   ): void {
+    if (kind === 'answer' && !content.trim()) {
+      const emptyId = active.assistantMessageId;
+      if (emptyId) {
+        this.flushPendingStoreUpdate(sessionId, emptyId);
+        this.flushPendingMessageUpdate(sessionId, emptyId);
+        this.clearThrottleMapsForMessage(emptyId);
+        this.removeEmptyAnswerPlaceholder(sessionId, emptyId);
+        active.assistantMessageId = null;
+      }
+      return;
+    }
     const messageId = this.ensureMessage(sessionId, active, kind, content);
-    this.clearPendingStoreUpdate(messageId);
-    this.clearPendingMessageUpdate(messageId);
+    this.rememberStreamedContent(messageId, content);
+    this.flushPendingStoreUpdate(sessionId, messageId);
+    this.flushPendingMessageUpdate(sessionId, messageId);
+    this.clearThrottleMapsForMessage(messageId);
     const thinkingDurationMs = kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
     const metadata =
       kind === 'thinking'
@@ -149,6 +275,7 @@ export class PiAssistantTranscript {
       this.host.getStore().updateMessage(sessionId, messageId, { content, metadata });
     }
     this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
+    this.noteFinalized(sessionId, messageId);
     if (kind === 'thinking') {
       active.thinkingLifecycle.markMessageFinalized();
     }
@@ -158,28 +285,81 @@ export class PiAssistantTranscript {
    * Closes placeholder bubbles that never received text, so a finished turn can
    * no longer look like it is still streaming.
    */
-  closeIdlePlaceholders(sessionId: string, active: ActivePiSession): void {
-    const placeholderIds = [active.thinkingMessageId, active.assistantMessageId].filter(
-      (messageId): messageId is string => Boolean(messageId),
-    );
-    for (const messageId of placeholderIds) {
-      this.clearPendingStoreUpdate(messageId);
-      this.clearPendingMessageUpdate(messageId);
+  closeIdlePlaceholders(
+    sessionId: string,
+    active: ActivePiSession,
+    options?: { finalize?: boolean },
+  ): void {
+    const finalize = options?.finalize ?? true;
+    const entries: Array<{ messageId: string; kind: 'answer' | 'thinking' }> = [];
+    if (active.thinkingMessageId && !active.thinkingLifecycle.isMessageFinalized) {
+      entries.push({ messageId: active.thinkingMessageId, kind: 'thinking' });
     }
-    if (!this.host.getStore() || placeholderIds.length === 0) return;
-
-    const messages = this.host.getStore().getSession(sessionId)?.messages ?? [];
-    for (const messageId of placeholderIds) {
-      const message = messages.find(candidate => candidate.id === messageId);
-      // A bubble finalizeMessage already closed (the ordinary turn with text) needs
-      // no second write, emit, or session updated_at bump.
-      if (!message || message.metadata?.isStreaming !== true) continue;
-      const metadata = { ...message.metadata, isStreaming: false, isFinal: true };
-      this.host.getStore().updateMessage(sessionId, messageId, { metadata });
-      // Republish the row with its own content, so a live view stops spinning
-      // without waiting for the session to be reloaded.
-      this.host.emitMessageUpdate(sessionId, messageId, message.content, metadata);
-      console.debug('[PiRuntime] closed an idle placeholder message for', sessionId);
+    if (active.assistantMessageId) {
+      entries.push({ messageId: active.assistantMessageId, kind: 'answer' });
+    }
+    for (const entry of entries) {
+      if (finalize && this.finalizedMessageIds.has(entry.messageId)) continue;
+      const content = this.resolveStreamedContent(entry.messageId, active, entry.kind);
+      const streamingMetadata =
+        entry.kind === 'thinking'
+          ? { isStreaming: true, isFinal: false, isThinking: true }
+          : {
+              isStreaming: true,
+              isFinal: false,
+              ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+            };
+      const finalMetadata =
+        entry.kind === 'thinking'
+          ? { isStreaming: false, isFinal: true, isThinking: true }
+          : {
+              isStreaming: false,
+              isFinal: true,
+              ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+            };
+      const metadata = finalize ? finalMetadata : streamingMetadata;
+      this.flushPendingStoreUpdate(sessionId, entry.messageId, content, metadata);
+      this.flushPendingMessageUpdate(sessionId, entry.messageId, content, metadata);
+      if (!finalize) {
+        if (this.host.getStore()) {
+          this.host
+            .getStore()
+            .updateMessage(
+              sessionId,
+              entry.messageId,
+              { content, metadata },
+              { touchUpdatedAt: false },
+            );
+        }
+        continue;
+      }
+      this.clearThrottleMapsForMessage(entry.messageId);
+      if (entry.kind === 'answer' && !content.trim()) {
+        this.removeEmptyAnswerPlaceholder(sessionId, entry.messageId);
+        if (active.assistantMessageId === entry.messageId) {
+          active.assistantMessageId = null;
+        }
+        continue;
+      }
+      if (!this.host.getStore()) continue;
+      const existing = this.host
+        .getStore()
+        .getSession(sessionId)
+        ?.messages.find(message => message.id === entry.messageId);
+      const mergedMetadata = {
+        ...existing?.metadata,
+        ...metadata,
+      };
+      this.host
+        .getStore()
+        .updateMessage(
+          sessionId,
+          entry.messageId,
+          { content, metadata: mergedMetadata },
+          { touchUpdatedAt: false },
+        );
+      this.host.emitMessageUpdate(sessionId, entry.messageId, content, mergedMetadata);
+      this.noteFinalized(sessionId, entry.messageId);
     }
   }
 
@@ -226,6 +406,26 @@ export class PiAssistantTranscript {
     startupLatency?: PiStartupLatency,
   ): void {
     if (!messageId) return;
+    this.flushContextUsageSync(sessionId);
+    this.pendingContextUsageBySession.set(sessionId, {
+      messageId,
+      piUsage,
+      model,
+      requestStartedAt,
+      firstVisibleTextAt,
+      startupLatency,
+    });
+  }
+
+  private runContextUsageSync(
+    sessionId: string,
+    messageId: string,
+    piUsage: PiUsage | undefined,
+    model: string | undefined,
+    requestStartedAt: number | null,
+    firstVisibleTextAt: number | null,
+    startupLatency?: PiStartupLatency,
+  ): void {
     setTimeout(() => {
       const active = this.host.getActiveSession(sessionId);
       const contextUsage = active?.piSession.getContextUsage?.();
@@ -377,6 +577,55 @@ export class PiAssistantTranscript {
     );
   }
 
+  private flushPendingStoreUpdate(
+    sessionId: string,
+    messageId: string,
+    content?: string,
+    metadata?: Record<string, unknown>,
+  ): void {
+    const timer = this.pendingStoreUpdateTimer.get(messageId);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingStoreUpdateTimer.delete(messageId);
+    }
+    const pending = this.pendingStoreUpdate.get(messageId);
+    this.pendingStoreUpdate.delete(messageId);
+    const body = content ?? pending?.content;
+    const meta = metadata ?? pending?.metadata;
+    if (body !== undefined && meta && this.host.getStore()) {
+      this.host
+        .getStore()
+        .updateMessage(
+          sessionId,
+          messageId,
+          { content: body, metadata: meta },
+          { touchUpdatedAt: false },
+        );
+      this.lastStoreUpdateTime.set(messageId, Date.now());
+    }
+  }
+
+  private flushPendingMessageUpdate(
+    sessionId: string,
+    messageId: string,
+    content?: string,
+    metadata?: Record<string, unknown>,
+  ): void {
+    const timer = this.pendingMessageUpdateTimer.get(messageId);
+    if (timer) {
+      clearTimeout(timer);
+      this.pendingMessageUpdateTimer.delete(messageId);
+    }
+    const pending = this.pendingMessageUpdate.get(messageId);
+    this.pendingMessageUpdate.delete(messageId);
+    const body = content ?? pending?.content;
+    const meta = metadata ?? pending?.metadata;
+    if (body !== undefined && meta) {
+      this.lastMessageUpdateEmitAt.set(messageId, Date.now());
+      this.host.emitMessageUpdate(sessionId, messageId, body, meta);
+    }
+  }
+
   private clearPendingStoreUpdate(messageId: string): void {
     const timer = this.pendingStoreUpdateTimer.get(messageId);
     if (timer) {
@@ -393,6 +642,15 @@ export class PiAssistantTranscript {
       this.pendingMessageUpdateTimer.delete(messageId);
     }
     this.pendingMessageUpdate.delete(messageId);
+  }
+
+  private clearThrottleMapsForMessage(messageId: string): void {
+    this.clearPendingStoreUpdate(messageId);
+    this.clearPendingMessageUpdate(messageId);
+    this.lastStoreUpdateTime.delete(messageId);
+    this.lastMessageUpdateEmitAt.delete(messageId);
+    this.throttleSessionByMessageId.delete(messageId);
+    this.lastStreamedContentByMessageId.delete(messageId);
   }
 
   clearThrottleStateBySession(sessionId: string, flush: boolean): void {
@@ -420,5 +678,6 @@ export class PiAssistantTranscript {
       this.lastMessageUpdateEmitAt.delete(messageId);
       this.throttleSessionByMessageId.delete(messageId);
     }
+    this.pruneFinalizedForSession(sessionId);
   }
 }
