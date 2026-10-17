@@ -1,37 +1,30 @@
-// Model catalog, load/install, and metadata hydration (#1069).
 import fs from 'fs';
 import path from 'path';
 
-import {
-  applyAutomaticLlamaCppServiceDefaults,
-  resolveLlamaCppLaunchContext,
-} from '../../../shared/llamacpp';
 import type {
+  LlamaCppBackendRef,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModel,
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
-  LlamaCppStatusSnapshot,
+  LlamaCppRuntimeInstallResult,
+} from '../../../shared/llamacpp';
+import {
+  applyAutomaticLlamaCppServiceDefaults,
+  LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
+  resolveLlamaCppLaunchContext,
+  type LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
 import { LlamaCppClient } from '../llamacppClient';
-import { mergeLocalModels, scanLocalGgufModels } from '../llamacppModelCatalog';
-import {
-  installModelOnce,
-  isModelDownloadNotFoundError,
-  isSameInstallRequest,
-  prefillInstallInputFromMarketplace,
-  refreshInstallInputFromMarketplace,
-  resolveManagedModelInstallDir,
-} from '../llamacppModelInstallation';
-import { retryLlamaCppReadRequest } from '../llamacppRequestRetry';
-import { shouldEnableLlamaCppModelsAutoload } from '../llamacppServe';
-import { getNvidiaSmiSnapshot } from '../nvidiaSmi';
-import { shouldKeepLlamaCppServiceRunning } from '../llamacppProcessLifecycle';
-import { resolveLlamaCppRuntimeMetadata } from '../llamacppRuntimePaths';
-import type { ChildProcess } from 'child_process';
 import { LlamaCppManagerLifecycleEvent, type LlamaCppModelsUnloadedForQuitEvent } from './types';
+import {
+  LLAMACPP_LAST_LOADED_MODEL_KEY,
+  LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS,
+  QUIT_RUNNING_MODELS_TIMEOUT_MS,
+  QUIT_UNLOAD_MODEL_TIMEOUT_MS,
+} from './core';
 import {
   isGgufPath,
   modelLaunchOptionsToPreset,
@@ -40,17 +33,230 @@ import {
   resolveImportedModelTargetPath,
   upsertIniSection,
 } from './fileUtils';
+import { shouldKeepLlamaCppServiceRunning } from '../llamacppProcessLifecycle';
+import { retryLlamaCppReadRequest } from '../llamacppRequestRetry';
+import { resolveManagedModelInstallDir } from '../llamacppModelInstallation';
+import { shouldEnableLlamaCppModelsAutoload } from '../llamacppServe';
+import { mergeLocalModels, scanLocalGgufModels } from '../llamacppModelCatalog';
+import {
+  installModelOnce,
+  isModelDownloadNotFoundError,
+  isSameInstallRequest,
+  prefillInstallInputFromMarketplace,
+  refreshInstallInputFromMarketplace,
+} from '../llamacppModelInstallation';
+import {
+  getLlamaCppBackendCompatibilityError,
+  getLlamaCppBackendExecutablePath,
+  getLlamaCppCurrentExecutablePath,
+  installLlamaCppBackend,
+  syncCurrentBackend,
+} from '../llamacppBackendManager';
+import {
+  backendRequiresDeviceValidation,
+  validateBackendDevices,
+} from '../llamacppBackendValidation';
+import {
+  prepareLlamaCppBackendVersionSwitch,
+  restartLlamaCppBackendVersionService,
+} from '../llamacppBackendVersionSwitch';
+import { getUserLlamaCppRuntimeRoot } from '../llamacppRuntimePaths';
+import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from '../llamacppNvidiaEnvironment';
+
 import { LlamaCppManagerService } from './serviceLifecycle';
 
-const LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS = 2_000;
-const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
-const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
-const LLAMACPP_LAST_LOADED_MODEL_KEY = 'llamacpp_last_loaded_model';
+const LLAMACPP_RUNTIME_PROGRESS_KEY = LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID;
 
 type RequestOptions = { signal?: AbortSignal };
 
 export class LlamaCppManager extends LlamaCppManagerService {
-  protected async restoreLastLoadedModelIfNeeded(): Promise<void> {
+  async setBackendSelection(
+    ref: LlamaCppBackendRef,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<LlamaCppRuntimeInstallResult> {
+    this.clearBackendListCache();
+    const runtimeRoot = getUserLlamaCppRuntimeRoot();
+    const installedExecutablePath = getLlamaCppBackendExecutablePath(
+      runtimeRoot,
+      ref,
+      process.platform,
+    );
+    const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
+    const hasNvidiaGpu = hasAvailableNvidiaGpu(nvidiaSnapshot);
+    const backendAlreadyInstalled = fs.existsSync(installedExecutablePath);
+    if (!backendAlreadyInstalled) {
+      this.emit('install-progress', {
+        phase: 'starting',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: ref.versionBackend,
+      } satisfies LlamaCppInstallProgress);
+    }
+    const compatibilityError = await getLlamaCppBackendCompatibilityError({
+      runtimeRoot,
+      ref,
+      platform: process.platform,
+      arch: process.arch,
+      hasNvidiaGpu,
+    });
+    if (compatibilityError) {
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: 'failed',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          error: compatibilityError,
+        } satisfies LlamaCppInstallProgress);
+      }
+      return {
+        success: false,
+        error: compatibilityError,
+        plan: {
+          kind: 'needs-manual',
+          message: compatibilityError,
+        },
+      };
+    }
+    const result: LlamaCppRuntimeInstallResult = backendAlreadyInstalled
+      ? (() => {
+          return {
+            success: true,
+            backend: ref,
+            executablePath: installedExecutablePath,
+            plan: {
+              kind: 'ready' as const,
+              executablePath: installedExecutablePath,
+            },
+          };
+        })()
+      : await (async () => {
+          this.emit('install-progress', {
+            phase: 'downloading',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+          } satisfies LlamaCppInstallProgress);
+          return await installLlamaCppBackend({
+            runtimeRoot,
+            ref,
+            platform: process.platform,
+            arch: process.arch,
+            hasNvidiaGpu,
+            switchCurrent: false,
+            signal: options.signal,
+            onProgress: progress => {
+              this.emit('install-progress', {
+                ...progress,
+                modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+                modelName: ref.versionBackend,
+              } satisfies LlamaCppInstallProgress);
+            },
+          });
+        })();
+    if (result.success && result.executablePath) {
+      if (backendRequiresDeviceValidation(ref)) {
+        const deviceResult = await this.listRuntimeDevices(ref);
+        if (!deviceResult.success) {
+          if (!backendAlreadyInstalled) {
+            this.emit('install-progress', {
+              phase: 'failed',
+              modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+              modelName: ref.versionBackend,
+              error: deviceResult.error || 'Backend device validation failed.',
+            } satisfies LlamaCppInstallProgress);
+          }
+          return {
+            ...result,
+            success: false,
+            error: deviceResult.error || 'Backend device validation failed.',
+          };
+        }
+        const validationError = validateBackendDevices(ref, deviceResult.devices);
+        if (validationError) {
+          if (!backendAlreadyInstalled) {
+            this.emit('install-progress', {
+              phase: 'failed',
+              modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+              modelName: ref.versionBackend,
+              error: validationError,
+            } satisfies LlamaCppInstallProgress);
+          }
+          return {
+            ...result,
+            success: false,
+            error: validationError,
+          };
+        }
+      }
+      const switchPreparation = await prepareLlamaCppBackendVersionSwitch({
+        serviceStatus: this.status.status,
+        listRunningModels: () => this.listRunningModels(),
+        stop: () => this.stop(),
+      });
+      if (switchPreparation.success === false) {
+        if (!backendAlreadyInstalled) {
+          this.emit('install-progress', {
+            phase: 'failed',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+            error: switchPreparation.error,
+          } satisfies LlamaCppInstallProgress);
+        }
+        return {
+          ...result,
+          success: false,
+          error: switchPreparation.error,
+          plan: { kind: 'needs-manual', message: switchPreparation.error },
+        };
+      }
+      syncCurrentBackend(runtimeRoot, ref);
+      const currentExecutablePath = getLlamaCppCurrentExecutablePath(runtimeRoot, process.platform);
+      this.executablePath = currentExecutablePath;
+      this.setStatus({
+        status: 'installed',
+        executablePath: currentExecutablePath,
+        managedByApp: false,
+      });
+      if (switchPreparation.restartService) {
+        const restartResult = await restartLlamaCppBackendVersionService({
+          start: () => this.start(),
+        });
+        if (restartResult.success === false) {
+          if (!backendAlreadyInstalled) {
+            this.emit('install-progress', {
+              phase: 'failed',
+              modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+              modelName: ref.versionBackend,
+              error: restartResult.error,
+            } satisfies LlamaCppInstallProgress);
+          }
+          return {
+            ...result,
+            success: false,
+            error: restartResult.error,
+            plan: { kind: 'needs-manual', message: restartResult.error },
+          };
+        }
+      }
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: 'done',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          percent: 100,
+        } satisfies LlamaCppInstallProgress);
+      }
+    } else {
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: result.cancelled ? 'cancelled' : 'failed',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          error: result.cancelled ? undefined : 'error' in result ? result.error : undefined,
+        } satisfies LlamaCppInstallProgress);
+      }
+    }
+    return result;
+  }
+  private async restoreLastLoadedModelIfNeeded(): Promise<void> {
     const config = this.getServiceConfig();
     if (!config.modelsAutoload || !shouldEnableLlamaCppModelsAutoload(config.modelsMax)) {
       return;
@@ -81,7 +287,7 @@ export class LlamaCppManager extends LlamaCppManagerService {
     }
   }
 
-  protected getLastLoadedModel(): string | undefined {
+  private getLastLoadedModel(): string | undefined {
     if (!this.storage) return undefined;
     const value = this.storage.get<unknown>(LLAMACPP_LAST_LOADED_MODEL_KEY);
     if (typeof value !== 'string') return undefined;
@@ -89,11 +295,11 @@ export class LlamaCppManager extends LlamaCppManagerService {
     return trimmed || undefined;
   }
 
-  protected persistLastLoadedModel(modelName: string): void {
+  private persistLastLoadedModel(modelName: string): void {
     this.storage?.set(LLAMACPP_LAST_LOADED_MODEL_KEY, modelName.trim());
   }
 
-  protected clearLastLoadedModel(modelName?: string): void {
+  private clearLastLoadedModel(modelName?: string): void {
     if (!this.storage) return;
     if (!modelName) {
       this.storage.delete(LLAMACPP_LAST_LOADED_MODEL_KEY);
@@ -358,7 +564,7 @@ export class LlamaCppManager extends LlamaCppManagerService {
     }
   }
 
-  protected async writeModelPreset(
+  private async writeModelPreset(
     input: LlamaCppModelLaunchInput,
     models: LlamaCppModel[],
   ): Promise<void> {
@@ -375,7 +581,7 @@ export class LlamaCppManager extends LlamaCppManagerService {
     fs.writeFileSync(this.getPresetPath(), next, 'utf-8');
   }
 
-  protected async resolveModelLoadInput(
+  private async resolveModelLoadInput(
     input: LlamaCppModelLaunchInput,
     models: LlamaCppModel[],
   ): Promise<LlamaCppModelLaunchInput> {
@@ -426,90 +632,20 @@ export class LlamaCppManager extends LlamaCppManagerService {
     };
   }
 
-  protected async resolveDefaultModelContextSize(): Promise<number | undefined> {
+  private async resolveDefaultModelContextSize(): Promise<number | undefined> {
     const configuredContextSize = normalizePositiveInteger(this.getServiceConfig().ctxSize);
     if (configuredContextSize) {
       return configuredContextSize;
     }
 
-    const nvidiaSnapshot =
-      process.platform === 'win32' ? await getNvidiaSmiSnapshot().catch((): null => null) : null;
+    const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
     const runtimeConfig = applyAutomaticLlamaCppServiceDefaults(this.getServiceConfig(), {
       nvidiaSnapshot,
     });
     return normalizePositiveInteger(runtimeConfig.ctxSize);
   }
 
-  protected async isHealthy(): Promise<boolean> {
-    try {
-      const version = await new LlamaCppClient(this.getBaseUrl()).version(300);
-      this.setStatus({
-        status: 'running',
-        version: version.version,
-        executablePath: this.executablePath ?? undefined,
-        pid: this.process?.pid,
-        managedByApp: Boolean(this.process),
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  protected async waitForStartupProcessExit(child: ChildProcess): Promise<void> {
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    await new Promise<void>(resolve => {
-      const settle = () => {
-        child.off('exit', settle);
-        child.off('error', settle);
-        resolve();
-      };
-      child.once('exit', settle);
-      child.once('error', settle);
-    });
-  }
-
-  protected formatStartupExitDetail(code: number | null, signal: NodeJS.Signals | null): string {
-    const exitCode = code === null ? 'null' : `${code} (0x${code.toString(16)})`;
-    return `exit code ${exitCode}, signal ${signal ?? 'null'}`;
-  }
-
-  protected async waitUntilHealthy(timeoutMs: number): Promise<void> {
-    const startedAt = Date.now();
-    while (Date.now() - startedAt < timeoutMs) {
-      if (await this.isHealthy()) return;
-      if (this.status.status === 'error' || this.status.status === 'stopped') {
-        return; // exit handler already set an error
-      }
-      await new Promise(resolve => setTimeout(resolve, 250));
-    }
-    const detail = this.startupStderr ? ` (stderr: ${this.startupStderr.slice(0, 300)})` : '';
-    this.setStatus({
-      status: 'error',
-      executablePath: this.executablePath ?? undefined,
-      error: `llama.cpp did not become ready before timeout${detail}`,
-      managedByApp: Boolean(this.process),
-    });
-  }
-
-  protected setStatus(
-    patch: Omit<Partial<LlamaCppStatusSnapshot>, 'checkedAt'> & {
-      status: LlamaCppStatusSnapshot['status'];
-    },
-  ): void {
-    const executablePath = Object.prototype.hasOwnProperty.call(patch, 'executablePath')
-      ? patch.executablePath
-      : this.status.executablePath;
-    this.status = {
-      ...this.status,
-      ...patch,
-      ...resolveLlamaCppRuntimeMetadata(executablePath),
-      checkedAt: new Date().toISOString(),
-    };
-    this.emit('status', this.status);
-  }
-
-  protected async refreshModelsAfterInstall(): Promise<void> {
+  private async refreshModelsAfterInstall(): Promise<void> {
     try {
       await new LlamaCppClient(this.getBaseUrl()).listModels();
     } catch {
@@ -517,7 +653,7 @@ export class LlamaCppManager extends LlamaCppManagerService {
     }
   }
 
-  protected hydrateModelContextMetadata(models: LlamaCppModel[]): LlamaCppModel[] {
+  private hydrateModelContextMetadata(models: LlamaCppModel[]): LlamaCppModel[] {
     return models.map(model => {
       const modelName = (model.name || model.model || model.id || '').trim();
       const runtimeContextLength =
@@ -539,7 +675,7 @@ export class LlamaCppManager extends LlamaCppManagerService {
     });
   }
 
-  protected hydrateRunningModels(runningModels: LlamaCppRunningModel[]): LlamaCppRunningModel[] {
+  private hydrateRunningModels(runningModels: LlamaCppRunningModel[]): LlamaCppRunningModel[] {
     const visibleModelNames = new Set<string>();
     const hydrated = runningModels.map(model => {
       const modelName = (model.name || model.model || model.id || '').trim();
@@ -577,7 +713,7 @@ export class LlamaCppManager extends LlamaCppManagerService {
     return hydrated;
   }
 
-  protected cacheThinkingToggleSupport(models: LlamaCppModel[]): void {
+  private cacheThinkingToggleSupport(models: LlamaCppModel[]): void {
     this.thinkingToggleSupportByModel.clear();
     models.forEach(model => {
       if (model.supportsThinkingToggle === undefined) return;
@@ -587,11 +723,11 @@ export class LlamaCppManager extends LlamaCppManagerService {
     });
   }
 
-  protected refreshThinkingToggleSupport(): void {
+  private refreshThinkingToggleSupport(): void {
     this.cacheThinkingToggleSupport(scanLocalGgufModels(this.getModelsDir()));
   }
 
-  protected needsThinkingToggleSupportRefresh(runningModels: LlamaCppRunningModel[]): boolean {
+  private needsThinkingToggleSupportRefresh(runningModels: LlamaCppRunningModel[]): boolean {
     return runningModels.some(
       model =>
         model.supportsThinkingToggle === undefined &&
@@ -599,13 +735,13 @@ export class LlamaCppManager extends LlamaCppManagerService {
     );
   }
 
-  protected getThinkingToggleSupport(model: LlamaCppModel): boolean | undefined {
+  private getThinkingToggleSupport(model: LlamaCppModel): boolean | undefined {
     return this.getModelReferenceKeys(model)
       .map(key => this.thinkingToggleSupportByModel.get(key))
       .find((supported): supported is boolean => supported !== undefined);
   }
 
-  protected getModelReferenceKeys(model: LlamaCppModel): string[] {
+  private getModelReferenceKeys(model: LlamaCppModel): string[] {
     return [model.name, model.id, model.model, model.path]
       .filter((value): value is string => Boolean(value?.trim()))
       .map(value => value.trim().replace(/\\/g, '/'))

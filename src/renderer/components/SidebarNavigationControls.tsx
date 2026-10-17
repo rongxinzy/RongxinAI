@@ -33,6 +33,7 @@ interface SidebarNavigationControlsProps {
   onWorkModeChange: (checked: boolean) => void;
   workMode: WorkMode;
   managedModelsOnly?: boolean;
+  inferenceEdition?: import('../../shared/inferenceEdition').InferenceEdition;
   /** Warms the lazily loaded chunk for a view on hover/focus intent. */
   onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
@@ -49,6 +50,7 @@ export const SidebarNavigationControls = ({
   onWorkModeChange,
   workMode,
   managedModelsOnly = false,
+  inferenceEdition,
   onPrefetchView,
 }: SidebarNavigationControlsProps) => {
   const hasActiveActivityRun = useSelector((state: RootState) => selectHasActiveActivityRun(state));
@@ -78,7 +80,7 @@ export const SidebarNavigationControls = ({
         : {}),
     });
   };
-  if (shouldShowLocalInferenceNavigation(isChat, managedModelsOnly)) {
+  if (shouldShowLocalInferenceNavigation(isChat, managedModelsOnly, inferenceEdition)) {
     addView(
       'localInference',
       i18nService.t('localInferenceTitle'),

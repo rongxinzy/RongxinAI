@@ -7,52 +7,56 @@ import type {
   LlamaCppBackendManifest,
   LlamaCppBackendManifestEntry,
   LlamaCppBackendRef,
+  LlamaCppInstallProgress,
   LlamaCppServiceConfig,
 } from '../../../shared/llamacpp';
-import { LlamaCppBackendError, LlamaCppRuntimeBackend } from '../../../shared/llamacpp';
-import { LlamaCppRuntimeTargetId } from '../llamacppRuntimeConstants';
+import {
+  LlamaCppRuntimeBackend,
+  LlamaCppRuntimeCudaMajor,
+  resolvePreferredLlamaCppRuntimeCudaMajor,
+} from '../../../shared/llamacpp';
 import { readBundledLlamaCppBackendManifest } from '../llamacppBackendResources';
+import { LlamaCppRuntimeTargetId } from '../llamacppRuntimeConstants';
 import {
   buildFallbackManifest,
-  DEFAULT_RELEASE_BASE_URL,
   DEFAULT_RUNTIME_VERSION,
+  DEFAULT_RELEASE_BASE_URL,
 } from '../llamacppFallbackManifest';
 import {
-  buildVersionBackend,
   getLlamaCppBackendDir,
   getLlamaCppBackendExecutablePath,
   getLlamaCppBackendsRoot,
   getLlamaCppCurrentBackendDir,
   getLlamaCppCurrentExecutablePath,
-  listInstalledBackendRefs,
-  readBackendBuildInfo,
-  readCurrentBackendRef,
+  removeCurrentBackendLink,
+  resolveManagedBackendExecutablePath,
   toBackendRef,
 } from './paths';
 import {
+  backendDownloadSizeCache,
+  BUILD_INFO_FILE,
   compareBackendInfo,
   compareVersionDesc,
+  fetchManifestFromUrl,
   findManifestEntry,
   inferBackendAccelerator,
   latestManifestVersion,
   normalizeArch,
-  normalizeBackendId,
   normalizeManifest,
   normalizePlatform,
   resolveArchiveUrl,
+  resolveBundledManifestUrl,
   resolvePartUrl,
+  setHasLoggedManifestFallback,
+  shouldLogManifestFallbackWarning,
   validateBackendForMachine,
 } from './support';
 
-const LLAMACPP_BACKEND_MANIFEST_FETCH_TIMEOUT_MS = 2_000;
-let hasLoggedManifestFallback = false;
-const backendDownloadSizeCache = new Map<string, number>();
-
-type LlamaCppBackendRootManifest = {
-  schemaVersion: 1;
-  defaultVersion?: string;
-  versions?: string[];
-  publicBaseUrl?: string;
+type LlamaCppBackendSelectionInput = {
+  platform: NodeJS.Platform;
+  arch: string;
+  hasNvidiaGpu: boolean;
+  config?: LlamaCppServiceConfig;
 };
 
 export async function fetchLlamaCppBackendManifest(
@@ -73,9 +77,9 @@ export async function fetchLlamaCppBackendManifest(
       throw new Error('The backend manifest does not contain any backends.');
     return manifest;
   } catch (error) {
-    if (!hasLoggedManifestFallback) {
+    if (shouldLogManifestFallbackWarning()) {
       console.warn('[LlamaCppBackend] manifest fetch failed, using built-in fallback:', error);
-      hasLoggedManifestFallback = true;
+      setHasLoggedManifestFallback();
     } else {
       console.debug(
         '[LlamaCppBackend] manifest fetch failed again, continuing with built-in fallback.',
@@ -83,85 +87,6 @@ export async function fetchLlamaCppBackendManifest(
     }
     return buildFallbackManifest(version);
   }
-}
-
-function resolveBundledManifestUrl(): string {
-  return 'file://llamacpp-backends/manifest.json';
-}
-
-async function fetchManifestFromUrl(manifestUrl: string): Promise<LlamaCppBackendManifest> {
-  const response = await fetch(manifestUrl, {
-    headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
-    // Listing must fall back promptly when the optional remote manifest is unavailable.
-    signal: AbortSignal.timeout(LLAMACPP_BACKEND_MANIFEST_FETCH_TIMEOUT_MS),
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
-  const parsed = (await response.json()) as LlamaCppBackendManifest | LlamaCppBackendRootManifest;
-  if (Array.isArray((parsed as LlamaCppBackendManifest).backends)) {
-    return normalizeManifest(parsed as LlamaCppBackendManifest, manifestUrl);
-  }
-  return await fetchVersionedManifestIndex(parsed as LlamaCppBackendRootManifest, manifestUrl);
-}
-
-async function fetchVersionedManifestIndex(
-  rootManifest: LlamaCppBackendRootManifest,
-  manifestUrl: string,
-): Promise<LlamaCppBackendManifest> {
-  const versions = Array.isArray(rootManifest.versions)
-    ? rootManifest.versions.map(item => String(item).trim()).filter(Boolean)
-    : [];
-  if (versions.length === 0) {
-    throw new Error('The root backend manifest does not contain any versions.');
-  }
-  const baseUrl = (
-    rootManifest.publicBaseUrl || manifestUrl.replace(/\/manifest\.json(?:[?#].*)?$/, '')
-  ).replace(/\/$/, '');
-  const manifests = await Promise.all(
-    versions.map(async version => {
-      const versionManifestUrl = `${baseUrl}/${version}/manifest.json`;
-      const versionManifest = await fetchManifestFromUrl(versionManifestUrl);
-      return {
-        version,
-        manifest: versionManifest,
-      };
-    }),
-  );
-  return {
-    schemaVersion: 1,
-    defaultVersion:
-      rootManifest.defaultVersion || manifests[0]?.manifest.defaultVersion || versions[0],
-    releaseBaseUrl: baseUrl,
-    backends: manifests.flatMap(({ version, manifest }) =>
-      manifest.backends.map(entry => injectVersionedArchiveUrls(entry, manifest, version, baseUrl)),
-    ),
-  };
-}
-
-function injectVersionedArchiveUrls(
-  entry: LlamaCppBackendManifestEntry,
-  manifest: LlamaCppBackendManifest,
-  version: string,
-  baseUrl: string,
-): LlamaCppBackendManifestEntry {
-  const releaseBaseUrl = (manifest.releaseBaseUrl || `${baseUrl}/${version}`).replace(/\/$/, '');
-  return {
-    ...entry,
-    archive: injectArchiveUrls(entry.archive, releaseBaseUrl),
-    companions: entry.companions?.map(companion => injectArchiveUrls(companion, releaseBaseUrl)),
-  };
-}
-
-function injectArchiveUrls<
-  T extends { assetName: string; url?: string; parts?: LlamaCppBackendArchivePart[] },
->(archive: T, releaseBaseUrl: string): T {
-  return {
-    ...archive,
-    url: archive.url || `${releaseBaseUrl}/${archive.assetName}`,
-    parts: archive.parts?.map(part => ({
-      ...part,
-      url: part.url || `${releaseBaseUrl}/${part.assetName}`,
-    })),
-  };
 }
 
 export async function listLlamaCppBackends(input: {
@@ -342,6 +267,7 @@ export function recommendLlamaCppBackend(input: {
   arch: string;
   hasNvidiaGpu: boolean;
   config?: LlamaCppServiceConfig;
+  driverVersion?: string;
 }): LlamaCppBackendRef | undefined {
   const normalizedPlatform = normalizePlatform(input.platform);
   const normalizedArch = normalizeArch(input.arch);
@@ -356,13 +282,34 @@ export function recommendLlamaCppBackend(input: {
       (!version || entry.version === version),
   );
   const desiredBackend = input.config?.runtimeBackend ?? LlamaCppRuntimeBackend.Auto;
+  const preferredCudaMajor = resolvePreferredLlamaCppRuntimeCudaMajor({
+    configured: input.config?.runtimeCudaMajor,
+    driverVersion: input.driverVersion,
+  });
   const selected = selectBackendByPriority(compatible, {
     platform: normalizedPlatform,
     arch: normalizedArch,
     hasNvidiaGpu: input.hasNvidiaGpu,
     desiredBackend,
+    preferredCudaMajor,
   });
   return selected ? toBackendRef(selected.version, selected.backend) : undefined;
+}
+
+export function recommendLlamaCppCpuBackend(input: {
+  manifest: LlamaCppBackendManifest;
+  platform: NodeJS.Platform;
+  arch: string;
+  config?: LlamaCppServiceConfig;
+}): LlamaCppBackendRef | undefined {
+  return recommendLlamaCppBackend({
+    ...input,
+    hasNvidiaGpu: false,
+    config: {
+      ...input.config,
+      runtimeBackend: LlamaCppRuntimeBackend.Cpu,
+    },
+  });
 }
 
 function selectBackendByPriority(
@@ -372,29 +319,31 @@ function selectBackendByPriority(
     arch: string;
     hasNvidiaGpu: boolean;
     desiredBackend: LlamaCppRuntimeBackend;
+    preferredCudaMajor: (typeof LlamaCppRuntimeCudaMajor)[keyof typeof LlamaCppRuntimeCudaMajor];
   },
 ): LlamaCppBackendManifestEntry | undefined {
-  if (input.platform === 'win32' && input.arch === 'x64') {
+  if ((input.platform === 'win32' || input.platform === 'linux') && input.arch === 'x64') {
     if (input.desiredBackend === LlamaCppRuntimeBackend.Cpu) {
       return compatible.find(entry => entry.accelerator === 'cpu');
     }
     if (input.desiredBackend === LlamaCppRuntimeBackend.Cuda) {
-      return (
-        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13') ??
-        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12')
-      );
+      return pickCudaBackendEntry(compatible, input.preferredCudaMajor);
     }
     if (input.hasNvidiaGpu) {
       return (
-        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '13') ??
-        compatible.find(entry => entry.accelerator === 'cuda' && entry.cudaMajor === '12') ??
+        pickCudaBackendEntry(compatible, input.preferredCudaMajor) ??
+        compatible.find(entry => entry.accelerator === 'cpu')
+      );
+    }
+    if (input.platform === 'win32') {
+      return (
         compatible.find(entry => entry.accelerator === 'vulkan') ??
         compatible.find(entry => entry.accelerator === 'cpu')
       );
     }
     return (
-      compatible.find(entry => entry.accelerator === 'vulkan') ??
-      compatible.find(entry => entry.accelerator === 'cpu')
+      compatible.find(entry => entry.accelerator === 'cpu') ??
+      compatible.find(entry => entry.accelerator === 'vulkan')
     );
   }
   if (input.platform === 'win32' && input.arch === 'arm64') {
@@ -412,4 +361,80 @@ function selectBackendByPriority(
     compatible.find(entry => entry.accelerator === 'cpu') ??
     compatible[0]
   );
+}
+
+function pickCudaBackendEntry(
+  compatible: LlamaCppBackendManifestEntry[],
+  preferredCudaMajor: (typeof LlamaCppRuntimeCudaMajor)[keyof typeof LlamaCppRuntimeCudaMajor],
+): LlamaCppBackendManifestEntry | undefined {
+  const secondaryCudaMajor =
+    preferredCudaMajor === LlamaCppRuntimeCudaMajor.Cuda13
+      ? LlamaCppRuntimeCudaMajor.Cuda12
+      : LlamaCppRuntimeCudaMajor.Cuda13;
+  return (
+    compatible.find(
+      entry => entry.accelerator === 'cuda' && entry.cudaMajor === preferredCudaMajor,
+    ) ??
+    compatible.find(
+      entry => entry.accelerator === 'cuda' && entry.cudaMajor === secondaryCudaMajor,
+    ) ??
+    compatible.find(entry => entry.accelerator === 'cuda')
+  );
+}
+
+export function readCurrentBackendRef(runtimeRoot: string): LlamaCppBackendRef | undefined {
+  return readBackendBuildInfo(getLlamaCppCurrentBackendDir(runtimeRoot));
+}
+
+export function readBackendBuildInfo(
+  runtimeDir: string,
+): (LlamaCppBackendRef & Record<string, unknown>) | undefined {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(path.join(runtimeDir, BUILD_INFO_FILE), 'utf8'),
+    ) as Record<string, unknown>;
+    const version = String(parsed.version ?? '').trim();
+    const backend = String(parsed.backend ?? parsed.target ?? '').trim();
+    if (!version || !backend) return undefined;
+    return { ...parsed, ...toBackendRef(version, backend) };
+  } catch {
+    return undefined;
+  }
+}
+
+export function syncCurrentBackend(runtimeRoot: string, ref: LlamaCppBackendRef): void {
+  const backendDir = getLlamaCppBackendDir(runtimeRoot, ref);
+  if (!fs.existsSync(backendDir)) {
+    throw new Error(`Backend does not exist: ${ref.versionBackend}`);
+  }
+  const currentDir = getLlamaCppCurrentBackendDir(runtimeRoot);
+  removeCurrentBackendLink(runtimeRoot);
+  fs.mkdirSync(runtimeRoot, { recursive: true });
+  fs.symlinkSync(backendDir, currentDir, process.platform === 'win32' ? 'junction' : 'dir');
+}
+
+export function listInstalledBackendRefs(
+  runtimeRoot: string,
+  platform: NodeJS.Platform = process.platform,
+): LlamaCppBackendRef[] {
+  const backendsRoot = getLlamaCppBackendsRoot(runtimeRoot);
+  if (!fs.existsSync(backendsRoot)) return [];
+  const refs: LlamaCppBackendRef[] = [];
+  for (const versionEntry of fs.readdirSync(backendsRoot, { withFileTypes: true })) {
+    if (!versionEntry.isDirectory()) continue;
+    for (const backendEntry of fs.readdirSync(path.join(backendsRoot, versionEntry.name), {
+      withFileTypes: true,
+    })) {
+      if (!backendEntry.isDirectory()) continue;
+      const ref = toBackendRef(versionEntry.name, backendEntry.name);
+      const executablePath = resolveManagedBackendExecutablePath(
+        path.join(backendsRoot, ref.version, ref.backend),
+        platform,
+      );
+      if (fs.existsSync(executablePath)) {
+        refs.push(ref);
+      }
+    }
+  }
+  return refs;
 }

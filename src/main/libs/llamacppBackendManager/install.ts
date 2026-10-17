@@ -1,10 +1,6 @@
-import crypto from 'crypto';
-import extractZip from 'extract-zip';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import * as tar from 'tar';
-import { fileURLToPath } from 'url';
 
 import type {
   LlamaCppBackendManifest,
@@ -16,54 +12,57 @@ import type {
   LlamaCppRuntimeUninstallResult,
   LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
-import { listLlamaCppRuntimeDevices } from '../llamacppManager';
+import { allowEndUserLlamaCppRuntimeDownload } from '../inferenceEditionPolicy';
 import { copyDirectoryContents, resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
-import {
-  DownloadCancelledError,
-  downloadFileWithResume,
-  throwIfDownloadCancelled,
-} from '../resumableDownload';
-import { fetchLlamaCppBackendManifest } from './catalog';
+import { DownloadCancelledError, throwIfDownloadCancelled } from '../resumableDownload';
 import {
   getLlamaCppBackendDir,
-  getLlamaCppBackendDownloadDir,
   getLlamaCppBackendExecutablePath,
-  getLlamaCppCurrentBackendDir,
+  getLlamaCppBackendDownloadDir,
   getLlamaCppCurrentExecutablePath,
   getManagedBackendBinDir,
-  readBackendBuildInfo,
-  readCurrentBackendRef,
   removeCurrentBackendLink,
-  resolveManagedBackendExecutablePath,
   sanitizePathSegment,
-  syncCurrentBackend,
-  writeBackendBuildInfo,
 } from './paths';
 import {
-  backendRequiresDeviceValidation,
-  downloadArchive,
+  extractArchive,
   failedInstall,
-  findArchiveNameHint,
   findExecutablePath,
   findRuntimePayloadDirectory,
-  inferBackendDirectoryMetadata,
-  parseBackendArchiveName,
-  restorePreviousBackend,
-  extractArchive,
-  findManifestEntry,
   inferBackendAccelerator,
+  inferBackendDirectoryMetadata,
   isSupportedBackendArchivePath,
+  normalizeArch,
   normalizePlatform,
-  resolveArchiveUrl,
+  parseBackendArchiveName,
   resolveImportDirectoryFromSelectedFile,
   validateBackendForMachine,
   validateImportedBackendDevices,
-  verifySha256,
+  writeBackendBuildInfo,
+  findArchiveNameHint,
+  downloadArchive,
+  findManifestEntry,
+  resolveArchiveUrl,
 } from './support';
+import { fetchLlamaCppBackendManifest, readCurrentBackendRef, syncCurrentBackend } from './catalog';
 
-const GITHUB_RELEASE_BASE_URL = 'https://github.com/ggml-org/llama.cpp/releases/download';
+export type BackendInstallProgressReporter = import('./support').BackendInstallProgressReporter;
 
-type BackendInstallProgressReporter = (progress: LlamaCppInstallProgress) => void;
+function restorePreviousBackend(
+  runtimeRoot: string,
+  previousRef: LlamaCppBackendRef | undefined,
+): void {
+  if (!previousRef) {
+    removeCurrentBackendLink(runtimeRoot);
+    return;
+  }
+  try {
+    syncCurrentBackend(runtimeRoot, previousRef);
+  } catch (error) {
+    console.error('[LlamaCpp] failed to restore previous backend after import:', error);
+    removeCurrentBackendLink(runtimeRoot);
+  }
+}
 
 export async function installLlamaCppBackend(input: {
   runtimeRoot: string;
@@ -76,6 +75,11 @@ export async function installLlamaCppBackend(input: {
   signal?: AbortSignal;
   onProgress?: BackendInstallProgressReporter;
 }): Promise<LlamaCppRuntimeInstallResult> {
+  if (!allowEndUserLlamaCppRuntimeDownload()) {
+    return failedInstall(
+      'This edition ships a fixed llama.cpp runtime and does not support downloading or switching backends.',
+    );
+  }
   const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
   if (input.signal?.aborted) {
     return { ...failedInstall('Download cancelled.'), cancelled: true };

@@ -1,5 +1,8 @@
+import fs from 'fs';
+
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import {
+  estimateRequiredLlamaCppModelVramMiB,
   LlamaCppMemoryPolicy,
   type LlamaCppModelLaunchInput,
   LlamaCppRuntimeBackend,
@@ -9,6 +12,7 @@ import {
   LlamaCppModelLoadFailureReason,
   type LlamaCppModelLoadFailureReason as LlamaCppModelLoadFailureReasonType,
 } from './llamacppModelLoadErrors';
+import { readGgufKvBytesPerToken } from './ggufMetadata';
 import { resolveLlamaCppDeviceSelection } from './llamacppServe';
 
 export const LlamaCppModelGpuPlacementMode = {
@@ -20,13 +24,10 @@ export const LlamaCppModelGpuPlacementMode = {
 export type LlamaCppModelGpuPlacementMode =
   (typeof LlamaCppModelGpuPlacementMode)[keyof typeof LlamaCppModelGpuPlacementMode];
 
-export const LlamaCppModelGpuPlacementDefaults = {
-  ModelSizeMultiplier: 1.2,
-  ContextBufferPer1024TokensMiB: 256,
-} as const;
-
 export type LlamaCppModelGpuPlacementInput = {
   launchInput: LlamaCppModelLaunchInput;
+  cacheTypeK?: string;
+  cacheTypeV?: string;
   runtimeBackend?: LlamaCppRuntimeBackend;
   runtimeCapabilities?: Pick<
     LlamaCppRuntimeCapabilities,
@@ -98,24 +99,7 @@ export function planLlamaCppModelGpuPlacement(
   };
 }
 
-export function estimateRequiredLlamaCppModelVramMiB(input: {
-  modelSizeBytes?: number;
-  ctxSize?: number;
-}): number {
-  const modelSizeMiB =
-    input.modelSizeBytes && input.modelSizeBytes > 0
-      ? Math.ceil(input.modelSizeBytes / 1024 / 1024)
-      : 0;
-  const contextBufferMiB =
-    input.ctxSize && input.ctxSize > 0
-      ? Math.ceil(input.ctxSize / 1024) *
-        LlamaCppModelGpuPlacementDefaults.ContextBufferPer1024TokensMiB
-      : 0;
-
-  return Math.ceil(
-    modelSizeMiB * LlamaCppModelGpuPlacementDefaults.ModelSizeMultiplier + contextBufferMiB,
-  );
-}
+export { estimateRequiredLlamaCppModelVramMiB } from '../../shared/llamacpp/modelMemoryEstimate';
 
 function validateManualMemoryBudget(
   input: LlamaCppModelGpuPlacementInput,
@@ -135,10 +119,7 @@ function validateManualMemoryBudget(
   const budgetMiB = Math.floor(systemMemory.totalMemoryMiB * (budgetPercent / 100));
   const availableSystemMemoryMiB = Math.min(budgetMiB, systemMemory.freeMemoryMiB);
   const availableMemoryMiB = availableSystemMemoryMiB + sumAvailableVramMiB(input.nvidiaSnapshot);
-  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB({
-    modelSizeBytes: input.modelSizeBytes,
-    ctxSize: input.launchInput.options?.ctxSize,
-  });
+  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(buildMemoryEstimateInput(input));
   if (requiredMemoryMiB <= availableMemoryMiB) return null;
 
   return {
@@ -148,6 +129,21 @@ function validateManualMemoryBudget(
       'The model startup estimate exceeds the configured system-memory budget plus free VRAM.',
     requiredMemoryMiB,
     availableMemoryMiB,
+  };
+}
+
+function buildMemoryEstimateInput(input: LlamaCppModelGpuPlacementInput) {
+  const modelPath = input.launchInput.modelPath;
+  const kvBytesPerToken =
+    modelPath && fs.existsSync(modelPath)
+      ? readGgufKvBytesPerToken(modelPath, input.cacheTypeK, input.cacheTypeV)
+      : undefined;
+  return {
+    modelSizeBytes: input.modelSizeBytes,
+    contextSize: input.launchInput.options?.ctxSize,
+    cacheTypeK: input.cacheTypeK,
+    cacheTypeV: input.cacheTypeV,
+    ...(kvBytesPerToken ? { kvBytesPerToken } : {}),
   };
 }
 
@@ -213,10 +209,7 @@ function selectGpuIndexes(input: LlamaCppModelGpuPlacementInput): number[] {
   const candidates = (input.nvidiaSnapshot?.gpus ?? [])
     .filter(gpu => Number.isFinite(gpu.memoryFreeMiB) && (gpu.memoryFreeMiB ?? -1) >= 0)
     .sort((left, right) => (right.memoryFreeMiB ?? 0) - (left.memoryFreeMiB ?? 0));
-  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB({
-    modelSizeBytes: input.modelSizeBytes,
-    ctxSize: input.launchInput.options?.ctxSize,
-  });
+  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(buildMemoryEstimateInput(input));
   const selected: number[] = [];
   let availableMemoryMiB = 0;
 

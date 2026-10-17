@@ -20,10 +20,6 @@ export {
   getLlamaCppCurrentBackendDir,
   getLlamaCppBackendExecutablePath,
   getLlamaCppCurrentExecutablePath,
-  readCurrentBackendRef,
-  readBackendBuildInfo,
-  syncCurrentBackend,
-  listInstalledBackendRefs,
 } from './llamacppBackendManager/paths';
 export {
   fetchLlamaCppBackendManifest,
@@ -31,6 +27,11 @@ export {
   resolveLlamaCppBackendDownloadSize,
   getLlamaCppBackendCompatibilityError,
   recommendLlamaCppBackend,
+  recommendLlamaCppCpuBackend,
+  readCurrentBackendRef,
+  readBackendBuildInfo,
+  syncCurrentBackend,
+  listInstalledBackendRefs,
 } from './llamacppBackendManager/catalog';
 export {
   installLlamaCppBackend,

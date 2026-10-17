@@ -1,0 +1,658 @@
+name: Build inference editions (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      source-ref:
+        description: 'Commit, tag, or branch to build (defaults to the caller SHA)'
+        type: string
+        default: ''
+      app-build-version:
+        description: 'SemVer embedded in release artifacts (release mode only)'
+        type: string
+        default: ''
+      mode:
+        description: 'release runs signing and candidate assembly; verify runs unsigned validation builds'
+        type: string
+        default: verify
+      fail-fast:
+        description: 'Stop other matrix legs when one build fails'
+        type: boolean
+        default: false
+      build-macos:
+        description: 'Include macOS cpu matrix legs (arm64 + x64; lite is Windows-only)'
+        type: boolean
+        default: true
+      build-windows:
+        description: 'Include Windows lite/cpu/cuda matrix legs'
+        type: boolean
+        default: true
+      build-linux:
+        description: 'Include Linux cpu/cuda matrix legs (lite is Windows-only)'
+        type: boolean
+        default: true
+    secrets:
+      CERTUM_USER_ID:
+        required: false
+      CERTUM_OTP_URI:
+        required: false
+      CERTUM_CERT_THUMBPRINT:
+        required: false
+      UPDATE_MANIFEST_KEY_ID:
+        required: false
+      UPDATE_MANIFEST_PUBLIC_KEY_BASE64:
+        required: false
+      MODELSCOPE_TOKENS:
+        required: false
+      MACOS_CSC_LINK:
+        required: false
+      MACOS_CSC_KEY_PASSWORD:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  plan-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          BUILD_MACOS: ${{ inputs.build-macos }}
+          BUILD_WINDOWS: ${{ inputs.build-windows }}
+          BUILD_LINUX: ${{ inputs.build-linux }}
+        shell: bash
+        run: |
+          matrix='{"include":['
+          separator=''
+
+          if [[ "$BUILD_WINDOWS" == "true" ]]; then
+            for edition in lite cpu cuda; do
+              # CUDA 12.4 nvcc rejects the VS 2026 (MSVC 14.5x) toolchain on
+              # windows-latest; the CUDA leg builds on windows-2022 (VS 2022).
+              runner='windows-latest'
+              if [[ "$edition" == 'cuda' ]]; then runner='windows-2022'; fi
+              matrix+="${separator}{\"platform\":\"windows\",\"runner\":\"${runner}\",\"artifact\":\"windows-${edition}-build\",\"runtime_target\":\"win-x64\",\"inference_edition\":\"${edition}\",\"target\":\"win32-x64-${edition}\"}"
+              separator=','
+            done
+          fi
+          # Edition matrix (krli, 2026-10-17): lite is Windows-only. Windows
+          # lite/cpu/cuda, Linux cpu/cuda, macOS cpu (arm64 + x64) = 7 legs.
+          # Keep in sync with scripts/release/inference-edition-targets.mjs.
+          if [[ "$BUILD_LINUX" == "true" ]]; then
+            for edition in cpu cuda; do
+              matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-${edition}-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"${edition}\",\"target\":\"linux-x64-${edition}\"}"
+              separator=','
+            done
+          fi
+          if [[ "$BUILD_MACOS" == "true" ]]; then
+            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-latest\",\"artifact\":\"macos-arm64-cpu-build\",\"runtime_target\":\"mac-arm64\",\"arch\":\"arm64\",\"inference_edition\":\"cpu\",\"target\":\"darwin-arm64-cpu\"}"
+            separator=','
+            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-15-intel\",\"artifact\":\"macos-x64-cpu-build\",\"runtime_target\":\"mac-x64\",\"arch\":\"x64\",\"inference_edition\":\"cpu\",\"target\":\"darwin-x64-cpu\"}"
+          fi
+
+          matrix+=']}'
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan-matrix
+    strategy:
+      fail-fast: ${{ inputs.fail-fast }}
+      matrix: ${{ fromJSON(needs.plan-matrix.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    environment: ${{ inputs.mode == 'release' && 'release' || '' }}
+    env:
+      ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+      - name: Resolve immutable source commit
+        id: source-commit
+        shell: bash
+        # pull_request runs check out the PR head (source-ref), while GITHUB_SHA
+        # is the synthetic merge commit. Every acceptance script that binds
+        # evidence to "this build" (uninstall lease, retained-uninstaller
+        # manifest, shell evidence) must use the commit actually built.
+        run: |
+          commit="$(git rev-parse HEAD)"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "ZHIYUAN_SOURCE_COMMIT=$commit" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Restore llama.cpp runtime
+        id: llama-runtime
+        uses: ./.github/actions/cache-llamacpp-runtime
+        with:
+          mode: restore
+      - name: Restore packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            vendor/engram-runtime
+            vendor/channel-runtime
+          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          restore-keys: |
+            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
+      - name: Install Electron system dependencies
+        if: ${{ matrix.platform == 'linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
+            libxss1 libxtst6 libuuid1 xdg-utils xvfb
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Read pinned Magpie Go toolchain
+        id: magpie-toolchain
+        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
+          cache: false
+      - name: Cache Magpie module and build scratch
+        uses: actions/cache@v5
+        with:
+          path: .cache/magpie
+          key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go${{ steps.magpie-toolchain.outputs.go-version }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
+      - name: Build and verify pinned Magpie gateway
+        shell: bash
+        env:
+          MAGPIE_TARGET: ${{ matrix.platform == 'linux' && 'linux-x64' || matrix.platform == 'windows' && 'win32-x64' || (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
+        run: |
+          set -euo pipefail
+          go version | grep -Fq "go${{ steps.magpie-toolchain.outputs.go-version }}"
+          bun run magpie:build -- --target "${MAGPIE_TARGET}"
+          bun run magpie:verify -- --target "${MAGPIE_TARGET}"
+      - name: Set up installer shell SDK
+        if: ${{ matrix.platform == 'windows' }}
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+      - name: Set up Windows runtimes
+        if: ${{ matrix.platform == 'windows' }}
+        run: |
+          bun run setup:uv-runtime
+          bun run setup:python-runtime
+          bun run engram:runtime:${{ matrix.runtime_target }}
+      - name: Set up POSIX runtimes
+        if: ${{ matrix.platform != 'windows' }}
+        run: |
+          bun run setup:posix-uv-runtime
+          bun run setup:posix-python-runtime
+          bun run engram:runtime:${{ matrix.runtime_target }}
+      - name: Sync vendor llama.cpp CPU edition
+        if: ${{ matrix.inference_edition != 'lite' }}
+        run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
+        env:
+          LLAMACPP_CPU_TARGET_ID: ${{ matrix.runtime_target }}
+      - name: Cache llama.cpp CUDA source
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+        uses: actions/cache@v5
+        with:
+          path: .cache/llama.cpp-src
+          key: llamacpp-cuda-src-b9244-v1
+          restore-keys: llamacpp-cuda-src-b9244-
+      - name: Set up CUDA 12.4 toolkit (Windows)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        uses: Jimver/cuda-toolkit@v0.2.22
+        id: cuda-toolkit
+        with:
+          cuda: '12.4.1'
+          method: network
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
+      - name: Verify CUDA compiler (Windows)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        shell: bash
+        run: nvcc --version
+      - name: Prepare llama.cpp CUDA source (Windows)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        shell: bash
+        run: bash scripts/ensure-llamacpp-cuda-source.sh
+      - name: Install Ninja (Windows CUDA)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        run: choco install ninja -y
+      - name: Set up MSVC developer environment (Windows CUDA)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Compile llama-server (Windows CUDA)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        shell: bash
+        run: bash scripts/build-llamacpp-cuda-rtx40.sh win
+      - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
+        shell: bash
+        run: bash scripts/ci/build-llamacpp-cuda-linux-in-docker.sh
+      - name: Finalize CUDA llama.cpp edition bundle
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+        run: node scripts/finalize-llamacpp-cuda-edition.cjs
+        env:
+          LLAMACPP_CUDA_PLATFORM: ${{ matrix.platform == 'windows' && 'win32' || 'linux' }}
+      - name: Stage bundled llama.cpp runtime
+        if: ${{ matrix.inference_edition != 'lite' }}
+        run: bun run prepare:inference-edition-runtime
+        env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
+      - name: Connect Certum SimplySign
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        id: certum-signing
+        uses: ./.github/actions/setup-certum-signing
+        with:
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+      - name: Build Windows (verify)
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        run: bun run dist:win:${{ matrix.inference_edition }}
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build Windows release (lite)
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'lite' }}
+        run: bun run dist:win:signed
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build Windows release (cpu)
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'cpu' }}
+        run: bun run dist:win:signed:cpu
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build Windows release (cuda)
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'cuda' }}
+        run: bun run dist:win:signed:cuda
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Validate optional macOS signing credentials
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          values=("$CSC_LINK" "$CSC_KEY_PASSWORD" "$APPLE_ID" "$APPLE_APP_SPECIFIC_PASSWORD" "$APPLE_TEAM_ID")
+          provided=0
+          for value in "${values[@]}"; do [[ -n "$value" ]] && provided=$((provided + 1)); done
+          if [[ $provided -eq 0 ]]; then
+            echo 'ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=false' >> "$GITHUB_ENV"
+            echo 'CSC_IDENTITY_AUTO_DISCOVERY=false' >> "$GITHUB_ENV"
+            echo '::warning title=Unsigned macOS release::Apple signing credentials are unavailable.'
+          elif [[ $provided -ne ${#values[@]} ]]; then
+            echo 'macOS signing credentials are only partially configured' >&2
+            exit 1
+          else
+            echo 'ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=true' >> "$GITHUB_ENV"
+            echo 'CSC_IDENTITY_AUTO_DISCOVERY=true' >> "$GITHUB_ENV"
+          fi
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Build macOS (verify)
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'macos' }}
+        run: node scripts/ensure-build-version.js && bun run dist:mac:${{ matrix.arch }}
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build unsigned macOS release
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build signed macOS release
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build Linux (verify)
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'linux' }}
+        # The CUDA llama-server is already built in Docker, finalized and staged
+        # above; dist:linux:cuda would rebuild it on the host against the
+        # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
+        run: ${{ matrix.inference_edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', matrix.inference_edition) }}
+        env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build Linux release
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
+        # The CUDA llama-server is already built in Docker, finalized and staged
+        # above; dist:linux:cuda would rebuild it on the host against the
+        # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
+        run: ${{ matrix.inference_edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', matrix.inference_edition) }}
+        env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Smoke bundled llama-server
+        if: ${{ matrix.inference_edition != 'lite' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=resources/llamacpp-bundled
+          test -f "$root/manifest.json" || { echo "Missing $root/manifest.json" >&2; exit 1; }
+          # Launch the server the manifest names, never an arbitrary find hit.
+          # Hosted runners have no GPU driver (the Windows CUDA server imports
+          # nvcuda.dll), so the portable CPU fallback is launched when declared;
+          # every other declared executable must exist.
+          node -e "const fs=require('fs');const m=require('./$root/manifest.json');for(const k of ['executable','vulkanExecutable','cpuFallbackExecutable'])if(m[k]&&!fs.existsSync('$root/'+m[k])){console.error('Declared '+k+' missing: '+m[k]);process.exit(1)}"
+          launch="$(node -e "const m=require('./$root/manifest.json');process.stdout.write(m.cpuFallbackExecutable||m.executable)")"
+          chmod +x "$root/$launch" 2>/dev/null || true
+          "$root/$launch" --version
+          node scripts/ci/measure-llamacpp-bundled.cjs "$root" "${{ matrix.target }}" "$launch"
+      - name: Verify packaged ACP registry and bridges
+        run: node scripts/ci/verify-packaged-acp-resources.mjs
+      - name: Verify packaged release version
+        if: ${{ inputs.mode == 'release' }}
+        shell: bash
+        run: node scripts/ci/verify-packaged-app-version.mjs '${{ inputs.app-build-version }}'
+      - name: Verify signed and notarized macOS release
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
+        shell: bash
+        run: |
+          app_path="$(find release -maxdepth 3 -type d -name '*.app' -print -quit)"
+          [[ -n "$app_path" ]] || { echo 'Packaged macOS app was not found' >&2; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          for attempt in 1 2 3; do
+            if xcrun stapler validate "$app_path"; then break; fi
+            if [[ "$attempt" == 3 ]]; then
+              echo 'macOS notarization ticket validation failed after 3 attempts' >&2
+              exit 1
+            fi
+            sleep $((attempt * 10))
+          done
+          node scripts/ci/verify-packaged-magpie-signature.mjs "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+      - name: Verify Windows Authenticode signatures
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/verify-windows-authenticode.ps1
+          -ProjectRoot '${{ github.workspace }}'
+          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
+      - name: Verify Windows release size and runtimes
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        shell: powershell
+        env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+      - name: Verify Windows package runtimes with a clean PATH
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        shell: powershell
+        env:
+          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-runtime-smoke.ps1
+          -ProjectRoot ${{ github.workspace }}
+      - name: Qualify Windows compression before release assembly
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        uses: ./.github/actions/verify-windows-compression
+      - name: Prepare isolated native uninstall acceptance (verify)
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        shell: powershell
+        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
+      - name: Prepare isolated native uninstall acceptance (release)
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        shell: powershell
+        env:
+          ZHIYUAN_SOURCE_COMMIT: ${{ steps.source-commit.outputs.commit }}
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-shell-uninstall.ps1 -Action prepare
+      - name: Verify Windows cold install, cache-hit upgrade, and uninstall
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-installer-smoke.ps1
+          -ProjectRoot '${{ github.workspace }}'
+      - name: Verify the packaged renderer in a virtual Ubuntu desktop
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'linux' }}
+        run: >-
+          node scripts/verify-linux-renderer.mjs
+          release/linux-unpacked
+          release/linux-render-smoke.png
+      - name: Verify the Linux renderer
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
+        run: xvfb-run -a node scripts/verify-linux-renderer.mjs release/linux-unpacked release/linux-render-smoke.png
+      - name: Install and start the exact Linux release deb
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          debs=(release/*.deb)
+          [[ ${#debs[@]} -eq 1 ]] || { echo 'Expected exactly one Linux deb package' >&2; exit 1; }
+          sudo apt-get install -y "$(realpath "${debs[0]}")"
+          app_exec="$(node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('electron-builder.json','utf8'));process.stdout.write('/opt/'+c.productName+'/'+(c.executableName||c.productName));")"
+          test -x "$app_exec" || {
+            echo "Installed Linux executable is missing: $app_exec" >&2
+            ls -d /opt/*/ >&2 || true
+            exit 1
+          }
+          node scripts/verify-linux-renderer.mjs "$app_exec" release/linux-deb-install-smoke.png
+      - name: Verify the final WebView2 installer interactively
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        shell: pwsh
+        run: |
+          node scripts/ci/windows-shell-interactive.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Shell interactive acceptance failed.' }
+          $installer = @(Get-ChildItem -LiteralPath release -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
+          if ($installer.Count -ne 1) { throw 'Expected exactly one shell installer.' }
+          $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
+          node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Shell evidence is invalid.' }
+      - name: Verify the final signed WebView2 installer interactively
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        shell: pwsh
+        env:
+          ZHIYUAN_SOURCE_COMMIT: ${{ steps.source-commit.outputs.commit }}
+        run: |
+          node scripts/ci/windows-shell-interactive.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Signed shell interactive acceptance failed.' }
+          $installer = @(Get-ChildItem -LiteralPath release -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
+          if ($installer.Count -ne 1) { throw 'Expected exactly one signed shell installer.' }
+          $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
+          node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Signed shell evidence is invalid.' }
+      - name: Verify native uninstall preserves user data
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        shell: powershell
+        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action verify
+      - name: Verify signed native uninstall preserves user data
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        shell: powershell
+        env:
+          ZHIYUAN_SOURCE_COMMIT: ${{ steps.source-commit.outputs.commit }}
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-shell-uninstall.ps1 -Action verify
+          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
+      - name: Upload shell acceptance evidence
+        if: ${{ always() && inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: shell-acceptance-${{ github.run_id }}
+          path: acceptance-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload signed shell acceptance evidence
+        if: ${{ always() && inputs.mode == 'release' && matrix.platform == 'windows' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: signed-shell-acceptance-${{ github.run_id }}
+          path: acceptance-diagnostics
+          if-no-files-found: error
+          retention-days: 7
+      - name: Assemble Windows release payload
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        shell: bash
+        env:
+          EDITION: ${{ matrix.inference_edition }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          installers=(release/ZhiYuanAgent-Setup-*.exe)
+          updaters=()
+          for file in release/*.exe; do
+            [[ "$(basename "$file")" == ZhiYuanAgent-Setup-* ]] || updaters+=("$file")
+          done
+          blockmaps=(release/*.exe.blockmap)
+          [[ ${#installers[@]} -eq 1 && ${#updaters[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one WebView2 installer, NSIS updater, and updater blockmap' >&2; exit 1; }
+          [[ "${blockmaps[0]}" == "${updaters[0]}.blockmap" ]] || { echo 'Blockmap must belong to the NSIS updater' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ inputs.app-build-version }}' win32 x64 "$EDITION" \
+            release/latest.yml release/electron-updater/latest.yml
+          node scripts/release/create-release-candidate.mjs \
+            '${{ inputs.app-build-version }}' \
+            '${{ steps.source-commit.outputs.commit }}' \
+            '${{ github.run_id }}' candidate "candidate-win32-x64-${EDITION}.json" \
+            "${installers[0]}:win32:x64:${EDITION}:installer" \
+            "${updaters[0]}:win32:x64:${EDITION}:updater" \
+            "${blockmaps[0]}:win32:x64:${EDITION}:blockmap" \
+            "release/electron-updater/latest.yml:win32:x64:${EDITION}:metadata"
+      - name: Assemble macOS release payload
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' }}
+        shell: bash
+        env:
+          EDITION: ${{ matrix.inference_edition }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          dmgs=(release/*.dmg)
+          zips=(release/*.zip)
+          blockmaps=(release/*.zip.blockmap)
+          [[ ${#dmgs[@]} -eq 1 && ${#zips[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one macOS DMG, ZIP, and blockmap' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ inputs.app-build-version }}' darwin '${{ matrix.arch }}' "$EDITION" \
+            release/latest-mac.yml release/electron-updater/latest-mac.yml
+          node scripts/release/create-release-candidate.mjs \
+            '${{ inputs.app-build-version }}' \
+            '${{ steps.source-commit.outputs.commit }}' \
+            '${{ github.run_id }}' candidate "candidate-darwin-${{ matrix.arch }}-${EDITION}.json" \
+            "${dmgs[0]}:darwin:${{ matrix.arch }}:${EDITION}:installer" \
+            "${zips[0]}:darwin:${{ matrix.arch }}:${EDITION}:updater" \
+            "${blockmaps[0]}:darwin:${{ matrix.arch }}:${EDITION}:blockmap" \
+            "release/electron-updater/latest-mac.yml:darwin:${{ matrix.arch }}:${EDITION}:metadata"
+      - name: Assemble Linux release payload
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
+        shell: bash
+        env:
+          EDITION: ${{ matrix.inference_edition }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          debs=(release/*.deb)
+          appimages=(release/*.AppImage)
+          [[ ${#debs[@]} -eq 1 && ${#appimages[@]} -eq 1 ]] || { echo 'Expected one Linux deb and AppImage' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ inputs.app-build-version }}' linux x64 "appimage-${EDITION}" \
+            release/latest-linux.yml release/electron-updater/latest-linux.yml
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ inputs.app-build-version }}' linux x64 "deb-${EDITION}" \
+            release/latest-linux.yml release/electron-updater/deb/latest-linux.yml
+          node scripts/release/create-release-candidate.mjs \
+            '${{ inputs.app-build-version }}' \
+            '${{ steps.source-commit.outputs.commit }}' \
+            '${{ github.run_id }}' candidate "candidate-linux-x64-${EDITION}.json" \
+            "${debs[0]}:linux:x64:deb-${EDITION}:installer" \
+            "${debs[0]}:linux:x64:deb-${EDITION}:updater" \
+            "release/electron-updater/deb/latest-linux.yml:linux:x64:deb-${EDITION}:metadata" \
+            "${appimages[0]}:linux:x64:appimage-${EDITION}:installer" \
+            "${appimages[0]}:linux:x64:appimage-${EDITION}:updater" \
+            "release/electron-updater/latest-linux.yml:linux:x64:appimage-${EDITION}:metadata"
+      - name: Upload release payload
+        if: ${{ inputs.mode == 'release' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-candidate-${{ inputs.app-build-version }}-${{ matrix.target }}
+          path: candidate/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'macos' }}
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/*.dmg
+          retention-days: 7
+      - uses: actions/upload-artifact@v6
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/*.exe
+          retention-days: 7
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() && inputs.mode == 'verify' && matrix.platform == 'linux' }}
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/linux-render-smoke.png
+          retention-days: 7
+      - name: Save llama.cpp runtime
+        if: success()
+        uses: ./.github/actions/cache-llamacpp-runtime
+        with:
+          mode: save
+          cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
+          cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}

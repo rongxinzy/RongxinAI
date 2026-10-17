@@ -4,6 +4,7 @@ import React from 'react';
 
 import { type AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import { LazyChunkErrorBoundary } from '../components/LazyChunkErrorBoundary';
+import type { InferenceEdition } from '../../shared/inferenceEdition';
 import type { SettingsEnterpriseConfig, SettingsOpenOptions } from '../components/settings/types';
 import { i18nService } from '../services/i18n';
 import { SettingsPage } from './lazyViews';
@@ -19,6 +20,7 @@ interface InitErrorViewProps {
   enterpriseConfig: SettingsEnterpriseConfig | null;
   appUpdateState: AppUpdateRuntimeState;
   managedModelsOnly: boolean;
+  inferenceEdition: InferenceEdition;
 }
 
 /**
@@ -35,6 +37,7 @@ export function InitErrorView({
   enterpriseConfig,
   appUpdateState,
   managedModelsOnly,
+  inferenceEdition,
 }: InitErrorViewProps) {
   return (
     <div className="h-screen overflow-hidden flex flex-col">
@@ -51,6 +54,7 @@ export function InitErrorView({
                 enterpriseConfig={enterpriseConfig}
                 appUpdateState={appUpdateState}
                 managedModelsOnly={managedModelsOnly}
+                inferenceEdition={inferenceEdition}
               />
             </React.Suspense>
           </LazyChunkErrorBoundary>

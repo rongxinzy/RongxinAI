@@ -5,6 +5,8 @@ export const LlamaCppRuntimeTargetId = {
   WinX64Cuda12: 'win-x64-cuda-12',
   WinArm64: 'win-arm64',
   LinuxX64: 'linux-x64',
+  LinuxX64Cuda12: 'linux-x64-cuda-12',
+  LinuxX64Cuda13: 'linux-x64-cuda-13',
   LinuxArm64: 'linux-arm64',
 } as const;
 

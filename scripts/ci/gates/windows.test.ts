@@ -65,17 +65,17 @@ test('PRs restore without saving; verified main runs publish the same cache grap
   expect(install?.if).toBeUndefined();
 });
 
-test.each([['release.yml', 'build-release', 'Assemble Windows release payload']])(
+test.each([['build-inference-editions.yml', 'build', 'Assemble Windows release payload']])(
   'compression qualification blocks the publication path in %s',
   (file, job, publishName) => {
     const releaseSteps = workflow(file).jobs[job].steps;
     const index = releaseSteps.findIndex(step => step.uses === compressionAction);
     expect(index).toBeGreaterThan(-1);
-    expect(releaseSteps[index].if).toBe("${{ matrix.platform == 'windows' }}");
+    expect(releaseSteps[index].if).toContain("matrix.platform == 'windows'");
     expect(releaseSteps[index]['continue-on-error']).toBeUndefined();
     const publishIndex = releaseSteps.findIndex(step => step.name === publishName);
     expect(publishIndex).toBeGreaterThan(index);
-    expect(releaseSteps[publishIndex].if).toBe("${{ matrix.platform == 'windows' }}");
+    expect(releaseSteps[publishIndex].if).toContain("matrix.platform == 'windows'");
   },
 );
 

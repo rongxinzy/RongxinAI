@@ -14,6 +14,11 @@ import { useAppKeyboardShortcuts } from './app/useAppKeyboardShortcuts';
 import { useAppUpdateState } from './app/useAppUpdateState';
 import { useNetworkStatusForwarder } from './app/useNetworkStatusForwarder';
 import {
+  InferenceEdition,
+  isLocalInferenceEnabledForEdition,
+  normalizeInferenceEdition,
+} from '../shared/inferenceEdition';
+import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
 } from './components/cowork/askUserQuestion';
@@ -110,6 +115,13 @@ const App: React.FC = () => {
   );
   const isWindows = window.electron.platform === 'win32';
   const managedModelsOnly = managedProviderPolicy?.mode === ManagedProviderAccessMode.Exclusive;
+  const [inferenceEdition, setInferenceEdition] = useState<InferenceEdition>(InferenceEdition.Lite);
+  useEffect(() => {
+    void window.electron.appInfo
+      .getInferenceEdition()
+      .then(value => setInferenceEdition(normalizeInferenceEdition(value)));
+  }, []);
+  const localInferenceEnabled = isLocalInferenceEnabledForEdition(inferenceEdition);
 
   useEffect(() => {
     if (!isInitialized || initError) return;
@@ -222,7 +234,7 @@ const App: React.FC = () => {
   }, [mainView, hasMountedLocalInference, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS]);
 
   useEffect(() => {
-    if (!managedProviderPolicy || managedModelsOnly) return;
+    if (!managedProviderPolicy || managedModelsOnly || !localInferenceEnabled) return;
     let active = true;
     void window.electron.appInfo
       .consumePendingLocalInferenceInstall()
@@ -283,7 +295,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleShowLocalInference = useCallback(() => {
-    if (managedModelsOnly) return;
+    if (managedModelsOnly || !localInferenceEnabled) return;
     setLocalInferenceRefreshRequestId(current => current + 1);
     setMainView(MainView.LocalInference);
   }, [managedModelsOnly]);
@@ -493,12 +505,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handler = () => {
-      if (managedModelsOnly) return;
+      if (managedModelsOnly || !localInferenceEnabled) return;
       setMainView(MainView.LocalInference);
     };
     window.addEventListener('app:show-local-inference', handler);
     return () => window.removeEventListener('app:show-local-inference', handler);
-  }, [managedModelsOnly]);
+  }, [managedModelsOnly, localInferenceEnabled]);
 
   // 鐩戝惉鎵樼洏鑿滃崟鎵撳紑璁剧疆鐨?IPC 浜嬩欢
   useEffect(() => {
@@ -558,6 +570,7 @@ const App: React.FC = () => {
         enterpriseConfig={enterpriseConfig}
         appUpdateState={appUpdateState}
         managedModelsOnly={managedModelsOnly}
+        inferenceEdition={inferenceEdition}
       />
     );
   }
@@ -593,6 +606,7 @@ const App: React.FC = () => {
             updateEntry={!isSidebarCollapsed ? updateEntry : null}
             hideLogin={Boolean(enterpriseConfig) || !getBranding().features.enableCommunityAuth}
             managedModelsOnly={managedModelsOnly}
+            inferenceEdition={inferenceEdition}
             onPrefetchView={prefetchFeatureView}
           />
           <MainViewCanvas
@@ -606,6 +620,8 @@ const App: React.FC = () => {
             enterpriseConfig={enterpriseConfig}
             appUpdateState={appUpdateState}
             managedModelsOnly={managedModelsOnly}
+            inferenceEdition={inferenceEdition}
+            localInferenceEnabled={localInferenceEnabled}
             onShowSkills={handleShowSkills}
             onCreateSkillByChat={handleCreateSkillByChat}
             onTrySkill={handleTrySkill}

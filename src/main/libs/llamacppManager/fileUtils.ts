@@ -1,4 +1,3 @@
-// File/preset helpers for LlamaCppManager (#1069).
 import fs from 'fs';
 import path from 'path';
 
@@ -24,6 +23,30 @@ export function resolveImportedModelTargetPath(importDir: string, sourcePath: st
     }
     attempt += 1;
   }
+}
+
+export function modelLaunchOptionsToPreset(
+  options: NonNullable<LlamaCppModelLaunchInput['options']>,
+): Record<string, string | number | boolean> {
+  return {
+    ...(options.ctxSize !== undefined ? { 'ctx-size': options.ctxSize } : {}),
+    ...(options.batchSize !== undefined ? { 'batch-size': options.batchSize } : {}),
+    ...(options.ubatchSize !== undefined ? { 'ubatch-size': options.ubatchSize } : {}),
+    ...(options.gpuLayers !== undefined ? { 'n-gpu-layers': options.gpuLayers } : {}),
+    ...(options.threads !== undefined ? { threads: options.threads } : {}),
+    ...(options.device ? { device: options.device } : {}),
+    ...(options.mainGpu !== undefined ? { 'main-gpu': options.mainGpu } : {}),
+    ...(options.splitMode ? { 'split-mode': options.splitMode } : {}),
+    ...(options.tensorSplit ? { 'tensor-split': options.tensorSplit } : {}),
+    ...(typeof options.mmap === 'boolean' ? { mmap: options.mmap } : {}),
+    ...(options.flashAttn ? { 'flash-attn': options.flashAttn } : {}),
+    ...(options.parallel !== undefined ? { parallel: options.parallel } : {}),
+    ...(options.reasoning ? { reasoning: options.reasoning } : {}),
+    ...(options.reasoningFormat && options.reasoningFormat !== 'auto'
+      ? { 'reasoning-format': options.reasoningFormat }
+      : {}),
+    ...(options.chatTemplate ? { 'chat-template': options.chatTemplate } : {}),
+  };
 }
 
 export function upsertIniSection(
@@ -68,28 +91,4 @@ function safeIsDirectoryEmpty(target: string): boolean {
 export function isGgufPath(value: string): boolean {
   const pathname = /^https?:\/\//i.test(value) ? new URL(value).pathname : value;
   return pathname.toLowerCase().endsWith('.gguf');
-}
-
-export function modelLaunchOptionsToPreset(
-  options: NonNullable<LlamaCppModelLaunchInput['options']>,
-): Record<string, string | number | boolean> {
-  return {
-    ...(options.ctxSize !== undefined ? { 'ctx-size': options.ctxSize } : {}),
-    ...(options.batchSize !== undefined ? { 'batch-size': options.batchSize } : {}),
-    ...(options.ubatchSize !== undefined ? { 'ubatch-size': options.ubatchSize } : {}),
-    ...(options.gpuLayers !== undefined ? { 'n-gpu-layers': options.gpuLayers } : {}),
-    ...(options.threads !== undefined ? { threads: options.threads } : {}),
-    ...(options.device ? { device: options.device } : {}),
-    ...(options.mainGpu !== undefined ? { 'main-gpu': options.mainGpu } : {}),
-    ...(options.splitMode ? { 'split-mode': options.splitMode } : {}),
-    ...(options.tensorSplit ? { 'tensor-split': options.tensorSplit } : {}),
-    ...(typeof options.mmap === 'boolean' ? { mmap: options.mmap } : {}),
-    ...(options.flashAttn ? { 'flash-attn': options.flashAttn } : {}),
-    ...(options.parallel !== undefined ? { parallel: options.parallel } : {}),
-    ...(options.reasoning ? { reasoning: options.reasoning } : {}),
-    ...(options.reasoningFormat && options.reasoningFormat !== 'auto'
-      ? { 'reasoning-format': options.reasoningFormat }
-      : {}),
-    ...(options.chatTemplate ? { 'chat-template': options.chatTemplate } : {}),
-  };
 }

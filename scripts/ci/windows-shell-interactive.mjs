@@ -187,10 +187,29 @@ export async function runShellAcceptance() {
   const components = JSON.parse(
     await readFile(path.join(root, 'build-tar/windows-components/manifest.json'), 'utf8'),
   ).components;
-  assert.deepEqual(
-    components.map(component => component.key).sort(),
-    ['channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv'].sort(),
-    'Main installer acceptance must retain all seven offline components',
+  // The fixed component set is scripts/nsis-offline-components.json (the same
+  // file the installers embed). lite must match it exactly; the new cpu/cuda
+  // editions must contain it, and their extra components (llamacpp-bundled)
+  // are reported, not counted. Every listed component is still verified
+  // installed and active below.
+  const baseKeys = JSON.parse(
+    await readFile(path.join(root, 'scripts/nsis-offline-components.json'), 'utf8'),
+  ).map(target => target.key);
+  const componentKeys = components.map(component => component.key);
+  const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
+  for (const key of baseKeys) {
+    assert.equal(
+      componentKeys.filter(candidate => candidate === key).length,
+      1,
+      `Main installer acceptance must retain fixed offline component ${key}`,
+    );
+  }
+  const extraKeys = componentKeys.filter(key => !baseKeys.includes(key));
+  if (edition === 'lite') {
+    assert.deepEqual(extraKeys, [], 'lite installer must carry only the fixed offline components');
+  }
+  console.log(
+    `[measure] windows-shell-components ${JSON.stringify({ edition, count: componentKeys.length, keys: componentKeys })}`,
   );
   async function assertDataPreserved() {
     assert.deepEqual(

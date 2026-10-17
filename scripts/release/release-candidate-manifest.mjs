@@ -3,21 +3,39 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
-export const CandidateTarget = {
-  WindowsX64Lite: 'win32-x64-lite',
-  MacX64Default: 'darwin-x64-default',
-  MacArm64Default: 'darwin-arm64-default',
-  LinuxX64AppImage: 'linux-x64-appimage',
-  LinuxX64Deb: 'linux-x64-deb',
-};
+import {
+  candidateTargetFromReleaseTarget,
+  listRequiredReleaseTargets,
+} from './inference-edition-targets.mjs';
 
-const REQUIRED_KINDS = new Map([
-  [CandidateTarget.WindowsX64Lite, ['installer', 'updater', 'blockmap', 'metadata']],
-  [CandidateTarget.MacX64Default, ['installer', 'updater', 'blockmap', 'metadata']],
-  [CandidateTarget.MacArm64Default, ['installer', 'updater', 'blockmap', 'metadata']],
-  [CandidateTarget.LinuxX64AppImage, ['installer', 'updater', 'metadata']],
-  [CandidateTarget.LinuxX64Deb, ['installer', 'updater', 'metadata']],
-]);
+function toCandidateEnumName(platform, arch, variant) {
+  const platformPart =
+    platform === 'win32' ? 'Windows' : platform === 'darwin' ? 'Mac' : 'Linux';
+  const archPart = arch === 'arm64' ? 'Arm64' : 'X64';
+  const variantPart = variant
+    .split('-')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join('');
+  return `${platformPart}${archPart}${variantPart}`;
+}
+
+/** @type {Record<string, string>} */
+export const CandidateTarget = {};
+
+/** @type {Map<string, string[]>} */
+const REQUIRED_KINDS = new Map();
+
+for (const releaseTarget of listRequiredReleaseTargets()) {
+  const [platform, arch, variant] = releaseTarget.split(':');
+  const candidateTarget = candidateTargetFromReleaseTarget(releaseTarget);
+  CandidateTarget[toCandidateEnumName(platform, arch, variant)] = candidateTarget;
+  REQUIRED_KINDS.set(
+    candidateTarget,
+    platform === 'linux'
+      ? ['installer', 'updater', 'metadata']
+      : ['installer', 'updater', 'blockmap', 'metadata'],
+  );
+}
 
 function validateReleaseVersion(value) {
   if (!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/.test(value)) {
@@ -107,10 +125,10 @@ function validateIdentity(manifest, expectedVersion, expectedCommit, expectedRun
     throw new Error(`Candidate version mismatch: ${manifest.releaseVersion}`);
   }
   if (manifest.sourceCommit !== expectedCommit) {
-    throw new Error(`Candidate source commit mismatch: ${manifest.sourceCommit}`);
+    throw new Error('Candidate source commit mismatch');
   }
   if (String(manifest.candidateRunId) !== expectedRunId) {
-    throw new Error(`Candidate run ID mismatch: ${manifest.candidateRunId}`);
+    throw new Error('Candidate run ID mismatch');
   }
   if (!Array.isArray(manifest.artifacts) || manifest.artifacts.length === 0) {
     throw new Error('Candidate manifest has no artifacts');
@@ -128,52 +146,26 @@ export async function createCandidateManifest({
   validateReleaseVersion(releaseVersion);
   validateCommit(sourceCommit);
   validateRunId(candidateRunId);
-  validateFilename(manifestName);
   if (!Array.isArray(specs) || specs.length === 0) throw new Error('Candidate artifact specs are required');
 
   const artifacts = [];
-  const copiedFiles = new Map();
   for (const spec of specs) {
-    const parsed = parseSpec(spec);
-    const filename = validateFilename(path.basename(parsed.filePath));
-    const relativePath = path.posix.join('payload', parsed.target, filename);
-    const description = await describeFile(parsed.filePath);
-    const existing = copiedFiles.get(relativePath);
-    if (existing) {
-      if (
-        existing.size !== description.size ||
-        existing.sha256 !== description.sha256 ||
-        existing.sha512 !== description.sha512
-      ) {
-        throw new Error(`Candidate artifacts collide at ${relativePath}`);
-      }
-    } else {
-      const destination = path.join(outputDirectory, ...relativePath.split('/'));
-      await fsp.mkdir(path.dirname(destination), { recursive: true });
-      await fsp.copyFile(parsed.filePath, destination);
-      copiedFiles.set(relativePath, description);
-    }
-    artifacts.push({
-      platform: parsed.platform,
-      arch: parsed.arch,
-      variant: parsed.variant,
-      kind: parsed.kind,
-      filename,
-      relativePath,
-      ...description,
-    });
+    const { filePath, platform, arch, variant, target, kind } = parseSpec(spec);
+    const { size, sha256, sha512 } = await describeFile(filePath);
+    const filename = path.basename(filePath);
+    validateFilename(filename);
+    const relativePath = `payload/${target}/${filename}`;
+    validateRelativePath(relativePath);
+    await fsp.mkdir(path.join(outputDirectory, 'payload', target), { recursive: true });
+    await fsp.copyFile(filePath, path.join(outputDirectory, relativePath));
+    artifacts.push({ platform, arch, variant, kind, filename, relativePath, size, sha256, sha512 });
   }
 
-  artifacts.sort((left, right) =>
-    `${left.platform}:${left.arch}:${left.variant}:${left.kind}`.localeCompare(
-      `${right.platform}:${right.arch}:${right.variant}:${right.kind}`,
-    ),
-  );
   const manifest = {
     schemaVersion: 1,
     releaseVersion,
     sourceCommit,
-    candidateRunId: String(candidateRunId),
+    candidateRunId,
     artifacts,
   };
   await verifyCandidateManifests({

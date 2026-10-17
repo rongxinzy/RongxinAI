@@ -105,6 +105,24 @@ function buildArguments(output) {
   ];
 }
 
+function extractTarArchive(archivePath, destinationDir) {
+  const archiveDir = path.dirname(archivePath);
+  const archiveName = path.basename(archivePath);
+  const destinationRelative = path.relative(archiveDir, destinationDir);
+  if (
+    !destinationRelative ||
+    destinationRelative.startsWith('..') ||
+    path.isAbsolute(destinationRelative)
+  ) {
+    throw new Error(
+      'Magpie upstream archive extraction requires the destination directory to live beside the archive',
+    );
+  }
+  fs.mkdirSync(destinationDir, { recursive: true });
+  // Git Bash GNU tar treats "D:\\..." archive paths as remote hosts; keep paths relative to cwd.
+  run('tar', ['-xf', archiveName, '-C', destinationRelative], { cwd: archiveDir });
+}
+
 function archiveArguments(repository, output, emptyAttributes, commit = upstream.commit) {
   // git archive applies checkout conversions and host configuration to stored blobs.
   // Match the pinned LF tar bytes without changing repository or global settings.
@@ -170,8 +188,7 @@ function build(options = {}) {
       throw new Error(
         `Pinned upstream archive SHA-256 mismatch: expected ${upstream.archiveSha256}, got ${archiveSha256}`,
       );
-    fs.mkdirSync(source);
-    run('tar', ['-xf', archive, '-C', source]);
+    extractTarArchive(archive, source);
     for (const [filename, expected] of [
       ['go.mod', upstream.goModSha256],
       ['go.sum', upstream.goSumSha256],
@@ -266,4 +283,11 @@ if (require.main === module) {
   }
 }
 
-module.exports = { build, buildArguments, archiveArguments, cleanGoEnvironment, treeDigest };
+module.exports = {
+  build,
+  buildArguments,
+  archiveArguments,
+  cleanGoEnvironment,
+  extractTarArchive,
+  treeDigest,
+};

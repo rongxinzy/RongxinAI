@@ -128,6 +128,8 @@ export const LlamaCppServiceConfigFieldKey = {
   TensorSplit: 'tensorSplit',
   MainGpu: 'mainGpu',
   FlashAttn: 'flashAttn',
+  CacheTypeK: 'cacheTypeK',
+  CacheTypeV: 'cacheTypeV',
   Jinja: 'jinja',
   Mlock: 'mlock',
 } as const;

@@ -1,13 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import type {
-  LlamaCppBackendInfo,
-  LlamaCppBackendRef,
-  LlamaCppRuntimeInstallResult,
-} from '../../../shared/llamacpp';
-import { resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
 
-const BUILD_INFO_FILE = 'runtime-build-info.json';
+import type { LlamaCppBackendRef } from '../../../shared/llamacpp';
+import { resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
 
 export function buildVersionBackend(version: string, backend: string): string {
   return `${version}/${backend}`;
@@ -57,63 +52,6 @@ export function getLlamaCppCurrentExecutablePath(
   return resolveManagedBackendExecutablePath(getLlamaCppCurrentBackendDir(runtimeRoot), platform);
 }
 
-export function readCurrentBackendRef(runtimeRoot: string): LlamaCppBackendRef | undefined {
-  return readBackendBuildInfo(getLlamaCppCurrentBackendDir(runtimeRoot));
-}
-
-export function readBackendBuildInfo(
-  runtimeDir: string,
-): (LlamaCppBackendRef & Record<string, unknown>) | undefined {
-  try {
-    const parsed = JSON.parse(
-      fs.readFileSync(path.join(runtimeDir, BUILD_INFO_FILE), 'utf8'),
-    ) as Record<string, unknown>;
-    const version = String(parsed.version ?? '').trim();
-    const backend = String(parsed.backend ?? parsed.target ?? '').trim();
-    if (!version || !backend) return undefined;
-    return { ...parsed, ...toBackendRef(version, backend) };
-  } catch {
-    return undefined;
-  }
-}
-
-export function syncCurrentBackend(runtimeRoot: string, ref: LlamaCppBackendRef): void {
-  const backendDir = getLlamaCppBackendDir(runtimeRoot, ref);
-  if (!fs.existsSync(backendDir)) {
-    throw new Error(`Backend does not exist: ${ref.versionBackend}`);
-  }
-  const currentDir = getLlamaCppCurrentBackendDir(runtimeRoot);
-  removeCurrentBackendLink(runtimeRoot);
-  fs.mkdirSync(runtimeRoot, { recursive: true });
-  fs.symlinkSync(backendDir, currentDir, process.platform === 'win32' ? 'junction' : 'dir');
-}
-
-export function listInstalledBackendRefs(
-  runtimeRoot: string,
-  platform: NodeJS.Platform = process.platform,
-): LlamaCppBackendRef[] {
-  const backendsRoot = getLlamaCppBackendsRoot(runtimeRoot);
-  if (!fs.existsSync(backendsRoot)) return [];
-  const refs: LlamaCppBackendRef[] = [];
-  for (const versionEntry of fs.readdirSync(backendsRoot, { withFileTypes: true })) {
-    if (!versionEntry.isDirectory()) continue;
-    for (const backendEntry of fs.readdirSync(path.join(backendsRoot, versionEntry.name), {
-      withFileTypes: true,
-    })) {
-      if (!backendEntry.isDirectory()) continue;
-      const ref = toBackendRef(versionEntry.name, backendEntry.name);
-      const executablePath = resolveManagedBackendExecutablePath(
-        path.join(backendsRoot, ref.version, ref.backend),
-        platform,
-      );
-      if (fs.existsSync(executablePath)) {
-        refs.push(ref);
-      }
-    }
-  }
-  return refs;
-}
-
 export function getManagedBackendBinDir(runtimeDir: string): string {
   return path.join(runtimeDir, 'build', 'bin');
 }
@@ -156,12 +94,4 @@ function assertSafeBackendRef(ref: LlamaCppBackendRef): void {
 
 export function sanitizePathSegment(value: string): string {
   return value.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/^\.+$/, '_') || 'archive';
-}
-
-export function writeBackendBuildInfo(runtimeDir: string, info: Record<string, unknown>): void {
-  fs.writeFileSync(
-    path.join(runtimeDir, BUILD_INFO_FILE),
-    `${JSON.stringify(info, null, 2)}\n`,
-    'utf8',
-  );
 }

@@ -138,13 +138,10 @@ jobs:
             mkdir -p "manifest/electron/${target_file}"
             aws s3api get-object --bucket "$R2_BUCKET" --key "$key" "manifest/electron/${target_file}/${filename}" > /dev/null
           done < <(jq -s -r '[.[].artifacts[] | select(.kind == "metadata")] | sort_by(.platform,.arch,.variant) | .[] | [.key,(.platform+":"+.arch+":"+.variant),.filename] | @tsv' "${metadata[@]}")
+          mapfile -t electron_specs < <(node scripts/release/print-electron-updater-verify-specs.mjs)
           node scripts/release/verify-electron-updater-generation.mjs \
             '${{ inputs.version }}' \
-            manifest/electron/win32-x64-lite/latest.yml:win32:x64:lite \
-            manifest/electron/darwin-x64-default/latest-mac.yml:darwin:x64:default \
-            manifest/electron/darwin-arm64-default/latest-mac.yml:darwin:arm64:default \
-            manifest/electron/linux-x64-appimage/latest-linux.yml:linux:x64:appimage \
-            manifest/electron/linux-x64-deb/latest-linux.yml:linux:x64:deb \
+            "${electron_specs[@]}" \
             --artifact-metadata "${metadata[@]}"
           generation_key='generations/${{ inputs.version }}/legacy/stable.json'
           set +e
@@ -250,9 +247,10 @@ jobs:
         shell: bash
         run: |
           set +e
+          mapfile -t release_targets < <(node scripts/release/print-required-release-targets.mjs)
           node scripts/release/verify-published-update.mjs --channel stable \
             '${{ inputs.version }}' \
-            win32:x64:lite darwin:x64:default darwin:arm64:default linux:x64:deb linux:x64:appimage
+            "${release_targets[@]}"
           smoke_status=$?
           set -e
           if [[ $smoke_status -ne 0 && '${{ steps.publish.outputs.changed }}' == 'true' ]]; then

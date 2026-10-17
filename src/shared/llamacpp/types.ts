@@ -151,6 +151,7 @@ export type LlamaCppRuntimeInstallResult = {
   executablePath?: string;
   backend?: LlamaCppBackendRef;
   error?: string;
+  warning?: string;
 };
 
 export type LlamaCppRuntimeUninstallResult = {
@@ -321,6 +322,8 @@ export type LlamaCppServiceConfig = {
   splitMode?: 'none' | 'layer' | 'row' | 'tensor';
   tensorSplit?: string;
   flashAttn?: 'on' | 'off' | 'auto';
+  cacheTypeK?: string;
+  cacheTypeV?: string;
   jinja?: 'on' | 'off' | 'auto';
   reasoning?: 'on' | 'off' | 'auto';
   reasoningFormat?: 'none' | 'deepseek' | 'deepseek-legacy' | 'auto';

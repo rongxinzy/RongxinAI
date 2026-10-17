@@ -48,6 +48,7 @@ export default function SettingsPage({
   enterpriseConfig,
   appUpdateState,
   managedModelsOnly = false,
+  inferenceEdition: _inferenceEdition,
   isSidebarCollapsed,
   onToggleSidebar,
   onNewChat,

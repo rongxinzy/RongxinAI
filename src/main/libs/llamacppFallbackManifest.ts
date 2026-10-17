@@ -4,6 +4,27 @@ import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 export const DEFAULT_RUNTIME_VERSION = 'b9518';
 export const DEFAULT_RELEASE_BASE_URL = 'https://rongxinai.krli.org/llamacpp';
 
+function createFallbackEntry(
+  version: string,
+  backend: string,
+  platform: NodeJS.Platform,
+  arch: string,
+  accelerator: LlamaCppBackendManifestEntry['accelerator'],
+  assetName: string,
+): LlamaCppBackendManifestEntry {
+  return {
+    version,
+    backend,
+    platform,
+    arch,
+    accelerator,
+    archive: {
+      assetName,
+      url: `${DEFAULT_RELEASE_BASE_URL}/${version}/${assetName}`,
+    },
+  };
+}
+
 export function buildFallbackManifest(version = DEFAULT_RUNTIME_VERSION): LlamaCppBackendManifest {
   return {
     schemaVersion: 1,
@@ -84,6 +105,28 @@ export function buildFallbackManifest(version = DEFAULT_RUNTIME_VERSION): LlamaC
         'cpu',
         `llama-${version}-bin-win-opencl-adreno-arm64.tar.gz`,
       ),
+      {
+        ...createFallbackEntry(
+          version,
+          LlamaCppRuntimeTargetId.LinuxX64Cuda12,
+          'linux',
+          'x64',
+          'cuda',
+          `llama-${version}-bin-ubuntu-cuda-12.4-x64.tar.gz`,
+        ),
+        cudaMajor: '12',
+      },
+      {
+        ...createFallbackEntry(
+          version,
+          LlamaCppRuntimeTargetId.LinuxX64Cuda13,
+          'linux',
+          'x64',
+          'cuda',
+          `llama-${version}-bin-ubuntu-cuda-13.3-x64.tar.gz`,
+        ),
+        cudaMajor: '13',
+      },
       createFallbackEntry(
         version,
         LlamaCppRuntimeTargetId.MacX64,
@@ -116,27 +159,22 @@ export function buildFallbackManifest(version = DEFAULT_RUNTIME_VERSION): LlamaC
         'cpu',
         `llama-${version}-bin-ubuntu-arm64.tar.gz`,
       ),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.MacArm64,
+        'darwin',
+        'arm64',
+        'metal',
+        `llama-${version}-bin-macos-arm64.tar.gz`,
+      ),
+      createFallbackEntry(
+        version,
+        LlamaCppRuntimeTargetId.MacX64,
+        'darwin',
+        'x64',
+        'metal',
+        `llama-${version}-bin-macos-x64.tar.gz`,
+      ),
     ],
-  };
-}
-
-function createFallbackEntry(
-  version: string,
-  backend: string,
-  platform: NodeJS.Platform,
-  arch: string,
-  accelerator: LlamaCppBackendManifestEntry['accelerator'],
-  assetName: string,
-): LlamaCppBackendManifestEntry {
-  return {
-    version,
-    backend,
-    platform,
-    arch,
-    accelerator,
-    archive: {
-      assetName,
-      url: `${DEFAULT_RELEASE_BASE_URL}/${version}/${assetName}`,
-    },
   };
 }

@@ -1,4 +1,5 @@
 import type { AppUpdateRuntimeState } from '../../../shared/appUpdate/constants';
+import type { InferenceEdition } from '../../../shared/inferenceEdition';
 
 export type TabType =
   | 'general'
@@ -40,4 +41,5 @@ export interface SettingsPageProps extends SettingsOpenOptions {
   enterpriseConfig?: SettingsEnterpriseConfig | null;
   appUpdateState?: AppUpdateRuntimeState;
   managedModelsOnly?: boolean;
+  inferenceEdition?: InferenceEdition;
 }

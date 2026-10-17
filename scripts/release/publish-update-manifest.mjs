@@ -2,6 +2,11 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  REQUIRED_RELEASE_TARGETS,
+  resolveReleaseArtifactFormat,
+} from './inference-edition-targets.mjs';
+
 const [outputPath, releaseVersion, commitSha, ...specs] = process.argv.slice(2);
 if (!outputPath || !releaseVersion || !commitSha || specs.length === 0) {
   throw new Error(
@@ -17,47 +22,11 @@ if (!/^(?:local|[1-9][0-9]*)$/.test(pipelineId)) {
   throw new Error(`Invalid update source pipeline ID: ${pipelineId}`);
 }
 
-const REQUIRED_RELEASE_TARGETS = new Set([
-  'win32:x64:lite',
-  'darwin:x64:default',
-  'darwin:arm64:default',
-  'linux:x64:deb',
-  'linux:x64:appimage',
-]);
-
 const privateKey = crypto.createPrivateKey({
   key: Buffer.from(privateKeyBase64, 'base64'),
   format: 'der',
   type: 'pkcs8',
 });
-
-function resolveArtifactFormat(platform, variant, kind = 'installer') {
-  if (kind === 'metadata') {
-    return { extension: '.yml', contentType: 'application/x-yaml' };
-  }
-  if (kind === 'blockmap') {
-    return { extension: '.blockmap', contentType: 'application/octet-stream' };
-  }
-  if (kind === 'updater' && platform === 'darwin' && variant === 'default') {
-    return { extension: '.zip', contentType: 'application/zip' };
-  }
-  if (platform === 'win32' && (variant === 'lite' || variant === 'full')) {
-    return {
-      extension: '.exe',
-      contentType: 'application/vnd.microsoft.portable-executable',
-    };
-  }
-  if (platform === 'darwin' && variant === 'default') {
-    return { extension: '.dmg', contentType: 'application/x-apple-diskimage' };
-  }
-  if (platform === 'linux' && variant === 'deb') {
-    return { extension: '.deb', contentType: 'application/vnd.debian.binary-package' };
-  }
-  if (platform === 'linux' && variant === 'appimage') {
-    return { extension: '.appimage', contentType: 'application/vnd.appimage' };
-  }
-  throw new Error(`Unsupported release target: ${platform}:${variant}`);
-}
 
 async function localArtifact(spec) {
   const [file, platform, arch, variant] = spec.split(':');
@@ -67,7 +36,7 @@ async function localArtifact(spec) {
 
   const content = await fs.readFile(file);
   const extension = path.extname(file).toLowerCase();
-  const format = resolveArtifactFormat(platform, variant);
+  const format = resolveReleaseArtifactFormat(platform, variant);
   if (extension !== format.extension || content.length === 0) {
     throw new Error(`Invalid ${platform} artifact: ${file}`);
   }
@@ -96,7 +65,7 @@ async function metadataArtifacts(metadataPath) {
   }
   return metadata.artifacts.map(artifact => {
     const { platform, arch, variant, kind = 'installer', filename, key, size, sha256, sha512 } = artifact ?? {};
-    const format = resolveArtifactFormat(platform, variant, kind);
+    const format = resolveReleaseArtifactFormat(platform, variant, kind);
     const expectedKey =
       kind === 'metadata'
         ? `generations/${releaseVersion}/electron/${platform}-${arch}-${variant}/${filename}`
@@ -147,7 +116,7 @@ if (missingTargets.length > 0 || unexpectedTargets.length > 0) {
 }
 
 const manifests = installerArtifacts.map(({ platform, arch, variant, filename, size, sha256, sha512 }) => {
-  const format = resolveArtifactFormat(platform, variant);
+  const format = resolveReleaseArtifactFormat(platform, variant);
   const target = `${platform}:${arch}:${variant}`;
   const updaterArtifacts = artifacts.filter(
     artifact =>

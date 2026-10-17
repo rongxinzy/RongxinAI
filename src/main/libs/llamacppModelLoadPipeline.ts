@@ -41,6 +41,8 @@ export type LlamaCppModelLoadPipelineInput = {
   memoryPolicy?: LlamaCppMemoryPolicy;
   memoryBudgetPercent?: number;
   modelSizeBytes?: number;
+  cacheTypeK?: string;
+  cacheTypeV?: string;
   signal?: AbortSignal;
   loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
   listModels: (timeoutMs: number) => Promise<LlamaCppModel[]>;
@@ -134,6 +136,8 @@ function applyGpuPlacement(input: LlamaCppModelLoadPipelineInput): LlamaCppModel
     memoryPolicy: input.memoryPolicy,
     memoryBudgetPercent: input.memoryBudgetPercent,
     modelSizeBytes: input.modelSizeBytes,
+    cacheTypeK: input.cacheTypeK,
+    cacheTypeV: input.cacheTypeV,
   });
 
   if (placementResult.success === true) {

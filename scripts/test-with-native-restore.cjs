@@ -15,7 +15,7 @@ function run(command, args) {
   return result.status ?? 1;
 }
 
-const nodeBuildStatus = run(npmCommand, ['rebuild', 'better-sqlite3']);
+const nodeBuildStatus = run(npmCommand, ['rebuild', 'better-sqlite3', '--build-from-source']);
 const testStatus =
   nodeBuildStatus === 0
     ? run(npmCommand, ['exec', '--', 'vitest', 'run', ...process.argv.slice(2)])

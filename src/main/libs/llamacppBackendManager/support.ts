@@ -13,34 +13,119 @@ import type {
   LlamaCppBackendRef,
   LlamaCppInstallProgress,
   LlamaCppRuntimeInstallResult,
-  LlamaCppServiceConfig,
-  LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
 import { LlamaCppBackendError } from '../../../shared/llamacpp';
+import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
 import { LlamaCppRuntimeTargetId } from '../llamacppRuntimeConstants';
 import { resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
-import { listLlamaCppRuntimeDevices } from '../llamacppManager';
-import { DEFAULT_RELEASE_BASE_URL } from '../llamacppFallbackManifest';
-import {
-  getLlamaCppBackendExecutablePath,
-  getLlamaCppCurrentExecutablePath,
-  getLlamaCppCurrentBackendDir,
-  getManagedBackendBinDir,
-  removeCurrentBackendLink,
-  syncCurrentBackend,
-  toBackendRef,
-} from './paths';
-import { writeBackendBuildInfo } from './paths';
 import {
   DownloadCancelledError,
   downloadFileWithResume,
   throwIfDownloadCancelled,
 } from '../resumableDownload';
+import { DEFAULT_RELEASE_BASE_URL } from '../llamacppFallbackManifest';
+import { getLlamaCppCurrentExecutablePath, toBackendRef } from './paths';
 
-const GITHUB_RELEASE_BASE_URL = 'https://github.com/ggml-org/llama.cpp/releases/download';
-const BUILD_INFO_FILE = 'runtime-build-info.json';
+export const BUILD_INFO_FILE = 'runtime-build-info.json';
+export const LLAMACPP_BACKEND_MANIFEST_FETCH_TIMEOUT_MS = 2_000;
+let hasLoggedManifestFallback = false;
 
-type BackendInstallProgressReporter = (progress: LlamaCppInstallProgress) => void;
+export function shouldLogManifestFallbackWarning(): boolean {
+  return !hasLoggedManifestFallback;
+}
+
+export function setHasLoggedManifestFallback(): void {
+  hasLoggedManifestFallback = true;
+}
+export const backendDownloadSizeCache = new Map<string, number>();
+
+export type BackendInstallProgressReporter = (progress: LlamaCppInstallProgress) => void;
+
+type LlamaCppBackendRootManifest = {
+  schemaVersion: 1;
+  defaultVersion?: string;
+  versions?: string[];
+  publicBaseUrl?: string;
+};
+
+export function resolveBundledManifestUrl(): string {
+  return 'file://llamacpp-backends/manifest.json';
+}
+
+export async function fetchManifestFromUrl(manifestUrl: string): Promise<LlamaCppBackendManifest> {
+  const response = await fetch(manifestUrl, {
+    headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
+    // Listing must fall back promptly when the optional remote manifest is unavailable.
+    signal: AbortSignal.timeout(LLAMACPP_BACKEND_MANIFEST_FETCH_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
+  const parsed = (await response.json()) as LlamaCppBackendManifest | LlamaCppBackendRootManifest;
+  if (Array.isArray((parsed as LlamaCppBackendManifest).backends)) {
+    return normalizeManifest(parsed as LlamaCppBackendManifest, manifestUrl);
+  }
+  return await fetchVersionedManifestIndex(parsed as LlamaCppBackendRootManifest, manifestUrl);
+}
+
+export async function fetchVersionedManifestIndex(
+  rootManifest: LlamaCppBackendRootManifest,
+  manifestUrl: string,
+): Promise<LlamaCppBackendManifest> {
+  const versions = Array.isArray(rootManifest.versions)
+    ? rootManifest.versions.map(item => String(item).trim()).filter(Boolean)
+    : [];
+  if (versions.length === 0) {
+    throw new Error('The root backend manifest does not contain any versions.');
+  }
+  const baseUrl = (
+    rootManifest.publicBaseUrl || manifestUrl.replace(/\/manifest\.json(?:[?#].*)?$/, '')
+  ).replace(/\/$/, '');
+  const manifests = await Promise.all(
+    versions.map(async version => {
+      const versionManifestUrl = `${baseUrl}/${version}/manifest.json`;
+      const versionManifest = await fetchManifestFromUrl(versionManifestUrl);
+      return {
+        version,
+        manifest: versionManifest,
+      };
+    }),
+  );
+  return {
+    schemaVersion: 1,
+    defaultVersion:
+      rootManifest.defaultVersion || manifests[0]?.manifest.defaultVersion || versions[0],
+    releaseBaseUrl: baseUrl,
+    backends: manifests.flatMap(({ version, manifest }) =>
+      manifest.backends.map(entry => injectVersionedArchiveUrls(entry, manifest, version, baseUrl)),
+    ),
+  };
+}
+
+export function injectVersionedArchiveUrls(
+  entry: LlamaCppBackendManifestEntry,
+  manifest: LlamaCppBackendManifest,
+  version: string,
+  baseUrl: string,
+): LlamaCppBackendManifestEntry {
+  const releaseBaseUrl = (manifest.releaseBaseUrl || `${baseUrl}/${version}`).replace(/\/$/, '');
+  return {
+    ...entry,
+    archive: injectArchiveUrls(entry.archive, releaseBaseUrl),
+    companions: entry.companions?.map(companion => injectArchiveUrls(companion, releaseBaseUrl)),
+  };
+}
+
+export function injectArchiveUrls<
+  T extends { assetName: string; url?: string; parts?: LlamaCppBackendArchivePart[] },
+>(archive: T, releaseBaseUrl: string): T {
+  return {
+    ...archive,
+    url: archive.url || `${releaseBaseUrl}/${archive.assetName}`,
+    parts: archive.parts?.map(part => ({
+      ...part,
+      url: part.url || `${releaseBaseUrl}/${part.assetName}`,
+    })),
+  };
+}
 
 export function normalizeManifest(
   manifest: LlamaCppBackendManifest,
@@ -174,227 +259,6 @@ export function backendRequiresDeviceValidation(backend: string): string | undef
   return undefined;
 }
 
-export function restorePreviousBackend(
-  runtimeRoot: string,
-  previousRef: LlamaCppBackendRef | undefined,
-): void {
-  if (!previousRef) {
-    removeCurrentBackendLink(runtimeRoot);
-    return;
-  }
-  try {
-    syncCurrentBackend(runtimeRoot, previousRef);
-  } catch (error) {
-    console.error('[LlamaCpp] failed to restore previous backend after import:', error);
-    removeCurrentBackendLink(runtimeRoot);
-  }
-}
-
-export function parseBackendArchiveName(archiveName: string): {
-  ref: LlamaCppBackendRef;
-  platform: NodeJS.Platform;
-  arch: string;
-  companion: boolean;
-} | null {
-  const match =
-    /^(.+?[-_])?llama(?:-main)?-(b\d+(?:-[a-f0-9]+)?)(?:-(cudart-llama))?-bin-(.+?)\.(?:tar\.gz|zip)$/i.exec(
-      archiveName,
-    );
-  if (!match) return null;
-  const version = match[2];
-  const companion = Boolean(match[3]);
-  const rawBackend = match[4];
-  const platform = rawBackend.startsWith('win-')
-    ? 'win32'
-    : rawBackend.startsWith('macos-')
-      ? 'darwin'
-      : rawBackend.startsWith('ubuntu-') || rawBackend.startsWith('linux-')
-        ? 'linux'
-        : process.platform;
-  const arch = rawBackend.endsWith('-arm64') ? 'arm64' : 'x64';
-  return {
-    ref: toBackendRef(version, normalizeBackendId(rawBackend)),
-    platform,
-    arch,
-    companion,
-  };
-}
-
-export function findArchiveNameHint(sourceDir: string): string | undefined {
-  const baseName = path.basename(sourceDir);
-  if (/llama-(?:main-)?b\d+/i.test(baseName)) return baseName;
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
-    if (!entry.isFile()) continue;
-    if (
-      /^(.+?[-_])?llama(?:-main)?-(b\d+(?:-[a-f0-9]+)?)(?:-(cudart-llama))?-bin-(.+?)\.(?:tar\.gz|zip)$/i.test(
-        entry.name,
-      )
-    ) {
-      return entry.name;
-    }
-  }
-  return undefined;
-}
-
-export function inferBackendDirectoryMetadata(input: {
-  sourceDir: string;
-  executablePath: string;
-  platform: NodeJS.Platform;
-  arch: string;
-}): {
-  ref: LlamaCppBackendRef;
-  platform: NodeJS.Platform;
-  arch: string;
-  accelerator: LlamaCppBackendManifestEntry['accelerator'];
-  cudaMajor?: '12' | '13';
-} | null {
-  const archiveNameHint = findArchiveNameHint(input.sourceDir);
-  const parsedArchive = archiveNameHint ? parseBackendArchiveName(archiveNameHint) : null;
-  if (parsedArchive && !parsedArchive.companion) {
-    const accelerator = inferBackendAccelerator(parsedArchive.ref.backend);
-    return {
-      ref: parsedArchive.ref,
-      platform: parsedArchive.platform,
-      arch: parsedArchive.arch,
-      accelerator,
-      cudaMajor: parsedArchive.ref.backend.includes('cuda-13')
-        ? '13'
-        : parsedArchive.ref.backend.includes('cuda-12')
-          ? '12'
-          : undefined,
-    };
-  }
-
-  const version = inferDirectoryVersion(input.sourceDir, input.executablePath);
-  if (!version) return null;
-  const backend = inferDirectoryBackendId(
-    input.sourceDir,
-    path.dirname(input.executablePath),
-    input.platform,
-    input.arch,
-  );
-  if (!backend) return null;
-  const accelerator = inferBackendAccelerator(backend);
-  return {
-    ref: toBackendRef(version, backend),
-    platform: normalizePlatform(input.platform),
-    arch: normalizeArch(input.arch),
-    accelerator,
-    cudaMajor: backend.includes('cuda-13') ? '13' : backend.includes('cuda-12') ? '12' : undefined,
-  };
-}
-
-function inferDirectoryVersion(sourceDir: string, executablePath: string): string | undefined {
-  const candidates = [
-    path.basename(sourceDir),
-    path.basename(path.dirname(executablePath)),
-    path.basename(path.dirname(path.dirname(executablePath))),
-  ];
-  for (const candidate of candidates) {
-    const match = /(?:^|[^a-z0-9])(b\d+(?:-[a-f0-9]+)?)(?:$|[^a-z0-9])/i.exec(candidate);
-    if (match) return match[1];
-  }
-  return undefined;
-}
-
-function inferDirectoryBackendId(
-  sourceDir: string,
-  executableDir: string,
-  platform: NodeJS.Platform,
-  arch: string,
-): string | undefined {
-  const normalizedPlatform = normalizePlatform(platform);
-  const normalizedArch = normalizeArch(arch);
-  if (normalizedPlatform === 'darwin') {
-    return normalizedArch === 'arm64'
-      ? LlamaCppRuntimeTargetId.MacArm64
-      : LlamaCppRuntimeTargetId.MacX64;
-  }
-  if (normalizedPlatform === 'linux') {
-    return normalizedArch === 'arm64'
-      ? LlamaCppRuntimeTargetId.LinuxArm64
-      : LlamaCppRuntimeTargetId.LinuxX64;
-  }
-  if (normalizedPlatform !== 'win32') return undefined;
-  if (normalizedArch === 'arm64') return LlamaCppRuntimeTargetId.WinArm64;
-  if (hasCuda13RuntimeMarkers(sourceDir) || hasCuda13RuntimeMarkers(executableDir)) {
-    return 'win-x64-cuda-13';
-  }
-  if (hasCuda12RuntimeMarkers(sourceDir) || hasCuda12RuntimeMarkers(executableDir)) {
-    return LlamaCppRuntimeTargetId.WinX64Cuda12;
-  }
-  if (hasVulkanRuntimeMarkers(sourceDir) || hasVulkanRuntimeMarkers(executableDir)) {
-    return 'win-x64-vulkan';
-  }
-  if (hasHipRuntimeMarkers(sourceDir) || hasHipRuntimeMarkers(executableDir)) {
-    return 'win-x64-hip';
-  }
-  return hasAnyCudaRuntimeMarkers(sourceDir) || hasAnyCudaRuntimeMarkers(executableDir)
-    ? LlamaCppRuntimeTargetId.WinX64Cuda12
-    : LlamaCppRuntimeTargetId.WinX64;
-}
-
-function hasAnyCudaRuntimeMarkers(rootDir: string): boolean {
-  return hasMarker(rootDir, /(?:ggml-cuda|cudart64_|cublas64_|cublasLt64_|cuda_runtime)/i);
-}
-
-function hasCuda12RuntimeMarkers(rootDir: string): boolean {
-  return hasMarker(rootDir, /(?:cudart64_12|cublas64_12|cublasLt64_12|cuda-12\.4|win-cuda-12\.)/i);
-}
-
-function hasCuda13RuntimeMarkers(rootDir: string): boolean {
-  return hasMarker(
-    rootDir,
-    /(?:cudart64_13|cublas64_13|cublasLt64_13|cuda-13\.[13]|win-cuda-13\.)/i,
-  );
-}
-
-function hasVulkanRuntimeMarkers(rootDir: string): boolean {
-  return hasMarker(rootDir, /(?:ggml-vulkan|vulkan-1\.dll|win-vulkan)/i);
-}
-
-function hasHipRuntimeMarkers(rootDir: string): boolean {
-  return hasMarker(rootDir, /(?:ggml-hip|hipblas|rocblas|amdhip64|win-hip)/i);
-}
-
-function hasMarker(rootDir: string, pattern: RegExp): boolean {
-  const queue = [rootDir];
-  while (queue.length > 0) {
-    const currentDir = queue.shift();
-    if (!currentDir) continue;
-    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
-      const nextPath = path.join(currentDir, entry.name);
-      if (entry.isDirectory()) {
-        queue.push(nextPath);
-        continue;
-      }
-      if (!entry.isFile()) continue;
-      if (pattern.test(entry.name) || /(?:nvcuda|nvml)\.dll$/i.test(entry.name)) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-export function failedInstall(error: string): LlamaCppRuntimeInstallResult {
-  return {
-    success: false,
-    plan: { kind: 'needs-manual', message: error },
-    error,
-  };
-}
-
-export function compareBackendInfo(a: LlamaCppBackendInfo, b: LlamaCppBackendInfo): number {
-  return compareVersionDesc(a.version, b.version) || a.backend.localeCompare(b.backend);
-}
-
-export function compareVersionDesc(a: string | undefined, b: string | undefined): number {
-  const left = Number.parseInt(a?.replace(/^b/, '') || '0', 10);
-  const right = Number.parseInt(b?.replace(/^b/, '') || '0', 10);
-  return right - left;
-}
-
 export async function downloadArchive(
   archive: {
     assetName: string;
@@ -483,7 +347,7 @@ export function resolvePartUrl(
   return `${(manifest.releaseBaseUrl || DEFAULT_RELEASE_BASE_URL).replace(/\/$/, '')}/${part.assetName}`;
 }
 
-async function downloadFile(
+export async function downloadFile(
   url: string,
   outputPath: string,
   expectedSize?: number,
@@ -495,9 +359,7 @@ async function downloadFile(
     return;
   }
 
-  const urls = url.includes('gitee.com/')
-    ? [url, url.replace(DEFAULT_RELEASE_BASE_URL, GITHUB_RELEASE_BASE_URL)]
-    : [url];
+  const urls = [url];
   const errors: string[] = [];
   for (const attemptUrl of urls) {
     try {
@@ -517,7 +379,7 @@ async function downloadFile(
   throw new Error(`Download failed: ${errors.join('; ')}`);
 }
 
-async function copyLocalFileWithProgress(
+export async function copyLocalFileWithProgress(
   sourcePath: string,
   outputPath: string,
   onProgress?: (completed: number, total?: number, speed?: number) => void,
@@ -646,4 +508,225 @@ export function findRuntimePayloadDirectory(rootDir: string): string {
     }
   }
   return fallback ?? rootDir;
+}
+
+export function writeBackendBuildInfo(runtimeDir: string, info: Record<string, unknown>): void {
+  fs.writeFileSync(
+    path.join(runtimeDir, BUILD_INFO_FILE),
+    `${JSON.stringify(info, null, 2)}\n`,
+    'utf8',
+  );
+}
+
+export function parseBackendArchiveName(archiveName: string): {
+  ref: LlamaCppBackendRef;
+  platform: NodeJS.Platform;
+  arch: string;
+  companion: boolean;
+} | null {
+  const match =
+    /^(.+?[-_])?llama(?:-main)?-(b\d+(?:-[a-f0-9]+)?)(?:-(cudart-llama))?-bin-(.+?)\.(?:tar\.gz|zip)$/i.exec(
+      archiveName,
+    );
+  if (!match) return null;
+  const version = match[2];
+  const companion = Boolean(match[3]);
+  const rawBackend = match[4];
+  const platform = rawBackend.startsWith('win-')
+    ? 'win32'
+    : rawBackend.startsWith('macos-')
+      ? 'darwin'
+      : rawBackend.startsWith('ubuntu-') || rawBackend.startsWith('linux-')
+        ? 'linux'
+        : process.platform;
+  const arch = rawBackend.endsWith('-arm64') ? 'arm64' : 'x64';
+  return {
+    ref: toBackendRef(version, normalizeBackendId(rawBackend)),
+    platform,
+    arch,
+    companion,
+  };
+}
+
+export function findArchiveNameHint(sourceDir: string): string | undefined {
+  const baseName = path.basename(sourceDir);
+  if (/llama-(?:main-)?b\d+/i.test(baseName)) return baseName;
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    if (
+      /^(.+?[-_])?llama(?:-main)?-(b\d+(?:-[a-f0-9]+)?)(?:-(cudart-llama))?-bin-(.+?)\.(?:tar\.gz|zip)$/i.test(
+        entry.name,
+      )
+    ) {
+      return entry.name;
+    }
+  }
+  return undefined;
+}
+
+export function inferBackendDirectoryMetadata(input: {
+  sourceDir: string;
+  executablePath: string;
+  platform: NodeJS.Platform;
+  arch: string;
+}): {
+  ref: LlamaCppBackendRef;
+  platform: NodeJS.Platform;
+  arch: string;
+  accelerator: LlamaCppBackendManifestEntry['accelerator'];
+  cudaMajor?: '12' | '13';
+} | null {
+  const archiveNameHint = findArchiveNameHint(input.sourceDir);
+  const parsedArchive = archiveNameHint ? parseBackendArchiveName(archiveNameHint) : null;
+  if (parsedArchive && !parsedArchive.companion) {
+    const accelerator = inferBackendAccelerator(parsedArchive.ref.backend);
+    return {
+      ref: parsedArchive.ref,
+      platform: parsedArchive.platform,
+      arch: parsedArchive.arch,
+      accelerator,
+      cudaMajor: parsedArchive.ref.backend.includes('cuda-13')
+        ? '13'
+        : parsedArchive.ref.backend.includes('cuda-12')
+          ? '12'
+          : undefined,
+    };
+  }
+
+  const version = inferDirectoryVersion(input.sourceDir, input.executablePath);
+  if (!version) return null;
+  const backend = inferDirectoryBackendId(
+    input.sourceDir,
+    path.dirname(input.executablePath),
+    input.platform,
+    input.arch,
+  );
+  if (!backend) return null;
+  const accelerator = inferBackendAccelerator(backend);
+  return {
+    ref: toBackendRef(version, backend),
+    platform: normalizePlatform(input.platform),
+    arch: normalizeArch(input.arch),
+    accelerator,
+    cudaMajor: backend.includes('cuda-13') ? '13' : backend.includes('cuda-12') ? '12' : undefined,
+  };
+}
+
+export function inferDirectoryVersion(
+  sourceDir: string,
+  executablePath: string,
+): string | undefined {
+  const candidates = [
+    path.basename(sourceDir),
+    path.basename(path.dirname(executablePath)),
+    path.basename(path.dirname(path.dirname(executablePath))),
+  ];
+  for (const candidate of candidates) {
+    const match = /(?:^|[^a-z0-9])(b\d+(?:-[a-f0-9]+)?)(?:$|[^a-z0-9])/i.exec(candidate);
+    if (match) return match[1];
+  }
+  return undefined;
+}
+
+export function inferDirectoryBackendId(
+  sourceDir: string,
+  executableDir: string,
+  platform: NodeJS.Platform,
+  arch: string,
+): string | undefined {
+  const normalizedPlatform = normalizePlatform(platform);
+  const normalizedArch = normalizeArch(arch);
+  if (normalizedPlatform === 'darwin') {
+    return normalizedArch === 'arm64'
+      ? LlamaCppRuntimeTargetId.MacArm64
+      : LlamaCppRuntimeTargetId.MacX64;
+  }
+  if (normalizedPlatform === 'linux') {
+    if (normalizedArch === 'arm64') return LlamaCppRuntimeTargetId.LinuxArm64;
+    if (hasCuda13RuntimeMarkers(sourceDir) || hasCuda13RuntimeMarkers(executableDir)) {
+      return LlamaCppRuntimeTargetId.LinuxX64Cuda13;
+    }
+    if (hasCuda12RuntimeMarkers(sourceDir) || hasCuda12RuntimeMarkers(executableDir)) {
+      return LlamaCppRuntimeTargetId.LinuxX64Cuda12;
+    }
+    return LlamaCppRuntimeTargetId.LinuxX64;
+  }
+  if (normalizedPlatform !== 'win32') return undefined;
+  if (normalizedArch === 'arm64') return LlamaCppRuntimeTargetId.WinArm64;
+  if (hasCuda13RuntimeMarkers(sourceDir) || hasCuda13RuntimeMarkers(executableDir)) {
+    return 'win-x64-cuda-13';
+  }
+  if (hasCuda12RuntimeMarkers(sourceDir) || hasCuda12RuntimeMarkers(executableDir)) {
+    return LlamaCppRuntimeTargetId.WinX64Cuda12;
+  }
+  if (hasVulkanRuntimeMarkers(sourceDir) || hasVulkanRuntimeMarkers(executableDir)) {
+    return 'win-x64-vulkan';
+  }
+  if (hasHipRuntimeMarkers(sourceDir) || hasHipRuntimeMarkers(executableDir)) {
+    return 'win-x64-hip';
+  }
+  return hasAnyCudaRuntimeMarkers(sourceDir) || hasAnyCudaRuntimeMarkers(executableDir)
+    ? LlamaCppRuntimeTargetId.WinX64Cuda12
+    : LlamaCppRuntimeTargetId.WinX64;
+}
+
+export function hasAnyCudaRuntimeMarkers(rootDir: string): boolean {
+  return hasMarker(rootDir, /(?:ggml-cuda|cudart64_|cublas64_|cublasLt64_|cuda_runtime)/i);
+}
+
+export function hasCuda12RuntimeMarkers(rootDir: string): boolean {
+  return hasMarker(rootDir, /(?:cudart64_12|cublas64_12|cublasLt64_12|cuda-12\.4|win-cuda-12\.)/i);
+}
+
+export function hasCuda13RuntimeMarkers(rootDir: string): boolean {
+  return hasMarker(
+    rootDir,
+    /(?:cudart64_13|cublas64_13|cublasLt64_13|cuda-13\.[13]|win-cuda-13\.)/i,
+  );
+}
+
+export function hasVulkanRuntimeMarkers(rootDir: string): boolean {
+  return hasMarker(rootDir, /(?:ggml-vulkan|vulkan-1\.dll|win-vulkan)/i);
+}
+
+export function hasHipRuntimeMarkers(rootDir: string): boolean {
+  return hasMarker(rootDir, /(?:ggml-hip|hipblas|rocblas|amdhip64|win-hip)/i);
+}
+
+export function hasMarker(rootDir: string, pattern: RegExp): boolean {
+  const queue = [rootDir];
+  while (queue.length > 0) {
+    const currentDir = queue.shift();
+    if (!currentDir) continue;
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const nextPath = path.join(currentDir, entry.name);
+      if (entry.isDirectory()) {
+        queue.push(nextPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      if (pattern.test(entry.name) || /(?:nvcuda|nvml)\.dll$/i.test(entry.name)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+export function failedInstall(error: string): LlamaCppRuntimeInstallResult {
+  return {
+    success: false,
+    plan: { kind: 'needs-manual', message: error },
+    error,
+  };
+}
+
+export function compareBackendInfo(a: LlamaCppBackendInfo, b: LlamaCppBackendInfo): number {
+  return compareVersionDesc(a.version, b.version) || a.backend.localeCompare(b.backend);
+}
+
+export function compareVersionDesc(a: string | undefined, b: string | undefined): number {
+  const left = Number.parseInt(a?.replace(/^b/, '') || '0', 10);
+  const right = Number.parseInt(b?.replace(/^b/, '') || '0', 10);
+  return right - left;
 }

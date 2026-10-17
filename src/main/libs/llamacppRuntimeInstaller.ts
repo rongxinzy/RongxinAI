@@ -8,11 +8,10 @@ import type {
   LlamaCppRuntimeInstallPlan,
   LlamaCppRuntimeInstallResult,
 } from '../../shared/llamacpp';
+import { resolveLlamaCppRuntimeAssetDownloadUrls } from '../../shared/llamacpp/runtimeDownloadSources';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 
-const LLAMACPP_RUNTIME_GITHUB_REPO = 'ggml-org/llama.cpp';
 const LLAMACPP_RUNTIME_RELEASE_TAG = 'b9505';
-const LLAMACPP_RUNTIME_DEFAULT_RELEASES_URL = 'https://rongxinai.krli.org/llamacpp';
 const LLAMACPP_RUNTIME_ASSETS: Record<string, string> = {
   [LlamaCppRuntimeTargetId.MacArm64]: 'llama-{tag}-bin-macos-arm64.tar.gz',
   [LlamaCppRuntimeTargetId.MacX64]: 'llama-{tag}-bin-macos-x64.tar.gz',
@@ -20,6 +19,8 @@ const LLAMACPP_RUNTIME_ASSETS: Record<string, string> = {
   [LlamaCppRuntimeTargetId.WinX64Cuda12]: 'llama-{tag}-bin-win-cuda-12.4-x64.tar.gz',
   [LlamaCppRuntimeTargetId.WinArm64]: 'llama-{tag}-bin-win-cpu-arm64.tar.gz',
   [LlamaCppRuntimeTargetId.LinuxX64]: 'llama-{tag}-bin-ubuntu-x64.tar.gz',
+  [LlamaCppRuntimeTargetId.LinuxX64Cuda12]: 'llama-{tag}-bin-ubuntu-cuda-12.4-x64.tar.gz',
+  [LlamaCppRuntimeTargetId.LinuxX64Cuda13]: 'llama-{tag}-bin-ubuntu-cuda-13.3-x64.tar.gz',
   [LlamaCppRuntimeTargetId.LinuxArm64]: 'llama-{tag}-bin-ubuntu-arm64.tar.gz',
 };
 const LLAMACPP_RUNTIME_COMPANION_ASSETS: Record<string, string[]> = {
@@ -80,7 +81,7 @@ export function resolveLlamaCppRuntimeDownloadUrls(
   env: NodeJS.ProcessEnv = process.env,
 ): string[] {
   const assetName = resolveLlamaCppRuntimeAssetName(targetId);
-  return resolveLlamaCppRuntimeAssetDownloadUrls(targetId, assetName, env);
+  return resolveRuntimeAssetDownloadUrls(targetId, assetName, env);
 }
 
 export function resolveLlamaCppRuntimeCompanionDownloads(
@@ -89,32 +90,22 @@ export function resolveLlamaCppRuntimeCompanionDownloads(
 ): Array<{ assetName: string; url: string; fallbackUrls?: string[] }> {
   return (LLAMACPP_RUNTIME_COMPANION_ASSETS[targetId] ?? []).map(template => {
     const assetName = template.replace(/\{tag\}/g, LLAMACPP_RUNTIME_RELEASE_TAG);
-    const [url, ...fallbackUrls] = resolveLlamaCppRuntimeAssetDownloadUrls(
-      targetId,
-      assetName,
-      env,
-    );
+    const [url, ...fallbackUrls] = resolveRuntimeAssetDownloadUrls(targetId, assetName, env);
     return { assetName, url, fallbackUrls };
   });
 }
 
-function resolveLlamaCppRuntimeAssetDownloadUrls(
+function resolveRuntimeAssetDownloadUrls(
   targetId: string,
   assetName: string,
   env: NodeJS.ProcessEnv = process.env,
 ): string[] {
-  const explicitUrl = env.LLAMACPP_RUNTIME_URL?.trim();
-  if (explicitUrl) {
-    return [explicitUrl.replace(/\{target\}/g, targetId).replace(/\{asset\}/g, assetName)];
-  }
-  const baseUrl = env.LLAMACPP_RUNTIME_BASE_URL?.trim();
-  if (baseUrl) {
-    return [`${baseUrl.replace(/\/$/, '')}/${assetName}`];
-  }
-  return [
-    `${LLAMACPP_RUNTIME_DEFAULT_RELEASES_URL}/${LLAMACPP_RUNTIME_RELEASE_TAG}/${assetName}`,
-    `https://github.com/${LLAMACPP_RUNTIME_GITHUB_REPO}/releases/download/${LLAMACPP_RUNTIME_RELEASE_TAG}/${assetName}`,
-  ];
+  return resolveLlamaCppRuntimeAssetDownloadUrls({
+    targetId,
+    assetName,
+    releaseTag: LLAMACPP_RUNTIME_RELEASE_TAG,
+    env,
+  });
 }
 
 export function createLlamaCppRuntimeInstallPlan(

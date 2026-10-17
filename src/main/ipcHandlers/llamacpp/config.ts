@@ -1,16 +1,17 @@
-// Service/model config sanitization for llama.cpp IPC (#1069).
-import fs from 'fs';
-
+import type { SqliteStore } from '../../sqliteStore';
 import {
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
+  getLlamaCppAcceleratorDevices,
+  getLlamaCppModelsMaxLimitViolation,
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
   LlamaCppGatewayAccessMode,
-  LlamaCppMemoryPolicy,
-  LlamaCppModelResidencyMode,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
+  LlamaCppMemoryPolicy,
+  LlamaCppModelResidencyMode,
   LlamaCppStructuredServiceFieldKey,
+  normalizeLlamaCppKvCacheType,
 } from '../../../shared/llamacpp';
 import type {
   LlamaCppModelLaunchInput,
@@ -19,19 +20,39 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppSetModelPreferenceInput,
 } from '../../../shared/llamacpp';
-import { getLlamaCppAcceleratorDevices } from '../../../shared/llamacpp';
 import { ModelCapabilityStatus, type ModelCapabilities } from '../../../shared/providers';
 import { resolveLlamaCppDeviceSelection } from '../../libs/llamacppManager';
-import type { SqliteStore } from '../../sqliteStore';
-import {
-  LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE,
-  LLAMACPP_MODEL_PREFERENCE_CAPABILITY_KEYS,
-  LLAMACPP_SANITIZED_NUMERIC_DEFAULTS,
-} from './helpers';
 
-const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
+export const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
-const LLAMACPP_MODEL_PREFERENCES_KEY = 'llamacpp_model_preferences';
+export const LLAMACPP_MODEL_PREFERENCES_KEY = 'llamacpp_model_preferences';
+const LLAMACPP_MODEL_PREFERENCE_CAPABILITY_KEYS = [
+  'toolCalling',
+  'imageInput',
+  'videoInput',
+  'audioInput',
+  'documentInput',
+  'reasoning',
+] as const satisfies ReadonlyArray<keyof ModelCapabilities>;
+
+const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
+  modelsMax: DEFAULT_LLAMACPP_SERVICE_CONFIG.modelsMax ?? '0',
+  timeout: DEFAULT_LLAMACPP_SERVICE_CONFIG.timeout ?? '120',
+  threadsHttp: DEFAULT_LLAMACPP_SERVICE_CONFIG.threadsHttp ?? '4',
+  cacheReuse: DEFAULT_LLAMACPP_SERVICE_CONFIG.cacheReuse ?? '256',
+  cacheRam: DEFAULT_LLAMACPP_SERVICE_CONFIG.cacheRam ?? '8192',
+  ctxSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.ctxSize ?? '4096',
+  parallel: DEFAULT_LLAMACPP_SERVICE_CONFIG.parallel ?? '2',
+  batchSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.batchSize ?? '512',
+  ubatchSize: DEFAULT_LLAMACPP_SERVICE_CONFIG.ubatchSize ?? '512',
+  gpuLayers: DEFAULT_LLAMACPP_SERVICE_CONFIG.gpuLayers ?? 'auto',
+  threads: DEFAULT_LLAMACPP_SERVICE_CONFIG.threads ?? '-1',
+  threadsBatch: DEFAULT_LLAMACPP_SERVICE_CONFIG.threadsBatch ?? '-1',
+  mainGpu: DEFAULT_LLAMACPP_SERVICE_CONFIG.mainGpu ?? '0',
+} as const;
+
+const LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE = { min: 10, max: 90 } as const;
+
 export function getLlamaCppServiceConfig(store: SqliteStore): LlamaCppServiceConfig {
   return sanitizeLlamaCppServiceConfig({
     ...DEFAULT_LLAMACPP_SERVICE_CONFIG,
@@ -411,6 +432,8 @@ export function sanitizeLlamaCppServiceConfig(
   if (splitMode) next.splitMode = splitMode;
   if (tensorSplit) next.tensorSplit = tensorSplit;
   if (isOnOffAuto(config?.flashAttn)) next.flashAttn = config.flashAttn;
+  if (isLlamaCppKvCacheType(config?.cacheTypeK)) next.cacheTypeK = config.cacheTypeK.trim();
+  if (isLlamaCppKvCacheType(config?.cacheTypeV)) next.cacheTypeV = config.cacheTypeV.trim();
   if (isOnOffAuto(config?.jinja)) next.jinja = config.jinja;
   if (isOnOffAuto(config?.reasoning)) next.reasoning = config.reasoning;
   if (isReasoningFormat(config?.reasoningFormat)) next.reasoningFormat = config.reasoningFormat;
@@ -636,7 +659,12 @@ function isRuntimeBackend(
 function isRuntimeCudaMajor(
   value: unknown,
 ): value is NonNullable<LlamaCppServiceConfig['runtimeCudaMajor']> {
-  return value === LlamaCppRuntimeCudaMajor.Cuda12;
+  return value === LlamaCppRuntimeCudaMajor.Cuda12 || value === LlamaCppRuntimeCudaMajor.Cuda13;
+}
+
+function isLlamaCppKvCacheType(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  return normalizeLlamaCppKvCacheType(value) === value.trim().toLowerCase();
 }
 
 function isReasoningFormat(

@@ -17,7 +17,12 @@ const {
   verifyPackagedMagpie,
   signPackagedWindowsMagpie,
 } = require('./magpie-runtime.cjs');
-const { buildArguments, cleanGoEnvironment, treeDigest } = require('./build-magpie-runtime.cjs');
+const {
+  buildArguments,
+  cleanGoEnvironment,
+  extractTarArchive,
+  treeDigest,
+} = require('./build-magpie-runtime.cjs');
 const { signWithRuntimeManifest } = require('./sign-magpie-macos.cjs');
 const temporaryDirectories: string[] = [];
 
@@ -105,6 +110,15 @@ describe('pinned Magpie runtime build', () => {
     expect(env).not.toHaveProperty('ANTHROPIC_API_KEY');
   });
 
+  test('extractTarArchive rejects destinations outside the archive directory', () => {
+    const root = temporaryRoot();
+    const archive = path.join(root, 'upstream.tar');
+    fs.writeFileSync(archive, 'not-a-real-tar');
+    expect(() => extractTarArchive(archive, path.join(os.tmpdir(), 'outside'))).toThrow(
+      'beside the archive',
+    );
+  });
+
   test('detects changes to any source snapshot file', () => {
     const root = temporaryRoot();
     fs.writeFileSync(path.join(root, 'main.go'), 'original');
@@ -140,18 +154,37 @@ describe('pinned Magpie runtime build', () => {
     expect(() => verifyRuntime(root, 'win32-arm64')).toThrow('MIT license');
   });
 
-  test('uses the target architecture and keeps both macOS helpers for universal merging', () => {
+  test('uses the target architecture and keeps both macOS helpers only for universal builds', () => {
     expect(contextTargets({ electronPlatformName: 'win32', arch: 3 })).toEqual(['win32-arm64']);
     expect(contextTargets({ electronPlatformName: 'linux', arch: 1 })).toEqual(['linux-x64']);
     expect(contextTargets({ electronPlatformName: 'darwin', arch: 4 })).toEqual([
       'darwin-x64',
       'darwin-arm64',
     ]);
-    expect(contextTargets({ electronPlatformName: 'darwin', arch: 3 })).toEqual([
-      'darwin-x64',
-      'darwin-arm64',
-    ]);
+    expect(contextTargets({ electronPlatformName: 'darwin', arch: 1 })).toEqual(['darwin-x64']);
+    expect(contextTargets({ electronPlatformName: 'darwin', arch: 3 })).toEqual(['darwin-arm64']);
     expect(() => contextTargets({ electronPlatformName: 'linux', arch: 0 })).toThrow('Unsupported');
+  });
+
+  test('configures only the packaged macOS helper for single-arch builds', () => {
+    const projectDir = temporaryRoot();
+    const root = path.join(projectDir, 'resources', 'magpie');
+    fixture(root, 'darwin-arm64');
+    const context = {
+      electronPlatformName: 'darwin',
+      arch: 3,
+      appOutDir: projectDir,
+      packager: { projectDir, config: { extraResources: [] } },
+    };
+    configureMagpieResources(context);
+    expect(context.packager.config.extraResources).toEqual([
+      { from: 'resources/magpie/upstream.json', to: 'magpie/upstream.json' },
+      {
+        from: 'resources/magpie/darwin-arm64',
+        to: 'magpie/darwin-arm64',
+        filter: ['magpie', 'manifest.json', 'LICENSE'],
+      },
+    ]);
   });
 
   test('adds only validated target resources and rejects a missing packaged payload', () => {

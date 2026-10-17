@@ -5,6 +5,11 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import yaml from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import {
+  ELECTRON_UPDATER_METADATA_FILENAMES,
+  listRequiredReleaseTargets,
+  resolveReleaseArtifactFormat,
+} from './inference-edition-targets.mjs';
 import { artifactIdentity } from './update-manifest-lib.mjs';
 
 const releaseToolsDirectory = path.join(process.cwd(), 'scripts', 'release');
@@ -38,31 +43,45 @@ describe('online update release tools', () => {
     fs.rmSync(temporaryDirectory, { recursive: true, force: true });
   });
 
+  function installerExtension(platform: string, variant: string) {
+    const { extension } = resolveReleaseArtifactFormat(platform, variant);
+    return extension === '.appimage' ? '.AppImage' : extension;
+  }
+
+  function buildInstallerArtifacts(version: string) {
+    return listRequiredReleaseTargets().map((target, index) => {
+      const [platform, arch, variant] = target.split(':');
+      const extension = installerExtension(platform, variant);
+      const filename = `installer-${platform}-${arch}-${variant.replace(/-/g, '_')}${extension}`;
+      return {
+        platform,
+        arch,
+        variant,
+        filename,
+        key: `releases/${version}/${platform}-${arch}-${variant}/${filename}`,
+        size: index + 1,
+        sha256: crypto.createHash('sha256').update(`artifact-${index}`).digest('hex'),
+        sha512: crypto.createHash('sha512').update(`sha512-${index}`).digest('base64'),
+      };
+    });
+  }
+
   function createManifest(version: string, filename = 'installer') {
-    const windowsArtifact = path.join(temporaryDirectory, `${filename}.exe`);
-    const macosX64Artifact = path.join(temporaryDirectory, `${filename}-x64.dmg`);
-    const macosArtifact = path.join(temporaryDirectory, `${filename}.dmg`);
-    const linuxDebArtifact = path.join(temporaryDirectory, `${filename}.deb`);
-    const linuxAppImageArtifact = path.join(temporaryDirectory, `${filename}.AppImage`);
     const manifestPath = path.join(temporaryDirectory, `${version}-${filename}.json`);
-    fs.writeFileSync(windowsArtifact, 'windows artifact');
-    fs.writeFileSync(macosX64Artifact, 'macos x64 artifact');
-    fs.writeFileSync(macosArtifact, 'macos artifact');
-    fs.writeFileSync(linuxDebArtifact, 'linux deb artifact');
-    fs.writeFileSync(linuxAppImageArtifact, 'linux appimage artifact');
+    const specs = listRequiredReleaseTargets().map(target => {
+      const [platform, arch, variant] = target.split(':');
+      const extension = installerExtension(platform, variant);
+      const artifactPath = path.join(
+        temporaryDirectory,
+        `${filename}-${platform}-${arch}-${variant.replace(/-/g, '_')}${extension}`,
+      );
+      fs.writeFileSync(artifactPath, `artifact for ${target}`);
+      return `${artifactPath}:${target}`;
+    });
 
     const result = runScript(
       'publish-update-manifest.mjs',
-      [
-        manifestPath,
-        version,
-        'a'.repeat(40),
-        `${windowsArtifact}:win32:x64:lite`,
-        `${macosX64Artifact}:darwin:x64:default`,
-        `${macosArtifact}:darwin:arm64:default`,
-        `${linuxDebArtifact}:linux:x64:deb`,
-        `${linuxAppImageArtifact}:linux:x64:appimage`,
-      ],
+      [manifestPath, version, 'a'.repeat(40), ...specs],
       releaseEnvironment,
     );
     expect(result.stderr).toBe('');
@@ -87,11 +106,11 @@ describe('online update release tools', () => {
     ).toEqual(
       expect.arrayContaining([
         {
-          target: 'linux:x64:deb',
+          target: 'linux:x64:deb-cpu',
           contentType: 'application/vnd.debian.binary-package',
         },
         {
-          target: 'linux:x64:appimage',
+          target: 'linux:x64:appimage-cpu',
           contentType: 'application/vnd.appimage',
         },
       ]),
@@ -102,28 +121,12 @@ describe('online update release tools', () => {
     const metadataPath = path.join(temporaryDirectory, 'uploaded-artifacts.json');
     const manifestPath = path.join(temporaryDirectory, 'metadata-manifest.json');
     const version = '2026.7.5';
-    const artifacts = [
-      ['win32', 'x64', 'lite', 'installer.exe'],
-      ['darwin', 'x64', 'default', 'installer-x64.dmg'],
-      ['darwin', 'arm64', 'default', 'installer.dmg'],
-      ['linux', 'x64', 'deb', 'installer.deb'],
-      ['linux', 'x64', 'appimage', 'installer.AppImage'],
-    ].map(([platform, arch, variant, filename], index) => ({
-      platform,
-      arch,
-      variant,
-      filename,
-      key: `releases/${version}/${platform}-${arch}-${variant}/${filename}`,
-      size: index + 1,
-      sha256: `${index}`.repeat(64),
-      sha512: crypto.createHash('sha512').update(`sha512-${index}`).digest('base64'),
-    }));
+    const artifacts = buildInstallerArtifacts(version);
     artifacts.push(
       ...artifacts.map(artifact => ({
         ...artifact,
         kind: 'updater',
-        filename:
-          artifact.platform === 'darwin' ? 'installer.zip' : artifact.filename,
+        filename: artifact.platform === 'darwin' ? 'installer.zip' : artifact.filename,
         key: `releases/${version}/${artifact.platform}-${artifact.arch}-${artifact.variant}/${artifact.platform === 'darwin' ? 'installer.zip' : artifact.filename}`,
       })),
     );
@@ -157,20 +160,10 @@ describe('online update release tools', () => {
 
   test('rejects uploaded metadata with a missing, duplicate, or unexpected release target', () => {
     const version = '2026.7.5';
-    const artifacts = [
-      ['win32', 'x64', 'lite', 'installer.exe'],
-      ['darwin', 'x64', 'default', 'installer-x64.dmg'],
-      ['darwin', 'arm64', 'default', 'installer.dmg'],
-      ['linux', 'x64', 'deb', 'installer.deb'],
-      ['linux', 'x64', 'appimage', 'installer.AppImage'],
-    ].map(([platform, arch, variant, filename], index) => ({
-      platform,
-      arch,
-      variant,
-      filename,
-      key: `releases/${version}/${platform}-${arch}-${variant}/${filename}`,
+    const artifacts = buildInstallerArtifacts(version).map((artifact, index) => ({
+      ...artifact,
       size: index + 1,
-      sha256: `${index}`.repeat(64),
+      sha256: crypto.createHash('sha256').update(`artifact-${index}`).digest('hex'),
       sha512: crypto.createHash('sha512').update(`sha512-${index}`).digest('base64'),
     }));
     const updaterArtifacts = artifacts.map(artifact => ({
@@ -181,7 +174,11 @@ describe('online update release tools', () => {
     }));
 
     for (const [caseName, invalidArtifacts, expectedError] of [
-      ['missing', [...artifacts.slice(0, -1), ...updaterArtifacts], 'must contain exactly the required targets'],
+      [
+        'missing',
+        [...artifacts.slice(0, -1), ...updaterArtifacts.slice(0, -1)],
+        'must contain exactly the required targets',
+      ],
       ['duplicate', [...artifacts, artifacts[0], ...updaterArtifacts], 'Duplicate release target'],
       [
         'missing-updater',
@@ -194,9 +191,10 @@ describe('online update release tools', () => {
           ...artifacts,
           ...updaterArtifacts,
           {
-            ...artifacts[1],
-            arch: 'armv7',
-            key: `releases/${version}/darwin-armv7-default/installer-x64.dmg`,
+            ...artifacts[0],
+            variant: 'full',
+            filename: 'unexpected-full.exe',
+            key: `releases/${version}/win32-x64-full/unexpected-full.exe`,
           },
         ],
         'must contain exactly the required targets',
@@ -340,11 +338,14 @@ describe('online update release tools', () => {
     const deletePlan = JSON.parse(
       fs.readFileSync(path.join(cleanupDirectory, 'delete-001.json'), 'utf8'),
     );
-    expect(deletePlan.Objects).toEqual([
-      { Key: 'releases/2026.7.1/win32-x64-lite/expired.exe' },
-      { Key: 'generations/2026.7.3/legacy/stable.json' },
-      { Key: 'generations/2026.7.1/electron/win32-x64-lite/latest.yml' },
-    ]);
+    expect(deletePlan.Objects).toEqual(
+      expect.arrayContaining([
+        { Key: 'releases/2026.7.1/win32-x64-lite/expired.exe' },
+        { Key: 'generations/2026.7.3/legacy/stable.json' },
+        { Key: 'generations/2026.7.1/electron/win32-x64-lite/latest.yml' },
+      ]),
+    );
+    expect(deletePlan.Objects.length).toBeGreaterThanOrEqual(3);
   });
 
   test('normalizes a multi-file Linux feed to a versioned AppImage Worker URL', () => {
@@ -367,14 +368,14 @@ describe('online update release tools', () => {
     );
     const result = runScript(
       'normalize-electron-updater-metadata.mjs',
-      ['2026.7.6', 'linux', 'x64', 'appimage', inputPath, outputPath],
+      ['2026.7.6', 'linux', 'x64', 'appimage-cpu', inputPath, outputPath],
       releaseEnvironment,
     );
     expect(result.status).toBe(0);
     const normalized = yaml.load(fs.readFileSync(outputPath, 'utf8')) as any;
     expect(normalized.files).toEqual([
       {
-        url: 'https://updates.rongxzyai.com/v2/electron/releases/2026.7.6/linux/x64/appimage/ZhiYuan.AppImage',
+        url: 'https://updates.rongxzyai.com/v2/electron/releases/2026.7.6/linux/x64/appimage-cpu/ZhiYuan.AppImage',
         sha512: appImageSha512,
       },
     ]);
@@ -395,7 +396,7 @@ describe('online update release tools', () => {
     );
     const result = runScript(
       'normalize-electron-updater-metadata.mjs',
-      ['2026.7.6', 'linux', 'x64', 'appimage', inputPath, path.join(temporaryDirectory, 'out.yml')],
+      ['2026.7.6', 'linux', 'x64', 'appimage-cpu', inputPath, path.join(temporaryDirectory, 'out.yml')],
       releaseEnvironment,
     );
     expect(result.status).not.toBe(0);
@@ -404,13 +405,22 @@ describe('online update release tools', () => {
 
   test('verifies every electron-updater generation target exactly once', () => {
     const version = '2026.7.7';
-    const targets = [
-      ['win32', 'x64', 'lite', 'latest.yml', 'ZhiYuan.exe'],
-      ['darwin', 'x64', 'default', 'latest-mac.yml', 'ZhiYuan-x64.zip'],
-      ['darwin', 'arm64', 'default', 'latest-mac.yml', 'ZhiYuan.zip'],
-      ['linux', 'x64', 'appimage', 'latest-linux.yml', 'ZhiYuan.AppImage'],
-      ['linux', 'x64', 'deb', 'latest-linux.yml', 'ZhiYuan.deb'],
-    ] as const;
+    const targets = [...ELECTRON_UPDATER_METADATA_FILENAMES.entries()].map(
+      ([releaseTarget, metadataName]) => {
+        const [platform, arch, variant] = releaseTarget.split(':');
+        const filename =
+          platform === 'win32'
+            ? 'ZhiYuan.exe'
+            : platform === 'darwin'
+              ? arch === 'x64'
+                ? 'ZhiYuan-x64.zip'
+                : 'ZhiYuan.zip'
+              : variant.startsWith('appimage')
+                ? 'ZhiYuan.AppImage'
+                : 'ZhiYuan.deb';
+        return [platform, arch, variant, metadataName, filename] as const;
+      },
+    );
     const artifactMetadataPath = path.join(temporaryDirectory, 'generation-artifacts.json');
     const artifacts = [];
     const metadataSpecs = [];

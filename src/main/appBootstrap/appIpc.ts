@@ -22,6 +22,10 @@ import { getCoworkLogPath } from '../libs/coworkLogger';
 import { APP_DATA_DIR_NAME } from '../appConstants';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { AppIpc, HardwareIpc, WindowIpc } from '../../shared/ipc/channels';
+import {
+  resolveEffectiveInferenceEdition,
+  usesBundledLlamaCppRuntime,
+} from '../libs/inferenceEditionPolicy';
 
 /** 2026/09/14 lisa  打开开发调试面板 **/
 const canUseDevTools = (): boolean => isDev || !app.isPackaged;
@@ -227,4 +231,6 @@ export const registerAppIpc = (): void => {
   ipcMain.handle(AppIpc.ConsumePendingLocalInferenceInstall, () =>
     consumePendingLocalInferenceInstall(app.getPath('userData')),
   );
+  ipcMain.handle(AppIpc.GetInferenceEdition, () => resolveEffectiveInferenceEdition());
+  ipcMain.handle(AppIpc.UsesBundledLlamaCppRuntime, () => usesBundledLlamaCppRuntime());
 };

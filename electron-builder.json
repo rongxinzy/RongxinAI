@@ -105,8 +105,8 @@
       "filter": ["**/*"]
     },
     {
-      "from": "resources/llamacpp-backends",
-      "to": "llamacpp-backends",
+      "from": "resources/llamacpp-bundled",
+      "to": "llamacpp-bundled",
       "filter": ["**/*"]
     },
     {

@@ -18,7 +18,8 @@ const {
 } = require('fs');
 const { spawnSync } = require('child_process');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
-const { configureMagpieResources, verifyPackagedMagpie } = require('./magpie-runtime.cjs');
+const { configureMagpieResources } = require('./magpie-runtime.cjs');
+const { verifyPackagedDeliverables } = require('./packaging/verify-packaged-runtimes.cjs');
 const {
   ensurePortableUvRuntime,
   checkRuntimeHealth: checkUvRuntimeHealth,
@@ -83,9 +84,7 @@ function resolveTargetArch(context) {
   if (context?.arch === 3) return 'arm64';
   if (context?.arch === 0) return 'ia32';
   if (context?.arch === 1) return 'x64';
-  if (process.arch === 'arm64') return 'arm64';
-  if (process.arch === 'ia32') return 'ia32';
-  return 'x64';
+  throw new Error(`[electron-builder-hooks] Unknown packaging arch: ${String(context?.arch)}`);
 }
 
 function resolveWindows7zaPath() {
@@ -427,9 +426,101 @@ function installSkillDependencies() {
   );
 }
 
+function configureInferenceEditionPublishUrls(context) {
+  const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
+  const arch = resolveTargetArch(context);
+  const platformName = context?.electronPlatformName;
+  if (!platformName) return;
+
+  /** @type {string | undefined} */
+  let publishUrl;
+  if (platformName === 'darwin') {
+    publishUrl = `https://updates.rongxzyai.com/v2/electron/stable/darwin/${arch}/${edition}`;
+  } else if (platformName === 'win32') {
+    publishUrl = `https://updates.rongxzyai.com/v2/electron/stable/win32/x64/${edition}`;
+  } else if (platformName === 'linux') {
+    publishUrl = `https://updates.rongxzyai.com/v2/electron/stable/linux/x64/appimage-${edition}`;
+  }
+  if (!publishUrl) return;
+
+  const applyPublishUrl = section => {
+    if (!section || typeof section !== 'object') return;
+    section.publish = [{ provider: 'generic', url: publishUrl }];
+  };
+  applyPublishUrl(context.packager.config);
+  applyPublishUrl(context.packager.config.mac);
+  applyPublishUrl(context.packager.config.win);
+  applyPublishUrl(context.packager.config.linux);
+  console.log(`[electron-builder-hooks] inference edition ${edition}: publish url ${publishUrl}`);
+}
+
+function configureInferenceEditionResources(context) {
+  const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
+  const extraResources = Array.isArray(context.packager.config.extraResources)
+    ? [...context.packager.config.extraResources]
+    : [];
+
+  const withoutLegacyBackends = extraResources.filter(entry => {
+    const target = typeof entry === 'string' ? entry : entry?.to;
+    return target !== 'llamacpp-backends';
+  });
+
+  const withoutBundled = withoutLegacyBackends.filter(entry => {
+    const target = typeof entry === 'string' ? entry : entry?.to;
+    return target !== 'llamacpp-bundled';
+  });
+
+  if (edition === 'lite') {
+    context.packager.config.extraResources = withoutBundled;
+    console.log('[electron-builder-hooks] lite edition: omit bundled llama.cpp runtime.');
+    return;
+  }
+
+  const prepare = spawnSync(process.execPath, ['scripts/prepare-inference-edition-runtime.cjs'], {
+    cwd: path.join(__dirname, '..'),
+    env: process.env,
+    stdio: 'inherit',
+  });
+  if (prepare.status !== 0) {
+    throw new Error(
+      `[electron-builder-hooks] Failed to stage bundled llama.cpp runtime for edition ${edition}.`,
+    );
+  }
+
+  const windowsComponentBundled =
+    context.electronPlatformName === 'win32' && (edition === 'cpu' || edition === 'cuda');
+  if (windowsComponentBundled) {
+    context.packager.config.extraResources = withoutBundled;
+    console.log(
+      `[electron-builder-hooks] inference edition ${edition}: llama.cpp runtime packed as Windows offline component.`,
+    );
+    return;
+  }
+
+  const hasBundled = withoutLegacyBackends.some(entry => {
+    const target = typeof entry === 'string' ? entry : entry?.to;
+    return target === 'llamacpp-bundled';
+  });
+  context.packager.config.extraResources = hasBundled
+    ? withoutLegacyBackends
+    : [
+        ...withoutLegacyBackends,
+        {
+          from: 'resources/llamacpp-bundled',
+          to: 'llamacpp-bundled',
+          filter: ['**/*'],
+        },
+      ];
+  console.log(
+    `[electron-builder-hooks] inference edition ${edition}: bundled llama.cpp runtime enabled.`,
+  );
+}
+
 async function beforePack(context) {
   configureMagpieResources(context);
   configureMacAutoUpdateMetadata(context);
+  configureInferenceEditionPublishUrls(context);
+  configureInferenceEditionResources(context);
   ensureBundledChannelRuntime(context);
   // Install skill dependencies first (for all platforms)
   installSkillDependencies();
@@ -625,7 +716,7 @@ async function beforePack(context) {
 }
 
 async function afterPack(context) {
-  verifyPackagedMagpie(context);
+  verifyPackagedDeliverables(context);
   assertPackagedApp({
     projectRoot: path.join(__dirname, '..'),
     appOutDir: context.appOutDir,

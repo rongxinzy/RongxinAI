@@ -1,6 +1,10 @@
 param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
-  [string]$ComponentsDir = ''
+  [string]$ComponentsDir = '',
+  # lite must ship exactly the fixed component set (scripts/nsis-offline-components.json).
+  # cpu/cuda are new editions: the fixed set must be present, and anything
+  # added (llamacpp-bundled) is integrity-checked and reported, never counted.
+  [string]$InferenceEdition = $(if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT } else { 'lite' })
 )
 
 $ErrorActionPreference = 'Stop'
@@ -60,20 +64,48 @@ $componentManifest = Get-Content -LiteralPath $componentManifestPath -Raw -Encod
 if ($componentManifest.offline -ne $true) {
   throw 'Windows component manifest must declare offline=true'
 }
-if (@($componentManifest.components).Count -ne 7) {
-  throw "Windows component manifest must contain exactly 7 components"
+$InferenceEdition = $InferenceEdition.Trim().ToLowerInvariant()
+$bundlesLlamaCpp = $InferenceEdition -eq 'cpu' -or $InferenceEdition -eq 'cuda'
+# The fixed (lite) component keys come from the same file the NSIS installer
+# embeds as component-targets.json; never hard-code a count here.
+$baseTargetsPath = Join-Path $ProjectRoot 'scripts\nsis-offline-components.json'
+Assert-Path $baseTargetsPath 'fixed offline component targets'
+$baseKeys = @((Get-Content -LiteralPath $baseTargetsPath -Raw -Encoding UTF8 | ConvertFrom-Json) | ForEach-Object { $_.key })
+$manifestKeys = @($componentManifest.components | ForEach-Object { $_.key })
+foreach ($key in $baseKeys) {
+  if (@($manifestKeys | Where-Object { $_ -eq $key }).Count -ne 1) {
+    throw "Windows component manifest must contain fixed component $key exactly once"
+  }
 }
+$extraKeys = @($manifestKeys | Where-Object { $baseKeys -notcontains $_ })
+if (-not $bundlesLlamaCpp -and $extraKeys.Count -gt 0) {
+  # lite: original exact-set gate stays enforced.
+  throw "Windows component manifest for edition ${InferenceEdition} has unexpected components: $($extraKeys -join ', ')"
+}
+Write-Host ("[measure] windows-component-set edition={0} count={1} keys={2}" -f $InferenceEdition, $manifestKeys.Count, ($manifestKeys -join ','))
 
-$systemTar = Join-Path $env:SystemRoot 'System32\tar.exe'
-Assert-Path $systemTar 'Windows system tar.exe'
+# Extract with the same pinned 7za.exe the NSIS and WebView2 installers embed
+# (node_modules/7zip-bin, hash recorded in windows-components/7za.sha256).
+# System32 tar.exe is not used: its LZMA support differs per Windows image
+# (windows-2022 lacks it), and end users never extract components with it.
+$sevenZip = Join-Path $ProjectRoot 'node_modules\7zip-bin\win\x64\7za.exe'
+Assert-Path $sevenZip 'pinned 7za.exe'
+$sevenZipHashPath = Join-Path $ComponentsDir '7za.sha256'
+Assert-Path $sevenZipHashPath 'pinned 7za.exe SHA-256'
+$expectedSevenZipHash = (Get-Content -LiteralPath $sevenZipHashPath -Raw).Trim().ToLowerInvariant()
+$actualSevenZipHash = (Get-FileHash -LiteralPath $sevenZip -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actualSevenZipHash -ne $expectedSevenZipHash) {
+  throw "SHA-256 mismatch for pinned 7za.exe"
+}
 
 $smokeRoot = Join-Path $env:TEMP ("zhiyuan-runtime-smoke-{0}-{1}" -f $PID, [guid]::NewGuid().ToString('N'))
 $oldPath = $env:PATH
 try {
   New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
   foreach ($component in @($componentManifest.components)) {
-    if ($component.key -match 'llama' -or $component.prefix -match 'llama') {
-      throw "The offline component manifest must not include llama.cpp: $($component.key)"
+    $isLlamaComponent = $component.key -match 'llama' -or $component.prefix -match 'llama'
+    if ($isLlamaComponent -and -not ($bundlesLlamaCpp -and $component.key -eq 'llamacpp-bundled' -and $component.prefix -eq 'llamacpp-bundled')) {
+      throw "The offline component manifest must not include llama.cpp for edition ${InferenceEdition}: $($component.key)"
     }
     $archivePath = Join-Path $ComponentsDir $component.archive
     Assert-Path $archivePath "Windows component archive $($component.key)"
@@ -84,7 +116,7 @@ try {
     if ((Get-Item -LiteralPath $archivePath).Length -ne $component.archiveSizeBytes) {
       throw "Size mismatch for Windows component $($component.key)"
     }
-    Invoke-Checked $systemTar @('-xf', $archivePath, '-C', $smokeRoot) "Windows component extraction: $($component.key)"
+    Invoke-Checked $sevenZip @('x', '-y', "-o$smokeRoot", $archivePath) "Windows component extraction: $($component.key)"
     $sentinelPath = Join-Path $smokeRoot $component.sentinel
     Assert-Path $sentinelPath "Windows component sentinel $($component.key)"
     if ($component.sentinelSha256 -notmatch '^[0-9a-f]{64}$') {
@@ -145,6 +177,32 @@ try {
   }
 
   Invoke-Checked $python @('--version') 'bundled application Python version probe'
+  if ($bundlesLlamaCpp) {
+    # Correctness (always enforced): the llama.cpp runtime extracted from the
+    # offline component must start from a clean PATH. The accelerated servers
+    # need hardware the hosted runner lacks (the CUDA server imports nvcuda.dll
+    # from the NVIDIA driver; the Vulkan server needs a Vulkan ICD), so the
+    # portable CPU fallback is what must launch everywhere. The CUDA server's
+    # DLL import closure is verified at build time by
+    # finalize-llamacpp-cuda-edition.cjs (scripts/windows-pe-imports.cjs), and
+    # it is launched here too when the host does have the NVIDIA driver.
+    $llamaRoot = Join-Path $resourcesRoot 'llamacpp-bundled'
+    $llamaManifest = Get-Content -LiteralPath (Join-Path $llamaRoot 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    $llamaLaunch = @()
+    if ($llamaManifest.cpuFallbackExecutable) { $llamaLaunch += $llamaManifest.cpuFallbackExecutable }
+    else { $llamaLaunch += $llamaManifest.executable }
+    $hasNvidiaDriver = Test-Path -LiteralPath (Join-Path $env:SystemRoot 'System32\nvcuda.dll')
+    if ($InferenceEdition -eq 'cuda' -and $hasNvidiaDriver) { $llamaLaunch += $llamaManifest.executable }
+    foreach ($llamaExecutable in $llamaLaunch) {
+      $llamaServer = Join-Path $llamaRoot ($llamaExecutable -replace '/', '\')
+      Assert-Path $llamaServer "bundled llama-server ($llamaExecutable)"
+      Invoke-Checked $llamaServer @('--version') "bundled llama-server launch ($llamaExecutable)"
+    }
+    Assert-Path (Join-Path $llamaRoot ($llamaManifest.executable -replace '/', '\')) "bundled primary llama-server ($($llamaManifest.executable))"
+    $llamaFiles = @(Get-ChildItem -LiteralPath $llamaRoot -Recurse -File)
+    $llamaBytes = ($llamaFiles | Measure-Object -Property Length -Sum).Sum
+    Write-Host ("[measure] windows-llamacpp-bundled edition={0} files={1} bytes={2} launched={3}" -f $InferenceEdition, $llamaFiles.Count, $llamaBytes, ($llamaLaunch -join ','))
+  }
   # Windows PowerShell 5.1 strips nested quotes from native process arguments.
   # Keep these probes quote-free so the Python code is identical on clean CI hosts.
   Invoke-Checked $skillPython @('-c', 'import pandas, openpyxl; print(1)') 'bundled XLSX dependency probe'

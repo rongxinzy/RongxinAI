@@ -56,11 +56,19 @@ function New-LiteralDirectoryJunction {
 
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 $targets = @((Get-Content -LiteralPath $TargetsPath -Raw -ErrorAction Stop | ConvertFrom-Json))
-$expectedKeys = @('channel-runtime', 'mcps', 'portable-git', 'python', 'skill-python', 'skills', 'uv')
+# Component contract: the seven fixed application components are always
+# required. The cpu/cuda editions' WebView2 setup additionally carries the
+# bundled llama.cpp runtime ('llamacpp-bundled'); no other key is accepted.
+# The count is therefore not fixed (lite 7, cpu/cuda 8).
+$requiredKeys = @('channel-runtime', 'mcps', 'portable-git', 'python', 'skill-python', 'skills', 'uv')
+$optionalKeys = @('llamacpp-bundled')
 $targetKeys = @($targets | ForEach-Object { [string]$_.key } | Sort-Object)
 $manifestKeys = @($manifest.components | ForEach-Object { [string]$_.key } | Sort-Object)
-if ($targets.Count -ne $expectedKeys.Count -or ($targetKeys -join ',') -cne ($expectedKeys -join ',') -or
-    @($manifest.components).Count -ne $expectedKeys.Count -or ($manifestKeys -join ',') -cne ($expectedKeys -join ',')) {
+$missingKeys = @($requiredKeys | Where-Object { $targetKeys -cnotcontains $_ })
+$unknownKeys = @($targetKeys | Where-Object { $requiredKeys -cnotcontains $_ -and $optionalKeys -cnotcontains $_ })
+if ($missingKeys.Count -gt 0 -or $unknownKeys.Count -gt 0 -or
+    @($targetKeys | Sort-Object -Unique).Count -ne $targetKeys.Count -or
+    ($manifestKeys -join ',') -cne ($targetKeys -join ',')) {
   throw 'Invalid component manifest: expected the complete application component set (no missing, duplicate or unknown components)'
 }
 $rows = @($targets | ForEach-Object {

@@ -79,6 +79,7 @@ interface SidebarProps {
   updateEntry?: React.ReactNode;
   hideLogin?: boolean;
   managedModelsOnly?: boolean;
+  inferenceEdition?: import('../../shared/inferenceEdition').InferenceEdition;
   /** Warms the lazily loaded chunk for a view on hover/focus intent. */
   onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
@@ -105,6 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   updateEntry,
   hideLogin,
   managedModelsOnly = false,
+  inferenceEdition,
   onPrefetchView,
 }) => {
   const dispatch = useDispatch();
@@ -452,6 +454,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               onWorkModeChange={handleWorkModeChange}
               workMode={workMode}
               managedModelsOnly={managedModelsOnly}
+              inferenceEdition={inferenceEdition}
               onPrefetchView={onPrefetchView}
             />
           </div>

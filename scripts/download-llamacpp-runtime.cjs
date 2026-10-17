@@ -13,10 +13,14 @@ const DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL = 'https://rongxinai.krli.org/llamac
 const OfficialAssetByTarget = {
   'mac-arm64': 'llama-{tag}-bin-macos-arm64.tar.gz',
   'mac-x64': 'llama-{tag}-bin-macos-x64.tar.gz',
-  'win-x64': 'llama-{tag}-bin-win-cpu-x64.tar.gz',
-  'win-x64-cuda-12': 'llama-{tag}-bin-win-cuda-12.4-x64.tar.gz',
+  'win-x64': 'llama-{tag}-bin-win-cpu-x64.zip',
+  'win-x64-vulkan': 'llama-{tag}-bin-win-vulkan-x64.zip',
+  'win-x64-cuda-12': 'llama-{tag}-bin-win-cuda-12.4-x64.zip',
   'win-arm64': 'llama-{tag}-bin-win-cpu-arm64.tar.gz',
   'linux-x64': 'llama-{tag}-bin-ubuntu-x64.tar.gz',
+  'linux-x64-vulkan': 'llama-{tag}-bin-ubuntu-vulkan-x64.tar.gz',
+  'linux-x64-cuda-12': 'llama-{tag}-bin-ubuntu-cuda-12.4-x64.tar.gz',
+  'linux-x64-cuda-13': 'llama-{tag}-bin-ubuntu-cuda-13.3-x64.tar.gz',
   'linux-arm64': 'llama-{tag}-bin-ubuntu-arm64.tar.gz',
 };
 const CompanionAssetsByTarget = {
@@ -144,6 +148,17 @@ function resolveRuntimeCompanionDownloadSources(targetId, options = {}) {
   );
 }
 
+function isTruthyEnv(value) {
+  const normalized = String(value ?? '')
+    .trim()
+    .toLowerCase();
+  return normalized === '1' || normalized === 'true' || normalized === 'yes';
+}
+
+function isCiOfficialGithubPreferred(env) {
+  return isTruthyEnv(env.CI) || isTruthyEnv(env.GITHUB_ACTIONS);
+}
+
 function resolveAssetDownloadSources(targetId, assetName, options = {}) {
   const env = options.env ?? process.env;
   const rootDir = options.rootDir ?? path.resolve(__dirname, '..');
@@ -160,10 +175,20 @@ function resolveAssetDownloadSources(targetId, assetName, options = {}) {
 
   const repo = resolveGitHubRepo(env);
   const releaseTag = resolveRuntimeReleaseTag(rootDir, env);
-  return [
-    `${DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL}/${releaseTag}/${assetName}`,
-    `https://github.com/${repo}/releases/download/${releaseTag}/${assetName}`,
-  ];
+  const mirrorUrl = `${DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL}/${releaseTag}/${assetName}`;
+  const githubUrl = `https://github.com/${repo}/releases/download/${releaseTag}/${assetName}`;
+
+  if (isCiOfficialGithubPreferred(env)) {
+    if (isTruthyEnv(env.LLAMACPP_RUNTIME_ALLOW_MIRROR_FALLBACK)) {
+      return [githubUrl, mirrorUrl];
+    }
+    return [githubUrl];
+  }
+
+  if (isTruthyEnv(env.LLAMACPP_RUNTIME_ALLOW_GITHUB_FALLBACK)) {
+    return [mirrorUrl, githubUrl];
+  }
+  return [mirrorUrl];
 }
 
 function formatDownloadFailureMessage(status, statusText, url, targetId, rootDir) {
@@ -282,7 +307,7 @@ async function main() {
   if (sync.status !== 0) process.exit(sync.status || 1);
 }
 
-async function extractArchive(archivePath, extractDir) {
+async function extractArchiveToDirectory(archivePath, extractDir) {
   const extension = resolveArchiveExtension(archivePath);
   if (extension === '.tar.gz') {
     await tar.x({
@@ -314,6 +339,10 @@ async function extractArchive(archivePath, extractDir) {
     return;
   }
   await extractZip(archivePath, { dir: extractDir });
+}
+
+async function extractArchive(archivePath, extractDir) {
+  return extractArchiveToDirectory(archivePath, extractDir);
 }
 
 function installNormalizedRuntime(options) {
@@ -471,7 +500,20 @@ function validateRuntimeTarget(runtimeDir, targetId) {
   }
 }
 
-if (require.main === module && process.argv[2] === '--download-one') {
+if (require.main === module && process.argv[2] === '--extract-only') {
+  const archivePath = process.argv[3];
+  const extractDir = process.argv[4];
+  if (!archivePath || !extractDir) {
+    console.error('usage: download-llamacpp-runtime.cjs --extract-only <archive> <extractDir>');
+    process.exit(1);
+  }
+  extractArchiveToDirectory(path.resolve(archivePath), path.resolve(extractDir)).catch(error => {
+    console.error(
+      `[download-llamacpp-runtime] ${error instanceof Error ? error.message : String(error)}`,
+    );
+    process.exit(1);
+  });
+} else if (require.main === module && process.argv[2] === '--download-one') {
   const payload = JSON.parse(process.argv[3] || '{}');
   downloadFileWithFallback(
     payload.urls,
@@ -494,6 +536,8 @@ if (require.main === module && process.argv[2] === '--download-one') {
 }
 
 module.exports = {
+  extractArchiveToDirectory,
+  resolveAssetDownloadSources,
   formatDownloadFailureMessage,
   resolveArchiveExtension,
   resolveExecutableName,

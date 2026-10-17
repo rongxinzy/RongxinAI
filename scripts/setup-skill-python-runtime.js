@@ -188,7 +188,15 @@ function validateSkillDependencyDeclarations(skillsRoot = SKILLS_ROOT) {
   for (const skillDir of listSkillDirectories(skillsRoot)) {
     const skillId = path.basename(skillDir);
     const pythonFiles = listPythonFiles(skillDir);
-    const localModules = new Set(pythonFiles.map(filePath => path.basename(filePath, '.py')));
+    // Local modules are sibling .py files and local packages (any directory
+    // holding an __init__.py), e.g. SKILLs/pdf/scripts/cover_lib.
+    const localModules = new Set(
+      pythonFiles.map(filePath =>
+        path.basename(filePath) === '__init__.py'
+          ? path.basename(path.dirname(filePath))
+          : path.basename(filePath, '.py'),
+      ),
+    );
     const requirementsPath = path.join(skillDir, 'requirements.txt');
     const declaredImports = fs.existsSync(requirementsPath)
       ? new Set(parseImportNames(requirementsPath))
