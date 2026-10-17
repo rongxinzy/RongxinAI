@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const fixtureRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../fixtures/glm-replay');
 
-export interface GlmReplayLine {
+interface GlmReplayLine {
   readonly t: number;
   readonly e: Record<string, unknown>;
 }
@@ -19,7 +19,7 @@ function readFixtureText(relativePath: string): string {
   return raw.toString('utf8');
 }
 
-export function loadGlmReplayFixture(relativePath: string): GlmReplayLine[] {
+function loadGlmReplayFixture(relativePath: string): GlmReplayLine[] {
   const lines = readFixtureText(relativePath).split('\n').filter(Boolean);
   return lines.map(line => JSON.parse(line) as GlmReplayLine);
 }
