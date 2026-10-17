@@ -17,7 +17,6 @@
     "src/main/libs/llamacppManager.ts": 1740,
     "src/main/memory/projectMemoryService.ts": 1041,
     "src/main/workbenchTask/taskService.test.ts": 1124,
-    "src/renderer/theme/components/contract.ts": 1143,
-    "src/shared/providers/constants.ts": 1637
+    "src/renderer/theme/components/contract.ts": 1143
   }
 }
