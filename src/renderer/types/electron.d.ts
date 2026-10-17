@@ -110,7 +110,6 @@ export interface IElectronAPI {
       callback: (entry: import('../../shared/devNetworkLog').DevNetworkLogEntry) => void,
     ) => () => void;
   };
-  qwen: Record<string, never>;
   feishu: FeishuApi;
   dingtalk: DingTalkApi;
   githubCopilot: GithubCopilotApi;

@@ -1,6 +1,6 @@
 # Windows 安装器瘦身与 cc-connect + 原生 Pi 迁移规划
 
-> **历史规划（2026-08-11）**：下列 OpenClaw/PicoClaw 表述描述迁移前状态与目标；截至 main 分支当前树，Agent 执行与 Channel/Cron 传输已按本文决策落地，安装包不再打包旧版 Agent runtime。文件名保留日期前缀供检索。
+> **历史规划（2026-08-11）**：下列 OpenClaw/PicoClaw 表述描述迁移前状态与目标；截至 main 分支当前树，Agent 执行与 Channel/Cron 传输已按本文决策落地，安装包不再打包旧版 Agent runtime。文中仍出现的 `openclawEngineManager.ts` 等路径已删除，勿当作现行代码。现行架构见 [architecture/overview.zh-CN.md](architecture/overview.zh-CN.md)。文件名保留日期前缀供检索。
 
 日期：2026-08-11。本文是 Windows 离线安装器、Python 依赖去重，以及 Channel/Cron 从旧版 sidecar 迁移到 cc-connect + 知远原生 Pi 的实施基线。本文只定义范围、顺序、验收和回滚；不包含实现代码。
 

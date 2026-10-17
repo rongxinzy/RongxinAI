@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { expect, test } from 'vitest';
+import { beforeEach, expect, test } from 'vitest';
 
 import {
   isLikelyErrorNotification,
+  resetAppToastDedupeForTests,
   resolveToastMessage,
   resolveToastNotification,
   showAppErrorToast,
@@ -11,6 +12,10 @@ import {
   showAppSuccessToast,
   showAppToast,
 } from './toastNotification';
+
+beforeEach(() => {
+  resetAppToastDedupeForTests();
+});
 
 test('treats error wording in a plain string detail as an error', () => {
   expect(resolveToastNotification('保存失败')).toEqual({
@@ -89,7 +94,23 @@ test('showAppToast also carries plain string details', () => {
   showAppToast('已复制');
 
   window.removeEventListener('app:showToast', listener);
-  expect(details).toEqual(['已复制']);
+  expect(details).toEqual([{ message: '已复制' }]);
+});
+
+test('showAppToast suppresses duplicate messages within the repeat window', () => {
+  const details: unknown[] = [];
+  const listener = (event: Event) => details.push((event as CustomEvent<unknown>).detail);
+  window.addEventListener('app:showToast', listener);
+
+  showAppToast('同一个错误', { isError: true });
+  showAppToast('同一个错误', { isError: true });
+  showAppToast('   ');
+  showAppToast('另一个错误', { isError: true });
+
+  window.removeEventListener('app:showToast', listener);
+  expect(details).toHaveLength(2);
+  expect(details[0]).toEqual({ message: '同一个错误', isError: true });
+  expect(details[1]).toEqual({ message: '另一个错误', isError: true });
 });
 
 test('showAppErrorToast keeps curated wording instead of prefixing it again', () => {

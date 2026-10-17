@@ -4,7 +4,7 @@ The shared PR and review process is defined in [DEVOPS.md](DEVOPS.md). Use its c
 
 Thank you for your interest in contributing to ZhiYuan Agent. Contributions of all sizes are welcome, including bug reports, documentation improvements, tests, UI refinements, and new features.
 
-Please read this guide and [`AGENTS.md`](AGENTS.md) before making a code change. `AGENTS.md` contains the repository's detailed architecture and implementation rules.
+Please read this guide and [`AGENTS.md`](AGENTS.md) before making a code change. `AGENTS.md` contains the repository's detailed architecture and implementation rules. For a concise map of processes, Pi, llama.cpp modules, IPC conventions, and release flow, see [`docs/architecture/overview.zh-CN.md`](docs/architecture/overview.zh-CN.md).
 
 ## Before You Start
 
@@ -20,6 +20,7 @@ Please read this guide and [`AGENTS.md`](AGENTS.md) before making a code change.
 - Git
 - Node.js `>=24 <25`
 - Bun `>=1.4 <1.5`
+- Go: only for packaging. The exact SDK version pinned in `resources/magpie/upstream.json` (currently Go 1.26.8) is required by `bun run magpie:build`
 
 Windows release builds also require PortableGit. Native dependencies such as `better-sqlite3` may require Python and a supported C/C++ build toolchain when a prebuilt binary is unavailable.
 
@@ -59,6 +60,7 @@ Use Bun for dependency installation and commit changes to `bun.lock` when depend
 | `SKILLs/`             | Skills bundled with the application runtime                |
 | `MCPs/`               | Bundled MCP integrations                                   |
 | `scripts/`            | Development, runtime, and packaging scripts                |
+| `docs/architecture/`  | Current architecture notes (streaming doc pending PR #1119) |
 
 ZhiYuan Agent uses Electron process isolation. Renderer code must not access Node.js or Electron APIs directly; use the typed preload and IPC boundary.
 
@@ -91,7 +93,7 @@ When changing behavior:
 - Reuse components in `src/shared/components/ui/` and `src/shared/components/ai-elements/` before creating new ones.
 - Use `lucide-react` for interface icons instead of handwritten SVG icon components.
 - Use `cn()` from `@shared/lib/utils` to merge class names.
-- Keep new files below 800 lines when possible and never above 1,000 lines. Add new logic in a separate module instead of extending an existing oversized file.
+- Keep new files below 800 lines when possible and never above 1,000 lines. CI enforces the hard cap via `scripts/ci/check-source-line-limit.mjs`; legacy oversize files may appear in `scripts/ci/source-line-baseline.json`, and those caps may only shrink over time. Add new logic in a separate module instead of extending an existing oversized file.
 - Centralize discriminants, status values, modes, and IPC channel names in an `as const` object. Do not repeat bare string literals across the codebase. See `src/scheduledTask/constants.ts` for the canonical pattern.
 
 Main-process logs must use the standard `console` API, begin with a module tag such as `[Scheduler]`, and read as concise English sentences. Avoid info-level logging in polling loops, and pass the caught error object as the final argument of error logs.
@@ -110,11 +112,14 @@ Run the relevant checks before opening a pull request:
 
 ```bash
 bun run build
-bun test
+bun run test
 bun run lint
+bun run knip
 bun run format:check
 bun run compile:electron
 ```
+
+Renderer toast notifications must go through `showAppToast` / `showAppError` in `src/renderer/services/toastNotification.ts` (re-exported from `appToast.ts`). Do not dispatch `CustomEvent('app:showToast')` directly; `bun run lint` runs an AST check for violations.
 
 For a focused test run:
 
@@ -124,11 +129,20 @@ bun test -- <name>
 
 For UI changes, manually exercise the affected flow in browser preview first. Check both light and dark themes, relevant states and viewport sizes, and both supported languages when relevant. Run `bun run web:preview:check` and inspect its screenshots. Use Electron for affected real IPC, native, and end-to-end behavior. Include screenshots or a short recording in the pull request, and identify which checks used browser fixtures versus Electron.
 
-Packaging is platform-specific:
+CI also enforces these gates on every pull request:
+
+- `bun run knip` fails on unused files, exports, and dependencies. Delete dead code instead of adding ignores.
+- `node scripts/ci/check-source-line-limit.mjs` fails on hand-written source files over 1000 lines. The baseline in `scripts/ci/source-line-baseline.json` only ratchets down: CI rejects new entries, raised caps, and a raised limit. The baseline is currently empty, so split a file before it reaches the limit.
+- `bun run check:python-dead-code`, `bun run format:check`, `bun run lint`, and `bun run check:openclaw-decoupling`.
+
+Packaging is platform-specific. Build and verify the bundled Magpie gateway for the target first (requires the pinned Go SDK, see [README.md](README.md#packaging)):
 
 ```bash
+bun run magpie:build --target win32-x64 --go /path/to/go
+bun run magpie:verify --target win32-x64
+bun run dist:win          # = dist:win:offline, unsigned
+bun run dist:win:signed   # Certum-signed, needs CERTUM_CERT_THUMBPRINT
 bun run dist:mac
-bun run dist:win
 bun run dist:linux
 ```
 

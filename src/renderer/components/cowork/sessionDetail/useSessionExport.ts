@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import { coworkService } from '../../../services/cowork';
 import { i18nService } from '../../../services/i18n';
+import { showAppToast } from '../../../services/toastNotification';
 import type { CoworkSession } from '../../../types/cowork';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../constants';
 import type { CaptureRect } from '../helpers/exportUtils';
@@ -68,21 +69,13 @@ export const useSessionExport = ({
           fileExtension: format,
         });
         if (result.success && !result.canceled) {
-          window.dispatchEvent(
-            new CustomEvent('app:showToast', {
-              detail: i18nService.t('coworkExportTextSuccess'),
-            }),
-          );
+          showAppToast(i18nService.t('coworkExportTextSuccess'));
         } else if (!result.success) {
           throw new Error(result.error || 'Export failed');
         }
       } catch (error) {
         console.error('Failed to export session text:', error);
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', {
-            detail: i18nService.t('coworkExportTextFailed'),
-          }),
-        );
+        showAppToast(i18nService.t('coworkExportTextFailed'));
       }
     },
     [currentSession],
@@ -271,11 +264,7 @@ export const useSessionExport = ({
                 defaultFileName: sanitizeExportFileName(`${currentSession.title}-${timestamp}.png`),
               });
               if (saveResult.success && !saveResult.canceled) {
-                window.dispatchEvent(
-                  new CustomEvent('app:showToast', {
-                    detail: i18nService.t('coworkExportImageSuccess'),
-                  }),
-                );
+                showAppToast(i18nService.t('coworkExportImageSuccess'));
                 return;
               }
               if (!saveResult.success) {
@@ -286,11 +275,7 @@ export const useSessionExport = ({
             }
           } catch (error) {
             console.error('Failed to export session image:', error);
-            window.dispatchEvent(
-              new CustomEvent('app:showToast', {
-                detail: i18nService.t('coworkExportImageFailed'),
-              }),
-            );
+            showAppToast(i18nService.t('coworkExportImageFailed'));
           } finally {
             setIsExportingImage(false);
           }

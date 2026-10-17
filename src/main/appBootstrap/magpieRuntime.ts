@@ -25,6 +25,13 @@ export const setupMagpieRuntime = (): void => {
       ? path.join(process.resourcesPath, 'magpie')
       : path.join(app.getAppPath(), 'resources/magpie'),
     privateHome: path.join(app.getPath('userData'), 'magpie'),
+    gatewayPort: {
+      read: () => {
+        const value = getStore().get<number>('magpie_gateway_port');
+        return typeof value === 'number' ? value : undefined;
+      },
+      write: port => getStore().set('magpie_gateway_port', port),
+    },
     serviceEnabled: {
       read: () => getStore().get<boolean>('magpie_service_enabled') === true,
       write: enabled => getStore().set('magpie_service_enabled', enabled),
