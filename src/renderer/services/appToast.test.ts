@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { resetAppToastDedupeForTests } from './toastNotification';
 import { showAppError, showAppToast } from './appToast';
 
 const captureToasts = () => {
@@ -15,6 +16,7 @@ const captureToasts = () => {
 };
 
 beforeEach(() => {
+  resetAppToastDedupeForTests();
   vi.useFakeTimers();
 });
 afterEach(() => {

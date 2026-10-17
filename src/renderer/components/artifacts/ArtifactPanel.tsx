@@ -21,6 +21,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '@/services/i18n';
+import { showAppToast } from '@/services/toastNotification';
 import type { RootState } from '@/store';
 import {
   addArtifact,
@@ -297,9 +298,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     try {
       await panelRef.current?.requestFullscreen();
     } catch {
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', { detail: t('artifactFullscreenUnavailable') }),
-      );
+      showAppToast(t('artifactFullscreenUnavailable'));
     }
   }, [dispatch]);
   const handleSelectArtifact = useCallback(
@@ -313,7 +312,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const handleCopy = useCallback(async () => {
     if (selectedArtifact) {
       await navigator.clipboard.writeText(selectedArtifact.content);
-      window.dispatchEvent(new CustomEvent('app:showToast', { detail: t('messageCopied') }));
+      showAppToast(t('messageCopied'));
     }
   }, [selectedArtifact]);
 

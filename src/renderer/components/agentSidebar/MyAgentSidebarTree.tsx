@@ -7,6 +7,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
+import { showAppToast } from '../../services/toastNotification';
 import { workspaceService } from '../../services/workspace';
 import { store, type RootState } from '../../store';
 import {
@@ -172,9 +173,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
           '[MyAgentSidebarTree] Failed to open workspace in file explorer:',
           result.error,
         );
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', { detail: i18nService.t('openFolderFailed') }),
-        );
+        showAppToast(i18nService.t('openFolderFailed'));
       }
     });
   };

@@ -3,6 +3,7 @@ import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
+import { showAppToast } from '../../services/toastNotification';
 import { RootState } from '../../store';
 import { selectIsStreaming } from '../../store/selectors/coworkSelectors';
 import { clearCurrentSession } from '../../store/slices/coworkSlice';
@@ -31,9 +32,7 @@ const ChatSkillShortcuts: React.FC = () => {
       skills.some(skill => skill.id === skillId && skill.enabled),
     );
     if (!allSkillsAvailable) {
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', { detail: i18nService.t('chatSkillUnavailable') }),
-      );
+      showAppToast(i18nService.t('chatSkillUnavailable'));
       return;
     }
     dispatch(setActiveSkillIds([...selectedSkillIds]));

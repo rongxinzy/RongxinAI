@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { selectMagpieDefaultModel } from '../../services/availableModels';
 import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
+import { showAppToast } from '../../services/toastNotification';
 import type { Model } from '../../store/slices/modelSlice';
 import { setSelectedModel } from '../../store/slices/modelSlice';
 import { toAgentModelRef } from '../../utils/agentModelRef';
@@ -33,11 +34,7 @@ export function usePersistAgentModelSelection({
           return false;
         }
         if (!updatedAgent) {
-          window.dispatchEvent(
-            new CustomEvent('app:showToast', {
-              detail: i18nService.t('agentSaveFailed'),
-            }),
-          );
+          showAppToast(i18nService.t('agentSaveFailed'));
           return false;
         }
 
@@ -47,9 +44,7 @@ export function usePersistAgentModelSelection({
         }
         return true;
       } catch {
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', { detail: i18nService.t('agentSaveFailed') }),
-        );
+        showAppToast(i18nService.t('agentSaveFailed'));
         return false;
       } finally {
         if (requestId === requestIdRef.current) {

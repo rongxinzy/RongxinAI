@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
+import { showAppToast } from '../../services/toastNotification';
 import { getCompactFolderName, isScratchWorkspacePath } from '../../utils/path';
 import CreateProjectDialog from './CreateProjectDialog';
 
@@ -92,11 +93,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
       });
       if (result.success && result.path) {
         if (isWindowsDriveRoot(result.path)) {
-          window.dispatchEvent(
-            new CustomEvent('app:showToast', {
-              detail: i18nService.t('folderDriveRootNotAllowed'),
-            }),
-          );
+          showAppToast(i18nService.t('folderDriveRootNotAllowed'));
           return;
         }
         onSelectFolder(result.path);
@@ -117,24 +114,18 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
           onSelectFolder(result.path);
         }
       } else {
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', { detail: i18nService.t('projectCreateFailed') }),
-        );
+        showAppToast(i18nService.t('projectCreateFailed'));
       }
     } catch (error) {
       console.error('Failed to create random workspace:', error);
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', { detail: i18nService.t('projectCreateFailed') }),
-      );
+      showAppToast(i18nService.t('projectCreateFailed'));
     }
   }, [onSelectFolder, onUseNoFolder]);
 
   const handleSelectRecentFolder = useCallback(
     (path: string) => {
       if (isWindowsDriveRoot(path)) {
-        window.dispatchEvent(
-          new CustomEvent('app:showToast', { detail: i18nService.t('folderDriveRootNotAllowed') }),
-        );
+        showAppToast(i18nService.t('folderDriveRootNotAllowed'));
         return;
       }
       onSelectFolder(path);
