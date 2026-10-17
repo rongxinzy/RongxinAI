@@ -20,7 +20,7 @@ function buildBrowserMockElectron(): Window['electron'] {
   return applyOverrides(
     applyOverrides(createGeneratedSurface(runtime), createInteractiveOverrides(runtime)),
     createScenarioOverrides(scenario),
-  );
+  ) as Window['electron'];
 }
 
 export const browserMockElectron: Window['electron'] = buildBrowserMockElectron();

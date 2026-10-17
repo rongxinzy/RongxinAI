@@ -714,12 +714,7 @@ function readIdentifier(source: string, index: number): { name: string; next: nu
   return { name: source.slice(start, index), next: index };
 }
 
-function skipBalanced(
-  source: string,
-  index: number,
-  open: string,
-  close: string,
-): number {
+function skipBalanced(source: string, index: number, open: string, close: string): number {
   if (source[index] !== open) return index;
   let depth = 0;
   let i = index;
@@ -764,7 +759,7 @@ function skipBalanced(
 function skipExpressionValue(source: string, index: number): number {
   index = skipWhitespace(source, index);
   const ch = source[index];
-  if (ch === '{' ) return skipBalanced(source, index, '{', '}');
+  if (ch === '{') return skipBalanced(source, index, '{', '}');
   if (ch === '(') return skipBalanced(source, index, '(', ')');
   if (ch === '[') return skipBalanced(source, index, '[', ']');
   if (ch === "'" || ch === '"' || ch === '`') {
