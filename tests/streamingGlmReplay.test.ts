@@ -166,9 +166,9 @@ describe('GLM Pi replay fixtures', () => {
           (event as { type?: string }).type === 'turn_start' &&
           harness.dbMessages().filter(message => message.type === 'assistant').length === 1
         ) {
-          expect(
-            harness.dbMessages().find(message => message.type === 'assistant')?.content,
-          ).toBe('Part');
+          expect(harness.dbMessages().find(message => message.type === 'assistant')?.content).toBe(
+            'Part',
+          );
         }
         for (const messageId of harness.answerMessageIds()) {
           const length = (harness.displayed(messageId) ?? '').length;
