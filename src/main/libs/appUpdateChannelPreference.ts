@@ -1,10 +1,8 @@
-import {
-  AppUpdateChannelPreference,
-} from '../../shared/appUpdate/constants';
+import { AppUpdateChannelPreference } from '../../shared/appUpdate/constants';
 import type { SqliteStore } from '../sqliteStore';
 import { AppUpdateReleaseChannel, type UpdateTarget } from './appUpdateManifest';
 
-export const APP_UPDATE_CHANNEL_STORE_KEY = 'app_update_channel';
+const APP_UPDATE_CHANNEL_STORE_KEY = 'app_update_channel';
 
 const ELECTRON_UPDATE_FEED_BASE = 'https://updates.rongxzyai.com/v2/electron';
 const MANIFEST_CACHE_KEY_PREFIX = 'app_update_manifest_cache';
