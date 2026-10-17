@@ -30,6 +30,16 @@ import { isolatedMagpieEnvironment, prepareMagpieHome } from './environment';
 import { resolveMagpieGatewayPort, type MagpieGatewayPortStore } from './gatewayPort';
 import { MAGPIE_VERSION, verifyMagpieBinary } from './integrity';
 import type { MagpieAgentConnectPreview } from '../../shared/magpie/types';
+import { formatMagpieManagementError } from './managementErrors';
+import {
+  mirrorOpenCodeConfigToUser,
+  resolveUserHome,
+  restoreAgentHostTrees,
+  snapshotAgentHostTrees,
+  stripCodexMagpieProviderBlock,
+  canonicalHostAgentId,
+} from './externalAgentHostConfig';
+import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
 const MODEL_FIELDS = new Set(['model', 'large', 'small', 'executor', 'planner']);
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 function maskApiKey(key: string | undefined): string | undefined {
@@ -80,6 +90,7 @@ export class MagpieManager {
   private hostSignatures = new Map<string, string>();
   private recentErrors: { timestamp: number; message: string; providerId?: string }[] = [];
   private cachedActiveProviderCount = 0;
+  private reapplyErrors = new Map<string, string>();
   constructor(private readonly options: MagpieManagerOptions) {}
   status(): MagpieStatus {
     return {
@@ -189,7 +200,7 @@ export class MagpieManager {
           const web = await this.webRequest('/', { signal });
           if (data.name === 'magpie' && data.version === MAGPIE_VERSION && web.ok && !exited) {
             this.state = { state: 'running', version: MAGPIE_VERSION, gatewayUrl };
-            await this.reapplyManagedAgentsAfterStart(signal);
+            void this.reapplyManagedAgentsAfterStart();
             return this.status();
           }
         } catch {
@@ -665,6 +676,9 @@ export class MagpieManager {
               wired: a.wired === true,
               ...(typeof version.version === 'string' ? { version: version.version } : {}),
               ...(typeof version.app === 'string' ? { appVersion: version.app } : {}),
+              ...(this.reapplyErrors.has(a.id)
+                ? { reapplyError: this.reapplyErrors.get(a.id) }
+                : {}),
               models: (Array.isArray(a.fields) ? a.fields : [])
                 .filter(
                   (f: Record<string, unknown>) =>
@@ -704,11 +718,31 @@ export class MagpieManager {
     };
   }
 
-  private async reapplyManagedAgentsAfterStart(signal: AbortSignal): Promise<void> {
-    signal.throwIfAborted();
+  private userHome(): string {
+    return resolveUserHome(this.options.environment);
+  }
+
+  private async reapplyManagedAgentsAfterStart(): Promise<void> {
     if (this.state.state !== 'running') return;
-    const snapshot = await this.agents();
-    await magpieReapplyConnectedAgents(this.agentClient(), snapshot);
+    try {
+      const snapshot = await this.agents();
+      this.reapplyErrors = await magpieReapplyConnectedAgents(this.agentClient(), snapshot);
+    } catch (error) {
+      console.warn('[Magpie] reapply sweep failed during startup:', error);
+    }
+  }
+
+  private async finalizeHostConnect(agentId: string): Promise<void> {
+    const home = this.userHome();
+    if (canonicalHostAgentId(agentId) === 'opencode') {
+      await mirrorOpenCodeConfigToUser(this.options.privateHome, home);
+    }
+  }
+
+  private async finalizeHostDisconnect(agentId: string): Promise<void> {
+    const home = this.userHome();
+    await restoreAgentHostTrees(this.options.privateHome, agentId, home);
+    if (canonicalHostAgentId(agentId) === 'codex') await stripCodexMagpieProviderBlock(home);
   }
 
   async previewAgent(agentId: string): Promise<MagpieAgentConnectPreview> {
@@ -718,17 +752,32 @@ export class MagpieManager {
 
   async connectAgent(agentId: string): Promise<MagpieAgents> {
     await this.ensureRunning();
-    return magpieAgentConnect(this.agentClient(), agentId);
+    if (isMagpieManagedAgentId(agentId)) {
+      await snapshotAgentHostTrees(this.options.privateHome, agentId, this.userHome());
+    }
+    const agents = await magpieAgentConnect(this.agentClient(), agentId);
+    await this.finalizeHostConnect(agentId);
+    return this.agents();
   }
 
   async disconnectAgent(agentId: string): Promise<MagpieAgents> {
-    await this.ensureRunning();
-    return magpieAgentDisconnect(this.agentClient(), agentId);
+    if (this.state.state !== 'running') return { agents: [], pending: false };
+    const agents = await magpieAgentDisconnect(this.agentClient(), agentId);
+    await this.finalizeHostDisconnect(agentId);
+    this.reapplyErrors.delete(agentId);
+    return agents;
   }
 
   async disconnectAllAgents(): Promise<MagpieAgents> {
-    await this.ensureRunning();
-    return magpieDisconnectAllManaged(this.agentClient());
+    if (this.state.state !== 'running') return { agents: [], pending: false };
+    await magpieDisconnectAllManaged(this.agentClient());
+    for (const id of ['claude', 'codex', 'opencode', 'gemini', 'pi']) {
+      await this.finalizeHostDisconnect(id).catch(error => {
+        console.warn(`[Magpie] host disconnect cleanup failed for ${id}:`, error);
+      });
+    }
+    this.reapplyErrors.clear();
+    return this.agents();
   }
 
   async setModel(selection: MagpieModelSelection): Promise<MagpieAgents> {
@@ -771,8 +820,9 @@ export class MagpieManager {
     init: RequestInit = {},
   ): Promise<Record<string, any>> {
     const response = await this.webRequest(route, init);
-    if (!response.ok) throw new Error('Local CLI management request failed');
     const text = await response.text();
+    if (!response.ok)
+      throw new Error(formatMagpieManagementError(response.status, response.statusText, text));
     if (text.length > 1024 * 1024) throw new Error('Management response exceeds size limit');
     return JSON.parse(text);
   }

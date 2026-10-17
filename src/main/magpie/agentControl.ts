@@ -62,12 +62,20 @@ async function magpieAgentReapply(client: MagpieManagementClient, agentId: strin
 export async function magpieReapplyConnectedAgents(
   client: MagpieManagementClient,
   agents: MagpieAgents,
-): Promise<void> {
+): Promise<Map<string, string>> {
+  const errors = new Map<string, string>();
   for (const agent of agents.agents) {
     if (!agent.wired) continue;
     if (!isMagpieManagedAgentId(agent.id)) continue;
-    await magpieAgentReapply(client, agent.id);
+    try {
+      await magpieAgentReapply(client, agent.id);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.set(agent.id, message);
+      console.warn(`[Magpie] reapply failed for ${agent.id}:`, error);
+    }
   }
+  return errors;
 }
 
 export async function magpieDisconnectAllManaged(

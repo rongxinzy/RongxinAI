@@ -383,13 +383,28 @@ describe('Magpie owned lifecycle', () => {
     };
     const { manager, root, fetcher } = await setup(undefined, store);
     try {
+      const started = Date.now();
       await manager.start();
+      expect(Date.now() - started).toBeLessThan(5_000);
       expect(gatewayPort).toBeGreaterThan(0);
+      await new Promise(resolve => setTimeout(resolve, 50));
       expect(
         fetcher.mock.calls.some(
           ([url, init]) => url.includes('/api/agents/reapply/codex') && init?.method === 'POST',
         ),
       ).toBe(true);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not call ensureRunning for disconnectAll when the service is stopped', async () => {
+    const { manager, root } = await setup();
+    try {
+      const ensureRunning = vi.spyOn(manager, 'ensureRunning');
+      await expect(manager.disconnectAllAgents()).resolves.toEqual({ agents: [], pending: false });
+      expect(ensureRunning).not.toHaveBeenCalled();
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });

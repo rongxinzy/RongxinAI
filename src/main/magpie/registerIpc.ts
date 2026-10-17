@@ -105,6 +105,8 @@ export function registerMagpieIpc(
         }
         const body = Buffer.concat(chunks).toString('utf8');
         if (route === '/api/signin') {
+          // Subscription sign-in stays behind the explicit opt-in switch and oauthPolicy;
+          // Codex ChatGPT join is still off by default via MAGPIE_NO_ACCOUNTS / noAccountDiscovery.
           try {
             const request = JSON.parse(body) as { agent?: unknown; site?: unknown };
             const agent = request.agent;
@@ -112,7 +114,6 @@ export function registerMagpieIpc(
               cancel:
                 !manager.status().subscriptionAccountsEnabled ||
                 typeof agent !== 'string' ||
-                agent === 'codex' ||
                 (agent === 'copilot' &&
                   request.site !== undefined &&
                   request.site !== '' &&

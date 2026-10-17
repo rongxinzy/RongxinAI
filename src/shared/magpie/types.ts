@@ -119,6 +119,8 @@ export interface MagpieAgent {
   wired: boolean;
   version?: string;
   appVersion?: string;
+  /** Set when gateway reapply failed for a wired agent after service startup. */
+  reapplyError?: string;
   models: {
     key: string;
     label: string;

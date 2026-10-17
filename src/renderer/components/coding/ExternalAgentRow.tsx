@@ -91,6 +91,9 @@ export function ExternalAgentRow({
             <h4 className="text-sm font-medium">{i18nService.t(labelKey)}</h4>
             <Badge variant="outline">{i18nService.t(statusKey)}</Badge>
             {statusDetail && <span className="text-xs text-muted-foreground">{statusDetail}</span>}
+            {agent?.reapplyError && (
+              <Badge variant="destructive">{i18nService.t('magpieExternalReapplyError')}</Badge>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
             {version
