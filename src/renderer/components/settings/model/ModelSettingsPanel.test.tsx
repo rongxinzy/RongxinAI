@@ -28,6 +28,14 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
 });
+test('opens official management only after an explicit button click', async () => {
+  api.catalog.mockResolvedValue(running);
+  render(<ModelSettingsPanel />);
+  await screen.findByRole('searchbox');
+  fireEvent.click(screen.getByRole('button', { name: 'magpieOpenManagement' }));
+  expect(api.openManagement).toHaveBeenCalledTimes(1);
+});
+
 test('opening settings only reads catalog and requires informed explicit activation', async () => {
   render(<ModelSettingsPanel />);
   await waitFor(() => expect(api.catalog).toHaveBeenCalledTimes(1));

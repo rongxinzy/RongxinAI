@@ -14,7 +14,15 @@ import {
 } from '../../../services/availableModels';
 import { i18nService } from '../../../services/i18n';
 import { showAppError } from '../../../services/appToast';
+import { MagpieAgentsPanel } from '../../coding/MagpieAgentsPanel';
 import { MagpieSubscriptionControl } from './MagpieSubscriptionControl';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@shared/components/ui/dialog';
 import { ModelCatalogBrowser } from './ModelCatalogBrowser';
 import { ProviderManagerSection } from './ProviderManagerSection';
 
@@ -27,6 +35,7 @@ export default function ModelSettingsPanel() {
   const [providers, setProviders] = useState<MagpieProviderSummary[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [diagnostics, setDiagnostics] = useState<MagpieDiagnosticSummary | null>(null);
+  const [externalAgentsOpen, setExternalAgentsOpen] = useState(false);
   const mounted = useRef(false);
   const locked = useRef(false);
   const actionVersion = useRef(0);
@@ -281,6 +290,33 @@ export default function ModelSettingsPanel() {
           />
         </>
       )}
+      <div className="space-y-2 rounded-xl border border-border-subtle p-4">
+        <p className="text-sm font-medium">{i18nService.t('magpieExternalSettingsLink')}</p>
+        <p className="text-sm text-muted-foreground">
+          {i18nService.t('magpieExternalSettingsLinkHint')}
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setExternalAgentsOpen(true)}
+        >
+          {i18nService.t('magpieExternalSettingsLink')}
+        </Button>
+      </div>
+
+      <Dialog open={externalAgentsOpen} onOpenChange={setExternalAgentsOpen}>
+        <DialogContent className="theme-control-sizing-4 flex max-h-[min(44rem,calc(100dvh-2rem))] flex-col gap-4 overflow-hidden sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{i18nService.t('magpieTitle')}</DialogTitle>
+            <DialogDescription>{i18nService.t('magpieExternalPanelDescription')}</DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            {externalAgentsOpen ? <MagpieAgentsPanel /> : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {catalog && (
         <MagpieSubscriptionControl
           status={catalog.status}

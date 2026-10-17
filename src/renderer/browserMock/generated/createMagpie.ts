@@ -39,6 +39,36 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
         pending: false,
       };
     },
+    previewAgent: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.previewAgent');
+      return {
+        changes: [],
+      };
+    },
+    connectAgent: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.connectAgent');
+      return {
+        agents: [],
+        pending: false,
+      };
+    },
+    disconnectAgent: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.disconnectAgent');
+      return {
+        agents: [],
+        pending: false,
+      };
+    },
+    disconnectAllAgents: async () => {
+      runtime.warnOnce('magpie.disconnectAllAgents');
+      return {
+        agents: [],
+        pending: false,
+      };
+    },
     models: async () => {
       runtime.warnOnce('magpie.models');
       return [];

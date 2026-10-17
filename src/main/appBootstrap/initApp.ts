@@ -48,6 +48,7 @@ import { getCoworkImageRoot } from './coworkSessionImages';
 import { bindPiWorkbenchRuntimeForwarder } from './piUiForwarder';
 import { initMcpServers } from './mcpBootstrap';
 import { resolveDefaultAgentModelRef } from './messageTriage';
+import { ensureEmbeddedPiAgentDir } from '../libs/agentEngine/piAgentDir';
 import { handleDeepLink } from './communityAuth';
 import { getCronJobService } from '../ipcHandlers/scheduledTask';
 import { aisphereService, startAISphereGateway } from '../extensions/aisphere';
@@ -109,6 +110,9 @@ export const initApp = async (): Promise<void> => {
     await app.whenReady();
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
+    await ensureEmbeddedPiAgentDir(app.getPath('userData')).catch(error => {
+      console.error('[PiRuntime] Failed to prepare embedded Pi agent directory:', error);
+    });
     // 开发态写入带知远 .ico 的开始菜单快捷方式，任务栏按 AUMID 取图标。
     ensureWindowsTaskbarBrand();
 
