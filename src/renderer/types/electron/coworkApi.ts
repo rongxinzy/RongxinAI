@@ -264,6 +264,8 @@ export interface CoworkApi {
     options?: { messageLimit?: number | null },
   ) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;
   getRuntimeSnapshots: (sessionId?: string) => Promise<PiUiRuntimeSnapshot[]>;
+  /** Ask main to reseed live stream text after a delta gap or mid-stream attach. */
+  requestStreamResync: (sessionId: string) => Promise<boolean>;
   remoteManaged: (
     sessionId: string,
   ) => Promise<{ success: boolean; remoteManaged: boolean; error?: string }>;

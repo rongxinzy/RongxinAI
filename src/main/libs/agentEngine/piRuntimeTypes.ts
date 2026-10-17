@@ -8,6 +8,7 @@ import type { CoworkSessionInterruption } from '../../../shared/cowork/interrupt
 import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import type { PiPlanEntry } from './piPlanTool';
 import type { PiRunProgressEvent } from './piRunState';
+import type { UIMessageChunk } from 'ai';
 
 /**
  * Pi-native workbench runtime types (issue #225).
@@ -43,6 +44,13 @@ export interface PiRuntimeEvents {
   started: (sessionId: string) => void;
   message: (sessionId: string, message: CoworkMessage) => void;
   messageUpdate: (
+    sessionId: string,
+    messageId: string,
+    content: string,
+    metadata?: Record<string, unknown>,
+  ) => void;
+  uiStreamChunk: (sessionId: string, messageId: string, chunk: UIMessageChunk) => void;
+  uiStreamSnapshot: (
     sessionId: string,
     messageId: string,
     content: string,

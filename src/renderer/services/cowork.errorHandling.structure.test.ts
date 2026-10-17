@@ -4,11 +4,16 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 
 const source = readFileSync(fileURLToPath(new URL('./cowork.ts', import.meta.url)), 'utf8');
+// The Pi UI event listener body moved into the stream pipeline module.
+const pipelineSource = readFileSync(
+  fileURLToPath(new URL('./coworkStreamPipeline.ts', import.meta.url)),
+  'utf8',
+);
 
 test('deduplicates the unified stream error fallback against the canonical terminal message', () => {
-  const listenerStart = source.indexOf('const uiEventCleanup = cowork.onStreamUiEvent');
-  const listenerEnd = source.indexOf('this.streamListenerCleanups.push(uiEventCleanup);');
-  const listenerSource = source.slice(listenerStart, listenerEnd);
+  const listenerStart = pipelineSource.indexOf('handleUiEvent(rawEvent: unknown): void {');
+  const listenerEnd = pipelineSource.indexOf('    flush(): void {', listenerStart);
+  const listenerSource = pipelineSource.slice(listenerStart, listenerEnd);
 
   expect(listenerStart).toBeGreaterThanOrEqual(0);
   expect(listenerEnd).toBeGreaterThan(listenerStart);
