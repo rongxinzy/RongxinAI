@@ -234,11 +234,17 @@ export class PiRuntimeTurnRecovery {
       return true;
     }
     active.pendingError = null;
+    active.retryStreamReusePending = false;
     if (active.answerText.trim()) {
       this.host.transcript.finalizeMessage(sessionId, active, 'answer', active.answerText);
-      active.assistantMessageId = null;
-      active.answerText = '';
+    } else {
+      this.host.transcript.closeIdlePlaceholders(sessionId, active, { finalize: true });
     }
+    active.assistantMessageId = null;
+    active.thinkingMessageId = null;
+    active.answerText = '';
+    active.thinkingText = '';
+    this.host.transcript.clearPendingContextUsage(sessionId);
     this.surfaceTurnError(sessionId, active, pending.classified, pending.message);
     return false;
   }

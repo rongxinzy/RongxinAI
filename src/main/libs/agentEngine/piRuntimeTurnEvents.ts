@@ -173,11 +173,6 @@ export class PiRuntimeTurnEvents {
           active.thinkingLifecycle.reset();
           this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);
           setStreamedAssistantText(active.piTranslatorState, '');
-          for (const messageId of [active.assistantMessageId, active.thinkingMessageId].filter(
-            (id): id is string => Boolean(id),
-          )) {
-            this.host.emit('uiStreamSnapshot', sessionId, messageId, '');
-          }
         } else {
           // New turn → fresh answer + thinking messages, created lazily on first content.
           active.assistantMessageId = null;
@@ -429,11 +424,11 @@ export class PiRuntimeTurnEvents {
                 : classified,
             };
             active.turnFailed = true;
-            if (active.assistantMessageId || active.thinkingMessageId) {
-              active.retryStreamReusePending = true;
-            }
+            active.retryStreamReusePending = false;
+            const mayAutoRetry =
+              classified.kind === CoworkErrorKind.Unknown || isTransient(classified.kind);
             this.host.transcript.closeIdlePlaceholders(sessionId, active, {
-              finalize: !active.retryStreamReusePending,
+              finalize: !mayAutoRetry,
             });
             if (
               !active.errorSurfaced &&
@@ -654,6 +649,17 @@ export class PiRuntimeTurnEvents {
         active.toolStartedAtByCallId.clear();
         const clearActivity = active.toolActivityTracker.clear();
         if (clearActivity) this.host.emit('toolActivity', sessionId, clearActivity);
+        if (active.pendingError) {
+          const willRetry = (event as { willRetry?: boolean }).willRetry === true;
+          if (
+            willRetry &&
+            (active.assistantMessageId !== null || active.thinkingMessageId !== null)
+          ) {
+            active.retryStreamReusePending = true;
+          } else {
+            active.retryStreamReusePending = false;
+          }
+        }
         // Failed attempt (deferred error pending): do not continue the agent
         // loop, mark completed, or emit complete. flushPendingError surfaces
         // the error when the run settles (auto_retry_end / agent_settled).

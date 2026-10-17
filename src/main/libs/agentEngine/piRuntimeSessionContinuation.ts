@@ -314,6 +314,7 @@ export async function continuePiRuntimeSession(
   active.errorSurfaced = false;
   active.retryNoticeEmitted = false;
   active.retryAttempts = 0;
+  active.retryStreamReusePending = false;
   active.turnExperts = (
     host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.experts ?? []
   )

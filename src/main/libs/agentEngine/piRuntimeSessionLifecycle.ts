@@ -93,6 +93,8 @@ export function stopActivePiRuntimeSession(
   active.agentLoop.stop();
   // Drop any deferred error without surfacing it — the user stopped the turn.
   active.pendingError = null;
+  active.retryStreamReusePending = false;
+  host.transcript.clearPendingContextUsage(sessionId);
   active.toolStartedAtByCallId.clear();
   const clearActivity = active.toolActivityTracker.clear();
   if (clearActivity) host.emit('toolActivity', sessionId, clearActivity);

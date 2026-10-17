@@ -66,6 +66,16 @@ describe('GLM Pi replay fixtures', () => {
         for (const messageId of harness.answerMessageIds()) {
           expect(harness.displayed(messageId)).toBe(finalAnswer);
         }
+        const dbAssistants = harness
+          .dbMessages()
+          .filter(message => message.type === 'assistant' && message.content.trim().length > 0);
+        expect(dbAssistants.length).toBeGreaterThan(0);
+        expect(dbAssistants.at(-1)?.content).toBe(finalAnswer);
+        for (const message of harness.dbMessages()) {
+          if (message.metadata?.isStreaming === true) {
+            throw new Error(`DB message ${message.id} still marked streaming after settle`);
+          }
+        }
         const sessionEvents = harness.sessionIpcEvents();
         const contentPatches = sessionEvents.filter(
           event =>
@@ -85,6 +95,14 @@ describe('GLM Pi replay fixtures', () => {
     await replayFixture('glm-replay-thinking-duration', 'glm-fresh-pr1127.jsonl.gz', harness => {
       const thinking = harness.currentMessages().find(message => message.metadata?.isThinking);
       expect(thinking?.metadata?.thinkingDurationMs).toEqual(expect.any(Number));
+      const dbThinking = harness
+        .dbMessages()
+        .find(
+          message =>
+            message.type === 'assistant' &&
+            typeof message.metadata?.thinkingDurationMs === 'number',
+        );
+      expect(dbThinking?.metadata?.thinkingDurationMs).toEqual(expect.any(Number));
     });
   }, 120_000);
 
@@ -159,6 +177,16 @@ describe('GLM Pi replay fixtures', () => {
       expect(finalContent).toBe('Recovered');
       expect(harness.displayed(messageId)).toBe(finalContent);
       expect(Math.max(...lengthsDuringRetry)).toBeGreaterThan(lengthAfterError);
+      const dbAssistants = harness.dbMessages().filter(message => message.type === 'assistant');
+      expect(dbAssistants).toHaveLength(1);
+      expect(dbAssistants[0]?.content).toBe('Recovered');
+      expect(
+        harness.ipcEvents.some(
+          event =>
+            event.type === PiUiEventType.MessageUpdate &&
+            (event as { metadata?: { streamReopen?: boolean } }).metadata?.streamReopen === true,
+        ),
+      ).toBe(true);
     } finally {
       harness.dispose();
     }

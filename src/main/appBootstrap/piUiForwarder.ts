@@ -230,14 +230,12 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
       if (metadata?.streamReopen === true) {
         coalescer.flush();
         sessionByMessageId.set(messageId, sessionId);
-        const reopenMetadata = { ...metadata };
-        delete reopenMetadata.streamReopen;
         emitUiEvent({
           type: PiUiEventType.MessageUpdate,
           sessionId,
           messageId,
           content,
-          metadata: reopenMetadata,
+          metadata,
         });
         return;
       }

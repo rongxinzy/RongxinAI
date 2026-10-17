@@ -59,13 +59,17 @@ export class PiAssistantTranscript {
 
   /** Clears streaming/finalized bookkeeping so a retry can reuse the same ids. */
   reopenStreamingMessagesForRetry(sessionId: string, active: ActivePiSession): void {
-    for (const messageId of [active.assistantMessageId, active.thinkingMessageId].filter(
-      (id): id is string => Boolean(id),
-    )) {
+    for (const entry of [
+      { messageId: active.assistantMessageId, kind: 'answer' as const },
+      { messageId: active.thinkingMessageId, kind: 'thinking' as const },
+    ]) {
+      if (!entry.messageId) continue;
+      const messageId = entry.messageId;
       this.finalizedMessageIds.delete(messageId);
-      this.rememberStreamedContent(messageId, '');
+      const content = this.resolveStreamedContent(messageId, active, entry.kind);
+      this.rememberStreamedContent(messageId, content);
       const metadata =
-        messageId === active.thinkingMessageId
+        entry.kind === 'thinking'
           ? { isStreaming: true, isFinal: false, isThinking: true, streamReopen: true }
           : { isStreaming: true, isFinal: false, streamReopen: true };
       if (this.host.getStore()) {
@@ -74,12 +78,16 @@ export class PiAssistantTranscript {
           .updateMessage(
             sessionId,
             messageId,
-            { content: '', metadata },
+            { metadata },
             { touchUpdatedAt: false },
           );
       }
-      this.host.emitMessageUpdate(sessionId, messageId, '', metadata);
+      this.host.emitMessageUpdate(sessionId, messageId, content, metadata);
     }
+  }
+
+  clearPendingContextUsage(sessionId: string): void {
+    this.pendingContextUsageBySession.delete(sessionId);
   }
 
   /** Runs at most one deferred context-usage sync per session per settled turn. */
@@ -349,6 +357,7 @@ export class PiAssistantTranscript {
     startupLatency?: PiStartupLatency,
   ): void {
     if (!messageId) return;
+    this.flushContextUsageSync(sessionId);
     this.pendingContextUsageBySession.set(sessionId, {
       messageId,
       piUsage,
@@ -598,6 +607,7 @@ export class PiAssistantTranscript {
   clearThrottleStateBySession(sessionId: string, flush: boolean): void {
     for (const [messageId, owner] of this.throttleSessionByMessageId) {
       if (owner !== sessionId) continue;
+      this.finalizedMessageIds.delete(messageId);
       if (flush) {
         const pendingStore = this.pendingStoreUpdate.get(messageId);
         if (pendingStore && this.host.getStore()) {
