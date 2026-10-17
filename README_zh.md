@@ -84,18 +84,18 @@
 
 ## 选择一套喜欢的界面
 
-知远提供 **Codex**、**大明风华**、**长安风物** 与 **未央金石** 四套主题。Codex 使用中性色与紧凑控件；大明风华以纸白、朱红与墨色为主；长安风物采用绢白、孔雀青、暖金和圆润控件，并提供墨青色的夜间外观；未央金石采用黑金、石白与静态云气纹。
+知远当前内置一套主题插件 **Zenith**，提供 **浅色** 与 **深色** 两种外观。Zenith 是面向桌面效率的未来感设计体系：轻量玻璃质感、清晰字阶、紧凑留白，以及统一定义背景、控件 recipe 与交互状态的语义 token。
 
-在「设置 → 外观」直接选择主题预览卡片，再选择浅色、深色或跟随系统。所有卡片随模式同步更新。背景、纹理、字体、圆角、控件与交互状态由整套主题统一定义。
+在「设置 → 外观」中选择 Zenith 预览卡片（仅注册一套主题时仍保留该入口），再选择浅色、深色或跟随系统；预览会随模式同步更新。仍保存旧主题 ID（Codex、大明风华、长安风物、未央金石等）的配置会自动回落到 Zenith。
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/theme-previews/appearance-settings-dark.png">
-    <img src="docs/theme-previews/appearance-settings-light.png" alt="外观设置组件：上方选择主题预览卡片，下方统一切换明暗模式" width="760">
+    <img src="docs/theme-previews/appearance-settings-light.png" alt="外观设置：Zenith 风格预览卡片与浅色、深色、跟随系统切换" width="760">
   </picture>
 </p>
 
-主题作者可从[主题开发文档](src/renderer/theme/README.md)和[设计规范](DESIGN.md)开始。主题包提供展示数据，业务组件继续负责交互与状态。
+若要新增可打包的主题插件，可从[主题开发文档](src/renderer/theme/README.md)和[设计规范](DESIGN.md)开始。主题包提供展示数据，业务组件继续负责交互与状态。
 
 ## 开发者快速开始
 
