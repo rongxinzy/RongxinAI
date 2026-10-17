@@ -134,9 +134,13 @@ export class PiStreamAccumulator {
     event: PiAssistantMessageEvent | undefined,
     snapshotMessage?: PiStreamMessage,
   ): PiStreamSnapshot {
-    // Embedded AgentSession events still provide an accumulating partial
-    // message. Prefer it when present so mixed thinking/text blocks cannot be
-    // missed; JSON/RPC delta-only consumers fall through to the reducer below.
+    // Pi 1.x emits fine-grained deltas alongside a shared partial message that
+    // may already include the delta (and sometimes more). When a delta is
+    // present, apply ONLY the delta — never the live snapshot.
+    if (event && this.eventUsesDeltaOnly(event)) {
+      return this.applyDeltaEvent(event, snapshotMessage);
+    }
+    // Delta-less updates (legacy cumulative snapshots) still replace from message.
     if (this.hasUsableSnapshot(snapshotMessage)) {
       this.replaceFromSnapshot(snapshotMessage);
       return this.snapshot();
@@ -145,6 +149,20 @@ export class PiStreamAccumulator {
       return this.snapshot();
     }
 
+    return this.applyDeltaEvent(event, snapshotMessage);
+  }
+
+  private eventUsesDeltaOnly(event: PiAssistantMessageEvent): boolean {
+    return (
+      event.type === PiAssistantEventType.TextDelta ||
+      event.type === PiAssistantEventType.ThinkingDelta
+    );
+  }
+
+  private applyDeltaEvent(
+    event: PiAssistantMessageEvent,
+    snapshotMessage?: PiStreamMessage,
+  ): PiStreamSnapshot {
     const contentIndex = event.contentIndex ?? 0;
     switch (event.type) {
       case PiAssistantEventType.Start:

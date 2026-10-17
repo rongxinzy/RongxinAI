@@ -32,6 +32,8 @@ import {
 } from './piImageInputFallback';
 import { getPiPreparingToolActivity, toToolActivityInput } from './toolActivity';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
+import { clonePiStreamMessage } from './piStreamMessageClone';
+import { syncPiToolResultDisplayText } from './piToolResultDisplayText';
 import { resolveCoworkStreamMessageId } from './piStreamChunkEmit';
 import type { PiSessionEvent } from './piTranslate/piEvents';
 import {
@@ -138,15 +140,6 @@ export class PiRuntimeTurnEvents {
   handlePiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
     // Late events from an aborted turn must not touch state.
     if (active.aborted) return;
-    // Debug: log all Pi events to diagnose frontend rendering issues
-    if (event.type !== 'message_update') {
-      console.log(
-        '[PiRuntime] Event:',
-        event.type,
-        event.message?.role ? `role=${event.message.role}` : '',
-        event.message?.stopReason ? `stopReason=${event.message.stopReason}` : '',
-      );
-    }
     switch (event.type) {
       case 'agent_start':
         active.isRunning = true;
@@ -170,14 +163,23 @@ export class PiRuntimeTurnEvents {
           const clearActivity = active.toolActivityTracker.clear();
           if (clearActivity) this.host.emit('toolActivity', sessionId, clearActivity);
         }
-        // New turn → fresh answer + thinking messages, created lazily on first content.
-        active.assistantMessageId = null;
-        active.thinkingMessageId = null;
-        active.answerText = '';
-        active.thinkingText = '';
-        active.streamAccumulator.reset();
+        if (active.retryStreamReusePending) {
+          // Auto-retry continues in the same assistant/thinking bubbles.
+          active.retryStreamReusePending = false;
+          active.answerText = '';
+          active.thinkingText = '';
+          active.streamAccumulator.reset();
+          active.thinkingLifecycle.reset();
+        } else {
+          // New turn → fresh answer + thinking messages, created lazily on first content.
+          active.assistantMessageId = null;
+          active.thinkingMessageId = null;
+          active.answerText = '';
+          active.thinkingText = '';
+          active.streamAccumulator.reset();
+          active.thinkingLifecycle.reset();
+        }
         this.emitTranslatedPiEvent(sessionId, active, { type: 'turn_start' });
-        active.thinkingLifecycle.reset();
         break;
 
       case 'message_start':
@@ -225,11 +227,14 @@ export class PiRuntimeTurnEvents {
         // for older cumulative snapshots, then reconcile against message_end.
         const priorAnswer = active.answerText;
         const priorThinking = active.thinkingText;
+        const segmentEventType = event.assistantMessageEvent?.type;
+        const deltaOnlyUpdate =
+          segmentEventType === PiAssistantEventType.TextDelta ||
+          segmentEventType === PiAssistantEventType.ThinkingDelta;
         const { text, thinking } = active.streamAccumulator.update(
           event.assistantMessageEvent,
-          event.message,
+          deltaOnlyUpdate ? undefined : clonePiStreamMessage(event.message),
         );
-        const segmentEventType = event.assistantMessageEvent?.type;
         const thinkingEnded = segmentEventType === PiAssistantEventType.ThinkingEnd;
         if (segmentEventType === PiAssistantEventType.ThinkingDelta) {
           active.thinkingLifecycle.start();
@@ -371,7 +376,9 @@ export class PiRuntimeTurnEvents {
           if (event.message.stopReason === 'error') {
             // The turn was already reported as failed (non-retryable error).
             if (active.errorSurfaced) return;
-            const { text, thinking } = active.streamAccumulator.reconcile(event.message);
+            const { text, thinking } = active.streamAccumulator.reconcile(
+              clonePiStreamMessage(event.message),
+            );
             if (thinking && thinking !== active.thinkingText) {
               active.thinkingText = thinking;
               active.thinkingLifecycle.markContentStreaming();
@@ -415,8 +422,9 @@ export class PiRuntimeTurnEvents {
                 : classified,
             };
             active.turnFailed = true;
-            // A failed turn leaves its bubble behind too; a retry streams into the
-            // same id and flips the flag back on by itself.
+            if (active.assistantMessageId || active.thinkingMessageId) {
+              active.retryStreamReusePending = true;
+            }
             this.host.transcript.closeIdlePlaceholders(sessionId, active);
             if (
               !active.errorSurfaced &&
@@ -440,10 +448,6 @@ export class PiRuntimeTurnEvents {
               // Pi snapshot still advertises image input, so their own `read`
               // would send the payload this server just refused.
               void this.host.syncImageInputCapability();
-              console.log(
-                '[DBG mark]',
-                JSON.stringify(this.host.imageCapabilityConfiguration(active)),
-              );
               if (carriedImages) {
                 active.imageRetryPending = true;
                 active.imageRejectionHandled = true;
@@ -463,7 +467,9 @@ export class PiRuntimeTurnEvents {
             active.turnFailed = false;
           }
 
-          const { text, thinking } = active.streamAccumulator.reconcile(event.message);
+          const { text, thinking } = active.streamAccumulator.reconcile(
+            clonePiStreamMessage(event.message),
+          );
           const finalThinking = thinking || active.thinkingText;
           const finalAnswer = text || active.answerText;
 
@@ -572,7 +578,7 @@ export class PiRuntimeTurnEvents {
         if (removeActivity) this.host.emit('toolActivity', sessionId, removeActivity);
         // Avoid duplicate result for the same call.
         if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
-        const resultText = event.displayResultText ?? '';
+        const resultText = event.displayResultText ?? syncPiToolResultDisplayText(event.result);
         const resultIsError = Boolean(event.isError) || extractToolResultIsError(event.result);
         agentResourceDiagnostics.recordPiToolResult(sessionId, resultText.length * 2);
         if (active.workbenchRunId) {
@@ -693,6 +699,9 @@ export class PiRuntimeTurnEvents {
           });
           break;
         }
+        if (active.assistantMessageId || active.thinkingMessageId) {
+          active.retryStreamReusePending = true;
+        }
         // Pi is retrying after an error. Retrying is invisible otherwise — the
         // failed attempt is deferred until the run settles — so the user is told
         // once per turn that the model answered with an error.
@@ -735,10 +744,7 @@ export class PiRuntimeTurnEvents {
         break;
 
       default:
-        // Silently ignore unknown/internal events
-        if (event.type && !event.type.startsWith('_')) {
-          console.log('[PiRuntime] Unhandled event type:', event.type);
-        }
+        break;
     }
   }
 

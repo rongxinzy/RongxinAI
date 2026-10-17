@@ -37,6 +37,18 @@ test('orders multiple text segments by content index', () => {
   ).toEqual({ text: 'first second', thinking: '' });
 });
 
+test('ignores a leading partial snapshot when a text delta is present', () => {
+  const accumulator = new PiStreamAccumulator();
+  accumulator.update({ type: PiAssistantEventType.TextDelta, contentIndex: 0, delta: 'abc' });
+  expect(
+    accumulator.update(
+      { type: PiAssistantEventType.TextDelta, contentIndex: 0, delta: 'def' },
+      { content: [{ type: 'text', text: 'abcdefg' }] },
+    ),
+  ).toEqual({ text: 'abcdef', thinking: '' });
+  expect(accumulator.lastUpdateAppendedOnly('text', 3)).toBe(true);
+});
+
 test('uses a legacy cumulative snapshot when no delta is available', () => {
   const accumulator = new PiStreamAccumulator();
 

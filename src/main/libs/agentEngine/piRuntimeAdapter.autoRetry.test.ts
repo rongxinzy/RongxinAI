@@ -99,6 +99,83 @@ describe('PiRuntimeAdapter', () => {
       adapter.on('complete', sessionId => completes.push(sessionId));
     });
 
+    it('reuses one assistant bubble after partial streaming and a 503 auto-retry', async () => {
+      const sessionMessages: Array<Record<string, unknown>> = [];
+      mockStore.getSession.mockImplementation(() => ({
+        messages: sessionMessages,
+      }));
+      mockStore.addMessage.mockImplementation(
+        (_sessionId: string, message: Record<string, unknown>) => {
+          const stored = {
+            ...message,
+            id: (message.id as string) ?? `msg-${sessionMessages.length}`,
+          };
+          sessionMessages.push(stored);
+          return stored;
+        },
+      );
+      mockStore.updateMessage.mockImplementation(
+        (_sessionId: string, messageId: string, patch: Record<string, unknown>) => {
+          const row = sessionMessages.find(item => item.id === messageId);
+          if (!row) return;
+          if (patch.content !== undefined) row.content = patch.content;
+          if (patch.metadata !== undefined) {
+            row.metadata = { ...(row.metadata as Record<string, unknown>), ...patch.metadata };
+          }
+        },
+      );
+
+      await adapter.startSession('test', 'Hi');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'partial answer content' }] },
+        assistantMessageEvent: {
+          type: 'text_delta',
+          contentIndex: 0,
+          delta: 'partial answer content',
+        },
+      });
+      const firstAssistantId = sessionMessages.find(message => message.type === 'assistant')?.id as
+        | string
+        | undefined;
+      expect(firstAssistantId).toBeTruthy();
+
+      failedAttempt('503 Service Unavailable');
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Final recovered answer' }],
+        },
+        assistantMessageEvent: {
+          type: 'text_delta',
+          contentIndex: 0,
+          delta: 'Final recovered answer',
+        },
+      });
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Final recovered answer' }],
+          stopReason: 'stop',
+        },
+      });
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'auto_retry_end', success: true, attempt: 1 });
+      listener!({ type: 'agent_settled' });
+
+      const assistantRows = sessionMessages.filter(message => message.type === 'assistant');
+      expect(assistantRows).toHaveLength(1);
+      expect(assistantRows[0]?.id).toBe(firstAssistantId);
+      expect(assistantRows[0]?.content).toBe('Final recovered answer');
+      expect(emittedMessages.filter(message => message.type === 'assistant')).toHaveLength(1);
+      expect(completes).toEqual(['test']);
+    });
+
     it('surfaces no error when an auto-retry succeeds', async () => {
       await adapter.startSession('test', 'Hi');
 

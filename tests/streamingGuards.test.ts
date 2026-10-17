@@ -152,6 +152,7 @@ describe('streaming guards (Cowork end-to-end IPC pipeline)', () => {
       expect(streamingBytes).toBeLessThanOrEqual(
         Math.round(1.3 * bodyBytes) + 400 * streaming.length,
       );
+      expect(streamingBytes / bodyCodePoints).toBeLessThan(80);
 
       // (e) Terminal snapshots are rare and bounded (message_end full state and
       // turn-completion bookkeeping only).

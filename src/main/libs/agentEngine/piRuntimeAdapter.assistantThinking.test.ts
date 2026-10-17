@@ -103,8 +103,10 @@ describe('PiRuntimeAdapter', () => {
         'test',
         placeholder?.id,
         expect.objectContaining({
+          content: '\n\n',
           metadata: expect.objectContaining({ isStreaming: false, isFinal: true }),
         }),
+        expect.objectContaining({ touchUpdatedAt: false }),
       );
       // The persisted row is what any later session load reads.
       const persisted = stored.find(message => message.id === placeholder?.id);
@@ -143,8 +145,16 @@ describe('PiRuntimeAdapter', () => {
         assistantMessageEvent: { type: 'thinking_delta', delta: 'Still inspecting' },
         message: {
           role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'Inspecting context Still inspecting' }],
+        },
+      });
+      listener!({
+        type: 'message_update',
+        assistantMessageEvent: { type: 'text_delta', contentIndex: 1, delta: 'Visible answer' },
+        message: {
+          role: 'assistant',
           content: [
-            { type: 'thinking', thinking: 'Inspecting context further' },
+            { type: 'thinking', thinking: 'Inspecting context Still inspecting' },
             { type: 'text', text: 'Visible answer' },
           ],
         },
