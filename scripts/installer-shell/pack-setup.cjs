@@ -254,7 +254,8 @@ try {
     path.join(path.dirname(shellExe), 'setup-size.json'),
     `${JSON.stringify(sizeReport, null, 2)}\n`,
   );
-  if (componentArchiveBytes !== null) assertSetupBudget(unsignedSetupBytes, componentArchiveBytes, setupBudgetEdition);
+  if (componentArchiveBytes !== null)
+    assertSetupBudget(unsignedSetupBytes, componentArchiveBytes, setupBudgetEdition);
   const outPath = path.resolve(outArg || `ZhiYuanAgent-Setup-${packageVersion}.exe`);
   appendPayload(shellExe, payloadZip, outPath, { maxBytes: setupBudget.maxInstallerBytes });
   const report = writeSetupManifest(outPath, packageVersion, {
