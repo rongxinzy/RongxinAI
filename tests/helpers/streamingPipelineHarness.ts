@@ -298,6 +298,8 @@ export interface CreateStreamingHarnessOptions {
   /** Prompt passed to adapter.startSession; default 'Hi'. */
   prompt?: string;
   delivery?: DeliveryControls | null;
+  /** When true, binds a real in-memory CoworkStore (for DB assertions). */
+  useSqliteStore?: boolean;
 }
 
 export class StreamingHarness {
@@ -332,12 +334,14 @@ export class StreamingHarness {
   private frameIndex = 0;
   private disposed = false;
   private coworkStoreHandle: HarnessCoworkStoreHandle | null = null;
+  private readonly useSqliteStore: boolean;
 
   /** @internal — use createStreamingHarness(). */
   constructor(options: CreateStreamingHarnessOptions) {
     this.sessionId = options.sessionId;
     this.prompt = options.prompt ?? 'Hi';
     this.deliveryControls = options.delivery ?? null;
+    this.useSqliteStore = options.useSqliteStore === true;
 
     this.store = createHarnessStore();
     this.store.dispatch(setCurrentSession(buildHarnessSession(options.sessionId)));
@@ -383,9 +387,11 @@ export class StreamingHarness {
   /** @internal — invoked by createStreamingHarness after construction. */
   async start(): Promise<void> {
     ensureForwarderBound(adapter);
-    this.coworkStoreHandle = createHarnessCoworkStore();
-    ensureHarnessCoworkSession(this.coworkStoreHandle.store, this.sessionId, 'chat');
-    adapter.setCoworkStore(this.coworkStoreHandle.store);
+    if (this.useSqliteStore) {
+      this.coworkStoreHandle = createHarnessCoworkStore();
+      ensureHarnessCoworkSession(this.coworkStoreHandle.store, this.sessionId, 'chat');
+      adapter.setCoworkStore(this.coworkStoreHandle.store);
+    }
     this.messageUpdateCounter = messageUpdateCounterFor(adapter);
     mockSession.subscribe.mockImplementation((callback: (event: unknown) => void) => {
       this.piListener = callback;

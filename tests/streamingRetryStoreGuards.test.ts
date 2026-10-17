@@ -1,12 +1,12 @@
 /**
  * Store-backed guards for auto-retry stream reuse and non-retryable error turns.
  */
-import './src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
+import '../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import {
   adapter,
   mockSession,
   setupPiRuntimeAdapterSuite,
-} from './src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
+} from '../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import { createHarnessCoworkStore, ensureHarnessCoworkSession } from './helpers/harnessCoworkStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 

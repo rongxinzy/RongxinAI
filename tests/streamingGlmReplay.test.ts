@@ -32,7 +32,7 @@ async function replayFixture(
   const events = glmReplayEvents(fixtureName);
   const expectedFinal = expectedFinalAssistantText(events);
   expect(expectedFinal.length).toBeGreaterThan(0);
-  const harness = await createStreamingHarness({ sessionId });
+  const harness = await createStreamingHarness({ sessionId, useSqliteStore: true });
   try {
     const answerIds = (): string[] => harness.answerMessageIds();
     harness.onFrame(() => {
@@ -107,7 +107,10 @@ describe('GLM Pi replay fixtures', () => {
   }, 120_000);
 
   it('auto-retry keeps one bubble and growing text during the retry', async () => {
-    const harness = await createStreamingHarness({ sessionId: 'glm-replay-retry' });
+    const harness = await createStreamingHarness({
+      sessionId: 'glm-replay-retry',
+      useSqliteStore: true,
+    });
     try {
       const scripted: unknown[] = [
         { type: 'turn_start' },
