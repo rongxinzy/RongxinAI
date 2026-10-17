@@ -109,6 +109,33 @@ test('mount polls status only and does not start the service or load agents', as
   expect(api.connectAgent).not.toHaveBeenCalled();
 });
 
+test('does not load agents when status becomes running until explicit refresh', async () => {
+  api.status
+    .mockResolvedValueOnce({ state: 'stopped', version: 'test' })
+    .mockResolvedValue({ state: 'running', version: 'test', gatewayUrl: 'http://127.0.0.1:1' });
+  render(<MagpieAgentsPanel />);
+  expect(await screen.findByText('magpieExternalServiceRequired')).toBeVisible();
+  await waitFor(() => expect(screen.getByText('magpieExternalKeepRunningNotice')).toBeVisible(), {
+    timeout: 5000,
+  });
+  expect(api.agents).not.toHaveBeenCalled();
+});
+
+test('blocks a second refresh while the first agent load is still in flight', async () => {
+  let resolveAgents!: (value: MagpieAgents) => void;
+  api.agents.mockImplementation(
+    () =>
+      new Promise<MagpieAgents>(resolve => {
+        resolveAgents = resolve;
+      }),
+  );
+  render(<MagpieAgentsPanel />);
+  await refreshAgents();
+  fireEvent.click(screen.getAllByRole('button', { name: 'magpieRefreshManagement' })[0]!);
+  expect(api.agents).toHaveBeenCalledTimes(1);
+  await act(async () => resolveAgents({ agents: [], pending: false }));
+});
+
 test('loads agents only after explicit refresh while the service is running', async () => {
   api.agents.mockResolvedValue(fiveAgents());
   render(<MagpieAgentsPanel />);

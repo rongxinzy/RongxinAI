@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const STASH_ROOT = 'host-agent-stash';
+const OPENCODE_STASH_NAME = 'opencode-merge.json';
 
 export function canonicalHostAgentId(agentId: string): string {
   const id = agentId.trim().toLowerCase();
@@ -33,6 +34,10 @@ function userOpenCodeConfig(home: string): string {
   return path.join(home, '.config', 'opencode', 'opencode.json');
 }
 
+function opencodeStashPath(privateHome: string): string {
+  return path.join(privateHome, STASH_ROOT, OPENCODE_STASH_NAME);
+}
+
 async function pathExists(target: string): Promise<boolean> {
   try {
     await fs.access(target);
@@ -42,71 +47,125 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
-async function copyFileEnsuringDir(from: string, to: string): Promise<void> {
-  await fs.mkdir(path.dirname(to), { recursive: true });
-  await fs.copyFile(from, to);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-async function copyTree(from: string, to: string): Promise<void> {
-  await fs.cp(from, to, { recursive: true, force: true, errorOnExist: false });
+function parseJsonObject(text: string, label: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(text);
+  if (!isRecord(parsed)) throw new Error(`${label} must be a JSON object`);
+  return parsed;
 }
 
-async function snapshotDirectoryTree(source: string, destination: string): Promise<void> {
-  if (!(await pathExists(source))) {
-    await fs.rm(destination, { recursive: true, force: true });
-    return;
-  }
-  await fs.rm(destination, { recursive: true, force: true });
-  await copyTree(source, destination);
-}
+type OpenCodeMergeStash = {
+  hadFile: boolean;
+  addedProviderKeys: string[];
+  replacedProviderValues: Record<string, unknown>;
+  changedModel: boolean;
+  hadModelKey: boolean;
+  modelBefore?: unknown;
+};
 
-async function restoreDirectoryTree(snapshot: string, target: string): Promise<void> {
-  await fs.rm(target, { recursive: true, force: true });
-  if (await pathExists(snapshot)) {
-    await copyTree(snapshot, target);
-  }
-}
-
-function hostStashDir(privateHome: string, agentId: string): string {
-  return path.join(privateHome, STASH_ROOT, agentId);
-}
-
-export async function snapshotAgentHostTrees(
-  privateHome: string,
-  agentId: string,
-  home: string,
-): Promise<void> {
-  const canonical = canonicalHostAgentId(agentId);
-  const roots = userAgentConfigRoots(home)[canonical];
-  if (!roots) return;
-  const stash = hostStashDir(privateHome, canonical);
-  await fs.rm(stash, { recursive: true, force: true });
-  for (const root of roots) {
-    const name = path.basename(root);
-    await snapshotDirectoryTree(root, path.join(stash, name));
+/** Remove legacy whole-tree snapshots; never store credentials or full agent dirs. */
+export async function clearLegacyHostAgentStorage(privateHome: string): Promise<void> {
+  const legacy = path.join(privateHome, STASH_ROOT);
+  if (!(await pathExists(legacy))) return;
+  const entries = await fs.readdir(legacy, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name === OPENCODE_STASH_NAME) continue;
+    await fs.rm(path.join(legacy, entry.name), { recursive: true, force: true });
   }
 }
 
-export async function restoreAgentHostTrees(
-  privateHome: string,
-  agentId: string,
-  home: string,
-): Promise<void> {
-  const canonical = canonicalHostAgentId(agentId);
-  const roots = userAgentConfigRoots(home)[canonical];
-  if (!roots) return;
-  const stash = hostStashDir(privateHome, canonical);
-  for (const root of roots) {
-    const name = path.basename(root);
-    await restoreDirectoryTree(path.join(stash, name), root);
-  }
-}
-
-/** Magpie writes OpenCode under app-private XDG; mirror into the user's real config. */
-export async function mirrorOpenCodeConfigToUser(privateHome: string, home: string): Promise<void> {
+/** Merge magpie OpenCode provider entries and model into the user's config without replacing the file. */
+export async function mergeOpenCodeConfigToUser(privateHome: string, home: string): Promise<void> {
+  await clearLegacyHostAgentStorage(privateHome);
   const from = privateOpenCodeConfig(privateHome);
   if (!(await pathExists(from))) return;
-  await copyFileEnsuringDir(from, userOpenCodeConfig(home));
+
+  const magpie = parseJsonObject(await fs.readFile(from, 'utf8'), 'Magpie OpenCode config');
+  const userPath = userOpenCodeConfig(home);
+  const hadFile = await pathExists(userPath);
+  const user = hadFile
+    ? parseJsonObject(await fs.readFile(userPath, 'utf8'), 'User OpenCode config')
+    : {};
+
+  const magpieProvider = isRecord(magpie.provider) ? magpie.provider : {};
+  const userProvider = isRecord(user.provider) ? { ...user.provider } : {};
+
+  const stash: OpenCodeMergeStash = {
+    hadFile,
+    addedProviderKeys: [],
+    replacedProviderValues: {},
+    changedModel: false,
+    hadModelKey: Object.prototype.hasOwnProperty.call(user, 'model'),
+  };
+  if (stash.hadModelKey) stash.modelBefore = user.model;
+
+  for (const [key, value] of Object.entries(magpieProvider)) {
+    if (!Object.prototype.hasOwnProperty.call(userProvider, key)) {
+      stash.addedProviderKeys.push(key);
+      userProvider[key] = value;
+    } else if (JSON.stringify(userProvider[key]) !== JSON.stringify(value)) {
+      stash.replacedProviderValues[key] = userProvider[key];
+      userProvider[key] = value;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(magpie, 'model')) {
+    stash.changedModel = true;
+    if (!stash.hadModelKey) stash.modelBefore = undefined;
+    user.model = magpie.model;
+  }
+
+  if (Object.keys(userProvider).length > 0) user.provider = userProvider;
+  else delete user.provider;
+
+  await fs.mkdir(path.dirname(userPath), { recursive: true });
+  await fs.writeFile(userPath, `${JSON.stringify(user, null, 2)}\n`, 'utf8');
+  await fs.mkdir(path.dirname(opencodeStashPath(privateHome)), { recursive: true });
+  await fs.writeFile(opencodeStashPath(privateHome), `${JSON.stringify(stash, null, 2)}\n`, 'utf8');
+}
+
+export async function revertOpenCodeConfigFromUser(
+  privateHome: string,
+  home: string,
+): Promise<void> {
+  const stashPath = opencodeStashPath(privateHome);
+  if (!(await pathExists(stashPath))) return;
+
+  const stash = JSON.parse(await fs.readFile(stashPath, 'utf8')) as OpenCodeMergeStash;
+  const userPath = userOpenCodeConfig(home);
+
+  if (!stash.hadFile) {
+    if (await pathExists(userPath)) await fs.rm(userPath, { force: true });
+    await fs.rm(stashPath, { force: true });
+    return;
+  }
+
+  if (!(await pathExists(userPath))) {
+    await fs.rm(stashPath, { force: true });
+    return;
+  }
+
+  const user = parseJsonObject(await fs.readFile(userPath, 'utf8'), 'User OpenCode config');
+  const userProvider = isRecord(user.provider) ? { ...user.provider } : {};
+
+  for (const key of stash.addedProviderKeys) delete userProvider[key];
+  for (const [key, value] of Object.entries(stash.replacedProviderValues)) {
+    userProvider[key] = value;
+  }
+
+  if (Object.keys(userProvider).length > 0) user.provider = userProvider;
+  else delete user.provider;
+
+  if (stash.changedModel) {
+    if (stash.hadModelKey) user.model = stash.modelBefore;
+    else delete user.model;
+  }
+
+  await fs.writeFile(userPath, `${JSON.stringify(user, null, 2)}\n`, 'utf8');
+  await fs.rm(stashPath, { force: true });
 }
 
 /** Fallback when upstream disconnect leaves Codex provider debris. */
@@ -118,14 +177,19 @@ export async function stripCodexMagpieProviderBlock(home: string): Promise<void>
   const out: string[] = [];
   let skipping = false;
   for (const line of lines) {
-    if (/^\[model_providers\.magpie\]/.test(line.trim())) {
+    const trimmed = line.trim();
+    if (/^\[model_providers\.magpie\]/.test(trimmed)) {
       skipping = true;
       continue;
     }
-    if (skipping && /^\[/.test(line.trim())) skipping = false;
-    if (!skipping) out.push(line);
+    if (skipping && /^\[/.test(trimmed)) skipping = false;
+    if (skipping) continue;
+    if (/^magpie[_a-z]*\s*=/.test(trimmed)) continue;
+    out.push(line);
   }
-  const next = out.join('\n');
+  let next = out.join('\n');
+  while (next.endsWith('\n\n')) next = next.slice(0, -1);
+  if (!next.endsWith('\n') && original.endsWith('\n')) next = `${next}\n`;
   if (next !== original) await fs.writeFile(configPath, next, 'utf8');
 }
 
@@ -146,17 +210,7 @@ export async function collectDirectorySnapshot(root: string): Promise<Map<string
   return out;
 }
 
-export function assertDirectorySnapshotsEqual(
-  before: Map<string, Buffer>,
-  after: Map<string, Buffer>,
-  label: string,
-): void {
-  const keys = new Set([...before.keys(), ...after.keys()]);
-  for (const key of keys) {
-    const left = before.get(key);
-    const right = after.get(key);
-    if (!left || !right || !left.equals(right)) {
-      throw new Error(`Host config drift for ${label} at ${key}`);
-    }
-  }
+export async function readFileIfExists(filePath: string): Promise<Buffer | null> {
+  if (!(await pathExists(filePath))) return null;
+  return fs.readFile(filePath);
 }

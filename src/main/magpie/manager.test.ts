@@ -411,6 +411,41 @@ describe('Magpie owned lifecycle', () => {
     }
   });
 
+  it('disconnectAll is a no-op when no managed agents are wired', async () => {
+    const { manager, root, fetcher } = await setup();
+    try {
+      await manager.start();
+      const prior = fetcher.getMockImplementation();
+      fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url.includes('/api/agents/disconnect/')) {
+          throw new Error('unexpected disconnect call');
+        }
+        if (url.endsWith('/api/state')) {
+          return Response.json({
+            settings: {},
+            agents: [
+              {
+                id: 'codex',
+                name: 'Codex',
+                wired: false,
+                fields: [{ key: 'model', label: 'Model', value: 'm1', options: [] }],
+              },
+            ],
+          });
+        }
+        return prior!(url, init);
+      });
+      fetcher.mockClear();
+      await manager.disconnectAllAgents();
+      expect(fetcher.mock.calls.some(([url]) => url.includes('/api/agents/disconnect/'))).toBe(
+        false,
+      );
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('runs diagnostics and measures gateway latency', async () => {
     const { manager, root } = await setup();
     try {

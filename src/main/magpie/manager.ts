@@ -32,10 +32,10 @@ import { MAGPIE_VERSION, verifyMagpieBinary } from './integrity';
 import type { MagpieAgentConnectPreview } from '../../shared/magpie/types';
 import { formatMagpieManagementError } from './managementErrors';
 import {
-  mirrorOpenCodeConfigToUser,
+  clearLegacyHostAgentStorage,
+  mergeOpenCodeConfigToUser,
+  revertOpenCodeConfigFromUser,
   resolveUserHome,
-  restoreAgentHostTrees,
-  snapshotAgentHostTrees,
   stripCodexMagpieProviderBlock,
   canonicalHostAgentId,
 } from './externalAgentHostConfig';
@@ -733,16 +733,26 @@ export class MagpieManager {
   }
 
   private async finalizeHostConnect(agentId: string): Promise<void> {
-    const home = this.userHome();
-    if (canonicalHostAgentId(agentId) === 'opencode') {
-      await mirrorOpenCodeConfigToUser(this.options.privateHome, home);
-    }
+    if (canonicalHostAgentId(agentId) !== 'opencode') return;
+    await mergeOpenCodeConfigToUser(this.options.privateHome, this.userHome());
   }
 
   private async finalizeHostDisconnect(agentId: string): Promise<void> {
+    const canonical = canonicalHostAgentId(agentId);
     const home = this.userHome();
-    await restoreAgentHostTrees(this.options.privateHome, agentId, home);
-    if (canonicalHostAgentId(agentId) === 'codex') await stripCodexMagpieProviderBlock(home);
+    if (canonical === 'opencode')
+      await revertOpenCodeConfigFromUser(this.options.privateHome, home);
+    if (canonical === 'codex') await stripCodexMagpieProviderBlock(home);
+    await clearLegacyHostAgentStorage(this.options.privateHome);
+  }
+
+  private wiredManagedAgentIds(agents: MagpieAgents): string[] {
+    const ids = new Set<string>();
+    for (const agent of agents.agents) {
+      if (!agent.wired || !isMagpieManagedAgentId(agent.id)) continue;
+      ids.add(canonicalHostAgentId(agent.id));
+    }
+    return [...ids];
   }
 
   async previewAgent(agentId: string): Promise<MagpieAgentConnectPreview> {
@@ -752,9 +762,7 @@ export class MagpieManager {
 
   async connectAgent(agentId: string): Promise<MagpieAgents> {
     await this.ensureRunning();
-    if (isMagpieManagedAgentId(agentId)) {
-      await snapshotAgentHostTrees(this.options.privateHome, agentId, this.userHome());
-    }
+    await clearLegacyHostAgentStorage(this.options.privateHome);
     await magpieAgentConnect(this.agentClient(), agentId);
     await this.finalizeHostConnect(agentId);
     return this.agents();
@@ -762,22 +770,27 @@ export class MagpieManager {
 
   async disconnectAgent(agentId: string): Promise<MagpieAgents> {
     if (this.state.state !== 'running') return { agents: [], pending: false };
+    const before = await this.agents();
+    const wasWired = before.agents.some(agent => agent.id === agentId && agent.wired);
     const agents = await magpieAgentDisconnect(this.agentClient(), agentId);
-    await this.finalizeHostDisconnect(agentId);
+    if (wasWired) await this.finalizeHostDisconnect(agentId);
     this.reapplyErrors.delete(agentId);
     return agents;
   }
 
   async disconnectAllAgents(): Promise<MagpieAgents> {
     if (this.state.state !== 'running') return { agents: [], pending: false };
-    await magpieDisconnectAllManaged(this.agentClient());
-    for (const id of ['claude', 'codex', 'opencode', 'gemini', 'pi']) {
+    const before = await this.agents();
+    const wired = this.wiredManagedAgentIds(before);
+    if (wired.length === 0) return before;
+    const next = await magpieDisconnectAllManaged(this.agentClient());
+    for (const id of wired) {
       await this.finalizeHostDisconnect(id).catch(error => {
         console.warn(`[Magpie] host disconnect cleanup failed for ${id}:`, error);
       });
     }
     this.reapplyErrors.clear();
-    return this.agents();
+    return next;
   }
 
   async setModel(selection: MagpieModelSelection): Promise<MagpieAgents> {
