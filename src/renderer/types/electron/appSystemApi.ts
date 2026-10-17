@@ -71,6 +71,8 @@ export interface AppInfoApi {
 }
 
 export interface AppUpdateApi {
+  getChannel: () => Promise<'stable' | 'beta'>;
+  setChannel: (channel: 'stable' | 'beta') => Promise<'stable' | 'beta'>;
   getState: () => Promise<AppUpdateRuntimeState>;
   checkNow: (options?: {
     manual?: boolean;

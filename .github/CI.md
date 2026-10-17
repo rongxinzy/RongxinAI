@@ -27,15 +27,13 @@ GitHub check for pull requests.
 
 ## Release and nightly checks
 
-Candidate builds run memory regression against the resolved candidate commit before
-platform packaging. Candidate quality also runs renderer type checking/bundle budgets
-and Presentation Studio tests. The Linux job installs and starts the exact candidate
-deb before assembling its payload; unpacked renderer verification is retained.
-Windows signing, runtime, install/upgrade/uninstall checks remain mandatory.
+Tag releases (`release.yml`) run memory regression, full quality gates, and platform
+packaging with Linux deb install smoke, Windows signing/install/uninstall checks, and
+beta-channel publish. Stable promotion is manual via `promote.yml` (no rebuild). See
+[RELEASING.md](../RELEASING.md).
 
-Nightly uses the same memory scenario with additional MemLab analysis. Tag publishing
-retains mandatory memory regression through reusable CI; its own platform jobs still
-own packaging. Main pushes repeat baseline checks without duplicate installation jobs.
+Nightly uses the same memory scenario with additional MemLab analysis. Main pushes
+repeat baseline checks without duplicate installation jobs.
 
 After this workflow is available on main, use **CI → Run workflow** on a selected branch
 to force all expensive checks. Individual Linux/Windows manual workflows remain available.

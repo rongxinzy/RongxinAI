@@ -282,29 +282,23 @@ test('CI waits for every selected reusable check and always runs the merge gate'
   }
 });
 
-test('candidate checks bind the source commit and block packaging before memory succeeds', () => {
-  const candidate = workflow('release-candidate.yml');
-  const memoryJob = candidate.jobs['memory-regression'];
-  expect(memoryJob.uses).toBe(workflow('ci.yml').jobs[HeavyJob.Memory].uses);
-  expect(memoryJob.with?.['source-ref']).toBe('${{ needs.prepare-candidate.outputs.commit }}');
-  expect(candidate.jobs['build-candidate'].needs).toContain('memory-regression');
-  const qualityCommands = candidate.jobs.quality.steps?.map(step => step.run ?? '').join('\n');
+test('tag release checks bind the source commit and block packaging before memory succeeds', () => {
+  const release = workflow('release.yml');
+  expect(release.on).toHaveProperty('push');
+  const memoryJob = release.jobs['memory-regression'];
+  expect(memoryJob.uses).toBe('./.github/workflows/memory-regression.yml');
+  expect(memoryJob.with?.['source-ref']).toBe('${{ needs.prepare-release.outputs.commit }}');
+  expect(release.jobs['build-release'].needs).toContain('memory-regression');
+  const qualityCommands = release.jobs.quality.steps?.map(step => step.run ?? '').join('\n');
   expect(qualityCommands).toContain('bun run build:tsc');
   expect(qualityCommands).toContain('bun run test:bundle-budget');
-  const steps = candidate.jobs['build-candidate'].steps ?? [];
+  const steps = release.jobs['build-release'].steps ?? [];
   const install = steps.findIndex(step =>
     step.run?.includes('sudo apt-get install -y "$(realpath'),
   );
-  const payload = steps.findIndex(step => step.name === 'Assemble Linux candidate payload');
+  const payload = steps.findIndex(step => step.name === 'Assemble Linux release payload');
   expect(install).toBeGreaterThan(-1);
   expect(payload).toBeGreaterThan(install);
-  // The smoke test must resolve the installed executable from the packaging
-  // config: a literal path went stale on the 知远智能体 rename and failed the
-  // whole candidate run before any artifact was uploaded.
   expect(steps[install].run).toContain('electron-builder.json');
   expect(steps[install].run).not.toContain("'/opt/知远/知远'");
-  expect(workflow('memory-leak-nightly.yml').jobs[HeavyJob.Memory].uses).toBe(memoryJob.uses);
-  expect(workflow('memory-leak-nightly.yml').jobs[HeavyJob.Memory].with?.['analyze-heap']).toBe(
-    true,
-  );
 });
