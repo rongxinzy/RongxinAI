@@ -8,11 +8,19 @@
 import { createGeneratedSurface } from './generated/surface';
 import { createInteractiveOverrides } from './interactive';
 import { applyOverrides } from './merge';
+import { readPreviewEdition, readPreviewScenario } from './previewQuery';
+import { createScenarioOverrides, editionWindowInjection } from './scenarios';
 import { createBrowserMockRuntime } from './runtime';
 
 const runtime = createBrowserMockRuntime();
 
-export const browserMockElectron: Window['electron'] = applyOverrides(
-  createGeneratedSurface(runtime),
-  createInteractiveOverrides(runtime),
-);
+function buildBrowserMockElectron(): Window['electron'] {
+  editionWindowInjection(readPreviewEdition());
+  const scenario = readPreviewScenario();
+  return applyOverrides(
+    applyOverrides(createGeneratedSurface(runtime), createInteractiveOverrides(runtime)),
+    createScenarioOverrides(scenario),
+  );
+}
+
+export const browserMockElectron: Window['electron'] = buildBrowserMockElectron();

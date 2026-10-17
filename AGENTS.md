@@ -31,7 +31,7 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 - 仅在 `import.meta.env.DEV` 且没有 preload bridge 时，`main.tsx` 才动态加载 `src/renderer/browserMock/`。生产构建不含 mock。
 - 完整表面由 `scripts/preview/generate-browser-mock.ts` 按 `Window['electron']`（`src/renderer/types/electron.d.ts`）生成。没有单独实现的方法返回类型上合法的默认值，每个路径只 `console.warn` 一次，不抛异常。`on*` 订阅注册到进程内事件总线，fixture 用同一条总线回放流式事件。
 - 会话、流式回复、设置、Skills、MCP、自动化、本地推理和 IM 的数据在 `browserMock/interactive.ts` 与 `browserMock/fixtures/`。改了 preload 契约后跑 `bun run web:preview:codegen`，并提交 `src/renderer/browserMock/generated/`。`bun run web:preview:codegen:check` 会在生成结果过期时失败。
-- `bun run web:preview:check`（先 `bunx playwright install chromium`）会打开会话、发送一条消息并等待流式回复、打开每个设置页、Skills、MCP、自动化、本地推理、IM、编程、待办、活动和对话框。任何 `console.error`、`pageerror` 或未处理拒绝都让命令失败，截图写到 `.github/pr-assets/browser-preview/`。改 UI 后用它确认没有缺 API 或控制台报错，再看截图。CI 在渲染器、共享契约或 `scripts/preview` 变更时跑同一条检查。
+- `bun run web:preview:check`（先 `bunx playwright install chromium`）在 headless Chromium 中跑 Playwright：视觉回归（基线位于 `scripts/preview/tests/visual.regression.spec.mjs-snapshots/`）、关键交互与 warn-only 的 axe 抽检；通过 URL 参数 `previewScenario` / `previewEdition` / `previewSkipBoot` 驱动 mock 的空态、错误、加载与晓软 lite 版。`console.error` 与 `pageerror` 会让检查失败。更新基线：`bun run web:preview:visual:update`。Preload 契约：`bun run web:preview:contract`（并与 `web:preview:codegen:check` 一起在 CI 的 `browser-preview` job 运行）。CI 在渲染器、共享契约或 `scripts/preview` 变更时跑上述检查；失败时上传 diff 到 workflow artifact `browser-preview-visual-diffs`。
 
 Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
 

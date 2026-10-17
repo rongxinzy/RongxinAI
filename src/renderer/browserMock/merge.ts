@@ -1,8 +1,4 @@
-type DeepPartial<T> = T extends (...args: never[]) => unknown
-  ? T
-  : T extends object
-    ? { [K in keyof T]?: DeepPartial<T[K]> }
-    : T;
+import type { DeepPartial } from './scenarioTypes';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

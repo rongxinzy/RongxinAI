@@ -45,11 +45,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
         },
       };
     },
-    fetchWindowsRuntimeManifest: async _p0 => {
-      void _p0;
-      runtime.warnOnce('llamacpp.fetchWindowsRuntimeManifest');
-      return {};
-    },
     listRuntimeDevices: async _p0 => {
       void _p0;
       runtime.warnOnce('llamacpp.listRuntimeDevices');

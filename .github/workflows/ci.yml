@@ -353,13 +353,21 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
       - run: bunx playwright install --with-deps chromium
-      - run: bun run web:preview:codegen:check
+      - run: bun run web:preview:contract
       - run: bun run web:preview:check
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
+        with:
+          name: browser-preview-visual-diffs
+          path: |
+            scripts/preview/tests/**/*-snapshots/**/*
+            test-results
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: browser-preview-screenshots
-          path: .github/pr-assets/browser-preview
+          path: scripts/preview/tests/**/*-snapshots/**/*.png
           retention-days: 7
 
   installer-preview:
