@@ -51,7 +51,7 @@ async function copyTree(from: string, to: string): Promise<void> {
   await fs.cp(from, to, { recursive: true, force: true, errorOnExist: false });
 }
 
-export async function snapshotDirectoryTree(source: string, destination: string): Promise<void> {
+async function snapshotDirectoryTree(source: string, destination: string): Promise<void> {
   if (!(await pathExists(source))) {
     await fs.rm(destination, { recursive: true, force: true });
     return;
@@ -60,14 +60,14 @@ export async function snapshotDirectoryTree(source: string, destination: string)
   await copyTree(source, destination);
 }
 
-export async function restoreDirectoryTree(snapshot: string, target: string): Promise<void> {
+async function restoreDirectoryTree(snapshot: string, target: string): Promise<void> {
   await fs.rm(target, { recursive: true, force: true });
   if (await pathExists(snapshot)) {
     await copyTree(snapshot, target);
   }
 }
 
-export function hostStashDir(privateHome: string, agentId: string): string {
+function hostStashDir(privateHome: string, agentId: string): string {
   return path.join(privateHome, STASH_ROOT, agentId);
 }
 

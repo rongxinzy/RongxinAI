@@ -755,7 +755,7 @@ export class MagpieManager {
     if (isMagpieManagedAgentId(agentId)) {
       await snapshotAgentHostTrees(this.options.privateHome, agentId, this.userHome());
     }
-    const agents = await magpieAgentConnect(this.agentClient(), agentId);
+    await magpieAgentConnect(this.agentClient(), agentId);
     await this.finalizeHostConnect(agentId);
     return this.agents();
   }
