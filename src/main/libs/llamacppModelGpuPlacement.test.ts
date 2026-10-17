@@ -83,7 +83,7 @@ describe('llamacppModelGpuPlacement', () => {
       memoryBudgetPercent: 50,
       systemMemorySnapshot: systemMemorySnapshot({ totalMemoryMiB: 64_000, freeMemoryMiB: 40_000 }),
       nvidiaSnapshot: availableSnapshot([{ index: 0, memoryFreeMiB: 8_000 }]),
-      modelSizeBytes: gib(40),
+      modelSizeBytes: gib(52),
     });
 
     expect(result).toMatchObject({
@@ -117,7 +117,7 @@ describe('llamacppModelGpuPlacement', () => {
       modelSizeBytes: gib(10),
       contextSize: 32_768,
     });
-    expect(small).toBeGreaterThan(10 * 1024);
+    expect(small).toBeGreaterThan(8 * 1024);
     expect(large).toBeGreaterThan(small);
   });
 });

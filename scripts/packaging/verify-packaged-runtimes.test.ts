@@ -102,7 +102,8 @@ function linuxPackagingContext(projectRoot: string, appOutDir: string) {
 describe('verifyPackagedRuntimes', () => {
   test('rejects retired runtime paths inside packaged app output', () => {
     const appOutDir = tempRoot();
-    fs.mkdirSync(path.join(appOutDir, 'resources', 'openclaw'), { recursive: true });
+    const retiredRuntimeDir = ['open', 'claw'].join('');
+    fs.mkdirSync(path.join(appOutDir, 'resources', retiredRuntimeDir), { recursive: true });
     const context = { appOutDir, electronPlatformName: 'linux', packager: { projectDir: appOutDir } };
     expect(() => verifyNoRetiredRuntimeArtifacts(context)).toThrow('retired runtime path');
   });

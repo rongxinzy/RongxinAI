@@ -166,46 +166,13 @@ jobs:
           pipx install 'awscli>=1.45.10,<2'
           npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
       - name: Download verified release payloads
-      - uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8
         with:
-          path: candidate/win32-x64-lite
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-lite
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/linux-x64-lite
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-lite
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/win32-x64-cpu
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-cpu
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/linux-x64-cpu
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-cpu
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/win32-x64-cuda
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-cuda
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/linux-x64-cuda
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-cuda
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/darwin-arm64-lite
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-lite
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/darwin-arm64-cpu
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-cpu
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/darwin-x64-lite
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-lite
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/darwin-x64-cpu
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-cpu
+          pattern: release-candidate-${{ needs.prepare-release.outputs.version }}-*
+          path: candidate-staging
+      - name: Stage release candidates by bundle id
+        shell: bash
+        run: bash scripts/release/stage-downloaded-release-candidates.sh '${{ needs.prepare-release.outputs.version }}'
       - name: Verify release completeness and identity
         shell: bash
         run: |
@@ -478,46 +445,13 @@ jobs:
       - uses: actions/setup-node@v6
         with: { node-version: '24.x' }
       - name: Download release payloads for GitHub assets
-      - uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8
         with:
-          path: candidate/win32-x64-lite
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-lite
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/linux-x64-lite
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-lite
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/win32-x64-cpu
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-cpu
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/linux-x64-cpu
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-cpu
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/win32-x64-cuda
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-cuda
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/linux-x64-cuda
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-cuda
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/darwin-arm64-lite
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-lite
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/darwin-arm64-cpu
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-cpu
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/darwin-x64-lite
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-lite
-      - uses: actions/download-artifact@v8
-        with:
-          path: candidate/darwin-x64-cpu
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-cpu
+          pattern: release-candidate-${{ needs.prepare-release.outputs.version }}-*
+          path: candidate-staging
+      - name: Stage GitHub release assets by bundle id
+        shell: bash
+        run: bash scripts/release/stage-downloaded-release-candidates.sh '${{ needs.prepare-release.outputs.version }}'
       - name: Collect GitHub release assets
         shell: bash
         run: |

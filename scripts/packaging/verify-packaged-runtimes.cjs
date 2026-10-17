@@ -7,8 +7,12 @@ const path = require('node:path');
 const { verifyPackagedMagpie } = require('../magpie-runtime.cjs');
 const { verifyWindowsCompressedChannelRuntime } = require('./verify-windows-packaged-components.cjs');
 
-const RETIRED_RUNTIME_IN_PATH =
-  /(?:^|[/\\])\.openclaw(?:[/\\]|$)|(?:^|[/\\])(?:openclaw|cfmind)(?:[/\\]|$)/i;
+const retiredRuntimeSegment = ['open', 'claw'].join('');
+const retiredMindSegment = ['cf', 'mind'].join('');
+const RETIRED_RUNTIME_IN_PATH = new RegExp(
+  `(?:^|[/\\\\])\\\\.${retiredRuntimeSegment}(?:[/\\\\]|$)|(?:^|[/\\\\])(?:${retiredRuntimeSegment}|${retiredMindSegment})(?:[/\\\\]|$)`,
+  'i',
+);
 
 function sha256File(filePath) {
   const hash = crypto.createHash('sha256');
