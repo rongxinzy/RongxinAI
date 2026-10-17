@@ -1,127 +1,161 @@
 /**
- * Synthetic Pi stream replay benchmark for main-process IPC coalescing.
- * Usage: bun run bench:stream [--variant=phase12] [--rate=200] [--size=100kb]
+ * Streaming pipeline bench (review S1 rewrite of bench:stream).
+ *
+ * Compares the pre-#1119 main-process pipeline (A) against the incremental
+ * pipeline of this PR at phase 1 (C) and phase 1+2 (D) under a virtual clock:
+ * no real sleeping, so a 2 MB stream at 50 tokens/s costs seconds of wall
+ * time instead of hours. Run with node (bun's perf_hooks numbers are not
+ * trustworthy); package.json bench:stream builds with bun and executes with node.
+ *
+ * Usage:
+ *   node streamBench.mjs [--group=A|C|D] [--rate=50|200|1000] [--size=100kb|2mb]
+ *                        [--thinking] [--render] [--a-max-size=500kb] [--out=path.json]
+ *
+ * 1 token = 4 UTF-16 code units. Results: one JSON object per scenario on
+ * stdout, plus the full run written to --out (default
+ * bench-results/stream-bench.json, directory created when missing).
  */
-import crypto from 'node:crypto';
-import { performance, monitorEventLoopDelay } from 'node:perf_hooks';
-import v8 from 'node:v8';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
-import {
-  createPiTranslatorState,
-  translatePiSessionEventToUiChunks,
-} from '../../src/main/libs/agentEngine/piTranslate/piTranslateUiMessageChunk';
-import { UiMessageChunkCoalescer } from '../../src/main/streaming/uiMessageChunkCoalescer';
-import { PiUiEventSequencer, PiUiEventType } from '../../src/shared/cowork/piUiEvent';
+import { runScenario, type BenchFlags } from './benchGroups';
+import type { BenchGroup, BenchSize, ScenarioConfig, ScenarioResult } from './scenarioShared';
 
-type Variant = 'phase12' | 'fullsnapshot';
-
-const parseArg = (name: string, fallback: string): string => {
+const argValue = (name: string): string | undefined => {
   const hit = process.argv.find(arg => arg.startsWith(`--${name}=`));
-  return hit ? hit.split('=')[1]! : fallback;
+  return hit === undefined ? undefined : hit.slice(name.length + 3);
 };
 
-const sizeKey = parseArg('size', '100kb').toLowerCase();
-const rate = Number.parseInt(parseArg('rate', '200'), 10);
-const variant = parseArg('variant', 'phase12') as Variant;
+const hasFlag = (name: string): boolean => process.argv.includes(`--${name}`);
 
-const targetChars = sizeKey === '2mb' ? 2_000_000 : 100_000;
-
-const corpus =
-  '混合 markdown：段落与 **bold**。\n\n```ts\nexport const x = 1;\n```\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\nC:\\\\Users\\\\dev\\\\README.md\n';
-
-const buildPayload = (): string => {
-  let out = '';
-  while (out.length < targetChars) out += corpus;
-  return out.slice(0, targetChars);
+const parseRate = (raw: string | undefined): number | null => {
+  if (raw === undefined) return null;
+  const rate = Number.parseInt(raw, 10);
+  if (!Number.isFinite(rate) || rate <= 0) throw new Error(`bench: invalid --rate=${raw}`);
+  return rate;
 };
 
-const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+const parseSize = (raw: string | undefined): BenchSize | null => {
+  if (raw === undefined) return null;
+  const normalized = raw.toLowerCase();
+  if (normalized === '100kb' || normalized === '2mb') return normalized;
+  throw new Error(`bench: invalid --size=${raw} (expected 100kb or 2mb)`);
+};
 
-const bench = async (): Promise<void> => {
-  const text = buildPayload();
-  const msPerChar = 1000 / Math.max(rate, 1);
-  const histogram = monitorEventLoopDelay({ resolution: 10 });
-  histogram.enable();
-  const cpuStart = process.cpuUsage();
-  const eluStart = performance.eventLoopUtilization();
-
-  let ipcEvents = 0;
-  let ipcBytes = 0;
-  const sequencer = new PiUiEventSequencer(() => crypto.randomUUID());
-  const translator = createPiTranslatorState();
-  translatePiSessionEventToUiChunks({ type: 'turn_start' }, translator);
-  const messageId = 'bench-message';
-
-  const emit = (payload: Parameters<typeof sequencer.next>[0]): void => {
-    const event = sequencer.next(payload);
-    ipcEvents += 1;
-    ipcBytes += v8.serialize(event).byteLength;
-  };
-
-  if (variant === 'fullsnapshot') {
-    let cursor = 0;
-    while (cursor < text.length) {
-      const end = Math.min(text.length, cursor + 8);
-      cursor = end;
-      emit({
-        type: PiUiEventType.MessageUpdate,
-        sessionId: 'bench',
-        messageId,
-        content: text.slice(0, cursor),
-      });
-      await delay(msPerChar * (end - (cursor - 8)));
+const parseGroups = (raw: string | undefined): readonly BenchGroup[] => {
+  if (raw === undefined) return ['A', 'C', 'D'];
+  const groups: BenchGroup[] = [];
+  for (const part of raw.split(',')) {
+    const group = part.trim().toUpperCase();
+    if (group !== 'A' && group !== 'C' && group !== 'D') {
+      throw new Error(`bench: invalid --group=${raw} (expected A, C or D)`);
     }
-  } else {
-    const coalescer = new UiMessageChunkCoalescer(({ sessionId, messageId: mid, chunk }) => {
-      emit({ type: PiUiEventType.StreamPart, sessionId, messageId: mid, chunk });
-    });
-    for (let index = 0; index < text.length;) {
-      const chunkSize = 1 + Math.floor(Math.random() * 8);
-      const slice = text.slice(index, index + chunkSize);
-      index += slice.length;
-      for (const ch of slice) {
-        for (const part of translatePiSessionEventToUiChunks(
-          {
-            type: 'message_update',
-            assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: ch },
-          },
-          translator,
-        )) {
-          coalescer.push('bench', messageId, part);
+    groups.push(group);
+  }
+  return groups;
+};
+
+const parseCharCount = (raw: string): number => {
+  const match = /^(\d+)(kb|mb)?$/.exec(raw.toLowerCase());
+  if (match === null) throw new Error(`bench: invalid size value ${raw}`);
+  const base = Number.parseInt(match[1]!, 10);
+  if (match[2] === 'kb') return base * 1000;
+  if (match[2] === 'mb') return base * 1_000_000;
+  return base;
+};
+
+const RATES: readonly number[] = [50, 200, 1000];
+const SIZES: readonly BenchSize[] = ['100kb', '2mb'];
+
+const buildMatrix = (
+  rate: number | null,
+  size: BenchSize | null,
+  thinkingOnly: boolean,
+  groups: readonly BenchGroup[],
+): ScenarioConfig[] => {
+  const rates = rate === null ? RATES : [rate];
+  const sizes = size === null ? SIZES : [size];
+  const scenarios: ScenarioConfig[] = [];
+  for (const group of groups) {
+    if (!thinkingOnly) {
+      for (const scenarioSize of sizes) {
+        for (const scenarioRate of rates) {
+          scenarios.push({ group, rate: scenarioRate, size: scenarioSize, thinking: false });
         }
       }
-      await delay(msPerChar * slice.length);
     }
-    coalescer.flush();
+    // Interleaved thinking+text (half of the bytes each): defaults to 100kb —
+    // LiveTextStore rebuilds the interleaved part tail on every out-of-order
+    // delta, so 2mb here is a deliberate worst case you must opt into with
+    // --size=2mb --thinking.
+    const thinkingSize = size ?? '100kb';
+    for (const scenarioRate of rates) {
+      scenarios.push({ group, rate: scenarioRate, size: thinkingSize, thinking: true });
+    }
   }
-
-  histogram.disable();
-  const cpuEnd = process.cpuUsage(cpuStart);
-  const elu = performance.eventLoopUtilization(eluStart);
-
-  const p99Ms = histogram.percentile(99) / 1e6;
-  const p50Ms = histogram.percentile(50) / 1e6;
-
-  console.log(
-    JSON.stringify(
-      {
-        variant,
-        sizeKey,
-        rate,
-        targetChars,
-        ipcEvents,
-        ipcBytes,
-        ipcBytesPerChar: ipcBytes / targetChars,
-        cpuUserMs: cpuEnd.user / 1000,
-        cpuSystemMs: cpuEnd.system / 1000,
-        eventLoopUtilization: elu.utilization,
-        eventLoopDelayP50Ms: p50Ms,
-        eventLoopDelayP99Ms: p99Ms,
-      },
-      null,
-      2,
-    ),
-  );
+  return scenarios;
 };
 
-void bench();
+const buildMeta = (flags: BenchFlags, scenarioCount: number): Record<string, unknown> => ({
+  generatedAt: new Date().toISOString(),
+  node: process.version,
+  scenarios: scenarioCount,
+  tokenUnit: '1 token = 4 UTF-16 code units',
+  aMaxChars: flags.aMaxChars,
+  renderAppliedTo: 'D only (jsdom lower-bound component)',
+  metricNotes: {
+    cpuMsPerVirtualSecond:
+      'mainCpuMs / (virtualDurationMs / 1000). Replaces ELU / event-loop-delay, which are meaningless under a virtual clock: estimate of how much of the single bench thread the pipeline occupies.',
+    maxBlockingMs:
+      'Wall duration of the longest synchronous callback (one Pi token, one virtual timer, or one rAF frame apply) — the event-loop blocking proxy.',
+    p99BlockingMs: 'p99 of that same callback-duration distribution.',
+    workerCpuMs:
+      'Group A only: wall time of the synchronous prefix-diff step that main@aa288943 ran inside its text worker; already included in mainCpuMs.',
+    e2eLatencyP50Ms:
+      'Virtual ms from a delta being produced to the frame that made it visible in the renderer model (p95 likewise).',
+    sqliteWrites:
+      'Transcript store.updateMessage writes under the 200 ms leading+trailing throttle model (A: copied legacy throttles; C/D: the same model applied to the incremental pipeline).',
+    rendererCommits:
+      'A: rAF frames carrying at least one ContentPatch; C: rAF frames dispatching to mock Redux; D: rAF frames applying chunks (with --render: React commits of the jsdom lower-bound component).',
+    ipcBytes: 'A: legacy payload {sessionId,messageId,patch}; C/D: JSON of the sequenced PiUiEvent.',
+  },
+});
+
+const main = async (): Promise<void> => {
+  const groups = parseGroups(argValue('group'));
+  const rate = parseRate(argValue('rate'));
+  const size = parseSize(argValue('size'));
+  const thinkingOnly = hasFlag('thinking');
+  const flags: BenchFlags = {
+    render: hasFlag('render'),
+    aMaxChars: parseCharCount(argValue('a-max-size') ?? '500kb'),
+  };
+  const scenarios = buildMatrix(rate, size, thinkingOnly, groups);
+  console.error(
+    `[bench:stream] ${scenarios.length} scenario(s), groups=${groups.join('+')}, render=${String(flags.render)}, aMaxChars=${flags.aMaxChars}`,
+  );
+
+  const results: ScenarioResult[] = [];
+  for (const config of scenarios) {
+    const result = await runScenario(config, flags);
+    results.push(result);
+    console.log(JSON.stringify(result));
+    console.error(
+      `[bench:stream] ${config.group}/${config.size}/${config.rate}tok/s${config.thinking ? '/thinking' : ''} wall=${result.wallMs}ms`,
+    );
+  }
+
+  const outPath = resolve(argValue('out') ?? 'bench-results/stream-bench.json');
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(
+    outPath,
+    `${JSON.stringify({ meta: buildMeta(flags, results.length), results }, null, 2)}\n`,
+    'utf8',
+  );
+  console.error(`[bench:stream] wrote ${outPath}`);
+};
+
+main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
+});
