@@ -32,6 +32,8 @@ import {
 } from './piImageInputFallback';
 import { getPiPreparingToolActivity, toToolActivityInput } from './toolActivity';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
+import { ProviderName } from '../../../shared/providers';
+import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
 import type { ActivePiSession, PiEvent, PiStartupLatency } from './piRuntimeSessionState';
 import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtractor';
 
@@ -648,6 +650,16 @@ export class PiRuntimeTurnEvents {
       error => {
         console.error(`[PiRuntimeAdapter] completion failed for session ${sessionId}:`, error);
         this.host.getWorkbench()?.failRun?.(sessionId, { message: String(error) });
+        if (
+          active.harnessModelProfile?.provider === ProviderName.Magpie &&
+          hasMagpieModelService()
+        ) {
+          try {
+            getMagpieModelService().recordError(String(error));
+          } catch {
+            /* ignore */
+          }
+        }
         this.host.emit('error', sessionId, classifyCoworkError(String(error)));
       },
     );

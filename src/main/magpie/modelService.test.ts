@@ -114,3 +114,46 @@ it('only actual model resolution requests an authorized lazy startup', async () 
   expect((await service.resolve()).model.id).toBe('fixture/model');
   expect(ensureRunning).toHaveBeenCalledTimes(1);
 });
+
+describe('fallback chains and observability', () => {
+  it('falls back to compatible model within provider fallback chain when primary is missing', async () => {
+    const status: MagpieStatus = {
+      state: 'running',
+      version: 'test',
+      gatewayUrl: 'http://127.0.0.1:1234',
+    };
+    const backend = {
+      status: () => status,
+      models: vi.fn(async () => [{ id: 'gpt-4o-mini' }]),
+      providers: vi.fn(async () => [
+        {
+          id: 'custom-openai',
+          name: 'OpenAI',
+          api: 'openai-completions' as const,
+          baseUrl: 'https://api.openai.com/v1',
+          models: ['gpt-4o'],
+          fallback: ['gpt-4o-mini'],
+          off: false,
+          hasKey: true,
+        },
+      ]),
+    };
+    const service = new MagpieModelService(backend, {
+      readDefaultModelId: () => 'gpt-4o',
+      writeDefaultModelId: () => {},
+    });
+    const resolution = await service.resolve('gpt-4o');
+    expect(resolution.model.id).toBe('gpt-4o-mini');
+  });
+
+  it('delegates recordError to backend', () => {
+    const status: MagpieStatus = { state: 'running', version: 'test' };
+    const recordError = vi.fn();
+    const service = new MagpieModelService(
+      { status: () => status, models: async () => [], recordError },
+      { readDefaultModelId: () => null, writeDefaultModelId: () => {} },
+    );
+    service.recordError('429 Rate limited', 'custom-openai');
+    expect(recordError).toHaveBeenCalledWith('429 Rate limited', 'custom-openai');
+  });
+});

@@ -12,7 +12,11 @@ import {
   ModelPoolIpc,
   OpenAICodexOAuthIpc,
 } from '../../shared/ipc/channels';
-import { MagpieIpc, type MagpieModelSelection } from '../../shared/magpie/types';
+import {
+  MagpieIpc,
+  type MagpieModelSelection,
+  type MagpieSaveProviderInput,
+} from '../../shared/magpie/types';
 import { onPush, onPushVoid } from './pushChannel';
 
 // Model providers, agent profiles, enterprise, and OAuth integrations.
@@ -128,6 +132,15 @@ export const providersApi = {
     catalog: () => ipcRenderer.invoke(MagpieIpc.catalog),
     selectDefault: (modelId: string) => ipcRenderer.invoke(MagpieIpc.selectDefault, modelId),
     openManagement: () => ipcRenderer.invoke(MagpieIpc.openManagement),
+    providers: () => ipcRenderer.invoke(MagpieIpc.providers),
+    saveProvider: (input: MagpieSaveProviderInput) =>
+      ipcRenderer.invoke(MagpieIpc.saveProvider, input),
+    setProviderEnabled: (id: string, enabled: boolean) =>
+      ipcRenderer.invoke(MagpieIpc.setProviderEnabled, id, enabled),
+    deleteProvider: (id: string) => ipcRenderer.invoke(MagpieIpc.deleteProvider, id),
+    testProvider: (input: MagpieSaveProviderInput) =>
+      ipcRenderer.invoke(MagpieIpc.testProvider, input),
+    diagnostics: () => ipcRenderer.invoke(MagpieIpc.diagnostics),
   },
 
   auth: {

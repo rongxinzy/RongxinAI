@@ -77,5 +77,39 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
         version: '0.0.0-preview',
       };
     },
+    providers: async () => {
+      runtime.warnOnce('magpie.providers');
+      return [];
+    },
+    saveProvider: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.saveProvider');
+      return [];
+    },
+    setProviderEnabled: async (_p0, _p1) => {
+      void _p0;
+      void _p1;
+      runtime.warnOnce('magpie.setProviderEnabled');
+      return [];
+    },
+    deleteProvider: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.deleteProvider');
+      return [];
+    },
+    testProvider: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.testProvider');
+      return {
+        ok: true,
+      };
+    },
+    diagnostics: async () => {
+      runtime.warnOnce('magpie.diagnostics');
+      return {
+        activeProviderCount: 0,
+        recentErrors: [],
+      };
+    },
   };
 }

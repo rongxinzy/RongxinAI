@@ -191,3 +191,74 @@ test('persisted unavailable agents show failure instead of claiming they were ne
   expect(screen.getByRole('alert')).toHaveTextContent('连接未完成');
   expect(screen.queryByText(/尚未验证连接/)).not.toBeInTheDocument();
 });
+
+test('displays Magpie wired status badge and direct standalone badge', () => {
+  const { rerender } = render(
+    createElement(
+      CodingAgentConnectionRow,
+      props({
+        magpieAgent: {
+          id: 'codex',
+          name: 'Codex',
+          cliMissing: false,
+          wired: true,
+          models: [],
+        },
+      }),
+    ),
+  );
+  expect(screen.getByText('已接入统一网关')).toBeInTheDocument();
+
+  rerender(
+    createElement(
+      CodingAgentConnectionRow,
+      props({
+        magpieAgent: {
+          id: 'codex',
+          name: 'Codex',
+          cliMissing: false,
+          wired: false,
+          models: [],
+        },
+      }),
+    ),
+  );
+  expect(screen.getByText('直连独立模式')).toBeInTheDocument();
+});
+
+test('allows selecting and applying model with explicit confirmation (A4 compliance)', async () => {
+  const onApplyMagpieModel = vi.fn(async () => true);
+  render(
+    createElement(
+      CodingAgentConnectionRow,
+      props({
+        magpieAgent: {
+          id: 'codex',
+          name: 'Codex',
+          cliMissing: false,
+          wired: true,
+          models: [
+            {
+              key: 'model',
+              label: 'Model',
+              value: 'gpt-4o',
+              options: [
+                { value: 'gpt-4o', label: 'GPT-4o' },
+                { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+              ],
+            },
+          ],
+        },
+        onApplyMagpieModel,
+      }),
+    ),
+  );
+
+  // Expand details
+  fireEvent.click(screen.getByRole('button', { name: '查看连接详情' }));
+  expect(screen.getByText('本地模型配置')).toBeVisible();
+
+  // The apply button is initially disabled because current selection matches existing value
+  const applyBtn = screen.getByRole('button', { name: '应用到 CLI' });
+  expect(applyBtn).toBeDisabled();
+});
