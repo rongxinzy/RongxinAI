@@ -150,8 +150,12 @@ checkFile('vite.config.ts', [forbiddenRuntimePattern, forbiddenStoragePattern]);
 
 for (const workflowFile of workflowFiles) {
   const content = fs.readFileSync(path.join(root, workflowFile), 'utf8');
+  const magpieGatewayReleaseBuild =
+    workflowFile === '.github/workflows/release.yml' && /magpie:build/.test(content);
+  const forbiddenGoSetup = /actions\/setup-go/.test(content) && !magpieGatewayReleaseBuild;
   if (
-    /repository:\s*rongxinzy\/pi-connect|actions\/setup-go|ZHIYUAN_CC_CONNECT_SOURCE/.test(content)
+    /repository:\s*rongxinzy\/pi-connect|ZHIYUAN_CC_CONNECT_SOURCE/.test(content) ||
+    forbiddenGoSetup
   ) {
     failures.push(
       `${workflowFile} must consume the published channel runtime, not pi-connect source`,
