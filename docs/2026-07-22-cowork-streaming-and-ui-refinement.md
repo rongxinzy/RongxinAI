@@ -1,6 +1,6 @@
 # 会话切换、流式输出与界面细节优化说明
 
-> **历史文档（2026-07-22）**：下文部分模块路径指当时并存的旧版 Agent runtime adapter；该路径已在后续迁移中删除，当前 Work/Chat 流式语义由 `piRuntimeAdapter.ts` 承担。保留原文供变更追溯。
+> **历史文档（2026-07-22）**：下文部分模块路径指当时并存的旧版 Agent runtime adapter；该路径已在后续迁移中删除，当前 Work/Chat 流式语义由 `piRuntimeAdapter.ts` 承担。现行流式 IPC/渲染说明见 [architecture/streaming.md](architecture/streaming.md)（PR #1119 待补）。保留原文供变更追溯。
 
 ## 1. 文档信息
 

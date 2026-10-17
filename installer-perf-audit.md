@@ -64,7 +64,7 @@ customInstall 里至少 6 个独立 `nsExec powershell`(recover、cache 校验�
 
 ### F7. 升级必然全量重解应用本体 + runAfterFinish 叠加首启成本
 
-electron-builder 每次升级都完整重解 ~150MB 应用文件(blockmap 只省下载,不省安装);`runAfterFinish: true`(`electron-builder.json:327`)装完自动启动,若用户勾了本地推理组件,首启还要下载 16–621MB 后端——都被算进"安装慢"的体感。
+electron-builder 每次升级都完整重解 ~150MB 应用文件(blockmap 只省下载,不省安装);`runAfterFinish: true`(`electron-builder.json:371`)装完自动启动,若用户勾了本地推理组件,首启还要下载 16–621MB 后端——都被算进"安装慢"的体感。
 
 ### F8. 没有安装时长门禁
 
@@ -89,4 +89,10 @@ CI 只断言正确性(7 个 cache-miss/hit、junction、卸载干净)与体积�
 
 ## 实施记录
 
-本分支已实施建议 1-4 与 6(插桩与反馈、危险动作后移、对账降级、去整包哈希、CI 时长预算);建议 5(终结 roaming python 拷贝)属应用侧行为变更,单独成 PR。验证:nsis-installer 内容断言 17/17;validator 在真实 Windows PowerShell 5.1 + 7za 上端到端 11 项断言全过(冷缓存拒绝原因、展开计时、快路径命中、默认容忍/深审计拒绝、篡改归档被 7z CRC 拦截);WSL 内无法编译 NSIS 与打包,完整安装器验证依赖 Windows CI(windows-installer 门禁)。
+建议 1-4 与 6 已合入 main(插桩与反馈、危险动作后移、对账降级、去整包哈希、CI 时长预算);建议 5(终结 roaming python 拷贝)属应用侧行为变更,单独成 PR。验证:nsis-installer 内容断言 17/17;validator 在真实 Windows PowerShell 5.1 + 7za 上端到端 11 项断言全过(冷缓存拒绝原因、展开计时、快路径命中、默认容忍/深审计拒绝、篡改归档被 7z CRC 拦截);WSL 内无法编译 NSIS 与打包,完整安装器验证依赖 Windows CI(windows-installer 门禁)。
+
+2026-10-17 复核（main `4a024b7`）：
+
+- 建议 5 仍未实施：`ensurePythonRuntimeReady`（`src/main/libs/pythonRuntime.ts:174`，由 `src/main/appBootstrap/initApp.ts:576` 调用）仍在不健康时用 `cpRecursiveSync` 把内置运行时整树拷到 roaming。
+- 建议 6 已落地：`scripts/ci/windows-installer-smoke.ps1` 解析 `phase=install-complete total_ms`。
+- 行号引用：`electron-builder.json` 的 `runAfterFinish` 已更新为第 371 行。`main.ts` 已在 #1078 拆分（现仅 97 行），文中 `main.ts:*` 和 `pythonRuntime.ts`、`nsis-installer.nsh`、`validate-offline-components.ps1`（现位于 `scripts/installer/`）的行号为排查时快照，以当前源码为准。

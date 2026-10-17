@@ -15,7 +15,7 @@
 
 正式发布继续使用受保护的 `release` 环境、现有 `setup-certum-signing` action 和同一 Certum 证书：
 
-1. electron-builder 签名应用、原生 NSIS 卸载器与 NSIS 更新器，`forceCodeSigning` 阻止无证书降级。
+1. electron-builder 签名应用、原生 NSIS 卸载器与 NSIS 更新器，`forceCodeSigning` 阻止无证书降级。打包钩子另用 `scripts/runtime-signing/sign-runtime.ps1` 与同一 Certum 证书签名 `resources/magpie/win32-x64/magpie.exe`（extraResources 不在 electron-builder 签名范围内），并把签名后的 SHA-256 写回 Magpie manifest；打包前须先 `bun run magpie:build` 和 `bun run magpie:verify`。
 2. 通过官方 NSIS `!finalize` 编译钩子，在最终 NSIS 安装器生成后、electron-builder 删除中间卸载器前，将已经签名的卸载器原样保留为 `out/ZhiYuanUninstall.exe`。第一次 `BUILD_UNINSTALLER` 编译先清除旧副本；钩子失败必须中止构建。
 3. 同时记录 `kind=nsis-uninstall-host`、实际 checkout commit、version、原中间文件名、安装后的原生文件名、bytes、sourceSha256 与 sha256。只接受当前配置推导的精确 `UNINSTALLER_OUT_FILE`，不用 glob 选旧文件；复制前后 SHA-256 必须相等。两次打包入口再次验证这个记录。
 4. 发布压缩的未签名 .NET 安装壳，将原生卸载器作为 `uninstall.exe` 放入 ZIP payload，不再复制第二套 .NET 运行时，也不重新签名卸载器。VC++ redistributable 只保留应用 `resources` 中的原文件，解包应用后执行它。
@@ -47,10 +47,6 @@ daily、手动 candidate、tag 发布和手动平台构建都对最终安装器�
 
 经 Windows 真实构建确认并批准，新 WebView2 安装器使用独立上限：最终完整文件 500 MiB、非组件部分 220 MiB。旧 NSIS 更新器仍为 450 MiB / 150 MiB；七组件合计上限仍为 300 MiB。非组件部分统一定义为最终安装器字节数减去七组件归档的真实字节合计，不通过扩大组件申报值挪用预算。
 
-提交 `02b8a66` 的 Windows PR 构建实测（尚未加入正式 Certum 签名）：
-
-- WebView2 安装器：491,244,872 字节（468.49 MiB），其中非组件 202,618,210 字节（193.23 MiB）。
-- NSIS 更新器：439,171,500 字节（418.83 MiB），其中非组件 150,544,838 字节（143.57 MiB）。
-- 相同七组件归档合计：288,626,662 字节；压缩的自包含 .NET 外壳为 72,154,001 字节（68.81 MiB）。两种完整安装器净差 49.66 MiB，主要来自无需用户另装 .NET 的自包含壳；应用归档压缩布局不同抵消了部分外壳成本。
+上述上限以正式流水线签名后的最终文件为准。
 
 打包前禁止把已内置于应用的 VC++ redistributable 再复制到 payload 根目录，也禁止以第二份 .NET 壳替代原生 NSIS 卸载器或新增重复根文件。正式构建在签名后再次读取最终 SFX 文件大小，并对七组件逐项核对实际归档大小与 SHA-256，再执行 500 / 220 / 300 MiB 门禁；签名证书与时间戳新增的字节同样计入上限。预算检查不替代既有 Authenticode 验证。

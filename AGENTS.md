@@ -44,12 +44,20 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 ## 架构
 
+目录导览、Pi/llama.cpp 模块拆分、IPC 约定与发版摘要见 [docs/architecture/overview.zh-CN.md](docs/architecture/overview.zh-CN.md)。Cowork **流式**细节见 [docs/architecture/streaming.md](docs/architecture/streaming.md)（PR #1119 待补）。
+
 ### 进程
 
-- **Main**（`src/main/main.ts`）：窗口、SQLite（better-sqlite3，`sqliteStore.ts`，库文件 userData/`zhiyuan.sqlite`）、Pi 运行时、llama.cpp 生命周期（`libs/llamacppManager.ts`、`src/shared/llamacpp/`）、Skill 管理（`skillManager.ts`）、MCP、IPC handler。安全：contextIsolation 开、nodeIntegration 关、sandbox 开。
+- **Main**（`src/main/main.ts`）：窗口、SQLite（better-sqlite3，`sqliteStore.ts`，库文件 userData/`zhiyuan.sqlite`）、Pi 运行时、llama.cpp 生命周期（`libs/llamacppManager/`、`libs/llamacppBackendManager/`、`ipcHandlers/llamacpp/`；对外仍经同名 barrel，`src/shared/llamacpp/` 共享类型）、Skill 管理（`skillManager.ts`）、MCP、IPC handler。安全：contextIsolation 开、nodeIntegration 关、sandbox 开。
 - **Channel/Cron 传输**（`src/main/libs/ccConnect*`、`src/main/im/`）：只搬运事件与 cron 触发，不执行 Agent、不持有任务状态。对外渠道：微信、企业微信、钉钉、飞书/Lark、QQ、Email；旧 connector 不得在 UI/文档重新暴露。
 - **Preload**（`src/main/preload.ts`）：`window.electron`，含 `cowork` 命名空间。
 - **Renderer**（`src/renderer/`）：全部 UI 与业务逻辑，只经 IPC 访问主进程；非 UI 逻辑放 `src/renderer/services/`。
+
+### 渲染层 IPC 与状态
+
+- **Toast：** 全局提示只经 `showAppToast` / `showAppError`（`src/renderer/services/toastNotification.ts`、`appToast.ts`）派发；禁止直接 `CustomEvent('app:showToast')`。`bun run lint` 含 `scripts/ci/check-app-show-toast-dispatch.mjs`。
+- **`electronDomains`（实验性）：** `src/renderer/services/electronDomains.ts` 按 5 域归类 preload；新代码不强制使用，可继续 `window.electron`。
+- **持久化 vs Redux：** `src/renderer/services/store.ts` 是主进程 SQLite KV 的 IPC 适配器；Redux 在 `src/renderer/store/`，二者勿混。
 
 ### 主进程 / Worker 边界
 
@@ -63,6 +71,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 - **流式链路**：改动 translator / coalescer / `piUiForwarder` / `LiveTextStore` / `StreamingMarkdownResponse` / 相关 IPC 前，必须先读 [docs/architecture/streaming.md](docs/architecture/streaming.md)。禁止发送端拼全文再 diff、禁止第二层发送端节流、禁止 IPC 常规推送全文快照；守护测试见 `tests/streamingGuards.test.ts`。
 - `App.tsx` → `coworkService.init()` → IPC 加载配置/会话 → 流监听；`startSession()` → IPC → `PiRuntimeAdapter` → 流事件 → Redux。
+- 流式 IPC/渲染细节不在此维护，见 [docs/architecture/streaming.md](docs/architecture/streaming.md)（#1119）。
 - 流事件：`message` / `messageUpdate` / `permissionRequest` / `complete` / `error`。权限请求经 `CoworkPermissionModal` 回传引擎。
 - IPC：`cowork:startSession`、`continueSession`、`stopSession`、`getSession`、`listSessions`、`deleteSession`、`respondToPermission`、`getConfig`、`setConfig`。`cowork:stream:*` 承载 Work/Chat；Channel/Cron run 以只读 activity 投影暴露。
 - 执行模式 `CoworkExecutionMode`：`auto` / `local`。
@@ -88,7 +97,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 - **Artifacts**：HTML/React 跑隔离 iframe，SVG 经 DOMPurify，Mermaid 严格安全模式——改渲染器不得破坏这些边界。
 - **TS**：`tsconfig.json`（renderer）、`electron-tsconfig.json`（主进程，CommonJS → `dist-electron/`）；别名 `@` → `src/renderer/`。
 - **Skills**：`SKILLs/` 是 Pi 运行时的内置 skill（经 `skills.config.json`），不是 IDE/agent 插件 skill。
-- **llama.cpp**：服务级选项管 `llama-server` 进程，模型级选项在加载/运行时传入。
+- **llama.cpp**：服务级选项管 `llama-server` 进程，模型级选项在加载/运行时传入。实现模块见 [docs/architecture/overview.zh-CN.md](docs/architecture/overview.zh-CN.md)「本地推理」一节。
 
 ### 企业扩展（enterprise/）
 
@@ -167,7 +176,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 - TypeScript，函数组件 + Hooks；2 空格、单引号、分号。组件 `PascalCase`，函数/变量 `camelCase`，Redux slice `*Slice.ts`。
 - 禁止 `any`（确需时旁注理由）。第三方 API/类型先查 `node_modules` 实际声明。
 - 禁止内联 `await import()`，一律顶层 import。
-- 文件：新文件目标 ≤800 行、硬上限 1000 行。已有超长文件不再追加，新逻辑写新文件 import；不主动拆旧文件，除非用户要求。
+- 文件：新文件目标 ≤800 行、硬上限 1000 行（CI：`scripts/ci/check-source-line-limit.mjs`）。`scripts/ci/source-line-baseline.json` 的 `caps` 只能缩小：文件降到 ≤1000 行后须从 baseline 删除，不得提高 cap 或 `limit`。已有超长文件不再追加，新逻辑写新文件 import；不主动拆旧文件，除非用户要求。
 - 大范围改动前完整读相关文件，不凭搜索片段判断。
 - 删除看似有意为之的功能/代码前先问用户。
 - 过期依赖的类型错误靠升级依赖解决，不降级或删代码绕过。
@@ -204,7 +213,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 ## 测试与验证
 
-- 代码改动后跑 `bun run lint` 并清零警告；提交前 `bun run format:check`。
+- 代码改动后跑 `bun run lint`（含 Knip、行数、toast AST）并清零警告；提交前 `bun run format:check`。推送 PR 前建议另跑 `bun run knip`、`bun run build`、`bun run test`。
 - 改 token/recipe/生成器：`bun run theme:generate`。改共享契约/主题引擎：另跑 `bunx vitest run src/renderer src/shared`、`bun run build`、`bun run test:bundle-budget`。
 - 单测与源码同目录，只用 `.test.ts`，`import { test, expect } from 'vitest'`；避免 import Electron-only API（如 electron-log）。新建/修改的测试必须跑到通过。
 - 全量测试有少量环境相关存量失败（skill smoke、release manifest 等）。遇失败用 `git stash` 对照 HEAD 判断是否由你引入。
