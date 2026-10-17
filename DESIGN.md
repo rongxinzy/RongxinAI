@@ -436,9 +436,10 @@ Before committing Zenith redesign:
 
 ### 页脚契约
 
-- **草稿页**（General / Appearance / Shortcuts / Email）：`Cancel` 丢弃未提交状态，`Save` 提交。General 的所有开关在 Save 时统一落盘，不得再出现「切换即生效但 Cancel 无法撤销」的混合语义。
-- **IM**：字段在失焦时已持久化，`Save` 只负责把待同步配置应用到网关；次要动作使用 `Close`，不得标成 `Cancel`。
-- **自动保存页**（Model / Platform Models / Memory / About）：只显示 `Close`，不得出现没有可提交内容的 `Save`。
+- **全部设置页自动保存**：页脚只保留 `Close`，不出现 `Save` / `Cancel`。切换、选择、开关在操作后立即写入；文本输入使用失焦或 600ms 防抖写入。
+- **General / Appearance / Shortcuts**：语言、主题、快捷键在变更时立即持久化；不得再出现「切换后还要点 Save」或关闭时回滚已生效设置。
+- **Email**：表单通过本地校验后自动写入 Skill 配置；关闭页面时冲刷未提交的有效表单。校验失败时不写入、不弹出自动错误。
+- **IM**：字段在失焦时持久化，800ms 防抖后自动同步网关；关闭页面时冲刷待同步配置。不得要求用户再点 `Save`。
 - 页脚与当前内容列同宽、右对齐；内容列切换时页脚按钮随之对齐，不固定在窗口最右缘。
 
 ### 宽度与间距
@@ -449,13 +450,13 @@ Before committing Zenith redesign:
 
 ### 模型页层级
 
-- 模型页按官方 Magpie 设置的信息架构分为 Service / Providers / Models / Network & sharing / Privacy / About 六个分段，使用分段控件切换；窄窗口下改为下拉选择，不得横向裁切分段标签。
+- 模型页按官方 Magpie 设置的信息架构分为 Service / Agents / Providers / Models / Network & sharing / Privacy / About 七个分段，使用分段控件切换；窄窗口下改为下拉选择，不得横向裁切分段标签。
 - 页面顶部只保留一个 `Model service` 区：状态徽标、简短说明、刷新/启用动作；启用说明只在未运行时出现。不得再出现打开官方管理页面的入口。
 - Provider 使用带分隔线的行式列表，不再为每个 Provider 套 Card；服务商模型标签使用 `text-xs`，不得出现 10px/11px 字号。
 - Default model 显示当前已保存默认模型；`Set as default` 只在用户选择了不同模型时出现，不展示长期禁用的主按钮。
 - Models / Network / Privacy 使用自动保存行：切换即写入，行内显示当前值；不得再引入页面级 Save。Network 的端口、局域网共享、CORS 与允许来源由宿主托管，只读展示并说明原因。
 - Privacy 的脱敏分类使用行式开关，不套嵌套卡片；订阅账号控制放在隐私分段底部。
-- 外部 Agent 收在 Service 的次级区块；未运行时隐藏，不展示禁用按钮。
+- 外部 Agent 是模型页的一级分段 `Agents`，直接展示接入列表与刷新/断开动作；不得收在 Service 底部，也不得再通过“管理接入”弹窗承载。
 - 页面内不得再出现重复的 `Models` 标题；许可证只在 About 分段出现一次。
 
 ### 其他修订
@@ -467,12 +468,12 @@ Before committing Zenith redesign:
 ### 验收补充
 
 - 设置页每个 tab 在 1440×900 与 1024×768 下检查浅色/深色、页脚对齐、无横向溢出；760×700 下检查侧栏与内容仍可用。
-- 删除页、`Close` 页、`Cancel/Save` 页分别验证页脚按钮不再出现「点了没反应」或「Cancel 不撤销」的行为。
+- 每个设置页切换、关闭、重开，确认变更已自动落盘且页脚只有 `Close`；不得出现 `Save`/`Cancel` 或关闭后回滚。
 
 ---
 
 **Design Authority**: This specification is the single source of truth for Zenith design system. Any deviation requires explicit approval and documentation update.
 
-**Version**: 3.3.0-zenith
+**Version**: 3.4.0-zenith
 **Last Updated**: 2026-10-17
 **Next Review**: Q1 2027

@@ -49,5 +49,6 @@ export const zhSettings: Record<string, string> = {
   systemPrompt: '系统提示词',
   systemPromptPlaceholder: '为 IM 机器人设置自定义指令...',
   settingsLoadFailed: '加载设置失败',
+  settingsSaveFailed: '保存设置失败',
   'settings.enterprise.managed': '由企业统一管理',
 };

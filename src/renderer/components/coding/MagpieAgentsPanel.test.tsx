@@ -89,10 +89,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('shows keep-running notice and disconnect-all when the service is running', async () => {
+test('shows keep-running notice and disconnect-all once an agent is connected', async () => {
+  const agents = fiveAgents();
+  agents.agents[0] = { ...agents.agents[0]!, wired: true };
+  api.agents.mockResolvedValue(agents);
   render(<MagpieAgentsPanel />);
   expect(await screen.findByText('magpieExternalKeepRunningNotice')).toBeVisible();
-  expect(screen.getByRole('button', { name: 'magpieExternalDisconnectAll' })).toBeVisible();
+  await refreshAgents();
+  expect(await screen.findByRole('button', { name: 'magpieExternalDisconnectAll' })).toBeVisible();
 });
 
 test('prompts to enable the model service when it is not running', async () => {
@@ -146,12 +150,12 @@ test('loads agents only after explicit refresh while the service is running', as
   expect(await screen.findByText('magpieExternalAgentCodex')).toBeVisible();
 });
 
-test('shows catalog rows with missing status when the agent list is empty', async () => {
+test('shows an empty state when the agent list is empty', async () => {
   api.agents.mockResolvedValue({ agents: [], pending: false });
   render(<MagpieAgentsPanel />);
   await refreshAgents();
-  expect((await screen.findAllByText('magpieExternalStatusMissing')).length).toBe(5);
-  expect(screen.getAllByText('magpieExternalAgentClaude').length).toBeGreaterThan(0);
+  expect(await screen.findByText('magpieNoAgents')).toBeVisible();
+  expect(screen.queryByText('magpieExternalStatusMissing')).toBeNull();
 });
 
 test('surfaces agent list failures without treating them as an empty catalog', async () => {

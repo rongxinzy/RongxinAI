@@ -424,7 +424,7 @@ export const zhCommon: Record<string, string> = {
   autoLaunchDescription: '系统启动时自动运行应用',
   autoLaunchUpdateFailed: '更新开机自启动设置失败',
   useSystemProxy: '使用系统代理',
-  useSystemProxyDescription: '开启后网络请求将跟随系统代理（保存后生效）',
+  useSystemProxyDescription: '开启后网络请求将跟随系统代理（立即生效）',
   sqliteAutoBackupEnabled: '启用自动备份与恢复',
   sqliteAutoBackupEnabledDescription: '开启后将自动备份数据，并在启动时尝试恢复损坏的数据',
   taskTemplateSectionTitle: '快速创建定时任务',

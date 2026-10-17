@@ -436,7 +436,7 @@ export const enCommon: Record<string, string> = {
   autoLaunchUpdateFailed: 'Failed to update launch at login setting',
   useSystemProxy: 'Use System Proxy',
   useSystemProxyDescription:
-    'When enabled, network requests follow system proxy settings (applies after Save)',
+    'When enabled, network requests follow system proxy settings (applies immediately)',
   sqliteAutoBackupEnabled: 'Enable Auto Backup and Recovery',
   sqliteAutoBackupEnabledDescription:
     'When enabled, the app automatically backs up data and tries to restore corrupted data on startup',

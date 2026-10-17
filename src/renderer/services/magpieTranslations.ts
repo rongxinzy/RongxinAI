@@ -22,25 +22,26 @@ export const magpieTranslations = {
     magpieCatalogRefresh: '刷新目录',
     magpieDefaultModel: '默认模型',
     magpieDefaultModelHint: '新会话以及使用默认模型的请求会解析到该模型。',
-    magpieCatalogEmpty: '目录暂无模型。请在管理界面配置服务商，或启动本地模型后刷新。',
+    magpieCatalogEmpty: '目录暂无模型。请在「渠道」中配置服务商，或启动本地模型后刷新。',
     magpieCatalogEnable: '启用模型服务',
     magpieCatalogConsent:
       '启用后会启动本机模型服务，并读取、同步已连接 Agent 的模型配置。订阅账号需单独启用；遥测与局域网访问默认关闭。',
     magpieSetDefault: '设为默认',
-
-    magpieTitle: '接入外部 Agent',
     magpieManagerDescription: '通过独立的模型服务管理本机 Agent 模型配置。',
-    magpieExternalPanelDescription:
-      '将本机 Claude Code、OpenCode、Gemini CLI、Pi 与 Codex 接入知远统一模型网关。接入后需保持知远运行。',
+
     magpieExternalKeepRunningNotice: '外部 Agent 需要知远保持运行，退出应用后网关将不可用。',
-    magpieExternalServiceRequired: '请先在上方启用模型服务，然后刷新本页读取 Agent 状态。',
+    magpieExternalServiceRequired: '请先在「服务」中启用模型服务，然后刷新本页读取 Agent 状态。',
     magpieExternalDisconnectAll: '全部断开',
+    magpieExternalDisconnectAllTitle: '断开全部外部 Agent？',
+    magpieExternalDisconnectAllDescription:
+      '将恢复所有已接入 Agent 的原始配置文件；未接入的 Agent 不受影响。',
     magpieExternalDisconnectOnQuit: '退出时断开所有外部 Agent',
     magpieExternalDisconnectOnQuitHint: '关闭应用前恢复各 Agent 的原始配置文件。默认关闭。',
     magpieExternalStatusMissing: '未安装',
     magpieExternalStatusDisconnected: '未接入',
     magpieExternalStatusConnected: '已接入',
-    magpieExternalStatusConnectedDetail: '· {count} 个模型',
+    magpieExternalStatusConnectedDetail: '{count} 个模型',
+    magpieExternalStatusConnectedDetailOne: '1 个模型',
     magpieExternalVersion: '版本 {version}',
     magpieExternalToggleLabel: '切换 {name} 接入状态',
     magpieExternalConnectConfirmTitle: '确认接入外部 Agent',
@@ -52,11 +53,9 @@ export const magpieTranslations = {
     magpieExternalGatewayTarget: '网关地址：{url}',
     magpieExternalSettingsLink: '接入外部 Agent',
     magpieExternalSettingsLinkHint: '让本机 CLI 使用知远已配置的模型。',
-    magpieExternalManage: '管理接入',
     magpieExternalAgentClaude: 'Claude Code',
     magpieExternalAgentOpenCode: 'OpenCode',
     magpieExternalAgentGemini: 'Gemini CLI',
-    magpieExternalAgentPi: 'Pi',
     magpieExternalAgentCodex: 'Codex',
     magpieExternalConnectHintClaude:
       '将修改 ~/.claude/settings.json 中的 ANTHROPIC_BASE_URL 等环境变量，并写入知远网关模型。',
@@ -152,6 +151,7 @@ export const magpieTranslations = {
     magpieSettingsSections: '模型服务设置',
     magpieSectionService: '服务',
     magpieSectionProviders: '渠道',
+    magpieSectionAgents: '接入 Agent',
     magpieSectionModels: '模型',
     magpieSectionNetwork: '网络与共享',
     magpieSectionPrivacy: '隐私',
@@ -264,29 +264,30 @@ export const magpieTranslations = {
     magpieDefaultModelHint:
       'New sessions and requests that resolve the default model use this model.',
     magpieCatalogEmpty:
-      'No models in the catalog. Configure a provider in management, or start a local model and refresh.',
+      'No models in the catalog. Configure a provider in Providers, or start a local model and refresh.',
     magpieCatalogEnable: 'Enable model service',
     magpieCatalogConsent:
       'Enabling starts the local model service and reads and synchronizes connected Agent configuration. Subscription accounts need separate opt-in; telemetry and LAN access stay off.',
     magpieSetDefault: 'Set as default',
 
-    magpieTitle: 'Connect external Agents',
     magpieManagerDescription:
       'Manage local Agent model configuration through the standalone model service.',
-    magpieExternalPanelDescription:
-      'Connect local Claude Code, OpenCode, Gemini CLI, Pi, and Codex to the ZhiYuan model gateway. Keep ZhiYuan running while they are connected.',
     magpieExternalKeepRunningNotice:
       'External Agents require ZhiYuan to keep running. The gateway is unavailable after you quit the app.',
     magpieExternalServiceRequired:
-      'Enable the model service above first, then refresh this page to read Agent status.',
+      'Enable the model service in Service first, then refresh this page to read Agent status.',
     magpieExternalDisconnectAll: 'Disconnect all',
+    magpieExternalDisconnectAllTitle: 'Disconnect all external Agents?',
+    magpieExternalDisconnectAllDescription:
+      'Restores the original configuration files of every connected Agent. Agents that are not connected are unchanged.',
     magpieExternalDisconnectOnQuit: 'Disconnect all external Agents on quit',
     magpieExternalDisconnectOnQuitHint:
       'Restore each Agent’s original configuration files before the app exits. Off by default.',
     magpieExternalStatusMissing: 'Not installed',
     magpieExternalStatusDisconnected: 'Not connected',
     magpieExternalStatusConnected: 'Connected',
-    magpieExternalStatusConnectedDetail: '· {count} model(s)',
+    magpieExternalStatusConnectedDetail: '{count} models',
+    magpieExternalStatusConnectedDetailOne: '1 model',
     magpieExternalVersion: 'Version {version}',
     magpieExternalToggleLabel: 'Toggle {name} connection',
     magpieExternalConnectConfirmTitle: 'Connect external Agent',
@@ -298,11 +299,9 @@ export const magpieTranslations = {
     magpieExternalGatewayTarget: 'Gateway: {url}',
     magpieExternalSettingsLink: 'Connect external Agents',
     magpieExternalSettingsLinkHint: 'Route local CLIs through models configured in ZhiYuan.',
-    magpieExternalManage: 'Manage connections',
     magpieExternalAgentClaude: 'Claude Code',
     magpieExternalAgentOpenCode: 'OpenCode',
     magpieExternalAgentGemini: 'Gemini CLI',
-    magpieExternalAgentPi: 'Pi',
     magpieExternalAgentCodex: 'Codex',
     magpieExternalConnectHintClaude:
       'Updates ANTHROPIC_BASE_URL and related keys in ~/.claude/settings.json and selects a gateway model.',
@@ -342,6 +341,7 @@ export const magpieTranslations = {
     magpieSettingsSections: 'Model service settings',
     magpieSectionService: 'Service',
     magpieSectionProviders: 'Providers',
+    magpieSectionAgents: 'Agents',
     magpieSectionModels: 'Models',
     magpieSectionNetwork: 'Network & sharing',
     magpieSectionPrivacy: 'Privacy',

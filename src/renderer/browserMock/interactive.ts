@@ -21,6 +21,7 @@ import {
   mockAgents,
   mockCoworkConfig,
   mockMagpieCatalog,
+  mockMagpieAgents,
   mockMagpiePreferences,
   mockMcpServers,
   mockScheduledTasks,
@@ -117,6 +118,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
     return `preview-event-${eventCount}`;
   });
   let skills: MockSkill[] = mockSkills.map(skill => ({ ...skill }));
+  const skillConfigs = new Map<string, Record<string, string>>();
   let servers: MockMcpServer[] = mockMcpServers.map(server => ({ ...server }));
   const tasks = mockScheduledTasks.map(task => ({ ...task }));
 
@@ -281,6 +283,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       selectDefault: () => Promise.resolve(mockMagpieCatalog),
       status: () => Promise.resolve(mockMagpieCatalog.status),
       models: () => Promise.resolve(mockMagpieCatalog.models),
+      agents: () => Promise.resolve(mockMagpieAgents),
       preferences: () => Promise.resolve(preferences),
       updatePreferences: patch => {
         preferences = { ...preferences, ...patch };
@@ -318,6 +321,12 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
     },
     skills: {
       list: () => Promise.resolve({ success: true, skills }),
+      getConfig: (id: string) =>
+        Promise.resolve({ success: true, config: skillConfigs.get(id) ?? {} }),
+      setConfig: (id: string, config: Record<string, string>) => {
+        skillConfigs.set(id, config);
+        return Promise.resolve({ success: true });
+      },
       setEnabled: ({ id, enabled }: { id: string; enabled: boolean }) => {
         skills = skills.map(skill => (skill.id === id ? { ...skill, enabled } : skill));
         return Promise.resolve({ success: true, skills });

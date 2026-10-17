@@ -69,6 +69,7 @@ class IMService {
   private messageUnsubscribe: (() => void) | null = null;
   private initPromise: Promise<void> | null = null;
   private readonly pendingConfigSync = new PendingIMConfigSync();
+  private pendingSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * Initialize IM service (with concurrency guard to prevent duplicate init)
@@ -99,6 +100,11 @@ class IMService {
    * Clean up listeners
    */
   destroy(): void {
+    if (this.pendingConfigSync.isPending) void this.syncPendingConfig();
+    if (this.pendingSyncTimer !== null) {
+      clearTimeout(this.pendingSyncTimer);
+      this.pendingSyncTimer = null;
+    }
     if (this.statusUnsubscribe) {
       this.statusUnsubscribe();
       this.statusUnsubscribe = null;
@@ -189,6 +195,7 @@ class IMService {
       });
       if (result.success) {
         this.pendingConfigSync.markPending();
+        this.schedulePendingSync();
         return true;
       } else {
         console.error('[IM Service] Failed to persist config:', result.error);
@@ -200,11 +207,23 @@ class IMService {
     }
   }
 
+  private schedulePendingSync(): void {
+    if (this.pendingSyncTimer !== null) clearTimeout(this.pendingSyncTimer);
+    this.pendingSyncTimer = setTimeout(() => {
+      this.pendingSyncTimer = null;
+      void this.syncPendingConfig();
+    }, 800);
+  }
+
   /**
    * Apply configuration persisted without a gateway restart. Returns immediately
    * when no channel configuration has changed since the last successful sync.
    */
   async syncPendingConfig(): Promise<boolean> {
+    if (this.pendingSyncTimer !== null) {
+      clearTimeout(this.pendingSyncTimer);
+      this.pendingSyncTimer = null;
+    }
     if (!this.pendingConfigSync.isPending) return true;
     try {
       const result: IMGatewayResult = await window.electron.im.syncConfig();

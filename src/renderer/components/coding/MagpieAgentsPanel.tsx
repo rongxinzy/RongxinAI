@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +11,7 @@ import {
   DialogTitle,
 } from '@shared/components/ui/dialog';
 import { Field, FieldDescription, FieldLabel } from '@shared/components/ui/field';
-import { Bot, Code2, Sparkles, Terminal, Workflow } from 'lucide-react';
+import { Bot, Code2, RefreshCw, Sparkles, Terminal, Workflow } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -81,6 +82,7 @@ export function MagpieAgentsPanel() {
   const [confirmMode, setConfirmMode] = useState<'connect' | 'disconnect'>('connect');
   const [pendingAgentId, setPendingAgentId] = useState<string | null>(null);
   const [preview, setPreview] = useState<MagpieAgentConnectPreview | null>(null);
+  const [disconnectAllOpen, setDisconnectAllOpen] = useState(false);
   const mounted = useRef(false);
   const locked = useRef(false);
   const epoch = useRef(0);
@@ -147,11 +149,17 @@ export function MagpieAgentsPanel() {
   const running = status?.state === 'running';
   const catalogAgents = useMemo(() => {
     const list = agents?.agents ?? [];
-    return MAGPIE_EXTERNAL_AGENT_CATALOG.map(entry => ({
-      entry,
-      agent: findCatalogAgent(list, entry.id),
-    }));
+    // Pi is the embedded runtime; it is internal and never exposed as a
+    // user-facing external Agent.
+    return MAGPIE_EXTERNAL_AGENT_CATALOG.filter(entry => entry.id !== MagpieExternalAgentId.Pi).map(
+      entry => ({
+        entry,
+        agent: findCatalogAgent(list, entry.id),
+      }),
+    );
   }, [agents]);
+  const hasConnectedAgent = agents?.agents.some(agent => agent.wired) === true;
+  const hasDetectedAgent = catalogAgents.some(({ agent }) => Boolean(agent));
 
   const beginToggle = async (catalogId: MagpieExternalAgentId, next: boolean) => {
     const agent = findCatalogAgent(agents?.agents ?? [], catalogId);
@@ -218,53 +226,70 @@ export function MagpieAgentsPanel() {
 
       {running && (
         <>
-          {!agents && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => void run(loadAgents)}
-            >
-              {i18nService.t('magpieRefreshManagement')}
-            </Button>
+          {!agents ? (
+            <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-border px-4 py-5">
+              <p className="text-sm text-muted-foreground">{i18nService.t('magpieNotLoaded')}</p>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => void run(loadAgents)}
+              >
+                <RefreshCw data-icon="inline-start" />
+                {i18nService.t('magpieRefreshManagement')}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {!hasDetectedAgent ? (
+                  <p className="text-sm text-muted-foreground">{i18nService.t('magpieNoAgents')}</p>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => void run(loadAgents)}
+                  >
+                    <RefreshCw data-icon="inline-start" />
+                    {i18nService.t('magpieRefreshManagement')}
+                  </Button>
+                  {hasConnectedAgent ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => setDisconnectAllOpen(true)}
+                    >
+                      {i18nService.t('magpieExternalDisconnectAll')}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+              {agents.pending && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {i18nService.t('magpieDiscoveryPending')}
+                </p>
+              )}
+              {hasDetectedAgent ? (
+                <div className="flex flex-col gap-4">
+                  {catalogAgents.map(({ entry, agent }) => (
+                    <ExternalAgentRow
+                      key={entry.id}
+                      catalogId={entry.id}
+                      labelKey={ROW_META[entry.id].labelKey}
+                      icon={ROW_META[entry.id].icon}
+                      agent={agent}
+                      busy={busy}
+                      onToggle={next => void beginToggle(entry.id, next)}
+                      onApplyModel={applyModel}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
           )}
-          {agents?.pending && (
-            <p role="status" className="text-sm text-muted-foreground">
-              {i18nService.t('magpieDiscoveryPending')}
-            </p>
-          )}
-          {agents &&
-            catalogAgents.map(({ entry, agent }) => (
-              <ExternalAgentRow
-                key={entry.id}
-                catalogId={entry.id}
-                labelKey={ROW_META[entry.id].labelKey}
-                icon={ROW_META[entry.id].icon}
-                agent={agent}
-                busy={busy}
-                onToggle={next => void beginToggle(entry.id, next)}
-                onApplyModel={applyModel}
-              />
-            ))}
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy || !api?.disconnectAllAgents}
-              onClick={() =>
-                void run(async () => {
-                  if (!api?.disconnectAllAgents) return;
-                  const next = await api.disconnectAllAgents();
-                  if (mounted.current) setAgents(next);
-                })
-              }
-            >
-              {i18nService.t('magpieExternalDisconnectAll')}
-            </Button>
-            <Button size="sm" variant="ghost" disabled={busy} onClick={() => void run(loadAgents)}>
-              {i18nService.t('magpieRefreshManagement')}
-            </Button>
-          </div>
         </>
       )}
 
@@ -292,7 +317,7 @@ export function MagpieAgentsPanel() {
       </Field>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="theme-control-sizing-4 sm:min-w-[28rem]">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
               {i18nService.t(
@@ -311,7 +336,7 @@ export function MagpieAgentsPanel() {
             </DialogDescription>
           </DialogHeader>
           {confirmMode === 'disconnect' && preview && preview.changes.length > 0 && (
-            <ul className="max-h-48 space-y-2 overflow-y-auto text-xs text-muted-foreground">
+            <ul className="max-h-48 space-y-2 overflow-y-auto text-sm text-muted-foreground">
               {preview.changes.map(change => (
                 <li key={change.path}>
                   <span className="font-medium text-foreground">{change.path}</span>
@@ -324,7 +349,7 @@ export function MagpieAgentsPanel() {
               ))}
             </ul>
           )}
-          {preview?.error && <p className="text-xs text-destructive">{preview.error}</p>}
+          {preview?.error && <p className="text-sm text-destructive">{preview.error}</p>}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
               {i18nService.t('magpieExternalCancel')}
@@ -339,6 +364,24 @@ export function MagpieAgentsPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DestructiveConfirmDialog
+        open={disconnectAllOpen}
+        title={i18nService.t('magpieExternalDisconnectAllTitle')}
+        description={i18nService.t('magpieExternalDisconnectAllDescription')}
+        cancelLabel={i18nService.t('magpieExternalCancel')}
+        confirmLabel={i18nService.t('magpieExternalDisconnectAll')}
+        isConfirming={busy}
+        onCancel={() => setDisconnectAllOpen(false)}
+        onConfirm={() => {
+          setDisconnectAllOpen(false);
+          void run(async () => {
+            if (!api?.disconnectAllAgents) return;
+            const next = await api.disconnectAllAgents();
+            if (mounted.current) setAgents(next);
+          });
+        }}
+      />
     </section>
   );
 }

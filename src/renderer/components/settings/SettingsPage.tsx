@@ -1,28 +1,21 @@
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import type { EnterpriseRendererSettingsPage } from '../../../shared/enterpriseRenderer';
-import { defaultConfig } from '../../config';
+import { defaultConfig, type AppConfig } from '../../config';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
 import { i18nService, type LanguageType } from '../../services/i18n';
-import { imService } from '../../services/im';
-import {
-  buildAppSettingsSavePatch,
-  getSettingsSaveErrorMessage,
-} from '../../services/settingsSave';
 import { themeService } from '../../services/theme';
 import { selectCoworkConfig } from '../../store/selectors/coworkSelectors';
 import ErrorMessage from '../ErrorMessage';
 import { EnterpriseSettingsPage } from '../enterprise/EnterpriseSettingsPage';
-import { localInferenceCompactButtonClass } from '../localInference/constants';
 import PageHeader from '../PageHeader';
 import AboutSettingsPanel from './about/AboutSettingsPanel';
 import { AISphereSettings } from './AISphereSettings';
 import { AppearanceSettingsPanel } from './appearance/AppearanceSettingsPanel';
-import type { EmailSettingsHandle } from './email/types';
 import { EmailSettingsPage } from './email/EmailSettingsPage';
 import GeneralSettingsPanel from './general/GeneralSettingsPanel';
 import ImSettingsPanel from './im/ImSettingsPanel';
@@ -35,12 +28,7 @@ import {
   type SettingsPageProps,
   type SettingsTabType,
 } from './types';
-import {
-  settingsContentWidthClass,
-  settingsFooterMode,
-  settingsFooterSecondaryLabel,
-  type SettingsFooterMode,
-} from './constants';
+import { settingsContentWidthClass } from './constants';
 import { useSettingsTabs } from './useSettingsTabs';
 
 export default function SettingsPage({
@@ -58,7 +46,6 @@ export default function SettingsPage({
   onToggleSidebar,
   onNewChat,
 }: SettingsPageProps) {
-  // 状态
   const [requestedActiveTab, setActiveTab] = useState<SettingsTabType>(initialTab ?? 'general');
   const [enterpriseSettingsPages, setEnterpriseSettingsPages] = useState<
     readonly EnterpriseRendererSettingsPage[]
@@ -72,14 +59,21 @@ export default function SettingsPage({
   const [preventSleep, setPreventSleep] = useState(false);
   const [codemodeEnabled, setCodemodeEnabled] = useState(false);
   const [mcpNativeBridge, setMcpNativeBridge] = useState(false);
-  const initialGeneralRef = useRef({
-    autoLaunch: false,
-    preventSleep: false,
-    codemodeEnabled: false,
-    mcpNativeBridge: false,
-  });
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(() => {
+    if (noticeI18nKey) {
+      const base = i18nService.t(noticeI18nKey);
+      return noticeExtra ? `${base} (${noticeExtra})` : base;
+    }
+    return notice ?? null;
+  });
+  const [themeStyle, setThemeStyle] = useState(themeService.getStyle());
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [shortcuts, setShortcuts] = useState({
+    ...defaultConfig.shortcuts!,
+  });
+  const coworkConfig = useSelector(selectCoworkConfig);
+
   const buildNoticeMessage = useCallback((): string | null => {
     if (noticeI18nKey) {
       const base = i18nService.t(noticeI18nKey);
@@ -88,13 +82,13 @@ export default function SettingsPage({
     return notice ?? null;
   }, [notice, noticeExtra, noticeI18nKey]);
 
-  const [noticeMessage, setNoticeMessage] = useState<string | null>(() => buildNoticeMessage());
-  const [themeStyle, setThemeStyle] = useState(themeService.getStyle());
-  const initialThemeStyleRef = useRef(themeService.getStyle());
-  const initialThemeRef = useRef<'light' | 'dark' | 'system'>(themeService.getTheme());
-  const initialLanguageRef = useRef<LanguageType>(i18nService.getLanguage());
-  const didSaveRef = useRef(false);
-  const emailSettingsRef = useRef<EmailSettingsHandle>(null);
+  const persistConfig = useCallback(async (patch: Partial<AppConfig>) => {
+    try {
+      await configService.updateConfig(patch);
+    } catch {
+      setError(i18nService.t('settingsSaveFailed'));
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -111,83 +105,24 @@ export default function SettingsPage({
     };
   }, []);
 
-  // 创建引用来确保内容区域的滚动
-  const contentRef = useRef<HTMLDivElement>(null);
-  // 快捷键设置
-  const [shortcuts, setShortcuts] = useState({
-    ...defaultConfig.shortcuts!,
-  });
-
-  const coworkConfig = useSelector(selectCoworkConfig);
-
-  const [embeddingEnabled, setEmbeddingEnabled] = useState<boolean>(
-    coworkConfig.embeddingEnabled ?? false,
-  );
-  const [embeddingProvider, setEmbeddingProvider] = useState<string>(
-    coworkConfig.embeddingProvider ?? 'openai',
-  );
-  const [embeddingModel, setEmbeddingModel] = useState<string>(coworkConfig.embeddingModel ?? '');
-  const [embeddingLocalModelPath, setEmbeddingLocalModelPath] = useState<string>(
-    coworkConfig.embeddingLocalModelPath ?? '',
-  );
-  const [embeddingVectorWeight, setEmbeddingVectorWeight] = useState<number>(
-    coworkConfig.embeddingVectorWeight ?? 0.7,
-  );
-  const [embeddingRemoteBaseUrl, setEmbeddingRemoteBaseUrl] = useState<string>(
-    coworkConfig.embeddingRemoteBaseUrl ?? '',
-  );
-  const [embeddingRemoteApiKey, setEmbeddingRemoteApiKey] = useState<string>(
-    coworkConfig.embeddingRemoteApiKey ?? '',
-  );
-
-  useEffect(() => {
-    setEmbeddingEnabled(coworkConfig.embeddingEnabled ?? false);
-    setEmbeddingProvider(coworkConfig.embeddingProvider ?? 'openai');
-    setEmbeddingModel(coworkConfig.embeddingModel ?? '');
-    setEmbeddingLocalModelPath(coworkConfig.embeddingLocalModelPath ?? '');
-    setEmbeddingVectorWeight(coworkConfig.embeddingVectorWeight ?? 0.7);
-    setEmbeddingRemoteBaseUrl(coworkConfig.embeddingRemoteBaseUrl ?? '');
-    setEmbeddingRemoteApiKey(coworkConfig.embeddingRemoteApiKey ?? '');
-  }, [
-    coworkConfig.embeddingEnabled,
-    coworkConfig.embeddingProvider,
-    coworkConfig.embeddingModel,
-    coworkConfig.embeddingLocalModelPath,
-    coworkConfig.embeddingVectorWeight,
-    coworkConfig.embeddingRemoteBaseUrl,
-    coworkConfig.embeddingRemoteApiKey,
-  ]);
-
   useEffect(() => {
     let active = true;
     void (async () => {
       try {
         const config = await configService.reload();
         if (!active) return;
-
-        // Set general settings
-        initialThemeRef.current = config.theme;
-        initialLanguageRef.current = config.language;
         setTheme(config.theme);
         setThemeStyle(themeService.getStyle());
         setLanguage(config.language);
         setUseSystemProxy(config.useSystemProxy ?? false);
         setSqliteAutoBackupEnabled(config.sqliteAutoBackupEnabled === true);
-
-        // 加载快捷键设置
         if (config.shortcuts) {
-          setShortcuts(prev => ({
-            ...prev,
-            ...config.shortcuts,
-          }));
+          setShortcuts(previous => ({ ...previous, ...config.shortcuts }));
         }
       } catch {
-        if (active) {
-          setError(i18nService.t('settingsLoadFailed'));
-        }
+        if (active) setError(i18nService.t('settingsLoadFailed'));
       }
     })();
-
     return () => {
       active = false;
     };
@@ -202,17 +137,10 @@ export default function SettingsPage({
         window.electron.cowork.getConfig().catch(() => null),
       ]);
       if (!active) return;
-      const next = {
-        autoLaunch: autoLaunchResult?.enabled === true,
-        preventSleep: preventSleepResult?.enabled === true,
-        codemodeEnabled: coworkConfigResult?.config?.codemodeEnabled === true,
-        mcpNativeBridge: coworkConfigResult?.config?.mcpNativeBridge === true,
-      };
-      initialGeneralRef.current = next;
-      setAutoLaunch(next.autoLaunch);
-      setPreventSleep(next.preventSleep);
-      setCodemodeEnabled(next.codemodeEnabled);
-      setMcpNativeBridge(next.mcpNativeBridge);
+      setAutoLaunch(autoLaunchResult?.enabled === true);
+      setPreventSleep(preventSleepResult?.enabled === true);
+      setCodemodeEnabled(coworkConfigResult?.config?.codemodeEnabled === true);
+      setMcpNativeBridge(coworkConfigResult?.config?.mcpNativeBridge === true);
     })();
     return () => {
       active = false;
@@ -220,24 +148,7 @@ export default function SettingsPage({
   }, []);
 
   useEffect(() => {
-    const initialTheme = initialThemeRef.current;
-    const initialThemeStyle = initialThemeStyleRef.current;
-    const initialLanguage = initialLanguageRef.current;
-    return () => {
-      if (didSaveRef.current) {
-        return;
-      }
-      themeService.setStyle(initialThemeStyle);
-      themeService.setTheme(initialTheme);
-      i18nService.setLanguage(initialLanguage, { persist: false });
-    };
-  }, []);
-
-  // 监听标签页切换，确保内容区域滚动到顶部
-  useEffect(() => {
-    if (contentRef.current) {
-      contentRef.current.scrollTop = 0;
-    }
+    if (contentRef.current) contentRef.current.scrollTop = 0;
   }, [activeTab]);
 
   useEffect(() => {
@@ -245,16 +156,12 @@ export default function SettingsPage({
   }, [buildNoticeMessage]);
 
   useEffect(() => {
-    if (initialTab) {
-      setActiveTab(initialTab);
-    }
+    if (initialTab) setActiveTab(initialTab);
   }, [initialTab]);
 
-  // Subscribe to language changes
   useEffect(() => {
     const unsubscribe = i18nService.subscribe(() => {
       setLanguage(i18nService.getLanguage());
-      // Re-translate notice message on language change
       if (noticeI18nKey) {
         const base = i18nService.t(noticeI18nKey);
         setNoticeMessage(noticeExtra ? `${base} (${noticeExtra})` : base);
@@ -263,116 +170,63 @@ export default function SettingsPage({
     return unsubscribe;
   }, [noticeI18nKey, noticeExtra]);
 
-  const hasCoworkConfigChanges =
-    embeddingEnabled !== (coworkConfig.embeddingEnabled ?? false) ||
-    embeddingProvider !== (coworkConfig.embeddingProvider ?? 'openai') ||
-    embeddingModel !== (coworkConfig.embeddingModel ?? '') ||
-    embeddingLocalModelPath !== (coworkConfig.embeddingLocalModelPath ?? '') ||
-    embeddingVectorWeight !== (coworkConfig.embeddingVectorWeight ?? 0.7) ||
-    embeddingRemoteBaseUrl !== (coworkConfig.embeddingRemoteBaseUrl ?? '') ||
-    embeddingRemoteApiKey !== (coworkConfig.embeddingRemoteApiKey ?? '');
+  const handleTabChange = (tab: SettingsTabType) => setActiveTab(tab);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (settingsFooterMode(activeTab) === 'close') {
-      onClose();
-      return;
-    }
-    setIsSaving(true);
-    setError(null);
-    let appConfigSaved = false;
+  const handleLanguageChange = (next: LanguageType) => {
+    setLanguage(next);
+    i18nService.setLanguage(next);
+  };
 
-    try {
-      const emailSaved = (await emailSettingsRef.current?.saveIfDirty()) ?? true;
-      if (!emailSaved) {
-        setActiveTab('email');
-        return;
-      }
+  const handleThemeChange = (next: 'light' | 'dark' | 'system') => {
+    setTheme(next);
+    themeService.setTheme(next);
+    void persistConfig({ theme: next });
+  };
 
-      const currentAppConfig = configService.getConfig();
-      const appConfigPatch = buildAppSettingsSavePatch({
-        current: currentAppConfig,
-        theme,
-        themeStyle,
-        language,
-        useSystemProxy,
-        sqliteAutoBackupEnabled,
-        shortcuts,
-      });
-      if (Object.keys(appConfigPatch).length > 0) {
-        await configService.updateConfig(appConfigPatch);
-        appConfigSaved = true;
-      }
+  const handleStyleChange = (id: string) => {
+    setThemeStyle(id);
+    themeService.setStyle(id);
+    void persistConfig({ themeStyle: id });
+  };
 
-      const initialGeneral = initialGeneralRef.current;
-      if (autoLaunch !== initialGeneral.autoLaunch) {
-        const result = await window.electron.autoLaunch.set(autoLaunch);
-        if (!result.success) {
-          throw new Error(result.error || i18nService.t('autoLaunchUpdateFailed'));
-        }
-        appConfigSaved = true;
-      }
-      if (preventSleep !== initialGeneral.preventSleep) {
-        const result = await window.electron.preventSleep.set(preventSleep);
-        if (!result.success) {
-          throw new Error(result.error || i18nService.t('preventSleepUpdateFailed'));
-        }
-        appConfigSaved = true;
-      }
-      if (
-        codemodeEnabled !== initialGeneral.codemodeEnabled ||
-        mcpNativeBridge !== initialGeneral.mcpNativeBridge
-      ) {
-        const updated = await coworkService.updateConfig({ codemodeEnabled, mcpNativeBridge });
-        if (!updated) {
-          throw new Error(i18nService.t('coworkConfigSaveFailed'));
-        }
-        appConfigSaved = true;
-      }
-      initialGeneralRef.current = { autoLaunch, preventSleep, codemodeEnabled, mcpNativeBridge };
-
-      // 应用主题
-      themeService.setStyle(themeStyle);
-      themeService.setTheme(theme);
-
-      // 应用语言
-      i18nService.setLanguage(language, { persist: false });
-
-      if (hasCoworkConfigChanges) {
-        const updated = await coworkService.updateConfig({
-          embeddingEnabled,
-          embeddingProvider,
-          embeddingModel,
-          embeddingLocalModelPath,
-          embeddingVectorWeight,
-          embeddingRemoteBaseUrl,
-          embeddingRemoteApiKey,
-        });
-        if (!updated) {
-          throw new Error(i18nService.t('coworkConfigSaveFailed'));
-        }
-      }
-
-      const channelConfigSynced = await imService.syncPendingConfig();
-      if (!channelConfigSynced) {
-        throw new Error(i18nService.t('coworkConfigSaveFailed'));
-      }
-
-      didSaveRef.current = true;
-      onClose();
-    } catch (error) {
-      setError(getSettingsSaveErrorMessage(error, appConfigSaved, key => i18nService.t(key)));
-    } finally {
-      setIsSaving(false);
+  const handleAutoLaunchChange = async (next: boolean) => {
+    const previous = autoLaunch;
+    setAutoLaunch(next);
+    const result = await window.electron.autoLaunch.set(next).catch(() => null);
+    if (!result?.success) {
+      setAutoLaunch(previous);
+      setError(result?.error || i18nService.t('autoLaunchUpdateFailed'));
     }
   };
 
-  // 标签页切换处理
-  const handleTabChange = (tab: SettingsTabType) => {
-    setActiveTab(tab);
+  const handlePreventSleepChange = async (next: boolean) => {
+    const previous = preventSleep;
+    setPreventSleep(next);
+    const result = await window.electron.preventSleep.set(next).catch(() => null);
+    if (!result?.success) {
+      setPreventSleep(previous);
+      setError(result?.error || i18nService.t('preventSleepUpdateFailed'));
+    }
   };
 
-  // Mapping from shortcut key to i18n label key for conflict messages
+  const handleCodemodeChange = async (next: boolean) => {
+    setCodemodeEnabled(next);
+    const updated = await coworkService.updateConfig({ codemodeEnabled: next });
+    if (!updated) {
+      setCodemodeEnabled(!next);
+      setError(i18nService.t('coworkConfigSaveFailed'));
+    }
+  };
+
+  const handleMcpNativeBridgeChange = async (next: boolean) => {
+    setMcpNativeBridge(next);
+    const updated = await coworkService.updateConfig({ mcpNativeBridge: next });
+    if (!updated) {
+      setMcpNativeBridge(!next);
+      setError(i18nService.t('coworkConfigSaveFailed'));
+    }
+  };
+
   const shortcutLabelMap: Record<string, string> = {
     newChat: 'newChat',
     search: 'search',
@@ -380,16 +234,14 @@ export default function SettingsPage({
     sendMessage: 'sendMessageShortcut',
   };
 
-  // 快捷键更新处理
   const handleShortcutChange = (key: keyof typeof shortcuts, value: string) => {
-    // Check for conflicts with other shortcuts (skip unset values)
     const conflictKey =
       value &&
       Object.keys(shortcuts).find(
-        k =>
-          k !== key &&
-          shortcuts[k as keyof typeof shortcuts] &&
-          shortcuts[k as keyof typeof shortcuts] === value,
+        candidate =>
+          candidate !== key &&
+          shortcuts[candidate as keyof typeof shortcuts] &&
+          shortcuts[candidate as keyof typeof shortcuts] === value,
       );
     if (conflictKey) {
       const conflictLabel = i18nService.t(shortcutLabelMap[conflictKey] ?? conflictKey);
@@ -398,18 +250,11 @@ export default function SettingsPage({
       );
       return;
     }
-    setShortcuts(prev => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
-  const handleSettingsFormKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
-    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
-    if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement) {
-      return;
-    }
-    event.preventDefault();
+    const next = { ...shortcuts, [key]: value };
+    setShortcuts(next);
+    void configService.updateConfig({ shortcuts: next }).catch(() => {
+      setError(i18nService.t('settingsSaveFailed'));
+    });
   };
 
   const { groups: navGroups, tabs: sidebarTabs } = useSettingsTabs({
@@ -419,12 +264,11 @@ export default function SettingsPage({
     managedModelsOnly,
   });
 
-  const activeTabLabel = useMemo(() => {
-    return sidebarTabs.find(t => t.key === activeTab)?.label ?? '';
-  }, [activeTab, sidebarTabs]);
+  const activeTabLabel = useMemo(
+    () => sidebarTabs.find(tab => tab.key === activeTab)?.label ?? '',
+    [activeTab, sidebarTabs],
+  );
   const contentWidthClass = settingsContentWidthClass(activeTab);
-  const footerMode: SettingsFooterMode = settingsFooterMode(activeTab);
-  const footerSecondaryLabel = settingsFooterSecondaryLabel(activeTab);
 
   const renderTabContent = () => {
     if (isEnterpriseTab(activeTab)) {
@@ -437,22 +281,25 @@ export default function SettingsPage({
         return (
           <GeneralSettingsPanel
             language={language}
-            onLanguageChange={nextLanguage => {
-              setLanguage(nextLanguage);
-              i18nService.setLanguage(nextLanguage, { persist: false });
-            }}
+            onLanguageChange={handleLanguageChange}
             autoLaunch={autoLaunch}
-            onAutoLaunchChange={setAutoLaunch}
+            onAutoLaunchChange={next => void handleAutoLaunchChange(next)}
             preventSleep={preventSleep}
-            onPreventSleepChange={setPreventSleep}
+            onPreventSleepChange={next => void handlePreventSleepChange(next)}
             useSystemProxy={useSystemProxy}
-            onUseSystemProxyChange={next => setUseSystemProxy(next)}
+            onUseSystemProxyChange={next => {
+              setUseSystemProxy(next);
+              void persistConfig({ useSystemProxy: next });
+            }}
             sqliteAutoBackupEnabled={sqliteAutoBackupEnabled}
-            onSqliteAutoBackupEnabledChange={next => setSqliteAutoBackupEnabled(next)}
+            onSqliteAutoBackupEnabledChange={next => {
+              setSqliteAutoBackupEnabled(next);
+              void persistConfig({ sqliteAutoBackupEnabled: next });
+            }}
             codemodeEnabled={codemodeEnabled}
-            onCodemodeEnabledChange={setCodemodeEnabled}
+            onCodemodeEnabledChange={next => void handleCodemodeChange(next)}
             mcpNativeBridge={mcpNativeBridge}
-            onMcpNativeBridgeChange={setMcpNativeBridge}
+            onMcpNativeBridgeChange={next => void handleMcpNativeBridgeChange(next)}
           />
         );
 
@@ -461,14 +308,8 @@ export default function SettingsPage({
           <AppearanceSettingsPanel
             appearance={theme}
             styleId={themeStyle}
-            onAppearanceChange={mode => {
-              setTheme(mode);
-              themeService.setTheme(mode);
-            }}
-            onStyleChange={id => {
-              setThemeStyle(id);
-              themeService.setStyle(id);
-            }}
+            onAppearanceChange={handleThemeChange}
+            onStyleChange={handleStyleChange}
           />
         );
 
@@ -510,7 +351,6 @@ export default function SettingsPage({
       />
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* Category sidebar; wraps into a tab strip when the window is narrow. */}
         <nav
           aria-label={i18nService.t('settings')}
           className="theme-shell-sidebar flex w-full shrink-0 flex-wrap items-center gap-1 px-2 py-2 lg:w-[220px] lg:flex-col lg:items-stretch lg:gap-4 lg:overflow-x-hidden lg:overflow-y-auto lg:px-2 lg:py-4"
@@ -546,7 +386,6 @@ export default function SettingsPage({
           ))}
         </nav>
 
-        {/* Right content */}
         <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {noticeMessage && (
             <div className="px-4 pt-4 sm:px-6">
@@ -564,12 +403,7 @@ export default function SettingsPage({
             </div>
           )}
 
-          <form
-            onSubmit={handleSubmit}
-            onKeyDown={handleSettingsFormKeyDown}
-            className="flex flex-col flex-1 overflow-hidden"
-          >
-            {/* Tab content */}
+          <div className="flex flex-col flex-1 overflow-hidden">
             <div
               ref={contentRef}
               role="region"
@@ -590,7 +424,7 @@ export default function SettingsPage({
                   activeTab === 'email' ? 'block' : 'hidden',
                 )}
               >
-                <EmailSettingsPage ref={emailSettingsRef} />
+                <EmailSettingsPage />
               </div>
               <div
                 className={cn(
@@ -614,7 +448,6 @@ export default function SettingsPage({
               )}
             </div>
 
-            {/* Footer buttons */}
             {!isEnterpriseTab(activeTab) && (
               <div className="shrink-0 border-t border-border bg-background">
                 <div
@@ -628,24 +461,13 @@ export default function SettingsPage({
                     variant="ghost"
                     className="theme-confirm-cancel min-w-16"
                     onClick={onClose}
-                    disabled={isSaving}
                   >
-                    {i18nService.t(footerSecondaryLabel)}
+                    {i18nService.t('close')}
                   </Button>
-                  {footerMode === 'draft' && (
-                    <Button
-                      type="submit"
-                      variant="default"
-                      className={localInferenceCompactButtonClass}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? i18nService.t('saving') : i18nService.t('save')}
-                    </Button>
-                  )}
                 </div>
               </div>
             )}
-          </form>
+          </div>
         </div>
       </div>
     </div>

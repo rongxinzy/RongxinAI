@@ -1,12 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@shared/components/ui/dialog';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import {
   Select,
@@ -41,6 +34,7 @@ import { useMagpiePreferences } from './useMagpiePreferences';
 
 const ModelSection = {
   Service: 'service',
+  Agents: 'agents',
   Providers: 'providers',
   Models: 'models',
   Network: 'network',
@@ -51,6 +45,7 @@ type ModelSection = (typeof ModelSection)[keyof typeof ModelSection];
 
 const MODEL_SECTIONS = [
   ModelSection.Service,
+  ModelSection.Agents,
   ModelSection.Providers,
   ModelSection.Models,
   ModelSection.Network,
@@ -60,6 +55,7 @@ const MODEL_SECTIONS = [
 
 const SECTION_LABEL_KEYS: Record<ModelSection, string> = {
   [ModelSection.Service]: 'magpieSectionService',
+  [ModelSection.Agents]: 'magpieSectionAgents',
   [ModelSection.Providers]: 'magpieSectionProviders',
   [ModelSection.Models]: 'magpieSectionModels',
   [ModelSection.Network]: 'magpieSectionNetwork',
@@ -70,7 +66,7 @@ const SECTION_LABEL_KEYS: Record<ModelSection, string> = {
 export default function ModelSettingsPanel() {
   const [section, setSection] = useState<ModelSection>(ModelSection.Service);
   const [compactSections, setCompactSections] = useState(
-    () => window.matchMedia('(max-width: 900px)').matches,
+    () => window.matchMedia('(max-width: 1100px)').matches,
   );
   const [catalog, setCatalog] = useState<MagpieModelCatalog | null>(null);
   const [selection, setSelection] = useState('');
@@ -80,13 +76,12 @@ export default function ModelSettingsPanel() {
   const [providers, setProviders] = useState<MagpieProviderSummary[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [diagnostics, setDiagnostics] = useState<MagpieDiagnosticSummary | null>(null);
-  const [externalAgentsOpen, setExternalAgentsOpen] = useState(false);
   const mounted = useRef(false);
   const locked = useRef(false);
   const actionVersion = useRef(0);
 
   useEffect(() => {
-    const query = window.matchMedia('(max-width: 900px)');
+    const query = window.matchMedia('(max-width: 1100px)');
     const onChange = () => setCompactSections(query.matches);
     query.addEventListener('change', onChange);
     return () => query.removeEventListener('change', onChange);
@@ -210,7 +205,10 @@ export default function ModelSettingsPanel() {
   const selected = models.find(model => model.id === selection);
   const saved = models.find(model => model.id === catalog?.defaultModelId);
   const needsPreferences =
-    running && section !== ModelSection.Service && section !== ModelSection.Providers;
+    running &&
+    section !== ModelSection.Service &&
+    section !== ModelSection.Agents &&
+    section !== ModelSection.Providers;
   const {
     preferences,
     saving,
@@ -397,28 +395,21 @@ export default function ModelSettingsPanel() {
               />
             </section>
           )}
-
-          {running && (
-            <section className="flex flex-col gap-3 border-t border-border pt-6">
-              <div className="flex min-w-0 flex-col gap-1">
-                <h3 className="text-base font-semibold">
-                  {i18nService.t('magpieExternalSettingsLink')}
-                </h3>
-                <p className="max-w-prose text-sm text-muted-foreground">
-                  {i18nService.t('magpieExternalSettingsLinkHint')}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="self-start"
-                onClick={() => setExternalAgentsOpen(true)}
-              >
-                {i18nService.t('magpieExternalManage')}
-              </Button>
-            </section>
-          )}
         </div>
+      )}
+
+      {section === ModelSection.Agents && (
+        <section className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 className="text-base font-semibold">
+              {i18nService.t('magpieExternalSettingsLink')}
+            </h2>
+            <p className="max-w-prose text-sm text-muted-foreground">
+              {i18nService.t('magpieExternalSettingsLinkHint')}
+            </p>
+          </div>
+          {running ? <MagpieAgentsPanel /> : preferencesUnavailable}
+        </section>
       )}
 
       {section === ModelSection.Providers && (
@@ -525,18 +516,6 @@ export default function ModelSettingsPanel() {
           ) : null}
         </div>
       )}
-
-      <Dialog open={externalAgentsOpen} onOpenChange={setExternalAgentsOpen}>
-        <DialogContent className="theme-control-sizing-4 flex max-h-[min(44rem,calc(100dvh-2rem))] flex-col gap-4 overflow-hidden sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{i18nService.t('magpieTitle')}</DialogTitle>
-            <DialogDescription>{i18nService.t('magpieExternalPanelDescription')}</DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {externalAgentsOpen ? <MagpieAgentsPanel /> : null}
-          </div>
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }

@@ -51,5 +51,6 @@ export const enSettings: Record<string, string> = {
   systemPrompt: 'System Prompt',
   systemPromptPlaceholder: 'Set custom instructions for IM bot...',
   settingsLoadFailed: 'Failed to load settings',
+  settingsSaveFailed: 'Failed to save settings',
   'settings.enterprise.managed': 'Managed by enterprise',
 };

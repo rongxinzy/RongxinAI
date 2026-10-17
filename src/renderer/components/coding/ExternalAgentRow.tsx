@@ -59,6 +59,10 @@ export function ExternalAgentRow({
     }
     return list;
   }, [field]);
+  const optionItems = useMemo(
+    () => Object.fromEntries(options.map(option => [option.value, option.label || option.value])),
+    [options],
+  );
 
   const statusKey =
     !agent || agent.cliMissing
@@ -70,7 +74,11 @@ export function ExternalAgentRow({
   const statusDetail =
     agent?.wired && !agent.cliMissing
       ? i18nService
-          .t('magpieExternalStatusConnectedDetail')
+          .t(
+            countConfiguredModels(agent) === 1
+              ? 'magpieExternalStatusConnectedDetailOne'
+              : 'magpieExternalStatusConnectedDetail',
+          )
           .replace('{count}', String(countConfiguredModels(agent)))
       : undefined;
 
@@ -88,18 +96,20 @@ export function ExternalAgentRow({
         <Icon className="size-5 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-sm font-medium">{i18nService.t(labelKey)}</h4>
+            <h3 className="text-sm font-medium">{i18nService.t(labelKey)}</h3>
             <Badge variant="outline">{i18nService.t(statusKey)}</Badge>
             {statusDetail && <span className="text-xs text-muted-foreground">{statusDetail}</span>}
             {agent?.reapplyError && (
               <Badge variant="destructive">{i18nService.t('magpieExternalReapplyError')}</Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
-            {version
-              ? i18nService.t('magpieExternalVersion').replace('{version}', version)
-              : i18nService.t('magpieVersionUnknown')}
-          </p>
+          {agent && !agent.cliMissing && (
+            <p className="text-xs text-muted-foreground">
+              {version
+                ? i18nService.t('magpieExternalVersion').replace('{version}', version)
+                : i18nService.t('magpieVersionUnknown')}
+            </p>
+          )}
         </div>
         <Switch
           checked={Boolean(agent?.wired)}
@@ -113,6 +123,7 @@ export function ExternalAgentRow({
       {field && !agent?.cliMissing && (
         <div className="flex flex-wrap items-center gap-2 pl-8">
           <Select
+            items={optionItems}
             value={draftValue || null}
             onValueChange={value => setDraftValue(value ?? '')}
             disabled={busy || options.length === 0}

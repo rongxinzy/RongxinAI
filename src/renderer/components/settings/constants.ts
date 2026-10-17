@@ -60,34 +60,6 @@ export function settingsContentWidthClass(tab: SettingsTabType): string {
   return 'max-w-3xl';
 }
 
-/**
- * Draft tabs keep local state until Save. Auto-saved tabs write immediately
- * through their own actions, so their footer must not offer a Save button that
- * has nothing left to persist.
- */
-const AUTO_SAVED_SETTINGS_TABS: readonly SettingsTabType[] = [
-  'model',
-  'aisphere',
-  'coworkMemory',
-  'about',
-];
-
-export type SettingsFooterMode = 'draft' | 'close';
-
-export function settingsFooterMode(tab: SettingsTabType): SettingsFooterMode {
-  return AUTO_SAVED_SETTINGS_TABS.includes(tab) ? 'close' : 'draft';
-}
-
-/**
- * IM fields persist on blur; the footer Save only applies pending config to the
- * gateway. Labelling the secondary action "Cancel" would promise a rollback the
- * page cannot perform, so it closes instead.
- */
-export function settingsFooterSecondaryLabel(tab: SettingsTabType): 'cancel' | 'close' {
-  if (tab === 'im') return 'close';
-  return settingsFooterMode(tab) === 'close' ? 'close' : 'cancel';
-}
-
 export const SEND_SHORTCUT_OPTIONS = [
   { value: 'Enter', label: 'Enter', labelMac: 'Enter' },
   { value: 'Shift+Enter', label: 'Shift+Enter', labelMac: 'Shift+Enter' },

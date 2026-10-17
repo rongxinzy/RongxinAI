@@ -35,7 +35,3 @@ export interface EmailConnectivityTestResult {
 }
 
 export type EmailValidationErrors = Partial<Record<EmailField, EmailValidationCode>>;
-
-export interface EmailSettingsHandle {
-  saveIfDirty: () => Promise<boolean>;
-}
