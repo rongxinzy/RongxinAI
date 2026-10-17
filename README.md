@@ -147,12 +147,23 @@ Packaging fails with an explicit error when the Magpie binary for the target is 
 
 | Command | Output |
 | --- | --- |
-| `bun run dist:win` | Alias of `dist:win:offline` |
-| `bun run dist:win:offline` | Unsigned Windows x64 build with all offline components bundled: the WebView2 installer `ZhiYuanAgent-Setup-<version>.exe` plus the NSIS updater |
-| `bun run dist:win:lite` | Alias of `dist:win:offline` |
-| `bun run dist:win:signed` | Same output, Certum-signed; requires `CERTUM_CERT_THUMBPRINT` and is used by the release workflow |
-| `bun run dist:mac` / `dist:mac:x64` / `dist:mac:arm64` / `dist:mac:universal` | macOS packages |
-| `bun run dist:linux` | Linux packages |
+#### Editions
+
+The edition is selected with `ZHIYUAN_UPDATE_VARIANT` and decides which bundled llama.cpp runtime ships. All editions bundle the offline components; nothing is downloaded on demand.
+
+| Edition | Platforms | Bundled local inference |
+| --- | --- | --- |
+| `lite` | Windows x64 only | None (no llama.cpp) |
+| `cpu` | Windows x64, Linux x64, macOS arm64 and x64 | llama.cpp CPU + Vulkan on Windows/Linux; Metal on macOS |
+| `cuda` | Windows x64, Linux x64 | llama.cpp built for RTX 40 (sm_89) with CUDA 12.4, the CUDA runtime libraries it needs, and a CPU fallback |
+
+| Command | Output |
+| --- | --- |
+| `bun run dist:win` / `dist:win:offline` / `dist:win:lite` | Unsigned Windows x64 lite build: the WebView2 installer `ZhiYuanAgent-Setup-<version>.exe` plus the NSIS updater |
+| `bun run dist:win:cpu` / `dist:win:cuda` | Same, cpu or cuda edition |
+| `bun run dist:win:signed` / `dist:win:signed:cpu` / `dist:win:signed:cuda` | Certum-signed lite / cpu / cuda; requires `CERTUM_CERT_THUMBPRINT`, used by the release workflow |
+| `bun run dist:linux:cpu` / `dist:linux:cuda` | Linux deb + AppImage, cpu or cuda (`dist:linux:cuda` compiles the CUDA llama-server locally with `scripts/build-llamacpp-cuda-rtx40.sh`) |
+| `bun run dist:mac:arm64` / `dist:mac:x64` | macOS packages; the release workflow builds them as the cpu edition |
 
 Packaging also involves platform runtimes, resources, and signing configuration; see [CONTRIBUTING.md](CONTRIBUTING.md), [RELEASING.md](RELEASING.md), and [`package.json`](package.json).
 
