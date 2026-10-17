@@ -170,10 +170,19 @@ function assertNsisBudget(
   };
 }
 
-function readComponentArchiveBytes(componentsDir, edition = resolveInferenceEdition()) {
+function readComponentArchiveBytes(
+  componentsDir,
+  edition = resolveInferenceEdition(),
+  { allowExtraComponents = false } = {},
+) {
   const targets = resolveNsisOfflineComponentTargets(edition);
   const manifest = JSON.parse(fs.readFileSync(path.join(componentsDir, 'manifest.json'), 'utf8'));
-  if (!Array.isArray(manifest.components) || manifest.components.length !== targets.length) {
+  if (
+    !Array.isArray(manifest.components) ||
+    (allowExtraComponents
+      ? manifest.components.length < targets.length
+      : manifest.components.length !== targets.length)
+  ) {
     throw new Error('Final size gate requires every bundled Windows component');
   }
   let total = 0;
@@ -207,8 +216,10 @@ function verifyFinalSetupBudget(setup, componentsDir, edition = resolveInference
   );
 }
 
+// The NSIS updater carries the seven fixed (lite) components but never the
+// llama.cpp component, so cpu/cuda manifests legitimately list extra entries.
 function readNsisUpdaterComponentDeductionBytes(componentsDir) {
-  return readComponentArchiveBytes(componentsDir, 'lite');
+  return readComponentArchiveBytes(componentsDir, 'lite', { allowExtraComponents: true });
 }
 
 function verifyFinalNsisBudget(

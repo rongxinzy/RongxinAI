@@ -22,6 +22,7 @@ const {
   readComponentArchiveBytes,
   assertPayloadDeduplication,
   verifyFinalNsisBudget,
+  readNsisUpdaterComponentDeductionBytes,
 } = require('./distribution-budget.cjs');
 const targets = require('../nsis-offline-components.json');
 const MiB = 1024 * 1024;
@@ -211,4 +212,27 @@ test('forbids duplicate root VC redistributable and duplicate managed uninstall 
   writeFileSync(path.join(payload, 'uninstall.exe'), readFileSync(host));
   writeFileSync(path.join(payload, 'ZhiYuanSetupShell.exe'), 'duplicate .NET shell');
   expect(() => assertPayloadDeduplication(payload, host)).toThrow(/duplicate payload content/);
+});
+
+test('NSIS deduction sums the fixed lite components even when cpu/cuda add llama.cpp', () => {
+  const { dir, components } = componentsFixture();
+  const liteTotal = components.reduce(
+    (sum: number, entry: { archiveSizeBytes: number }) => sum + entry.archiveSizeBytes,
+    0,
+  );
+  const extra = Buffer.from('archive-llamacpp-bundled');
+  writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), extra);
+  const withRuntime = [
+    ...components,
+    {
+      key: 'llamacpp-bundled',
+      prefix: 'llamacpp-bundled',
+      archiveSizeBytes: extra.length,
+      archiveSha256: createHash('sha256').update(extra).digest('hex'),
+    },
+  ];
+  writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ components: withRuntime }));
+  expect(readNsisUpdaterComponentDeductionBytes(dir)).toBe(liteTotal);
+  // The strict lite read still rejects a manifest that does not match exactly.
+  expect(() => readComponentArchiveBytes(dir, 'lite')).toThrow(/every bundled Windows component/);
 });
