@@ -9,6 +9,7 @@ const expectedSidecarRevision = 'ecf720f875e31b3df3464d820e6c485775719abe';
 const forbiddenRuntimePattern = /openclaw|cfmind/i;
 const forbiddenStoragePattern =
   /(?:\.openclaw|openclaw\.json|im_session_mappings|openclaw_session_key|telegramOpenClaw|feishuOpenClaw|dingtalkOpenClaw)/i;
+const forbiddenBrandingPattern = /龙虾|clawEmail|popo\.png|moltbot|DING_DWS_CLAW/i;
 const failures = [];
 
 const productionRoots = [
@@ -18,6 +19,9 @@ const productionRoots = [
   'src/scheduledTask',
   'src/shared',
 ];
+
+const brandingScanRoots = [...productionRoots, 'SKILLs', 'public'];
+const forbiddenPublicAssets = ['public/popo.png', 'public/love.png', 'public/hand.png'];
 
 const buildRoots = ['scripts', 'resources'];
 const workflowFiles = [
@@ -93,6 +97,20 @@ for (const buildRoot of buildRoots) {
   for (const relativePath of walk(buildRoot)) {
     if (relativePath.endsWith('check-openclaw-decoupling.mjs')) continue;
     checkFile(relativePath, [forbiddenRuntimePattern, forbiddenStoragePattern]);
+  }
+}
+
+for (const sourceRoot of brandingScanRoots) {
+  for (const relativePath of walk(sourceRoot)) {
+    if (/\.test\.[cm]?[jt]sx?$/i.test(relativePath)) continue;
+    if (/[/\\]design\.md$/i.test(relativePath)) continue;
+    checkFile(relativePath, [forbiddenBrandingPattern]);
+  }
+}
+
+for (const relativePath of forbiddenPublicAssets) {
+  if (fs.existsSync(path.join(root, relativePath))) {
+    failures.push(`${relativePath} must not exist`);
   }
 }
 
