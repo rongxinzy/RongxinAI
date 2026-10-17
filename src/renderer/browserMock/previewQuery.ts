@@ -21,7 +21,7 @@ export const PreviewEdition = {
 
 export type PreviewEdition = (typeof PreviewEdition)[keyof typeof PreviewEdition];
 
-export function readPreviewSearchParams(
+function readPreviewSearchParams(
   search = typeof window !== 'undefined' ? window.location.search : '',
 ): URLSearchParams {
   return new URLSearchParams(search);

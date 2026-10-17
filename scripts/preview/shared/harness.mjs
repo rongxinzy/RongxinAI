@@ -51,6 +51,20 @@ export async function settle(page) {
   await page.waitForTimeout(150);
 }
 
+/** General settings loads cowork config asynchronously; wait before screenshots. */
+export async function waitForGeneralSettingsPanel(page) {
+  const bridgeSwitch = page
+    .locator('.flex.items-center.justify-between')
+    .filter({ has: page.getByText('MCP native bridge', { exact: true }) })
+    .getByRole('switch');
+  await bridgeSwitch.waitFor({ state: 'visible', timeout: 30_000 });
+  await page.waitForFunction(
+    element => element?.getAttribute('aria-checked') === 'false',
+    await bridgeSwitch.elementHandle(),
+    { timeout: 30_000 },
+  );
+}
+
 export async function home(page, baseUrl, search = '') {
   await page.goto(`${baseUrl}${search}`, { waitUntil: 'domcontentloaded' });
   if (search.includes('previewScenario=error')) {
@@ -65,13 +79,6 @@ export async function home(page, baseUrl, search = '') {
     return;
   }
   await page.getByText('Calculator', { exact: true }).first().waitFor({ timeout: 60_000 });
-}
-
-export async function openSkills(page) {
-  await page.getByRole('button', { name: 'Files & Images' }).first().click();
-  await page.getByText('Skills', { exact: true }).first().click();
-  await page.getByText('Manage Skills', { exact: true }).click();
-  await page.getByText('Word documents').first().waitFor({ timeout: 30_000 });
 }
 
 export async function openConnectors(page, { empty = false } = {}) {

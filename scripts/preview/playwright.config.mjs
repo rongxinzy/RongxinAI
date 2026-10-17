@@ -2,6 +2,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from '@playwright/test';
 
+import { PREVIEW_LOCALE, PREVIEW_VIEWPORT } from './shared/constants.mjs';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const previewPort = Number(process.env.PREVIEW_PORT ?? 5176);
 
@@ -24,8 +26,8 @@ export default defineConfig({
   snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   use: {
     baseURL: `http://127.0.0.1:${previewPort}/`,
-    locale: 'en-US',
-    viewport: { width: 1440, height: 900 },
+    locale: PREVIEW_LOCALE,
+    viewport: PREVIEW_VIEWPORT,
     deviceScaleFactor: 1,
     trace: 'retain-on-failure',
   },

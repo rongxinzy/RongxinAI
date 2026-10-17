@@ -1,7 +1,14 @@
 import { expect } from '@playwright/test';
 
 import { settingsTabs, sidebarViews } from './constants.mjs';
-import { home, openConnectors, openSkillsPage, previewSearch, settle } from './harness.mjs';
+import {
+  home,
+  openConnectors,
+  openSkillsPage,
+  previewSearch,
+  settle,
+  waitForGeneralSettingsPanel,
+} from './harness.mjs';
 
 /**
  * @param {import('@playwright/test').Page} page
@@ -67,6 +74,7 @@ export async function walkScreens(
     await step('settings-general-lite', async () => {
       await page.getByRole('button', { name: 'Settings', exact: true }).first().click();
       await page.getByRole('button', { name: 'General', exact: true }).first().click();
+      await waitForGeneralSettingsPanel(page);
       await shot('settings-general');
     });
     return;
@@ -132,6 +140,9 @@ export async function walkScreens(
     await page.getByRole('menuitem', { name: 'Settings' }).click();
     for (const [name, label] of settingsTabs) {
       await page.getByRole('button', { name: label, exact: true }).first().click();
+      if (name === 'settings-general') {
+        await waitForGeneralSettingsPanel(page);
+      }
       await shot(name);
     }
   });

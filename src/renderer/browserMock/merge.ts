@@ -5,7 +5,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /** Deep-merge fixture overrides onto the generated surface. Functions replace wholesale. */
-export function applyOverrides<T>(base: T, overrides: DeepPartial<T> | undefined): T {
+export function applyOverrides<T extends object>(
+  base: T,
+  overrides: DeepPartial<T> | undefined,
+): T {
   if (overrides === undefined) return base;
   if (typeof overrides === 'function' || !isRecord(overrides) || !isRecord(base)) {
     return overrides as T;

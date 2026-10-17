@@ -340,6 +340,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.browser-preview == 'true'
     runs-on: ubuntu-latest
+    # Pin to the same Playwright + Chromium build as @playwright/test in bun.lock.
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble
     timeout-minutes: 20
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -347,12 +350,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun-workspace
-      - name: Restore Playwright browsers
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-      - run: bunx playwright install --with-deps chromium
       - run: bun run web:preview:contract
       - run: bun run web:preview:check
       - uses: actions/upload-artifact@v4

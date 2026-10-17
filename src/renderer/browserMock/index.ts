@@ -17,10 +17,10 @@ const runtime = createBrowserMockRuntime();
 function buildBrowserMockElectron(): Window['electron'] {
   editionWindowInjection(readPreviewEdition());
   const scenario = readPreviewScenario();
-  return applyOverrides(
-    applyOverrides(createGeneratedSurface(runtime), createInteractiveOverrides(runtime)),
-    createScenarioOverrides(scenario),
-  ) as Window['electron'];
+  let electron: Window['electron'] = createGeneratedSurface(runtime);
+  electron = applyOverrides<Window['electron']>(electron, createInteractiveOverrides(runtime));
+  electron = applyOverrides<Window['electron']>(electron, createScenarioOverrides(scenario));
+  return electron;
 }
 
 export const browserMockElectron: Window['electron'] = buildBrowserMockElectron();
