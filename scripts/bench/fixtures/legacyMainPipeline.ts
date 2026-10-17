@@ -21,7 +21,7 @@ import { CoworkRunPolicy, type CoworkContentPatch } from '../../../src/shared/co
 const MESSAGE_UPDATE_THROTTLE_MS = 200;
 const STORE_UPDATE_THROTTLE_MS = 200;
 
-export const LEGACY_ANSWER_MESSAGE_ID = 'bench-legacy-answer';
+const LEGACY_ANSWER_MESSAGE_ID = 'bench-legacy-answer';
 export const LEGACY_THINKING_MESSAGE_ID = 'bench-legacy-thinking';
 
 export type LegacyMessageKind = 'answer' | 'thinking';
@@ -42,13 +42,13 @@ interface LegacyMessageState {
 }
 
 /** main@aa288943 textWorkerOperations.ts, Content branch. */
-export interface LegacyDiffResult {
+interface LegacyDiffResult {
   readonly content: string;
   readonly offset: number;
   readonly truncated: boolean;
 }
 
-export const runLegacyContentDiff = (
+const runLegacyContentDiff = (
   content: string,
   previous: string,
   reset: boolean,
@@ -63,7 +63,7 @@ export const runLegacyContentDiff = (
 };
 
 /** main@aa288943 coworkContentProjection.ts with the worker call inlined and timed. */
-export class LegacyContentProjection {
+class LegacyContentProjection {
   private revision = 0;
   private readonly previous = new Map<string, { revision: number; content: string }>();
   private workerCpuNs = 0n;

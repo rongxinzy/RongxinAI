@@ -117,7 +117,8 @@ const buildMeta = (flags: BenchFlags, scenarioCount: number): Record<string, unk
       'Transcript store.updateMessage writes under the 200 ms leading+trailing throttle model (A: copied legacy throttles; C/D: the same model applied to the incremental pipeline).',
     rendererCommits:
       'A: rAF frames carrying at least one ContentPatch; C: rAF frames dispatching to mock Redux; D: rAF frames applying chunks (with --render: React commits of the jsdom lower-bound component).',
-    ipcBytes: 'A: legacy payload {sessionId,messageId,patch}; C/D: JSON of the sequenced PiUiEvent.',
+    ipcBytes:
+      'A: legacy payload {sessionId,messageId,patch}; C/D: JSON of the sequenced PiUiEvent.',
   },
 });
 
@@ -155,7 +156,14 @@ const main = async (): Promise<void> => {
   console.error(`[bench:stream] wrote ${outPath}`);
 };
 
-main().catch((error: unknown) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .then(() => {
+    // --render leaves React passive-effect callbacks queued on the real
+    // scheduler (one per profiled commit). They read window.event after the
+    // jsdom globals are restored, so exit once the JSON is written.
+    process.exit(0);
+  })
+  .catch((error: unknown) => {
+    console.error(error);
+    process.exit(1);
+  });

@@ -56,7 +56,7 @@ export interface ScenarioResult {
 }
 
 export const FRAME_MS = 1000 / 60;
-export const TOKEN_CHARS = 4;
+const TOKEN_CHARS = 4;
 /** thinking/text alternate in blocks of 25 tokens (100 chars) within one message. */
 const THINKING_BLOCK_TOKENS = 25;
 
@@ -71,7 +71,7 @@ export const buildCorpus = (chars: number): string => {
   return out.slice(0, chars);
 };
 
-export interface FeedToken {
+interface FeedToken {
   readonly kind: TokenKind;
   readonly delta: string;
 }
@@ -79,7 +79,7 @@ export interface FeedToken {
 export interface FeedPlan {
   readonly intervalMs: number;
   readonly tokenCount: number;
-  readonly tokenAt(index: number): FeedToken;
+  tokenAt(index: number): FeedToken;
 }
 
 /** Token i fires at virtual time i * intervalMs; kind alternates in blocks when thinking. */
@@ -104,14 +104,17 @@ export const roundTo = (value: number, digits = 3): number => {
   return Math.round(value * factor) / factor;
 };
 
-export const percentileOfSorted = (sorted: readonly number[], percent: number): number => {
+const percentileOfSorted = (sorted: readonly number[], percent: number): number => {
   if (sorted.length === 0) return 0;
   const rank = Math.max(0, Math.ceil((percent / 100) * sorted.length) - 1);
   return sorted[Math.min(rank, sorted.length - 1)]!;
 };
 
 export const percentileOf = (values: readonly number[], percent: number): number =>
-  percentileOfSorted([...values].sort((left, right) => left - right), percent);
+  percentileOfSorted(
+    [...values].sort((left, right) => left - right),
+    percent,
+  );
 
 /**
  * Per-stream end-to-end latency: deltas are recorded with their production
@@ -183,7 +186,7 @@ export interface MeasureStart {
   readonly hrtime: bigint;
 }
 
-export interface MeasureResult {
+interface MeasureResult {
   readonly cpuMs: number;
   readonly wallMs: number;
 }
@@ -193,7 +196,7 @@ export const startMeasure = (): MeasureStart => ({
   hrtime: process.hrtime.bigint(),
 });
 
-export const finishMeasure = (start: MeasureStart): MeasureResult => {
+const finishMeasure = (start: MeasureStart): MeasureResult => {
   const usage = process.cpuUsage(start.cpuUsage);
   return {
     cpuMs: (usage.user + usage.system) / 1000,
@@ -249,11 +252,14 @@ export class ThrottledSqliteCounter {
     }
     if (this.trailingArmed) return;
     this.trailingArmed = true;
-    this.clock.setTimeout(() => {
-      this.trailingArmed = false;
-      this.lastWriteAt = this.clock.now();
-      this.writes += 1;
-    }, this.intervalMs - (now - this.lastWriteAt));
+    this.clock.setTimeout(
+      () => {
+        this.trailingArmed = false;
+        this.lastWriteAt = this.clock.now();
+        this.writes += 1;
+      },
+      this.intervalMs - (now - this.lastWriteAt),
+    );
   }
 
   /** Finalization always persists the final snapshot once. */
