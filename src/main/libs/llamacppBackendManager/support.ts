@@ -13,21 +13,21 @@ import type {
   LlamaCppBackendRef,
   LlamaCppInstallProgress,
   LlamaCppRuntimeInstallResult,
-} from '../../shared/llamacpp';
-import { LlamaCppBackendError } from '../../shared/llamacpp';
-import { listLlamaCppRuntimeDevices } from './llamacppRuntimeDeviceProbe';
-import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
-import { resolveLlamaCppExecutableName } from './llamacppRuntimeInstaller';
+} from '../../../shared/llamacpp';
+import { LlamaCppBackendError } from '../../../shared/llamacpp';
+import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
+import { LlamaCppRuntimeTargetId } from '../llamacppRuntimeConstants';
+import { resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
 import {
   DownloadCancelledError,
   downloadFileWithResume,
   throwIfDownloadCancelled,
-} from './resumableDownload';
-import { DEFAULT_RELEASE_BASE_URL } from './llamacppFallbackManifest';
+} from '../resumableDownload';
+import { DEFAULT_RELEASE_BASE_URL } from '../llamacppFallbackManifest';
 import {
   getLlamaCppCurrentExecutablePath,
   toBackendRef,
-} from './llamacppBackendManagerPaths';
+} from './paths';
 
 export const BUILD_INFO_FILE = 'runtime-build-info.json';
 export const LLAMACPP_BACKEND_MANIFEST_FETCH_TIMEOUT_MS = 2_000;

@@ -1,17 +1,4 @@
 {
   "limit": 1000,
-  "caps": {
-    "MCPs/feishu/skills/lark-doc/scripts/doc_word_stat.py": 1243,
-    "MCPs/feishu/skills/lark-slides/scripts/xml_text_overlap_lint_test.py": 1229,
-    "MCPs/feishu/skills/lark-slides/scripts/xml_text_overlap_lint.py": 1421,
-    "scripts/generate-quick-case-sites.mjs": 1073,
-    "SKILLs/pdf/scripts/cover.py": 1579,
-    "SKILLs/pdf/scripts/render_body.py": 1039,
-    "src/main/codingAgent/drivers/acpCodingDriver.ts": 1231,
-    "src/main/im/imCoworkHandler.ts": 1319,
-    "src/main/libs/coworkUtil.ts": 1672,
-    "src/main/memory/projectMemoryService.ts": 1041,
-    "src/main/workbenchTask/taskService.test.ts": 1124,
-    "src/renderer/theme/components/contract.ts": 1143
-  }
+  "caps": {}
 }

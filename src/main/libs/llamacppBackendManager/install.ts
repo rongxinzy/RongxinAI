@@ -11,10 +11,10 @@ import type {
   LlamaCppRuntimeInstallResult,
   LlamaCppRuntimeUninstallResult,
   LlamaCppStatusSnapshot,
-} from '../../shared/llamacpp';
-import { allowEndUserLlamaCppRuntimeDownload } from './inferenceEditionPolicy';
-import { copyDirectoryContents, resolveLlamaCppExecutableName } from './llamacppRuntimeInstaller';
-import { DownloadCancelledError, throwIfDownloadCancelled } from './resumableDownload';
+} from '../../../shared/llamacpp';
+import { allowEndUserLlamaCppRuntimeDownload } from '../inferenceEditionPolicy';
+import { copyDirectoryContents, resolveLlamaCppExecutableName } from '../llamacppRuntimeInstaller';
+import { DownloadCancelledError, throwIfDownloadCancelled } from '../resumableDownload';
 import {
   getLlamaCppBackendDir,
   getLlamaCppBackendExecutablePath,
@@ -23,7 +23,7 @@ import {
   getManagedBackendBinDir,
   removeCurrentBackendLink,
   sanitizePathSegment,
-} from './llamacppBackendManagerPaths';
+} from './paths';
 import {
   extractArchive,
   failedInstall,
@@ -43,15 +43,15 @@ import {
   downloadArchive,
   findManifestEntry,
   resolveArchiveUrl,
-} from './llamacppBackendManagerSupport';
+} from './support';
 import {
   fetchLlamaCppBackendManifest,
   readCurrentBackendRef,
   syncCurrentBackend,
-} from './llamacppBackendManagerCatalog';
+} from './catalog';
 
 export type BackendInstallProgressReporter =
-  import('./llamacppBackendManagerSupport').BackendInstallProgressReporter;
+  import('./support').BackendInstallProgressReporter;
 
 function restorePreviousBackend(
   runtimeRoot: string,

@@ -1,3 +1,17 @@
+/**
+ * Public entry for llama.cpp manager orchestration.
+ * Implementation split under ./llamacppManager (issue #1069).
+ */
+export * from './llamacppManager/types';
+export { LlamaCppManager } from './llamacppManager/modelOps';
+export {
+  isGgufPath,
+  modelLaunchOptionsToPreset,
+  normalizePositiveInteger,
+  removeEmptyParentDirs,
+  resolveImportedModelTargetPath,
+  upsertIniSection,
+} from './llamacppManager/fileUtils';
 export { isPathInside, mergeLocalModels, scanLocalGgufModels } from './llamacppModelCatalog';
 export {
   chooseModelScopeInstallFile,
@@ -21,13 +35,3 @@ export {
   shouldEnableLlamaCppModelsAutoload,
 } from './llamacppServe';
 export { listLlamaCppRuntimeDevices } from './llamacppRuntimeDeviceProbe';
-
-export { LlamaCppManagerCore } from './llamacppManagerCore';
-export { LlamaCppManagerBackend } from './llamacppManagerBackend';
-export { LlamaCppManager } from './llamacppManagerService';
-export { LlamaCppManagerLifecycleEvent, LlamaCppProcessOutputStream } from './llamacppManagerCore';
-export type {
-  LlamaCppProcessOutputEvent,
-  LlamaCppModelsUnloadedForQuitEvent,
-} from './llamacppManagerCore';
-export { modelLaunchOptionsToPreset } from './llamacppManagerFileUtils';

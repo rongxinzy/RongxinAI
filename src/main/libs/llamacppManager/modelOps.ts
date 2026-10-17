@@ -10,24 +10,24 @@ import type {
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
   LlamaCppRuntimeInstallResult,
-} from '../../shared/llamacpp';
+} from '../../../shared/llamacpp';
 import {
   applyAutomaticLlamaCppServiceDefaults,
   LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
   resolveLlamaCppLaunchContext,
   type LlamaCppStatusSnapshot,
-} from '../../shared/llamacpp';
-import { LlamaCppClient } from './llamacppClient';
+} from '../../../shared/llamacpp';
+import { LlamaCppClient } from '../llamacppClient';
 import {
   LlamaCppManagerLifecycleEvent,
   type LlamaCppModelsUnloadedForQuitEvent,
-} from './llamacppManagerCore';
+} from './types';
 import {
   LLAMACPP_LAST_LOADED_MODEL_KEY,
   LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS,
   QUIT_RUNNING_MODELS_TIMEOUT_MS,
   QUIT_UNLOAD_MODEL_TIMEOUT_MS,
-} from './llamacppManagerCore';
+} from './core';
 import {
   isGgufPath,
   modelLaunchOptionsToPreset,
@@ -35,44 +35,44 @@ import {
   removeEmptyParentDirs,
   resolveImportedModelTargetPath,
   upsertIniSection,
-} from './llamacppManagerFileUtils';
-import { shouldKeepLlamaCppServiceRunning } from './llamacppProcessLifecycle';
-import { retryLlamaCppReadRequest } from './llamacppRequestRetry';
-import { resolveManagedModelInstallDir } from './llamacppModelInstallation';
-import { shouldEnableLlamaCppModelsAutoload } from './llamacppServe';
-import { mergeLocalModels, scanLocalGgufModels } from './llamacppModelCatalog';
+} from './fileUtils';
+import { shouldKeepLlamaCppServiceRunning } from '../llamacppProcessLifecycle';
+import { retryLlamaCppReadRequest } from '../llamacppRequestRetry';
+import { resolveManagedModelInstallDir } from '../llamacppModelInstallation';
+import { shouldEnableLlamaCppModelsAutoload } from '../llamacppServe';
+import { mergeLocalModels, scanLocalGgufModels } from '../llamacppModelCatalog';
 import {
   installModelOnce,
   isModelDownloadNotFoundError,
   isSameInstallRequest,
   prefillInstallInputFromMarketplace,
   refreshInstallInputFromMarketplace,
-} from './llamacppModelInstallation';
+} from '../llamacppModelInstallation';
 import {
   getLlamaCppBackendCompatibilityError,
   getLlamaCppBackendExecutablePath,
   getLlamaCppCurrentExecutablePath,
   installLlamaCppBackend,
   syncCurrentBackend,
-} from './llamacppBackendManager';
+} from '../llamacppBackendManager';
 import {
   backendRequiresDeviceValidation,
   validateBackendDevices,
-} from './llamacppBackendValidation';
+} from '../llamacppBackendValidation';
 import {
   prepareLlamaCppBackendVersionSwitch,
   restartLlamaCppBackendVersionService,
-} from './llamacppBackendVersionSwitch';
-import { getUserLlamaCppRuntimeRoot } from './llamacppRuntimePaths';
-import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from './llamacppNvidiaEnvironment';
+} from '../llamacppBackendVersionSwitch';
+import { getUserLlamaCppRuntimeRoot } from '../llamacppRuntimePaths';
+import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from '../llamacppNvidiaEnvironment';
 
-import { LlamaCppManagerBackend } from './llamacppManagerBackend';
+import { LlamaCppManagerService } from './serviceLifecycle';
 
 const LLAMACPP_RUNTIME_PROGRESS_KEY = LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID;
 
 type RequestOptions = { signal?: AbortSignal };
 
-export class LlamaCppManager extends LlamaCppManagerBackend {
+export class LlamaCppManager extends LlamaCppManagerService {
   async setBackendSelection(
     ref: LlamaCppBackendRef,
     options: { signal?: AbortSignal } = {},

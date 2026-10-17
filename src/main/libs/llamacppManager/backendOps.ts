@@ -19,14 +19,14 @@ import type {
   LlamaCppRuntimeUninstallResult,
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
-} from '../../shared/llamacpp';
-import type { LlamaCppBackendRef } from '../../shared/llamacpp';
+} from '../../../shared/llamacpp';
+import type { LlamaCppBackendRef } from '../../../shared/llamacpp';
 import {
   applyAutomaticLlamaCppServiceDefaults,
   isLikelyCudaDriverMismatchError,
   LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
   resolveLlamaCppLaunchContext,
-} from '../../shared/llamacpp';
+} from '../../../shared/llamacpp';
 import {
   fetchLlamaCppBackendManifest,
   getLlamaCppBackendCompatibilityError,
@@ -41,35 +41,35 @@ import {
   resolveLlamaCppBackendDownloadSize,
   syncCurrentBackend,
   uninstallLlamaCppBackend,
-} from './llamacppBackendManager';
+} from '../llamacppBackendManager';
 import {
   backendRequiresDeviceValidation,
   validateBackendDevices,
-} from './llamacppBackendValidation';
+} from '../llamacppBackendValidation';
 import {
   prepareLlamaCppBackendVersionSwitch,
   restartLlamaCppBackendVersionService,
-} from './llamacppBackendVersionSwitch';
+} from '../llamacppBackendVersionSwitch';
 import {
   readBundledLlamaCppRuntimeManifest,
   resolveBundledLlamaCppExecutablePath,
-} from './llamacppBundledRuntime';
+} from '../llamacppBundledRuntime';
 import {
   isVulkanBackendStartupFailure,
   resolveBundledEditionRuntime,
   type ResolvedBundledRuntime,
-} from './llamacppBundledRuntimeSelection';
+} from '../llamacppBundledRuntimeSelection';
 import {
   primaryGpuSupportsCudaEdition,
   resolveCudaEditionGpuMessage,
   shouldEnforceCudaEditionGpuPolicy,
-} from './llamacppCudaEditionPolicy';
+} from '../llamacppCudaEditionPolicy';
 import {
   isLocalInferenceFeatureEnabled,
   usesBundledLlamaCppRuntime,
-} from './inferenceEditionPolicy';
-import { LlamaCppClient } from './llamacppClient';
-import { isPathInside, mergeLocalModels, scanLocalGgufModels } from './llamacppModelCatalog';
+} from '../inferenceEditionPolicy';
+import { LlamaCppClient } from '../llamacppClient';
+import { isPathInside, mergeLocalModels, scanLocalGgufModels } from '../llamacppModelCatalog';
 import {
   installModelOnce,
   isModelDownloadNotFoundError,
@@ -77,24 +77,24 @@ import {
   prefillInstallInputFromMarketplace,
   refreshInstallInputFromMarketplace,
   resolveManagedModelInstallDir,
-} from './llamacppModelInstallation';
-import { getDefaultLlamaCppModelsDir } from './llamacppModelLibraryPath';
+} from '../llamacppModelInstallation';
+import { getDefaultLlamaCppModelsDir } from '../llamacppModelLibraryPath';
 import {
   createLlamaCppServerSpawnOptions,
   shouldKeepLlamaCppServiceRunning,
-} from './llamacppProcessLifecycle';
-import { retryLlamaCppReadRequest } from './llamacppRequestRetry';
+} from '../llamacppProcessLifecycle';
+import { retryLlamaCppReadRequest } from '../llamacppRequestRetry';
 import {
   createLlamaCppRuntimeInstallPlan,
   executeLlamaCppRuntimeInstallPlan,
   resolveLlamaCppExecutableName,
-} from './llamacppRuntimeInstaller';
+} from '../llamacppRuntimeInstaller';
 import {
   findExternalLlamaCppExecutable,
   findLlamaCppExecutable,
   getUserLlamaCppRuntimeRoot,
   resolveLlamaCppRuntimeMetadata,
-} from './llamacppRuntimePaths';
+} from '../llamacppRuntimePaths';
 import {
   buildLlamaCppServeEnv,
   buildLlamaCppServiceConfigFieldSupport,
@@ -104,13 +104,13 @@ import {
   listLlamaCppRuntimeHelpFlags,
   resolveLlamaCppDeviceSelection,
   shouldEnableLlamaCppModelsAutoload,
-} from './llamacppServe';
-import { listLlamaCppRuntimeDevices } from './llamacppRuntimeDeviceProbe';
-import { MarketplaceService } from './marketplaceService';
-import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from './llamacppNvidiaEnvironment';
-import { t } from '../i18n';
+} from '../llamacppServe';
+import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
+import { MarketplaceService } from '../marketplaceService';
+import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from '../llamacppNvidiaEnvironment';
+import { t } from '../../i18n';
 
-import { LlamaCppManagerCore } from './llamacppManagerCore';
+import { LlamaCppManagerCore } from './core';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = '8080';
@@ -136,34 +136,7 @@ type LlamaCppManagerStorage = {
   delete(key: string): void;
 };
 
-export const LlamaCppManagerLifecycleEvent = {
-  ModelsUnloadedForQuit: 'models-unloaded-for-quit',
-  ProcessOutput: 'process-output',
-} as const;
-
-export type LlamaCppManagerLifecycleEvent =
-  (typeof LlamaCppManagerLifecycleEvent)[keyof typeof LlamaCppManagerLifecycleEvent];
-
-export const LlamaCppProcessOutputStream = {
-  Stdout: 'stdout',
-  Stderr: 'stderr',
-} as const;
-
-export type LlamaCppProcessOutputStream =
-  (typeof LlamaCppProcessOutputStream)[keyof typeof LlamaCppProcessOutputStream];
-
-export type LlamaCppProcessOutputEvent = {
-  stream: LlamaCppProcessOutputStream;
-  text: string;
-  createdAt: string;
-  pid?: number;
-};
-
-export type LlamaCppModelsUnloadedForQuitEvent = {
-  modelNames: string[];
-};
-
-export class LlamaCppManagerBackend extends LlamaCppManagerCore {
+export class LlamaCppManagerBackendOps extends LlamaCppManagerCore {
   async listBackends(): Promise<LlamaCppBackendListResult> {
     const cacheKey = this.getBackendListCacheKey();
     const cached = this.backendListCache;

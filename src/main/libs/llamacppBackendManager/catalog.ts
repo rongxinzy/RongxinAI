@@ -9,19 +9,19 @@ import type {
   LlamaCppBackendRef,
   LlamaCppInstallProgress,
   LlamaCppServiceConfig,
-} from '../../shared/llamacpp';
+} from '../../../shared/llamacpp';
 import {
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   resolvePreferredLlamaCppRuntimeCudaMajor,
-} from '../../shared/llamacpp';
-import { readBundledLlamaCppBackendManifest } from './llamacppBackendResources';
-import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
+} from '../../../shared/llamacpp';
+import { readBundledLlamaCppBackendManifest } from '../llamacppBackendResources';
+import { LlamaCppRuntimeTargetId } from '../llamacppRuntimeConstants';
 import {
   buildFallbackManifest,
   DEFAULT_RUNTIME_VERSION,
   DEFAULT_RELEASE_BASE_URL,
-} from './llamacppFallbackManifest';
+} from '../llamacppFallbackManifest';
 import {
   getLlamaCppBackendDir,
   getLlamaCppBackendExecutablePath,
@@ -31,7 +31,7 @@ import {
   removeCurrentBackendLink,
   resolveManagedBackendExecutablePath,
   toBackendRef,
-} from './llamacppBackendManagerPaths';
+} from './paths';
 import {
   backendDownloadSizeCache,
   BUILD_INFO_FILE,
@@ -50,9 +50,9 @@ import {
   setHasLoggedManifestFallback,
   shouldLogManifestFallbackWarning,
   validateBackendForMachine,
-} from './llamacppBackendManagerSupport';
+} from './support';
 
-export type LlamaCppBackendSelectionInput = {
+type LlamaCppBackendSelectionInput = {
   platform: NodeJS.Platform;
   arch: string;
   hasNvidiaGpu: boolean;

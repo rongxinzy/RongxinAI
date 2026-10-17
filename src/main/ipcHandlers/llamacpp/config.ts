@@ -1,4 +1,4 @@
-import type { SqliteStore } from '../sqliteStore';
+import type { SqliteStore } from '../../sqliteStore';
 import {
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
   getLlamaCppAcceleratorDevices,
@@ -12,16 +12,16 @@ import {
   LlamaCppModelResidencyMode,
   LlamaCppStructuredServiceFieldKey,
   normalizeLlamaCppKvCacheType,
-} from '../../shared/llamacpp';
+} from '../../../shared/llamacpp';
 import type {
   LlamaCppModelLaunchInput,
   LlamaCppModelPreference,
   LlamaCppModelPreferences,
   LlamaCppServiceConfig,
   LlamaCppSetModelPreferenceInput,
-} from '../../shared/llamacpp';
-import { ModelCapabilityStatus, type ModelCapabilities } from '../../shared/providers';
-import { resolveLlamaCppDeviceSelection } from '../libs/llamacppManager';
+} from '../../../shared/llamacpp';
+import { ModelCapabilityStatus, type ModelCapabilities } from '../../../shared/providers';
+import { resolveLlamaCppDeviceSelection } from '../../libs/llamacppManager';
 
 export const LLAMACPP_SERVICE_CONFIG_KEY = 'llamacpp_service_config';
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';

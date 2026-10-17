@@ -129,7 +129,10 @@ const config: KnipConfig = {
   ignoreIssues: {
     'src/main/llamacppModelDaemonEntry.ts': ['exports', 'types', 'files'],
     'src/main/libs/llamacpp*.ts': ['exports', 'types', 'files'],
+    'src/main/libs/llamacppManager/**/*.ts': ['exports', 'types', 'files'],
+    'src/main/libs/llamacppBackendManager/**/*.ts': ['exports', 'types', 'files'],
     'src/main/ipcHandlers/llamacpp.ts': ['exports', 'types', 'files'],
+    'src/main/ipcHandlers/llamacpp/**/*.ts': ['exports', 'types', 'files'],
     'src/shared/llamacpp/**': ['exports', 'types', 'files'],
     'src/renderer/utils/llamacppAgentEligibility.ts': ['exports', 'types', 'files'],
     'scripts/**/*llamacpp*': ['exports', 'types', 'files'],

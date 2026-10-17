@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import type { LlamaCppModelLaunchInput } from '../../shared/llamacpp';
+import type { LlamaCppModelLaunchInput } from '../../../shared/llamacpp';
 
 export function normalizePositiveInteger(value: string | undefined): number | undefined {
   const trimmed = value?.trim();
