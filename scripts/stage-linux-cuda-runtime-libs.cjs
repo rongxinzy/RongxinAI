@@ -45,7 +45,10 @@ function resolveLibrarySource(resolvedPath, searchDirs) {
 }
 
 function copyLibraryWithSoname(sourcePath, targetDir, soname) {
-  if (NVIDIA_DRIVER_CUDA_LIB.test(soname) || NVIDIA_DRIVER_CUDA_LIB.test(path.basename(sourcePath))) {
+  if (
+    NVIDIA_DRIVER_CUDA_LIB.test(soname) ||
+    NVIDIA_DRIVER_CUDA_LIB.test(path.basename(sourcePath))
+  ) {
     throw new Error(`Refusing to bundle NVIDIA driver library ${soname}`);
   }
   fs.mkdirSync(targetDir, { recursive: true });
@@ -126,7 +129,9 @@ function stageLinuxCudaRuntimeLibraries(serverPath, options = {}) {
 if (require.main === module) {
   const serverPath = path.resolve(process.argv[2] || '');
   if (!serverPath) {
-    console.error('[stage-linux-cuda-runtime-libs] Usage: node scripts/stage-linux-cuda-runtime-libs.cjs <path/to/llama-server>');
+    console.error(
+      '[stage-linux-cuda-runtime-libs] Usage: node scripts/stage-linux-cuda-runtime-libs.cjs <path/to/llama-server>',
+    );
     process.exit(1);
   }
   try {

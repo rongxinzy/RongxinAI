@@ -42,9 +42,9 @@ describe('stageLinuxCudaRuntimeLibs', () => {
   });
 
   test('resolveLibrarySource rejects missing libraries outside search dirs', () => {
-    expect(() =>
-      resolveLibrarySource('/nonexistent/libfoo.so.1', ['/also/missing']),
-    ).toThrow('Could not resolve shared library path');
+    expect(() => resolveLibrarySource('/nonexistent/libfoo.so.1', ['/also/missing'])).toThrow(
+      'Could not resolve shared library path',
+    );
   });
 
   test('NVIDIA_DRIVER_CUDA_LIB matches driver sonames only', () => {

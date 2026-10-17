@@ -50,7 +50,10 @@ function main() {
       manifest.cpuFallbackSha256 = sha256File(fallbackPath);
     }
   }
-  fs.writeFileSync(path.join(targetRoot, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  fs.writeFileSync(
+    path.join(targetRoot, 'manifest.json'),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+  );
   console.log(
     `[prepare-inference-edition-runtime] Staged ${edition} runtime to resources/llamacpp-bundled (${manifest.sha256.slice(0, 12)}…).`,
   );

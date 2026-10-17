@@ -58,9 +58,7 @@ function verifyBundledSha256(
   return absolute;
 }
 
-export async function detectUsableBundledVulkanGpu(
-  vulkanExecutablePath: string,
-): Promise<boolean> {
+export async function detectUsableBundledVulkanGpu(vulkanExecutablePath: string): Promise<boolean> {
   if (!vulkanExecutablePath || !fs.existsSync(vulkanExecutablePath)) return false;
   const cached = gpuProbeCache.get(vulkanExecutablePath);
   if (cached !== undefined) return cached;

@@ -117,7 +117,9 @@ try {
     // component-<key>.* when staging for the shared validator).
     const manifestPath = path.join(componentsDir, 'manifest.json');
     if (!fs.existsSync(manifestPath)) fail(`component manifest missing: ${manifestPath}`);
-    const { resolveNsisOfflineComponentTargets } = require('../resolve-nsis-offline-components.cjs');
+    const {
+      resolveNsisOfflineComponentTargets,
+    } = require('../resolve-nsis-offline-components.cjs');
     const targets = resolveNsisOfflineComponentTargets();
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     if (!Array.isArray(manifest.components) || manifest.components.length !== targets.length) {

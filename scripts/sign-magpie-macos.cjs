@@ -28,7 +28,9 @@ async function signWithRuntimeManifest(options, signer = signAsync) {
   const root = path.join(options.app, 'Contents', 'Resources', 'magpie');
   const packagedTargets = listPackagedMacMagpieTargets(root);
   if (packagedTargets.length === 0) {
-    throw new Error('macOS signing expected at least one packaged Magpie helper under Resources/magpie');
+    throw new Error(
+      'macOS signing expected at least one packaged Magpie helper under Resources/magpie',
+    );
   }
   const manifests = new Map(packagedTargets.map(key => [key, verifyRuntime(root, key)]));
   let manifestSealed = false;

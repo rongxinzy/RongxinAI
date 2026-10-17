@@ -15,9 +15,7 @@ describe('resolveLlamaCppRuntimeAssetDownloadUrls', () => {
         releaseTag: 'b9244',
         env: {},
       }),
-    ).toEqual([
-      `${DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL}/b9244/llama-b9244-bin-win-cpu-x64.zip`,
-    ]);
+    ).toEqual([`${DEFAULT_LLAMACPP_RUNTIME_RELEASES_URL}/b9244/llama-b9244-bin-win-cpu-x64.zip`]);
   });
 
   test('prefers official GitHub in CI with optional mirror fallback', () => {

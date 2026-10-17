@@ -309,10 +309,7 @@ function runtimeBackendFieldsFromTargetId(
       runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda12,
     };
   }
-  if (
-    targetId === LlamaCppRuntimeTargetId.LinuxX64Cuda13 ||
-    targetId === 'win-x64-cuda-13'
-  ) {
+  if (targetId === LlamaCppRuntimeTargetId.LinuxX64Cuda13 || targetId === 'win-x64-cuda-13') {
     return {
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
       runtimeCudaMajor: LlamaCppRuntimeCudaMajor.Cuda13,

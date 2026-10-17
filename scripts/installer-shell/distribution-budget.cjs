@@ -4,7 +4,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { MAX_SETUP_BYTES, inspectSetup } = require('./sfx-format.cjs');
 const { sha256File } = require('../windows-resource-pack.cjs');
-const { resolveNsisOfflineComponentTargets, resolveInferenceEdition } = require('../resolve-nsis-offline-components.cjs');
+const {
+  resolveNsisOfflineComponentTargets,
+  resolveInferenceEdition,
+} = require('../resolve-nsis-offline-components.cjs');
 
 const MiB = 1024 * 1024;
 const MAX_COMPONENT_BYTES = 300 * MiB;
@@ -52,12 +55,7 @@ function resolveEditionNsisBudget(edition = resolveInferenceEdition()) {
   return EDITION_NSIS_BUDGETS[edition] || EDITION_NSIS_BUDGETS.lite;
 }
 
-function assertBudget(
-  installerBytes,
-  componentArchiveBytes,
-  limits,
-  label,
-) {
+function assertBudget(installerBytes, componentArchiveBytes, limits, label) {
   if (
     !Number.isSafeInteger(installerBytes) ||
     !Number.isSafeInteger(componentArchiveBytes) ||
@@ -75,10 +73,7 @@ function assertBudget(
   if (limits.maxInstallerBytes != null && installerBytes > limits.maxInstallerBytes) {
     throw new Error(`Final ${label} exceeds the ${limits.maxInstallerBytes / MiB} MiB budget`);
   }
-  if (
-    limits.maxNonComponentBytes != null &&
-    nonComponentBytes > limits.maxNonComponentBytes
-  ) {
+  if (limits.maxNonComponentBytes != null && nonComponentBytes > limits.maxNonComponentBytes) {
     throw new Error(
       `Final ${label} non-component bytes exceed the ${limits.maxNonComponentBytes / MiB} MiB budget`,
     );
@@ -106,7 +101,11 @@ function assertSetupBudget(installerBytes, componentArchiveBytes) {
   );
 }
 
-function assertNsisBudget(installerBytes, componentArchiveBytes, edition = resolveInferenceEdition()) {
+function assertNsisBudget(
+  installerBytes,
+  componentArchiveBytes,
+  edition = resolveInferenceEdition(),
+) {
   const limits = resolveEditionNsisBudget(edition);
   if (limits.maxInstallerBytes == null) {
     return {
@@ -161,7 +160,11 @@ function readNsisUpdaterComponentDeductionBytes(componentsDir) {
   return readComponentArchiveBytes(componentsDir, 'lite');
 }
 
-function verifyFinalNsisBudget(releaseDir, componentArchiveBytes, edition = resolveInferenceEdition()) {
+function verifyFinalNsisBudget(
+  releaseDir,
+  componentArchiveBytes,
+  edition = resolveInferenceEdition(),
+) {
   const limits = resolveEditionNsisBudget(edition);
   if (limits.maxInstallerBytes == null) {
     return { edition, skipped: true, componentArchiveBytes };

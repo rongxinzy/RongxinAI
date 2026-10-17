@@ -46,11 +46,7 @@ export function applyAutomaticLlamaCppServiceDefaults(
       ? {}
       : { ctxSize: resolveAutomaticLlamaCppContextSize(input.nvidiaSnapshot) }),
     ...(hasNvidiaGpu && !config.flashAttn?.trim() ? { flashAttn: 'on' as const } : {}),
-    ...(hasNvidiaGpu && !config.cacheTypeK?.trim()
-      ? { cacheTypeK: LlamaCppKvCacheType.Q8_0 }
-      : {}),
-    ...(hasNvidiaGpu && !config.cacheTypeV?.trim()
-      ? { cacheTypeV: LlamaCppKvCacheType.Q8_0 }
-      : {}),
+    ...(hasNvidiaGpu && !config.cacheTypeK?.trim() ? { cacheTypeK: LlamaCppKvCacheType.Q8_0 } : {}),
+    ...(hasNvidiaGpu && !config.cacheTypeV?.trim() ? { cacheTypeV: LlamaCppKvCacheType.Q8_0 } : {}),
   };
 }

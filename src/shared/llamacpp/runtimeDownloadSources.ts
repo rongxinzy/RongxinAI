@@ -26,9 +26,7 @@ export function resolveLlamaCppRuntimeAssetDownloadUrls(
 
   const explicitUrl = env.LLAMACPP_RUNTIME_URL?.trim();
   if (explicitUrl) {
-    return [
-      explicitUrl.replace(/\{target\}/g, targetId).replace(/\{asset\}/g, assetName),
-    ];
+    return [explicitUrl.replace(/\{target\}/g, targetId).replace(/\{asset\}/g, assetName)];
   }
 
   const baseUrl = env.LLAMACPP_RUNTIME_BASE_URL?.trim();

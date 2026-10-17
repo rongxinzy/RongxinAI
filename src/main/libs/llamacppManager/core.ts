@@ -140,6 +140,7 @@ import {
   LlamaCppManagerLifecycleEvent,
   LlamaCppProcessOutputStream,
   type LlamaCppModelsUnloadedForQuitEvent,
+  type LlamaCppProcessOutputEvent,
 } from './types';
 
 export class LlamaCppManagerCore extends EventEmitter {
@@ -267,7 +268,6 @@ export class LlamaCppManagerCore extends EventEmitter {
       return config;
     }
   }
-
 
   async installRuntime(
     options: { signal?: AbortSignal } = {},

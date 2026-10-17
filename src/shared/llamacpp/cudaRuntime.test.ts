@@ -32,8 +32,8 @@ test('resolvePreferredLlamaCppRuntimeCudaMajor prefers configured major and driv
 });
 
 test('isLikelyCudaDriverMismatchError detects common CUDA driver/runtime failures', () => {
-  expect(isLikelyCudaDriverMismatchError('CUDA driver version is insufficient for CUDA runtime')).toBe(
-    true,
-  );
+  expect(
+    isLikelyCudaDriverMismatchError('CUDA driver version is insufficient for CUDA runtime'),
+  ).toBe(true);
   expect(isLikelyCudaDriverMismatchError('model file not found')).toBe(false);
 });

@@ -5,7 +5,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { verifyPackagedMagpie } = require('../magpie-runtime.cjs');
-const { verifyWindowsCompressedChannelRuntime } = require('./verify-windows-packaged-components.cjs');
+const {
+  verifyWindowsCompressedChannelRuntime,
+} = require('./verify-windows-packaged-components.cjs');
 
 const retiredRuntimeSegment = ['open', 'claw'].join('');
 const retiredMindSegment = ['cf', 'mind'].join('');
@@ -112,7 +114,9 @@ function verifyPackagedLlamaCppBundled(context) {
   }
 
   if (context.electronPlatformName === 'win32') {
-    const { verifyWindowsCompressedLlamaCppBundled } = require('./verify-windows-packaged-components.cjs');
+    const {
+      verifyWindowsCompressedLlamaCppBundled,
+    } = require('./verify-windows-packaged-components.cjs');
     verifyWindowsCompressedLlamaCppBundled(context);
     return;
   }

@@ -12,12 +12,16 @@ export function isRtx40ClassComputeCapability(value: string | undefined): boolea
   return normalized === LLAMACPP_CUDA_EDITION_COMPUTE_CAPABILITY || normalized.startsWith('8.9');
 }
 
-export function primaryGpuSupportsCudaEdition(snapshot: NvidiaSmiSnapshot | null | undefined): boolean {
+export function primaryGpuSupportsCudaEdition(
+  snapshot: NvidiaSmiSnapshot | null | undefined,
+): boolean {
   const gpu = snapshot?.gpus?.[0];
   return isRtx40ClassComputeCapability(gpu?.computeCapability);
 }
 
-export function resolveCudaEditionGpuMessage(snapshot: NvidiaSmiSnapshot | null | undefined): string {
+export function resolveCudaEditionGpuMessage(
+  snapshot: NvidiaSmiSnapshot | null | undefined,
+): string {
   const capability = snapshot?.gpus?.[0]?.computeCapability ?? '?';
   return t('llamacppCudaEditionUnsupportedGpu', {
     capability: String(capability),

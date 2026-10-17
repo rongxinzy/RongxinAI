@@ -155,22 +155,25 @@ jobs:
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - name: Read pinned Magpie Go toolchain
+        id: magpie-toolchain
+        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
       - uses: actions/setup-go@v6
         with:
-          go-version: '1.26.8'
+          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
           cache: false
       - name: Cache Magpie module and build scratch
         uses: actions/cache@v5
         with:
           path: .cache/magpie
-          key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go1.26.8-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
-      - name: Build and verify Magpie runtime
+          key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go${{ steps.magpie-toolchain.outputs.go-version }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
+      - name: Build and verify pinned Magpie gateway
         shell: bash
         env:
           MAGPIE_TARGET: ${{ matrix.platform == 'linux' && 'linux-x64' || matrix.platform == 'windows' && 'win32-x64' || (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
         run: |
           set -euo pipefail
-          go version | grep -Fq 'go1.26.8'
+          go version | grep -Fq "go${{ steps.magpie-toolchain.outputs.go-version }}"
           bun run magpie:build -- --target "${MAGPIE_TARGET}"
           bun run magpie:verify -- --target "${MAGPIE_TARGET}"
       - name: Set up installer shell SDK
@@ -221,11 +224,15 @@ jobs:
       - name: Install Ninja (Windows CUDA)
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         run: choco install ninja -y
-      - name: Compile llama-server (Windows CUDA)
+      - name: Set up MSVC developer environment (Windows CUDA)
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         uses: ilammy/msvc-dev-cmd@v1
         with:
-          cmd: bash scripts/build-llamacpp-cuda-rtx40.sh win
+          arch: x64
+      - name: Compile llama-server (Windows CUDA)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        shell: bash
+        run: bash scripts/build-llamacpp-cuda-rtx40.sh win
       - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
         shell: bash

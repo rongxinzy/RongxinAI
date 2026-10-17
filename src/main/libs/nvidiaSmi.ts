@@ -111,7 +111,9 @@ function parseNvidiaSmiLine(line: string): NvidiaGpuInfo | null {
   }
 
   const driverVersion = parts.length >= 5 ? parts[parts.length - 1] : undefined;
-  const memoryFreeMiB = parseMemoryMiB(parts[parts.length >= 5 ? parts.length - 2 : parts.length - 1]);
+  const memoryFreeMiB = parseMemoryMiB(
+    parts[parts.length >= 5 ? parts.length - 2 : parts.length - 1],
+  );
   const memoryTotalMiB = parseMemoryMiB(
     parts[parts.length >= 5 ? parts.length - 3 : parts.length - 2],
   );

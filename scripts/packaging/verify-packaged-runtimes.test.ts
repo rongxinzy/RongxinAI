@@ -47,7 +47,10 @@ function writeChannelRuntimeFixture(options: {
   const checksum = checksumOverride ?? actualChecksum;
 
   fs.mkdirSync(path.join(appOutDir, 'resources', 'channel-runtime'), { recursive: true });
-  fs.writeFileSync(path.join(appOutDir, 'resources', 'channel-runtime', 'cc-connect-sidecar'), sidecarBytes);
+  fs.writeFileSync(
+    path.join(appOutDir, 'resources', 'channel-runtime', 'cc-connect-sidecar'),
+    sidecarBytes,
+  );
 
   if (includeBuildInfo) {
     fs.writeFileSync(
@@ -104,7 +107,11 @@ describe('verifyPackagedRuntimes', () => {
     const appOutDir = tempRoot();
     const retiredRuntimeDir = ['open', 'claw'].join('');
     fs.mkdirSync(path.join(appOutDir, 'resources', retiredRuntimeDir), { recursive: true });
-    const context = { appOutDir, electronPlatformName: 'linux', packager: { projectDir: appOutDir } };
+    const context = {
+      appOutDir,
+      electronPlatformName: 'linux',
+      packager: { projectDir: appOutDir },
+    };
     expect(() => verifyNoRetiredRuntimeArtifacts(context)).toThrow('retired runtime path');
   });
 
@@ -119,7 +126,9 @@ describe('verifyPackagedRuntimes', () => {
     const sidecarBytes = Buffer.from('pinned sidecar');
     writeChannelRuntimeFixture({ projectRoot, appOutDir, sidecarBytes });
 
-    expect(() => verifyPackagedChannelRuntime(linuxPackagingContext(projectRoot, appOutDir))).not.toThrow();
+    expect(() =>
+      verifyPackagedChannelRuntime(linuxPackagingContext(projectRoot, appOutDir)),
+    ).not.toThrow();
   });
 
   test('rejects channel sidecar when sha256 does not match package.json pin', () => {
@@ -141,9 +150,9 @@ describe('verifyPackagedRuntimes', () => {
       })}\n`,
     );
 
-    expect(() => verifyPackagedChannelRuntime(linuxPackagingContext(projectRoot, appOutDir))).toThrow(
-      'SHA-256 mismatch',
-    );
+    expect(() =>
+      verifyPackagedChannelRuntime(linuxPackagingContext(projectRoot, appOutDir)),
+    ).toThrow('SHA-256 mismatch');
   });
 
   test('rejects packaged channel runtime when package.json pin is missing', () => {
@@ -168,9 +177,9 @@ describe('verifyPackagedRuntimes', () => {
       })}\n`,
     );
 
-    expect(() => verifyPackagedChannelRuntime(linuxPackagingContext(projectRoot, appOutDir))).toThrow(
-      'missing channelRuntime pin',
-    );
+    expect(() =>
+      verifyPackagedChannelRuntime(linuxPackagingContext(projectRoot, appOutDir)),
+    ).toThrow('missing channelRuntime pin');
   });
 
   test('rejects non-lite packaging when runtime-build-info.json is missing', () => {
@@ -183,9 +192,9 @@ describe('verifyPackagedRuntimes', () => {
       includeBuildInfo: false,
     });
 
-    expect(() => verifyPackagedChannelRuntime(linuxPackagingContext(projectRoot, appOutDir))).toThrow(
-      'runtime-build-info.json',
-    );
+    expect(() =>
+      verifyPackagedChannelRuntime(linuxPackagingContext(projectRoot, appOutDir)),
+    ).toThrow('runtime-build-info.json');
   });
 
   test('rejects lite edition when llamacpp-bundled is present in packaged resources', () => {

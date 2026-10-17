@@ -51,10 +51,15 @@ export function estimateLlamaCppKvBytesPerToken(input: {
   cacheTypeK?: string;
   cacheTypeV?: string;
 }): number {
-  const modelGiB = input.modelSizeBytes / (1024 ** 3);
-  const f16BytesPerToken = Math.max(48, Math.min(512, Math.round(128 * Math.max(0.5, modelGiB / 4))));
+  const modelGiB = input.modelSizeBytes / 1024 ** 3;
+  const f16BytesPerToken = Math.max(
+    48,
+    Math.min(512, Math.round(128 * Math.max(0.5, modelGiB / 4))),
+  );
   return Math.max(
     16,
-    Math.round(f16BytesPerToken * resolveLlamaCppKvCacheBpvFactor(input.cacheTypeK, input.cacheTypeV)),
+    Math.round(
+      f16BytesPerToken * resolveLlamaCppKvCacheBpvFactor(input.cacheTypeK, input.cacheTypeV),
+    ),
   );
 }

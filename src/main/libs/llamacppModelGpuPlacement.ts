@@ -119,9 +119,7 @@ function validateManualMemoryBudget(
   const budgetMiB = Math.floor(systemMemory.totalMemoryMiB * (budgetPercent / 100));
   const availableSystemMemoryMiB = Math.min(budgetMiB, systemMemory.freeMemoryMiB);
   const availableMemoryMiB = availableSystemMemoryMiB + sumAvailableVramMiB(input.nvidiaSnapshot);
-  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(
-    buildMemoryEstimateInput(input),
-  );
+  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(buildMemoryEstimateInput(input));
   if (requiredMemoryMiB <= availableMemoryMiB) return null;
 
   return {
@@ -211,9 +209,7 @@ function selectGpuIndexes(input: LlamaCppModelGpuPlacementInput): number[] {
   const candidates = (input.nvidiaSnapshot?.gpus ?? [])
     .filter(gpu => Number.isFinite(gpu.memoryFreeMiB) && (gpu.memoryFreeMiB ?? -1) >= 0)
     .sort((left, right) => (right.memoryFreeMiB ?? 0) - (left.memoryFreeMiB ?? 0));
-  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(
-    buildMemoryEstimateInput(input),
-  );
+  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB(buildMemoryEstimateInput(input));
   const selected: number[] = [];
   let availableMemoryMiB = 0;
 

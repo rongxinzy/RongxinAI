@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -193,7 +194,12 @@ async function finalizeLinuxEdition(hostTargetId, cudaBackendId, executableName,
   );
 }
 
-async function finalizeWindowsEdition(hostTargetId, cudaBackendId, executableName, builtServerBytes) {
+async function finalizeWindowsEdition(
+  hostTargetId,
+  cudaBackendId,
+  executableName,
+  builtServerBytes,
+) {
   ensureCpuEditionStaged(hostTargetId);
 
   const urls = resolveRuntimeDownloadSources(cudaBackendId, { rootDir: ROOT });

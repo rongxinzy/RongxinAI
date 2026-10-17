@@ -62,7 +62,10 @@ describe('verifyWindowsPackagedComponents', () => {
     fs.rmSync(stagingRoot, { recursive: true, force: true });
     expect(packed.status).toBe(0);
 
-    const archiveSha256 = crypto.createHash('sha256').update(fs.readFileSync(archivePath)).digest('hex');
+    const archiveSha256 = crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(archivePath))
+      .digest('hex');
     fs.writeFileSync(
       path.join(componentsDir, 'channel-runtime.manifest.json'),
       `${JSON.stringify({

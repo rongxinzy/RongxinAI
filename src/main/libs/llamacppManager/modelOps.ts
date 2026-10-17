@@ -18,10 +18,7 @@ import {
   type LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
 import { LlamaCppClient } from '../llamacppClient';
-import {
-  LlamaCppManagerLifecycleEvent,
-  type LlamaCppModelsUnloadedForQuitEvent,
-} from './types';
+import { LlamaCppManagerLifecycleEvent, type LlamaCppModelsUnloadedForQuitEvent } from './types';
 import {
   LLAMACPP_LAST_LOADED_MODEL_KEY,
   LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS,

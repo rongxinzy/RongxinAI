@@ -117,29 +117,29 @@ export function MainViewCanvas({
           !isLocalInferenceDormant &&
           localInferenceEnabled &&
           !managedModelsOnly && (
-          <div
-            className={
-              mainView === MainView.LocalInference ? 'h-full min-h-0' : 'hidden h-full min-h-0'
-            }
-          >
-            {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
-            <LazyChunkErrorBoundary resetKey={mainView}>
-              <React.Suspense fallback={null}>
-                <LocalInferenceView
-                  installRequestId={localInferenceInstallRequestId}
-                  onInstallRequestHandled={onLocalInferenceInstallRequestHandled}
-                  refreshRequestId={localInferenceRefreshRequestId}
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  isVisible={mainView === MainView.LocalInference}
-                  onToggleSidebar={onToggleSidebar}
-                  onNewChat={onNewChat}
-                  onOpenModelSettings={onOpenModelSettings}
-                  updateBadge={null}
-                />
-              </React.Suspense>
-            </LazyChunkErrorBoundary>
-          </div>
-        )}
+            <div
+              className={
+                mainView === MainView.LocalInference ? 'h-full min-h-0' : 'hidden h-full min-h-0'
+              }
+            >
+              {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
+              <LazyChunkErrorBoundary resetKey={mainView}>
+                <React.Suspense fallback={null}>
+                  <LocalInferenceView
+                    installRequestId={localInferenceInstallRequestId}
+                    onInstallRequestHandled={onLocalInferenceInstallRequestHandled}
+                    refreshRequestId={localInferenceRefreshRequestId}
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    isVisible={mainView === MainView.LocalInference}
+                    onToggleSidebar={onToggleSidebar}
+                    onNewChat={onNewChat}
+                    onOpenModelSettings={onOpenModelSettings}
+                    updateBadge={null}
+                  />
+                </React.Suspense>
+              </LazyChunkErrorBoundary>
+            </div>
+          )}
         <LazyChunkErrorBoundary resetKey={mainView}>
           <React.Suspense fallback={lazyViewFallback}>
             {mainView === MainView.Settings ? (

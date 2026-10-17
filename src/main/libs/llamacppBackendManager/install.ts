@@ -44,14 +44,9 @@ import {
   findManifestEntry,
   resolveArchiveUrl,
 } from './support';
-import {
-  fetchLlamaCppBackendManifest,
-  readCurrentBackendRef,
-  syncCurrentBackend,
-} from './catalog';
+import { fetchLlamaCppBackendManifest, readCurrentBackendRef, syncCurrentBackend } from './catalog';
 
-export type BackendInstallProgressReporter =
-  import('./support').BackendInstallProgressReporter;
+export type BackendInstallProgressReporter = import('./support').BackendInstallProgressReporter;
 
 function restorePreviousBackend(
   runtimeRoot: string,

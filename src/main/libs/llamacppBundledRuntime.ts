@@ -52,19 +52,19 @@ export function resolveBundledLlamaCppExecutablePath(
       : manifest.executable;
   const absolute = path.join(root, relative);
   if (!fs.existsSync(absolute)) return undefined;
-  const expectedSha256 = options.preferCpuFallback
-    ? manifest.cpuFallbackSha256
-    : manifest.sha256;
+  const expectedSha256 = options.preferCpuFallback ? manifest.cpuFallbackSha256 : manifest.sha256;
   if (expectedSha256 && !verifySha256(absolute, expectedSha256)) {
     throw new Error('The bundled llama.cpp runtime failed SHA-256 verification.');
   }
   return absolute;
 }
 
-export function tryResolveActiveBundledLlamaCppRuntime(): {
-  executablePath: string;
-  backend: LlamaCppBackendRef;
-} | undefined {
+export function tryResolveActiveBundledLlamaCppRuntime():
+  | {
+      executablePath: string;
+      backend: LlamaCppBackendRef;
+    }
+  | undefined {
   if (!usesBundledLlamaCppRuntime()) return undefined;
   const manifest = readBundledLlamaCppRuntimeManifest();
   if (!manifest) return undefined;

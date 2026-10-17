@@ -84,9 +84,7 @@ function resolveTargetArch(context) {
   if (context?.arch === 3) return 'arm64';
   if (context?.arch === 0) return 'ia32';
   if (context?.arch === 1) return 'x64';
-  throw new Error(
-    `[electron-builder-hooks] Unknown packaging arch: ${String(context?.arch)}`,
-  );
+  throw new Error(`[electron-builder-hooks] Unknown packaging arch: ${String(context?.arch)}`);
 }
 
 function resolveWindows7zaPath() {

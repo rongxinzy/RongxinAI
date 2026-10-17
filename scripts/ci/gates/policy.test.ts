@@ -289,7 +289,9 @@ test('tag release checks bind the source commit and block packaging before memor
   expect(memoryJob.uses).toBe('./.github/workflows/memory-regression.yml');
   expect(memoryJob.with?.['source-ref']).toBe('${{ needs.prepare-release.outputs.commit }}');
   expect(release.jobs['build-release'].needs).toContain('memory-regression');
-  expect(release.jobs['build-release'].uses).toBe('./.github/workflows/build-inference-editions.yml');
+  expect(release.jobs['build-release'].uses).toBe(
+    './.github/workflows/build-inference-editions.yml',
+  );
   const qualityCommands = release.jobs.quality.steps?.map(step => step.run ?? '').join('\n');
   expect(qualityCommands).toContain('bun run build:tsc');
   expect(qualityCommands).toContain('bun run test:bundle-budget');

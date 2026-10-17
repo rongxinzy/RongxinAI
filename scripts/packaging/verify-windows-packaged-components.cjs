@@ -35,9 +35,7 @@ function extractWindowsComponentArchive(sevenZipPath, archivePath, destinationDi
 function readWindowsComponentManifest(componentsDir, componentKey) {
   const manifestPath = path.join(componentsDir, `${componentKey}.manifest.json`);
   if (!fs.existsSync(manifestPath)) {
-    throw new Error(
-      `[PackagedRuntimeVerify] Missing Windows component manifest: ${manifestPath}`,
-    );
+    throw new Error(`[PackagedRuntimeVerify] Missing Windows component manifest: ${manifestPath}`);
   }
   return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 }
@@ -49,7 +47,9 @@ function verifyWindowsCompressedChannelRuntime(context, targetId, expectedChecks
   const manifest = readWindowsComponentManifest(componentsDir, componentKey);
   const archivePath = path.join(componentsDir, manifest.archive || `${componentKey}.7z`);
   if (!fs.existsSync(archivePath)) {
-    throw new Error(`[PackagedRuntimeVerify] Missing Windows channel-runtime archive: ${archivePath}`);
+    throw new Error(
+      `[PackagedRuntimeVerify] Missing Windows channel-runtime archive: ${archivePath}`,
+    );
   }
 
   const archiveSha256 = sha256File(archivePath);

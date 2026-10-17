@@ -48,7 +48,9 @@ export function estimateLlamaCppModelMemory(
   const runtimeBufferMiB = Math.max(128, Math.round(modelSizeMiB * 0.03 + contextTokens / 512));
   const gpuWeightFraction = clampFraction(input.gpuWeightFraction ?? 0.82);
 
-  const estimatedVramMiB = Math.ceil(modelSizeMiB * gpuWeightFraction + kvCacheMiB + runtimeBufferMiB);
+  const estimatedVramMiB = Math.ceil(
+    modelSizeMiB * gpuWeightFraction + kvCacheMiB + runtimeBufferMiB,
+  );
   const estimatedSystemMemoryMiB = Math.ceil(
     modelSizeMiB * (1 - gpuWeightFraction * 0.65) + kvCacheMiB * 0.15 + runtimeBufferMiB * 1.2,
   );

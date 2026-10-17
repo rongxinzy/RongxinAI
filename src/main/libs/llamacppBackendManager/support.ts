@@ -24,10 +24,7 @@ import {
   throwIfDownloadCancelled,
 } from '../resumableDownload';
 import { DEFAULT_RELEASE_BASE_URL } from '../llamacppFallbackManifest';
-import {
-  getLlamaCppCurrentExecutablePath,
-  toBackendRef,
-} from './paths';
+import { getLlamaCppCurrentExecutablePath, toBackendRef } from './paths';
 
 export const BUILD_INFO_FILE = 'runtime-build-info.json';
 export const LLAMACPP_BACKEND_MANIFEST_FETCH_TIMEOUT_MS = 2_000;

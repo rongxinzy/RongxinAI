@@ -16,7 +16,12 @@ const {
 
 const ROOT = path.resolve(__dirname, '..');
 const CPU_EDITION_ROOT = path.join(ROOT, 'vendor', 'llamacpp', 'cpu');
-const BUNDLE_CHECKSUMS_PATH = path.join(ROOT, 'resources', 'llamacpp-backends', 'bundle-checksums.json');
+const BUNDLE_CHECKSUMS_PATH = path.join(
+  ROOT,
+  'resources',
+  'llamacpp-backends',
+  'bundle-checksums.json',
+);
 
 const CPU_VULKAN_BUNDLE = {
   'win-x64': [
@@ -119,7 +124,8 @@ function runVersionSmoke(executablePath, platform) {
   const binDir = path.dirname(executablePath);
   const env = { ...process.env };
   if (platform === 'linux') {
-    env.LD_LIBRARY_PATH = binDir + (env.LD_LIBRARY_PATH ? path.delimiter + env.LD_LIBRARY_PATH : '');
+    env.LD_LIBRARY_PATH =
+      binDir + (env.LD_LIBRARY_PATH ? path.delimiter + env.LD_LIBRARY_PATH : '');
   } else if (platform === 'win32') {
     env.PATH = binDir + (env.PATH ? path.delimiter + env.PATH : '');
   }
@@ -173,9 +179,7 @@ async function installBackendEntry(releaseTag, entry, hostPlatform) {
     return {
       backend: entry.backend,
       accelerator: entry.accelerator,
-      relativeExecutable: path
-        .relative(CPU_EDITION_ROOT, stagedExecutable)
-        .replace(/\\/g, '/'),
+      relativeExecutable: path.relative(CPU_EDITION_ROOT, stagedExecutable).replace(/\\/g, '/'),
       sha256: sha256File(stagedExecutable),
       sourceUrl,
       archiveSha256: sha256File(archivePath),

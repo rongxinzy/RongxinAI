@@ -67,7 +67,10 @@ test('NSIS budgets are edition-specific (lite/cpu/cuda)', () => {
   expect(assertNsisBudget(439_171_500, 288_626_662, 'lite').nonComponentBytes).toBe(150_544_838);
   expect(assertNsisBudget(378 * MiB, 288_626_662, 'cpu')).toMatchObject({ edition: 'cpu' });
   expect(() => assertNsisBudget(479_234_525, 288_626_662, 'cpu')).toThrow(/450 MiB/);
-  expect(assertNsisBudget(500 * MiB, 300 * MiB, 'cuda')).toMatchObject({ skipped: true, edition: 'cuda' });
+  expect(assertNsisBudget(500 * MiB, 300 * MiB, 'cuda')).toMatchObject({
+    skipped: true,
+    edition: 'cuda',
+  });
   expect(() => assertSetupBudget(491_244_872, 288_626_662)).not.toThrow();
 });
 
