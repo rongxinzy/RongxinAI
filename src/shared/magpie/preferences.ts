@@ -105,5 +105,3 @@ export const MAGPIE_REDACT_KINDS = [
   { id: 'ip', defaultOn: false },
   { id: 'bucket', defaultOn: false },
 ] as const;
-
-export type MagpieRedactKind = (typeof MAGPIE_REDACT_KINDS)[number]['id'];
