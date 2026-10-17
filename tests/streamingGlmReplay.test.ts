@@ -58,7 +58,7 @@ describe('GLM Pi replay fixtures', () => {
 
   it.each([
     ['glm-tool-text.jsonl', 'glm-replay-tool-text'],
-    ['glm-fresh-pr1127.jsonl', 'glm-replay-fresh'],
+    ['glm-fresh-pr1127.jsonl.gz', 'glm-replay-fresh'],
   ] as const)(
     'replay %s with prefix-safe frames and incremental IPC',
     async (fixture, sessionId) => {
@@ -82,7 +82,7 @@ describe('GLM Pi replay fixtures', () => {
   );
 
   it('preserves thinkingDurationMs after a thinking turn (glm-fresh)', async () => {
-    await replayFixture('glm-replay-thinking-duration', 'glm-fresh-pr1127.jsonl', harness => {
+    await replayFixture('glm-replay-thinking-duration', 'glm-fresh-pr1127.jsonl.gz', harness => {
       const thinking = harness.currentMessages().find(message => message.metadata?.isThinking);
       expect(thinking?.metadata?.thinkingDurationMs).toEqual(expect.any(Number));
     });

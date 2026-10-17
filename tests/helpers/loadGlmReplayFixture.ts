@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,9 +10,17 @@ export interface GlmReplayLine {
   readonly e: Record<string, unknown>;
 }
 
-export function loadGlmReplayFixture(relativePath: string): GlmReplayLine[] {
+function readFixtureText(relativePath: string): string {
   const absolute = resolve(fixtureRoot, relativePath);
-  const lines = readFileSync(absolute, 'utf8').split('\n').filter(Boolean);
+  const raw = readFileSync(absolute);
+  if (relativePath.endsWith('.gz')) {
+    return gunzipSync(raw).toString('utf8');
+  }
+  return raw.toString('utf8');
+}
+
+export function loadGlmReplayFixture(relativePath: string): GlmReplayLine[] {
+  const lines = readFixtureText(relativePath).split('\n').filter(Boolean);
   return lines.map(line => JSON.parse(line) as GlmReplayLine);
 }
 

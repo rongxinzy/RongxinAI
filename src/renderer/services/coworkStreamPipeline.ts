@@ -78,7 +78,11 @@ export interface CoworkStreamPipeline {
   dispose(): void;
 }
 
-type BoundedIdSet = { has: (id: string) => boolean; add: (id: string) => void };
+type BoundedIdSet = {
+  has: (id: string) => boolean;
+  add: (id: string) => void;
+  delete: (id: string) => void;
+};
 
 /** Insertion-order FIFO id set with a hard cap so bookkeeping stays bounded. */
 const createBoundedIdSet = (capacity: number): BoundedIdSet => {
@@ -92,6 +96,9 @@ const createBoundedIdSet = (capacity: number): BoundedIdSet => {
         if (oldest === undefined) break;
         ids.delete(oldest);
       }
+    },
+    delete: id => {
+      ids.delete(id);
     },
   };
 };
