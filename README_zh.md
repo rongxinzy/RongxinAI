@@ -139,12 +139,23 @@ bun run magpie:verify --target <平台-架构>
 
 | 命令 | 产物 |
 | --- | --- |
-| `bun run dist:win` | `dist:win:offline` 的别名 |
-| `bun run dist:win:offline` | 未签名 Windows x64 构建，内置全部离线组件：WebView2 安装器 `ZhiYuanAgent-Setup-<version>.exe` 与 NSIS 更新器 |
-| `bun run dist:win:lite` | `dist:win:offline` 的别名 |
-| `bun run dist:win:signed` | 产物相同，使用 Certum 签名；需要 `CERTUM_CERT_THUMBPRINT`，由发布流水线使用 |
-| `bun run dist:mac` / `dist:mac:x64` / `dist:mac:arm64` / `dist:mac:universal` | macOS 安装包 |
-| `bun run dist:linux` | Linux 安装包 |
+#### 版本
+
+版本由 `ZHIYUAN_UPDATE_VARIANT` 选择，决定随包内置哪种 llama.cpp 运行时。所有版本都内置离线组件，不做按需下载。
+
+| 版本 | 平台 | 内置本地推理 |
+| --- | --- | --- |
+| `lite` | 仅 Windows x64 | 无（不含 llama.cpp） |
+| `cpu` | Windows x64、Linux x64、macOS arm64 与 x64 | Windows/Linux 为 llama.cpp CPU + Vulkan；macOS 为 Metal |
+| `cuda` | Windows x64、Linux x64 | 面向 RTX 40（sm_89）、CUDA 12.4 构建的 llama.cpp，附带所需 CUDA 运行库和 CPU 回退 |
+
+| 命令 | 产物 |
+| --- | --- |
+| `bun run dist:win` / `dist:win:offline` / `dist:win:lite` | 未签名 Windows x64 lite 构建：WebView2 安装器 `ZhiYuanAgent-Setup-<version>.exe` 与 NSIS 更新器 |
+| `bun run dist:win:cpu` / `dist:win:cuda` | 同上，cpu 或 cuda 版 |
+| `bun run dist:win:signed` / `dist:win:signed:cpu` / `dist:win:signed:cuda` | Certum 签名的 lite / cpu / cuda；需要 `CERTUM_CERT_THUMBPRINT`，由发布流水线使用 |
+| `bun run dist:linux:cpu` / `dist:linux:cuda` | Linux deb + AppImage，cpu 或 cuda（`dist:linux:cuda` 会用 `scripts/build-llamacpp-cuda-rtx40.sh` 在本机编译 CUDA llama-server） |
+| `bun run dist:mac:arm64` / `dist:mac:x64` | macOS 安装包；发布流水线按 cpu 版构建 |
 
 打包还涉及平台运行时、资源与签名配置，详见[贡献指南](CONTRIBUTING.md)、[RELEASING.md](RELEASING.md) 及 [`package.json`](package.json)。
 
