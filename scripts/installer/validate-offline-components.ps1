@@ -16,6 +16,15 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# Component contract: the seven fixed application components are always
+# required. The cpu/cuda editions' WebView2 setup additionally carries the
+# bundled llama.cpp runtime ('llamacpp-bundled'); no other key is accepted.
+# The count is therefore not fixed (lite 7, cpu/cuda 8).
+$RequiredComponentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')
+$OptionalComponentKeys = @('llamacpp-bundled')
+# Set before anything can throw: the catch block reports elapsed time.
+$modeStartedAt = Get-Date
+
 function Stop-WithCode([int]$Code, [string]$Message) {
   # NSIS relays stdout into a single-line dialog and log field, so exception
   # details must not span multiple lines.
@@ -61,8 +70,16 @@ function Get-Components {
     throw "Component targets are missing: $ComponentTargetsPath"
   }
   $targets = @((Get-Content -LiteralPath $ComponentTargetsPath -Raw -ErrorAction Stop | ConvertFrom-Json))
-  if ($targets.Count -ne 7) {
-    throw "Invalid component targets: expected 7 components, got $($targets.Count)"
+  $targetKeys = @($targets | ForEach-Object { [string]$_.key })
+  foreach ($requiredKey in $RequiredComponentKeys) {
+    if ($targetKeys -cnotcontains $requiredKey) {
+      throw "Invalid component targets: missing required component $requiredKey"
+    }
+  }
+  foreach ($targetKey in $targetKeys) {
+    if ($RequiredComponentKeys -cnotcontains $targetKey -and $OptionalComponentKeys -cnotcontains $targetKey) {
+      throw "Invalid component targets: unknown component $targetKey"
+    }
   }
 
   $components = @(
@@ -89,7 +106,7 @@ function Get-Components {
       }
     }
   )
-  if (@($components.Key | Sort-Object -Unique).Count -ne 7) {
+  if (@($components.Key | Sort-Object -Unique).Count -ne $targets.Count) {
     throw 'Invalid component targets: duplicate component key'
   }
   return $components
@@ -182,7 +199,6 @@ try {
     throw "7za executable is missing: $SevenZipPath"
   }
   $components = Get-Components
-  $modeStartedAt = Get-Date
 
   if ($Mode -eq 'cache') {
     foreach ($component in $components) {

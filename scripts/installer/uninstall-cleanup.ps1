@@ -18,7 +18,8 @@ Assert-PhysicalPath $InstallDir
 Assert-PhysicalPath $RuntimeRoot
 $resources = Join-Path $InstallDir 'resources'
 Assert-PhysicalPath $resources
-$prefixes = @('channel-runtime', 'SKILLs', 'MCPs', 'mingit', 'python-win', 'skill-python', 'uv-win')
+# 'llamacpp-bundled' is the cpu/cuda editions' bundled llama.cpp runtime component.
+$prefixes = @('channel-runtime', 'SKILLs', 'MCPs', 'mingit', 'python-win', 'skill-python', 'uv-win', 'llamacpp-bundled')
 foreach ($prefix in $prefixes) {
   $link = Join-Path $resources $prefix
   if (Test-Path -LiteralPath $link) {
@@ -44,7 +45,7 @@ function Remove-TreeWithoutFollowingLinks([string]$Path) {
     [IO.File]::Delete($item.FullName)
   }
 }
-foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')) {
+foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv', 'llamacpp-bundled')) {
   $root = Join-Path $RuntimeRoot $key
   Assert-PhysicalPath $root
   if (-not (Test-Path -LiteralPath $root)) { continue }
