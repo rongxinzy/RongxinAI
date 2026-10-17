@@ -80,8 +80,10 @@ function getWindowsResourceArchiveCompression(component) {
     : WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.NonSolid;
 }
 
+const { shouldIncludeLlamaCppBundledComponent } = require('./resolve-nsis-offline-components.cjs');
+
 function getWindowsResourceComponents(projectRoot) {
-  return [
+  const components = [
     {
       key: 'channel-runtime',
       label: 'cc-connect channel runtime',
@@ -132,6 +134,16 @@ function getWindowsResourceComponents(projectRoot) {
       sentinel: 'uv-win/uv.exe',
     },
   ];
+  if (shouldIncludeLlamaCppBundledComponent()) {
+    components.push({
+      key: 'llamacpp-bundled',
+      label: 'Bundled llama.cpp runtime',
+      dir: path.join(projectRoot, 'resources', 'llamacpp-bundled'),
+      prefix: 'llamacpp-bundled',
+      sentinel: 'llamacpp-bundled/manifest.json',
+    });
+  }
+  return components;
 }
 
 function computeWindowsResourceComponentId(component) {

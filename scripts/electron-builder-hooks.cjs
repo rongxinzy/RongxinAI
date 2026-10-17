@@ -467,11 +467,13 @@ function configureInferenceEditionResources(context) {
     return target !== 'llamacpp-backends';
   });
 
+  const withoutBundled = withoutLegacyBackends.filter(entry => {
+    const target = typeof entry === 'string' ? entry : entry?.to;
+    return target !== 'llamacpp-bundled';
+  });
+
   if (edition === 'lite') {
-    context.packager.config.extraResources = withoutLegacyBackends.filter(entry => {
-      const target = typeof entry === 'string' ? entry : entry?.to;
-      return target !== 'llamacpp-bundled';
-    });
+    context.packager.config.extraResources = withoutBundled;
     console.log('[electron-builder-hooks] lite edition: omit bundled llama.cpp runtime.');
     return;
   }
@@ -485,6 +487,16 @@ function configureInferenceEditionResources(context) {
     throw new Error(
       `[electron-builder-hooks] Failed to stage bundled llama.cpp runtime for edition ${edition}.`,
     );
+  }
+
+  const windowsComponentBundled =
+    context.electronPlatformName === 'win32' && (edition === 'cpu' || edition === 'cuda');
+  if (windowsComponentBundled) {
+    context.packager.config.extraResources = withoutBundled;
+    console.log(
+      `[electron-builder-hooks] inference edition ${edition}: llama.cpp runtime packed as Windows offline component.`,
+    );
+    return;
   }
 
   const hasBundled = withoutLegacyBackends.some(entry => {

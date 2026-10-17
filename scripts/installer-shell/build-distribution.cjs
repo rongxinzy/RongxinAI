@@ -6,7 +6,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { writeSetupManifest } = require('./sfx-format.cjs');
 const { verifyRetainedHost } = require('./retain-uninstaller.cjs');
-const { verifyFinalSetupBudget, verifyFinalNsisBudget } = require('./distribution-budget.cjs');
+const {
+  verifyFinalSetupBudget,
+  verifyFinalNsisBudget,
+  describeEditionByteBreakdown,
+} = require('./distribution-budget.cjs');
+const { resolveInferenceEdition } = require('../resolve-nsis-offline-components.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const signed = process.argv.includes('--signed');
@@ -57,9 +62,14 @@ const finalBudget = verifyFinalSetupBudget(
   path.join(root, 'build-tar', 'windows-components'),
 );
 console.log(`[installer-shell] final signed-byte budget ${JSON.stringify(finalBudget)}`);
+const edition = resolveInferenceEdition();
+console.log(
+  `[installer-shell] NSIS byte budget profile ${JSON.stringify(describeEditionByteBreakdown(edition))}`,
+);
 const nsisBudget = verifyFinalNsisBudget(
   path.join(root, 'release'),
   finalBudget.componentArchiveBytes,
+  edition,
 );
 console.log(`[installer-shell] final NSIS updater budget ${JSON.stringify(nsisBudget)}`);
 // The report must describe the final signed bytes, never the pre-signing file.

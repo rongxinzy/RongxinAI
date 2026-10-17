@@ -97,8 +97,8 @@ function verifyPackagedChannelRuntime(context) {
 
 function verifyPackagedLlamaCppBundled(context) {
   const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'lite').trim().toLowerCase();
-  const bundledRoot = path.join(packagedResourcesRoot(context), 'llamacpp-bundled');
   if (edition === 'lite') {
+    const bundledRoot = path.join(packagedResourcesRoot(context), 'llamacpp-bundled');
     if (fs.existsSync(bundledRoot)) {
       throw new Error(
         '[PackagedRuntimeVerify] Lite edition must not include packaged llamacpp-bundled resources.',
@@ -107,6 +107,13 @@ function verifyPackagedLlamaCppBundled(context) {
     return;
   }
 
+  if (context.electronPlatformName === 'win32') {
+    const { verifyWindowsCompressedLlamaCppBundled } = require('./verify-windows-packaged-components.cjs');
+    verifyWindowsCompressedLlamaCppBundled(context);
+    return;
+  }
+
+  const bundledRoot = path.join(packagedResourcesRoot(context), 'llamacpp-bundled');
   const manifestPath = path.join(bundledRoot, 'manifest.json');
   if (!fs.existsSync(manifestPath)) {
     throw new Error(

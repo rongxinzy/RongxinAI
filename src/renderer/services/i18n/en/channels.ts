@@ -102,7 +102,7 @@ export const enChannels: Record<string, string> = {
   feishuBotCreateWizardDone: 'Done',
   feishuBotCreateWizardAppIdPlaceholder: 'Enter App ID',
   feishuBotCreateWizardAppSecretPlaceholder: 'Enter App Secret',
-  email: 'clawEmail',
+  email: 'Email',
   // Email Channel
   channelPrefixEmail: 'Email',
   emailSettings: 'Email Settings',

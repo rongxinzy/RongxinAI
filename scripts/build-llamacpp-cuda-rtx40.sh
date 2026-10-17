@@ -29,16 +29,24 @@ case "${PLATFORM}" in
   linux)
     # Match ggml-org/llama.cpp .devops/cuda.Dockerfile: devel images have no driver libcuda.so.
     CMAKE_ARGS+=(
+      -G Ninja
       -DGGML_METAL=OFF
       -DCMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined
       -DCMAKE_BUILD_RPATH='$ORIGIN'
       -DCMAKE_INSTALL_RPATH='$ORIGIN'
     )
     EXECUTABLE_NAME=llama-server
+    BUILD_CONFIG=()
     ;;
   win|windows)
-    CMAKE_ARGS+=(-DGGML_METAL=OFF)
+    # Match ggml-org/llama.cpp release.yml windows-cuda: Ninja + MSVC toolset (not VS CUDA integration).
+    CMAKE_ARGS+=(
+      -G Ninja
+      -DCMAKE_BUILD_TYPE=Release
+      -DGGML_METAL=OFF
+    )
     EXECUTABLE_NAME=llama-server.exe
+    BUILD_CONFIG=(--config Release)
     ;;
   *)
     echo "Unsupported platform: ${PLATFORM}" >&2
@@ -47,7 +55,7 @@ case "${PLATFORM}" in
 esac
 
 cmake "${CMAKE_ARGS[@]}"
-cmake --build "${BUILD_DIR}" --config Release --target llama-server -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+cmake --build "${BUILD_DIR}" "${BUILD_CONFIG[@]}" --target llama-server -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 
 BUILT_SERVER="$(
   find "${BUILD_DIR}" -type f -name "${EXECUTABLE_NAME}" 2>/dev/null | head -n 1

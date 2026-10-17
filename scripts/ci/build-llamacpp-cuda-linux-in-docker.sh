@@ -33,7 +33,7 @@ docker run --rm \
     git config --global --add safe.directory "*"
     nvcc --version
     bash scripts/build-llamacpp-cuda-rtx40.sh linux
-    node scripts/stage-linux-cuda-runtime-libs.cjs /workspace/vendor/llamacpp/cuda/bin/llama-server
+    bash scripts/ci/stage-linux-cuda-runtime-libs.sh /workspace/vendor/llamacpp/cuda/bin/llama-server
   '
 
 server="${ROOT_DIR}/vendor/llamacpp/cuda/bin/llama-server"

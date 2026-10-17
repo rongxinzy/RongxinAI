@@ -179,7 +179,13 @@ jobs:
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         shell: bash
         run: bash scripts/ensure-llamacpp-cuda-source.sh
+      - name: Install Ninja (Windows CUDA)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        run: choco install ninja -y
       - name: Build RTX 40 CUDA llama.cpp runtime (Windows)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Compile llama-server (Windows CUDA)
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         shell: bash
         run: bash scripts/build-llamacpp-cuda-rtx40.sh win

@@ -108,8 +108,56 @@ function verifyWindowsCompressedChannelRuntime(context, targetId, expectedChecks
   }
 }
 
+function verifyWindowsCompressedLlamaCppBundled(context) {
+  const projectRoot = context.packager.projectDir;
+  const componentsDir = path.join(projectRoot, 'build-tar', 'windows-components');
+  const componentKey = 'llamacpp-bundled';
+  const manifest = readWindowsComponentManifest(componentsDir, componentKey);
+  const archivePath = path.join(componentsDir, manifest.archive || `${componentKey}.7z`);
+  if (!fs.existsSync(archivePath)) {
+    throw new Error(
+      `[PackagedRuntimeVerify] Missing Windows llamacpp-bundled archive: ${archivePath}`,
+    );
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-llamacpp-bundled-verify-'));
+  try {
+    extractWindowsComponentArchive(resolveWindows7zaPath(projectRoot), archivePath, tempDir);
+    const manifestPath = path.join(tempDir, manifest.prefix || componentKey, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error(
+        `[PackagedRuntimeVerify] Missing llamacpp-bundled manifest after extracting ${archivePath}`,
+      );
+    }
+    const bundledManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const bundledRoot = path.dirname(manifestPath);
+    for (const [executableKey, shaKey] of [
+      ['executable', 'sha256'],
+      ['vulkanExecutable', 'vulkanSha256'],
+      ['cpuFallbackExecutable', 'cpuFallbackSha256'],
+    ]) {
+      const relative = bundledManifest[executableKey];
+      const expected = bundledManifest[shaKey];
+      if (typeof relative !== 'string' || !relative) continue;
+      const filePath = path.join(bundledRoot, relative);
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`[PackagedRuntimeVerify] Missing llamacpp ${executableKey}: ${filePath}`);
+      }
+      const actual = sha256File(filePath);
+      if (expected && actual.toLowerCase() !== expected.trim().toLowerCase()) {
+        throw new Error(
+          `[PackagedRuntimeVerify] llamacpp ${executableKey} SHA-256 mismatch (expected ${expected}, got ${actual})`,
+        );
+      }
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 module.exports = {
   extractWindowsComponentArchive,
   readWindowsComponentManifest,
   verifyWindowsCompressedChannelRuntime,
+  verifyWindowsCompressedLlamaCppBundled,
 };

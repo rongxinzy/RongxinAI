@@ -4,18 +4,58 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { MAX_SETUP_BYTES, inspectSetup } = require('./sfx-format.cjs');
 const { sha256File } = require('../windows-resource-pack.cjs');
-const targets = require('../nsis-offline-components.json');
+const { resolveNsisOfflineComponentTargets, resolveInferenceEdition } = require('../resolve-nsis-offline-components.cjs');
 
-const MAX_COMPONENT_BYTES = 300 * 1024 * 1024;
-const MAX_NON_COMPONENT_BYTES = 220 * 1024 * 1024;
-const MAX_NSIS_BYTES = 450 * 1024 * 1024;
-const MAX_NSIS_NON_COMPONENT_BYTES = 150 * 1024 * 1024;
+const MiB = 1024 * 1024;
+const MAX_COMPONENT_BYTES = 300 * MiB;
+const MAX_NON_COMPONENT_BYTES = 220 * MiB;
+const MAX_NSIS_BYTES = 450 * MiB;
+const MAX_NSIS_NON_COMPONENT_BYTES = 150 * MiB;
+
+/** Measured on CI (build-platforms @ 558d5243): cpu NSIS updater with in-app llamacpp. */
+const CPU_NSIS_MEASURED = {
+  installerBytes: 479_234_525,
+  componentArchiveBytes: 288_626_662,
+  nonComponentBytes: 190_607_863,
+};
+/** Baseline lite/cpu app payload inside NSIS (seven fixed components deducted). */
+const LITE_NSIS_MEASURED = {
+  installerBytes: 439_171_500,
+  componentArchiveBytes: 288_626_662,
+  nonComponentBytes: 150_544_838,
+};
+
+const EDITION_NSIS_BUDGETS = {
+  lite: {
+    maxInstallerBytes: MAX_NSIS_BYTES,
+    maxNonComponentBytes: MAX_NSIS_NON_COMPONENT_BYTES,
+    maxComponentBytes: MAX_COMPONENT_BYTES,
+    measured: LITE_NSIS_MEASURED,
+  },
+  cpu: {
+    // NSIS gate keeps the seven fixed runtime components as the deduction baseline; llama.cpp
+    // ships as an eighth offline component in the WebView2 setup payload only.
+    maxInstallerBytes: MAX_NSIS_BYTES,
+    maxNonComponentBytes: MAX_NSIS_NON_COMPONENT_BYTES,
+    maxComponentBytes: 400 * MiB,
+    measured: CPU_NSIS_MEASURED,
+  },
+  cuda: {
+    maxInstallerBytes: null,
+    maxNonComponentBytes: null,
+    maxComponentBytes: null,
+    measured: null,
+  },
+};
+
+function resolveEditionNsisBudget(edition = resolveInferenceEdition()) {
+  return EDITION_NSIS_BUDGETS[edition] || EDITION_NSIS_BUDGETS.lite;
+}
 
 function assertBudget(
   installerBytes,
   componentArchiveBytes,
-  maximumBytes,
-  maximumNonComponentBytes,
+  limits,
   label,
 ) {
   if (
@@ -27,24 +67,29 @@ function assertBudget(
     throw new Error('Invalid final setup/component byte counts');
   }
   const nonComponentBytes = installerBytes - componentArchiveBytes;
-  if (componentArchiveBytes > MAX_COMPONENT_BYTES) {
-    throw new Error('Component archives exceed the unchanged 300 MiB budget');
-  }
-  if (installerBytes > maximumBytes) {
-    throw new Error(`Final ${label} exceeds the ${maximumBytes / 1024 / 1024} MiB budget`);
-  }
-  if (nonComponentBytes > maximumNonComponentBytes) {
+  if (limits.maxComponentBytes != null && componentArchiveBytes > limits.maxComponentBytes) {
     throw new Error(
-      `Final ${label} non-component bytes exceed the ${maximumNonComponentBytes / 1024 / 1024} MiB budget`,
+      `Component archives exceed the ${limits.maxComponentBytes / MiB} MiB budget for ${label}`,
+    );
+  }
+  if (limits.maxInstallerBytes != null && installerBytes > limits.maxInstallerBytes) {
+    throw new Error(`Final ${label} exceeds the ${limits.maxInstallerBytes / MiB} MiB budget`);
+  }
+  if (
+    limits.maxNonComponentBytes != null &&
+    nonComponentBytes > limits.maxNonComponentBytes
+  ) {
+    throw new Error(
+      `Final ${label} non-component bytes exceed the ${limits.maxNonComponentBytes / MiB} MiB budget`,
     );
   }
   return {
     installerBytes,
     componentArchiveBytes,
     nonComponentBytes,
-    maxSetupBytes: maximumBytes,
-    maxComponentBytes: MAX_COMPONENT_BYTES,
-    maxNonComponentBytes: maximumNonComponentBytes,
+    maxSetupBytes: limits.maxInstallerBytes,
+    maxComponentBytes: limits.maxComponentBytes,
+    maxNonComponentBytes: limits.maxNonComponentBytes,
   };
 }
 
@@ -52,26 +97,40 @@ function assertSetupBudget(installerBytes, componentArchiveBytes) {
   return assertBudget(
     installerBytes,
     componentArchiveBytes,
-    MAX_SETUP_BYTES,
-    MAX_NON_COMPONENT_BYTES,
+    {
+      maxInstallerBytes: MAX_SETUP_BYTES,
+      maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
+      maxComponentBytes: MAX_COMPONENT_BYTES,
+    },
     'WebView2 installer',
   );
 }
 
-function assertNsisBudget(installerBytes, componentArchiveBytes) {
-  return assertBudget(
-    installerBytes,
-    componentArchiveBytes,
-    MAX_NSIS_BYTES,
-    MAX_NSIS_NON_COMPONENT_BYTES,
-    'NSIS updater',
-  );
+function assertNsisBudget(installerBytes, componentArchiveBytes, edition = resolveInferenceEdition()) {
+  const limits = resolveEditionNsisBudget(edition);
+  if (limits.maxInstallerBytes == null) {
+    return {
+      installerBytes,
+      componentArchiveBytes,
+      nonComponentBytes: installerBytes - componentArchiveBytes,
+      maxSetupBytes: null,
+      maxComponentBytes: null,
+      maxNonComponentBytes: null,
+      skipped: true,
+      edition,
+    };
+  }
+  return {
+    edition,
+    ...assertBudget(installerBytes, componentArchiveBytes, limits, 'NSIS updater'),
+  };
 }
 
-function readComponentArchiveBytes(componentsDir) {
+function readComponentArchiveBytes(componentsDir, edition = resolveInferenceEdition()) {
+  const targets = resolveNsisOfflineComponentTargets(edition);
   const manifest = JSON.parse(fs.readFileSync(path.join(componentsDir, 'manifest.json'), 'utf8'));
   if (!Array.isArray(manifest.components) || manifest.components.length !== targets.length) {
-    throw new Error('Final size gate requires all seven component archives');
+    throw new Error('Final size gate requires every bundled Windows component');
   }
   let total = 0;
   for (const target of targets) {
@@ -94,14 +153,23 @@ function readComponentArchiveBytes(componentsDir) {
 }
 
 function verifyFinalSetupBudget(setup, componentsDir) {
-  // inspectSetup reads the actual signed file size, including its certificate
-  // table. Neither a pre-signing manifest nor inflated component metadata can
-  // make a too-large final installer pass this gate.
   const final = inspectSetup(setup);
   return assertSetupBudget(final.installerBytes, readComponentArchiveBytes(componentsDir));
 }
 
-function verifyFinalNsisBudget(releaseDir, componentArchiveBytes) {
+function readNsisUpdaterComponentDeductionBytes(componentsDir) {
+  return readComponentArchiveBytes(componentsDir, 'lite');
+}
+
+function verifyFinalNsisBudget(releaseDir, componentArchiveBytes, edition = resolveInferenceEdition()) {
+  const limits = resolveEditionNsisBudget(edition);
+  if (limits.maxInstallerBytes == null) {
+    return { edition, skipped: true, componentArchiveBytes };
+  }
+  const componentsDir = path.resolve(releaseDir, '..', 'build-tar', 'windows-components');
+  const nsisComponentDeduction = fs.existsSync(path.join(componentsDir, 'manifest.json'))
+    ? readNsisUpdaterComponentDeductionBytes(componentsDir)
+    : componentArchiveBytes;
   const updaters = fs
     .readdirSync(releaseDir, { withFileTypes: true })
     .filter(
@@ -114,11 +182,31 @@ function verifyFinalNsisBudget(releaseDir, componentArchiveBytes) {
   if (updaters.length !== 1)
     throw new Error(`Expected exactly one NSIS updater; found ${updaters.length}`);
   const updater = path.join(releaseDir, updaters[0].name);
-  // electron-builder already completed any required signing before this
-  // distribution entry point. Count final bytes without modifying the file.
   return {
     file: updaters[0].name,
-    ...assertNsisBudget(fs.statSync(updater).size, componentArchiveBytes),
+    componentArchiveBytes: nsisComponentDeduction,
+    setupComponentArchiveBytes: componentArchiveBytes,
+    ...assertNsisBudget(fs.statSync(updater).size, nsisComponentDeduction, edition),
+  };
+}
+
+function describeEditionByteBreakdown(edition = resolveInferenceEdition()) {
+  const limits = resolveEditionNsisBudget(edition);
+  return {
+    edition,
+    limits: {
+      maxInstallerMiB: limits.maxInstallerBytes == null ? null : limits.maxInstallerBytes / MiB,
+      maxNonComponentMiB:
+        limits.maxNonComponentBytes == null ? null : limits.maxNonComponentBytes / MiB,
+      maxComponentMiB: limits.maxComponentBytes == null ? null : limits.maxComponentBytes / MiB,
+    },
+    measuredReference: limits.measured
+      ? {
+          installerMiB: limits.measured.installerBytes / MiB,
+          componentArchiveMiB: limits.measured.componentArchiveBytes / MiB,
+          nonComponentMiB: limits.measured.nonComponentBytes / MiB,
+        }
+      : null,
   };
 }
 
@@ -147,14 +235,19 @@ function assertPayloadDeduplication(payloadDir, retainedHost) {
 }
 
 module.exports = {
+  MiB,
   MAX_COMPONENT_BYTES,
   MAX_NON_COMPONENT_BYTES,
   MAX_NSIS_BYTES,
   MAX_NSIS_NON_COMPONENT_BYTES,
+  EDITION_NSIS_BUDGETS,
+  resolveEditionNsisBudget,
   assertSetupBudget,
   assertNsisBudget,
   readComponentArchiveBytes,
+  readNsisUpdaterComponentDeductionBytes,
   verifyFinalSetupBudget,
   verifyFinalNsisBudget,
+  describeEditionByteBreakdown,
   assertPayloadDeduplication,
 };

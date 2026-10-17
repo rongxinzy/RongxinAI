@@ -14,7 +14,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 // IMAP ID information for 163.com compatibility
 const IMAP_ID = {
-  name: 'moltbot',
+  name: 'zhiyuan-agent',
   version: '0.0.1',
   vendor: 'netease',
   'support-email': 'kefu@188.com',

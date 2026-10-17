@@ -117,9 +117,8 @@ try {
     // component-<key>.* when staging for the shared validator).
     const manifestPath = path.join(componentsDir, 'manifest.json');
     if (!fs.existsSync(manifestPath)) fail(`component manifest missing: ${manifestPath}`);
-    const targets = JSON.parse(
-      fs.readFileSync(path.join(projectRoot, 'scripts', 'nsis-offline-components.json'), 'utf8'),
-    );
+    const { resolveNsisOfflineComponentTargets } = require('../resolve-nsis-offline-components.cjs');
+    const targets = resolveNsisOfflineComponentTargets();
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     if (!Array.isArray(manifest.components) || manifest.components.length !== targets.length) {
       fail('component manifest must contain every bundled Windows component');
@@ -157,9 +156,9 @@ try {
     }
 
     fs.copyFileSync(manifestPath, path.join(payloadDir, 'component-manifest.json'));
-    fs.copyFileSync(
-      path.join(projectRoot, 'scripts', 'nsis-offline-components.json'),
+    fs.writeFileSync(
       path.join(payloadDir, 'component-targets.json'),
+      `${JSON.stringify(targets, null, 2)}\n`,
     );
     for (const script of [
       'validate-offline-components.ps1',

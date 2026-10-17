@@ -53,21 +53,21 @@ test('the real Windows build fits and signature bytes consume the remaining budg
   expect(() => assertSetupBudget(220 * MiB + 100 + 16, 100)).toThrow(/220 MiB/);
 });
 
-test('NSIS keeps its original 450/150 MiB limits independently of WebView2', () => {
+test('NSIS budgets are edition-specific (lite/cpu/cuda)', () => {
   expect(MAX_NSIS_BYTES).toBe(450 * MiB);
   expect(MAX_NSIS_NON_COMPONENT_BYTES).toBe(150 * MiB);
-  expect(assertNsisBudget(450 * MiB, 300 * MiB)).toMatchObject({
+  expect(assertNsisBudget(450 * MiB, 300 * MiB, 'lite')).toMatchObject({
     installerBytes: 450 * MiB,
     componentArchiveBytes: 300 * MiB,
     nonComponentBytes: 150 * MiB,
-    maxSetupBytes: 450 * MiB,
-    maxNonComponentBytes: 150 * MiB,
+    edition: 'lite',
   });
-  expect(() => assertNsisBudget(450 * MiB + 1, 300 * MiB)).toThrow(/450 MiB/);
-  expect(() => assertNsisBudget(400 * MiB, 250 * MiB - 1)).toThrow(/150 MiB/);
-  expect(() => assertNsisBudget(400 * MiB, 300 * MiB + 1)).toThrow(/300 MiB/);
-  expect(assertNsisBudget(439_171_500, 288_626_662).nonComponentBytes).toBe(150_544_838);
-  expect(() => assertNsisBudget(491_244_872, 288_626_662)).toThrow(/450 MiB/);
+  expect(() => assertNsisBudget(450 * MiB + 1, 300 * MiB, 'lite')).toThrow(/450 MiB/);
+  expect(() => assertNsisBudget(400 * MiB, 250 * MiB - 1, 'lite')).toThrow(/150 MiB/);
+  expect(assertNsisBudget(439_171_500, 288_626_662, 'lite').nonComponentBytes).toBe(150_544_838);
+  expect(assertNsisBudget(378 * MiB, 288_626_662, 'cpu')).toMatchObject({ edition: 'cpu' });
+  expect(() => assertNsisBudget(479_234_525, 288_626_662, 'cpu')).toThrow(/450 MiB/);
+  expect(assertNsisBudget(500 * MiB, 300 * MiB, 'cuda')).toMatchObject({ skipped: true, edition: 'cuda' });
   expect(() => assertSetupBudget(491_244_872, 288_626_662)).not.toThrow();
 });
 
@@ -144,7 +144,7 @@ test.each(['missing', 'duplicate'])('rejects a %s component manifest entry', mod
   if (mode === 'missing') components.pop();
   else components[0] = components[1];
   writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ components }));
-  expect(() => readComponentArchiveBytes(dir)).toThrow(/seven|identity/);
+  expect(() => readComponentArchiveBytes(dir)).toThrow(/every bundled|identity/);
 });
 
 test('forbids duplicate root VC redistributable and duplicate managed uninstall host', () => {
