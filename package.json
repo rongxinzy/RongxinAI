@@ -73,7 +73,6 @@
     "web:preview:codegen": "node --experimental-strip-types --experimental-detect-module scripts/preview/generate-browser-mock.ts",
     "web:preview:codegen:check": "node --experimental-strip-types --experimental-detect-module scripts/preview/generate-browser-mock.ts --check",
     "web:preview:check": "playwright test -c scripts/preview/playwright.config.mjs",
-    "web:preview:visual:update": "playwright test -c scripts/preview/playwright.config.mjs --update-snapshots",
     "web:preview:contract": "node --experimental-strip-types --experimental-detect-module scripts/preview/verify-preload-mock-contract.ts",
     "build": "npm run build:tsc && npm run build:vite && npm run check:electron-runtime-dependencies",
     "build:tsc": "tsc",

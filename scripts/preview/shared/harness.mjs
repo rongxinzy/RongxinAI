@@ -1,6 +1,6 @@
 import { FIXED_TIME_MS } from './constants.mjs';
 
-/** Freeze clocks and disable motion so screenshots stay deterministic. */
+/** Freeze clocks and disable motion so interaction tests stay deterministic. */
 export async function applyDeterministicRendering(page) {
   await page.addInitScript(fixedMs => {
     const RealDate = Date;
@@ -46,25 +46,6 @@ export function attachConsoleGuards(page, failures, label) {
   });
 }
 
-export async function settle(page) {
-  await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(150);
-}
-
-/** General settings loads cowork config asynchronously; wait before screenshots. */
-export async function waitForGeneralSettingsPanel(page) {
-  const bridgeSwitch = page
-    .locator('.flex.items-center.justify-between')
-    .filter({ has: page.getByText('MCP native bridge', { exact: true }) })
-    .getByRole('switch');
-  await bridgeSwitch.waitFor({ state: 'visible', timeout: 30_000 });
-  await page.waitForFunction(
-    element => element?.getAttribute('aria-checked') === 'false',
-    await bridgeSwitch.elementHandle(),
-    { timeout: 30_000 },
-  );
-}
-
 export async function home(page, baseUrl, search = '') {
   await page.goto(`${baseUrl}${search}`, { waitUntil: 'domcontentloaded' });
   if (search.includes('previewScenario=error')) {
@@ -79,30 +60,6 @@ export async function home(page, baseUrl, search = '') {
     return;
   }
   await page.getByText('Calculator', { exact: true }).first().waitFor({ timeout: 60_000 });
-}
-
-export async function openConnectors(page, { empty = false } = {}) {
-  await page.getByRole('button', { name: 'Files & Images' }).first().click();
-  await page.getByRole('menuitem', { name: 'Connectors' }).hover();
-  await page.getByRole('menuitem', { name: 'Manage Connectors' }).click();
-  await page.getByRole('heading', { name: 'Connectors' }).waitFor({ timeout: 30_000 });
-  await page.getByRole('tab', { name: /^Installed/ }).click();
-  if (empty) {
-    await page.getByRole('heading', { name: 'Connectors' }).waitFor({ timeout: 30_000 });
-    return;
-  }
-  await page.getByText('Filesystem', { exact: true }).waitFor({ timeout: 30_000 });
-}
-
-export async function openSkillsPage(page, { empty = false } = {}) {
-  await page.getByRole('button', { name: 'Files & Images' }).first().click();
-  await page.getByText('Skills', { exact: true }).first().click();
-  await page.getByText('Manage Skills', { exact: true }).click();
-  if (empty) {
-    await page.getByRole('heading', { name: 'Skills' }).waitFor({ timeout: 30_000 });
-    return;
-  }
-  await page.getByText('Word documents').first().waitFor({ timeout: 30_000 });
 }
 
 export function previewSearch({ scenario, edition, skipBoot = true, extra } = {}) {

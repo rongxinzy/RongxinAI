@@ -1,5 +1,5 @@
 /**
- * Scenario-specific overrides for browser preview visual and interaction tests.
+ * Scenario-specific overrides for browser preview interaction tests and local walkthroughs.
  */
 import {
   PreviewEdition as PreviewEditionConst,

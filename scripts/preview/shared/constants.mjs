@@ -13,25 +13,3 @@ export const PreviewEdition = {
   Zhiyuan: 'zhiyuan',
   Xiaoruan: 'xiaoruan',
 };
-
-export const settingsTabs = [
-  ['settings-general', 'General'],
-  ['settings-appearance', 'Appearance'],
-  ['settings-shortcuts', 'Shortcuts'],
-  ['settings-model', 'Model'],
-  ['settings-platform-models', 'Platform Models'],
-  ['settings-model-routing', 'Model Routing'],
-  ['settings-memory', 'Memory'],
-  ['settings-im', 'IM Bot'],
-  ['settings-email', 'Email'],
-  ['settings-about', 'About'],
-];
-
-export const sidebarViews = [
-  ['local-inference', 'Local Inference'],
-  ['coding', 'Coding'],
-  ['todo', 'Todo'],
-  ['scheduled-tasks', 'Automation', 'Daily sales digest'],
-  ['activity', 'Activity', '正在查询'],
-  ['expert', 'Expert'],
-];

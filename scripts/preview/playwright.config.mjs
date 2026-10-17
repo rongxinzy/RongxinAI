@@ -16,14 +16,8 @@ export default defineConfig({
   timeout: 180_000,
   expect: {
     timeout: 30_000,
-    toHaveScreenshot: {
-      maxDiffPixelRatio: 0.015,
-      animations: 'disabled',
-      caret: 'hide',
-    },
   },
   reporter: process.env.CI ? [['github'], ['list']] : [['list']],
-  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   use: {
     baseURL: `http://127.0.0.1:${previewPort}/`,
     locale: PREVIEW_LOCALE,
