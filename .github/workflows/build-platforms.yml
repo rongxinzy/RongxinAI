@@ -1,4 +1,7 @@
-name: Build platform artifacts (manual)
+name: Verify inference edition builds (manual)
+
+# Branch validation: pull_request runs the same reusable build as tag release (verify mode).
+# workflow_dispatch exists for post-merge manual runs on the default branch only.
 
 on:
   workflow_dispatch:
@@ -18,289 +21,35 @@ on:
         required: true
         default: true
         type: boolean
+  pull_request:
+    paths:
+      - '.github/workflows/build-inference-editions.yml'
+      - '.github/workflows/build-platforms.yml'
+      - '.github/workflows/release.yml'
+      - 'package.json'
+      - 'bun.lock'
+      - 'electron-builder*.json'
+      - 'electron-builder*.cjs'
+      - 'scripts/**'
+      - 'resources/**'
+      - 'vendor/llamacpp/**'
 
 permissions:
   contents: read
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+concurrency:
+  group: verify-inference-editions-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  plan-platforms:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-    steps:
-      - id: plan
-        env:
-          BUILD_MACOS: ${{ inputs.build_macos }}
-          BUILD_WINDOWS: ${{ inputs.build_windows }}
-          BUILD_LINUX: ${{ inputs.build_linux }}
-        shell: bash
-        run: |
-          matrix='{"include":['
-          separator=''
-
-          if [[ "$BUILD_WINDOWS" == "true" ]]; then
-            for edition in lite cpu cuda; do
-              matrix+="${separator}{\"platform\":\"windows\",\"runner\":\"windows-latest\",\"artifact\":\"windows-${edition}-build\",\"runtime_target\":\"win-x64\",\"inference_edition\":\"${edition}\"}"
-              separator=','
-            done
-          fi
-          if [[ "$BUILD_LINUX" == "true" ]]; then
-            for edition in lite cpu cuda; do
-              matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-${edition}-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"${edition}\"}"
-              separator=','
-            done
-          fi
-          if [[ "$BUILD_MACOS" == "true" ]]; then
-            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-latest\",\"artifact\":\"macos-arm64-cpu-build\",\"runtime_target\":\"mac-arm64\",\"arch\":\"arm64\",\"inference_edition\":\"cpu\"}"
-            separator=','
-            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-15-intel\",\"artifact\":\"macos-x64-cpu-build\",\"runtime_target\":\"mac-x64\",\"arch\":\"x64\",\"inference_edition\":\"cpu\"}"
-            separator=','
-            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-latest\",\"artifact\":\"macos-arm64-lite-build\",\"runtime_target\":\"mac-arm64\",\"arch\":\"arm64\",\"inference_edition\":\"lite\"}"
-            separator=','
-            matrix+="${separator}{\"platform\":\"macos\",\"runner\":\"macos-15-intel\",\"artifact\":\"macos-x64-lite-build\",\"runtime_target\":\"mac-x64\",\"arch\":\"x64\",\"inference_edition\":\"lite\"}"
-          fi
-
-          matrix+=']}'
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-
-  build-platforms:
-    needs: plan-platforms
-    strategy:
-      # Let lite/cpu/cuda matrix legs finish independently during manual validation.
+  verify-inference-editions:
+    uses: ./.github/workflows/build-inference-editions.yml
+    with:
+      source-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      mode: verify
       fail-fast: false
-      matrix: ${{ fromJSON(needs.plan-platforms.outputs.matrix) }}
-    runs-on: ${{ matrix.runner }}
-    environment: release
-    env:
-      ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
-    # A release build may download upstream runtimes, but it must never consume
-    # a runner indefinitely when an upstream command stalls.
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24.x'
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore llama.cpp runtime
-        id: llama-runtime
-        uses: ./.github/actions/cache-llamacpp-runtime
-        with:
-          mode: restore
-      - name: Restore packaging caches
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ~/.npm
-            ~/.cache/electron
-            ~/.cache/electron-builder
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
-            vendor/engram-runtime
-            vendor/channel-runtime
-          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
-          restore-keys: |
-            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
-      - name: Install Electron system dependencies
-        if: ${{ matrix.platform == 'linux' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
-            libxss1 libxtst6 libuuid1 xdg-utils xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
-      - uses: actions/setup-go@v6
-        with:
-          go-version: '1.26.8'
-          cache: false
-      - name: Cache Magpie module and build scratch
-        uses: actions/cache@v5
-        with:
-          path: .cache/magpie
-          key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go1.26.8-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
-      - name: Build and verify Magpie runtime
-        shell: bash
-        env:
-          MAGPIE_TARGET: ${{ matrix.platform == 'linux' && 'linux-x64' || matrix.platform == 'windows' && 'win32-x64' || (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
-        run: |
-          set -euo pipefail
-          go version | grep -Fq 'go1.26.8'
-          bun run magpie:build -- --target "${MAGPIE_TARGET}"
-          bun run magpie:verify -- --target "${MAGPIE_TARGET}"
-      - name: Set up installer shell SDK
-        if: ${{ matrix.platform == 'windows' }}
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '8.0.x'
-      - name: Set up Windows runtimes
-        if: ${{ matrix.platform == 'windows' }}
-        run: |
-          bun run setup:uv-runtime
-          bun run setup:python-runtime
-          bun run engram:runtime:${{ matrix.runtime_target }}
-      - name: Set up POSIX runtimes
-        if: ${{ matrix.platform != 'windows' }}
-        run: |
-          bun run setup:posix-uv-runtime
-          bun run setup:posix-python-runtime
-          bun run engram:runtime:${{ matrix.runtime_target }}
-      - name: Sync vendor llama.cpp CPU edition
-        if: ${{ matrix.inference_edition != 'lite' }}
-        run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
-        env:
-          LLAMACPP_CPU_TARGET_ID: ${{ matrix.runtime_target }}
-      - name: Cache llama.cpp CUDA source
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
-        uses: actions/cache@v5
-        with:
-          path: .cache/llama.cpp-src
-          key: llamacpp-cuda-src-b9244-v1
-          restore-keys: llamacpp-cuda-src-b9244-
-      - name: Set up CUDA 12.4 toolkit (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        uses: Jimver/cuda-toolkit@v0.2.22
-        id: cuda-toolkit
-        with:
-          cuda: '12.4.1'
-          method: network
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
-      - name: Verify CUDA compiler (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: nvcc --version
-      - name: Prepare llama.cpp CUDA source (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: bash scripts/ensure-llamacpp-cuda-source.sh
-      - name: Install Ninja (Windows CUDA)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        run: choco install ninja -y
-      - name: Compile llama-server (Windows CUDA)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          cmd: bash scripts/build-llamacpp-cuda-rtx40.sh win
-      - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
-        shell: bash
-        run: bash scripts/ci/build-llamacpp-cuda-linux-in-docker.sh
-      - name: Finalize CUDA llama.cpp edition bundle
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
-        run: node scripts/finalize-llamacpp-cuda-edition.cjs
-        env:
-          LLAMACPP_CUDA_PLATFORM: ${{ matrix.platform == 'windows' && 'win32' || 'linux' }}
-      - name: Stage bundled llama.cpp runtime
-        if: ${{ matrix.inference_edition != 'lite' }}
-        run: bun run prepare:inference-edition-runtime
-        env:
-          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
-      - name: Build macOS
-        if: ${{ matrix.platform == 'macos' }}
-        run: node scripts/ensure-build-version.js && bun run dist:mac:${{ matrix.arch }}
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build Windows
-        if: ${{ matrix.platform == 'windows' }}
-        run: bun run dist:win:${{ matrix.inference_edition }}
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build Linux
-        if: ${{ matrix.platform == 'linux' }}
-        run: bun run dist:linux
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Smoke bundled llama-server
-        if: ${{ matrix.inference_edition != 'lite' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          server="$(find resources/llamacpp-bundled -name 'llama-server*' -type f | head -n 1)"
-          if [[ -z "$server" ]]; then
-            echo "Bundled llama-server not found under resources/llamacpp-bundled" >&2
-            exit 1
-          fi
-          chmod +x "$server" 2>/dev/null || true
-          "$server" --version || "$server" --help | head -n 5
-          du -sh resources/llamacpp-bundled vendor/llamacpp/* 2>/dev/null || true
-      - name: Verify packaged ACP registry and bridges
-        run: node scripts/ci/verify-packaged-acp-resources.mjs
-      - name: Verify Windows package runtimes with a clean PATH
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/windows-runtime-smoke.ps1
-          -ProjectRoot ${{ github.workspace }}
-      - name: Verify the packaged renderer in a virtual Ubuntu desktop
-        if: ${{ matrix.platform == 'linux' }}
-        run: >-
-          node scripts/verify-linux-renderer.mjs
-          release/linux-unpacked
-          release/linux-render-smoke.png
-      - name: Prepare isolated native uninstall acceptance
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
-      - name: Verify the final WebView2 installer interactively
-        if: ${{ matrix.platform == 'windows' }}
-        shell: pwsh
-        run: |
-          node scripts/ci/windows-shell-interactive.mjs
-          if ($LASTEXITCODE -ne 0) { throw 'Shell interactive acceptance failed.' }
-          $installer = @(Get-ChildItem -LiteralPath release -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
-          if ($installer.Count -ne 1) { throw 'Expected exactly one shell installer.' }
-          $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
-          node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
-          if ($LASTEXITCODE -ne 0) { throw 'Shell evidence is invalid.' }
-      - name: Verify native uninstall preserves user data
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action verify
-      - name: Upload shell acceptance evidence
-        if: ${{ always() && matrix.platform == 'windows' }}
-        uses: actions/upload-artifact@v6
-        with:
-          name: shell-acceptance-${{ github.run_id }}
-          path: acceptance-diagnostics
-          if-no-files-found: error
-          retention-days: 7
-      - uses: actions/upload-artifact@v6
-        if: ${{ matrix.platform == 'macos' }}
-        with:
-          name: ${{ matrix.artifact }}
-          path: release/*.dmg
-          retention-days: 7
-      - uses: actions/upload-artifact@v6
-        if: ${{ matrix.platform == 'windows' }}
-        with:
-          name: ${{ matrix.artifact }}
-          path: release/*.exe
-          retention-days: 7
-      - uses: actions/upload-artifact@v6
-        if: ${{ always() && matrix.platform == 'linux' }}
-        with:
-          name: ${{ matrix.artifact }}
-          path: |
-            release/*.AppImage
-            release/*.deb
-            release/linux-render-smoke.png
-          retention-days: 7
-      - name: Save llama.cpp runtime
-        if: success()
-        uses: ./.github/actions/cache-llamacpp-runtime
-        with:
-          mode: save
-          cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
-          cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}
+      build-macos: ${{ github.event_name != 'workflow_dispatch' || inputs.build_macos }}
+      build-windows: ${{ github.event_name != 'workflow_dispatch' || inputs.build_windows }}
+      build-linux: ${{ github.event_name != 'workflow_dispatch' || inputs.build_linux }}
+    secrets:
+      MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}

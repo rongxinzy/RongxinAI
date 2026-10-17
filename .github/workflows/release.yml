@@ -130,346 +130,24 @@ jobs:
 
   build-release:
     needs: [prepare-release, quality, memory-regression]
-    strategy:
+    uses: ./.github/workflows/build-inference-editions.yml
+    with:
+      source-ref: ${{ needs.prepare-release.outputs.commit }}
+      app-build-version: ${{ needs.prepare-release.outputs.version }}
+      mode: release
       fail-fast: true
-      matrix:
-        include:
-          - platform: windows
-            runner: windows-latest
-            target: win32-x64-lite
-            runtime_target: win-x64
-          - platform: macos
-            runner: macos-latest
-            target: darwin-arm64-default
-            runtime_target: mac-arm64
-            arch: arm64
-          - platform: macos
-            runner: macos-15-intel
-            target: darwin-x64-default
-            runtime_target: mac-x64
-            arch: x64
-          - platform: linux
-            runner: ubuntu-latest
-            target: linux-x64-default
-            runtime_target: linux-x64
-    runs-on: ${{ matrix.runner }}
-    # The release environment has no protection rules; it scopes the Certum
-    # signing credentials to this job without adding an approval gate.
-    environment: release
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare-release.outputs.commit }}
-      - uses: actions/setup-node@v6
-        with: { node-version: '24.x' }
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: '1.4.0' }
-      - name: Restore bundled runtime cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            resources/python-win
-            resources/uv-win
-            resources/python-mac
-            resources/uv-mac
-            resources/python-linux
-            resources/uv-linux
-            resources/uv-archives
-          key: bundled-runtimes-${{ runner.os }}-${{ matrix.runtime_target }}-${{ hashFiles('scripts/setup-python-runtime.js', 'scripts/setup-uv-runtime.js', 'scripts/setup-mac-python-runtime.js', 'scripts/setup-mac-uv-runtime.js', 'electron-builder.json') }}
-      - name: Restore packaging caches
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ~/.npm
-            ~/.cache/electron
-            ~/.cache/electron-builder
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
-            vendor/channel-runtime
-          key: release-packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
-          restore-keys: |
-            release-packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
-      - name: Install Electron system dependencies
-        if: ${{ matrix.platform == 'linux' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
-            libxss1 libxtst6 libuuid1 xdg-utils xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
-      - name: Set up installer shell SDK
-        if: ${{ matrix.platform == 'windows' }}
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '8.0.x'
-      - name: Set up Windows runtimes
-        if: ${{ matrix.platform == 'windows' }}
-        run: |
-          bun run setup:uv-runtime
-          bun run setup:python-runtime
-      - name: Set up POSIX runtimes
-        if: ${{ matrix.platform != 'windows' }}
-        run: |
-          bun run setup:posix-uv-runtime
-          bun run setup:posix-python-runtime
-      - name: Connect Certum SimplySign
-        if: ${{ matrix.platform == 'windows' }}
-        id: certum-signing
-        uses: ./.github/actions/setup-certum-signing
-        with:
-          user-id: ${{ secrets.CERTUM_USER_ID }}
-          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
-          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
-      - name: Build Windows release
-        if: ${{ matrix.platform == 'windows' }}
-        run: bun run dist:win:signed
-        env:
-          APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
-          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Validate optional macOS signing credentials
-        if: ${{ matrix.platform == 'macos' }}
-        shell: bash
-        run: |
-          values=("$CSC_LINK" "$CSC_KEY_PASSWORD" "$APPLE_ID" "$APPLE_APP_SPECIFIC_PASSWORD" "$APPLE_TEAM_ID")
-          provided=0
-          for value in "${values[@]}"; do [[ -n "$value" ]] && provided=$((provided + 1)); done
-          if [[ $provided -eq 0 ]]; then
-            echo 'ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=false' >> "$GITHUB_ENV"
-            echo 'CSC_IDENTITY_AUTO_DISCOVERY=false' >> "$GITHUB_ENV"
-            echo '::warning title=Unsigned macOS release::Apple signing credentials are unavailable.'
-          elif [[ $provided -ne ${#values[@]} ]]; then
-            echo 'macOS signing credentials are only partially configured' >&2
-            exit 1
-          else
-            echo 'ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=true' >> "$GITHUB_ENV"
-            echo 'CSC_IDENTITY_AUTO_DISCOVERY=true' >> "$GITHUB_ENV"
-          fi
-        env:
-          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      - name: Build unsigned macOS release
-        if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
-        env:
-          APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build signed macOS release
-        if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
-        env:
-          APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Verify signed and notarized macOS release
-        if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
-        shell: bash
-        run: |
-          app_path="$(find release -maxdepth 3 -type d -name '*.app' -print -quit)"
-          [[ -n "$app_path" ]] || { echo 'Packaged macOS app was not found' >&2; exit 1; }
-          codesign --verify --deep --strict --verbose=2 "$app_path"
-          # stapler validate asks Apple for the ticket, and hits the same
-          # intermittent CloudKit drop as the staple step itself
-          # (NSURLErrorDomain -1005): retry before failing the candidate.
-          for attempt in 1 2 3; do
-            if xcrun stapler validate "$app_path"; then break; fi
-            if [[ "$attempt" == 3 ]]; then
-              echo 'macOS notarization ticket validation failed after 3 attempts' >&2
-              exit 1
-            fi
-            sleep $((attempt * 10))
-          done
-          node scripts/ci/verify-packaged-magpie-signature.mjs "$app_path"
-          spctl --assess --type execute --verbose=4 "$app_path"
-      - name: Build Linux release
-        if: ${{ matrix.platform == 'linux' }}
-        run: bun run dist:linux
-        env:
-          APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Verify packaged release version
-        shell: bash
-        run: node scripts/ci/verify-packaged-app-version.mjs '${{ needs.prepare-release.outputs.version }}'
-      - name: Verify packaged ACP registry and bridges
-        shell: bash
-        run: node scripts/ci/verify-packaged-acp-resources.mjs
-      - name: Verify Windows Authenticode signatures
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/verify-windows-authenticode.ps1
-          -ProjectRoot '${{ github.workspace }}'
-          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
-      - name: Verify Windows release size and runtimes
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
-      - name: Qualify Windows compression before release assembly
-        if: ${{ matrix.platform == 'windows' }}
-        uses: ./.github/actions/verify-windows-compression
-      - name: Prepare isolated native uninstall acceptance
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        env:
-          ZHIYUAN_SOURCE_COMMIT: ${{ needs.prepare-release.outputs.commit }}
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/windows-shell-uninstall.ps1 -Action prepare
-      - name: Verify Windows cold install, cache-hit upgrade, and uninstall
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/windows-installer-smoke.ps1
-          -ProjectRoot '${{ github.workspace }}'
-      - name: Verify the Linux renderer
-        if: ${{ matrix.platform == 'linux' }}
-        run: xvfb-run -a node scripts/verify-linux-renderer.mjs release/linux-unpacked release/linux-render-smoke.png
-      - name: Install and start the exact Linux release deb
-        if: ${{ matrix.platform == 'linux' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          debs=(release/*.deb)
-          [[ ${#debs[@]} -eq 1 ]] || { echo 'Expected exactly one Linux deb package' >&2; exit 1; }
-          sudo apt-get install -y "$(realpath "${debs[0]}")"
-          # The deb installs under `${productName}/${executableName}`: resolve it from
-          # the packaging config instead of a literal path, which a product rename
-          # left pointing at a directory that no longer exists.
-          app_exec="$(node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('electron-builder.json','utf8'));process.stdout.write('/opt/'+c.productName+'/'+(c.executableName||c.productName));")"
-          test -x "$app_exec" || {
-            echo "Installed Linux executable is missing: $app_exec" >&2
-            ls -d /opt/*/ >&2 || true
-            exit 1
-          }
-          node scripts/verify-linux-renderer.mjs "$app_exec" release/linux-deb-install-smoke.png
-      - name: Verify the final signed WebView2 installer interactively
-        if: ${{ matrix.platform == 'windows' }}
-        shell: pwsh
-        env:
-          ZHIYUAN_SOURCE_COMMIT: ${{ needs.prepare-release.outputs.commit }}
-        run: |
-          node scripts/ci/windows-shell-interactive.mjs
-          if ($LASTEXITCODE -ne 0) { throw 'Signed shell interactive acceptance failed.' }
-          $installer = @(Get-ChildItem -LiteralPath release -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
-          if ($installer.Count -ne 1) { throw 'Expected exactly one signed shell installer.' }
-          $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
-          node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
-          if ($LASTEXITCODE -ne 0) { throw 'Signed shell evidence is invalid.' }
-      - name: Verify signed native uninstall preserves user data
-        if: ${{ matrix.platform == 'windows' }}
-        shell: powershell
-        env:
-          ZHIYUAN_SOURCE_COMMIT: ${{ needs.prepare-release.outputs.commit }}
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/windows-shell-uninstall.ps1 -Action verify
-          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
-      - name: Upload signed shell acceptance evidence
-        if: ${{ always() && matrix.platform == 'windows' }}
-        uses: actions/upload-artifact@v6
-        with:
-          name: signed-shell-acceptance-${{ github.run_id }}
-          path: acceptance-diagnostics
-          if-no-files-found: error
-          retention-days: 7
-      - name: Assemble Windows release payload
-        if: ${{ matrix.platform == 'windows' }}
-        shell: bash
-        run: |
-          shopt -s nullglob
-          installers=(release/ZhiYuanAgent-Setup-*.exe)
-          updaters=()
-          for file in release/*.exe; do
-            [[ "$(basename "$file")" == ZhiYuanAgent-Setup-* ]] || updaters+=("$file")
-          done
-          blockmaps=(release/*.exe.blockmap)
-          [[ ${#installers[@]} -eq 1 && ${#updaters[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one WebView2 installer, NSIS updater, and updater blockmap' >&2; exit 1; }
-          [[ "${blockmaps[0]}" == "${updaters[0]}.blockmap" ]] || { echo 'Blockmap must belong to the NSIS updater' >&2; exit 1; }
-          node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ needs.prepare-release.outputs.version }}' win32 x64 lite \
-            release/latest.yml release/electron-updater/latest.yml
-          node scripts/release/create-release-candidate.mjs \
-            '${{ needs.prepare-release.outputs.version }}' \
-            '${{ needs.prepare-release.outputs.commit }}' \
-            '${{ github.run_id }}' candidate candidate-win32-x64-lite.json \
-            "${installers[0]}:win32:x64:lite:installer" \
-            "${updaters[0]}:win32:x64:lite:updater" \
-            "${blockmaps[0]}:win32:x64:lite:blockmap" \
-            'release/electron-updater/latest.yml:win32:x64:lite:metadata'
-      - name: Assemble macOS release payload
-        if: ${{ matrix.platform == 'macos' }}
-        shell: bash
-        run: |
-          shopt -s nullglob
-          dmgs=(release/*.dmg)
-          zips=(release/*.zip)
-          blockmaps=(release/*.zip.blockmap)
-          [[ ${#dmgs[@]} -eq 1 && ${#zips[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one macOS DMG, ZIP, and blockmap' >&2; exit 1; }
-          node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ needs.prepare-release.outputs.version }}' darwin ${{ matrix.arch }} default \
-            release/latest-mac.yml release/electron-updater/latest-mac.yml
-          node scripts/release/create-release-candidate.mjs \
-            '${{ needs.prepare-release.outputs.version }}' \
-            '${{ needs.prepare-release.outputs.commit }}' \
-            '${{ github.run_id }}' candidate candidate-darwin-${{ matrix.arch }}-default.json \
-            "${dmgs[0]}:darwin:${{ matrix.arch }}:default:installer" \
-            "${zips[0]}:darwin:${{ matrix.arch }}:default:updater" \
-            "${blockmaps[0]}:darwin:${{ matrix.arch }}:default:blockmap" \
-            'release/electron-updater/latest-mac.yml:darwin:${{ matrix.arch }}:default:metadata'
-      - name: Assemble Linux release payload
-        if: ${{ matrix.platform == 'linux' }}
-        shell: bash
-        run: |
-          shopt -s nullglob
-          debs=(release/*.deb)
-          appimages=(release/*.AppImage)
-          [[ ${#debs[@]} -eq 1 && ${#appimages[@]} -eq 1 ]] || { echo 'Expected one Linux deb and AppImage' >&2; exit 1; }
-          node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ needs.prepare-release.outputs.version }}' linux x64 appimage \
-            release/latest-linux.yml release/electron-updater/latest-linux.yml
-          node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ needs.prepare-release.outputs.version }}' linux x64 deb \
-            release/latest-linux.yml release/electron-updater/deb/latest-linux.yml
-          node scripts/release/create-release-candidate.mjs \
-            '${{ needs.prepare-release.outputs.version }}' \
-            '${{ needs.prepare-release.outputs.commit }}' \
-            '${{ github.run_id }}' candidate candidate-linux-x64.json \
-            "${debs[0]}:linux:x64:deb:installer" \
-            "${debs[0]}:linux:x64:deb:updater" \
-            'release/electron-updater/deb/latest-linux.yml:linux:x64:deb:metadata' \
-            "${appimages[0]}:linux:x64:appimage:installer" \
-            "${appimages[0]}:linux:x64:appimage:updater" \
-            'release/electron-updater/latest-linux.yml:linux:x64:appimage:metadata'
-      - name: Upload release payload
-        uses: actions/upload-artifact@v6
-        with:
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-${{ matrix.target }}
-          path: candidate
-          if-no-files-found: error
-          retention-days: 14
+    secrets:
+      CERTUM_USER_ID: ${{ secrets.CERTUM_USER_ID }}
+      CERTUM_OTP_URI: ${{ secrets.CERTUM_OTP_URI }}
+      CERTUM_CERT_THUMBPRINT: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+      UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+      UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+      MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      MACOS_CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+      MACOS_CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
   # The publish gate consumes exactly the bytes the smoke steps above verified
   # (same-run artifacts). Any smoke failure stops the pipeline here and the
@@ -488,32 +166,56 @@ jobs:
           pipx install 'awscli>=1.45.10,<2'
           npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
       - name: Download verified release payloads
-        uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v8
         with:
-          path: candidate/windows
+          path: candidate/win32-x64-lite
           name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-lite
       - uses: actions/download-artifact@v8
         with:
-          path: candidate/macos-arm64
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-default
+          path: candidate/linux-x64-lite
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-lite
       - uses: actions/download-artifact@v8
         with:
-          path: candidate/macos-x64
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-default
+          path: candidate/win32-x64-cpu
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-cpu
       - uses: actions/download-artifact@v8
         with:
-          path: candidate/linux
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-default
+          path: candidate/linux-x64-cpu
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-cpu
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/win32-x64-cuda
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-cuda
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/linux-x64-cuda
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-cuda
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/darwin-arm64-lite
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-lite
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/darwin-arm64-cpu
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-cpu
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/darwin-x64-lite
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-lite
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/darwin-x64-cpu
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-cpu
       - name: Verify release completeness and identity
         shell: bash
         run: |
           set -euo pipefail
-          manifests=(
-            candidate/windows/candidate-win32-x64-lite.json
-            candidate/macos-arm64/candidate-darwin-arm64-default.json
-            candidate/macos-x64/candidate-darwin-x64-default.json
-            candidate/linux/candidate-linux-x64.json
-          )
+          manifests=()
+          roots=()
+          while IFS=$'\t' read -r bundle manifest; do
+            manifests+=("candidate/${bundle}/${manifest}")
+            roots+=("candidate/${bundle}")
+          done < <(node scripts/release/print-release-candidate-layout.mjs)
           for manifest in "${manifests[@]}"; do
             [[ -f "$manifest" ]] || { echo "Missing release manifest: $manifest" >&2; exit 1; }
           done
@@ -522,7 +224,7 @@ jobs:
             '${{ needs.prepare-release.outputs.commit }}' \
             '${{ github.run_id }}' \
             "${manifests[@]}" \
-            --payload-roots candidate/windows candidate/macos-arm64 candidate/macos-x64 candidate/linux
+            --payload-roots "${roots[@]}"
       - name: Configure protected R2 access
         shell: bash
         env:
@@ -539,16 +241,20 @@ jobs:
       - name: Verify and upload immutable release bytes
         shell: bash
         run: |
+          set -euo pipefail
+          manifests=()
+          roots=()
+          while IFS=$'\t' read -r bundle manifest; do
+            manifests+=("candidate/${bundle}/${manifest}")
+            roots+=("candidate/${bundle}")
+          done < <(node scripts/release/print-release-candidate-layout.mjs)
           node scripts/release/upload-release-candidate.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             '${{ needs.prepare-release.outputs.commit }}' \
             '${{ github.run_id }}' \
             uploaded-metadata \
-            candidate/windows/candidate-win32-x64-lite.json \
-            candidate/macos-arm64/candidate-darwin-arm64-default.json \
-            candidate/macos-x64/candidate-darwin-x64-default.json \
-            candidate/linux/candidate-linux-x64.json \
-            --payload-roots candidate/windows candidate/macos-arm64 candidate/macos-x64 candidate/linux
+            "${manifests[@]}" \
+            --payload-roots "${roots[@]}"
       - name: Archive build metadata for stable promotion
         shell: bash
         run: |
@@ -562,12 +268,17 @@ jobs:
               --cache-control 'public, max-age=31536000, immutable'
           done
       - name: Create signed beta manifest from uploaded release metadata
+        shell: bash
         run: |
+          set -euo pipefail
+          shopt -s nullglob
+          metadata=(uploaded-metadata/update-artifacts-*.json)
+          [[ ${#metadata[@]} -gt 0 ]] || { echo 'Missing uploaded artifact metadata' >&2; exit 1; }
           node scripts/release/publish-update-manifest.mjs \
             manifest/beta.json \
             '${{ needs.prepare-release.outputs.version }}' \
             '${{ needs.prepare-release.outputs.commit }}' \
-            --metadata uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json uploaded-metadata/update-artifacts-4.json
+            --metadata "${metadata[@]}"
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
@@ -623,7 +334,10 @@ jobs:
         if: steps.version_check.outputs.idempotent != 'true'
         shell: bash
         run: |
-          metadata=(uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json uploaded-metadata/update-artifacts-4.json)
+          set -euo pipefail
+          shopt -s nullglob
+          metadata=(uploaded-metadata/update-artifacts-*.json)
+          [[ ${#metadata[@]} -gt 0 ]] || { echo 'Missing uploaded artifact metadata' >&2; exit 1; }
           mkdir -p manifest/electron
           while IFS=$'\t' read -r key target filename; do
             target_file="${target//:/-}"
@@ -734,9 +448,11 @@ jobs:
       - name: Smoke test published beta release
         shell: bash
         run: |
+          set -euo pipefail
+          mapfile -t release_targets < <(node scripts/release/print-required-release-targets.mjs)
           node scripts/release/verify-published-update.mjs --channel beta \
             '${{ needs.prepare-release.outputs.version }}' \
-            win32:x64:lite darwin:x64:default darwin:arm64:default linux:x64:deb linux:x64:appimage
+            "${release_targets[@]}"
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
@@ -756,22 +472,52 @@ jobs:
     needs: [prepare-release, build-release, publish]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit }}
+      - uses: actions/setup-node@v6
+        with: { node-version: '24.x' }
+      - name: Download release payloads for GitHub assets
       - uses: actions/download-artifact@v8
         with:
-          path: candidate/windows
+          path: candidate/win32-x64-lite
           name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-lite
       - uses: actions/download-artifact@v8
         with:
-          path: candidate/macos-arm64
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-default
+          path: candidate/linux-x64-lite
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-lite
       - uses: actions/download-artifact@v8
         with:
-          path: candidate/macos-x64
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-default
+          path: candidate/win32-x64-cpu
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-cpu
       - uses: actions/download-artifact@v8
         with:
-          path: candidate/linux
-          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-default
+          path: candidate/linux-x64-cpu
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-cpu
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/win32-x64-cuda
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-win32-x64-cuda
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/linux-x64-cuda
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-linux-x64-cuda
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/darwin-arm64-lite
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-lite
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/darwin-arm64-cpu
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-arm64-cpu
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/darwin-x64-lite
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-lite
+      - uses: actions/download-artifact@v8
+        with:
+          path: candidate/darwin-x64-cpu
+          name: release-candidate-${{ needs.prepare-release.outputs.version }}-darwin-x64-cpu
       - name: Collect GitHub release assets
         shell: bash
         run: |

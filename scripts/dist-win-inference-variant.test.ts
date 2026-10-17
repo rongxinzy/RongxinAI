@@ -20,4 +20,14 @@ test('Windows dist scripts preserve ZHIYUAN_UPDATE_VARIANT for each inference ed
     /ZHIYUAN_UPDATE_VARIANT=cuda[\s\S]*dist:win:offline/,
   );
   expect(packageJson.scripts['dist:win:lite']).toContain('dist:win:offline');
+
+  const signed = packageJson.scripts['dist:win:signed'];
+  expect(signed).not.toMatch(/ZHIYUAN_UPDATE_VARIANT=lite/);
+  expect(signed).toContain('node scripts/ensure-build-version.js');
+  expect(packageJson.scripts['dist:win:signed:cpu']).toMatch(
+    /ZHIYUAN_UPDATE_VARIANT=cpu[\s\S]*dist:win:signed/,
+  );
+  expect(packageJson.scripts['dist:win:signed:cuda']).toMatch(
+    /ZHIYUAN_UPDATE_VARIANT=cuda[\s\S]*dist:win:signed/,
+  );
 });

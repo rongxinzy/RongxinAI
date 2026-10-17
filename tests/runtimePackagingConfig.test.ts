@@ -182,7 +182,7 @@ test('publish verification uses portable jq flags and preserves updater filename
   assert.match(workflow, /manifest\/electron\/\$\{target_file\}\/\$\{filename\}/);
   assert.match(workflow, /print-electron-updater-verify-specs\.mjs/);
   assert.match(workflow, /verify-electron-updater-generation\.mjs/);
-  assert.match(workflow, /candidate-win32-x64-lite/);
+  assert.match(workflow, /print-release-candidate-layout\.mjs/);
 });
 
 test('release supply-chain gates track every checked-in npm lockfile', () => {
@@ -217,7 +217,10 @@ test('release supply-chain gates track every checked-in npm lockfile', () => {
 });
 
 test('unsigned macOS release builds do not receive empty signing credentials', () => {
-  const workflow = readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8');
+  const workflow = readFileSync(
+    path.join(root, '.github', 'workflows', 'build-inference-editions.yml'),
+    'utf8',
+  );
   const unsignedStart = workflow.indexOf('- name: Build unsigned macOS release');
   const signedStart = workflow.indexOf('- name: Build signed macOS release');
   const verifyStart = workflow.indexOf('- name: Verify signed and notarized macOS release');
@@ -235,7 +238,7 @@ test('unsigned macOS release builds do not receive empty signing credentials', (
 });
 
 test('release workflows explicitly provision the private POSIX toolchain', () => {
-  for (const workflow of ['release.yml']) {
+  for (const workflow of ['build-inference-editions.yml']) {
     const content = readFileSync(path.join(root, '.github', 'workflows', workflow), 'utf8');
     assert.match(content, /bun run setup:posix-uv-runtime/);
     assert.match(content, /bun run setup:posix-python-runtime/);
@@ -244,7 +247,7 @@ test('release workflows explicitly provision the private POSIX toolchain', () =>
 });
 
 test('Windows release workflow runs the clean-path bundled runtime gate', () => {
-  for (const workflowName of ['release.yml', 'release.yml']) {
+  for (const workflowName of ['build-inference-editions.yml']) {
     const workflow = readFileSync(path.join(root, '.github', 'workflows', workflowName), 'utf8');
     assert.match(workflow, /windows-runtime-smoke\.ps1/);
   }
@@ -282,13 +285,20 @@ test('protected Windows releases authenticate with Certum and require valid sign
   assert.match(packageJson.scripts['dist:win:signed'], /electron-builder\.windows-signed\.cjs/);
   assert.match(packageJson.scripts['dist:win:offline'], /electron-builder\.json/);
 
-  for (const workflowName of ['release.yml', 'release.yml']) {
-    const workflow = readFileSync(path.join(root, '.github', 'workflows', workflowName), 'utf8');
-    assert.match(workflow, /\.\/\.github\/actions\/setup-certum-signing/);
-    assert.match(workflow, /bun run dist:win:signed/);
-    assert.match(workflow, /CERTUM_CERT_THUMBPRINT:/);
-    assert.match(workflow, /verify-windows-authenticode\.ps1/);
-  }
+  const releaseWorkflow = readFileSync(
+    path.join(root, '.github', 'workflows', 'release.yml'),
+    'utf8',
+  );
+  assert.match(releaseWorkflow, /uses: \.\/\.github\/workflows\/build-inference-editions\.yml/);
+  assert.match(releaseWorkflow, /CERTUM_CERT_THUMBPRINT:/);
+
+  const buildWorkflow = readFileSync(
+    path.join(root, '.github', 'workflows', 'build-inference-editions.yml'),
+    'utf8',
+  );
+  assert.match(buildWorkflow, /\.\/\.github\/actions\/setup-certum-signing/);
+  assert.match(buildWorkflow, /bun run dist:win:signed/);
+  assert.match(buildWorkflow, /verify-windows-authenticode\.ps1/);
 
   const setupAction = readFileSync(
     path.join(root, '.github', 'actions', 'setup-certum-signing', 'action.yml'),
@@ -376,12 +386,17 @@ test('installer-related pull requests build and exercise the Windows installer',
 
 test('tag release publishes beta and archives build metadata for promotion', () => {
   const workflow = readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8');
+  const buildWorkflow = readFileSync(
+    path.join(root, '.github', 'workflows', 'build-inference-editions.yml'),
+    'utf8',
+  );
 
   assert.match(workflow, /push:\s*\n\s*tags:/);
   assert.match(workflow, /TAG_NAME:/);
   assert.match(workflow, /git merge-base --is-ancestor/);
-  assert.match(workflow, /APP_BUILD_VERSION:/);
-  assert.match(workflow, /create-release-candidate\.mjs/);
+  assert.match(workflow, /app-build-version:/);
+  assert.match(workflow, /uses: \.\/\.github\/workflows\/build-inference-editions\.yml/);
+  assert.match(buildWorkflow, /create-release-candidate\.mjs/);
   assert.match(workflow, /verify-release-candidate\.mjs/);
   assert.match(workflow, /upload-release-candidate\.mjs/);
   assert.match(workflow, /UPDATE_RELEASE_CHANNEL: beta/);
