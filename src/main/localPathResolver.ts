@@ -61,7 +61,10 @@ export const resolveLocalPathCandidate = async (
   }
 
   const normalized = normalizeWindowsShellPath(rawPath);
-  const resolved = path.resolve(cwd ?? '', normalized);
+  // A relative candidate needs the session cwd; never resolve it against the
+  // main process's own working directory.
+  if (!path.isAbsolute(normalized) && !cwd) return null;
+  const resolved = cwd ? path.resolve(cwd, normalized) : path.resolve(normalized);
   if (!isAllowedShellProbePath(resolved, allowedRoots)) return null;
 
   try {

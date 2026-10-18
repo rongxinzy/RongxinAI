@@ -46,6 +46,17 @@ describe('resolveLocalPathCandidate', () => {
     ).resolves.toBe(path.join(tempBase, 'workspace', 'notes', 'a.txt'));
   });
 
+  it('never resolves relative candidates without a cwd', async () => {
+    makeFile('no-cwd/a.txt');
+    const previous = process.cwd();
+    process.chdir(path.join(tempBase, 'no-cwd'));
+    try {
+      await expect(resolveLocalPathCandidate('a.txt', undefined, roots)).resolves.toBeNull();
+    } finally {
+      process.chdir(previous);
+    }
+  });
+
   it('resolves file URLs via fileURLToPath', async () => {
     const filePath = makeFile('url/销售简历.html');
     const fileUrl = pathToFileURL(filePath).href;

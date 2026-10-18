@@ -404,7 +404,9 @@ const LocalAwareMarkdownAnchor: React.FC<LocalAwareMarkdownAnchorProps> = ({
     );
   }
 
-  if (!isExternalLink && restrictLocalFileLinks) {
+  // 受限视图（coding 预览）里，路径样但未解析到文件的链接降级为纯文本；
+  // 页内锚点等非路径 href 保持普通锚点。
+  if (!isExternalLink && restrictLocalFileLinks && candidate && isLocalPathCandidate(candidate)) {
     return <span className="text-muted-foreground">{children}</span>;
   }
 
