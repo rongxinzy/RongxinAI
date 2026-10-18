@@ -15,7 +15,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } 
 import { useDispatch, useSelector } from 'react-redux';
 
 import type { CodingElicitation, CodingEvent } from '../../../shared/codingAgent';
-import { detectArtifactsFromMessages } from '../../services/artifactParser';
+import { collectInlineArtifacts } from '../../services/inlineArtifacts';
 import { loadArtifactFileWithRetry } from '../../services/artifactFileLoader';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
@@ -100,8 +100,9 @@ export const CodingEventStream = ({
     () => new Set(),
   );
 
-  // Artifact detection runs on the settled transcript only — scanning on every
-  // streamed chunk would redo the whole parse per token.
+  // Inline artifact projection runs on the settled transcript only — scanning
+  // on every streamed chunk would redo the whole parse per token. File-backed
+  // artifacts come from collectCodingFileArtifacts over structured events.
   const detectableMessages = useMemo(
     () => (isStreaming ? [] : toDetectableCodingMessages(turns)),
     [turns, isStreaming],
@@ -116,10 +117,7 @@ export const CodingEventStream = ({
   useEffect(() => {
     if (!artifactSessionKey) return;
     if (!isStreaming) {
-      for (const { artifact } of detectArtifactsFromMessages(
-        detectableMessages,
-        artifactSessionKey,
-      )) {
+      for (const artifact of collectInlineArtifacts(detectableMessages, artifactSessionKey)) {
         // The coding page keeps revealing its own stream artifacts; the cowork
         // panel only opens for live declared deliverables.
         dispatch(addArtifact({ sessionId: artifactSessionKey, artifact, reveal: true }));

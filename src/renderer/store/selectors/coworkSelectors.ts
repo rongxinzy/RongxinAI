@@ -49,16 +49,6 @@ export const selectDisplayedSessionId = createSelector(
   resolveDisplayedSessionId,
 );
 
-const selectCurrentMessages = createSelector(
-  selectCurrentSession,
-  session => session?.messages ?? null,
-);
-
-export const selectCurrentMessagesLength = createSelector(
-  selectCurrentMessages,
-  messages => messages?.length ?? 0,
-);
-
 export const selectCurrentToolActivities = createSelector(
   selectCurrentSessionId,
   selectToolActivitiesBySession,

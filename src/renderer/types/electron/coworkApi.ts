@@ -32,6 +32,8 @@ interface CoworkSession {
   messages: CoworkMessage[];
   messagesOffset: number;
   totalMessages: number;
+  /** Ledger artifacts of the whole session (not limited to the loaded page). */
+  artifacts?: import('../../../shared/cowork/artifacts').CoworkPersistedArtifact[];
   createdAt: number;
   updatedAt: number;
 }

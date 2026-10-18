@@ -1,9 +1,7 @@
 import { toast } from 'sonner';
 
 import { resolveArtifactPath } from '../../shared/cowork/artifactPath';
-import { shouldRevealLiveArtifact } from '../store/slices/artifactSlice';
 import type { Artifact } from '../types/artifact';
-import type { ArtifactDetectionResult } from './artifactDetectionService';
 import { i18nService } from './i18n';
 
 /**
@@ -24,10 +22,6 @@ export type ArtifactFileAvailability =
 
 /** Deadline for a single probe attempt. */
 const PROBE_TIMEOUT_MS = 3_000;
-/** How many probes may sit on the main process at once. */
-export const ARTIFACT_FILE_PROBE_CONCURRENCY = 4;
-/** Deadline for a whole batch; probes that cannot start inside it report `Unavailable`. */
-const BATCH_TIMEOUT_MS = 8_000;
 /** Transient probe failures are retried once inside the same budget. */
 const PROBE_ATTEMPTS = 2;
 
@@ -75,61 +69,6 @@ export async function probeArtifactFileAvailability(
     if (state !== ArtifactFileAvailability.Unavailable) return state;
   }
   return ArtifactFileAvailability.Unavailable;
-}
-
-/** Runs `worker` over `items` with bounded concurrency, keeping input order. */
-async function mapWithConcurrency<T, R>(
-  items: readonly T[],
-  limit: number,
-  worker: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let nextIndex = 0;
-  const runners = Array.from({ length: Math.min(Math.max(limit, 1), items.length) }, async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      results[index] = await worker(items[index]);
-    }
-  });
-  await Promise.all(runners);
-  return results;
-}
-
-export interface PreparedArtifact {
-  artifact: Artifact;
-  reveal: boolean;
-}
-
-/**
- * Resolves a whole batch before insertion, preserving detection order and never
- * exceeding the batch deadline. Only a confirmed `Missing` verdict drops an
- * artifact; unconfirmed paths are kept and simply not revealed.
- */
-export async function prepareAvailableArtifacts(
-  detected: ArtifactDetectionResult[],
-  isLiveSession: boolean,
-  cwd?: string | null,
-): Promise<PreparedArtifact[]> {
-  const batchDeadline = Date.now() + BATCH_TIMEOUT_MS;
-  const states = await mapWithConcurrency(
-    detected,
-    ARTIFACT_FILE_PROBE_CONCURRENCY,
-    ({ artifact }) => probeArtifactFileAvailability(artifact, cwd, batchDeadline - Date.now()),
-  );
-
-  return detected.flatMap(({ artifact }, index) => {
-    const state = states[index];
-    if (state === ArtifactFileAvailability.Missing) return [];
-    return [
-      {
-        artifact,
-        reveal:
-          state === ArtifactFileAvailability.Available &&
-          shouldRevealLiveArtifact(artifact, { isLiveSession, previewable: true }),
-      },
-    ];
-  });
 }
 
 export async function openAvailableArtifact(

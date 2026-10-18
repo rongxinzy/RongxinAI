@@ -2,10 +2,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { CoworkArtifactSource } from '../../shared/cowork/artifacts';
-import { CoworkMessageType } from '../../shared/cowork/constants';
 import { ArtifactRole, type Artifact } from '../types/artifact';
-import { ARTIFACT_FILE_PROBE_CONCURRENCY, prepareAvailableArtifacts } from './artifactAvailability';
-import { detectArtifactsFromMessages } from './artifactParser';
+import { ArtifactFileAvailability, probeArtifactFileAvailability } from './artifactAvailability';
 
 afterEach(() => {
   vi.useRealTimers();
@@ -26,52 +24,24 @@ const artifact: Artifact = {
   createdAt: 1,
 };
 
-test('filters a nonexistent path claimed in the final model answer', async () => {
+test('reports a recorded path that no longer exists as missing', async () => {
   const checkArtifactFile = vi.fn(async () => ({ success: false }));
   vi.stubGlobal('electron', { dialog: { checkArtifactFile } });
-  const detected = detectArtifactsFromMessages(
-    [
-      {
-        id: 'answer',
-        type: CoworkMessageType.Assistant,
-        content: 'Created C:/workspace/report.pptx',
-        timestamp: 1,
-        metadata: { isFinalAnswer: true },
-      },
-    ],
-    'session',
-  );
-  expect(detected).toHaveLength(1);
-  expect(await prepareAvailableArtifacts(detected, true)).toEqual([]);
+
+  expect(await probeArtifactFileAvailability(artifact)).toBe(ArtifactFileAvailability.Missing);
   expect(checkArtifactFile).toHaveBeenCalledWith(artifact.filePath);
 });
 
-test('checks history too, keeps inline artifacts, and preserves asynchronous insertion order', async () => {
-  const checkArtifactFile = vi.fn(async (filePath: string) => ({
-    success: !filePath.includes('missing'),
-  }));
+test('treats inline artifacts without a path as available without probing', async () => {
+  const checkArtifactFile = vi.fn(async () => ({ success: false }));
   vi.stubGlobal('electron', { dialog: { checkArtifactFile } });
-  const inline = { ...artifact, id: 'inline', filePath: undefined, content: '<html />' };
-  const detected = [
-    artifact,
-    { ...artifact, id: 'missing', filePath: 'C:/missing.pptx' },
-    inline,
-  ].map(item => ({ artifact: item, needsFileLoad: Boolean(item.filePath) }));
-  expect(
-    (await prepareAvailableArtifacts(detected, false)).map(item => [item.artifact.id, item.reveal]),
-  ).toEqual([
-    ['file', false],
-    ['inline', false],
-  ]);
-  expect(
-    (await prepareAvailableArtifacts(detected, true)).map(item => [item.artifact.id, item.reveal]),
-  ).toEqual([
-    ['file', true],
-    ['inline', true],
-  ]);
+  const inline = { ...artifact, filePath: undefined, content: '<html />' };
+
+  expect(await probeArtifactFileAvailability(inline)).toBe(ArtifactFileAvailability.Available);
+  expect(checkArtifactFile).not.toHaveBeenCalled();
 });
 
-test('keeps an artifact whose probe rejects instead of silently discarding it', async () => {
+test('a rejected probe is unknown, never missing', async () => {
   vi.stubGlobal('electron', {
     dialog: {
       checkArtifactFile: async () => {
@@ -79,64 +49,27 @@ test('keeps an artifact whose probe rejects instead of silently discarding it', 
       },
     },
   });
-  expect(await prepareAvailableArtifacts([{ artifact, needsFileLoad: true }], true)).toEqual([
-    { artifact, reveal: false },
-  ]);
+  expect(await probeArtifactFileAvailability(artifact)).toBe(ArtifactFileAvailability.Unavailable);
 });
 
-test('keeps an artifact whose probe never answers, bounded by the probe deadline', async () => {
+test('a probe that never answers is bounded by the probe deadline', async () => {
   vi.useFakeTimers();
   const checkArtifactFile = vi.fn(() => new Promise<{ success: boolean }>(() => {}));
   vi.stubGlobal('electron', { dialog: { checkArtifactFile } });
 
-  const pending = prepareAvailableArtifacts([{ artifact, needsFileLoad: true }], true);
+  const pending = probeArtifactFileAvailability(artifact);
   await vi.advanceTimersByTimeAsync(60_000);
 
-  expect(await pending).toEqual([{ artifact, reveal: false }]);
+  expect(await pending).toBe(ArtifactFileAvailability.Unavailable);
   expect(checkArtifactFile).toHaveBeenCalled();
-});
-
-test('bounds concurrent probes and preserves detection order', async () => {
-  let inFlight = 0;
-  let peak = 0;
-  vi.stubGlobal('electron', {
-    dialog: {
-      checkArtifactFile: async () => {
-        inFlight += 1;
-        peak = Math.max(peak, inFlight);
-        await Promise.resolve();
-        inFlight -= 1;
-        return { success: true };
-      },
-    },
-  });
-
-  const detected = Array.from({ length: ARTIFACT_FILE_PROBE_CONCURRENCY * 3 }, (_, index) => ({
-    artifact: { ...artifact, id: `artifact-${index}`, filePath: `C:/workspace/${index}.pptx` },
-    needsFileLoad: true,
-  }));
-
-  const prepared = await prepareAvailableArtifacts(detected, false);
-
-  expect(peak).toBe(ARTIFACT_FILE_PROBE_CONCURRENCY);
-  expect(prepared.map(item => item.artifact.id)).toEqual(detected.map(item => item.artifact.id));
 });
 
 test('checks the decoded native path of a percent-encoded file URL claim', async () => {
   const checkArtifactFile = vi.fn(async () => ({ success: true }));
   vi.stubGlobal('electron', { dialog: { checkArtifactFile } });
-  const urlArtifact = {
-    ...artifact,
-    id: 'url',
-    filePath: 'file:///C:/workspace/report%20with%20spaces.pptx',
-  };
+  const urlArtifact = { ...artifact, filePath: 'file:///C:/workspace/report%20with%20spaces.pptx' };
 
-  const prepared = await prepareAvailableArtifacts(
-    [{ artifact: urlArtifact, needsFileLoad: true }],
-    false,
-  );
-
-  expect(prepared).toHaveLength(1);
+  expect(await probeArtifactFileAvailability(urlArtifact)).toBe(ArtifactFileAvailability.Available);
   expect(checkArtifactFile).toHaveBeenCalledWith('C:/workspace/report with spaces.pptx');
 });
 
@@ -144,12 +77,8 @@ test('resolves a relative tool path against the session workspace before checkin
   const checkArtifactFile = vi.fn(async () => ({ success: true }));
   vi.stubGlobal('electron', { dialog: { checkArtifactFile } });
   const relative = { ...artifact, filePath: 'output/report.pptx' };
-  expect(
-    await prepareAvailableArtifacts(
-      [{ artifact: relative, needsFileLoad: true }],
-      false,
-      'C:/workspace',
-    ),
-  ).toHaveLength(1);
+  expect(await probeArtifactFileAvailability(relative, 'C:/workspace')).toBe(
+    ArtifactFileAvailability.Available,
+  );
   expect(checkArtifactFile).toHaveBeenCalledWith('C:/workspace/output/report.pptx');
 });
