@@ -208,6 +208,18 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     });
   });
 
+  runtime.on('messageRemoved', (sessionId: string, messageId: string) => {
+    coalescer.flush();
+    sessionByMessageId.delete(messageId);
+    finalContentByMessage.delete(messageId);
+    clearTruncationForMessage(messageId);
+    emitUiEvent({
+      type: PiUiEventType.MessageRemoved,
+      sessionId,
+      messageId,
+    });
+  });
+
   runtime.on('uiStreamChunk', (sessionId: string, messageId: string, chunk: UIMessageChunk) => {
     emitStreamChunk(sessionId, messageId, chunk);
   });
@@ -227,6 +239,18 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
   runtime.on(
     'messageUpdate',
     (sessionId: string, messageId: string, content: string, metadata?: Record<string, unknown>) => {
+      if (metadata?.streamReopen === true) {
+        coalescer.flush();
+        sessionByMessageId.set(messageId, sessionId);
+        emitUiEvent({
+          type: PiUiEventType.MessageUpdate,
+          sessionId,
+          messageId,
+          content,
+          metadata,
+        });
+        return;
+      }
       if (metadata?.isStreaming !== false) return;
       coalescer.flush();
       sessionByMessageId.set(messageId, sessionId);

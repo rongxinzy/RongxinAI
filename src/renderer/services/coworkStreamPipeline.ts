@@ -29,6 +29,7 @@ import coworkReducer, {
   dequeuePendingPermission,
   enqueuePendingPermission,
   updateMessageContents,
+  removeMessage,
   updateSessionStatus,
   updateToolActivity,
 } from '../store/slices/coworkSlice';
@@ -78,7 +79,11 @@ export interface CoworkStreamPipeline {
   dispose(): void;
 }
 
-type BoundedIdSet = { has: (id: string) => boolean; add: (id: string) => void };
+type BoundedIdSet = {
+  has: (id: string) => boolean;
+  add: (id: string) => void;
+  delete: (id: string) => void;
+};
 
 /** Insertion-order FIFO id set with a hard cap so bookkeeping stays bounded. */
 const createBoundedIdSet = (capacity: number): BoundedIdSet => {
@@ -92,6 +97,9 @@ const createBoundedIdSet = (capacity: number): BoundedIdSet => {
         if (oldest === undefined) break;
         ids.delete(oldest);
       }
+    },
+    delete: id => {
+      ids.delete(id);
     },
   };
 };
@@ -208,6 +216,12 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
             chunk: event.chunk,
           });
           break;
+        case PiUiEventType.MessageRemoved:
+          liveTextBatcher.flush();
+          finalizedMessageIds.delete(event.messageId);
+          deps.liveText.clear(event.messageId);
+          deps.dispatch(removeMessage({ sessionId: event.sessionId, messageId: event.messageId }));
+          break;
         case PiUiEventType.MessageUpdate:
           if (event.metadata?.isStreaming === false || event.metadata?.isFinal === true) {
             // Final state: flush pending deltas so the live text is complete
@@ -234,6 +248,16 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
                 metadata: event.metadata,
               });
             }
+          } else if (event.metadata?.streamReopen === true) {
+            finalizedMessageIds.delete(event.messageId);
+            const metadata = { ...event.metadata };
+            delete metadata.streamReopen;
+            updateBatcher.enqueue({
+              sessionId: event.sessionId,
+              messageId: event.messageId,
+              content: event.content,
+              metadata,
+            });
           } else {
             // S6: a full-body MessageUpdate while the message is still
             // streaming is the forbidden "send full text, fake the stream"

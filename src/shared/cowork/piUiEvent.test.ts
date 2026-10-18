@@ -67,6 +67,18 @@ test('sequences events independently per session and globally for dismissals', (
   ).toBe(1);
 });
 
+test('message_removed validates session and message id', () => {
+  const sequencer = new PiUiEventSequencer(() => 'event-removed');
+  const event = sequencer.next({
+    type: PiUiEventType.MessageRemoved,
+    sessionId: 'session-a',
+    messageId: 'message-1',
+  });
+  expect(isPiUiEvent(event)).toBe(true);
+  expect(isPiUiEvent({ ...event, messageId: '' })).toBe(false);
+  expect(isPiUiEvent({ ...event, sessionId: '' })).toBe(false);
+});
+
 test('event validation rejects unversioned or incomplete payloads', () => {
   const sequencer = new PiUiEventSequencer(() => 'event-1');
   const event = sequencer.next({

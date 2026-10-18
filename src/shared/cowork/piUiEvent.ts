@@ -8,6 +8,7 @@ import type { UIMessageChunk } from 'ai';
 export const PiUiEventType = {
   Started: 'started',
   Message: 'message',
+  MessageRemoved: 'message_removed',
   MessageUpdate: 'message_update',
   StreamPart: 'stream_part',
   ContentPatch: 'content_patch',
@@ -54,6 +55,11 @@ export type PiUiEvent =
       type: typeof PiUiEventType.Message;
       sessionId: string;
       message: PiUiMessage;
+    })
+  | (PiUiEventBase & {
+      type: typeof PiUiEventType.MessageRemoved;
+      sessionId: string;
+      messageId: string;
     })
   | (PiUiEventBase & {
       type: typeof PiUiEventType.MessageUpdate;
@@ -263,6 +269,8 @@ export const isPiUiEvent = (value: unknown): value is PiUiEvent => {
       return isSessionId(candidate.sessionId);
     case PiUiEventType.Message:
       return isSessionId(candidate.sessionId) && isPiUiMessage(candidate.message);
+    case PiUiEventType.MessageRemoved:
+      return isSessionId(candidate.sessionId) && isNonEmptyString(candidate.messageId);
     case PiUiEventType.MessageUpdate:
       return (
         isSessionId(candidate.sessionId) &&

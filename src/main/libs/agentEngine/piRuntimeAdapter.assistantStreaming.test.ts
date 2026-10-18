@@ -187,6 +187,7 @@ describe('PiRuntimeAdapter', () => {
         addMessage: (_sessionId: string, message: unknown) => message,
         getSession: () => ({ messages: seededMessageIds.map(id => ({ id, metadata: {} })) }),
         updateMessage,
+        updateSession: vi.fn(),
       } as unknown as CoworkStore);
       mockSession.getContextUsage.mockReturnValue({ tokens: 1_200, contextWindow: 262_144 });
 
@@ -207,6 +208,8 @@ describe('PiRuntimeAdapter', () => {
             usage,
           },
         });
+        listener!({ type: 'agent_end' });
+        listener!({ type: 'agent_settled' });
       };
 
       // The deferred context-usage sync is the last writer per turn; select its
@@ -242,6 +245,34 @@ describe('PiRuntimeAdapter', () => {
         reasoningTokens: 60,
         totalTokens: 1_320,
       });
+    });
+
+    it('flushes deferred context usage before scheduling usage on a later answer', async () => {
+      const flushSpy = vi.spyOn(adapter.transcript, 'flushContextUsageSync');
+      await adapter.startSession('multi-usage', 'Hi');
+
+      const driveAnswerEnd = (text: string): void => {
+        listener!({ type: 'turn_start' });
+        listener!({
+          type: 'message_update',
+          message: { role: 'assistant', content: [{ type: 'text', text }] },
+        });
+        listener!({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text }],
+            stopReason: 'stop',
+            usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2 },
+          },
+        });
+      };
+
+      driveAnswerEnd('First answer');
+      const flushCountAfterFirst = flushSpy.mock.calls.length;
+      driveAnswerEnd('Second answer');
+      expect(flushSpy.mock.calls.length).toBe(flushCountAfterFirst + 1);
+      flushSpy.mockRestore();
     });
 
     it('should mark an answer as final only after the agent run ends', async () => {
