@@ -4,8 +4,8 @@ import { Skeleton } from '@shared/components/ui/skeleton';
 
 import type { Artifact } from '@/types/artifact';
 
-// Renderers pull heavy runtimes (Prism/refractor, mermaid, KaTeX/CodeMirror
-// via MarkdownContent, document preview libs), so each one is code-split and
+// Renderers pull heavy runtimes (Shiki, mermaid, KaTeX/CodeMirror
+// via StaticMarkdownContent, document preview libs), so each one is code-split and
 // only loads when an artifact of that type is actually shown (issue #141).
 const CodeRenderer = React.lazy(() => import('./renderers/CodeRenderer'));
 const DocumentRenderer = React.lazy(() => import('./renderers/DocumentRenderer'));

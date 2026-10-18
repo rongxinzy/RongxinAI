@@ -55,7 +55,7 @@ import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
 import { invalidateArtifactFile, loadArtifactFileWithRetry } from '@/services/artifactFileLoader';
 import { MAX_PREVIEW_HTML_CHARS } from './renderers/constants';
 
-// Same code-split as ArtifactRenderer — avoid static import pulling Prism into the main chunk.
+// Same code-split as ArtifactRenderer — avoid static import pulling Shiki into the main chunk.
 const CodeRenderer = React.lazy(() => import('./renderers/CodeRenderer'));
 const codeRendererFallback = (
   <div className="h-full min-h-0 p-4" aria-busy="true">

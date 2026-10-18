@@ -9,7 +9,7 @@ import { i18nService } from '../../services/i18n';
 import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { Skill } from '../../types/skill';
 import { isCoreSkill } from '@shared/skills/constants';
-import MarkdownContent from '../MarkdownContent';
+import StaticMarkdownContent from '../markdown/StaticMarkdownContent';
 
 interface SkillDocumentDialogProps {
   skill: Skill;
@@ -216,7 +216,7 @@ export function SkillDocumentDialog({
                   {i18nService.t('skillContentUnavailable')}
                 </p>
               ) : isContentReady ? (
-                <MarkdownContent content={skillContent} />
+                <StaticMarkdownContent content={skillContent} />
               ) : (
                 <div className="py-3 text-sm text-muted-foreground">{i18nService.t('loading')}</div>
               )}

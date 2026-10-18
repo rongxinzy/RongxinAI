@@ -7,12 +7,11 @@
  * 旧 react-markdown 管线（MarkdownContent.tsx）已删除。
  *
  * 本地链接语义（issue #805）：候选交主进程 `shell.resolveLocalPath` 判定；`file://` 前缀
- * 在进入解析器前剥掉（Streamdown 的 sanitize 只放行 http(s)/mailto/tel 与相对路径，
- * 带 scheme 的 file URL 会被过滤掉），剥掉后的裸路径与相对路径候选走同一解析链。
+ * 在进入解析器前剥掉 —— Streamdown 的 sanitize 只放行 http(s)/mailto/tel 与相对路径，
+ * 带 scheme 的 file URL 会被整链路过滤；剥壳后的裸路径与相对路径候选走同一解析链。
  */
 import { cjk } from '@streamdown/cjk';
-import { code } from '@streamdown/code';
-import { math } from '@streamdown/math';
+import { LinkSafetyModal } from '@shared/components/ai-elements/linkSafetyModal';
 import { Button } from '@shared/components/ui/button';
 import { FileText, Folder } from 'lucide-react';
 import React, { Suspense, lazy, useMemo } from 'react';
@@ -46,7 +45,7 @@ const openLocalPath = async (filePath: string): Promise<void> => {
       );
     }
   } catch (error) {
-    console.error('[StaticMarkdown] Failed to open local path:', error);
+    console.error('[StaticMarkdown] Failed to open local path:', filePath, error);
   }
 };
 
@@ -150,9 +149,7 @@ const LocalAwareImage = ({ onImageClick, ...props }: ImageProps) => {
       className={`max-w-full max-h-96 object-contain rounded-xl my-4${
         onImageClick && src ? ' cursor-pointer hover:opacity-90 transition-opacity' : ''
       }`}
-      onClick={
-        onImageClick && src ? () => onImageClick({ src, alt: props.alt }) : undefined
-      }
+      onClick={onImageClick && src ? () => onImageClick({ src, alt: props.alt }) : undefined}
     />
   );
 };
@@ -167,16 +164,13 @@ export interface StaticMarkdownContentProps {
 }
 
 const stripFileScheme = (destination: string): string => {
-  const trimmed = destination.trim();
-  const match = /^file:\/{2,3}(\/\/)?(.*)$/.exec(trimmed);
-  return match ? (match[2] ?? '') : destination;
+  const match = /^file:\/{2,3}(?:\/\/)?(.*)$/.exec(destination.trim());
+  return match ? (match[1] ?? '') : destination;
 };
 
 /**
- * Markdown 预处理：
- * 1. `file://` 链接目标 URL 编码（括号等字符会截断 markdown 目标解析）；
- * 2. 剥掉 `file://` scheme —— Streamdown sanitize 只放行 http(s)/mailto/tel/相对路径，
- *    剥壳后的裸路径候选由 LocalAwareAnchor 经主进程解析。
+ * Markdown 预处理：`file://` 链接目标剥掉 scheme 并做 URL 编码（括号等字符会
+ * 截断 markdown 目标解析）。只处理 `](file:` 形式，其他内容原样保留。
  */
 const preprocessMarkdown = (content: string): string => {
   if (!content.includes('](file:')) return content;
@@ -227,10 +221,10 @@ const preprocessMarkdown = (content: string): string => {
   return result;
 };
 
-// 外链确认弹窗 portal 到 body（与 chat 的 LinkSafetyModal 同一扩展点）。
+// 外链确认弹窗 portal 到 body，避免被消息祖先 transform/overflow 裁剪（同 chat）。
 const linkSafety: StreamdownProps['linkSafety'] = {
   enabled: true,
-  renderModal: () => null,
+  renderModal: props => <LinkSafetyModal {...props} />,
 };
 
 const basePlugins = { cjk };
@@ -262,35 +256,38 @@ const StaticMarkdownContent: React.FC<StaticMarkdownContentProps> = ({
     [cwd, restrictLocalFileLinks, showRevealInFolderAction, onImageClick],
   );
 
+  // 与 chat 的 richMessageResponseLoader 同一判定思路：无富内容时首帧不加载
+  // shiki/katex；```/~~~ 走 AiPre 代码块，$$ 走 KaTeX。
   const needsRichRuntime = /```|~~~|\$\$/.test(processed);
 
-  const body = (
-    <Streamdown
-      className={`markdown-content text-sm leading-[23px] ${className}`}
-      mode="static"
-      animated={false}
-      parseIncompleteMarkdown={false}
-      shikiTheme={zhiyuanShikiThemes}
-      codeBlockMaxHeight={0}
-      tableMaxHeight={0}
-      linkSafety={undefined}
-      components={components}
-    >
-      {processed}
-    </Streamdown>
-  );
+  const shared = {
+    className: `markdown-content text-sm leading-[23px] ${className}`,
+    mode: 'static' as const,
+    animated: false,
+    parseIncompleteMarkdown: false,
+    shikiTheme: zhiyuanShikiThemes,
+    codeBlockMaxHeight: 0,
+    tableMaxHeight: 0,
+    linkSafety,
+  };
 
   if (!needsRichRuntime) {
-    return <div className={className ? undefined : undefined}>{body}</div>;
+    return (
+      <Streamdown {...shared} plugins={basePlugins} components={components}>
+        {processed}
+      </Streamdown>
+    );
   }
 
   return (
-    <Suspense fallback={body}>
-      <RichStaticMarkdown
-        className={`markdown-content text-sm leading-[23px] ${className}`}
-        processed={processed}
-        components={components}
-      />
+    <Suspense
+      fallback={
+        <Streamdown {...shared} plugins={basePlugins} components={components}>
+          {processed}
+        </Streamdown>
+      }
+    >
+      <RichStaticMarkdown {...shared} processed={processed} components={components} />
     </Suspense>
   );
 };
