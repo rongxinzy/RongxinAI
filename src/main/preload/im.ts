@@ -1,100 +1,38 @@
 import { ipcRenderer } from 'electron';
 
+import { DingTalkInstallIpc, FeishuInstallIpc, ImIpc } from '../../shared/ipc/channels';
+import type { IpcContractApi } from '../../shared/ipc/contract';
+import type { imContract, imInstanceContract } from '../../shared/ipc/imContract';
 import {
-  DingTalkInstallIpc,
-  FeishuInstallIpc,
-  ImIpc,
-  ImInstanceIpc,
-  WeixinInstallIpc,
-} from '../../shared/ipc/channels';
-import type { Platform } from '../../shared/platform';
+  dingtalkInstallContractChannels,
+  feishuInstallContractChannels,
+  imContractChannels,
+  imInstanceContractChannels,
+} from '../../shared/ipc/imContract.channels';
 import { onPush } from './pushChannel';
+import { createIpcInvokers } from './createIpcInvokers';
 
-// IM gateways, login/install flows, and per-platform instances.
+// IM gateways, login/install flows, and per-platform instances. Gateway and
+// instance invoke methods come from the contract channel maps; the install
+// helpers adapt flat renderer args to the contract's object payloads, and push
+// subscriptions stay hand-wired.
 export const imApi = {
   im: {
-    getConfig: () => ipcRenderer.invoke(ImIpc.ConfigGet),
-    setConfig: (config: unknown, options?: { syncGateway?: boolean }) =>
-      ipcRenderer.invoke(ImIpc.ConfigSet, config, options),
-    syncConfig: () => ipcRenderer.invoke(ImIpc.ConfigSync),
-
-    startGateway: (platform: Platform) => ipcRenderer.invoke(ImIpc.GatewayStart, platform),
-    stopGateway: (platform: Platform) => ipcRenderer.invoke(ImIpc.GatewayStop, platform),
-    testGateway: (platform: Platform, configOverride?: unknown, accountId?: string) =>
-      ipcRenderer.invoke(ImIpc.GatewayTest, platform, configOverride, accountId),
-
-    getStatus: () => ipcRenderer.invoke(ImIpc.StatusGet),
-    getLocalIp: () => ipcRenderer.invoke(ImIpc.GetLocalIp) as Promise<string>,
-    weixinLoginStart: () => ipcRenderer.invoke(WeixinInstallIpc.Start),
-    weixinLoginPoll: (qrcode: string) => ipcRenderer.invoke(WeixinInstallIpc.Poll, qrcode),
-    // Multi-Instance
-    addDingTalkInstance: (name: string, workspaceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.dingtalkAdd, name, workspaceId),
-    deleteDingTalkInstance: (instanceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.dingtalkDelete, instanceId),
-    setDingTalkInstanceConfig: (
-      instanceId: string,
-      config: unknown,
-      options?: { syncGateway?: boolean },
-    ) => ipcRenderer.invoke(ImInstanceIpc.dingtalkSetConfig, instanceId, config, options),
-
-    addQQInstance: (name: string, workspaceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.qqAdd, name, workspaceId),
-    deleteQQInstance: (instanceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.qqDelete, instanceId),
-    setQQInstanceConfig: (
-      instanceId: string,
-      config: unknown,
-      options?: { syncGateway?: boolean },
-    ) => ipcRenderer.invoke(ImInstanceIpc.qqSetConfig, instanceId, config, options),
-
-    addFeishuInstance: (name: string, workspaceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.feishuAdd, name, workspaceId),
-    deleteFeishuInstance: (instanceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.feishuDelete, instanceId),
-    setFeishuInstanceConfig: (
-      instanceId: string,
-      config: unknown,
-      options?: { syncGateway?: boolean },
-    ) => ipcRenderer.invoke(ImInstanceIpc.feishuSetConfig, instanceId, config, options),
-
-    addWecomInstance: (name: string, workspaceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.wecomAdd, name, workspaceId),
-    deleteWecomInstance: (instanceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.wecomDelete, instanceId),
-    setWecomInstanceConfig: (
-      instanceId: string,
-      config: unknown,
-      options?: { syncGateway?: boolean },
-    ) => ipcRenderer.invoke(ImInstanceIpc.wecomSetConfig, instanceId, config, options),
-
-    addTelegramInstance: (name: string, workspaceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.telegramAdd, name, workspaceId),
-    deleteTelegramInstance: (instanceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.telegramDelete, instanceId),
-    setTelegramInstanceConfig: (
-      instanceId: string,
-      config: unknown,
-      options?: { syncGateway?: boolean },
-    ) => ipcRenderer.invoke(ImInstanceIpc.telegramSetConfig, instanceId, config, options),
-
-    addDiscordInstance: (name: string, workspaceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.discordAdd, name, workspaceId),
-    deleteDiscordInstance: (instanceId: string) =>
-      ipcRenderer.invoke(ImInstanceIpc.discordDelete, instanceId),
-    setDiscordInstanceConfig: (
-      instanceId: string,
-      config: unknown,
-      options?: { syncGateway?: boolean },
-    ) => ipcRenderer.invoke(ImInstanceIpc.discordSetConfig, instanceId, config, options),
-
+    ...createIpcInvokers(imContractChannels),
+    ...createIpcInvokers(imInstanceContractChannels),
     onStatusChange: (callback: (status: unknown) => void) => onPush(ImIpc.StatusChange, callback),
     onMessageReceived: (callback: (message: unknown) => void) =>
       onPush(ImIpc.MessageReceived, callback),
-  },
+  } as IpcContractApi<typeof imContract> &
+    IpcContractApi<typeof imInstanceContract> & {
+      onStatusChange: (callback: (status: unknown) => void) => () => void;
+      onMessageReceived: (callback: (message: unknown) => void) => () => void;
+    },
 
   feishu: {
     install: {
+      ...createIpcInvokers(feishuInstallContractChannels),
+      // The renderer surface keeps flat args; adapt to the contract payload.
       verify: (appId: string, appSecret: string) =>
         ipcRenderer.invoke(FeishuInstallIpc.Verify, { appId, appSecret }),
     },
@@ -102,6 +40,8 @@ export const imApi = {
 
   dingtalk: {
     install: {
+      ...createIpcInvokers(dingtalkInstallContractChannels),
+      // The renderer surface keeps flat args; adapt to the contract payloads.
       qrcode: () => ipcRenderer.invoke(DingTalkInstallIpc.Qrcode),
       poll: (deviceCode: string) => ipcRenderer.invoke(DingTalkInstallIpc.Poll, { deviceCode }),
       verify: (clientId: string, clientSecret: string) =>

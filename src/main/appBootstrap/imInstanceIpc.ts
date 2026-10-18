@@ -1,10 +1,4 @@
 /** IM per-instance IPC: DingTalk / QQ / Feishu / WeCom / Telegram / Discord add & delete. */
-import fs from 'fs';
-import path from 'path';
-
-import { ipcMain } from 'electron';
-
-import { rt } from './runtimeState';
 import { getIMGatewayManager } from './ccConnectRuntime';
 import { scheduleImConfigSync } from './imGatewayIpc';
 import type {
@@ -15,46 +9,46 @@ import type {
   TelegramInstanceConfig,
   WecomInstanceConfig,
 } from '../im';
-import type { Platform } from '../../shared/platform';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { feishuInstallContract, imInstanceContract } from '../../shared/ipc/imContract';
 
 export const registerImInstanceIpc = (): void => {
-  ipcMain.handle('im:dingtalk:instance:add', async (_event, name: string, workspaceId: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_DINGTALK_CHANNEL_CONFIG: defaults } = await import('../im/types.js');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'DingTalk Bot',
-        workspaceId,
-      };
-      getIMGatewayManager().getIMStore().setDingTalkInstanceConfig(instanceId, instance);
-      scheduleImConfigSync();
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add DingTalk instance',
-      };
-    }
-  });
+  handleIpcContract(imInstanceContract, {
+    addDingTalkInstance: async (_event, name: string, workspaceId: string) => {
+      try {
+        const instanceId = crypto.randomUUID();
+        const { DEFAULT_DINGTALK_CHANNEL_CONFIG: defaults } = await import('../im/types.js');
+        const instance = {
+          ...defaults,
+          instanceId,
+          instanceName: name || 'DingTalk Bot',
+          workspaceId,
+        };
+        getIMGatewayManager().getIMStore().setDingTalkInstanceConfig(instanceId, instance);
+        scheduleImConfigSync();
+        return { success: true, instance };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to add DingTalk instance',
+        };
+      }
+    },
 
-  ipcMain.handle('im:dingtalk:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deleteDingTalkInstance(instanceId);
-      scheduleImConfigSync();
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete DingTalk instance',
-      };
-    }
-  });
+    deleteDingTalkInstance: async (_event, instanceId: string) => {
+      try {
+        getIMGatewayManager().getIMStore().deleteDingTalkInstance(instanceId);
+        scheduleImConfigSync();
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete DingTalk instance',
+        };
+      }
+    },
 
-  ipcMain.handle(
-    'im:dingtalk:instance:config:set',
-    async (
+    setDingTalkInstanceConfig: async (
       _event,
       instanceId: string,
       config: Partial<DingTalkInstanceConfig>,
@@ -73,46 +67,43 @@ export const registerImInstanceIpc = (): void => {
         };
       }
     },
-  );
 
-  // QQ Multi-Instance handlers
-  ipcMain.handle('im:qq:instance:add', async (_event, name: string, workspaceId: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_QQ_CONFIG: defaults } = await import('../im/types.js');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'QQ Bot',
-        workspaceId,
-      };
-      getIMGatewayManager().getIMStore().setQQInstanceConfig(instanceId, instance);
-      scheduleImConfigSync();
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add QQ instance',
-      };
-    }
-  });
+    // QQ Multi-Instance handlers
+    addQQInstance: async (_event, name: string, workspaceId: string) => {
+      try {
+        const instanceId = crypto.randomUUID();
+        const { DEFAULT_QQ_CONFIG: defaults } = await import('../im/types.js');
+        const instance = {
+          ...defaults,
+          instanceId,
+          instanceName: name || 'QQ Bot',
+          workspaceId,
+        };
+        getIMGatewayManager().getIMStore().setQQInstanceConfig(instanceId, instance);
+        scheduleImConfigSync();
+        return { success: true, instance };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to add QQ instance',
+        };
+      }
+    },
 
-  ipcMain.handle('im:qq:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deleteQQInstance(instanceId);
-      scheduleImConfigSync();
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete QQ instance',
-      };
-    }
-  });
+    deleteQQInstance: async (_event, instanceId: string) => {
+      try {
+        getIMGatewayManager().getIMStore().deleteQQInstance(instanceId);
+        scheduleImConfigSync();
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete QQ instance',
+        };
+      }
+    },
 
-  ipcMain.handle(
-    'im:qq:instance:config:set',
-    async (
+    setQQInstanceConfig: async (
       _event,
       instanceId: string,
       config: Partial<QQInstanceConfig>,
@@ -131,46 +122,43 @@ export const registerImInstanceIpc = (): void => {
         };
       }
     },
-  );
 
-  // Feishu Multi-Instance handlers
-  ipcMain.handle('im:feishu:instance:add', async (_event, name: string, workspaceId: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_FEISHU_CHANNEL_CONFIG: defaults } = await import('../im/types.js');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'Feishu Bot',
-        workspaceId,
-      };
-      getIMGatewayManager().getIMStore().setFeishuInstanceConfig(instanceId, instance);
-      scheduleImConfigSync();
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add Feishu instance',
-      };
-    }
-  });
+    // Feishu Multi-Instance handlers
+    addFeishuInstance: async (_event, name: string, workspaceId: string) => {
+      try {
+        const instanceId = crypto.randomUUID();
+        const { DEFAULT_FEISHU_CHANNEL_CONFIG: defaults } = await import('../im/types.js');
+        const instance = {
+          ...defaults,
+          instanceId,
+          instanceName: name || 'Feishu Bot',
+          workspaceId,
+        };
+        getIMGatewayManager().getIMStore().setFeishuInstanceConfig(instanceId, instance);
+        scheduleImConfigSync();
+        return { success: true, instance };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to add Feishu instance',
+        };
+      }
+    },
 
-  ipcMain.handle('im:feishu:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deleteFeishuInstance(instanceId);
-      scheduleImConfigSync();
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete Feishu instance',
-      };
-    }
-  });
+    deleteFeishuInstance: async (_event, instanceId: string) => {
+      try {
+        getIMGatewayManager().getIMStore().deleteFeishuInstance(instanceId);
+        scheduleImConfigSync();
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete Feishu instance',
+        };
+      }
+    },
 
-  ipcMain.handle(
-    'im:feishu:instance:config:set',
-    async (
+    setFeishuInstanceConfig: async (
       _event,
       instanceId: string,
       config: Partial<FeishuInstanceConfig>,
@@ -189,46 +177,43 @@ export const registerImInstanceIpc = (): void => {
         };
       }
     },
-  );
 
-  // WeCom Multi-Instance handlers
-  ipcMain.handle('im:wecom:instance:add', async (_event, name: string, workspaceId: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_WECOM_CONFIG: defaults } = await import('../im/types.js');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'WeCom Bot',
-        workspaceId,
-      };
-      getIMGatewayManager().getIMStore().setWecomInstanceConfig(instanceId, instance);
-      scheduleImConfigSync();
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add WeCom instance',
-      };
-    }
-  });
+    // WeCom Multi-Instance handlers
+    addWecomInstance: async (_event, name: string, workspaceId: string) => {
+      try {
+        const instanceId = crypto.randomUUID();
+        const { DEFAULT_WECOM_CONFIG: defaults } = await import('../im/types.js');
+        const instance = {
+          ...defaults,
+          instanceId,
+          instanceName: name || 'WeCom Bot',
+          workspaceId,
+        };
+        getIMGatewayManager().getIMStore().setWecomInstanceConfig(instanceId, instance);
+        scheduleImConfigSync();
+        return { success: true, instance };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to add WeCom instance',
+        };
+      }
+    },
 
-  ipcMain.handle('im:wecom:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deleteWecomInstance(instanceId);
-      scheduleImConfigSync();
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete WeCom instance',
-      };
-    }
-  });
+    deleteWecomInstance: async (_event, instanceId: string) => {
+      try {
+        getIMGatewayManager().getIMStore().deleteWecomInstance(instanceId);
+        scheduleImConfigSync();
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete WeCom instance',
+        };
+      }
+    },
 
-  ipcMain.handle(
-    'im:wecom:instance:config:set',
-    async (
+    setWecomInstanceConfig: async (
       _event,
       instanceId: string,
       config: Partial<WecomInstanceConfig>,
@@ -247,46 +232,43 @@ export const registerImInstanceIpc = (): void => {
         };
       }
     },
-  );
 
-  // Telegram Multi-Instance handlers
-  ipcMain.handle('im:telegram:instance:add', async (_event, name: string, workspaceId: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_TELEGRAM_CHANNEL_CONFIG: defaults } = await import('../im/types.js');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'Telegram Bot',
-        workspaceId,
-      };
-      getIMGatewayManager().getIMStore().setTelegramInstanceConfig(instanceId, instance);
-      scheduleImConfigSync();
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add Telegram instance',
-      };
-    }
-  });
+    // Telegram Multi-Instance handlers
+    addTelegramInstance: async (_event, name: string, workspaceId: string) => {
+      try {
+        const instanceId = crypto.randomUUID();
+        const { DEFAULT_TELEGRAM_CHANNEL_CONFIG: defaults } = await import('../im/types.js');
+        const instance = {
+          ...defaults,
+          instanceId,
+          instanceName: name || 'Telegram Bot',
+          workspaceId,
+        };
+        getIMGatewayManager().getIMStore().setTelegramInstanceConfig(instanceId, instance);
+        scheduleImConfigSync();
+        return { success: true, instance };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to add Telegram instance',
+        };
+      }
+    },
 
-  ipcMain.handle('im:telegram:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deleteTelegramInstance(instanceId);
-      scheduleImConfigSync();
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete Telegram instance',
-      };
-    }
-  });
+    deleteTelegramInstance: async (_event, instanceId: string) => {
+      try {
+        getIMGatewayManager().getIMStore().deleteTelegramInstance(instanceId);
+        scheduleImConfigSync();
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete Telegram instance',
+        };
+      }
+    },
 
-  ipcMain.handle(
-    'im:telegram:instance:config:set',
-    async (
+    setTelegramInstanceConfig: async (
       _event,
       instanceId: string,
       config: Partial<TelegramInstanceConfig>,
@@ -305,46 +287,43 @@ export const registerImInstanceIpc = (): void => {
         };
       }
     },
-  );
 
-  // Discord Multi-Instance handlers
-  ipcMain.handle('im:discord:instance:add', async (_event, name: string, workspaceId: string) => {
-    try {
-      const instanceId = crypto.randomUUID();
-      const { DEFAULT_DISCORD_CHANNEL_CONFIG: defaults } = await import('../im/types.js');
-      const instance = {
-        ...defaults,
-        instanceId,
-        instanceName: name || 'Discord Bot',
-        workspaceId,
-      };
-      getIMGatewayManager().getIMStore().setDiscordInstanceConfig(instanceId, instance);
-      scheduleImConfigSync();
-      return { success: true, instance };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to add Discord instance',
-      };
-    }
-  });
+    // Discord Multi-Instance handlers
+    addDiscordInstance: async (_event, name: string, workspaceId: string) => {
+      try {
+        const instanceId = crypto.randomUUID();
+        const { DEFAULT_DISCORD_CHANNEL_CONFIG: defaults } = await import('../im/types.js');
+        const instance = {
+          ...defaults,
+          instanceId,
+          instanceName: name || 'Discord Bot',
+          workspaceId,
+        };
+        getIMGatewayManager().getIMStore().setDiscordInstanceConfig(instanceId, instance);
+        scheduleImConfigSync();
+        return { success: true, instance };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to add Discord instance',
+        };
+      }
+    },
 
-  ipcMain.handle('im:discord:instance:delete', async (_event, instanceId: string) => {
-    try {
-      getIMGatewayManager().getIMStore().deleteDiscordInstance(instanceId);
-      scheduleImConfigSync();
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete Discord instance',
-      };
-    }
-  });
+    deleteDiscordInstance: async (_event, instanceId: string) => {
+      try {
+        getIMGatewayManager().getIMStore().deleteDiscordInstance(instanceId);
+        scheduleImConfigSync();
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete Discord instance',
+        };
+      }
+    },
 
-  ipcMain.handle(
-    'im:discord:instance:config:set',
-    async (
+    setDiscordInstanceConfig: async (
       _event,
       instanceId: string,
       config: Partial<DiscordInstanceConfig>,
@@ -363,18 +342,16 @@ export const registerImInstanceIpc = (): void => {
         };
       }
     },
-  );
+  });
 
-  ipcMain.handle(
-    'feishu:install:verify',
-    async (_event, { appId, appSecret }: { appId: string; appSecret: string }) => {
+  // feishu:install:verify lives in this registration unit as well.
+  handleIpcContract(feishuInstallContract, {
+    verify: async (_event, { appId, appSecret }) => {
       try {
         return await getIMGatewayManager().verifyFeishuCredentials(appId, appSecret);
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : '验证失败' };
       }
     },
-  );
-
-  // DingTalk bot install helpers
+  });
 };

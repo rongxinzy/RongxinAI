@@ -18,7 +18,9 @@ import {
   DeliveryMode,
   IpcChannel,
   PayloadKind,
+  ScheduleKind,
   SessionTarget,
+  WakeMode,
 } from '../../../scheduledTask/constants';
 import { getCcConnectScopedConversationId } from '../../im/ccConnectConversationId';
 import { t } from '../../i18n';
@@ -36,6 +38,19 @@ test('task-list handler delegates to the canonical scheduler service', async () 
   expect(listJobs).toHaveBeenCalledOnce();
 });
 
+/** Full `ScheduledTaskInput` base — delivery-focused tests vary the delivery. */
+const baseInput = {
+  name: 'Delivery task',
+  description: '',
+  enabled: true,
+  schedule: { kind: ScheduleKind.At, at: '2026-10-20T09:00:00.000Z' },
+  sessionTarget: SessionTarget.Isolated,
+  wakeMode: WakeMode.Now,
+  workspaceId: null,
+  sessionKey: null,
+  payload: { kind: PayloadKind.AgentTurn, message: 'Run' },
+};
+
 test('create preserves native conversation colons and full channel account IDs', async () => {
   const addJob = vi.fn(async input => ({ id: 'task-1', ...input }));
   registerScheduledTaskHandlers({
@@ -43,7 +58,7 @@ test('create preserves native conversation colons and full channel account IDs',
     getIMGatewayManager: () => null,
   });
   const input = {
-    payload: { kind: PayloadKind.AgentTurn, message: 'Run' },
+    ...baseInput,
     delivery: {
       mode: DeliveryMode.Announce,
       channel: 'dingtalk-connector',
@@ -78,7 +93,7 @@ test('create restores and validates scoped conversation ownership', async () => 
     create?.(
       {},
       {
-        payload: { kind: PayloadKind.AgentTurn, message: 'Run' },
+        ...baseInput,
         delivery: {
           mode: DeliveryMode.Announce,
           channel: 'dingtalk-connector',
@@ -100,7 +115,7 @@ test('create restores and validates scoped conversation ownership', async () => 
     create?.(
       {},
       {
-        payload: { kind: PayloadKind.AgentTurn, message: 'Run' },
+        ...baseInput,
         delivery: {
           mode: DeliveryMode.Announce,
           channel: 'dingtalk-connector',
@@ -122,8 +137,8 @@ test('create preserves the selected execution binding when announce delivery is 
   await electronMocks.handlers.get(IpcChannel.Create)?.(
     {},
     {
+      ...baseInput,
       sessionTarget: SessionTarget.Task,
-      payload: { kind: PayloadKind.AgentTurn, message: 'Run' },
       delivery: {
         mode: DeliveryMode.Announce,
         channel: 'dingtalk-connector',

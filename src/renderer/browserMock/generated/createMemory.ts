@@ -112,9 +112,8 @@ export function createMemory(runtime: BrowserMockRuntime): Window['electron']['m
         success: true,
       };
     },
-    forget: async (_p0, _p1) => {
+    forget: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('memory.forget');
       return {
         success: true,

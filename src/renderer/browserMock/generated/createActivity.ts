@@ -3,15 +3,15 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createActivity(runtime: BrowserMockRuntime): Window['electron']['activity'] {
   return {
+    onUpdated: _p0 => {
+      return runtime.subscribe('activity.onUpdated', _p0);
+    },
     list: async () => {
       runtime.warnOnce('activity.list');
       return {
         success: true,
         runs: [],
       };
-    },
-    onUpdated: _p0 => {
-      return runtime.subscribe('activity.onUpdated', _p0);
     },
   };
 }
