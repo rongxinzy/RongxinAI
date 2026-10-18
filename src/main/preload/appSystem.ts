@@ -117,7 +117,8 @@ export const appSystemApi = {
     openExternal: (url: string) => ipcRenderer.invoke(ShellIpc.OpenExternal, url),
     openHtmlInBrowser: (htmlContent: string) =>
       ipcRenderer.invoke(ShellIpc.OpenHtmlInBrowser, htmlContent),
-    pathExists: (filePath: string) => ipcRenderer.invoke(ShellIpc.PathExists, filePath),
+    resolveLocalPath: (candidate: string, cwd?: string) =>
+      ipcRenderer.invoke(ShellIpc.ResolveLocalPath, candidate, cwd),
   },
 
   autoLaunch: {

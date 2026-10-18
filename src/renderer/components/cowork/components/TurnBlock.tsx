@@ -164,7 +164,7 @@ const ToolActivityStatusLine: React.FC<{ activity: CoworkToolActivity }> = ({ ac
 const TurnBlockComponent: React.FC<{
   turn: ConversationTurn;
   artifacts?: Artifact[];
-  resolveLocalFilePath?: (href: string, text: string) => string | null;
+  cwd?: string;
   mapDisplayText?: (value: string) => string;
   showTypingIndicator?: boolean;
   showCopyButtons?: boolean;
@@ -183,7 +183,7 @@ const TurnBlockComponent: React.FC<{
 }> = ({
   turn,
   artifacts,
-  resolveLocalFilePath,
+  cwd,
   mapDisplayText,
   showTypingIndicator = false,
   showCopyButtons = true,
@@ -296,7 +296,7 @@ const TurnBlockComponent: React.FC<{
         <AssistantBubble
           key={item.message.id}
           message={item.message}
-          resolveLocalFilePath={resolveLocalFilePath}
+          cwd={cwd}
           mapDisplayText={mapDisplayText}
           turnMetadata={
             showCopyButtons && index === finalAnswerIndex ? item.message.metadata : undefined

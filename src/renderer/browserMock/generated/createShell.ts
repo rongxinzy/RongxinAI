@@ -31,12 +31,12 @@ export function createShell(runtime: BrowserMockRuntime): Window['electron']['sh
         success: true,
       };
     },
-    pathExists: async _p0 => {
+    resolveLocalPath: async (_p0, _p1) => {
       void _p0;
-      runtime.warnOnce('shell.pathExists');
+      void _p1;
+      runtime.warnOnce('shell.resolveLocalPath');
       return {
-        success: true,
-        exists: true,
+        path: '/home/user/preview',
       };
     },
   };
