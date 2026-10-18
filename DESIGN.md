@@ -7,6 +7,17 @@
 
 Zenith is a modern premium design system that balances futuristic aesthetics with desktop efficiency, characterized by subtle glassmorphism, clean typography, efficient spacing, and smooth interactions. Surfaces have depth without distraction, typography is crisp and readable, and the interface feels light yet information-dense.
 
+## 水彩欢迎与会话试点（2026-10-17 用户授权，待视觉验收）
+
+用户在查看水彩概念后批准先实现欢迎页与一页真实对话，验收满意后再决定是否推广。本节仅覆盖 Cowork 欢迎与真实会话表面；不替换全产品 Zenith 规范，不改变品牌、功能、导航或运行时。
+
+- **获准偏离**：试点使用原创水彩插画、纸感中性背景、低饱和强调色和留白；试点表面不沿用玻璃、渐变主动作或彩色发光。插画是装饰，不承载交互或虚构任务状态。
+- **实现边界**：复用现有输入、模型/工作区选择、消息与工具组件。外观写入已注册 hook 与 recipe，同时覆盖浅色和深色；不得用页面 CSS 覆盖、额外主题设置或手改生成样式。
+- **真实会话**：保持发送、流式更新、停止、重试、权限批准/拒绝及已有 Trace 入口；不以静态原型替代业务组件，不新增虚构执行轨迹。
+- **状态连续性**：主题切换不重建会话或编辑器，保留草稿、焦点、选中、滚动与弹层；装饰不遮挡输入，不接收指针事件，窄窗口不挤压操作。
+- **验收范围**：欢迎/真实会话、浅色/深色、标准/窄窗口，覆盖长文本、动态输出、键盘与 reduced-motion。概念图只表达方向，不是已验收截图；实际截图和测试结果在 PR 单独记录。
+- **当前状态**：试点开发中，尚未完成浏览器视觉验收；不得据此声称可合并、发布或已通过全局设计验收。
+
 ## Design Principles
 
 1. **Subtle Glassmorphism** - Light backdrop blur and translucency for depth without overwhelming
