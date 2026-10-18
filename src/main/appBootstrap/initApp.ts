@@ -8,9 +8,8 @@ import path from 'path';
 
 import { pathToFileURL } from 'url';
 
-import { app, BrowserWindow, net, powerMonitor, protocol } from 'electron';
+import { app, BrowserWindow, dialog, net, powerMonitor, protocol } from 'electron';
 
-import { isDev } from './appEnv';
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
 import { rt } from './runtimeState';
 import {
@@ -57,7 +56,6 @@ import { DB_FILENAME } from '../appConstants';
 import { startSqliteDiagnostics } from '../sqliteDiagnostics';
 import { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
 import { isAllowedLocalfilePath } from '../localfilePathValidation';
-import { registerDevNetworkProtocol } from '../devNetworkLog';
 import { ActivityService } from '../activity/activityService';
 import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 import { registerWorkbenchTaskIpcHandlers } from '../workbenchTask/ipc';
@@ -78,8 +76,7 @@ import { registerLlamaCppIpcHandlers } from '../ipcHandlers/llamacpp';
 import { registerTriageIpcHandlers } from '../ipcHandlers/triage';
 import { registerOllamaIpcHandlers } from '../ipcHandlers/ollama';
 import { registerMarketplaceIpcHandlers } from '../ipcHandlers/marketplace';
-import { initCopilotTokenManager } from '../libs/copilotTokenManager';
-import { setCopilotTokenState } from '../libs/copilotTokenManager';
+import { cleanupLegacyCopilotStoredToken } from '../legacyCredentialCleanup';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from '../libs/enterpriseConfigSync';
 import { CoworkExecutionMode } from '../../shared/cowork/constants';
 import { setTriageClassifierDeps } from '../libs/agentEngine/piClassifierTriage';
@@ -189,14 +186,24 @@ export const initApp = async (): Promise<void> => {
         return new Response('Bad Request', { status: 400 });
       }
     });
-    // 2026/09/17 lixiang  仅开发态挂 Network 镜像，避免生产 clone 响应体
-    if (isDev) {
-      registerDevNetworkProtocol();
-    }
 
     profiler.mark('initStore');
     console.log('[Main] initApp: starting initStore()');
-    rt.store = await initStore();
+    try {
+      rt.store = await initStore();
+    } catch (error) {
+      // Schema migrations are transactional and rethrow instead of silently
+      // skipping; without a store the app cannot run, so say so and exit
+      // instead of leaving a process with no window.
+      console.error('[Main] initApp: store initialization failed:', error);
+      const detail = error instanceof Error ? error.message : String(error);
+      dialog.showErrorBox(
+        '知远无法启动 / 知远 failed to start',
+        `本地数据库初始化失败。\nLocal database initialization failed.\n\n${detail}`,
+      );
+      app.exit(1);
+      return;
+    }
     startSqliteDiagnostics({
       db: rt.store.getDatabase(),
       dbPath: path.join(app.getPath('userData'), DB_FILENAME),
@@ -387,26 +394,9 @@ export const initApp = async (): Promise<void> => {
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
       userDataPath: app.getPath('userData'),
     });
-    // Initialize Copilot token manager and restore token state if available
-    initCopilotTokenManager(getStore);
-    const storedGithubToken = getStore().get('github_copilot_github_token') as string | undefined;
-    if (storedGithubToken) {
-      import('../libs/githubCopilotAuth.js')
-        .then(({ getCopilotToken }) =>
-          getCopilotToken(storedGithubToken).then(({ token, expiresAt, baseUrl }) => {
-            setCopilotTokenState({
-              copilotToken: token,
-              baseUrl,
-              expiresAt,
-              githubToken: storedGithubToken,
-            });
-            console.log('[Main] restored Copilot token state from stored GitHub token');
-          }),
-        )
-        .catch(err => {
-          console.warn('[Main] failed to restore Copilot token on startup:', err);
-        });
-    }
+    // Remove the stored GitHub OAuth token from the retired in-app Copilot
+    // device-flow sign-in; subscription sign-in now goes through the model gateway.
+    cleanupLegacyCopilotStoredToken(getStore());
 
     // Enterprise config sync must run before agent services initialize.
     profiler.mark('enterpriseConfigSync');

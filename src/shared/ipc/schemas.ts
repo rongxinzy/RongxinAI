@@ -13,7 +13,6 @@ import { z } from 'zod';
 
 import { CoworkExecutionMode, CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
 import { hasCoworkSubmissionContent } from '../cowork/submissionContent';
-import { ApiRequestPurpose } from './apiRequest';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -30,19 +29,7 @@ const IpcResult = <T extends z.ZodRawShape>(data: T) =>
 
 // ─── MCP ────────────────────────────────────────────────────────────────────
 
-// ─── API ────────────────────────────────────────────────────────────────────
-
-export const ApiFetchSchema = {
-  input: z.object({
-    url: z.string().url(),
-    method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
-    headers: z.record(z.string(), z.string()),
-    body: z.string().optional(),
-    timeoutMs: z.number().int().positive().max(300_000).optional(),
-    purpose: z.literal(ApiRequestPurpose.ConnectivityTest).optional(),
-  }),
-  output: z.object({ status: z.number(), data: z.unknown() }).passthrough(),
-};
+// ─── Model Pool ─────────────────────────────────────────────────────────────
 
 export const ModelPoolStreamSchema = {
   input: z.object({
@@ -197,10 +184,6 @@ export const ProjectCreateDirectorySchema = {
 // ─── Feishu Install ─────────────────────────────────────────────────────────
 
 // ─── DingTalk Install ───────────────────────────────────────────────────────
-
-// ─── GitHub Copilot ─────────────────────────────────────────────────────────
-
-// ─── OpenAI Codex OAuth ─────────────────────────────────────────────────────
 
 // ─── Cowork Stream Events (main → renderer push) ────────────────────────────
 

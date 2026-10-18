@@ -8,7 +8,6 @@
  * preview mock, so keep the list in its current order when moving members.
  */
 import type {
-  ApiProxyApi,
   AppEventsApi,
   ContextMenuApi,
   MemoryApi,
@@ -43,10 +42,8 @@ import type {
   DingTalkApi,
   EnterpriseApi,
   FeishuApi,
-  GithubCopilotApi,
   ManagedProvidersApi,
   ModelPoolApi,
-  OpenaiCodexOAuthApi,
   PermissionsApi,
 } from './electron/integrationsApi';
 import type { RuntimeRetryNotice } from '../../common/runtimeNotice';
@@ -63,7 +60,6 @@ export interface IElectronAPI {
   triage: TriageApi;
   hardware: HardwareApi;
   agents: AgentsApi;
-  api: ApiProxyApi;
   checkApiConfig: (options?: {
     probeModel?: boolean;
   }) => Promise<{ hasConfig: boolean; config: null; error?: string }>;
@@ -106,16 +102,8 @@ export interface IElectronAPI {
   networkStatus: {
     send: (status: 'online' | 'offline') => void;
   };
-  // 2026/09/17 lixiang  开发态主进程 HTTP 镜像到 DevTools Network
-  devNetwork: {
-    onEntry: (
-      callback: (entry: import('../../shared/devNetworkLog').DevNetworkLogEntry) => void,
-    ) => () => void;
-  };
   feishu: FeishuApi;
   dingtalk: DingTalkApi;
-  githubCopilot: GithubCopilotApi;
-  openaiCodexOAuth: OpenaiCodexOAuthApi;
   activity: ActivityApi;
 }
 

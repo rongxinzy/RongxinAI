@@ -89,11 +89,6 @@ export const ManagedProviderIpc = {
 } as const;
 export type ManagedProviderIpc = (typeof ManagedProviderIpc)[keyof typeof ManagedProviderIpc];
 
-// ─── API (HTTP proxy) ───────────────────────────────────────────────────────
-export const ApiIpc = {
-  Fetch: 'api:fetch',
-} as const;
-
 // ─── ZhiYuan Model Pool ────────────────────────────────────────────────────
 export const ModelPoolIpc = {
   ListModels: 'model-pool:list-models',
@@ -221,7 +216,7 @@ export const ShellIpc = {
   ShowItemInFolder: 'shell:showItemInFolder',
   OpenExternal: 'shell:openExternal',
   OpenHtmlInBrowser: 'shell:openHtmlInBrowser',
-  PathExists: 'shell:pathExists',
+  ResolveLocalPath: 'shell:resolveLocalPath',
 } as const;
 export type ShellIpc = (typeof ShellIpc)[keyof typeof ShellIpc];
 
@@ -328,26 +323,6 @@ export const DingTalkInstallIpc = {
 } as const;
 export type DingTalkInstallIpc = (typeof DingTalkInstallIpc)[keyof typeof DingTalkInstallIpc];
 
-// ─── GitHub Copilot ─────────────────────────────────────────────────────────
-export const GitHubCopilotIpc = {
-  RequestDeviceCode: 'github-copilot:request-device-code',
-  PollForToken: 'github-copilot:poll-for-token',
-  CancelPolling: 'github-copilot:cancel-polling',
-  SignOut: 'github-copilot:sign-out',
-  RefreshToken: 'github-copilot:refresh-token',
-  TokenUpdated: 'github-copilot:token-updated',
-} as const;
-export type GitHubCopilotIpc = (typeof GitHubCopilotIpc)[keyof typeof GitHubCopilotIpc];
-
-// ─── OpenAI Codex OAuth ─────────────────────────────────────────────────────
-export const OpenAICodexOAuthIpc = {
-  Start: 'openai-codex-oauth:start',
-  Cancel: 'openai-codex-oauth:cancel',
-  Logout: 'openai-codex-oauth:logout',
-  Status: 'openai-codex-oauth:status',
-} as const;
-export type OpenAICodexOAuthIpc = (typeof OpenAICodexOAuthIpc)[keyof typeof OpenAICodexOAuthIpc];
-
 // ─── Network ────────────────────────────────────────────────────────────────
 export const NetworkIpc = {
   StatusChange: 'network:status-change',
@@ -360,12 +335,6 @@ export const RuntimeNoticeIpc = {
   Notice: 'runtime:notice',
 } as const;
 export type RuntimeNoticeIpc = (typeof RuntimeNoticeIpc)[keyof typeof RuntimeNoticeIpc];
-
-// 2026/09/17 lixiang  开发态主进程 HTTP → 渲染进程 Network beacon
-export const DevNetworkIpc = {
-  Entry: 'dev-network:entry',
-} as const;
-export type DevNetworkIpc = (typeof DevNetworkIpc)[keyof typeof DevNetworkIpc];
 
 // ─── Artifact ledger ────────────────────────────────────────────────────────
 /** Event-time artifact upserts (main → renderer) and ledger list reads. */
