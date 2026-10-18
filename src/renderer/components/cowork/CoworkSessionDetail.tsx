@@ -3,7 +3,7 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@shared/components/ai-elements/conversation';
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
@@ -254,28 +254,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     rootRef: detailRootRef,
   });
 
-  // Automatically ensure interactive prompt/permission cards stay in view
-  useEffect(() => {
-    if (inlineQuestionPermission || (inlinePermission && !hasInlineToolPermissionCard)) {
-      const scrollElement = scrollContainerRef.current?.closest(
-        '.cowork-conversation-scroll',
-      ) as HTMLElement | null;
-      if (scrollElement) {
-        requestAnimationFrame(() => {
-          scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
-        });
-      }
-    }
-  }, [inlineQuestionPermission, inlinePermission, hasInlineToolPermissionCard]);
-
   const effectiveTurns = useMemo(() => {
     if (turns.length === 0 && isStreaming) {
       return [{ id: 'streaming-only', userMessage: null, assistantItems: [] }];
     }
     return turns;
   }, [turns, isStreaming]);
-
-  // StickToBottom (Conversation) handles auto-scroll during streaming
 
   if (!currentSession) {
     return null;
@@ -418,7 +402,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             {isSessionSwitching ? (
               <CoworkConversationLoadingSkeleton />
             ) : (
-              <Conversation className="h-full" initial="instant" resize="instant">
+              <Conversation className="relative flex-1 h-full overflow-y-hidden" role="log">
                 <ConversationContent
                   className="pt-3"
                   observeContentResize={false}

@@ -4,26 +4,58 @@ import { render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
+import { ConversationViewportProvider } from '@shared/components/ai-elements/useConversationViewport';
+
 import type { ConversationTurn } from '../helpers/messageGrouping';
-import { VirtualizedTurnList } from './VirtualizedTurnList';
+import { VirtualizedTurnList, type VirtualizedTurnListProps } from './VirtualizedTurnList';
 
 const mocks = vi.hoisted(() => ({
   elementScroll: vi.fn(),
   measureElement: vi.fn(),
-  scrollRef: { current: null as HTMLElement | null },
+  scrollRef: { current: null as HTMLDivElement | null },
   scrollToEnd: vi.fn(),
   scrollToIndex: vi.fn(),
   useVirtualizer: vi.fn(),
-}));
-
-vi.mock('use-stick-to-bottom', () => ({
-  useStickToBottomContext: () => ({ scrollRef: mocks.scrollRef }),
 }));
 
 vi.mock('@tanstack/react-virtual', () => ({
   elementScroll: mocks.elementScroll,
   useVirtualizer: (options: unknown) => mocks.useVirtualizer(options),
 }));
+
+const makeViewportValue = () => ({
+  attachContentElement: vi.fn(),
+  attachScrollElement: (element: HTMLDivElement | null) => {
+    mocks.scrollRef.current = element;
+  },
+  getScrollElement: () => mocks.scrollRef.current,
+  isAtBottom: true,
+  isFollowingOutput: () => true,
+  registerScrollWriter: () => () => undefined,
+  scrollToBottom: vi.fn(),
+});
+
+const renderList = (props: VirtualizedTurnListProps & { key?: string }) =>
+  render(
+    React.createElement(
+      ConversationViewportProvider,
+      { value: makeViewportValue() },
+      React.createElement(VirtualizedTurnList, props),
+    ),
+  );
+
+const rerenderList = (
+  view: ReturnType<typeof render>,
+  props: VirtualizedTurnListProps & { key?: string },
+) => {
+  view.rerender(
+    React.createElement(
+      ConversationViewportProvider,
+      { value: makeViewportValue() },
+      React.createElement(VirtualizedTurnList, props),
+    ),
+  );
+};
 
 beforeEach(() => {
   mocks.scrollRef.current = document.createElement('div');
@@ -42,13 +74,11 @@ beforeEach(() => {
 });
 
 test('starts at the estimated end and anchors dynamic measurements to the end', () => {
-  render(
-    React.createElement(VirtualizedTurnList, {
-      turns: [],
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
+  renderList({
+    turns: [],
+    renderAll: false,
+    renderTurn: () => null,
+  });
 
   expect(mocks.useVirtualizer).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -63,23 +93,19 @@ test('starts at the estimated end and anchors dynamic measurements to the end', 
 });
 
 test('positions a newly mounted virtualizer at the end before paint', () => {
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      key: 'session-1',
-      turns: [],
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
+  const view = renderList({
+    key: 'session-1',
+    turns: [],
+    renderAll: false,
+    renderTurn: () => null,
+  });
 
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      key: 'session-2',
-      turns: [],
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
+  rerenderList(view, {
+    key: 'session-2',
+    turns: [],
+    renderAll: false,
+    renderTurn: () => null,
+  });
 
   expect(mocks.scrollToEnd).toHaveBeenCalledTimes(2);
 });
@@ -87,14 +113,12 @@ test('positions a newly mounted virtualizer at the end before paint', () => {
 test('positions the initial tail once before enabling history pagination', () => {
   const onInitialTailPositioned = vi.fn();
 
-  render(
-    React.createElement(VirtualizedTurnList, {
-      turns: [],
-      onInitialTailPositioned,
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
+  renderList({
+    turns: [],
+    onInitialTailPositioned,
+    renderAll: false,
+    renderTurn: () => null,
+  });
 
   expect(mocks.scrollToEnd).toHaveBeenCalledTimes(1);
   expect(onInitialTailPositioned).toHaveBeenCalledOnce();
@@ -109,13 +133,11 @@ test('does not retry internal anchor adjustments while the user scrolls upward',
   });
   const requestFrame = vi.spyOn(window, 'requestAnimationFrame');
 
-  render(
-    React.createElement(VirtualizedTurnList, {
-      turns: [],
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
+  renderList({
+    turns: [],
+    renderAll: false,
+    renderTurn: () => null,
+  });
 
   const options = mocks.useVirtualizer.mock.calls[0]?.[0] as {
     scrollToFn: (
@@ -154,13 +176,11 @@ test('lets a short session clamp its estimated end to the top of a non-overflowi
     },
   ];
 
-  render(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
+  renderList({
+    turns,
+    renderAll: false,
+    renderTurn: () => null,
+  });
 
   expect(mocks.useVirtualizer).toHaveBeenCalledWith(
     expect.objectContaining({ initialOffset: 300 }),
@@ -168,30 +188,16 @@ test('lets a short session clamp its estimated end to the top of a non-overflowi
 });
 
 test('does not call scrollToEnd again after the initial tail position', () => {
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns: [],
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
+  const view = renderList({
+    turns: [],
+    renderAll: false,
+    renderTurn: () => null,
+  });
 
   expect(mocks.scrollToEnd).toHaveBeenCalledTimes(1);
 
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      turns: [],
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      turns: [],
-      renderAll: false,
-      renderTurn: () => null,
-    }),
-  );
+  rerenderList(view, { turns: [], renderAll: false, renderTurn: () => null });
+  rerenderList(view, { turns: [], renderAll: false, renderTurn: () => null });
 
   expect(mocks.scrollToEnd).toHaveBeenCalledTimes(1);
 });
@@ -213,13 +219,11 @@ test('positions only the virtual tail window instead of rendering the full sessi
     scrollToIndex: mocks.scrollToIndex,
   });
 
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn,
-    }),
-  );
+  const view = renderList({
+    turns,
+    renderAll: false,
+    renderTurn,
+  });
 
   expect(renderTurn).toHaveBeenCalled();
   expect(renderTurn.mock.calls.every(([, index]) => index === 99)).toBe(true);
@@ -250,20 +254,16 @@ test('synchronizes measured layout before the following React commit', () => {
     scrollToIndex: mocks.scrollToIndex,
   });
 
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn: () => React.createElement('div', null, 'turn'),
-    }),
-  );
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn: () => React.createElement('div', null, 'turn'),
-    }),
-  );
+  const view = renderList({
+    turns,
+    renderAll: false,
+    renderTurn: () => React.createElement('div', null, 'turn'),
+  });
+  rerenderList(view, {
+    turns,
+    renderAll: false,
+    renderTurn: () => React.createElement('div', null, 'turn'),
+  });
 
   const row = view.container.querySelector<HTMLElement>('[data-index="0"]');
   expect(mocks.measureElement).toHaveBeenCalledTimes(1);
