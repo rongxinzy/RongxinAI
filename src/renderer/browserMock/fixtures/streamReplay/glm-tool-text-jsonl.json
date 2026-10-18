@@ -5,10 +5,7 @@
   "markers": {
     "thinkingBeforeAnswer": true,
     "toolBeforeAnswer": true,
-    "toolNames": [
-      "list_files",
-      "list_files"
-    ]
+    "toolNames": ["list_files", "list_files"]
   },
   "events": [
     {
