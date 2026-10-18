@@ -8,6 +8,7 @@ import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/l
 import type { MarketplaceModel } from '../../shared/marketplace';
 import {
   buildLlamaCppExecutableCandidates,
+  buildLlamaCppPresetGlobalGpuSection,
   buildLlamaCppServeEnv,
   buildLlamaServerModelArgs,
   buildLlamaServerArgs,
@@ -196,8 +197,6 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
     '512',
     '--ubatch-size',
     '128',
-    '--gpu-layers',
-    'all',
     '--threads',
     '8',
     '--threads-batch',
@@ -368,31 +367,48 @@ test('resolveLlamaCppRuntimeTargetPreference defaults to auto CUDA 12 preference
   });
 });
 
-test('buildLlamaServerArgs keeps advanced GPU routing settings as restart-only server flags', () => {
-  expect(
-    buildLlamaServerArgs(
-      {
-        device: '0,1',
-        splitMode: 'layer',
-        tensorSplit: '3,2',
-      },
-      '/models/custom',
-      '/presets/custom.ini',
-    ),
-  ).toContain('--device');
-  expect(
-    buildLlamaServerArgs(
-      {
-        device: '0,1',
-        splitMode: 'layer',
-        tensorSplit: '3,2',
-      },
-      '/models/custom',
-      '/presets/custom.ini',
-    ),
-  ).toEqual(
-    expect.arrayContaining(['--device', '0,1', '--split-mode', 'layer', '--tensor-split', '3,2']),
+test('buildLlamaServerArgs keeps GPU placement flags off the router command line', () => {
+  const args = buildLlamaServerArgs(
+    {
+      gpuLayers: 'all',
+      device: 'CUDA0,CUDA1',
+      mainGpu: '1',
+      splitMode: 'layer',
+      tensorSplit: '3,1',
+    },
+    '/models/custom',
+    '/presets/custom.ini',
   );
+
+  for (const flag of [
+    '--device',
+    '--main-gpu',
+    '--tensor-split',
+    '--gpu-layers',
+    '--n-gpu-layers',
+    '--split-mode',
+  ]) {
+    expect(args).not.toContain(flag);
+  }
+});
+
+test('buildLlamaCppPresetGlobalGpuSection renders GPU routing settings into the preset global section', () => {
+  expect(
+    buildLlamaCppPresetGlobalGpuSection({
+      gpuLayers: '999',
+      device: '0,1',
+      splitMode: 'layer',
+      tensorSplit: '3,2',
+      mainGpu: '1',
+    }),
+  ).toEqual({
+    'n-gpu-layers': '999',
+    device: '0,1',
+    'split-mode': 'layer',
+    'tensor-split': '3,2',
+    'main-gpu': '1',
+  });
+  expect(buildLlamaCppPresetGlobalGpuSection({})).toEqual({});
 });
 
 test('filterLlamaCppServiceConfigByRuntimeCapabilities drops unsupported and hidden runtime fields', () => {
