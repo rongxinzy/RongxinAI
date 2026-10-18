@@ -30,7 +30,7 @@ export const skillsAndMcpApi = {
     onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) => () => void;
   },
 
-  marketplace: createIpcInvokers(marketplaceContractChannels) as IpcContractApi<
-    typeof marketplaceContract
-  >,
+  marketplace: {
+    ...createIpcInvokers(marketplaceContractChannels),
+  } as IpcContractApi<typeof marketplaceContract>,
 };

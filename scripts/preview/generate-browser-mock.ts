@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isInterfaceDeclaration, SyntaxKind, type Node } from 'typescript/unstable/ast';
+import { isInterfaceDeclaration, type Node } from 'typescript/unstable/ast';
 import {
   API,
   ObjectFlags,
@@ -855,6 +855,11 @@ function collectPathsFromObjectLiteralText(
     }
     index = ident.next;
     index = skipWhitespace(source, index);
+    // `} as <type>` casts close a property object; skip the type expression.
+    if (ident.name === 'as') {
+      index = skipExpressionValue(source, index);
+      continue;
+    }
     const pathKey = prefix ? `${prefix}.${ident.name}` : ident.name;
     if (source[index] === '(') {
       paths.add(pathKey);
@@ -887,9 +892,7 @@ function collectPathsFromObjectLiteralText(
 
 function findExportObjectBrace(source: string, exportName: string): number {
   // Tolerates an optional type annotation (`export const x: T = { ... }`).
-  const pattern = new RegExp(
-    `export\\s+const\\s+${exportName}\\s*(?::[^=]*|=)\\s*=\\s*\\{`,
-  );
+  const pattern = new RegExp(`export\\s+const\\s+${exportName}\\s*(:[^=]*?)?\\s*=\\s*\\{`);
   const match = pattern.exec(source);
   if (!match) throw new Error(`Missing export const ${exportName}`);
   return match.index + match[0].length - 1;
