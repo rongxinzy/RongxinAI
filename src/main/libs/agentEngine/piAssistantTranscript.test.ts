@@ -101,6 +101,221 @@ describe('PiAssistantTranscript', () => {
     expect(emitMessageRemoved).not.toHaveBeenCalled();
   });
 
+  it('merges existing metadata when closeIdle finalizes on error', () => {
+    const updateMessage = vi.fn();
+    const thinkingRow = {
+      id: 'think-1',
+      type: 'assistant' as const,
+      content: 'thought body',
+      metadata: {
+        isStreaming: true,
+        isThinking: true,
+        thinkingDurationMs: 4321,
+      },
+    };
+    const active = baseActive();
+    active.thinkingMessageId = thinkingRow.id;
+    active.thinkingText = 'thought body';
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [thinkingRow] }),
+          updateMessage: updateMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(updateMessage).toHaveBeenCalledWith(
+      'session',
+      thinkingRow.id,
+      expect.objectContaining({
+        metadata: expect.objectContaining({ thinkingDurationMs: 4321, isThinking: true }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('does not delete a placeholder when persisted content is non-empty', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'persisted-1',
+      type: 'assistant' as const,
+      content: 'visible in db',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
+  it('removeEmptyAnswerPlaceholder keeps rows when active answer text is in memory', () => {
+    const deleteMessage = vi.fn(() => true);
+    const emitMessageRemoved = vi.fn();
+    const row = {
+      id: 'in-memory-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    active.answerText = 'only in active.answerText';
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved,
+      getActiveSession: () => active,
+    });
+    (
+      local as unknown as {
+        removeEmptyAnswerPlaceholder: (
+          sessionId: string,
+          messageId: string,
+          active: ActivePiSession,
+        ) => void;
+      }
+    ).removeEmptyAnswerPlaceholder('session', row.id, active);
+    expect(deleteMessage).not.toHaveBeenCalled();
+    expect(emitMessageRemoved).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a placeholder when streamed content was captured in memory', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'streamed-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.streamInto('session', active, 'answer', 'delta text');
+    active.answerText = '';
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a placeholder when resolveStreamedContent has retry prior answer', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'retry-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    active.retryPriorAnswer = 'partial from prior attempt';
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
+  it('finalizeMessage with empty content uses resolved streamed answer text', () => {
+    const updateMessage = vi.fn();
+    const row = {
+      id: 'stream-finalize-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage,
+          addMessage: vi.fn(),
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    active.retryPriorAnswer = 'resolved prior answer';
+    active.answerText = '';
+    local.finalizeMessage('session', active, 'answer', '');
+    const finalizePatch = updateMessage.mock.calls.find(
+      call => call[1] === row.id && (call[2] as { content?: string })?.content,
+    )?.[2] as { content?: string; metadata?: Record<string, unknown> } | undefined;
+    expect(finalizePatch?.content).toBe('resolved prior answer');
+    expect(finalizePatch?.metadata).toMatchObject({ isStreaming: false, isFinal: true });
+  });
+
+  it('finalizeMessage empty path removes placeholder before clearing streamed memory', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'throttle-order-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.streamInto('session', active, 'answer', 'streamed body');
+    active.answerText = '';
+    local.finalizeMessage('session', active, 'answer', '');
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
   it('removes a never-displayed empty placeholder and emits messageRemoved', () => {
     const emitMessageRemoved = vi.fn();
     const deleteMessage = vi.fn(() => true);

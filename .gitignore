@@ -7,6 +7,8 @@ release/
 !scripts/release/**
 !enterprise/src/release/
 !enterprise/src/release/**
+scripts/ci/streaming-mutations-results.json
+test-results/
 node_modules
 dist
 dist-electron
