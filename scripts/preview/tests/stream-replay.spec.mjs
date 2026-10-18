@@ -205,6 +205,12 @@ test('scroll pin gate catches forced scroll-away sabotage', async ({ page, baseU
 test('pins scroll to bottom while streaming by default', async ({ page, baseURL }, testInfo) => {
   await applyDeterministicRendering(page);
   await startReplayPage(page, baseURL, 'synthetic-20000');
+  // The follow logic is the only scroll owner; browser scroll anchoring must be
+  // off or it shifts the viewport when a code block re-renders above the fold.
+  const overflowAnchor = await findConversationScroller(page).evaluate(
+    el => getComputedStyle(el).overflowAnchor,
+  );
+  expect(overflowAnchor).toBe('none');
   const result = await runStreamReplay(page, { fixtureId: 'synthetic-20000', mode: 'stepped' });
   assertStreamingScrollPinned(result.samples);
   const maxScrollGap = Math.max(...result.samples.map(sample => sample.distanceFromBottom ?? 0));

@@ -48,7 +48,15 @@ export const ConversationContent = ({
   ...props
 }: ConversationContentProps) => {
   const viewport = useConversationViewportContext();
-  const resolvedScrollClassName = cn('min-w-0 overflow-x-hidden overflow-y-auto', scrollClassName);
+  // Browser scroll anchoring would be an unowned second writer of scrollTop:
+  // when a node near the top of the viewport is replaced (e.g. a code block
+  // swapping to its async shiki-highlighted version) it shifts the viewport,
+  // and the follow hook reads that shift as the user scrolling up. The
+  // viewport hook / registered virtualizer is the only owner, so turn it off.
+  const resolvedScrollClassName = cn(
+    'min-w-0 overflow-x-hidden overflow-y-auto [overflow-anchor:none]',
+    scrollClassName,
+  );
   const contentClassName = cn(
     'flex min-w-0 gap-8 p-4',
     reverse ? 'flex-col-reverse' : 'flex-col',
