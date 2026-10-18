@@ -73,7 +73,7 @@ describe('handleIpcContract', () => {
   test('impl receives the forwarded ipc event', async () => {
     const seen: unknown[] = [];
     handleIpcContract(contract, {
-      add: (e) => {
+      add: e => {
         seen.push(e);
         return 0;
       },

@@ -200,7 +200,9 @@ export const registerMcpIpc = (): void => {
 
         getMcpStore().setEnabled(options.id, options.enabled);
         const servers = getMcpStore().listServers();
-        refreshMcpBridge().catch(err => console.error('[McpBridge] background refresh error:', err));
+        refreshMcpBridge().catch(err =>
+          console.error('[McpBridge] background refresh error:', err),
+        );
         return { success: true, servers };
       } catch (error) {
         return {
@@ -214,10 +216,9 @@ export const registerMcpIpc = (): void => {
       try {
         // The bundled registry is permissive (`Record<string, unknown>` rows);
         // the renderer projects known fields off each server object.
-        const data = loadBundledMcpMarketplace(
-          app.getAppPath(),
-          process.resourcesPath,
-        ) as z.infer<typeof mcpContract.fetchMarketplace.result>['data'];
+        const data = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath) as z.infer<
+          typeof mcpContract.fetchMarketplace.result
+        >['data'];
         return { success: true, data };
       } catch (error) {
         return {
@@ -231,7 +232,9 @@ export const registerMcpIpc = (): void => {
       try {
         const marketplace = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath);
         if (
-          !marketplace.servers.some(server => (server as { iconPath?: string }).iconPath === iconPath)
+          !marketplace.servers.some(
+            server => (server as { iconPath?: string }).iconPath === iconPath,
+          )
         ) {
           return { success: false, error: 'MCP icon is not registered' };
         }
@@ -299,7 +302,9 @@ export const registerMcpIpc = (): void => {
         });
         if (result.canceled || result.filePaths.length === 0)
           return { success: true, cancelled: true };
-        const input = JSON.parse(await fs.promises.readFile(result.filePaths[0], 'utf8')) as unknown;
+        const input = JSON.parse(
+          await fs.promises.readFile(result.filePaths[0], 'utf8'),
+        ) as unknown;
         const servers = importMcpConfig(input);
         const existingNames = new Set(
           getMcpStore()

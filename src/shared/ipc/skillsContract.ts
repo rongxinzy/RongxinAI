@@ -14,29 +14,26 @@ import { defineIpcContract } from './contract';
 import { SkillsIpc } from './channels';
 
 /** A skill row as returned by SkillManager.listSkills() (main-owned SkillRecord). */
-export const SkillRecordSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string(),
-    enabled: z.boolean(),
-    pinned: z.boolean(),
-    isOfficial: z.boolean(),
-    isBuiltIn: z.boolean(),
-    updatedAt: z.number(),
-    prompt: z.string(),
-    skillPath: z.string(),
-    iconUrl: z.string().optional(),
-    displayName: z.string().optional(),
-    displayDescription: z.string().optional(),
-    displayAuthor: z.string().optional(),
-    displayLicense: z.string().optional(),
-    metadataContent: z.string().optional(),
-    metadataFields: z.record(z.string(), z.string()).optional(),
-    version: z.string().optional(),
-  });
-
-export type SkillRecordIpc = z.infer<typeof SkillRecordSchema>;
+const SkillRecordSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  enabled: z.boolean(),
+  pinned: z.boolean(),
+  isOfficial: z.boolean(),
+  isBuiltIn: z.boolean(),
+  updatedAt: z.number(),
+  prompt: z.string(),
+  skillPath: z.string(),
+  iconUrl: z.string().optional(),
+  displayName: z.string().optional(),
+  displayDescription: z.string().optional(),
+  displayAuthor: z.string().optional(),
+  displayLicense: z.string().optional(),
+  metadataContent: z.string().optional(),
+  metadataFields: z.record(z.string(), z.string()).optional(),
+  version: z.string().optional(),
+});
 
 /** `{ success: true, skills } | { success: false, error? }` envelope. */
 const SkillsEnvelopeSchema = z.object({
@@ -54,13 +51,11 @@ const EmailConnectivityCheckSchema = z.object({
   durationMs: z.number(),
 });
 
-export const EmailConnectivityTestResultSchema = z.object({
+const EmailConnectivityTestResultSchema = z.object({
   testedAt: z.number(),
   verdict: z.enum(['pass', 'fail']),
   checks: z.array(EmailConnectivityCheckSchema),
 });
-
-export type EmailConnectivityTestResultIpc = z.infer<typeof EmailConnectivityTestResultSchema>;
 
 export const skillsContract = defineIpcContract({
   list: {
@@ -206,13 +201,3 @@ export const skillsContract = defineIpcContract({
     }),
   },
 });
-
-/**
- * Named data types derived from the schemas, for renderer code that needs the
- * shape without a contract method (e.g. local state typed as a skill row).
- */
-export type SkillsContractTypes = {
-  skill: z.infer<typeof SkillRecordSchema>;
-  emailConnectivityTestResult: z.infer<typeof EmailConnectivityTestResultSchema>;
-};
-

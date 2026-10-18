@@ -35,10 +35,7 @@ export function registerMarketplaceIpcHandlers(options: {
       const controller = new AbortController();
       activeSearches.set(key, controller);
       try {
-        return await service.search(
-          request.params as MarketplaceSearchParams,
-          controller.signal,
-        );
+        return await service.search(request.params as MarketplaceSearchParams, controller.signal);
       } catch (error) {
         if (controller.signal.aborted) {
           return {

@@ -24,7 +24,7 @@
 import type { z } from 'zod';
 
 /** One IPC method: channel constant + argument tuple schema + result schema. */
-export interface IpcContractMethod {
+interface IpcContractMethod {
   readonly channel: string;
   readonly args: z.ZodTuple;
   readonly result: z.ZodType;
@@ -75,6 +75,6 @@ export type IpcContractHandlers<C extends IpcContract> = {
 };
 
 /** Channel map for a contract: method name → channel constant. Zod-free values. */
-export type IpcContractChannels<C extends IpcContract> = Readonly<
-  { [K in keyof C]: C[K]['channel'] }
->;
+export type IpcContractChannels<C extends IpcContract> = Readonly<{
+  [K in keyof C]: C[K]['channel'];
+}>;

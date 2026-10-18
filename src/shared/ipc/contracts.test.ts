@@ -14,8 +14,9 @@ import { marketplaceContract, MarketplaceSearchRequestSchema } from '../marketpl
 
 test('skills setEnabled accepts the renderer payload shape', () => {
   // src/renderer/services/skill.ts setSkillEnabled
-  expect(skillsContract.setEnabled.args.safeParse([{ id: 'web-search', enabled: false }]).success)
-    .toBe(true);
+  expect(
+    skillsContract.setEnabled.args.safeParse([{ id: 'web-search', enabled: false }]).success,
+  ).toBe(true);
 });
 
 test('skills setEnabledBatch accepts the batch payload shape', () => {
@@ -54,9 +55,7 @@ test('skills config roundtrip payload parses', () => {
   const config = { host: 'imap.qq.com', port: '993', ssl: 'true' };
   expect(skillsContract.setConfig.args.safeParse(['email', config]).success).toBe(true);
   expect(skillsContract.getConfig.args.safeParse(['email']).success).toBe(true);
-  expect(
-    skillsContract.testEmailConnectivity.args.safeParse(['email', config]).success,
-  ).toBe(true);
+  expect(skillsContract.testEmailConnectivity.args.safeParse(['email', config]).success).toBe(true);
 });
 
 test('skills fetchMarketplace accepts the service options object', () => {
@@ -75,8 +74,7 @@ test('skills createCustom accepts the CreateSkillDialog payload', () => {
     ]).success,
   ).toBe(true);
   expect(
-    skillsContract.createCustom.args.safeParse([{ id: 'x', name: 'n', description: 'd' }])
-      .success,
+    skillsContract.createCustom.args.safeParse([{ id: 'x', name: 'n', description: 'd' }]).success,
   ).toBe(false);
 });
 
@@ -97,11 +95,10 @@ test('skills envelope result accepts real SkillRecord rows', () => {
     metadataFields: { author: 'zhiyuan' },
     version: '1.0.0',
   };
-  expect(skillsContract.list.result.safeParse({ success: true, skills: [row] }).success).toBe(
-    true,
-  );
-  expect(skillsContract.list.result.safeParse({ success: false, error: 'disk offline' }).success)
-    .toBe(true);
+  expect(skillsContract.list.result.safeParse({ success: true, skills: [row] }).success).toBe(true);
+  expect(
+    skillsContract.list.result.safeParse({ success: false, error: 'disk offline' }).success,
+  ).toBe(true);
   expect(skillsContract.list.result.safeParse({ success: 'yes' }).success).toBe(false);
 });
 
@@ -135,16 +132,16 @@ test('mcp create accepts both real form payloads', () => {
 });
 
 test('mcp create rejects a wrong transport type', () => {
-  expect(mcpContract.create.args.safeParse([{ ...stdioForm, transportType: 'grpc' }]).success)
-    .toBe(false);
+  expect(mcpContract.create.args.safeParse([{ ...stdioForm, transportType: 'grpc' }]).success).toBe(
+    false,
+  );
 });
 
 test('mcp update accepts a partial patch and strips unknown keys', () => {
   // McpManager edit flow sends only the changed fields
   expect(mcpContract.update.args.safeParse(['srv-1', { enabled: true }]).success).toBe(true);
   expect(
-    mcpContract.update.args.safeParse(['srv-1', { description: 'new text', timeout: 120 }])
-      .success,
+    mcpContract.update.args.safeParse(['srv-1', { description: 'new text', timeout: 120 }]).success,
   ).toBe(true);
   // Unknown keys are stripped (zod default), never forwarded to the store.
   const parsed = mcpContract.update.args.safeParse(['srv-1', { unknownField: 1, name: 'ok' }]);
@@ -166,9 +163,8 @@ test('mcp authorize accepts the token-connect payload plus requestId', () => {
   // useMcpOfficialConnect passes form data; mcpService.authorize spreads in
   // authorizationRequestId.
   expect(
-    mcpContract.authorize.args.safeParse([
-      { ...tokenForm, authorizationRequestId: 'req-9' },
-    ]).success,
+    mcpContract.authorize.args.safeParse([{ ...tokenForm, authorizationRequestId: 'req-9' }])
+      .success,
   ).toBe(true);
   // useMcpTokenConnect-style call without an id (defensive: schema keeps it
   // optional) and a malformed headers map both behave as expected.
@@ -233,16 +229,14 @@ test('marketplace search accepts request envelopes built by useMarketplaceSearch
 });
 
 test('marketplace search rejects an empty requestId and bad enum values', () => {
+  expect(MarketplaceSearchRequestSchema.safeParse({ requestId: '', params: {} }).success).toBe(
+    false,
+  );
   expect(
-    MarketplaceSearchRequestSchema.safeParse({ requestId: '', params: {} }).success,
+    MarketplaceSearchRequestSchema.safeParse({ requestId: 'r', params: { task: 'math' } }).success,
   ).toBe(false);
   expect(
-    MarketplaceSearchRequestSchema.safeParse({ requestId: 'r', params: { task: 'math' } })
-      .success,
-  ).toBe(false);
-  expect(
-    MarketplaceSearchRequestSchema.safeParse({ requestId: 'r', params: { limit: 'many' } })
-      .success,
+    MarketplaceSearchRequestSchema.safeParse({ requestId: 'r', params: { limit: 'many' } }).success,
   ).toBe(false);
 });
 

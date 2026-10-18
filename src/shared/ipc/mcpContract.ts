@@ -15,35 +15,30 @@ import { z } from 'zod';
 import { defineIpcContract } from './contract';
 import { McpIpc } from './channels';
 
-export const McpTransportTypeSchema = z.enum(['stdio', 'sse', 'http']);
-export type McpTransportTypeIpc = z.infer<typeof McpTransportTypeSchema>;
+const McpTransportTypeSchema = z.enum(['stdio', 'sse', 'http']);
 
-export const McpExposureSchema = z.enum(['codemode', 'deferred', 'direct', 'hidden']);
-export type McpExposureIpc = z.infer<typeof McpExposureSchema>;
+const McpExposureSchema = z.enum(['codemode', 'deferred', 'direct', 'hidden']);
 
 /** Stored MCP server row as returned by McpStore.listServers(). */
-export const McpServerConfigSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    description: z.string(),
-    enabled: z.boolean(),
-    transportType: McpTransportTypeSchema,
-    command: z.string().optional(),
-    args: z.array(z.string()).optional(),
-    env: z.record(z.string(), z.string()).optional(),
-    url: z.string().optional(),
-    headers: z.record(z.string(), z.string()).optional(),
-    timeout: z.number().optional(),
-    isBuiltIn: z.boolean(),
-    githubUrl: z.string().optional(),
-    registryId: z.string().optional(),
-    exposure: McpExposureSchema.optional(),
-    createdAt: z.number(),
-    updatedAt: z.number(),
-  });
-
-export type McpServerConfigIpc = z.infer<typeof McpServerConfigSchema>;
+const McpServerConfigSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  enabled: z.boolean(),
+  transportType: McpTransportTypeSchema,
+  command: z.string().optional(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+  url: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  timeout: z.number().optional(),
+  isBuiltIn: z.boolean(),
+  githubUrl: z.string().optional(),
+  registryId: z.string().optional(),
+  exposure: McpExposureSchema.optional(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
 
 const ServersEnvelopeSchema = z.object({
   success: z.boolean(),
@@ -52,7 +47,7 @@ const ServersEnvelopeSchema = z.object({
 });
 
 /** Form payload the renderer sends to create/testConnection/authorize. */
-export const McpServerFormSchema = z.object({
+const McpServerFormSchema = z.object({
   name: z.string(),
   description: z.string(),
   transportType: McpTransportTypeSchema,
@@ -68,8 +63,6 @@ export const McpServerFormSchema = z.object({
   exposure: McpExposureSchema.optional(),
 });
 
-export type McpServerFormIpc = z.infer<typeof McpServerFormSchema>;
-
 /** Partial form payload for `update`; main merges it over the stored row. */
 const McpServerFormPatchSchema = McpServerFormSchema.partial();
 
@@ -84,46 +77,40 @@ const McpPresentationLocaleSchema = z.object({
     .optional(),
 });
 
-const McpPresentationSchema = z
-  .object({
-    name: z.string().optional(),
-    authorization: z.string().optional(),
-    zh: McpPresentationLocaleSchema.optional(),
-    en: McpPresentationLocaleSchema.optional(),
-  });
+const McpPresentationSchema = z.object({
+  name: z.string().optional(),
+  authorization: z.string().optional(),
+  zh: McpPresentationLocaleSchema.optional(),
+  en: McpPresentationLocaleSchema.optional(),
+});
 
 /** Bundled MCP marketplace registry entry (registry.json is permissive). */
-export const McpMarketplaceServerSchema = z
-  .object({
-    id: z.string(),
-    name: z.string(),
-    description_zh: z.string().optional(),
-    description_en: z.string().optional(),
-    category: z.string(),
-    transportType: McpTransportTypeSchema,
-    descriptionKey: z.string().optional(),
-    categoryKey: z.string().optional(),
-    command: z.string().optional(),
-    defaultArgs: z.array(z.string()).optional(),
-    url: z.string().optional(),
-    headers: z.record(z.string(), z.string()).optional(),
-    authType: z.enum(['oauth', 'cli', 'token', 'external']).optional(),
-    connectorPath: z.string().optional(),
-    iconPath: z.string().optional(),
-    metadataPath: z.string().optional(),
-    requiredEnvKeys: z.array(z.string()).optional(),
-    optionalEnvKeys: z.array(z.string()).optional(),
-    presentation: McpPresentationSchema.optional(),
-  });
+const McpMarketplaceServerSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description_zh: z.string().optional(),
+  description_en: z.string().optional(),
+  category: z.string(),
+  transportType: McpTransportTypeSchema,
+  descriptionKey: z.string().optional(),
+  categoryKey: z.string().optional(),
+  command: z.string().optional(),
+  defaultArgs: z.array(z.string()).optional(),
+  url: z.string().optional(),
+  headers: z.record(z.string(), z.string()).optional(),
+  authType: z.enum(['oauth', 'cli', 'token', 'external']).optional(),
+  connectorPath: z.string().optional(),
+  iconPath: z.string().optional(),
+  metadataPath: z.string().optional(),
+  requiredEnvKeys: z.array(z.string()).optional(),
+  optionalEnvKeys: z.array(z.string()).optional(),
+  presentation: McpPresentationSchema.optional(),
+});
 
-export type McpMarketplaceServerIpc = z.infer<typeof McpMarketplaceServerSchema>;
-
-export const McpMarketplaceDataSchema = z.object({
+const McpMarketplaceDataSchema = z.object({
   categories: z.array(z.object({ id: z.string(), name_zh: z.string(), name_en: z.string() })),
   servers: z.array(McpMarketplaceServerSchema),
 });
-
-export type McpMarketplaceDataIpc = z.infer<typeof McpMarketplaceDataSchema>;
 
 export const mcpContract = defineIpcContract({
   list: {
@@ -156,12 +143,11 @@ export const mcpContract = defineIpcContract({
   testConnection: {
     channel: McpIpc.TestConnection,
     args: z.tuple([McpServerFormSchema]),
-    result: z
-      .object({
-        success: z.boolean(),
-        error: z.string().optional(),
-        toolCount: z.number().optional(),
-      }),
+    result: z.object({
+      success: z.boolean(),
+      error: z.string().optional(),
+      toolCount: z.number().optional(),
+    }),
   },
   fetchMarketplace: {
     channel: McpIpc.FetchMarketplace,

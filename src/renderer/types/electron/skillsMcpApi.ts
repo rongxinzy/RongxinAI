@@ -7,20 +7,8 @@
  */
 
 import type { IpcContractApi } from '../../../shared/ipc/contract';
-import type {
-  skillsContract,
-  SkillsContractTypes,
-} from '../../../shared/ipc/skillsContract';
+import type { skillsContract } from '../../../shared/ipc/skillsContract';
 import type { mcpContract } from '../../../shared/ipc/mcpContract';
-import type { McpMarketplaceDataIpc, McpServerConfigIpc } from '../../../shared/ipc/mcpContract';
-
-/** Skill row returned by main's SkillManager (`SkillRecord`). */
-export type Skill = SkillsContractTypes['skill'];
-/** `mcp:*` result envelope servers list. */
-export type McpServerConfigIPC = McpServerConfigIpc;
-
-export type EmailConnectivityTestResult = SkillsContractTypes['emailConnectivityTestResult'];
-export type McpMarketplaceData = McpMarketplaceDataIpc;
 
 type SkillsContractApi = IpcContractApi<typeof skillsContract>;
 
