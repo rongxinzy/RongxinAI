@@ -22,7 +22,8 @@ function fakeManagement(
           return { keys: [...keys.values()].map(({ secret: _secret, ...rest }) => rest) };
         if (route === '/api/caller-keys/copy-key') {
           const key = keys.get(String(body?.key));
-          return key?.secret ?? '';
+          // Mirrors the real handler: the wrapped access.Update result.
+          return { keys: [], secret: key?.secret ?? '' };
         }
         if (route === '/api/caller-keys/add-key') {
           const id = `key-${keys.size + 1}`;
@@ -60,6 +61,17 @@ describe('syncMagpieLanAccessKey', () => {
     expect(addCalls).toHaveLength(1);
     expect(addCalls[0].body).toEqual({ name: 'zhiyuan-lan', secret: 'sk-lan-one' });
     expect(calls.some(call => call.route === '/api/caller-keys/remove-key')).toBe(false);
+  });
+
+  it('issues only the copy probe when the existing key already holds the secret', async () => {
+    const { client, calls } = fakeManagement([
+      { id: 'key-1', name: 'zhiyuan-lan', secret: 'sk-lan-one' },
+    ]);
+    await syncMagpieLanAccessKey(client, 'sk-lan-one');
+    expect(calls.map(call => call.route)).toEqual([
+      '/api/caller-keys',
+      '/api/caller-keys/copy-key',
+    ]);
   });
 
   it('replaces the key after the token is regenerated, adding the new secret first', async () => {

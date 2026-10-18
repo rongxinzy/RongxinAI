@@ -55,9 +55,10 @@ export const setupMagpieRuntime = (): void => {
         const enabled = isLlamaCppLanAccessEnabled(getLlamaCppServiceConfig(getStore()));
         return {
           enabled,
-          // Only read (never mint) a token here: minting on read could surprise
-          // the manager at app start; the UI's token surface creates it on demand.
-          lanToken: enabled ? getLanCredentialVault().getLanToken() : null,
+          // Mint on read when LAN is on: a user who enables LAN before ever
+          // opening the token dialog still gets a key imported, and the same
+          // token is what the dialog later shows.
+          lanToken: enabled ? getLanCredentialVault().ensureLanToken() : null,
         };
       },
     },

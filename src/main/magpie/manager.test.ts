@@ -126,7 +126,7 @@ describe('Magpie owned lifecycle', () => {
       if (url.endsWith('/api/caller-keys/copy-key')) {
         const body = JSON.parse(String(_init?.body ?? '{}')) as { key?: string };
         const key = callerKeys.find(entry => entry.id === body.key);
-        return Response.json(key?.secret ?? '');
+        return Response.json({ keys: [], secret: key?.secret ?? '' });
       }
       if (url.endsWith('/api/caller-keys/add-key')) {
         const body = JSON.parse(String(_init?.body ?? '{}')) as {

@@ -123,9 +123,7 @@ export class MagpieManager {
     return this.options.lanAccess?.read().enabled === true;
   }
   /** The process may run for the model service or because LAN access needs it. */
-  private shouldRun(): boolean {
-    return this.isServiceEnabled() || this.isLanAccessEnabled();
-  }
+  private shouldRun = (): boolean => this.isServiceEnabled() || this.isLanAccessEnabled();
   start(): Promise<MagpieStatus> {
     try {
       this.options.serviceEnabled?.write(true);
@@ -323,8 +321,8 @@ export class MagpieManager {
         return await this.shutdown();
       }
       if (this.state.state === 'running') {
-        // The env flip needs a restart even when the token itself is unchanged.
-        if (this.isLanAccessEnabled()) await this.syncLanAccessKeyAfterStart();
+        // The env flip needs a restart even when the token itself is unchanged;
+        // launch re-imports the key once the new process is up.
         return await this.stopOwned().then(() => this.startOwned());
       }
       if (shouldRun) return await this.startOwned();

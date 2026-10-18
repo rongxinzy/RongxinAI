@@ -42,12 +42,13 @@ export async function syncMagpieLanAccessKey(
   const existing = keys.filter(key => key.name === MAGPIE_LAN_KEY_NAME);
   const active = existing.filter(key => key.off !== true);
   if (active.length === 1) {
+    // copy-key answers {"secret": "..."} (the wrapped access.Update result).
     const copied = await client.managementJson('/api/caller-keys/copy-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: active[0].id }),
     });
-    if (typeof copied === 'string' && copied === secret) return;
+    if (copied.secret === secret) return;
   }
   await client.managementJson('/api/caller-keys/add-key', {
     method: 'POST',
