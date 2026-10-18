@@ -8,7 +8,7 @@ import path from 'path';
 
 import { pathToFileURL } from 'url';
 
-import { app, BrowserWindow, net, powerMonitor, protocol } from 'electron';
+import { app, BrowserWindow, dialog, net, powerMonitor, protocol } from 'electron';
 
 import { isDev } from './appEnv';
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
@@ -196,7 +196,21 @@ export const initApp = async (): Promise<void> => {
 
     profiler.mark('initStore');
     console.log('[Main] initApp: starting initStore()');
-    rt.store = await initStore();
+    try {
+      rt.store = await initStore();
+    } catch (error) {
+      // Schema migrations are transactional and rethrow instead of silently
+      // skipping; without a store the app cannot run, so say so and exit
+      // instead of leaving a process with no window.
+      console.error('[Main] initApp: store initialization failed:', error);
+      const detail = error instanceof Error ? error.message : String(error);
+      dialog.showErrorBox(
+        '知远无法启动 / 知远 failed to start',
+        `本地数据库初始化失败。\nLocal database initialization failed.\n\n${detail}`,
+      );
+      app.exit(1);
+      return;
+    }
     startSqliteDiagnostics({
       db: rt.store.getDatabase(),
       dbPath: path.join(app.getPath('userData'), DB_FILENAME),
