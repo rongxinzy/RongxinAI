@@ -16,7 +16,7 @@ const AT_BOTTOM_PX = 1;
 const UPWARD_SCROLL_EPSILON_PX = 1;
 
 /** Performs the actual scroll write; a virtualizer replaces direct writes. */
-export type ConversationScrollWriter = () => void;
+type ConversationScrollWriter = () => void;
 
 export interface ConversationViewport {
   /** Ref callback for the scroll container element. */

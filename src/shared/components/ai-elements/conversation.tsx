@@ -7,13 +7,14 @@ import { ArrowDownIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { useCallback } from 'react';
 import {
+  type ConversationViewport,
   ConversationViewportProvider,
   useConversationViewport,
   useConversationViewportContext,
 } from './useConversationViewport';
 
-export type ConversationProps = Omit<ComponentProps<'div'>, 'children'> & {
-  children: ReactNode | ((viewport: ReturnType<typeof useConversationViewport>) => ReactNode);
+export type ConversationProps = ComponentProps<'div'> & {
+  children?: ReactNode | ((viewport: ConversationViewport) => ReactNode);
 };
 
 /**
@@ -26,9 +27,7 @@ export const Conversation = ({ children, ...props }: ConversationProps) => {
 
   return (
     <ConversationViewportProvider value={viewport}>
-      <div {...props}>
-        {typeof children === 'function' ? children(viewport) : children}
-      </div>
+      <div {...props}>{typeof children === 'function' ? children(viewport) : children}</div>
     </ConversationViewportProvider>
   );
 };

@@ -4,10 +4,7 @@ import { act, render } from '@testing-library/react';
 import React, { useEffect } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
-import {
-  useConversationViewport,
-  useConversationViewportContext,
-} from './useConversationViewport';
+import { useConversationViewport } from './useConversationViewport';
 
 const observe = vi.fn();
 

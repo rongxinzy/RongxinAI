@@ -17,7 +17,7 @@ export interface VirtualizedTurnListHandle {
   scrollToTurn: (index: number) => void;
 }
 
-interface VirtualizedTurnListProps {
+export interface VirtualizedTurnListProps {
   turns: ConversationTurn[];
   onInitialTailPositioned?: () => void;
   /** Renders one turn row, including its wrapper element. */
@@ -245,14 +245,7 @@ export const VirtualizedTurnList = React.forwardRef<
     hasPositionedInitialTailRef.current = true;
     followedTailEdgesRef.current = { first: firstId, last: lastId };
     if (!historyPrepended) onInitialTailPositioned?.();
-  }, [
-    onInitialTailPositioned,
-    renderAll,
-    getScrollElement,
-    isFollowingOutput,
-    turns,
-    virtualizer,
-  ]);
+  }, [onInitialTailPositioned, renderAll, getScrollElement, isFollowingOutput, turns, virtualizer]);
 
   useImperativeHandle(
     ref,

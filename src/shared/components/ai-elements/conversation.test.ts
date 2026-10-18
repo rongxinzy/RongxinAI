@@ -171,11 +171,7 @@ test('keeps horizontal overflow inside message content', () => {
 
   const scrollElement = container.querySelector<HTMLElement>('.cowork-conversation-scroll');
   expect(scrollElement).not.toBeNull();
-  expect(scrollElement).toHaveClass(
-    'min-w-0',
-    'overflow-x-hidden',
-    'overflow-y-auto',
-  );
+  expect(scrollElement).toHaveClass('min-w-0', 'overflow-x-hidden', 'overflow-y-auto');
 });
 
 test('content growth while at the bottom keeps the viewport at the bottom', () => {

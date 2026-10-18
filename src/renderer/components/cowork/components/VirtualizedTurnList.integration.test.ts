@@ -10,7 +10,7 @@ import type { ConversationTurn } from '../helpers/messageGrouping';
 import { VirtualizedTurnList } from './VirtualizedTurnList';
 
 const VIEWPORT_HEIGHT = 600;
-const scrollRef = { current: null as HTMLElement | null };
+const scrollRef = { current: null as HTMLDivElement | null };
 const viewportTimeouts = new Set<number>();
 
 const clearViewportTimeouts = (): void => {
@@ -132,7 +132,7 @@ const flushResizeObservers = async (afterPass?: () => void): Promise<void> => {
   }
 };
 
-const installViewport = (): HTMLElement => {
+const installViewport = (): HTMLDivElement => {
   const viewport = document.createElement('div');
   let scrollTop = 0;
 
@@ -322,7 +322,12 @@ test('preserves the visible turn and viewport offset when older turns are prepen
       'data-turn-height': '200',
       'data-turn-id': turn.id,
     });
-  const view = renderList(viewport, { turns, onInitialTailPositioned, renderAll: false, renderTurn });
+  const view = renderList(viewport, {
+    turns,
+    onInitialTailPositioned,
+    renderAll: false,
+    renderTurn,
+  });
   await flushResizeObservers();
   await waitFor(() => expect(onInitialTailPositioned).toHaveBeenCalledOnce());
 
@@ -582,42 +587,41 @@ test('follows streaming tail growth while at the bottom and stops after scrollin
   heights.set('turn-19', 640);
   rerenderList(view, { turns, renderAll: false, renderTurn });
   await flushResizeObservers();
+  const bottomScrollTop = Math.max(viewport.scrollHeight - VIEWPORT_HEIGHT, 0);
   await waitFor(() => {
-    expect(viewport.scrollTop).toBe(Math.max(viewport.scrollHeight - VIEWPORT_HEIGHT, 0));
+    expect(viewport.scrollTop).toBe(bottomScrollTop);
   });
 
-  // User scrolls up: the same growth must not yank them back down.
-  let observedWhileScrolledUp = -1;
-  const writes: Array<[string, number]> = [];
-  const originalScrollTo = viewport.scrollTo;
-  viewport.scrollTo = ((options: ScrollToOptions | number) => {
-    writes.push([
-      typeof options === 'number' ? String(options) : `${options.top}:${options.behavior}`,
-      typeof options === 'number' ? options : (options.top ?? viewport.scrollTop),
-    ]);
-    return originalScrollTo(options);
-  }) as typeof viewport.scrollTo;
-  viewport.addEventListener('scroll', () => {
-    writes.push(['scroll-event', viewport.scrollTop]);
-  });
+  // The user scrolls up within the overscan window: the streaming turn stays
+  // mounted, but the viewport is no longer at the bottom.
   await act(async () => {
     viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }));
-    viewport.scrollTop = 1200;
+    viewport.scrollTop = bottomScrollTop - 600;
     viewport.dispatchEvent(new Event('scroll'));
-    observedWhileScrolledUp = viewport.scrollTop;
   });
-  console.log('[follow-test] after user scroll:', JSON.stringify(writes));
   await flushResizeObservers();
-  console.log('[follow-test] after flush:', JSON.stringify(writes), 'scrollTop:', viewport.scrollTop);
-  expect(observedWhileScrolledUp).toBe(1200);
+  const settledScrollTop = viewport.scrollTop;
+  expect(settledScrollTop).toBeLessThan(bottomScrollTop - 100);
+  expect(followRef.current).toBe(false);
 
+  const anchorRow = Array.from(viewport.querySelectorAll<HTMLElement>('[data-index]')).find(row => {
+    const start = Number.parseFloat(row.style.top);
+    return start <= viewport.scrollTop && start + row.offsetHeight > viewport.scrollTop;
+  });
+  const anchorId = anchorRow?.querySelector<HTMLElement>('[data-turn-id]')?.dataset.turnId;
+  const anchorOffset = Number.parseFloat(anchorRow?.style.top ?? '0') - viewport.scrollTop;
+  expect(anchorId).toBeTruthy();
+
+  // Further streaming growth must not yank the user back to the bottom: the
+  // anchored content keeps its offset and the viewport stays scrolled up.
   heights.set('turn-19', 1040);
   rerenderList(view, { turns, renderAll: false, renderTurn });
   await flushResizeObservers();
-  console.log('[follow-test] final:', JSON.stringify(writes), 'scrollTop:', viewport.scrollTop);
-  // The virtualizer anchors measurements above the viewport, so scrollTop may
-  // legitimately shift by the above-viewport growth delta; it must stay in the
-  // scrolled-up region, never snap back to the tail.
-  expect(viewport.scrollTop).toBeGreaterThanOrEqual(1200);
-  expect(viewport.scrollTop).toBeLessThan(viewport.scrollHeight - VIEWPORT_HEIGHT - 1);
+
+  expect(viewport.scrollTop).toBe(settledScrollTop);
+  const anchoredContent = viewport.querySelector<HTMLElement>(`[data-turn-id="${anchorId}"]`);
+  const anchoredRow = anchoredContent?.closest<HTMLElement>('[data-index]');
+  expect(anchoredRow).not.toBeNull();
+  expect(Number.parseFloat(anchoredRow?.style.top ?? '0') - viewport.scrollTop).toBe(anchorOffset);
+  expect(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop).toBeGreaterThan(600);
 });

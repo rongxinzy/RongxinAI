@@ -7,12 +7,12 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { ConversationViewportProvider } from '@shared/components/ai-elements/useConversationViewport';
 
 import type { ConversationTurn } from '../helpers/messageGrouping';
-import { VirtualizedTurnList } from './VirtualizedTurnList';
+import { VirtualizedTurnList, type VirtualizedTurnListProps } from './VirtualizedTurnList';
 
 const mocks = vi.hoisted(() => ({
   elementScroll: vi.fn(),
   measureElement: vi.fn(),
-  scrollRef: { current: null as HTMLElement | null },
+  scrollRef: { current: null as HTMLDivElement | null },
   scrollToEnd: vi.fn(),
   scrollToIndex: vi.fn(),
   useVirtualizer: vi.fn(),
@@ -35,7 +35,7 @@ const makeViewportValue = () => ({
   scrollToBottom: vi.fn(),
 });
 
-const renderList = (props: Record<string, unknown>) =>
+const renderList = (props: VirtualizedTurnListProps & { key?: string }) =>
   render(
     React.createElement(
       ConversationViewportProvider,
@@ -46,7 +46,7 @@ const renderList = (props: Record<string, unknown>) =>
 
 const rerenderList = (
   view: ReturnType<typeof render>,
-  props: Record<string, unknown>,
+  props: VirtualizedTurnListProps & { key?: string },
 ) => {
   view.rerender(
     React.createElement(
