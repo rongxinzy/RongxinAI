@@ -6,6 +6,7 @@ import type {
   LlamaCppModelLaunchLogSource,
   LlamaCppMemoryPolicy,
   LlamaCppModelResidencyMode,
+  LlamaCppOrchestrator,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppServiceConfigFieldKey,
@@ -293,6 +294,8 @@ export type LlamaCppServiceConfig = {
   listenHost?: string;
   port?: string;
   gatewayAccessMode?: LlamaCppGatewayAccessMode;
+  /** Local inference process orchestration; defaults to router when unset. */
+  orchestrator?: LlamaCppOrchestrator;
   modelsDir?: string;
   runtimeVersion?: string;
   runtimeBackend?: LlamaCppRuntimeBackend;

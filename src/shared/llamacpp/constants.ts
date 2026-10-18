@@ -99,6 +99,13 @@ export const LlamaCppGatewayAccessMode = {
 export type LlamaCppGatewayAccessMode =
   (typeof LlamaCppGatewayAccessMode)[keyof typeof LlamaCppGatewayAccessMode];
 
+export const LlamaCppOrchestrator = {
+  Router: 'router',
+  Daemon: 'daemon',
+} as const;
+
+export type LlamaCppOrchestrator = (typeof LlamaCppOrchestrator)[keyof typeof LlamaCppOrchestrator];
+
 export const LlamaCppModelResidencyMode = {
   Timed: 'timed',
   Forever: 'forever',

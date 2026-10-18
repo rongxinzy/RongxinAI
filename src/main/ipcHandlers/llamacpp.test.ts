@@ -6,6 +6,7 @@ import {
   LlamaCppRuntimeCudaMajor,
   LlamaCppMemoryPolicy,
   LlamaCppModelResidencyMode,
+  LlamaCppOrchestrator,
 } from '../../shared/llamacpp';
 import { ModelCapabilityStatus } from '../../shared/providers';
 import type { LlamaCppManager } from '../libs/llamacppManager';
@@ -180,6 +181,7 @@ test('getLlamaCppServiceConfig maps legacy listen-all host to listenHost while k
     host: '127.0.0.1',
     listenHost: '0.0.0.0',
     port: '8080',
+    orchestrator: LlamaCppOrchestrator.Router,
     modelsMax: '3',
     keepRunningOnAppQuit: true,
     timeout: '120',
@@ -400,6 +402,7 @@ test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not 
   expect(getLlamaCppServiceConfig(store)).toEqual({
     host: '127.0.0.1',
     port: '8080',
+    orchestrator: LlamaCppOrchestrator.Router,
     modelsMax: '1',
     keepRunningOnAppQuit: true,
     timeout: '120',
@@ -448,9 +451,10 @@ test('does not subscribe to obsolete manager status events', async () => {
     .mockResolvedValue([]);
   const manager = {
     on: vi.fn(() => manager),
+    getModelsDir: vi.fn(() => '/tmp/models'),
   } as unknown as LlamaCppManager;
   const store = {
-    get: vi.fn(() => undefined),
+    get: vi.fn(() => ({ orchestrator: 'daemon' })),
     set: vi.fn(),
   };
 
@@ -458,12 +462,11 @@ test('does not subscribe to obsolete manager status events', async () => {
     getStore: () => store as never,
   });
 
-  await Promise.resolve();
+  await vi.waitFor(() => expect(daemonListRunningModels).toHaveBeenCalledOnce());
 
   expect(manager.on).toHaveBeenCalledWith('install-progress', expect.any(Function));
   expect(manager.on).not.toHaveBeenCalledWith('status', expect.any(Function));
   expect(reconnect).toHaveBeenCalledOnce();
-  expect(daemonListRunningModels).toHaveBeenCalledOnce();
 });
 
 test('retries startup binding synchronization until an automatically loaded model is available', async () => {
@@ -509,6 +512,7 @@ test('synchronizes running models and notifies renderers after service startup',
   electronMocks.windows.push({ isDestroyed: () => false, webContents: { send } });
   const manager = {
     on: vi.fn(() => manager),
+    getModelsDir: vi.fn(() => '/tmp/models'),
     start: vi.fn(async () => ({ status: 'running', checkedAt: new Date(0).toISOString() })),
     listRunningModels: vi.fn(async () => [
       { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
@@ -516,7 +520,7 @@ test('synchronizes running models and notifies renderers after service startup',
     client: vi.fn(async () => ({ showModel: vi.fn(async () => ({})) })),
   } as unknown as LlamaCppManager;
   const store = {
-    get: vi.fn(() => undefined),
+    get: vi.fn(() => ({ orchestrator: 'daemon' })),
     set: vi.fn(),
   };
   const onModelBindingsChanged = vi.fn();
@@ -553,13 +557,14 @@ test('synchronizes current running models when model bindings are refreshed', as
   electronMocks.handlers.clear();
   const manager = {
     on: vi.fn(() => manager),
+    getModelsDir: vi.fn(() => '/tmp/models'),
     listRunningModels: vi.fn(async () => [
       { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
     ]),
     client: vi.fn(async () => ({ showModel: vi.fn(async () => ({})) })),
   } as unknown as LlamaCppManager;
   const store = {
-    get: vi.fn(() => undefined),
+    get: vi.fn(() => ({ orchestrator: 'daemon' })),
     set: vi.fn(),
   };
   const onModelBindingsChanged = vi.fn();
@@ -591,13 +596,17 @@ test('preserves model bindings when the running-model query temporarily fails', 
   electronMocks.windows.length = 0;
   const manager = {
     on: vi.fn(() => manager),
+    getModelsDir: vi.fn(() => '/tmp/models'),
     start: vi.fn(async () => ({ status: 'running', checkedAt: new Date(0).toISOString() })),
     listRunningModels: vi.fn(async () => {
       throw new Error('temporary connection failure');
     }),
   } as unknown as LlamaCppManager;
   const store = {
-    get: vi.fn(() => ({ providers: { llamacpp: { models: [{ id: 'qwen-local' }] } } })),
+    get: vi.fn(() => ({
+      orchestrator: 'daemon',
+      providers: { llamacpp: { models: [{ id: 'qwen-local' }] } },
+    })),
     set: vi.fn(),
   };
   vi.spyOn(LlamaCppModelDaemonController.prototype, 'reconnect').mockResolvedValue(null);
@@ -628,6 +637,7 @@ test('waits for runtime install cleanup before confirming cancellation', async (
   const manager = {} as LlamaCppManager;
   Object.assign(manager, {
     on: vi.fn(() => manager),
+    getModelsDir: vi.fn(() => '/tmp/models'),
     installRuntime: vi.fn(
       ({ signal }: { signal: AbortSignal }) =>
         new Promise<{ success: false; cancelled: true }>(resolve => {
@@ -643,7 +653,7 @@ test('waits for runtime install cleanup before confirming cancellation', async (
     ),
   });
   const store = {
-    get: vi.fn(() => undefined),
+    get: vi.fn(() => ({ orchestrator: 'daemon' })),
     set: vi.fn(),
   };
 

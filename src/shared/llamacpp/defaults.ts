@@ -1,5 +1,5 @@
 import type { NvidiaSmiSnapshot } from '../hardware';
-import { LlamaCppMemoryPolicy } from './constants';
+import { LlamaCppMemoryPolicy, LlamaCppOrchestrator } from './constants';
 import { LlamaCppKvCacheType } from './kvCacheTypes';
 import type { LlamaCppServiceConfig } from './types';
 
@@ -8,6 +8,7 @@ const LLAMACPP_DEFAULT_CONTEXT_HIGH_VRAM_MIB = 20 * 1024;
 export const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {
   host: '127.0.0.1',
   port: '8080',
+  orchestrator: LlamaCppOrchestrator.Router,
   modelsMax: '3',
   keepRunningOnAppQuit: true,
   timeout: '120',

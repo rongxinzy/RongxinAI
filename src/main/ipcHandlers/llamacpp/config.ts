@@ -6,6 +6,7 @@ import {
   LLAMACPP_GPU_LAYERS_MAX,
   LLAMACPP_STRUCTURED_INTEGER_RANGES,
   LlamaCppGatewayAccessMode,
+  LlamaCppOrchestrator,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppMemoryPolicy,
@@ -289,6 +290,11 @@ export function sanitizeLlamaCppServiceConfig(
   const host = config?.host?.trim();
   const listenHost = config?.listenHost?.trim();
   const gatewayAccessMode = config?.gatewayAccessMode;
+  // Absent or invalid values stay absent: the orchestrator mode is resolved to
+  // router at consumption sites, so snapshots do not churn with the default.
+  const orchestrator = isLlamaCppOrchestrator(config?.orchestrator)
+    ? config.orchestrator
+    : undefined;
   const port = normalizeIntegerString(config?.port);
   const modelsDir = config?.modelsDir?.trim();
   const runtimeVersion = config?.runtimeVersion?.trim();
@@ -391,6 +397,7 @@ export function sanitizeLlamaCppServiceConfig(
   ) {
     next.gatewayAccessMode = gatewayAccessMode;
   }
+  if (orchestrator) next.orchestrator = orchestrator;
   if (port) next.port = port;
   if (modelsDir) next.modelsDir = modelsDir;
   if (runtimeVersion && /^b\d+(?:-[a-f0-9]+)?$/i.test(runtimeVersion))
@@ -665,6 +672,10 @@ function isRuntimeCudaMajor(
 function isLlamaCppKvCacheType(value: unknown): value is string {
   if (typeof value !== 'string' || !value.trim()) return false;
   return normalizeLlamaCppKvCacheType(value) === value.trim().toLowerCase();
+}
+
+function isLlamaCppOrchestrator(value: unknown): value is LlamaCppOrchestrator {
+  return value === LlamaCppOrchestrator.Router || value === LlamaCppOrchestrator.Daemon;
 }
 
 function isReasoningFormat(

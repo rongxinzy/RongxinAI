@@ -21,6 +21,7 @@ import {
   type LlamaCppModelDaemonStatus,
 } from './llamacppModelDaemonProtocol';
 import { LlamaCppGatewayCredentialVault } from './llamacppGatewayCredentialVault';
+import type { LlamaCppModelOrchestrator } from './llamacppModelOrchestrator';
 import { findLlamaCppExecutable } from './llamacppRuntimePaths';
 
 const CONTROL_CONNECT_TIMEOUT_MS = 1_000;
@@ -77,7 +78,7 @@ type KeyValueStore = {
   delete(key: string): void;
 };
 
-export class LlamaCppModelDaemonController {
+export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator {
   private readonly credentials: LlamaCppGatewayCredentialVault;
   private controlPort: number | null = null;
   private lastStatus: LlamaCppModelDaemonStatus | null = null;

@@ -85,9 +85,9 @@ const runAppCleanup = async (): Promise<void> => {
     });
   }
 
-  if (rt.llamaCppModelDaemonController) {
-    await rt.llamaCppModelDaemonController.shutdownForQuit().catch(error => {
-      console.error('[LlamaCppDaemon] Failed to stop local inference daemon on quit:', error);
+  if (rt.llamaCppModelOrchestrator) {
+    await rt.llamaCppModelOrchestrator.shutdownForQuit().catch(error => {
+      console.error('[LlamaCpp] Failed to stop local inference orchestrator on quit:', error);
     });
   }
 
