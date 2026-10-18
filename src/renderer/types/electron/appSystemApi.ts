@@ -59,7 +59,10 @@ export interface ShellApi {
   showItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
   openHtmlInBrowser: (htmlContent: string) => Promise<{ success: boolean; error?: string }>;
-  pathExists: (filePath: string) => Promise<{ success: boolean; exists: boolean; error?: string }>;
+  resolveLocalPath: (
+    candidate: string,
+    cwd?: string,
+  ) => Promise<{ path: string | null; error?: string }>;
 }
 
 export interface AppInfoApi {

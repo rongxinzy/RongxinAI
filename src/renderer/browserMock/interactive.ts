@@ -372,6 +372,10 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       selectFiles: () => Promise.resolve({ success: true, paths: [`${PREVIEW_ROOT}/notes.md`] }),
       showMessageBox: () => Promise.resolve({ response: 0 }),
     },
+    shell: {
+      // 浏览器预览无真实文件系统；本地路径一律按「未解析」处理，渲染为普通文本。
+      resolveLocalPath: () => Promise.resolve({ path: null }),
+    },
     project: {
       getDefaultBaseDir: () => Promise.resolve({ success: true, path: '/home/user/projects' }),
       createDirectory: ({ name }: { name: string }) =>

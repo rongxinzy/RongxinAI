@@ -53,7 +53,6 @@ import {
   buildDisplayItems,
   hasActiveTurnStreamingContent,
 } from './helpers/messageGrouping';
-import { resolveLocalFilePath } from './helpers/pathUtils';
 import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
@@ -199,10 +198,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // lastMessageContent is sourced from the memoized selector
   // (selectLastMessageContent), so there is no need to derive it here.
 
-  const resolveSessionLocalFilePath = useCallback(
-    (href: string, text: string) => resolveLocalFilePath(href, text, currentSession?.cwd),
-    [currentSession?.cwd],
-  );
+  const sessionCwd = currentSession?.cwd;
 
   const mapDisplayText = useCallback((value: string): string => {
     return value;
@@ -327,7 +323,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <TurnBlock
                 turn={turn}
                 artifacts={turnArtifacts}
-                resolveLocalFilePath={resolveSessionLocalFilePath}
+                cwd={sessionCwd}
                 mapDisplayText={mapDisplayText}
                 showTypingIndicator={showTypingIndicator}
                 toolActivities={isLastTurn ? toolActivities : undefined}

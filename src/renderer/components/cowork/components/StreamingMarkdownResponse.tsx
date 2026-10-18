@@ -14,109 +14,102 @@ import { MessageResponse } from '@shared/components/ai-elements/message';
 import { useStreamingTextSegments } from '@shared/components/ai-elements/streamingText';
 
 import type { StreamingTextSegments } from '@shared/components/ai-elements/streamingText';
-import type { ComponentProps, MouseEvent } from 'react';
-import { useContext, useEffect, useMemo, useState } from 'react';
+import type { ComponentProps, MouseEvent, ReactNode } from 'react';
+import { useContext, useMemo, useState } from 'react';
 import { StreamdownContext } from 'streamdown';
 
-import {
-  checkPathExistsCached,
-  getCachedPathExists,
-  linkifyLocalPathsInMarkdown,
-  parseLocalPathHref,
-  resolveOpenableLocalPath,
-} from '../helpers/localFilePathLinks';
+import { isLocalPathCandidate, useResolvedLocalPath } from '../../../services/useResolvedLocalPath';
 
-type AnchorProps = ComponentProps<'a'> & { node?: unknown };
+const EXTERNAL_LINK_PATTERN = /^(https?|mailto|tel):/i;
 
-const LocalAwareAnchor = ({
-  href,
-  children,
-  className,
-  resolveLocalFilePath,
-  skipPathExistsCheck = false,
-  ...props
-}: AnchorProps & {
-  resolveLocalFilePath?: (href: string, text: string) => string | null;
-  /** 流式输出时跳过 pathExists IPC，避免每个 token 打主进程把 UI 拖死。 */
-  skipPathExistsCheck?: boolean;
-}) => {
-  const text = Array.isArray(children)
+const isExternalHref = (href: string): boolean => EXTERNAL_LINK_PATTERN.test(href);
+
+const nodeToText = (children: ReactNode): string =>
+  Array.isArray(children)
     ? children.map(child => (typeof child === 'string' ? child : '')).join('')
     : typeof children === 'string'
       ? children
       : '';
-  const localPath = resolveOpenableLocalPath(href, text, resolveLocalFilePath);
-  const syntheticPath = !localPath && href ? parseLocalPathHref(href) : null;
-  const candidatePath = localPath ?? syntheticPath;
-  const { linkSafety } = useContext(StreamdownContext);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const cached =
-    candidatePath && !skipPathExistsCheck ? getCachedPathExists(candidatePath) : undefined;
-  // null = 检查中：先当普通文本，避免 1.42GB / 不存在文件误高亮
-  const [exists, setExists] = useState<boolean | null>(
-    candidatePath && !skipPathExistsCheck ? (cached !== undefined ? cached : null) : false,
-  );
 
-  useEffect(() => {
-    let cancelled = false;
-    if (!candidatePath || skipPathExistsCheck) {
-      setExists(false);
-      return;
-    }
-    const currentCached = getCachedPathExists(candidatePath);
-    if (currentCached !== undefined) {
-      setExists(currentCached);
-      return;
-    }
-    setExists(null);
-    void checkPathExistsCached(candidatePath)
-      .then(result => {
-        if (!cancelled) setExists(result);
-      })
-      .catch(() => {
-        if (!cancelled) setExists(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [candidatePath, skipPathExistsCheck]);
+type AnchorProps = ComponentProps<'a'> & { node?: unknown };
+type InlineCodeProps = ComponentProps<'code'> & { node?: unknown };
 
-  // 2026/09/20 lixiang  仅磁盘上存在的文件才主题色+下划线+可点（issue #805）
-  if (candidatePath && exists === true) {
-    const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
+/** 打开本地文件：失败时退回在文件夹中显示（issue #805）。 */
+const openLocalPath = async (filePath: string): Promise<void> => {
+  try {
+    const openResult = await window.electron.shell.openPath(filePath);
+    if (openResult?.success) return;
+    const revealResult = await window.electron.shell.showItemInFolder(filePath);
+    if (!revealResult?.success) {
+      console.error(
+        '[Cowork] Failed to open local path:',
+        filePath,
+        openResult?.error ?? revealResult?.error,
+      );
+    }
+  } catch (error) {
+    console.error('[Cowork] Failed to open local path:', filePath, error);
+  }
+};
+
+const LocalPathButton = ({ filePath, children }: { filePath: string; children: ReactNode }) => (
+  <button
+    type="button"
+    className="theme-surface-markdown-link cursor-pointer break-all appearance-none bg-transparent p-0 text-left font-inherit"
+    title={filePath}
+    data-local-path={filePath}
+    onClick={(event: MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
       event.stopPropagation();
-      try {
-        const openResult = await window.electron.shell.openPath(candidatePath);
-        if (openResult?.success) return;
-        const revealResult = await window.electron.shell.showItemInFolder(candidatePath);
-        if (!revealResult?.success) {
-          console.error(
-            '[Cowork] Failed to open local path:',
-            candidatePath,
-            openResult?.error ?? revealResult?.error,
-          );
-        }
-      } catch (error) {
-        console.error('[Cowork] Failed to open local path:', candidatePath, error);
-      }
-    };
+      void openLocalPath(filePath);
+    }}
+  >
+    {children}
+  </button>
+);
+
+/**
+ * Inline code 候选：内容整体是单行 path-looking 字符串才询问主进程；
+ * 解析成功渲染为可点按钮，失败保持普通 inline code 外观。
+ */
+const LocalAwareInlineCode = ({
+  children,
+  cwd,
+  enabled,
+  ...props
+}: InlineCodeProps & { cwd: string | undefined; enabled: boolean }) => {
+  const text = nodeToText(children);
+  const resolved = useResolvedLocalPath(isLocalPathCandidate(text) ? text : null, cwd, enabled);
+  if (resolved) {
     return (
-      <button
-        type="button"
-        className="theme-surface-markdown-link cursor-pointer break-all appearance-none bg-transparent p-0 text-left font-inherit"
-        title={candidatePath}
-        data-local-path={candidatePath}
-        onClick={handleClick}
-      >
-        {children}
-      </button>
+      <LocalPathButton filePath={resolved}>
+        <code {...props}>{children}</code>
+      </LocalPathButton>
     );
   }
+  return <code {...props}>{children}</code>;
+};
 
-  if (candidatePath) {
-    // 检查中或不存在：保持纯文本，不套链接样式
-    return <span className="break-all">{children}</span>;
+/**
+ * 链接候选：href 非 http(s)/mailto/tel（含 file:// 与相对路径）时询问主进程；
+ * 解析成功作为本地文件打开，否则交给 Streamdown linkSafety / 普通锚点。
+ */
+const LocalAwareAnchor = ({
+  href,
+  children,
+  className,
+  cwd,
+  enabled,
+  ...props
+}: AnchorProps & { cwd: string | undefined; enabled: boolean }) => {
+  const hrefValue = typeof href === 'string' ? href.trim() : '';
+  const candidate = hrefValue && !isExternalHref(hrefValue) ? hrefValue : null;
+  const resolved = useResolvedLocalPath(candidate, cwd, enabled);
+  const { linkSafety } = useContext(StreamdownContext);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  if (resolved) {
+    return <LocalPathButton filePath={resolved}>{children}</LocalPathButton>;
   }
 
   // 外链：复用 Streamdown linkSafety（确认弹窗）
@@ -162,37 +155,25 @@ const LocalAwareAnchor = ({
   );
 };
 
-const buildAnchorComponent = (
-  resolveLocalFilePath?: (href: string, text: string) => string | null,
-  skipPathExistsCheck = false,
-) => {
-  const Anchor = (props: AnchorProps) => (
-    <LocalAwareAnchor
-      {...props}
-      resolveLocalFilePath={resolveLocalFilePath}
-      skipPathExistsCheck={skipPathExistsCheck}
-    />
-  );
-  return Anchor;
-};
-
 const StaticMarkdownBlock = ({
   content,
-  resolveLocalFilePath,
-  skipPathExistsCheck,
+  cwd,
+  enabled,
 }: {
   content: string;
-  resolveLocalFilePath?: (href: string, text: string) => string | null;
-  skipPathExistsCheck?: boolean;
+  cwd: string | undefined;
+  enabled: boolean;
 }) => {
-  // Committed Markdown only changes when a block closes; avoid re-running the
-  // path regex on every streaming frame.
-  const prepared = useMemo(() => linkifyLocalPathsInMarkdown(content), [content]);
   const components = useMemo(
-    () => ({ a: buildAnchorComponent(resolveLocalFilePath, skipPathExistsCheck) }),
-    [resolveLocalFilePath, skipPathExistsCheck],
+    () => ({
+      a: (props: AnchorProps) => <LocalAwareAnchor {...props} cwd={cwd} enabled={enabled} />,
+      inlineCode: (props: InlineCodeProps) => (
+        <LocalAwareInlineCode {...props} cwd={cwd} enabled={enabled} />
+      ),
+    }),
+    [cwd, enabled],
   );
-  return <MessageResponse components={components}>{prepared}</MessageResponse>;
+  return <MessageResponse components={components}>{content}</MessageResponse>;
 };
 
 /** 流式尾段：纯文本，不做 Markdown/Shiki 重解析。 */
@@ -203,18 +184,17 @@ const StreamingPlainTail = ({ content }: { content: string }) => (
 export const StreamingMarkdownResponse = ({
   content,
   isStreaming,
-  resolveLocalFilePath,
+  cwd,
 }: {
   content: string;
   isStreaming: boolean;
-  resolveLocalFilePath?: (href: string, text: string) => string | null;
+  cwd?: string;
 }) => {
   const { committed, tail }: StreamingTextSegments = useStreamingTextSegments(content, isStreaming);
-  const resolve = useMemo(() => resolveLocalFilePath, [resolveLocalFilePath]);
 
-  // 流结束后整段走完整 Markdown（含代码高亮 / 本地路径检查）。
+  // 流结束后整段走完整 Markdown（含代码高亮 / 本地路径解析）。
   if (!isStreaming) {
-    return <StaticMarkdownBlock content={content} resolveLocalFilePath={resolve} />;
+    return <StaticMarkdownBlock content={content} cwd={cwd} enabled />;
   }
 
   // 流式中：只对已闭合的稳定块跑 Streamdown；正在增长的 tail 用纯文本。
@@ -226,11 +206,8 @@ export const StreamingMarkdownResponse = ({
   return (
     <div className="flex flex-col gap-4">
       {committed ? (
-        <StaticMarkdownBlock
-          content={committed}
-          resolveLocalFilePath={resolve}
-          skipPathExistsCheck
-        />
+        // 流式中的已提交块不发本地路径 IPC，流结束后统一解析。
+        <StaticMarkdownBlock content={committed} cwd={cwd} enabled={false} />
       ) : null}
       {tail ? <StreamingPlainTail content={tail} /> : null}
     </div>
