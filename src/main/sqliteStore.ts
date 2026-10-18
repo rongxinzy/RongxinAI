@@ -2,32 +2,17 @@ import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 
-import {
-  AgentId,
-  DefaultAgentAvatarIcon,
-  DefaultAgentProfile,
-  LegacyAgentName,
-  normalizeAgentAvatarIcon,
-} from '../shared/agent';
-import { CoworkScheduledSessionTitlePrefix, CoworkSessionSource } from '../shared/cowork/constants';
 import { DB_FILENAME } from './appConstants';
-import { migrateScheduledSessionTitles } from './scheduledSessionTitles/migration';
-import {
-  initializeArtifactLedgerSchema,
-  migrateLegacyArtifactsToLedger,
-} from './artifactLedger/schema';
-import { normalizeArtifactKeyPath } from './artifactLedger/artifactLedger';
 import {
   openSqliteDatabaseWithRecovery,
   SqliteBackupManager,
 } from './libs/sqliteBackup/sqliteBackupManager';
+import { applyCoreSchema } from './coreSchema';
 import { initializeWorkbenchTaskSchema } from './workbenchTask/schema';
 import { initializeCodingAgentSchema } from './codingAgent/schema';
 import { initializeTodoSchema } from './todo/schema';
-import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 type ChangePayload<T = unknown> = {
   key: string;
@@ -35,13 +20,10 @@ type ChangePayload<T = unknown> = {
   oldValue: T | undefined;
 };
 
-const AGENT_WORKING_DIRECTORY_BACKFILL_KEY = 'agents.workingDirectoryBackfill.v1.completed';
-
 export class SqliteStore {
   private db: Database.Database;
   private dbPath: string;
   private emitter = new EventEmitter();
-  private didRunMigration = false;
 
   private constructor(db: Database.Database, dbPath: string) {
     this.db = db;
@@ -82,486 +64,10 @@ export class SqliteStore {
   }
 
   private initializeTables(basePath: string) {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS kv (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-
-    // Create cowork tables
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS cowork_sessions (
-        id TEXT PRIMARY KEY,
-        title TEXT NOT NULL,
-        title_user_renamed INTEGER NOT NULL DEFAULT 0,
-        status TEXT NOT NULL DEFAULT 'idle',
-        pinned INTEGER NOT NULL DEFAULT 0,
-        pin_order INTEGER,
-        cwd TEXT NOT NULL,
-        system_prompt TEXT NOT NULL DEFAULT '',
-        model_override TEXT NOT NULL DEFAULT '',
-        execution_mode TEXT,
-        workspace_id TEXT,
-        source TEXT NOT NULL DEFAULT '${CoworkSessionSource.Manual}',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-
-    const sessionColumns = this.db.pragma('table_info(cowork_sessions)') as Array<{
-      name: string;
-    }>;
-    if (!sessionColumns.some(column => column.name === 'source')) {
-      this.db.transaction(() => {
-        this.db.exec(`
-          ALTER TABLE cowork_sessions
-          ADD COLUMN source TEXT NOT NULL DEFAULT '${CoworkSessionSource.Manual}';
-        `);
-        const prefixes = Object.values(CoworkScheduledSessionTitlePrefix);
-        this.db
-          .prepare(
-            `
-              UPDATE cowork_sessions
-              SET source = ?
-              WHERE ${prefixes.map(() => 'TRIM(title) LIKE ?').join(' OR ')}
-            `,
-          )
-          .run(CoworkSessionSource.Scheduled, ...prefixes.map(prefix => `${prefix}%`));
-      })();
-    }
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS workspaces (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        path TEXT NOT NULL,
-        is_hidden INTEGER NOT NULL DEFAULT 0,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-    this.migrateWorkspacePathUniqueness();
-    this.db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);');
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS workspace_folders (
-        workspace_id TEXT NOT NULL,
-        path TEXT NOT NULL,
-        position INTEGER NOT NULL DEFAULT 0,
-        PRIMARY KEY (workspace_id, path)
-      );
-    `);
-    this.db.exec(
-      'CREATE INDEX IF NOT EXISTS idx_workspace_folders_workspace ON workspace_folders(workspace_id);',
-    );
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS cowork_messages (
-        id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
-        type TEXT NOT NULL,
-        content TEXT NOT NULL,
-        metadata TEXT,
-        created_at INTEGER NOT NULL,
-        sequence INTEGER,
-        FOREIGN KEY (session_id) REFERENCES cowork_sessions(id) ON DELETE CASCADE
-      );
-    `);
-
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_cowork_messages_session_id ON cowork_messages(session_id);
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS cowork_session_experts (
-        session_id TEXT NOT NULL,
-        expert_id TEXT NOT NULL,
-        package_id TEXT NOT NULL,
-        expert_name TEXT NOT NULL,
-        source TEXT NOT NULL,
-        prompt_snapshot TEXT NOT NULL,
-        skill_ids TEXT NOT NULL DEFAULT '[]',
-        capability_policy TEXT NOT NULL DEFAULT '{}',
-        content_hash TEXT NOT NULL DEFAULT '',
-        created_at INTEGER NOT NULL,
-        PRIMARY KEY (session_id, expert_id),
-        FOREIGN KEY (session_id) REFERENCES cowork_sessions(id) ON DELETE CASCADE
-      );
-    `);
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_cowork_session_experts_session_id
-      ON cowork_session_experts(session_id, created_at);
-    `);
-
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS cowork_config (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-
+    applyCoreSchema(this.db);
     initializeWorkbenchTaskSchema(this.db);
     initializeCodingAgentSchema(this.db);
     initializeTodoSchema(this.db);
-
-    // Create agents table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS agents (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        description TEXT NOT NULL DEFAULT '',
-        system_prompt TEXT NOT NULL DEFAULT '',
-        identity TEXT NOT NULL DEFAULT '',
-        model TEXT NOT NULL DEFAULT '',
-        working_directory TEXT NOT NULL DEFAULT '',
-        icon TEXT NOT NULL DEFAULT '',
-        skill_ids TEXT NOT NULL DEFAULT '[]',
-        mcp_ids TEXT NOT NULL DEFAULT '[]',
-        enabled INTEGER NOT NULL DEFAULT 1,
-        pinned INTEGER NOT NULL DEFAULT 0,
-        pin_order INTEGER,
-        is_default INTEGER NOT NULL DEFAULT 0,
-        source TEXT NOT NULL DEFAULT 'custom',
-        preset_id TEXT NOT NULL DEFAULT '',
-        triage_override TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-
-    // Create MCP servers table
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS mcp_servers (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL UNIQUE,
-        description TEXT NOT NULL DEFAULT '',
-        enabled INTEGER NOT NULL DEFAULT 0,
-        transport_type TEXT NOT NULL DEFAULT 'stdio',
-        config_json TEXT NOT NULL DEFAULT '{}',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      );
-    `);
-
-    // Migrations - safely add columns if they don't exist
-    try {
-      // Check if execution_mode column exists
-      const columns = this.db.pragma('table_info(cowork_sessions)') as Array<{ name: string }>;
-      const colNames = columns.map(c => c.name);
-
-      if (!colNames.includes('execution_mode')) {
-        this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN execution_mode TEXT;');
-        this.didRunMigration = true;
-      }
-
-      if (!colNames.includes('title_user_renamed')) {
-        this.db.exec(
-          'ALTER TABLE cowork_sessions ADD COLUMN title_user_renamed INTEGER NOT NULL DEFAULT 0;',
-        );
-        this.didRunMigration = true;
-      }
-
-      if (!colNames.includes('pinned')) {
-        this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;');
-        this.didRunMigration = true;
-      }
-
-      if (!colNames.includes('pin_order')) {
-        this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN pin_order INTEGER;');
-        this.didRunMigration = true;
-      }
-
-      if (!colNames.includes('active_skill_ids')) {
-        this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN active_skill_ids TEXT;');
-        this.didRunMigration = true;
-      }
-
-      if (!colNames.includes('model_override')) {
-        this.db.exec(
-          "ALTER TABLE cowork_sessions ADD COLUMN model_override TEXT NOT NULL DEFAULT '';",
-        );
-        this.didRunMigration = true;
-      }
-
-      // Migration: Add sequence column to cowork_messages
-      const msgColumns = this.db.pragma('table_info(cowork_messages)') as Array<{ name: string }>;
-      const msgColNames = msgColumns.map(c => c.name);
-
-      if (!msgColNames.includes('sequence')) {
-        this.db.exec('ALTER TABLE cowork_messages ADD COLUMN sequence INTEGER');
-        this.didRunMigration = true;
-
-        // Assign sequence numbers to existing messages ordered by created_at + ROWID
-        this.db.exec(`
-          WITH numbered AS (
-            SELECT id, ROW_NUMBER() OVER (
-              PARTITION BY session_id
-              ORDER BY created_at ASC, ROWID ASC
-            ) as seq
-            FROM cowork_messages
-          )
-          UPDATE cowork_messages
-          SET sequence = (SELECT seq FROM numbered WHERE numbered.id = cowork_messages.id)
-        `);
-      }
-    } catch {
-      // Column already exists or migration not needed.
-    }
-
-    // Drives every ORDER BY COALESCE(sequence, created_at) read of the messages
-    // table (session open, UI history paging, restore tail reads). Without it
-    // each of those queries re-sorts the whole session in a temp b-tree. Must
-    // stay below the sequence-column migration: on legacy databases the column
-    // does not exist until that ALTER TABLE, and creating the index earlier
-    // fails with "no such column: sequence".
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_cowork_messages_session_order
-      ON cowork_messages(session_id, COALESCE(sequence, created_at), created_at);
-    `);
-    initializeArtifactLedgerSchema(this.db);
-    migrateLegacyArtifactsToLedger(this.db, normalizeArtifactKeyPath);
-
-    try {
-      const pinnedResult = this.db
-        .prepare('UPDATE cowork_sessions SET pinned = 0 WHERE pinned IS NULL;')
-        .run();
-      const pinOrderResult = this.db
-        .prepare(
-          'UPDATE cowork_sessions SET pin_order = updated_at WHERE pinned = 1 AND pin_order IS NULL;',
-        )
-        .run();
-      const unpinnedResult = this.db
-        .prepare(
-          'UPDATE cowork_sessions SET pin_order = NULL WHERE pinned = 0 AND pin_order IS NOT NULL;',
-        )
-        .run();
-      if (pinnedResult.changes > 0 || pinOrderResult.changes > 0 || unpinnedResult.changes > 0) {
-        this.didRunMigration = true;
-      }
-    } catch {
-      // Column might not exist yet.
-    }
-
-    // Migration: Add agent_id column to cowork_sessions
-    try {
-      const workspaceCols = this.db.pragma('table_info(workspaces)') as Array<{ name: string }>;
-      if (!workspaceCols.some(column => column.name === 'is_hidden')) {
-        this.db.exec('ALTER TABLE workspaces ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0;');
-        this.didRunMigration = true;
-      }
-
-      const sessionCols = this.db.pragma('table_info(cowork_sessions)') as Array<{ name: string }>;
-      const sessionColNames = sessionCols.map(c => c.name);
-      if (!sessionColNames.includes('agent_id')) {
-        this.db.exec(
-          "ALTER TABLE cowork_sessions ADD COLUMN agent_id TEXT NOT NULL DEFAULT 'main';",
-        );
-        this.didRunMigration = true;
-      }
-      if (!sessionColNames.includes('mode')) {
-        this.db.exec("ALTER TABLE cowork_sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'work';");
-        this.didRunMigration = true;
-      }
-      if (!sessionColNames.includes('workspace_id')) {
-        this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN workspace_id TEXT;');
-        this.didRunMigration = true;
-      }
-
-      const fallbackWorkspacePath = path.join(os.homedir(), 'zhiyuan', 'project');
-      const legacySessions = this.db
-        .prepare(
-          "SELECT id, cwd FROM cowork_sessions WHERE workspace_id IS NULL OR TRIM(workspace_id) = ''",
-        )
-        .all() as Array<{ id: string; cwd: string }>;
-      const insertWorkspace = this.db.prepare(
-        `INSERT INTO workspaces (id, name, path, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at`,
-      );
-      const updateSessionWorkspace = this.db.prepare(
-        'UPDATE cowork_sessions SET workspace_id = ? WHERE id = ?',
-      );
-      const now = Date.now();
-      const migrateWorkspaces = this.db.transaction(() => {
-        for (const session of legacySessions) {
-          const workspacePath = normalizeWorkspacePath(
-            session.cwd?.trim() || fallbackWorkspacePath,
-          );
-          const workspaceId = workspaceIdForPath(workspacePath);
-          insertWorkspace.run(
-            workspaceId,
-            workspaceNameForPath(workspacePath),
-            workspacePath,
-            now,
-            now,
-          );
-          updateSessionWorkspace.run(workspaceId, session.id);
-        }
-      });
-      migrateWorkspaces();
-      if (legacySessions.length > 0) this.didRunMigration = true;
-    } catch {
-      // Column already exists or migration not needed.
-    }
-
-    // Create the index only after legacy databases have received workspace_id.
-    this.db.exec(
-      'CREATE INDEX IF NOT EXISTS idx_cowork_sessions_workspace_id ON cowork_sessions(workspace_id);',
-    );
-
-    // Migration: Add working_directory column to agents
-    try {
-      const agentCols = this.db.pragma('table_info(agents)') as Array<{ name: string }>;
-      const agentColNames = agentCols.map(c => c.name);
-      if (!agentColNames.includes('working_directory')) {
-        this.db.exec("ALTER TABLE agents ADD COLUMN working_directory TEXT NOT NULL DEFAULT '';");
-        this.didRunMigration = true;
-      }
-      if (!agentColNames.includes('pinned')) {
-        this.db.exec('ALTER TABLE agents ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;');
-        this.didRunMigration = true;
-      }
-      if (!agentColNames.includes('pin_order')) {
-        this.db.exec('ALTER TABLE agents ADD COLUMN pin_order INTEGER;');
-        this.didRunMigration = true;
-      }
-      if (!agentColNames.includes('triage_override')) {
-        this.db.exec('ALTER TABLE agents ADD COLUMN triage_override TEXT;');
-        this.didRunMigration = true;
-      }
-      if (!agentColNames.includes('mcp_ids')) {
-        this.db.exec("ALTER TABLE agents ADD COLUMN mcp_ids TEXT NOT NULL DEFAULT '[]';");
-        this.didRunMigration = true;
-      }
-    } catch {
-      // Column already exists or migration not needed.
-    }
-
-    try {
-      const pinnedAgentResult = this.db
-        .prepare('UPDATE agents SET pinned = 0 WHERE pinned IS NULL;')
-        .run();
-      const pinOrderAgentResult = this.db
-        .prepare('UPDATE agents SET pin_order = updated_at WHERE pinned = 1 AND pin_order IS NULL;')
-        .run();
-      const unpinnedAgentResult = this.db
-        .prepare('UPDATE agents SET pin_order = NULL WHERE pinned = 0 AND pin_order IS NOT NULL;')
-        .run();
-      if (
-        pinnedAgentResult.changes > 0 ||
-        pinOrderAgentResult.changes > 0 ||
-        unpinnedAgentResult.changes > 0
-      ) {
-        this.didRunMigration = true;
-      }
-    } catch {
-      // Columns might not exist yet.
-    }
-
-    // Migration: Ensure default agent exists and legacy display values are upgraded.
-    try {
-      const mainAgent = this.db
-        .prepare('SELECT id, name, icon FROM agents WHERE id = ?')
-        .get(AgentId.Main) as { id: string; name: string; icon: string } | undefined;
-      if (!mainAgent) {
-        const now = Date.now();
-        // Read existing systemPrompt from cowork_config to inherit into main agent
-        let existingSystemPrompt = '';
-        try {
-          const spRow = this.db
-            .prepare("SELECT value FROM cowork_config WHERE key = 'systemPrompt'")
-            .get() as { value: string } | undefined;
-          if (spRow?.value) {
-            existingSystemPrompt = spRow.value;
-          }
-        } catch {
-          // No existing systemPrompt
-        }
-        this.db
-          .prepare(
-            `
-          INSERT INTO agents (id, name, description, system_prompt, identity, model, icon, skill_ids, enabled, is_default, source, preset_id, created_at, updated_at)
-          VALUES (?, ?, '', ?, '', '', ?, '[]', 1, 1, 'custom', '', ?, ?)
-        `,
-          )
-          .run(
-            AgentId.Main,
-            DefaultAgentProfile.Name,
-            existingSystemPrompt,
-            DefaultAgentAvatarIcon,
-            now,
-            now,
-          );
-      } else {
-        const normalizedName = mainAgent.name.trim();
-        const shouldUpgradeName =
-          !normalizedName || normalizedName.toLowerCase() === LegacyAgentName.Main;
-        if (shouldUpgradeName) {
-          this.db
-            .prepare('UPDATE agents SET name = ?, updated_at = ? WHERE id = ?')
-            .run(DefaultAgentProfile.Name, Date.now(), AgentId.Main);
-          this.didRunMigration = true;
-        }
-      }
-    } catch (error) {
-      console.warn('[SqliteStore] failed to ensure default agent:', error);
-    }
-
-    // Migration: Replace legacy text/emoji/designed agent icons with the latest SVG avatar format.
-    try {
-      const rows = this.db.prepare('SELECT id, icon FROM agents').all() as Array<{
-        id: string;
-        icon: string;
-      }>;
-      const updates = rows
-        .map(row => ({ id: row.id, icon: normalizeAgentAvatarIcon(row.icon) }))
-        .filter((row, index) => row.icon !== rows[index].icon);
-
-      if (updates.length > 0) {
-        const now = Date.now();
-        const updateIcon = this.db.prepare(
-          'UPDATE agents SET icon = ?, updated_at = ? WHERE id = ?',
-        );
-        const migrateIcons = this.db.transaction((agents: Array<{ id: string; icon: string }>) => {
-          for (const agent of agents) {
-            updateIcon.run(agent.icon, now, agent.id);
-          }
-        });
-        migrateIcons(updates);
-        this.didRunMigration = true;
-      }
-    } catch (error) {
-      console.warn('[SqliteStore] failed to migrate agent avatar icons:', error);
-    }
-
-    // Migration: Backfill agent working directories from the legacy global cwd once.
-    try {
-      if (this.get<string>(AGENT_WORKING_DIRECTORY_BACKFILL_KEY) !== '1') {
-        const cwdRow = this.db
-          .prepare("SELECT value FROM cowork_config WHERE key = 'workingDirectory'")
-          .get() as { value: string } | undefined;
-        const legacyWorkingDirectory = cwdRow?.value?.trim() || '';
-        if (legacyWorkingDirectory) {
-          const result = this.db
-            .prepare(
-              `UPDATE agents
-               SET working_directory = ?, updated_at = ?
-               WHERE TRIM(COALESCE(working_directory, '')) = ''`,
-            )
-            .run(legacyWorkingDirectory, Date.now());
-          if (result.changes > 0) {
-            this.didRunMigration = true;
-          }
-        }
-        this.set(AGENT_WORKING_DIRECTORY_BACKFILL_KEY, '1');
-      }
-    } catch (error) {
-      console.warn('[SqliteStore] failed to backfill agent working directories:', error);
-    }
-
-    this.dropLegacyUserMemoryTables();
-    migrateScheduledSessionTitles(this.db);
     this.migrateFromElectronStore(basePath);
   }
 
@@ -613,47 +119,12 @@ export class SqliteStore {
     this.emitter.emit('change', { key, newValue: undefined, oldValue } as ChangePayload);
   }
 
-  private migrateWorkspacePathUniqueness(): void {
-    const indexes = this.db.pragma('index_list(workspaces)') as Array<{
-      name: string;
-      unique: number;
-    }>;
-    const hasUniquePathIndex = indexes.some(index => {
-      if (index.unique !== 1) return false;
-      const columns = this.db.pragma(`index_info(${index.name})`) as Array<{ name: string }>;
-      return columns.length === 1 && columns[0].name === 'path';
-    });
-    if (!hasUniquePathIndex) return;
-
-    this.db.transaction(() => {
-      this.db.exec(`
-        CREATE TABLE workspaces_rebuilt (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          path TEXT NOT NULL,
-          is_hidden INTEGER NOT NULL DEFAULT 0,
-          created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
-        );
-        INSERT INTO workspaces_rebuilt (id, name, path, is_hidden, created_at, updated_at)
-        SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces;
-        DROP TABLE workspaces;
-        ALTER TABLE workspaces_rebuilt RENAME TO workspaces;
-      `);
-    })();
-    this.didRunMigration = true;
-  }
-
   getDatabase(): Database.Database {
     return this.db;
   }
 
   getDbPath(): string {
     return this.dbPath;
-  }
-
-  getDidRunMigration(): boolean {
-    return this.didRunMigration;
   }
 
   close(): void {
@@ -670,17 +141,6 @@ export class SqliteStore {
       return parsed.sqliteAutoBackupEnabled === true;
     } catch {
       return false;
-    }
-  }
-
-  private dropLegacyUserMemoryTables(): void {
-    try {
-      this.db.exec(`
-        DROP TABLE IF EXISTS user_memory_sources;
-        DROP TABLE IF EXISTS user_memories;
-      `);
-    } catch (error) {
-      console.warn('[SqliteStore] failed to drop legacy user memory tables:', error);
     }
   }
 
@@ -701,8 +161,8 @@ export class SqliteStore {
 
       const now = Date.now();
       const insert = this.db.prepare(`
-        INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)
-      `);
+      INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)
+    `);
       const migrate = this.db.transaction(() => {
         for (const [key, value] of entries) {
           insert.run(key, JSON.stringify(value), now);

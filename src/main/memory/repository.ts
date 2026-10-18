@@ -22,6 +22,9 @@ import {
 } from './constants';
 import { EXPLICIT_MEMORY_SOURCE } from './explicitUserRequestedMemory';
 import { migrateLegacyMemoryTimestamps } from './memoryTimestampMigration';
+import { addColumnIfMissing, runMigrations } from '../sqliteMigrations';
+
+const MEMORY_SCHEMA_SCOPE = 'memory';
 
 export interface MemoryProjectionInput {
   title: string;
@@ -120,7 +123,6 @@ type SqlRow = Record<string, unknown>;
 export class MemoryRepository {
   constructor(private readonly db: Database.Database) {
     this.ensureSchema();
-    migrateLegacyMemoryTimestamps(db);
   }
 
   createLink(input: MemoryLinkInput): string {
@@ -753,20 +755,10 @@ export class MemoryRepository {
       promotion_source_project_id: 'TEXT',
       promotion_source_session_id: 'TEXT',
     };
-    const columns = this.db.prepare('PRAGMA table_info(memory_links)').all() as Array<{
-      name: string;
-    }>;
-    const existing = new Set(columns.map(column => column.name));
     for (const [name, definition] of Object.entries(additions)) {
-      if (!existing.has(name))
-        this.db.exec(`ALTER TABLE memory_links ADD COLUMN ${name} ${definition}`);
+      addColumnIfMissing(this.db, 'memory_links', name, definition);
     }
-    const outboxColumns = this.db.prepare('PRAGMA table_info(memory_outbox)').all() as Array<{
-      name: string;
-    }>;
-    if (!outboxColumns.some(column => column.name === 'link_id')) {
-      this.db.exec('ALTER TABLE memory_outbox ADD COLUMN link_id TEXT');
-    }
+    addColumnIfMissing(this.db, 'memory_outbox', 'link_id', 'TEXT');
     const candidateAdditions: Record<string, string> = {
       project_id: "TEXT NOT NULL DEFAULT 'personal://zhiyuan-agent/user'",
       project_root: "TEXT NOT NULL DEFAULT ''",
@@ -775,17 +767,13 @@ export class MemoryRepository {
       promotion_source_project_id: 'TEXT',
       promotion_source_session_id: 'TEXT',
     };
-    const candidateColumns = this.db
-      .prepare('PRAGMA table_info(memory_candidates)')
-      .all() as Array<{
-      name: string;
-    }>;
-    const existingCandidateColumns = new Set(candidateColumns.map(column => column.name));
     for (const [name, definition] of Object.entries(candidateAdditions)) {
-      if (!existingCandidateColumns.has(name)) {
-        this.db.exec(`ALTER TABLE memory_candidates ADD COLUMN ${name} ${definition}`);
-      }
+      addColumnIfMissing(this.db, 'memory_candidates', name, definition);
     }
+    migrateLegacyMemoryTimestamps(this.db);
+    runMigrations(this.db, MEMORY_SCHEMA_SCOPE, [
+      { version: 1, name: 'legacy-reconcile', up: () => {} },
+    ]);
   }
 }
 

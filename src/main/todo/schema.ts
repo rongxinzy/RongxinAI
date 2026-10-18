@@ -1,4 +1,33 @@
+/**
+ * Todo schema: current-shape DDL plus the versioned migration list.
+ *
+ * The DDL creates the full current tables on a fresh database. Migration 1 is
+ * the legacy reconcile for the column adds and indexes that used to be
+ * re-probed on every startup. Fresh databases no-op through it and record the
+ * version.
+ */
 import type Database from 'better-sqlite3';
+
+import { addColumnIfMissing, runMigrations, type Migration } from '../sqliteMigrations';
+
+export const TODO_SCHEMA_SCOPE = 'todo';
+
+function reconcileLegacyTodoSchema(db: Database.Database): void {
+  addColumnIfMissing(db, 'todos', 'remind_notified_at', 'INTEGER');
+  db.exec(
+    'CREATE INDEX IF NOT EXISTS idx_todos_reminders ON todos(status, remind_at, remind_notified_at)',
+  );
+}
+
+export function todoMigrations(): Migration[] {
+  return [
+    {
+      version: 1,
+      name: 'legacy-reconcile',
+      up: reconcileLegacyTodoSchema,
+    },
+  ];
+}
 
 export function initializeTodoSchema(db: Database.Database): void {
   db.exec(`
@@ -51,12 +80,5 @@ export function initializeTodoSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_todo_steps_todo_order
       ON todo_steps(todo_id, step_order ASC, created_at ASC);
   `);
-
-  const todoColumns = db.prepare('PRAGMA table_info(todos)').all() as Array<{ name: string }>;
-  if (!todoColumns.some(column => column.name === 'remind_notified_at')) {
-    db.exec('ALTER TABLE todos ADD COLUMN remind_notified_at INTEGER');
-  }
-  db.exec(
-    'CREATE INDEX IF NOT EXISTS idx_todos_reminders ON todos(status, remind_at, remind_notified_at)',
-  );
+  runMigrations(db, TODO_SCHEMA_SCOPE, todoMigrations());
 }
