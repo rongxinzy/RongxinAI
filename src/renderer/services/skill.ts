@@ -181,7 +181,7 @@ class SkillService {
 
   async confirmInstall(
     pendingId: string,
-    action: string,
+    action: 'install' | 'installDisabled' | 'cancel',
   ): Promise<{ success: boolean; skills?: Skill[]; error?: string }> {
     try {
       const result = await window.electron.skills.confirmInstall(pendingId, action);

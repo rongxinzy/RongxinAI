@@ -2,7 +2,8 @@
 import fs from 'fs';
 import path from 'path';
 
-import { app, dialog, ipcMain, shell } from 'electron';
+import { app, dialog } from 'electron';
+import type { z } from 'zod';
 
 import { rt } from './runtimeState';
 import { getMcpStore, getStore } from './runtimeServices';
@@ -32,42 +33,26 @@ import {
 } from '../libs/mcpIntegrationManifest';
 import { IntegrationOperation } from '../libs/mcpIntegrationRuntime';
 import { McpCredentialVault } from '../libs/mcpCredentialVault';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { mcpContract } from '../../shared/ipc/mcpContract';
 import type { McpServerFormData } from '../mcpStore';
-import { McpIpc } from '../../shared/ipc/channels';
 
 export const registerMcpIpc = (): void => {
-  // MCP Server IPC handlers
-  ipcMain.handle(McpIpc.List, () => {
-    try {
-      ensureBuiltInMcpDefaultsDisabled();
-      const servers = getMcpStore().listServers();
-      return { success: true, servers };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to list MCP servers',
-      };
-    }
-  });
+  handleIpcContract(mcpContract, {
+    list: () => {
+      try {
+        ensureBuiltInMcpDefaultsDisabled();
+        const servers = getMcpStore().listServers();
+        return { success: true, servers };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to list MCP servers',
+        };
+      }
+    },
 
-  ipcMain.handle(
-    McpIpc.Create,
-    async (
-      _event,
-      data: {
-        name: string;
-        description: string;
-        transportType: string;
-        command?: string;
-        args?: string[];
-        env?: Record<string, string>;
-        url?: string;
-        headers?: Record<string, string>;
-        isBuiltIn?: boolean;
-        registryId?: string;
-        exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
-      },
-    ) => {
+    create: async (_event, data) => {
       try {
         const validationError = await validateMcpServerConfig(data as McpServerFormData);
         if (validationError) {
@@ -88,27 +73,8 @@ export const registerMcpIpc = (): void => {
         };
       }
     },
-  );
 
-  ipcMain.handle(
-    McpIpc.Update,
-    async (
-      _event,
-      id: string,
-      data: {
-        name?: string;
-        description?: string;
-        transportType?: string;
-        command?: string;
-        args?: string[];
-        env?: Record<string, string>;
-        url?: string;
-        headers?: Record<string, string>;
-        githubUrl?: string;
-        registryId?: string;
-        exposure?: 'codemode' | 'deferred' | 'direct' | 'hidden';
-      },
-    ) => {
+    update: async (_event, id, data) => {
       try {
         const existing = getMcpStore().getServer(id);
         if (!existing) {
@@ -149,276 +115,281 @@ export const registerMcpIpc = (): void => {
         };
       }
     },
-  );
 
-  ipcMain.handle(McpIpc.TestConnection, async (_event, data: McpServerFormData) => {
-    try {
-      const validationError = await validateMcpServerConfig(data);
-      if (validationError) {
-        return { success: false, error: validationError };
-      }
-      return await probeMcpConnection(data);
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to test MCP connection',
-      };
-    }
-  });
-
-  ipcMain.handle(McpIpc.Delete, async (_event, id: string) => {
-    try {
-      const existing = getMcpStore().getServer(id);
-      if (!existing) {
-        return { success: false, error: 'MCP server not found' };
-      }
-      if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
-        const uninstallStatus = await getMcpIntegrationRuntime().run(
-          OfficialIntegrationId.Feishu,
-          IntegrationOperation.Uninstall,
-        );
-        if (uninstallStatus.error) {
-          return { success: false, error: uninstallStatus.error };
+    testConnection: async (_event, data) => {
+      try {
+        const validationError = await validateMcpServerConfig(data as McpServerFormData);
+        if (validationError) {
+          return { success: false, error: validationError };
         }
+        return await probeMcpConnection(data as McpServerFormData);
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to test MCP connection',
+        };
       }
-      getMcpStore().deleteServer(id);
-      // OAuth sessions are keyed by the registry id during authorization,
-      // while the installed server row has its own random database id. Clear
-      // both keys so uninstall actually unlinks this App's authorization.
-      const oauthKeys = new Set([id, existing.registryId].filter(Boolean));
-      for (const oauthKey of oauthKeys) {
-        getStore().delete(`${MCP_OAUTH_STORE_PREFIX}${oauthKey}`);
-        new McpCredentialVault(getStore()).deleteValue(`${MCP_OAUTH_STORE_PREFIX}${oauthKey}`);
-      }
-      const servers = getMcpStore().listServers();
-      const refreshResult = await refreshMcpBridge();
-      if (refreshResult.error) {
-        console.error('[McpBridge] refresh after uninstall failed:', refreshResult.error);
-      }
-      return { success: true, servers, refreshError: refreshResult.error };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete MCP server',
-      };
-    }
-  });
+    },
 
-  ipcMain.handle(McpIpc.SetEnabled, async (_event, options: { id: string; enabled: boolean }) => {
-    try {
-      if (options.enabled) {
-        const existing = getMcpStore().getServer(options.id);
+    delete: async (_event, id) => {
+      try {
+        const existing = getMcpStore().getServer(id);
         if (!existing) {
           return { success: false, error: 'MCP server not found' };
         }
-        if (
-          existing.registryId === FEISHU_MCP_REGISTRY_ID &&
-          !hasVerifiedAgentTools(OfficialIntegrationManifests[OfficialIntegrationId.Feishu])
-        ) {
-          return {
-            success: false,
-            error:
-              'Feishu is installed as an official connector, but no verified agent tools are available yet.',
-          };
-        }
-        if (existing.registryId !== FEISHU_MCP_REGISTRY_ID) {
-          const validationError = await validateStoredMcpServerConfig(existing);
-          if (validationError) {
-            return { success: false, error: validationError };
+        if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
+          const uninstallStatus = await getMcpIntegrationRuntime().run(
+            OfficialIntegrationId.Feishu,
+            IntegrationOperation.Uninstall,
+          );
+          if (uninstallStatus.error) {
+            return { success: false, error: uninstallStatus.error };
           }
-          // Enabling must remain responsive. refreshMcpBridge() immediately
-          // follows this write and performs the single authoritative OAuth
-          // refresh plus MCP initialization. Doing it here as a synchronous
-          // probe duplicated that network work and blocked the switch.
         }
-      }
-
-      getMcpStore().setEnabled(options.id, options.enabled);
-      const servers = getMcpStore().listServers();
-      refreshMcpBridge().catch(err => console.error('[McpBridge] background refresh error:', err));
-      return { success: true, servers };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to update MCP server',
-      };
-    }
-  });
-
-  ipcMain.handle(McpIpc.FetchMarketplace, async () => {
-    try {
-      return {
-        success: true,
-        data: loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to load bundled MCP marketplace',
-      };
-    }
-  });
-
-  ipcMain.handle(McpIpc.LoadIcon, async (_event, iconPath: string) => {
-    try {
-      const marketplace = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath);
-      if (
-        !marketplace.servers.some(server => (server as { iconPath?: string }).iconPath === iconPath)
-      ) {
-        return { success: false, error: 'MCP icon is not registered' };
-      }
-      const roots = [
-        path.join(process.resourcesPath, 'MCPs'),
-        path.join(app.getAppPath(), 'MCPs'),
-        path.join(process.cwd(), 'MCPs'),
-      ];
-      for (const root of roots) {
-        const filePath = path.resolve(root, iconPath);
-        if (!filePath.startsWith(`${root}${path.sep}`) || !fs.existsSync(filePath)) continue;
-        const extension = path.extname(filePath).toLowerCase();
-        const mimeType =
-          extension === '.png'
-            ? 'image/png'
-            : extension === '.jpg' || extension === '.jpeg'
-              ? 'image/jpeg'
-              : extension === '.svg'
-                ? 'image/svg+xml'
-                : null;
-        if (!mimeType) return { success: false, error: 'Unsupported MCP icon format' };
+        getMcpStore().deleteServer(id);
+        // OAuth sessions are keyed by the registry id during authorization,
+        // while the installed server row has its own random database id. Clear
+        // both keys so uninstall actually unlinks this App's authorization.
+        const oauthKeys = new Set([id, existing.registryId].filter(Boolean));
+        for (const oauthKey of oauthKeys) {
+          getStore().delete(`${MCP_OAUTH_STORE_PREFIX}${oauthKey}`);
+          new McpCredentialVault(getStore()).deleteValue(`${MCP_OAUTH_STORE_PREFIX}${oauthKey}`);
+        }
+        const servers = getMcpStore().listServers();
+        const refreshResult = await refreshMcpBridge();
+        if (refreshResult.error) {
+          console.error('[McpBridge] refresh after uninstall failed:', refreshResult.error);
+        }
+        return { success: true, servers, refreshError: refreshResult.error };
+      } catch (error) {
         return {
-          success: true,
-          data: `data:${mimeType};base64,${fs.readFileSync(filePath).toString('base64')}`,
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete MCP server',
         };
       }
-      return { success: false, error: 'MCP icon was not found' };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to load MCP icon',
-      };
-    }
-  });
+    },
 
-  ipcMain.handle(McpIpc.ExportConfig, async () => {
-    try {
-      const result = await dialog.showSaveDialog({
-        title: 'Export MCP configuration',
-        defaultPath: 'mcp.json',
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-      });
-      if (result.canceled || !result.filePath) return { success: true, cancelled: true };
-      const document = exportMcpConfig(getMcpStore().listServers());
-      await fs.promises.writeFile(
-        result.filePath,
-        `${JSON.stringify(document, null, 2)}\n`,
-        'utf8',
-      );
+    setEnabled: async (_event, options) => {
+      try {
+        if (options.enabled) {
+          const existing = getMcpStore().getServer(options.id);
+          if (!existing) {
+            return { success: false, error: 'MCP server not found' };
+          }
+          if (
+            existing.registryId === FEISHU_MCP_REGISTRY_ID &&
+            !hasVerifiedAgentTools(OfficialIntegrationManifests[OfficialIntegrationId.Feishu])
+          ) {
+            return {
+              success: false,
+              error:
+                'Feishu is installed as an official connector, but no verified agent tools are available yet.',
+            };
+          }
+          if (existing.registryId !== FEISHU_MCP_REGISTRY_ID) {
+            const validationError = await validateStoredMcpServerConfig(existing);
+            if (validationError) {
+              return { success: false, error: validationError };
+            }
+            // Enabling must remain responsive. refreshMcpBridge() immediately
+            // follows this write and performs the single authoritative OAuth
+            // refresh plus MCP initialization. Doing it here as a synchronous
+            // probe duplicated that network work and blocked the switch.
+          }
+        }
+
+        getMcpStore().setEnabled(options.id, options.enabled);
+        const servers = getMcpStore().listServers();
+        refreshMcpBridge().catch(err =>
+          console.error('[McpBridge] background refresh error:', err),
+        );
+        return { success: true, servers };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to update MCP server',
+        };
+      }
+    },
+
+    fetchMarketplace: async () => {
+      try {
+        // The bundled registry is permissive (`Record<string, unknown>` rows);
+        // the renderer projects known fields off each server object.
+        const data = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath) as z.infer<
+          typeof mcpContract.fetchMarketplace.result
+        >['data'];
+        return { success: true, data };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to load bundled MCP marketplace',
+        };
+      }
+    },
+
+    loadIcon: async (_event, iconPath) => {
+      try {
+        const marketplace = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath);
+        if (
+          !marketplace.servers.some(
+            server => (server as { iconPath?: string }).iconPath === iconPath,
+          )
+        ) {
+          return { success: false, error: 'MCP icon is not registered' };
+        }
+        const roots = [
+          path.join(process.resourcesPath, 'MCPs'),
+          path.join(app.getAppPath(), 'MCPs'),
+          path.join(process.cwd(), 'MCPs'),
+        ];
+        for (const root of roots) {
+          const filePath = path.resolve(root, iconPath);
+          if (!filePath.startsWith(`${root}${path.sep}`) || !fs.existsSync(filePath)) continue;
+          const extension = path.extname(filePath).toLowerCase();
+          const mimeType =
+            extension === '.png'
+              ? 'image/png'
+              : extension === '.jpg' || extension === '.jpeg'
+                ? 'image/jpeg'
+                : extension === '.svg'
+                  ? 'image/svg+xml'
+                  : null;
+          if (!mimeType) return { success: false, error: 'Unsupported MCP icon format' };
+          return {
+            success: true,
+            data: `data:${mimeType};base64,${fs.readFileSync(filePath).toString('base64')}`,
+          };
+        }
+        return { success: false, error: 'MCP icon was not found' };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to load MCP icon',
+        };
+      }
+    },
+
+    exportConfig: async () => {
+      try {
+        const result = await dialog.showSaveDialog({
+          title: 'Export MCP configuration',
+          defaultPath: 'mcp.json',
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+        });
+        if (result.canceled || !result.filePath) return { success: true, cancelled: true };
+        const document = exportMcpConfig(getMcpStore().listServers());
+        await fs.promises.writeFile(
+          result.filePath,
+          `${JSON.stringify(document, null, 2)}\n`,
+          'utf8',
+        );
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to export MCP configuration',
+        };
+      }
+    },
+
+    importConfig: async () => {
+      try {
+        const result = await dialog.showOpenDialog({
+          title: 'Import MCP configuration',
+          properties: ['openFile'],
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+        });
+        if (result.canceled || result.filePaths.length === 0)
+          return { success: true, cancelled: true };
+        const input = JSON.parse(
+          await fs.promises.readFile(result.filePaths[0], 'utf8'),
+        ) as unknown;
+        const servers = importMcpConfig(input);
+        const existingNames = new Set(
+          getMcpStore()
+            .listServers()
+            .map(server => server.name),
+        );
+        for (const server of servers) {
+          if (existingNames.has(server.name)) {
+            return { success: false, error: `MCP server "${server.name}" already exists.` };
+          }
+          const validationError = await validateMcpServerConfig(server);
+          if (validationError) return { success: false, error: validationError };
+        }
+        for (const server of servers) getMcpStore().createServer(server);
+        const refreshed = await refreshMcpBridge();
+        return {
+          success: !refreshed.error,
+          servers: getMcpStore().listServers(),
+          error: refreshed.error,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to import MCP configuration',
+        };
+      }
+    },
+
+    importConfigContent: async (_event, jsonContent) => {
+      try {
+        const input = JSON.parse(jsonContent) as unknown;
+        const servers = importMcpConfig(input);
+        const existingNames = new Set(
+          getMcpStore()
+            .listServers()
+            .map(server => server.name),
+        );
+        for (const server of servers) {
+          if (existingNames.has(server.name)) {
+            return { success: false, error: `MCP server "${server.name}" already exists.` };
+          }
+          const validationError = await validateMcpServerConfig(server);
+          if (validationError) return { success: false, error: validationError };
+        }
+        for (const server of servers) getMcpStore().createServer(server);
+        const refreshed = await refreshMcpBridge();
+        return {
+          success: !refreshed.error,
+          servers: getMcpStore().listServers(),
+          error: refreshed.error,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to import MCP configuration',
+        };
+      }
+    },
+
+    cancelAuthorize: (_event, requestId) => {
+      rt.activeMcpAuthorizations.get(requestId)?.abort();
       return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to export MCP configuration',
-      };
-    }
-  });
+    },
 
-  ipcMain.handle(McpIpc.ImportConfig, async () => {
-    try {
-      const result = await dialog.showOpenDialog({
-        title: 'Import MCP configuration',
-        properties: ['openFile'],
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-      });
-      if (result.canceled || result.filePaths.length === 0)
-        return { success: true, cancelled: true };
-      const input = JSON.parse(await fs.promises.readFile(result.filePaths[0], 'utf8')) as unknown;
-      const servers = importMcpConfig(input);
-      const existingNames = new Set(
-        getMcpStore()
-          .listServers()
-          .map(server => server.name),
-      );
-      for (const server of servers) {
-        if (existingNames.has(server.name)) {
-          return { success: false, error: `MCP server "${server.name}" already exists.` };
-        }
-        const validationError = await validateMcpServerConfig(server);
-        if (validationError) return { success: false, error: validationError };
+    getFeishuCliStatus: () => ({
+      success: true,
+      installed: Boolean(getLocalFeishuCliCommand()),
+    }),
+
+    prepareFeishuCli: async () => {
+      try {
+        const status = await getMcpIntegrationRuntime().run(
+          OfficialIntegrationId.Feishu,
+          IntegrationOperation.Provision,
+        );
+        return status.error ? { success: false, error: status.error } : { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to install Feishu CLI',
+        };
       }
-      for (const server of servers) getMcpStore().createServer(server);
-      const refreshed = await refreshMcpBridge();
-      return {
-        success: !refreshed.error,
-        servers: getMcpStore().listServers(),
-        error: refreshed.error,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to import MCP configuration',
-      };
-    }
-  });
+    },
 
-  ipcMain.handle(McpIpc.ImportConfigContent, async (_event, jsonContent: string) => {
-    try {
-      const input = JSON.parse(jsonContent) as unknown;
-      const servers = importMcpConfig(input);
-      const existingNames = new Set(
-        getMcpStore()
-          .listServers()
-          .map(server => server.name),
-      );
-      for (const server of servers) {
-        if (existingNames.has(server.name)) {
-          return { success: false, error: `MCP server "${server.name}" already exists.` };
-        }
-        const validationError = await validateMcpServerConfig(server);
-        if (validationError) return { success: false, error: validationError };
-      }
-      for (const server of servers) getMcpStore().createServer(server);
-      const refreshed = await refreshMcpBridge();
-      return {
-        success: !refreshed.error,
-        servers: getMcpStore().listServers(),
-        error: refreshed.error,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to import MCP configuration',
-      };
-    }
-  });
-
-  ipcMain.handle(McpIpc.CancelAuthorize, (_event, requestId: string) => {
-    rt.activeMcpAuthorizations.get(requestId)?.abort();
-    return { success: true };
-  });
-
-  ipcMain.handle(McpIpc.GetFeishuCliStatus, () => ({
-    success: true,
-    installed: Boolean(getLocalFeishuCliCommand()),
-  }));
-
-  ipcMain.handle(McpIpc.PrepareFeishuCli, async () => {
-    try {
-      const status = await getMcpIntegrationRuntime().run(
-        OfficialIntegrationId.Feishu,
-        IntegrationOperation.Provision,
-      );
-      return status.error ? { success: false, error: status.error } : { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to install Feishu CLI',
-      };
-    }
-  });
-
-  ipcMain.handle(
-    McpIpc.Authorize,
-    async (_event, rawData: McpServerFormData & { authorizationRequestId?: string }) => {
+    authorize: async (_event, rawData) => {
       const { authorizationRequestId, ...data } = rawData;
       const cancellation = authorizationRequestId ? new AbortController() : null;
       if (authorizationRequestId && cancellation) {
@@ -459,7 +430,7 @@ export const registerMcpIpc = (): void => {
           }
           return { success: true, servers, refreshError: refreshResult.error };
         }
-        const validationError = await validateMcpServerConfig(data);
+        const validationError = await validateMcpServerConfig(data as McpServerFormData);
         if (validationError) return { success: false, error: validationError };
         if (!data.registryId || !data.url)
           return { success: false, error: 'Official MCP configuration is incomplete' };
@@ -474,7 +445,7 @@ export const registerMcpIpc = (): void => {
           return { success: false, error: 'OAuth authorization did not return an access token' };
 
         getMcpStore().createServer({
-          ...data,
+          ...(data as McpServerFormData),
           isBuiltIn: true,
           headers: { ...data.headers, Authorization: `Bearer ${accessToken}` },
         });
@@ -492,19 +463,19 @@ export const registerMcpIpc = (): void => {
         if (authorizationRequestId) rt.activeMcpAuthorizations.delete(authorizationRequestId);
       }
     },
-  );
 
-  // Explicit bridge refresh — renderer can await this for loading state
-  ipcMain.handle(McpIpc.RefreshBridge, async () => {
-    try {
-      const result = await refreshMcpBridge();
-      return { success: true, tools: result.tools, error: result.error };
-    } catch (error) {
-      return {
-        success: false,
-        tools: 0,
-        error: error instanceof Error ? error.message : 'Failed to refresh MCP bridge',
-      };
-    }
+    // Explicit bridge refresh — renderer can await this for loading state
+    refreshBridge: async () => {
+      try {
+        const result = await refreshMcpBridge();
+        return { success: true, tools: result.tools, error: result.error };
+      } catch (error) {
+        return {
+          success: false,
+          tools: 0,
+          error: error instanceof Error ? error.message : 'Failed to refresh MCP bridge',
+        };
+      }
+    },
   });
 };
