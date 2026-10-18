@@ -109,7 +109,12 @@ import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
 import { MarketplaceService } from '../marketplaceService';
 import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from '../llamacppNvidiaEnvironment';
 import { t } from '../../i18n';
-import { normalizePositiveInteger } from './fileUtils';
+import {
+  buildLlamaCppPresetGlobalGpuSection,
+  LLAMACPP_PRESET_GLOBAL_GPU_KEYS,
+  normalizePositiveInteger,
+  replaceIniSectionKeys,
+} from './fileUtils';
 import type { LlamaCppManagerDownstreamSurface } from './types';
 
 const DEFAULT_HOST = '127.0.0.1';
@@ -228,6 +233,26 @@ export class LlamaCppManagerCore extends EventEmitter {
 
   getPresetPath(): string {
     return path.join(app.getPath('userData'), 'llamacpp', 'models-preset.ini');
+  }
+
+  /**
+   * Keeps the preset's global `[*]` GPU section in sync with the resolved
+   * runtime config. Router CLI GPU flags were removed (they override every
+   * model's preset section), so the global section carries the service-level
+   * defaults while per-model sections written by writeModelPreset still win.
+   */
+  protected upsertPresetGlobalGpuSection(config: LlamaCppServiceConfig): void {
+    const existing = fs.existsSync(this.getPresetPath())
+      ? fs.readFileSync(this.getPresetPath(), 'utf-8')
+      : 'version = 1\n\n';
+    const next = replaceIniSectionKeys(
+      existing,
+      '*',
+      LLAMACPP_PRESET_GLOBAL_GPU_KEYS,
+      buildLlamaCppPresetGlobalGpuSection(config),
+    );
+    fs.mkdirSync(path.dirname(this.getPresetPath()), { recursive: true });
+    fs.writeFileSync(this.getPresetPath(), next, 'utf-8');
   }
 
   getConnectionAndLoadTimeoutMs(): number {
@@ -684,6 +709,7 @@ export class LlamaCppManagerCore extends EventEmitter {
       resolvedRuntimeConfig,
       runtimeCapabilities,
     );
+    this.upsertPresetGlobalGpuSection(filteredRuntimeConfig);
     this.setStatus({ status: 'starting', executablePath: this.executablePath, managedByApp: true });
     const keepRunningOnAppQuit = shouldKeepLlamaCppServiceRunning(filteredRuntimeConfig);
     const serviceProcess = spawn(

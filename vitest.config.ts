@@ -17,6 +17,7 @@ export default defineConfig({
       'tests/**/*.test.ts',
       'scripts/**/*.test.ts',
     ],
+    exclude: ['scripts/preview/recordStreamReplayFixtures.codegen.test.ts'],
     environment: 'node',
     environmentMatchGlobs: [['src/**/*.test.tsx', 'jsdom']],
     setupFiles: ['./tests/setup/jsdom.ts'],

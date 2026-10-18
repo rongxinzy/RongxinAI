@@ -51,6 +51,7 @@ import {
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { createPiWorkbenchContract } from './piRuntimeWorkbenchContract';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
+import { openPersistentPiSessionManager } from './piSessionStore';
 import { buildPiSessionCustomTools } from './piRuntimeSessionCustomTools';
 import {
   getPiModules,
@@ -160,10 +161,19 @@ export async function startPiRuntimeSession(
       hasAppliedApplicationRuntimeEnv = true;
     }
     const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
-    // Cowork owns the canonical transcript in SQLite. Pi's default session
-    // manager persists its own transcript, which would be duplicated by the
-    // SQLite history prompt used when a session is recreated.
-    if (pi.SessionManager?.inMemory) {
+    // Pi's session manager keeps the structured transcript (tool calls,
+    // results, images, thinking) in a per-Cowork-session JSONL. Rebuilds
+    // reopen that file and continue with structured history; only a legacy
+    // session without a file falls back to the flattened text restore.
+    const piSessionStoreRoot = host.getPiSessionStoreRoot();
+    if (piSessionStoreRoot && pi.SessionManager?.create && pi.SessionManager?.open) {
+      sessionOptions.sessionManager = openPersistentPiSessionManager(
+        pi.SessionManager,
+        piSessionStoreRoot,
+        sessionId,
+        workspaceRoot,
+      ).manager;
+    } else if (pi.SessionManager?.inMemory) {
       sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
     }
 
@@ -523,7 +533,10 @@ export async function startPiRuntimeSession(
     // A live Pi session replaces the lightweight IM retention marker.
     host.retainedSessionIds.delete(sessionId);
 
-    // Send the prompt (may include conversation history for restart restores)
+    // Send the prompt. `options._piPromptOverride` carries the flattened
+    // history restore only when no persisted Pi session file exists; when the
+    // session manager above reopened one, Pi already holds the prior turns as
+    // structured messages and the override is just the new user prompt.
     let initialPrompt = researchRun
       ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
       : shortcutWorkflow

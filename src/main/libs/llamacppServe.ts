@@ -62,13 +62,12 @@ export function buildLlamaServerArgs(
   if (config.kvUnified === false) args.push('--no-kv-unified');
   appendArg(args, '--batch-size', config.batchSize);
   appendArg(args, '--ubatch-size', config.ubatchSize);
-  appendArg(args, '--gpu-layers', config.gpuLayers);
+  // GPU placement flags stay off the router CLI: router CLI args override every
+  // model's preset section, which would make per-model GPU placement impossible.
+  // They are rendered into the preset global section instead (see
+  // buildLlamaCppPresetGlobalGpuSection), where per-model sections still override them.
   appendArg(args, '--threads', config.threads);
   appendArg(args, '--threads-batch', config.threadsBatch);
-  appendArg(args, '--device', config.device);
-  appendArg(args, '--main-gpu', config.mainGpu);
-  appendArg(args, '--split-mode', config.splitMode);
-  appendArg(args, '--tensor-split', config.tensorSplit);
   appendArg(args, '--flash-attn', config.flashAttn);
   appendArg(args, '--cache-type-k', config.cacheTypeK);
   appendArg(args, '--cache-type-v', config.cacheTypeV);
