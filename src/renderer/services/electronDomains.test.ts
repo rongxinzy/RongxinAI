@@ -54,8 +54,6 @@ describe('electronDomains', () => {
     permissions: { request: () => Promise.resolve(true) },
     feishu: { auth: () => Promise.resolve() },
     dingtalk: { auth: () => Promise.resolve() },
-    githubCopilot: { auth: () => Promise.resolve() },
-    openaiCodexOAuth: { auth: () => Promise.resolve() },
     activity: { list: () => Promise.resolve([]) },
     enterprise: { getStatus: () => Promise.resolve({}) },
   };

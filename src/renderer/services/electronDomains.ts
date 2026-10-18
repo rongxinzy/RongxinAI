@@ -9,7 +9,7 @@
  * - Inference: Local and remote inference runtimes (llama.cpp, ollama, magpie, model pool, providers).
  * - Agent: Agent engines, Cowork sessions, Skills, MCP, Tasks, Coding workbench.
  * - Workspace: Project management, memory, persistent SQLite KV store.
- * - Integration: External messaging channels (IM, Feishu, DingTalk, GitHub Copilot).
+ * - Integration: External messaging channels (IM, Feishu, DingTalk).
  */
 import type { IElectronAPI } from '../types/electron';
 
@@ -65,8 +65,6 @@ interface IntegrationDomainApi {
   permissions: IElectronAPI['permissions'];
   feishu: IElectronAPI['feishu'];
   dingtalk: IElectronAPI['dingtalk'];
-  githubCopilot: IElectronAPI['githubCopilot'];
-  openaiCodexOAuth: IElectronAPI['openaiCodexOAuth'];
   activity: IElectronAPI['activity'];
   enterprise: IElectronAPI['enterprise'];
 }
@@ -149,8 +147,6 @@ export const electronDomains: ElectronDomains = {
       permissions: e.permissions,
       feishu: e.feishu,
       dingtalk: e.dingtalk,
-      githubCopilot: e.githubCopilot,
-      openaiCodexOAuth: e.openaiCodexOAuth,
       activity: e.activity,
       enterprise: e.enterprise,
     };

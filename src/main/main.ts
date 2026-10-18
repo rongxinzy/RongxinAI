@@ -34,11 +34,10 @@ import { registerTaskIpc } from './appBootstrap/taskIpc';
 import { registerPermissionsIpc } from './appBootstrap/permissionsIpc';
 import { registerImGatewayIpc } from './appBootstrap/imGatewayIpc';
 import { registerImInstanceIpc } from './appBootstrap/imInstanceIpc';
-import { registerCopilotIpc } from './appBootstrap/copilotIpc';
+import { registerIntegrationsIpc } from './appBootstrap/integrationsIpc';
 import { registerDialogIpc } from './appBootstrap/dialogIpc';
 import { registerShellIpc } from './appBootstrap/shellIpc';
 import { registerAppUpdateIpc } from './appBootstrap/appUpdateIpc';
-import { registerApiFetchIpc } from './appBootstrap/apiFetchIpc';
 import { registerAppLifecycleHandlers } from './appBootstrap/appLifecycle';
 import { initApp } from './appBootstrap/initApp';
 import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
@@ -79,11 +78,10 @@ if (!gotTheLock) {
   registerPermissionsIpc();
   registerImGatewayIpc();
   registerImInstanceIpc();
-  registerCopilotIpc();
+  registerIntegrationsIpc();
   registerDialogIpc();
   registerShellIpc();
   registerAppUpdateIpc();
-  registerApiFetchIpc();
   registerAppLifecycleHandlers();
 
   // 启动应用
