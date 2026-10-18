@@ -841,6 +841,7 @@ export class PiRuntimeTurnEvents {
         workspaceRoot: active.workspaceRoot,
         finalAnswer: active.lastCompletedAnswerText,
         finalMessageId: active.lastCompletedAnswerMessageId,
+        artifactsSettled: active.artifactRecorder?.settled(),
         workflowCompleted:
           active.researchRun || active.shortcutWorkflow
             ? active.agentLoop.getState().done

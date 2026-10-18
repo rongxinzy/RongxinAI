@@ -5,10 +5,9 @@ const DeclareArtifactToolName = 'declare_artifact';
 export const DeclareArtifactSystemPrompt = [
   '## Artifact declaration',
   '',
-  '- After creating or modifying a file, call `declare_artifact` with the absolute file path.',
-  '- Set `role` to "intermediate" for work-in-progress files and "deliverable" for final outputs.',
+  '- Files you write, edit or generate (including with bash or python) are recorded automatically; you do not need to declare every file.',
+  '- Call `declare_artifact` only to annotate a file: mark the final output the user asked for as role "deliverable" (optionally with a `title`), or mark a file as "intermediate".',
   '- Deliverables default to the current workspace; when the user asks for an output at a specific location outside the workspace, declare that absolute path directly — it is accepted and recorded as an external deliverable. Intermediate files always stay in the workspace.',
-  '- Prefer `declare_artifact` over mentioning file paths in prose — the UI reads tool calls, not text.',
   '- Declare only after the write has completed; the tool briefly waits for a file that is still being written.',
 ].join('\n');
 
@@ -87,9 +86,9 @@ export function buildDeclareArtifactTool(
     name: DeclareArtifactToolName,
     label: 'Declare Artifact',
     description:
-      'Declare a file as an artifact so it appears in the UI artifact panel. ' +
-      'Call this every time you create or finalize a deliverable file. ' +
-      'The file path must be absolute.',
+      'Annotate an already-produced file with its role and title. ' +
+      'Produced files are recorded automatically; call this to mark the final deliverable ' +
+      '(or an intermediate file). The file path must be absolute.',
     parameters: {
       type: 'object',
       properties: {
