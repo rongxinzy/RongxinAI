@@ -36,10 +36,8 @@ import type {
   LlamaCppSetModelPreferenceInput,
   LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
-import type {
-  MarketplaceSearchRequest,
-  MarketplaceSearchResult,
-} from '../../../shared/marketplace';
+import type { IpcContractApi } from '../../../shared/ipc/contract';
+import type { marketplaceContract } from '../../../shared/marketplace/contract';
 import type {
   OllamaCancelPullResult,
   OllamaChatChunk,
@@ -169,10 +167,7 @@ export interface LlamaCppApi {
   ) => () => void;
 }
 
-export interface MarketplaceApi {
-  search: (request: MarketplaceSearchRequest) => Promise<MarketplaceSearchResult>;
-  cancelSearch: (requestId: string) => Promise<{ cancelled: boolean }>;
-}
+export interface MarketplaceApi extends IpcContractApi<typeof marketplaceContract> {}
 
 export interface TriageApi {
   getConfig: () => Promise<TriageConfig>;

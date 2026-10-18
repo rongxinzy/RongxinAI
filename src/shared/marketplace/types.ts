@@ -127,11 +127,6 @@ export type MarketplaceSearchParams = {
   language?: string;
 };
 
-export type MarketplaceSearchRequest = {
-  requestId: string;
-  params: MarketplaceSearchParams;
-};
-
 export type MarketplaceSearchResult = {
   models: MarketplaceModel[];
   totalCount?: number;

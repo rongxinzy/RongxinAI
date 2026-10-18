@@ -13,6 +13,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { isInterfaceDeclaration, type Node } from 'typescript/unstable/ast';
+
+import { collectPathsFromPreloadExport } from './preload-paths.ts';
 import {
   API,
   ObjectFlags,
@@ -20,6 +22,7 @@ import {
   SymbolFlags,
   TypeFlags,
   type Checker,
+  type ParameterDeclaration,
   type Project,
   type Signature,
   type Symbol,
@@ -445,7 +448,19 @@ class Generator {
   private emitFunction(type: Type, pathKey: string): string[] {
     const signature = this.callSignatures(type)[0];
     if (!signature) return ['() => undefined'];
-    const params = signature.getParameters().filter(param => param.name !== 'this');
+    const params = signature
+      .getParameters()
+      .filter(param => param.name !== 'this')
+      // A rest parameter over an empty tuple (`...args: []`, the shape
+      // contract-derived zero-arg methods get) contributes no arguments.
+      .filter(param => {
+        if (!signature.hasRestParameter) return true;
+        const handle = param.valueDeclaration ?? param.declarations[0];
+        const parameter = handle?.resolve(this.project);
+        if (!parameter || !('dotDotDotToken' in parameter)) return true;
+        if (!(parameter as ParameterDeclaration).dotDotDotToken) return true;
+        return !this.isEmptyTupleType(this.propertyType(param));
+      });
     const names = params.map((_, index) => `_p${index}`);
     const callbackIndex = this.callbackIndex(signature, params);
     const returned = this.checker.getReturnTypeOfSignature(signature) ?? this.checker.getVoidType();
@@ -600,6 +615,11 @@ class Generator {
     return this.checker.getTypeOfSymbolAtLocation(prop, node);
   }
 
+  /** True when `type` is the empty tuple type `[]`. */
+  private isEmptyTupleType(type: Type): boolean {
+    return type.isTupleType() && this.checker.getTypeArguments(type).length === 0;
+  }
+
   private literalValue(type: Type): string | number | boolean | bigint | undefined {
     if (!('value' in type)) return undefined;
     const value = type.value;
@@ -643,231 +663,10 @@ function formatDir(dir: string): void {
   if (result.status !== 0) throw new Error('oxfmt failed');
 }
 
-/** Strip // and block comments without touching string/template contents. */
-function stripTypeScriptComments(source: string): string {
-  let out = '';
-  let index = 0;
-  while (index < source.length) {
-    const ch = source[index];
-    const next = source[index + 1];
-    if (ch === '/' && next === '/') {
-      index += 2;
-      while (index < source.length && source[index] !== '\n') index += 1;
-      continue;
-    }
-    if (ch === '/' && next === '*') {
-      index += 2;
-      while (index < source.length && !(source[index] === '*' && source[index + 1] === '/')) {
-        index += 1;
-      }
-      index += 2;
-      continue;
-    }
-    if (ch === "'" || ch === '"' || ch === '`') {
-      const quote = ch;
-      out += ch;
-      index += 1;
-      while (index < source.length) {
-        const c = source[index];
-        out += c;
-        index += 1;
-        if (c === '\\') {
-          if (index < source.length) {
-            out += source[index];
-            index += 1;
-          }
-          continue;
-        }
-        if (quote === '`' && c === '$' && source[index] === '{') {
-          out += '{';
-          index += 1;
-          let depth = 1;
-          while (index < source.length && depth > 0) {
-            const t = source[index];
-            out += t;
-            index += 1;
-            if (t === '{') depth += 1;
-            else if (t === '}') depth -= 1;
-          }
-          continue;
-        }
-        if (c === quote) break;
-      }
-      continue;
-    }
-    out += ch;
-    index += 1;
-  }
-  return out;
-}
-
-function skipWhitespace(source: string, index: number): number {
-  while (index < source.length && /\s/.test(source[index] ?? '')) index += 1;
-  return index;
-}
-
-function readIdentifier(source: string, index: number): { name: string; next: number } | undefined {
-  index = skipWhitespace(source, index);
-  const start = index;
-  if (!/[A-Za-z_$]/.test(source[index] ?? '')) return undefined;
-  index += 1;
-  while (index < source.length && /[\w$]/.test(source[index] ?? '')) index += 1;
-  return { name: source.slice(start, index), next: index };
-}
-
-function skipBalanced(source: string, index: number, open: string, close: string): number {
-  if (source[index] !== open) return index;
-  let depth = 0;
-  let i = index;
-  while (i < source.length) {
-    const ch = source[i];
-    if (ch === open) depth += 1;
-    else if (ch === close) {
-      depth -= 1;
-      if (depth === 0) return i + 1;
-    } else if (ch === "'" || ch === '"' || ch === '`') {
-      const quote = ch;
-      i += 1;
-      while (i < source.length) {
-        const c = source[i];
-        i += 1;
-        if (c === '\\') {
-          i += 1;
-          continue;
-        }
-        if (quote === '`' && c === '$' && source[i] === '{') {
-          i = skipBalanced(source, i, '{', '}');
-          continue;
-        }
-        if (c === quote) break;
-      }
-      continue;
-    } else if (ch === '/' && source[i + 1] === '/') {
-      i += 2;
-      while (i < source.length && source[i] !== '\n') i += 1;
-      continue;
-    } else if (ch === '/' && source[i + 1] === '*') {
-      i += 2;
-      while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i += 1;
-      i += 2;
-      continue;
-    }
-    i += 1;
-  }
-  throw new Error(`Unbalanced ${open}${close} in preload fragment`);
-}
-
-function skipExpressionValue(source: string, index: number): number {
-  index = skipWhitespace(source, index);
-  const ch = source[index];
-  if (ch === '{') return skipBalanced(source, index, '{', '}');
-  if (ch === '(') return skipBalanced(source, index, '(', ')');
-  if (ch === '[') return skipBalanced(source, index, '[', ']');
-  if (ch === "'" || ch === '"' || ch === '`') {
-    const quote = ch;
-    index += 1;
-    while (index < source.length) {
-      const c = source[index];
-      index += 1;
-      if (c === '\\') {
-        index += 1;
-        continue;
-      }
-      if (quote === '`' && c === '$' && source[index] === '{') {
-        index = skipBalanced(source, index, '{', '}');
-        continue;
-      }
-      if (c === quote) break;
-    }
-    return index;
-  }
-  while (index < source.length) {
-    const c = source[index];
-    if (c === ',' || c === '}' || c === ')') break;
-    if (c === '{' || c === '(' || c === '[') {
-      index = skipBalanced(source, index, c, c === '{' ? '}' : c === '(' ? ')' : ']');
-      continue;
-    }
-    index += 1;
-  }
-  return index;
-}
-
-function collectPathsFromObjectLiteralText(
-  source: string,
-  openBraceIndex: number,
-  prefix: string,
-): Set<string> {
-  const paths = new Set<string>();
-  let index = openBraceIndex + 1;
-  while (index < source.length) {
-    index = skipWhitespace(source, index);
-    if (source[index] === '}') break;
-    if (source[index] === ',') {
-      index += 1;
-      continue;
-    }
-    if (source.slice(index, index + 3) === '...') {
-      index = skipExpressionValue(source, index + 3);
-      continue;
-    }
-    if (source[index] === '[') {
-      index = skipBalanced(source, index, '[', ']');
-      index = skipWhitespace(source, index);
-      if (source[index] === ':') index = skipExpressionValue(source, index + 1);
-      continue;
-    }
-    const ident = readIdentifier(source, index);
-    if (!ident) {
-      index = skipExpressionValue(source, index);
-      continue;
-    }
-    index = ident.next;
-    index = skipWhitespace(source, index);
-    const pathKey = prefix ? `${prefix}.${ident.name}` : ident.name;
-    if (source[index] === '(') {
-      paths.add(pathKey);
-      index = skipBalanced(source, index, '(', ')');
-      continue;
-    }
-    if (source[index] === ':') {
-      index = skipWhitespace(source, index + 1);
-      if (source[index] === '{') {
-        for (const nested of collectPathsFromObjectLiteralText(source, index, pathKey)) {
-          paths.add(nested);
-        }
-        index = skipBalanced(source, index, '{', '}');
-      } else {
-        paths.add(pathKey);
-        index = skipExpressionValue(source, index);
-      }
-      continue;
-    }
-    paths.add(pathKey);
-    index = skipExpressionValue(source, index);
-  }
-  return paths;
-}
-
-function findExportObjectBrace(source: string, exportName: string): number {
-  const pattern = new RegExp(`export\\s+const\\s+${exportName}\\s*=\\s*\\{`);
-  const match = pattern.exec(source);
-  if (!match) throw new Error(`Missing export const ${exportName}`);
-  return match.index + match[0].length - 1;
-}
-
-function collectPathsFromPreloadExport(fileRelative: string, exportName: string): Set<string> {
-  const filePath = path.join(ROOT, fileRelative);
-  const raw = fs.readFileSync(filePath, 'utf8');
-  const source = stripTypeScriptComments(raw);
-  const openBrace = findExportObjectBrace(source, exportName);
-  return collectPathsFromObjectLiteralText(source, openBrace, '');
-}
-
 function collectPreloadPaths(): Set<string> {
   const paths = new Set<string>(['platform', 'arch']);
   for (const fragment of PRELOAD_FRAGMENT_EXPORTS) {
-    for (const pathKey of collectPathsFromPreloadExport(fragment.file, fragment.exportName)) {
+    for (const pathKey of collectPathsFromPreloadExport(ROOT, fragment.file, fragment.exportName)) {
       paths.add(pathKey);
     }
   }
