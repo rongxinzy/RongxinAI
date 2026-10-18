@@ -21,6 +21,9 @@ export interface CoworkImageAttachment {
   path?: string;
 }
 
+/** An image the composer is sending now: always carries its inline bytes. */
+export type CoworkOutgoingImageAttachment = CoworkImageAttachment & { base64Data: string };
+
 export interface CoworkFileAttachment {
   name: string;
   path: string;
@@ -238,7 +241,7 @@ export interface CoworkStartOptions {
   expertIds?: string[];
   modelOverride?: string;
   permissionMode?: CoworkPermissionMode;
-  imageAttachments?: CoworkImageAttachment[];
+  imageAttachments?: CoworkOutgoingImageAttachment[];
   fileAttachments?: CoworkFileAttachment[];
 }
 
@@ -251,7 +254,7 @@ export interface CoworkContinueOptions {
   goalMode?: boolean;
   expertIds?: string[];
   permissionMode?: CoworkPermissionMode;
-  imageAttachments?: CoworkImageAttachment[];
+  imageAttachments?: CoworkOutgoingImageAttachment[];
   fileAttachments?: CoworkFileAttachment[];
 }
 

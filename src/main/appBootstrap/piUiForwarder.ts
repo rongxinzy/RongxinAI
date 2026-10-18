@@ -4,13 +4,15 @@
  */
 import crypto from 'crypto';
 
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow } from 'electron';
 
 import { rt } from './runtimeState';
 import { getCoworkStore, getStore } from './runtimeServices';
 import { getPiRuntimeAdapter } from './sessionServices';
 import { sanitizeCoworkMessageForIpc, sanitizePermissionRequestForIpc } from './ipcPayloadSanitize';
 import { CoworkStreamIpc } from '../../shared/ipc/channels';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { coworkPiStreamContract } from '../../shared/ipc/coworkContract';
 import { bindCoworkRunBridge } from '../coworkRunBridge';
 import { slimQueuedMessagesForIpc } from '../coworkImageAttachments';
 import { persistCoworkTerminalError } from '../coworkTerminalErrorPersistence';
@@ -85,9 +87,18 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     }
   };
 
-  ipcMain.handle(CoworkStreamIpc.RuntimeSnapshots, (_event, sessionId?: string) =>
-    runtimeSnapshots.read(sessionId),
-  );
+  const requestStreamResync = (sessionId: string): boolean => {
+    coalescer.flush();
+    for (const live of runtime.getLiveStreamTexts(sessionId)) {
+      emitStreamSnapshot(sessionId, live.messageId, live.content, live.metadata);
+    }
+    return true;
+  };
+
+  handleIpcContract(coworkPiStreamContract, {
+    getRuntimeSnapshots: (_event, sessionId) => runtimeSnapshots.read(sessionId),
+    requestStreamResync: (_event, sessionId) => requestStreamResync(sessionId),
+  });
 
   const broadcastUiEvent = (event: PiUiEvent): void => {
     runtimeSnapshots.observe(event);
@@ -176,18 +187,6 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
       emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId, patch });
     }
   };
-
-  // Renderer-initiated resync (delta-sequence gap or mid-stream attach):
-  // flush pending deltas, then reseed every live (unfinalized) message with
-  // one full snapshot; subsequent deltas append onto that base.
-  ipcMain.handle(CoworkStreamIpc.StreamResync, (_event, sessionId: unknown) => {
-    if (typeof sessionId !== 'string' || sessionId.length === 0) return false;
-    coalescer.flush();
-    for (const live of runtime.getLiveStreamTexts(sessionId)) {
-      emitStreamSnapshot(sessionId, live.messageId, live.content, live.metadata);
-    }
-    return true;
-  });
 
   bindCoworkRunBridge(
     runtime,

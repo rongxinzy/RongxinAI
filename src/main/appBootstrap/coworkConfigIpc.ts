@@ -1,29 +1,15 @@
 /** Cowork config IPC: get/set configuration, embedding config, theme, proxy. */
-import { ipcMain } from 'electron';
-
-import { rt } from './runtimeState';
-import { getCoworkStore, getSkillManager, getStore } from './runtimeServices';
+import { getCoworkStore, getSkillManager } from './runtimeServices';
 import { getPiRuntimeAdapter } from './sessionServices';
 import { parseCoworkExecutionMode } from '../../shared/cowork/executionMode';
 import { getChangedSessionPermissionModes } from '../coworkPermissionModeChanges';
 import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
-import { applyProxyPreference, getUseSystemProxyFromConfig } from './appConfigSettings';
 import type { CoworkStore } from '../coworkStore';
-import { CoworkExecutionMode, CoworkPermissionMode } from '../../shared/cowork/constants';
+import { CoworkPermissionMode } from '../../shared/cowork/constants';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { coworkConfigContract } from '../../shared/ipc/coworkContract';
 
 export const registerCoworkConfigIpc = (): void => {
-  ipcMain.handle('cowork:config:get', async () => {
-    try {
-      const config = getCoworkStore().getConfig();
-      return { success: true, config };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get config',
-      };
-    }
-  });
-
   const VALID_EMBEDDING_PROVIDERS = [
     'local',
     'openai',
@@ -72,26 +58,20 @@ export const registerCoworkConfigIpc = (): void => {
     };
   }
 
-  ipcMain.handle(
-    'cowork:config:set',
-    async (
-      _event,
-      config: {
-        workingDirectory?: string;
-        executionMode?: CoworkExecutionMode;
-        permissionMode?: CoworkPermissionMode;
-        permissionModeBySession?: Record<string, CoworkPermissionMode>;
-        embeddingEnabled?: boolean;
-        embeddingProvider?: string;
-        embeddingModel?: string;
-        embeddingLocalModelPath?: string;
-        embeddingVectorWeight?: number;
-        embeddingRemoteBaseUrl?: string;
-        embeddingRemoteApiKey?: string;
-        codemodeEnabled?: boolean;
-        mcpNativeBridge?: boolean;
-      },
-    ) => {
+  handleIpcContract(coworkConfigContract, {
+    getConfig: async () => {
+      try {
+        const config = getCoworkStore().getConfig();
+        return { success: true as const, config };
+      } catch (error) {
+        return {
+          success: false as const,
+          error: error instanceof Error ? error.message : 'Failed to get config',
+        };
+      }
+    },
+
+    setConfig: async (_event, config) => {
       try {
         const normalizedPermissionMode =
           config.permissionMode === CoworkPermissionMode.Ask ||
@@ -146,13 +126,13 @@ export const registerCoworkConfigIpc = (): void => {
           // {STATE_DIR}/workspace-main/ regardless of the user's working directory.
         }
 
-        return { success: true };
+        return { success: true as const };
       } catch (error) {
         return {
-          success: false,
+          success: false as const,
           error: error instanceof Error ? error.message : 'Failed to set config',
         };
       }
     },
-  );
+  });
 };

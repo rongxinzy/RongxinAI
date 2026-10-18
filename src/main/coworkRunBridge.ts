@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
-import { BrowserWindow, ipcMain } from 'electron';
-import { CoworkSessionIpc, CoworkStreamIpc } from '../shared/ipc/channels';
+import { BrowserWindow } from 'electron';
+import { CoworkStreamIpc } from '../shared/ipc/channels';
 import {
   CoworkRunPhase,
   CoworkRunPolicy,
@@ -9,6 +9,8 @@ import {
 import { PiRunStateTracker } from './libs/agentEngine/piRunState';
 import type { PiRuntimeAdapter } from './libs/agentEngine/piRuntimeAdapter';
 import { CoworkContentProjection } from './coworkContentProjection';
+import { handleIpcContract } from './ipc/handleIpcContract';
+import { coworkRunSnapshotContract } from '../shared/ipc/coworkContract';
 
 export function bindCoworkRunBridge(
   runtime: PiRuntimeAdapter,
@@ -48,10 +50,9 @@ export function bindCoworkRunBridge(
         .catch(error => console.error('[CoworkRunBridge] message projection failed:', error));
     });
   });
-  ipcMain.handle(
-    CoworkSessionIpc.RunSnapshot,
-    async (event, sessionId: unknown, replayContent: unknown) => {
-      if (typeof sessionId !== 'string' || sessionId.length > 200) return { success: false };
+  handleIpcContract(coworkRunSnapshotContract, {
+    getRunSnapshot: async (event, sessionId, replayContent) => {
+      if (sessionId.length > 200) return { success: false };
       if (replayContent === true) {
         // SQLite lifecycle remains on main. Read only a bounded tail; transforms run in workers.
         const stored = getDatabase()
@@ -66,8 +67,9 @@ export function bindCoworkRunBridge(
           if (!projection.has(message.id))
             await projection.project(sessionId, message.id, message.content);
         }
+        const sender = event.sender;
         for (const patch of await projection.replay(sessionId)) {
-          if (!event.sender.isDestroyed()) event.sender.send(CoworkStreamIpc.ContentPatch, patch);
+          if (!sender.isDestroyed()) sender.send(CoworkStreamIpc.ContentPatch, patch);
         }
       }
       return {
@@ -76,6 +78,6 @@ export function bindCoworkRunBridge(
         running: runtime.isSessionRunning(sessionId),
       };
     },
-  );
+  });
   return projection;
 }

@@ -1,16 +1,17 @@
 import { writeFile } from 'fs/promises';
 
-import { BrowserWindow, dialog, ipcMain } from 'electron';
+import { BrowserWindow, dialog } from 'electron';
 
 import {
   WorkbenchRunTrigger,
   WorkbenchTaskIpc,
-  type WorkbenchApprovalResponseInput,
-  type WorkbenchRun,
+  type WorkbenchTaskResumeInput,
   type WorkbenchTask,
   type WorkbenchTaskChangedEvent,
-  type WorkbenchTaskResumeInput,
+  type WorkbenchRun,
 } from '../../shared/workbenchTask';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { workbenchTaskContract } from '../../shared/ipc/workbenchTaskContract';
 import type { WorkbenchTaskService } from './taskService';
 
 export function registerWorkbenchTaskIpcHandlers(options: {
@@ -25,60 +26,6 @@ export function registerWorkbenchTaskIpcHandlers(options: {
   service.on('changed', (event: WorkbenchTaskChangedEvent) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(WorkbenchTaskIpc.Changed, event);
-    }
-  });
-
-  ipcMain.handle(WorkbenchTaskIpc.GetCurrent, (_event, sessionId: string) => ({
-    success: true,
-    detail: service.getCurrent(sessionId) ?? undefined,
-  }));
-
-  ipcMain.handle(WorkbenchTaskIpc.GetDetail, (_event, taskId: string) => {
-    const detail = service.getDetail(taskId);
-    return detail
-      ? { success: true, detail }
-      : { success: false, error: 'Workbench task not found.' };
-  });
-
-  ipcMain.handle(WorkbenchTaskIpc.ListForSession, (_event, sessionId: string) => ({
-    success: true,
-    tasks: service.listForSession(sessionId),
-  }));
-
-  ipcMain.handle(WorkbenchTaskIpc.ExportAudit, async (event, taskId: string) => {
-    try {
-      const detail = service.getDetail(taskId);
-      if (!detail) return { success: false, error: 'Workbench task not found.' };
-      const owner = BrowserWindow.fromWebContents(event.sender);
-      const saveOptions = {
-        defaultPath: `workbench-task-audit-${detail.task.id}.json`,
-        filters: [{ name: 'JSON', extensions: ['json'] }],
-      };
-      const selection = owner
-        ? await dialog.showSaveDialog(owner, saveOptions)
-        : await dialog.showSaveDialog(saveOptions);
-      if (selection.canceled || !selection.filePath) {
-        return { success: true, canceled: true };
-      }
-      await writeFile(
-        selection.filePath,
-        `${JSON.stringify(
-          {
-            schemaVersion: 1,
-            exportedAt: new Date().toISOString(),
-            detail,
-          },
-          null,
-          2,
-        )}\n`,
-        'utf8',
-      );
-      return { success: true, path: selection.filePath };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
     }
   });
 
@@ -108,27 +55,77 @@ export function registerWorkbenchTaskIpcHandlers(options: {
     }
   };
 
-  ipcMain.handle(WorkbenchTaskIpc.Resume, (_event, input: WorkbenchTaskResumeInput) =>
-    startRun(input.taskId, WorkbenchRunTrigger.Resume, input),
-  );
-  ipcMain.handle(WorkbenchTaskIpc.Retry, (_event, taskId: string) =>
-    startRun(taskId, WorkbenchRunTrigger.Retry),
-  );
+  handleIpcContract(workbenchTaskContract, {
+    getCurrent: (_event, sessionId) => ({
+      success: true,
+      detail: service.getCurrent(sessionId) ?? undefined,
+    }),
 
-  ipcMain.handle(WorkbenchTaskIpc.Accept, (_event, taskId: string) => {
-    try {
-      return { success: true, detail: service.acceptTask(taskId) };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  });
+    getDetail: (_event, taskId) => {
+      const detail = service.getDetail(taskId);
+      return detail
+        ? { success: true, detail }
+        : { success: false, error: 'Workbench task not found.' };
+    },
 
-  ipcMain.handle(
-    WorkbenchTaskIpc.RespondToApproval,
-    (_event, input: WorkbenchApprovalResponseInput) => {
+    listForSession: (_event, sessionId) => ({
+      success: true,
+      tasks: service.listForSession(sessionId),
+    }),
+
+    exportAudit: async (event, taskId) => {
+      try {
+        const detail = service.getDetail(taskId);
+        if (!detail) return { success: false, error: 'Workbench task not found.' };
+        const owner = BrowserWindow.fromWebContents(event.sender);
+        const saveOptions = {
+          defaultPath: `workbench-task-audit-${detail.task.id}.json`,
+          filters: [{ name: 'JSON', extensions: ['json'] }],
+        };
+        const selection = owner
+          ? await dialog.showSaveDialog(owner, saveOptions)
+          : await dialog.showSaveDialog(saveOptions);
+        if (selection.canceled || !selection.filePath) {
+          return { success: true, canceled: true };
+        }
+        await writeFile(
+          selection.filePath,
+          `${JSON.stringify(
+            {
+              schemaVersion: 1,
+              exportedAt: new Date().toISOString(),
+              detail,
+            },
+            null,
+            2,
+          )}\n`,
+          'utf8',
+        );
+        return { success: true, path: selection.filePath };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+
+    resume: (_event, input) => startRun(input.taskId, WorkbenchRunTrigger.Resume, input),
+
+    retry: (_event, taskId) => startRun(taskId, WorkbenchRunTrigger.Retry),
+
+    accept: (_event, taskId) => {
+      try {
+        return { success: true, detail: service.acceptTask(taskId) };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+
+    respondToApproval: (_event, input) => {
       try {
         service.respondToApproval(input);
         const approval = service.repository.getApproval(input.approvalId);
@@ -143,5 +140,5 @@ export function registerWorkbenchTaskIpcHandlers(options: {
         };
       }
     },
-  );
+  });
 }

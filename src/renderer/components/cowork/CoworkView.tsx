@@ -38,6 +38,7 @@ import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSl
 import { WorkMode } from '../../store/workMode/constants';
 import {
   type CoworkImageAttachment,
+  type CoworkOutgoingImageAttachment,
   type CoworkFileAttachment,
   type CoworkPermissionRequest,
   type CoworkPermissionResult,
@@ -235,7 +236,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const handleStartSession = async (
     prompt: string,
-    imageAttachments?: CoworkImageAttachment[],
+    imageAttachments?: CoworkOutgoingImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
@@ -470,7 +471,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const handleContinueSession = async (
     prompt: string,
-    imageAttachments?: CoworkImageAttachment[],
+    imageAttachments?: CoworkOutgoingImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,

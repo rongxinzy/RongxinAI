@@ -32,6 +32,7 @@ import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type {
   CoworkImageAttachment,
+  CoworkOutgoingImageAttachment,
   CoworkFileAttachment,
   CoworkMessage,
   CoworkMessageMetadata,
@@ -83,7 +84,7 @@ interface CoworkSessionDetailProps {
   onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
   onContinue: (
     prompt: string,
-    imageAttachments?: CoworkImageAttachment[],
+    imageAttachments?: CoworkOutgoingImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
     goalMode?: boolean,

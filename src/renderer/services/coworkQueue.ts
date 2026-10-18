@@ -1,5 +1,5 @@
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
-import type { CoworkFileAttachment, CoworkImageAttachment } from '../types/cowork';
+import type { CoworkFileAttachment, CoworkOutgoingImageAttachment } from '../types/cowork';
 import { PiUiEventSequenceTracker, PiUiEventType } from '../../shared/cowork/piUiEvent';
 
 type QueueListener = (items: CoworkPendingMessage[]) => void;
@@ -38,7 +38,7 @@ class CoworkQueueService {
   enqueue(
     sessionId: string,
     text: string,
-    imageAttachments?: CoworkImageAttachment[],
+    imageAttachments?: CoworkOutgoingImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     skillIds?: string[],
   ) {
