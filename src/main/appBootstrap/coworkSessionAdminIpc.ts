@@ -134,6 +134,12 @@ export const registerCoworkSessionAdminIpc = (): void => {
                 .metadata as CoworkMessageMetadata | undefined,
             });
           }
+          // Imported messages were never seen by the Pi session file; drop it
+          // so the next turn rebuilds from this transcript instead of mixing
+          // the import with stale structured history.
+          if (session.messages?.length) {
+            getPiRuntimeAdapter().invalidatePiSessionDir(session.id);
+          }
           const updated = rt.coworkStore.getSession(session.id);
           return {
             success: true,

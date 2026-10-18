@@ -6,9 +6,12 @@ export * from './llamacppManager/types';
 export { LlamaCppManager } from './llamacppManager/modelOps';
 export {
   isGgufPath,
+  buildLlamaCppPresetGlobalGpuSection,
+  LLAMACPP_PRESET_GLOBAL_GPU_KEYS,
   modelLaunchOptionsToPreset,
   normalizePositiveInteger,
   removeEmptyParentDirs,
+  replaceIniSectionKeys,
   resolveImportedModelTargetPath,
   upsertIniSection,
 } from './llamacppManager/fileUtils';

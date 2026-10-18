@@ -7,10 +7,8 @@ import { EnterpriseSessionIpc } from '../../shared/enterpriseSession';
 import {
   CommunityAuthIpc,
   EnterpriseIpc,
-  GitHubCopilotIpc,
   ManagedProviderIpc,
   ModelPoolIpc,
-  OpenAICodexOAuthIpc,
 } from '../../shared/ipc/channels';
 import {
   MagpieIpc,
@@ -176,23 +174,5 @@ export const providersApi = {
       onPush(ModelPoolIpc.streamError(requestId), callback),
     onStreamAbort: (requestId: string, callback: () => void) =>
       onPushVoid(ModelPoolIpc.streamAbort(requestId), callback),
-  },
-
-  githubCopilot: {
-    requestDeviceCode: () => ipcRenderer.invoke(GitHubCopilotIpc.RequestDeviceCode),
-    pollForToken: (deviceCode: string, interval: number, expiresIn: number) =>
-      ipcRenderer.invoke(GitHubCopilotIpc.PollForToken, { deviceCode, interval, expiresIn }),
-    cancelPolling: () => ipcRenderer.invoke(GitHubCopilotIpc.CancelPolling),
-    signOut: () => ipcRenderer.invoke(GitHubCopilotIpc.SignOut),
-    refreshToken: () => ipcRenderer.invoke(GitHubCopilotIpc.RefreshToken),
-    onTokenUpdated: (callback: (data: { token: string; baseUrl: string }) => void) =>
-      onPush(GitHubCopilotIpc.TokenUpdated, callback),
-  },
-
-  openaiCodexOAuth: {
-    start: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Start),
-    cancel: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Cancel),
-    logout: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Logout),
-    status: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Status),
   },
 };

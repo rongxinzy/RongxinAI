@@ -234,6 +234,9 @@ export function onPiSessionDeleted(host: PiRuntimeAdapterHost, sessionId: string
   // queue.clear emits queueUpdated itself when the session had queued items.
   host.queue.clear(sessionId);
   host.getWorkbenchTaskService()?.deleteSession(sessionId);
+  // The deleted session's Pi JSONL must go with it: it holds the only other
+  // copy of the conversation and a reused cowork session id must start clean.
+  host.invalidatePiSessionDir(sessionId);
 }
 
 export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Date.now()): void {
