@@ -26,7 +26,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version-file: .nvmrc
+          check-latest: true
       - id: source
         name: Validate repository, workflow, tag and main ancestry
         env:
@@ -52,7 +53,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version-file: .nvmrc
+          check-latest: true
       - uses: actions/download-artifact@v8
         with:
           repository: ${{ matrix.sourceRepository }}
