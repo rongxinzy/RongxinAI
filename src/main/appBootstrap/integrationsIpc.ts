@@ -7,11 +7,11 @@ import { generateSessionTitle } from '../libs/coworkUtil';
 import { isInternalWorkspacePath } from './workspacePaths';
 import { getCoworkStore } from './runtimeServices';
 import { t } from '../i18n';
-import { AppConfigIpc } from '../../shared/ipc/channels';
+import { AppConfigIpc, DingTalkInstallIpc } from '../../shared/ipc/channels';
 
 export const registerIntegrationsIpc = (): void => {
   const modelService = getMagpieModelService();
-  ipcMain.handle('dingtalk:install:qrcode', async () => {
+  ipcMain.handle(DingTalkInstallIpc.Qrcode, async () => {
     try {
       return await getIMGatewayManager().startDingTalkInstallQrcode();
     } catch (error) {
@@ -20,7 +20,7 @@ export const registerIntegrationsIpc = (): void => {
   });
 
   ipcMain.handle(
-    'dingtalk:install:poll',
+    DingTalkInstallIpc.Poll,
     async (_event, { deviceCode }: { deviceCode: string }) => {
       try {
         return await getIMGatewayManager().pollDingTalkInstall(deviceCode);
@@ -31,7 +31,7 @@ export const registerIntegrationsIpc = (): void => {
   );
 
   ipcMain.handle(
-    'dingtalk:install:verify',
+    DingTalkInstallIpc.Verify,
     async (_event, { clientId, clientSecret }: { clientId: string; clientSecret: string }) => {
       try {
         return await getIMGatewayManager().verifyDingTalkCredentials(clientId, clientSecret);
