@@ -11,21 +11,20 @@ import {
   EmptyTitle,
 } from '@shared/components/ui/empty';
 import { Code2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useMemo, useState, type ReactNode, type RefObject } from 'react';
+import { useSelector } from 'react-redux';
 
 import type { CodingElicitation, CodingEvent } from '../../../shared/codingAgent';
-import { collectInlineArtifacts } from '../../services/inlineArtifacts';
-import { loadArtifactFileWithRetry } from '../../services/artifactFileLoader';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
-import { addArtifact, selectSessionArtifacts } from '../../store/slices/artifactSlice';
+import { selectSessionArtifacts } from '../../store/slices/artifactSlice';
 import type { Artifact } from '../../types/artifact';
 import { CodingConversationTurn } from './CodingConversationTurn';
 import { CodingElicitationCard } from './CodingElicitationCard';
 import { toDetectableCodingMessages } from './codingArtifactMessages';
-import { collectCodingFileArtifacts } from './codingArtifacts';
 import { projectCodingEvents } from './codingEventProjection';
+import { useInlineArtifacts } from '../cowork/sessionDetail/useInlineArtifacts';
+import { useLedgerArtifacts } from './useLedgerArtifacts';
 
 interface CodingEventStreamProps {
   events: CodingEvent[];
@@ -42,8 +41,6 @@ interface CodingEventStreamProps {
    * cards that open the artifact panel.
    */
   artifactSessionKey?: string | null;
-  /** Base directory used to resolve relative artifact paths for disk reads. */
-  artifactBaseDir?: string | null;
   /** A question the agent is waiting on for this lane. */
   elicitation?: CodingElicitation | null;
   onRespondElicitation?: (answer: string) => Promise<boolean>;
@@ -71,12 +68,10 @@ export const CodingEventStream = ({
   emptyDescription,
   headerActions,
   artifactSessionKey = null,
-  artifactBaseDir = null,
   elicitation = null,
   onRespondElicitation,
   onCancelElicitation,
 }: CodingEventStreamProps) => {
-  const dispatch = useDispatch();
   const turns = useMemo(() => projectCodingEvents(events), [events]);
   const [expandedActivityIds, setExpandedActivityIds] = useState<ReadonlySet<string>>(
     () => new Set(),
@@ -92,90 +87,30 @@ export const CodingEventStream = ({
   const artifacts = useSelector((state: RootState) =>
     artifactSessionKey ? selectSessionArtifacts(state, artifactSessionKey) : undefined,
   );
-  // Tracks the latest loaded write per artifact so a file is re-read from disk
-  // after a rewrite, but not on every render.
-  const loadedFileVersionsRef = useRef<Map<string, string>>(new Map());
-  const loadingFileVersionsRef = useRef<Map<string, string>>(new Map());
-  const [loadingArtifactIds, setLoadingArtifactIds] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  );
 
-  // Inline artifact projection runs on the settled transcript only — scanning
-  // on every streamed chunk would redo the whole parse per token. File-backed
-  // artifacts come from collectCodingFileArtifacts over structured events.
-  const detectableMessages = useMemo(
-    () => (isStreaming ? [] : toDetectableCodingMessages(turns)),
-    [turns, isStreaming],
-  );
-  const fileArtifacts = useMemo(
-    () =>
-      artifactSessionKey
-        ? collectCodingFileArtifacts(events, artifactSessionKey, artifactBaseDir)
-        : [],
-    [events, artifactSessionKey, artifactBaseDir],
-  );
-  useEffect(() => {
-    if (!artifactSessionKey) return;
-    if (!isStreaming) {
-      for (const artifact of collectInlineArtifacts(detectableMessages, artifactSessionKey)) {
-        // The coding page keeps revealing its own stream artifacts; the cowork
-        // panel only opens for live declared deliverables.
-        dispatch(addArtifact({ sessionId: artifactSessionKey, artifact, reveal: true }));
-      }
-    }
-    for (const { artifact, needsFileLoad, version } of fileArtifacts) {
-      // The coding page keeps revealing its own stream artifacts; the cowork
-      // panel only opens for live declared deliverables.
-      dispatch(addArtifact({ sessionId: artifactSessionKey, artifact, reveal: true }));
-      if (!needsFileLoad) continue;
-      const loadKey = `${artifactSessionKey}:${artifact.id}`;
-      if (loadedFileVersionsRef.current.get(loadKey) === version) continue;
-      loadedFileVersionsRef.current.set(loadKey, version);
-      loadingFileVersionsRef.current.set(loadKey, version);
-      setLoadingArtifactIds(current => new Set(current).add(artifact.id));
-      void loadArtifactFileWithRetry(artifact, artifactBaseDir)
-        .then(loaded => {
-          if (!loaded) return;
-          dispatch(
-            addArtifact({
-              sessionId: artifactSessionKey,
-              artifact: { ...artifact, content: loaded.content, filePath: loaded.filePath },
-              reveal: true,
-            }),
-          );
-        })
-        .finally(() => {
-          if (loadingFileVersionsRef.current.get(loadKey) !== version) return;
-          loadingFileVersionsRef.current.delete(loadKey);
-          setLoadingArtifactIds(current => {
-            const next = new Set(current);
-            next.delete(artifact.id);
-            return next;
-          });
-        });
-    }
-  }, [
-    artifactSessionKey,
-    artifactBaseDir,
+  // File-backed artifacts come from the main-process ledger: rows recorded
+  // while this lane was not shown are read once per lane, live rows arrive
+  // through the shared `artifact:upsert` subscription. Inline code blocks use
+  // the same projection as cowork, once the transcript settles.
+  useLedgerArtifacts(artifactSessionKey);
+  const settledMessages = useMemo(() => toDetectableCodingMessages(turns), [turns]);
+  useInlineArtifacts({
+    sessionId: artifactSessionKey ?? undefined,
+    messages: settledMessages,
     isStreaming,
-    detectableMessages,
-    fileArtifacts,
-    dispatch,
-  ]);
+  });
 
-  // Anchor preview cards to the tool call that wrote the file. Store artifacts
-  // win over collector output because they may carry disk-loaded content.
+  // Anchor preview cards to the tool call that wrote the file.
   const artifactsByToolCallId = useMemo(() => {
     const grouped = new Map<string, Artifact[]>();
-    const storedById = new Map((artifacts ?? []).map(artifact => [artifact.id, artifact]));
-    for (const { artifact, toolCallId } of fileArtifacts) {
-      if (!toolCallId) continue;
-      const list = grouped.get(toolCallId) ?? [];
-      list.push(storedById.get(artifact.id) ?? artifact);
-      grouped.set(toolCallId, list);
+    for (const artifact of artifacts ?? []) {
+      if (!artifact.toolCallId) continue;
+      const list = grouped.get(artifact.toolCallId) ?? [];
+      list.push(artifact);
+      grouped.set(artifact.toolCallId, list);
     }
     return grouped;
-  }, [fileArtifacts, artifacts]);
+  }, [artifacts]);
 
   const artifactsByMessageId = useMemo(() => groupArtifactsByMessage(artifacts ?? []), [artifacts]);
 
@@ -239,7 +174,6 @@ export const CodingEventStream = ({
                 }
                 artifactsByMessageId={artifactsByMessageId}
                 artifactsByToolCallId={artifactsByToolCallId}
-                loadingArtifactIds={loadingArtifactIds}
                 expandedActivityIds={expandedActivityIds}
                 onActivityOpenChange={setActivityOpen}
                 onReEditUserMessage={onReEditUserMessage}

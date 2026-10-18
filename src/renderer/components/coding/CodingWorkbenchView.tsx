@@ -545,7 +545,6 @@ export const CodingWorkbenchView = ({
               }
               scrollAreaRef={eventStreamRef}
               artifactSessionKey={artifactSessionKey}
-              artifactBaseDir={activeLane?.executionRoot ?? null}
               elicitation={activeElicitation}
               onRespondElicitation={respondElicitation}
               onCancelElicitation={cancelElicitation}

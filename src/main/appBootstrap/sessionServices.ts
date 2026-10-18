@@ -24,6 +24,7 @@ import { promoteVerifiedWorkbenchRun } from '../memory/taskMemoryPromotion';
 export const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!rt.workbenchTaskService) {
     rt.workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
+      listLedgerArtifacts: scopeId => getArtifactLedger().list(scopeId),
       onVerifiedRun: event => {
         const complete = getPiRuntimeAdapter().getSessionMemoryCompletion(event.task.sessionId);
         if (!complete) {

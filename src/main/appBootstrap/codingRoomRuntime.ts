@@ -253,9 +253,16 @@ export const getCodingRoomService = (): CodingRoomService => {
           });
           return { taskId: workbench.task.id, runId: workbench.run.id };
         },
-        completeExternalWorkbenchRun: async ({ sessionId, runId, workspaceRoot, finalAnswer }) => {
+        completeExternalWorkbenchRun: async ({
+          sessionId,
+          laneId,
+          runId,
+          workspaceRoot,
+          finalAnswer,
+        }) => {
           await getWorkbenchTaskService().completeRun({
             sessionId,
+            artifactScopeId: laneId,
             runId,
             workspaceRoot,
             finalAnswer,

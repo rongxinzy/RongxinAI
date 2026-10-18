@@ -406,6 +406,34 @@ test('coding lane events record under the lane scope', async () => {
   expect(ledger.list('lane-1')).toHaveLength(1);
 });
 
+test('coding lane rows carry the workbench run of the lane assignment', () => {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE coding_agent_lanes (id TEXT PRIMARY KEY, execution_root TEXT, source_root TEXT);
+    CREATE TABLE coding_assignments (
+      id TEXT PRIMARY KEY, lane_id TEXT, workbench_run_id TEXT, created_at INTEGER
+    );
+    CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
+  `);
+  initializeArtifactLedgerSchema(db);
+  databases.push(db);
+  db.prepare(
+    `INSERT INTO coding_agent_lanes (id, execution_root, source_root) VALUES ('lane-1', '/repo', '/repo')`,
+  ).run();
+  db.prepare(
+    `INSERT INTO coding_assignments (id, lane_id, workbench_run_id, created_at) VALUES
+      ('old', 'lane-1', 'run-old', 1), ('new', 'lane-1', 'run-new', 2)`,
+  ).run();
+
+  recordCodingLaneArtifact(db, 'lane-1', CodingEventKind.FileChange, {
+    path: 'out/report.html',
+    type: 'diff',
+    newText: '<h1>x</h1>',
+  });
+
+  expect(new ArtifactLedger(db).list('lane-1')[0].runId).toBe('run-new');
+});
+
 function recordCodingLaneArtifactsForTest(db: Database.Database): void {
   recordCodingLaneArtifact(db, 'lane-1', CodingEventKind.FileChange, {
     path: 'out/report.html',
