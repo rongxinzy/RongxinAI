@@ -3,7 +3,7 @@
  *
  * Covers OS permissions, community auth, the managed model pool, enterprise
  * config/session, managed providers (incl. AISphere), provider install flows
- * (Feishu, DingTalk, GitHub Copilot, OpenAI Codex OAuth) and the activity feed.
+ * (Feishu, DingTalk) and the activity feed.
  */
 import type { ActivityRun } from '../../../shared/activity/types';
 import type {
@@ -132,49 +132,6 @@ export interface DingTalkApi {
       error?: string;
     }>;
   };
-}
-
-export interface GithubCopilotApi {
-  requestDeviceCode: () => Promise<{
-    userCode: string;
-    verificationUri: string;
-    deviceCode: string;
-    interval: number;
-    expiresIn: number;
-  }>;
-  pollForToken: (
-    deviceCode: string,
-    interval: number,
-    expiresIn: number,
-  ) => Promise<{
-    success: boolean;
-    token?: string;
-    githubUser?: string;
-    baseUrl?: string;
-    error?: string;
-  }>;
-  cancelPolling: () => Promise<void>;
-  signOut: () => Promise<void>;
-  refreshToken: () => Promise<{
-    success: boolean;
-    token?: string;
-    baseUrl?: string;
-    error?: string;
-  }>;
-  onTokenUpdated: (callback: (data: { token: string; baseUrl: string }) => void) => () => void;
-}
-
-export interface OpenaiCodexOAuthApi {
-  start: () => Promise<
-    | { success: true; email: string | null; accountId: string | null; expiresAt: number }
-    | { success: false; error: string }
-  >;
-  cancel: () => Promise<void>;
-  logout: () => Promise<void>;
-  status: () => Promise<
-    | { loggedIn: true; email: string | null; accountId: string | null; expiresAt: number }
-    | { loggedIn: false }
-  >;
 }
 
 export interface ActivityApi {

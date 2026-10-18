@@ -24,7 +24,6 @@ const ELECTRON_MEMBERS = [
   'triage',
   'hardware',
   'agents',
-  'api',
   'checkApiConfig',
   'generateSessionTitle',
   'getRecentCwds',
@@ -55,11 +54,8 @@ const ELECTRON_MEMBERS = [
   'enterprise',
   'managedProviders',
   'networkStatus',
-  'devNetwork',
   'feishu',
   'dingtalk',
-  'githubCopilot',
-  'openaiCodexOAuth',
   'activity',
 ] as const;
 

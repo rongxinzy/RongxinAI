@@ -3,13 +3,10 @@ import { ipcRenderer } from 'electron';
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import { AppUpdateIpc } from '../../shared/appUpdate/constants';
 import { TriageIpcChannel } from '../../shared/triage';
-import type { ApiRequestPurpose } from '../../shared/ipc/apiRequest';
 import {
-  ApiIpc,
   AppConfigIpc,
   AppIpc,
   ContextMenuIpc,
-  DevNetworkIpc,
   DialogIpc,
   LogIpc,
   NetworkIpc,
@@ -38,17 +35,6 @@ export const appSystemApi = {
   permissions: {
     checkCalendar: () => ipcRenderer.invoke(PermissionsIpc.CheckCalendar),
     requestCalendar: () => ipcRenderer.invoke(PermissionsIpc.RequestCalendar),
-  },
-
-  api: {
-    fetch: (options: {
-      url: string;
-      method: string;
-      headers: Record<string, string>;
-      body?: string;
-      timeoutMs?: number;
-      purpose?: ApiRequestPurpose;
-    }) => ipcRenderer.invoke(ApiIpc.Fetch, options),
   },
 
   // Internal app-level events (replaces raw ipcRenderer.on usage in App.tsx)
@@ -190,11 +176,5 @@ export const appSystemApi = {
 
   networkStatus: {
     send: (status: 'online' | 'offline') => ipcRenderer.send(NetworkIpc.StatusChange, status),
-  },
-
-  // 2026/09/17 lixiang  开发态主进程网络日志 → 渲染进程 Network beacon
-  devNetwork: {
-    onEntry: (callback: (entry: import('../../shared/devNetworkLog').DevNetworkLogEntry) => void) =>
-      onPush(DevNetworkIpc.Entry, callback),
   },
 };

@@ -1,19 +1,10 @@
 /**
  * Core app preload surface, split from `../electron.d.ts`.
  *
- * Key/value store, the renderer->main fetch proxy, app events, the context
- * menu bridge, window controls and the managed memory service.
+ * Key/value store, app events, the context menu bridge, window controls and
+ * the managed memory service.
  */
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../../shared/contextMenu';
-
-interface ApiResponse {
-  ok: boolean;
-  status: number;
-  statusText: string;
-  headers: Record<string, string>;
-  data: any;
-  error?: string;
-}
 
 interface WindowState {
   isMaximized: boolean;
@@ -25,17 +16,6 @@ export interface StoreApi {
   get: (key: string) => Promise<any>;
   set: (key: string, value: any) => Promise<void>;
   remove: (key: string) => Promise<void>;
-}
-
-export interface ApiProxyApi {
-  fetch: (options: {
-    url: string;
-    method: string;
-    headers: Record<string, string>;
-    body?: string;
-    timeoutMs?: number;
-    purpose?: import('../../../shared/ipc/apiRequest').ApiRequestPurpose;
-  }) => Promise<ApiResponse>;
 }
 
 export interface AppEventsApi {
