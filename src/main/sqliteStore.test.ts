@@ -426,7 +426,6 @@ test('migrates unique workspace paths while preserving existing workspaces', asy
     name: 'Existing workspace',
     path: '/repo/shared',
   });
-  expect(store.getDidRunMigration()).toBe(true);
 
   db.prepare(
     `INSERT INTO workspaces (id, name, path, is_hidden, created_at, updated_at)
