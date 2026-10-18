@@ -80,9 +80,7 @@ export async function evictIdleLlamaCppRouterModelsForLoad(input: {
   stopModel: (modelName: string) => Promise<unknown>;
 }): Promise<string[]> {
   const evicted: string[] = [];
-  let running = input.runningModelNames.filter(
-    name => name && name !== input.targetModelName,
-  );
+  let running = input.runningModelNames.filter(name => name && name !== input.targetModelName);
   if (running.length < input.limit) return evicted;
 
   // Probe slots once per candidate; a model that turns busy after its probe

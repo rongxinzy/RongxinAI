@@ -398,7 +398,8 @@ export function sanitizeLlamaCppServiceConfig(
     next.gatewayAccessMode = gatewayAccessMode;
   }
   if (orchestrator) next.orchestrator = orchestrator;
-  if (port) next.port = port;  if (modelsDir) next.modelsDir = modelsDir;
+  if (port) next.port = port;
+  if (modelsDir) next.modelsDir = modelsDir;
   if (runtimeVersion && /^b\d+(?:-[a-f0-9]+)?$/i.test(runtimeVersion))
     next.runtimeVersion = runtimeVersion;
   if (isRuntimeBackend(runtimeBackend)) next.runtimeBackend = runtimeBackend;

@@ -234,8 +234,7 @@ export function registerLlamaCppIpcHandlers(
   // The implementation is chosen once, at registration, from the config's
   // `orchestrator` field (default router); a switch takes effect on the next
   // app start. `daemon` keeps its name so the ~20 call sites stay unchanged.
-  const useRouterOrchestrator =
-    resolveServiceConfig().orchestrator !== LlamaCppOrchestrator.Daemon;
+  const useRouterOrchestrator = resolveServiceConfig().orchestrator !== LlamaCppOrchestrator.Daemon;
   const routerOrchestrator = useRouterOrchestrator ? createRouterOrchestrator() : null;
   const daemon: LlamaCppModelOrchestrator = routerOrchestrator ?? createDaemonOrchestrator();
   const stopLeftoverDaemonBeforeStart = async (): Promise<void> => {
@@ -637,8 +636,8 @@ export function registerLlamaCppIpcHandlers(
             // immediately like the daemon path does.
             const freedModels = await evictIdleLlamaCppRouterModelsForLoad({
               limit: loadLimitViolation.limit,
-              runningModelNames: runningModels.map(
-                model => (model.name || model.model || model.id || '').trim(),
+              runningModelNames: runningModels.map(model =>
+                (model.name || model.model || model.id || '').trim(),
               ),
               targetModelName: modelName,
               slotsBusy: async candidateName =>

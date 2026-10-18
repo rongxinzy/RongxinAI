@@ -1,6 +1,4 @@
-import type {
-  LlamaCppModelDaemonStatus,
-} from './llamacppModelDaemonProtocol';
+import type { LlamaCppModelDaemonStatus } from './llamacppModelDaemonProtocol';
 import type {
   LlamaCppModelLaunchInput,
   LlamaCppRunningModel,

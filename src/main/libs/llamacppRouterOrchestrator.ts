@@ -126,22 +126,27 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
     if (!modelName) throw new Error('Model name is required.');
     await this.ensureStarted();
 
-    const modelPath = input.modelPath?.trim() || this.findLocalModel(modelName)?.path;
+    // Already resident: never rewrite the preset, since a changed section makes
+    // the router restart a running instance (and an option-less gateway load
+    // would drop the ctx/GPU options of the last explicit load).
+    const known = (await this.client().listRouterModels()).find(model => model.id === modelName);
+    if (known?.state === 'loaded' || known?.state === 'sleeping') {
+      this.lastRunningModels = await this.fetchRunningModels();
+      return this.currentStatus();
+    }
+    const modelPath =
+      input.modelPath?.trim() || known?.modelPath || this.findLocalModel(modelName)?.path;
     if (!modelPath) throw new Error(`Local model was not found: ${modelName}.`);
 
-    upsertLlamaCppRouterModelPresetSection({
-      presetPath: this.options.getPresetPath(),
-      modelName,
-      modelPath,
-      options: input.options,
-    });
-    // listModels performs GET /models?reload=1, so the freshly written preset
-    // section is picked up before the load request below.
-    const models = await this.client().listModels();
-    const existing = models.find(model => matchesName(model, modelName));
-    if (existing?.status === 'loaded' || existing?.status === 'sleeping') {
-      this.lastRunningModels = toRunningModels(models);
-      return this.currentStatus();
+    if (input.options || input.modelPath || !known) {
+      upsertLlamaCppRouterModelPresetSection({
+        presetPath: this.options.getPresetPath(),
+        modelName,
+        modelPath,
+        options: input.options,
+      });
+      // listModels performs GET /models?reload=1 so the router sees the section.
+      await this.client().listModels();
     }
 
     try {
@@ -358,7 +363,10 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
       presetPath: this.options.getPresetPath(),
       config,
     });
-    if (parseGatewayPort(config) !== this.gatewayPort || isLanMode(config) !== this.gatewayLanMode) {
+    if (
+      parseGatewayPort(config) !== this.gatewayPort ||
+      isLanMode(config) !== this.gatewayLanMode
+    ) {
       await this.startGateway(config);
     }
   }

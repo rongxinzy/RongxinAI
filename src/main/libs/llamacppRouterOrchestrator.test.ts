@@ -178,7 +178,10 @@ describe('LlamaCppRouterOrchestrator', () => {
         }
         if (url === '/v1/chat/completions') {
           // Minimal successful completion so the client's readiness probe passes.
-          return reply({ id: 'cmpl-probe', choices: [{ index: 0, message: { role: 'assistant', content: 'pong' } }] });
+          return reply({
+            id: 'cmpl-probe',
+            choices: [{ index: 0, message: { role: 'assistant', content: 'pong' } }],
+          });
         }
         reply({ error: { message: `unexpected ${url}` } }, 404);
       });
@@ -404,7 +407,7 @@ class FakeChildProcess extends EventEmitter {
   /** Emits captured spawn lines so the splitter can attribute them. */
   emitSpawnLines(): void {
     queueMicrotask(() => {
-      const text = this.stdoutLines.join('\n');
+      const text = this.stdoutLines.map(line => `${line}\n`).join('');
       if (text) this.emitStdout(text);
     });
   }

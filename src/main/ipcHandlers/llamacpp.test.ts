@@ -462,12 +462,11 @@ test('does not subscribe to obsolete manager status events', async () => {
     getStore: () => store as never,
   });
 
-  await Promise.resolve();
+  await vi.waitFor(() => expect(daemonListRunningModels).toHaveBeenCalledOnce());
 
   expect(manager.on).toHaveBeenCalledWith('install-progress', expect.any(Function));
   expect(manager.on).not.toHaveBeenCalledWith('status', expect.any(Function));
   expect(reconnect).toHaveBeenCalledOnce();
-  expect(daemonListRunningModels).toHaveBeenCalledOnce();
 });
 
 test('retries startup binding synchronization until an automatically loaded model is available', async () => {
