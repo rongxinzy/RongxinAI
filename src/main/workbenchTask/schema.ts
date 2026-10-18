@@ -10,8 +10,6 @@ import type Database from 'better-sqlite3';
 
 import { addColumnIfMissing, runMigrations, type Migration } from '../sqliteMigrations';
 
-export const WORKBENCH_TASK_SCHEMA_SCOPE = 'workbench-task';
-
 const CURRENT_SCHEMA_DDL = `
   -- Retired workflow state must not retain foreign keys to live tasks/runs.
   DROP TABLE IF EXISTS workbench_production_loops;
@@ -121,17 +119,15 @@ function reconcileLegacyWorkbenchTaskSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'workbench_runs', 'final_answer_json', 'TEXT');
 }
 
-export function workbenchTaskMigrations(): Migration[] {
-  return [
-    {
-      version: 1,
-      name: 'legacy-reconcile',
-      up: reconcileLegacyWorkbenchTaskSchema,
-    },
-  ];
-}
+const WORKBENCH_TASK_MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    name: 'legacy-reconcile',
+    up: reconcileLegacyWorkbenchTaskSchema,
+  },
+];
 
 export function initializeWorkbenchTaskSchema(db: Database.Database): void {
   db.exec(CURRENT_SCHEMA_DDL);
-  runMigrations(db, WORKBENCH_TASK_SCHEMA_SCOPE, workbenchTaskMigrations());
+  runMigrations(db, 'workbench-task', WORKBENCH_TASK_MIGRATIONS);
 }

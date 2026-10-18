@@ -10,8 +10,6 @@ import type Database from 'better-sqlite3';
 
 import { addColumnIfMissing, runMigrations, type Migration } from '../sqliteMigrations';
 
-export const TODO_SCHEMA_SCOPE = 'todo';
-
 function reconcileLegacyTodoSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'todos', 'remind_notified_at', 'INTEGER');
   db.exec(
@@ -19,15 +17,13 @@ function reconcileLegacyTodoSchema(db: Database.Database): void {
   );
 }
 
-export function todoMigrations(): Migration[] {
-  return [
-    {
-      version: 1,
-      name: 'legacy-reconcile',
-      up: reconcileLegacyTodoSchema,
-    },
-  ];
-}
+const TODO_MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    name: 'legacy-reconcile',
+    up: reconcileLegacyTodoSchema,
+  },
+];
 
 export function initializeTodoSchema(db: Database.Database): void {
   db.exec(`
@@ -80,5 +76,5 @@ export function initializeTodoSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_todo_steps_todo_order
       ON todo_steps(todo_id, step_order ASC, created_at ASC);
   `);
-  runMigrations(db, TODO_SCHEMA_SCOPE, todoMigrations());
+  runMigrations(db, 'todo', TODO_MIGRATIONS);
 }

@@ -10,8 +10,6 @@ import type Database from 'better-sqlite3';
 
 import { addColumnIfMissing, runMigrations, type Migration } from '../sqliteMigrations';
 
-export const CODING_SCHEMA_SCOPE = 'coding-agent';
-
 const CURRENT_SCHEMA_DDL = `
   CREATE TABLE IF NOT EXISTS coding_rooms (
     id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', workspace_root TEXT NOT NULL UNIQUE,
@@ -92,12 +90,7 @@ function reconcileLegacyCodingSchema(db: Database.Database): void {
   addColumnIfMissing(db, 'coding_agent_lanes', 'execution_root', "TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(db, 'coding_agent_lanes', 'model_override', 'TEXT');
   addColumnIfMissing(db, 'coding_agent_lanes', 'source_root', "TEXT NOT NULL DEFAULT ''");
-  addColumnIfMissing(
-    db,
-    'coding_agent_lanes',
-    'config_options_json',
-    "TEXT NOT NULL DEFAULT '[]'",
-  );
+  addColumnIfMissing(db, 'coding_agent_lanes', 'config_options_json', "TEXT NOT NULL DEFAULT '[]'");
   addColumnIfMissing(
     db,
     'coding_agent_lanes',
@@ -115,12 +108,7 @@ function reconcileLegacyCodingSchema(db: Database.Database): void {
     'auth_methods_json',
     "TEXT NOT NULL DEFAULT '[]'",
   );
-  addColumnIfMissing(
-    db,
-    'coding_agent_profiles',
-    'environment_json',
-    "TEXT NOT NULL DEFAULT '{}'",
-  );
+  addColumnIfMissing(db, 'coding_agent_profiles', 'environment_json', "TEXT NOT NULL DEFAULT '{}'");
 
   addColumnIfMissing(db, 'coding_assignments', 'workflow_stage', 'TEXT');
   addColumnIfMissing(db, 'coding_assignments', 'previous_assignment_id', 'TEXT');
@@ -143,17 +131,17 @@ function reconcileLegacyCodingSchema(db: Database.Database): void {
   `);
 }
 
-export function codingAgentMigrations(): Migration[] {
-  return [
-    {
-      version: 1,
-      name: 'legacy-reconcile',
-      up: reconcileLegacyCodingSchema,
-    },
-  ];
-}
+const CODING_SCHEMA_SCOPE = 'coding-agent';
+
+const CODING_MIGRATIONS: Migration[] = [
+  {
+    version: 1,
+    name: 'legacy-reconcile',
+    up: reconcileLegacyCodingSchema,
+  },
+];
 
 export function initializeCodingAgentSchema(db: Database.Database): void {
   db.exec(CURRENT_SCHEMA_DDL);
-  runMigrations(db, CODING_SCHEMA_SCOPE, codingAgentMigrations());
+  runMigrations(db, CODING_SCHEMA_SCOPE, CODING_MIGRATIONS);
 }

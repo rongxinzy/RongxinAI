@@ -62,10 +62,11 @@ test('fresh database: schema initializes, versions recorded, migrations do not r
   const store = await SqliteStore.create(userDataPath);
   const db = store.getDatabase();
 
-  for (const scope of ['core', 'workbench-task', 'coding-agent', 'todo']) {
+  // core is at 2 (legacy reconcile + electron-store import); module scopes at 1.
+  for (const scope of ['workbench-task', 'coding-agent', 'todo']) {
     expect(scopeRow(db, scope)?.version).toBe(1);
   }
-  expect(columnNames(db, 'cowork_sessions').has('sequence' as never)).toBe(false);
+  expect(scopeRow(db, 'core')?.version).toBe(2);
   expect(columnNames(db, 'cowork_messages').has('sequence')).toBe(true);
   expect(columnNames(db, 'agents').has('working_directory')).toBe(true);
 
@@ -177,7 +178,7 @@ test('legacy cowork database: columns added, sequence backfilled, version record
     .all('session-1') as Array<{ detail: string }>;
   expect(plan.map(row => row.detail).join('\n')).not.toContain('TEMP B-TREE');
 
-  expect(scopeRow(migrated, 'core')?.version).toBe(1);
+  expect(scopeRow(migrated, 'core')?.version).toBe(2);
   const coreRow = scopeRow(migrated, 'core');
   store.close();
 
@@ -376,22 +377,31 @@ test('core scope failure rolls back and rethrows, leaving the version un-advance
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
-    -- Legacy table with a shape the reconcile cannot adopt: the workspace
-    -- rebuild expects these columns and fails on the missing ones.
-    CREATE TABLE workspaces (
+    CREATE TABLE cowork_messages (
       id TEXT PRIMARY KEY,
-      name TEXT NOT NULL
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      metadata TEXT,
+      created_at INTEGER NOT NULL
     );
+    -- Abort the reconcile partway through: the trigger fires when the
+    -- working-directory backfill marker is written to kv.
+    CREATE TRIGGER reject_core_migration
+    BEFORE INSERT ON kv
+    WHEN NEW.key = 'agents.workingDirectoryBackfill.v1.completed'
+    BEGIN SELECT RAISE(ABORT, 'simulated core migration failure'); END;
   `);
   legacy.close();
 
   const db = new Database(dbPath);
-  expect(() => applyCoreSchema(db)).toThrow();
-  // The version bump rolled back with the migration body; the schema
-  // bookkeeping table itself is created outside the transaction and survives.
+  expect(() => applyCoreSchema(db, userDataPath)).toThrow('simulated core migration failure');
+  // The failed migration's version bump rolled back with its body: the scope
+  // has no row at all instead of advancing to the failed version.
   expect(scopeRow(db, 'core')).toBeUndefined();
-  // The cowork_sessions columns added before the failure are rolled back too.
+  // The column adds executed earlier inside the same migration rolled back.
   expect(columnNames(db, 'cowork_sessions').has('pinned')).toBe(false);
+  expect(columnNames(db, 'cowork_messages').has('sequence')).toBe(false);
   db.close();
 });
 

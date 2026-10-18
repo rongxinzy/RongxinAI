@@ -58,11 +58,7 @@ function writeScopeVersion(db: Database.Database, scope: string, version: number
  * Throws on non-increasing version numbers before touching the database and
  * rethrows any migration failure after rolling back its transaction.
  */
-export function runMigrations(
-  db: Database.Database,
-  scope: string,
-  migrations: Migration[],
-): void {
+export function runMigrations(db: Database.Database, scope: string, migrations: Migration[]): void {
   ensureMigrationsTable(db);
   for (let index = 1; index < migrations.length; index += 1) {
     if (migrations[index].version <= migrations[index - 1].version) {
@@ -94,7 +90,7 @@ export function runMigrations(
 }
 
 /** Reads the current column names of `table` via PRAGMA table_info. */
-export function tableColumnNames(db: Database.Database, table: string): Set<string> {
+function tableColumnNames(db: Database.Database, table: string): Set<string> {
   const columns = db.pragma(`table_info(${table})`) as Array<{ name: string }>;
   return new Set(columns.map(column => column.name));
 }

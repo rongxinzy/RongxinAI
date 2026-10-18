@@ -9,6 +9,7 @@
  * exactly once.
  */
 import type Database from 'better-sqlite3';
+import fs from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 
@@ -29,9 +30,10 @@ import {
 } from './artifactLedger/schema';
 import { normalizeArtifactKeyPath } from './artifactLedger/artifactLedger';
 
-export const AGENT_WORKING_DIRECTORY_BACKFILL_KEY = 'agents.workingDirectoryBackfill.v1.completed';
+const AGENT_WORKING_DIRECTORY_BACKFILL_KEY = 'agents.workingDirectoryBackfill.v1.completed';
+const ELECTRON_STORE_IMPORT_KEY = 'core.electronStoreImport.v1.completed';
 
-export function initializeCoreSchema(): string {
+function coreSchemaDdl(): string {
   return `
     CREATE TABLE IF NOT EXISTS kv (
       key TEXT PRIMARY KEY,
@@ -209,15 +211,15 @@ function normalizePinState(db: Database.Database, table: string): void {
 }
 
 function ensureDefaultAgent(db: Database.Database): void {
-  const mainAgent = db
-    .prepare('SELECT id, name FROM agents WHERE id = ?')
-    .get(AgentId.Main) as { id: string; name: string } | undefined;
+  const mainAgent = db.prepare('SELECT id, name FROM agents WHERE id = ?').get(AgentId.Main) as
+    | { id: string; name: string }
+    | undefined;
   if (!mainAgent) {
     const now = Date.now();
     // Read existing systemPrompt from cowork_config to inherit into main agent.
-    const spRow = db
-      .prepare("SELECT value FROM cowork_config WHERE key = 'systemPrompt'")
-      .get() as { value: string } | undefined;
+    const spRow = db.prepare("SELECT value FROM cowork_config WHERE key = 'systemPrompt'").get() as
+      | { value: string }
+      | undefined;
     const existingSystemPrompt = spRow?.value ?? '';
     db.prepare(
       `
@@ -297,6 +299,28 @@ function backfillScheduledSessionSource(db: Database.Database): void {
   ).run(CoworkSessionSource.Scheduled, ...prefixes.map(prefix => `${prefix}%`));
 }
 
+function migrateFromElectronStore(db: Database.Database, userDataPath: string): void {
+  const row = db.prepare('SELECT COUNT(*) as count FROM kv').get() as { count: number };
+  if (row.count > 0) return;
+
+  const legacyPath = path.join(userDataPath, 'config.json');
+  if (!fs.existsSync(legacyPath)) return;
+
+  const raw = fs.readFileSync(legacyPath, 'utf8');
+  const data = JSON.parse(raw) as Record<string, unknown>;
+  if (!data || typeof data !== 'object') return;
+
+  const entries = Object.entries(data);
+  if (!entries.length) return;
+
+  const now = Date.now();
+  const insert = db.prepare('INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)');
+  for (const [key, value] of entries) {
+    insert.run(key, JSON.stringify(value), now);
+  }
+  console.info(`Migrated ${entries.length} entries from electron-store.`);
+}
+
 /**
  * Legacy reconcile: converges any partially-migrated installation to the
  * current schema. Idempotent by construction (column probes + guarded
@@ -370,26 +394,36 @@ function reconcileLegacyCoreSchema(db: Database.Database): void {
   migrateLegacyArtifactsToLedger(db, normalizeArtifactKeyPath);
 }
 
-export function coreMigrations(): Migration[] {
-  return [
-    {
-      version: 1,
-      name: 'legacy-reconcile',
-      up: reconcileLegacyCoreSchema,
-    },
-  ];
+/** Whether the electron-store one-shot import already ran. */
+function electronStoreImportCompleted(db: Database.Database): boolean {
+  const row = db.prepare('SELECT value FROM kv WHERE key = ?').get(ELECTRON_STORE_IMPORT_KEY) as
+    | { value: string }
+    | undefined;
+  return row?.value === JSON.stringify(true);
+}
+
+function markElectronStoreImportCompleted(db: Database.Database): void {
+  db.prepare(
+    `INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+  ).run(ELECTRON_STORE_IMPORT_KEY, JSON.stringify(true), Date.now());
 }
 
 /**
  * Apply the cowork-core schema: current-shape DDL, versioned migrations, then
- * the indexes whose expressions depend on migrated columns. The message-order
+ * the indexes whose existence depends on migrated state. The message-order
  * index references `sequence`, which on legacy databases only exists after
- * migration 1; creating it earlier fails with "no such column: sequence".
+ * migration 1, and `idx_workspaces_path` must survive the unique-path table
+ * rebuild inside that migration, so both are created after it. The artifact
+ * ledger schema runs before the migrations because the legacy-artifact copy
+ * inside migration 1 writes into it. `userDataPath` points the one-shot
+ * electron-store import at the real config.json location.
  */
-export function applyCoreSchema(db: Database.Database): void {
-  db.exec(initializeCoreSchema());
+export function applyCoreSchema(db: Database.Database, userDataPath: string): void {
+  db.exec(coreSchemaDdl());
+  initializeArtifactLedgerSchema(db);
+  runMigrations(db, 'core', coreMigrations(userDataPath));
   db.exec('CREATE INDEX IF NOT EXISTS idx_workspaces_path ON workspaces(path);');
-  runMigrations(db, 'core', coreMigrations());
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_cowork_messages_session_order
     ON cowork_messages(session_id, COALESCE(sequence, created_at), created_at);
@@ -397,5 +431,30 @@ export function applyCoreSchema(db: Database.Database): void {
   db.exec(
     'CREATE INDEX IF NOT EXISTS idx_cowork_sessions_workspace_id ON cowork_sessions(workspace_id);',
   );
-  initializeArtifactLedgerSchema(db);
+}
+
+function coreMigrations(userDataPath: string): Migration[] {
+  return [
+    {
+      version: 1,
+      name: 'legacy-reconcile',
+      up: reconcileLegacyCoreSchema,
+    },
+    {
+      version: 2,
+      name: 'electron-store-import',
+      up: db => {
+        if (electronStoreImportCompleted(db)) return;
+        markElectronStoreImportCompleted(db);
+        // Marked before the import: a corrupted config.json must not crash
+        // startup every boot; a failed import leaves the JSON unreadable
+        // anyway, so retrying it cannot succeed either.
+        try {
+          migrateFromElectronStore(db, userDataPath);
+        } catch (error) {
+          console.warn('[SqliteStore] failed to migrate electron-store data:', error);
+        }
+      },
+    },
+  ];
 }

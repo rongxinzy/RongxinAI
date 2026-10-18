@@ -741,6 +741,17 @@ export class MemoryRepository {
 
   private ensureAddedColumns(): void {
     if (typeof this.db.prepare !== 'function') return;
+    runMigrations(this.db, MEMORY_SCHEMA_SCOPE, [
+      { version: 1, name: 'legacy-reconcile', up: d => this.reconcileLegacyMemorySchema(d) },
+    ]);
+  }
+
+  /**
+   * Legacy reconcile: the column adds and timestamp rewrite that used to be
+   * re-probed on every repository construction. Idempotent by construction,
+   * so a fresh database runs through it as a no-op and records the version.
+   */
+  private reconcileLegacyMemorySchema(db: Database.Database): void {
     const additions: Record<string, string> = {
       title: "TEXT NOT NULL DEFAULT ''",
       content: "TEXT NOT NULL DEFAULT ''",
@@ -756,9 +767,9 @@ export class MemoryRepository {
       promotion_source_session_id: 'TEXT',
     };
     for (const [name, definition] of Object.entries(additions)) {
-      addColumnIfMissing(this.db, 'memory_links', name, definition);
+      addColumnIfMissing(db, 'memory_links', name, definition);
     }
-    addColumnIfMissing(this.db, 'memory_outbox', 'link_id', 'TEXT');
+    addColumnIfMissing(db, 'memory_outbox', 'link_id', 'TEXT');
     const candidateAdditions: Record<string, string> = {
       project_id: "TEXT NOT NULL DEFAULT 'personal://zhiyuan-agent/user'",
       project_root: "TEXT NOT NULL DEFAULT ''",
@@ -768,12 +779,9 @@ export class MemoryRepository {
       promotion_source_session_id: 'TEXT',
     };
     for (const [name, definition] of Object.entries(candidateAdditions)) {
-      addColumnIfMissing(this.db, 'memory_candidates', name, definition);
+      addColumnIfMissing(db, 'memory_candidates', name, definition);
     }
-    migrateLegacyMemoryTimestamps(this.db);
-    runMigrations(this.db, MEMORY_SCHEMA_SCOPE, [
-      { version: 1, name: 'legacy-reconcile', up: () => {} },
-    ]);
+    migrateLegacyMemoryTimestamps(db);
   }
 }
 

@@ -89,9 +89,7 @@ test('applies only versions newer than the recorded one', () => {
   const db = createTempDb();
   const applied: string[] = [];
   try {
-    runMigrations(db, 'unit', [
-      { version: 1, name: 'first', up: () => applied.push('first') },
-    ]);
+    runMigrations(db, 'unit', [{ version: 1, name: 'first', up: () => applied.push('first') }]);
     runMigrations(db, 'unit', [
       { version: 1, name: 'first', up: () => applied.push('first-again') },
       { version: 2, name: 'second', up: () => applied.push('second') },

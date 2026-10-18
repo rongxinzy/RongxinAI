@@ -1,7 +1,6 @@
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { EventEmitter } from 'events';
-import fs from 'fs';
 import path from 'path';
 
 import { DB_FILENAME } from './appConstants';
@@ -64,11 +63,10 @@ export class SqliteStore {
   }
 
   private initializeTables(basePath: string) {
-    applyCoreSchema(this.db);
+    applyCoreSchema(this.db, basePath);
     initializeWorkbenchTaskSchema(this.db);
     initializeCodingAgentSchema(this.db);
     initializeTodoSchema(this.db);
-    this.migrateFromElectronStore(basePath);
   }
 
   onDidChange<T = unknown>(
@@ -141,38 +139,6 @@ export class SqliteStore {
       return parsed.sqliteAutoBackupEnabled === true;
     } catch {
       return false;
-    }
-  }
-
-  private migrateFromElectronStore(userDataPath: string) {
-    const row = this.db.prepare('SELECT COUNT(*) as count FROM kv').get() as { count: number };
-    if (row.count > 0) return;
-
-    const legacyPath = path.join(userDataPath, 'config.json');
-    if (!fs.existsSync(legacyPath)) return;
-
-    try {
-      const raw = fs.readFileSync(legacyPath, 'utf8');
-      const data = JSON.parse(raw) as Record<string, unknown>;
-      if (!data || typeof data !== 'object') return;
-
-      const entries = Object.entries(data);
-      if (!entries.length) return;
-
-      const now = Date.now();
-      const insert = this.db.prepare(`
-      INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)
-    `);
-      const migrate = this.db.transaction(() => {
-        for (const [key, value] of entries) {
-          insert.run(key, JSON.stringify(value), now);
-        }
-      });
-
-      migrate();
-      console.info(`Migrated ${entries.length} entries from electron-store.`);
-    } catch (error) {
-      console.warn('Failed to migrate electron-store data:', error);
     }
   }
 }
