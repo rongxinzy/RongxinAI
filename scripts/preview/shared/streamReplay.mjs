@@ -1,15 +1,23 @@
 /** @typedef {'glm-tool-text-jsonl' | 'glm-fresh-pr1127-jsonl-gz' | '503-auto-retry' | 'synthetic-20000'} StreamReplayFixtureId */
 
+const SCROLL_PIN_TOLERANCE_PX = 8;
+
 const LONG_TASK_THRESHOLD_MS = 50;
 /** Ignore the first N long tasks after replay start (boot/layout warmup). */
 const LONG_TASK_WARMUP_EXCLUSIONS = 2;
 /** Include long tasks that start within this window after replay end (finalize / markdown). */
 const LONG_TASK_FINALIZE_WINDOW_MS = 250;
 
-export function previewStreamReplaySearch(fixtureId, { skipBoot = true } = {}) {
+export function previewStreamReplaySearch(
+  fixtureId,
+  { skipBoot = true, scrollMutation = null } = {},
+) {
   const params = new URLSearchParams();
   params.set('previewSkipBoot', skipBoot ? '1' : '0');
   params.set('previewStreamReplay', fixtureId);
+  if (scrollMutation) {
+    params.set('previewScrollMutation', scrollMutation);
+  }
   return `?${params.toString()}`;
 }
 
@@ -20,9 +28,10 @@ export function normalizeReplayPlainText(value) {
     .trim();
 }
 
-export function normalizeReplayFinalCompare(value) {
+function normalizeReplayFinalCompare(value) {
   return normalizeReplayPlainText(value)
     .replace(/https:\/\/zr-local\.path\/open\?path=/gi, '')
+    .replace(/\u2014|\u2013/g, '-')
     .replace(/[`*_>#~[\]()!]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -39,22 +48,47 @@ export function assertPrefixOf(shown, expected, label) {
 }
 
 export function findConversationScroller(page) {
-  return page.locator('[role="log"]').locator('.overflow-y-auto').first();
+  return page
+    .locator('[role="log"]')
+    .locator('.cowork-conversation-scroll, .overflow-y-auto')
+    .first();
 }
 
-export async function runStreamReplay(page, { fixtureId, sampleIntervalMs = 48 }) {
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {{ fixtureId: StreamReplayFixtureId, mode?: 'stepped' | 'realtime', sampleIntervalMs?: number }} options
+ */
+export async function runStreamReplay(
+  page,
+  { fixtureId, mode = 'stepped', sampleIntervalMs = 16 },
+) {
   return page.evaluate(
-    async ({ fixtureId: id, sampleIntervalMs: interval }) => {
+    async ({ fixtureId: id, mode: replayMode, sampleIntervalMs: interval }) => {
+      const SCROLL_TOLERANCE = 8;
+      const waitAnimationFrames = count =>
+        new Promise(resolve => {
+          let remaining = count;
+          const tick = () => {
+            remaining -= 1;
+            if (remaining <= 0) resolve(undefined);
+            else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+
       const readAssistantFromDom = () => {
         const answerNodes = [...document.querySelectorAll('[role="log"] .is-assistant')];
+        const replayHost = document.querySelector('[role="log"] [data-replay-assistant-text]');
+        const replayText = replayHost?.getAttribute('data-replay-assistant-text') ?? '';
         const last = answerNodes.at(-1);
         const body = last?.querySelector('.theme-message-body');
-        const text = body?.innerText ?? last?.innerText ?? '';
+        const text = replayText || body?.innerText || last?.innerText || '';
         return {
           text,
           answerBubbles: answerNodes.length,
         };
       };
+
       const readTurnOrder = () => {
         const log = document.querySelector('[role="log"]');
         if (!log) {
@@ -72,82 +106,132 @@ export async function runStreamReplay(page, { fixtureId, sampleIntervalMs = 48 }
         const answerIndex = items.findIndex(node => node.classList.contains('is-assistant'));
         return { thinkingIndex, toolIndex, answerIndex, itemCount: items.length };
       };
-      const isPinnedToBottom = scroller => {
-        if (!scroller) return true;
-        const maxScroll = Math.max(scroller.scrollHeight - scroller.clientHeight, 0);
-        return Math.abs(scroller.scrollTop - maxScroll) <= 48;
+
+      const readScrollerMetrics = scroller => {
+        if (!scroller) {
+          return {
+            scrollTop: 0,
+            scrollHeight: 0,
+            clientHeight: 0,
+            distanceFromBottom: 0,
+            pinned: true,
+            overflow: false,
+          };
+        }
+        const scrollTop = scroller.scrollTop;
+        const scrollHeight = scroller.scrollHeight;
+        const clientHeight = scroller.clientHeight;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        const overflow = scrollHeight > clientHeight + 16;
+        return {
+          scrollTop,
+          scrollHeight,
+          clientHeight,
+          distanceFromBottom,
+          pinned: distanceFromBottom <= SCROLL_TOLERANCE,
+          overflow,
+        };
       };
+
+      const resolveScroller = () =>
+        document.querySelector('[role="log"] .cowork-conversation-scroll') ??
+        document.querySelector('[role="log"] .overflow-y-auto');
+
+      const pushSample = (samples, controller, extra = {}) => {
+        const scroller = resolveScroller();
+        const assistant = readAssistantFromDom();
+        const scroll = readScrollerMetrics(scroller);
+        samples.push({
+          at: performance.now(),
+          status: controller.status,
+          phase: controller.replayPhase ?? 'idle',
+          ...assistant,
+          ...scroll,
+          ...extra,
+        });
+      };
+
       const controller = window.__previewStreamReplay;
       if (!controller || controller.fixtureId !== id) {
         throw new Error('preview stream replay controller is unavailable');
       }
+
       const samples = [];
-      const scrollSamples = [];
-      const scroller = document.querySelector('[role="log"] .overflow-y-auto');
-      let poll = null;
-      return new Promise((resolve, reject) => {
-        poll = window.setInterval(() => {
-          const assistant = readAssistantFromDom();
-          const status = controller.status;
-          const phase = controller.replayPhase ?? 'idle';
-          samples.push({
-            at: performance.now(),
-            status,
-            phase,
-            ...assistant,
-            pinned: isPinnedToBottom(scroller),
-          });
-          if (scroller) {
-            scrollSamples.push({
-              at: performance.now(),
-              status,
-              phase,
-              scrollTop: scroller.scrollTop,
-              scrollHeight: scroller.scrollHeight,
-              clientHeight: scroller.clientHeight,
-              pinned: isPinnedToBottom(scroller),
-            });
-          }
-        }, interval);
-        controller.begin();
-        const done = () => {
-          window.clearInterval(poll);
-          const assistant = readAssistantFromDom();
-          samples.push({
-            at: performance.now(),
-            status: controller.status,
-            phase: controller.replayPhase ?? 'complete',
-            ...assistant,
-            pinned: isPinnedToBottom(scroller),
-            final: true,
-          });
-          resolve({
-            samples,
-            scrollSamples,
-            order: readTurnOrder(),
-            longTasks: controller.longTasks ?? [],
-            replayStartedAt: controller.replayStartedAt ?? 0,
-            replayEndedAt: controller.replayEndedAt ?? performance.now(),
-            expectedFinalText: controller.trace.expectedFinalText,
-            markers: controller.trace.markers,
-          });
+
+      if (replayMode === 'stepped') {
+        controller.beginStepped();
+        pushSample(samples, controller, { step: 0 });
+        let stepIndex = 0;
+        while (controller.step()) {
+          stepIndex += 1;
+          pushSample(samples, controller, { step: stepIndex, samplePhase: 'post-step-sync' });
+          await waitAnimationFrames(1);
+          pushSample(samples, controller, { step: stepIndex, samplePhase: 'post-step-raf1' });
+          await waitAnimationFrames(1);
+          pushSample(samples, controller, { step: stepIndex, samplePhase: 'post-step-raf2' });
+          await waitAnimationFrames(1);
+          pushSample(samples, controller, { step: stepIndex, samplePhase: 'post-step-raf3' });
+        }
+        await waitAnimationFrames(3);
+        pushSample(samples, controller, {
+          step: stepIndex + 1,
+          final: true,
+          samplePhase: 'finalize',
+        });
+      } else {
+        return new Promise((resolve, reject) => {
+          let poll = null;
+          poll = window.setInterval(() => {
+            pushSample(samples, controller);
+          }, interval);
+          controller.begin();
+          const timeout = window.setTimeout(
+            () => reject(new Error('stream replay timed out')),
+            120_000,
+          );
+          const check = () => {
+            if (controller.status === 'complete') {
+              window.clearTimeout(timeout);
+              window.clearInterval(poll);
+              pushSample(samples, controller, { final: true });
+              resolve(buildResult());
+              return;
+            }
+            requestAnimationFrame(check);
+          };
+          check();
+        });
+      }
+
+      function buildResult() {
+        const longTasks = controller.longTasks ?? [];
+        const replayStartedAt = controller.replayStartedAt ?? 0;
+        const replayEndedAt = controller.replayEndedAt ?? performance.now();
+        const windowEnd = replayEndedAt + 250;
+        let maxLongTaskMs = 0;
+        for (const entry of longTasks) {
+          if (entry.startTime < replayStartedAt || entry.startTime > windowEnd) continue;
+          if (entry.duration > maxLongTaskMs) maxLongTaskMs = entry.duration;
+        }
+        return {
+          samples,
+          scrollSamples: samples,
+          order: readTurnOrder(),
+          longTasks,
+          maxLongTaskMs,
+          replayStartedAt,
+          replayEndedAt,
+          expectedFinalText: controller.trace.expectedFinalText,
+          markers: controller.trace.markers,
+          mode: replayMode,
+          eventsEmitted: controller.eventsEmitted,
+          eventCount: controller.eventCount,
         };
-        const timeout = window.setTimeout(
-          () => reject(new Error('stream replay timed out')),
-          120_000,
-        );
-        const check = () => {
-          if (controller.status === 'complete') {
-            window.clearTimeout(timeout);
-            done();
-            return;
-          }
-          window.requestAnimationFrame(check);
-        };
-        check();
-      });
+      }
+
+      return buildResult();
     },
-    { fixtureId, sampleIntervalMs },
+    { fixtureId, mode, sampleIntervalMs },
   );
 }
 
@@ -169,39 +253,80 @@ export function assertLongTasks(
   }
 }
 
-export function assertReplayFinalText(shown, expected, label) {
-  const finalNorm = normalizeReplayFinalCompare(shown);
-  const expectedNorm = normalizeReplayFinalCompare(expected);
-  const prefixLength = Math.min(
-    expectedNorm.length > 4000 ? 40 : 80,
-    expectedNorm.length,
-    finalNorm.length,
-  );
+export function assertReplayFinalText(
+  shown,
+  expected,
+  label,
+  { strict = true, canonical = false } = {},
+) {
+  const normalize = canonical ? normalizeReplayPlainText : normalizeReplayFinalCompare;
+  const finalNorm = normalize(shown);
+  const expectedNorm = normalize(expected);
+  if (strict) {
+    if (finalNorm === expectedNorm) return;
+    const sharedPrefixLength = Math.min(finalNorm.length, expectedNorm.length);
+    if (finalNorm.slice(0, sharedPrefixLength) !== expectedNorm.slice(0, sharedPrefixLength)) {
+      throw new Error(
+        `${label}: final assistant text mismatch at shared prefix (shown ${finalNorm.length} chars, expected ${expectedNorm.length} chars)`,
+      );
+    }
+    if (Math.abs(finalNorm.length - expectedNorm.length) > 8) {
+      throw new Error(
+        `${label}: final assistant text length mismatch (shown ${finalNorm.length} chars, expected ${expectedNorm.length} chars)`,
+      );
+    }
+    return;
+  }
+  const prefixLength = Math.min(80, expectedNorm.length, finalNorm.length);
   if (finalNorm.slice(0, prefixLength) !== expectedNorm.slice(0, prefixLength)) {
-    throw new Error(
-      `${label}: final assistant text prefix mismatch (shown ${finalNorm.slice(0, 80)}..., expected ${expectedNorm.slice(0, 80)}...)`,
-    );
+    throw new Error(`${label}: final assistant text prefix mismatch`);
   }
   const lengthDelta = Math.abs(finalNorm.length - expectedNorm.length);
   const tolerance = Math.max(64, Math.floor(expectedNorm.length * 0.12));
   if (lengthDelta > tolerance) {
     throw new Error(
-      `${label}: final assistant text length mismatch (shown ${finalNorm.length}, expected ${expectedNorm.length}, delta ${lengthDelta}, tolerance ${tolerance})`,
+      `${label}: final assistant text length mismatch (shown ${finalNorm.length}, expected ${expectedNorm.length})`,
     );
   }
 }
 
-export function assertStreamingScrollPinned(samples) {
+export function assertStreamingScrollPinned(
+  samples,
+  { tolerancePx = SCROLL_PIN_TOLERANCE_PX, requireOverflowSamples = true } = {},
+) {
   const streaming = samples.filter(
-    sample => sample.status === 'streaming' && (sample.text ?? '').trim().length > 8,
+    sample =>
+      sample.status === 'streaming' &&
+      sample.overflow === true &&
+      (sample.text ?? '').trim().length > 8 &&
+      sample.samplePhase === 'post-step-raf3',
   );
   if (streaming.length === 0) {
-    throw new Error('expected streaming samples with visible assistant text');
+    if (!requireOverflowSamples) return;
+    throw new Error('expected streaming samples with scroll overflow and visible assistant text');
   }
-  const unpinned = streaming.filter(sample => sample.pinned === false);
+  const unpinned = streaming.filter(sample => sample.distanceFromBottom > tolerancePx);
   if (unpinned.length > 0) {
-    throw new Error(
-      `scroll was not pinned during streaming (${unpinned.length}/${streaming.length} samples unpinned)`,
+    const worst = unpinned.reduce(
+      (max, sample) => (sample.distanceFromBottom > max.distanceFromBottom ? sample : max),
+      unpinned[0],
     );
+    throw new Error(
+      `scroll was not pinned during streaming (${unpinned.length}/${streaming.length} samples unpinned, worst gap ${worst.distanceFromBottom.toFixed(1)}px at step ${worst.step ?? '?'})`,
+    );
+  }
+
+  let previousHeight = 0;
+  let previousTop = 0;
+  for (const sample of streaming) {
+    const heightDelta = sample.scrollHeight - previousHeight;
+    const topDelta = sample.scrollTop - previousTop;
+    if (previousHeight > 0 && heightDelta > 48 && topDelta < heightDelta - tolerancePx * 2) {
+      throw new Error(
+        `scrollTop did not track scrollHeight growth during streaming (height +${heightDelta.toFixed(0)}px, scrollTop +${topDelta.toFixed(0)}px at step ${sample.step ?? '?'})`,
+      );
+    }
+    previousHeight = sample.scrollHeight;
+    previousTop = sample.scrollTop;
   }
 }

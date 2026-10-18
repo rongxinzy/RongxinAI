@@ -19,7 +19,12 @@ test('source rewrites and finalization still invalidate the cached segments', ()
     tail: 'rewritten tail',
   });
   const complete = segmenter.update('rewritten tail', false);
-  expect(complete).toEqual({ committed: 'rewritten tail', tail: '' });
+  expect(complete).toEqual({ committed: '', tail: 'rewritten tail' });
+  const cold = new StreamingTextSegmenter();
+  expect(cold.update('history message', false)).toEqual({
+    committed: 'history message',
+    tail: '',
+  });
   expect(segmenter.update('rewritten tail', false)).toBe(complete);
   expect(segmenter.update('rewritten tail', true)).toEqual({
     committed: '',

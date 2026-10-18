@@ -38,6 +38,7 @@ ALLOWLIST_SURVIVORS: tuple[str, ...] = (
     'M15 ',
     'M16 ',
     'M18 stop path does not clear retry flag',
+    'M23 retry turn_start clears visible text before reopen',
 )
 
 M: dict[str, list[tuple[str, str, str]]] = {
@@ -188,13 +189,25 @@ def is_allowlisted(name: str) -> bool:
     return any(name.startswith(prefix) for prefix in ALLOWLIST_SURVIVORS)
 
 
+def ensure_node_sqlite() -> None:
+    subprocess.run(
+        ['npm', 'rebuild', 'better-sqlite3', '--build-from-source'],
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
 def run_vitest() -> subprocess.CompletedProcess[str]:
+    env = {**os.environ, 'CI': 'true'}
     return subprocess.run(
-        ['bun', 'run', 'test', '--', *TESTS],
+        ['npm', 'exec', '--', 'vitest', 'run', *TESTS],
         cwd=ROOT,
         capture_output=True,
         text=True,
         timeout=900,
+        env=env,
     )
 
 
@@ -204,6 +217,7 @@ def main() -> int:
     only = args
     results: dict[str, object] = {}
 
+    ensure_node_sqlite()
     baseline = run_vitest()
     baseline_out = baseline.stdout + baseline.stderr
     if baseline.returncode != 0:

@@ -237,16 +237,11 @@ describe('PiRuntimeAdapter', () => {
       adapter.stopSession('usage-stop');
       adapter.transcript.flushContextUsageSync('usage-stop');
       vi.advanceTimersByTime(5_000);
-      expect(
-        updateMessage.mock.calls.some(
-          call =>
-            call[2] &&
-            typeof call[2] === 'object' &&
-            call[2] !== null &&
-            'metadata' in call[2] &&
-            (call[2] as { metadata?: { contextUsage?: unknown } }).metadata?.contextUsage,
-        ),
-      ).toBe(false);
+      const wroteDeferredUsage = updateMessage.mock.calls.some(call => {
+        const metadata = (call[2] as { metadata?: Record<string, unknown> } | undefined)?.metadata;
+        return Boolean(metadata?.contextUsage || metadata?.usage);
+      });
+      expect(wroteDeferredUsage).toBe(false);
       vi.useRealTimers();
     });
   });

@@ -212,9 +212,25 @@ export const StreamingMarkdownResponse = ({
   const { committed, tail }: StreamingTextSegments = useStreamingTextSegments(content, isStreaming);
   const resolve = useMemo(() => resolveLocalFilePath, [resolveLocalFilePath]);
 
-  // 流结束后整段走完整 Markdown（含代码高亮 / 本地路径检查）。
+  // 流结束后复用流式阶段已提交的分块，避免对全文再跑一遍 Streamdown。
   if (!isStreaming) {
-    return <StaticMarkdownBlock content={content} resolveLocalFilePath={resolve} />;
+    if (committed || tail) {
+      return (
+        <div className="flex flex-col gap-4">
+          {committed ? (
+            <StaticMarkdownBlock
+              content={committed}
+              resolveLocalFilePath={resolve}
+              skipPathExistsCheck
+            />
+          ) : null}
+          {tail ? <StreamingPlainTail content={tail} /> : null}
+        </div>
+      );
+    }
+    return (
+      <StaticMarkdownBlock content={content} resolveLocalFilePath={resolve} skipPathExistsCheck />
+    );
   }
 
   // 流式中：只对已闭合的稳定块跑 Streamdown；正在增长的 tail 用纯文本。

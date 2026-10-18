@@ -21,7 +21,26 @@ import synthetic20kTrace from './fixtures/streamReplay/synthetic-20000.json';
 const PreviewStreamReplayQuery = {
   Fixture: 'previewStreamReplay',
   AutoStart: 'previewStreamAutoStart',
+  ScrollMutation: 'previewScrollMutation',
 } as const;
+
+/** Dev-only scroll regressions for Playwright gate verification. */
+export const PreviewScrollMutation = {
+  StickStop: 'stick-stop',
+  NoTailFollow: 'no-tail-follow',
+} as const;
+export type PreviewScrollMutation =
+  (typeof PreviewScrollMutation)[keyof typeof PreviewScrollMutation];
+
+export function readPreviewScrollMutation(
+  search = readBrowserSearchParam(),
+): PreviewScrollMutation | null {
+  const raw = new URLSearchParams(search).get(PreviewStreamReplayQuery.ScrollMutation)?.trim();
+  if (raw === PreviewScrollMutation.StickStop || raw === PreviewScrollMutation.NoTailFollow) {
+    return raw;
+  }
+  return null;
+}
 
 export type StreamReplayFixtureId =
   | 'glm-tool-text-jsonl'
@@ -78,11 +97,18 @@ export function getStreamReplayTrace(id: StreamReplayFixtureId): StreamReplayTra
 export interface StreamReplayController {
   readonly fixtureId: StreamReplayFixtureId;
   readonly trace: StreamReplayTrace;
+  /** Real-time replay (setTimeout delays). For manual preview / smoke only. */
   begin(): void;
+  /** Deterministic stepped replay for Playwright (no timers). */
+  beginStepped(): void;
+  /** Emit the next IPC event; returns false when the trace is finished. */
+  step(): boolean;
   readonly status: 'idle' | 'streaming' | 'complete';
   readonly replayPhase: 'idle' | 'first' | 'retry' | 'complete';
   readonly replayStartedAt: number;
   readonly replayEndedAt: number;
+  readonly eventsEmitted: number;
+  readonly eventCount: number;
 }
 
 declare global {
@@ -151,6 +177,7 @@ export function installStreamReplayController(options: {
   let replayStartedAt = 0;
   let replayEndedAt = 0;
   let timers: ReturnType<typeof setTimeout>[] = [];
+  let nextEventIndex = 0;
   const samples: Array<{ at: number; text: string; answerBubbles: number }> = [];
   const longTasks: Array<{ startTime: number; duration: number }> = [];
 
@@ -166,13 +193,48 @@ export function installStreamReplayController(options: {
     samples.push({ at: performance.now(), text, answerBubbles: answerNodes.length });
   };
 
-  const begin = (): void => {
-    if (status !== 'idle') return;
+  const applyStreamReopenPhase = (payload: PiUiEvent): void => {
+    if (
+      payload.type === 'message_update' &&
+      'metadata' in payload &&
+      payload.metadata &&
+      typeof payload.metadata === 'object' &&
+      (payload.metadata as { streamReopen?: boolean }).streamReopen === true
+    ) {
+      replayPhase = 'retry';
+    }
+  };
+
+  const emitEventAtIndex = (index: number): void => {
+    const entry = trace.events[index];
+    if (!entry) return;
+    const payload = entry.event as PiUiEvent;
+    applyStreamReopenPhase(payload);
+    options.emitRecorded(payload);
+    sampleDom();
+    if (index === trace.events.length - 1) {
+      status = 'complete';
+      replayPhase = 'complete';
+      replayEndedAt = performance.now();
+      const current = options.getSession();
+      if (current) {
+        options.setSession({
+          ...current,
+          status: CoworkSessionStatus.Completed,
+          updatedAt: Date.now(),
+        });
+      }
+      options.runtime.emit('preview.streamReplay.complete', { fixtureId: options.fixtureId });
+    }
+  };
+
+  const resetReplayState = (): void => {
+    clearTimers();
+    nextEventIndex = 0;
     status = 'streaming';
     replayPhase = 'first';
     replayStartedAt = performance.now();
     replayEndedAt = 0;
-    clearTimers();
     const session = options.getSession();
     if (session) {
       options.setSession({
@@ -181,46 +243,41 @@ export function installStreamReplayController(options: {
         updatedAt: Date.now(),
       });
     }
+  };
+
+  const begin = (): void => {
+    if (status !== 'idle') return;
+    resetReplayState();
     let elapsed = 0;
     trace.events.forEach((entry, index) => {
       elapsed += Math.max(8, entry.delayMs);
       timers.push(
         setTimeout(() => {
-          const payload = entry.event as PiUiEvent;
-          if (
-            payload.type === 'message_update' &&
-            'metadata' in payload &&
-            payload.metadata &&
-            typeof payload.metadata === 'object' &&
-            (payload.metadata as { streamReopen?: boolean }).streamReopen === true
-          ) {
-            replayPhase = 'retry';
-          }
-          options.emitRecorded(payload);
-          sampleDom();
-          if (index === trace.events.length - 1) {
-            status = 'complete';
-            replayPhase = 'complete';
-            replayEndedAt = performance.now();
-            const current = options.getSession();
-            if (current) {
-              options.setSession({
-                ...current,
-                status: CoworkSessionStatus.Completed,
-                updatedAt: Date.now(),
-              });
-            }
-            options.runtime.emit('preview.streamReplay.complete', { fixtureId: options.fixtureId });
-          }
+          emitEventAtIndex(index);
         }, elapsed),
       );
     });
+  };
+
+  const beginStepped = (): void => {
+    if (status !== 'idle') return;
+    resetReplayState();
+  };
+
+  const step = (): boolean => {
+    if (status !== 'streaming') return false;
+    if (nextEventIndex >= trace.events.length) return false;
+    emitEventAtIndex(nextEventIndex);
+    nextEventIndex += 1;
+    return status === 'streaming';
   };
 
   const controller: StreamReplayController = {
     fixtureId: options.fixtureId,
     trace,
     begin,
+    beginStepped,
+    step,
     get status() {
       return status;
     },
@@ -232,6 +289,12 @@ export function installStreamReplayController(options: {
     },
     get replayEndedAt() {
       return replayEndedAt;
+    },
+    get eventsEmitted() {
+      return nextEventIndex;
+    },
+    get eventCount() {
+      return trace.events.length;
     },
   };
 
