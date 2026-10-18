@@ -301,7 +301,12 @@ export const mockMagpieAgents: MagpieAgents = {
 };
 
 export const mockMagpieCatalog: MagpieModelCatalog = {
-  status: { state: 'running', version: 'preview', enabled: true },
+  status: {
+    state: 'running',
+    version: 'preview',
+    enabled: true,
+    gatewayUrl: 'http://127.0.0.1:18425',
+  },
   defaultModelId: 'preview-model',
   models: [
     {

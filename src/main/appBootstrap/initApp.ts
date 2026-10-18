@@ -378,6 +378,12 @@ export const initApp = async (): Promise<void> => {
         if (rt.magpieManager?.status().state === 'running')
           await rt.managedMagpieBindings?.synchronize();
       },
+      onLanAccessChanged: async () => {
+        await rt.magpieManager?.onLanAccessChanged();
+      },
+      onLanAccessTokenRegenerated: async () => {
+        await rt.magpieManager?.onLanAccessTokenRegenerated();
+      },
     });
     // Warm the short-lived backend cache before the runtime settings dialog is opened.
     void localInferenceManager.listBackends();
@@ -499,6 +505,12 @@ export const initApp = async (): Promise<void> => {
     if (getStore().get<boolean>('magpie_service_enabled') === true) {
       await rt.magpieManager?.ensureRunning().catch(error => {
         console.warn('[Magpie] Previously enabled model service could not start:', error);
+      });
+    } else {
+      // LAN access is served by the bundled model gateway; the toggle alone may
+      // start it even when unified model management was never enabled.
+      await rt.magpieManager?.onLanAccessChanged().catch(error => {
+        console.warn('[Magpie] LAN access model service start failed:', error);
       });
     }
 

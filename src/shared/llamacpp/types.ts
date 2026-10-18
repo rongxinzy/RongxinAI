@@ -342,6 +342,8 @@ export type LlamaCppServiceConfig = {
 
 export type LlamaCppGatewayLanTokenResult = {
   token: string;
+  /** Whether the LAN token was re-imported into the bundled model gateway. */
+  lanAccessSynced?: boolean;
 };
 
 export type LlamaCppDeleteModelResult = {

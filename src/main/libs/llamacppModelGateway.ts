@@ -1,12 +1,6 @@
 import http from 'node:http';
 
-import {
-  LlamaCppGatewayAccessMode,
-  type LlamaCppGatewayAccessMode as LlamaCppGatewayAccessModeType,
-} from '../../shared/llamacpp';
-
-const LOCAL_GATEWAY_HOST = '127.0.0.1';
-const LAN_GATEWAY_HOST = '0.0.0.0';
+const GATEWAY_HOST = '127.0.0.1';
 const GATEWAY_PATH_PREFIX = '/v1/';
 const MAX_REQUEST_BODY_BYTES = 10 * 1024 * 1024;
 
@@ -18,11 +12,7 @@ export type LlamaCppGatewayModelLease = {
 export type LlamaCppModelGatewayOptions = {
   acquireModel: (modelName: string) => Promise<LlamaCppGatewayModelLease>;
   listModels: () => Array<{ id: string; owned_by?: string }>;
-  getConfig: () => {
-    port: number;
-    accessMode: LlamaCppGatewayAccessModeType;
-    lanToken?: string;
-  };
+  getConfig: () => { port: number };
 };
 
 export type LlamaCppModelGateway = {
@@ -31,6 +21,12 @@ export type LlamaCppModelGateway = {
   stop: () => Promise<void>;
 };
 
+/**
+ * Loopback-only model gateway in front of the llama-server router: on-demand
+ * model loading, in-flight leases and the loaded-only /v1/models listing.
+ * LAN access is served by the bundled model gateway instead; this listener
+ * always binds 127.0.0.1 and never authenticates.
+ */
 export function createLlamaCppModelGateway(
   options: LlamaCppModelGatewayOptions,
 ): LlamaCppModelGateway {
@@ -38,12 +34,10 @@ export function createLlamaCppModelGateway(
   let boundPort: number | null = null;
 
   return {
-    baseUrl: () => (boundPort ? `http://${LOCAL_GATEWAY_HOST}:${boundPort}/v1` : null),
+    baseUrl: () => (boundPort ? `http://${GATEWAY_HOST}:${boundPort}/v1` : null),
     start: async () => {
       if (server) return;
       const config = options.getConfig();
-      const host =
-        config.accessMode === LlamaCppGatewayAccessMode.Lan ? LAN_GATEWAY_HOST : LOCAL_GATEWAY_HOST;
       await new Promise<void>((resolve, reject) => {
         const nextServer = http.createServer((request, response) => {
           void handleGatewayRequest(request, response, options).catch(error => {
@@ -52,7 +46,7 @@ export function createLlamaCppModelGateway(
           });
         });
         nextServer.once('error', reject);
-        nextServer.listen(config.port, host, () => {
+        nextServer.listen(config.port, GATEWAY_HOST, () => {
           const address = nextServer.address();
           if (!address || typeof address === 'string') {
             nextServer.close();
@@ -61,7 +55,9 @@ export function createLlamaCppModelGateway(
           }
           server = nextServer;
           boundPort = address.port;
-          console.log(`[LlamaCppGateway] local model gateway started on ${host}:${boundPort}`);
+          console.log(
+            `[LlamaCppGateway] local model gateway started on ${GATEWAY_HOST}:${boundPort}`,
+          );
           resolve();
         });
       });
@@ -87,10 +83,6 @@ async function handleGatewayRequest(
     writeJsonError(response, 404, 'Route not found.');
     return;
   }
-  if (!isAuthorized(request, options.getConfig())) {
-    writeJsonError(response, 401, 'A valid gateway bearer token is required.');
-    return;
-  }
   if (request.method === 'GET' && request.url === '/v1/models') {
     writeJson(response, 200, { object: 'list', data: options.listModels().map(toOpenAiModel) });
     return;
@@ -113,21 +105,6 @@ async function handleGatewayRequest(
   } finally {
     lease.release();
   }
-}
-
-function isAuthorized(
-  request: http.IncomingMessage,
-  config: ReturnType<LlamaCppModelGatewayOptions['getConfig']>,
-): boolean {
-  if (config.accessMode !== LlamaCppGatewayAccessMode.Lan || isLoopbackRequest(request))
-    return true;
-  const token = config.lanToken?.trim();
-  return Boolean(token && request.headers.authorization === `Bearer ${token}`);
-}
-
-function isLoopbackRequest(request: http.IncomingMessage): boolean {
-  const address = request.socket.remoteAddress;
-  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
 function toOpenAiModel(model: { id: string; owned_by?: string }): Record<string, string> {

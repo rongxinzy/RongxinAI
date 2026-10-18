@@ -7,7 +7,6 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
-import { LlamaCppGatewayAccessMode } from '../../shared/llamacpp';
 import { scanLocalGgufModels } from './llamacppModelCatalog';
 import { createLlamaCppModelGateway, type LlamaCppModelGateway } from './llamacppModelGateway';
 import {
@@ -30,7 +29,6 @@ const MAX_CONTROL_BODY_BYTES = 1024 * 1024;
 
 export class LlamaCppModelDaemonRuntime {
   private config: LlamaCppServiceConfig;
-  private lanToken: string | undefined;
   private controlServer: http.Server | null = null;
   private gateway: LlamaCppModelGateway | null = null;
   private readonly processes: LlamaCppModelProcessManager;
@@ -42,7 +40,6 @@ export class LlamaCppModelDaemonRuntime {
 
   constructor(private readonly bootstrap: LlamaCppModelDaemonBootstrap) {
     this.config = bootstrap.serviceConfig;
-    this.lanToken = bootstrap.lanToken;
     this.processes = new LlamaCppModelProcessManager({
       getExecutablePath: async () => this.bootstrap.executablePath,
       getServiceConfig: () => this.config,
@@ -133,7 +130,7 @@ export class LlamaCppModelDaemonRuntime {
           await this.processes.stopAll();
           return { success: true, status: this.getStatus() };
         case LlamaCppModelDaemonCommand.ApplyConfig:
-          await this.applyConfig(input.serviceConfig, input.lanToken);
+          await this.applyConfig(input.serviceConfig);
           return { success: true, status: this.getStatus() };
         case LlamaCppModelDaemonCommand.Shutdown:
           const result = { success: true, status: this.getStatus() } as const;
@@ -196,13 +193,9 @@ export class LlamaCppModelDaemonRuntime {
     }));
   }
 
-  private async applyConfig(config: LlamaCppServiceConfig, lanToken?: string): Promise<void> {
-    const shouldRestartGateway =
-      this.config.port !== config.port ||
-      this.config.gatewayAccessMode !== config.gatewayAccessMode ||
-      this.config.listenHost !== config.listenHost;
+  private async applyConfig(config: LlamaCppServiceConfig): Promise<void> {
+    const shouldRestartGateway = this.config.port !== config.port;
     this.config = config;
-    this.lanToken = lanToken;
     if (!shouldRestartGateway) return;
     await this.gateway?.stop();
     this.gateway = null;
@@ -226,12 +219,6 @@ export class LlamaCppModelDaemonRuntime {
       listModels: () => this.listRunningModels().map(model => ({ id: model.name })),
       getConfig: () => ({
         port: Number.parseInt(this.config.port ?? '8080', 10) || 8080,
-        accessMode:
-          this.config.gatewayAccessMode === LlamaCppGatewayAccessMode.Lan ||
-          this.config.listenHost === '0.0.0.0'
-            ? LlamaCppGatewayAccessMode.Lan
-            : LlamaCppGatewayAccessMode.Local,
-        ...(this.lanToken ? { lanToken: this.lanToken } : {}),
       }),
     });
     await this.gateway.start();

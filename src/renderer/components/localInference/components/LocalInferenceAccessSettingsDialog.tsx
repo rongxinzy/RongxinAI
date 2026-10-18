@@ -22,6 +22,8 @@ type LocalInferenceAccessSettingsDialogProps = {
   keepRunningOnAppQuit: boolean;
   willRestartOnSave: boolean;
   port: string;
+  /** Gateway port serving LAN requests; undefined while the model gateway is not running. */
+  lanGatewayPort?: string;
   lanToken: string;
   exampleModelName?: string;
   onAllowLanAccessChange: (value: boolean) => void;
@@ -43,6 +45,7 @@ export function LocalInferenceAccessSettingsDialog({
   keepRunningOnAppQuit,
   willRestartOnSave,
   port,
+  lanGatewayPort,
   lanToken,
   exampleModelName,
   onAllowLanAccessChange,
@@ -55,8 +58,11 @@ export function LocalInferenceAccessSettingsDialog({
   const resolvedPort = port.trim() || DEFAULT_PORT;
   const portValid = isValidLlamaCppPort(port);
   const listenHost = allowLanAccess ? LAN_HOST : LOCALHOST_HOST;
+  // LAN requests reach the bundled model gateway, whose port is independent of
+  // the llama.cpp service port shown above.
+  const endpointPort = allowLanAccess ? lanGatewayPort?.trim() || resolvedPort : resolvedPort;
   const endpointBase = allowLanAccess
-    ? `http://<LAN-IP>:${resolvedPort}/v1`
+    ? `http://<LAN-IP>:${endpointPort}/v1`
     : `http://${listenHost}:${resolvedPort}/v1`;
   const modelName = exampleModelName?.trim() || '<model-name>';
   const requestAuthorization =

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { projectMagpieCatalog } from './catalog';
 import { MagpieManager } from './manager';
 import { isolatedMagpieEnvironment, prepareMagpieHome } from './environment';
+import { MAGPIE_LAN_KEY_NAME } from './lanAccess';
 import { verifyMagpieBinary, MAGPIE_COMMIT, MAGPIE_VERSION } from './integrity';
 async function temporary() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'magpie-host-test-'));
@@ -29,6 +30,18 @@ describe('Magpie isolation and integrity', () => {
       isolatedMagpieEnvironment('/private', 1234, 'test', { HOME: '/real' }, true)
         .MAGPIE_NO_ACCOUNTS,
     ).toBe('0');
+  });
+  it('binds the gateway on 0.0.0.0 only when LAN access is enabled', () => {
+    const base = { HOME: '/real' };
+    expect(isolatedMagpieEnvironment('/private', 1234, 'test', base, false, true).MAGPIE_ADDR).toBe(
+      '0.0.0.0:1234',
+    );
+    expect(isolatedMagpieEnvironment('/private', 1234, 'test', base, true, true).MAGPIE_ADDR).toBe(
+      '0.0.0.0:1234',
+    );
+    expect(
+      isolatedMagpieEnvironment('/private', 1234, 'test', base, false, false).MAGPIE_ADDR,
+    ).toBe('127.0.0.1:1234');
   });
   it('forces private no-account, no-telemetry and no-update settings without touching home', async () => {
     const root = await temporary();
@@ -88,6 +101,7 @@ describe('Magpie owned lifecycle', () => {
   async function setup(
     serviceEnabled?: { read(): boolean; write(enabled: boolean): void },
     gatewayPort?: { read(): number | undefined; write(port: number): void },
+    lanAccess?: { read(): { enabled: boolean; lanToken: string | null } },
   ) {
     const root = await temporary();
     let port = 21000;
@@ -101,9 +115,37 @@ describe('Magpie owned lifecycle', () => {
       }),
     });
     const spawn = vi.fn(() => child);
+    const callerKeys: Array<{ id: string; name: string; secret?: string }> = [];
     const fetcher = vi.fn(async (url: string, _init?: RequestInit) => {
       if (url.endsWith('/api/hello'))
         return Response.json({ name: 'magpie', version: MAGPIE_VERSION });
+      if (url.endsWith('/api/caller-keys'))
+        return Response.json({
+          keys: callerKeys.map(({ secret: _secret, ...rest }) => rest),
+        });
+      if (url.endsWith('/api/caller-keys/copy-key')) {
+        const body = JSON.parse(String(_init?.body ?? '{}')) as { key?: string };
+        const key = callerKeys.find(entry => entry.id === body.key);
+        return Response.json({ keys: [], secret: key?.secret ?? '' });
+      }
+      if (url.endsWith('/api/caller-keys/add-key')) {
+        const body = JSON.parse(String(_init?.body ?? '{}')) as {
+          name?: string;
+          secret?: string;
+        };
+        callerKeys.push({
+          id: `lan-${callerKeys.length + 1}`,
+          name: body.name,
+          secret: body.secret,
+        });
+        return Response.json({ keys: [] });
+      }
+      if (url.endsWith('/api/caller-keys/remove-key')) {
+        const body = JSON.parse(String(_init?.body ?? '{}')) as { key?: string };
+        const index = callerKeys.findIndex(entry => entry.id === body.key);
+        if (index >= 0) callerKeys.splice(index, 1);
+        return Response.json({ keys: [] });
+      }
       if (url.endsWith('/api/state'))
         return Response.json({
           settings: { secret: 'never-project' },
@@ -163,6 +205,7 @@ describe('Magpie owned lifecycle', () => {
     });
     const manager = new MagpieManager({
       serviceEnabled,
+      ...(lanAccess ? { lanAccess } : {}),
       parseCatalog: async bytes =>
         projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
       resourcesRoot: root,
@@ -174,7 +217,7 @@ describe('Magpie owned lifecycle', () => {
       port: async () => ++port,
       ...(gatewayPort ? { gatewayPort } : {}),
     });
-    return { root, child, spawn, fetcher, manager };
+    return { root, child, spawn, fetcher, manager, callerKeys };
   }
   it('stays stopped until explicitly enabled, starts once, projects only public fields, stops owned process', async () => {
     const { root, manager, spawn, fetcher, child } = await setup();
@@ -456,6 +499,101 @@ describe('Magpie owned lifecycle', () => {
       expect(diag.recentErrors).toHaveLength(1);
       expect(diag.recentErrors![0].message).toBe('Rate limit exceeded');
       expect(diag.latencyMs).toBeGreaterThanOrEqual(0);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('starts with LAN access even when the service is disabled, binds 0.0.0.0 and imports the LAN key', async () => {
+    let lanToken: string | null = 'sk-lan-token';
+    const lanAccess = { read: () => ({ enabled: true, lanToken }) };
+    const { manager, root, spawn, callerKeys } = await setup(undefined, undefined, lanAccess);
+    try {
+      expect(manager.status().enabled).toBe(false);
+      const status = await manager.onLanAccessChanged();
+      expect(status.state).toBe('running');
+      expect(spawn).toHaveBeenCalledTimes(1);
+      expect(manager.status().enabled).toBe(false); // preference untouched
+      const env = spawn.mock.calls[0][2].env as NodeJS.ProcessEnv;
+      expect(env.MAGPIE_ADDR).toMatch(/^0\.0\.0\.0:\d+$/);
+      await vi.waitFor(() =>
+        expect(callerKeys).toEqual([
+          { id: 'lan-1', name: MAGPIE_LAN_KEY_NAME, secret: 'sk-lan-token' },
+        ]),
+      );
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the service preference off after a LAN-only run stops', async () => {
+    let enabled = false;
+    const preference = {
+      read: () => enabled,
+      write: (value: boolean) => {
+        enabled = value;
+      },
+    };
+    let lanEnabled = true;
+    const lanAccess = { read: () => ({ enabled: lanEnabled, lanToken: 'sk-lan-token' }) };
+    const { manager, root } = await setup(preference, undefined, lanAccess);
+    try {
+      await manager.onLanAccessChanged();
+      expect(enabled).toBe(false);
+      lanEnabled = false;
+      // LAN was the only reason to run: stopping returns to stopped, not failed.
+      expect((await manager.onLanAccessChanged()).state).toBe('stopped');
+      expect(enabled).toBe(false);
+      expect(await manager.ensureRunning().catch((): null => null)).toBeNull();
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('restarts the owned process when the LAN toggle flips', async () => {
+    let lanEnabled = false;
+    const lanAccess = { read: () => ({ enabled: lanEnabled, lanToken: 'sk-lan-token' }) };
+    const { manager, root, spawn } = await setup(
+      { read: () => true, write: () => {} },
+      undefined,
+      lanAccess,
+    );
+    try {
+      await manager.start();
+      expect((spawn.mock.calls[0][2].env as NodeJS.ProcessEnv).MAGPIE_ADDR).toMatch(
+        /^127\.0\.0\.1:/,
+      );
+      lanEnabled = true;
+      expect((await manager.onLanAccessChanged()).state).toBe('running');
+      expect(spawn).toHaveBeenCalledTimes(2);
+      expect((spawn.mock.calls[1][2].env as NodeJS.ProcessEnv).MAGPIE_ADDR).toMatch(/^0\.0\.0\.0:/);
+      lanEnabled = false;
+      expect((await manager.onLanAccessChanged()).state).toBe('running');
+      expect(spawn).toHaveBeenCalledTimes(3);
+      expect((spawn.mock.calls[2][2].env as NodeJS.ProcessEnv).MAGPIE_ADDR).toMatch(
+        /^127\.0\.0\.1:/,
+      );
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('replaces the imported key after the LAN token is regenerated', async () => {
+    let lanToken: string | null = 'sk-lan-first';
+    const lanAccess = { read: () => ({ enabled: true, lanToken }) };
+    const { manager, root, callerKeys } = await setup(undefined, undefined, lanAccess);
+    try {
+      await manager.onLanAccessChanged();
+      await vi.waitFor(() => expect(callerKeys).toHaveLength(1));
+      lanToken = 'sk-lan-second';
+      await manager.onLanAccessTokenRegenerated();
+      expect(callerKeys).toEqual([
+        { id: 'lan-2', name: MAGPIE_LAN_KEY_NAME, secret: 'sk-lan-second' },
+      ]);
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });
