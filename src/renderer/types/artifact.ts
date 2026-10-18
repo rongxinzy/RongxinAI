@@ -5,11 +5,7 @@ import {
   type CoworkArtifactType,
 } from '../../shared/cowork/artifacts';
 
-export {
-  ArtifactPreviewMode,
-  getArtifactPreviewMode,
-  isBinaryArtifactFile,
-} from '../../shared/cowork/artifactPreview';
+export { ArtifactPreviewMode, getArtifactPreviewMode } from '../../shared/cowork/artifactPreview';
 
 export type ArtifactType = CoworkArtifactType;
 

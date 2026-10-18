@@ -33,7 +33,7 @@ const setup = (list: (scopeId: string) => Promise<unknown>, scopeId: string | nu
   const store = configureStore({ reducer: { artifact: artifactReducer } });
   store.dispatch(activateSessionArtifactView('lane-1'));
   const wrapper = ({ children }: { children: React.ReactNode }) =>
-    React.createElement(Provider, { store, children });
+    React.createElement(Provider, { store }, children);
   const view = renderHook(({ id }) => useLedgerArtifacts(id), {
     initialProps: { id: scopeId },
     wrapper,
