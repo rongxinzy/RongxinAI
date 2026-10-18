@@ -1,7 +1,7 @@
 /** Windows shell path normalization for renderer-supplied paths (drag & drop, dialogs). */
 import { isWindows } from './appEnv';
 
-export const safeDecodeURIComponent = (value: string): string => {
+const safeDecodeURIComponent = (value: string): string => {
   try {
     return decodeURIComponent(value);
   } catch {

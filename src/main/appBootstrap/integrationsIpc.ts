@@ -1,14 +1,12 @@
 /** Integration IPC: DingTalk install plus session title, recent cwds and readiness helpers. */
-import { ipcMain } from 'electron';
-
 import { getIMGatewayManager } from './ccConnectRuntime';
 import { getMagpieModelService } from './magpieRuntime';
 import { generateSessionTitle } from '../libs/coworkUtil';
 import { isInternalWorkspacePath } from './workspacePaths';
 import { getCoworkStore } from './runtimeServices';
 import { t } from '../i18n';
-import { AppConfigIpc } from '../../shared/ipc/channels';
-import { handleIpcContract } from '../ipc/handleIpcContract';
+import { appSystemContract } from '../../shared/ipc/appSystemContract';
+import { handleIpcContract, handleIpcContractSubset } from '../ipc/handleIpcContract';
 import { dingtalkInstallContract } from '../../shared/ipc/imContract';
 
 export const registerIntegrationsIpc = (): void => {
@@ -39,17 +37,19 @@ export const registerIntegrationsIpc = (): void => {
     },
   });
 
-  ipcMain.handle(AppConfigIpc.GenerateSessionTitle, async (_event, userInput: string | null) => {
-    return generateSessionTitle(userInput, t('coworkDefaultSessionTitle'));
-  });
+  handleIpcContractSubset(appSystemContract, {
+    generateSessionTitle: async (_event, userInput) => {
+      return generateSessionTitle(userInput, t('coworkDefaultSessionTitle'));
+    },
 
-  ipcMain.handle(AppConfigIpc.GetRecentCwds, async (_event, limit?: number) => {
-    const boundedLimit = limit ? Math.min(Math.max(limit, 1), 20) : 8;
-    return getCoworkStore()
-      .listRecentCwds(20)
-      .filter(cwd => !isInternalWorkspacePath(cwd))
-      .slice(0, boundedLimit);
-  });
+    getRecentCwds: async (_event, limit) => {
+      const boundedLimit = limit ? Math.min(Math.max(limit, 1), 20) : 8;
+      return getCoworkStore()
+        .listRecentCwds(20)
+        .filter(cwd => !isInternalWorkspacePath(cwd))
+        .slice(0, boundedLimit);
+    },
 
-  ipcMain.handle(AppConfigIpc.CheckApiConfig, () => modelService.checkReadiness());
+    checkApiConfig: async () => modelService.checkReadiness(),
+  });
 };

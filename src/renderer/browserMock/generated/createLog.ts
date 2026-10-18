@@ -3,6 +3,12 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createLog(runtime: BrowserMockRuntime): Window['electron']['log'] {
   return {
+    fromRenderer: (_p0, _p1, _p2) => {
+      void _p0;
+      void _p1;
+      void _p2;
+      runtime.warnOnce('log.fromRenderer');
+    },
     getPath: async () => {
       runtime.warnOnce('log.getPath');
       return '';
@@ -17,12 +23,6 @@ export function createLog(runtime: BrowserMockRuntime): Window['electron']['log'
         canceled: false,
         missingEntries: [],
       };
-    },
-    fromRenderer: (_p0, _p1, _p2) => {
-      void _p0;
-      void _p1;
-      void _p2;
-      runtime.warnOnce('log.fromRenderer');
     },
   };
 }

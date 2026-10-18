@@ -47,6 +47,10 @@ import type {
   PermissionsApi,
 } from './electron/integrationsApi';
 import type { RuntimeRetryNotice } from '../../common/runtimeNotice';
+import type { IpcContractApi } from '../../shared/ipc/contract';
+import type { appSystemContract } from '../../shared/ipc/appSystemContract';
+
+type AppSystemContractApi = IpcContractApi<typeof appSystemContract>;
 
 export interface IElectronAPI {
   platform: string;
@@ -60,11 +64,9 @@ export interface IElectronAPI {
   triage: TriageApi;
   hardware: HardwareApi;
   agents: AgentsApi;
-  checkApiConfig: (options?: {
-    probeModel?: boolean;
-  }) => Promise<{ hasConfig: boolean; config: null; error?: string }>;
-  generateSessionTitle: (userInput: string | null) => Promise<string>;
-  getRecentCwds: (limit?: number) => Promise<string[]>;
+  checkApiConfig: AppSystemContractApi['checkApiConfig'];
+  generateSessionTitle: AppSystemContractApi['generateSessionTitle'];
+  getRecentCwds: AppSystemContractApi['getRecentCwds'];
   appEvents: AppEventsApi;
   contextMenu: ContextMenuApi;
   window: WindowApi;
@@ -79,12 +81,12 @@ export interface IElectronAPI {
   project: ProjectApi;
   shell: ShellApi;
   autoLaunch: {
-    get: () => Promise<{ enabled: boolean }>;
-    set: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
+    get: AppSystemContractApi['autoLaunchGet'];
+    set: AppSystemContractApi['autoLaunchSet'];
   };
   preventSleep: {
-    get: () => Promise<{ enabled: boolean }>;
-    set: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
+    get: AppSystemContractApi['preventSleepGet'];
+    set: AppSystemContractApi['preventSleepSet'];
   };
   appInfo: AppInfoApi;
   appUpdate: AppUpdateApi;

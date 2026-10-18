@@ -3,6 +3,22 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createModelPool(runtime: BrowserMockRuntime): Window['electron']['modelPool'] {
   return {
+    onStreamData: (_p0, _p1) => {
+      void _p0;
+      return runtime.subscribe('modelPool.onStreamData', _p1);
+    },
+    onStreamDone: (_p0, _p1) => {
+      void _p0;
+      return runtime.subscribe('modelPool.onStreamDone', _p1);
+    },
+    onStreamError: (_p0, _p1) => {
+      void _p0;
+      return runtime.subscribe('modelPool.onStreamError', _p1);
+    },
+    onStreamAbort: (_p0, _p1) => {
+      void _p0;
+      return runtime.subscribe('modelPool.onStreamAbort', _p1);
+    },
     listModels: async () => {
       runtime.warnOnce('modelPool.listModels');
       return {
@@ -24,22 +40,6 @@ export function createModelPool(runtime: BrowserMockRuntime): Window['electron']
       void _p0;
       runtime.warnOnce('modelPool.cancelStream');
       return false;
-    },
-    onStreamData: (_p0, _p1) => {
-      void _p0;
-      return runtime.subscribe('modelPool.onStreamData', _p1);
-    },
-    onStreamDone: (_p0, _p1) => {
-      void _p0;
-      return runtime.subscribe('modelPool.onStreamDone', _p1);
-    },
-    onStreamError: (_p0, _p1) => {
-      void _p0;
-      return runtime.subscribe('modelPool.onStreamError', _p1);
-    },
-    onStreamAbort: (_p0, _p1) => {
-      void _p0;
-      return runtime.subscribe('modelPool.onStreamAbort', _p1);
     },
   };
 }

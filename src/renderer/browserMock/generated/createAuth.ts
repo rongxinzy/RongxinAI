@@ -3,6 +3,9 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createAuth(runtime: BrowserMockRuntime): Window['electron']['auth'] {
   return {
+    onCommunityCallback: _p0 => {
+      return runtime.subscribe('auth.onCommunityCallback', _p0);
+    },
     communityLogin: async () => {
       runtime.warnOnce('auth.communityLogin');
       return {
@@ -24,9 +27,6 @@ export function createAuth(runtime: BrowserMockRuntime): Window['electron']['aut
       return {
         success: true,
       };
-    },
-    onCommunityCallback: _p0 => {
-      return runtime.subscribe('auth.onCommunityCallback', _p0);
     },
   };
 }

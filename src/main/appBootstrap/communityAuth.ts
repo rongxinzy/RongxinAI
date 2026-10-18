@@ -14,6 +14,8 @@ import { COMMUNITY_AUTH_ORIGIN, configureCommunityAuthSession } from '../communi
 import { registerZhiyuanDeepLinkProtocol } from '../deepLinkRegistration';
 import { registerModelPoolIpcHandlers } from '../modelPoolIpc';
 import { CommunityAuthIpc } from '../../shared/ipc/channels';
+import { providersContract } from '../../shared/ipc/providersContract';
+import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 import { getBranding } from '../../shared/branding';
 import { t } from '../i18n';
 
@@ -143,57 +145,59 @@ export const registerCommunityAuthIpc = (): void => {
     registerModelPoolIpcHandlers(communityAuthSession);
   }
 
-  ipcMain.handle(CommunityAuthIpc.GetCommunityUser, async () => {
-    const user = communityAuthSession!.getUser();
-    if (!user) return { success: false };
-    try {
-      await communityAuthSession!.getAccessToken();
-      return { success: true, user };
-    } catch {
-      return { success: false };
-    }
-  });
-
-  ipcMain.handle(CommunityAuthIpc.Logout, () => {
-    communityAuthSession!.clear();
-    return { success: true };
-  });
-
-  ipcMain.handle(CommunityAuthIpc.Login, async () => {
-    try {
-      if (!communityAuthSession!.canPersist()) {
-        return { success: false, error: '系统安全存储不可用，无法安全地保存登录状态。' };
+  handleIpcContractSubset(providersContract, {
+    authGetCommunityUser: async () => {
+      const user = communityAuthSession!.getUser();
+      if (!user) return { success: false };
+      try {
+        await communityAuthSession!.getAccessToken();
+        return { success: true, user };
+      } catch {
+        return { success: false };
       }
-      const verifier = crypto.randomBytes(48).toString('base64url');
-      const state = crypto.randomBytes(32).toString('base64url');
-      const codeChallenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-      const response = await net.fetch(`${COMMUNITY_AUTH_ORIGIN}/v1/auth/authorize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          redirect_uri: 'zhiyuan://auth/callback',
-          state,
-          code_challenge: codeChallenge,
-          code_challenge_method: 'S256',
-        }),
-      });
-      const payload = await readCommunityAuthPayload(response);
-      const loginUrl = typeof payload?.login_url === 'string' ? payload.login_url : null;
-      if (!response.ok || !loginUrl || !loginUrl.startsWith(`${COMMUNITY_AUTH_ORIGIN}/`)) {
-        console.warn(
-          `[CommunityAuth] login initialization returned an invalid response with status ${response.status}`,
-        );
-        return { success: false, error: t('communityAuthServiceUnavailable') };
-      }
-      pendingCommunityLogin = { state, verifier, expiresAt: Date.now() + 10 * 60 * 1000 };
-      await shell.openExternal(loginUrl);
+    },
+
+    authCommunityLogout: async () => {
+      communityAuthSession!.clear();
       return { success: true };
-    } catch (error) {
-      console.error('[Auth] login failed:', error);
-      return {
-        success: false,
-        error: t('communityAuthServiceUnavailable'),
-      };
-    }
+    },
+
+    authCommunityLogin: async () => {
+      try {
+        if (!communityAuthSession!.canPersist()) {
+          return { success: false, error: '系统安全存储不可用，无法安全地保存登录状态。' };
+        }
+        const verifier = crypto.randomBytes(48).toString('base64url');
+        const state = crypto.randomBytes(32).toString('base64url');
+        const codeChallenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+        const response = await net.fetch(`${COMMUNITY_AUTH_ORIGIN}/v1/auth/authorize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            redirect_uri: 'zhiyuan://auth/callback',
+            state,
+            code_challenge: codeChallenge,
+            code_challenge_method: 'S256',
+          }),
+        });
+        const payload = await readCommunityAuthPayload(response);
+        const loginUrl = typeof payload?.login_url === 'string' ? payload.login_url : null;
+        if (!response.ok || !loginUrl || !loginUrl.startsWith(`${COMMUNITY_AUTH_ORIGIN}/`)) {
+          console.warn(
+            `[CommunityAuth] login initialization returned an invalid response with status ${response.status}`,
+          );
+          return { success: false, error: t('communityAuthServiceUnavailable') };
+        }
+        pendingCommunityLogin = { state, verifier, expiresAt: Date.now() + 10 * 60 * 1000 };
+        await shell.openExternal(loginUrl);
+        return { success: true };
+      } catch (error) {
+        console.error('[Auth] login failed:', error);
+        return {
+          success: false,
+          error: t('communityAuthServiceUnavailable'),
+        };
+      }
+    },
   });
 };

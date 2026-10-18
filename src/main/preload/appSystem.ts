@@ -2,39 +2,48 @@ import { ipcRenderer } from 'electron';
 
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import { AppUpdateIpc } from '../../shared/appUpdate/constants';
-import { TriageIpcChannel } from '../../shared/triage';
-import {
-  AppConfigIpc,
-  AppIpc,
-  ContextMenuIpc,
-  DialogIpc,
-  LogIpc,
-  NetworkIpc,
-  PermissionsIpc,
-  ProjectIpc,
-  RuntimeNoticeIpc,
-  ShellIpc,
-  StoreIpc,
-  WindowIpc,
-} from '../../shared/ipc/channels';
+import { ContextMenuIpc, NetworkIpc, WindowIpc } from '../../shared/ipc/channels';
+import { appSystemContractChannels } from '../../shared/ipc/appSystemContract.channels';
+import type { appSystemContract } from '../../shared/ipc/appSystemContract';
+import type { IpcContractApi } from '../../shared/ipc/contract';
 import { onPush, onPushVoid } from './pushChannel';
+import { createIpcInvokers } from './createIpcInvokers';
+
+type AppSystemContractApi = IpcContractApi<typeof appSystemContract>;
+const invokers = createIpcInvokers(appSystemContractChannels);
+
+// Rename a contract invoker to its preload-facing method name, keeping the
+// contract-derived signature.
+const asApi = <K extends keyof AppSystemContractApi>(method: K): AppSystemContractApi[K] =>
+  invokers[method] as AppSystemContractApi[K];
+
+/** Maps contract method names onto the preload-facing member names. */
+type Renamed<M extends Record<string, keyof AppSystemContractApi>> = {
+  [K in keyof M]: AppSystemContractApi[M[K]];
+};
+
+/** Contract invokers renamed to preload names, plus hand-wired members. */
+type WithExtra<E, M extends Record<string, keyof AppSystemContractApi>> = Renamed<M> & E;
 
 // App, window, dialog, shell, and other system-level bridges for the renderer.
+// Invoke methods come from the contract channel map via createIpcInvokers;
+// fire-and-forget sends (contextMenu.execute, window controls, network status)
+// and push subscriptions stay hand-wired below.
 export const appSystemApi = {
   store: {
-    get: (key: string) => ipcRenderer.invoke(StoreIpc.Get, key),
-    set: (key: string, value: unknown) => ipcRenderer.invoke(StoreIpc.Set, key, value),
-    remove: (key: string) => ipcRenderer.invoke(StoreIpc.Remove, key),
+    get: asApi('storeGet'),
+    set: asApi('storeSet'),
+    remove: asApi('storeRemove'),
   },
 
   triage: {
-    getConfig: () => ipcRenderer.invoke(TriageIpcChannel.GetConfig),
-    setConfig: (config: unknown) => ipcRenderer.invoke(TriageIpcChannel.SetConfig, config),
+    getConfig: asApi('triageGetConfig'),
+    setConfig: asApi('triageSetConfig'),
   },
 
   permissions: {
-    checkCalendar: () => ipcRenderer.invoke(PermissionsIpc.CheckCalendar),
-    requestCalendar: () => ipcRenderer.invoke(PermissionsIpc.RequestCalendar),
+    checkCalendar: asApi('permissionsCheckCalendar'),
+    requestCalendar: asApi('permissionsRequestCalendar'),
   },
 
   // Internal app-level events (replaces raw ipcRenderer.on usage in App.tsx)
@@ -53,11 +62,11 @@ export const appSystemApi = {
     minimize: () => ipcRenderer.send(WindowIpc.Minimize),
     toggleMaximize: () => ipcRenderer.send(WindowIpc.ToggleMaximize),
     close: () => ipcRenderer.send(WindowIpc.Close),
-    isMaximized: () => ipcRenderer.invoke(WindowIpc.IsMaximized),
+    isMaximized: asApi('windowIsMaximized'),
     showSystemMenu: (position: { x: number; y: number }) =>
       ipcRenderer.send(WindowIpc.ShowSystemMenu, position),
-    toggleDevTools: () => ipcRenderer.invoke(WindowIpc.ToggleDevTools), // 切换调试面板
-    openDevTools: () => ipcRenderer.invoke(WindowIpc.OpenDevTools),
+    toggleDevTools: asApi('windowToggleDevTools'), // 切换调试面板
+    openDevTools: asApi('windowOpenDevTools'),
     onStateChanged: (
       callback: (state: {
         isMaximized: boolean;
@@ -67,114 +76,195 @@ export const appSystemApi = {
     ) => onPush(WindowIpc.StateChanged, callback),
   },
 
-  checkApiConfig: (options?: { probeModel?: boolean }) =>
-    ipcRenderer.invoke(AppConfigIpc.CheckApiConfig, options),
-  generateSessionTitle: (userInput: string | null) =>
-    ipcRenderer.invoke(AppConfigIpc.GenerateSessionTitle, userInput),
-  getRecentCwds: (limit?: number) => ipcRenderer.invoke(AppConfigIpc.GetRecentCwds, limit),
+  checkApiConfig: asApi('checkApiConfig'),
+  generateSessionTitle: asApi('generateSessionTitle'),
+  getRecentCwds: asApi('getRecentCwds'),
 
   dialog: {
-    selectDirectory: (options?: { defaultPath?: string }) =>
-      ipcRenderer.invoke(DialogIpc.SelectDirectory, options),
-    selectFile: (options?: {
-      title?: string;
-      filters?: { name: string; extensions: string[] }[];
-    }) => ipcRenderer.invoke(DialogIpc.SelectFile, options),
-    selectFiles: (options?: {
-      title?: string;
-      filters?: { name: string; extensions: string[] }[];
-    }) => ipcRenderer.invoke(DialogIpc.SelectFiles, options),
-    saveInlineFile: (options: {
-      dataBase64: string;
-      fileName?: string;
-      mimeType?: string;
-      cwd?: string;
-    }) => ipcRenderer.invoke(DialogIpc.SaveInlineFile, options),
-    readFileAsDataUrl: (filePath: string) =>
-      ipcRenderer.invoke(DialogIpc.ReadFileAsDataUrl, filePath),
-    checkArtifactFile: (filePath: string) =>
-      ipcRenderer.invoke(DialogIpc.CheckArtifactFile, filePath),
-    generateThumbnail: (filePath: string) =>
-      ipcRenderer.invoke(DialogIpc.GenerateThumbnail, filePath),
-    showMessageBox: (options: {
-      message: string;
-      type?: 'none' | 'info' | 'error' | 'question' | 'warning';
-      title?: string;
-    }) => ipcRenderer.invoke(DialogIpc.ShowMessageBox, options),
+    selectDirectory: asApi('dialogSelectDirectory'),
+    selectFile: asApi('dialogSelectFile'),
+    selectFiles: asApi('dialogSelectFiles'),
+    saveInlineFile: asApi('dialogSaveInlineFile'),
+    readFileAsDataUrl: asApi('dialogReadFileAsDataUrl'),
+    checkArtifactFile: asApi('dialogCheckArtifactFile'),
+    generateThumbnail: asApi('dialogGenerateThumbnail'),
+    showMessageBox: asApi('dialogShowMessageBox'),
   },
 
   project: {
-    getDefaultBaseDir: () => ipcRenderer.invoke(ProjectIpc.GetDefaultBaseDir),
-    createDirectory: (options: { name: string; baseDir?: string }) =>
-      ipcRenderer.invoke(ProjectIpc.CreateDirectory, options),
-    ensureScratchDir: () => ipcRenderer.invoke(ProjectIpc.EnsureScratchDir),
-    createRandomWorkspace: () => ipcRenderer.invoke(ProjectIpc.CreateRandomWorkspace),
+    getDefaultBaseDir: asApi('projectGetDefaultBaseDir'),
+    createDirectory: asApi('projectCreateDirectory'),
+    ensureScratchDir: asApi('projectEnsureScratchDir'),
+    createRandomWorkspace: asApi('projectCreateRandomWorkspace'),
   },
 
   shell: {
-    openPath: (filePath: string) => ipcRenderer.invoke(ShellIpc.OpenPath, filePath),
-    showItemInFolder: (filePath: string) => ipcRenderer.invoke(ShellIpc.ShowItemInFolder, filePath),
-    openExternal: (url: string) => ipcRenderer.invoke(ShellIpc.OpenExternal, url),
-    openHtmlInBrowser: (htmlContent: string) =>
-      ipcRenderer.invoke(ShellIpc.OpenHtmlInBrowser, htmlContent),
-    resolveLocalPath: (candidate: string, cwd?: string) =>
-      ipcRenderer.invoke(ShellIpc.ResolveLocalPath, candidate, cwd),
+    openPath: asApi('shellOpenPath'),
+    showItemInFolder: asApi('shellShowItemInFolder'),
+    openExternal: asApi('shellOpenExternal'),
+    openHtmlInBrowser: asApi('shellOpenHtmlInBrowser'),
+    resolveLocalPath: asApi('shellResolveLocalPath'),
   },
 
   autoLaunch: {
-    get: () => ipcRenderer.invoke(AppIpc.GetAutoLaunch),
-    set: (enabled: boolean) => ipcRenderer.invoke(AppIpc.SetAutoLaunch, enabled),
+    get: asApi('autoLaunchGet'),
+    set: asApi('autoLaunchSet'),
   },
 
   preventSleep: {
-    get: () => ipcRenderer.invoke(AppIpc.GetPreventSleep),
-    set: (enabled: boolean) => ipcRenderer.invoke(AppIpc.SetPreventSleep, enabled),
+    get: asApi('preventSleepGet'),
+    set: asApi('preventSleepSet'),
   },
 
   appInfo: {
-    getVersion: () => ipcRenderer.invoke(AppIpc.GetVersion),
-    isDev: () => ipcRenderer.invoke(AppIpc.IsDev),
-    isEnterprise: () => ipcRenderer.invoke(AppIpc.IsEnterprise),
-    getSystemLocale: () => ipcRenderer.invoke(AppIpc.GetSystemLocale),
-    consumePendingLocalInferenceInstall: () =>
-      ipcRenderer.invoke(AppIpc.ConsumePendingLocalInferenceInstall),
-    getInferenceEdition: () => ipcRenderer.invoke(AppIpc.GetInferenceEdition),
-    usesBundledLlamaCppRuntime: () => ipcRenderer.invoke(AppIpc.UsesBundledLlamaCppRuntime),
-    relaunch: () => ipcRenderer.invoke(AppIpc.Relaunch),
+    getVersion: asApi('appGetVersion'),
+    isDev: asApi('appIsDev'),
+    isEnterprise: asApi('appIsEnterprise'),
+    getSystemLocale: asApi('appGetSystemLocale'),
+    consumePendingLocalInferenceInstall: asApi('appConsumePendingLocalInferenceInstall'),
+    getInferenceEdition: asApi('appGetInferenceEdition'),
+    usesBundledLlamaCppRuntime: asApi('appUsesBundledLlamaCppRuntime'),
+    relaunch: asApi('appRelaunch'),
   },
 
   appUpdate: {
-    getChannel: () => ipcRenderer.invoke(AppUpdateIpc.GetChannel),
-    setChannel: (channel: 'stable' | 'beta') =>
-      ipcRenderer.invoke(AppUpdateIpc.SetChannel, channel),
-    getState: () => ipcRenderer.invoke(AppUpdateIpc.GetState),
-    checkNow: (options?: { manual?: boolean; userId?: string | null }) =>
-      ipcRenderer.invoke(AppUpdateIpc.CheckNow, options),
-    retryDownload: () => ipcRenderer.invoke(AppUpdateIpc.RetryDownload),
-    pauseDownload: () => ipcRenderer.invoke(AppUpdateIpc.PauseDownload),
-    resumeDownload: () => ipcRenderer.invoke(AppUpdateIpc.ResumeDownload),
-    cancelDownload: () => ipcRenderer.invoke(AppUpdateIpc.CancelDownload),
-    installReady: () => ipcRenderer.invoke(AppUpdateIpc.InstallReady),
-    revealDownload: () => ipcRenderer.invoke(AppUpdateIpc.RevealDownload),
+    getChannel: asApi('appUpdateGetChannel'),
+    setChannel: asApi('appUpdateSetChannel'),
+    getState: asApi('appUpdateGetState'),
+    checkNow: asApi('appUpdateCheckNow'),
+    retryDownload: asApi('appUpdateRetryDownload'),
+    pauseDownload: asApi('appUpdatePauseDownload'),
+    resumeDownload: asApi('appUpdateResumeDownload'),
+    cancelDownload: asApi('appUpdateCancelDownload'),
+    installReady: asApi('appUpdateInstallReady'),
+    revealDownload: asApi('appUpdateRevealDownload'),
     onStateChanged: (callback: (data: unknown) => void) =>
       onPush(AppUpdateIpc.StateChanged, callback),
   },
 
   log: {
-    getPath: () => ipcRenderer.invoke(LogIpc.GetPath),
-    openFolder: () => ipcRenderer.invoke(LogIpc.OpenFolder),
-    exportZip: () => ipcRenderer.invoke(LogIpc.ExportZip),
+    getPath: asApi('logGetPath'),
+    openFolder: asApi('logOpenFolder'),
+    exportZip: asApi('logExportZip'),
     fromRenderer: (level: string, tag: string, message: string) =>
-      ipcRenderer.send(LogIpc.FromRenderer, level, tag, message),
+      ipcRenderer.send('log:fromRenderer', level, tag, message),
   },
 
   runtimeNotices: {
     onNotice: (
       callback: (notice: import('../../common/runtimeNotice').RuntimeRetryNotice) => void,
-    ) => onPush(RuntimeNoticeIpc.Notice, callback),
+    ) => onPush('runtime:notice', callback),
   },
 
   networkStatus: {
     send: (status: 'online' | 'offline') => ipcRenderer.send(NetworkIpc.StatusChange, status),
   },
+} satisfies {
+  appEvents: {
+    onOpenSettings: (callback: () => void) => () => void;
+    onNewTask: (callback: () => void) => () => void;
+  };
+  contextMenu: {
+    execute: (action: ContextMenuAction) => void;
+    onOpen: (callback: (event: ContextMenuOpenEvent) => void) => () => void;
+  };
+  runtimeNotices: {
+    onNotice: (
+      callback: (notice: import('../../common/runtimeNotice').RuntimeRetryNotice) => void,
+    ) => () => void;
+  };
+  networkStatus: {
+    send: (status: 'online' | 'offline') => void;
+  };
+  store: Renamed<{ get: 'storeGet'; set: 'storeSet'; remove: 'storeRemove' }>;
+  triage: Renamed<{ getConfig: 'triageGetConfig'; setConfig: 'triageSetConfig' }>;
+  permissions: Renamed<{
+    checkCalendar: 'permissionsCheckCalendar';
+    requestCalendar: 'permissionsRequestCalendar';
+  }>;
+  window: WithExtra<
+    {
+      minimize: () => void;
+      toggleMaximize: () => void;
+      close: () => void;
+      showSystemMenu: (position: { x: number; y: number }) => void;
+      onStateChanged: (
+        callback: (state: {
+          isMaximized: boolean;
+          isFullscreen: boolean;
+          isFocused: boolean;
+        }) => void,
+      ) => () => void;
+    },
+    {
+      isMaximized: 'windowIsMaximized';
+      toggleDevTools: 'windowToggleDevTools';
+      openDevTools: 'windowOpenDevTools';
+    }
+  >;
+  checkApiConfig: AppSystemContractApi['checkApiConfig'];
+  generateSessionTitle: AppSystemContractApi['generateSessionTitle'];
+  getRecentCwds: AppSystemContractApi['getRecentCwds'];
+  dialog: Renamed<{
+    selectDirectory: 'dialogSelectDirectory';
+    selectFile: 'dialogSelectFile';
+    selectFiles: 'dialogSelectFiles';
+    saveInlineFile: 'dialogSaveInlineFile';
+    readFileAsDataUrl: 'dialogReadFileAsDataUrl';
+    checkArtifactFile: 'dialogCheckArtifactFile';
+    generateThumbnail: 'dialogGenerateThumbnail';
+    showMessageBox: 'dialogShowMessageBox';
+  }>;
+  project: Renamed<{
+    getDefaultBaseDir: 'projectGetDefaultBaseDir';
+    createDirectory: 'projectCreateDirectory';
+    ensureScratchDir: 'projectEnsureScratchDir';
+    createRandomWorkspace: 'projectCreateRandomWorkspace';
+  }>;
+  shell: Renamed<{
+    openPath: 'shellOpenPath';
+    showItemInFolder: 'shellShowItemInFolder';
+    openExternal: 'shellOpenExternal';
+    openHtmlInBrowser: 'shellOpenHtmlInBrowser';
+    resolveLocalPath: 'shellResolveLocalPath';
+  }>;
+  autoLaunch: Renamed<{ get: 'autoLaunchGet'; set: 'autoLaunchSet' }>;
+  preventSleep: Renamed<{ get: 'preventSleepGet'; set: 'preventSleepSet' }>;
+  appInfo: Renamed<{
+    getVersion: 'appGetVersion';
+    isDev: 'appIsDev';
+    isEnterprise: 'appIsEnterprise';
+    getSystemLocale: 'appGetSystemLocale';
+    consumePendingLocalInferenceInstall: 'appConsumePendingLocalInferenceInstall';
+    getInferenceEdition: 'appGetInferenceEdition';
+    usesBundledLlamaCppRuntime: 'appUsesBundledLlamaCppRuntime';
+    relaunch: 'appRelaunch';
+  }>;
+  appUpdate: WithExtra<
+    {
+      onStateChanged: (callback: (data: unknown) => void) => () => void;
+    },
+    {
+      getChannel: 'appUpdateGetChannel';
+      setChannel: 'appUpdateSetChannel';
+      getState: 'appUpdateGetState';
+      checkNow: 'appUpdateCheckNow';
+      retryDownload: 'appUpdateRetryDownload';
+      pauseDownload: 'appUpdatePauseDownload';
+      resumeDownload: 'appUpdateResumeDownload';
+      cancelDownload: 'appUpdateCancelDownload';
+      installReady: 'appUpdateInstallReady';
+      revealDownload: 'appUpdateRevealDownload';
+    }
+  >;
+  log: WithExtra<
+    {
+      fromRenderer: (level: string, tag: string, message: string) => void;
+    },
+    {
+      getPath: 'logGetPath';
+      openFolder: 'logOpenFolder';
+      exportZip: 'logExportZip';
+    }
+  >;
 };
