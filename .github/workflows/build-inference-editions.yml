@@ -31,6 +31,10 @@ on:
         description: 'Include Linux cpu/cuda matrix legs (lite is Windows-only)'
         type: boolean
         default: true
+      linux-inference-editions:
+        description: 'Comma-separated Linux editions to build (default cpu,cuda)'
+        type: string
+        default: 'cpu,cuda'
     secrets:
       CERTUM_USER_ID:
         required: false
@@ -72,6 +76,7 @@ jobs:
           BUILD_MACOS: ${{ inputs.build-macos }}
           BUILD_WINDOWS: ${{ inputs.build-windows }}
           BUILD_LINUX: ${{ inputs.build-linux }}
+          LINUX_INFERENCE_EDITIONS: ${{ inputs.linux-inference-editions }}
         shell: bash
         run: |
           matrix='{"include":['
@@ -91,7 +96,10 @@ jobs:
           # lite/cpu/cuda, Linux cpu/cuda, macOS cpu (arm64 + x64) = 7 legs.
           # Keep in sync with scripts/release/inference-edition-targets.mjs.
           if [[ "$BUILD_LINUX" == "true" ]]; then
-            for edition in cpu cuda; do
+            IFS=',' read -r -a linux_editions <<< "$LINUX_INFERENCE_EDITIONS"
+            for edition in "${linux_editions[@]}"; do
+              edition="${edition// /}"
+              if [[ -z "$edition" ]]; then continue; fi
               matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-${edition}-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"${edition}\",\"target\":\"linux-x64-${edition}\"}"
               separator=','
             done

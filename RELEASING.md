@@ -27,6 +27,12 @@ Beta users opt in under **Settings → About → Beta update channel**.
 
 `lite` has no llama.cpp. `cpu` bundles llama.cpp CPU + Vulkan (Metal on macOS). `cuda` bundles an RTX 40 (sm_89) / CUDA 12.4 llama-server, its CUDA libraries, and a CPU fallback. Every leg builds and verifies the pinned Magpie gateway (`magpie:build` + `magpie:verify`) before packaging.
 
+**Pre-release verification:** `build-platforms.yml` (optional on PRs) runs the same unsigned
+verify builds as release, scoped by change type: full 7 legs when packaging definitions
+change; one Linux x64 cpu leg as smoke when only dependencies or bundled assets drift;
+nightly on `main` plus manual dispatch for the full matrix. Tag **`release.yml`** remains
+the authoritative signed build and is unchanged by that workflow.
+
 Windows size gates live in `scripts/installer-shell/distribution-budget.cjs`: lite keeps hard limits (WebView2 setup 500 MiB total / 220 MiB non-component, components 300 MiB; NSIS updater 450 MiB). cpu enforces limits = measured size + an explicit margin (ceil 3%, whole MiB) for the WebView2 setup, the NSIS updater and the staged llama.cpp runtime (`scripts/ci/measure-llamacpp-bundled.cjs`); the measured run id is recorded next to each value, and these limits change only through a PR that cites a new measured run. cuda is publicly released but has no size limit (a deliberate decision for the public release); CI still measures and reports its sizes and enforces sha256/runtime integrity.
 
 ## 2. Promote → stable (`promote.yml`)
