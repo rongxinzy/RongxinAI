@@ -43,6 +43,7 @@ describe('PiRuntimeAdapter', () => {
     let errors: CoworkError[];
     let completes: string[];
     let emittedMessages: Array<Record<string, unknown>>;
+    let messageUpdates: Array<{ content?: string; metadata?: Record<string, unknown> }>;
 
     const failedAttempt = (errorMessage: string) => {
       listener!({
@@ -92,8 +93,15 @@ describe('PiRuntimeAdapter', () => {
       errors = [];
       completes = [];
       emittedMessages = [];
+      messageUpdates = [];
       adapter.on('message', (_sid, message) =>
         emittedMessages.push(message as unknown as Record<string, unknown>),
+      );
+      adapter.on('messageUpdate', (_sid, _messageId, content, metadata) =>
+        messageUpdates.push({
+          content: typeof content === 'string' ? content : undefined,
+          metadata: metadata as Record<string, unknown>,
+        }),
       );
       adapter.on('error', (_sid, error) => errors.push(error as CoworkError));
       adapter.on('complete', sessionId => completes.push(sessionId));
@@ -144,6 +152,9 @@ describe('PiRuntimeAdapter', () => {
       failedAttempt('503 Service Unavailable');
       listener!({ type: 'auto_retry_start', attempt: 1 });
       listener!({ type: 'turn_start' });
+      const reopenUpdate = messageUpdates.find(update => update.metadata?.streamReopen === true);
+      expect(reopenUpdate?.content).toContain('partial answer content');
+
       listener!({
         type: 'message_update',
         message: {
@@ -174,6 +185,31 @@ describe('PiRuntimeAdapter', () => {
       expect(assistantRows[0]?.content).toBe('Final recovered answer');
       expect(emittedMessages.filter(message => message.type === 'assistant')).toHaveLength(1);
       expect(completes).toEqual(['test']);
+    });
+
+    it('keeps thinking text visible through retry turn_start reopen', async () => {
+      await adapter.startSession('test', 'Hi');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'partial thinking trace' }],
+        },
+        assistantMessageEvent: {
+          type: 'thinking_delta',
+          contentIndex: 0,
+          delta: 'partial thinking trace',
+        },
+      });
+      failedAttempt('503 Service Unavailable');
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      messageUpdates.length = 0;
+      listener!({ type: 'turn_start' });
+      const thinkingReopen = messageUpdates.find(
+        update => update.metadata?.streamReopen === true && update.metadata?.isThinking === true,
+      );
+      expect(thinkingReopen?.content).toContain('partial thinking trace');
     });
 
     it('surfaces no error when an auto-retry succeeds', async () => {

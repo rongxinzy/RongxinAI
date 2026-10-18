@@ -1,13 +1,38 @@
 import fs from 'fs';
 import path from 'path';
 
-import type { LlamaCppModelLaunchInput } from '../../../shared/llamacpp';
+import type { LlamaCppModelLaunchInput, LlamaCppServiceConfig } from '../../../shared/llamacpp';
 
 export function normalizePositiveInteger(value: string | undefined): number | undefined {
   const trimmed = value?.trim();
   if (!trimmed) return undefined;
   const parsed = Number.parseInt(trimmed, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * GPU placement for the router preset's global `[*]` section. Keys mirror
+ * modelLaunchOptionsToPreset so a per-model section overrides them one by one.
+ * Unset values are omitted so stale entries are removed on upsert.
+ */
+export const LLAMACPP_PRESET_GLOBAL_GPU_KEYS = [
+  'n-gpu-layers',
+  'device',
+  'main-gpu',
+  'split-mode',
+  'tensor-split',
+] as const;
+
+export function buildLlamaCppPresetGlobalGpuSection(
+  config: LlamaCppServiceConfig,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  if (config.gpuLayers?.trim()) values['n-gpu-layers'] = config.gpuLayers.trim();
+  if (config.device?.trim()) values.device = config.device.trim();
+  if (config.mainGpu?.trim()) values['main-gpu'] = config.mainGpu.trim();
+  if (config.splitMode?.trim()) values['split-mode'] = config.splitMode.trim();
+  if (config.tensorSplit?.trim()) values['tensor-split'] = config.tensorSplit.trim();
+  return values;
 }
 
 export function resolveImportedModelTargetPath(importDir: string, sourcePath: string): string {
@@ -67,6 +92,37 @@ export function upsertIniSection(
   let end = start + 1;
   while (end < lines.length && !/^\s*\[.+\]\s*$/.test(lines[end])) end += 1;
   return [...lines.slice(0, start), ...rendered, ...lines.slice(end)].join('\n').trimEnd() + '\n';
+}
+
+/**
+ * Replaces only `managedKeys` within an INI section: keys the caller owns are
+ * set from `values` (or removed when unset), while other keys in the section
+ * are preserved. Used for the preset's global `[*]` GPU section, where the
+ * service config owns GPU placement keys but must not clobber user or
+ * future keys such as ctx-size.
+ */
+export function replaceIniSectionKeys(
+  source: string,
+  section: string,
+  managedKeys: readonly string[],
+  values: Record<string, string | number | boolean>,
+): string {
+  const lines = source.split(/\r?\n/);
+  const start = lines.findIndex(line => line.trim() === `[${section}]`);
+  const preserved: Record<string, string> = {};
+  if (start !== -1) {
+    let end = start + 1;
+    while (end < lines.length && !/^\s*\[.+\]\s*$/.test(lines[end])) end += 1;
+    const managedKeySet = new Set(managedKeys);
+    for (const line of lines.slice(start + 1, end)) {
+      const match = line.match(/^([^=]+?)\s*=\s*(.*)$/);
+      if (!match) continue;
+      const key = match[1].trim();
+      if (managedKeySet.has(key)) continue;
+      preserved[key] = match[2].trim();
+    }
+  }
+  return upsertIniSection(source, section, { ...preserved, ...values });
 }
 
 export function removeEmptyParentDirs(startDir: string, stopDir: string): void {

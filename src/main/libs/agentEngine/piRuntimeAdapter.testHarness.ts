@@ -57,6 +57,19 @@ const hoisted = vi.hoisted(() => {
     getShellPath: vi.fn(),
   }));
   const mockSessionManagerInMemory = vi.fn((cwd?: string) => ({ cwd }));
+  // File-backed SessionManager surface, recorded so specs can assert which
+  // strategy a launch picked and which directory it targeted.
+  const mockSessionManagerCreate = vi.fn((cwd: string, sessionDir?: string) => ({
+    cwd,
+    sessionDir,
+  }));
+  const mockSessionManagerOpen = vi.fn(
+    (sessionFile: string, sessionDir?: string, cwdOverride?: string) => ({
+      sessionFile,
+      sessionDir,
+      cwdOverride,
+    }),
+  );
   const mockCompleteSimple = vi.fn().mockResolvedValue({
     content: [{ type: 'text', text: 'Hello from Pi' }],
     stopReason: 'stop',
@@ -67,6 +80,8 @@ const hoisted = vi.hoisted(() => {
     mockSettingsManagerCreate,
     mockSettingsManagerInMemory,
     mockSessionManagerInMemory,
+    mockSessionManagerCreate,
+    mockSessionManagerOpen,
     mockCreateAgentSession: vi.fn().mockResolvedValue({ session: mockSession }),
     mockDefaultResourceLoader: vi.fn(function (this: { reload: () => Promise<void> }) {
       this.reload = vi.fn().mockResolvedValue(undefined);
@@ -187,6 +202,8 @@ export const mockDefaultResourceLoader = hoisted.mockDefaultResourceLoader;
 export const mockSettingsManagerCreate = hoisted.mockSettingsManagerCreate;
 export const mockSettingsManagerInMemory = hoisted.mockSettingsManagerInMemory;
 export const mockSessionManagerInMemory = hoisted.mockSessionManagerInMemory;
+export const mockSessionManagerCreate = hoisted.mockSessionManagerCreate;
+export const mockSessionManagerOpen = hoisted.mockSessionManagerOpen;
 export const mockGetModel = hoisted.mockGetModel;
 export const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
@@ -199,6 +216,8 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
   DefaultResourceLoader: hoisted.mockDefaultResourceLoader,
   SessionManager: {
     inMemory: hoisted.mockSessionManagerInMemory,
+    create: hoisted.mockSessionManagerCreate,
+    open: hoisted.mockSessionManagerOpen,
   },
   SettingsManager: {
     create: hoisted.mockSettingsManagerCreate,
@@ -229,6 +248,7 @@ vi.mock('../coworkUtil', async importOriginal => {
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { clearImageInputObservations } from './piImageInputFallback';
+import { piSessionDirFor } from './piSessionStore';
 
 /**
  * The adapter under test for the current spec.
@@ -255,6 +275,49 @@ export const createTemporaryWorkspace = (): string => {
   const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-runtime-'));
   temporaryWorkspaceRoots.add(workspaceRoot);
   return workspaceRoot;
+};
+
+/**
+ * Root for file-backed Pi session directories. Specs that enable persistence
+ * pass this to `adapter.setPiSessionStoreRoot`; it is cleaned up with the
+ * workspaces.
+ */
+export const createTemporaryPiSessionRoot = (): string => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-sessions-'));
+  temporaryWorkspaceRoots.add(root);
+  return root;
+};
+
+/** Drop a minimal Pi session JSONL so a rebuild resolves and reopens it. */
+export const seedPersistedPiSession = (rootDir: string, sessionId: string): string => {
+  const sessionDir = piSessionDirFor(rootDir, sessionId);
+  fs.mkdirSync(sessionDir, { recursive: true });
+  const sessionFile = path.join(sessionDir, '2026-01-01T00-00-00-000Z_seed.jsonl');
+  fs.writeFileSync(
+    sessionFile,
+    [
+      JSON.stringify({
+        type: 'session',
+        version: 3,
+        id: sessionId,
+        timestamp: '2026-01-01T00:00:00.000Z',
+        cwd: process.cwd(),
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'entry-1',
+        parentId: null,
+        timestamp: '2026-01-01T00:00:01.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'Earlier turn' }],
+          timestamp: '2026-01-01T00:00:01.000Z',
+        },
+      }),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  return sessionFile;
 };
 
 /**

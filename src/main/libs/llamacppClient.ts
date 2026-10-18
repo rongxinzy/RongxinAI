@@ -6,6 +6,11 @@ import type {
   LlamaCppModelLaunchResult,
   LlamaCppRunningModel,
 } from '../../shared/llamacpp';
+import type { LlamaCppRouterModelSnapshot, LlamaCppRouterModelSlots } from './llamacppRouterStatus';
+import {
+  parseLlamaCppRouterModelsPayload,
+  parseLlamaCppRouterSlotsPayload,
+} from './llamacppRouterStatus';
 
 type LlamaCppClientOptions = {
   loadTimeoutMs?: number;
@@ -88,6 +93,38 @@ export class LlamaCppClient {
   async runningModels(timeoutMs = 30_000): Promise<LlamaCppRunningModel[]> {
     const models = await this.listModelsSnapshot(timeoutMs);
     return models.filter(isRunningModel);
+  }
+
+  /**
+   * Typed router-mode model snapshot from GET /models (b9244): per-model state
+   * with failed/exit_code and the child port from status.args.
+   */
+  async listRouterModels(timeoutMs = 30_000): Promise<LlamaCppRouterModelSnapshot[]> {
+    const payload = await this.requestJson<unknown>('/models', {
+      method: 'GET',
+      timeoutMs: timeoutMs || this.loadTimeoutMs || 30_000,
+    });
+    return parseLlamaCppRouterModelsPayload(payload);
+  }
+
+  /**
+   * In-flight probe for one model via GET /slots?model=X. Any failure reports
+   * busy=true so callers never evict a model whose state is unknown.
+   */
+  async getModelSlots(model: string, timeoutMs = 2_000): Promise<LlamaCppRouterModelSlots> {
+    try {
+      const payload = await this.requestJson<unknown>(`/slots?model=${encodeURIComponent(model)}`, {
+        method: 'GET',
+        timeoutMs: timeoutMs || this.loadTimeoutMs || 2_000,
+      });
+      return parseLlamaCppRouterSlotsPayload(payload);
+    } catch {
+      return {
+        busy: true,
+        processingSlots: 0,
+        totalSlots: 0,
+      };
+    }
   }
 
   async showModel(name: string): Promise<unknown> {

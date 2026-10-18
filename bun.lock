@@ -80,6 +80,7 @@
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
         "concurrently": "^8.2.2",
+        "croner": "^10.0.1",
         "cronstrue": "^3.14.0",
         "cross-env": "^7.0.3",
         "docx-preview": "^0.3.7",
@@ -1591,6 +1592,8 @@
     "crc32-stream": ["crc32-stream@4.0.3", "https://registry.npmmirror.com/crc32-stream/-/crc32-stream-4.0.3.tgz", { "dependencies": { "crc-32": "^1.2.0", "readable-stream": "^3.4.0" } }, "sha512-NT7w2JVU7DFroFdYkeq8cywxrgjPHWkdX1wjpRQXPX5Asews3tA+Ght6lddQO5Mkumffp3X7GEqku3epj2toIw=="],
 
     "crelt": ["crelt@1.0.7", "https://registry.npmmirror.com/crelt/-/crelt-1.0.7.tgz", {}, "sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA=="],
+
+    "croner": ["croner@10.0.1", "", {}, "sha512-ixNtAJndqh173VQ4KodSdJEI6nuioBWI0V1ITNKhZZsO0pEMoDxz539T4FTTbSZ/xIOSuDnzxLVRqBVSvPNE2g=="],
 
     "cronstrue": ["cronstrue@3.24.0", "https://registry.npmmirror.com/cronstrue/-/cronstrue-3.24.0.tgz", { "bin": { "cronstrue": "bin/cli.js" } }, "sha512-t/Ji3Ur2c/pzhIAWNwC0ftl3JAE4dLfCjAdZoTZXmPDZwcispnS1PaMcMS4OmIIXyIVouAz+yw+mfQiE3hz5OQ=="],
 

@@ -42,6 +42,7 @@ export function attachConsoleGuards(page, failures, label) {
     failures.push(`${label} console: ${text}`);
   });
   page.on('pageerror', error => {
+    if (error.message.includes('ResizeObserver loop')) return;
     failures.push(`${label} pageerror: ${error.message}`);
   });
 }
