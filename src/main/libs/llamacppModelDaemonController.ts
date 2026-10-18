@@ -156,11 +156,9 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
 
   async applyConfig(config: LlamaCppServiceConfig): Promise<LlamaCppModelDaemonStatus> {
     await this.ensureStarted();
-    const lanToken = this.isLanMode(config) ? this.credentials.ensureLanToken() : undefined;
     return await this.request({
       command: LlamaCppModelDaemonCommand.ApplyConfig,
       serviceConfig: config,
-      ...(lanToken ? { lanToken } : {}),
     });
   }
 
@@ -169,11 +167,9 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
       await this.reconnect();
     }
     if (!this.controlPort) return this.stoppedStatus();
-    const lanToken = this.isLanMode(config) ? this.credentials.ensureLanToken() : undefined;
     return await this.request({
       command: LlamaCppModelDaemonCommand.ApplyConfig,
       serviceConfig: config,
-      ...(lanToken ? { lanToken } : {}),
     });
   }
 
@@ -209,12 +205,9 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
   }
 
   async regenerateLanToken(): Promise<string> {
-    const token = this.credentials.regenerateLanToken();
-    const config = this.options.getServiceConfig();
-    if (this.isLanMode(config) && this.controlPort) {
-      await this.applyConfig(config);
-    }
-    return token;
+    // The bundled model gateway owns LAN authentication; its imported key is
+    // replaced through the management API, not by the daemon's loopback path.
+    return this.credentials.regenerateLanToken();
   }
 
   private async ensureStarted(): Promise<LlamaCppModelDaemonStatus> {
@@ -282,7 +275,6 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
       userDataPath: this.options.userDataPath,
       executablePath,
       serviceConfig,
-      ...(this.isLanMode(serviceConfig) ? { lanToken: this.credentials.ensureLanToken() } : {}),
     };
     const entryPath = resolveLlamaCppModelDaemonEntryPath(__dirname);
     const child = spawn(process.execPath, [entryPath], {
@@ -407,10 +399,6 @@ export class LlamaCppModelDaemonController implements LlamaCppModelOrchestrator 
         logSessionId: '',
       })),
     });
-  }
-
-  private isLanMode(config: LlamaCppServiceConfig): boolean {
-    return config.gatewayAccessMode === 'lan' || config.listenHost === '0.0.0.0';
   }
 
   private async waitForControlPortToClose(controlPort: number): Promise<void> {

@@ -64,6 +64,8 @@ type UseLocalInferenceAccessSettingsResult = {
   setDraftPort: (value: string) => void;
   currentHost: string;
   currentPort: string;
+  /** Gateway port serving LAN requests; undefined while the model gateway is not running. */
+  lanGatewayPort: string | undefined;
   exampleModelName?: string;
   refreshServiceConfig: () => Promise<LlamaCppServiceConfig>;
   openAccessSettings: () => void;
@@ -72,6 +74,16 @@ type UseLocalInferenceAccessSettingsResult = {
   setDraftAllowLanAccess: (value: boolean) => void;
   regenerateLanToken: () => void;
 };
+
+/** Extracts the LAN port from the bundled model gateway's URL. */
+function parseLanGatewayPort(gatewayUrl: string | undefined): string | undefined {
+  if (!gatewayUrl) return undefined;
+  try {
+    return new URL(gatewayUrl).port || undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function useLocalInferenceAccessSettings(
   input: UseLocalInferenceAccessSettingsInput,
@@ -91,6 +103,7 @@ export function useLocalInferenceAccessSettings(
   const [draftKeepRunningOnAppQuit, setDraftKeepRunningOnAppQuit] = useState(true);
   const [draftPort, setDraftPort] = useState(LLAMACPP_DEFAULT_PORT);
   const [draftLanToken, setDraftLanToken] = useState('');
+  const [lanGatewayPort, setLanGatewayPort] = useState<string | undefined>(undefined);
 
   const currentHost =
     serviceConfig.listenHost?.trim() || serviceConfig.host?.trim() || LLAMACPP_LOCALHOST_HOST;
@@ -109,6 +122,19 @@ export function useLocalInferenceAccessSettings(
     return nextConfig;
   }, []);
 
+  const refreshLanGatewayPort = useCallback(async () => {
+    // LAN requests are served by the bundled model gateway, so the advertised
+    // endpoint must use its port (not the llama.cpp service port).
+    try {
+      const status = await window.electron.magpie.status();
+      setLanGatewayPort(
+        status.state === 'running' ? parseLanGatewayPort(status.gatewayUrl) : undefined,
+      );
+    } catch {
+      setLanGatewayPort(undefined);
+    }
+  }, []);
+
   const openAccessSettings = useCallback(() => {
     void refreshServiceConfig()
       .then(nextConfig => {
@@ -118,6 +144,7 @@ export function useLocalInferenceAccessSettings(
         setDraftKeepRunningOnAppQuit(nextConfig.keepRunningOnAppQuit !== false);
         setDraftPort(nextConfig.port?.trim() || LLAMACPP_DEFAULT_PORT);
         if (nextHost === LLAMACPP_LAN_HOST) {
+          void refreshLanGatewayPort();
           void window.electron.llamacpp
             .getGatewayLanToken()
             .then(token => setDraftLanToken(token.token))
@@ -134,23 +161,27 @@ export function useLocalInferenceAccessSettings(
         setDraftLanToken('');
         setAccessSettingsOpen(true);
       });
-  }, [allowLanAccess, currentPort, refreshServiceConfig]);
+  }, [allowLanAccess, currentPort, refreshLanGatewayPort, refreshServiceConfig]);
 
   const closeAccessSettings = useCallback(() => {
     setAccessSettingsOpen(false);
   }, []);
 
-  const updateDraftAllowLanAccess = useCallback((value: boolean) => {
-    setDraftAllowLanAccess(value);
-    if (!value) {
-      setDraftLanToken('');
-      return;
-    }
-    void window.electron.llamacpp
-      .getGatewayLanToken()
-      .then(result => setDraftLanToken(result.token))
-      .catch(() => setDraftLanToken(''));
-  }, []);
+  const updateDraftAllowLanAccess = useCallback(
+    (value: boolean) => {
+      setDraftAllowLanAccess(value);
+      if (!value) {
+        setDraftLanToken('');
+        return;
+      }
+      void refreshLanGatewayPort();
+      void window.electron.llamacpp
+        .getGatewayLanToken()
+        .then(result => setDraftLanToken(result.token))
+        .catch(() => setDraftLanToken(''));
+    },
+    [refreshLanGatewayPort],
+  );
 
   const regenerateLanToken = useCallback(() => {
     void runAction(async () => {
@@ -188,6 +219,7 @@ export function useLocalInferenceAccessSettings(
         );
         setDraftPort(nextConfig.port?.trim() || LLAMACPP_DEFAULT_PORT);
         setDraftKeepRunningOnAppQuit(nextConfig.keepRunningOnAppQuit !== false);
+        await refreshLanGatewayPort();
         setAccessSettingsOpen(false);
         showToast(
           isRunning
@@ -206,6 +238,7 @@ export function useLocalInferenceAccessSettings(
     draftKeepRunningOnAppQuit,
     draftPort,
     isRunning,
+    refreshLanGatewayPort,
     refreshLocalModels,
     runAction,
     onRestartStatus,
@@ -223,6 +256,7 @@ export function useLocalInferenceAccessSettings(
     setDraftPort,
     currentHost,
     currentPort,
+    lanGatewayPort,
     exampleModelName,
     refreshServiceConfig,
     openAccessSettings,

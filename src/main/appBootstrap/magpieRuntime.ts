@@ -7,9 +7,12 @@ import { rt } from './runtimeState';
 import { getOllamaManager, getStore } from './runtimeServices';
 import { MagpieManager } from '../magpie/manager';
 import { MagpieModelService, installMagpieModelService } from '../magpie/modelService';
+import { isLlamaCppLanAccessEnabled } from '../magpie/lanAccess';
 import { ManagedMagpieProviderBindings } from '../magpie/managedProviderBindings';
+import { LlamaCppGatewayCredentialVault } from '../libs/llamacppGatewayCredentialVault';
 import { readOllamaProviderSnapshot } from '../magpie/ollamaProviderBinding';
 import { buildLlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
+import { getLlamaCppServiceConfig } from '../ipcHandlers/llamacpp';
 import { registerMagpieIpc } from '../magpie/registerIpc';
 import { registerAcpMagpieModelApply } from '../codingAgent/acpMagpieModel';
 import { zhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
@@ -18,6 +21,13 @@ let magpieModelService: MagpieModelService | undefined;
 
 /** The Magpie model service installed by {@link setupMagpieRuntime}. */
 export const getMagpieModelService = (): MagpieModelService | undefined => magpieModelService;
+
+/** LAN gateway credential store; created lazily because the SQLite store starts later. */
+let lanCredentialVault: LlamaCppGatewayCredentialVault | undefined;
+const getLanCredentialVault = (): LlamaCppGatewayCredentialVault => {
+  if (!lanCredentialVault) lanCredentialVault = new LlamaCppGatewayCredentialVault(getStore());
+  return lanCredentialVault;
+};
 
 export const setupMagpieRuntime = (): void => {
   rt.magpieManager = new MagpieManager({
@@ -39,6 +49,18 @@ export const setupMagpieRuntime = (): void => {
     subscriptionAccounts: {
       read: () => getStore().get<boolean>('magpie_subscription_accounts_enabled') === true,
       write: enabled => getStore().set('magpie_subscription_accounts_enabled', enabled),
+    },
+    lanAccess: {
+      read: () => {
+        const enabled = isLlamaCppLanAccessEnabled(getLlamaCppServiceConfig(getStore()));
+        return {
+          enabled,
+          // Mint on read when LAN is on: a user who enables LAN before ever
+          // opening the token dialog still gets a key imported, and the same
+          // token is what the dialog later shows.
+          lanToken: enabled ? getLanCredentialVault().ensureLanToken() : null,
+        };
+      },
     },
   });
   rt.managedMagpieBindings = new ManagedMagpieProviderBindings(

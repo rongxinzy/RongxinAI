@@ -8,7 +8,6 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
-import { LlamaCppGatewayAccessMode } from '../../shared/llamacpp';
 import { LlamaCppClient } from './llamacppClient';
 import { LlamaCppGatewayCredentialVault } from './llamacppGatewayCredentialVault';
 import type { LlamaCppModelDaemonStatus } from './llamacppModelDaemonProtocol';
@@ -63,9 +62,10 @@ export type LlamaCppRouterOrchestratorOptions = {
  * In-process orchestrator that runs one llama-server router bound to an
  * ephemeral loopback port with `--models-max 0 --no-models-autoload`, so the
  * app owns capacity, eviction and idle unloading instead of the router's
- * unsafe LRU. The shared gateway keeps owning config.port, so LAN access mode
- * and its bearer token behave exactly as in daemon mode. All router HTTP goes
- * through one LlamaCppClient pointed at the router's loopback base URL.
+ * unsafe LRU. The shared loopback gateway keeps owning config.port for
+ * on-demand loads and the loaded-only model listing; LAN access is served by
+ * the bundled model gateway. All router HTTP goes through one LlamaCppClient
+ * pointed at the router's loopback base URL.
  */
 export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
   private readonly credentials: LlamaCppGatewayCredentialVault;
@@ -82,7 +82,6 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
   private splitter: LlamaCppRouterLogSplitter | null = null;
   private gateway: LlamaCppModelGateway | null = null;
   private gatewayPort = LLAMACPP_ROUTER_DEFAULT_GATEWAY_PORT;
-  private gatewayLanMode = false;
   private lastRunningModels: LlamaCppRunningModel[] = [];
   private starting: Promise<void> | null = null;
   private stopping: Promise<void> | null = null;
@@ -232,8 +231,8 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
   }
 
   async regenerateLanToken(): Promise<string> {
-    // The gateway reads the token through getConfig on every request, so a
-    // refreshed token takes effect without restarting the listener.
+    // The bundled model gateway authenticates LAN requests; its imported key is
+    // replaced through the management API, not by this loopback path.
     return this.credentials.regenerateLanToken();
   }
 
@@ -330,22 +329,13 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
     await this.gateway?.stop().catch((): undefined => undefined);
     this.gateway = null;
     this.gatewayPort = parseGatewayPort(config);
-    this.gatewayLanMode = isLanMode(config);
     const gateway = createLlamaCppModelGateway({
       acquireModel: async modelName => this.acquireGatewayModel(modelName),
       listModels: () =>
         this.lastRunningModels.map(model => ({
           id: (model.name || model.model || model.id || '').trim(),
         })),
-      getConfig: () => {
-        const liveConfig = this.options.getServiceConfig();
-        const lanMode = isLanMode(liveConfig);
-        return {
-          port: parseGatewayPort(liveConfig),
-          accessMode: lanMode ? LlamaCppGatewayAccessMode.Lan : LlamaCppGatewayAccessMode.Local,
-          ...(lanMode ? { lanToken: this.credentials.ensureLanToken() } : {}),
-        };
-      },
+      getConfig: () => ({ port: parseGatewayPort(this.options.getServiceConfig()) }),
     });
     await gateway.start();
     this.gateway = gateway;
@@ -356,17 +346,14 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
    * global GPU section is refreshed so subsequent model loads pick up the new
    * service-level options (the router command line itself is fixed at spawn,
    * like daemon model processes reading config at their own spawn time), and
-   * the gateway listener restarts only when its port or access mode changed.
+   * the gateway listener restarts only when its port changed.
    */
   private async applyConfigWhileRunning(config: LlamaCppServiceConfig): Promise<void> {
     writeLlamaCppRouterPresetGlobalSection({
       presetPath: this.options.getPresetPath(),
       config,
     });
-    if (
-      parseGatewayPort(config) !== this.gatewayPort ||
-      isLanMode(config) !== this.gatewayLanMode
-    ) {
+    if (parseGatewayPort(config) !== this.gatewayPort) {
       await this.startGateway(config);
     }
   }
@@ -495,12 +482,6 @@ function matchesName(model: LlamaCppModel, modelName: string): boolean {
 
 function parseGatewayPort(config: LlamaCppServiceConfig): number {
   return Number.parseInt(config.port ?? '', 10) || LLAMACPP_ROUTER_DEFAULT_GATEWAY_PORT;
-}
-
-function isLanMode(config: LlamaCppServiceConfig): boolean {
-  return (
-    config.gatewayAccessMode === LlamaCppGatewayAccessMode.Lan || config.listenHost === '0.0.0.0'
-  );
 }
 
 function toErrorMessage(error: unknown): string {
