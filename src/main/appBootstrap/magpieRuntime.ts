@@ -47,11 +47,11 @@ export const setupMagpieRuntime = (): void => {
   );
   rt.managedMagpieBindings.setOllamaReader(() => readOllamaProviderSnapshot(getOllamaManager()));
   rt.managedMagpieBindings.setGpuReader(async () => {
-    const daemon = rt.llamaCppModelDaemonController;
-    if (!daemon) return { baseUrl: null, models: [] };
-    const models = await daemon.listRunningModels();
+    const orchestrator = rt.llamaCppModelOrchestrator;
+    if (!orchestrator) return { baseUrl: null, models: [] };
+    const models = await orchestrator.listRunningModels();
     return {
-      baseUrl: daemon.gatewayBaseUrl(),
+      baseUrl: orchestrator.gatewayBaseUrl(),
       models: models
         .map(buildLlamaCppRunningModelBinding)
         .filter((model): model is NonNullable<typeof model> => Boolean(model)),

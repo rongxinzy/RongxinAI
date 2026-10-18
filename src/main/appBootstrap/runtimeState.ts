@@ -16,7 +16,7 @@ import { CcConnectRuntimeStatusRegistry as CcConnectRuntimeStatusRegistryCtor } 
 import type { CcConnectSidecarManager } from '../libs/ccConnectSidecarManager';
 import type { AppUpdateCoordinator } from '../libs/appUpdateCoordinator';
 import type { LlamaCppManager } from '../libs/llamacppManager';
-import type { LlamaCppModelDaemonController } from '../libs/llamacppModelDaemonController';
+import type { LlamaCppModelOrchestrator } from '../libs/llamacppModelOrchestrator';
 import type { McpIntegrationRuntime } from '../libs/mcpIntegrationRuntime';
 import type { McpToolManifestEntry, McpServerManager } from '../libs/mcpServerManager';
 import type { OllamaManager } from '../libs/ollamaManager';
@@ -90,7 +90,7 @@ export const rt = {
   sqliteBackupManager: null as SqliteBackupManager | null,
 
   llamaCppManager: null as LlamaCppManager | null,
-  llamaCppModelDaemonController: null as LlamaCppModelDaemonController | null,
+  llamaCppModelOrchestrator: null as LlamaCppModelOrchestrator | null,
   ollamaManager: null as OllamaManager | null,
 
   piWorkbenchRuntimeForwarderBound: false,

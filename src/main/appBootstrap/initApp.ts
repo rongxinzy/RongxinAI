@@ -371,7 +371,7 @@ export const initApp = async (): Promise<void> => {
     });
     const localInferenceManager = getLlamaCppManager();
     localInferenceManager.initializeModelsDir();
-    rt.llamaCppModelDaemonController = registerLlamaCppIpcHandlers(localInferenceManager, {
+    rt.llamaCppModelOrchestrator = registerLlamaCppIpcHandlers(localInferenceManager, {
       getStore,
       onModelBindingsChanged: async (url, models) => {
         rt.managedMagpieBindings?.setGpuSnapshot(url, models);
