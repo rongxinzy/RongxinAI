@@ -283,7 +283,7 @@ export class WorkbenchTaskService extends EventEmitter {
     const result = verifyWorkbenchRun(verificationContext);
     // Files the run produced come from the event-time artifact ledger; wait
     // for its settle-time workspace diff so generated files are included.
-    await input.artifactsSettled;
+    if (input.artifactsSettled) await input.artifactsSettled;
     const declaredCandidates = getCurrentDeclaredArtifacts(
       this.repository.getDetail(task.id)!.artifacts,
       run.id,
