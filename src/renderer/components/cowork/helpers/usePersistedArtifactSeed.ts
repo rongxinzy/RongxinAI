@@ -27,9 +27,7 @@ export const usePersistedArtifactSeed = (
     const existingIds = new Set(existing.map(artifact => artifact.id));
     let cancelled = false;
     void prepareAvailableArtifacts(
-      candidates
-        .filter(artifact => !existingIds.has(artifact.id))
-        .map(artifact => ({ artifact, needsFileLoad: Boolean(artifact.filePath) })),
+      candidates.filter(artifact => !existingIds.has(artifact.id)),
       false,
       batch.cwd,
     ).then(available => {

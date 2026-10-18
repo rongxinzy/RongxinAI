@@ -47,27 +47,31 @@ describe('artifact reducer', () => {
     expect(state.selectedArtifactId).toBe('artifact-1');
   });
 
-  test('promotes a path-backed intermediate artifact when the final answer references it', () => {
-    const intermediate = makeArtifact({ content: 'cached binary data' });
-    const deliverable = makeArtifact({
-      id: 'artifact-final-answer',
-      messageId: 'message-final-answer',
-      role: ArtifactRole.Deliverable,
+  test('merges same-path file events into one row and keeps the newest observed content', () => {
+    const sighting = makeArtifact({ content: '' });
+    const refresh = makeArtifact({
+      id: 'artifact-refresh',
+      messageId: 'message-refresh',
+      content: '<h1>observed</h1>',
     });
 
-    const stateWithIntermediate = artifactReducer(
+    const stateWithSighting = artifactReducer(
       undefined,
-      addArtifact({ sessionId: 'session-1', artifact: intermediate }),
+      addArtifact({ sessionId: 'session-1', artifact: sighting }),
     );
     const state = artifactReducer(
-      stateWithIntermediate,
-      addArtifact({ sessionId: 'session-1', artifact: deliverable }),
+      stateWithSighting,
+      addArtifact({ sessionId: 'session-1', artifact: refresh }),
     );
 
     expect(state.artifactsBySession['session-1']).toHaveLength(1);
     expect(state.artifactsBySession['session-1'][0]).toMatchObject({
-      role: ArtifactRole.Deliverable,
-      content: 'cached binary data',
+      // The newest touching event moves the anchor forward…
+      id: 'artifact-refresh',
+      messageId: 'message-refresh',
+      // …but the first sighting keeps its creation stamp.
+      createdAt: 1,
+      content: '<h1>observed</h1>',
     });
   });
 
@@ -86,7 +90,47 @@ describe('artifact reducer', () => {
     );
   });
 
-  test('keeps explicit declaration metadata while merging inferred file content', () => {
+  test('keeps inline artifacts separate and idempotent without a file path', () => {
+    const firstBlock = makeArtifact({
+      id: 'artifact-message-1-0',
+      messageId: 'message-1',
+      type: 'html',
+      content: '<h1>one</h1>',
+      source: 'codeblock',
+      filePath: undefined,
+      fileName: undefined,
+      title: 'HTML Page',
+    });
+    const secondBlock = makeArtifact({
+      id: 'artifact-message-1-1',
+      messageId: 'message-1',
+      type: 'html',
+      content: '<h1>two</h1>',
+      source: 'codeblock',
+      filePath: undefined,
+      fileName: undefined,
+      title: 'HTML Page',
+    });
+
+    let state = artifactReducer(
+      undefined,
+      addArtifact({ sessionId: 'session-1', artifact: firstBlock }),
+    );
+    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: secondBlock }));
+    // Re-projecting the same settled message must not churn the rows.
+    const repeated = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-1', artifact: { ...secondBlock } }),
+    );
+
+    expect(repeated).toBe(state);
+    expect(repeated.artifactsBySession['session-1'].map(row => row.id)).toEqual([
+      'artifact-message-1-0',
+      'artifact-message-1-1',
+    ]);
+  });
+
+  test('keeps declared metadata while merging observed file content', () => {
     const declared = makeArtifact({
       id: 'declared-artifact',
       messageId: 'declare-message',
@@ -95,10 +139,11 @@ describe('artifact reducer', () => {
       role: ArtifactRole.Intermediate,
       declared: true,
     });
-    const inferred = makeArtifact({
+    const observed = makeArtifact({
       id: 'write-artifact',
       messageId: 'write-message',
       title: 'presentation.pptx',
+      type: 'document',
       content: '<h1>loaded</h1>',
       role: ArtifactRole.Deliverable,
       declared: false,
@@ -108,12 +153,14 @@ describe('artifact reducer', () => {
       undefined,
       addArtifact({ sessionId: 'session-1', artifact: declared }),
     );
-    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: inferred }));
+    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: observed }));
 
     expect(state.artifactsBySession['session-1']).toEqual([
       expect.objectContaining({
-        id: 'declared-artifact',
-        messageId: 'declare-message',
+        // The anchor moves to the newest touching event…
+        id: 'write-artifact',
+        messageId: 'write-message',
+        // …but an undeclared file event never downgrades declared metadata.
         title: 'Explicit title',
         type: 'html',
         role: ArtifactRole.Intermediate,
@@ -123,7 +170,7 @@ describe('artifact reducer', () => {
     ]);
   });
 
-  test('anchors a declared deliverable to the final answer that references the same path', () => {
+  test('moves the anchor forward when a same-path sighting arrives after the declaration', () => {
     const declared = makeArtifact({
       id: 'declared-artifact',
       messageId: 'declare-message-outside-page',
@@ -131,9 +178,9 @@ describe('artifact reducer', () => {
       role: ArtifactRole.Deliverable,
       declared: true,
     });
-    const finalAnswer = makeArtifact({
-      id: 'artifact-final-answer',
-      messageId: 'final-answer-in-current-page',
+    const laterSighting = makeArtifact({
+      id: 'artifact-later-sighting',
+      messageId: 'sighting-message-in-current-page',
       role: ArtifactRole.Deliverable,
       declared: false,
     });
@@ -142,12 +189,15 @@ describe('artifact reducer', () => {
       undefined,
       addArtifact({ sessionId: 'session-1', artifact: declared }),
     );
-    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: finalAnswer }));
+    state = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-1', artifact: laterSighting }),
+    );
 
     expect(state.artifactsBySession['session-1']).toEqual([
       expect.objectContaining({
-        id: 'declared-artifact',
-        messageId: 'final-answer-in-current-page',
+        id: 'artifact-later-sighting',
+        messageId: 'sighting-message-in-current-page',
         title: 'Explicit title',
         role: ArtifactRole.Deliverable,
         declared: true,
@@ -155,16 +205,16 @@ describe('artifact reducer', () => {
     ]);
   });
 
-  test('keeps the final answer anchor when persisted declaration data arrives later', () => {
-    const finalAnswer = makeArtifact({
-      id: 'artifact-final-answer',
-      messageId: 'final-answer-in-current-page',
+  test('moves the anchor forward when the declaration arrives after the file sighting', () => {
+    const sighting = makeArtifact({
+      id: 'artifact-sighting',
+      messageId: 'sighting-message',
       role: ArtifactRole.Deliverable,
       declared: false,
     });
     const declared = makeArtifact({
       id: 'declared-artifact',
-      messageId: 'declare-message-outside-page',
+      messageId: 'declare-message',
       title: 'Explicit title',
       role: ArtifactRole.Deliverable,
       declared: true,
@@ -172,14 +222,15 @@ describe('artifact reducer', () => {
 
     let state = artifactReducer(
       undefined,
-      addArtifact({ sessionId: 'session-1', artifact: finalAnswer }),
+      addArtifact({ sessionId: 'session-1', artifact: sighting }),
     );
     state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: declared }));
 
     expect(state.artifactsBySession['session-1'][0]).toMatchObject({
       id: 'declared-artifact',
-      messageId: 'final-answer-in-current-page',
+      messageId: 'declare-message',
       title: 'Explicit title',
+      role: ArtifactRole.Deliverable,
       declared: true,
     });
   });

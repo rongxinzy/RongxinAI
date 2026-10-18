@@ -11,6 +11,7 @@ import {
   CoworkSessionMode,
   type CoworkSessionSource,
 } from '../../shared/cowork/constants';
+import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import { store } from '../store';
 import { setCurrentAgentId } from '../store/slices/agentSlice';
 import { clearSessionArtifacts, addArtifact } from '../store/slices/artifactSlice';
@@ -61,6 +62,25 @@ import { coworkLiveTextStore } from './liveTextStore';
 import { CoworkRunSync } from './coworkRunSync';
 import { PiUiRecovery } from './piUiRecovery';
 import { createCoworkStreamPipeline, type CoworkStreamPipeline } from './coworkStreamPipeline';
+
+/** Live ledger upsert payload shape (see ArtifactsApi.onUpsert). */
+type ArtifactUpsertPayload = { scopeId: string; artifact: CoworkPersistedArtifact };
+
+/**
+ * Lands one ledger upsert in the artifact store. The reveal flag is the
+ * delivery signal: only a declared deliverable recorded during a run the user
+ * may be watching opens the panel by itself; everything else just joins the
+ * list. The slice's path dedupe makes repeated upserts idempotent.
+ */
+export function dispatchArtifactUpsert(event: ArtifactUpsertPayload): void {
+  store.dispatch(
+    addArtifact({
+      sessionId: event.scopeId,
+      artifact: { ...event.artifact, sessionId: event.scopeId },
+      reveal: event.artifact.declared && event.artifact.role === 'deliverable',
+    }),
+  );
+}
 
 const classifyError = (error: string | CoworkError): string => {
   if (typeof error === 'object' && 'kind' in error) {
@@ -176,20 +196,10 @@ class CoworkService {
 
     // Event-time artifact ledger upserts: recorded by the main process at
     // tool/diff time and dispatched through the same reducer the persisted
-    // seed and the renderer detectors use, so delivery paths stay idempotent.
+    // seed uses, so delivery paths stay idempotent.
     const artifactsApi = window.electron?.artifacts;
     if (typeof artifactsApi?.onUpsert === 'function') {
-      this.streamListenerCleanups.push(
-        artifactsApi.onUpsert(({ scopeId, artifact }) => {
-          store.dispatch(
-            addArtifact({
-              sessionId: scopeId,
-              artifact: { ...artifact, sessionId: scopeId },
-              reveal: artifact.declared && artifact.role === 'deliverable',
-            }),
-          );
-        }),
-      );
+      this.streamListenerCleanups.push(artifactsApi.onUpsert(dispatchArtifactUpsert));
     }
     void recovery
       .bootstrap()
@@ -608,6 +618,38 @@ class CoworkService {
     }
   }
 
+  /**
+   * Re-syncs a session's ledger rows once when it is opened: upserts recorded
+   * while no renderer was attached are folded back in. Idempotent by design —
+   * the slice's path-dedupe merge makes this a no-op for rows the persisted
+   * seed already landed — and silent, so opening history never pops the panel.
+   */
+  private async refreshLedgerArtifacts(sessionId: string): Promise<void> {
+    const artifactsApi = window.electron?.artifacts;
+    if (typeof artifactsApi?.list !== 'function') return;
+    let artifacts: CoworkPersistedArtifact[] | undefined;
+    try {
+      const result = await artifactsApi.list(sessionId);
+      if (!result.success) {
+        if (result.error)
+          console.error('[CoworkService] artifact ledger read failed:', result.error);
+        return;
+      }
+      artifacts = result.artifacts;
+    } catch (error) {
+      console.error('[CoworkService] artifact ledger read failed:', error);
+      return;
+    }
+    // The read may settle after the user moved on; only the viewed session may
+    // touch the store.
+    if (store.getState().cowork.currentSessionId !== sessionId) return;
+    for (const artifact of artifacts ?? []) {
+      // Silent on purpose: opening a session is history, not a live delivery,
+      // so rows join the list without opening the panel.
+      store.dispatch(addArtifact({ sessionId, artifact: { ...artifact, sessionId } }));
+    }
+  }
+
   async loadSession(sessionId: string): Promise<CoworkSession | null> {
     const cowork = window.electron?.cowork;
     if (!cowork) return null;
@@ -634,6 +676,9 @@ class CoworkService {
       }
       const wasCurrentSession = store.getState().cowork.currentSessionId === sessionId;
       store.dispatch(setCurrentSession(result.session));
+      // Fold ledger rows recorded while this session was not open back in,
+      // silently and idempotently.
+      void this.refreshLedgerArtifacts(sessionId);
       this.runSync?.requestRecovery(sessionId);
       // Only restore streaming for running sessions — never clear it here.
       // Clearing is the responsibility of complete/error stream events.

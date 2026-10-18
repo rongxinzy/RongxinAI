@@ -3,7 +3,6 @@ import { toast } from 'sonner';
 import { resolveArtifactPath } from '../../shared/cowork/artifactPath';
 import { shouldRevealLiveArtifact } from '../store/slices/artifactSlice';
 import type { Artifact } from '../types/artifact';
-import type { ArtifactDetectionResult } from './artifactDetectionService';
 import { i18nService } from './i18n';
 
 /**
@@ -102,23 +101,21 @@ export interface PreparedArtifact {
 }
 
 /**
- * Resolves a whole batch before insertion, preserving detection order and never
+ * Resolves a whole batch before insertion, preserving batch order and never
  * exceeding the batch deadline. Only a confirmed `Missing` verdict drops an
  * artifact; unconfirmed paths are kept and simply not revealed.
  */
 export async function prepareAvailableArtifacts(
-  detected: ArtifactDetectionResult[],
+  detected: readonly Artifact[],
   isLiveSession: boolean,
   cwd?: string | null,
 ): Promise<PreparedArtifact[]> {
   const batchDeadline = Date.now() + BATCH_TIMEOUT_MS;
-  const states = await mapWithConcurrency(
-    detected,
-    ARTIFACT_FILE_PROBE_CONCURRENCY,
-    ({ artifact }) => probeArtifactFileAvailability(artifact, cwd, batchDeadline - Date.now()),
+  const states = await mapWithConcurrency(detected, ARTIFACT_FILE_PROBE_CONCURRENCY, artifact =>
+    probeArtifactFileAvailability(artifact, cwd, batchDeadline - Date.now()),
   );
 
-  return detected.flatMap(({ artifact }, index) => {
+  return detected.flatMap((artifact, index) => {
     const state = states[index];
     if (state === ArtifactFileAvailability.Missing) return [];
     return [

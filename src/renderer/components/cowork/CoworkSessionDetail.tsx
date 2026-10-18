@@ -12,7 +12,6 @@ import type { CoworkSessionInterruption } from '../../../shared/cowork/interrupt
 import { i18nService } from '../../services/i18n';
 import { RootState } from '../../store';
 import {
-  selectCurrentMessagesLength,
   selectCurrentSession,
   selectCurrentToolActivities,
   selectIsStreaming,
@@ -74,7 +73,7 @@ import { SessionArtifactPanelRegion } from './sessionDetail/SessionArtifactPanel
 import { SessionExportDialog } from './sessionDetail/SessionExportDialog';
 import { useArtifactLinkInterception } from './sessionDetail/useArtifactLinkInterception';
 import { useArtifactPanelPresentation } from './sessionDetail/useArtifactPanelPresentation';
-import { useSessionArtifactDetection } from './sessionDetail/useSessionArtifactDetection';
+import { useInlineArtifacts } from './sessionDetail/useInlineArtifacts';
 import { useSessionExport } from './sessionDetail/useSessionExport';
 
 interface CoworkSessionDetailProps {
@@ -136,7 +135,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const isStreaming = useSelector(selectIsStreaming);
   const toolActivities = useSelector(selectCurrentToolActivities);
   const remoteManaged = useSelector(selectRemoteManaged);
-  const messagesLength = useSelector(selectCurrentMessagesLength);
   const skills = useSelector((state: RootState) => state.skill.skills);
   const detailRootRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -191,7 +189,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     previewSessionId ? selectSessionArtifacts(state, previewSessionId) : EMPTY_ARTIFACTS,
   );
 
-  useSessionArtifactDetection({ sessionId, currentSession, isStreaming, messagesLength });
+  useInlineArtifacts({ sessionId, messages: currentSession?.messages, isStreaming });
   useArtifactLinkInterception({
     scrollContainerRef,
     sessionId,
@@ -206,9 +204,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     sessionArtifacts,
   );
 
-  // lastMessageContent and messagesLength are now sourced from memoized
-  // selectors (selectLastMessageContent / selectCurrentMessagesLength)
-  // so there is no need to derive them from currentSession here.
+  // lastMessageContent is sourced from the memoized selector
+  // (selectLastMessageContent), so there is no need to derive it here.
 
   const resolveSessionLocalFilePath = useCallback(
     (href: string, text: string) => resolveLocalFilePath(href, text, currentSession?.cwd),
@@ -261,17 +258,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     lastTurnItems &&
     findToolGroupForPermission(lastTurnItems, inlinePermission),
   );
-  const turnArtifactsMap = useTurnArtifacts(
-    turns,
-    sessionArtifacts,
-    PREVIEWABLE_ARTIFACT_TYPES,
-    currentSession?.cwd,
-  );
+  const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
   const pendingTurnArtifactsMap = useTurnArtifacts(
     turns,
     pendingArtifacts,
     PREVIEWABLE_ARTIFACT_TYPES,
-    currentSession?.cwd,
   );
 
   const markInitialHistoryTailPositioned = useSessionHistoryPagination({

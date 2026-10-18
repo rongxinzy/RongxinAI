@@ -1,4 +1,4 @@
-import { getFileName } from '../../services/artifactParser';
+import { getFileName } from '../../services/artifactPaths';
 import { stripFileProtocol } from '../cowork/helpers/localFilePathLinks';
 
 const LOCAL_FILE_MARKDOWN_LINK_PATTERN =

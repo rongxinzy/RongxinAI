@@ -54,7 +54,6 @@ const config: KnipConfig = {
         // Renderer workers constructed with `new Worker(new URL(..., import.meta.url))`.
         'src/renderer/components/artifacts/renderers/csvPreview.worker.ts',
         'src/renderer/components/artifacts/renderers/dxfPreview.worker.ts',
-        'src/renderer/services/artifactDetection.worker.ts',
         // electron-builder hook paths. The packaging config is not a Knip plugin input.
         'scripts/electron-builder-hooks.cjs',
         'scripts/notarize.js',
