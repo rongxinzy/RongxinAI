@@ -295,6 +295,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "concurrently": "^8.2.2",
+    "croner": "^10.0.1",
     "cronstrue": "^3.14.0",
     "cross-env": "^7.0.3",
     "docx-preview": "^0.3.7",
