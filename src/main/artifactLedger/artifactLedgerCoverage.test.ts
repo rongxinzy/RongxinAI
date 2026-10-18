@@ -29,12 +29,6 @@ afterEach(async () => {
   }
 });
 
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-const waitForDiff = async (): Promise<void> => {
-  await sleep(600);
-  await sleep(120);
-};
-
 async function createWorkspace(): Promise<{
   root: string;
   ledger: ArtifactLedger;
@@ -174,7 +168,8 @@ test('ledger is strictly ahead of the renderer detector for edit rewrites', asyn
 test('ledger is strictly ahead of the renderer detector for bash-produced files', async () => {
   const { root, ledger, recorder } = await createWorkspace();
   recorder.onRunStart('run-1');
-  await sleep(50);
+  // Wait for the run-start baseline so the diff can attribute the new file.
+  await recorder.flushDiffs();
   const docPath = path.join(root, 'export.docx');
   await fs.writeFile(docPath, Buffer.from('binary'));
   recorder.onToolEnd({
@@ -184,7 +179,7 @@ test('ledger is strictly ahead of the renderer detector for bash-produced files'
     isError: false,
     resultMessageId: 'm-result-1',
   });
-  await waitForDiff();
+  await recorder.flushDiffs();
 
   const messages = [
     toolUseMessage('m-tool-1', 'bash', 'call-1', { command: 'libreoffice --convert-to docx' }),

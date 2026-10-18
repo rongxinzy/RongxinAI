@@ -84,8 +84,10 @@ export class ArtifactRecorder {
   private latest: WorkspaceSnapshot | null = null;
   private baselinePromise: Promise<WorkspaceSnapshot | null> | null = null;
   private diffTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastDiff: Promise<void> | null = null;
   private diffAnchor = '';
   private warnedTruncated = false;
+  private runGeneration = 0;
   private disposed = false;
 
   constructor(options: ArtifactRecorderOptions) {
@@ -95,22 +97,20 @@ export class ArtifactRecorder {
     this.snapshotOptions = options.snapshotOptions;
   }
 
-  get scopeId(): string {
-    return this.sessionId;
-  }
-
   /** New agent run: reset per-run state and capture the workspace baseline. */
   onRunStart(runId: string | null): void {
     if (this.disposed) return;
     this.runId = runId;
+    this.runGeneration += 1;
     this.recordedKeys = new Set();
     this.baseline = null;
     this.latest = null;
+    const generation = this.runGeneration;
     this.baselinePromise = takeWorkspaceSnapshot(this.workspaceRoot, {
       ...this.snapshotOptions,
       signal: this.lifecycle.signal,
     }).then(snapshot => {
-      if (this.disposed || !snapshot) return snapshot;
+      if (this.disposed || generation !== this.runGeneration || !snapshot) return snapshot;
       this.baseline = snapshot;
       this.latest = snapshot;
       this.warnOnceIfTruncated(snapshot);
@@ -183,7 +183,22 @@ export class ArtifactRecorder {
       this.diffTimer = null;
     }
     const anchor = finalAnswerMessageId ?? this.diffAnchor;
-    void this.runDiff(anchor, true);
+    this.lastDiff = this.runDiff(anchor, true);
+  }
+
+  /**
+   * Deterministic flush for tests: waits for the run-start baseline, runs a
+   * debounce-pending diff immediately, and awaits any in-flight diff. Never
+   * relies on the real debounce timer firing.
+   */
+  async flushDiffs(): Promise<void> {
+    await this.baselinePromise;
+    if (this.diffTimer) {
+      clearTimeout(this.diffTimer);
+      this.diffTimer = null;
+      this.lastDiff = this.runDiff(this.diffAnchor, false);
+    }
+    await this.lastDiff;
   }
 
   /**
@@ -327,19 +342,22 @@ export class ArtifactRecorder {
     this.diffAnchor = anchorMessageId;
     this.diffTimer = setTimeout(() => {
       this.diffTimer = null;
-      void this.runDiff(anchorMessageId, false);
+      this.lastDiff = this.runDiff(anchorMessageId, false);
     }, DIFF_DEBOUNCE_MS);
   }
 
   private async runDiff(anchorMessageId: string, isFinal: boolean): Promise<void> {
     if (this.disposed) return;
+    // A diff that outlives its run must not stamp the next run with stale
+    // baselines or attribute records to the wrong run.
+    const generation = this.runGeneration;
     const base = this.latest ?? (await this.baselinePromise);
-    if (this.disposed || !base) return;
+    if (this.disposed || generation !== this.runGeneration || !base) return;
     const next = await takeWorkspaceSnapshot(this.workspaceRoot, {
       ...this.snapshotOptions,
       signal: this.lifecycle.signal,
     });
-    if (this.disposed || !next) return;
+    if (this.disposed || generation !== this.runGeneration || !next) return;
     if (base.truncated || next.truncated) {
       this.warnOnceIfTruncated(next.truncated ? next : base);
       return;

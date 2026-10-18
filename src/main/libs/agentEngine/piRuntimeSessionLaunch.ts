@@ -597,14 +597,15 @@ export async function startPiRuntimeSession(
 }
 
 /** Recorder factory: artifact capture is active only for Work-mode sessions
- * with a workspace root and a host-provided ledger. */
+ * with file tools enabled, a workspace root, and a host-provided ledger. */
 function createArtifactRecorderForSession(
   host: PiRuntimeAdapterHost,
   sessionId: string,
   workspaceRoot: string,
   resourceState: PiResourceState,
 ): ArtifactRecorder | null {
-  if (resourceState.chatMode) return null;
+  if (resourceState.chatMode || !resourceState.fileToolsEnabled) return null;
+  if (!workspaceRoot) return null;
   const ledger = host.getArtifactLedger();
   if (!ledger) return null;
   return new ArtifactRecorder({ sessionId, workspaceRoot, ledger });

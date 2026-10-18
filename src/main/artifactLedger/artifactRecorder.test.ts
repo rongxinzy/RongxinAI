@@ -25,14 +25,6 @@ afterEach(async () => {
   }
 });
 
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-
-/** Diff debounce is 400ms; sleep past it so the debounced rescan completes. */
-const waitForDiff = async (): Promise<void> => {
-  await sleep(600);
-  await sleep(120);
-};
-
 async function createWorkspace(): Promise<{
   root: string;
   ledger: ArtifactLedger;
@@ -128,7 +120,8 @@ test('a bash-made document is caught by the debounced workspace diff', async () 
   const { root, ledger, recorder } = await createWorkspace();
 
   recorder.onRunStart('run-1');
-  await sleep(50);
+  // Wait for the run-start baseline so the diff can attribute the new file.
+  await recorder.flushDiffs();
   await fs.writeFile(path.join(root, 'export.docx'), Buffer.from('binary'));
   recorder.onToolEnd({
     toolCallId: 'call-1',
@@ -137,9 +130,9 @@ test('a bash-made document is caught by the debounced workspace diff', async () 
     isError: false,
     resultMessageId: 'm-result-1',
   });
-  await waitForDiff();
+  await recorder.flushDiffs();
   recorder.onRunSettled('m-final');
-  await sleep(150);
+  await recorder.flushDiffs();
 
   const artifacts = ledger.list('session-1');
   expect(artifacts).toHaveLength(1);
@@ -297,7 +290,7 @@ test('diffs ignore .git and node_modules and never duplicate recorded files', as
   await fs.mkdir(path.join(root, 'node_modules/pkg'), { recursive: true });
 
   recorder.onRunStart('run-1');
-  await sleep(50);
+  await recorder.flushDiffs();
 
   await fs.writeFile(path.join(root, 'report.md'), 'v1', 'utf8');
   await fs.writeFile(path.join(root, '.git/tracked.md'), 'x', 'utf8');
@@ -310,7 +303,7 @@ test('diffs ignore .git and node_modules and never duplicate recorded files', as
     isError: false,
     resultMessageId: 'm-result-1',
   });
-  await waitForDiff();
+  await recorder.flushDiffs();
 
   // The same file recorded through the write path later must not duplicate.
   recorder.onToolStart('call-2', 'write', { file_path: 'report.md', content: 'v2' });
@@ -323,7 +316,7 @@ test('diffs ignore .git and node_modules and never duplicate recorded files', as
     resultMessageId: 'm-result-2',
   });
   recorder.onRunSettled('m-final');
-  await sleep(150);
+  await recorder.flushDiffs();
 
   const artifacts = ledger.list('session-1');
   expect(artifacts.map(artifact => artifact.filePath)).toEqual([path.join(root, 'report.md')]);
@@ -355,7 +348,7 @@ test('a truncated workspace snapshot disables diff detection with one warning', 
     snapshotOptions: { maxFiles: 4 },
   });
   recorder.onRunStart('run-1');
-  await sleep(50);
+  await recorder.flushDiffs();
   recorder.onToolEnd({
     toolCallId: 'call-1',
     toolName: 'bash',
@@ -363,9 +356,9 @@ test('a truncated workspace snapshot disables diff detection with one warning', 
     isError: false,
     resultMessageId: 'm-result-1',
   });
-  await waitForDiff();
+  await recorder.flushDiffs();
   recorder.onRunSettled('m-final');
-  await sleep(150);
+  await recorder.flushDiffs();
   expect(ledger.list('session-1')).toEqual([]);
   expect(warn).toHaveBeenCalledTimes(1);
   recorder.dispose();

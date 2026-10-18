@@ -35,6 +35,21 @@ export interface DeclareArtifactToolOptions {
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
+/** Race a pending-write wait against tool abortion: an aborted declaration
+ * stops waiting immediately instead of parking until the write settles. */
+function raceWithAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T | null> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.resolve(null);
+  return new Promise<T | null>(resolve => {
+    const onAbort = (): void => resolve(null);
+    signal.addEventListener('abort', onAbort, { once: true });
+    void promise.then(value => {
+      signal.removeEventListener('abort', onAbort);
+      resolve(value);
+    });
+  });
+}
+
 async function defaultFileExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath, FsConstants.F_OK);
@@ -57,12 +72,13 @@ export function buildDeclareArtifactTool(
 ): Record<string, unknown> {
   const fileExists = options.fileExists ?? defaultFileExists;
 
-  const ensureFilePresent = async (filePath: string): Promise<boolean> => {
+  const ensureFilePresent = async (filePath: string, signal?: AbortSignal): Promise<boolean> => {
     if (await fileExists(filePath)) return true;
     // A parallel write/edit of the same file may still be in flight; wait for
     // the recorder to settle it, then re-check existence.
-    if (options.awaitPendingWrite && (await options.awaitPendingWrite(filePath))) {
-      return fileExists(filePath);
+    if (options.awaitPendingWrite) {
+      const settled = await raceWithAbort(options.awaitPendingWrite(filePath), signal);
+      if (settled) return fileExists(filePath);
     }
     return false;
   };
@@ -103,12 +119,13 @@ export function buildDeclareArtifactTool(
     execute: async (
       _toolCallId: string,
       params: Record<string, unknown>,
+      signal?: AbortSignal,
     ): Promise<DeclareArtifactToolResult> => {
       const filePath = text(params.filePath);
       if (!filePath) {
         return failure('declare_artifact requires a non-empty file path.');
       }
-      if (!(await ensureFilePresent(filePath))) {
+      if (!(await ensureFilePresent(filePath, signal))) {
         return failure(
           `declare_artifact failed: file does not exist at ${filePath}. Create the file before declaring it.`,
           { filePath },

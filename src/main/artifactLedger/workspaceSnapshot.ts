@@ -56,6 +56,14 @@ export async function takeWorkspaceSnapshot(
   const { signal } = options;
   const maxFiles = options.maxFiles ?? WORKSPACE_SNAPSHOT_MAX_FILES;
   const maxDepth = options.maxDepth ?? WORKSPACE_SNAPSHOT_MAX_DEPTH;
+  if (!root) return null;
+  try {
+    const rootStat = await fs.stat(root);
+    if (!rootStat.isDirectory()) return null;
+  } catch {
+    return null;
+  }
+  if (signal?.aborted) return null;
   const byKey = new Map<string, WorkspaceSnapshotEntry>();
   let truncated = false;
   let stop = false;

@@ -6,6 +6,7 @@ type DeclareArtifactTool = {
   execute: (
     toolCallId: string,
     params: Record<string, unknown>,
+    signal?: AbortSignal,
   ) => Promise<{
     content: Array<{ type: 'text'; text: string }>;
     details: Record<string, unknown>;
@@ -118,4 +119,22 @@ test('reports failure when a pending write settles without producing the file', 
   expect(onDeclare).not.toHaveBeenCalled();
   expect(result.details.isError).toBe(true);
   expect(result.details.error).toContain('file does not exist');
+});
+
+test('an aborted declaration stops waiting on the pending write', async () => {
+  const onDeclare = vi.fn();
+  const tool = buildDeclareArtifactTool({
+    onDeclare,
+    fileExists: async () => false,
+    // Never settles: only the abort signal may unblock the wait.
+    awaitPendingWrite: () => new Promise<boolean>(() => {}),
+  }) as unknown as DeclareArtifactTool;
+
+  const controller = new AbortController();
+  const pending = tool.execute('call-1', { filePath: 'C:/tmp/stuck.md' }, controller.signal);
+  controller.abort();
+  const result = await pending;
+
+  expect(onDeclare).not.toHaveBeenCalled();
+  expect(result.details.isError).toBe(true);
 });
