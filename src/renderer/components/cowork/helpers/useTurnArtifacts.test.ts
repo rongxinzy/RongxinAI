@@ -83,6 +83,22 @@ test('anchors a ledger row on its toolCallId inside the producing tool_group', (
   expect(map.get('turn-1')?.map(row => row.id)).toEqual(['row-1']);
 });
 
+test('attaches a live upsert while the turn is still streaming (no tool result yet)', () => {
+  const streaming = toolGroupTurn('turn-1');
+  const [toolGroup] = streaming.assistantItems as unknown as [
+    { group: { toolResult?: unknown; status: string } },
+  ];
+  toolGroup.group.toolResult = undefined;
+  toolGroup.group.status = 'running';
+  const view = renderTurnArtifacts({ turns: [streaming], artifacts: [] });
+  expect(view.result.current.get('turn-1')).toEqual([]);
+
+  // The ledger upsert lands mid-stream with only its tool call id and an
+  // anchor message the renderer has not seen yet.
+  view.rerender({ turns: [streaming], artifacts: [artifact({ messageId: 'not-yet-loaded' })] });
+  expect(view.result.current.get('turn-1')?.map(row => row.id)).toEqual(['row-1']);
+});
+
 test('anchors a ledger row on its messageId when the toolCallId is absent', () => {
   const toolResultRow = artifact({ toolCallId: undefined, messageId: 'toolr-msg' });
   const map = renderTurnArtifacts({
