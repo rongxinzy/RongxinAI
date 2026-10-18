@@ -33,7 +33,6 @@ interface CodingConversationTurnProps {
   artifactsByMessageId?: ReadonlyMap<string, Artifact[]>;
   /** File artifacts keyed by the tool call that produced them. */
   artifactsByToolCallId?: ReadonlyMap<string, Artifact[]>;
-  loadingArtifactIds?: ReadonlySet<string>;
   expandedActivityIds: ReadonlySet<string>;
   onActivityOpenChange: (activityId: string, open: boolean) => void;
   onReEditUserMessage: (content: string) => void;
@@ -166,7 +165,6 @@ const CodingConversationTurnComponent = ({
   turn,
   artifactsByMessageId,
   artifactsByToolCallId,
-  loadingArtifactIds,
   expandedActivityIds,
   onActivityOpenChange,
   onReEditUserMessage,
@@ -190,7 +188,6 @@ const CodingConversationTurnComponent = ({
         key={activity.id}
         activity={activity}
         artifacts={toolCallId ? artifactsByToolCallId?.get(toolCallId) : undefined}
-        loadingArtifactIds={loadingArtifactIds}
         open={expandedActivityIds.has(activity.id)}
         onOpenChange={open => onActivityOpenChange(activity.id, open)}
       />
@@ -270,11 +267,7 @@ const CodingConversationTurnComponent = ({
               {artifacts.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-2">
                   {artifacts.map(artifact => (
-                    <ArtifactPreviewCard
-                      key={artifact.id}
-                      artifact={artifact}
-                      disabled={loadingArtifactIds?.has(artifact.id)}
-                    />
+                    <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
                   ))}
                 </div>
               )}
@@ -389,7 +382,6 @@ const conversationTurnPropsEqual = (
   prev.showWaitingIndicator === next.showWaitingIndicator &&
   prev.artifactsByMessageId === next.artifactsByMessageId &&
   prev.artifactsByToolCallId === next.artifactsByToolCallId &&
-  prev.loadingArtifactIds === next.loadingArtifactIds &&
   prev.expandedActivityIds === next.expandedActivityIds &&
   prev.onActivityOpenChange === next.onActivityOpenChange &&
   prev.onReEditUserMessage === next.onReEditUserMessage &&

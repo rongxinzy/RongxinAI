@@ -18,10 +18,53 @@ function columnValue(db: Database.Database, table: string, column: string, id: s
 
 test('converts legacy datetime timestamps to ISO UTC on repository construction', () => {
   const db = new Database(':memory:');
-  new MemoryRepository(db);
   db.exec(`
-    UPDATE memory_links SET created_at = '2026-09-09 11:10:34', updated_at = '2026-09-09 11:10:34'
-      WHERE id = 'none';
+    CREATE TABLE memory_links (
+      id TEXT PRIMARY KEY,
+      memory_id INTEGER NOT NULL,
+      project_id TEXT NOT NULL,
+      scope TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      task_id TEXT,
+      run_id TEXT,
+      artifact_id TEXT,
+      approval_id TEXT,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+    CREATE TABLE memory_candidates (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      source_kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      expires_at TEXT
+    );
+    CREATE TABLE memory_outbox (
+      id TEXT PRIMARY KEY,
+      operation TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      status TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      available_at TEXT NOT NULL,
+      last_error TEXT,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      completed_at TEXT
+    );
+    CREATE TABLE memory_import_rejections (
+      id TEXT PRIMARY KEY,
+      rejected_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+  `);
+  // Seed legacy rows BEFORE the first repository construction, matching how a
+  // real pre-migration database looks; the reconcile runs once from now on.
+  db.exec(`
     INSERT INTO memory_links (id, memory_id, project_id, scope, session_id, source_kind, status)
       VALUES ('link-legacy', 1, 'project-a', 'session', 'session-a', 'session_summary', 'active');
     INSERT INTO memory_links (id, memory_id, project_id, scope, session_id, source_kind, status)

@@ -44,7 +44,7 @@ description: React 组件开发的标准化蓝图。从 Props 接口设计、状
 
 - 附最小使用示例
 - 说明扩展方向与注意事项
-- 组件文件落盘后调用 `declare_artifact` 声明
+- 写入的文件会自动记录；最终交付的组件文件再用 `declare_artifact` 标注为交付物
 
 ## 输出规范
 

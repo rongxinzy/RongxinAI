@@ -1,8 +1,13 @@
-import { getFileName } from '../../services/artifactParser';
-import { stripFileProtocol } from '../cowork/helpers/localFilePathLinks';
+import { getFileName } from '../../services/artifactPaths';
 
 const LOCAL_FILE_MARKDOWN_LINK_PATTERN =
   /!?\[([^\]\n]*)\]\(\s*<?(file:\/\/[^)\s>]+)>?(?:\s+(?:"[^"]*"|'[^']*'))?\s*\)/gi;
+
+const stripFileProtocol = (value: string): string => {
+  let cleaned = value.replace(/^file:\/\//i, '');
+  if (/^\/[A-Za-z]:/.test(cleaned)) cleaned = cleaned.slice(1);
+  return cleaned;
+};
 
 /**
  * Streamdown blocks file:// URLs before custom link rendering. Coding turns

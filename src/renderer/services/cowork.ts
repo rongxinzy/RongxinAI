@@ -11,6 +11,7 @@ import {
   CoworkSessionMode,
   type CoworkSessionSource,
 } from '../../shared/cowork/constants';
+import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import { store } from '../store';
 import { setCurrentAgentId } from '../store/slices/agentSlice';
 import { clearSessionArtifacts, addArtifact } from '../store/slices/artifactSlice';
@@ -62,6 +63,25 @@ import { CoworkRunSync } from './coworkRunSync';
 import { PiUiRecovery } from './piUiRecovery';
 import { createCoworkStreamPipeline, type CoworkStreamPipeline } from './coworkStreamPipeline';
 
+/** Live ledger upsert payload shape (see ArtifactsApi.onUpsert). */
+type ArtifactUpsertPayload = { scopeId: string; artifact: CoworkPersistedArtifact };
+
+/**
+ * Lands one ledger upsert in the artifact store. The reveal flag is the
+ * delivery signal: only a declared deliverable recorded during a run the user
+ * may be watching opens the panel by itself; everything else just joins the
+ * list. The slice's path dedupe makes repeated upserts idempotent.
+ */
+export function dispatchArtifactUpsert(event: ArtifactUpsertPayload): void {
+  store.dispatch(
+    addArtifact({
+      sessionId: event.scopeId,
+      artifact: { ...event.artifact, sessionId: event.scopeId },
+      reveal: event.artifact.declared && event.artifact.role === 'deliverable',
+    }),
+  );
+}
+
 const classifyError = (error: string | CoworkError): string => {
   if (typeof error === 'object' && 'kind' in error) {
     const key = getUserErrorI18nKey(error.kind);
@@ -93,6 +113,19 @@ class CoworkService {
       this.loadSessions(undefined, store.getState().workspace.currentWorkspaceId ?? undefined),
       this.loadChatSessions(),
     ]);
+
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const { readStreamReplayFixtureId, getStreamReplayTrace } =
+        await import('../browserMock/streamReplay');
+      const streamReplayFixtureId = readStreamReplayFixtureId();
+      if (streamReplayFixtureId) {
+        await this.loadSession(getStreamReplayTrace(streamReplayFixtureId).sessionId);
+      }
+    }
+
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      window.__previewCoworkStreamReady = true;
+    }
 
     this.initialized = true;
   }
@@ -176,20 +209,10 @@ class CoworkService {
 
     // Event-time artifact ledger upserts: recorded by the main process at
     // tool/diff time and dispatched through the same reducer the persisted
-    // seed and the renderer detectors use, so delivery paths stay idempotent.
+    // seed uses, so delivery paths stay idempotent.
     const artifactsApi = window.electron?.artifacts;
     if (typeof artifactsApi?.onUpsert === 'function') {
-      this.streamListenerCleanups.push(
-        artifactsApi.onUpsert(({ scopeId, artifact }) => {
-          store.dispatch(
-            addArtifact({
-              sessionId: scopeId,
-              artifact: { ...artifact, sessionId: scopeId },
-              reveal: artifact.declared && artifact.role === 'deliverable',
-            }),
-          );
-        }),
-      );
+      this.streamListenerCleanups.push(artifactsApi.onUpsert(dispatchArtifactUpsert));
     }
     void recovery
       .bootstrap()
@@ -608,6 +631,18 @@ class CoworkService {
     }
   }
 
+  /**
+   * Projects the session's ledger rows (read with the session) into the
+   * artifact store. Idempotent — the slice's path-dedupe merge makes this a
+   * no-op for rows already landed by live upserts — and silent, so opening
+   * history never pops the panel. Missing files are reported when opened.
+   */
+  private projectLedgerArtifacts(sessionId: string, artifacts: CoworkPersistedArtifact[]): void {
+    for (const artifact of artifacts) {
+      store.dispatch(addArtifact({ sessionId, artifact: { ...artifact, sessionId } }));
+    }
+  }
+
   async loadSession(sessionId: string): Promise<CoworkSession | null> {
     const cowork = window.electron?.cowork;
     if (!cowork) return null;
@@ -634,6 +669,7 @@ class CoworkService {
       }
       const wasCurrentSession = store.getState().cowork.currentSessionId === sessionId;
       store.dispatch(setCurrentSession(result.session));
+      this.projectLedgerArtifacts(sessionId, result.session.artifacts ?? []);
       this.runSync?.requestRecovery(sessionId);
       // Only restore streaming for running sessions — never clear it here.
       // Clearing is the responsibility of complete/error stream events.

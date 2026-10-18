@@ -66,6 +66,7 @@ import type { PiCodingElicitationResponse } from './piCodingElicitation';
 import { PiCadViewerService } from './piCadViewerTool';
 import { resolvePiModel } from './piMagpiePiModel';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
+import { invalidatePiSessionDir } from './piSessionStore';
 import { PiRuntimeQueueController } from './piRuntimeQueueController';
 import { PiRuntimeSessionMemory } from './piRuntimeSessionMemory';
 import { continuePiRuntimeSession, patchPiRuntimeSession } from './piRuntimeSessionContinuation';
@@ -178,6 +179,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
    * with the current MCP proxy topology.
    */
   private mcpToolManifestGeneration = 0;
+  /** Root of per-session Pi JSONL directories (`<userData>/pi-sessions`). */
+  private piSessionStoreRoot: string | null = null;
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
@@ -222,6 +225,21 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
 
   setImageAttachmentRoot(root: string): void {
     this.imageAttachmentRoot = root;
+  }
+
+  /**
+   * Root directory for file-backed Pi sessions (`<userData>/pi-sessions`).
+   * Each Cowork session then keeps its structured transcript in Pi's own
+   * JSONL and rebuilds reopen it instead of replaying a flattened prompt.
+   */
+  setPiSessionStoreRoot(root: string): void {
+    this.piSessionStoreRoot = root;
+  }
+
+  /** Drops a session's Pi JSONL so the next turn cannot restore stale history. */
+  invalidatePiSessionDir(sessionId: string): void {
+    if (!this.piSessionStoreRoot) return;
+    invalidatePiSessionDir(this.piSessionStoreRoot, sessionId);
   }
 
   persistImageAttachments(
@@ -317,6 +335,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
   }
   getMcpToolManifestGeneration(): number {
     return this.mcpToolManifestGeneration;
+  }
+  getPiSessionStoreRoot(): string | null {
+    return this.piSessionStoreRoot;
   }
   getOcrCommandFor(): ((imagePath: string) => string) | undefined {
     return this.bundledOcrHelper?.commandFor;

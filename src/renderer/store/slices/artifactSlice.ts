@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-import { normalizeFilePathForDedup } from '../../services/artifactParser';
+import { normalizeFilePathForDedup } from '../../services/artifactPaths';
 import { ArtifactRole, type Artifact } from '../../types/artifact';
 import type { RootState } from '../index';
 
@@ -93,48 +93,64 @@ function restoreSessionView(state: ArtifactState, viewState: ArtifactSessionView
   state.layoutMode = viewState.layoutMode;
 }
 
-function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
-  const declaredArtifact = incoming.declared ? incoming : existing.declared ? existing : null;
-  const deliveryAnchorArtifact =
-    !incoming.declared && incoming.role === ArtifactRole.Deliverable
-      ? incoming
-      : !existing.declared && existing.role === ArtifactRole.Deliverable
-        ? existing
-        : null;
-  const merged = {
-    ...existing,
-    ...incoming,
-    ...(declaredArtifact
-      ? {
-          id: declaredArtifact.id,
-          messageId:
-            declaredArtifact.role === ArtifactRole.Deliverable && deliveryAnchorArtifact
-              ? deliveryAnchorArtifact.messageId
-              : declaredArtifact.messageId,
-          type: declaredArtifact.type,
-          title: declaredArtifact.title,
-          fileName: declaredArtifact.fileName,
-          filePath: declaredArtifact.filePath,
-          source: declaredArtifact.source,
-          role: declaredArtifact.role,
-          declared: true,
-          createdAt: declaredArtifact.createdAt,
-        }
-      : {}),
-    content: incoming.content || existing.content,
-    role:
-      declaredArtifact?.role ??
-      (existing.role === ArtifactRole.Deliverable || incoming.role === ArtifactRole.Deliverable
-        ? ArtifactRole.Deliverable
-        : ArtifactRole.Intermediate),
-  };
+/** Field equality that treats absent (`undefined`) and explicit `null` anchors alike. */
+function sameArtifactValue(a: unknown, b: unknown): boolean {
+  return a === b || (a == null && b == null);
+}
 
-  const existingKeys = Object.keys(existing) as (keyof Artifact)[];
-  const mergedKeys = Object.keys(merged) as (keyof Artifact)[];
-  return existingKeys.length === mergedKeys.length &&
-    mergedKeys.every(key => existing[key] === merged[key])
-    ? existing
-    : merged;
+/** True when every field matches, ignoring key-presence differences. */
+function sameArtifact(a: Artifact, b: Artifact): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if (!sameArtifactValue(a[key as keyof Artifact], b[key as keyof Artifact])) return false;
+  }
+  return true;
+}
+
+/** Inline artifacts carry no declaration flag at all; keep them key-clean. */
+function mergeDeclared(
+  existing: boolean | undefined,
+  incoming: boolean | undefined,
+): boolean | undefined {
+  if (existing === true || incoming === true) return true;
+  if (existing === undefined && incoming === undefined) return undefined;
+  return false;
+}
+
+/**
+ * The one merge rule for artifact upserts, mirroring the main-process ledger
+ * (`mergeLedgerRow` in src/main/artifactLedger/artifactLedger.ts):
+ *
+ * - Every touching event moves the anchor (id, messageId, toolCallId, runId)
+ *   forward to that event; createdAt stays at first sighting.
+ * - A file event refreshes file metadata and observed content, and may refresh
+ *   the type only while the row is undeclared; it never touches declared
+ *   metadata (declared flag, role, title).
+ * - A declaration (incoming.declared) sets declared, the role, the type and
+ *   the title when one was given.
+ * - Observed content only replaces stored content when it is non-empty.
+ */
+function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
+  const isDeclaration = incoming.declared === true;
+  const merged: Artifact = {
+    ...existing,
+    id: incoming.id,
+    messageId: incoming.messageId,
+    toolCallId: incoming.toolCallId ?? existing.toolCallId ?? null,
+    runId: incoming.runId ?? existing.runId ?? null,
+    taskId: incoming.taskId ?? existing.taskId,
+    type: isDeclaration ? incoming.type : existing.declared ? existing.type : incoming.type,
+    title: isDeclaration ? incoming.title || existing.title : existing.title,
+    content: incoming.content !== '' ? incoming.content : existing.content,
+    language: incoming.language ?? existing.language,
+    fileName: incoming.fileName ?? existing.fileName,
+    filePath: incoming.filePath ?? existing.filePath,
+    source: incoming.source,
+    role: isDeclaration ? incoming.role : existing.role,
+    declared: mergeDeclared(existing.declared, incoming.declared),
+    createdAt: existing.createdAt,
+  };
+  return sameArtifact(existing, merged) ? existing : merged;
 }
 
 /**
@@ -154,23 +170,6 @@ function shouldRevealMergedArtifact(
   if (next.declared === true) return true;
   return previous.role !== ArtifactRole.Deliverable || (!previous.content && Boolean(next.content));
 }
-
-/**
- * Whether a freshly detected artifact may open the panel by itself.
- *
- * Automatic opening is a live-delivery signal: the agent must have declared the
- * artifact as a deliverable during a run the user is watching, and the file must
- * be readable. Heuristic candidates, backfilled history, and unreadable paths
- * only appear in the list.
- */
-export const shouldRevealLiveArtifact = (
-  artifact: Artifact,
-  context: { isLiveSession: boolean; previewable: boolean },
-): boolean =>
-  context.isLiveSession &&
-  context.previewable &&
-  artifact.declared === true &&
-  artifact.role === ArtifactRole.Deliverable;
 
 /** What kind of event asked for the reveal; suppression only mutes promotions. */
 const RevealKind = {
@@ -233,16 +232,9 @@ const artifactSlice = createSlice({
       );
     },
 
-    setSessionArtifacts(
-      state,
-      action: PayloadAction<{ sessionId: string; artifacts: Artifact[] }>,
-    ) {
-      state.artifactsBySession[action.payload.sessionId] = action.payload.artifacts;
-    },
-
     /**
      * `reveal` means the caller certifies this event as a delivery worth showing
-     * (cowork: `shouldRevealLiveArtifact`). The slice does not re-derive that
+     * (cowork: live ledger upserts of declared deliverables). The slice does not re-derive that
      * policy, so every surface states its own: cowork only reveals live declared
      * deliverables, the coding page keeps revealing its own stream artifacts.
      */

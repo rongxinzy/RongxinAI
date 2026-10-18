@@ -173,13 +173,10 @@ export class PiRuntimeTurnEvents {
           active.retryPriorAnswer = priorAnswer;
           this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);
           active.answerText = '';
-          active.thinkingText = '';
           active.streamAccumulator.reset();
           active.thinkingLifecycle.reset();
           setStreamedAssistantText(active.piTranslatorState, priorAnswer);
-          if (priorThinking) {
-            active.thinkingText = priorThinking;
-          }
+          active.thinkingText = priorThinking;
         } else {
           // New turn → fresh answer + thinking messages, created lazily on first content.
           active.retryPriorAnswer = '';
@@ -841,6 +838,7 @@ export class PiRuntimeTurnEvents {
         workspaceRoot: active.workspaceRoot,
         finalAnswer: active.lastCompletedAnswerText,
         finalMessageId: active.lastCompletedAnswerMessageId,
+        artifactsSettled: active.artifactRecorder?.settled(),
         workflowCompleted:
           active.researchRun || active.shortcutWorkflow
             ? active.agentLoop.getState().done

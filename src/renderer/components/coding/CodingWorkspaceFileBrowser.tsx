@@ -438,9 +438,7 @@ export const CodingWorkspaceFileBrowser = ({
                   content={selectedContent}
                   className="p-4"
                   restrictLocalFileLinks
-                  resolveLocalFilePath={href =>
-                    resolveWorkspaceMarkdownLink(href, sourceRoot, selectedPath)
-                  }
+                  cwd={resolveWorkspaceMarkdownLink('.', sourceRoot, selectedPath) ?? sourceRoot}
                 />
               ) : fileView === CodingWorkspaceFileView.Preview ? (
                 <CodeBlock

@@ -24,6 +24,10 @@ function loadGlmReplayFixture(relativePath: string): GlmReplayLine[] {
   return lines.map(line => JSON.parse(line) as GlmReplayLine);
 }
 
+export function loadGlmReplayTimedLines(relativePath: string): GlmReplayLine[] {
+  return loadGlmReplayFixture(relativePath);
+}
+
 export function glmReplayEvents(relativePath: string): unknown[] {
   return loadGlmReplayFixture(relativePath).map(line => line.e);
 }

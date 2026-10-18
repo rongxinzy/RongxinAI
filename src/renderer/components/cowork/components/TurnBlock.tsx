@@ -164,8 +164,7 @@ const ToolActivityStatusLine: React.FC<{ activity: CoworkToolActivity }> = ({ ac
 const TurnBlockComponent: React.FC<{
   turn: ConversationTurn;
   artifacts?: Artifact[];
-  pendingArtifacts?: Artifact[];
-  resolveLocalFilePath?: (href: string, text: string) => string | null;
+  cwd?: string;
   mapDisplayText?: (value: string) => string;
   showTypingIndicator?: boolean;
   showCopyButtons?: boolean;
@@ -184,8 +183,7 @@ const TurnBlockComponent: React.FC<{
 }> = ({
   turn,
   artifacts,
-  pendingArtifacts,
-  resolveLocalFilePath,
+  cwd,
   mapDisplayText,
   showTypingIndicator = false,
   showCopyButtons = true,
@@ -298,7 +296,7 @@ const TurnBlockComponent: React.FC<{
         <AssistantBubble
           key={item.message.id}
           message={item.message}
-          resolveLocalFilePath={resolveLocalFilePath}
+          cwd={cwd}
           mapDisplayText={mapDisplayText}
           turnMetadata={
             showCopyButtons && index === finalAnswerIndex ? item.message.metadata : undefined
@@ -315,10 +313,9 @@ const TurnBlockComponent: React.FC<{
     item => item.type === CoworkDisplayItemType.ToolGroup && !item.group.toolResult,
   );
   const showTransportStatus = Boolean(!isTurnComplete && latestActivity && !hasActiveTool);
-  const deliverables = [...(artifacts ?? []), ...(pendingArtifacts ?? [])].filter(
+  const deliverables = (artifacts ?? []).filter(
     artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
   );
-  const pendingArtifactIds = new Set(pendingArtifacts?.map(artifact => artifact.id));
   const copyContent = showCopyButtons
     ? [...items]
         .reverse()
@@ -356,11 +353,7 @@ const TurnBlockComponent: React.FC<{
               {deliverables.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {deliverables.map(artifact => (
-                    <ArtifactPreviewCard
-                      key={artifact.id}
-                      artifact={artifact}
-                      disabled={pendingArtifactIds.has(artifact.id)}
-                    />
+                    <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
                   ))}
                 </div>
               )}

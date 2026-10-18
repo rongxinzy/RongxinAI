@@ -24,6 +24,7 @@ import { promoteVerifiedWorkbenchRun } from '../memory/taskMemoryPromotion';
 export const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!rt.workbenchTaskService) {
     rt.workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
+      listLedgerArtifacts: scopeId => getArtifactLedger().list(scopeId),
       onVerifiedRun: event => {
         const complete = getPiRuntimeAdapter().getSessionMemoryCompletion(event.task.sessionId);
         if (!complete) {
@@ -76,6 +77,9 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL = resolveAnySearchGatewayUrl();
     rt.piRuntimeAdapter = new PiRuntimeAdapter();
     rt.piRuntimeAdapter.setImageAttachmentRoot(coworkImageRoot(app.getPath('userData')));
+    // File-backed Pi sessions live beside the SQLite transcript under
+    // userData; one directory per Cowork session id.
+    rt.piRuntimeAdapter.setPiSessionStoreRoot(app.getPath('userData'));
     rt.piRuntimeAdapter.setCoworkStore(getCoworkStore());
     rt.piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     rt.piRuntimeAdapter.setArtifactLedger(getArtifactLedger());

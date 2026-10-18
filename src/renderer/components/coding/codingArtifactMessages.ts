@@ -1,7 +1,7 @@
 import type { CoworkMessage } from '../../types/cowork';
 import type { CodingConversationTurn } from './codingEventProjection';
 
-/** Converts completed coding answers into the existing artifact parser input. */
+/** Converts completed coding answers into inline code-block projection input. */
 export const toDetectableCodingMessages = (turns: CodingConversationTurn[]): CoworkMessage[] =>
   turns.flatMap(turn =>
     turn.assistantMessages

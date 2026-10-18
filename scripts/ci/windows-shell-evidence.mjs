@@ -131,7 +131,8 @@ export async function verifyShellEvidence({
   runId,
 }) {
   // Per-edition ceiling (distribution-budget.cjs): lite keeps the original
-  // 500 MiB limit; report-only editions (cpu/cuda) pass null (no size limit).
+  // 500 MiB limit; cpu uses its measured + margin limit; cuda passes null
+  // (uncapped, krli decision for its public release).
   const framing = sfx.inspectSetup(installer, {
     maxBytes: distributionBudget.resolveEditionSetupBudget().maxInstallerBytes,
   });

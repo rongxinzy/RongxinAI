@@ -6,7 +6,7 @@ import { openAvailableArtifact } from '../../../services/artifactAvailability';
 import {
   getArtifactTypeFromExtension,
   normalizeFilePathForDedup,
-} from '../../../services/artifactParser';
+} from '../../../services/artifactPaths';
 import { selectArtifact } from '../../../store/slices/artifactSlice';
 import type { Artifact } from '../../../types/artifact';
 
