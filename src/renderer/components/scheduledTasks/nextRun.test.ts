@@ -79,3 +79,19 @@ test('returns null instead of guessing for unevaluable schedules', () => {
   expect(computeNextRunAtMs({ kind: 'cron', expr: '0 9 32 * *' }, from)).toBeNull();
   expect(computeNextRunAtMs({ kind: 'cron', expr: '0 9 * * *', tz: 'Not/AZone' }, from)).toBeNull();
 });
+
+test('follows daylight saving time in the schedule timezone', () => {
+  // New York switches to EDT on 2027-03-14; 09:00 local is 14:00 UTC before
+  // and 13:00 UTC after the change.
+  const beforeSwitch = Date.UTC(2027, 2, 13, 15, 0, 0);
+  expect(
+    computeNextRunAtMs({ kind: 'cron', expr: '0 9 * * *', tz: 'America/New_York' }, beforeSwitch),
+  ).toBe(Date.UTC(2027, 2, 14, 13, 0, 0));
+});
+
+test('accepts month and weekday names', () => {
+  const from = new Date(2026, 8, 14, 10, 0, 0).getTime(); // Monday
+  expect(computeNextRunAtMs({ kind: 'cron', expr: '0 9 * * FRI' }, from)).toBe(
+    new Date(2026, 8, 18, 9, 0, 0).getTime(),
+  );
+});
