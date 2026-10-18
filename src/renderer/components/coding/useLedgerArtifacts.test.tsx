@@ -32,8 +32,9 @@ const setup = (list: (scopeId: string) => Promise<unknown>, scopeId: string | nu
   vi.stubGlobal('electron', { artifacts: { list, onUpsert: () => () => {} } });
   const store = configureStore({ reducer: { artifact: artifactReducer } });
   store.dispatch(activateSessionArtifactView('lane-1'));
-  const wrapper = ({ children }: { children: React.ReactNode }) =>
-    React.createElement(Provider, { store }, children);
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <Provider store={store}>{children}</Provider>
+  );
   const view = renderHook(({ id }) => useLedgerArtifacts(id), {
     initialProps: { id: scopeId },
     wrapper,
