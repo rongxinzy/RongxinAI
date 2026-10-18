@@ -192,7 +192,7 @@ describe('PiAssistantTranscript', () => {
     expect(deleteMessage).not.toHaveBeenCalled();
   });
 
-  it('does not delete a placeholder when retry prior answer text exists', () => {
+  it('does not delete a placeholder when resolveStreamedContent has retry prior answer', () => {
     const deleteMessage = vi.fn(() => true);
     const row = {
       id: 'retry-1',

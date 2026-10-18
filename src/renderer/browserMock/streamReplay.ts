@@ -18,7 +18,7 @@ import glmToolTextTrace from './fixtures/streamReplay/glm-tool-text-jsonl.json';
 import retry503Trace from './fixtures/streamReplay/503-auto-retry.json';
 import synthetic20kTrace from './fixtures/streamReplay/synthetic-20000.json';
 
-export const PreviewStreamReplayQuery = {
+const PreviewStreamReplayQuery = {
   Fixture: 'previewStreamReplay',
   AutoStart: 'previewStreamAutoStart',
 } as const;
@@ -80,6 +80,9 @@ export interface StreamReplayController {
   readonly trace: StreamReplayTrace;
   begin(): void;
   readonly status: 'idle' | 'streaming' | 'complete';
+  readonly replayPhase: 'idle' | 'first' | 'retry' | 'complete';
+  readonly replayStartedAt: number;
+  readonly replayEndedAt: number;
 }
 
 declare global {
@@ -87,6 +90,9 @@ declare global {
     __previewStreamReplay?: StreamReplayController & {
       samples: Array<{ at: number; text: string; answerBubbles: number }>;
       longTasks: Array<{ startTime: number; duration: number }>;
+      replayPhase: 'idle' | 'first' | 'retry' | 'complete';
+      replayStartedAt: number;
+      replayEndedAt: number;
     };
   }
 }
@@ -141,6 +147,9 @@ export function installStreamReplayController(options: {
 }): StreamReplayController {
   const trace = getStreamReplayTrace(options.fixtureId);
   let status: 'idle' | 'streaming' | 'complete' = 'idle';
+  let replayPhase: 'idle' | 'first' | 'retry' | 'complete' = 'idle';
+  let replayStartedAt = 0;
+  let replayEndedAt = 0;
   let timers: ReturnType<typeof setTimeout>[] = [];
   const samples: Array<{ at: number; text: string; answerBubbles: number }> = [];
   const longTasks: Array<{ startTime: number; duration: number }> = [];
@@ -153,14 +162,16 @@ export function installStreamReplayController(options: {
   const sampleDom = (): void => {
     const answerNodes = [...document.querySelectorAll('.is-assistant .theme-message-body')];
     const last = answerNodes.at(-1);
-    const text =
-      last?.getAttribute('data-assistant-plaintext')?.trim() ?? last?.textContent?.trim() ?? '';
+    const text = (last as HTMLElement | undefined)?.innerText?.trim() ?? '';
     samples.push({ at: performance.now(), text, answerBubbles: answerNodes.length });
   };
 
   const begin = (): void => {
     if (status !== 'idle') return;
     status = 'streaming';
+    replayPhase = 'first';
+    replayStartedAt = performance.now();
+    replayEndedAt = 0;
     clearTimers();
     const session = options.getSession();
     if (session) {
@@ -175,10 +186,22 @@ export function installStreamReplayController(options: {
       elapsed += Math.max(8, entry.delayMs);
       timers.push(
         setTimeout(() => {
-          options.emitRecorded(entry.event as PiUiEvent);
+          const payload = entry.event as PiUiEvent;
+          if (
+            payload.type === 'message_update' &&
+            'metadata' in payload &&
+            payload.metadata &&
+            typeof payload.metadata === 'object' &&
+            (payload.metadata as { streamReopen?: boolean }).streamReopen === true
+          ) {
+            replayPhase = 'retry';
+          }
+          options.emitRecorded(payload);
           sampleDom();
           if (index === trace.events.length - 1) {
             status = 'complete';
+            replayPhase = 'complete';
+            replayEndedAt = performance.now();
             const current = options.getSession();
             if (current) {
               options.setSession({
@@ -200,6 +223,15 @@ export function installStreamReplayController(options: {
     begin,
     get status() {
       return status;
+    },
+    get replayPhase() {
+      return replayPhase;
+    },
+    get replayStartedAt() {
+      return replayStartedAt;
+    },
+    get replayEndedAt() {
+      return replayEndedAt;
     },
   };
 

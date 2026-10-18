@@ -163,8 +163,6 @@ export class PiAssistantTranscript {
     if (existing.content.length > 0) return;
     const streamed = this.lastStreamedContentByMessageId.get(messageId) ?? '';
     if (streamed.length > 0) return;
-    const inMemory = active.answerText || active.retryPriorAnswer;
-    if (inMemory.length > 0) return;
     if (!store.deleteMessage(sessionId, messageId)) return;
     this.lastStreamedContentByMessageId.delete(messageId);
     this.unnoteFinalized(sessionId, messageId);
@@ -262,8 +260,8 @@ export class PiAssistantTranscript {
         }
         this.flushPendingStoreUpdate(sessionId, emptyId);
         this.flushPendingMessageUpdate(sessionId, emptyId);
-        this.clearThrottleMapsForMessage(emptyId);
         this.removeEmptyAnswerPlaceholder(sessionId, emptyId, active);
+        this.clearThrottleMapsForMessage(emptyId);
         active.assistantMessageId = null;
       }
       return;
@@ -349,7 +347,6 @@ export class PiAssistantTranscript {
         }
         continue;
       }
-      this.clearThrottleMapsForMessage(entry.messageId);
       if (entry.kind === 'answer' && !content.trim()) {
         const resolved = this.resolveStreamedContent(entry.messageId, active, 'answer');
         if (!resolved.trim()) {
@@ -358,8 +355,10 @@ export class PiAssistantTranscript {
             active.assistantMessageId = null;
           }
         }
+        this.clearThrottleMapsForMessage(entry.messageId);
         continue;
       }
+      this.clearThrottleMapsForMessage(entry.messageId);
       if (!this.host.getStore()) continue;
       const existing = this.host
         .getStore()

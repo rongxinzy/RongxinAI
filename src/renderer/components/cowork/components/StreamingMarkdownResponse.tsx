@@ -15,7 +15,7 @@ import { useStreamingTextSegments } from '@shared/components/ai-elements/streami
 
 import type { StreamingTextSegments } from '@shared/components/ai-elements/streamingText';
 import type { ComponentProps, MouseEvent } from 'react';
-import { useContext, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { StreamdownContext } from 'streamdown';
 
 import {
@@ -211,11 +211,9 @@ export const StreamingMarkdownResponse = ({
 }) => {
   const { committed, tail }: StreamingTextSegments = useStreamingTextSegments(content, isStreaming);
   const resolve = useMemo(() => resolveLocalFilePath, [resolveLocalFilePath]);
-  const deferredContent = useDeferredValue(content);
-  const isFinalizing = !isStreaming && deferredContent !== content;
 
   // 流结束后整段走完整 Markdown（含代码高亮 / 本地路径检查）。
-  if (!isStreaming && !isFinalizing) {
+  if (!isStreaming) {
     return <StaticMarkdownBlock content={content} resolveLocalFilePath={resolve} />;
   }
 
@@ -228,11 +226,11 @@ export const StreamingMarkdownResponse = ({
   return (
     <div className="flex flex-col gap-4">
       {committed ? (
-        isStreaming || isFinalizing ? (
-          <StreamingPlainTail content={committed} />
-        ) : (
-          <StaticMarkdownBlock content={committed} resolveLocalFilePath={resolve} />
-        )
+        <StaticMarkdownBlock
+          content={committed}
+          resolveLocalFilePath={resolve}
+          skipPathExistsCheck
+        />
       ) : null}
       {tail ? <StreamingPlainTail content={tail} /> : null}
     </div>

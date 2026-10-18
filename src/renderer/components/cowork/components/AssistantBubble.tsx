@@ -36,10 +36,7 @@ export const AssistantBubble: React.FC<{
   return (
     <div className="py-1 focus:outline-none">
       <Message from="assistant">
-        <MessageContent
-          data-assistant-plaintext={rawContent}
-          data-assistant-streaming={isStreaming ? 'true' : 'false'}
-        >
+        <MessageContent>
           {/* 2026/09/20 lixiang  下传本地路径解析，使盘符路径可点打开（issue #805） */}
           <StreamingMarkdownResponse
             content={rawContent}

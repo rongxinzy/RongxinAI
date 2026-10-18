@@ -43,6 +43,7 @@ describe('PiRuntimeAdapter', () => {
     let errors: CoworkError[];
     let completes: string[];
     let emittedMessages: Array<Record<string, unknown>>;
+    let messageUpdates: Array<{ content?: string; metadata?: Record<string, unknown> }>;
 
     const failedAttempt = (errorMessage: string) => {
       listener!({
@@ -92,8 +93,15 @@ describe('PiRuntimeAdapter', () => {
       errors = [];
       completes = [];
       emittedMessages = [];
+      messageUpdates = [];
       adapter.on('message', (_sid, message) =>
         emittedMessages.push(message as unknown as Record<string, unknown>),
+      );
+      adapter.on('messageUpdate', (_sid, _messageId, content, metadata) =>
+        messageUpdates.push({
+          content: typeof content === 'string' ? content : undefined,
+          metadata: metadata as Record<string, unknown>,
+        }),
       );
       adapter.on('error', (_sid, error) => errors.push(error as CoworkError));
       adapter.on('complete', sessionId => completes.push(sessionId));
@@ -144,6 +152,9 @@ describe('PiRuntimeAdapter', () => {
       failedAttempt('503 Service Unavailable');
       listener!({ type: 'auto_retry_start', attempt: 1 });
       listener!({ type: 'turn_start' });
+      const reopenUpdate = messageUpdates.find(update => update.metadata?.streamReopen === true);
+      expect(reopenUpdate?.content).toContain('partial answer content');
+
       listener!({
         type: 'message_update',
         message: {

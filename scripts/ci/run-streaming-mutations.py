@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 TESTS = [
@@ -28,6 +29,7 @@ TESTS = [
 TE = 'src/main/libs/agentEngine/piRuntimeTurnEvents.ts'
 TR = 'src/main/libs/agentEngine/piAssistantTranscript.ts'
 LC = 'src/main/libs/agentEngine/piRuntimeSessionLifecycle.ts'
+REC = 'src/main/libs/agentEngine/piRuntimeTurnRecovery.ts'
 
 # Defensive duplicate guards — surviving mutations here do not fail CI.
 ALLOWLIST_SURVIVORS: tuple[str, ...] = (
@@ -116,9 +118,16 @@ M: dict[str, list[tuple[str, str, str]]] = {
     ],
     'M16 flushPendingError does not clear flag': [
         (
-            'src/main/libs/agentEngine/piRuntimeTurnRecovery.ts',
+            REC,
             '    active.pendingError = null;\n    active.retryStreamReusePending = false;\n',
             '    active.pendingError = null;\n',
+        ),
+    ],
+    'M17 flushPendingError no finalize when no answer text': [
+        (
+            REC,
+            '    } else {\n      this.host.transcript.closeIdlePlaceholders(sessionId, active, { finalize: true });\n    }',
+            '    }',
         ),
     ],
     'M18 stop path does not clear retry flag (defensive duplicate)': [
@@ -164,9 +173,6 @@ M: dict[str, list[tuple[str, str, str]]] = {
     'M24b empty placeholder guard: streamed content length': [
         (TR, '    if (streamed.length > 0) return;\n', ''),
     ],
-    'M24c empty placeholder guard: in-memory answer text': [
-        (TR, '    if (inMemory.length > 0) return;\n', ''),
-    ],
 }
 
 
@@ -182,24 +188,37 @@ def is_allowlisted(name: str) -> bool:
     return any(name.startswith(prefix) for prefix in ALLOWLIST_SURVIVORS)
 
 
+def run_vitest() -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ['bun', 'run', 'test', '--', *TESTS],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=900,
+    )
+
+
 def main() -> int:
     args = [arg for arg in sys.argv[1:] if arg != '--ci-gate']
     ci_gate = '--ci-gate' in sys.argv
     only = args
     results: dict[str, object] = {}
+
+    baseline = run_vitest()
+    baseline_out = baseline.stdout + baseline.stderr
+    if baseline.returncode != 0:
+        print('Baseline vitest subset failed before mutations:', flush=True)
+        print(baseline_out[-2000:], flush=True)
+        return 1
+    print('Baseline vitest subset passed', flush=True)
+
     for name, patches in M.items():
         if only and not any(name.startswith(o) for o in only):
             continue
         try:
             for path, old, new in patches:
                 sub(path, old, new)
-            proc = subprocess.run(
-                ['bun', 'x', 'vitest', 'run', *TESTS],
-                cwd=ROOT,
-                capture_output=True,
-                text=True,
-                timeout=900,
-            )
+            proc = run_vitest()
             out = proc.stdout + proc.stderr
             fails = sorted(set(re.findall(r'FAIL\s+(\S+)\s+>\s*(.*)', out)))
             summ = re.findall(r'Tests\s+(.*)', out)
@@ -217,7 +236,7 @@ def main() -> int:
             subprocess.run(['git', 'checkout', '--', *restore_paths], cwd=ROOT, check=False)
         print(name, json.dumps(results[name])[:700], flush=True)
 
-    out_path = os.path.join(ROOT, 'scripts/ci/streaming-mutations-results.json')
+    out_path = os.path.join(tempfile.gettempdir(), 'streaming-mutations-results.json')
     with open(out_path, 'w', encoding='utf-8') as handle:
         json.dump(results, handle, indent=1)
     print(f'Wrote {out_path}', flush=True)

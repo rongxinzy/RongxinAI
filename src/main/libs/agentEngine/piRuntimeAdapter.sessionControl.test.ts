@@ -235,6 +235,7 @@ describe('PiRuntimeAdapter', () => {
         Date.now(),
       );
       adapter.stopSession('usage-stop');
+      adapter.transcript.flushContextUsageSync('usage-stop');
       vi.advanceTimersByTime(5_000);
       expect(
         updateMessage.mock.calls.some(

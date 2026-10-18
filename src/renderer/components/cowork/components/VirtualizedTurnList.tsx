@@ -53,7 +53,7 @@ export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListHandle,
   VirtualizedTurnListProps
 >(({ turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
-  const { scrollRef, stopScroll } = useStickToBottomContext();
+  const { scrollRef } = useStickToBottomContext();
   const hasPositionedInitialTailRef = useRef(false);
   const followedTailEdgesRef = useRef<{ first?: string; last?: string } | null>(null);
   const shouldFollowInitialTailRef = useRef(true);
@@ -192,7 +192,6 @@ export const VirtualizedTurnList = React.forwardRef<
 
     const stopFollowingInitialTail = () => {
       shouldFollowInitialTailRef.current = false;
-      stopScroll();
     };
     const handleWheel = (event: WheelEvent) => {
       if (event.deltaY < 0) stopFollowingInitialTail();
@@ -202,18 +201,15 @@ export const VirtualizedTurnList = React.forwardRef<
         stopFollowingInitialTail();
       }
     };
+
     scrollElement.addEventListener('wheel', handleWheel, { passive: true });
-    scrollElement.addEventListener('touchstart', stopFollowingInitialTail, { passive: true });
-    scrollElement.addEventListener('pointerdown', stopFollowingInitialTail, { passive: true });
     ownerDocument.addEventListener('keydown', handleKeyDown);
 
     return () => {
       scrollElement.removeEventListener('wheel', handleWheel);
-      scrollElement.removeEventListener('touchstart', stopFollowingInitialTail);
-      scrollElement.removeEventListener('pointerdown', stopFollowingInitialTail);
       ownerDocument.removeEventListener('keydown', handleKeyDown);
     };
-  }, [scrollRef, stopScroll]);
+  }, [scrollRef]);
 
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;

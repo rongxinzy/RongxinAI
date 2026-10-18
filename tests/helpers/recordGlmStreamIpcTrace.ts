@@ -3,7 +3,6 @@
  * Pi events) through the production streaming harness.
  */
 import '../../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
-import { setupPiRuntimeAdapterSuite } from '../../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import {
   buildCorpus,
   buildTextTurn,
@@ -23,12 +22,12 @@ export interface RecordedStreamReplayTrace {
   readonly markers: StreamReplayMarkers;
 }
 
-export interface RecordedStreamReplayEvent {
+interface RecordedStreamReplayEvent {
   readonly delayMs: number;
   readonly event: PiUiEvent;
 }
 
-export interface StreamReplayMarkers {
+interface StreamReplayMarkers {
   readonly thinkingBeforeAnswer: boolean;
   readonly toolBeforeAnswer: boolean;
   readonly toolNames: readonly string[];
@@ -182,11 +181,6 @@ export async function recordSyntheticTextIpcTrace(
     turn.events,
     turn.finalText,
   );
-}
-
-/** Vitest suite hook — call once from codegen tests. */
-export function installStreamReplayRecordingSuite(): void {
-  setupPiRuntimeAdapterSuite();
 }
 
 export const scripted503RetryPiEvents: PiStreamEvent[] = [

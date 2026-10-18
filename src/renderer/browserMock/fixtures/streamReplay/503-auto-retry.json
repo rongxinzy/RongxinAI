@@ -2,6 +2,7 @@
   "sessionId": "preview-stream-503-retry",
   "fixture": "503-auto-retry",
   "expectedFinalText": "Recovered",
+  "markers": { "thinkingBeforeAnswer": false, "toolBeforeAnswer": false, "toolNames": [] },
   "events": [
     {
       "delayMs": 1,
@@ -9,15 +10,16 @@
         "type": "message",
         "sessionId": "preview-stream-503-retry",
         "message": {
-          "id": "fcbc6ec4-d222-4e5d-9ec4-7cc4df52245f",
+          "id": "00000000-0000-4000-8000-000000000001",
           "type": "user",
           "content": "Hi",
-          "timestamp": 1792296155364
+          "timestamp": 1700000000001,
+          "metadata": null
         },
         "protocolVersion": 1,
-        "eventId": "8f351b1c-6996-4a9b-8fd5-95c9b43e6606",
+        "eventId": "00000000-0000-4000-8000-000000000002",
         "sequence": 1,
-        "emittedAt": 1792296155364
+        "emittedAt": 1700000000002
       }
     },
     {
@@ -26,19 +28,16 @@
         "type": "message",
         "sessionId": "preview-stream-503-retry",
         "message": {
-          "id": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+          "id": "00000000-0000-4000-8000-000000000003",
           "type": "assistant",
           "content": "Part",
-          "timestamp": 1792296155380,
-          "metadata": {
-            "isStreaming": true,
-            "isFinal": false
-          }
+          "timestamp": 1700000000003,
+          "metadata": { "isStreaming": true, "isFinal": false }
         },
         "protocolVersion": 1,
-        "eventId": "ce014fc9-92ed-407f-8582-f04580aea5d0",
+        "eventId": "00000000-0000-4000-8000-000000000004",
         "sequence": 2,
-        "emittedAt": 1792296155380
+        "emittedAt": 1700000000004
       }
     },
     {
@@ -46,15 +45,12 @@
       "event": {
         "type": "stream_part",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
-        "chunk": {
-          "type": "text-start",
-          "id": "cc90da234114404e"
-        },
+        "messageId": "00000000-0000-4000-8000-000000000003",
+        "chunk": { "type": "text-start", "id": "00000000-0000-4000-8000-000000000005" },
         "protocolVersion": 1,
-        "eventId": "b8b7a905-a4c5-4886-80a5-76382db2523a",
+        "eventId": "00000000-0000-4000-8000-000000000006",
         "sequence": 3,
-        "emittedAt": 1792296155380
+        "emittedAt": 1700000000005
       }
     },
     {
@@ -62,16 +58,16 @@
       "event": {
         "type": "stream_part",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "messageId": "00000000-0000-4000-8000-000000000003",
         "chunk": {
           "type": "text-delta",
-          "id": "cc90da234114404e",
+          "id": "00000000-0000-4000-8000-000000000005",
           "delta": "Part"
         },
         "protocolVersion": 1,
-        "eventId": "f5849328-b51f-4683-90e2-311605788747",
+        "eventId": "00000000-0000-4000-8000-000000000007",
         "sequence": 4,
-        "emittedAt": 1792296155396
+        "emittedAt": 1700000000006
       }
     },
     {
@@ -79,15 +75,12 @@
       "event": {
         "type": "stream_part",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
-        "chunk": {
-          "type": "text-end",
-          "id": "cc90da234114404e"
-        },
+        "messageId": "00000000-0000-4000-8000-000000000003",
+        "chunk": { "type": "text-end", "id": "00000000-0000-4000-8000-000000000005" },
         "protocolVersion": 1,
-        "eventId": "561d4521-d2ae-4f10-8c96-2bb497c25588",
+        "eventId": "00000000-0000-4000-8000-000000000008",
         "sequence": 5,
-        "emittedAt": 1792296155396
+        "emittedAt": 1700000000007
       }
     },
     {
@@ -95,16 +88,13 @@
       "event": {
         "type": "message_update",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "messageId": "00000000-0000-4000-8000-000000000003",
         "content": "Part",
-        "metadata": {
-          "isStreaming": false,
-          "isFinal": true
-        },
+        "metadata": { "isStreaming": false, "isFinal": true },
         "protocolVersion": 1,
-        "eventId": "51aeca97-fdf7-48d3-ac8a-1fd31f0f1bcc",
+        "eventId": "00000000-0000-4000-8000-000000000009",
         "sequence": 6,
-        "emittedAt": 1792296155396
+        "emittedAt": 1700000000008
       }
     },
     {
@@ -112,17 +102,13 @@
       "event": {
         "type": "message_update",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "messageId": "00000000-0000-4000-8000-000000000003",
         "content": "Part",
-        "metadata": {
-          "isStreaming": true,
-          "isFinal": false,
-          "streamReopen": true
-        },
+        "metadata": { "isStreaming": true, "isFinal": false, "streamReopen": true },
         "protocolVersion": 1,
-        "eventId": "68aff015-9385-4903-aaa1-50a4e5e5af98",
+        "eventId": "00000000-0000-4000-8000-000000000010",
         "sequence": 7,
-        "emittedAt": 1792296155444
+        "emittedAt": 1700000000009
       }
     },
     {
@@ -130,15 +116,12 @@
       "event": {
         "type": "stream_part",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
-        "chunk": {
-          "type": "text-start",
-          "id": "44443ba8e5c727ff"
-        },
+        "messageId": "00000000-0000-4000-8000-000000000003",
+        "chunk": { "type": "text-start", "id": "00000000-0000-4000-8000-000000000011" },
         "protocolVersion": 1,
-        "eventId": "2e6889be-1a2a-4362-85a8-2a1140cdbeb7",
+        "eventId": "00000000-0000-4000-8000-000000000012",
         "sequence": 8,
-        "emittedAt": 1792296155460
+        "emittedAt": 1700000000010
       }
     },
     {
@@ -146,16 +129,16 @@
       "event": {
         "type": "stream_part",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "messageId": "00000000-0000-4000-8000-000000000003",
         "chunk": {
           "type": "text-delta",
-          "id": "44443ba8e5c727ff",
+          "id": "00000000-0000-4000-8000-000000000011",
           "delta": "Reco"
         },
         "protocolVersion": 1,
-        "eventId": "a6fc50eb-a1e9-4541-b568-7f454bffce55",
+        "eventId": "00000000-0000-4000-8000-000000000013",
         "sequence": 9,
-        "emittedAt": 1792296155476
+        "emittedAt": 1700000000011
       }
     },
     {
@@ -163,16 +146,16 @@
       "event": {
         "type": "stream_part",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "messageId": "00000000-0000-4000-8000-000000000003",
         "chunk": {
           "type": "text-delta",
-          "id": "44443ba8e5c727ff",
+          "id": "00000000-0000-4000-8000-000000000011",
           "delta": "vered"
         },
         "protocolVersion": 1,
-        "eventId": "7352f8f2-8f05-442a-8785-2f5ac354d678",
+        "eventId": "00000000-0000-4000-8000-000000000014",
         "sequence": 10,
-        "emittedAt": 1792296155492
+        "emittedAt": 1700000000012
       }
     },
     {
@@ -180,15 +163,12 @@
       "event": {
         "type": "stream_part",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
-        "chunk": {
-          "type": "text-end",
-          "id": "44443ba8e5c727ff"
-        },
+        "messageId": "00000000-0000-4000-8000-000000000003",
+        "chunk": { "type": "text-end", "id": "00000000-0000-4000-8000-000000000011" },
         "protocolVersion": 1,
-        "eventId": "582cc6e2-2148-4746-b921-280788e1ebb1",
+        "eventId": "00000000-0000-4000-8000-000000000015",
         "sequence": 11,
-        "emittedAt": 1792296155492
+        "emittedAt": 1700000000013
       }
     },
     {
@@ -196,16 +176,13 @@
       "event": {
         "type": "message_update",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "messageId": "00000000-0000-4000-8000-000000000003",
         "content": "Recovered",
-        "metadata": {
-          "isStreaming": false,
-          "isFinal": true
-        },
+        "metadata": { "isStreaming": false, "isFinal": true },
         "protocolVersion": 1,
-        "eventId": "35bff20d-889d-4cc1-b1b8-37fb87c760d8",
+        "eventId": "00000000-0000-4000-8000-000000000016",
         "sequence": 12,
-        "emittedAt": 1792296155492
+        "emittedAt": 1700000000014
       }
     },
     {
@@ -213,7 +190,7 @@
       "event": {
         "type": "message_update",
         "sessionId": "preview-stream-503-retry",
-        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "messageId": "00000000-0000-4000-8000-000000000003",
         "content": "",
         "metadata": {
           "isStreaming": false,
@@ -222,9 +199,9 @@
           "metadataOnly": true
         },
         "protocolVersion": 1,
-        "eventId": "1a229b44-d50b-45cd-8178-fc221441a6a1",
+        "eventId": "00000000-0000-4000-8000-000000000017",
         "sequence": 13,
-        "emittedAt": 1792296155540
+        "emittedAt": 1700000000015
       }
     },
     {
@@ -233,15 +210,10 @@
         "type": "completed",
         "sessionId": "preview-stream-503-retry",
         "protocolVersion": 1,
-        "eventId": "d159ad25-8db2-4c8b-8647-5269b2dbe303",
+        "eventId": "00000000-0000-4000-8000-000000000018",
         "sequence": 14,
-        "emittedAt": 1792296155540
+        "emittedAt": 1700000000016
       }
     }
-  ],
-  "markers": {
-    "thinkingBeforeAnswer": false,
-    "toolBeforeAnswer": false,
-    "toolNames": []
-  }
+  ]
 }
