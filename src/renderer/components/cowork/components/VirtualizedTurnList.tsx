@@ -188,18 +188,6 @@ export const VirtualizedTurnList = React.forwardRef<
     const scrollElement = getScrollElement();
     if (!scrollElement) return;
 
-    const previousOverflowAnchor = scrollElement.style.overflowAnchor;
-    scrollElement.style.overflowAnchor = 'none';
-
-    return () => {
-      scrollElement.style.overflowAnchor = previousOverflowAnchor;
-    };
-  }, [getScrollElement]);
-
-  useLayoutEffect(() => {
-    const scrollElement = getScrollElement();
-    if (!scrollElement) return;
-
     const rows = scrollElement.querySelectorAll<HTMLElement>('[data-turn-key]');
     for (const row of rows) {
       const key = row.dataset.turnKey;
