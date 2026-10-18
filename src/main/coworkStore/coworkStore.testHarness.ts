@@ -9,7 +9,7 @@
 import BetterSqlite3 from 'better-sqlite3';
 
 import { CoworkSessionSource } from '../../shared/cowork/constants';
-import { initializeCoworkArtifactIndexSchema } from '../coworkArtifactIndex';
+import { initializeArtifactLedgerSchema } from '../artifactLedger/schema';
 import { CoworkStore } from '../coworkStore';
 
 export interface CoworkStoreTestHarness {
@@ -108,7 +108,7 @@ export function createCoworkStoreHarness(): CoworkStoreTestHarness {
     );
   `);
 
-  initializeCoworkArtifactIndexSchema(db);
+  initializeArtifactLedgerSchema(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS agents (

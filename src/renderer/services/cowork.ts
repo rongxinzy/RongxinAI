@@ -13,7 +13,7 @@ import {
 } from '../../shared/cowork/constants';
 import { store } from '../store';
 import { setCurrentAgentId } from '../store/slices/agentSlice';
-import { clearSessionArtifacts } from '../store/slices/artifactSlice';
+import { clearSessionArtifacts, addArtifact } from '../store/slices/artifactSlice';
 import {
   addMessage,
   addSession,
@@ -173,6 +173,24 @@ class CoworkService {
     this.streamListenerCleanups.push(
       cowork.onStreamUiEvent(event => pipeline?.handleUiEvent(event)),
     );
+
+    // Event-time artifact ledger upserts: recorded by the main process at
+    // tool/diff time and dispatched through the same reducer the persisted
+    // seed and the renderer detectors use, so delivery paths stay idempotent.
+    const artifactsApi = window.electron?.artifacts;
+    if (typeof artifactsApi?.onUpsert === 'function') {
+      this.streamListenerCleanups.push(
+        artifactsApi.onUpsert(({ scopeId, artifact }) => {
+          store.dispatch(
+            addArtifact({
+              sessionId: scopeId,
+              artifact: { ...artifact, sessionId: scopeId },
+              reveal: artifact.declared && artifact.role === 'deliverable',
+            }),
+          );
+        }),
+      );
+    }
     void recovery
       .bootstrap()
       .catch(error =>

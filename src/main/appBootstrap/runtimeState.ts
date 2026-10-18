@@ -30,6 +30,7 @@ import type { ZhiYuanEngramAdapter } from '../memory/zhiyuanEngramAdapter';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import type { McpStore } from '../mcpStore';
 import type { CoworkStore } from '../coworkStore';
+import type { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import type { SkillManager } from '../skillManager';
 import type { SqliteStore } from '../sqliteStore';
 import type { TodoReminderScheduler } from '../todo/reminderScheduler';
@@ -44,6 +45,7 @@ import type { WorkbenchTaskService } from '../workbenchTask/taskService';
 export const rt = {
   store: null as SqliteStore | null,
   coworkStore: null as CoworkStore | null,
+  artifactLedger: null as ArtifactLedger | null,
   piRuntimeAdapter: null as PiRuntimeAdapter | null,
   workbenchTaskService: null as WorkbenchTaskService | null,
   codingRoomService: null as CodingRoomService | null,

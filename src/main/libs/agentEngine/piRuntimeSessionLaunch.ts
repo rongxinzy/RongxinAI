@@ -64,6 +64,7 @@ import {
   type PiResourceState,
 } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
+import { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
 import type { PiStartOptions } from './piRuntimeTypes';
 
 // Pi's bash tool inherits the main-process environment. Initialize the
@@ -468,6 +469,12 @@ export async function startPiRuntimeSession(
       workbenchRunId,
       workbenchContract,
       workspaceRoot,
+      artifactRecorder: createArtifactRecorderForSession(
+        host,
+        sessionId,
+        workspaceRoot,
+        resourceState,
+      ),
       settingsManager,
       approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
       unattended: resourceState.unattended,
@@ -587,4 +594,19 @@ export async function startPiRuntimeSession(
       host.initializingSessions.delete(sessionId);
     }
   }
+}
+
+/** Recorder factory: artifact capture is active only for Work-mode sessions
+ * with file tools enabled, a workspace root, and a host-provided ledger. */
+function createArtifactRecorderForSession(
+  host: PiRuntimeAdapterHost,
+  sessionId: string,
+  workspaceRoot: string,
+  resourceState: PiResourceState,
+): ArtifactRecorder | null {
+  if (resourceState.chatMode || !resourceState.fileToolsEnabled) return null;
+  if (!workspaceRoot) return null;
+  const ledger = host.getArtifactLedger();
+  if (!ledger) return null;
+  return new ArtifactRecorder({ sessionId, workspaceRoot, ledger });
 }

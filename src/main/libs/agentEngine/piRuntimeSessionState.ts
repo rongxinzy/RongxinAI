@@ -13,6 +13,7 @@ import type { HarnessModelProfileInput } from '../../../shared/harness';
 import type { WorkbenchApprovalMode, WorkbenchTaskContract } from '../../../shared/workbenchTask';
 import type { ModelCapabilities, ProviderModelPiCompaction } from '../../../shared/providers';
 import { PiAgentLoopController } from './piAgentLoop';
+import type { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
 import {
   buildPiBackgroundCompletionContext,
   type PiBackgroundCompletionResult,
@@ -220,6 +221,9 @@ export interface ActivePiSession {
   workbenchRunId: string | null;
   workbenchContract: WorkbenchTaskContract;
   workspaceRoot: string;
+  /** Event-time artifact capture for this session (null in chat mode or when
+   * the host exposes no ledger). */
+  artifactRecorder: ArtifactRecorder | null;
   settingsManager: PiSettingsManager | null;
   approvalMode: WorkbenchApprovalMode;
   unattended: boolean;

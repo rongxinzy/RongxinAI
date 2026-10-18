@@ -37,7 +37,8 @@ export interface Artifact {
   messageId: string;
   sessionId: string;
   taskId?: string;
-  runId?: string;
+  runId?: string | null;
+  toolCallId?: string | null;
   type: ArtifactType;
   title: string;
   content: string;

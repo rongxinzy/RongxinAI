@@ -188,6 +188,9 @@ export function buildPiSessionCustomTools(
               });
             }
           : undefined,
+        awaitPendingWrite: filePath =>
+          host.activeSessions.get(sessionId)?.artifactRecorder?.awaitPendingWrite(filePath) ??
+          Promise.resolve(false),
       }),
     );
   }

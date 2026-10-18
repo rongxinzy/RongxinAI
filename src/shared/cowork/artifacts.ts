@@ -27,6 +27,10 @@ export type CoworkArtifactRole = (typeof CoworkArtifactRole)[keyof typeof Cowork
 export interface CoworkPersistedArtifact {
   id: string;
   messageId: string;
+  /** Producing tool call, when known — anchors the preview card. */
+  toolCallId?: string | null;
+  /** Workbench run that produced the artifact, when known. */
+  runId?: string | null;
   type: CoworkArtifactType;
   title: string;
   content: string;
