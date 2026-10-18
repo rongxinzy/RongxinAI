@@ -345,6 +345,24 @@ describe('LlamaCppRouterOrchestrator', () => {
     expect(routerCalls.map(call => call.url)).toContain('/models/load');
     expect(gatewayLeases).toEqual(['smol']);
   });
+
+  test('the gateway stays loopback-only even when the config asks for LAN', async () => {
+    const lanOrchestrator = createOrchestrator({
+      gatewayAccessMode: 'lan',
+      listenHost: '0.0.0.0',
+    });
+    try {
+      await lanOrchestrator.status();
+      // The gateway URL is the loopback listener itself.
+      expect(lanOrchestrator.gatewayBaseUrl()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/v1$/);
+      // A LAN-configured request without a bearer token still reaches the
+      // loopback gateway: this listener never authenticates.
+      const response = await fetch(`${lanOrchestrator.gatewayBaseUrl()}/models`);
+      expect(response.ok).toBe(true);
+    } finally {
+      await lanOrchestrator.stopService().catch(() => undefined);
+    }
+  });
 });
 
 function modelsFixture(

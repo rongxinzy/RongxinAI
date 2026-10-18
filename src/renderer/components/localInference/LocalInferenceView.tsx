@@ -299,6 +299,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     draftKeepRunningOnAppQuit,
     draftPort,
     draftLanToken,
+    lanGatewayPort,
     exampleModelName,
     setDraftKeepRunningOnAppQuit,
     setDraftPort,
@@ -709,6 +710,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         keepRunningOnAppQuit={draftKeepRunningOnAppQuit}
         willRestartOnSave={isRunning}
         port={draftPort}
+        lanGatewayPort={lanGatewayPort}
         lanToken={draftLanToken}
         exampleModelName={exampleModelName}
         onAllowLanAccessChange={setDraftAllowLanAccess}

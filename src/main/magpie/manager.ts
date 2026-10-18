@@ -27,6 +27,7 @@ import {
   magpieReapplyConnectedAgents,
 } from './agentControl';
 import { isolatedMagpieEnvironment, prepareMagpieHome } from './environment';
+import { syncMagpieLanAccessKey } from './lanAccess';
 import { resolveMagpieGatewayPort, type MagpieGatewayPortStore } from './gatewayPort';
 import { MAGPIE_VERSION, verifyMagpieBinary } from './integrity';
 import type { MagpieAgentConnectPreview } from '../../shared/magpie/types';
@@ -73,6 +74,12 @@ export interface MagpieManagerOptions {
   parseCatalog?: typeof parseMagpieCatalog;
   serviceEnabled?: { read(): boolean; write(enabled: boolean): void };
   subscriptionAccounts?: { read(): boolean; write(enabled: boolean): void | Promise<void> };
+  /**
+   * Local-inference LAN access: when on, the gateway binds 0.0.0.0 (non-loopback
+   * requests then require a gateway key) and the LAN token is imported as the
+   * `zhiyuan-lan` key after each start. `enabled` alone must not run the service.
+   */
+  lanAccess?: { read(): { enabled: boolean; lanToken: string | null } };
 }
 /** Owns exactly one verified, isolated upstream process. Never attaches to existing gateways. */
 export class MagpieManager {
@@ -93,6 +100,7 @@ export class MagpieManager {
   private recentErrors: { timestamp: number; message: string; providerId?: string }[] = [];
   private cachedActiveProviderCount = 0;
   private reapplyErrors = new Map<string, string>();
+  private lanAccessChange?: Promise<MagpieStatus>;
   constructor(private readonly options: MagpieManagerOptions) {}
   status(): MagpieStatus {
     return {
@@ -111,6 +119,13 @@ export class MagpieManager {
       (this.options.serviceEnabled?.read() ?? this.memoryEnabled)
     );
   }
+  private isLanAccessEnabled(): boolean {
+    return this.options.lanAccess?.read().enabled === true;
+  }
+  /** The process may run for the model service or because LAN access needs it. */
+  private shouldRun(): boolean {
+    return this.isServiceEnabled() || this.isLanAccessEnabled();
+  }
   start(): Promise<MagpieStatus> {
     try {
       this.options.serviceEnabled?.write(true);
@@ -123,9 +138,7 @@ export class MagpieManager {
   }
   private startOwned(): Promise<MagpieStatus> {
     if (this.stopping)
-      return this.stopping.then(() =>
-        this.isServiceEnabled() ? this.startOwned() : this.status(),
-      );
+      return this.stopping.then(() => (this.shouldRun() ? this.startOwned() : this.status()));
     if (this.pending) return this.pending;
     if (this.state.state === 'running') return Promise.resolve(this.status());
     this.abort = new AbortController();
@@ -153,6 +166,7 @@ export class MagpieManager {
       this.webPort = await port();
       while (this.webPort === gatewayPort) this.webPort = await port();
       this.webKey = randomBytes(32).toString('hex');
+      const lanAccessEnabled = this.isLanAccessEnabled();
       signal.throwIfAborted();
       const child = (this.options.spawn ?? spawn)(
         binary,
@@ -168,6 +182,7 @@ export class MagpieManager {
             this.webKey,
             this.options.environment,
             this.options.subscriptionAccounts?.read() === true,
+            lanAccessEnabled,
           ),
         },
       );
@@ -203,6 +218,7 @@ export class MagpieManager {
           if (data.name === 'magpie' && data.version === MAGPIE_VERSION && web.ok && !exited) {
             this.state = { state: 'running', version: MAGPIE_VERSION, gatewayUrl };
             void this.reapplyManagedAgentsAfterStart();
+            if (lanAccessEnabled) void this.syncLanAccessKeyAfterStart();
             return this.status();
           }
         } catch {
@@ -281,14 +297,69 @@ export class MagpieManager {
   }
   /** Only a previously explicit, persisted enable permits lazy startup or one recovery attempt. */
   async ensureRunning(): Promise<MagpieStatus> {
-    if (!this.isServiceEnabled())
-      throw new Error('Enable unified model management in settings first.');
+    if (!this.shouldRun()) throw new Error('Enable unified model management in settings first.');
     const status = await this.startOwned();
-    if (status.state !== 'running' || !status.gatewayUrl || !this.isServiceEnabled())
+    if (status.state !== 'running' || !status.gatewayUrl || !this.shouldRun())
       throw new Error(
         status.error || 'The model service could not start. Retry in model settings.',
       );
     return status;
+  }
+
+  /**
+   * Applies a local-inference LAN toggle change: MAGPIE_ADDR is read only at
+   * process start, so the owned process restarts when the flag flips. The
+   * service-enabled preference itself is never rewritten.
+   */
+  onLanAccessChanged(): Promise<MagpieStatus> {
+    if (this.subscriptionChange)
+      return Promise.reject(new Error('Subscription settings are already changing'));
+    if (this.lanAccessChange) return this.lanAccessChange;
+    if (this.state.state === 'starting') return this.pending ?? Promise.resolve(this.status());
+    const run = (async (): Promise<MagpieStatus> => {
+      const shouldRun = this.shouldRun();
+      if (this.state.state === 'running' && !shouldRun) {
+        // LAN was the only reason the process was running.
+        return await this.shutdown();
+      }
+      if (this.state.state === 'running') {
+        // The env flip needs a restart even when the token itself is unchanged.
+        if (this.isLanAccessEnabled()) await this.syncLanAccessKeyAfterStart();
+        return await this.stopOwned().then(() => this.startOwned());
+      }
+      if (shouldRun) return await this.startOwned();
+      return this.status();
+    })().finally(() => {
+      this.lanAccessChange = undefined;
+    });
+    this.lanAccessChange = run;
+    return run;
+  }
+
+  /** Best-effort key import after the gateway is up; failures surface in diagnostics. */
+  private async syncLanAccessKeyAfterStart(): Promise<void> {
+    const lanToken = this.options.lanAccess?.read().lanToken;
+    if (!lanToken) return;
+    try {
+      await this.syncLanAccessKey(lanToken);
+    } catch (error) {
+      console.warn('[Magpie] failed to import the LAN access key:', error);
+      this.recordError('LAN access key import failed');
+    }
+  }
+
+  /** Re-imports the (already rotated) LAN token as the `zhiyuan-lan` gateway key. */
+  async onLanAccessTokenRegenerated(): Promise<void> {
+    if (this.state.state !== 'running') return;
+    const lanToken = this.options.lanAccess?.read().lanToken;
+    if (!lanToken) return;
+    await this.syncLanAccessKey(lanToken);
+  }
+  private async syncLanAccessKey(lanToken: string): Promise<void> {
+    await syncMagpieLanAccessKey(
+      { managementJson: (route, init) => this.managementJson(route, init) },
+      lanToken,
+    );
   }
   /** Main-only authoritative host binding snapshot; external Provider credentials never enter here. */
   syncHostProviders(definitions: readonly MagpieHostProvider[]): Promise<void> {

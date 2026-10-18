@@ -1,11 +1,15 @@
 import path from 'node:path';
 import fs from 'node:fs/promises';
+// A concrete 0.0.0.0 host makes the gateway require a key for every non-loopback request.
+const MAGPIE_LAN_GATEWAY_HOST = '0.0.0.0';
+const MAGPIE_LOOPBACK_GATEWAY_HOST = '127.0.0.1';
 export function isolatedMagpieEnvironment(
   root: string,
   gatewayPort: number,
   webKey: string,
   source: NodeJS.ProcessEnv = process.env,
   subscriptionAccountsEnabled = false,
+  lanGatewayEnabled = false,
 ): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {};
   for (const key of [
@@ -33,7 +37,7 @@ export function isolatedMagpieEnvironment(
     XDG_DATA_HOME: path.join(root, 'data'),
     XDG_STATE_HOME: path.join(root, 'state'),
     MAGPIE_NO_ACCOUNTS: subscriptionAccountsEnabled ? '0' : '1',
-    MAGPIE_ADDR: `127.0.0.1:${gatewayPort}`,
+    MAGPIE_ADDR: `${lanGatewayEnabled ? MAGPIE_LAN_GATEWAY_HOST : MAGPIE_LOOPBACK_GATEWAY_HOST}:${gatewayPort}`,
     MAGPIE_WEB_KEY: webKey,
   };
 }

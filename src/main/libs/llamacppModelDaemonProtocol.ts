@@ -21,7 +21,6 @@ export type LlamaCppModelDaemonCommand =
 export type LlamaCppModelDaemonBootstrap = {
   controlPort: number;
   controlToken: string;
-  lanToken?: string;
   userDataPath: string;
   executablePath: string;
   serviceConfig: LlamaCppServiceConfig;
@@ -50,7 +49,6 @@ export type LlamaCppModelDaemonRequest =
   | {
       command: typeof LlamaCppModelDaemonCommand.ApplyConfig;
       serviceConfig: LlamaCppServiceConfig;
-      lanToken?: string;
     }
   | { command: typeof LlamaCppModelDaemonCommand.Shutdown };
 

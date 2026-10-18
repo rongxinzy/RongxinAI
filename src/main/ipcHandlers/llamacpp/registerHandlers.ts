@@ -32,6 +32,7 @@ import { LlamaCppModelResidencyMode } from '../../../shared/llamacpp';
 import { t } from '../../i18n';
 import { LlamaCppManager } from '../../libs/llamacppManager';
 import { createLlamaCppModelLaunchLogger } from '../../libs/llamacppModelLaunchLog';
+import { isLlamaCppLanAccessEnabled } from '../../magpie/lanAccess';
 import {
   getLlamaCppModelLoadFailureI18nKey,
   LlamaCppModelLoadFailureReason,
@@ -111,6 +112,10 @@ export function registerLlamaCppIpcHandlers(
       baseUrl: string | null,
       models: readonly import('../../libs/llamacppAgentBinding').LlamaCppRunningModelBinding[],
     ) => void | Promise<void>;
+    /** Notified when the LAN access toggle or its token changes so the model gateway follows. */
+    onLanAccessChanged?: () => void | Promise<void>;
+    /** Notified after a LAN token regeneration so the imported gateway key is replaced. */
+    onLanAccessTokenRegenerated?: () => void | Promise<void>;
   },
 ): LlamaCppModelOrchestrator {
   const broadcast = (channel: string, payload: unknown): void => {
@@ -452,18 +457,33 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(
     LlamaCppIpcChannel.SetServiceConfig,
     async (_event, config: LlamaCppServiceConfig) => {
+      const previousConfig = getLlamaCppServiceConfig(options.getStore());
       const sanitized = sanitizeLlamaCppServiceConfig(config);
       options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
       await daemon.applyConfigIfRunning(sanitized);
+      if (isLlamaCppLanAccessEnabled(previousConfig) !== isLlamaCppLanAccessEnabled(sanitized)) {
+        // The model gateway reads MAGPIE_ADDR only at process start.
+        await options.onLanAccessChanged?.();
+      }
       return sanitized;
     },
   );
   ipcMain.handle(LlamaCppIpcChannel.GetGatewayLanToken, async () => ({
     token: daemon.getLanToken(),
   }));
-  ipcMain.handle(LlamaCppIpcChannel.RegenerateGatewayLanToken, async () => ({
-    token: await daemon.regenerateLanToken(),
-  }));
+  ipcMain.handle(LlamaCppIpcChannel.RegenerateGatewayLanToken, async () => {
+    const token = await daemon.regenerateLanToken();
+    let lanAccessSynced = false;
+    if (isLlamaCppLanAccessEnabled(getLlamaCppServiceConfig(options.getStore()))) {
+      try {
+        await options.onLanAccessTokenRegenerated?.();
+        lanAccessSynced = true;
+      } catch (error) {
+        console.warn('[LlamaCpp] failed to update the LAN gateway key:', error);
+      }
+    }
+    return { token, lanAccessSynced };
+  });
   ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
   ipcMain.handle(
     LlamaCppIpcChannel.SetModelsDir,
