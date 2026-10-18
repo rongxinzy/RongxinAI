@@ -325,6 +325,41 @@ test('loadModel applies the default context size through model presets instead o
   expect(fs.readFileSync(presetPath, 'utf-8')).toContain('ctx-size = 16384');
 });
 
+test('preset global GPU section is refreshed on service start and stale keys are removed', () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-preset-global-gpu-'));
+  const presetPath = path.join(modelsDir, 'models-preset.ini');
+  fs.writeFileSync(
+    presetPath,
+    [
+      'version = 1',
+      '',
+      '[*]',
+      'device = none',
+      'n-gpu-layers = 99',
+      '',
+      '[smol]',
+      'model = /models/smol.gguf',
+      '',
+    ].join('\n'),
+  );
+
+  class PresetWriterManager extends LlamaCppManager {
+    writeGlobalGpuSection(config: ReturnType<LlamaCppManager['getServiceConfig']>): void {
+      this.upsertPresetGlobalGpuSection(config);
+    }
+  }
+
+  const manager = new PresetWriterManager(() => ({ modelsDir }));
+  manager.getPresetPath = () => presetPath;
+  manager.writeGlobalGpuSection({ gpuLayers: '999', tensorSplit: '3,1' });
+
+  const preset = fs.readFileSync(presetPath, 'utf-8');
+  expect(preset).toContain('[*]\nn-gpu-layers = 999\ntensor-split = 3,1');
+  // Stale global device entry must not linger after the config stopped setting it.
+  expect(preset).not.toContain('device = none');
+  expect(preset).toContain('[smol]\nmodel = /models/smol.gguf');
+});
+
 test('deleteModel removes empty parent directories after deleting a GGUF file', async () => {
   const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-delete-'));
   const repoDir = path.join(modelsDir, 'modelscope', 'unsloth', 'Qwen3.5-0.8B-GGUF');
