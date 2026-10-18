@@ -79,7 +79,8 @@ jobs:
         with:
           ref: ${{ needs.prepare-release.outputs.commit }}
       - uses: actions/setup-node@v6
-        with: { node-version: '24.x' }
+        with: { node-version-file: .nvmrc
+          check-latest: true }
       - uses: oven-sh/setup-bun@v2
         with: { bun-version: '1.4.0' }
       - name: Restore Bun and Electron caches
@@ -160,7 +161,8 @@ jobs:
         with:
           ref: ${{ needs.prepare-release.outputs.commit }}
       - uses: actions/setup-node@v6
-        with: { node-version: '24.x' }
+        with: { node-version-file: .nvmrc
+          check-latest: true }
       - name: Install release tools
         run: |
           pipx install 'awscli>=1.45.10,<2'
@@ -443,7 +445,8 @@ jobs:
         with:
           ref: ${{ needs.prepare-release.outputs.commit }}
       - uses: actions/setup-node@v6
-        with: { node-version: '24.x' }
+        with: { node-version-file: .nvmrc
+          check-latest: true }
       - name: Download release payloads for GitHub assets
         uses: actions/download-artifact@v8
         with:

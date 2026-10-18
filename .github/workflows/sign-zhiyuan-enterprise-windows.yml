@@ -48,7 +48,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version-file: .nvmrc
+          check-latest: true
       - id: source
         name: Validate Zhiyuan Enterprise unsigned package run
         env:
@@ -110,7 +111,8 @@ jobs:
           path: zhiyuan-core
       - uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version-file: .nvmrc
+          check-latest: true
       - name: Install and verify enterprise extension
         working-directory: aaas
         run: |

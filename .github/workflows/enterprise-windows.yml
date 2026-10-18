@@ -68,7 +68,8 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: '24.x'
+          node-version-file: .nvmrc
+          check-latest: true
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.0'
