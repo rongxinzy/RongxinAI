@@ -642,6 +642,17 @@ const coworkSlice = createSlice({
       }
     },
 
+    removeMessage(state, action: PayloadAction<{ sessionId: string; messageId: string }>) {
+      const { sessionId, messageId } = action.payload;
+      const dropFromSession = (session: CoworkSession | null | undefined): void => {
+        if (!session || session.id !== sessionId) return;
+        session.messages = session.messages.filter(message => message.id !== messageId);
+        session.updatedAt = Date.now();
+      };
+      dropFromSession(state.currentSession);
+      dropFromSession(state.streamingSessions[sessionId]);
+    },
+
     updateToolActivity(
       state,
       action: PayloadAction<{ sessionId: string; event: CoworkToolActivityEvent }>,
@@ -811,6 +822,7 @@ export const {
   addMessage,
   prependMessages,
   updateMessageContents,
+  removeMessage,
   updateToolActivity,
   setRemoteManaged,
   updateSessionPinned,

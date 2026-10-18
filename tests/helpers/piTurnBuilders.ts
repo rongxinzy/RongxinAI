@@ -122,7 +122,15 @@ interface PiPartState {
 export class PiTurnBuilder {
   private readonly parts: PiPartState[] = [];
 
-  constructor(private readonly random: () => number = Math.random) {}
+  /**
+   * When true, each delta event's `message` snapshot includes the delta plus an
+   * extra trailing character — matching Pi 1.x shared partials that run ahead
+   * of the event's own delta.
+   */
+  constructor(
+    private readonly random: () => number = Math.random,
+    private readonly messageSnapshotLeadsDelta = true,
+  ) {}
 
   agentStart(): PiStreamEvent {
     return { type: 'agent_start' };
@@ -136,14 +144,14 @@ export class PiTurnBuilder {
     return { type: 'message_start', message: { role: 'assistant', content: [] } };
   }
 
-  beginTextPart(contentIndex: number): PiStreamEvent {
+  beginTextPart(contentIndex: number, snapshotAhead?: string): PiStreamEvent {
     this.parts.push({ kind: 'text', contentIndex, text: '' });
-    return this.updateEvent(contentIndex, 'text_start');
+    return this.updateEvent(contentIndex, 'text_start', { snapshotAhead });
   }
 
-  beginThinkingPart(contentIndex: number): PiStreamEvent {
+  beginThinkingPart(contentIndex: number, snapshotAhead = 'The user'): PiStreamEvent {
     this.parts.push({ kind: 'thinking', contentIndex, text: '' });
-    return this.updateEvent(contentIndex, 'thinking_start');
+    return this.updateEvent(contentIndex, 'thinking_start', { snapshotAhead });
   }
 
   appendText(contentIndex: number, delta: string): PiStreamEvent {
@@ -231,6 +239,27 @@ export class PiTurnBuilder {
     );
   }
 
+  /** Message snapshot for a delta event when the shared partial leads the delta. */
+  private blocksForDeltaSnapshot(
+    delta: string,
+    updatedKind: PiPartState['kind'],
+    contentIndex: number,
+  ): PiContentBlock[] {
+    if (!this.messageSnapshotLeadsDelta || delta.length === 0) {
+      return this.blocks();
+    }
+    const skew = delta.charAt(delta.length - 1);
+    return this.sortedParts().map(part => {
+      const skewed =
+        part.contentIndex === contentIndex && part.kind === updatedKind
+          ? part.text + skew
+          : part.text;
+      return part.kind === 'text'
+        ? { type: 'text', text: skewed }
+        : { type: 'thinking', thinking: skewed };
+    });
+  }
+
   /** Deltas may arrive without a *_start event (Pi does not always send one). */
   private ensurePart(kind: PiPartState['kind'], contentIndex: number): PiPartState {
     const existing = this.parts.find(candidate => candidate.contentIndex === contentIndex);
@@ -246,12 +275,45 @@ export class PiTurnBuilder {
     return part;
   }
 
+  private blocksForStartSnapshot(
+    contentIndex: number,
+    eventType: PiAssistantMessageEventKind,
+    snapshotAhead: string,
+  ): PiContentBlock[] {
+    if (!this.messageSnapshotLeadsDelta) return this.blocks();
+    const kind = eventType.startsWith('thinking') ? 'thinking' : 'text';
+    return this.sortedParts().map(part => {
+      if (part.contentIndex === contentIndex && part.kind === kind) {
+        return part.kind === 'text'
+          ? { type: 'text', text: snapshotAhead }
+          : { type: 'thinking', thinking: snapshotAhead };
+      }
+      return part.kind === 'text'
+        ? { type: 'text', text: part.text }
+        : { type: 'thinking', thinking: part.text };
+    });
+  }
+
   private updateEvent(
     contentIndex: number,
     eventType: PiAssistantMessageEventKind,
-    extra?: { delta?: string; content?: string },
+    extra?: { delta?: string; content?: string; snapshotAhead?: string },
   ): PiStreamEvent {
-    const content = this.blocks();
+    const part = this.parts.find(candidate => candidate.contentIndex === contentIndex);
+    const delta = extra?.delta;
+    let content = this.blocks();
+    if (
+      (eventType === 'text_start' || eventType === 'thinking_start') &&
+      extra?.snapshotAhead !== undefined
+    ) {
+      content = this.blocksForStartSnapshot(contentIndex, eventType, extra.snapshotAhead);
+    } else if (
+      delta !== undefined &&
+      (eventType === 'text_delta' || eventType === 'thinking_delta') &&
+      part
+    ) {
+      content = this.blocksForDeltaSnapshot(delta, part.kind, contentIndex);
+    }
     return {
       type: 'message_update',
       message: { role: 'assistant', content },
@@ -318,12 +380,14 @@ export interface BuildTextTurnOptions {
   /** Also emit text_start / text_end (end carries the full part text). */
   emitStartEnd?: boolean;
   stopReason?: string;
+  /** Pi 1.x shared partial runs ahead of each delta (default true). */
+  messageSnapshotLeadsDelta?: boolean;
 }
 
 /** One text part (contentIndex 0) streamed as randomly split deltas. */
 export function buildTextTurn(options: BuildTextTurnOptions): BuiltTurn {
   const { min, max } = clampDeltaRange(options.minDelta, options.maxDelta);
-  const builder = new PiTurnBuilder(options.random);
+  const builder = new PiTurnBuilder(options.random, options.messageSnapshotLeadsDelta ?? true);
   const events: PiStreamEvent[] = [
     builder.agentStart(),
     builder.turnStart(),
@@ -347,6 +411,7 @@ export interface BuildInterleavedThinkingTurnOptions {
   /** Emit part start/end events per phase; default true. */
   emitStartEnd?: boolean;
   stopReason?: string;
+  messageSnapshotLeadsDelta?: boolean;
 }
 
 /**
@@ -358,7 +423,7 @@ export function buildInterleavedThinkingTurn(
 ): BuiltTurn {
   const { min, max } = clampDeltaRange(options.minDelta, options.maxDelta);
   const emitStartEnd = options.emitStartEnd ?? true;
-  const builder = new PiTurnBuilder(options.random);
+  const builder = new PiTurnBuilder(options.random, options.messageSnapshotLeadsDelta ?? true);
   const events: PiStreamEvent[] = [
     builder.agentStart(),
     builder.turnStart(),

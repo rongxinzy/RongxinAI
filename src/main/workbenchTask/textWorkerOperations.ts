@@ -19,7 +19,18 @@ export function runTextWorkerOperation(input: TextWorkerInput): TextWorkerOutput
   const extract = (result: unknown): string => {
     if (result === undefined || result === null) return '';
     if (typeof result === 'string') return result;
-    if (Array.isArray(result)) return result.map(extract).filter(Boolean).join('\n');
+    if (Array.isArray(result)) {
+      return result
+        .map(item => {
+          if (item && typeof item === 'object') {
+            const block = item as Record<string, unknown>;
+            if (block.type === 'image') return '';
+          }
+          return extract(item);
+        })
+        .filter(Boolean)
+        .join('\n');
+    }
     if (typeof result === 'object') {
       const record = result as Record<string, unknown>;
       if (typeof record.text === 'string') return record.text;

@@ -170,6 +170,10 @@ export interface ActivePiSession {
   retryNoticeEmitted: boolean;
   /** Retry attempts Pi reported in the current turn. */
   retryAttempts: number;
+  /** When set, the next turn_start reuses assistant/thinking message ids (auto-retry). */
+  retryStreamReusePending: boolean;
+  /** Last visible answer body before a retry turn_start cleared in-memory stream state. */
+  retryPriorAnswer: string;
   completionPending?: Promise<void>;
   requestStartedAt: number | null;
   firstVisibleTextAt: number | null;

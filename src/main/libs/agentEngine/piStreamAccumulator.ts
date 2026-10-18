@@ -134,9 +134,13 @@ export class PiStreamAccumulator {
     event: PiAssistantMessageEvent | undefined,
     snapshotMessage?: PiStreamMessage,
   ): PiStreamSnapshot {
-    // Embedded AgentSession events still provide an accumulating partial
-    // message. Prefer it when present so mixed thinking/text blocks cannot be
-    // missed; JSON/RPC delta-only consumers fall through to the reducer below.
+    // Pi 1.x shares a mutable partial on every message_update. Incremental
+    // assistant events (*_start / *_delta / *_end / toolcall_*) must never
+    // read it — only delta-less snapshots and message_end reconciliation do.
+    if (event && this.eventUsesIncrementalOnly(event)) {
+      return this.applyDeltaEvent(event);
+    }
+    // Delta-less updates (legacy cumulative snapshots) still replace from message.
     if (this.hasUsableSnapshot(snapshotMessage)) {
       this.replaceFromSnapshot(snapshotMessage);
       return this.snapshot();
@@ -145,10 +149,25 @@ export class PiStreamAccumulator {
       return this.snapshot();
     }
 
+    return this.applyDeltaEvent(event);
+  }
+
+  private eventUsesIncrementalOnly(event: PiAssistantMessageEvent): boolean {
+    if (event.type.startsWith('toolcall_')) return true;
+    return (
+      event.type === PiAssistantEventType.TextStart ||
+      event.type === PiAssistantEventType.TextDelta ||
+      event.type === PiAssistantEventType.TextEnd ||
+      event.type === PiAssistantEventType.ThinkingStart ||
+      event.type === PiAssistantEventType.ThinkingDelta ||
+      event.type === PiAssistantEventType.ThinkingEnd
+    );
+  }
+
+  private applyDeltaEvent(event: PiAssistantMessageEvent): PiStreamSnapshot {
     const contentIndex = event.contentIndex ?? 0;
     switch (event.type) {
       case PiAssistantEventType.Start:
-        if (this.segments.size === 0) this.replaceFromSnapshot(snapshotMessage);
         break;
       case PiAssistantEventType.TextStart:
         this.startSegment(contentIndex, PiStreamSegmentKind.Text);
@@ -169,7 +188,6 @@ export class PiStreamAccumulator {
         this.finishSegment(contentIndex, PiStreamSegmentKind.Thinking, event.content);
         break;
       default:
-        if (this.segments.size === 0) this.replaceFromSnapshot(snapshotMessage);
         break;
     }
     return this.snapshot();

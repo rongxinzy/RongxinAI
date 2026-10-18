@@ -108,6 +108,12 @@ import type {
 import { LiveTextStore } from '../../src/renderer/services/liveTextStore';
 import coworkReducer, { setCurrentSession } from '../../src/renderer/store/slices/coworkSlice';
 import type { CoworkMessage, CoworkSession } from '../../src/renderer/types/cowork';
+import type { CoworkStore } from '../../src/main/coworkStore';
+import {
+  createHarnessCoworkStore,
+  ensureHarnessCoworkSession,
+  type HarnessCoworkStoreHandle,
+} from './harnessCoworkStore';
 
 export { PiUiEventType };
 export type { PiUiEvent };
@@ -292,6 +298,8 @@ export interface CreateStreamingHarnessOptions {
   /** Prompt passed to adapter.startSession; default 'Hi'. */
   prompt?: string;
   delivery?: DeliveryControls | null;
+  /** When true, binds a real in-memory CoworkStore (for DB assertions). */
+  useSqliteStore?: boolean;
 }
 
 export class StreamingHarness {
@@ -325,12 +333,15 @@ export class StreamingHarness {
   private pumping = false;
   private frameIndex = 0;
   private disposed = false;
+  private coworkStoreHandle: HarnessCoworkStoreHandle | null = null;
+  private readonly useSqliteStore: boolean;
 
   /** @internal — use createStreamingHarness(). */
   constructor(options: CreateStreamingHarnessOptions) {
     this.sessionId = options.sessionId;
     this.prompt = options.prompt ?? 'Hi';
     this.deliveryControls = options.delivery ?? null;
+    this.useSqliteStore = options.useSqliteStore === true;
 
     this.store = createHarnessStore();
     this.store.dispatch(setCurrentSession(buildHarnessSession(options.sessionId)));
@@ -376,6 +387,11 @@ export class StreamingHarness {
   /** @internal — invoked by createStreamingHarness after construction. */
   async start(): Promise<void> {
     ensureForwarderBound(adapter);
+    if (this.useSqliteStore) {
+      this.coworkStoreHandle = createHarnessCoworkStore();
+      ensureHarnessCoworkSession(this.coworkStoreHandle.store, this.sessionId, 'chat');
+      adapter.setCoworkStore(this.coworkStoreHandle.store);
+    }
     this.messageUpdateCounter = messageUpdateCounterFor(adapter);
     mockSession.subscribe.mockImplementation((callback: (event: unknown) => void) => {
       this.piListener = callback;
@@ -492,9 +508,22 @@ export class StreamingHarness {
     this.disposed = true;
     this.frameListeners.clear();
     this.pipeline.dispose();
+    this.coworkStoreHandle?.cleanup();
+    this.coworkStoreHandle = null;
     if (activeWindows[0] === this.fakeWindow) {
       activeWindows = [];
     }
+  }
+
+  /** Messages persisted in the SQLite CoworkStore for this session. */
+  dbMessages(): CoworkMessage[] {
+    const store = this.coworkStoreHandle?.store;
+    if (!store) return [];
+    return store.getSession(this.sessionId, null, { includeArtifacts: false })?.messages ?? [];
+  }
+
+  coworkStore(): CoworkStore | null {
+    return this.coworkStoreHandle?.store ?? null;
   }
 
   // ── renderer observations ──────────────────────────────────────────────────
