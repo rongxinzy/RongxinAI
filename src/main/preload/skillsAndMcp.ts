@@ -1,70 +1,33 @@
-import { ipcRenderer } from 'electron';
-
+import type { IpcContractApi } from '../../shared/ipc/contract';
+import { skillsContractChannels } from '../../shared/ipc/skillsContract.channels';
+import { mcpContractChannels } from '../../shared/ipc/mcpContract.channels';
+import { marketplaceContractChannels } from '../../shared/marketplace/contract.channels';
 import { McpIpc, SkillsIpc } from '../../shared/ipc/channels';
-import { MarketplaceIpcChannel } from '../../shared/marketplace/constants';
-import type { MarketplaceSearchRequest } from '../../shared/marketplace/types';
 import { onPush, onPushVoid } from './pushChannel';
+import { createIpcInvokers } from './createIpcInvokers';
 
-// Skills, MCP servers, and the shared marketplace bridge.
+// Skills, MCP servers, and the shared marketplace bridge. Invoke methods come
+// from the contract channel maps via createIpcInvokers; push subscriptions
+// (onChanged / onBridgeSync*) stay hand-wired below.
 export const skillsAndMcpApi = {
   skills: {
-    list: () => ipcRenderer.invoke(SkillsIpc.List),
-    setEnabled: (options: { id: string; enabled: boolean }) =>
-      ipcRenderer.invoke(SkillsIpc.SetEnabled, options),
-    setEnabledBatch: (options: { ids: string[]; enabled: boolean }) =>
-      ipcRenderer.invoke(SkillsIpc.SetEnabledBatch, options),
-    setPinned: (options: { id: string; pinned: boolean }) =>
-      ipcRenderer.invoke(SkillsIpc.SetPinned, options),
-    delete: (id: string) => ipcRenderer.invoke(SkillsIpc.Delete, id),
-    download: (source: string, options?: { iconUrl?: string; displayName?: string }) =>
-      ipcRenderer.invoke(SkillsIpc.Download, source, options),
-    confirmInstall: (pendingId: string, action: string) =>
-      ipcRenderer.invoke(SkillsIpc.ConfirmInstall, pendingId, action),
-    getRoot: () => ipcRenderer.invoke(SkillsIpc.GetRoot),
-    getContent: (skillId: string) => ipcRenderer.invoke(SkillsIpc.GetContent, skillId),
-    autoRoutingPrompt: () => ipcRenderer.invoke(SkillsIpc.AutoRoutingPrompt),
-    getConfig: (skillId: string) => ipcRenderer.invoke(SkillsIpc.GetConfig, skillId),
-    setConfig: (skillId: string, config: Record<string, string>) =>
-      ipcRenderer.invoke(SkillsIpc.SetConfig, skillId, config),
-    testEmailConnectivity: (skillId: string, config: Record<string, string>) =>
-      ipcRenderer.invoke(SkillsIpc.TestEmailConnectivity, skillId, config),
-    fetchMarketplace: (options?: { pageNumber?: number; pageSize?: number }) =>
-      ipcRenderer.invoke(SkillsIpc.FetchMarketplace, options),
-    fetchMarketplaceContent: (skillId: string) =>
-      ipcRenderer.invoke(SkillsIpc.FetchMarketplaceContent, skillId),
-    createCustom: (params: { id: string; name: string; description: string; content: string }) =>
-      ipcRenderer.invoke(SkillsIpc.CreateCustom, params),
+    ...createIpcInvokers(skillsContractChannels),
     onChanged: (callback: () => void) => onPushVoid(SkillsIpc.Changed, callback),
+  } as IpcContractApi<typeof import('../../shared/ipc/skillsContract').skillsContract> & {
+    onChanged: (callback: () => void) => () => void;
   },
 
   mcp: {
-    list: () => ipcRenderer.invoke(McpIpc.List),
-    create: (data: unknown) => ipcRenderer.invoke(McpIpc.Create, data),
-    update: (id: string, data: unknown) => ipcRenderer.invoke(McpIpc.Update, id, data),
-    delete: (id: string) => ipcRenderer.invoke(McpIpc.Delete, id),
-    setEnabled: (options: { id: string; enabled: boolean }) =>
-      ipcRenderer.invoke(McpIpc.SetEnabled, options),
-    testConnection: (data: unknown) => ipcRenderer.invoke(McpIpc.TestConnection, data),
-    fetchMarketplace: () => ipcRenderer.invoke(McpIpc.FetchMarketplace),
-    refreshBridge: () => ipcRenderer.invoke(McpIpc.RefreshBridge),
-    authorize: (data: unknown) => ipcRenderer.invoke(McpIpc.Authorize, data),
-    cancelAuthorize: (requestId: string) => ipcRenderer.invoke(McpIpc.CancelAuthorize, requestId),
-    getFeishuCliStatus: () => ipcRenderer.invoke(McpIpc.GetFeishuCliStatus),
-    prepareFeishuCli: () => ipcRenderer.invoke(McpIpc.PrepareFeishuCli),
-    loadIcon: (iconPath: string) => ipcRenderer.invoke(McpIpc.LoadIcon, iconPath),
-    exportConfig: () => ipcRenderer.invoke(McpIpc.ExportConfig),
-    importConfig: () => ipcRenderer.invoke(McpIpc.ImportConfig),
-    importConfigContent: (jsonContent: string) =>
-      ipcRenderer.invoke(McpIpc.ImportConfigContent, jsonContent),
+    ...createIpcInvokers(mcpContractChannels),
     onBridgeSyncStart: (callback: () => void) => onPushVoid(McpIpc.BridgeSyncStart, callback),
     onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) =>
       onPush(McpIpc.BridgeSyncDone, callback),
+  } as IpcContractApi<typeof import('../../shared/ipc/mcpContract').mcpContract> & {
+    onBridgeSyncStart: (callback: () => void) => () => void;
+    onBridgeSyncDone: (callback: (data: { tools: number; error?: string }) => void) => () => void;
   },
 
-  marketplace: {
-    search: (request: MarketplaceSearchRequest) =>
-      ipcRenderer.invoke(MarketplaceIpcChannel.Search, request),
-    cancelSearch: (requestId: string) =>
-      ipcRenderer.invoke(MarketplaceIpcChannel.CancelSearch, requestId),
-  },
+  marketplace: createIpcInvokers(marketplaceContractChannels) as IpcContractApi<
+    typeof import('../../shared/marketplace/contract').marketplaceContract
+  >,
 };
