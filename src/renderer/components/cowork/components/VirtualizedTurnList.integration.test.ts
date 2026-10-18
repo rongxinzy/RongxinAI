@@ -4,11 +4,13 @@ import { act, cleanup, render, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
+import { ConversationViewportContext } from '@shared/components/ai-elements/useConversationViewport';
+
 import type { ConversationTurn } from '../helpers/messageGrouping';
 import { VirtualizedTurnList } from './VirtualizedTurnList';
 
 const VIEWPORT_HEIGHT = 600;
-const scrollRef = { current: null as HTMLElement | null };
+const scrollRef = { current: null as HTMLDivElement | null };
 const viewportTimeouts = new Set<number>();
 
 const clearViewportTimeouts = (): void => {
@@ -16,9 +18,53 @@ const clearViewportTimeouts = (): void => {
   viewportTimeouts.clear();
 };
 
-vi.mock('use-stick-to-bottom', () => ({
-  useStickToBottomContext: () => ({ scrollRef }),
-}));
+/**
+ * Stand-in for the <Conversation> owner: provides a viewport whose scroll
+ * element is the jsdom viewport, so the virtualizer is the single writer.
+ * Follow state mirrors the real hook: upward user scrolls stop following.
+ */
+const followRef = { current: true };
+const mockViewportValue = {
+  attachContentElement: vi.fn(),
+  attachScrollElement: (element: HTMLDivElement | null) => {
+    scrollRef.current = element;
+  },
+  getScrollElement: () => scrollRef.current,
+  isAtBottom: true,
+  isFollowingOutput: () => followRef.current,
+  registerScrollWriter: () => () => undefined,
+  scrollToBottom: () => {
+    const element = scrollRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  },
+};
+
+interface TurnListProps {
+  turns: ConversationTurn[];
+  onInitialTailPositioned?: () => void;
+  renderAll: boolean;
+  renderTurn: (turn: ConversationTurn, index: number) => React.ReactNode;
+}
+
+const renderList = (viewport: HTMLElement, props: TurnListProps) =>
+  render(
+    React.createElement(
+      ConversationViewportContext.Provider,
+      { value: mockViewportValue },
+      React.createElement(VirtualizedTurnList, props),
+    ),
+    { container: viewport },
+  );
+
+const rerenderList = (view: ReturnType<typeof render>, props: TurnListProps) => {
+  view.rerender(
+    React.createElement(
+      ConversationViewportContext.Provider,
+      { value: mockViewportValue },
+      React.createElement(VirtualizedTurnList, props),
+    ),
+  );
+};
 
 class TestResizeObserver implements ResizeObserver {
   static instances = new Set<TestResizeObserver>();
@@ -86,7 +132,7 @@ const flushResizeObservers = async (afterPass?: () => void): Promise<void> => {
   }
 };
 
-const installViewport = (): HTMLElement => {
+const installViewport = (): HTMLDivElement => {
   const viewport = document.createElement('div');
   let scrollTop = 0;
 
@@ -121,6 +167,13 @@ const installViewport = (): HTMLElement => {
       typeof options === 'number' ? options : (options.top ?? viewport.scrollTop);
     queueMicrotask(() => viewport.dispatchEvent(new Event('scroll')));
   }) as typeof viewport.scrollTo;
+  viewport.addEventListener('scroll', () => {
+    // Mirror the real hook's follow rule. Programmatic writes from the
+    // virtualizer go through scrollTo (async microtask); treat every scroll
+    // event uniformly: landing at the bottom re-arms, anything else stops.
+    const maxScroll = Math.max(viewport.scrollHeight - viewport.clientHeight, 0);
+    followRef.current = Math.abs(viewport.scrollTop - maxScroll) <= 1;
+  });
   document.body.append(viewport);
   scrollRef.current = viewport;
   return viewport;
@@ -137,6 +190,7 @@ beforeEach(() => {
     return handle;
   });
   TestResizeObserver.instances.clear();
+  followRef.current = true;
   vi.stubGlobal('ResizeObserver', TestResizeObserver);
   Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
     configurable: true,
@@ -162,18 +216,15 @@ afterEach(() => {
 
 test('cancels pending scroll debounce timers before disposing the viewport', async () => {
   const viewport = installViewport();
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns: makeTurns(100),
-      renderAll: false,
-      renderTurn: (turn: ConversationTurn) =>
-        React.createElement('div', {
-          'data-turn-height': '200',
-          'data-turn-id': turn.id,
-        }),
-    }),
-    { container: viewport },
-  );
+  const view = renderList(viewport, {
+    turns: makeTurns(100),
+    renderAll: false,
+    renderTurn: (turn: ConversationTurn) =>
+      React.createElement('div', {
+        'data-turn-height': '200',
+        'data-turn-id': turn.id,
+      }),
+  });
   await flushResizeObservers();
   clearViewportTimeouts();
 
@@ -197,18 +248,15 @@ test('renders a short session at the top of a non-overflowing viewport', async (
   const viewport = installViewport();
   const turns = makeTurns(1);
 
-  render(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn: (turn: ConversationTurn) =>
-        React.createElement('div', {
-          'data-turn-height': '180',
-          'data-turn-id': turn.id,
-        }),
-    }),
-    { container: viewport },
-  );
+  renderList(viewport, {
+    turns,
+    renderAll: false,
+    renderTurn: (turn: ConversationTurn) =>
+      React.createElement('div', {
+        'data-turn-height': '180',
+        'data-turn-id': turn.id,
+      }),
+  });
 
   await flushResizeObservers();
 
@@ -229,14 +277,7 @@ test('keeps a long variable-height session at the tail without overlapping rows'
       'data-turn-id': turn.id,
     });
 
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn,
-    }),
-    { container: viewport },
-  );
+  const view = renderList(viewport, { turns, renderAll: false, renderTurn });
 
   expect(viewport.querySelector('[data-turn-id="turn-99"]')).not.toBeNull();
   await flushResizeObservers(() => {
@@ -252,13 +293,7 @@ test('keeps a long variable-height session at the tail without overlapping rows'
     const turnId = row.querySelector<HTMLElement>('[data-turn-id]')?.dataset.turnId;
     if (turnId) heights.set(turnId, (heights.get(turnId) ?? 0) + 45);
   }
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn,
-    }),
-  );
+  rerenderList(view, { turns, renderAll: false, renderTurn });
   await flushResizeObservers();
 
   await waitFor(() => {
@@ -287,15 +322,12 @@ test('preserves the visible turn and viewport offset when older turns are prepen
       'data-turn-height': '200',
       'data-turn-id': turn.id,
     });
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      onInitialTailPositioned,
-      renderAll: false,
-      renderTurn,
-    }),
-    { container: viewport },
-  );
+  const view = renderList(viewport, {
+    turns,
+    onInitialTailPositioned,
+    renderAll: false,
+    renderTurn,
+  });
   await flushResizeObservers();
   await waitFor(() => expect(onInitialTailPositioned).toHaveBeenCalledOnce());
 
@@ -315,14 +347,12 @@ test('preserves the visible turn and viewport offset when older turns are prepen
   expect(anchorId).toBeTruthy();
 
   const prepended = [...makeTurns(50, 'older'), ...turns];
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      turns: prepended,
-      onInitialTailPositioned,
-      renderAll: false,
-      renderTurn,
-    }),
-  );
+  rerenderList(view, {
+    turns: prepended,
+    onInitialTailPositioned,
+    renderAll: false,
+    renderTurn,
+  });
   await flushResizeObservers();
 
   await waitFor(() => {
@@ -339,18 +369,15 @@ test('keeps the tail anchored in the same observer delivery when an existing his
   const viewport = installViewport();
   const turns = makeTurns(4);
   const heights = new Map(turns.map(turn => [turn.id, 400]));
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn: (turn: ConversationTurn) =>
-        React.createElement('div', {
-          'data-turn-height': String(heights.get(turn.id)),
-          'data-turn-id': turn.id,
-        }),
-    }),
-    { container: viewport },
-  );
+  const view = renderList(viewport, {
+    turns,
+    renderAll: false,
+    renderTurn: (turn: ConversationTurn) =>
+      React.createElement('div', {
+        'data-turn-height': String(heights.get(turn.id)),
+        'data-turn-id': turn.id,
+      }),
+  });
   await flushResizeObservers();
 
   const tail = viewport.querySelector<HTMLElement>('[data-index="3"]')!;
@@ -377,20 +404,15 @@ test('measures retained rows before painting a history prepend with overflowing 
       'data-turn-height': String(turn.id === turns[0].id ? tailHeight : 100),
       'data-turn-id': turn.id,
     });
-  const view = render(
-    React.createElement(VirtualizedTurnList, { turns, renderAll: false, renderTurn }),
-    { container: viewport },
-  );
+  const view = renderList(viewport, { turns, renderAll: false, renderTurn });
   await flushResizeObservers();
   tailHeight = 2275;
 
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      turns: [...makeTurns(2, 'older'), ...turns],
-      renderAll: false,
-      renderTurn,
-    }),
-  );
+  rerenderList(view, {
+    turns: [...makeTurns(2, 'older'), ...turns],
+    renderAll: false,
+    renderTurn,
+  });
 
   // The growing retained row can overflow the cached sizer before its observer fires.
   expect(viewport.firstElementChild).toHaveStyle({ height: '2475px' });
@@ -401,18 +423,15 @@ test('measures retained rows before painting a history prepend with overflowing 
 
 test('compensates a resize above a scrolled-up viewport before the next frame', async () => {
   const viewport = installViewport();
-  render(
-    React.createElement(VirtualizedTurnList, {
-      turns: makeTurns(10),
-      renderAll: false,
-      renderTurn: (turn: ConversationTurn) =>
-        React.createElement('div', {
-          'data-turn-height': '400',
-          'data-turn-id': turn.id,
-        }),
-    }),
-    { container: viewport },
-  );
+  renderList(viewport, {
+    turns: makeTurns(10),
+    renderAll: false,
+    renderTurn: (turn: ConversationTurn) =>
+      React.createElement('div', {
+        'data-turn-height': '400',
+        'data-turn-id': turn.id,
+      }),
+  });
   await flushResizeObservers();
   await act(async () => {
     viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }));
@@ -461,14 +480,7 @@ test('preserves visible content when a missing turn prefix is prepended', async 
       'data-turn-height': String(heights.get(turn.id)),
       'data-turn-id': turn.id,
     });
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns,
-      renderAll: false,
-      renderTurn,
-    }),
-    { container: viewport },
-  );
+  const view = renderList(viewport, { turns, renderAll: false, renderTurn });
   await flushResizeObservers();
 
   await act(async () => {
@@ -507,13 +519,11 @@ test('preserves visible content when a missing turn prefix is prepended', async 
         }
       : turn,
   );
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      turns: [...makeTurns(50, 'older'), ...expandedTurns],
-      renderAll: false,
-      renderTurn,
-    }),
-  );
+  rerenderList(view, {
+    turns: [...makeTurns(50, 'older'), ...expandedTurns],
+    renderAll: false,
+    renderTurn,
+  });
   await flushResizeObservers();
 
   await waitFor(() => {
@@ -536,24 +546,19 @@ test('finishes initial tail positioning when history is prepended concurrently',
       'data-turn-height': '200',
       'data-turn-id': turn.id,
     });
-  const view = render(
-    React.createElement(VirtualizedTurnList, {
-      turns: initialTurns,
-      onInitialTailPositioned,
-      renderAll: false,
-      renderTurn,
-    }),
-    { container: viewport },
-  );
+  const view = renderList(viewport, {
+    turns: initialTurns,
+    onInitialTailPositioned,
+    renderAll: false,
+    renderTurn,
+  });
 
-  view.rerender(
-    React.createElement(VirtualizedTurnList, {
-      turns: [...makeTurns(10, 'older'), ...initialTurns],
-      onInitialTailPositioned,
-      renderAll: false,
-      renderTurn,
-    }),
-  );
+  rerenderList(view, {
+    turns: [...makeTurns(10, 'older'), ...initialTurns],
+    onInitialTailPositioned,
+    renderAll: false,
+    renderTurn,
+  });
   await flushResizeObservers();
 
   await waitFor(() => {
@@ -561,4 +566,62 @@ test('finishes initial tail positioning when history is prepended concurrently',
     expect(viewport.scrollTop).toBe(Math.max(viewport.scrollHeight - VIEWPORT_HEIGHT, 0));
     expect(viewport.querySelector('[data-turn-id="recent-9"]')).not.toBeNull();
   });
+});
+
+test('follows streaming tail growth while at the bottom and stops after scrolling up', async () => {
+  const viewport = installViewport();
+  const turns = makeTurns(20);
+  const heights = new Map(turns.map(turn => [turn.id, 200]));
+  const renderTurn = (turn: ConversationTurn) =>
+    React.createElement('div', {
+      'data-turn-height': String(heights.get(turn.id)),
+      'data-turn-id': turn.id,
+    });
+  const view = renderList(viewport, { turns, renderAll: false, renderTurn });
+  await flushResizeObservers();
+  await waitFor(() => {
+    expect(viewport.scrollTop).toBe(Math.max(viewport.scrollHeight - VIEWPORT_HEIGHT, 0));
+  });
+
+  // Streaming growth of the tail turn: still following, stays at the bottom.
+  heights.set('turn-19', 640);
+  rerenderList(view, { turns, renderAll: false, renderTurn });
+  await flushResizeObservers();
+  const bottomScrollTop = Math.max(viewport.scrollHeight - VIEWPORT_HEIGHT, 0);
+  await waitFor(() => {
+    expect(viewport.scrollTop).toBe(bottomScrollTop);
+  });
+
+  // The user scrolls up within the overscan window: the streaming turn stays
+  // mounted, but the viewport is no longer at the bottom.
+  await act(async () => {
+    viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }));
+    viewport.scrollTop = bottomScrollTop - 600;
+    viewport.dispatchEvent(new Event('scroll'));
+  });
+  await flushResizeObservers();
+  const settledScrollTop = viewport.scrollTop;
+  expect(settledScrollTop).toBeLessThan(bottomScrollTop - 100);
+  expect(followRef.current).toBe(false);
+
+  const anchorRow = Array.from(viewport.querySelectorAll<HTMLElement>('[data-index]')).find(row => {
+    const start = Number.parseFloat(row.style.top);
+    return start <= viewport.scrollTop && start + row.offsetHeight > viewport.scrollTop;
+  });
+  const anchorId = anchorRow?.querySelector<HTMLElement>('[data-turn-id]')?.dataset.turnId;
+  const anchorOffset = Number.parseFloat(anchorRow?.style.top ?? '0') - viewport.scrollTop;
+  expect(anchorId).toBeTruthy();
+
+  // Further streaming growth must not yank the user back to the bottom: the
+  // anchored content keeps its offset and the viewport stays scrolled up.
+  heights.set('turn-19', 1040);
+  rerenderList(view, { turns, renderAll: false, renderTurn });
+  await flushResizeObservers();
+
+  expect(viewport.scrollTop).toBe(settledScrollTop);
+  const anchoredContent = viewport.querySelector<HTMLElement>(`[data-turn-id="${anchorId}"]`);
+  const anchoredRow = anchoredContent?.closest<HTMLElement>('[data-index]');
+  expect(anchoredRow).not.toBeNull();
+  expect(Number.parseFloat(anchoredRow?.style.top ?? '0') - viewport.scrollTop).toBe(anchorOffset);
+  expect(viewport.scrollHeight - viewport.clientHeight - viewport.scrollTop).toBeGreaterThan(600);
 });
