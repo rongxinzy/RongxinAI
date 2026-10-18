@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { LlamaCppMemoryPolicy } from './constants';
+import { LlamaCppMemoryPolicy, LlamaCppOrchestrator } from './constants';
 import {
   applyAutomaticLlamaCppServiceDefaults,
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
@@ -11,6 +11,7 @@ test('llama.cpp service defaults are explicit and stable', () => {
   expect(DEFAULT_LLAMACPP_SERVICE_CONFIG).toEqual({
     host: '127.0.0.1',
     port: '8080',
+    orchestrator: LlamaCppOrchestrator.Router,
     modelsMax: '3',
     keepRunningOnAppQuit: true,
     timeout: '120',

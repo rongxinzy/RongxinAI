@@ -21,6 +21,7 @@ import {
   LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
   LlamaCppIpcChannel,
   LlamaCppModelLaunchLogPhase,
+  LlamaCppOrchestrator,
 } from '../../../shared/llamacpp';
 import {
   ModelCapabilityStatus,
@@ -37,6 +38,9 @@ import {
 } from '../../libs/llamacppModelLoadErrors';
 import { LlamaCppModelLoadLock } from '../../libs/llamacppModelLoadLock';
 import { LlamaCppModelDaemonController } from '../../libs/llamacppModelDaemonController';
+import type { LlamaCppModelOrchestrator } from '../../libs/llamacppModelOrchestrator';
+import { LlamaCppRouterOrchestrator } from '../../libs/llamacppRouterOrchestrator';
+import { evictIdleLlamaCppRouterModelsForLoad } from '../../libs/llamacppRouterEviction';
 import { loadLlamaCppModelThroughPipeline } from '../../libs/llamacppModelLoadPipeline';
 import {
   LlamaCppModelResidencyManager,
@@ -108,7 +112,7 @@ export function registerLlamaCppIpcHandlers(
       models: readonly import('../../libs/llamacppAgentBinding').LlamaCppRunningModelBinding[],
     ) => void | Promise<void>;
   },
-): LlamaCppModelDaemonController {
+): LlamaCppModelOrchestrator {
   const broadcast = (channel: string, payload: unknown): void => {
     BrowserWindow.getAllWindows().forEach(win => {
       if (win.isDestroyed()) return;
@@ -205,17 +209,53 @@ export function registerLlamaCppIpcHandlers(
   const { sendModelLaunchLog } = registerLlamaCppModelLaunchLogIpcHandlers({
     broadcast,
   });
-  const daemon = new LlamaCppModelDaemonController({
-    userDataPath: app.getPath('userData'),
-    getStore: options.getStore,
-    getServiceConfig: () => {
-      const config = getLlamaCppServiceConfig(options.getStore());
-      return {
-        ...config,
-        modelsDir: config.modelsDir?.trim() || manager.getModelsDir(),
-      };
-    },
-  });
+  const resolveServiceConfig = () => {
+    const config = getLlamaCppServiceConfig(options.getStore());
+    return {
+      ...config,
+      modelsDir: config.modelsDir?.trim() || manager.getModelsDir(),
+    };
+  };
+  const createDaemonOrchestrator = (): LlamaCppModelOrchestrator =>
+    new LlamaCppModelDaemonController({
+      userDataPath: app.getPath('userData'),
+      getStore: options.getStore,
+      getServiceConfig: resolveServiceConfig,
+    });
+  const createRouterOrchestrator = (): LlamaCppRouterOrchestrator =>
+    new LlamaCppRouterOrchestrator({
+      userDataPath: app.getPath('userData'),
+      getStore: options.getStore,
+      getServiceConfig: resolveServiceConfig,
+      getModelsDir: () => manager.getModelsDir(),
+      getPresetPath: () => manager.getPresetPath(),
+      acquireModelLease: (modelName, load) => residency.acquire(modelName, load),
+    });
+  // The implementation is chosen once, at registration, from the config's
+  // `orchestrator` field (default router); a switch takes effect on the next
+  // app start. `daemon` keeps its name so the ~20 call sites stay unchanged.
+  const useRouterOrchestrator =
+    resolveServiceConfig().orchestrator !== LlamaCppOrchestrator.Daemon;
+  const routerOrchestrator = useRouterOrchestrator ? createRouterOrchestrator() : null;
+  const daemon: LlamaCppModelOrchestrator = routerOrchestrator ?? createDaemonOrchestrator();
+  const stopLeftoverDaemonBeforeStart = async (): Promise<void> => {
+    if (!routerOrchestrator) return;
+    // Upgrades from the daemon build may leave a detached daemon (spawned with
+    // keepRunningOnAppQuit) holding config.port. Stop it through the existing
+    // controller before the router gateway binds; nothing to do when none is
+    // registered.
+    const leftover = new LlamaCppModelDaemonController({
+      userDataPath: app.getPath('userData'),
+      getStore: options.getStore,
+      getServiceConfig: resolveServiceConfig,
+    });
+    const reconnected = await leftover.reconnect().catch((): null => null);
+    if (reconnected) {
+      await leftover.stopService().catch((error: unknown) => {
+        console.warn('[LlamaCpp] failed to stop the leftover model daemon:', error);
+      });
+    }
+  };
   const loadModelLock = new LlamaCppModelLoadLock();
   let activeModelLoad: { modelName: string; controller: AbortController } | null = null;
   let loadModelCore: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
@@ -584,13 +624,41 @@ export function registerLlamaCppIpcHandlers(
         try {
           launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingService);
           throwIfLlamaCppModelLoadCancelled(controller.signal);
-          const runningModels = await daemon.listRunningModels();
+          let runningModels = await daemon.listRunningModels();
           throwIfLlamaCppModelLoadCancelled(controller.signal);
-          const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
+          let loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
             modelsMax: serviceConfig.modelsMax,
             runningModels,
             targetModelName: modelName,
           });
+          if (loadLimitViolation && routerOrchestrator) {
+            // Router mode owns capacity: free room by evicting idle models
+            // (never one whose /slots is busy or unknown) instead of failing
+            // immediately like the daemon path does.
+            const freedModels = await evictIdleLlamaCppRouterModelsForLoad({
+              limit: loadLimitViolation.limit,
+              runningModelNames: runningModels.map(
+                model => (model.name || model.model || model.id || '').trim(),
+              ),
+              targetModelName: modelName,
+              slotsBusy: async candidateName =>
+                await routerOrchestrator.getModelSlots(candidateName).then(slots => slots.busy),
+              stopModel: async candidateName => {
+                await daemon.stopModel(candidateName);
+              },
+            });
+            if (freedModels.length > 0) {
+              launchLogger.info(LlamaCppModelLaunchLogPhase.LoadingModel, undefined, {
+                evictedIdleModels: freedModels,
+              });
+              runningModels = await daemon.listRunningModels();
+              loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
+                modelsMax: serviceConfig.modelsMax,
+                runningModels,
+                targetModelName: modelName,
+              });
+            }
+          }
           if (loadLimitViolation) {
             launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, loadLimitViolation);
             throw new Error(
@@ -699,12 +767,17 @@ export function registerLlamaCppIpcHandlers(
       },
     );
   };
-  void daemon
-    .reconnect()
-    .then(() => refreshRunningModelBindings())
-    .catch(error => {
-      console.error('[LlamaCppDaemon] failed to reconnect to local inference daemon:', error);
-    });
+  void (async () => {
+    // In router mode this also clears a leftover daemon from the previous
+    // build before the router gateway binds config.port for the first time.
+    await stopLeftoverDaemonBeforeStart();
+    await daemon
+      .reconnect()
+      .then(() => refreshRunningModelBindings())
+      .catch(error => {
+        console.error('[LlamaCppDaemon] failed to reconnect to local inference daemon:', error);
+      });
+  })();
   ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
     let result: LlamaCppModelLaunchResult | undefined;
     await residency.ensureReady(input.model, async () => {
