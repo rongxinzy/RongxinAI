@@ -28,7 +28,9 @@ jobs:
         with:
           ref: main
       - uses: actions/setup-node@v6
-        with: { node-version: '24.x' }
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
       - name: Install release tools
         run: |
           pipx install 'awscli>=1.45.10,<2'
