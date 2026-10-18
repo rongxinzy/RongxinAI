@@ -619,33 +619,13 @@ class CoworkService {
   }
 
   /**
-   * Re-syncs a session's ledger rows once when it is opened: upserts recorded
-   * while no renderer was attached are folded back in. Idempotent by design —
-   * the slice's path-dedupe merge makes this a no-op for rows the persisted
-   * seed already landed — and silent, so opening history never pops the panel.
+   * Projects the session's ledger rows (read with the session) into the
+   * artifact store. Idempotent — the slice's path-dedupe merge makes this a
+   * no-op for rows already landed by live upserts — and silent, so opening
+   * history never pops the panel. Missing files are reported when opened.
    */
-  private async refreshLedgerArtifacts(sessionId: string): Promise<void> {
-    const artifactsApi = window.electron?.artifacts;
-    if (typeof artifactsApi?.list !== 'function') return;
-    let artifacts: CoworkPersistedArtifact[] | undefined;
-    try {
-      const result = await artifactsApi.list(sessionId);
-      if (!result.success) {
-        if (result.error)
-          console.error('[CoworkService] artifact ledger read failed:', result.error);
-        return;
-      }
-      artifacts = result.artifacts;
-    } catch (error) {
-      console.error('[CoworkService] artifact ledger read failed:', error);
-      return;
-    }
-    // The read may settle after the user moved on; only the viewed session may
-    // touch the store.
-    if (store.getState().cowork.currentSessionId !== sessionId) return;
-    for (const artifact of artifacts ?? []) {
-      // Silent on purpose: opening a session is history, not a live delivery,
-      // so rows join the list without opening the panel.
+  private projectLedgerArtifacts(sessionId: string, artifacts: CoworkPersistedArtifact[]): void {
+    for (const artifact of artifacts) {
       store.dispatch(addArtifact({ sessionId, artifact: { ...artifact, sessionId } }));
     }
   }
@@ -676,9 +656,7 @@ class CoworkService {
       }
       const wasCurrentSession = store.getState().cowork.currentSessionId === sessionId;
       store.dispatch(setCurrentSession(result.session));
-      // Fold ledger rows recorded while this session was not open back in,
-      // silently and idempotently.
-      void this.refreshLedgerArtifacts(sessionId);
+      this.projectLedgerArtifacts(sessionId, result.session.artifacts ?? []);
       this.runSync?.requestRecovery(sessionId);
       // Only restore streaming for running sessions — never clear it here.
       // Clearing is the responsibility of complete/error stream events.

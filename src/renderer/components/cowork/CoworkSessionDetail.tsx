@@ -57,7 +57,6 @@ import { resolveLocalFilePath } from './helpers/pathUtils';
 import { findToolGroupForPermission } from './helpers/toolPermissionMatch';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
-import { usePersistedArtifactSeed } from './helpers/usePersistedArtifactSeed';
 import { resolveStableSessionKey, setPersistentToggleNamespace } from './hooks/usePersistentToggle';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { useRecoverableWorkbenchTaskId } from './hooks/useRecoverableWorkbenchTaskId';
@@ -197,13 +196,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     cwd: currentSession?.cwd,
   });
 
-  const pendingArtifacts = usePersistedArtifactSeed(
-    sessionId,
-    currentSession?.artifacts,
-    currentSession?.cwd,
-    sessionArtifacts,
-  );
-
   // lastMessageContent is sourced from the memoized selector
   // (selectLastMessageContent), so there is no need to derive it here.
 
@@ -259,11 +251,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     findToolGroupForPermission(lastTurnItems, inlinePermission),
   );
   const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
-  const pendingTurnArtifactsMap = useTurnArtifacts(
-    turns,
-    pendingArtifacts,
-    PREVIEWABLE_ARTIFACT_TYPES,
-  );
 
   const markInitialHistoryTailPositioned = useSessionHistoryPagination({
     sessionId,
@@ -340,7 +327,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <TurnBlock
                 turn={turn}
                 artifacts={turnArtifacts}
-                pendingArtifacts={pendingTurnArtifactsMap.get(turn.id)}
                 resolveLocalFilePath={resolveSessionLocalFilePath}
                 mapDisplayText={mapDisplayText}
                 showTypingIndicator={showTypingIndicator}

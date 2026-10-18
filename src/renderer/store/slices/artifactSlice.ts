@@ -171,23 +171,6 @@ function shouldRevealMergedArtifact(
   return previous.role !== ArtifactRole.Deliverable || (!previous.content && Boolean(next.content));
 }
 
-/**
- * Whether a freshly detected artifact may open the panel by itself.
- *
- * Automatic opening is a live-delivery signal: the agent must have declared the
- * artifact as a deliverable during a run the user is watching, and the file must
- * be readable. Heuristic candidates, backfilled history, and unreadable paths
- * only appear in the list.
- */
-export const shouldRevealLiveArtifact = (
-  artifact: Artifact,
-  context: { isLiveSession: boolean; previewable: boolean },
-): boolean =>
-  context.isLiveSession &&
-  context.previewable &&
-  artifact.declared === true &&
-  artifact.role === ArtifactRole.Deliverable;
-
 /** What kind of event asked for the reveal; suppression only mutes promotions. */
 const RevealKind = {
   /** The artifact was just added to the session. */
@@ -251,7 +234,7 @@ const artifactSlice = createSlice({
 
     /**
      * `reveal` means the caller certifies this event as a delivery worth showing
-     * (cowork: `shouldRevealLiveArtifact`). The slice does not re-derive that
+     * (cowork: live ledger upserts of declared deliverables). The slice does not re-derive that
      * policy, so every surface states its own: cowork only reveals live declared
      * deliverables, the coding page keeps revealing its own stream artifacts.
      */

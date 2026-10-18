@@ -104,10 +104,6 @@ test('repeated ledger upserts for the same row stay idempotent', () => {
 });
 
 test('loading a session folds the ledger rows in without opening the panel', async () => {
-  const listArtifacts = vi.fn(async () => ({
-    success: true,
-    artifacts: [ledgerRow({ declared: true, role: CoworkArtifactRole.Deliverable })],
-  }));
   vi.stubGlobal('window', {
     electron: {
       cowork: {
@@ -132,6 +128,7 @@ test('loading a session folds the ledger rows in without opening the panel', asy
             messages: [],
             messagesOffset: 0,
             totalMessages: 0,
+            artifacts: [ledgerRow({ declared: true, role: CoworkArtifactRole.Deliverable })],
             createdAt: 1,
             updatedAt: 1,
           },
@@ -142,17 +139,14 @@ test('loading a session folds the ledger rows in without opening the panel', asy
         getConfig: async () => ({ success: false }),
         listSessions: async () => ({ success: true, sessions: [] }),
       },
-      artifacts: { list: listArtifacts, onUpsert: () => () => {} },
+      artifacts: { onUpsert: () => () => {} },
     },
   });
   await coworkService.init();
 
   await coworkService.loadSession('session-1');
 
-  await vi.waitFor(() => {
-    expect(state.getState().artifact.artifactsBySession['session-1']).toHaveLength(1);
-  });
+  expect(state.getState().artifact.artifactsBySession['session-1']).toHaveLength(1);
   // History is not a live delivery: rows join the list, the panel stays closed.
   expect(state.getState().artifact.isPanelOpen).toBe(false);
-  expect(listArtifacts).toHaveBeenCalledWith('session-1');
 });

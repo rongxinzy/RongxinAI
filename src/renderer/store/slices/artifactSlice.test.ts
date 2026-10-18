@@ -15,7 +15,6 @@ import {
   setArtifactLayoutMode,
   setPanelView,
   setPanelWidth,
-  shouldRevealLiveArtifact,
   togglePanel,
 } from './artifactSlice';
 import artifactReducer from './artifactSlice';
@@ -395,25 +394,6 @@ describe('artifact reducer', () => {
 
     expect(state.isPanelOpen).toBe(false);
     expect(state.selectedArtifactId).toBeNull();
-  });
-
-  test('reveals only live, declared, previewable deliverables', () => {
-    const deliverable = makeArtifact({ role: ArtifactRole.Deliverable, declared: true });
-    const live = { isLiveSession: true, previewable: true };
-
-    expect(shouldRevealLiveArtifact(deliverable, live)).toBe(true);
-    expect(shouldRevealLiveArtifact(deliverable, { ...live, isLiveSession: false })).toBe(false);
-    expect(shouldRevealLiveArtifact(deliverable, { ...live, previewable: false })).toBe(false);
-    // Heuristic candidates (declared: false) never open the panel by themselves.
-    expect(shouldRevealLiveArtifact(makeArtifact({ role: ArtifactRole.Deliverable }), live)).toBe(
-      false,
-    );
-    expect(
-      shouldRevealLiveArtifact(
-        makeArtifact({ role: ArtifactRole.Intermediate, declared: true }),
-        live,
-      ),
-    ).toBe(false);
   });
 
   test('previews the sole deliverable when the panel is toggled open', () => {
