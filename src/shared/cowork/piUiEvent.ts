@@ -269,6 +269,8 @@ export const isPiUiEvent = (value: unknown): value is PiUiEvent => {
       return isSessionId(candidate.sessionId);
     case PiUiEventType.Message:
       return isSessionId(candidate.sessionId) && isPiUiMessage(candidate.message);
+    case PiUiEventType.MessageRemoved:
+      return isSessionId(candidate.sessionId) && isNonEmptyString(candidate.messageId);
     case PiUiEventType.MessageUpdate:
       return (
         isSessionId(candidate.sessionId) &&
