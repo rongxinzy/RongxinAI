@@ -32,6 +32,15 @@ packaging with Linux deb install smoke, Windows signing/install/uninstall checks
 beta-channel publish. Stable promotion is manual via `promote.yml` (no rebuild). See
 [RELEASING.md](../RELEASING.md).
 
+**Inference edition packaging (`build-platforms.yml`, not required):** pull requests
+that touch packaging definitions (`electron-builder*`, `vendor/llamacpp/**`, release/build
+workflows, `scripts/release/**`, and other packaging-specific scripts) run the full
+7-leg verify matrix. Pull requests that only change dependencies, bundled assets, or
+non-packaging scripts under `scripts/**` / `resources/**` run one Linux x64 **cpu**
+smoke leg. Unrelated PRs do not run this workflow. A nightly schedule on `main` and
+**workflow_dispatch** run the full matrix; tag releases already build every edition via
+`release.yml`.
+
 Nightly uses the same memory scenario with additional MemLab analysis. Main pushes
 repeat baseline checks without duplicate installation jobs.
 
