@@ -166,16 +166,13 @@ export async function startPiRuntimeSession(
     // reopen that file and continue with structured history; only a legacy
     // session without a file falls back to the flattened text restore.
     const piSessionStoreRoot = host.getPiSessionStoreRoot();
-    let reopenedFromStoreFile = false;
     if (piSessionStoreRoot && pi.SessionManager?.create && pi.SessionManager?.open) {
-      const persistent = openPersistentPiSessionManager(
+      sessionOptions.sessionManager = openPersistentPiSessionManager(
         pi.SessionManager,
         piSessionStoreRoot,
         sessionId,
         workspaceRoot,
-      );
-      sessionOptions.sessionManager = persistent.manager;
-      reopenedFromStoreFile = persistent.reusedFile;
+      ).manager;
     } else if (pi.SessionManager?.inMemory) {
       sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
     }
@@ -536,25 +533,15 @@ export async function startPiRuntimeSession(
     // A live Pi session replaces the lightweight IM retention marker.
     host.retainedSessionIds.delete(sessionId);
 
-    // Send the prompt (a restart restore flattens history into it — unless
-    // the reopened Pi session file already carries that history structured).
+    // Send the prompt. `options._piPromptOverride` carries the flattened
+    // history restore only when no persisted Pi session file exists; when the
+    // session manager above reopened one, Pi already holds the prior turns as
+    // structured messages and the override is just the new user prompt.
     let initialPrompt = researchRun
       ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
       : shortcutWorkflow
         ? shortcutWorkflow.buildInitialPrompt(options._piPromptOverride || prompt)
         : options._piPromptOverride || prompt;
-    if (reopenedFromStoreFile && options._piPromptOverride) {
-      // The JSONL already holds the prior turns as structured messages; the
-      // flattened history override would duplicate every one of them.
-      const userPrompt = options._piPromptOverride.slice(
-        Math.max(0, options._piPromptOverride.lastIndexOf(`User: ${prompt}`)),
-      );
-      initialPrompt = researchRun
-        ? researchRun.buildInitialPrompt(userPrompt)
-        : shortcutWorkflow
-          ? shortcutWorkflow.buildInitialPrompt(userPrompt)
-          : userPrompt;
-    }
     if (shouldRunGoalLoop) {
       initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
     }

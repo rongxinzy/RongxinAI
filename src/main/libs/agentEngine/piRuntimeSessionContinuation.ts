@@ -21,7 +21,7 @@ import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/work
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
 import { restorePiConversationPrompt, summarizePiHistoryFromStore } from './piConversationContext';
-import { hasPersistedPiSession, piSessionDirFor } from './piSessionStore';
+import { hasPersistedPiSession } from './piSessionStore';
 import { PiAgentLoopMode } from './piAgentLoop';
 import { PiPlanModePrompt } from './piPlanTool';
 import { resolvePiTurnWorkflowSkills } from './piTurnWorkflow';
@@ -47,17 +47,18 @@ import {
   preparePiPrompt,
   sendPiPrompt,
   PiChatRuntimeLimit,
-  type PiResourceState,
 } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import type { PiContinueOptions, PiSessionPatch } from './piRuntimeTypes';
 
-/** Restore source labels for the pi-history-restored diagnostic line. */
-const PiHistoryRestoreSource = {
-  Continue: 'continue',
-  Recreate: 'recreate',
-  SkillsChange: 'skills-change',
-} as const;
+interface PiSessionHistoryRestore {
+  /**
+   * Prompt for the rebuilt Pi session. When the persisted JSONL already
+   * carries the history this is just the new user prompt; otherwise it is
+   * the flattened history restore (legacy sessions, post-invalidation).
+   */
+  prompt: string;
+}
 
 /**
  * Restores history for a session rebuild.
@@ -73,14 +74,13 @@ const restorePiSessionHistory = (
   sessionId: string,
   prompt: string,
   context: {
-    source: string;
     contextWindowTokens?: number;
     maxOutputTokens?: number;
     chatMode: boolean;
   },
-): string => {
+): PiSessionHistoryRestore => {
   const piSessionStoreRoot = host.getPiSessionStoreRoot();
-  if (piSessionStoreRoot && hasPersistedPiSession(piSessionDirFor(piSessionStoreRoot, sessionId))) {
+  if (piSessionStoreRoot && hasPersistedPiSession(piSessionStoreRoot, sessionId)) {
     agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
       source: 'jsonl',
       messageCount: 0,
@@ -89,7 +89,7 @@ const restorePiSessionHistory = (
       promptChars: prompt.length,
       restoreMs: 0,
     });
-    return prompt;
+    return { prompt };
   }
   const historyLoadStartedAt = Date.now();
   const piPrompt = restorePiConversationPrompt(host.getStore(), sessionId, prompt, {
@@ -106,7 +106,7 @@ const restorePiSessionHistory = (
     promptChars: piPrompt.length,
     restoreMs: Date.now() - historyLoadStartedAt,
   });
-  return piPrompt;
+  return { prompt: piPrompt };
 };
 
 export async function continuePiRuntimeSession(
@@ -134,10 +134,10 @@ export async function continuePiRuntimeSession(
     const chatMode =
       options.sessionMode === CoworkSessionMode.Chat ||
       storedSession?.mode === CoworkSessionMode.Chat;
-    const piPrompt = restorePiSessionHistory(host, sessionId, prompt, {
-      source: PiHistoryRestoreSource.Continue,
-      chatMode,
-    });
+    // With a persisted Pi session file the startSession below reopens it and
+    // Pi restores structured history; the override then stays the plain
+    // prompt. Without a file the flattened restore travels as the override.
+    const restored = restorePiSessionHistory(host, sessionId, prompt, { chatMode });
     return await host.startSession(sessionId, prompt, {
       ...options,
       sessionMode: chatMode ? CoworkSessionMode.Chat : CoworkSessionMode.Work,
@@ -152,7 +152,7 @@ export async function continuePiRuntimeSession(
       modelOverride: options.modelOverride ?? storedSession?.modelOverride,
       goalMode: options.goalMode ?? active?.goalMode,
       unattended: nextUnattended,
-      _piPromptOverride: piPrompt,
+      _piPromptOverride: restored.prompt,
       _workflowSkillIdsOverride: resolvePiTurnWorkflowSkills({
         attachedSkillIds: options.attachedSkillIds,
         previousWorkflowSkillIds: active?.requestedWorkflowSkillIds,
@@ -200,24 +200,17 @@ export async function continuePiRuntimeSession(
     unattendedTopologyChanged ||
     workflowChanged
   ) {
-    const historyLoadStartedAt = Date.now();
-    // Paged tail read, not a full transcript: see the continue-rebuild note.
     if (mcpToolTopologyChanged) {
       console.log('[PiRuntime] recreating session after MCP tool manifest refresh');
     }
-    const piPrompt = restorePiConversationPrompt(host.getStore(), sessionId, prompt, {
-      maxChars: resolveConversationHistoryCharLimit(
+    // The rebuild reopens the persisted session file when one exists; only a
+    // legacy session without a file needs the flattened restore prompt.
+    const restored = restorePiSessionHistory(host, sessionId, prompt, {
+      contextWindowTokens:
         typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+      maxOutputTokens:
         typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
-        active.resourceState.chatMode,
-      ),
-      ocrCommandFor: host.getOcrCommandFor(),
-    });
-    agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
-      source: 'recreate',
-      ...summarizePiHistoryFromStore(host.getStore(), sessionId),
-      promptChars: piPrompt.length,
-      restoreMs: Date.now() - historyLoadStartedAt,
+      chatMode: active.resourceState.chatMode,
     });
     host.disposeSessionForRecreation(sessionId, active);
     return await host.startSession(sessionId, prompt, {
@@ -230,7 +223,7 @@ export async function continuePiRuntimeSession(
       codemode: nextCodemode,
       mcpNativeBridge: nextMcpNativeBridge,
       unattended: nextUnattended,
-      _piPromptOverride: piPrompt,
+      _piPromptOverride: restored.prompt,
       _workflowSkillIdsOverride: requestedWorkflowSkillIds,
     });
   }
@@ -248,21 +241,14 @@ export async function continuePiRuntimeSession(
   const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
   const skillsChanged = !haveSameStringList(requestedSkillIds, active.requestedSkillIds);
   if (skillsChanged) {
-    const historyLoadStartedAt = Date.now();
-    // Paged tail read, not a full transcript: see the continue-rebuild note.
-    const piPrompt = restorePiConversationPrompt(host.getStore(), sessionId, prompt, {
-      maxChars: resolveConversationHistoryCharLimit(
+    // Same restore rule as the topology recreate above: the persisted file
+    // carries the history unless this is a legacy session.
+    const restored = restorePiSessionHistory(host, sessionId, prompt, {
+      contextWindowTokens:
         typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+      maxOutputTokens:
         typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
-        active.resourceState.chatMode,
-      ),
-      ocrCommandFor: host.getOcrCommandFor(),
-    });
-    agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
-      source: 'skills-change',
-      ...summarizePiHistoryFromStore(host.getStore(), sessionId),
-      promptChars: piPrompt.length,
-      restoreMs: Date.now() - historyLoadStartedAt,
+      chatMode: active.resourceState.chatMode,
     });
     host.disposeSessionForRecreation(sessionId, active);
     return await host.startSession(sessionId, prompt, {
@@ -275,7 +261,7 @@ export async function continuePiRuntimeSession(
       codemode: nextCodemode,
       mcpNativeBridge: nextMcpNativeBridge,
       unattended: nextUnattended,
-      _piPromptOverride: piPrompt,
+      _piPromptOverride: restored.prompt,
       _workflowSkillIdsOverride: requestedWorkflowSkillIds,
     });
   }
