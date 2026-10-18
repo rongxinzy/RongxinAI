@@ -164,8 +164,9 @@ describe('PiAssistantTranscript', () => {
     expect(deleteMessage).not.toHaveBeenCalled();
   });
 
-  it('does not delete a placeholder when active answer text is retained in memory', () => {
+  it('removeEmptyAnswerPlaceholder keeps rows when active answer text is in memory', () => {
     const deleteMessage = vi.fn(() => true);
+    const emitMessageRemoved = vi.fn();
     const row = {
       id: 'in-memory-1',
       type: 'assistant' as const,
@@ -184,11 +185,20 @@ describe('PiAssistantTranscript', () => {
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
-      emitMessageRemoved: vi.fn(),
+      emitMessageRemoved,
       getActiveSession: () => active,
     });
-    local.closeIdlePlaceholders('session', active, { finalize: true });
+    (
+      local as unknown as {
+        removeEmptyAnswerPlaceholder: (
+          sessionId: string,
+          messageId: string,
+          active: ActivePiSession,
+        ) => void;
+      }
+    ).removeEmptyAnswerPlaceholder('session', row.id, active);
     expect(deleteMessage).not.toHaveBeenCalled();
+    expect(emitMessageRemoved).not.toHaveBeenCalled();
   });
 
   it('does not delete a placeholder when streamed content was captured in memory', () => {
