@@ -30,7 +30,7 @@ import {
 } from '../../../shared/codingAgent';
 import { showAppError } from '../../services/appToast';
 import { i18nService } from '../../services/i18n';
-import MarkdownContent from '../MarkdownContent';
+import StaticMarkdownContent from '../markdown/StaticMarkdownContent';
 import { CodingWorkspaceFileView } from './constants';
 import {
   detectWorkspaceLineEnding,
@@ -434,7 +434,7 @@ export const CodingWorkspaceFileBrowser = ({
           ) : selectedContent !== null && selectedPath ? (
             <ScrollArea className="h-full">
               {fileView === CodingWorkspaceFileView.Preview && isMarkdownFilePath(selectedPath) ? (
-                <MarkdownContent
+                <StaticMarkdownContent
                   content={selectedContent}
                   className="p-4"
                   restrictLocalFileLinks

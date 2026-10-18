@@ -8,7 +8,7 @@ import { i18nService } from '../../services/i18n';
 import { resolveLocalizedText } from '../../services/skill';
 import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import type { MarketplaceSkill } from '../../types/skill';
-import MarkdownContent from '../MarkdownContent';
+import StaticMarkdownContent from '../markdown/StaticMarkdownContent';
 
 interface MarketplaceSkillDocumentDialogProps {
   skill: MarketplaceSkill;
@@ -148,7 +148,7 @@ export function MarketplaceSkillDocumentDialog({
               {isLoadingContent ? (
                 <div className="py-3 text-sm text-muted-foreground">{i18nService.t('loading')}</div>
               ) : skillContent && isContentReady ? (
-                <MarkdownContent content={skillContent} />
+                <StaticMarkdownContent content={skillContent} />
               ) : skillContentError ? (
                 <p className="text-sm text-muted-foreground">
                   {i18nService.t('skillContentUnavailable')}

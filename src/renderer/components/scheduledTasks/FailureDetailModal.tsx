@@ -12,7 +12,7 @@ import { i18nService } from '../../services/i18n';
 // 2026/09/23 失败详情同样提取 JSON 内 message，与活动流展示一致
 import { extractUserFacingErrorMessage } from '../../services/coworkTerminalError';
 import { compactMarkdownClass } from '../compactMarkdownClass';
-import MarkdownContent from '../MarkdownContent';
+import StaticMarkdownContent from '../markdown/StaticMarkdownContent';
 
 interface FailureDetailModalProps {
   inputCommand: string;
@@ -69,7 +69,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
             </div>
             <div className="bg-destructive/10 rounded-lg p-3 wrap-break-word border border-destructive/20">
               {error ? (
-                <MarkdownContent
+                <StaticMarkdownContent
                   content={extractUserFacingErrorMessage(error)}
                   className={compactMarkdownClass('destructive')}
                 />
