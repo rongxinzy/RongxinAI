@@ -16,7 +16,7 @@ import { clearSelection } from '../../../store/slices/quickActionSlice';
 import { activateSkill, clearActiveSkills } from '../../../store/slices/skillSlice';
 import type { Model } from '../../../store/slices/modelSlice';
 import type { Skill } from '../../../types/skill';
-import type { CoworkFileAttachment, CoworkImageAttachment } from '../../../types/cowork';
+import type { CoworkFileAttachment, CoworkOutgoingImageAttachment } from '../../../types/cowork';
 import { parseCoworkSlashSubmission } from '../coworkSlashCommands';
 import { extractBase64FromDataUrl, isImagePath } from './promptInputUtils';
 import type { CoworkAttachment, CoworkPromptInputProps } from './types';
@@ -174,7 +174,7 @@ export function useCoworkPromptSubmission({
         dataUrlLength: a.dataUrl?.length ?? 0,
       })),
     });
-    const imageAtts: CoworkImageAttachment[] = [];
+    const imageAtts: CoworkOutgoingImageAttachment[] = [];
     const fileAtts: CoworkFileAttachment[] = [];
     for (const attachment of attachments) {
       if (attachment.isImage && attachment.dataUrl) {
