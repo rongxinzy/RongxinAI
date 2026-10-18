@@ -2,10 +2,9 @@
  * Coding-lane artifact recording at the event-write choke point.
  *
  * CodingRoomRepository.appendEvent delegates here after a coding event row is
- * committed. The rule mirrors the renderer's collectCodingFileArtifacts:
- * FileChange events with a diff/write action and write-shaped ToolCall events
- * become ledger rows scoped to the lane id, resolved against the lane's
- * execution root.
+ * committed. This is the only coding-artifact rule: FileChange events with a
+ * diff/write action and write-shaped ToolCall events become ledger rows scoped
+ * to the lane id, resolved against the lane's execution root.
  */
 import type Database from 'better-sqlite3';
 
