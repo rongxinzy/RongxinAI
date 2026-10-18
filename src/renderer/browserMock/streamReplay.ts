@@ -21,6 +21,7 @@ import synthetic20kTrace from './fixtures/streamReplay/synthetic-20000.json';
 const PreviewStreamReplayQuery = {
   Fixture: 'previewStreamReplay',
   AutoStart: 'previewStreamAutoStart',
+  InstantBaseline: 'previewStreamReplayInstant',
   ScrollMutation: 'previewScrollMutation',
 } as const;
 
@@ -77,6 +78,14 @@ export function readStreamReplayFixtureId(
   if (!raw) return null;
   if (raw in TRACES) return raw as StreamReplayFixtureId;
   return null;
+}
+
+export function readPreviewStreamReplayInstant(search = readBrowserSearchParam()): boolean {
+  const raw = new URLSearchParams(search)
+    .get(PreviewStreamReplayQuery.InstantBaseline)
+    ?.trim()
+    .toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes';
 }
 
 export function shouldAutoStartStreamReplay(search = readBrowserSearchParam()): boolean {
@@ -159,6 +168,36 @@ export function seedStreamReplaySession(trace: StreamReplayTrace): MockSession {
     totalMessages: userMessage ? 1 : 0,
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+export function seedStreamReplaySessionFullParse(trace: StreamReplayTrace): MockSession {
+  const base = seedStreamReplaySession(trace);
+  let assistantId: string | undefined;
+  for (const entry of trace.events) {
+    const event = entry.event;
+    if (event.type !== PiUiEventType.Message || !('message' in event)) continue;
+    if (event.message?.type !== 'assistant') continue;
+    assistantId = event.message.id;
+    break;
+  }
+  if (!assistantId) return base;
+  const now = Date.UTC(2026, 10, 16, 8, 0, 0);
+  return {
+    ...base,
+    status: CoworkSessionStatus.Completed,
+    messages: [
+      ...base.messages,
+      {
+        id: assistantId,
+        type: 'assistant',
+        content: trace.expectedFinalText,
+        timestamp: now + 1000,
+        metadata: { isStreaming: false, isFinal: true },
+      },
+    ],
+    totalMessages: base.messages.length + 1,
+    updatedAt: now + 1000,
   };
 }
 

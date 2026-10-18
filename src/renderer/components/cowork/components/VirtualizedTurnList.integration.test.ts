@@ -17,7 +17,7 @@ const clearViewportTimeouts = (): void => {
 };
 
 vi.mock('use-stick-to-bottom', () => ({
-  useStickToBottomContext: () => ({ scrollRef, stopScroll: () => undefined }),
+  useStickToBottomContext: () => ({ scrollRef }),
 }));
 
 class TestResizeObserver implements ResizeObserver {

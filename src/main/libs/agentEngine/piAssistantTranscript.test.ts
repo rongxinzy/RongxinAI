@@ -164,6 +164,33 @@ describe('PiAssistantTranscript', () => {
     expect(deleteMessage).not.toHaveBeenCalled();
   });
 
+  it('does not delete a placeholder when active answer text is retained in memory', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'in-memory-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    active.answerText = 'only in active.answerText';
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
   it('does not delete a placeholder when streamed content was captured in memory', () => {
     const deleteMessage = vi.fn(() => true);
     const row = {

@@ -41,8 +41,10 @@ import {
   installStreamReplayController,
   installStreamReplayLongTaskObserver,
   readPreviewScrollMutation,
+  readPreviewStreamReplayInstant,
   readStreamReplayFixtureId,
   seedStreamReplaySession,
+  seedStreamReplaySessionFullParse,
   shouldAutoStartStreamReplay,
 } from './streamReplay';
 
@@ -142,25 +144,30 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
   let streamReplayController: ReturnType<typeof installStreamReplayController> | undefined;
   if (streamReplayFixtureId) {
     const trace = getStreamReplayTrace(streamReplayFixtureId);
-    const seeded = seedStreamReplaySession(trace);
+    const instantBaseline = readPreviewStreamReplayInstant();
+    const seeded = instantBaseline
+      ? seedStreamReplaySessionFullParse(trace)
+      : seedStreamReplaySession(trace);
     sessions.set(seeded.id, { mode: CoworkSessionMode.Work, session: seeded });
-    installStreamReplayLongTaskObserver();
-    streamReplayController = installStreamReplayController({
-      runtime,
-      fixtureId: streamReplayFixtureId,
-      emitRecorded: payload => {
-        runtime.emit('cowork.onStreamUiEvent', payload);
-      },
-      getSession: () => sessions.get(seeded.id)?.session,
-      setSession: session => {
-        sessions.set(session.id, { mode: CoworkSessionMode.Work, session });
-      },
-    });
-    void import('./previewScrollMutationDev').then(module => {
-      module.installPreviewScrollMutation(readPreviewScrollMutation());
-    });
-    if (shouldAutoStartStreamReplay()) {
-      setTimeout(() => streamReplayController?.begin(), 80);
+    if (!instantBaseline) {
+      installStreamReplayLongTaskObserver();
+      streamReplayController = installStreamReplayController({
+        runtime,
+        fixtureId: streamReplayFixtureId,
+        emitRecorded: payload => {
+          runtime.emit('cowork.onStreamUiEvent', payload);
+        },
+        getSession: () => sessions.get(seeded.id)?.session,
+        setSession: session => {
+          sessions.set(session.id, { mode: CoworkSessionMode.Work, session });
+        },
+      });
+      void import('./previewScrollMutationDev').then(module => {
+        module.installPreviewScrollMutation(readPreviewScrollMutation());
+      });
+      if (shouldAutoStartStreamReplay()) {
+        setTimeout(() => streamReplayController?.begin(), 80);
+      }
     }
   }
 

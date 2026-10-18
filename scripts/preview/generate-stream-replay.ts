@@ -21,6 +21,15 @@ const readFixtureMap = (dir: string): Map<string, string> => {
   return map;
 };
 
+const formatFixtureJsonInDir = (dir: string): void => {
+  const names = listJsonFiles(dir);
+  if (names.length === 0) return;
+  execFileSync('bunx', ['oxfmt', ...names.map(name => join(dir, name))], {
+    cwd: root,
+    stdio: 'pipe',
+  });
+};
+
 const runCodegenTo = (outDir: string): void => {
   execFileSync('bun', ['x', 'vitest', 'run', '-c', 'vitest.stream-replay-codegen.config.ts'], {
     cwd: root,
@@ -37,6 +46,8 @@ if (check) {
   const tempDir = mkdtempSync(join(tmpdir(), 'stream-replay-codegen-'));
   try {
     runCodegenTo(tempDir);
+    formatFixtureJsonInDir(tempDir);
+    formatFixtureJsonInDir(fixtureDir);
     const expected = readFixtureMap(fixtureDir);
     const actual = readFixtureMap(tempDir);
     const missing = [...expected.keys()].filter(name => !actual.has(name));
@@ -57,5 +68,6 @@ if (check) {
   }
 } else {
   runCodegenTo(fixtureDir);
+  formatFixtureJsonInDir(fixtureDir);
   console.log(`[web:preview:stream-replay:codegen] ok (${fixtureDir})`);
 }

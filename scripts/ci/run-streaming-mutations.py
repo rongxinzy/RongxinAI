@@ -173,6 +173,13 @@ M: dict[str, list[tuple[str, str, str]]] = {
     'M24b empty placeholder guard: streamed content length': [
         (TR, '    if (streamed.length > 0) return;\n', ''),
     ],
+    'M24c empty placeholder guard: in-memory answer text': [
+        (
+            TR,
+            '    const inMemory = active.answerText || active.retryPriorAnswer;\n    if (inMemory.length > 0) return;\n',
+            '',
+        ),
+    ],
     'M32 finalizeMessage empty path skips resolved prior answer': [
         (
             TR,

@@ -257,6 +257,44 @@ export async function runStreamReplay(
   );
 }
 
+/**
+ * @param {import('@playwright/test').Page} page
+ * @param {{ fixtureId: StreamReplayFixtureId, maxEventsEmitted: number }} options
+ */
+export async function runStreamReplayThroughEvents(page, { fixtureId, maxEventsEmitted }) {
+  return page.evaluate(
+    async ({ id, maxEvents }) => {
+      const waitAnimationFrames = count =>
+        new Promise(resolve => {
+          let remaining = count;
+          const tick = () => {
+            remaining -= 1;
+            if (remaining <= 0) resolve(undefined);
+            else requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+        });
+
+      const controller = window.__previewStreamReplay;
+      if (!controller || controller.fixtureId !== id) {
+        throw new Error('preview stream replay controller is unavailable');
+      }
+      controller.beginStepped();
+      while (controller.status === 'streaming' && controller.eventsEmitted < maxEvents) {
+        if (!controller.step()) break;
+        await waitAnimationFrames(2);
+      }
+      await waitAnimationFrames(3);
+      return {
+        eventsEmitted: controller.eventsEmitted,
+        eventCount: controller.eventCount,
+        replayPhase: controller.replayPhase,
+      };
+    },
+    { id: fixtureId, maxEvents: maxEventsEmitted },
+  );
+}
+
 export function assertStreamingScrollPinned(
   samples,
   { tolerancePx = SCROLL_PIN_TOLERANCE_PX, requireOverflowSamples = true } = {},

@@ -73,6 +73,7 @@ import { useArtifactLinkInterception } from './sessionDetail/useArtifactLinkInte
 import { useArtifactPanelPresentation } from './sessionDetail/useArtifactPanelPresentation';
 import { useInlineArtifacts } from './sessionDetail/useInlineArtifacts';
 import { useSessionExport } from './sessionDetail/useSessionExport';
+
 interface CoworkSessionDetailProps {
   displayedSessionId?: string;
   isSessionSwitching?: boolean;

@@ -17,6 +17,7 @@ import {
   readAssistantRenderedBody,
   reportLongTasks,
   runStreamReplay,
+  runStreamReplayThroughEvents,
 } from '../shared/streamReplay.mjs';
 
 test.describe.configure({ retries: 0 });
@@ -39,20 +40,10 @@ async function readFullParseBaseline(page, baseURL, fixtureId) {
   await page.waitForFunction(() => window.__previewCoworkStreamReady === true, undefined, {
     timeout: 120_000,
   });
+  await page.waitForFunction(() => window.__previewStreamReplay === undefined, undefined, {
+    timeout: 10_000,
+  });
   await page.evaluate(async () => {
-    const controller = window.__previewStreamReplay;
-    if (!controller) throw new Error('missing replay controller');
-    if (controller.status === 'idle') {
-      controller.beginStepped();
-      while (controller.step()) {
-        await new Promise(resolve => {
-          requestAnimationFrame(() => requestAnimationFrame(resolve));
-        });
-      }
-    }
-    if (controller.status !== 'complete') {
-      throw new Error(`stream replay did not complete (status=${controller.status})`);
-    }
     await new Promise(resolve => {
       requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     });
@@ -170,6 +161,16 @@ test('503 auto-retry keeps a single answer bubble that keeps growing', async ({
   const failures = [];
   attachConsoleGuards(page, failures, '503-retry');
   await applyDeterministicRendering(page);
+  await startReplayPage(page, baseURL, '503-auto-retry');
+  const midReplay = await runStreamReplayThroughEvents(page, {
+    fixtureId: '503-auto-retry',
+    maxEventsEmitted: 11,
+  });
+  expect(midReplay.eventsEmitted).toBe(11);
+  expect(midReplay.replayPhase).toBe('retry');
+  const midRetryText = normalizeReplayPlainText(await readAssistantRenderedBody(page));
+  expect(midRetryText).toContain('Recovered');
+  expect(midRetryText.length).toBeGreaterThan('Part'.length);
   await startReplayPage(page, baseURL, '503-auto-retry');
   const result = await runStreamReplay(page, { fixtureId: '503-auto-retry', mode: 'stepped' });
   const bubbleCounts = result.samples.map(sample => sample.answerBubbles);
