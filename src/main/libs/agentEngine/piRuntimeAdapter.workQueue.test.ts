@@ -171,7 +171,7 @@ describe('PiRuntimeAdapter', () => {
         getSession: () => ({ messages: [], experts: [] }),
         updateSession: vi.fn(),
         updateMessage: vi.fn(),
-        refreshSessionArtifacts: vi.fn(),
+        listSessionArtifacts: vi.fn(),
       } as unknown as CoworkStore);
 
       let listener: ((event: { type: string }) => void) | null = null;

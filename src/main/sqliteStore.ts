@@ -15,7 +15,11 @@ import {
 import { CoworkScheduledSessionTitlePrefix, CoworkSessionSource } from '../shared/cowork/constants';
 import { DB_FILENAME } from './appConstants';
 import { migrateScheduledSessionTitles } from './scheduledSessionTitles/migration';
-import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
+import {
+  initializeArtifactLedgerSchema,
+  migrateLegacyArtifactsToLedger,
+} from './artifactLedger/schema';
+import { normalizeArtifactKeyPath } from './artifactLedger/artifactLedger';
 import {
   openSqliteDatabaseWithRecovery,
   SqliteBackupManager,
@@ -315,7 +319,8 @@ export class SqliteStore {
       CREATE INDEX IF NOT EXISTS idx_cowork_messages_session_order
       ON cowork_messages(session_id, COALESCE(sequence, created_at), created_at);
     `);
-    initializeCoworkArtifactIndexSchema(this.db);
+    initializeArtifactLedgerSchema(this.db);
+    migrateLegacyArtifactsToLedger(this.db, normalizeArtifactKeyPath);
 
     try {
       const pinnedResult = this.db

@@ -15,6 +15,7 @@ import type {
   StoreApi,
   WindowApi,
 } from './electron/appCoreApi';
+import type { ArtifactsApi } from './electron/artifactsApi';
 import type {
   AppInfoApi,
   AppUpdateApi,
@@ -73,6 +74,7 @@ export interface IElectronAPI {
   window: WindowApi;
   memory: MemoryApi;
   magpie: import('../../shared/magpie/types').MagpieApi;
+  artifacts: ArtifactsApi;
   cowork: CoworkApi;
   workbenchTask: WorkbenchTaskApi;
   todo: TodoApi;

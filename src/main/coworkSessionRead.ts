@@ -1,7 +1,6 @@
-import type { CoworkMessage, CoworkSessionStatus, CoworkStore } from './coworkStore';
+import type { CoworkMessage, CoworkStore } from './coworkStore';
 import type { CoworkPersistedArtifact } from '../shared/cowork/artifacts';
-import { CoworkSessionStatus as SessionStatus } from '../shared/cowork/constants';
-import type { CoworkArtifactIndex } from './coworkArtifactIndex';
+import { ArtifactLedger } from './artifactLedger/artifactLedger';
 
 export interface CoworkSessionReadOptions {
   includeArtifacts?: boolean;
@@ -25,20 +24,21 @@ export function readCoworkSessionMessages(
   return { totalMessages, messageOffset, messages };
 }
 
+/**
+ * Session artifacts come from the event-time ledger (single source of truth);
+ * running and settled sessions read the same rows. Kept as a choke point so
+ * metadata reads can skip artifact loading without callers caring.
+ */
 export function readCoworkSessionArtifacts(
-  index: Pick<CoworkArtifactIndex, 'listSession' | 'refreshSession'>,
+  ledger: Pick<ArtifactLedger, 'list'>,
   sessionId: string,
-  status: CoworkSessionStatus,
   options: CoworkSessionReadOptions,
 ): CoworkPersistedArtifact[] {
-  // Runtime metadata reads must not rebuild or materialize the artifact index.
   if (options.includeArtifacts === false) return [];
   try {
-    return status === SessionStatus.Running
-      ? index.listSession(sessionId)
-      : index.refreshSession(sessionId);
+    return ledger.list(sessionId);
   } catch (error) {
-    console.error(`[CoworkStore] Failed to index artifacts for session ${sessionId}:`, error);
+    console.error(`[CoworkStore] Failed to read artifacts for session ${sessionId}:`, error);
     return [];
   }
 }

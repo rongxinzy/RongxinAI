@@ -18,6 +18,7 @@ import { createContextMenu } from './createContextMenu';
 import { createWindow } from './createWindow';
 import { createMemory } from './createMemory';
 import { createMagpie } from './createMagpie';
+import { createArtifacts } from './createArtifacts';
 import { createCowork } from './createCowork';
 import { createWorkbenchTask } from './createWorkbenchTask';
 import { createTodo } from './createTodo';
@@ -69,6 +70,7 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     window: createWindow(runtime),
     memory: createMemory(runtime),
     magpie: createMagpie(runtime),
+    artifacts: createArtifacts(runtime),
     cowork: createCowork(runtime),
     workbenchTask: createWorkbenchTask(runtime),
     todo: createTodo(runtime),

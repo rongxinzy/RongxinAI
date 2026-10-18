@@ -39,6 +39,7 @@ import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { persistCoworkImageAttachments } from '../../coworkImageAttachments';
 import type { CoworkStore } from '../../coworkStore';
+import type { ArtifactLedger } from '../../artifactLedger/artifactLedger';
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
@@ -183,6 +184,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
   private sessionSummaryBackfillService: SessionSummaryBackfillService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
   private scheduledTaskService: ScheduledTaskService | null = null;
+  private artifactLedgerService: ArtifactLedger | null = null;
   readonly initializingSessions = new Map<string, InitializingPiSession>();
   readonly memoryInjectionDedup = new MemoryInjectionDedup();
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
@@ -279,6 +281,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
     this.mcpInjected = true;
     this.mcpToolManifestGeneration += 1;
   }
+  setArtifactLedger(ledger: ArtifactLedger): void {
+    this.artifactLedgerService = ledger;
+  }
   refreshMcpTools(): void {
     this.mcpToolManifestGeneration += 1;
   }
@@ -294,6 +299,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
   }
   getWorkbenchTaskService(): WorkbenchTaskService | null {
     return this.workbenchTaskService;
+  }
+  getArtifactLedger(): ArtifactLedger | null {
+    return this.artifactLedgerService;
   }
   getProjectMemoryService(): ProjectMemoryService | null {
     return this.projectMemoryService;

@@ -26,6 +26,7 @@ import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
 import { registerCoworkSessionIpc } from './appBootstrap/coworkSessionIpc';
 import { registerCoworkQueueIpc } from './appBootstrap/coworkQueueIpc';
 import { registerCoworkSessionAdminIpc } from './appBootstrap/coworkSessionAdminIpc';
+import { registerArtifactIpc } from './artifactLedger/artifactIpc';
 import { registerCoworkExportIpc } from './appBootstrap/coworkExportIpc';
 import { registerCoworkConfigIpc } from './appBootstrap/coworkConfigIpc';
 import { registerAgentIpc } from './appBootstrap/agentIpc';
@@ -70,6 +71,7 @@ if (!gotTheLock) {
   registerCoworkSessionIpc();
   registerCoworkQueueIpc();
   registerCoworkSessionAdminIpc();
+  registerArtifactIpc();
   registerCoworkExportIpc();
   registerCoworkConfigIpc();
   registerAgentIpc();

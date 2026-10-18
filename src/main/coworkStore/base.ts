@@ -2,17 +2,17 @@
 // Split from src/main/coworkStore.ts (issue #1069).
 import Database from 'better-sqlite3';
 
-import { CoworkArtifactIndex } from '../coworkArtifactIndex';
+import { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import { WorkspaceFolderRepository } from '../workspaceFolderRepository';
 
 export class CoworkStoreBase {
   protected db: Database.Database;
-  protected artifactIndex: CoworkArtifactIndex;
+  protected artifactLedger: ArtifactLedger;
   protected workspaceFolders: WorkspaceFolderRepository;
 
-  constructor(db: Database.Database) {
+  constructor(db: Database.Database, artifactLedger?: ArtifactLedger) {
     this.db = db;
-    this.artifactIndex = new CoworkArtifactIndex(db);
+    this.artifactLedger = artifactLedger ?? new ArtifactLedger(db);
     this.workspaceFolders = new WorkspaceFolderRepository(db);
   }
 

@@ -14,6 +14,7 @@ import {
   CodingToolCallStatus,
 } from '../../shared/codingAgent';
 import { initializeCodingAgentSchema } from './schema';
+import { initializeArtifactLedgerSchema } from '../artifactLedger/schema';
 import { CodingRoomRepository } from './codingRoomRepository';
 
 let db: Database.Database | undefined;
@@ -31,6 +32,7 @@ afterEach(() => {
 test('persists independent mission lanes and append-only events', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Fix refresh flow');
@@ -66,6 +68,7 @@ test('persists independent mission lanes and append-only events', () => {
 test('writer lease is mutually exclusive and handoffs are immutable records', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Review');
@@ -86,6 +89,7 @@ test('writer lease is mutually exclusive and handoffs are immutable records', ()
 test('persists logical coding workspaces separately from source folders', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
 
   const room = repository.createWorkspace(
@@ -109,6 +113,7 @@ test('persists logical coding workspaces separately from source folders', () => 
 test('coalesces streamed chunks with the same message ID into one durable event', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Stream');
@@ -135,6 +140,7 @@ test('coalesces streamed chunks with the same message ID into one durable event'
 test('replaces an in-process streaming snapshot instead of appending it', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Snapshot');
@@ -152,6 +158,7 @@ test('replaces an in-process streaming snapshot instead of appending it', () => 
 test('coalesces streamed tool call snapshots with the same tool call ID', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Tool');
@@ -179,6 +186,7 @@ test('coalesces streamed tool call snapshots with the same tool call ID', () => 
 test('loads a lane and its owning room directly by lane id', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Direct lookup');
@@ -195,6 +203,7 @@ test('loads a lane and its owning room directly by lane id', () => {
 test('coalesces stream chunks in memory and flushes them to SQLite', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Memory coalesce');
@@ -232,6 +241,7 @@ test('coalesces stream chunks in memory and flushes them to SQLite', () => {
 test('takes over an existing stream row without duplicating it after a restart', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Restart takeover');
@@ -258,6 +268,7 @@ test('takes over an existing stream row without duplicating it after a restart',
 test('deleting a lane drops its buffered stream writes', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Dropped writes');
@@ -325,6 +336,7 @@ test('flushing against a closed database drops buffered writes without throwing'
   tempDirectories.push(directory);
   db = new Database(path.join(directory, 'events.sqlite'));
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Closed flush');
@@ -342,6 +354,7 @@ test('flushing against a closed database drops buffered writes without throwing'
 test('persists one pending elicitation per lane and rejects duplicate responses', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Clarify implementation');
@@ -366,6 +379,7 @@ test('persists one pending elicitation per lane and rejects duplicate responses'
 test('cancels the questions a previous application run left pending', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Resume after restart');
@@ -394,6 +408,7 @@ test('cancels the questions a previous application run left pending', () => {
 test('recovers the lanes and missions that were waiting for an answer', () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   const repository = new CodingRoomRepository(db);
   const room = repository.getOrCreateRoom('/workspace/project');
   const mission = repository.createMission(room.id, 'Waiting lane');

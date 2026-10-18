@@ -230,12 +230,7 @@ export class CoworkSessionStore extends CoworkMessageStore {
       };
     });
 
-    const artifacts = readCoworkSessionArtifacts(
-      this.artifactIndex,
-      id,
-      row.status as CoworkSessionStatus,
-      options,
-    );
+    const artifacts = readCoworkSessionArtifacts(this.artifactLedger, id, options);
 
     return {
       id: row.id,
@@ -266,8 +261,8 @@ export class CoworkSessionStore extends CoworkMessageStore {
     };
   }
 
-  refreshSessionArtifacts(sessionId: string): CoworkPersistedArtifact[] {
-    return this.artifactIndex.refreshSession(sessionId);
+  listSessionArtifacts(sessionId: string): CoworkPersistedArtifact[] {
+    return this.artifactLedger.list(sessionId);
   }
 
   updateSession(

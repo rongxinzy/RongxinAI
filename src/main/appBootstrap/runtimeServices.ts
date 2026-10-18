@@ -16,6 +16,7 @@ import { McpCredentialVault } from '../libs/mcpCredentialVault';
 import { McpStore } from '../mcpStore';
 import { AgentManager } from '../agentManager';
 import { CoworkStore } from '../coworkStore';
+import { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import { SkillManager } from '../skillManager';
 import { SqliteStore } from '../sqliteStore';
 
@@ -110,9 +111,17 @@ export const startAppUpdatePolling = (): void => {
 export const getCoworkStore = () => {
   if (!rt.coworkStore) {
     const sqliteStore = getStore();
-    rt.coworkStore = new CoworkStore(sqliteStore.getDatabase());
+    rt.coworkStore = new CoworkStore(sqliteStore.getDatabase(), getArtifactLedger());
   }
   return rt.coworkStore;
+};
+
+/** Shared artifact ledger over the main SQLite database (event-time source of truth). */
+export const getArtifactLedger = (): ArtifactLedger => {
+  if (!rt.artifactLedger) {
+    rt.artifactLedger = new ArtifactLedger(getStore().getDatabase());
+  }
+  return rt.artifactLedger;
 };
 
 export const getAgentManager = () => {

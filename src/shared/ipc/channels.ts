@@ -366,3 +366,11 @@ export const DevNetworkIpc = {
   Entry: 'dev-network:entry',
 } as const;
 export type DevNetworkIpc = (typeof DevNetworkIpc)[keyof typeof DevNetworkIpc];
+
+// ─── Artifact ledger ────────────────────────────────────────────────────────
+/** Event-time artifact upserts (main → renderer) and ledger list reads. */
+export const ArtifactIpc = {
+  Upsert: 'artifact:upsert',
+  List: 'artifact:list',
+} as const;
+export type ArtifactIpc = (typeof ArtifactIpc)[keyof typeof ArtifactIpc];

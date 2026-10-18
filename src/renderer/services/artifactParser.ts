@@ -2,6 +2,14 @@ import { ArtifactRole, type Artifact, type ArtifactType } from '../types/artifac
 import type { CoworkMessage } from '../types/cowork';
 import { discoverWorkbenchMessageArtifactBlocks } from '../../shared/workbenchTask';
 import {
+  extractFilePath,
+  normalizeToolName,
+  WRITE_TOOL_NAMES,
+} from '../../shared/cowork/artifactToolShapes';
+
+export { extractFilePath, normalizeToolName, WRITE_TOOL_NAMES };
+
+import {
   ArtifactTypeByLanguage,
   getInlineArtifactRole,
   getInlineArtifactLanguage,
@@ -196,22 +204,6 @@ function generateTitle(type: ArtifactType, language: string, content: string): s
     case 'code':
       return `${language.charAt(0).toUpperCase() + language.slice(1)} Code`;
   }
-}
-
-export const WRITE_TOOL_NAMES = new Set(['write', 'writefile', 'write_file']);
-
-export function normalizeToolName(name: string): string {
-  return name.toLowerCase().replace(/[_\s]/g, '');
-}
-
-export function extractFilePath(toolInput: Record<string, unknown>): string | null {
-  for (const key of ['file_path', 'path', 'filePath', 'target_file', 'targetFile']) {
-    const val = toolInput[key];
-    if (typeof val === 'string' && val.length > 0) {
-      return val;
-    }
-  }
-  return null;
 }
 
 export function getFileExtension(filePath: string): string {

@@ -2,6 +2,8 @@ import { randomUUID } from 'crypto';
 import path from 'path';
 import type Database from 'better-sqlite3';
 
+import { recordCodingLaneArtifact } from '../artifactLedger/codingLaneArtifacts';
+
 import {
   CodingErrorMessage,
   CodingAssignmentStatus,
@@ -539,6 +541,7 @@ export class CodingRoomRepository {
     this.dropPendingStreamWrites([laneId]);
     const remove = this.db.transaction(() => {
       this.db.prepare('DELETE FROM coding_events WHERE lane_id = ?').run(laneId);
+      this.db.prepare('DELETE FROM artifact_ledger WHERE scope_id = ?').run(laneId);
       this.db.prepare('DELETE FROM coding_elicitations WHERE lane_id = ?').run(laneId);
       this.db.prepare('DELETE FROM coding_assignments WHERE lane_id = ?').run(laneId);
       this.db
@@ -703,6 +706,7 @@ export class CodingRoomRepository {
     this.db
       .prepare('INSERT INTO coding_events VALUES (?, ?, ?, ?, ?, ?)')
       .run(event.id, laneId, sequence, kind, JSON.stringify(payload), event.createdAt);
+    recordCodingLaneArtifact(this.db, laneId, kind, payload);
     return event;
   }
   appendOrMergeStreamEvent(
@@ -823,6 +827,11 @@ export class CodingRoomRepository {
       }
       this.pendingStreamWrites.delete(key);
       this.streamFlushBackoffMs.delete(entry.laneId);
+      // Streamed tool calls merge their full payload over time; re-evaluate
+      // the artifact rule when the merged payload reaches SQLite. Idempotent.
+      if (entry.kind === CodingEventKind.ToolCall) {
+        recordCodingLaneArtifact(this.db, entry.laneId, entry.kind, entry.payload);
+      }
     }
     // Keep a lane's retry timer alive while it still has buffered writes.
     if (laneId === undefined) {

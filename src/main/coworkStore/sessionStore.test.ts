@@ -229,21 +229,32 @@ test('getSession returns all messages when one has corrupt metadata', () => {
   expect(nullMsg.metadata).toBeUndefined();
 });
 
-test('getSession lazily backfills artifacts from messages outside the loaded page', () => {
+test('getSession returns ledger artifacts even when their messages fall outside the loaded page', () => {
   const { db, store } = harness;
   const sid = 'artifact-session';
   insertSessionRow(db, sid);
-  insertMessageRow(
-    db,
-    'artifact-message',
+  const recordedAt = 1_000;
+  db.prepare(
+    `INSERT INTO artifact_ledger (
+       scope_id, artifact_key, id, message_id, type, title, content, file_path,
+       source, role, declared, created_at, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
     sid,
-    'assistant',
-    '```artifact:html title="History preview"\n<h1>old</h1>\n```',
-    null,
+    'path:/work/history-preview.html',
+    'artifact-tool-artifact-message',
+    'artifact-message',
+    'html',
+    'History preview',
+    '<h1>old</h1>',
+    '/work/history-preview.html',
+    'tool',
+    'deliverable',
     1,
-    1,
+    recordedAt,
+    recordedAt,
   );
-  for (let sequence = 2; sequence <= 35; sequence += 1) {
+  for (let sequence = 1; sequence <= 35; sequence += 1) {
     insertMessageRow(
       db,
       `message-${sequence}`,
@@ -258,6 +269,8 @@ test('getSession lazily backfills artifacts from messages outside the loaded pag
 
   const session = store.getSession(sid);
 
+  // The artifact message is outside the first page, but the ledger row is
+  // returned regardless of transcript paging.
   expect(session?.messagesOffset).toBe(5);
   expect(session?.messages.some(message => message.id === 'artifact-message')).toBe(false);
   expect(session?.artifacts).toEqual([
@@ -265,6 +278,7 @@ test('getSession lazily backfills artifacts from messages outside the loaded pag
       messageId: 'artifact-message',
       title: 'History preview',
       content: '<h1>old</h1>',
+      declared: true,
     }),
   ]);
 });
