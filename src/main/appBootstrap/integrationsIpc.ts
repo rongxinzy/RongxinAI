@@ -7,39 +7,37 @@ import { generateSessionTitle } from '../libs/coworkUtil';
 import { isInternalWorkspacePath } from './workspacePaths';
 import { getCoworkStore } from './runtimeServices';
 import { t } from '../i18n';
-import { AppConfigIpc, DingTalkInstallIpc } from '../../shared/ipc/channels';
+import { AppConfigIpc } from '../../shared/ipc/channels';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { dingtalkInstallContract } from '../../shared/ipc/imContract';
 
 export const registerIntegrationsIpc = (): void => {
   const modelService = getMagpieModelService();
-  ipcMain.handle(DingTalkInstallIpc.Qrcode, async () => {
-    try {
-      return await getIMGatewayManager().startDingTalkInstallQrcode();
-    } catch (error) {
-      throw new Error(error instanceof Error ? error.message : '获取二维码失败');
-    }
-  });
+  handleIpcContract(dingtalkInstallContract, {
+    qrcode: async () => {
+      try {
+        return await getIMGatewayManager().startDingTalkInstallQrcode();
+      } catch (error) {
+        throw new Error(error instanceof Error ? error.message : '获取二维码失败');
+      }
+    },
 
-  ipcMain.handle(
-    DingTalkInstallIpc.Poll,
-    async (_event, { deviceCode }: { deviceCode: string }) => {
+    poll: async (_event, { deviceCode }) => {
       try {
         return await getIMGatewayManager().pollDingTalkInstall(deviceCode);
       } catch (error) {
         return { done: false, error: error instanceof Error ? error.message : '轮询失败' };
       }
     },
-  );
 
-  ipcMain.handle(
-    DingTalkInstallIpc.Verify,
-    async (_event, { clientId, clientSecret }: { clientId: string; clientSecret: string }) => {
+    verify: async (_event, { clientId, clientSecret }) => {
       try {
         return await getIMGatewayManager().verifyDingTalkCredentials(clientId, clientSecret);
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : '验证失败' };
       }
     },
-  );
+  });
 
   ipcMain.handle(AppConfigIpc.GenerateSessionTitle, async (_event, userInput: string | null) => {
     return generateSessionTitle(userInput, t('coworkDefaultSessionTitle'));

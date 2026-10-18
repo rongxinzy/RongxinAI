@@ -5,223 +5,127 @@ export function createCodingAgentPart1(
   runtime: BrowserMockRuntime,
 ): Pick<
   Window['electron']['codingAgent'],
-  | 'commitGitChanges'
-  | 'commitAndPushGitChanges'
-  | 'pushGitBranch'
-  | 'switchGitBranch'
-  | 'createGitBranch'
-  | 'createGitPullRequest'
-  | 'listWorkspaceFiles'
-  | 'readWorkspaceFile'
-  | 'writeWorkspaceFile'
+  | 'createSession'
   | 'discoverAgents'
+  | 'followUpPendingMessage'
+  | 'handoff'
+  | 'prepareLane'
   | 'probeAgent'
-  | 'addProfile'
-  | 'trustProfile'
-  | 'authenticateProfile'
-  | 'startAuthTerminal'
-  | 'writeAuthTerminal'
-  | 'resizeAuthTerminal'
-  | 'cancelAuthTerminal'
+  | 'prompt'
+  | 'respondElicitation'
   | 'respondPermission'
-  | 'onChanged'
-  | 'onEventDelta'
-  | 'loadEventPage'
-  | 'onPendingMessagesChanged'
-  | 'onAuthTerminalData'
-  | 'onAuthTerminalExit'
+  | 'saveLaneView'
+  | 'selectLane'
+  | 'setLaneConfigOption'
+  | 'setLaneModelOverride'
+  | 'startSession'
+  | 'steerPendingMessage'
+  | 'trustProfile'
 > {
   return {
-    commitGitChanges: async _p0 => {
+    createSession: async _p0 => {
       void _p0;
-      runtime.warnOnce('codingAgent.commitGitChanges');
+      runtime.warnOnce('codingAgent.createSession');
       return {
         success: true,
-        status: {
-          isRepository: false,
-          targetRoot: '',
-          repositoryRoot: '',
-          githubRepositoryUrl: '',
-          hasOrigin: false,
-          hasRemoteBranch: false,
-          defaultBranch: '',
-          branch: '',
-          localBranches: [],
-          head: '',
-          detached: false,
-          upstream: '',
-          ahead: 0,
-          behind: 0,
-          additions: 0,
-          deletions: 0,
-          files: [],
-          isIsolated: false,
-          isBusy: false,
-          canMutate: false,
-        },
-      };
-    },
-    commitAndPushGitChanges: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.commitAndPushGitChanges');
-      return {
-        success: true,
-        result: {
-          status: {
-            isRepository: false,
-            targetRoot: '',
-            repositoryRoot: '',
-            githubRepositoryUrl: '',
-            hasOrigin: false,
-            hasRemoteBranch: false,
-            defaultBranch: '',
-            branch: '',
-            localBranches: [],
-            head: '',
-            detached: false,
-            upstream: '',
-            ahead: 0,
-            behind: 0,
-            additions: 0,
-            deletions: 0,
-            files: [],
-            isIsolated: false,
-            isBusy: false,
-            canMutate: false,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
           },
-          pushed: false,
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
         },
-      };
-    },
-    pushGitBranch: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.pushGitBranch');
-      return {
-        success: true,
-        status: {
-          isRepository: false,
-          targetRoot: '',
-          repositoryRoot: '',
-          githubRepositoryUrl: '',
-          hasOrigin: false,
-          hasRemoteBranch: false,
-          defaultBranch: '',
-          branch: '',
-          localBranches: [],
-          head: '',
-          detached: false,
-          upstream: '',
-          ahead: 0,
-          behind: 0,
-          additions: 0,
-          deletions: 0,
-          files: [],
-          isIsolated: false,
-          isBusy: false,
-          canMutate: false,
-        },
-      };
-    },
-    switchGitBranch: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.switchGitBranch');
-      return {
-        success: true,
-        status: {
-          isRepository: false,
-          targetRoot: '',
-          repositoryRoot: '',
-          githubRepositoryUrl: '',
-          hasOrigin: false,
-          hasRemoteBranch: false,
-          defaultBranch: '',
-          branch: '',
-          localBranches: [],
-          head: '',
-          detached: false,
-          upstream: '',
-          ahead: 0,
-          behind: 0,
-          additions: 0,
-          deletions: 0,
-          files: [],
-          isIsolated: false,
-          isBusy: false,
-          canMutate: false,
-        },
-      };
-    },
-    createGitBranch: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.createGitBranch');
-      return {
-        success: true,
-        status: {
-          isRepository: false,
-          targetRoot: '',
-          repositoryRoot: '',
-          githubRepositoryUrl: '',
-          hasOrigin: false,
-          hasRemoteBranch: false,
-          defaultBranch: '',
-          branch: '',
-          localBranches: [],
-          head: '',
-          detached: false,
-          upstream: '',
-          ahead: 0,
-          behind: 0,
-          additions: 0,
-          deletions: 0,
-          files: [],
-          isIsolated: false,
-          isBusy: false,
-          canMutate: false,
-        },
-      };
-    },
-    createGitPullRequest: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.createGitPullRequest');
-      return {
-        success: true,
-      };
-    },
-    listWorkspaceFiles: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.listWorkspaceFiles');
-      return {
-        success: true,
-        entries: [],
-      };
-    },
-    readWorkspaceFile: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.readWorkspaceFile');
-      return {
-        success: true,
-        file: {
-          path: '/home/user/preview',
-          content: '',
-          sha256: '',
-        },
-      };
-    },
-    writeWorkspaceFile: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.writeWorkspaceFile');
-      return {
-        success: true,
-        file: {
-          path: '/home/user/preview',
-          content: '',
-          sha256: '',
-        },
+        profiles: [],
       };
     },
     discoverAgents: async _p0 => {
       void _p0;
       runtime.warnOnce('codingAgent.discoverAgents');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    followUpPendingMessage: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.followUpPendingMessage');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    handoff: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.handoff');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    prepareLane: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.prepareLane');
       return {
         success: true,
         snapshot: {
@@ -269,9 +173,9 @@ export function createCodingAgentPart1(
         profiles: [],
       };
     },
-    addProfile: async _p0 => {
+    prompt: async _p0 => {
       void _p0;
-      runtime.warnOnce('codingAgent.addProfile');
+      runtime.warnOnce('codingAgent.prompt');
       return {
         success: true,
         snapshot: {
@@ -294,121 +198,9 @@ export function createCodingAgentPart1(
         profiles: [],
       };
     },
-    trustProfile: async _p0 => {
+    respondElicitation: async _p0 => {
       void _p0;
-      runtime.warnOnce('codingAgent.trustProfile');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    authenticateProfile: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.authenticateProfile');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    startAuthTerminal: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.startAuthTerminal');
-      return {
-        success: true,
-        terminal: {
-          id: 'preview',
-          profileId: '',
-          methodId: '',
-        },
-      };
-    },
-    writeAuthTerminal: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.writeAuthTerminal');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    resizeAuthTerminal: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.resizeAuthTerminal');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    cancelAuthTerminal: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.cancelAuthTerminal');
+      runtime.warnOnce('codingAgent.respondElicitation');
       return {
         success: true,
         snapshot: {
@@ -456,33 +248,180 @@ export function createCodingAgentPart1(
         profiles: [],
       };
     },
-    onChanged: _p0 => {
-      return runtime.subscribe('codingAgent.onChanged', _p0);
-    },
-    onEventDelta: _p0 => {
-      return runtime.subscribe('codingAgent.onEventDelta', _p0);
-    },
-    loadEventPage: async _p0 => {
+    saveLaneView: async _p0 => {
       void _p0;
-      runtime.warnOnce('codingAgent.loadEventPage');
+      runtime.warnOnce('codingAgent.saveLaneView');
       return {
         success: true,
-        page: {
-          laneId: '',
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
           events: [],
-          hasMore: false,
-          nextCursor: 0,
+          eventWindows: [],
+          elicitations: [],
         },
+        profiles: [],
       };
     },
-    onPendingMessagesChanged: _p0 => {
-      return runtime.subscribe('codingAgent.onPendingMessagesChanged', _p0);
+    selectLane: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.selectLane');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
     },
-    onAuthTerminalData: _p0 => {
-      return runtime.subscribe('codingAgent.onAuthTerminalData', _p0);
+    setLaneConfigOption: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.setLaneConfigOption');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
     },
-    onAuthTerminalExit: _p0 => {
-      return runtime.subscribe('codingAgent.onAuthTerminalExit', _p0);
+    setLaneModelOverride: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.setLaneModelOverride');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    startSession: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.startSession');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    steerPendingMessage: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.steerPendingMessage');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    trustProfile: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.trustProfile');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
     },
   };
 }

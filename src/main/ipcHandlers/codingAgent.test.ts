@@ -58,7 +58,31 @@ test('registers each channel once and retains target paging, editing and composi
     CodingAgentIpc.CancelElicitation,
   ]) {
     expect(handlers.has(channel)).toBe(true);
-    expect(await handlers.get(channel)!(event, { paths: [] })).toEqual({
+    // Args match each contract schema — writeWorkspaceFile needs the full
+    // write payload; getProfileAvailableCommands takes a bare profile id; the
+    // rest take a workspace-root-bearing target.
+    const args =
+      channel === CodingAgentIpc.WriteWorkspaceFile
+        ? {
+            workspaceRoot: 'workspace',
+            path: 'src/a.ts',
+            content: 'export {};',
+            expectedSha256: '0'.repeat(64),
+          }
+        : channel === CodingAgentIpc.LoadEventPage
+          ? { workspaceRoot: 'workspace', laneId: 'lane-1', beforeSequence: null }
+          : channel === CodingAgentIpc.CommitAndPushGitChanges
+            ? { workspaceRoot: 'workspace', message: 'fix: lint', paths: [] }
+            : channel === CodingAgentIpc.CreateGitBranch
+              ? { workspaceRoot: 'workspace', branch: 'feat/x' }
+              : channel === CodingAgentIpc.RespondElicitation
+                ? { workspaceRoot: 'workspace', response: { requestId: 'req-1', answer: 'yes' } }
+                : channel === CodingAgentIpc.CancelElicitation
+                  ? { workspaceRoot: 'workspace', requestId: 'req-1' }
+                  : channel === CodingAgentIpc.GetProfileAvailableCommands
+                    ? 'claude'
+                    : { workspaceRoot: 'workspace' };
+    expect(await handlers.get(channel)!(event, args)).toEqual({
       success: false,
       error: failure.message,
     });

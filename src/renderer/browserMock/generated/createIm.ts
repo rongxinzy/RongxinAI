@@ -52,30 +52,8 @@ export function createIm(runtime: BrowserMockRuntime): Window['electron']['im'] 
         success: true,
       };
     },
-    syncConfig: async () => {
-      runtime.warnOnce('im.syncConfig');
-      return {
-        success: true,
-      };
-    },
-    startGateway: async _p0 => {
+    testGateway: async _p0 => {
       void _p0;
-      runtime.warnOnce('im.startGateway');
-      return {
-        success: true,
-      };
-    },
-    stopGateway: async _p0 => {
-      void _p0;
-      runtime.warnOnce('im.stopGateway');
-      return {
-        success: true,
-      };
-    },
-    testGateway: async (_p0, _p1, _p2) => {
-      void _p0;
-      void _p1;
-      void _p2;
       runtime.warnOnce('im.testGateway');
       return {
         success: true,
@@ -120,10 +98,6 @@ export function createIm(runtime: BrowserMockRuntime): Window['electron']['im'] 
         },
       };
     },
-    getLocalIp: async () => {
-      runtime.warnOnce('im.getLocalIp');
-      return '';
-    },
     weixinLoginStart: async () => {
       runtime.warnOnce('im.weixinLoginStart');
       return {
@@ -138,78 +112,11 @@ export function createIm(runtime: BrowserMockRuntime): Window['electron']['im'] 
         status: 'confirmed',
       };
     },
-    addQQInstance: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('im.addQQInstance');
-      return {
-        success: true,
-        instance: {
-          instanceId: '',
-          instanceName: '',
-          workspaceId: '',
-          enabled: false,
-          appId: '',
-          appSecret: '',
-          dmPolicy: 'open',
-          allowFrom: [],
-          groupPolicy: 'open',
-          groupAllowFrom: [],
-          historyLimit: 0,
-          markdownSupport: false,
-          imageServerBaseUrl: '',
-          debug: false,
-        },
-      };
-    },
-    deleteQQInstance: async _p0 => {
-      void _p0;
-      runtime.warnOnce('im.deleteQQInstance');
-      return {
-        success: true,
-      };
-    },
     setQQInstanceConfig: async (_p0, _p1, _p2) => {
       void _p0;
       void _p1;
       void _p2;
       runtime.warnOnce('im.setQQInstanceConfig');
-      return {
-        success: true,
-      };
-    },
-    addFeishuInstance: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('im.addFeishuInstance');
-      return {
-        success: true,
-        instance: {
-          instanceId: '',
-          instanceName: '',
-          workspaceId: '',
-          enabled: false,
-          appId: '',
-          appSecret: '',
-          domain: '',
-          dmPolicy: 'open',
-          allowFrom: [],
-          groupPolicy: 'open',
-          groupAllowFrom: [],
-          groups: {},
-          historyLimit: 0,
-          streaming: false,
-          replyMode: 'auto',
-          blockStreaming: false,
-          footer: {},
-          mediaMaxMb: 0,
-          debug: false,
-        },
-      };
-    },
-    deleteFeishuInstance: async _p0 => {
-      void _p0;
-      runtime.warnOnce('im.deleteFeishuInstance');
       return {
         success: true,
       };
@@ -223,72 +130,11 @@ export function createIm(runtime: BrowserMockRuntime): Window['electron']['im'] 
         success: true,
       };
     },
-    addDingTalkInstance: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('im.addDingTalkInstance');
-      return {
-        success: true,
-        instance: {
-          instanceId: '',
-          instanceName: '',
-          workspaceId: '',
-          enabled: false,
-          clientId: '',
-          clientSecret: '',
-          dmPolicy: 'open',
-          allowFrom: [],
-          groupPolicy: 'open',
-          sessionTimeout: 1792108800000,
-          separateSessionByConversation: false,
-          groupSessionScope: 'group',
-          sharedMemoryAcrossConversations: false,
-          gatewayBaseUrl: '',
-          debug: false,
-        },
-      };
-    },
-    deleteDingTalkInstance: async _p0 => {
-      void _p0;
-      runtime.warnOnce('im.deleteDingTalkInstance');
-      return {
-        success: true,
-      };
-    },
     setDingTalkInstanceConfig: async (_p0, _p1, _p2) => {
       void _p0;
       void _p1;
       void _p2;
       runtime.warnOnce('im.setDingTalkInstanceConfig');
-      return {
-        success: true,
-      };
-    },
-    addWecomInstance: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('im.addWecomInstance');
-      return {
-        success: true,
-        instance: {
-          instanceId: '',
-          instanceName: '',
-          workspaceId: '',
-          enabled: false,
-          botId: '',
-          secret: '',
-          dmPolicy: 'open',
-          allowFrom: [],
-          groupPolicy: 'open',
-          groupAllowFrom: [],
-          sendThinkingMessage: false,
-          debug: false,
-        },
-      };
-    },
-    deleteWecomInstance: async _p0 => {
-      void _p0;
-      runtime.warnOnce('im.deleteWecomInstance');
       return {
         success: true,
       };
@@ -302,79 +148,11 @@ export function createIm(runtime: BrowserMockRuntime): Window['electron']['im'] 
         success: true,
       };
     },
-    addTelegramInstance: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('im.addTelegramInstance');
-      return {
-        success: true,
-        instance: {
-          instanceId: '',
-          instanceName: '',
-          workspaceId: '',
-          enabled: false,
-          botToken: '',
-          dmPolicy: 'open',
-          allowFrom: [],
-          groupPolicy: 'open',
-          groupAllowFrom: [],
-          groups: {},
-          historyLimit: 0,
-          replyToMode: 'all',
-          linkPreview: false,
-          streaming: 'block',
-          mediaMaxMb: 0,
-          proxy: '',
-          webhookUrl: '',
-          webhookSecret: '',
-          debug: false,
-        },
-      };
-    },
-    deleteTelegramInstance: async _p0 => {
-      void _p0;
-      runtime.warnOnce('im.deleteTelegramInstance');
-      return {
-        success: true,
-      };
-    },
     setTelegramInstanceConfig: async (_p0, _p1, _p2) => {
       void _p0;
       void _p1;
       void _p2;
       runtime.warnOnce('im.setTelegramInstanceConfig');
-      return {
-        success: true,
-      };
-    },
-    addDiscordInstance: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('im.addDiscordInstance');
-      return {
-        success: true,
-        instance: {
-          instanceId: '',
-          instanceName: '',
-          workspaceId: '',
-          enabled: false,
-          botToken: '',
-          dmPolicy: 'open',
-          allowFrom: [],
-          groupPolicy: 'open',
-          groupAllowFrom: [],
-          guilds: {},
-          historyLimit: 0,
-          streaming: 'block',
-          mediaMaxMb: 0,
-          proxy: '',
-          debug: false,
-        },
-      };
-    },
-    deleteDiscordInstance: async _p0 => {
-      void _p0;
-      runtime.warnOnce('im.deleteDiscordInstance');
       return {
         success: true,
       };
@@ -393,6 +171,220 @@ export function createIm(runtime: BrowserMockRuntime): Window['electron']['im'] 
     },
     onMessageReceived: _p0 => {
       return runtime.subscribe('im.onMessageReceived', _p0);
+    },
+    syncConfig: async () => {
+      runtime.warnOnce('im.syncConfig');
+      return {
+        success: true,
+      };
+    },
+    startGateway: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.startGateway');
+      return {
+        success: true,
+      };
+    },
+    stopGateway: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.stopGateway');
+      return {
+        success: true,
+      };
+    },
+    getLocalIp: async () => {
+      runtime.warnOnce('im.getLocalIp');
+      return '';
+    },
+    addDingTalkInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.addDingTalkInstance');
+      return {
+        success: true,
+        instance: {
+          enabled: false,
+          clientId: '',
+          clientSecret: '',
+          dmPolicy: 'open',
+          allowFrom: [],
+          groupPolicy: 'open',
+          sessionTimeout: 1792108800000,
+          separateSessionByConversation: false,
+          groupSessionScope: 'group',
+          sharedMemoryAcrossConversations: false,
+          gatewayBaseUrl: '',
+          debug: false,
+          instanceId: '',
+          instanceName: '',
+          workspaceId: '',
+        },
+      };
+    },
+    deleteDingTalkInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.deleteDingTalkInstance');
+      return {
+        success: true,
+      };
+    },
+    addQQInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.addQQInstance');
+      return {
+        success: true,
+        instance: {
+          enabled: false,
+          appId: '',
+          appSecret: '',
+          dmPolicy: 'open',
+          allowFrom: [],
+          groupPolicy: 'open',
+          groupAllowFrom: [],
+          historyLimit: 0,
+          markdownSupport: false,
+          imageServerBaseUrl: '',
+          debug: false,
+          instanceId: '',
+          instanceName: '',
+          workspaceId: '',
+        },
+      };
+    },
+    deleteQQInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.deleteQQInstance');
+      return {
+        success: true,
+      };
+    },
+    addFeishuInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.addFeishuInstance');
+      return {
+        success: true,
+        instance: {
+          enabled: false,
+          appId: '',
+          appSecret: '',
+          domain: '',
+          dmPolicy: 'open',
+          allowFrom: [],
+          groupPolicy: 'open',
+          groupAllowFrom: [],
+          groups: {},
+          historyLimit: 0,
+          streaming: false,
+          replyMode: 'auto',
+          blockStreaming: false,
+          footer: {},
+          mediaMaxMb: 0,
+          debug: false,
+          instanceId: '',
+          instanceName: '',
+          workspaceId: '',
+        },
+      };
+    },
+    deleteFeishuInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.deleteFeishuInstance');
+      return {
+        success: true,
+      };
+    },
+    addWecomInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.addWecomInstance');
+      return {
+        success: true,
+        instance: {
+          enabled: false,
+          botId: '',
+          secret: '',
+          dmPolicy: 'open',
+          allowFrom: [],
+          groupPolicy: 'open',
+          groupAllowFrom: [],
+          sendThinkingMessage: false,
+          debug: false,
+          instanceId: '',
+          instanceName: '',
+          workspaceId: '',
+        },
+      };
+    },
+    deleteWecomInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.deleteWecomInstance');
+      return {
+        success: true,
+      };
+    },
+    addTelegramInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.addTelegramInstance');
+      return {
+        success: true,
+        instance: {
+          enabled: false,
+          botToken: '',
+          dmPolicy: 'open',
+          allowFrom: [],
+          groupPolicy: 'open',
+          groupAllowFrom: [],
+          groups: {},
+          historyLimit: 0,
+          replyToMode: 'all',
+          linkPreview: false,
+          streaming: 'block',
+          mediaMaxMb: 0,
+          proxy: '',
+          webhookUrl: '',
+          webhookSecret: '',
+          debug: false,
+          instanceId: '',
+          instanceName: '',
+          workspaceId: '',
+        },
+      };
+    },
+    deleteTelegramInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.deleteTelegramInstance');
+      return {
+        success: true,
+      };
+    },
+    addDiscordInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.addDiscordInstance');
+      return {
+        success: true,
+        instance: {
+          enabled: false,
+          botToken: '',
+          dmPolicy: 'open',
+          allowFrom: [],
+          groupPolicy: 'open',
+          groupAllowFrom: [],
+          guilds: {},
+          historyLimit: 0,
+          streaming: 'block',
+          mediaMaxMb: 0,
+          proxy: '',
+          debug: false,
+          instanceId: '',
+          instanceName: '',
+          workspaceId: '',
+        },
+      };
+    },
+    deleteDiscordInstance: async _p0 => {
+      void _p0;
+      runtime.warnOnce('im.deleteDiscordInstance');
+      return {
+        success: true,
+      };
     },
   };
 }

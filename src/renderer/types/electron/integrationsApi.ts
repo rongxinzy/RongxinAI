@@ -6,6 +6,8 @@
  * (Feishu, DingTalk) and the activity feed.
  */
 import type { ActivityRun } from '../../../shared/activity/types';
+import type { IpcContractApi } from '../../../shared/ipc/contract';
+import type { activityContract } from '../../../shared/ipc/automationContract';
 import type {
   EnterprisePasswordChangeInput,
   EnterprisePasswordLoginInput,
@@ -134,7 +136,8 @@ export interface DingTalkApi {
   };
 }
 
-export interface ActivityApi {
-  list: () => Promise<{ success: boolean; runs: ActivityRun[] }>;
+type ActivityContractApi = IpcContractApi<typeof activityContract>;
+
+export interface ActivityApi extends Omit<ActivityContractApi, 'onUpdated'> {
   onUpdated: (callback: (run: ActivityRun) => void) => () => void;
 }

@@ -2,9 +2,13 @@
  * Core app preload surface, split from `../electron.d.ts`.
  *
  * Key/value store, app events, the context menu bridge, window controls and
- * the managed memory service.
+ * the managed memory service. Memory method signatures derive from the zod IPC
+ * contract (`src/shared/ipc/memoryContract.ts`) — the contract is the single
+ * source of truth shared with main and preload.
  */
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../../shared/contextMenu';
+import type { IpcContractApi } from '../../../shared/ipc/contract';
+import type { memoryContract } from '../../../shared/ipc/memoryContract';
 
 interface WindowState {
   isMaximized: boolean;
@@ -39,43 +43,4 @@ export interface WindowApi {
   onStateChanged: (callback: (state: WindowState) => void) => () => void;
 }
 
-export interface MemoryApi {
-  list: (
-    input?: import('../../../shared/memory').ManagedMemoryListInput,
-  ) => Promise<
-    import('../../../shared/memory').MemoryIpcResult<
-      import('../../../shared/memory').ManagedMemoryRecord[]
-    >
-  >;
-  resolveSessionTitles: (
-    input: import('../../../shared/memory').MemorySessionTitleResolveInput,
-  ) => Promise<
-    import('../../../shared/memory').MemoryIpcResult<
-      import('../../../shared/memory').MemorySessionTitle[]
-    >
-  >;
-  createManual: (
-    input: import('../../../shared/memory').ManualMemoryCreateInput,
-  ) => Promise<
-    import('../../../shared/memory').MemoryIpcResult<
-      import('../../../shared/memory').ManagedMemoryRecord
-    >
-  >;
-  updateManual: (
-    input: import('../../../shared/memory').ManualMemoryUpdateInput,
-  ) => Promise<
-    import('../../../shared/memory').MemoryIpcResult<
-      import('../../../shared/memory').ManagedMemoryRecord
-    >
-  >;
-  confirmCandidate: (
-    id: string,
-  ) => Promise<import('../../../shared/memory').MemoryIpcResult<number | null>>;
-  archive: (id: string) => Promise<import('../../../shared/memory').MemoryIpcResult<void>>;
-  restore: (id: string) => Promise<import('../../../shared/memory').MemoryIpcResult<void>>;
-  forget: (
-    id: string,
-    hardDelete: boolean,
-  ) => Promise<import('../../../shared/memory').MemoryIpcResult<boolean>>;
-  drainOutbox: () => Promise<import('../../../shared/memory').MemoryIpcResult<number>>;
-}
+export type MemoryApi = IpcContractApi<typeof memoryContract>;

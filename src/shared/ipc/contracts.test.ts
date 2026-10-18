@@ -1,8 +1,18 @@
 import { describe, expect, test } from 'vitest';
 
+import { artifactsContract } from './artifactsContract';
+import { codingAgentContract } from './codingAgentContract';
+import {
+  dingtalkInstallContract,
+  feishuInstallContract,
+  imContract,
+  imInstanceContract,
+} from './imContract';
 import { mcpContract } from './mcpContract';
-import { skillsContract } from './skillsContract';
 import { marketplaceContract, MarketplaceSearchRequestSchema } from '../marketplace/contract';
+import { memoryContract } from './memoryContract';
+import { skillsContract } from './skillsContract';
+import { activityContract, scheduledTasksContract } from './automationContract';
 
 /**
  * Schema fidelity tests: fixtures below are copied from real renderer call
@@ -268,11 +278,31 @@ describe('contract/channel consistency', () => {
     const { skillsContractChannels } = await import('./skillsContract.channels');
     const { mcpContractChannels } = await import('./mcpContract.channels');
     const { marketplaceContractChannels } = await import('../marketplace/contract.channels');
+    const { codingAgentContractChannels } = await import('./codingAgentContract.channels');
+    const {
+      imContractChannels,
+      imInstanceContractChannels,
+      feishuInstallContractChannels,
+      dingtalkInstallContractChannels,
+    } = await import('./imContract.channels');
+    const { scheduledTasksContractChannels, activityContractChannels } =
+      await import('./automationContract.channels');
+    const { memoryContractChannels } = await import('./memoryContract.channels');
+    const { artifactsContractChannels } = await import('./artifactsContract.channels');
 
     for (const [map, contract] of [
       [skillsContractChannels, skillsContract],
       [mcpContractChannels, mcpContract],
       [marketplaceContractChannels, marketplaceContract],
+      [codingAgentContractChannels, codingAgentContract],
+      [imContractChannels, imContract],
+      [imInstanceContractChannels, imInstanceContract],
+      [feishuInstallContractChannels, feishuInstallContract],
+      [dingtalkInstallContractChannels, dingtalkInstallContract],
+      [scheduledTasksContractChannels, scheduledTasksContract],
+      [activityContractChannels, activityContract],
+      [memoryContractChannels, memoryContract],
+      [artifactsContractChannels, artifactsContract],
     ] as const) {
       expect(Object.keys(map).sort()).toEqual(Object.keys(contract).sort());
       for (const method of Object.keys(contract)) {

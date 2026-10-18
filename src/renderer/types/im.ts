@@ -366,6 +366,18 @@ interface WeixinGatewayStatus {
 
 // ==================== Common IM Types ====================
 
+/** Inbound IM message pushed to the renderer. */
+export interface IMMessage {
+  platform: Platform;
+  messageId: string;
+  conversationId: string;
+  senderId: string;
+  senderName?: string;
+  content: string;
+  chatType: 'direct' | 'group';
+  timestamp: number;
+}
+
 export interface IMGatewayConfig {
   dingtalk: DingTalkMultiInstanceConfig;
   feishu: FeishuMultiInstanceConfig;
