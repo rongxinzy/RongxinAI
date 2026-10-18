@@ -3,6 +3,27 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createTodo(runtime: BrowserMockRuntime): Window['electron']['todo'] {
   return {
+    delete: async _p0 => {
+      void _p0;
+      runtime.warnOnce('todo.delete');
+      return {
+        success: true,
+      };
+    },
+    deleteList: async _p0 => {
+      void _p0;
+      runtime.warnOnce('todo.deleteList');
+      return {
+        success: true,
+      };
+    },
+    deleteStep: async _p0 => {
+      void _p0;
+      runtime.warnOnce('todo.deleteStep');
+      return {
+        success: true,
+      };
+    },
     list: async _p0 => {
       void _p0;
       runtime.warnOnce('todo.list');
@@ -61,13 +82,6 @@ export function createTodo(runtime: BrowserMockRuntime): Window['electron']['tod
         },
       };
     },
-    delete: async _p0 => {
-      void _p0;
-      runtime.warnOnce('todo.delete');
-      return {
-        success: true,
-      };
-    },
     listLists: async () => {
       runtime.warnOnce('todo.listLists');
       return {
@@ -101,13 +115,6 @@ export function createTodo(runtime: BrowserMockRuntime): Window['electron']['tod
         },
       };
     },
-    deleteList: async _p0 => {
-      void _p0;
-      runtime.warnOnce('todo.deleteList');
-      return {
-        success: true,
-      };
-    },
     createStep: async _p0 => {
       void _p0;
       runtime.warnOnce('todo.createStep');
@@ -138,13 +145,6 @@ export function createTodo(runtime: BrowserMockRuntime): Window['electron']['tod
           createdAt: 1792108800000,
           updatedAt: 1792108800000,
         },
-      };
-    },
-    deleteStep: async _p0 => {
-      void _p0;
-      runtime.warnOnce('todo.deleteStep');
-      return {
-        success: true,
       };
     },
     onChanged: _p0 => {

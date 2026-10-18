@@ -2,7 +2,11 @@ import type { ReactNode } from 'react';
 
 import type { CoworkPermissionMode } from '../../../../shared/cowork/constants';
 import type { DraftAttachment } from '../../../store/slices/coworkSlice';
-import type { CoworkFileAttachment, CoworkImageAttachment } from '../../../types/cowork';
+import type {
+  CoworkFileAttachment,
+  CoworkImageAttachment,
+  CoworkOutgoingImageAttachment,
+} from '../../../types/cowork';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
 // so that attachment state survives view switches (cowork ↔ skills, etc.)
@@ -20,7 +24,7 @@ export interface CoworkPromptInputRef {
 export interface CoworkPromptInputProps {
   onSubmit: (
     prompt: string,
-    imageAttachments?: CoworkImageAttachment[],
+    imageAttachments?: CoworkOutgoingImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
     goalMode?: boolean,

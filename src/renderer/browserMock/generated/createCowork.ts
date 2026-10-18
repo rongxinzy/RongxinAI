@@ -3,9 +3,20 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createCowork(runtime: BrowserMockRuntime): Window['electron']['cowork'] {
   return {
-    getRunSnapshot: async (_p0, _p1) => {
+    onStreamRunState: _p0 => {
+      return runtime.subscribe('cowork.onStreamRunState', _p0);
+    },
+    onStreamContentPatch: _p0 => {
+      return runtime.subscribe('cowork.onStreamContentPatch', _p0);
+    },
+    onStreamUiEvent: _p0 => {
+      return runtime.subscribe('cowork.onStreamUiEvent', _p0);
+    },
+    onSessionsChanged: _p0 => {
+      return runtime.subscribe('cowork.onSessionsChanged', _p0);
+    },
+    getRunSnapshot: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('cowork.getRunSnapshot');
       return {
         success: true,
@@ -19,14 +30,17 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
           confirmedAt: 1792108800000,
           lastProgressAt: 1792108800000,
         },
-        running: false,
       };
     },
-    onStreamRunState: _p0 => {
-      return runtime.subscribe('cowork.onStreamRunState', _p0);
+    getRuntimeSnapshots: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.getRuntimeSnapshots');
+      return [];
     },
-    onStreamContentPatch: _p0 => {
-      return runtime.subscribe('cowork.onStreamContentPatch', _p0);
+    requestStreamResync: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.requestStreamResync');
+      return false;
     },
     listWorkspaces: async () => {
       runtime.warnOnce('cowork.listWorkspaces');
@@ -67,9 +81,8 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
         },
       };
     },
-    renameWorkspace: async (_p0, _p1) => {
+    renameWorkspace: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('cowork.renameWorkspace');
       return {
         success: true,
@@ -126,6 +139,7 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
           workspaceId: '',
           agentId: '',
           source: 'manual',
+          experts: [],
           messages: [],
           messagesOffset: 0,
           totalMessages: 0,
@@ -153,6 +167,7 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
           workspaceId: '',
           agentId: '',
           source: 'manual',
+          experts: [],
           messages: [],
           messagesOffset: 0,
           totalMessages: 0,
@@ -160,6 +175,195 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
           createdAt: 1792108800000,
           updatedAt: 1792108800000,
         },
+      };
+    },
+    stopSession: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.stopSession');
+      return {
+        success: true,
+      };
+    },
+    compactSession: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.compactSession');
+      return {
+        success: true,
+        cancelled: false,
+      };
+    },
+    saveSession: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.saveSession');
+      return {
+        success: true,
+        session: {
+          id: 'preview',
+          title: 'Preview',
+          status: 'idle',
+          pinned: false,
+          cwd: '/home/user/preview',
+          systemPrompt: '',
+          modelOverride: '',
+          executionMode: 'auto',
+          activeSkillIds: [],
+          workspaceId: '',
+          agentId: '',
+          source: 'manual',
+          experts: [],
+          messages: [],
+          messagesOffset: 0,
+          totalMessages: 0,
+          artifacts: [],
+          createdAt: 1792108800000,
+          updatedAt: 1792108800000,
+        },
+      };
+    },
+    deleteSession: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.deleteSession');
+      return {
+        success: true,
+      };
+    },
+    deleteSessions: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.deleteSessions');
+      return {
+        success: true,
+      };
+    },
+    setSessionPinned: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.setSessionPinned');
+      return {
+        success: true,
+      };
+    },
+    renameSession: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.renameSession');
+      return {
+        success: true,
+      };
+    },
+    updateSessionModel: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.updateSessionModel');
+      return {
+        success: true,
+        session: {
+          id: 'preview',
+          title: 'Preview',
+          status: 'idle',
+          pinned: false,
+          cwd: '/home/user/preview',
+          systemPrompt: '',
+          modelOverride: '',
+          executionMode: 'auto',
+          activeSkillIds: [],
+          workspaceId: '',
+          agentId: '',
+          source: 'manual',
+          experts: [],
+          messages: [],
+          messagesOffset: 0,
+          totalMessages: 0,
+          artifacts: [],
+          createdAt: 1792108800000,
+          updatedAt: 1792108800000,
+        },
+      };
+    },
+    getSession: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.getSession');
+      return {
+        success: true,
+        session: {
+          id: 'preview',
+          title: 'Preview',
+          status: 'idle',
+          pinned: false,
+          cwd: '/home/user/preview',
+          systemPrompt: '',
+          modelOverride: '',
+          executionMode: 'auto',
+          activeSkillIds: [],
+          workspaceId: '',
+          agentId: '',
+          source: 'manual',
+          experts: [],
+          messages: [],
+          messagesOffset: 0,
+          totalMessages: 0,
+          artifacts: [],
+          createdAt: 1792108800000,
+          updatedAt: 1792108800000,
+        },
+      };
+    },
+    remoteManaged: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.remoteManaged');
+      return {
+        success: true,
+        remoteManaged: false,
+      };
+    },
+    listSessions: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.listSessions');
+      return {
+        success: true,
+        sessions: [],
+      };
+    },
+    getSessionMessages: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.getSessionMessages');
+      return {
+        success: true,
+        messages: [],
+      };
+    },
+    exportResultImage: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.exportResultImage');
+      return {
+        success: true,
+        canceled: false,
+      };
+    },
+    captureImageChunk: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.captureImageChunk');
+      return {
+        success: true,
+      };
+    },
+    saveResultImage: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.saveResultImage');
+      return {
+        success: true,
+        canceled: false,
+      };
+    },
+    exportSessionText: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.exportSessionText');
+      return {
+        success: true,
+        canceled: false,
+      };
+    },
+    respondToPermission: async _p0 => {
+      void _p0;
+      runtime.warnOnce('cowork.respondToPermission');
+      return {
+        success: true,
       };
     },
     listPendingMessages: async _p0 => {
@@ -245,181 +449,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
         },
       };
     },
-    stopSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.stopSession');
-      return {
-        success: true,
-      };
-    },
-    compactSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.compactSession');
-      return {
-        success: true,
-        cancelled: false,
-      };
-    },
-    saveSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.saveSession');
-      return null;
-    },
-    deleteSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.deleteSession');
-      return {
-        success: true,
-      };
-    },
-    deleteSessions: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.deleteSessions');
-      return {
-        success: true,
-      };
-    },
-    setSessionPinned: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.setSessionPinned');
-      return {
-        success: true,
-      };
-    },
-    renameSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.renameSession');
-      return {
-        success: true,
-      };
-    },
-    updateSessionModel: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.updateSessionModel');
-      return {
-        success: true,
-        session: {
-          id: 'preview',
-          title: 'Preview',
-          status: 'idle',
-          pinned: false,
-          cwd: '/home/user/preview',
-          systemPrompt: '',
-          modelOverride: '',
-          executionMode: 'auto',
-          activeSkillIds: [],
-          workspaceId: '',
-          agentId: '',
-          source: 'manual',
-          messages: [],
-          messagesOffset: 0,
-          totalMessages: 0,
-          artifacts: [],
-          createdAt: 1792108800000,
-          updatedAt: 1792108800000,
-        },
-      };
-    },
-    getSession: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('cowork.getSession');
-      return {
-        success: true,
-        session: {
-          id: 'preview',
-          title: 'Preview',
-          status: 'idle',
-          pinned: false,
-          cwd: '/home/user/preview',
-          systemPrompt: '',
-          modelOverride: '',
-          executionMode: 'auto',
-          activeSkillIds: [],
-          workspaceId: '',
-          agentId: '',
-          source: 'manual',
-          messages: [],
-          messagesOffset: 0,
-          totalMessages: 0,
-          artifacts: [],
-          createdAt: 1792108800000,
-          updatedAt: 1792108800000,
-        },
-      };
-    },
-    getRuntimeSnapshots: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.getRuntimeSnapshots');
-      return [];
-    },
-    requestStreamResync: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.requestStreamResync');
-      return false;
-    },
-    remoteManaged: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.remoteManaged');
-      return {
-        success: true,
-        remoteManaged: false,
-      };
-    },
-    listSessions: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.listSessions');
-      return {
-        success: true,
-        sessions: [],
-      };
-    },
-    getSessionMessages: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.getSessionMessages');
-      return {
-        success: true,
-        messages: [],
-      };
-    },
-    exportResultImage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.exportResultImage');
-      return {
-        success: true,
-        canceled: false,
-      };
-    },
-    captureImageChunk: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.captureImageChunk');
-      return {
-        success: true,
-      };
-    },
-    saveResultImage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.saveResultImage');
-      return {
-        success: true,
-        canceled: false,
-      };
-    },
-    exportSessionText: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.exportSessionText');
-      return {
-        success: true,
-        canceled: false,
-      };
-    },
-    respondToPermission: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.respondToPermission');
-      return {
-        success: true,
-      };
-    },
     getConfig: async () => {
       runtime.warnOnce('cowork.getConfig');
       return {
@@ -429,6 +458,7 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
           systemPrompt: '',
           executionMode: 'auto',
           permissionMode: 'ask',
+          permissionModeBySession: {},
           embeddingEnabled: false,
           embeddingProvider: '',
           embeddingModel: '',
@@ -447,12 +477,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
       return {
         success: true,
       };
-    },
-    onStreamUiEvent: _p0 => {
-      return runtime.subscribe('cowork.onStreamUiEvent', _p0);
-    },
-    onSessionsChanged: _p0 => {
-      return runtime.subscribe('cowork.onSessionsChanged', _p0);
     },
   };
 }

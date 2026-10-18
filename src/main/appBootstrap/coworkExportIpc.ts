@@ -2,128 +2,90 @@
 import fs from 'fs';
 import path from 'path';
 
-import { app, dialog, BrowserWindow, ipcMain } from 'electron';
+import { app, dialog, BrowserWindow } from 'electron';
 
-import { rt } from './runtimeState';
-import {
-  ensurePngFileName,
-  normalizeCaptureRect,
-  getDefaultExportImageName,
-  savePngWithDialog,
-} from './fileExportHelpers';
+import { normalizeCaptureRect, savePngWithDialog } from './fileExportHelpers';
 import { getPiRuntimeAdapter } from './sessionServices';
-import { type PermissionResult } from '../libs/agentEngine';
-import { CoworkPermissionIpc } from '../../shared/ipc/channels';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { coworkExportContract } from '../../shared/ipc/coworkContract';
 
 export const registerCoworkExportIpc = (): void => {
-  ipcMain.handle(
-    'cowork:session:exportResultImage',
-    async (
-      event,
-      options: {
-        rect: { x: number; y: number; width: number; height: number };
-        defaultFileName?: string;
-      },
-    ) => {
+  handleIpcContract(coworkExportContract, {
+    exportResultImage: async (event, options) => {
       try {
-        const { rect, defaultFileName } = options || {};
-        const captureRect = normalizeCaptureRect(rect);
+        const sender = event.sender;
+        const captureRect = normalizeCaptureRect(options.rect);
         if (!captureRect) {
-          return { success: false, error: 'Capture rect is required' };
+          return { success: false as const, error: 'Capture rect is required' };
         }
 
-        const image = await event.sender.capturePage(captureRect);
-        return savePngWithDialog(event.sender, image.toPNG(), defaultFileName);
+        const image = await sender.capturePage(captureRect);
+        return savePngWithDialog(sender, image.toPNG(), options.defaultFileName);
       } catch (error) {
         return {
-          success: false,
+          success: false as const,
           error: error instanceof Error ? error.message : 'Failed to export session image',
         };
       }
     },
-  );
 
-  ipcMain.handle(
-    'cowork:session:captureImageChunk',
-    async (
-      event,
-      options: {
-        rect: { x: number; y: number; width: number; height: number };
-      },
-    ) => {
+    captureImageChunk: async (event, options) => {
       try {
-        const captureRect = normalizeCaptureRect(options?.rect);
+        const sender = event.sender;
+        const captureRect = normalizeCaptureRect(options.rect);
         if (!captureRect) {
-          return { success: false, error: 'Capture rect is required' };
+          return { success: false as const, error: 'Capture rect is required' };
         }
 
-        const image = await event.sender.capturePage(captureRect);
+        const image = await sender.capturePage(captureRect);
         const pngBuffer = image.toPNG();
 
         return {
-          success: true,
+          success: true as const,
           width: captureRect.width,
           height: captureRect.height,
           pngBase64: pngBuffer.toString('base64'),
         };
       } catch (error) {
         return {
-          success: false,
+          success: false as const,
           error: error instanceof Error ? error.message : 'Failed to capture session image chunk',
         };
       }
     },
-  );
 
-  ipcMain.handle(
-    'cowork:session:saveResultImage',
-    async (
-      event,
-      options: {
-        pngBase64: string;
-        defaultFileName?: string;
-      },
-    ) => {
+    saveResultImage: async (event, options) => {
       try {
-        const base64 = typeof options?.pngBase64 === 'string' ? options.pngBase64.trim() : '';
+        const sender = event.sender;
+        const base64 = options.pngBase64.trim();
         if (!base64) {
-          return { success: false, error: 'Image data is required' };
+          return { success: false as const, error: 'Image data is required' };
         }
 
         const pngBuffer = Buffer.from(base64, 'base64');
         if (pngBuffer.length <= 0) {
-          return { success: false, error: 'Invalid image data' };
+          return { success: false as const, error: 'Invalid image data' };
         }
 
-        return savePngWithDialog(event.sender, pngBuffer, options?.defaultFileName);
+        return savePngWithDialog(sender, pngBuffer, options.defaultFileName);
       } catch (error) {
         return {
-          success: false,
+          success: false as const,
           error: error instanceof Error ? error.message : 'Failed to save session image',
         };
       }
     },
-  );
 
-  ipcMain.handle(
-    'cowork:session:exportText',
-    async (
-      event,
-      options: {
-        content: string;
-        defaultFileName?: string;
-        fileExtension?: string;
-      },
-    ) => {
+    exportSessionText: async (event, options) => {
       try {
-        const content = typeof options?.content === 'string' ? options.content : '';
+        const content = options.content;
         if (!content) {
-          return { success: false, error: 'Export content is empty' };
+          return { success: false as const, error: 'Export content is empty' };
         }
 
-        const ext = options?.fileExtension || 'md';
+        const ext = options.fileExtension || 'md';
         const filterName = ext === 'json' ? 'JSON' : 'Markdown';
-        const defaultName = options?.defaultFileName || `session-export.${ext}`;
+        const defaultName = options.defaultFileName || `session-export.${ext}`;
         const ownerWindow = BrowserWindow.fromWebContents(event.sender);
         const saveOptions = {
           title: 'Export Session',
@@ -135,39 +97,30 @@ export const registerCoworkExportIpc = (): void => {
           : await dialog.showSaveDialog(saveOptions);
 
         if (saveResult.canceled || !saveResult.filePath) {
-          return { success: true, canceled: true };
+          return { success: true as const, canceled: true };
         }
 
         await fs.promises.writeFile(saveResult.filePath, content, 'utf-8');
-        return { success: true, canceled: false, path: saveResult.filePath };
+        return { success: true as const, canceled: false, path: saveResult.filePath };
       } catch (error) {
         return {
-          success: false,
+          success: false as const,
           error: error instanceof Error ? error.message : 'Failed to export session',
         };
       }
     },
-  );
 
-  ipcMain.handle(
-    CoworkPermissionIpc.Respond,
-    async (
-      _event,
-      options: {
-        requestId: string;
-        result: PermissionResult;
-      },
-    ) => {
+    respondToPermission: async (_event, options) => {
       try {
         const runtime = getPiRuntimeAdapter();
         runtime.respondToPermission(options.requestId, options.result);
-        return { success: true };
+        return { success: true as const };
       } catch (error) {
         return {
-          success: false,
+          success: false as const,
           error: error instanceof Error ? error.message : 'Failed to respond to permission',
         };
       }
     },
-  );
+  });
 };
