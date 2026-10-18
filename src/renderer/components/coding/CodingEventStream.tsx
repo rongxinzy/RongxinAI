@@ -136,11 +136,7 @@ export const CodingEventStream = ({
           {headerActions}
         </div>
       ) : null}
-      <Conversation
-        className="h-full"
-        initial="instant"
-        resize={isStreaming ? 'smooth' : 'instant'}
-      >
+      <Conversation className="relative h-full" role="log">
         <ConversationContent
           reverse={false}
           scrollClassName="coding-conversation-scroll"

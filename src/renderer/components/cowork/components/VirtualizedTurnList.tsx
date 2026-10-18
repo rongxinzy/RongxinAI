@@ -7,7 +7,8 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { useStickToBottomContext } from 'use-stick-to-bottom';
+
+import { useConversationViewportContext } from '@shared/components/ai-elements/useConversationViewport';
 
 import { estimateCachedTurnHeight } from '../helpers/cachedTurnHeight';
 import { getConversationTurnMessageIds, type ConversationTurn } from '../helpers/messageGrouping';
@@ -45,18 +46,18 @@ const syncMeasuredTurnLayout = <TScrollElement extends Element, TItemElement ext
 /**
  * Renders only the visible window of conversation turns (issue #141
  * Phase 3). Turn identity comes from stable turn ids, measured heights are
- * remembered per turn, and the stick-to-bottom scroll context provides the
- * scroll element. While `renderAll` is set the list renders every turn so
- * DOM-based export capture keeps working.
+ * remembered per turn, and the virtualizer is the single owner of the
+ * viewport's scroll position: every write goes through its scroll pipeline
+ * (anchor + follow-on-append adjustments included). While `renderAll` is set
+ * the list renders every turn so DOM-based export capture keeps working.
  */
 export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListHandle,
   VirtualizedTurnListProps
 >(({ turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
-  const { scrollRef } = useStickToBottomContext();
+  const { getScrollElement, registerScrollWriter } = useConversationViewportContext();
   const hasPositionedInitialTailRef = useRef(false);
   const followedTailEdgesRef = useRef<{ first?: string; last?: string } | null>(null);
-  const shouldFollowInitialTailRef = useRef(true);
   const virtualSizerRef = useRef<HTMLDivElement>(null);
   const measuredTurnSizesRef = useRef(new Map<string, number>());
   const previousMessageIdsByTurnRef = useRef(new Map<string, string[]>());
@@ -65,6 +66,7 @@ export const VirtualizedTurnList = React.forwardRef<
   );
   const tailRetryFrameRef = useRef<number | null>(null);
   const tailRetryWindowRef = useRef<Window | null>(null);
+  const tailRetryCleanupRef = useRef<(() => void) | null>(null);
   const estimatedTurnSizes = useMemo(() => turns.map(estimateCachedTurnHeight), [turns]);
 
   const { internallyPrependedTurnSizes, nextMessageIdsByTurn } = useMemo(() => {
@@ -103,9 +105,7 @@ export const VirtualizedTurnList = React.forwardRef<
     if (!scrollElement || !targetWindow) return;
 
     // Upward anchor adjustments stay short of the end and must not schedule a
-    // later scroll write. Initial row refs can run before the sizer ref attaches,
-    // and the sizer grows in the same turn after this scrollTop assignment, so a
-    // clamped tail write during mounting still needs a retry.
+    // later scroll write.
     const totalSize = typeof instance.getTotalSize === 'function' ? instance.getTotalSize() : null;
     const virtualizerMaxScroll =
       totalSize !== null ? Math.max(totalSize - scrollElement.clientHeight, 0) : null;
@@ -117,24 +117,40 @@ export const VirtualizedTurnList = React.forwardRef<
     const clampedOffset = scrollElement.scrollTop;
     if (requestedOffset - clampedOffset < 1) return;
 
+    // A tail-seeking write can still be clamped to the stale content height
+    // during mounting (the sizer grows later in the same commit). Retry once
+    // on the next frame; the retry only runs when nothing else moved the
+    // scroll position in between.
     if (tailRetryFrameRef.current !== null && tailRetryWindowRef.current) {
       tailRetryWindowRef.current.cancelAnimationFrame(tailRetryFrameRef.current);
     }
-
-    tailRetryWindowRef.current = targetWindow;
-    tailRetryFrameRef.current = targetWindow.requestAnimationFrame(() => {
+    const cleanup = () => {
       tailRetryFrameRef.current = null;
       tailRetryWindowRef.current = null;
+    };
+    scrollElement.addEventListener('scroll', cleanup, { once: true, passive: true });
+    tailRetryWindowRef.current = targetWindow;
+    tailRetryFrameRef.current = targetWindow.requestAnimationFrame(() => {
+      const frame = tailRetryFrameRef.current;
+      tailRetryFrameRef.current = null;
+      tailRetryWindowRef.current = null;
+      if (frame === null) return;
+      scrollElement.removeEventListener('scroll', cleanup);
       const currentScrollElement = instance.scrollElement as HTMLElement | null;
       if (currentScrollElement === scrollElement && scrollElement.scrollTop === clampedOffset) {
         scrollElement.scrollTo({ top: requestedOffset, behavior: 'auto' });
       }
     });
+    tailRetryCleanupRef.current = () => {
+      targetWindow.cancelAnimationFrame(tailRetryFrameRef.current ?? 0);
+      scrollElement.removeEventListener('scroll', cleanup);
+      cleanup();
+    };
   }, []);
   const initialOffset = estimatedTurnSizes.reduce((total, size) => total + size, 0);
   const virtualizer = useVirtualizer({
     count: turns.length,
-    getScrollElement: () => scrollRef.current,
+    getScrollElement,
     getItemKey: index => turns[index]?.id ?? index,
     estimateSize: index => estimatedTurnSizes[index] ?? 300,
     overscan: TURN_OVERSCAN,
@@ -164,17 +180,23 @@ export const VirtualizedTurnList = React.forwardRef<
     [virtualizer],
   );
 
+  // The virtualizer owns the viewport's scroll position: route the follow
+  // hook's "scroll to bottom" through it instead of a second writer.
+  const scrollToEnd = useCallback(() => {
+    virtualizer.scrollToEnd({ behavior: 'auto' });
+  }, [virtualizer]);
+  useEffect(() => registerScrollWriter(scrollToEnd), [registerScrollWriter, scrollToEnd]);
+
   useEffect(
     () => () => {
-      if (tailRetryFrameRef.current !== null && tailRetryWindowRef.current) {
-        tailRetryWindowRef.current.cancelAnimationFrame(tailRetryFrameRef.current);
-      }
+      tailRetryCleanupRef.current?.();
+      tailRetryCleanupRef.current = null;
     },
     [],
   );
 
   useLayoutEffect(() => {
-    const scrollElement = scrollRef.current;
+    const scrollElement = getScrollElement();
     if (!scrollElement) return;
 
     const previousOverflowAnchor = scrollElement.style.overflowAnchor;
@@ -183,40 +205,10 @@ export const VirtualizedTurnList = React.forwardRef<
     return () => {
       scrollElement.style.overflowAnchor = previousOverflowAnchor;
     };
-  }, [scrollRef]);
-
-  useEffect(() => {
-    const scrollElement = scrollRef.current;
-    const ownerDocument = scrollElement?.ownerDocument;
-    if (!scrollElement || !ownerDocument) return;
-
-    const stopFollowingInitialTail = () => {
-      shouldFollowInitialTailRef.current = false;
-    };
-    const handleWheel = (event: WheelEvent) => {
-      if (event.deltaY < 0) stopFollowingInitialTail();
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (['ArrowUp', 'Home', 'PageUp'].includes(event.key)) {
-        stopFollowingInitialTail();
-      }
-    };
-
-    scrollElement.addEventListener('wheel', handleWheel, { passive: true });
-    scrollElement.addEventListener('touchstart', stopFollowingInitialTail, { passive: true });
-    scrollElement.addEventListener('pointerdown', stopFollowingInitialTail, { passive: true });
-    ownerDocument.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      scrollElement.removeEventListener('wheel', handleWheel);
-      scrollElement.removeEventListener('touchstart', stopFollowingInitialTail);
-      scrollElement.removeEventListener('pointerdown', stopFollowingInitialTail);
-      ownerDocument.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [scrollRef]);
+  }, [getScrollElement]);
 
   useLayoutEffect(() => {
-    const scrollElement = scrollRef.current;
+    const scrollElement = getScrollElement();
     if (!scrollElement) return;
 
     const rows = scrollElement.querySelectorAll<HTMLElement>('[data-turn-key]');
@@ -240,13 +232,13 @@ export const VirtualizedTurnList = React.forwardRef<
       measuredTurnSizesRef.current.set(key, height);
     }
     previousMessageIdsByTurnRef.current = nextMessageIdsByTurn;
-  }, [internallyPrependedTurnSizes, nextMessageIdsByTurn, scrollRef, turns, virtualizer]);
+  }, [internallyPrependedTurnSizes, nextMessageIdsByTurn, getScrollElement, turns, virtualizer]);
 
   // 仅首次定位到底；同一次数的流式增高交给 anchorTo:end。
   // 首屏还在跟随底部时，历史消息前插会换掉首条 id 但末条不变，followOnAppend 不会补滚。
   useLayoutEffect(() => {
-    const scrollElement = scrollRef.current;
-    if (!scrollElement || renderAll || !shouldFollowInitialTailRef.current) {
+    const scrollElement = getScrollElement();
+    if (!scrollElement || renderAll) {
       return;
     }
 
@@ -263,13 +255,12 @@ export const VirtualizedTurnList = React.forwardRef<
     hasPositionedInitialTailRef.current = true;
     followedTailEdgesRef.current = { first: firstId, last: lastId };
     if (!historyPrepended) onInitialTailPositioned?.();
-  }, [onInitialTailPositioned, renderAll, scrollRef, turns, virtualizer]);
+  }, [onInitialTailPositioned, renderAll, getScrollElement, turns, virtualizer]);
 
   useImperativeHandle(
     ref,
     () => ({
       scrollToTurn: index => {
-        shouldFollowInitialTailRef.current = false;
         virtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' });
       },
     }),
