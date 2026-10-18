@@ -7,13 +7,9 @@ import { pathToFileURL } from 'url';
 
 import { ipcMain, shell } from 'electron';
 
-import { isDev } from './appEnv';
 import { normalizeWindowsShellPath } from './shellPathNormalize';
-import {
-  isAllowedShellOpenPath,
-  isAllowedShellProbePath,
-  isSensitivePath,
-} from '../shellPathValidation';
+import { isAllowedShellOpenPath, isSensitivePath } from '../shellPathValidation';
+import { resolveLocalPathCandidate } from '../localPathResolver';
 import { getAllowedShellProbeRoots } from './dialogIpc';
 import { ShellIpc } from '../../shared/ipc/channels';
 
@@ -50,26 +46,25 @@ export const registerShellIpc = (): void => {
     }
   });
 
-  // 供对话内本地路径高亮：仅当处于受允许的安全根目录且磁盘上存在对应文件时返回 exists: true
-  ipcMain.handle(ShellIpc.PathExists, async (_event, filePath: string) => {
-    try {
-      if (typeof filePath !== 'string' || !filePath.trim()) {
-        return { success: true, exists: false };
+  // 对话内本地路径解析：把渲染进程给出的候选（inline code / 非 http 链接）解析为
+  // 允许根目录内真实存在的文件路径；目录与不存在的路径返回 null。
+  ipcMain.handle(
+    ShellIpc.ResolveLocalPath,
+    async (_event, candidate: string, cwd?: string): Promise<{ path: string | null }> => {
+      try {
+        const allowedRoots = getAllowedShellProbeRoots();
+        const resolved = await resolveLocalPathCandidate(
+          typeof candidate === 'string' ? candidate : '',
+          typeof cwd === 'string' && cwd ? cwd : undefined,
+          allowedRoots,
+        );
+        return { path: resolved };
+      } catch (error) {
+        console.error('[ShellIpc] resolve local path failed:', error);
+        return { path: null };
       }
-      const normalizedPath = normalizeWindowsShellPath(filePath);
-      const allowedRoots = getAllowedShellProbeRoots();
-      if (!isAllowedShellProbePath(normalizedPath, allowedRoots)) {
-        return { success: true, exists: false };
-      }
-      return { success: true, exists: fs.existsSync(normalizedPath) };
-    } catch (error) {
-      return {
-        success: false,
-        exists: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
-  });
+    },
+  );
 
   ipcMain.handle('shell:openExternal', async (_event, url: string) => {
     try {

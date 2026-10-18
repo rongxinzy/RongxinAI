@@ -14,6 +14,7 @@ import remarkMath from 'remark-math';
 
 import { i18nService } from '../services/i18n';
 import { showAppToast } from '../services/toastNotification';
+import { isLocalPathCandidate, useResolvedLocalPath } from '../services/useResolvedLocalPath';
 import CodeBlock from './CodeBlock';
 
 const SAFE_URL_PROTOCOLS = new Set(['http', 'https', 'mailto', 'tel', 'file']);
@@ -173,122 +174,8 @@ const dispatchAppToast = (message: string): void => {
   showAppToast(message);
 };
 
-const safeDecodeURIComponent = (value: string): string => {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-};
-
-const stripHashAndQuery = (value: string): string => value.split('#')[0].split('?')[0];
-
-const stripFileProtocol = (value: string): string => {
-  let cleaned = value.replace(/^file:\/\//i, '');
-  if (/^\/[A-Za-z]:/.test(cleaned)) {
-    cleaned = cleaned.slice(1);
-  }
-  return cleaned;
-};
-
-const hasFileExtension = (value: string): boolean => /\.[A-Za-z0-9]{1,6}$/.test(value);
-
-const looksLikeDirectory = (value: string): boolean => {
-  if (!value) return false;
-  if (value.endsWith('/') || value.endsWith('\\')) return true;
-  return !hasFileExtension(value);
-};
-
-const isLikelyLocalFilePath = (href: string): boolean => {
-  if (!href) return false;
-  if (/^file:\/\//i.test(href)) return true;
-  if (/^[A-Za-z]:[\\/]/.test(href)) return true;
-  if (href.startsWith('/') || href.startsWith('./') || href.startsWith('../')) return true;
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return false;
-
-  const base = stripHashAndQuery(href);
-  if (base.includes('/') || base.includes('\\')) return true;
-
-  const extMatch = base.match(/\.([A-Za-z0-9]{1,6})$/);
-  if (!extMatch) return false;
-  const ext = extMatch[1].toLowerCase();
-  const commonTlds = new Set([
-    'com',
-    'net',
-    'org',
-    'io',
-    'cn',
-    'co',
-    'ai',
-    'app',
-    'dev',
-    'gov',
-    'edu',
-  ]);
-  return !commonTlds.has(ext);
-};
-
-const toFileHref = (filePath: string): string => {
-  const normalized = filePath.replace(/\\/g, '/');
-  if (/^[A-Za-z]:/.test(filePath)) {
-    return `file:///${normalized}`;
-  }
-  if (normalized.startsWith('/')) {
-    return `file://${normalized}`;
-  }
-  return `file://${normalized}`;
-};
-
-const getLocalPathFromLink = (
-  href: string | null,
-  text: string,
-  resolveLocalFilePath?: (href: string, text: string) => string | null,
-): string | null => {
-  if (!href) return null;
-  const resolved = resolveLocalFilePath ? resolveLocalFilePath(href, text) : null;
-  if (resolved) return resolved;
-  if (!isLikelyLocalFilePath(href)) return null;
-  const rawPath = stripFileProtocol(stripHashAndQuery(href));
-  const decoded = safeDecodeURIComponent(rawPath);
-  return decoded || rawPath || null;
-};
-
-const findFallbackPathFromContext = (
-  anchor: HTMLAnchorElement | null,
-  fileName: string,
-  resolveLocalFilePath?: (href: string, text: string) => string | null,
-): string | null => {
-  const trimmedName = fileName.trim();
-  if (!trimmedName || trimmedName.includes('/') || trimmedName.includes('\\')) {
-    return null;
-  }
-
-  if (!anchor || typeof anchor.closest !== 'function') return null;
-  const container = anchor.closest('.markdown-content');
-  if (!container) return null;
-
-  const anchors = Array.from(container.querySelectorAll('a'));
-  const index = anchors.indexOf(anchor);
-  if (index <= 0) return null;
-
-  for (let i = index - 1; i >= 0; i -= 1) {
-    const candidate = anchors[i] as HTMLAnchorElement;
-    const candidateHref = candidate.getAttribute('href');
-    const candidateText = candidate.textContent ?? '';
-    const basePath = getLocalPathFromLink(candidateHref, candidateText, resolveLocalFilePath);
-    if (!basePath || !looksLikeDirectory(basePath)) {
-      continue;
-    }
-
-    const normalizedBase = basePath.replace(/[\\/]+$/, '');
-    return `${normalizedBase}/${trimmedName}`;
-  }
-
-  return null;
-};
-
 const createMarkdownComponents = (
-  resolveLocalFilePath?: (href: string, text: string) => string | null,
+  sessionCwd: string | undefined,
   showRevealInFolderAction = false,
   onImageClick?: (image: { src: string; alt?: string | null }) => void,
   restrictLocalFileLinks = false,
@@ -407,171 +294,165 @@ const createMarkdownComponents = (
 
     const hrefValue = typeof href === 'string' ? href.trim() : '';
     const isExternalLink = !!hrefValue && isExternalHref(hrefValue);
-    const linkText = Array.isArray(children) ? children.join('') : String(children ?? '');
-    const resolvedPath =
-      hrefValue && !isExternalLink && resolveLocalFilePath
-        ? resolveLocalFilePath(hrefValue, linkText)
-        : null;
-    const isUnresolvedRestrictedLocalPath =
-      !!hrefValue &&
-      !isExternalLink &&
-      restrictLocalFileLinks &&
-      !resolvedPath &&
-      isLikelyLocalFilePath(hrefValue);
-    const isLocalFilePath =
-      !!hrefValue &&
-      !isExternalLink &&
-      (resolvedPath || (!restrictLocalFileLinks && isLikelyLocalFilePath(hrefValue)));
+    const candidate = hrefValue && !isExternalLink ? hrefValue : null;
 
-    if (isUnresolvedRestrictedLocalPath) {
-      return <span className="text-muted-foreground">{children}</span>;
-    }
+    return (
+      <LocalAwareMarkdownAnchor
+        candidate={candidate}
+        cwd={sessionCwd}
+        restrictLocalFileLinks={restrictLocalFileLinks}
+        showRevealInFolderAction={showRevealInFolderAction}
+        hrefValue={hrefValue}
+        isExternalLink={isExternalLink}
+        {...props}
+      >
+        {children}
+      </LocalAwareMarkdownAnchor>
+    );
+  },
+});
 
-    if (isLocalFilePath) {
-      const rawPath = resolvedPath ?? stripFileProtocol(stripHashAndQuery(hrefValue));
-      const decodedPath = safeDecodeURIComponent(rawPath);
-      const filePath = decodedPath || rawPath;
-      const isDirectoryLink = looksLikeDirectory(filePath);
-      const shouldShowRevealInFolderAction = showRevealInFolderAction && !isDirectoryLink;
+interface LocalAwareMarkdownAnchorProps {
+  candidate: string | null;
+  cwd: string | undefined;
+  restrictLocalFileLinks: boolean;
+  showRevealInFolderAction: boolean;
+  hrefValue: string;
+  isExternalLink: boolean;
+  children?: React.ReactNode;
+}
 
-      const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-        e.preventDefault();
-        const anchor = e.currentTarget;
-        try {
-          const result = await window.electron.shell.openPath(filePath);
-          if (result?.success) {
-            return;
-          }
+/**
+ * 本地文件链接：由主进程 `shell.resolveLocalPath` 判定是否存在（issue #805）；
+ * 解析失败时按 restrictLocalFileLinks 降级为纯文本或普通锚点。
+ */
+const LocalAwareMarkdownAnchor: React.FC<LocalAwareMarkdownAnchorProps> = ({
+  candidate,
+  cwd,
+  restrictLocalFileLinks,
+  showRevealInFolderAction,
+  hrefValue,
+  isExternalLink,
+  children,
+  ...props
+}) => {
+  const resolved = useResolvedLocalPath(
+    candidate && isLocalPathCandidate(candidate) ? candidate : null,
+    cwd,
+    true,
+  );
 
-          const fallbackPath = findFallbackPathFromContext(anchor, linkText, resolveLocalFilePath);
-          if (fallbackPath) {
-            const fallbackResult = await window.electron.shell.openPath(fallbackPath);
-            if (!fallbackResult?.success) {
-              console.error('Failed to open file (fallback):', fallbackPath, fallbackResult?.error);
-            }
-          } else {
-            console.error('Failed to open file:', filePath, result?.error);
-          }
-        } catch (error) {
-          console.error('Failed to open file:', filePath, error);
-        }
-      };
+  if (resolved) {
+    const isDirectoryLink = false;
+    const shouldShowRevealInFolderAction = showRevealInFolderAction && !isDirectoryLink;
 
-      const handleRevealInFolder = async (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const anchor = e.currentTarget.parentElement?.querySelector('a');
-        const linkedAnchor = anchor instanceof HTMLAnchorElement ? anchor : null;
-
-        const tryReveal = async (targetPath: string): Promise<boolean> => {
-          const result = await window.electron.shell.showItemInFolder(targetPath);
-          if (result?.success) {
-            return true;
-          }
-          console.error('Failed to show item in folder:', targetPath, result?.error);
-          return false;
-        };
-
-        try {
-          if (await tryReveal(filePath)) {
-            return;
-          }
-
-          const fallbackPath = findFallbackPathFromContext(
-            linkedAnchor,
-            linkText,
-            resolveLocalFilePath,
-          );
-          if (fallbackPath && fallbackPath !== filePath && (await tryReveal(fallbackPath))) {
-            return;
-          }
-
-          dispatchAppToast(i18nService.t('showInFolderFailed'));
-        } catch (error) {
-          console.error('Failed to show item in folder:', filePath, error);
-          dispatchAppToast(i18nService.t('showInFolderFailed'));
-        }
-      };
-
-      return (
-        <span className="group inline-flex max-w-full items-center gap-1 align-baseline">
-          <a
-            href={toFileHref(filePath)}
-            onClick={handleClick}
-            className="theme-surface-markdown-link cursor-pointer inline-flex items-center gap-1"
-            title={filePath}
-            {...props}
-          >
-            {children}
-            {isDirectoryLink ? (
-              <Folder className="h-3.5 w-3.5 inline" />
-            ) : (
-              <FileText className="h-3.5 w-3.5 inline" />
-            )}
-          </a>
-          {shouldShowRevealInFolderAction && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleRevealInFolder}
-              className="theme-page-markdown-content-button-1 inline-flex items-center justify-center pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
-              title={i18nService.t('showInFolder')}
-              aria-label={i18nService.t('showInFolder')}
-            >
-              <Folder className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </span>
-      );
-    }
-
-    if (isExternalLink) {
-      const handleExternalClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
-        const openExternal = (window as any)?.electron?.shell?.openExternal;
-        if (typeof openExternal !== 'function') {
+    const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      try {
+        const result = await window.electron.shell.openPath(resolved);
+        if (result?.success) {
           return;
         }
+        console.error('Failed to open file:', resolved, result?.error);
+      } catch (error) {
+        console.error('Failed to open file:', resolved, error);
+      }
+    };
 
-        e.preventDefault();
-        const opened = await openExternalViaDefaultBrowser(hrefValue);
-        if (!opened) {
-          openExternalViaAnchorFallback(hrefValue);
+    const handleRevealInFolder = async (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        const result = await window.electron.shell.showItemInFolder(resolved);
+        if (!result?.success) {
+          console.error('Failed to show item in folder:', resolved, result?.error);
+          dispatchAppToast(i18nService.t('showInFolderFailed'));
         }
-      };
+      } catch (error) {
+        console.error('Failed to show item in folder:', resolved, error);
+        dispatchAppToast(i18nService.t('showInFolderFailed'));
+      }
+    };
 
-      return (
+    return (
+      <span className="group inline-flex max-w-full items-center gap-1 align-baseline">
         <a
-          href={hrefValue}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={handleExternalClick}
-          className="theme-surface-markdown-link"
+          href={resolved}
+          onClick={handleClick}
+          className="theme-surface-markdown-link cursor-pointer inline-flex items-center gap-1"
+          title={resolved}
+          data-local-path={resolved}
           {...props}
         >
           {children}
+          <FileText className="h-3.5 w-3.5 inline" />
         </a>
-      );
-    }
+        {shouldShowRevealInFolderAction && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleRevealInFolder}
+            className="theme-page-markdown-content-button-1 inline-flex items-center justify-center pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
+            title={i18nService.t('showInFolder')}
+            aria-label={i18nService.t('showInFolder')}
+          >
+            <Folder className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </span>
+    );
+  }
+
+  if (!isExternalLink && restrictLocalFileLinks) {
+    return <span className="text-muted-foreground">{children}</span>;
+  }
+
+  if (isExternalLink) {
+    const handleExternalClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
+      const openExternal = (window as any)?.electron?.shell?.openExternal;
+      if (typeof openExternal !== 'function') {
+        return;
+      }
+
+      e.preventDefault();
+      const opened = await openExternalViaDefaultBrowser(hrefValue);
+      if (!opened) {
+        openExternalViaAnchorFallback(hrefValue);
+      }
+    };
 
     return (
       <a
         href={hrefValue}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={handleExternalClick}
         className="theme-surface-markdown-link"
         {...props}
       >
         {children}
       </a>
     );
-  },
-});
+  }
+
+  return (
+    <a
+      href={hrefValue}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="theme-surface-markdown-link"
+      {...props}
+    >
+      {children}
+    </a>
+  );
+};
 
 interface MarkdownContentProps {
   content: string;
   className?: string;
-  resolveLocalFilePath?: (href: string, text: string) => string | null;
+  cwd?: string;
   restrictLocalFileLinks?: boolean;
   showRevealInFolderAction?: boolean;
   onImageClick?: (image: { src: string; alt?: string | null }) => void;
@@ -580,20 +461,15 @@ interface MarkdownContentProps {
 const MarkdownContent: React.FC<MarkdownContentProps> = ({
   content,
   className = '',
-  resolveLocalFilePath,
+  cwd,
   restrictLocalFileLinks = false,
   showRevealInFolderAction = false,
   onImageClick,
 }) => {
   const components = useMemo(
     () =>
-      createMarkdownComponents(
-        resolveLocalFilePath,
-        showRevealInFolderAction,
-        onImageClick,
-        restrictLocalFileLinks,
-      ),
-    [resolveLocalFilePath, showRevealInFolderAction, onImageClick, restrictLocalFileLinks],
+      createMarkdownComponents(cwd, showRevealInFolderAction, onImageClick, restrictLocalFileLinks),
+    [cwd, showRevealInFolderAction, onImageClick, restrictLocalFileLinks],
   );
   const normalizedContent = useMemo(
     () => normalizeDisplayMath(encodeFileUrlsInMarkdown(content)),
