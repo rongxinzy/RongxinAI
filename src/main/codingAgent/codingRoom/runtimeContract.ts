@@ -64,6 +64,8 @@ export interface CodingRoomRuntime {
   };
   completeExternalWorkbenchRun(input: {
     sessionId: string;
+    /** Lane whose ledger rows hold the run's file effects. */
+    laneId: string;
     runId: string;
     workspaceRoot: string;
     finalAnswer: string;

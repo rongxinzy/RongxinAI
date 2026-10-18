@@ -29,12 +29,13 @@ import {
   type WorkbenchTaskDetail,
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
+import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import { HarnessActivationType } from '../../shared/harness';
 import { HarnessMeasurementService } from '../harness/measurementService';
 import { t } from '../i18n';
 import { collectWorkbenchArtifactsAsync } from './artifactWorkerPool';
 import { applyWorkbenchDeliveryGate } from './deliveryGate';
-import { getCurrentDeclaredArtifacts } from './artifactCompletion';
+import { getCurrentDeclaredArtifacts, getLedgerRunCandidates } from './artifactCompletion';
 import { WorkbenchTaskRepository } from './repository';
 import { classifyWorkbenchToolRisk, createToolIdempotencyKey } from './riskClassifier';
 import { verifyWorkbenchRun, type WorkbenchVerificationContext } from './verification';
@@ -67,6 +68,8 @@ interface VerifiedWorkbenchRunEvent {
 
 export interface WorkbenchTaskServiceOptions {
   onVerifiedRun?: (event: VerifiedWorkbenchRunEvent) => void;
+  /** Reads the event-time artifact ledger for one scope (session or lane). */
+  listLedgerArtifacts?: (scopeId: string) => CoworkPersistedArtifact[];
 }
 
 type PendingApproval = {
@@ -254,6 +257,10 @@ export class WorkbenchTaskService extends EventEmitter {
     workflowCompleted?: boolean;
     workflowSnapshot?: Record<string, unknown> | null;
     artifactCandidates?: WorkbenchArtifactCandidate[];
+    /** Ledger scope holding the run's files: the session, or a coding lane. */
+    artifactScopeId?: string;
+    /** Settles once the ledger has recorded the run's final workspace diff. */
+    artifactsSettled?: Promise<unknown>;
     streamClosedCleanly?: boolean;
     signal?: AbortSignal;
   }): Promise<WorkbenchTaskDetail> {
@@ -274,34 +281,21 @@ export class WorkbenchTaskService extends EventEmitter {
       workflowSnapshot: input.workflowSnapshot,
     };
     const result = verifyWorkbenchRun(verificationContext);
-    const toolArtifactCandidates: WorkbenchArtifactCandidate[] = this.repository
-      .listApprovalsForRun(run.id)
-      .filter(approval => approval.effectStatus === WorkbenchApprovalEffectStatus.Succeeded)
-      .flatMap(approval => {
-        const resultDetails =
-          approval.result?.details && typeof approval.result.details === 'object'
-            ? (approval.result.details as Record<string, unknown>)
-            : {};
-        const pathValue =
-          approval.request.path ??
-          approval.request.file_path ??
-          approval.request.filePath ??
-          resultDetails.path ??
-          resultDetails.file_path ??
-          resultDetails.filePath;
-        return typeof pathValue === 'string'
-          ? [
-              {
-                path: pathValue,
-                source: WorkbenchArtifactCandidateSource.ToolEffect,
-                verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-              },
-            ]
-          : [];
-      });
+    // Files the run produced come from the event-time artifact ledger; wait
+    // for its settle-time workspace diff so generated files are included.
+    await input.artifactsSettled;
+    const declaredCandidates = getCurrentDeclaredArtifacts(
+      this.repository.getDetail(task.id)!.artifacts,
+      run.id,
+    );
     const artifactCandidates = [
-      ...getCurrentDeclaredArtifacts(this.repository.getDetail(task.id)!.artifacts, run.id),
-      ...toolArtifactCandidates,
+      ...declaredCandidates,
+      ...getLedgerRunCandidates(
+        this.options.listLedgerArtifacts?.(input.artifactScopeId ?? input.sessionId) ?? [],
+        run.id,
+        input.workspaceRoot,
+        declaredCandidates,
+      ),
       ...(input.artifactCandidates ?? []),
     ];
     let collected: Awaited<ReturnType<typeof collectWorkbenchArtifactsAsync>> = [];

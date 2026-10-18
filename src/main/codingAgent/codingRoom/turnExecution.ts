@@ -406,6 +406,7 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
         if (assignment?.workbenchRunId) {
           await this.runtime.completeExternalWorkbenchRun({
             sessionId: lane.localSessionId,
+            laneId: lane.id,
             runId: assignment.workbenchRunId,
             workspaceRoot: executionRoot,
             finalAnswer: answer,

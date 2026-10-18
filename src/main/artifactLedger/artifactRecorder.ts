@@ -186,6 +186,16 @@ export class ArtifactRecorder {
     this.lastDiff = this.runDiff(anchor, true);
   }
 
+  /** Resolves once the settle-time workspace diff has landed in the ledger;
+   * task delivery reads the run's rows only after this. Never rejects. */
+  async settled(): Promise<void> {
+    try {
+      await this.lastDiff;
+    } catch {
+      // A failed diff leaves the rows recorded so far; delivery still proceeds.
+    }
+  }
+
   /**
    * Deterministic flush for tests: waits for the run-start baseline, runs a
    * debounce-pending diff immediately, and awaits any in-flight diff. Never

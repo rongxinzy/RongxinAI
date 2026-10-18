@@ -83,7 +83,7 @@ export function recordCodingLaneArtifact(
       id: `coding-file-${artifactKeyForPath(candidate.filePath)}`,
       messageId: '',
       toolCallId: candidate.toolCallId,
-      runId: null,
+      runId: laneWorkbenchRunId(db, laneId),
       type: candidate.type,
       title: getArtifactFileName(candidate.filePath),
       content: candidate.content,
@@ -95,6 +95,24 @@ export function recordCodingLaneArtifact(
     if (artifact) publishArtifactUpsert(laneId, artifact);
   } catch (error) {
     console.warn(`[ArtifactLedger] failed to record coding lane artifact for ${laneId}:`, error);
+  }
+}
+
+/**
+ * External coding turns run inside a workbench run linked through the lane's
+ * latest assignment; task delivery reads the run's ledger rows by it.
+ */
+function laneWorkbenchRunId(db: Database.Database, laneId: string): string | null {
+  try {
+    const row = db
+      .prepare(
+        'SELECT workbench_run_id FROM coding_assignments WHERE lane_id = ? ORDER BY created_at DESC LIMIT 1',
+      )
+      .get(laneId) as { workbench_run_id?: unknown } | undefined;
+    return readString(row?.workbench_run_id);
+  } catch {
+    // Lanes without assignments (or stores without the table) record no run.
+    return null;
   }
 }
 
