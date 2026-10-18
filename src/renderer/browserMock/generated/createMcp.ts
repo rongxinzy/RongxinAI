@@ -3,6 +3,12 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createMcp(runtime: BrowserMockRuntime): Window['electron']['mcp'] {
   return {
+    onBridgeSyncStart: _p0 => {
+      return runtime.subscribe('mcp.onBridgeSyncStart', _p0);
+    },
+    onBridgeSyncDone: _p0 => {
+      return runtime.subscribe('mcp.onBridgeSyncDone', _p0);
+    },
     list: async () => {
       runtime.warnOnce('mcp.list');
       return {
@@ -18,9 +24,8 @@ export function createMcp(runtime: BrowserMockRuntime): Window['electron']['mcp'
         servers: [],
       };
     },
-    update: async (_p0, _p1) => {
+    update: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('mcp.update');
       return {
         success: true,
@@ -124,12 +129,6 @@ export function createMcp(runtime: BrowserMockRuntime): Window['electron']['mcp'
         success: true,
         servers: [],
       };
-    },
-    onBridgeSyncStart: _p0 => {
-      return runtime.subscribe('mcp.onBridgeSyncStart', _p0);
-    },
-    onBridgeSyncDone: _p0 => {
-      return runtime.subscribe('mcp.onBridgeSyncDone', _p0);
     },
   };
 }

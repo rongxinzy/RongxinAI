@@ -3,6 +3,9 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createSkills(runtime: BrowserMockRuntime): Window['electron']['skills'] {
   return {
+    onChanged: _p0 => {
+      return runtime.subscribe('skills.onChanged', _p0);
+    },
     list: async () => {
       runtime.warnOnce('skills.list');
       return {
@@ -13,6 +16,14 @@ export function createSkills(runtime: BrowserMockRuntime): Window['electron']['s
     setEnabled: async _p0 => {
       void _p0;
       runtime.warnOnce('skills.setEnabled');
+      return {
+        success: true,
+        skills: [],
+      };
+    },
+    setEnabledBatch: async _p0 => {
+      void _p0;
+      runtime.warnOnce('skills.setEnabledBatch');
       return {
         success: true,
         skills: [],
@@ -34,18 +45,17 @@ export function createSkills(runtime: BrowserMockRuntime): Window['electron']['s
         skills: [],
       };
     },
-    download: async (_p0, _p1) => {
+    download: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('skills.download');
       return {
         success: true,
         skills: [],
+        auditReport: {},
       };
     },
-    confirmInstall: async (_p0, _p1) => {
+    confirmInstall: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('skills.confirmInstall');
       return {
         success: true,
@@ -79,17 +89,15 @@ export function createSkills(runtime: BrowserMockRuntime): Window['electron']['s
         config: {},
       };
     },
-    setConfig: async (_p0, _p1) => {
+    setConfig: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('skills.setConfig');
       return {
         success: true,
       };
     },
-    testEmailConnectivity: async (_p0, _p1) => {
+    testEmailConnectivity: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('skills.testEmailConnectivity');
       return {
         success: true,
@@ -132,9 +140,6 @@ export function createSkills(runtime: BrowserMockRuntime): Window['electron']['s
           skillPath: '',
         },
       };
-    },
-    onChanged: _p0 => {
-      return runtime.subscribe('skills.onChanged', _p0);
     },
   };
 }

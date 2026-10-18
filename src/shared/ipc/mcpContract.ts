@@ -12,7 +12,7 @@
  */
 import { z } from 'zod';
 
-import { defineIpcContract, type IpcContractChannels } from './contract';
+import { defineIpcContract } from './contract';
 import { McpIpc } from './channels';
 
 export const McpTransportTypeSchema = z.enum(['stdio', 'sse', 'http']);
@@ -41,8 +41,7 @@ export const McpServerConfigSchema = z
     exposure: McpExposureSchema.optional(),
     createdAt: z.number(),
     updatedAt: z.number(),
-  })
-  .passthrough();
+  });
 
 export type McpServerConfigIpc = z.infer<typeof McpServerConfigSchema>;
 
@@ -74,22 +73,16 @@ export type McpServerFormIpc = z.infer<typeof McpServerFormSchema>;
 /** Partial form payload for `update`; main merges it over the stored row. */
 const McpServerFormPatchSchema = McpServerFormSchema.partial();
 
-const McpPresentationSectionSchema = z
-  .object({ title: z.string().optional(), description: z.string().optional() })
-  .passthrough();
-
-const McpPresentationLocaleSchema = z
-  .object({
-    description: z.string().optional(),
-    examples: z.array(z.string()).optional(),
-    connect: z
-      .record(
-        z.string(),
-        z.object({ title: z.string().optional(), description: z.string().optional() }).passthrough(),
-      )
-      .optional(),
-  })
-  .passthrough();
+const McpPresentationLocaleSchema = z.object({
+  description: z.string().optional(),
+  examples: z.array(z.string()).optional(),
+  connect: z
+    .record(
+      z.string(),
+      z.object({ title: z.string().optional(), description: z.string().optional() }),
+    )
+    .optional(),
+});
 
 const McpPresentationSchema = z
   .object({
@@ -97,8 +90,7 @@ const McpPresentationSchema = z
     authorization: z.string().optional(),
     zh: McpPresentationLocaleSchema.optional(),
     en: McpPresentationLocaleSchema.optional(),
-  })
-  .passthrough();
+  });
 
 /** Bundled MCP marketplace registry entry (registry.json is permissive). */
 export const McpMarketplaceServerSchema = z
@@ -122,19 +114,14 @@ export const McpMarketplaceServerSchema = z
     requiredEnvKeys: z.array(z.string()).optional(),
     optionalEnvKeys: z.array(z.string()).optional(),
     presentation: McpPresentationSchema.optional(),
-  })
-  .passthrough();
+  });
 
 export type McpMarketplaceServerIpc = z.infer<typeof McpMarketplaceServerSchema>;
 
-export const McpMarketplaceDataSchema = z
-  .object({
-    categories: z.array(
-      z.object({ id: z.string(), name_zh: z.string(), name_en: z.string() }).passthrough(),
-    ),
-    servers: z.array(McpMarketplaceServerSchema),
-  })
-  .passthrough();
+export const McpMarketplaceDataSchema = z.object({
+  categories: z.array(z.object({ id: z.string(), name_zh: z.string(), name_en: z.string() })),
+  servers: z.array(McpMarketplaceServerSchema),
+});
 
 export type McpMarketplaceDataIpc = z.infer<typeof McpMarketplaceDataSchema>;
 
@@ -174,8 +161,7 @@ export const mcpContract = defineIpcContract({
         success: z.boolean(),
         error: z.string().optional(),
         toolCount: z.number().optional(),
-      })
-      .passthrough(),
+      }),
   },
   fetchMarketplace: {
     channel: McpIpc.FetchMarketplace,
@@ -259,23 +245,3 @@ export const mcpContract = defineIpcContract({
     }),
   },
 });
-
-/** Preload channel map for the mcp namespace (zod-free values). */
-export const mcpContractChannels: IpcContractChannels<typeof mcpContract> = {
-  list: McpIpc.List,
-  create: McpIpc.Create,
-  update: McpIpc.Update,
-  delete: McpIpc.Delete,
-  setEnabled: McpIpc.SetEnabled,
-  testConnection: McpIpc.TestConnection,
-  fetchMarketplace: McpIpc.FetchMarketplace,
-  refreshBridge: McpIpc.RefreshBridge,
-  authorize: McpIpc.Authorize,
-  cancelAuthorize: McpIpc.CancelAuthorize,
-  getFeishuCliStatus: McpIpc.GetFeishuCliStatus,
-  prepareFeishuCli: McpIpc.PrepareFeishuCli,
-  loadIcon: McpIpc.LoadIcon,
-  exportConfig: McpIpc.ExportConfig,
-  importConfig: McpIpc.ImportConfig,
-  importConfigContent: McpIpc.ImportConfigContent,
-} as const;

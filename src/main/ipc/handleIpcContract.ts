@@ -11,7 +11,7 @@
 import { ipcMain } from 'electron';
 import { z } from 'zod';
 
-import type { IpcContract, IpcContractHandlers } from '../../shared/ipc/contract';
+import type { IpcContract, IpcContractHandlers, IpcInvokeEventLike } from '../../shared/ipc/contract';
 
 /** Compact one-line summary of a zod failure, e.g. `0: expected string` / `name: required`. */
 function summarizeZodIssues(error: z.ZodError): string {
@@ -39,7 +39,10 @@ export function handleIpcContract<C extends IpcContract>(
           `IPC ${definition.channel} rejected invalid arguments: ${summarizeZodIssues(parsedArgs.error)}`,
         );
       }
-      const impl = impls[method] as (event: Electron.IpcMainInvokeEvent, ...args: unknown[]) => unknown;
+      const impl = impls[method] as (
+        event: IpcInvokeEventLike,
+        ...args: unknown[]
+      ) => unknown;
       return impl(event, ...parsedArgs.data);
     });
   }

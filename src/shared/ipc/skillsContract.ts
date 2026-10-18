@@ -4,13 +4,13 @@
  * `SkillsApi` types.
  *
  * Arg/result shapes mirror what the renderer sends today
- * (`src/renderer/services/skill.ts` + skill components). Result envelopes are
- * intentionally loose where main returns rich records (`passthrough`) — the
- * main-side `SkillRecord` stays the owner of that shape.
+ * (`src/renderer/services/skill.ts` + skill components). The main-side
+ * `SkillRecord` stays the owner of the full shape; the schema documents the
+ * fields the renderer reads (results are not stripped at runtime).
  */
 import { z } from 'zod';
 
-import { defineIpcContract, type IpcContractChannels } from './contract';
+import { defineIpcContract } from './contract';
 import { SkillsIpc } from './channels';
 
 /** A skill row as returned by SkillManager.listSkills() (main-owned SkillRecord). */
@@ -34,8 +34,7 @@ export const SkillRecordSchema = z
     metadataContent: z.string().optional(),
     metadataFields: z.record(z.string(), z.string()).optional(),
     version: z.string().optional(),
-  })
-  .passthrough();
+  });
 
 export type SkillRecordIpc = z.infer<typeof SkillRecordSchema>;
 
@@ -208,22 +207,12 @@ export const skillsContract = defineIpcContract({
   },
 });
 
-/** Preload channel map for the skills namespace (zod-free values). */
-export const skillsContractChannels: IpcContractChannels<typeof skillsContract> = {
-  list: SkillsIpc.List,
-  setEnabled: SkillsIpc.SetEnabled,
-  setEnabledBatch: SkillsIpc.SetEnabledBatch,
-  setPinned: SkillsIpc.SetPinned,
-  delete: SkillsIpc.Delete,
-  download: SkillsIpc.Download,
-  confirmInstall: SkillsIpc.ConfirmInstall,
-  getRoot: SkillsIpc.GetRoot,
-  getContent: SkillsIpc.GetContent,
-  autoRoutingPrompt: SkillsIpc.AutoRoutingPrompt,
-  getConfig: SkillsIpc.GetConfig,
-  setConfig: SkillsIpc.SetConfig,
-  testEmailConnectivity: SkillsIpc.TestEmailConnectivity,
-  fetchMarketplace: SkillsIpc.FetchMarketplace,
-  fetchMarketplaceContent: SkillsIpc.FetchMarketplaceContent,
-  createCustom: SkillsIpc.CreateCustom,
-} as const;
+/**
+ * Named data types derived from the schemas, for renderer code that needs the
+ * shape without a contract method (e.g. local state typed as a skill row).
+ */
+export type SkillsContractTypes = {
+  skill: z.infer<typeof SkillRecordSchema>;
+  emailConnectivityTestResult: z.infer<typeof EmailConnectivityTestResultSchema>;
+};
+

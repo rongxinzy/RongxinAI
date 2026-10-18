@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { app, dialog } from 'electron';
+import type { z } from 'zod';
 
 import { rt } from './runtimeState';
 import { getMcpStore, getStore } from './runtimeServices';
@@ -211,10 +212,13 @@ export const registerMcpIpc = (): void => {
 
     fetchMarketplace: async () => {
       try {
-        return {
-          success: true,
-          data: loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath),
-        };
+        // The bundled registry is permissive (`Record<string, unknown>` rows);
+        // the renderer projects known fields off each server object.
+        const data = loadBundledMcpMarketplace(
+          app.getAppPath(),
+          process.resourcesPath,
+        ) as z.infer<typeof mcpContract.fetchMarketplace.result>['data'];
+        return { success: true, data };
       } catch (error) {
         return {
           success: false,

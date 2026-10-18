@@ -55,10 +55,21 @@ export type IpcContractApi<C extends IpcContract> = {
  * Main-side impl map for `handleIpcContract`: impls receive the zod *output*
  * of the args tuple (already validated) and must return the result type the
  * result schema infers — checked at compile time, not runtime.
+ *
+ * The `event` parameter is typed loosely (a structural subset of
+ * `Electron.IpcMainInvokeEvent`) because this shared module compiles in both
+ * the renderer tsconfig (where the `Electron` ambient namespace may be
+ * unavailable) and the main tsconfig.
  */
+export interface IpcInvokeEventLike {
+  readonly sender: {
+    readonly id: number;
+  };
+}
+
 export type IpcContractHandlers<C extends IpcContract> = {
   [K in keyof C]: (
-    event: Electron.IpcMainInvokeEvent,
+    event: IpcInvokeEventLike,
     ...args: z.output<C[K]['args']>
   ) => z.output<C[K]['result']> | Promise<z.output<C[K]['result']>>;
 };

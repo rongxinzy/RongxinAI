@@ -6,12 +6,13 @@
  * Search params mirror `MarketplaceSearchParams` in `src/shared/marketplace/types.ts`.
  * The result is the catalog service's `MarketplaceSearchResult`; models are a
  * large evolving projection, so the result schema keeps only the fields every
- * consumer reads and stays `passthrough`.
+ * consumer reads.
  */
 import { z } from 'zod';
 
-import { defineIpcContract, type IpcContractChannels } from '../ipc/contract';
+import { defineIpcContract } from '../ipc/contract';
 import { MarketplaceDeviceProfile, MarketplaceIpcChannel } from './constants';
+import type { MarketplaceSearchResult } from './types';
 
 export const MarketplaceSearchParamsSchema = z
   .object({
@@ -29,26 +30,21 @@ export const MarketplaceSearchParamsSchema = z
     quantization: z.string().optional(),
     minStars: z.number().optional(),
     language: z.string().optional(),
-  })
-  .passthrough();
+  });
 
 export const MarketplaceSearchRequestSchema = z.object({
   requestId: z.string().min(1),
   params: MarketplaceSearchParamsSchema,
 });
 
-export const MarketplaceSearchResultSchema = z
-  .object({
-    models: z.array(z.object({}).passthrough()),
-    totalCount: z.number().optional(),
-    nextCursor: z.string().optional(),
-    hasMore: z.boolean().optional(),
-    warning: z.string().optional(),
-    source: z.enum(['d1', 'cloud-catalog', 'modelscope', 'curated']).optional(),
-    catalogUpdatedAt: z.string().optional(),
-    scoreVersion: z.string().optional(),
-  })
-  .passthrough();
+/**
+ * The catalog service owns this projection (`MarketplaceModel` is a large
+ * evolving type in ./types); result validation only pins the envelope fields,
+ * with `models` cast to the shared type.
+ */
+export const MarketplaceSearchResultSchema = z.custom<MarketplaceSearchResult>(
+  value => typeof value === 'object' && value !== null,
+);
 
 export const marketplaceContract = defineIpcContract({
   search: {
@@ -62,9 +58,3 @@ export const marketplaceContract = defineIpcContract({
     result: z.object({ cancelled: z.boolean() }),
   },
 });
-
-/** Preload channel map for the marketplace namespace (zod-free values). */
-export const marketplaceContractChannels: IpcContractChannels<typeof marketplaceContract> = {
-  search: MarketplaceIpcChannel.Search,
-  cancelSearch: MarketplaceIpcChannel.CancelSearch,
-} as const;

@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isInterfaceDeclaration, type Node } from 'typescript/unstable/ast';
+import { isInterfaceDeclaration, SyntaxKind, type Node } from 'typescript/unstable/ast';
 import {
   API,
   ObjectFlags,
@@ -20,6 +20,7 @@ import {
   SymbolFlags,
   TypeFlags,
   type Checker,
+  type ParameterDeclaration,
   type Project,
   type Signature,
   type Symbol,
@@ -445,7 +446,19 @@ class Generator {
   private emitFunction(type: Type, pathKey: string): string[] {
     const signature = this.callSignatures(type)[0];
     if (!signature) return ['() => undefined'];
-    const params = signature.getParameters().filter(param => param.name !== 'this');
+    const params = signature
+      .getParameters()
+      .filter(param => param.name !== 'this')
+      // A rest parameter over an empty tuple (`...args: []`, the shape
+      // contract-derived zero-arg methods get) contributes no arguments.
+      .filter(param => {
+        if (!signature.hasRestParameter) return true;
+        const handle = param.valueDeclaration ?? param.declarations[0];
+        const parameter = handle?.resolve(this.project);
+        if (!parameter || !('dotDotDotToken' in parameter)) return true;
+        if (!(parameter as ParameterDeclaration).dotDotDotToken) return true;
+        return !this.isEmptyTupleType(this.propertyType(param));
+      });
     const names = params.map((_, index) => `_p${index}`);
     const callbackIndex = this.callbackIndex(signature, params);
     const returned = this.checker.getReturnTypeOfSignature(signature) ?? this.checker.getVoidType();
@@ -598,6 +611,11 @@ class Generator {
     const handle = prop.valueDeclaration ?? prop.declarations[0];
     const node = handle?.resolve(this.project) ?? this.anchor;
     return this.checker.getTypeOfSymbolAtLocation(prop, node);
+  }
+
+  /** True when `type` is the empty tuple type `[]`. */
+  private isEmptyTupleType(type: Type): boolean {
+    return type.isTupleType() && this.checker.getTypeArguments(type).length === 0;
   }
 
   private literalValue(type: Type): string | number | boolean | bigint | undefined {
@@ -797,6 +815,7 @@ function collectPathsFromObjectLiteralText(
   source: string,
   openBraceIndex: number,
   prefix: string,
+  channelMaps?: Map<string, Set<string>>,
 ): Set<string> {
   const paths = new Set<string>();
   let index = openBraceIndex + 1;
@@ -808,7 +827,19 @@ function collectPathsFromObjectLiteralText(
       continue;
     }
     if (source.slice(index, index + 3) === '...') {
-      index = skipExpressionValue(source, index + 3);
+      index = skipWhitespace(source, index + 3);
+      const spread = readCreateIpcInvokersCall(source, index);
+      if (spread) {
+        const methodNames = channelMaps?.get(spread.channelMapIdentifier);
+        if (methodNames) {
+          for (const name of methodNames) {
+            paths.add(prefix ? `${prefix}.${name}` : name);
+          }
+        }
+        index = spread.end;
+      } else {
+        index = skipExpressionValue(source, index);
+      }
       continue;
     }
     if (source[index] === '[') {
@@ -833,7 +864,12 @@ function collectPathsFromObjectLiteralText(
     if (source[index] === ':') {
       index = skipWhitespace(source, index + 1);
       if (source[index] === '{') {
-        for (const nested of collectPathsFromObjectLiteralText(source, index, pathKey)) {
+        for (const nested of collectPathsFromObjectLiteralText(
+          source,
+          index,
+          pathKey,
+          channelMaps,
+        )) {
           paths.add(nested);
         }
         index = skipBalanced(source, index, '{', '}');
@@ -850,10 +886,63 @@ function collectPathsFromObjectLiteralText(
 }
 
 function findExportObjectBrace(source: string, exportName: string): number {
-  const pattern = new RegExp(`export\\s+const\\s+${exportName}\\s*=\\s*\\{`);
+  // Tolerates an optional type annotation (`export const x: T = { ... }`).
+  const pattern = new RegExp(
+    `export\\s+const\\s+${exportName}\\s*(?::[^=]*|=)\\s*=\\s*\\{`,
+  );
   const match = pattern.exec(source);
   if (!match) throw new Error(`Missing export const ${exportName}`);
   return match.index + match[0].length - 1;
+}
+
+/**
+ * Match `createIpcInvokers(<identifier>)` at `index`; returns the channel-map
+ * identifier and the index just past the closing paren, or undefined when the
+ * expression is anything else.
+ */
+function readCreateIpcInvokersCall(
+  source: string,
+  index: number,
+): { channelMapIdentifier: string; end: number } | undefined {
+  const ident = readIdentifier(source, index);
+  if (!ident || ident.name !== 'createIpcInvokers') return undefined;
+  let cursor = skipWhitespace(source, ident.next);
+  if (source[cursor] !== '(') return undefined;
+  const close = skipBalanced(source, cursor, '(', ')');
+  const inner = source.slice(cursor + 1, close - 1).trim();
+  if (!/^[A-Za-z_$][\w$]*$/u.test(inner)) return undefined;
+  return { channelMapIdentifier: inner, end: close };
+}
+
+/**
+ * Resolve the channel-map identifiers imported by a preload fragment and map
+ * each to the method names of its `export const <name> = { ... }` literal.
+ */
+function collectChannelMaps(fileRelative: string): Map<string, Set<string>> {
+  const filePath = path.join(ROOT, fileRelative);
+  const source = stripTypeScriptComments(fs.readFileSync(filePath, 'utf8'));
+  const maps = new Map<string, Set<string>>();
+  const importPattern = /import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g;
+  for (const match of source.matchAll(importPattern)) {
+    const from = match[2];
+    if (!from.endsWith('.channels')) continue;
+    for (const spec of match[1].split(',')) {
+      const name = spec.trim();
+      if (!name) continue;
+      const resolved = path.resolve(path.dirname(filePath), `${from}.ts`);
+      if (!fs.existsSync(resolved)) continue;
+      const channelsSource = stripTypeScriptComments(fs.readFileSync(resolved, 'utf8'));
+      let openBrace: number;
+      try {
+        openBrace = findExportObjectBrace(channelsSource, name);
+      } catch {
+        continue;
+      }
+      const names = collectPathsFromObjectLiteralText(channelsSource, openBrace, '');
+      maps.set(name, names);
+    }
+  }
+  return maps;
 }
 
 function collectPathsFromPreloadExport(fileRelative: string, exportName: string): Set<string> {
@@ -861,7 +950,12 @@ function collectPathsFromPreloadExport(fileRelative: string, exportName: string)
   const raw = fs.readFileSync(filePath, 'utf8');
   const source = stripTypeScriptComments(raw);
   const openBrace = findExportObjectBrace(source, exportName);
-  return collectPathsFromObjectLiteralText(source, openBrace, '');
+  return collectPathsFromObjectLiteralText(
+    source,
+    openBrace,
+    '',
+    collectChannelMaps(fileRelative),
+  );
 }
 
 function collectPreloadPaths(): Set<string> {
