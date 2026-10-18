@@ -68,6 +68,12 @@ describe('PiRuntimeAdapter', () => {
         },
         getSession: () => ({ messages: stored }),
         updateMessage,
+        deleteMessage: (_sessionId: string, messageId: string) => {
+          const index = stored.findIndex(message => message.id === messageId);
+          if (index === -1) return false;
+          stored.splice(index, 1);
+          return true;
+        },
       } as unknown as CoworkStore);
 
       await adapter.startSession('test', 'Use a tool without writing an answer');

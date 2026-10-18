@@ -244,6 +244,7 @@ export class PiRuntimeTurnRecovery {
     active.thinkingMessageId = null;
     active.answerText = '';
     active.thinkingText = '';
+    active.retryPriorAnswer = '';
     this.host.transcript.clearPendingContextUsage(sessionId);
     this.surfaceTurnError(sessionId, active, pending.classified, pending.message);
     return false;

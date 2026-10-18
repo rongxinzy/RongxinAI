@@ -8,6 +8,7 @@ import type { UIMessageChunk } from 'ai';
 export const PiUiEventType = {
   Started: 'started',
   Message: 'message',
+  MessageRemoved: 'message_removed',
   MessageUpdate: 'message_update',
   StreamPart: 'stream_part',
   ContentPatch: 'content_patch',
@@ -54,6 +55,11 @@ export type PiUiEvent =
       type: typeof PiUiEventType.Message;
       sessionId: string;
       message: PiUiMessage;
+    })
+  | (PiUiEventBase & {
+      type: typeof PiUiEventType.MessageRemoved;
+      sessionId: string;
+      messageId: string;
     })
   | (PiUiEventBase & {
       type: typeof PiUiEventType.MessageUpdate;

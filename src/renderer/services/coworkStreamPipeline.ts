@@ -29,6 +29,7 @@ import coworkReducer, {
   dequeuePendingPermission,
   enqueuePendingPermission,
   updateMessageContents,
+  removeMessage,
   updateSessionStatus,
   updateToolActivity,
 } from '../store/slices/coworkSlice';
@@ -214,6 +215,12 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
             messageId: event.messageId,
             chunk: event.chunk,
           });
+          break;
+        case PiUiEventType.MessageRemoved:
+          liveTextBatcher.flush();
+          finalizedMessageIds.delete(event.messageId);
+          deps.liveText.clear(event.messageId);
+          deps.dispatch(removeMessage({ sessionId: event.sessionId, messageId: event.messageId }));
           break;
         case PiUiEventType.MessageUpdate:
           if (event.metadata?.isStreaming === false || event.metadata?.isFinal === true) {

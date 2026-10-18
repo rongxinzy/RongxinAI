@@ -52,6 +52,27 @@ export function assertNothingStreaming(
   expect(dbAssistants(store, sessionId).every(row => !row.streaming)).toBe(true);
 }
 
+export function answerRowsUi(harness: StreamingHarness) {
+  return assistantRows(harness).filter(row => !row.thinking);
+}
+
+export function answerRowsDb(store: CoworkStore, sessionId: string) {
+  return dbAssistants(store, sessionId).filter(row => !row.thinking);
+}
+
+export function assertAnswerUiMatchesDb(
+  harness: StreamingHarness,
+  store: CoworkStore,
+  sessionId: string,
+): void {
+  const ui = answerRowsUi(harness);
+  const db = answerRowsDb(store, sessionId);
+  expect(ui.length).toBe(db.length);
+  for (const row of db) {
+    expect(ui.some(candidate => candidate.shown === row.content)).toBe(true);
+  }
+}
+
 export function streamText(
   harness: StreamingHarness,
   builder: PiTurnBuilder,

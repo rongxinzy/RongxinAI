@@ -43,6 +43,7 @@ export interface PiRuntimeEvents {
   executionEvent: (sessionId: string, event: PiRunProgressEvent) => void;
   started: (sessionId: string) => void;
   message: (sessionId: string, message: CoworkMessage) => void;
+  messageRemoved: (sessionId: string, messageId: string) => void;
   messageUpdate: (
     sessionId: string,
     messageId: string,

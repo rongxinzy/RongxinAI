@@ -464,6 +464,7 @@ export async function startPiRuntimeSession(
       retryNoticeEmitted: false,
       retryAttempts: 0,
       retryStreamReusePending: false,
+      retryPriorAnswer: '',
       workbenchRunId,
       workbenchContract,
       workspaceRoot,

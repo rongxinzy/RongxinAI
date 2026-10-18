@@ -208,6 +208,18 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     });
   });
 
+  runtime.on('messageRemoved', (sessionId: string, messageId: string) => {
+    coalescer.flush();
+    sessionByMessageId.delete(messageId);
+    finalContentByMessage.delete(messageId);
+    clearTruncationForMessage(messageId);
+    emitUiEvent({
+      type: PiUiEventType.MessageRemoved,
+      sessionId,
+      messageId,
+    });
+  });
+
   runtime.on('uiStreamChunk', (sessionId: string, messageId: string, chunk: UIMessageChunk) => {
     emitStreamChunk(sessionId, messageId, chunk);
   });

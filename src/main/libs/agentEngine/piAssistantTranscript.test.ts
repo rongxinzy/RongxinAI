@@ -36,6 +36,7 @@ describe('PiAssistantTranscript', () => {
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
       getActiveSession: () => undefined,
     });
   });

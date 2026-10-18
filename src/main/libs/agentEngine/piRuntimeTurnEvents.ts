@@ -169,6 +169,7 @@ export class PiRuntimeTurnEvents {
           active.retryStreamReusePending = false;
           const priorAnswer = active.answerText;
           const priorThinking = active.thinkingText;
+          active.retryPriorAnswer = priorAnswer;
           this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);
           active.answerText = '';
           active.thinkingText = '';
@@ -180,6 +181,7 @@ export class PiRuntimeTurnEvents {
           }
         } else {
           // New turn → fresh answer + thinking messages, created lazily on first content.
+          active.retryPriorAnswer = '';
           active.assistantMessageId = null;
           active.thinkingMessageId = null;
           active.answerText = '';
@@ -230,6 +232,9 @@ export class PiRuntimeTurnEvents {
           } else if (chunk.type === 'reasoning-delta') {
             reasoningDeltaLen += chunk.delta.length;
           }
+        }
+        if (textDeltaLen > 0) {
+          active.retryPriorAnswer = '';
         }
         // Pi 0.84 emits fine-grained assistantMessageEvent deltas. Keep support
         // for older cumulative snapshots, then reconcile against message_end.
@@ -527,6 +532,7 @@ export class PiRuntimeTurnEvents {
           this.host.transcript.closeIdlePlaceholders(sessionId, active);
 
           // Turn's segments are done; next turn starts fresh messages.
+          active.retryPriorAnswer = '';
           active.assistantMessageId = null;
           active.thinkingMessageId = null;
           active.answerText = '';
@@ -797,6 +803,7 @@ export class PiRuntimeTurnEvents {
       );
       return;
     }
+    active.retryPriorAnswer = '';
     this.host.transcript.markFinalAnswer(sessionId, active);
     this.host.transcript.flushContextUsageSync(sessionId);
     this.host.transcript.clearThrottleStateBySession(sessionId, false);

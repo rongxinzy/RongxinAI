@@ -5,8 +5,11 @@ import '../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import { setupPiRuntimeAdapterSuite } from '../src/main/libs/agentEngine/piRuntimeAdapter.testHarness';
 import { PiTurnBuilder, PiUiEventType } from './helpers/streamingPipelineHarness';
 import {
+  assertAnswerUiMatchesDb,
   assertNothingStreaming,
   assistantRows,
+  answerRowsDb,
+  answerRowsUi,
   createAuditHarness,
   dbAssistants,
   emitAssistantError,
@@ -240,15 +243,16 @@ describe('streaming audit pipeline', () => {
     }
   });
 
-  it('A12b final retry with no answer text does not persist an empty answer row', async () => {
+  it('A12b final retry with no answer text keeps the first attempt body', async () => {
     const sessionId = 'audit-a12b';
+    const partial = 'Attempt one partial text';
     const { store, cleanup, harness } = await createAuditHarness(sessionId);
     try {
       const b1 = new PiTurnBuilder();
       harness.emitPi(b1.agentStart());
       harness.emitPi(b1.turnStart());
       harness.emitPi(b1.messageStart());
-      streamText(harness, b1, 0, 'Attempt one partial text');
+      streamText(harness, b1, 0, partial);
       emitAssistantError(harness, b1, '503 Service Unavailable');
       harness.emitPi({ type: 'agent_end', messages: [], willRetry: true });
       harness.emitPi({ type: 'auto_retry_start', attempt: 1 });
@@ -264,11 +268,124 @@ describe('streaming audit pipeline', () => {
       harness.emitPi({ type: 'auto_retry_end', success: false, attempt: 1, finalError: '503' });
       harness.emitPi(b2.agentSettled());
       harness.settle();
-      const emptyAnswers = dbAssistants(store, sessionId).filter(
-        row => !row.thinking && row.content.trim().length === 0,
-      );
-      expect(emptyAnswers).toHaveLength(0);
-      expect(dbAssistants(store, sessionId).every(row => !row.streaming)).toBe(true);
+      const answers = answerRowsDb(store, sessionId);
+      expect(answers).toHaveLength(1);
+      expect(answers[0]?.content).toBe(partial);
+      expect(answerRowsUi(harness)[0]?.shown).toBe(partial);
+      assertAnswerUiMatchesDb(harness, store, sessionId);
+      assertNothingStreaming(harness, store, sessionId);
+    } finally {
+      harness.dispose();
+      cleanup();
+    }
+  });
+
+  it('A11b second retry fails instantly then third attempt succeeds', async () => {
+    const sessionId = 'audit-a11b';
+    const partial = 'Attempt one partial text';
+    const finalText = 'Final recovered answer.';
+    const { store, cleanup, harness } = await createAuditHarness(sessionId);
+    try {
+      const b1 = new PiTurnBuilder();
+      harness.emitPi(b1.agentStart());
+      harness.emitPi(b1.turnStart());
+      harness.emitPi(b1.messageStart());
+      streamText(harness, b1, 0, partial);
+      emitAssistantError(harness, b1, '503 Service Unavailable');
+      harness.emitPi({ type: 'agent_end', messages: [], willRetry: true });
+      harness.emitPi({ type: 'auto_retry_start', attempt: 1 });
+      const b2 = new PiTurnBuilder();
+      harness.emitPi(b2.turnStart());
+      harness.emitPi(b2.messageStart());
+      emitAssistantError(harness, b2, '503 Service Unavailable');
+      harness.emitPi({ type: 'agent_end', messages: [], willRetry: true });
+      expect(answerRowsUi(harness)[0]?.shown).toBe(partial);
+      harness.emitPi({ type: 'auto_retry_start', attempt: 2 });
+      const b3 = new PiTurnBuilder();
+      harness.emitPi(b3.turnStart());
+      harness.emitPi(b3.messageStart());
+      streamText(harness, b3, 0, finalText, 9);
+      harness.emitPi(b3.messageEnd());
+      harness.emitPi({ type: 'auto_retry_end', success: true, attempt: 2 });
+      harness.emitPi({ type: 'agent_end', messages: [] });
+      harness.emitPi(b3.agentSettled());
+      harness.settle();
+      expect(answerRowsDb(store, sessionId)).toHaveLength(1);
+      expect(answerRowsDb(store, sessionId)[0]?.content).toBe(finalText);
+      expect(answerRowsUi(harness)).toHaveLength(1);
+      expect(answerRowsUi(harness)[0]?.shown).toBe(finalText);
+      assertAnswerUiMatchesDb(harness, store, sessionId);
+    } finally {
+      harness.dispose();
+      cleanup();
+    }
+  });
+
+  it('A11c no-thinking: second retry fails instantly then third succeeds', async () => {
+    const sessionId = 'audit-a11c';
+    const partial = 'Attempt one partial text';
+    const finalText = 'Final recovered answer.';
+    const { store, cleanup, harness } = await createAuditHarness(sessionId);
+    try {
+      const b1 = new PiTurnBuilder();
+      harness.emitPi(b1.agentStart());
+      harness.emitPi(b1.turnStart());
+      harness.emitPi(b1.messageStart());
+      streamText(harness, b1, 0, partial);
+      emitAssistantError(harness, b1, '503 Service Unavailable');
+      harness.emitPi({ type: 'agent_end', messages: [], willRetry: true });
+      harness.emitPi({ type: 'auto_retry_start', attempt: 1 });
+      const b2 = new PiTurnBuilder();
+      harness.emitPi(b2.turnStart());
+      harness.emitPi(b2.messageStart());
+      emitAssistantError(harness, b2, '503 Service Unavailable');
+      harness.emitPi({ type: 'agent_end', messages: [], willRetry: true });
+      expect(answerRowsUi(harness)[0]?.shown).toBe(partial);
+      harness.emitPi({ type: 'auto_retry_start', attempt: 2 });
+      const b3 = new PiTurnBuilder();
+      harness.emitPi(b3.turnStart());
+      harness.emitPi(b3.messageStart());
+      streamText(harness, b3, 0, finalText, 9);
+      harness.emitPi(b3.messageEnd());
+      harness.emitPi({ type: 'auto_retry_end', success: true, attempt: 2 });
+      harness.emitPi({ type: 'agent_end', messages: [] });
+      harness.emitPi(b3.agentSettled());
+      harness.settle();
+      expect(answerRowsDb(store, sessionId)).toHaveLength(1);
+      expect(answerRowsDb(store, sessionId)[0]?.content).toBe(finalText);
+      assertAnswerUiMatchesDb(harness, store, sessionId);
+    } finally {
+      harness.dispose();
+      cleanup();
+    }
+  });
+
+  it('A12c no-thinking: single retry fails instantly and keeps first attempt text', async () => {
+    const sessionId = 'audit-a12c';
+    const partial = 'Attempt one partial text';
+    const { store, cleanup, harness } = await createAuditHarness(sessionId);
+    try {
+      const b1 = new PiTurnBuilder();
+      harness.emitPi(b1.agentStart());
+      harness.emitPi(b1.turnStart());
+      harness.emitPi(b1.messageStart());
+      streamText(harness, b1, 0, partial);
+      emitAssistantError(harness, b1, '503 Service Unavailable');
+      harness.emitPi({ type: 'agent_end', messages: [], willRetry: true });
+      harness.emitPi({ type: 'auto_retry_start', attempt: 1 });
+      const b2 = new PiTurnBuilder();
+      harness.emitPi(b2.turnStart());
+      harness.emitPi(b2.messageStart());
+      emitAssistantError(harness, b2, '503 Service Unavailable');
+      harness.emitPi({ type: 'agent_end', messages: [], willRetry: false });
+      harness.emitPi({ type: 'auto_retry_end', success: false, attempt: 1, finalError: '503' });
+      harness.emitPi(b2.agentSettled());
+      harness.settle();
+      expect(answerRowsDb(store, sessionId)).toHaveLength(1);
+      expect(answerRowsDb(store, sessionId)[0]?.content).toBe(partial);
+      expect(answerRowsUi(harness)[0]?.shown).toBe(partial);
+      assertAnswerUiMatchesDb(harness, store, sessionId);
+      assertNothingStreaming(harness, store, sessionId);
     } finally {
       harness.dispose();
       cleanup();

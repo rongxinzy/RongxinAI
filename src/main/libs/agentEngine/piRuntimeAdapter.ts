@@ -108,6 +108,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
     emitMessageUpdate: (sessionId, messageId, content, metadata) => {
       this.emit('messageUpdate', sessionId, messageId, content, metadata);
     },
+    emitMessageRemoved: (sessionId, messageId) => {
+      this.emit('messageRemoved', sessionId, messageId);
+    },
     getActiveSession: sessionId => this.activeSessions.get(sessionId),
   });
 

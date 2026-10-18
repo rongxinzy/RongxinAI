@@ -172,6 +172,8 @@ export interface ActivePiSession {
   retryAttempts: number;
   /** When set, the next turn_start reuses assistant/thinking message ids (auto-retry). */
   retryStreamReusePending: boolean;
+  /** Last visible answer body before a retry turn_start cleared in-memory stream state. */
+  retryPriorAnswer: string;
   completionPending?: Promise<void>;
   requestStartedAt: number | null;
   firstVisibleTextAt: number | null;

@@ -23,6 +23,7 @@ export interface PiAssistantTranscriptHost {
     content: string,
     metadata?: Record<string, unknown>,
   ): void;
+  emitMessageRemoved(sessionId: string, messageId: string): void;
   getActiveSession(sessionId: string): ActivePiSession | undefined;
 }
 
@@ -112,7 +113,7 @@ export class PiAssistantTranscript {
     kind: 'answer' | 'thinking',
   ): string {
     if (kind === 'answer' && active.assistantMessageId === messageId) {
-      return active.answerText;
+      return active.answerText || active.retryPriorAnswer;
     }
     if (kind === 'thinking' && active.thinkingMessageId === messageId) {
       return active.thinkingText;
@@ -148,15 +149,26 @@ export class PiAssistantTranscript {
     this.finalizedMessageIdsBySession.delete(sessionId);
   }
 
-  private removeEmptyAnswerPlaceholder(sessionId: string, messageId: string): void {
+  private removeEmptyAnswerPlaceholder(
+    sessionId: string,
+    messageId: string,
+    active: ActivePiSession,
+  ): void {
     const store = this.host.getStore();
-    if (!store) return;
+    if (!store?.deleteMessage) return;
     const existing = store
       .getSession(sessionId)
       ?.messages.find(message => message.id === messageId);
     if (!existing || existing.metadata?.isThinking) return;
-    if (existing.content.trim().length > 0) return;
-    store.deleteMessage(sessionId, messageId);
+    if (existing.content.length > 0) return;
+    const streamed = this.lastStreamedContentByMessageId.get(messageId) ?? '';
+    if (streamed.length > 0) return;
+    const inMemory = active.answerText || active.retryPriorAnswer;
+    if (inMemory.length > 0) return;
+    if (!store.deleteMessage(sessionId, messageId)) return;
+    this.lastStreamedContentByMessageId.delete(messageId);
+    this.unnoteFinalized(sessionId, messageId);
+    this.host.emitMessageRemoved(sessionId, messageId);
   }
   // ── Private: assistant message lifecycle ──
 
@@ -244,10 +256,14 @@ export class PiAssistantTranscript {
     if (kind === 'answer' && !content.trim()) {
       const emptyId = active.assistantMessageId;
       if (emptyId) {
+        const resolved = this.resolveStreamedContent(emptyId, active, 'answer');
+        if (resolved.trim()) {
+          return this.finalizeMessage(sessionId, active, kind, resolved);
+        }
         this.flushPendingStoreUpdate(sessionId, emptyId);
         this.flushPendingMessageUpdate(sessionId, emptyId);
         this.clearThrottleMapsForMessage(emptyId);
-        this.removeEmptyAnswerPlaceholder(sessionId, emptyId);
+        this.removeEmptyAnswerPlaceholder(sessionId, emptyId, active);
         active.assistantMessageId = null;
       }
       return;
@@ -335,9 +351,12 @@ export class PiAssistantTranscript {
       }
       this.clearThrottleMapsForMessage(entry.messageId);
       if (entry.kind === 'answer' && !content.trim()) {
-        this.removeEmptyAnswerPlaceholder(sessionId, entry.messageId);
-        if (active.assistantMessageId === entry.messageId) {
-          active.assistantMessageId = null;
+        const resolved = this.resolveStreamedContent(entry.messageId, active, 'answer');
+        if (!resolved.trim()) {
+          this.removeEmptyAnswerPlaceholder(sessionId, entry.messageId, active);
+          if (active.assistantMessageId === entry.messageId) {
+            active.assistantMessageId = null;
+          }
         }
         continue;
       }
