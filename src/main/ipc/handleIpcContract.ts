@@ -24,6 +24,29 @@ function summarizeZodIssues(error: z.ZodError): string {
   return error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ');
 }
 
+function registerContractMethods<C extends IpcContract>(
+  contract: C,
+  methods: ReadonlyArray<keyof C & string>,
+  impls: Partial<
+    Record<keyof C & string, (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown>
+  >,
+): void {
+  for (const method of methods) {
+    const definition = contract[method];
+    const impl = impls[method];
+    if (!impl) throw new Error(`IPC contract method ${method} has no handler`);
+    ipcMain.handle(definition.channel, async (event, ...rawArgs: unknown[]) => {
+      const parsedArgs = definition.args.safeParse(rawArgs);
+      if (!parsedArgs.success) {
+        throw new Error(
+          `IPC ${definition.channel} rejected invalid arguments: ${summarizeZodIssues(parsedArgs.error)}`,
+        );
+      }
+      return impl(event, ...parsedArgs.data);
+    });
+  }
+}
+
 /**
  * Register every contract method on `ipcMain`. The impl receives the parsed,
  * typed args and the full `Electron.IpcMainInvokeEvent`; a zod failure rejects
@@ -35,29 +58,21 @@ export function handleIpcContract<C extends IpcContract>(
   contract: C,
   impls: IpcContractHandlers<C, IpcMainInvokeEvent>,
 ): void {
-  for (const method of Object.keys(contract) as Array<keyof C & string>) {
-    const definition = contract[method];
-    ipcMain.handle(definition.channel, async (event, ...rawArgs: unknown[]) => {
-      const parsedArgs = definition.args.safeParse(rawArgs);
-      if (!parsedArgs.success) {
-        throw new Error(
-          `IPC ${definition.channel} rejected invalid arguments: ${summarizeZodIssues(parsedArgs.error)}`,
-        );
-      }
-      const impl = impls[method] as (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown;
-      return impl(event, ...parsedArgs.data);
-    });
-  }
+  registerContractMethods(
+    contract,
+    Object.keys(contract) as Array<keyof C & string>,
+    impls as never,
+  );
 }
 
 /**
- * Register a subset of a contract's methods (same validation semantics as
+ * Register only the methods present in `impls` (same validation semantics as
  * `handleIpcContract`); for contracts whose handlers live in several
- * registration files. Each subset must cover its methods exactly once.
+ * registration files. Each method must be registered by exactly one subset.
  */
 export function handleIpcContractSubset<C extends IpcContract, K extends keyof C & string>(
   contract: C,
   impls: { [P in K]: IpcContractHandlers<C, IpcMainInvokeEvent>[P] },
 ): void {
-  handleIpcContract(contract, impls as unknown as IpcContractHandlers<C>);
+  registerContractMethods(contract, Object.keys(impls) as K[], impls as never);
 }
