@@ -89,7 +89,6 @@ test('starts at the estimated end and anchors dynamic measurements to the end', 
     }),
   );
   expect(mocks.scrollToEnd).toHaveBeenCalledWith({ behavior: 'auto' });
-  expect(mocks.scrollRef.current?.style.overflowAnchor).toBe('none');
 });
 
 test('positions a newly mounted virtualizer at the end before paint', () => {

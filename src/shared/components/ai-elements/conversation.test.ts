@@ -174,6 +174,27 @@ test('keeps horizontal overflow inside message content', () => {
   expect(scrollElement).toHaveClass('min-w-0', 'overflow-x-hidden', 'overflow-y-auto');
 });
 
+test('disables browser scroll anchoring on the scroll container it owns', () => {
+  const container = installViewport();
+  render(
+    React.createElement(
+      Conversation,
+      null,
+      React.createElement(
+        TestConversationContent,
+        { observeContentResize: false, scrollClassName: 'coding-conversation-scroll' },
+        'message',
+      ),
+    ),
+    { container },
+  );
+
+  // Rendered as a class (not set by a child effect) so it is in place on the
+  // first paint, before any child layout effect could see a null scroll ref.
+  const scrollElement = container.querySelector<HTMLElement>('.coding-conversation-scroll');
+  expect(scrollElement).toHaveClass('[overflow-anchor:none]');
+});
+
 test('content growth while at the bottom keeps the viewport at the bottom', () => {
   const container = installViewport();
   vi.stubGlobal('ResizeObserver', TestResizeObserver);
