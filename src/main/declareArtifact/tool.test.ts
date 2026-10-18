@@ -54,7 +54,6 @@ test('rejects declarations when the file does not exist', async () => {
   const tool = buildDeclareArtifactTool({
     onDeclare,
     fileExists: async () => false,
-    existenceWaitMs: 0,
   }) as unknown as DeclareArtifactTool;
 
   const result = await tool.execute('call-1', {
@@ -66,15 +65,30 @@ test('rejects declarations when the file does not exist', async () => {
   expect(result.details.isError).toBe(true);
 });
 
-test('waits for a file that is still being written by a parallel tool call', async () => {
+test('fails fast when the pending write registry knows nothing of the path', async () => {
   const onDeclare = vi.fn();
-  let checks = 0;
   const tool = buildDeclareArtifactTool({
     onDeclare,
-    existencePollIntervalMs: 1,
-    fileExists: async () => {
-      checks += 1;
-      return checks >= 3;
+    fileExists: async () => false,
+    awaitPendingWrite: async () => false,
+  }) as unknown as DeclareArtifactTool;
+
+  const result = await tool.execute('call-1', { filePath: 'C:/tmp/missing.md' });
+
+  expect(onDeclare).not.toHaveBeenCalled();
+  expect(result.details.isError).toBe(true);
+});
+
+test('succeeds after waiting for a pending parallel write of the same file', async () => {
+  const onDeclare = vi.fn();
+  let fileMaterialized = false;
+  const tool = buildDeclareArtifactTool({
+    onDeclare,
+    fileExists: async () => fileMaterialized,
+    // The pending write settles asynchronously, then the file appears.
+    awaitPendingWrite: async () => {
+      fileMaterialized = true;
+      return true;
     },
   }) as unknown as DeclareArtifactTool;
 
@@ -89,4 +103,19 @@ test('waits for a file that is still being written by a parallel tool call', asy
   expect(result.details).toMatchObject({
     filePath: 'C:/Users/Administrator/.zhiyuan/scratch/剑影残阳.md',
   });
+});
+
+test('reports failure when a pending write settles without producing the file', async () => {
+  const onDeclare = vi.fn();
+  const tool = buildDeclareArtifactTool({
+    onDeclare,
+    fileExists: async () => false,
+    awaitPendingWrite: async () => true,
+  }) as unknown as DeclareArtifactTool;
+
+  const result = await tool.execute('call-1', { filePath: 'C:/tmp/never-written.md' });
+
+  expect(onDeclare).not.toHaveBeenCalled();
+  expect(result.details.isError).toBe(true);
+  expect(result.details.error).toContain('file does not exist');
 });

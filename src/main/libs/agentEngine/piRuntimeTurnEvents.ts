@@ -153,6 +153,7 @@ export class PiRuntimeTurnEvents {
           );
         }
         this.host.emit('started', sessionId);
+        active.artifactRecorder?.onRunStart(active.workbenchRunId);
         break;
 
       case 'turn_start':
@@ -581,6 +582,7 @@ export class PiRuntimeTurnEvents {
         const store = this.host.getStore();
         const emittedToolUse = store ? store.addMessage(sessionId, toolUseMsg) : toolUseMsg;
         this.host.emit('message', sessionId, emittedToolUse);
+        active.artifactRecorder?.onToolStart(event.toolCallId, event.toolName, event.args);
         break;
       }
 
@@ -644,6 +646,14 @@ export class PiRuntimeTurnEvents {
           : toolResultMsg;
         active.toolResultMessageIdByCallId.set(event.toolCallId, emittedToolResult.id);
         this.host.emit('message', sessionId, emittedToolResult);
+        active.artifactRecorder?.onToolEnd({
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          args: event.args,
+          result: event.result,
+          isError: resultIsError,
+          resultMessageId: emittedToolResult.id,
+        });
         break;
       }
 
@@ -782,6 +792,9 @@ export class PiRuntimeTurnEvents {
   private handleTurnSettled(sessionId: string, active: ActivePiSession): void {
     if (active.completionPending) return;
     active.isRunning = false;
+    // Flush artifact capture before completion decides the run's fate: the
+    // final diff anchors to the last completed answer message.
+    active.artifactRecorder?.onRunSettled(active.lastCompletedAnswerMessageId);
     // Run settled with a deferred or surfaced failure: never complete it.
     // flushPendingError is idempotent after auto_retry_end.
     if (active.pendingError || active.errorSurfaced) {
@@ -843,16 +856,6 @@ export class PiRuntimeTurnEvents {
         const store = this.host.getStore();
         if (store) {
           store.updateSession(sessionId, { status: 'idle' });
-          if (!active.resourceState.chatMode) {
-            try {
-              store.refreshSessionArtifacts(sessionId);
-            } catch (error) {
-              console.error(
-                `[PiRuntimeAdapter] artifact refresh failed for session ${sessionId}:`,
-                error,
-              );
-            }
-          }
         }
         if (!active.resourceState.chatMode) {
           void this.host.runPostTurnMemoryMaintenance(

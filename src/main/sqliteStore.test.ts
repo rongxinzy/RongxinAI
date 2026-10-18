@@ -268,7 +268,7 @@ test('backfills legacy scheduled sessions only when adding the source column', a
   reopenedStore.close();
 });
 
-test('creates the artifact index after adding sequence to legacy messages', async () => {
+test('creates the artifact ledger after adding sequence to legacy messages', async () => {
   const userDataPath = createTempUserDataPath();
   createLegacyDatabase(userDataPath);
   const db = new Database(path.join(userDataPath, DB_FILENAME));
@@ -313,8 +313,8 @@ test('creates the artifact index after adding sequence to legacy messages', asyn
   const artifactTables = migratedDb
     .prepare(
       `SELECT name FROM sqlite_master
-       WHERE type = 'table' AND name IN (
-         'cowork_session_artifacts', 'cowork_artifact_index_state'
+       WHERE type IN ('table', 'trigger') AND name IN (
+         'artifact_ledger', 'trg_artifact_ledger_session_delete'
        )
        ORDER BY name`,
     )
@@ -322,8 +322,8 @@ test('creates the artifact index after adding sequence to legacy messages', asyn
 
   expect(messageColumns.map(column => column.name)).toContain('sequence');
   expect(artifactTables.map(table => table.name)).toEqual([
-    'cowork_artifact_index_state',
-    'cowork_session_artifacts',
+    'artifact_ledger',
+    'trg_artifact_ledger_session_delete',
   ]);
 
   store.close();

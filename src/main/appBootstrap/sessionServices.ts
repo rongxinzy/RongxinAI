@@ -3,7 +3,7 @@ import path from 'path';
 import { app } from 'electron';
 
 import { rt } from './runtimeState';
-import { getCoworkStore, getSkillManager, getStore } from './runtimeServices';
+import { getCoworkStore, getArtifactLedger, getSkillManager, getStore } from './runtimeServices';
 import { EngramManager } from '../memory/engramManager';
 import { ProjectMemoryService } from '../memory/projectMemoryService';
 import { MemoryRepository } from '../memory/repository';
@@ -78,6 +78,7 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     rt.piRuntimeAdapter.setImageAttachmentRoot(coworkImageRoot(app.getPath('userData')));
     rt.piRuntimeAdapter.setCoworkStore(getCoworkStore());
     rt.piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
+    rt.piRuntimeAdapter.setArtifactLedger(getArtifactLedger());
     rt.piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
     rt.piRuntimeAdapter.setSessionSummaryService(
       new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),

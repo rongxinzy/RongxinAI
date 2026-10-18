@@ -9,6 +9,7 @@
 
 import type { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import type { CoworkStore } from '../../coworkStore';
+import type { ArtifactLedger } from '../../artifactLedger/artifactLedger';
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import type { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
@@ -47,6 +48,8 @@ export interface PiRuntimeAdapterHost {
   // Late-bound services, injected through the adapter's setters.
   getStore(): CoworkStore | null;
   getWorkbenchTaskService(): WorkbenchTaskService | null;
+  /** Shared event-time artifact ledger; null when artifact recording is off. */
+  getArtifactLedger(): ArtifactLedger | null;
   getProjectMemoryService(): ProjectMemoryService | null;
   getConversationHistoryService(): ConversationHistoryService | null;
   getScheduledTaskService(): ScheduledTaskService | null;

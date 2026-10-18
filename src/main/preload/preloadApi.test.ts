@@ -8,6 +8,7 @@ import { AgentIpcChannel } from '../../shared/agent/constants';
 import { CoworkSessionIpc, ModelPoolIpc, StoreIpc } from '../../shared/ipc/channels';
 import { LlamaCppIpcChannel } from '../../shared/llamacpp/constants';
 import { appSystemApi } from './appSystem';
+import { artifactsApi } from './artifacts';
 import { automationApi } from './automation';
 import { codingAgentApi } from './codingAgent';
 import { coworkApi } from './cowork';
@@ -128,6 +129,7 @@ describe('split api fragments', () => {
     expect(Object.keys(codingAgentApi)).toEqual(['codingAgent']);
     expect(Object.keys(imApi).sort()).toEqual(['dingtalk', 'feishu', 'im']);
     expect(Object.keys(memoryApi)).toEqual(['memory']);
+    expect(Object.keys(artifactsApi)).toEqual(['artifacts']);
     expect(Object.keys(automationApi).sort()).toEqual(['activity', 'scheduledTasks']);
   });
 });
@@ -148,6 +150,7 @@ describe('preload entry', () => {
       'appInfo',
       'appUpdate',
       'arch',
+      'artifacts',
       'auth',
       'autoLaunch',
       'checkApiConfig',

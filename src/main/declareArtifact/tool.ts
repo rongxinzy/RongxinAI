@@ -27,11 +27,10 @@ export interface DeclaredArtifactInput {
 export interface DeclareArtifactToolOptions {
   onDeclare?: (artifact: DeclaredArtifactInput) => void | Promise<void>;
   fileExists?: (filePath: string) => Promise<boolean>;
-  /** How long to keep polling for a file that does not exist yet. Models often
-   * emit `write` and `declare_artifact` in one parallel tool block, so the
-   * declaration can legitimately arrive while the write is still in flight. */
-  existenceWaitMs?: number;
-  existencePollIntervalMs?: number;
+  /** When provided, a declaration for a not-yet-existing file waits for the
+   * recorder's pending write/edit of the same file (models often emit `write`
+   * and `declare_artifact` in one parallel tool block) instead of failing. */
+  awaitPendingWrite?: (filePath: string) => Promise<boolean>;
 }
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
@@ -45,11 +44,6 @@ async function defaultFileExists(filePath: string): Promise<boolean> {
   }
 }
 
-const DEFAULT_EXISTENCE_WAIT_MS = 2500;
-const DEFAULT_EXISTENCE_POLL_INTERVAL_MS = 50;
-
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-
 const failure = (
   message: string,
   details: Record<string, unknown> = {},
@@ -62,15 +56,13 @@ export function buildDeclareArtifactTool(
   options: DeclareArtifactToolOptions = {},
 ): Record<string, unknown> {
   const fileExists = options.fileExists ?? defaultFileExists;
-  const existenceWaitMs = options.existenceWaitMs ?? DEFAULT_EXISTENCE_WAIT_MS;
-  const pollIntervalMs = options.existencePollIntervalMs ?? DEFAULT_EXISTENCE_POLL_INTERVAL_MS;
 
-  const waitForFile = async (filePath: string): Promise<boolean> => {
+  const ensureFilePresent = async (filePath: string): Promise<boolean> => {
     if (await fileExists(filePath)) return true;
-    const deadline = Date.now() + existenceWaitMs;
-    while (Date.now() < deadline) {
-      await sleep(Math.min(pollIntervalMs, deadline - Date.now()));
-      if (await fileExists(filePath)) return true;
+    // A parallel write/edit of the same file may still be in flight; wait for
+    // the recorder to settle it, then re-check existence.
+    if (options.awaitPendingWrite && (await options.awaitPendingWrite(filePath))) {
+      return fileExists(filePath);
     }
     return false;
   };
@@ -116,7 +108,7 @@ export function buildDeclareArtifactTool(
       if (!filePath) {
         return failure('declare_artifact requires a non-empty file path.');
       }
-      if (!(await waitForFile(filePath))) {
+      if (!(await ensureFilePresent(filePath))) {
         return failure(
           `declare_artifact failed: file does not exist at ${filePath}. Create the file before declaring it.`,
           { filePath },

@@ -4,6 +4,7 @@ import { afterEach } from 'vitest';
 
 import { CodingRoomService } from './codingRoomService';
 import { initializeCodingAgentSchema } from './schema';
+import { initializeArtifactLedgerSchema } from '../artifactLedger/schema';
 
 let db: Database.Database | undefined;
 const tempDirectories: string[] = [];
@@ -16,6 +17,7 @@ const services: CodingRoomService[] = [];
 export function openCodingRoomDatabase(): Database.Database {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  initializeArtifactLedgerSchema(db);
   return db;
 }
 

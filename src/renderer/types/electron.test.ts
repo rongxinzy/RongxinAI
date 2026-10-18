@@ -33,6 +33,7 @@ const ELECTRON_MEMBERS = [
   'window',
   'memory',
   'magpie',
+  'artifacts',
   'cowork',
   'workbenchTask',
   'todo',

@@ -135,7 +135,7 @@ const fakeStore = {
   updateMessage: () => undefined,
   updateSession: () => undefined,
   getSession: () => undefined,
-  refreshSessionArtifacts: () => undefined,
+  listSessionArtifacts: () => [],
 } as unknown as CoworkStore; // test double for a wide store interface
 
 const readRecord = (value: unknown, key: string): unknown =>

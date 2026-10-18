@@ -34,6 +34,7 @@ export function disposePiSessionForRecreation(
   host.recovery.dismissAskUserQuestionsBySession(sessionId);
   host.recovery.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
   active.agentLoop.stop();
+  active.artifactRecorder?.dispose();
   active.pendingError = null;
   active.toolStartedAtByCallId.clear();
   const clearActivity = active.toolActivityTracker.clear();
@@ -91,6 +92,7 @@ export function stopActivePiRuntimeSession(
   active.isRunning = false;
   active.turnFailed = false;
   active.agentLoop.stop();
+  active.artifactRecorder?.dispose();
   // Drop any deferred error without surfacing it — the user stopped the turn.
   active.pendingError = null;
   active.retryStreamReusePending = false;
@@ -257,6 +259,7 @@ export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Dat
     ...nonExpired.slice(0, Math.max(0, excessCount - expired.length)),
   ];
   for (const session of candidates) {
+    session.artifactRecorder?.dispose();
     session.unsubscribe();
     session.piSession.abortBash();
     void session.piSession.abort();
