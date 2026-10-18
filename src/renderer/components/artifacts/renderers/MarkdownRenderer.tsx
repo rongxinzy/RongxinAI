@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import MarkdownContent from '@/components/MarkdownContent';
+import StaticMarkdownContent from '@/components/markdown/StaticMarkdownContent';
 import { loadArtifactFile } from '@/services/artifactFileLoader';
 import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
@@ -80,7 +80,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ artifact }) => {
 
   return (
     <div className="h-full overflow-auto p-6">
-      <MarkdownContent content={content} />
+      <StaticMarkdownContent content={content} />
     </div>
   );
 };

@@ -14,7 +14,7 @@ import { i18nService } from '../../services/i18n';
 import { extractUserFacingErrorMessage } from '../../services/coworkTerminalError';
 import type { ActivityRun } from '../../../shared/activity/types';
 import { compactMarkdownClass } from '../compactMarkdownClass';
-import MarkdownContent from '../MarkdownContent';
+import StaticMarkdownContent from '../markdown/StaticMarkdownContent';
 import { formatActivityClockTime, formatActivityError, formatActivityTime } from './utils';
 
 interface ActivityRunRowProps {
@@ -221,7 +221,7 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
               }
             }}
           >
-            <MarkdownContent
+            <StaticMarkdownContent
               content={bodyText}
               className={compactMarkdownClass(isFailed ? 'destructive' : 'muted')}
             />
