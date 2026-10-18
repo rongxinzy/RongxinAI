@@ -1,13 +1,15 @@
 import { CodingEventKind, type CodingEvent } from '../../../shared/codingAgent';
 import {
   extractFilePath,
+  normalizeToolName,
+  WRITE_TOOL_NAMES,
+} from '../../../shared/cowork/artifactToolShapes';
+import {
   getArtifactTypeFromExtension,
   getFileExtension,
   getFileName,
   normalizeFilePathForDedup,
-  normalizeToolName,
-  WRITE_TOOL_NAMES,
-} from '../../services/artifactParser';
+} from '../../services/artifactPaths';
 import { ArtifactRole, isBinaryArtifactFile, type Artifact } from '../../types/artifact';
 
 /**

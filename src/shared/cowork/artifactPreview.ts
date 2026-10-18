@@ -15,7 +15,7 @@ export const ArtifactPreviewMode = {
 
 export type ArtifactPreviewMode = (typeof ArtifactPreviewMode)[keyof typeof ArtifactPreviewMode];
 
-export const ArtifactTypeByExtension = {
+const ArtifactTypeByExtension = {
   '.doc': 'document',
   '.html': 'html',
   '.htm': 'html',

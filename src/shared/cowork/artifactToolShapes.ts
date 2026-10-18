@@ -1,9 +1,8 @@
 /**
  * Shared tool-shape helpers for file-backed artifact discovery.
  *
- * Used by both the renderer's message heuristics (artifactParser) and the
- * main-process artifact recorder, so the write-tool rule cannot drift between
- * the two detection paths while they coexist.
+ * Used by the main-process artifact recorder (and the coding lane's event
+ * projection), so the write-tool rule stays in one place.
  */
 
 /** Tools whose file target is the artifact itself. Members are stored

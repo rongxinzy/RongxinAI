@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { CoworkArtifactRole } from './artifacts';
-import { parseCodeBlockArtifacts } from '../../renderer/services/artifactParser';
+import { parseCodeBlockArtifacts } from '../../renderer/services/inlineArtifacts';
 
 // The persistent artifact index was removed in favor of the event-time
 // ledger (file-backed artifacts) plus this single renderer parser for inline
