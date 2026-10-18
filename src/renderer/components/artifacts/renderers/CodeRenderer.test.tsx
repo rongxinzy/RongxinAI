@@ -72,17 +72,19 @@ describe('CodeRenderer', () => {
       />,
     );
 
-    // Plain fallback keeps the text without any syntax color spans.
+    // Plain fallback renders raw tokens without loading any shiki grammar:
+    // spans exist but none carries a syntax color.
     await screen.findByText('plain body');
-    expect(document.querySelectorAll('span[style*="color"]').length).toBe(0);
+    const colored = Array.from(document.querySelectorAll('span[style*="color"]')).filter(
+      span => (span as HTMLElement).style.color !== 'inherit',
+    );
+    expect(colored.length).toBe(0);
   });
 
   test('oversized content skips highlighting and renders as plain pre', () => {
     const bigContent = 'x'.repeat(50_001);
     render(
-      <CodeRenderer
-        artifact={makeCodeArtifact({ language: 'python', content: bigContent })}
-      />,
+      <CodeRenderer artifact={makeCodeArtifact({ language: 'python', content: bigContent })} />,
     );
 
     const pre = document.querySelector('pre');

@@ -12,6 +12,7 @@
  */
 import { cjk } from '@streamdown/cjk';
 import { LinkSafetyModal } from '@shared/components/ai-elements/linkSafetyModal';
+import { hasRichMessageContent } from '@shared/components/ai-elements/richMessageResponseLoader';
 import { Button } from '@shared/components/ui/button';
 import { FileText, Folder } from 'lucide-react';
 import React, { Suspense, lazy, useMemo } from 'react';
@@ -22,7 +23,6 @@ import { showAppToast } from '../../services/toastNotification';
 import { isLocalPathCandidate, useResolvedLocalPath } from '../../services/useResolvedLocalPath';
 import { toLocalfileUrl } from '../../utils/localfileUrl';
 import { zhiyuanShikiThemes } from './shikiThemes';
-
 // KaTeX 样式与 mhchem 宏随富渲染模块按需加载（与 chat 的 richMessageResponse 同策略）。
 const RichStaticMarkdown = lazy(() => import('./richStaticMarkdown'));
 
@@ -154,7 +154,7 @@ const LocalAwareImage = ({ onImageClick, ...props }: ImageProps) => {
   );
 };
 
-export interface StaticMarkdownContentProps {
+interface StaticMarkdownContentProps {
   content: string;
   className?: string;
   cwd?: string;
@@ -164,8 +164,14 @@ export interface StaticMarkdownContentProps {
 }
 
 const stripFileScheme = (destination: string): string => {
-  const match = /^file:\/{2,3}(?:\/\/)?(.*)$/.exec(destination.trim());
-  return match ? (match[1] ?? '') : destination;
+  const trimmed = destination.trim();
+  // `file:///abs/path` → `/abs/path`；`file://localhost/x` 同样剥掉授权段。
+  // 其他 `file://host/...`（UNC）保留 host 部分，由主进程 fileURLToPath 语义判定。
+  const localhostMatch = /^file:\/\/(?:localhost)?(\/.*)$/i.exec(trimmed);
+  if (localhostMatch) return localhostMatch[1] ?? trimmed;
+  const hostMatch = /^file:\/\/([^/].*)$/i.exec(trimmed);
+  if (hostMatch) return `//${hostMatch[1] ?? ''}`;
+  return destination;
 };
 
 /**
@@ -257,8 +263,8 @@ const StaticMarkdownContent: React.FC<StaticMarkdownContentProps> = ({
   );
 
   // 与 chat 的 richMessageResponseLoader 同一判定思路：无富内容时首帧不加载
-  // shiki/katex；```/~~~ 走 AiPre 代码块，$$ 走 KaTeX。
-  const needsRichRuntime = /```|~~~|\$\$/.test(processed);
+  // shiki/katex；```/~~~ 走 AiPre 代码块，$$ 与 $...$/\( 走 KaTeX。
+  const needsRichRuntime = hasRichMessageContent(processed);
 
   const shared = {
     className: `markdown-content text-sm leading-[23px] ${className}`,
