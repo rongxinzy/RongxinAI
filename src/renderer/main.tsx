@@ -28,7 +28,6 @@ const root = ReactDOM.createRoot(rootElement);
 let activityUnsubscribe: (() => void) | null = null;
 let runtimeNoticeUnsubscribe: (() => void) | null = null;
 let codingFailureUnsubscribe: (() => void) | null = null;
-let devNetworkUnsubscribe: (() => void) | null = null;
 
 async function renderRoot(): Promise<void> {
   // Browser preview (`bun run web:preview`): no preload bridge, so install the IPC mock.
@@ -49,13 +48,6 @@ async function renderRoot(): Promise<void> {
       </React.StrictMode>,
     );
     return;
-  }
-
-  // 2026/09/17 lixiang  开发态：主进程 HTTP → xr-net beacon → DevTools Network
-  if (import.meta.env.DEV) {
-    const { startDevNetworkBeacon } = await import('./services/devNetworkBeacon');
-    devNetworkUnsubscribe?.();
-    devNetworkUnsubscribe = startDevNetworkBeacon();
   }
 
   const [{ default: App }, { store }] = await Promise.all([import('./App'), import('./store')]);
@@ -91,8 +83,6 @@ if (import.meta.hot) {
     runtimeNoticeUnsubscribe = null;
     codingFailureUnsubscribe?.();
     codingFailureUnsubscribe = null;
-    devNetworkUnsubscribe?.();
-    devNetworkUnsubscribe = null;
   });
 }
 

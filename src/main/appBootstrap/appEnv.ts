@@ -65,21 +65,6 @@ export const applyAppIdentity = (): void => {
       scheme: ZHIYUAN_ENTERPRISE_RENDERER_SCHEME,
       privileges: ZHIYUAN_ENTERPRISE_RENDERER_PROTOCOL_PRIVILEGES,
     },
-    // 2026/09/17 lixiang  开发态 xr-net beacon，主进程请求可出现在 DevTools Network
-    ...(process.env.NODE_ENV === 'development'
-      ? [
-          {
-            scheme: 'xr-net',
-            privileges: {
-              standard: true,
-              secure: true,
-              supportFetchAPI: true,
-              corsEnabled: true,
-              bypassCSP: true,
-            },
-          },
-        ]
-      : []),
   ]);
 };
 

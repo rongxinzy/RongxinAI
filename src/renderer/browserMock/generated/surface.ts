@@ -9,7 +9,6 @@ import { createMarketplace } from './createMarketplace';
 import { createTriage } from './createTriage';
 import { createHardware } from './createHardware';
 import { createAgents } from './createAgents';
-import { createApi } from './createApi';
 import { createCheckApiConfig } from './createCheckApiConfig';
 import { createGenerateSessionTitle } from './createGenerateSessionTitle';
 import { createGetRecentCwds } from './createGetRecentCwds';
@@ -41,11 +40,8 @@ import { createModelPool } from './createModelPool';
 import { createEnterprise } from './createEnterprise';
 import { createManagedProviders } from './createManagedProviders';
 import { createNetworkStatus } from './createNetworkStatus';
-import { createDevNetwork } from './createDevNetwork';
 import { createFeishu } from './createFeishu';
 import { createDingtalk } from './createDingtalk';
-import { createGithubCopilot } from './createGithubCopilot';
-import { createOpenaiCodexOAuth } from './createOpenaiCodexOAuth';
 import { createActivity } from './createActivity';
 
 export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['electron'] {
@@ -61,7 +57,6 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     triage: createTriage(runtime),
     hardware: createHardware(runtime),
     agents: createAgents(runtime),
-    api: createApi(runtime),
     checkApiConfig: createCheckApiConfig(runtime),
     generateSessionTitle: createGenerateSessionTitle(runtime),
     getRecentCwds: createGetRecentCwds(runtime),
@@ -92,11 +87,8 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     enterprise: createEnterprise(runtime),
     managedProviders: createManagedProviders(runtime),
     networkStatus: createNetworkStatus(runtime),
-    devNetwork: createDevNetwork(runtime),
     feishu: createFeishu(runtime),
     dingtalk: createDingtalk(runtime),
-    githubCopilot: createGithubCopilot(runtime),
-    openaiCodexOAuth: createOpenaiCodexOAuth(runtime),
     activity: createActivity(runtime),
   };
 }
