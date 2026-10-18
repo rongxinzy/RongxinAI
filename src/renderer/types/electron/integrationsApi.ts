@@ -4,35 +4,35 @@
  * Covers OS permissions, community auth, the managed model pool, enterprise
  * config/session, managed providers (incl. AISphere), provider install flows
  * (Feishu, DingTalk) and the activity feed.
+ *
+ * Invoke method signatures derive from the zod IPC contract
+ * (`src/shared/ipc/providersContract.ts`); push subscriptions and the
+ * Feishu/DingTalk install flows (owned by the IM domain) stay hand-written.
  */
 import type { ActivityRun } from '../../../shared/activity/types';
 import type { IpcContractApi } from '../../../shared/ipc/contract';
 import type { activityContract } from '../../../shared/ipc/automationContract';
-import type {
-  EnterprisePasswordChangeInput,
-  EnterprisePasswordLoginInput,
-  EnterpriseSessionResult,
-} from '../../../shared/enterpriseSession';
+import type { appSystemContract } from '../../../shared/ipc/appSystemContract';
+import type { providersContract } from '../../../shared/ipc/providersContract';
+
+type AppSystemContractApi = IpcContractApi<typeof appSystemContract>;
+type ProvidersContractApi = IpcContractApi<typeof providersContract>;
+
+/** Maps contract method names onto the preload-facing member names. */
+type Renamed<M extends Record<string, keyof ProvidersContractApi>> = {
+  [K in keyof M]: ProvidersContractApi[M[K]];
+};
 
 export interface PermissionsApi {
-  checkCalendar: () => Promise<{
-    success: boolean;
-    status?: string;
-    error?: string;
-    autoRequested?: boolean;
-  }>;
-  requestCalendar: () => Promise<{
-    success: boolean;
-    granted?: boolean;
-    status?: string;
-    error?: string;
-  }>;
+  checkCalendar: AppSystemContractApi['permissionsCheckCalendar'];
+  requestCalendar: AppSystemContractApi['permissionsRequestCalendar'];
 }
 
-export interface AuthApi {
-  communityLogin: () => Promise<{ success: boolean; error?: string }>;
-  getCommunityUser: () => Promise<{ success: boolean; user?: { id: string; email: string } }>;
-  communityLogout: () => Promise<{ success: boolean }>;
+export interface AuthApi extends Renamed<{
+  communityLogin: 'authCommunityLogin';
+  getCommunityUser: 'authGetCommunityUser';
+  communityLogout: 'authCommunityLogout';
+}> {
   onCommunityCallback: (
     callback: (data: {
       success: boolean;
@@ -42,24 +42,11 @@ export interface AuthApi {
   ) => () => void;
 }
 
-export interface ModelPoolApi {
-  listModels: () => Promise<{
-    ok: boolean;
-    status: number;
-    models: string[];
-    error?: string;
-  }>;
-  stream: (input: {
-    requestId: string;
-    conversationId: string;
-    body: Record<string, unknown>;
-  }) => Promise<{
-    ok: boolean;
-    status: number;
-    statusText: string;
-    error?: string;
-  }>;
-  cancelStream: (requestId: string) => Promise<boolean>;
+export interface ModelPoolApi extends Renamed<{
+  listModels: 'modelPoolListModels';
+  stream: 'modelPoolStream';
+  cancelStream: 'modelPoolCancelStream';
+}> {
   onStreamData: (requestId: string, callback: (data: string) => void) => () => void;
   onStreamDone: (requestId: string, callback: () => void) => () => void;
   onStreamError: (requestId: string, callback: (error: string) => void) => () => void;
@@ -67,37 +54,27 @@ export interface ModelPoolApi {
 }
 
 export interface EnterpriseApi {
-  getConfig: () => Promise<{
-    ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
-    disableUpdate?: boolean;
-    version: string;
-    name: string;
-  } | null>;
-  renderer: {
-    sessionGateEntrypoint: () => Promise<string | null>;
-    settingsPages: () => Promise<
-      readonly import('../../../shared/enterpriseRenderer').EnterpriseRendererSettingsPage[]
-    >;
-  };
-  session: {
-    snapshot: () => Promise<EnterpriseSessionResult>;
-    login: (input: EnterprisePasswordLoginInput) => Promise<EnterpriseSessionResult>;
-    changePassword: (input: EnterprisePasswordChangeInput) => Promise<EnterpriseSessionResult>;
-    logout: () => Promise<EnterpriseSessionResult>;
-  };
+  getConfig: ProvidersContractApi['enterpriseGetConfig'];
+  renderer: Renamed<{
+    sessionGateEntrypoint: 'enterpriseSessionGateEntrypoint';
+    settingsPages: 'enterpriseSettingsPages';
+  }>;
+  session: Renamed<{
+    snapshot: 'enterpriseSessionSnapshot';
+    login: 'enterpriseSessionLogin';
+    changePassword: 'enterpriseSessionChangePassword';
+    logout: 'enterpriseSessionLogout';
+  }>;
 }
 
-export interface ManagedProvidersApi {
-  policy: () => Promise<import('../../../shared/managedProviders').ManagedProviderAccessPolicy>;
-  catalog: () => Promise<
-    readonly import('../../../shared/managedProviders').ManagedProviderCatalogModel[]
-  >;
+export interface ManagedProvidersApi extends Renamed<{
+  policy: 'managedProviderPolicy';
+  catalog: 'managedProviderCatalog';
+  aisphereSnapshot: 'aisphereSnapshot';
+  aisphereConnect: 'aisphereConnect';
+  aisphereRefresh: 'aisphereRefresh';
+}> {
   onChanged: (callback: () => void) => () => void;
-  aisphereSnapshot: () => Promise<import('../../../shared/aisphere').AISphereSnapshot>;
-  aisphereConnect: (
-    address: string,
-  ) => Promise<import('../../../shared/aisphere').AISphereSnapshot>;
-  aisphereRefresh: () => Promise<import('../../../shared/aisphere').AISphereSnapshot>;
 }
 
 export interface FeishuApi {

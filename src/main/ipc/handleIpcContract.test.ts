@@ -5,7 +5,7 @@ import { ipcMain } from 'electron';
 import { z } from 'zod';
 
 import { defineIpcContract } from '../../shared/ipc/contract';
-import { handleIpcContract } from './handleIpcContract';
+import { handleIpcContract, handleIpcContractSubset } from './handleIpcContract';
 
 // tests/__mocks__/electron.ts registers ipcMain.handle as a no-op stub; capture
 // the registrations so tests can invoke the wrapped handler directly.
@@ -154,5 +154,24 @@ describe('handleIpcContract', () => {
     );
 
     await expect(registered.get('test:contract:probe')!(event)).resolves.toBe(extra);
+  });
+});
+
+describe('handleIpcContractSubset', () => {
+  test('registers only the given methods so subsets can share one contract', async () => {
+    handleIpcContractSubset(contract, { add: (_event, a, b) => a + b });
+    handleIpcContractSubset(contract, {
+      greet: (_event, { name }) => ({ message: `hello ${name}` }),
+      noArgs: () => true,
+    });
+    expect([...registered.keys()].sort()).toEqual([
+      'test:contract:add',
+      'test:contract:greet',
+      'test:contract:noArgs',
+    ]);
+    await expect(registered.get('test:contract:add')?.(event, 2, 3)).resolves.toBe(5);
+    await expect(registered.get('test:contract:add')?.(event, 'x', 3)).rejects.toThrow(
+      'IPC test:contract:add rejected invalid arguments',
+    );
   });
 });

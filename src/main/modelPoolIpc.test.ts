@@ -72,7 +72,9 @@ describe('Model Pool IPC', () => {
       { sender: { send: vi.fn() } },
       { requestId: 'cancel-auth', conversationId: 'session', body: {} },
     );
-    expect(electronMocks.handlers.get(ModelPoolIpc.CancelStream)?.({}, 'cancel-auth')).toBe(true);
+    await expect(
+      electronMocks.handlers.get(ModelPoolIpc.CancelStream)?.({}, 'cancel-auth'),
+    ).resolves.toBe(true);
     // Token acquisition now happens after route resolution, so wait until the
     // handler is actually awaiting credentials before releasing the promise.
     await vi.waitFor(() => expect(manager.getModelPoolAccessToken).toHaveBeenCalled());

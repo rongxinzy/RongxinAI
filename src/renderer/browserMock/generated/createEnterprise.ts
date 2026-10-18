@@ -5,10 +5,7 @@ export function createEnterprise(runtime: BrowserMockRuntime): Window['electron'
   return {
     getConfig: async () => {
       runtime.warnOnce('enterprise.getConfig');
-      return {
-        version: '0.0.0-preview',
-        name: 'Preview',
-      };
+      return {};
     },
     renderer: {
       sessionGateEntrypoint: async () => {

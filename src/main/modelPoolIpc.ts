@@ -1,7 +1,9 @@
-import { app, ipcMain, session } from 'electron';
+import { app, session } from 'electron';
 
 import { ModelPoolIpc } from '../shared/ipc/channels';
-import { ModelPoolModelsSchema, ModelPoolStreamSchema } from '../shared/ipc/schemas';
+import { providersContract } from '../shared/ipc/providersContract';
+import { handleIpcContractSubset } from './ipc/handleIpcContract';
+import { ModelPoolModelsSchema } from '../shared/ipc/schemas';
 import {
   ZhiyuanModelPool,
   ZhiyuanModelPoolHeader,
@@ -146,142 +148,146 @@ export function registerModelPoolIpcHandlers(
   communityAuthSession: CommunityAuthSessionManager,
 ): void {
   warmZhiyuanIntranetProbe();
-  ipcMain.handle(ModelPoolIpc.ListModels, async () => {
-    try {
-      const fetchResult = await fetchModelPoolModels(communityAuthSession);
-      const response = fetchResult.response;
-      if (!response.ok) {
+  handleIpcContractSubset(providersContract, {
+    modelPoolListModels: async () => {
+      try {
+        const fetchResult = await fetchModelPoolModels(communityAuthSession);
+        const response = fetchResult.response;
+        if (!response.ok) {
+          const result = {
+            ok: false,
+            status: response.status,
+            models: [] as string[],
+            error: modelPoolErrorMessage(await response.text(), response.status),
+          };
+          return ModelPoolModelsSchema.output.parse(result);
+        }
+        let models = parseModelIds((await response.json()) as unknown);
+        if (fetchResult.usedIntranet) {
+          // The renderer only knows the logical free model id; report the
+          // intranet model under that id instead of the physical gateway name.
+          models = models.map(modelId =>
+            modelId === ZhiyuanModelPool.IntranetModelId ? ZhiyuanModelPool.FreeModelId : modelId,
+          );
+        }
         const result = {
-          ok: false,
+          ok: true,
           status: response.status,
-          models: [] as string[],
-          error: modelPoolErrorMessage(await response.text(), response.status),
+          models,
         };
         return ModelPoolModelsSchema.output.parse(result);
+      } catch {
+        return ModelPoolModelsSchema.output.parse({
+          ok: false,
+          status: 0,
+          models: [] as string[],
+          error: t('modelPoolServiceUnavailable'),
+        });
       }
-      let models = parseModelIds((await response.json()) as unknown);
-      if (fetchResult.usedIntranet) {
-        // The renderer only knows the logical free model id; report the
-        // intranet model under that id instead of the physical gateway name.
-        models = models.map(modelId =>
-          modelId === ZhiyuanModelPool.IntranetModelId ? ZhiyuanModelPool.FreeModelId : modelId,
-        );
-      }
-      const result = {
-        ok: true,
-        status: response.status,
-        models,
+    },
+
+    modelPoolStream: async (event, input) => {
+      const controller = new AbortController();
+      activeModelPoolStreams.set(input.requestId, controller);
+      const destroyed = () => controller.abort();
+      event.sender.once?.('destroyed', destroyed);
+      const cleanup = () => {
+        event.sender.removeListener?.('destroyed', destroyed);
+        if (activeModelPoolStreams.get(input.requestId) === controller)
+          activeModelPoolStreams.delete(input.requestId);
       };
-      return ModelPoolModelsSchema.output.parse(result);
-    } catch {
-      return ModelPoolModelsSchema.output.parse({
-        ok: false,
-        status: 0,
-        models: [] as string[],
-        error: t('modelPoolServiceUnavailable'),
-      });
-    }
-  });
+      const send = (channel: string, ...args: unknown[]) => {
+        if (!event.sender.isDestroyed?.()) event.sender.send(channel, ...args);
+      };
 
-  ipcMain.handle(ModelPoolIpc.Stream, async (event, rawInput: unknown) => {
-    const input = ModelPoolStreamSchema.input.parse(rawInput);
-    const controller = new AbortController();
-    activeModelPoolStreams.set(input.requestId, controller);
-    const destroyed = () => controller.abort();
-    event.sender.once?.('destroyed', destroyed);
-    const cleanup = () => {
-      event.sender.removeListener?.('destroyed', destroyed);
-      if (activeModelPoolStreams.get(input.requestId) === controller)
-        activeModelPoolStreams.delete(input.requestId);
-    };
-    const send = (channel: string, ...args: unknown[]) => {
-      if (!event.sender.isDestroyed?.()) event.sender.send(channel, ...args);
-    };
-
-    try {
-      let forceTokenRefresh = false;
-      const tokenProvider: ModelPoolTokenProvider = async () =>
-        forceTokenRefresh
-          ? communityAuthSession.getModelPoolAccessToken({ forceRefresh: true })
-          : communityAuthSession.getModelPoolAccessToken();
-      let fetchResult = await fetchModelPool(
-        input.body,
-        tokenProvider,
-        controller.signal,
-        input.conversationId,
-      );
-      if (fetchResult.response.status === 401 && !fetchResult.usedIntranet) {
-        await fetchResult.response.body?.cancel();
-        forceTokenRefresh = true;
-        fetchResult = await fetchModelPool(
+      try {
+        let forceTokenRefresh = false;
+        const tokenProvider: ModelPoolTokenProvider = async () =>
+          forceTokenRefresh
+            ? communityAuthSession.getModelPoolAccessToken({ forceRefresh: true })
+            : communityAuthSession.getModelPoolAccessToken();
+        let fetchResult = await fetchModelPool(
           input.body,
           tokenProvider,
           controller.signal,
           input.conversationId,
         );
-      }
-      const response = fetchResult.response;
-
-      if (!response.ok || !response.body) {
-        const error = response.body
-          ? modelPoolErrorMessage(await readModelPoolErrorBody(response), response.status)
-          : t('modelPoolServiceUnavailable');
-        cleanup();
-        return { ok: false, status: response.status, statusText: response.statusText, error };
-      }
-
-      const reader = response.body.getReader();
-      const cancelReader = () => {
-        void reader.cancel().catch((): void => undefined);
-      };
-      controller.signal.addEventListener('abort', cancelReader, { once: true });
-      const decoder = new TextDecoder();
-      void (async () => {
-        try {
-          while (true) {
-            const { value, done } = await reader.read();
-            controller.signal.throwIfAborted();
-            if (done) {
-              const finalChunk = decoder.decode();
-              if (finalChunk) {
-                send(ModelPoolIpc.streamData(input.requestId), finalChunk);
-              }
-              send(ModelPoolIpc.streamDone(input.requestId));
-              break;
-            }
-            send(ModelPoolIpc.streamData(input.requestId), decoder.decode(value, { stream: true }));
-          }
-        } catch (error) {
-          if (error instanceof Error && error.name === 'AbortError') {
-            send(ModelPoolIpc.streamAbort(input.requestId));
-          } else {
-            send(ModelPoolIpc.streamError(input.requestId), t('modelPoolStreamInterrupted'));
-          }
-        } finally {
-          controller.signal.removeEventListener('abort', cancelReader);
-          await reader.cancel().catch((): void => undefined);
-          reader.releaseLock();
-          cleanup();
+        if (fetchResult.response.status === 401 && !fetchResult.usedIntranet) {
+          await fetchResult.response.body?.cancel();
+          forceTokenRefresh = true;
+          fetchResult = await fetchModelPool(
+            input.body,
+            tokenProvider,
+            controller.signal,
+            input.conversationId,
+          );
         }
-      })();
+        const response = fetchResult.response;
 
-      return { ok: true, status: response.status, statusText: response.statusText };
-    } catch {
-      cleanup();
-      return {
-        ok: false,
-        status: 0,
-        statusText: 'Model Pool request failed',
-        error: t('modelPoolServiceUnavailable'),
-      };
-    }
-  });
+        if (!response.ok || !response.body) {
+          const error = response.body
+            ? modelPoolErrorMessage(await readModelPoolErrorBody(response), response.status)
+            : t('modelPoolServiceUnavailable');
+          cleanup();
+          return { ok: false, status: response.status, statusText: response.statusText, error };
+        }
 
-  ipcMain.handle(ModelPoolIpc.CancelStream, (_event, requestId: string) => {
-    const controller = activeModelPoolStreams.get(requestId);
-    if (!controller) return false;
-    controller.abort();
-    activeModelPoolStreams.delete(requestId);
-    return true;
+        const reader = response.body.getReader();
+        const cancelReader = () => {
+          void reader.cancel().catch((): void => undefined);
+        };
+        controller.signal.addEventListener('abort', cancelReader, { once: true });
+        const decoder = new TextDecoder();
+        void (async () => {
+          try {
+            while (true) {
+              const { value, done } = await reader.read();
+              controller.signal.throwIfAborted();
+              if (done) {
+                const finalChunk = decoder.decode();
+                if (finalChunk) {
+                  send(ModelPoolIpc.streamData(input.requestId), finalChunk);
+                }
+                send(ModelPoolIpc.streamDone(input.requestId));
+                break;
+              }
+              send(
+                ModelPoolIpc.streamData(input.requestId),
+                decoder.decode(value, { stream: true }),
+              );
+            }
+          } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+              send(ModelPoolIpc.streamAbort(input.requestId));
+            } else {
+              send(ModelPoolIpc.streamError(input.requestId), t('modelPoolStreamInterrupted'));
+            }
+          } finally {
+            controller.signal.removeEventListener('abort', cancelReader);
+            await reader.cancel().catch((): void => undefined);
+            reader.releaseLock();
+            cleanup();
+          }
+        })();
+
+        return { ok: true, status: response.status, statusText: response.statusText };
+      } catch {
+        cleanup();
+        return {
+          ok: false,
+          status: 0,
+          statusText: 'Model Pool request failed',
+          error: t('modelPoolServiceUnavailable'),
+        };
+      }
+    },
+
+    modelPoolCancelStream: async (_event, requestId) => {
+      const controller = activeModelPoolStreams.get(requestId);
+      if (!controller) return false;
+      controller.abort();
+      activeModelPoolStreams.delete(requestId);
+      return true;
+    },
   });
 }

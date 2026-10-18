@@ -1,157 +1,114 @@
 import { ipcRenderer } from 'electron';
 
-import { AgentIpcChannel } from '../../shared/agent/constants';
-import { AISphereIpc } from '../../shared/aisphere';
-import { EnterpriseRendererIpc } from '../../shared/enterpriseRenderer';
-import { EnterpriseSessionIpc } from '../../shared/enterpriseSession';
-import {
-  CommunityAuthIpc,
-  EnterpriseIpc,
-  ManagedProviderIpc,
-  ModelPoolIpc,
-} from '../../shared/ipc/channels';
-import {
-  MagpieIpc,
-  type MagpieModelSelection,
-  type MagpieSaveProviderInput,
-} from '../../shared/magpie/types';
-import type { MagpiePreferencesPatch } from '../../shared/magpie/preferences';
+import { CommunityAuthIpc, ManagedProviderIpc, ModelPoolIpc } from '../../shared/ipc/channels';
+import { providersContractChannels } from '../../shared/ipc/providersContract.channels';
+import type { providersContract } from '../../shared/ipc/providersContract';
+import type { IpcContractApi } from '../../shared/ipc/contract';
 import { onPush, onPushVoid } from './pushChannel';
+import { createIpcInvokers } from './createIpcInvokers';
+
+type ProvidersContractApi = IpcContractApi<typeof providersContract>;
+const invokers = createIpcInvokers(providersContractChannels);
+
+// Rename a contract invoker to its preload-facing method name, keeping the
+// contract-derived signature.
+const asApi = <K extends keyof ProvidersContractApi>(method: K): ProvidersContractApi[K] =>
+  invokers[method] as ProvidersContractApi[K];
+
+/** Maps contract method names onto the preload-facing member names. */
+type Renamed<M extends Record<string, keyof ProvidersContractApi>> = {
+  [K in keyof M]: ProvidersContractApi[M[K]];
+};
+
+/** Contract invokers renamed to preload names, plus hand-wired members. */
+type WithExtra<E, M extends Record<string, keyof ProvidersContractApi>> = Renamed<M> & E;
 
 // Model providers, agent profiles, enterprise, and OAuth integrations.
+// Invoke methods come from the contract channel map via createIpcInvokers;
+// push subscriptions (onChanged / onCommunityCallback / onStream*) stay
+// hand-wired below.
 export const providersApi = {
   enterprise: {
-    getConfig: () => ipcRenderer.invoke(EnterpriseIpc.GetConfig),
+    getConfig: asApi('enterpriseGetConfig'),
     renderer: {
-      sessionGateEntrypoint: () =>
-        ipcRenderer.invoke(EnterpriseRendererIpc.SessionGateEntrypoint) as Promise<string | null>,
-      settingsPages: () =>
-        ipcRenderer.invoke(EnterpriseRendererIpc.SettingsPages) as Promise<
-          readonly import('../../shared/enterpriseRenderer').EnterpriseRendererSettingsPage[]
-        >,
+      sessionGateEntrypoint: asApi('enterpriseSessionGateEntrypoint'),
+      settingsPages: asApi('enterpriseSettingsPages'),
     },
     session: {
-      snapshot: () => ipcRenderer.invoke(EnterpriseSessionIpc.Snapshot),
-      login: (input: unknown) => ipcRenderer.invoke(EnterpriseSessionIpc.Login, input),
-      changePassword: (input: unknown) =>
-        ipcRenderer.invoke(EnterpriseSessionIpc.ChangePassword, input),
-      logout: () => ipcRenderer.invoke(EnterpriseSessionIpc.Logout),
+      snapshot: asApi('enterpriseSessionSnapshot'),
+      login: asApi('enterpriseSessionLogin'),
+      changePassword: asApi('enterpriseSessionChangePassword'),
+      logout: asApi('enterpriseSessionLogout'),
     },
   },
 
   managedProviders: {
-    policy: () =>
-      ipcRenderer.invoke(ManagedProviderIpc.Policy) as Promise<
-        import('../../shared/managedProviders').ManagedProviderAccessPolicy
-      >,
-    catalog: () =>
-      ipcRenderer.invoke(ManagedProviderIpc.Catalog) as Promise<
-        readonly import('../../shared/managedProviders').ManagedProviderCatalogModel[]
-      >,
+    policy: asApi('managedProviderPolicy'),
+    catalog: asApi('managedProviderCatalog'),
     onChanged: (callback: () => void) => onPushVoid(ManagedProviderIpc.Changed, callback),
-    aisphereSnapshot: () =>
-      ipcRenderer.invoke(AISphereIpc.Snapshot) as Promise<
-        import('../../shared/aisphere').AISphereSnapshot
-      >,
-    aisphereConnect: (address: string) =>
-      ipcRenderer.invoke(AISphereIpc.Connect, address) as Promise<
-        import('../../shared/aisphere').AISphereSnapshot
-      >,
-    aisphereRefresh: () =>
-      ipcRenderer.invoke(AISphereIpc.Refresh) as Promise<
-        import('../../shared/aisphere').AISphereSnapshot
-      >,
+    aisphereSnapshot: asApi('aisphereSnapshot'),
+    aisphereConnect: asApi('aisphereConnect'),
+    aisphereRefresh: asApi('aisphereRefresh'),
   },
 
   agents: {
     list: async () => {
-      const result = await ipcRenderer.invoke(AgentIpcChannel.List);
+      const result = await asApi('agentsList')();
       return result?.success ? result.agents : [];
     },
     get: async (id: string) => {
-      const result = await ipcRenderer.invoke(AgentIpcChannel.Get, id);
+      const result = await asApi('agentsGet')(id);
       return result?.success ? result.agent : null;
     },
-    create: async (request: {
-      id?: string;
-      name: string;
-      description?: string;
-      systemPrompt?: string;
-      identity?: string;
-      model?: string;
-      workingDirectory?: string;
-      icon?: string;
-      skillIds?: string[];
-      source?: string;
-      presetId?: string;
-    }) => {
-      const result = await ipcRenderer.invoke(AgentIpcChannel.Create, request);
+    create: async (
+      request: Parameters<ProvidersContractApi['agentsCreate']>[0],
+    ): Promise<Awaited<ReturnType<ProvidersContractApi['agentsCreate']>>['agent'] | null> => {
+      const result = await asApi('agentsCreate')(request);
       return result?.success ? result.agent : null;
     },
     update: async (
       id: string,
-      updates: {
-        name?: string;
-        description?: string;
-        systemPrompt?: string;
-        identity?: string;
-        model?: string;
-        workingDirectory?: string;
-        icon?: string;
-        skillIds?: string[];
-        enabled?: boolean;
-        pinned?: boolean;
-      },
-    ) => {
-      const result = await ipcRenderer.invoke(AgentIpcChannel.Update, id, updates);
+      updates: Parameters<ProvidersContractApi['agentsUpdate']>[1],
+    ): Promise<Awaited<ReturnType<ProvidersContractApi['agentsUpdate']>>['agent'] | null> => {
+      const result = await asApi('agentsUpdate')(id, updates);
       return result?.success ? result.agent : null;
     },
     delete: async (id: string) => {
-      const result = await ipcRenderer.invoke(AgentIpcChannel.Delete, id);
+      const result = await asApi('agentsDelete')(id);
       return result?.success ? result.deleted : false;
     },
-    importExpertPackage: async (expertDir: string) => {
-      return await ipcRenderer.invoke(AgentIpcChannel.ImportExpertPackage, expertDir);
-    },
-    getPresetExperts: async () => {
-      return await ipcRenderer.invoke(AgentIpcChannel.GetPresetExperts);
-    },
+    importExpertPackage: asApi('agentsImportExpertPackage'),
+    getPresetExperts: asApi('agentsGetPresetExperts'),
   },
 
   magpie: {
-    status: () => ipcRenderer.invoke(MagpieIpc.status),
-    setSubscriptionAccounts: (enabled: boolean) =>
-      ipcRenderer.invoke(MagpieIpc.setSubscriptionAccounts, enabled),
-    start: () => ipcRenderer.invoke(MagpieIpc.start),
-    stop: () => ipcRenderer.invoke(MagpieIpc.stop),
-    agents: () => ipcRenderer.invoke(MagpieIpc.agents),
-    setModel: (selection: MagpieModelSelection) =>
-      ipcRenderer.invoke(MagpieIpc.setModel, selection),
-    previewAgent: (agentId: string) => ipcRenderer.invoke(MagpieIpc.previewAgent, agentId),
-    connectAgent: (agentId: string) => ipcRenderer.invoke(MagpieIpc.connectAgent, agentId),
-    disconnectAgent: (agentId: string) => ipcRenderer.invoke(MagpieIpc.disconnectAgent, agentId),
-    disconnectAllAgents: () => ipcRenderer.invoke(MagpieIpc.disconnectAllAgents),
-    models: () => ipcRenderer.invoke(MagpieIpc.models),
-    catalog: () => ipcRenderer.invoke(MagpieIpc.catalog),
-    selectDefault: (modelId: string) => ipcRenderer.invoke(MagpieIpc.selectDefault, modelId),
-    providers: () => ipcRenderer.invoke(MagpieIpc.providers),
-    saveProvider: (input: MagpieSaveProviderInput) =>
-      ipcRenderer.invoke(MagpieIpc.saveProvider, input),
-    setProviderEnabled: (id: string, enabled: boolean) =>
-      ipcRenderer.invoke(MagpieIpc.setProviderEnabled, id, enabled),
-    deleteProvider: (id: string) => ipcRenderer.invoke(MagpieIpc.deleteProvider, id),
-    testProvider: (input: MagpieSaveProviderInput) =>
-      ipcRenderer.invoke(MagpieIpc.testProvider, input),
-    diagnostics: () => ipcRenderer.invoke(MagpieIpc.diagnostics),
-    preferences: () => ipcRenderer.invoke(MagpieIpc.preferences),
-    updatePreferences: (patch: MagpiePreferencesPatch) =>
-      ipcRenderer.invoke(MagpieIpc.updatePreferences, patch),
+    status: asApi('magpieStatus'),
+    setSubscriptionAccounts: asApi('magpieSetSubscriptionAccounts'),
+    start: asApi('magpieStart'),
+    stop: asApi('magpieStop'),
+    agents: asApi('magpieAgents'),
+    setModel: asApi('magpieSetModel'),
+    previewAgent: asApi('magpiePreviewAgent'),
+    connectAgent: asApi('magpieConnectAgent'),
+    disconnectAgent: asApi('magpieDisconnectAgent'),
+    disconnectAllAgents: asApi('magpieDisconnectAllAgents'),
+    models: asApi('magpieModels'),
+    catalog: asApi('magpieCatalog'),
+    selectDefault: asApi('magpieSelectDefault'),
+    providers: asApi('magpieProviders'),
+    saveProvider: asApi('magpieSaveProvider'),
+    setProviderEnabled: asApi('magpieSetProviderEnabled'),
+    deleteProvider: asApi('magpieDeleteProvider'),
+    testProvider: asApi('magpieTestProvider'),
+    diagnostics: asApi('magpieDiagnostics'),
+    preferences: asApi('magpiePreferences'),
+    updatePreferences: asApi('magpieUpdatePreferences'),
   },
 
   auth: {
-    communityLogin: () => ipcRenderer.invoke(CommunityAuthIpc.Login),
-    getCommunityUser: () => ipcRenderer.invoke(CommunityAuthIpc.GetCommunityUser),
-    communityLogout: () => ipcRenderer.invoke(CommunityAuthIpc.Logout),
+    communityLogin: asApi('authCommunityLogin'),
+    getCommunityUser: asApi('authGetCommunityUser'),
+    communityLogout: asApi('authCommunityLogout'),
     onCommunityCallback: (
       callback: (data: {
         success: boolean;
@@ -162,10 +119,9 @@ export const providersApi = {
   },
 
   modelPool: {
-    listModels: () => ipcRenderer.invoke(ModelPoolIpc.ListModels),
-    stream: (input: { requestId: string; conversationId: string; body: Record<string, unknown> }) =>
-      ipcRenderer.invoke(ModelPoolIpc.Stream, input),
-    cancelStream: (requestId: string) => ipcRenderer.invoke(ModelPoolIpc.CancelStream, requestId),
+    listModels: asApi('modelPoolListModels'),
+    stream: asApi('modelPoolStream'),
+    cancelStream: asApi('modelPoolCancelStream'),
     onStreamData: (requestId: string, callback: (data: string) => void) =>
       onPush(ModelPoolIpc.streamData(requestId), callback),
     onStreamDone: (requestId: string, callback: () => void) =>
@@ -175,4 +131,107 @@ export const providersApi = {
     onStreamAbort: (requestId: string, callback: () => void) =>
       onPushVoid(ModelPoolIpc.streamAbort(requestId), callback),
   },
+} satisfies {
+  agents: {
+    list: () => Promise<
+      NonNullable<Awaited<ReturnType<ProvidersContractApi['agentsList']>>['agents']>
+    >;
+    get: (
+      id: string,
+    ) => Promise<NonNullable<
+      Awaited<ReturnType<ProvidersContractApi['agentsGet']>>['agent']
+    > | null>;
+    create: ProvidersContractApi['agentsCreate'] extends (request: infer R) => Promise<infer Res>
+      ? (
+          request: R,
+        ) => Promise<Res extends { agent?: infer A } ? (A extends null ? never : A | null) : never>
+      : never;
+    update: ProvidersContractApi['agentsUpdate'] extends (
+      id: string,
+      updates: infer U,
+    ) => Promise<infer Res>
+      ? (
+          id: string,
+          updates: U,
+        ) => Promise<Res extends { agent?: infer A } ? (A extends null ? never : A | null) : never>
+      : never;
+    delete: (id: string) => Promise<boolean>;
+    importExpertPackage: ProvidersContractApi['agentsImportExpertPackage'];
+    getPresetExperts: ProvidersContractApi['agentsGetPresetExperts'];
+  };
+  enterprise: {
+    getConfig: ProvidersContractApi['enterpriseGetConfig'];
+    renderer: Renamed<{
+      sessionGateEntrypoint: 'enterpriseSessionGateEntrypoint';
+      settingsPages: 'enterpriseSettingsPages';
+    }>;
+    session: Renamed<{
+      snapshot: 'enterpriseSessionSnapshot';
+      login: 'enterpriseSessionLogin';
+      changePassword: 'enterpriseSessionChangePassword';
+      logout: 'enterpriseSessionLogout';
+    }>;
+  };
+  managedProviders: WithExtra<
+    { onChanged: (callback: () => void) => () => void },
+    {
+      policy: 'managedProviderPolicy';
+      catalog: 'managedProviderCatalog';
+      aisphereSnapshot: 'aisphereSnapshot';
+      aisphereConnect: 'aisphereConnect';
+      aisphereRefresh: 'aisphereRefresh';
+    }
+  >;
+  magpie: Renamed<{
+    status: 'magpieStatus';
+    setSubscriptionAccounts: 'magpieSetSubscriptionAccounts';
+    start: 'magpieStart';
+    stop: 'magpieStop';
+    agents: 'magpieAgents';
+    setModel: 'magpieSetModel';
+    previewAgent: 'magpiePreviewAgent';
+    connectAgent: 'magpieConnectAgent';
+    disconnectAgent: 'magpieDisconnectAgent';
+    disconnectAllAgents: 'magpieDisconnectAllAgents';
+    models: 'magpieModels';
+    catalog: 'magpieCatalog';
+    selectDefault: 'magpieSelectDefault';
+    providers: 'magpieProviders';
+    saveProvider: 'magpieSaveProvider';
+    setProviderEnabled: 'magpieSetProviderEnabled';
+    deleteProvider: 'magpieDeleteProvider';
+    testProvider: 'magpieTestProvider';
+    diagnostics: 'magpieDiagnostics';
+    preferences: 'magpiePreferences';
+    updatePreferences: 'magpieUpdatePreferences';
+  }>;
+  auth: WithExtra<
+    {
+      onCommunityCallback: (
+        callback: (data: {
+          success: boolean;
+          user?: { id: string; email: string; name: string };
+          error?: string;
+        }) => void,
+      ) => () => void;
+    },
+    {
+      communityLogin: 'authCommunityLogin';
+      getCommunityUser: 'authGetCommunityUser';
+      communityLogout: 'authCommunityLogout';
+    }
+  >;
+  modelPool: WithExtra<
+    {
+      onStreamData: (requestId: string, callback: (data: string) => void) => () => void;
+      onStreamDone: (requestId: string, callback: () => void) => () => void;
+      onStreamError: (requestId: string, callback: (error: string) => void) => () => void;
+      onStreamAbort: (requestId: string, callback: () => void) => () => void;
+    },
+    {
+      listModels: 'modelPoolListModels';
+      stream: 'modelPoolStream';
+      cancelStream: 'modelPoolCancelStream';
+    }
+  >;
 };

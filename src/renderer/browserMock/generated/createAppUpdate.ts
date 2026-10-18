@@ -3,6 +3,9 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createAppUpdate(runtime: BrowserMockRuntime): Window['electron']['appUpdate'] {
   return {
+    onStateChanged: _p0 => {
+      return runtime.subscribe('appUpdate.onStateChanged', _p0);
+    },
     getChannel: async () => {
       runtime.warnOnce('appUpdate.getChannel');
       return 'beta';
@@ -282,9 +285,6 @@ export function createAppUpdate(runtime: BrowserMockRuntime): Window['electron']
       return {
         success: true,
       };
-    },
-    onStateChanged: _p0 => {
-      return runtime.subscribe('appUpdate.onStateChanged', _p0);
     },
   };
 }

@@ -2,7 +2,10 @@
  * Agent preload surface, split from `../electron.d.ts`.
  *
  * Covers agent profiles/preset experts plus the per-session workbench task
- * and todo surfaces.
+ * and todo surfaces. `importExpertPackage` / `getPresetExperts` derive from
+ * the zod IPC contract (`src/shared/ipc/providersContract.ts`); the
+ * list/get/create/update/delete methods unwrap the success envelope in the
+ * preload and keep their unwrapped signatures.
  */
 import type {
   WorkbenchApprovalResponseInput,
@@ -11,7 +14,11 @@ import type {
   WorkbenchTaskExportResult,
   WorkbenchTaskListResult,
 } from '../../../shared/workbenchTask';
+import type { IpcContractApi } from '../../../shared/ipc/contract';
+import type { providersContract } from '../../../shared/ipc/providersContract';
 import type { Agent } from '../agent';
+
+type ProvidersContractApi = IpcContractApi<typeof providersContract>;
 
 export interface AgentsApi {
   list: () => Promise<Agent[]>;
@@ -46,27 +53,8 @@ export interface AgentsApi {
     },
   ) => Promise<Agent>;
   delete: (id: string) => Promise<boolean>;
-  importExpertPackage: (expertDir: string) => Promise<{
-    success: boolean;
-    agentIds?: string[];
-    expertType?: string;
-    name?: string;
-    error?: string;
-  }>;
-  getPresetExperts: () => Promise<{
-    experts: Array<{
-      name: string;
-      displayName: { en: string; zh: string };
-      profession: { en: string; zh: string };
-      displayDescription: { en: string; zh: string };
-      categoryId: string;
-      tags: Array<{ en: string; zh: string }>;
-      quickPrompts: Array<{ en: string; zh: string }>;
-      workflow: string[];
-      path: string;
-    }>;
-    error?: string;
-  }>;
+  importExpertPackage: ProvidersContractApi['agentsImportExpertPackage'];
+  getPresetExperts: ProvidersContractApi['agentsGetPresetExperts'];
 }
 
 export interface WorkbenchTaskApi {

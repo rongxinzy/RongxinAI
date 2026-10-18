@@ -1,14 +1,10 @@
 /** Dialog IPC: directory/file pickers, screenshot capture, recent file roots. */
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 
-import { app, BrowserWindow, desktopCapturer, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog } from 'electron';
 
 import { getCoworkStore } from './runtimeServices';
-import { isInternalWorkspacePath } from './workspacePaths';
-import { normalizeWindowsShellPath, safeDecodeURIComponent } from './shellPathNormalize';
-import { listAllMatchingSessionIds } from './coworkSessionImages';
 import {
   MAX_INLINE_ATTACHMENT_BYTES,
   inferAttachmentExtension,
@@ -16,31 +12,29 @@ import {
   sanitizeAttachmentFileName,
 } from './fileExportHelpers';
 import { registerArtifactFileAvailabilityHandler } from '../artifactFileAvailability';
+import { appSystemContract } from '../../shared/ipc/appSystemContract';
+import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 
 export const registerDialogIpc = (): void => {
   // Dialog handlers
-  ipcMain.handle('dialog:selectDirectory', async (event, options?: { defaultPath?: string }) => {
-    const ownerWindow = BrowserWindow.fromWebContents(event.sender);
-    const defaultPath = options?.defaultPath?.trim();
-    const dialogOptions = {
-      properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[],
-      ...(defaultPath ? { defaultPath } : {}),
-    };
-    const result = ownerWindow
-      ? await dialog.showOpenDialog(ownerWindow, dialogOptions)
-      : await dialog.showOpenDialog(dialogOptions);
-    if (result.canceled || result.filePaths.length === 0) {
-      return { success: true, path: null };
-    }
-    return { success: true, path: result.filePaths[0] };
-  });
+  handleIpcContractSubset(appSystemContract, {
+    dialogSelectDirectory: async (event, options) => {
+      const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+      const defaultPath = options?.defaultPath?.trim();
+      const dialogOptions = {
+        properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[],
+        ...(defaultPath ? { defaultPath } : {}),
+      };
+      const result = ownerWindow
+        ? await dialog.showOpenDialog(ownerWindow, dialogOptions)
+        : await dialog.showOpenDialog(dialogOptions);
+      if (result.canceled || result.filePaths.length === 0) {
+        return { success: true, path: null };
+      }
+      return { success: true, path: result.filePaths[0] };
+    },
 
-  ipcMain.handle(
-    'dialog:selectFile',
-    async (
-      event,
-      options?: { title?: string; filters?: { name: string; extensions: string[] }[] },
-    ) => {
+    dialogSelectFile: async (event, options) => {
       const ownerWindow = BrowserWindow.fromWebContents(event.sender);
       const dialogOptions = {
         properties: ['openFile'] as 'openFile'[],
@@ -55,14 +49,8 @@ export const registerDialogIpc = (): void => {
       }
       return { success: true, path: result.filePaths[0] };
     },
-  );
 
-  ipcMain.handle(
-    'dialog:selectFiles',
-    async (
-      event,
-      options?: { title?: string; filters?: { name: string; extensions: string[] }[] },
-    ) => {
+    dialogSelectFiles: async (event, options) => {
       const ownerWindow = BrowserWindow.fromWebContents(event.sender);
       const dialogOptions = {
         properties: ['openFile', 'multiSelections'] as ('openFile' | 'multiSelections')[],
@@ -77,20 +65,9 @@ export const registerDialogIpc = (): void => {
       }
       return { success: true, paths: result.filePaths };
     },
-  );
 
-  ipcMain.handle(
-    'dialog:showMessageBox',
-    async (
-      event,
-      options: {
-        message: string;
-        type?: 'none' | 'info' | 'error' | 'question' | 'warning';
-        title?: string;
-      },
-    ) => {
+    dialogShowMessageBox: async (event, options) => {
       const ownerWindow = BrowserWindow.fromWebContents(event.sender);
-      const { dialog } = await import('electron');
       return dialog.showMessageBox(ownerWindow!, {
         type: options.type || 'warning',
         title: options.title || '',
@@ -98,16 +75,10 @@ export const registerDialogIpc = (): void => {
         buttons: ['OK'],
       });
     },
-  );
 
-  ipcMain.handle(
-    'dialog:saveInlineFile',
-    async (
-      _event,
-      options?: { dataBase64?: string; fileName?: string; mimeType?: string; cwd?: string },
-    ) => {
+    dialogSaveInlineFile: async (_event, options) => {
       try {
-        const dataBase64 = typeof options?.dataBase64 === 'string' ? options.dataBase64.trim() : '';
+        const dataBase64 = typeof options.dataBase64 === 'string' ? options.dataBase64.trim() : '';
         if (!dataBase64) {
           return { success: false, path: null, error: 'Missing file data' };
         }
@@ -144,30 +115,16 @@ export const registerDialogIpc = (): void => {
         };
       }
     },
-  );
 
-  // Read a local file as a data URL (data:<mime>;base64,...)
-  const MAX_READ_AS_DATA_URL_BYTES = 20 * 1024 * 1024;
-  const MIME_BY_EXT: Record<string, string> = {
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.gif': 'image/gif',
-    '.webp': 'image/webp',
-    '.bmp': 'image/bmp',
-    '.svg': 'image/svg+xml',
-    '.tiff': 'image/tiff',
-    '.tif': 'image/tiff',
-    '.ico': 'image/x-icon',
-    '.avif': 'image/avif',
-  };
-  registerArtifactFileAvailabilityHandler();
-  ipcMain.handle(
-    'dialog:readFileAsDataUrl',
-    async (
+    // Read a local file as a data URL (data:<mime>;base64,...)
+    dialogReadFileAsDataUrl: async (
       _event,
-      filePath?: string,
-    ): Promise<{ success: boolean; dataUrl?: string; error?: string }> => {
+      filePath,
+    ): Promise<{
+      success: boolean;
+      dataUrl?: string;
+      error?: string;
+    }> => {
       try {
         if (typeof filePath !== 'string' || !filePath.trim()) {
           return { success: false, error: 'Missing file path' };
@@ -195,14 +152,15 @@ export const registerDialogIpc = (): void => {
         };
       }
     },
-  );
 
-  ipcMain.handle(
-    'dialog:generateThumbnail',
-    async (
+    dialogGenerateThumbnail: async (
       _event,
-      filePath?: string,
-    ): Promise<{ success: boolean; dataUrl?: string; error?: string }> => {
+      filePath,
+    ): Promise<{
+      success: boolean;
+      dataUrl?: string;
+      error?: string;
+    }> => {
       try {
         if (typeof filePath !== 'string' || !filePath.trim()) {
           return { success: false, error: 'Missing file path' };
@@ -243,7 +201,24 @@ export const registerDialogIpc = (): void => {
         };
       }
     },
-  );
+  });
+
+  // Read a local file as a data URL (data:<mime>;base64,...)
+  const MAX_READ_AS_DATA_URL_BYTES = 20 * 1024 * 1024;
+  const MIME_BY_EXT: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.svg': 'image/svg+xml',
+    '.tiff': 'image/tiff',
+    '.tif': 'image/tiff',
+    '.ico': 'image/x-icon',
+    '.avif': 'image/avif',
+  };
+  registerArtifactFileAvailabilityHandler();
 };
 
 export const getAllowedShellProbeRoots = (): string[] => {

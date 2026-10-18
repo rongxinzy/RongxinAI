@@ -21,7 +21,9 @@ import { exportLogsZip } from '../libs/logExport';
 import { getCoworkLogPath } from '../libs/coworkLogger';
 import { APP_DATA_DIR_NAME } from '../appConstants';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
-import { AppIpc, HardwareIpc, WindowIpc } from '../../shared/ipc/channels';
+import { HardwareIpc } from '../../shared/ipc/channels';
+import { appSystemContract } from '../../shared/ipc/appSystemContract';
+import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 import {
   resolveEffectiveInferenceEdition,
   usesBundledLlamaCppRuntime,
@@ -66,126 +68,121 @@ export const registerAppIpc = (): void => {
     }
   });
 
-  // Log IPC handlers
-  ipcMain.handle('log:getPath', () => {
-    return getLogFilePath();
-  });
+  handleIpcContractSubset(appSystemContract, {
+    logGetPath: async () => {
+      return getLogFilePath();
+    },
 
-  ipcMain.handle('log:openFolder', () => {
-    const logPath = getLogFilePath();
-    if (logPath) {
-      shell.showItemInFolder(logPath);
-    }
-  });
-
-  ipcMain.handle('log:exportZip', async event => {
-    try {
-      const ownerWindow = BrowserWindow.fromWebContents(event.sender);
-      if (!ownerWindow || ownerWindow.isDestroyed()) {
-        return { success: false, error: 'Window is not available' };
+    logOpenFolder: async () => {
+      const logPath = getLogFilePath();
+      if (logPath) {
+        shell.showItemInFolder(logPath);
       }
+    },
 
-      const saveOptions = {
-        title: 'Export Logs',
-        defaultPath: path.join(app.getPath('downloads'), buildLogExportFileName()),
-        filters: [{ name: 'Zip Archive', extensions: ['zip'] }],
-      };
+    logExportZip: async event => {
+      try {
+        const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+        if (!ownerWindow || ownerWindow.isDestroyed()) {
+          return { success: false, error: 'Window is not available' };
+        }
 
-      const saveResult = await dialog.showSaveDialog(ownerWindow, saveOptions);
+        const saveOptions = {
+          title: 'Export Logs',
+          defaultPath: path.join(app.getPath('downloads'), buildLogExportFileName()),
+          filters: [{ name: 'Zip Archive', extensions: ['zip'] }],
+        };
 
-      if (saveResult.canceled || !saveResult.filePath) {
-        return { success: true, canceled: true };
+        const saveResult = await dialog.showSaveDialog(ownerWindow, saveOptions);
+
+        if (saveResult.canceled || !saveResult.filePath) {
+          return { success: true, canceled: true };
+        }
+
+        const outputPath = ensureZipFileName(saveResult.filePath);
+        const archiveResult = await exportLogsZip({
+          outputPath,
+          entries: [
+            ...getRecentMainLogEntries(),
+            { archiveName: 'cowork.log', filePath: getCoworkLogPath() },
+            ...(process.platform === 'win32'
+              ? [
+                  {
+                    archiveName: 'install-timing.log',
+                    filePath: path.join(
+                      app.getPath('appData'),
+                      APP_DATA_DIR_NAME,
+                      'install-timing.log',
+                    ),
+                  },
+                ]
+              : []),
+          ],
+        });
+
+        return {
+          success: true,
+          canceled: false,
+          path: outputPath,
+          missingEntries: archiveResult.missingEntries,
+        };
+      } catch (error) {
+        console.error('[LogExport] export failed:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to export logs',
+        };
       }
+    },
 
-      const outputPath = ensureZipFileName(saveResult.filePath);
-      const archiveResult = await exportLogsZip({
-        outputPath,
-        entries: [
-          ...getRecentMainLogEntries(),
-          { archiveName: 'cowork.log', filePath: getCoworkLogPath() },
-          ...(process.platform === 'win32'
-            ? [
-                {
-                  archiveName: 'install-timing.log',
-                  filePath: path.join(
-                    app.getPath('appData'),
-                    APP_DATA_DIR_NAME,
-                    'install-timing.log',
-                  ),
-                },
-              ]
-            : []),
-        ],
-      });
+    // Auto-launch IPC handlers
+    // Use SQLite rt.store as the source of truth for UI state, because
+    // app.getLoginItemSettings() returns unreliable values on macOS and
+    // requires matching args on Windows.
+    autoLaunchGet: async () => {
+      const stored = getStore().get<boolean>('auto_launch_enabled');
+      // Fall back to OS API if SQLite has no record yet (e.g. upgraded from older version)
+      const enabled = stored ?? getAutoLaunchEnabled();
+      return { enabled };
+    },
 
-      return {
-        success: true,
-        canceled: false,
-        path: outputPath,
-        missingEntries: archiveResult.missingEntries,
-      };
-    } catch (error) {
-      console.error('[LogExport] export failed:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to export logs',
-      };
-    }
-  });
+    autoLaunchSet: async (_event, enabled) => {
+      try {
+        setAutoLaunchEnabled(enabled);
+        getStore().set('auto_launch_enabled', enabled);
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to set auto-launch',
+        };
+      }
+    },
 
-  // Auto-launch IPC handlers
-  // Use SQLite rt.store as the source of truth for UI state, because
-  // app.getLoginItemSettings() returns unreliable values on macOS and
-  // requires matching args on Windows.
-  ipcMain.handle('app:getAutoLaunch', () => {
-    const stored = getStore().get<boolean>('auto_launch_enabled');
-    // Fall back to OS API if SQLite has no record yet (e.g. upgraded from older version)
-    const enabled = stored ?? getAutoLaunchEnabled();
-    return { enabled };
-  });
+    preventSleepGet: async () => {
+      const enabled = getStore().get<boolean>('prevent_sleep_enabled') ?? false;
+      return { enabled };
+    },
 
-  ipcMain.handle('app:setAutoLaunch', (_event, enabled: unknown) => {
-    if (typeof enabled !== 'boolean') {
-      return { success: false, error: 'Invalid parameter: enabled must be boolean' };
-    }
-    try {
-      setAutoLaunchEnabled(enabled);
-      getStore().set('auto_launch_enabled', enabled);
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to set auto-launch',
-      };
-    }
-  });
+    preventSleepSet: async (_event, enabled) => {
+      try {
+        setPreventSleepBlockerEnabled(enabled);
+        getStore().set('prevent_sleep_enabled', enabled);
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to set prevent-sleep',
+        };
+      }
+    },
 
-  ipcMain.handle('app:getPreventSleep', () => {
-    const enabled = getStore().get<boolean>('prevent_sleep_enabled') ?? false;
-    return { enabled };
-  });
-
-  ipcMain.handle('app:setPreventSleep', (_event, enabled: unknown) => {
-    if (typeof enabled !== 'boolean') {
-      return { success: false, error: 'Invalid parameter: enabled must be boolean' };
-    }
-    try {
-      setPreventSleepBlockerEnabled(enabled);
-      getStore().set('prevent_sleep_enabled', enabled);
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to set prevent-sleep',
-      };
-    }
-  });
-
-  ipcMain.handle('app:relaunch', () => {
-    console.log('[Main] app:relaunch requested, scheduling restart...');
-    recordAppQuitOrigin(AppQuitOrigin.RendererRelaunch);
-    app.relaunch();
-    app.quit();
+    appRelaunch: async () => {
+      console.log('[Main] app:relaunch requested, scheduling restart...');
+      recordAppQuitOrigin(AppQuitOrigin.RendererRelaunch);
+      app.relaunch();
+      app.quit();
+    },
   });
 
   // Window control IPC handlers
@@ -205,32 +202,33 @@ export const registerAppIpc = (): void => {
     rt.mainWindow?.close();
   });
 
-  ipcMain.handle('window:isMaximized', () => {
-    return rt.mainWindow?.isMaximized() ?? false;
-  });
-
   ipcMain.on(
     'window:showSystemMenu',
     (_event, position: { x?: number; y?: number } | undefined) => {
       showSystemMenu(position);
     },
   );
-  ipcMain.handle(WindowIpc.ToggleDevTools, event => toggleDevToolsForSender(event.sender));
-  ipcMain.handle(WindowIpc.OpenDevTools, event => {
-    if (!canUseDevTools()) return false;
-    const target = event.sender?.isDestroyed?.() ? rt.mainWindow?.webContents : event.sender;
-    if (!target || target.isDestroyed()) return false;
-    openDevToolsWindow(target);
-    return true;
-  });
 
-  ipcMain.handle(AppIpc.GetVersion, () => app.getVersion());
-  ipcMain.handle(AppIpc.IsDev, () => canUseDevTools()); // 开发环境打开调试面板
-  ipcMain.handle(AppIpc.IsEnterprise, () => isEnterprise);
-  ipcMain.handle(AppIpc.GetSystemLocale, () => app.getLocale());
-  ipcMain.handle(AppIpc.ConsumePendingLocalInferenceInstall, () =>
-    consumePendingLocalInferenceInstall(app.getPath('userData')),
-  );
-  ipcMain.handle(AppIpc.GetInferenceEdition, () => resolveEffectiveInferenceEdition());
-  ipcMain.handle(AppIpc.UsesBundledLlamaCppRuntime, () => usesBundledLlamaCppRuntime());
+  handleIpcContractSubset(appSystemContract, {
+    windowIsMaximized: async () => {
+      return rt.mainWindow?.isMaximized() ?? false;
+    },
+    windowToggleDevTools: async event => toggleDevToolsForSender(event.sender),
+    windowOpenDevTools: async event => {
+      if (!canUseDevTools()) return false;
+      const target = event.sender?.isDestroyed?.() ? rt.mainWindow?.webContents : event.sender;
+      if (!target || target.isDestroyed()) return false;
+      openDevToolsWindow(target);
+      return true;
+    },
+
+    appGetVersion: async () => app.getVersion(),
+    appIsDev: async () => canUseDevTools(), // 开发环境打开调试面板
+    appIsEnterprise: async () => isEnterprise,
+    appGetSystemLocale: async () => app.getLocale(),
+    appConsumePendingLocalInferenceInstall: async () =>
+      consumePendingLocalInferenceInstall(app.getPath('userData')),
+    appGetInferenceEdition: async () => resolveEffectiveInferenceEdition(),
+    appUsesBundledLlamaCppRuntime: async () => usesBundledLlamaCppRuntime(),
+  });
 };
