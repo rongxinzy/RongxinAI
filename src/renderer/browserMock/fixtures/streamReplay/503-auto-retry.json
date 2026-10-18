@@ -1,0 +1,247 @@
+{
+  "sessionId": "preview-stream-503-retry",
+  "fixture": "503-auto-retry",
+  "expectedFinalText": "Recovered",
+  "events": [
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "message",
+        "sessionId": "preview-stream-503-retry",
+        "message": {
+          "id": "fcbc6ec4-d222-4e5d-9ec4-7cc4df52245f",
+          "type": "user",
+          "content": "Hi",
+          "timestamp": 1792296155364
+        },
+        "protocolVersion": 1,
+        "eventId": "8f351b1c-6996-4a9b-8fd5-95c9b43e6606",
+        "sequence": 1,
+        "emittedAt": 1792296155364
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "message",
+        "sessionId": "preview-stream-503-retry",
+        "message": {
+          "id": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+          "type": "assistant",
+          "content": "Part",
+          "timestamp": 1792296155380,
+          "metadata": {
+            "isStreaming": true,
+            "isFinal": false
+          }
+        },
+        "protocolVersion": 1,
+        "eventId": "ce014fc9-92ed-407f-8582-f04580aea5d0",
+        "sequence": 2,
+        "emittedAt": 1792296155380
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "stream_part",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "chunk": {
+          "type": "text-start",
+          "id": "cc90da234114404e"
+        },
+        "protocolVersion": 1,
+        "eventId": "b8b7a905-a4c5-4886-80a5-76382db2523a",
+        "sequence": 3,
+        "emittedAt": 1792296155380
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "stream_part",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "chunk": {
+          "type": "text-delta",
+          "id": "cc90da234114404e",
+          "delta": "Part"
+        },
+        "protocolVersion": 1,
+        "eventId": "f5849328-b51f-4683-90e2-311605788747",
+        "sequence": 4,
+        "emittedAt": 1792296155396
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "stream_part",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "chunk": {
+          "type": "text-end",
+          "id": "cc90da234114404e"
+        },
+        "protocolVersion": 1,
+        "eventId": "561d4521-d2ae-4f10-8c96-2bb497c25588",
+        "sequence": 5,
+        "emittedAt": 1792296155396
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "message_update",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "content": "Part",
+        "metadata": {
+          "isStreaming": false,
+          "isFinal": true
+        },
+        "protocolVersion": 1,
+        "eventId": "51aeca97-fdf7-48d3-ac8a-1fd31f0f1bcc",
+        "sequence": 6,
+        "emittedAt": 1792296155396
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "message_update",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "content": "Part",
+        "metadata": {
+          "isStreaming": true,
+          "isFinal": false,
+          "streamReopen": true
+        },
+        "protocolVersion": 1,
+        "eventId": "68aff015-9385-4903-aaa1-50a4e5e5af98",
+        "sequence": 7,
+        "emittedAt": 1792296155444
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "stream_part",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "chunk": {
+          "type": "text-start",
+          "id": "44443ba8e5c727ff"
+        },
+        "protocolVersion": 1,
+        "eventId": "2e6889be-1a2a-4362-85a8-2a1140cdbeb7",
+        "sequence": 8,
+        "emittedAt": 1792296155460
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "stream_part",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "chunk": {
+          "type": "text-delta",
+          "id": "44443ba8e5c727ff",
+          "delta": "Reco"
+        },
+        "protocolVersion": 1,
+        "eventId": "a6fc50eb-a1e9-4541-b568-7f454bffce55",
+        "sequence": 9,
+        "emittedAt": 1792296155476
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "stream_part",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "chunk": {
+          "type": "text-delta",
+          "id": "44443ba8e5c727ff",
+          "delta": "vered"
+        },
+        "protocolVersion": 1,
+        "eventId": "7352f8f2-8f05-442a-8785-2f5ac354d678",
+        "sequence": 10,
+        "emittedAt": 1792296155492
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "stream_part",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "chunk": {
+          "type": "text-end",
+          "id": "44443ba8e5c727ff"
+        },
+        "protocolVersion": 1,
+        "eventId": "582cc6e2-2148-4746-b921-280788e1ebb1",
+        "sequence": 11,
+        "emittedAt": 1792296155492
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "message_update",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "content": "Recovered",
+        "metadata": {
+          "isStreaming": false,
+          "isFinal": true
+        },
+        "protocolVersion": 1,
+        "eventId": "35bff20d-889d-4cc1-b1b8-37fb87c760d8",
+        "sequence": 12,
+        "emittedAt": 1792296155492
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "message_update",
+        "sessionId": "preview-stream-503-retry",
+        "messageId": "988d92db-9ea3-4634-b7c8-5be1580b4ea0",
+        "content": "",
+        "metadata": {
+          "isStreaming": false,
+          "isFinal": true,
+          "isFinalAnswer": true,
+          "metadataOnly": true
+        },
+        "protocolVersion": 1,
+        "eventId": "1a229b44-d50b-45cd-8178-fc221441a6a1",
+        "sequence": 13,
+        "emittedAt": 1792296155540
+      }
+    },
+    {
+      "delayMs": 1,
+      "event": {
+        "type": "completed",
+        "sessionId": "preview-stream-503-retry",
+        "protocolVersion": 1,
+        "eventId": "d159ad25-8db2-4c8b-8647-5269b2dbe303",
+        "sequence": 14,
+        "emittedAt": 1792296155540
+      }
+    }
+  ],
+  "markers": {
+    "thinkingBeforeAnswer": false,
+    "toolBeforeAnswer": false,
+    "toolNames": []
+  }
+}

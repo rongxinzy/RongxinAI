@@ -13,11 +13,12 @@ const mocks = vi.hoisted(() => ({
   scrollRef: { current: null as HTMLElement | null },
   scrollToEnd: vi.fn(),
   scrollToIndex: vi.fn(),
+  stopScroll: vi.fn(),
   useVirtualizer: vi.fn(),
 }));
 
 vi.mock('use-stick-to-bottom', () => ({
-  useStickToBottomContext: () => ({ scrollRef: mocks.scrollRef }),
+  useStickToBottomContext: () => ({ scrollRef: mocks.scrollRef, stopScroll: mocks.stopScroll }),
 }));
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -31,6 +32,7 @@ beforeEach(() => {
   mocks.measureElement.mockReset();
   mocks.scrollToEnd.mockReset();
   mocks.scrollToIndex.mockReset();
+  mocks.stopScroll.mockReset();
   mocks.useVirtualizer.mockReset();
   mocks.useVirtualizer.mockReturnValue({
     getTotalSize: () => 0,

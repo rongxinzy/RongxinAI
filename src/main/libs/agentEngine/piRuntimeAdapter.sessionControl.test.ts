@@ -187,6 +187,67 @@ describe('PiRuntimeAdapter', () => {
       adapter.stopSession('unknown');
       // Should not throw
     });
+
+    it('clears pending context usage scheduled before stop', async () => {
+      vi.useFakeTimers();
+      const updateMessage = vi.fn();
+      const messages: Array<{
+        id: string;
+        type: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      const addMessage = vi.fn(
+        (
+          _sessionId: string,
+          message: { type: string; content?: string; metadata?: Record<string, unknown> },
+        ) => {
+          const persisted = {
+            ...message,
+            id: `msg-${messages.length + 1}`,
+            content: message.content ?? '',
+            timestamp: Date.now(),
+          };
+          messages.push(persisted);
+          return persisted;
+        },
+      );
+      adapter.setCoworkStore({
+        addMessage,
+        updateMessage,
+        getSession: (sessionId: string) => ({ id: sessionId, messages }),
+        updateSession: vi.fn(),
+      } as unknown as CoworkStore);
+
+      await adapter.startSession('usage-stop', 'Hello');
+      messages.push({
+        id: 'assistant-usage-1',
+        type: 'assistant',
+        content: 'partial',
+        metadata: { isStreaming: true },
+      });
+      adapter.transcript.scheduleContextUsageSync(
+        'usage-stop',
+        'assistant-usage-1',
+        { input: 12, output: 3, cacheRead: 0, cacheWrite: 0, total: 15 },
+        'test-model',
+        Date.now(),
+        Date.now(),
+      );
+      adapter.stopSession('usage-stop');
+      vi.advanceTimersByTime(5_000);
+      expect(
+        updateMessage.mock.calls.some(
+          call =>
+            call[2] &&
+            typeof call[2] === 'object' &&
+            call[2] !== null &&
+            'metadata' in call[2] &&
+            (call[2] as { metadata?: { contextUsage?: unknown } }).metadata?.contextUsage,
+        ),
+      ).toBe(false);
+      vi.useRealTimers();
+    });
   });
 
   describe('stopAllSessions', () => {

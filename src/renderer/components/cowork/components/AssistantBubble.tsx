@@ -16,10 +16,10 @@ const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string |
 
 export const AssistantBubble: React.FC<{
   message: CoworkMessage;
-  cwd?: string;
+  resolveLocalFilePath?: (href: string, text: string) => string | null;
   mapDisplayText?: (value: string) => string;
   turnMetadata?: CoworkMessageMetadata | null;
-}> = ({ message, mapDisplayText, cwd, turnMetadata }) => {
+}> = ({ message, mapDisplayText, resolveLocalFilePath, turnMetadata }) => {
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const isStreaming = Boolean(message.metadata?.isStreaming);
   const liveContent = useLiveMessageText(message.id, isStreaming);
@@ -36,9 +36,16 @@ export const AssistantBubble: React.FC<{
   return (
     <div className="py-1 focus:outline-none">
       <Message from="assistant">
-        <MessageContent>
-          {/* 2026/09/20 lixiang  本地路径交主进程解析，盘符路径可点打开（issue #805） */}
-          <StreamingMarkdownResponse content={rawContent} isStreaming={isStreaming} cwd={cwd} />
+        <MessageContent
+          data-assistant-plaintext={rawContent}
+          data-assistant-streaming={isStreaming ? 'true' : 'false'}
+        >
+          {/* 2026/09/20 lixiang  下传本地路径解析，使盘符路径可点打开（issue #805） */}
+          <StreamingMarkdownResponse
+            content={rawContent}
+            isStreaming={isStreaming}
+            resolveLocalFilePath={resolveLocalFilePath}
+          />
           <CoworkContentNotice truncated={message.metadata?.contentTruncated} />
         </MessageContent>
       </Message>

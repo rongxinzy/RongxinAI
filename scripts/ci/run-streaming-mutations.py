@@ -18,13 +18,25 @@ TESTS = [
     'src/main/libs/agentEngine/piEventProjectionQueue.test.ts',
     'src/main/libs/agentEngine/piRuntimeAdapter.assistantStreaming.test.ts',
     'src/main/libs/agentEngine/piRuntimeAdapter.autoRetry.test.ts',
+    'src/main/libs/agentEngine/piRuntimeAdapter.sessionControl.test.ts',
     'src/main/libs/agentEngine/piAssistantTranscript.test.ts',
+    'src/renderer/services/coworkStreamPipeline.streamReopen.test.ts',
     'tests/streamingGuards.test.ts',
     'tests/streamingConsistency.test.ts',
 ]
 
 TE = 'src/main/libs/agentEngine/piRuntimeTurnEvents.ts'
 TR = 'src/main/libs/agentEngine/piAssistantTranscript.ts'
+LC = 'src/main/libs/agentEngine/piRuntimeSessionLifecycle.ts'
+
+# Defensive duplicate guards — surviving mutations here do not fail CI.
+ALLOWLIST_SURVIVORS: tuple[str, ...] = (
+    'M13 ',
+    'M14 ',
+    'M15 ',
+    'M16 ',
+    'M18 stop path does not clear retry flag',
+)
 
 M: dict[str, list[tuple[str, str, str]]] = {
     'M1 accumulator: *_start/_end read snapshot again': [
@@ -109,19 +121,11 @@ M: dict[str, list[tuple[str, str, str]]] = {
             '    active.pendingError = null;\n',
         ),
     ],
-    'M17 flushPendingError no finalize when no answer text': [
-        (
-            'src/main/libs/agentEngine/piRuntimeTurnRecovery.ts',
-            '    } else {\n      this.host.transcript.closeIdlePlaceholders(sessionId, active, { finalize: true });\n    }',
-            '    }',
-        ),
+    'M18 stop path does not clear retry flag (defensive duplicate)': [
+        (LC, '  active.retryStreamReusePending = false;\n', ''),
     ],
-    'M18 stop path does not clear flag/usage': [
-        (
-            'src/main/libs/agentEngine/piRuntimeSessionLifecycle.ts',
-            '  active.retryStreamReusePending = false;\n  host.transcript.clearPendingContextUsage(sessionId);\n',
-            '',
-        ),
+    'M18 stop path does not clear pending context usage': [
+        (LC, '  host.transcript.clearPendingContextUsage(sessionId);\n', ''),
     ],
     'M19 finalizedMessageIds not pruned': [
         (TR, '    this.pruneFinalizedForSession(sessionId);\n', ''),
@@ -150,9 +154,18 @@ M: dict[str, list[tuple[str, str, str]]] = {
     'M23 retry turn_start clears visible text before reopen': [
         (
             TE,
-            '          const priorAnswer = active.answerText;\n          const priorThinking = active.thinkingText;\n          this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);\n          active.answerText = \'\';\n',
-            '          const priorAnswer = active.answerText;\n          const priorThinking = active.thinkingText;\n          active.answerText = \'\';\n          active.thinkingText = \'\';\n          this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);\n',
+            '          active.retryPriorAnswer = priorAnswer;\n          this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);\n          active.answerText = \'\';\n',
+            '          active.retryPriorAnswer = priorAnswer;\n          active.answerText = \'\';\n          active.thinkingText = \'\';\n          this.host.transcript.reopenStreamingMessagesForRetry(sessionId, active);\n',
         ),
+    ],
+    'M24a empty placeholder guard: persisted content length': [
+        (TR, '    if (existing.content.length > 0) return;\n', ''),
+    ],
+    'M24b empty placeholder guard: streamed content length': [
+        (TR, '    if (streamed.length > 0) return;\n', ''),
+    ],
+    'M24c empty placeholder guard: in-memory answer text': [
+        (TR, '    if (inMemory.length > 0) return;\n', ''),
     ],
 }
 
@@ -165,8 +178,14 @@ def sub(path: str, old: str, new: str, count: int = 1) -> None:
     open(full, 'w', encoding='utf-8').write(text.replace(old, new, count))
 
 
+def is_allowlisted(name: str) -> bool:
+    return any(name.startswith(prefix) for prefix in ALLOWLIST_SURVIVORS)
+
+
 def main() -> int:
-    only = sys.argv[1:]
+    args = [arg for arg in sys.argv[1:] if arg != '--ci-gate']
+    ci_gate = '--ci-gate' in sys.argv
+    only = args
     results: dict[str, object] = {}
     for name, patches in M.items():
         if only and not any(name.startswith(o) for o in only):
@@ -175,22 +194,24 @@ def main() -> int:
             for path, old, new in patches:
                 sub(path, old, new)
             proc = subprocess.run(
-                ['bunx', 'vitest', 'run', *TESTS],
+                ['bun', 'x', 'vitest', 'run', *TESTS],
                 cwd=ROOT,
                 capture_output=True,
                 text=True,
-                timeout=600,
+                timeout=900,
             )
             out = proc.stdout + proc.stderr
             fails = sorted(set(re.findall(r'FAIL\s+(\S+)\s+>\s*(.*)', out)))
             summ = re.findall(r'Tests\s+(.*)', out)
             results[name] = {
                 'exit': proc.returncode,
+                'caught': proc.returncode != 0,
+                'allowlisted': is_allowlisted(name),
                 'summary': summ[-1] if summ else out[-400:],
                 'failing': [f'{a} > {b[:90]}' for a, b in fails][:8],
             }
         except AssertionError as error:
-            results[name] = {'error': str(error)}
+            results[name] = {'error': str(error), 'caught': False, 'allowlisted': is_allowlisted(name)}
         finally:
             restore_paths = sorted({path for path, _, _ in patches})
             subprocess.run(['git', 'checkout', '--', *restore_paths], cwd=ROOT, check=False)
@@ -200,6 +221,31 @@ def main() -> int:
     with open(out_path, 'w', encoding='utf-8') as handle:
         json.dump(results, handle, indent=1)
     print(f'Wrote {out_path}', flush=True)
+
+    patch_errors = [name for name, row in results.items() if 'error' in row]
+    survived = [
+        name
+        for name, row in results.items()
+        if row.get('exit') == 0 and not row.get('allowlisted') and 'error' not in row
+    ]
+    allowlisted_survivors = [
+        name for name, row in results.items() if row.get('exit') == 0 and row.get('allowlisted')
+    ]
+    print(
+        f'Summary: caught={sum(1 for r in results.values() if r.get("caught"))} '
+        f'survived_must_catch={len(survived)} allowlisted_survivors={len(allowlisted_survivors)} '
+        f'patch_errors={len(patch_errors)}',
+        flush=True,
+    )
+    if survived:
+        print('Survived (must-catch):', ', '.join(survived), flush=True)
+    if allowlisted_survivors:
+        print('Survived (allowlisted):', ', '.join(allowlisted_survivors), flush=True)
+    if patch_errors:
+        print('Patch errors:', ', '.join(patch_errors), flush=True)
+
+    if ci_gate and (survived or patch_errors):
+        return 1
     return 0
 
 

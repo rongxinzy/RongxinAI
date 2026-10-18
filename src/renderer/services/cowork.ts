@@ -114,6 +114,15 @@ class CoworkService {
       this.loadChatSessions(),
     ]);
 
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      const { readStreamReplayFixtureId, getStreamReplayTrace } =
+        await import('../browserMock/streamReplay');
+      const streamReplayFixtureId = readStreamReplayFixtureId();
+      if (streamReplayFixtureId) {
+        await this.loadSession(getStreamReplayTrace(streamReplayFixtureId).sessionId);
+      }
+    }
+
     this.initialized = true;
   }
 

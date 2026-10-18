@@ -101,6 +101,124 @@ describe('PiAssistantTranscript', () => {
     expect(emitMessageRemoved).not.toHaveBeenCalled();
   });
 
+  it('merges existing metadata when closeIdle finalizes on error', () => {
+    const updateMessage = vi.fn();
+    const thinkingRow = {
+      id: 'think-1',
+      type: 'assistant' as const,
+      content: 'thought body',
+      metadata: {
+        isStreaming: true,
+        isThinking: true,
+        thinkingDurationMs: 4321,
+      },
+    };
+    const active = baseActive();
+    active.thinkingMessageId = thinkingRow.id;
+    active.thinkingText = 'thought body';
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [thinkingRow] }),
+          updateMessage: updateMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(updateMessage).toHaveBeenCalledWith(
+      'session',
+      thinkingRow.id,
+      expect.objectContaining({
+        metadata: expect.objectContaining({ thinkingDurationMs: 4321, isThinking: true }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('does not delete a placeholder when persisted content is non-empty', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'persisted-1',
+      type: 'assistant' as const,
+      content: 'visible in db',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a placeholder when streamed content was captured in memory', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'streamed-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.streamInto('session', active, 'answer', 'delta text');
+    active.answerText = '';
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not delete a placeholder when retry prior answer text exists', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'retry-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    active.retryPriorAnswer = 'partial from prior attempt';
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
   it('removes a never-displayed empty placeholder and emits messageRemoved', () => {
     const emitMessageRemoved = vi.fn();
     const deleteMessage = vi.fn(() => true);
