@@ -36,6 +36,17 @@ import {
 type MockSkill = (typeof mockSkills)[number];
 import type { BrowserMockRuntime } from './runtime';
 import type { DeepPartial } from './scenarioTypes';
+import {
+  getStreamReplayTrace,
+  installStreamReplayController,
+  installStreamReplayLongTaskObserver,
+  readPreviewScrollMutation,
+  readPreviewStreamReplayInstant,
+  readStreamReplayFixtureId,
+  seedStreamReplaySession,
+  seedStreamReplaySessionFullParse,
+  shouldAutoStartStreamReplay,
+} from './streamReplay';
 
 type ElectronApi = Window['electron'];
 type StartOptions = Parameters<ElectronApi['cowork']['startSession']>[0];
@@ -66,50 +77,54 @@ function sessionMode(options: object): CoworkSessionMode {
 }
 
 export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPartial<ElectronApi> {
+  const streamReplayFixtureId = readStreamReplayFixtureId();
   let preferences = { ...mockMagpiePreferences };
   const store = new Map<string, unknown>();
   const sessions = new Map<string, PreviewEntry>();
-  for (const summary of mockSessionSummaries) {
-    const entry = cloneSession(summary.id, CoworkSessionMode.Work);
-    if (entry) sessions.set(summary.id, entry);
+  if (!streamReplayFixtureId) {
+    for (const summary of mockSessionSummaries) {
+      const entry = cloneSession(summary.id, CoworkSessionMode.Work);
+      if (entry) sessions.set(summary.id, entry);
+    }
   }
   const chatNow = Date.UTC(2026, 9, 16, 6, 0, 0);
-  sessions.set('session-chat-1', {
-    mode: CoworkSessionMode.Chat,
-    session: {
-      id: 'session-chat-1',
-      title: 'Draft a weekly update',
-      status: CoworkSessionStatus.Completed,
-      pinned: false,
-      cwd: mockWorkspaces[0]?.path ?? PREVIEW_ROOT,
-      systemPrompt: '',
-      modelOverride: '',
-      executionMode: CoworkExecutionMode.Auto,
-      activeSkillIds: [],
-      workspaceId: '',
-      agentId: 'main',
-      source: CoworkSessionSource.Manual,
+  if (!streamReplayFixtureId)
+    sessions.set('session-chat-1', {
       mode: CoworkSessionMode.Chat,
-      messages: [
-        {
-          id: 'msg-chat-1',
-          type: 'user',
-          content: 'Draft a short weekly update for the calculator project.',
-          timestamp: chatNow,
-        },
-        {
-          id: 'msg-chat-2',
-          type: 'assistant',
-          content: 'This week the calculator gained keyboard input and a division-by-zero test.',
-          timestamp: chatNow + 1000,
-        },
-      ],
-      messagesOffset: 0,
-      totalMessages: 2,
-      createdAt: chatNow,
-      updatedAt: chatNow + 1000,
-    },
-  });
+      session: {
+        id: 'session-chat-1',
+        title: 'Draft a weekly update',
+        status: CoworkSessionStatus.Completed,
+        pinned: false,
+        cwd: mockWorkspaces[0]?.path ?? PREVIEW_ROOT,
+        systemPrompt: '',
+        modelOverride: '',
+        executionMode: CoworkExecutionMode.Auto,
+        activeSkillIds: [],
+        workspaceId: '',
+        agentId: 'main',
+        source: CoworkSessionSource.Manual,
+        mode: CoworkSessionMode.Chat,
+        messages: [
+          {
+            id: 'msg-chat-1',
+            type: 'user',
+            content: 'Draft a short weekly update for the calculator project.',
+            timestamp: chatNow,
+          },
+          {
+            id: 'msg-chat-2',
+            type: 'assistant',
+            content: 'This week the calculator gained keyboard input and a division-by-zero test.',
+            timestamp: chatNow + 1000,
+          },
+        ],
+        messagesOffset: 0,
+        totalMessages: 2,
+        createdAt: chatNow,
+        updatedAt: chatNow + 1000,
+      },
+    });
 
   let liveCount = 0;
   let eventCount = 0;
@@ -125,6 +140,36 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
   const emitUi = (payload: PiUiEventPayload) => {
     runtime.emit('cowork.onStreamUiEvent', sequencer.next(payload));
   };
+
+  let streamReplayController: ReturnType<typeof installStreamReplayController> | undefined;
+  if (streamReplayFixtureId) {
+    const trace = getStreamReplayTrace(streamReplayFixtureId);
+    const instantBaseline = readPreviewStreamReplayInstant();
+    const seeded = instantBaseline
+      ? seedStreamReplaySessionFullParse(trace)
+      : seedStreamReplaySession(trace);
+    sessions.set(seeded.id, { mode: CoworkSessionMode.Work, session: seeded });
+    if (!instantBaseline) {
+      installStreamReplayLongTaskObserver();
+      streamReplayController = installStreamReplayController({
+        runtime,
+        fixtureId: streamReplayFixtureId,
+        emitRecorded: payload => {
+          runtime.emit('cowork.onStreamUiEvent', payload);
+        },
+        getSession: () => sessions.get(seeded.id)?.session,
+        setSession: session => {
+          sessions.set(session.id, { mode: CoworkSessionMode.Work, session });
+        },
+      });
+      void import('./previewScrollMutationDev').then(module => {
+        module.installPreviewScrollMutation(readPreviewScrollMutation());
+      });
+      if (shouldAutoStartStreamReplay()) {
+        setTimeout(() => streamReplayController?.begin(), 80);
+      }
+    }
+  }
 
   const streamAssistant = (sessionId: string, user?: { id: string; content: string }) => {
     setTimeout(() => {

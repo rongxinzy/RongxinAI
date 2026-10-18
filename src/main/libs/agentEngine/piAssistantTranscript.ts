@@ -262,8 +262,8 @@ export class PiAssistantTranscript {
         }
         this.flushPendingStoreUpdate(sessionId, emptyId);
         this.flushPendingMessageUpdate(sessionId, emptyId);
-        this.clearThrottleMapsForMessage(emptyId);
         this.removeEmptyAnswerPlaceholder(sessionId, emptyId, active);
+        this.clearThrottleMapsForMessage(emptyId);
         active.assistantMessageId = null;
       }
       return;
@@ -349,7 +349,6 @@ export class PiAssistantTranscript {
         }
         continue;
       }
-      this.clearThrottleMapsForMessage(entry.messageId);
       if (entry.kind === 'answer' && !content.trim()) {
         const resolved = this.resolveStreamedContent(entry.messageId, active, 'answer');
         if (!resolved.trim()) {
@@ -358,8 +357,10 @@ export class PiAssistantTranscript {
             active.assistantMessageId = null;
           }
         }
+        this.clearThrottleMapsForMessage(entry.messageId);
         continue;
       }
+      this.clearThrottleMapsForMessage(entry.messageId);
       if (!this.host.getStore()) continue;
       const existing = this.host
         .getStore()
