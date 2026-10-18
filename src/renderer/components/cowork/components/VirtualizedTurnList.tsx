@@ -55,7 +55,8 @@ export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListHandle,
   VirtualizedTurnListProps
 >(({ turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
-  const { getScrollElement, registerScrollWriter } = useConversationViewportContext();
+  const { getScrollElement, isFollowingOutput, registerScrollWriter } =
+    useConversationViewportContext();
   const hasPositionedInitialTailRef = useRef(false);
   const followedTailEdgesRef = useRef<{ first?: string; last?: string } | null>(null);
   const virtualSizerRef = useRef<HTMLDivElement>(null);
@@ -66,7 +67,6 @@ export const VirtualizedTurnList = React.forwardRef<
   );
   const tailRetryFrameRef = useRef<number | null>(null);
   const tailRetryWindowRef = useRef<Window | null>(null);
-  const tailRetryCleanupRef = useRef<(() => void) | null>(null);
   const estimatedTurnSizes = useMemo(() => turns.map(estimateCachedTurnHeight), [turns]);
 
   const { internallyPrependedTurnSizes, nextMessageIdsByTurn } = useMemo(() => {
@@ -124,28 +124,16 @@ export const VirtualizedTurnList = React.forwardRef<
     if (tailRetryFrameRef.current !== null && tailRetryWindowRef.current) {
       tailRetryWindowRef.current.cancelAnimationFrame(tailRetryFrameRef.current);
     }
-    const cleanup = () => {
-      tailRetryFrameRef.current = null;
-      tailRetryWindowRef.current = null;
-    };
-    scrollElement.addEventListener('scroll', cleanup, { once: true, passive: true });
+
     tailRetryWindowRef.current = targetWindow;
     tailRetryFrameRef.current = targetWindow.requestAnimationFrame(() => {
-      const frame = tailRetryFrameRef.current;
       tailRetryFrameRef.current = null;
       tailRetryWindowRef.current = null;
-      if (frame === null) return;
-      scrollElement.removeEventListener('scroll', cleanup);
       const currentScrollElement = instance.scrollElement as HTMLElement | null;
       if (currentScrollElement === scrollElement && scrollElement.scrollTop === clampedOffset) {
         scrollElement.scrollTo({ top: requestedOffset, behavior: 'auto' });
       }
     });
-    tailRetryCleanupRef.current = () => {
-      targetWindow.cancelAnimationFrame(tailRetryFrameRef.current ?? 0);
-      scrollElement.removeEventListener('scroll', cleanup);
-      cleanup();
-    };
   }, []);
   const initialOffset = estimatedTurnSizes.reduce((total, size) => total + size, 0);
   const virtualizer = useVirtualizer({
@@ -189,8 +177,9 @@ export const VirtualizedTurnList = React.forwardRef<
 
   useEffect(
     () => () => {
-      tailRetryCleanupRef.current?.();
-      tailRetryCleanupRef.current = null;
+      if (tailRetryFrameRef.current !== null && tailRetryWindowRef.current) {
+        tailRetryWindowRef.current.cancelAnimationFrame(tailRetryFrameRef.current);
+      }
     },
     [],
   );
@@ -236,9 +225,10 @@ export const VirtualizedTurnList = React.forwardRef<
 
   // 仅首次定位到底；同一次数的流式增高交给 anchorTo:end。
   // 首屏还在跟随底部时，历史消息前插会换掉首条 id 但末条不变，followOnAppend 不会补滚。
+  // 用户上滚后 isFollowingOutput() 为假，历史前插不再把视口拽回底部。
   useLayoutEffect(() => {
     const scrollElement = getScrollElement();
-    if (!scrollElement || renderAll) {
+    if (!scrollElement || renderAll || !isFollowingOutput()) {
       return;
     }
 
@@ -255,7 +245,14 @@ export const VirtualizedTurnList = React.forwardRef<
     hasPositionedInitialTailRef.current = true;
     followedTailEdgesRef.current = { first: firstId, last: lastId };
     if (!historyPrepended) onInitialTailPositioned?.();
-  }, [onInitialTailPositioned, renderAll, getScrollElement, turns, virtualizer]);
+  }, [
+    onInitialTailPositioned,
+    renderAll,
+    getScrollElement,
+    isFollowingOutput,
+    turns,
+    virtualizer,
+  ]);
 
   useImperativeHandle(
     ref,

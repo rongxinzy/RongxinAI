@@ -27,6 +27,8 @@ export interface ConversationViewport {
   getScrollElement: () => HTMLDivElement | null;
   /** True while the viewport sits near the bottom (drives the button). */
   isAtBottom: boolean;
+  /** Synchronous "output growth should keep following the bottom" state. */
+  isFollowingOutput: () => boolean;
   /** Re-arms following and writes the scroll position to the bottom. */
   scrollToBottom: () => void;
   /**
@@ -157,6 +159,8 @@ export const useConversationViewport = (): ConversationViewport => {
 
   const getScrollElement = useCallback(() => scrollElementRef.current, []);
 
+  const isFollowingOutput = useCallback(() => followRef.current, []);
+
   const registerScrollWriter = useCallback((writer: ConversationScrollWriter | null) => {
     scrollWriterRef.current = writer;
     return () => {
@@ -170,6 +174,7 @@ export const useConversationViewport = (): ConversationViewport => {
       attachScrollElement,
       getScrollElement,
       isAtBottom,
+      isFollowingOutput,
       registerScrollWriter,
       scrollToBottom,
     }),
@@ -178,13 +183,14 @@ export const useConversationViewport = (): ConversationViewport => {
       attachScrollElement,
       getScrollElement,
       isAtBottom,
+      isFollowingOutput,
       registerScrollWriter,
       scrollToBottom,
     ],
   );
 };
 
-const ConversationViewportContext = createContext<ConversationViewport | null>(null);
+export const ConversationViewportContext = createContext<ConversationViewport | null>(null);
 
 export const ConversationViewportProvider = ConversationViewportContext.Provider;
 
