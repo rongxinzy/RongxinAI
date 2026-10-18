@@ -264,6 +264,8 @@ export interface PiModules {
   DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
   SessionManager?: {
     inMemory(cwd?: string): unknown;
+    create(cwd: string, sessionDir?: string, options?: { id?: string }): unknown;
+    open(sessionFile: string, sessionDir?: string, cwdOverride?: string): unknown;
   };
   SettingsManager?: {
     create(cwd: string, agentDir?: string): PiSettingsManager;

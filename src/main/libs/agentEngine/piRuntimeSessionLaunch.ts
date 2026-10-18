@@ -51,6 +51,7 @@ import {
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { createPiWorkbenchContract } from './piRuntimeWorkbenchContract';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
+import { openPersistentPiSessionManager } from './piSessionStore';
 import { buildPiSessionCustomTools } from './piRuntimeSessionCustomTools';
 import {
   getPiModules,
@@ -160,10 +161,22 @@ export async function startPiRuntimeSession(
       hasAppliedApplicationRuntimeEnv = true;
     }
     const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
-    // Cowork owns the canonical transcript in SQLite. Pi's default session
-    // manager persists its own transcript, which would be duplicated by the
-    // SQLite history prompt used when a session is recreated.
-    if (pi.SessionManager?.inMemory) {
+    // Pi's session manager keeps the structured transcript (tool calls,
+    // results, images, thinking) in a per-Cowork-session JSONL. Rebuilds
+    // reopen that file and continue with structured history; only a legacy
+    // session without a file falls back to the flattened text restore.
+    const piSessionStoreRoot = host.getPiSessionStoreRoot();
+    let reopenedFromStoreFile = false;
+    if (piSessionStoreRoot && pi.SessionManager?.create && pi.SessionManager?.open) {
+      const persistent = openPersistentPiSessionManager(
+        pi.SessionManager,
+        piSessionStoreRoot,
+        sessionId,
+        workspaceRoot,
+      );
+      sessionOptions.sessionManager = persistent.manager;
+      reopenedFromStoreFile = persistent.reusedFile;
+    } else if (pi.SessionManager?.inMemory) {
       sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
     }
 
@@ -523,12 +536,25 @@ export async function startPiRuntimeSession(
     // A live Pi session replaces the lightweight IM retention marker.
     host.retainedSessionIds.delete(sessionId);
 
-    // Send the prompt (may include conversation history for restart restores)
+    // Send the prompt (a restart restore flattens history into it — unless
+    // the reopened Pi session file already carries that history structured).
     let initialPrompt = researchRun
       ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
       : shortcutWorkflow
         ? shortcutWorkflow.buildInitialPrompt(options._piPromptOverride || prompt)
         : options._piPromptOverride || prompt;
+    if (reopenedFromStoreFile && options._piPromptOverride) {
+      // The JSONL already holds the prior turns as structured messages; the
+      // flattened history override would duplicate every one of them.
+      const userPrompt = options._piPromptOverride.slice(
+        Math.max(0, options._piPromptOverride.lastIndexOf(`User: ${prompt}`)),
+      );
+      initialPrompt = researchRun
+        ? researchRun.buildInitialPrompt(userPrompt)
+        : shortcutWorkflow
+          ? shortcutWorkflow.buildInitialPrompt(userPrompt)
+          : userPrompt;
+    }
     if (shouldRunGoalLoop) {
       initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
     }

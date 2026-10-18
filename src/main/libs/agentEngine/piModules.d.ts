@@ -10,6 +10,13 @@
 declare module '@earendil-works/pi-coding-agent' {
   export class SessionManager {
     static inMemory(cwd?: string): SessionManager;
+    static create(
+      cwd: string,
+      sessionDir?: string,
+      options?: { id?: string; parentSession?: string },
+    ): SessionManager;
+    static open(sessionFile: string, sessionDir?: string, cwdOverride?: string): SessionManager;
+    static continueRecent(cwd: string, sessionDir?: string): SessionManager;
   }
 
   export class DefaultResourceLoader {

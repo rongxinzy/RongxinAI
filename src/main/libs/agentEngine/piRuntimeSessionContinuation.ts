@@ -21,6 +21,7 @@ import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/work
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
 import { restorePiConversationPrompt, summarizePiHistoryFromStore } from './piConversationContext';
+import { hasPersistedPiSession, piSessionDirFor } from './piSessionStore';
 import { PiAgentLoopMode } from './piAgentLoop';
 import { PiPlanModePrompt } from './piPlanTool';
 import { resolvePiTurnWorkflowSkills } from './piTurnWorkflow';
@@ -51,6 +52,63 @@ import {
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import type { PiContinueOptions, PiSessionPatch } from './piRuntimeTypes';
 
+/** Restore source labels for the pi-history-restored diagnostic line. */
+const PiHistoryRestoreSource = {
+  Continue: 'continue',
+  Recreate: 'recreate',
+  SkillsChange: 'skills-change',
+} as const;
+
+/**
+ * Restores history for a session rebuild.
+ *
+ * A persisted Pi session file is authoritative: the rebuild reopens it and
+ * only the new user prompt travels, so tool calls/results, images, and
+ * thinking survive as structured messages. Without a file (legacy session or
+ * a post-invalidation rebuild) the one-shot flattened-text restore runs and
+ * the turn itself recreates the file for every later rebuild.
+ */
+const restorePiSessionHistory = (
+  host: PiRuntimeAdapterHost,
+  sessionId: string,
+  prompt: string,
+  context: {
+    source: string;
+    contextWindowTokens?: number;
+    maxOutputTokens?: number;
+    chatMode: boolean;
+  },
+): string => {
+  const piSessionStoreRoot = host.getPiSessionStoreRoot();
+  if (piSessionStoreRoot && hasPersistedPiSession(piSessionDirFor(piSessionStoreRoot, sessionId))) {
+    agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+      source: 'jsonl',
+      messageCount: 0,
+      contentBytes: 0,
+      metadataBytes: 0,
+      promptChars: prompt.length,
+      restoreMs: 0,
+    });
+    return prompt;
+  }
+  const historyLoadStartedAt = Date.now();
+  const piPrompt = restorePiConversationPrompt(host.getStore(), sessionId, prompt, {
+    maxChars: resolveConversationHistoryCharLimit(
+      context.contextWindowTokens,
+      context.maxOutputTokens,
+      context.chatMode,
+    ),
+    ocrCommandFor: host.getOcrCommandFor(),
+  });
+  agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+    source: 'text-fallback',
+    ...summarizePiHistoryFromStore(host.getStore(), sessionId),
+    promptChars: piPrompt.length,
+    restoreMs: Date.now() - historyLoadStartedAt,
+  });
+  return piPrompt;
+};
+
 export async function continuePiRuntimeSession(
   host: PiRuntimeAdapterHost,
   sessionId: string,
@@ -72,24 +130,13 @@ export async function continuePiRuntimeSession(
     console.log(
       `[PiRuntime] continueSession: session ${sessionId} not active or was aborted, restoring context via prompt`,
     );
-    const historyLoadStartedAt = Date.now();
-    // Read the transcript tail in pages and stop at the character budget
-    // instead of materializing the full history; the injected prompt is
-    // identical because the selection rule only ever walks newest-first.
-    // Metadata still comes from a zero-message read for mode/experts/cwd.
     const storedSession = host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false });
     const chatMode =
       options.sessionMode === CoworkSessionMode.Chat ||
       storedSession?.mode === CoworkSessionMode.Chat;
-    const piPrompt = restorePiConversationPrompt(host.getStore(), sessionId, prompt, {
-      maxChars: resolveConversationHistoryCharLimit(undefined, undefined, chatMode),
-      ocrCommandFor: host.getOcrCommandFor(),
-    });
-    agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
-      source: 'continue',
-      ...summarizePiHistoryFromStore(host.getStore(), sessionId),
-      promptChars: piPrompt.length,
-      restoreMs: Date.now() - historyLoadStartedAt,
+    const piPrompt = restorePiSessionHistory(host, sessionId, prompt, {
+      source: PiHistoryRestoreSource.Continue,
+      chatMode,
     });
     return await host.startSession(sessionId, prompt, {
       ...options,

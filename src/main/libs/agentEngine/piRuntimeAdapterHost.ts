@@ -56,6 +56,12 @@ export interface PiRuntimeAdapterHost {
   getMcpServerManager(): McpServerManager | null;
   getMcpToolManifestGeneration(): number;
   getOcrCommandFor(): ((imagePath: string) => string) | undefined;
+  /**
+   * Root directory (`<userData>/pi-sessions`) holding one Pi session JSONL
+   * directory per Cowork session. Null disables file persistence (tests
+   * without an injected root keep the in-memory session manager).
+   */
+  getPiSessionStoreRoot(): string | null;
 
   // Session-scoped helpers implemented by the adapter.
   getSessionMemoryCompletion(sessionId: string): SessionMemoryCompletion | null;
@@ -77,6 +83,8 @@ export interface PiRuntimeAdapterHost {
     cause?: CoworkInterruptionCause,
   ): void;
   disposeSessionForRecreation(sessionId: string, active: ActivePiSession): void;
+  /** Deletes the session's Pi JSONL directory (divergence or session delete). */
+  invalidatePiSessionDir(sessionId: string): void;
   startSession(sessionId: string, prompt: string, options?: PiStartOptions): Promise<void>;
   continueSession(sessionId: string, prompt: string, options?: PiContinueOptions): Promise<void>;
   isSessionActive(sessionId: string): boolean;
