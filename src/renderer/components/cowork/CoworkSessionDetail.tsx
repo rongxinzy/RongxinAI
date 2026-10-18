@@ -73,8 +73,6 @@ import { useArtifactLinkInterception } from './sessionDetail/useArtifactLinkInte
 import { useArtifactPanelPresentation } from './sessionDetail/useArtifactPanelPresentation';
 import { useInlineArtifacts } from './sessionDetail/useInlineArtifacts';
 import { useSessionExport } from './sessionDetail/useSessionExport';
-import { PreviewScrollMutation, readPreviewScrollMutation } from '../../browserMock/streamReplay';
-
 interface CoworkSessionDetailProps {
   displayedSessionId?: string;
   isSessionSwitching?: boolean;
@@ -204,10 +202,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const mapDisplayText = useCallback((value: string): string => {
     return value;
   }, []);
-
-  const previewScrollMutation =
-    import.meta.env.DEV && typeof window !== 'undefined' ? readPreviewScrollMutation() : null;
-  const disableConversationResize = previewScrollMutation === PreviewScrollMutation.NoTailFollow;
 
   const handleReEdit = useCallback(
     (message: CoworkMessage) => {
@@ -423,11 +417,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             {isSessionSwitching ? (
               <CoworkConversationLoadingSkeleton />
             ) : (
-              <Conversation
-                className="h-full"
-                initial="instant"
-                {...(disableConversationResize ? {} : { resize: 'instant' })}
-              >
+              <Conversation className="h-full" initial="instant" resize="instant">
                 <ConversationContent
                   className="pt-3"
                   observeContentResize={false}

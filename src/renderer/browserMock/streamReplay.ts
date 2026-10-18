@@ -24,9 +24,8 @@ const PreviewStreamReplayQuery = {
   ScrollMutation: 'previewScrollMutation',
 } as const;
 
-/** Dev-only scroll regressions for Playwright gate verification. */
+/** Dev-only scroll sabotage for Playwright gate verification (browserMock only). */
 export const PreviewScrollMutation = {
-  StickStop: 'stick-stop',
   NoTailFollow: 'no-tail-follow',
 } as const;
 export type PreviewScrollMutation =
@@ -36,9 +35,7 @@ export function readPreviewScrollMutation(
   search = readBrowserSearchParam(),
 ): PreviewScrollMutation | null {
   const raw = new URLSearchParams(search).get(PreviewStreamReplayQuery.ScrollMutation)?.trim();
-  if (raw === PreviewScrollMutation.StickStop || raw === PreviewScrollMutation.NoTailFollow) {
-    return raw;
-  }
+  if (raw === PreviewScrollMutation.NoTailFollow) return raw;
   return null;
 }
 
@@ -113,6 +110,7 @@ export interface StreamReplayController {
 
 declare global {
   interface Window {
+    __previewCoworkStreamReady?: boolean;
     __previewStreamReplay?: StreamReplayController & {
       samples: Array<{ at: number; text: string; answerBubbles: number }>;
       longTasks: Array<{ startTime: number; duration: number }>;

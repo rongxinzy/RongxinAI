@@ -34,7 +34,7 @@ test('commits the complete response when streaming finishes', () => {
   segmenter.update('Unfinished paragraph', true);
 
   expect(segmenter.update('Unfinished paragraph', false)).toEqual({
-    committed: '',
-    tail: 'Unfinished paragraph',
+    committed: 'Unfinished paragraph',
+    tail: '',
   });
 });

@@ -219,6 +219,66 @@ describe('PiAssistantTranscript', () => {
     expect(deleteMessage).not.toHaveBeenCalled();
   });
 
+  it('finalizeMessage with empty content uses resolved streamed answer text', () => {
+    const updateMessage = vi.fn();
+    const row = {
+      id: 'stream-finalize-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage,
+          addMessage: vi.fn(),
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    active.retryPriorAnswer = 'resolved prior answer';
+    active.answerText = '';
+    local.finalizeMessage('session', active, 'answer', '');
+    const finalizePatch = updateMessage.mock.calls.find(
+      call => call[1] === row.id && (call[2] as { content?: string })?.content,
+    )?.[2] as { content?: string; metadata?: Record<string, unknown> } | undefined;
+    expect(finalizePatch?.content).toBe('resolved prior answer');
+    expect(finalizePatch?.metadata).toMatchObject({ isStreaming: false, isFinal: true });
+  });
+
+  it('finalizeMessage empty path removes placeholder before clearing streamed memory', () => {
+    const deleteMessage = vi.fn(() => true);
+    const row = {
+      id: 'throttle-order-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getSession: () => ({ messages: [row] }),
+          updateMessage: vi.fn(),
+          deleteMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate: vi.fn(),
+      emitMessageRemoved: vi.fn(),
+      getActiveSession: () => active,
+    });
+    local.streamInto('session', active, 'answer', 'streamed body');
+    active.answerText = '';
+    local.finalizeMessage('session', active, 'answer', '');
+    expect(deleteMessage).not.toHaveBeenCalled();
+  });
+
   it('removes a never-displayed empty placeholder and emits messageRemoved', () => {
     const emitMessageRemoved = vi.fn();
     const deleteMessage = vi.fn(() => true);

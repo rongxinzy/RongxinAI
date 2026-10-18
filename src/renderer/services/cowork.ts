@@ -123,6 +123,10 @@ class CoworkService {
       }
     }
 
+    if (import.meta.env.DEV && typeof window !== 'undefined') {
+      window.__previewCoworkStreamReady = true;
+    }
+
     this.initialized = true;
   }
 

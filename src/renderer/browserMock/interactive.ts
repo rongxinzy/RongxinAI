@@ -40,6 +40,7 @@ import {
   getStreamReplayTrace,
   installStreamReplayController,
   installStreamReplayLongTaskObserver,
+  readPreviewScrollMutation,
   readStreamReplayFixtureId,
   seedStreamReplaySession,
   shouldAutoStartStreamReplay,
@@ -154,6 +155,9 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       setSession: session => {
         sessions.set(session.id, { mode: CoworkSessionMode.Work, session });
       },
+    });
+    void import('./previewScrollMutationDev').then(module => {
+      module.installPreviewScrollMutation(readPreviewScrollMutation());
     });
     if (shouldAutoStartStreamReplay()) {
       setTimeout(() => streamReplayController?.begin(), 80);

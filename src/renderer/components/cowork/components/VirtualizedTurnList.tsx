@@ -9,10 +9,6 @@ import React, {
 } from 'react';
 import { useStickToBottomContext } from 'use-stick-to-bottom';
 
-import {
-  readPreviewScrollMutation,
-  PreviewScrollMutation,
-} from '../../../browserMock/streamReplay';
 import { estimateCachedTurnHeight } from '../helpers/cachedTurnHeight';
 import { getConversationTurnMessageIds, type ConversationTurn } from '../helpers/messageGrouping';
 
@@ -57,11 +53,7 @@ export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListHandle,
   VirtualizedTurnListProps
 >(({ turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
-  const { scrollRef, stopScroll } = useStickToBottomContext();
-  const previewScrollMutation =
-    import.meta.env.DEV && typeof window !== 'undefined' ? readPreviewScrollMutation() : null;
-  const disableTailFollow = previewScrollMutation === PreviewScrollMutation.NoTailFollow;
-  const stickStopActive = previewScrollMutation === PreviewScrollMutation.StickStop;
+  const { scrollRef } = useStickToBottomContext();
   const hasPositionedInitialTailRef = useRef(false);
   const followedTailEdgesRef = useRef<{ first?: string; last?: string } | null>(null);
   const shouldFollowInitialTailRef = useRef(true);
@@ -94,57 +86,51 @@ export const VirtualizedTurnList = React.forwardRef<
       nextMessageIdsByTurn: nextIdsByTurn,
     };
   }, [turns]);
-  const blockTailScrollCompensation = disableTailFollow || stickStopActive;
+  const scrollToFn = useCallback<typeof elementScroll>((offset, options, instance) => {
+    const scrollElement = instance.scrollElement as HTMLElement | null;
+    const targetWindow = scrollElement?.ownerDocument.defaultView;
+    const maxScroll = scrollElement
+      ? Math.max(scrollElement.scrollHeight - scrollElement.clientHeight, 0)
+      : 0;
+    const wasAtTail = scrollElement ? Math.abs(scrollElement.scrollTop - maxScroll) < 1 : false;
+    const requestedOffset = offset + (options.adjustments ?? 0);
 
-  const scrollToFn = useCallback<typeof elementScroll>(
-    (offset, options, instance) => {
-      const scrollElement = instance.scrollElement as HTMLElement | null;
-      const targetWindow = scrollElement?.ownerDocument.defaultView;
-      const maxScroll = scrollElement
-        ? Math.max(scrollElement.scrollHeight - scrollElement.clientHeight, 0)
-        : 0;
-      const wasAtTail = scrollElement ? Math.abs(scrollElement.scrollTop - maxScroll) < 1 : false;
-      const requestedOffset = offset + (options.adjustments ?? 0);
+    // TanStack updates its size cache before requesting scroll compensation,
+    // but notifies onChange afterwards. Grow the DOM first so the browser does
+    // not clamp that compensation to the previous height for one painted frame.
+    syncMeasuredTurnLayout(instance, virtualSizerRef.current);
+    elementScroll(offset, options, instance);
+    if (!scrollElement || !targetWindow) return;
 
-      // TanStack updates its size cache before requesting scroll compensation,
-      // but notifies onChange afterwards. Grow the DOM first so the browser does
-      // not clamp that compensation to the previous height for one painted frame.
-      syncMeasuredTurnLayout(instance, virtualSizerRef.current);
-      elementScroll(offset, options, instance);
-      if (blockTailScrollCompensation || !scrollElement || !targetWindow) return;
+    // Upward anchor adjustments stay short of the end and must not schedule a
+    // later scroll write. Initial row refs can run before the sizer ref attaches,
+    // and the sizer grows in the same turn after this scrollTop assignment, so a
+    // clamped tail write during mounting still needs a retry.
+    const totalSize = typeof instance.getTotalSize === 'function' ? instance.getTotalSize() : null;
+    const virtualizerMaxScroll =
+      totalSize !== null ? Math.max(totalSize - scrollElement.clientHeight, 0) : null;
+    const seeksTail =
+      wasAtTail ||
+      requestedOffset >= maxScroll - 1 ||
+      (virtualizerMaxScroll !== null && requestedOffset >= virtualizerMaxScroll - 1);
+    if (!seeksTail && options.behavior === undefined) return;
+    const clampedOffset = scrollElement.scrollTop;
+    if (requestedOffset - clampedOffset < 1) return;
 
-      // Upward anchor adjustments stay short of the end and must not schedule a
-      // later scroll write. Initial row refs can run before the sizer ref attaches,
-      // and the sizer grows in the same turn after this scrollTop assignment, so a
-      // clamped tail write during mounting still needs a retry.
-      const totalSize =
-        typeof instance.getTotalSize === 'function' ? instance.getTotalSize() : null;
-      const virtualizerMaxScroll =
-        totalSize !== null ? Math.max(totalSize - scrollElement.clientHeight, 0) : null;
-      const seeksTail =
-        wasAtTail ||
-        requestedOffset >= maxScroll - 1 ||
-        (virtualizerMaxScroll !== null && requestedOffset >= virtualizerMaxScroll - 1);
-      if (!seeksTail && options.behavior === undefined) return;
-      const clampedOffset = scrollElement.scrollTop;
-      if (requestedOffset - clampedOffset < 1) return;
+    if (tailRetryFrameRef.current !== null && tailRetryWindowRef.current) {
+      tailRetryWindowRef.current.cancelAnimationFrame(tailRetryFrameRef.current);
+    }
 
-      if (tailRetryFrameRef.current !== null && tailRetryWindowRef.current) {
-        tailRetryWindowRef.current.cancelAnimationFrame(tailRetryFrameRef.current);
+    tailRetryWindowRef.current = targetWindow;
+    tailRetryFrameRef.current = targetWindow.requestAnimationFrame(() => {
+      tailRetryFrameRef.current = null;
+      tailRetryWindowRef.current = null;
+      const currentScrollElement = instance.scrollElement as HTMLElement | null;
+      if (currentScrollElement === scrollElement && scrollElement.scrollTop === clampedOffset) {
+        scrollElement.scrollTo({ top: requestedOffset, behavior: 'auto' });
       }
-
-      tailRetryWindowRef.current = targetWindow;
-      tailRetryFrameRef.current = targetWindow.requestAnimationFrame(() => {
-        tailRetryFrameRef.current = null;
-        tailRetryWindowRef.current = null;
-        const currentScrollElement = instance.scrollElement as HTMLElement | null;
-        if (currentScrollElement === scrollElement && scrollElement.scrollTop === clampedOffset) {
-          scrollElement.scrollTo({ top: requestedOffset, behavior: 'auto' });
-        }
-      });
-    },
-    [blockTailScrollCompensation],
-  );
+    });
+  }, []);
   const initialOffset = estimatedTurnSizes.reduce((total, size) => total + size, 0);
   const virtualizer = useVirtualizer({
     count: turns.length,
@@ -155,8 +141,8 @@ export const VirtualizedTurnList = React.forwardRef<
     initialOffset,
     initialRect: INITIAL_VIEWPORT_RECT,
     // 2026/09/16 lixiang  贴底时条目增高由 virtualizer 直接补偿 scrollTop，勿再额外 scrollToEnd（防抖只会滞后跳动）
-    ...(disableTailFollow || stickStopActive ? {} : { anchorTo: 'end' as const }),
-    followOnAppend: !(disableTailFollow || stickStopActive),
+    anchorTo: 'end',
+    followOnAppend: true,
     scrollToFn,
     onChange: instance => {
       // Also synchronize measurements that do not require a scroll adjustment.
@@ -186,14 +172,6 @@ export const VirtualizedTurnList = React.forwardRef<
     },
     [],
   );
-
-  useEffect(() => {
-    if (previewScrollMutation !== PreviewScrollMutation.StickStop) return;
-    const intervalId = window.setInterval(() => {
-      stopScroll();
-    }, 30);
-    return () => window.clearInterval(intervalId);
-  }, [previewScrollMutation, stopScroll]);
 
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;
@@ -225,10 +203,14 @@ export const VirtualizedTurnList = React.forwardRef<
     };
 
     scrollElement.addEventListener('wheel', handleWheel, { passive: true });
+    scrollElement.addEventListener('touchstart', stopFollowingInitialTail, { passive: true });
+    scrollElement.addEventListener('pointerdown', stopFollowingInitialTail, { passive: true });
     ownerDocument.addEventListener('keydown', handleKeyDown);
 
     return () => {
       scrollElement.removeEventListener('wheel', handleWheel);
+      scrollElement.removeEventListener('touchstart', stopFollowingInitialTail);
+      scrollElement.removeEventListener('pointerdown', stopFollowingInitialTail);
       ownerDocument.removeEventListener('keydown', handleKeyDown);
     };
   }, [scrollRef]);
@@ -264,13 +246,7 @@ export const VirtualizedTurnList = React.forwardRef<
   // 首屏还在跟随底部时，历史消息前插会换掉首条 id 但末条不变，followOnAppend 不会补滚。
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;
-    if (
-      !scrollElement ||
-      renderAll ||
-      !shouldFollowInitialTailRef.current ||
-      disableTailFollow ||
-      stickStopActive
-    ) {
+    if (!scrollElement || renderAll || !shouldFollowInitialTailRef.current) {
       return;
     }
 

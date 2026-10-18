@@ -38,7 +38,6 @@ ALLOWLIST_SURVIVORS: tuple[str, ...] = (
     'M15 ',
     'M16 ',
     'M18 stop path does not clear retry flag',
-    'M23 retry turn_start clears visible text before reopen',
 )
 
 M: dict[str, list[tuple[str, str, str]]] = {
@@ -174,6 +173,20 @@ M: dict[str, list[tuple[str, str, str]]] = {
     'M24b empty placeholder guard: streamed content length': [
         (TR, '    if (streamed.length > 0) return;\n', ''),
     ],
+    'M32 finalizeMessage empty path skips resolved prior answer': [
+        (
+            TR,
+            '        const resolved = this.resolveStreamedContent(emptyId, active, \'answer\');\n        if (resolved.trim()) {\n          return this.finalizeMessage(sessionId, active, kind, resolved);\n        }\n',
+            '',
+        ),
+    ],
+    'M37 finalizeMessage clears throttle maps before placeholder removal': [
+        (
+            TR,
+            '        this.removeEmptyAnswerPlaceholder(sessionId, emptyId, active);\n        this.clearThrottleMapsForMessage(emptyId);\n',
+            '        this.clearThrottleMapsForMessage(emptyId);\n        this.removeEmptyAnswerPlaceholder(sessionId, emptyId, active);\n',
+        ),
+    ],
 }
 
 
@@ -202,7 +215,16 @@ def ensure_node_sqlite() -> None:
 def run_vitest() -> subprocess.CompletedProcess[str]:
     env = {**os.environ, 'CI': 'true'}
     return subprocess.run(
-        ['npm', 'exec', '--', 'vitest', 'run', *TESTS],
+        [
+            'npm',
+            'exec',
+            '--',
+            'vitest',
+            'run',
+            '--pool=forks',
+            '--maxWorkers=1',
+            *TESTS,
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,

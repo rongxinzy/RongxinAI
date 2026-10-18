@@ -163,6 +163,8 @@ export class PiAssistantTranscript {
     if (existing.content.length > 0) return;
     const streamed = this.lastStreamedContentByMessageId.get(messageId) ?? '';
     if (streamed.length > 0) return;
+    const inMemory = active.answerText || active.retryPriorAnswer;
+    if (inMemory.length > 0) return;
     if (!store.deleteMessage(sessionId, messageId)) return;
     this.lastStreamedContentByMessageId.delete(messageId);
     this.unnoteFinalized(sessionId, messageId);

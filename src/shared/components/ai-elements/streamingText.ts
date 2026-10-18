@@ -68,16 +68,8 @@ export class StreamingTextSegmenter {
     // Reveal animation frames reuse the source text; do not rescan Markdown on each frame.
     if (content === this.previousContent && isStreaming === this.wasStreaming) return this.segments;
     if (!isStreaming) {
-      if (this.wasStreaming) {
-        const boundary = getLastStableBoundary(this.tail);
-        if (boundary > 0) {
-          this.committed += this.tail.slice(0, boundary);
-          this.tail = this.tail.slice(boundary);
-        }
-      } else {
-        this.committed = content;
-        this.tail = '';
-      }
+      this.committed = content;
+      this.tail = '';
       this.previousContent = content;
       this.wasStreaming = false;
       return this.snapshot();

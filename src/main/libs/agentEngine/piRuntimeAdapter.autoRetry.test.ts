@@ -187,6 +187,31 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toEqual(['test']);
     });
 
+    it('keeps thinking text visible through retry turn_start reopen', async () => {
+      await adapter.startSession('test', 'Hi');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'partial thinking trace' }],
+        },
+        assistantMessageEvent: {
+          type: 'thinking_delta',
+          contentIndex: 0,
+          delta: 'partial thinking trace',
+        },
+      });
+      failedAttempt('503 Service Unavailable');
+      listener!({ type: 'auto_retry_start', attempt: 1 });
+      messageUpdates.length = 0;
+      listener!({ type: 'turn_start' });
+      const thinkingReopen = messageUpdates.find(
+        update => update.metadata?.streamReopen === true && update.metadata?.isThinking === true,
+      );
+      expect(thinkingReopen?.content).toContain('partial thinking trace');
+    });
+
     it('surfaces no error when an auto-retry succeeds', async () => {
       await adapter.startSession('test', 'Hi');
 

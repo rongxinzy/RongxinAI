@@ -2,7 +2,7 @@
  * Stream replay fixture recorder (vitest harness). Not part of `bun run test`.
  * Run via: bun run web:preview:stream-replay:codegen
  */
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -17,7 +17,10 @@ import {
 import { writeStreamReplayFixture } from './streamReplayFixtureLib';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const outDir = resolve(root, 'src/renderer/browserMock/fixtures/streamReplay');
+const outDir = resolve(
+  process.env.STREAM_REPLAY_FIXTURE_OUT_DIR ??
+    join(root, 'src/renderer/browserMock/fixtures/streamReplay'),
+);
 
 describe('stream replay fixture codegen', () => {
   setupPiRuntimeAdapterSuite();

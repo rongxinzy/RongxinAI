@@ -33,16 +33,8 @@ export const AssistantBubble: React.FC<{
   // arrived yet; render nothing instead of an empty shell.
   if (rawContent.trim().length === 0) return null;
 
-  const streamReplayActive =
-    import.meta.env.DEV &&
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).has('previewStreamReplay');
-
   return (
-    <div
-      className="py-1 focus:outline-none"
-      {...(streamReplayActive ? { 'data-replay-assistant-text': rawContent } : {})}
-    >
+    <div className="py-1 focus:outline-none">
       <Message from="assistant">
         <MessageContent>
           {/* 2026/09/20 lixiang  下传本地路径解析，使盘符路径可点打开（issue #805） */}

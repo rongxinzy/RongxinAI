@@ -3,8 +3,6 @@
 const SCROLL_PIN_TOLERANCE_PX = 8;
 
 const LONG_TASK_THRESHOLD_MS = 50;
-/** Ignore the first N long tasks after replay start (boot/layout warmup). */
-const LONG_TASK_WARMUP_EXCLUSIONS = 2;
 /** Include long tasks that start within this window after replay end (finalize / markdown). */
 const LONG_TASK_FINALIZE_WINDOW_MS = 250;
 
@@ -28,13 +26,39 @@ export function normalizeReplayPlainText(value) {
     .trim();
 }
 
-function normalizeReplayFinalCompare(value) {
-  return normalizeReplayPlainText(value)
-    .replace(/https:\/\/zr-local\.path\/open\?path=/gi, '')
-    .replace(/\u2014|\u2013/g, '-')
-    .replace(/[`*_>#~[\]()!]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+export function previewStreamReplayInstantSearch(fixtureId, { skipBoot = true } = {}) {
+  const params = new URLSearchParams(previewStreamReplaySearch(fixtureId, { skipBoot }).slice(1));
+  params.set('previewStreamReplayInstant', '1');
+  return `?${params.toString()}`;
+}
+
+export async function readAssistantRenderedBody(page) {
+  const body = page.locator('[role="log"] .group.is-assistant .theme-message-body').last();
+  await body.waitFor({ state: 'attached', timeout: 60_000 });
+  return body.innerText();
+}
+
+export function assertExactRenderedText(shown, expected, label) {
+  const normalizedShown = normalizeReplayPlainText(shown);
+  const normalizedExpected = normalizeReplayPlainText(expected);
+  if (normalizedShown !== normalizedExpected) {
+    throw new Error(
+      `${label}: rendered assistant text mismatch (shown ${normalizedShown.length} chars, expected ${normalizedExpected.length} chars)`,
+    );
+  }
+}
+
+export function reportLongTasks(longTasks, { replayStartedAt, replayEndedAt } = {}) {
+  const windowEnd = replayEndedAt + LONG_TASK_FINALIZE_WINDOW_MS;
+  const inWindow = longTasks.filter(
+    entry => entry.startTime >= replayStartedAt && entry.startTime <= windowEnd,
+  );
+  let maxLongTaskMs = 0;
+  for (const entry of inWindow) {
+    if (entry.duration > maxLongTaskMs) maxLongTaskMs = entry.duration;
+  }
+  const offenders = inWindow.filter(entry => entry.duration > LONG_TASK_THRESHOLD_MS + 0.5);
+  return { maxLongTaskMs, offenders, sampleCount: inWindow.length, windowEnd };
 }
 
 export function assertPrefixOf(shown, expected, label) {
@@ -77,12 +101,10 @@ export async function runStreamReplay(
         });
 
       const readAssistantFromDom = () => {
-        const answerNodes = [...document.querySelectorAll('[role="log"] .is-assistant')];
-        const replayHost = document.querySelector('[role="log"] [data-replay-assistant-text]');
-        const replayText = replayHost?.getAttribute('data-replay-assistant-text') ?? '';
+        const answerNodes = [...document.querySelectorAll('[role="log"] .group.is-assistant')];
         const last = answerNodes.at(-1);
         const body = last?.querySelector('.theme-message-body');
-        const text = replayText || body?.innerText || last?.innerText || '';
+        const text = body?.innerText ?? '';
         return {
           text,
           answerBubbles: answerNodes.length,
@@ -233,61 +255,6 @@ export async function runStreamReplay(
     },
     { fixtureId, mode, sampleIntervalMs },
   );
-}
-
-export function assertLongTasks(
-  longTasks,
-  { replayStartedAt, replayEndedAt, warmupExclusions = LONG_TASK_WARMUP_EXCLUSIONS } = {},
-) {
-  const windowEnd = replayEndedAt + LONG_TASK_FINALIZE_WINDOW_MS;
-  const inWindow = longTasks.filter(
-    entry => entry.startTime >= replayStartedAt && entry.startTime <= windowEnd,
-  );
-  const offenders = inWindow
-    .slice(warmupExclusions)
-    .filter(entry => entry.duration > LONG_TASK_THRESHOLD_MS + 0.5);
-  if (offenders.length > 0) {
-    throw new Error(
-      `long task exceeded ${LONG_TASK_THRESHOLD_MS}ms (${offenders.length} after ${warmupExclusions} warmup exclusions, window ends ${windowEnd.toFixed(0)}ms): ${JSON.stringify(offenders.slice(0, 3))}`,
-    );
-  }
-}
-
-export function assertReplayFinalText(
-  shown,
-  expected,
-  label,
-  { strict = true, canonical = false } = {},
-) {
-  const normalize = canonical ? normalizeReplayPlainText : normalizeReplayFinalCompare;
-  const finalNorm = normalize(shown);
-  const expectedNorm = normalize(expected);
-  if (strict) {
-    if (finalNorm === expectedNorm) return;
-    const sharedPrefixLength = Math.min(finalNorm.length, expectedNorm.length);
-    if (finalNorm.slice(0, sharedPrefixLength) !== expectedNorm.slice(0, sharedPrefixLength)) {
-      throw new Error(
-        `${label}: final assistant text mismatch at shared prefix (shown ${finalNorm.length} chars, expected ${expectedNorm.length} chars)`,
-      );
-    }
-    if (Math.abs(finalNorm.length - expectedNorm.length) > 8) {
-      throw new Error(
-        `${label}: final assistant text length mismatch (shown ${finalNorm.length} chars, expected ${expectedNorm.length} chars)`,
-      );
-    }
-    return;
-  }
-  const prefixLength = Math.min(80, expectedNorm.length, finalNorm.length);
-  if (finalNorm.slice(0, prefixLength) !== expectedNorm.slice(0, prefixLength)) {
-    throw new Error(`${label}: final assistant text prefix mismatch`);
-  }
-  const lengthDelta = Math.abs(finalNorm.length - expectedNorm.length);
-  const tolerance = Math.max(64, Math.floor(expectedNorm.length * 0.12));
-  if (lengthDelta > tolerance) {
-    throw new Error(
-      `${label}: final assistant text length mismatch (shown ${finalNorm.length}, expected ${expectedNorm.length})`,
-    );
-  }
 }
 
 export function assertStreamingScrollPinned(

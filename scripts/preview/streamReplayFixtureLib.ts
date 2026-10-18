@@ -26,7 +26,7 @@ function normalizeStreamReplayTrace(slug: string, trace: RecordedStreamReplayTra
     if (value === null || value === undefined) return null;
     if (typeof value === 'boolean') return value;
     if (typeof value === 'number') {
-      if (key === 'timestamp' || key === 'emittedAt') {
+      if (key === 'timestamp' || key === 'emittedAt' || key === 'updatedAt') {
         timeCounter += 1;
         return 1_700_000_000_000 + timeCounter;
       }
@@ -60,7 +60,7 @@ export function writeStreamReplayFixture(
   trace: RecordedStreamReplayTrace,
 ): void {
   const normalized = normalizeStreamReplayTrace(name, trace);
-  const json = `${JSON.stringify(normalized)}\n`;
+  const json = `${JSON.stringify(normalized, null, 2)}\n`;
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, `${name}.json`), json, 'utf8');
 }
