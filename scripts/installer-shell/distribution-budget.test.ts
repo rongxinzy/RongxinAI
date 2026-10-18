@@ -15,8 +15,14 @@ const {
   MAGPIE_GATEWAY_COMPRESSED_BYTES,
   MAGPIE_GATEWAY_MARGIN_BYTES,
   MAGPIE_GATEWAY_NSIS_ALLOWANCE_BYTES,
-  REPORT_ONLY_EDITIONS,
-  isReportOnlyEdition,
+  UNCAPPED_EDITIONS,
+  BUNDLED_RUNTIME_EDITIONS,
+  isUncappedEdition,
+  bundlesRuntimeComponent,
+  CPU_SETUP_MEASURED,
+  CPU_SETUP_MARGIN,
+  CPU_NSIS_MEASURED,
+  CPU_NSIS_MARGIN,
   resolveEditionSetupBudget,
   resolveEditionNsisBudget,
   assertSetupBudget,
@@ -75,7 +81,7 @@ test('NSIS budgets: lite = original limits + Magpie allowance only', () => {
   });
   expect(assertNsisBudget(450 * MiB, 300 * MiB, 'lite')).toMatchObject({
     edition: 'lite',
-    reportOnly: false,
+    uncapped: false,
   });
   expect(() => assertNsisBudget(450 * MiB + 1, 300 * MiB, 'lite')).toThrow(/450 MiB/);
   expect(() => assertNsisBudget(400 * MiB, 400 * MiB - nonComponentLimit - 1, 'lite')).toThrow(
@@ -98,33 +104,113 @@ test('lite WebView2 keeps its original limits; the Magpie allowance does not lea
   expect(assertSetupBudget(500_213_656, 288_942_645, 'lite')).toMatchObject({ edition: 'lite' });
 });
 
-// Policy (krli, 2026-10-17): never hard-code a size limit for an unknown. The
-// new editions are measured and reported; a follow-up PR adds measured + margin.
-test.each(['cpu', 'cuda'])('%s is report-only: sizes are measured, never rejected', edition => {
-  expect(REPORT_ONLY_EDITIONS.has(edition)).toBe(true);
-  expect(isReportOnlyEdition(edition)).toBe(true);
+// cpu limits = measured (build run 39032801288) + ceil(3%) whole-MiB margin.
+// Changing them requires a new measured run, never a round-number bump.
+test('cpu WebView2 limits are exactly measured + explicit margin', () => {
+  expect(CPU_SETUP_MEASURED).toEqual({
+    installerBytes: 527_673_448,
+    componentArchiveBytes: 316_397_703,
+    nonComponentBytes: 211_275_745,
+  });
+  expect(CPU_SETUP_MARGIN).toEqual({
+    installerBytes: 16 * MiB,
+    componentArchiveBytes: 10 * MiB,
+    nonComponentBytes: 7 * MiB,
+  });
+  for (const key of Object.keys(CPU_SETUP_MEASURED) as (keyof typeof CPU_SETUP_MEASURED)[]) {
+    const margin = CPU_SETUP_MARGIN[key];
+    expect(margin).toBe(Math.ceil((CPU_SETUP_MEASURED[key] * 0.03) / MiB) * MiB);
+  }
+  const limits = resolveEditionSetupBudget('cpu');
+  expect(limits).toEqual({
+    maxInstallerBytes: 544_450_664,
+    maxComponentBytes: 326_883_463,
+    maxNonComponentBytes: 218_615_777,
+  });
+  // The measured cpu build passes its own limits.
+  expect(assertSetupBudget(527_673_448, 316_397_703, 'cpu')).toMatchObject({
+    edition: 'cpu',
+    uncapped: false,
+    nonComponentBytes: 211_275_745,
+  });
+  expect(() =>
+    assertSetupBudget(limits.maxInstallerBytes + 1, limits.maxComponentBytes, 'cpu'),
+  ).toThrow(/519\.2 MiB/);
+  expect(() => assertSetupBudget(500 * MiB, limits.maxComponentBytes + 1, 'cpu')).toThrow(
+    /311\.7 MiB budget/,
+  );
+  expect(() => assertSetupBudget(limits.maxNonComponentBytes + 1 + MiB, MiB, 'cpu')).toThrow(
+    /non-component bytes exceed the 208\.5 MiB/,
+  );
+});
+
+test('cpu NSIS limits are exactly measured + explicit margin', () => {
+  expect(CPU_NSIS_MEASURED).toEqual({
+    installerBytes: 450_027_196,
+    componentArchiveBytes: 288_987_169,
+    nonComponentBytes: 161_040_027,
+  });
+  expect(CPU_NSIS_MARGIN).toEqual({
+    installerBytes: 13 * MiB,
+    componentArchiveBytes: 9 * MiB,
+    nonComponentBytes: 5 * MiB,
+  });
+  for (const key of Object.keys(CPU_NSIS_MEASURED) as (keyof typeof CPU_NSIS_MEASURED)[]) {
+    expect(CPU_NSIS_MARGIN[key]).toBe(Math.ceil((CPU_NSIS_MEASURED[key] * 0.03) / MiB) * MiB);
+  }
+  const limits = resolveEditionNsisBudget('cpu');
+  expect(limits).toMatchObject({
+    maxInstallerBytes: 463_658_684,
+    maxComponentBytes: 298_424_353,
+    maxNonComponentBytes: 166_282_907,
+    measured: CPU_NSIS_MEASURED,
+  });
+  expect(assertNsisBudget(450_027_196, 288_987_169, 'cpu')).toMatchObject({
+    edition: 'cpu',
+    uncapped: false,
+    nonComponentBytes: 161_040_027,
+  });
+  expect(() => assertNsisBudget(limits.maxInstallerBytes + 1, 280 * MiB, 'cpu')).toThrow(
+    /442\.2 MiB/,
+  );
+  expect(() => assertNsisBudget(400 * MiB, limits.maxComponentBytes + 1, 'cpu')).toThrow(
+    /284\.6 MiB/,
+  );
+  expect(() =>
+    assertNsisBudget(280 * MiB + limits.maxNonComponentBytes + 1, 280 * MiB, 'cpu'),
+  ).toThrow(/non-component/);
+});
+
+// cuda is publicly released with NO size limit (krli decision); integrity only.
+test('cuda is uncapped: sizes are measured, never rejected', () => {
+  expect([...UNCAPPED_EDITIONS]).toEqual(['cuda']);
+  expect(isUncappedEdition('cuda')).toBe(true);
   const none = { maxInstallerBytes: null, maxComponentBytes: null, maxNonComponentBytes: null };
-  expect(resolveEditionSetupBudget(edition)).toEqual(none);
-  expect(resolveEditionNsisBudget(edition)).toMatchObject(none);
-  expect(assertSetupBudget(4096 * MiB, 3000 * MiB, edition)).toMatchObject({
-    edition,
-    reportOnly: true,
+  expect(resolveEditionSetupBudget('cuda')).toEqual(none);
+  expect(resolveEditionNsisBudget('cuda')).toMatchObject(none);
+  expect(assertSetupBudget(4096 * MiB, 3000 * MiB, 'cuda')).toMatchObject({
+    edition: 'cuda',
+    uncapped: true,
     installerBytes: 4096 * MiB,
     componentArchiveBytes: 3000 * MiB,
     nonComponentBytes: 1096 * MiB,
   });
-  expect(assertNsisBudget(2048 * MiB, 300 * MiB, edition)).toMatchObject({
-    edition,
-    reportOnly: true,
+  expect(assertNsisBudget(2048 * MiB, 300 * MiB, 'cuda')).toMatchObject({
+    edition: 'cuda',
+    uncapped: true,
     nonComponentBytes: 1748 * MiB,
   });
   // Byte-count validity is correctness, not a budget: still enforced.
-  expect(() => assertSetupBudget(100, 101, edition)).toThrow(/byte counts/);
+  expect(() => assertSetupBudget(100, 101, 'cuda')).toThrow(/byte counts/);
 });
 
-test('lite is never report-only', () => {
-  expect(isReportOnlyEdition('lite')).toBe(false);
-  expect(REPORT_ONLY_EDITIONS.has('lite')).toBe(false);
+test('only cuda is uncapped; cpu and cuda bundle the optional llama.cpp component', () => {
+  expect(isUncappedEdition('lite')).toBe(false);
+  expect(isUncappedEdition('cpu')).toBe(false);
+  expect([...BUNDLED_RUNTIME_EDITIONS].sort()).toEqual(['cpu', 'cuda']);
+  expect(bundlesRuntimeComponent('lite')).toBe(false);
+  expect(bundlesRuntimeComponent('cpu')).toBe(true);
+  expect(bundlesRuntimeComponent('cuda')).toBe(true);
 });
 
 test('the NSIS final gate reads the sole updater without modifying its bytes', () => {
@@ -245,7 +331,7 @@ test('NSIS deduction sums the fixed lite components even when cpu/cuda add llama
   expect(() => readComponentArchiveBytes(dir, 'lite')).toThrow(/every bundled Windows component/);
 });
 
-test('report-only editions require the fixed set, verify and count extra components', () => {
+test('llama.cpp editions require the fixed set, verify and count extra components', () => {
   const { dir, components } = componentsFixture();
   const liteTotal = components.reduce(
     (sum: number, entry: { archiveSizeBytes: number }) => sum + entry.archiveSizeBytes,
@@ -268,7 +354,7 @@ test('report-only editions require the fixed set, verify and count extra compone
   // Integrity of the extra component is still enforced.
   writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), Buffer.alloc(extra.length));
   expect(() => readComponentArchiveBytes(dir, 'cpu')).toThrow(/bytes\/hash mismatch/);
-  // A missing fixed component is a broken install, even when report-only.
+  // A missing fixed component is a broken install, in every edition.
   writeFileSync(path.join(dir, 'llamacpp-bundled.7z'), extra);
   writeFileSync(
     path.join(dir, 'manifest.json'),

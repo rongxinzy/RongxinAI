@@ -20,12 +20,19 @@ const MiB = 1024 * 1024;
 //                   allowance below (components 300 MiB)
 // Never loosen lite to absorb other growth: find and remove the growth instead.
 //
-// cpu and cuda are NEW editions whose real sizes were unknown when this gate
-// was written. Policy (krli, 2026-10-17): never hard-code a size limit for an
-// unknown. These editions are REPORT-ONLY: every gate still computes and logs
-// the measured bytes as `[measure]` lines (and the GitHub job summary), but
-// never fails on size. A small follow-up PR adds limits = measured + explicit
-// margin. Integrity is NOT report-only: every component archive is still
+// cpu: enforced limits = value MEASURED by CI + an explicit margin. #1117
+// shipped cpu/cuda report-only (policy, krli 2026-10-17: never hard-code a
+// size limit for an unknown); the measured `[measure]` lines of build run
+// 39032801288 (all 7 legs green, main 51b62ed6) now set the cpu limits below.
+// Margin rule: ceil(3% of the measured bytes) in whole MiB, per gate.
+// Limits change ONLY through a PR that cites a new measured run (run id +
+// `[measure]` values) and recomputes measured + margin. Never bump a cpu limit
+// by a round number to make a build pass: find the growth first.
+//
+// cuda is publicly released like the other editions but has NO size limit
+// (krli decision for the public cuda release): its llama.cpp CUDA runtime is
+// dominated by NVIDIA DLLs we do not control. Its gates still measure and log
+// `[measure]` lines. Integrity is never uncapped: every component archive is
 // checked against its manifest size and sha256 (readComponentArchiveBytes), and
 // the llama.cpp runtime is pinned by sha256 (finalize-llamacpp-cuda-edition.cjs,
 // resources/llamacpp-backends/manifest.json).
@@ -35,16 +42,32 @@ const MAX_NON_COMPONENT_BYTES = 220 * MiB;
 const MAX_NSIS_BYTES = 450 * MiB;
 const MAX_NSIS_NON_COMPONENT_BYTES = 150 * MiB;
 
-/** Editions whose size gates only measure and report (no limits yet). */
-const REPORT_ONLY_EDITIONS = new Set(['cpu', 'cuda']);
+/** Editions with no size limit (cuda, krli decision for its public release). */
+const UNCAPPED_EDITIONS = new Set(['cuda']);
 
-function isReportOnlyEdition(edition = resolveInferenceEdition()) {
-  return REPORT_ONLY_EDITIONS.has(edition);
+/**
+ * Editions that bundle the optional llama.cpp component (`llamacpp-bundled`)
+ * on top of the fixed lite component set. Component identity is checked as the
+ * fixed required set plus integrity-checked extras for these editions.
+ */
+const BUNDLED_RUNTIME_EDITIONS = new Set(['cpu', 'cuda']);
+
+function isUncappedEdition(edition = resolveInferenceEdition()) {
+  return UNCAPPED_EDITIONS.has(edition);
+}
+
+function bundlesRuntimeComponent(edition = resolveInferenceEdition()) {
+  return BUNDLED_RUNTIME_EDITIONS.has(edition);
+}
+
+function formatMiB(bytes) {
+  const mib = bytes / MiB;
+  return Number.isInteger(mib) ? String(mib) : mib.toFixed(1);
 }
 
 /**
  * Emit one machine-greppable `[measure]` line (and append it to the GitHub job
- * summary when available). Used for report-only editions and for lite alike.
+ * summary when available). Every edition logs its measured bytes.
  */
 function reportMeasurement(label, data) {
   const line = `[measure] ${label} ${JSON.stringify(data)}`;
@@ -64,16 +87,59 @@ const LITE_SETUP_BUDGET = {
   maxNonComponentBytes: MAX_NON_COMPONENT_BYTES,
   maxComponentBytes: MAX_COMPONENT_BYTES,
 };
-const REPORT_ONLY_BUDGET = {
+const UNCAPPED_BUDGET = {
   maxInstallerBytes: null,
   maxNonComponentBytes: null,
   maxComponentBytes: null,
 };
 
+// cpu WebView2 setup, measured in build run 39032801288 (win32-x64-cpu):
+//   `[measure] windows-webview2-setup edition=cpu`
+//     installerBytes 527,673,448 / componentArchiveBytes 316,397,703 /
+//     nonComponentBytes 211,275,745
+//   components: the fixed lite set + llamacpp-bundled 27,410,534 B.
+const CPU_SETUP_MEASURED = {
+  installerBytes: 527_673_448,
+  componentArchiveBytes: 316_397_703,
+  nonComponentBytes: 211_275_745,
+};
+// Margins: ceil(3% of measured) in whole MiB.
+const CPU_SETUP_MARGIN = {
+  installerBytes: 16 * MiB,
+  componentArchiveBytes: 10 * MiB,
+  nonComponentBytes: 7 * MiB,
+};
+
+// cpu NSIS updater, measured in build run 39032801288 (win32-x64-cpu):
+//   `[measure] windows-nsis-updater edition=cpu`
+//     installerBytes 450,027,196 / componentArchiveBytes 288,987,169 (the fixed
+//     lite set: the updater never carries llama.cpp) / nonComponentBytes
+//     161,040,027
+const CPU_NSIS_MEASURED = {
+  installerBytes: 450_027_196,
+  componentArchiveBytes: 288_987_169,
+  nonComponentBytes: 161_040_027,
+};
+const CPU_NSIS_MARGIN = {
+  installerBytes: 13 * MiB,
+  componentArchiveBytes: 9 * MiB,
+  nonComponentBytes: 5 * MiB,
+};
+
+function measuredLimits(measured, margin) {
+  return {
+    maxInstallerBytes: measured.installerBytes + margin.installerBytes,
+    maxNonComponentBytes: measured.nonComponentBytes + margin.nonComponentBytes,
+    maxComponentBytes: measured.componentArchiveBytes + margin.componentArchiveBytes,
+  };
+}
+
+const CPU_SETUP_BUDGET = measuredLimits(CPU_SETUP_MEASURED, CPU_SETUP_MARGIN);
+
 const EDITION_SETUP_BUDGETS = {
   lite: LITE_SETUP_BUDGET,
-  cpu: REPORT_ONLY_BUDGET,
-  cuda: REPORT_ONLY_BUDGET,
+  cpu: CPU_SETUP_BUDGET,
+  cuda: UNCAPPED_BUDGET,
 };
 
 // Magpie gateway allowance (#1021 made Magpie the model execution path; #1122
@@ -105,8 +171,8 @@ const LITE_NSIS_MEASURED = {
 
 const EDITION_NSIS_BUDGETS = {
   lite: { ...LITE_NSIS_BUDGET, measured: LITE_NSIS_MEASURED },
-  cpu: { ...REPORT_ONLY_BUDGET, measured: null },
-  cuda: { ...REPORT_ONLY_BUDGET, measured: null },
+  cpu: { ...measuredLimits(CPU_NSIS_MEASURED, CPU_NSIS_MARGIN), measured: CPU_NSIS_MEASURED },
+  cuda: { ...UNCAPPED_BUDGET, measured: null },
 };
 
 function resolveEditionSetupBudget(edition = resolveInferenceEdition()) {
@@ -129,15 +195,15 @@ function assertBudget(installerBytes, componentArchiveBytes, limits, label) {
   const nonComponentBytes = installerBytes - componentArchiveBytes;
   if (limits.maxComponentBytes != null && componentArchiveBytes > limits.maxComponentBytes) {
     throw new Error(
-      `Component archives exceed the ${limits.maxComponentBytes / MiB} MiB budget for ${label}`,
+      `Component archives exceed the ${formatMiB(limits.maxComponentBytes)} MiB budget for ${label}`,
     );
   }
   if (limits.maxInstallerBytes != null && installerBytes > limits.maxInstallerBytes) {
-    throw new Error(`Final ${label} exceeds the ${limits.maxInstallerBytes / MiB} MiB budget`);
+    throw new Error(`Final ${label} exceeds the ${formatMiB(limits.maxInstallerBytes)} MiB budget`);
   }
   if (limits.maxNonComponentBytes != null && nonComponentBytes > limits.maxNonComponentBytes) {
     throw new Error(
-      `Final ${label} non-component bytes exceed the ${limits.maxNonComponentBytes / MiB} MiB budget`,
+      `Final ${label} non-component bytes exceed the ${formatMiB(limits.maxNonComponentBytes)} MiB budget`,
     );
   }
   return {
@@ -157,7 +223,7 @@ function assertSetupBudget(
 ) {
   return {
     edition,
-    reportOnly: isReportOnlyEdition(edition),
+    uncapped: isUncappedEdition(edition),
     ...assertBudget(
       installerBytes,
       componentArchiveBytes,
@@ -174,7 +240,7 @@ function assertNsisBudget(
 ) {
   return {
     edition,
-    reportOnly: isReportOnlyEdition(edition),
+    uncapped: isUncappedEdition(edition),
     ...assertBudget(
       installerBytes,
       componentArchiveBytes,
@@ -200,17 +266,17 @@ function verifyComponentArchive(componentsDir, entry) {
 // Sums the component archives the final installer carries, verifying each one's
 // manifest size and sha256 (integrity, always enforced).
 // lite: the manifest must hold exactly the fixed lite component set (original
-// gate). Report-only editions (cpu/cuda): the fixed lite set must still be
-// present (an install without them is broken), and every additional component
-// is integrity-checked, counted and reported, never rejected by count/name.
+// gate). Editions bundling llama.cpp (cpu/cuda): the fixed lite set must still
+// be present (an install without them is broken), and every additional
+// component (llamacpp-bundled) is integrity-checked, counted and reported.
 function readComponentArchiveBytes(
   componentsDir,
   edition = resolveInferenceEdition(),
   { allowExtraComponents = false } = {},
 ) {
-  const reportOnly = isReportOnlyEdition(edition);
-  const targets = resolveNsisOfflineComponentTargets(reportOnly ? 'lite' : edition);
-  const allowExtra = allowExtraComponents || reportOnly;
+  const bundled = bundlesRuntimeComponent(edition);
+  const targets = resolveNsisOfflineComponentTargets(bundled ? 'lite' : edition);
+  const allowExtra = allowExtraComponents || bundled;
   const manifest = JSON.parse(fs.readFileSync(path.join(componentsDir, 'manifest.json'), 'utf8'));
   if (
     !Array.isArray(manifest.components) ||
@@ -228,7 +294,7 @@ function readComponentArchiveBytes(
     }
     total += verifyComponentArchive(componentsDir, entries[0]);
   }
-  if (reportOnly && !allowExtraComponents) {
+  if (bundled && !allowExtraComponents) {
     const known = new Set(targets.map(target => target.key));
     const extras = manifest.components.filter(component => !known.has(component.key));
     for (const entry of extras) total += verifyComponentArchive(componentsDir, entry);
@@ -341,8 +407,14 @@ module.exports = {
   MAX_NON_COMPONENT_BYTES,
   MAX_NSIS_BYTES,
   MAX_NSIS_NON_COMPONENT_BYTES,
-  REPORT_ONLY_EDITIONS,
-  isReportOnlyEdition,
+  UNCAPPED_EDITIONS,
+  BUNDLED_RUNTIME_EDITIONS,
+  isUncappedEdition,
+  bundlesRuntimeComponent,
+  CPU_SETUP_MEASURED,
+  CPU_SETUP_MARGIN,
+  CPU_NSIS_MEASURED,
+  CPU_NSIS_MARGIN,
   reportMeasurement,
   MAGPIE_GATEWAY_COMPRESSED_BYTES,
   MAGPIE_GATEWAY_MARGIN_BYTES,

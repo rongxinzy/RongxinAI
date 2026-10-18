@@ -74,16 +74,16 @@ const nsisBudget = verifyFinalNsisBudget(
   edition,
 );
 console.log(`[installer-shell] final NSIS updater budget ${JSON.stringify(nsisBudget)}`);
-// Always measured; for report-only editions (cpu/cuda) these lines are the
-// input for the follow-up limits PR (measured value + explicit margin).
+// Always measured. These lines are the only input for changing a cpu limit
+// (measured + explicit margin, see distribution-budget.cjs); cuda is uncapped.
 reportMeasurement(`windows-webview2-setup edition=${edition}`, {
-  reportOnly: finalBudget.reportOnly,
+  uncapped: finalBudget.uncapped,
   installerBytes: finalBudget.installerBytes,
   componentArchiveBytes: finalBudget.componentArchiveBytes,
   nonComponentBytes: finalBudget.nonComponentBytes,
 });
 reportMeasurement(`windows-nsis-updater edition=${edition}`, {
-  reportOnly: nsisBudget.reportOnly,
+  uncapped: nsisBudget.uncapped,
   file: nsisBudget.file,
   installerBytes: nsisBudget.installerBytes,
   componentArchiveBytes: nsisBudget.componentArchiveBytes,
