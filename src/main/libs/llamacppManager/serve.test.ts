@@ -9,6 +9,7 @@ import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../../share
 import type { MarketplaceModel } from '../../../shared/marketplace';
 import {
   buildLlamaCppExecutableCandidates,
+  buildLlamaCppPresetGlobalGpuSection,
   buildLlamaCppServeEnv,
   buildLlamaServerModelArgs,
   buildLlamaServerArgs,
@@ -16,12 +17,14 @@ import {
   extractModelScopeFilePaths,
   filterLlamaCppServiceConfigByRuntimeCapabilities,
   isPathInside,
+  LLAMACPP_PRESET_GLOBAL_GPU_KEYS,
   listLlamaCppRuntimeDevices,
   LlamaCppManager,
   mergeLocalModels,
   modelLaunchOptionsToPreset,
   parseLlamaCppHelpFlags,
   parseLlamaCppListDevicesOutput,
+  replaceIniSectionKeys,
   resolveLlamaCppDeviceSelection,
   resolveLlamaCppRuntimeTargetPreference,
   scanLocalGgufModels,
@@ -151,6 +154,10 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
         gpuLayers: 'all',
         threads: '8',
         threadsBatch: '4',
+        device: 'CUDA0,CUDA1',
+        mainGpu: '1',
+        splitMode: 'layer',
+        tensorSplit: '3,1',
         flashAttn: 'auto',
         reasoning: 'off',
         reasoningFormat: 'none',
@@ -197,8 +204,6 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
     '512',
     '--ubatch-size',
     '128',
-    '--gpu-layers',
-    'all',
     '--threads',
     '8',
     '--threads-batch',
@@ -217,6 +222,31 @@ test('buildLlamaServerArgs maps llama.cpp server and router options from service
     '--no-mmap',
     '--mlock',
   ]);
+});
+
+test('buildLlamaServerArgs keeps GPU placement flags off the router command line', () => {
+  const args = buildLlamaServerArgs(
+    {
+      gpuLayers: 'all',
+      device: 'CUDA0,CUDA1',
+      mainGpu: '1',
+      splitMode: 'layer',
+      tensorSplit: '3,1',
+    },
+    '/models/custom',
+    '/presets/custom.ini',
+  );
+
+  for (const flag of [
+    '--device',
+    '--main-gpu',
+    '--tensor-split',
+    '--gpu-layers',
+    '--n-gpu-layers',
+    '--split-mode',
+  ]) {
+    expect(args).not.toContain(flag);
+  }
 });
 
 test('buildLlamaServerArgs always disables router model autoload', () => {
@@ -369,31 +399,57 @@ test('resolveLlamaCppRuntimeTargetPreference defaults to auto CUDA 12 preference
   });
 });
 
-test('buildLlamaServerArgs keeps advanced GPU routing settings as restart-only server flags', () => {
+test('buildLlamaCppPresetGlobalGpuSection renders GPU routing settings into the preset global section', () => {
   expect(
-    buildLlamaServerArgs(
-      {
-        device: '0,1',
-        splitMode: 'layer',
-        tensorSplit: '3,2',
-      },
-      '/models/custom',
-      '/presets/custom.ini',
-    ),
-  ).toContain('--device');
-  expect(
-    buildLlamaServerArgs(
-      {
-        device: '0,1',
-        splitMode: 'layer',
-        tensorSplit: '3,2',
-      },
-      '/models/custom',
-      '/presets/custom.ini',
-    ),
-  ).toEqual(
-    expect.arrayContaining(['--device', '0,1', '--split-mode', 'layer', '--tensor-split', '3,2']),
+    buildLlamaCppPresetGlobalGpuSection({
+      gpuLayers: '999',
+      device: '0,1',
+      splitMode: 'layer',
+      tensorSplit: '3,2',
+      mainGpu: '1',
+    }),
+  ).toEqual({
+    'n-gpu-layers': '999',
+    device: '0,1',
+    'split-mode': 'layer',
+    'tensor-split': '3,2',
+    'main-gpu': '1',
+  });
+});
+
+test('buildLlamaCppPresetGlobalGpuSection omits unset keys so stale values are removed on upsert', () => {
+  expect(buildLlamaCppPresetGlobalGpuSection({})).toEqual({});
+  expect(buildLlamaCppPresetGlobalGpuSection({ gpuLayers: '  ', tensorSplit: '3,2' })).toEqual({
+    'tensor-split': '3,2',
+  });
+});
+
+test('preset global GPU section preserves other global keys and drops stale GPU keys', () => {
+  const preset = [
+    'version = 1',
+    '',
+    '[*]',
+    'ctx-size = 2048',
+    'n-gpu-layers = 99',
+    'device = none',
+    '',
+    '[smol]',
+    'model = /models/smol.gguf',
+    'n-gpu-layers = 0',
+    '',
+  ].join('\n');
+
+  const next = replaceIniSectionKeys(
+    preset,
+    '*',
+    LLAMACPP_PRESET_GLOBAL_GPU_KEYS,
+    buildLlamaCppPresetGlobalGpuSection({ gpuLayers: '999', tensorSplit: '3,2' }),
   );
+
+  expect(next).toContain('[*]\nctx-size = 2048\nn-gpu-layers = 999\ntensor-split = 3,2');
+  // Stale global device key is gone; the per-model section is untouched.
+  expect(next).not.toContain('device = none');
+  expect(next).toContain('[smol]\nmodel = /models/smol.gguf\nn-gpu-layers = 0');
 });
 
 test('filterLlamaCppServiceConfigByRuntimeCapabilities drops unsupported and hidden runtime fields', () => {
