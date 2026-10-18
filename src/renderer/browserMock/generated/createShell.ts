@@ -31,9 +31,8 @@ export function createShell(runtime: BrowserMockRuntime): Window['electron']['sh
         success: true,
       };
     },
-    resolveLocalPath: async (_p0, _p1) => {
+    resolveLocalPath: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('shell.resolveLocalPath');
       return {
         path: '/home/user/preview',

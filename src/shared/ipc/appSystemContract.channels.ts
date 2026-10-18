@@ -1,0 +1,78 @@
+/**
+ * Channel map for the system IPC contract, importable by the sandboxed
+ * preload. Kept in a separate zod-free module because the preload bundle must
+ * not require zod; the type argument locks the map to the contract's channels.
+ */
+import type { IpcContractChannels } from './contract';
+import type { appSystemContract } from './appSystemContract';
+import {
+  AppIpc,
+  AppConfigIpc,
+  DialogIpc,
+  LogIpc,
+  PermissionsIpc,
+  ProjectIpc,
+  ShellIpc,
+  StoreIpc,
+  WindowIpc,
+} from './channels';
+import { AppUpdateIpc } from '../appUpdate/constants';
+import { TriageIpcChannel } from '../triage';
+
+export const appSystemContractChannels: IpcContractChannels<typeof appSystemContract> = {
+  storeGet: StoreIpc.Get,
+  storeSet: StoreIpc.Set,
+  storeRemove: StoreIpc.Remove,
+  triageGetConfig: TriageIpcChannel.GetConfig,
+  triageSetConfig: TriageIpcChannel.SetConfig,
+  permissionsCheckCalendar: PermissionsIpc.CheckCalendar,
+  permissionsRequestCalendar: PermissionsIpc.RequestCalendar,
+  windowIsMaximized: WindowIpc.IsMaximized,
+  windowToggleDevTools: WindowIpc.ToggleDevTools,
+  windowOpenDevTools: WindowIpc.OpenDevTools,
+  checkApiConfig: AppConfigIpc.CheckApiConfig,
+  generateSessionTitle: AppConfigIpc.GenerateSessionTitle,
+  getRecentCwds: AppConfigIpc.GetRecentCwds,
+  dialogSelectDirectory: DialogIpc.SelectDirectory,
+  dialogSelectFile: DialogIpc.SelectFile,
+  dialogSelectFiles: DialogIpc.SelectFiles,
+  dialogSaveInlineFile: DialogIpc.SaveInlineFile,
+  dialogReadFileAsDataUrl: DialogIpc.ReadFileAsDataUrl,
+  dialogCheckArtifactFile: DialogIpc.CheckArtifactFile,
+  dialogGenerateThumbnail: DialogIpc.GenerateThumbnail,
+  dialogShowMessageBox: DialogIpc.ShowMessageBox,
+  projectGetDefaultBaseDir: ProjectIpc.GetDefaultBaseDir,
+  projectCreateDirectory: ProjectIpc.CreateDirectory,
+  projectEnsureScratchDir: ProjectIpc.EnsureScratchDir,
+  projectCreateRandomWorkspace: ProjectIpc.CreateRandomWorkspace,
+  shellOpenPath: ShellIpc.OpenPath,
+  shellShowItemInFolder: ShellIpc.ShowItemInFolder,
+  shellOpenExternal: ShellIpc.OpenExternal,
+  shellOpenHtmlInBrowser: ShellIpc.OpenHtmlInBrowser,
+  shellResolveLocalPath: ShellIpc.ResolveLocalPath,
+  autoLaunchGet: AppIpc.GetAutoLaunch,
+  autoLaunchSet: AppIpc.SetAutoLaunch,
+  preventSleepGet: AppIpc.GetPreventSleep,
+  preventSleepSet: AppIpc.SetPreventSleep,
+  appGetVersion: AppIpc.GetVersion,
+  appIsDev: AppIpc.IsDev,
+  appIsEnterprise: AppIpc.IsEnterprise,
+  appGetSystemLocale: AppIpc.GetSystemLocale,
+  appConsumePendingLocalInferenceInstall: AppIpc.ConsumePendingLocalInferenceInstall,
+  appGetInferenceEdition: AppIpc.GetInferenceEdition,
+  appUsesBundledLlamaCppRuntime: AppIpc.UsesBundledLlamaCppRuntime,
+  appRelaunch: AppIpc.Relaunch,
+  appUpdateGetChannel: AppUpdateIpc.GetChannel,
+  appUpdateSetChannel: AppUpdateIpc.SetChannel,
+  appUpdateGetState: AppUpdateIpc.GetState,
+  appUpdateCheckNow: AppUpdateIpc.CheckNow,
+  appUpdateRetryDownload: AppUpdateIpc.RetryDownload,
+  appUpdatePauseDownload: AppUpdateIpc.PauseDownload,
+  appUpdateResumeDownload: AppUpdateIpc.ResumeDownload,
+  appUpdateCancelDownload: AppUpdateIpc.CancelDownload,
+  appUpdateInstallReady: AppUpdateIpc.InstallReady,
+  appUpdateRevealDownload: AppUpdateIpc.RevealDownload,
+  logGetPath: LogIpc.GetPath,
+  logOpenFolder: LogIpc.OpenFolder,
+  logExportZip: LogIpc.ExportZip,
+} as const;

@@ -3,9 +3,8 @@ import { access, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ipcMain } from 'electron';
-
-import { DialogIpc } from '../shared/ipc/channels';
+import { appSystemContract } from '../shared/ipc/appSystemContract';
+import { handleIpcContractSubset } from './ipc/handleIpcContract';
 
 /** Check metadata and read permission without loading or encoding the file. */
 export async function checkArtifactFile(filePath: unknown): Promise<{ success: boolean }> {
@@ -23,7 +22,7 @@ export async function checkArtifactFile(filePath: unknown): Promise<{ success: b
 }
 
 export function registerArtifactFileAvailabilityHandler(): void {
-  ipcMain.handle(DialogIpc.CheckArtifactFile, (_event, filePath: unknown) =>
-    checkArtifactFile(filePath),
-  );
+  handleIpcContractSubset(appSystemContract, {
+    dialogCheckArtifactFile: (_event, filePath) => checkArtifactFile(filePath),
+  });
 }

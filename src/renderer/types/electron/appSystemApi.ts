@@ -3,105 +3,80 @@
  *
  * Native dialogs, project directory helpers, shell integration and app
  * lifecycle: version info, update flow and log export.
+ *
+ * Method signatures derive from the zod IPC contract
+ * (`src/shared/ipc/appSystemContract.ts`) — the contract is the single source
+ * of truth shared with main and preload. The hand-written member names map to
+ * contract methods via the `Renamed` helper below.
  */
-import type {
-  AppUpdateCheckResult,
-  AppUpdateRuntimeState,
-} from '../../../shared/appUpdate/constants';
-import type { InferenceEdition } from '../../../shared/inferenceEdition';
+import type { IpcContractApi } from '../../../shared/ipc/contract';
+import type { appSystemContract } from '../../../shared/ipc/appSystemContract';
 
-export interface DialogApi {
-  selectDirectory: (options?: {
-    defaultPath?: string;
-  }) => Promise<{ success: boolean; path: string | null }>;
-  selectFile: (options?: {
-    title?: string;
-    filters?: { name: string; extensions: string[] }[];
-  }) => Promise<{ success: boolean; path: string | null }>;
-  selectFiles: (options?: {
-    title?: string;
-    filters?: { name: string; extensions: string[] }[];
-  }) => Promise<{ success: boolean; paths: string[] }>;
-  saveInlineFile: (options: {
-    dataBase64: string;
-    fileName?: string;
-    mimeType?: string;
-    cwd?: string;
-  }) => Promise<{ success: boolean; path: string | null; error?: string }>;
-  readFileAsDataUrl: (
-    filePath: string,
-  ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
-  checkArtifactFile: (filePath: string) => Promise<{ success: boolean }>;
-  generateThumbnail: (
-    filePath: string,
-  ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
-  showMessageBox: (options: {
-    message: string;
-    type?: 'none' | 'info' | 'error' | 'question' | 'warning';
-    title?: string;
-  }) => Promise<{ response: number }>;
+type AppSystemContractApi = IpcContractApi<typeof appSystemContract>;
+
+/** Maps contract method names onto the preload-facing member names. */
+type Renamed<M extends Record<string, keyof AppSystemContractApi>> = {
+  [K in keyof M]: AppSystemContractApi[M[K]];
+};
+
+export interface DialogApi extends Renamed<{
+  selectDirectory: 'dialogSelectDirectory';
+  selectFile: 'dialogSelectFile';
+  selectFiles: 'dialogSelectFiles';
+  saveInlineFile: 'dialogSaveInlineFile';
+  readFileAsDataUrl: 'dialogReadFileAsDataUrl';
+  checkArtifactFile: 'dialogCheckArtifactFile';
+  generateThumbnail: 'dialogGenerateThumbnail';
+  showMessageBox: 'dialogShowMessageBox';
+}> {}
+
+export interface ProjectApi extends Renamed<{
+  getDefaultBaseDir: 'projectGetDefaultBaseDir';
+  createDirectory: 'projectCreateDirectory';
+  ensureScratchDir: 'projectEnsureScratchDir';
+  createRandomWorkspace: 'projectCreateRandomWorkspace';
+}> {}
+
+export interface ShellApi extends Renamed<{
+  openPath: 'shellOpenPath';
+  showItemInFolder: 'shellShowItemInFolder';
+  openExternal: 'shellOpenExternal';
+  openHtmlInBrowser: 'shellOpenHtmlInBrowser';
+  resolveLocalPath: 'shellResolveLocalPath';
+}> {}
+
+export interface AppInfoApi extends Renamed<{
+  getVersion: 'appGetVersion';
+  isDev: 'appIsDev';
+  isEnterprise: 'appIsEnterprise';
+  getSystemLocale: 'appGetSystemLocale';
+  consumePendingLocalInferenceInstall: 'appConsumePendingLocalInferenceInstall';
+  getInferenceEdition: 'appGetInferenceEdition';
+  usesBundledLlamaCppRuntime: 'appUsesBundledLlamaCppRuntime';
+  relaunch: 'appRelaunch';
+}> {}
+
+export interface AppUpdateApi extends Renamed<{
+  getChannel: 'appUpdateGetChannel';
+  setChannel: 'appUpdateSetChannel';
+  getState: 'appUpdateGetState';
+  checkNow: 'appUpdateCheckNow';
+  retryDownload: 'appUpdateRetryDownload';
+  pauseDownload: 'appUpdatePauseDownload';
+  resumeDownload: 'appUpdateResumeDownload';
+  cancelDownload: 'appUpdateCancelDownload';
+  installReady: 'appUpdateInstallReady';
+  revealDownload: 'appUpdateRevealDownload';
+}> {
+  onStateChanged: (
+    callback: (data: import('../../../shared/appUpdate/constants').AppUpdateRuntimeState) => void,
+  ) => () => void;
 }
 
-export interface ProjectApi {
-  getDefaultBaseDir: () => Promise<{ success: boolean; path: string | null; error?: string }>;
-  createDirectory: (options: { name: string; baseDir?: string }) => Promise<{
-    success: boolean;
-    path: string | null;
-    code?: 'invalid-name' | 'already-exists';
-    error?: string;
-  }>;
-  ensureScratchDir: () => Promise<{ success: boolean; path: string | null; error?: string }>;
-  createRandomWorkspace: () => Promise<{ success: boolean; path: string | null; error?: string }>;
-}
-
-export interface ShellApi {
-  openPath: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  showItemInFolder: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-  openExternal: (url: string) => Promise<{ success: boolean; error?: string }>;
-  openHtmlInBrowser: (htmlContent: string) => Promise<{ success: boolean; error?: string }>;
-  resolveLocalPath: (
-    candidate: string,
-    cwd?: string,
-  ) => Promise<{ path: string | null; error?: string }>;
-}
-
-export interface AppInfoApi {
-  getVersion: () => Promise<string>;
-  isDev: () => Promise<boolean>;
-  isEnterprise: () => Promise<boolean>;
-  getSystemLocale: () => Promise<string>;
-  consumePendingLocalInferenceInstall: () => Promise<string | null>;
-  getInferenceEdition: () => Promise<InferenceEdition>;
-  usesBundledLlamaCppRuntime: () => Promise<boolean>;
-  relaunch: () => Promise<void>;
-}
-
-export interface AppUpdateApi {
-  getChannel: () => Promise<'stable' | 'beta'>;
-  setChannel: (channel: 'stable' | 'beta') => Promise<'stable' | 'beta'>;
-  getState: () => Promise<AppUpdateRuntimeState>;
-  checkNow: (options?: {
-    manual?: boolean;
-    userId?: string | null;
-  }) => Promise<AppUpdateCheckResult>;
-  retryDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
-  pauseDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
-  resumeDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
-  cancelDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
-  installReady: () => Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }>;
-  revealDownload: () => Promise<{ success: boolean; path?: string; error?: string }>;
-  onStateChanged: (callback: (data: AppUpdateRuntimeState) => void) => () => void;
-}
-
-export interface LogApi {
-  getPath: () => Promise<string>;
-  openFolder: () => Promise<void>;
-  exportZip: () => Promise<{
-    success: boolean;
-    canceled?: boolean;
-    path?: string;
-    missingEntries?: string[];
-    error?: string;
-  }>;
+export interface LogApi extends Renamed<{
+  getPath: 'logGetPath';
+  openFolder: 'logOpenFolder';
+  exportZip: 'logExportZip';
+}> {
   fromRenderer: (level: string, tag: string, message: string) => void;
 }

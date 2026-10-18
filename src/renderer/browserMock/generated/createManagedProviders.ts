@@ -5,6 +5,9 @@ export function createManagedProviders(
   runtime: BrowserMockRuntime,
 ): Window['electron']['managedProviders'] {
   return {
+    onChanged: _p0 => {
+      return runtime.subscribe('managedProviders.onChanged', _p0);
+    },
     policy: async () => {
       runtime.warnOnce('managedProviders.policy');
       return {
@@ -15,9 +18,6 @@ export function createManagedProviders(
     catalog: async () => {
       runtime.warnOnce('managedProviders.catalog');
       return [];
-    },
-    onChanged: _p0 => {
-      return runtime.subscribe('managedProviders.onChanged', _p0);
     },
     aisphereSnapshot: async () => {
       runtime.warnOnce('managedProviders.aisphereSnapshot');
