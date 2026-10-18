@@ -8,11 +8,67 @@ import {
   RONGX_DIR_NAME,
   WATCH_DEBOUNCE_MS,
 } from './constants';
-import { listSkillDirs } from './skillDirs';
+
+/**
+ * Decides whether a filesystem event observed under a skills root affects a
+ * skill definition and should trigger a debounced skills-changed notification.
+ *
+ * `relativePath` is the event filename relative to the watched root; `\`
+ * separators are normalized to `/` (recursive fs.watch reports child paths
+ * as platform-separated relative paths). `null` filenames carry no path
+ * information and are handled per-platform.
+ */
+export function isSkillDefinitionChange(
+  relativePath: string | null,
+  platform: NodeJS.Platform,
+): boolean {
+  if (relativePath === null) {
+    // On Windows, fs.watch (ReadDirectoryChangesW) frequently reports null
+    // filenames for unrelated filesystem activity (AV scans, search indexing,
+    // timestamp updates).  Ignoring null filenames avoids false
+    // skills-changed listener chains that can trigger unwanted
+    // Gateway restarts.  Legitimate skill changes always go through explicit
+    // code paths (installSkill, deleteSkill, etc.) that call
+    // notifySkillsChanged directly.
+    return platform !== 'win32';
+  }
+
+  const segments = relativePath
+    .split('\\')
+    .join('/')
+    .split('/')
+    .filter(segment => segment.length > 0);
+  if (segments.length === 0) return false;
+  // Ignore hidden files/dirs (dot-prefixed caches, metadata, tombstones).
+  if (segments[0].startsWith('.')) return false;
+
+  const [first, second, third] = segments;
+
+  // Root-level config file.
+  if (segments.length === 1) {
+    return first === SKILLS_CONFIG_FILE || !path.posix.extname(first);
+  }
+
+  // `<skill>/SKILL.md`, `<skill>/skills.config.json`, or the same names under
+  // `<skill>/zhiyuan/`. Everything else (deeper files, caches, data files)
+  // is not a definition change.
+  if (segments.length === 2) {
+    return second === SKILL_FILE_NAME || second === SKILLS_CONFIG_FILE;
+  }
+  if (segments.length === 3 && second === RONGX_DIR_NAME) {
+    return third === SKILL_FILE_NAME || third === SKILLS_CONFIG_FILE;
+  }
+  return false;
+}
 
 /**
  * Watches the skill roots for definition-file changes and debounces
  * skills-changed notifications (browser windows + registered listeners).
+ *
+ * One recursive watcher per root replaces the former fan-out of one watcher
+ * per skill directory (and per `.rongx` directory); a recursive watcher
+ * already sees new skill directories, so watchers are no longer torn down
+ * and re-created after every change.
  */
 export class SkillWatcher {
   private watchers: fs.FSWatcher[] = [];
@@ -46,69 +102,24 @@ export class SkillWatcher {
       }
     }
 
-    // Root-level watch: only react to directory additions/removals (new/deleted skills).
     const rootWatchHandler = (_event: string, filename: string | null) => {
-      // On Windows, fs.watch (ReadDirectoryChangesW) frequently reports null
-      // filenames for unrelated filesystem activity (AV scans, search indexing,
-      // timestamp updates).  Ignoring null filenames avoids false
-      // skills-changed listener chains that can trigger unwanted
-      // Gateway restarts.  Legitimate skill changes always go through explicit
-      // code paths (installSkill, deleteSkill, etc.) that call
-      // notifySkillsChanged directly.
-      if (!filename) {
-        if (process.platform !== 'win32') this.scheduleNotify();
-        return;
-      }
-      // Ignore hidden files/dirs and known non-skill files
-      if (filename.startsWith('.')) return;
-      // Accept directory changes (new skill added/removed) and config file
-      if (filename === SKILLS_CONFIG_FILE) {
-        this.scheduleNotify();
-        return;
-      }
-      // For other filenames, check if it looks like a skill directory entry
-      // (no extension = likely a directory name)
-      if (!path.extname(filename)) {
+      if (isSkillDefinitionChange(filename, process.platform)) {
         this.scheduleNotify();
       }
-    };
-
-    // Skill-directory-level watch: only react to skill definition file changes.
-    const skillDirWatchHandler = (_event: string, filename: string | null) => {
-      if (!filename) {
-        if (process.platform !== 'win32') this.scheduleNotify();
-        return;
-      }
-      if (filename === SKILL_FILE_NAME || filename === SKILLS_CONFIG_FILE) {
-        this.scheduleNotify();
-      }
-      // Ignore cache files, data files, and any other non-definition files.
     };
 
     roots.forEach(root => {
       if (!fs.existsSync(root)) return;
       try {
-        this.watchers.push(fs.watch(root, rootWatchHandler));
+        const watcher = fs.watch(root, { recursive: true }, rootWatchHandler);
+        watcher.on('error', error => {
+          // Watching a deleted/unavailable root must never crash main.
+          console.error('[skills] Skills root watcher error for %s:', root, error);
+        });
+        this.watchers.push(watcher);
       } catch (error) {
         console.warn('[skills] Failed to watch skills root:', root, error);
       }
-
-      const skillDirs = listSkillDirs(root);
-      skillDirs.forEach(dir => {
-        try {
-          this.watchers.push(fs.watch(dir, skillDirWatchHandler));
-        } catch (error) {
-          console.warn('[skills] Failed to watch skill directory:', dir, error);
-        }
-
-        const rongxDir = path.join(dir, RONGX_DIR_NAME);
-        if (!fs.existsSync(rongxDir)) return;
-        try {
-          this.watchers.push(fs.watch(rongxDir, skillDirWatchHandler));
-        } catch (error) {
-          console.warn('[skills] Failed to watch skill UI metadata directory:', rongxDir, error);
-        }
-      });
     });
   }
 
@@ -132,7 +143,6 @@ export class SkillWatcher {
     }
     this.notifyTimer = setTimeout(() => {
       this.notifyTimer = null;
-      this.startWatching();
       this.notifySkillsChanged();
     }, WATCH_DEBOUNCE_MS);
   }
