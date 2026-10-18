@@ -3,11 +3,13 @@
  * `artifact:list` reads from the ledger. Registration also installs the
  * window fan-out as the recorder-side publisher sink.
  */
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow } from 'electron';
 
 import { ArtifactIpc } from '../../shared/ipc/channels';
 import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import { getArtifactLedger } from '../appBootstrap/runtimeServices';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { artifactsContract } from '../../shared/ipc/artifactsContract';
 import { setArtifactUpsertPublisher, type ArtifactUpsertEvent } from './publisher';
 
 const MAX_SCOPE_ID_LENGTH = 200;
@@ -32,11 +34,10 @@ function publishUpsertToWindows(event: ArtifactUpsertEvent): void {
 export const registerArtifactIpc = (): void => {
   setArtifactUpsertPublisher(publishUpsertToWindows);
 
-  ipcMain.handle(
-    ArtifactIpc.List,
-    async (_event, rawScopeId: unknown): Promise<ArtifactListResult> => {
+  handleIpcContract(artifactsContract, {
+    list: async (_event, rawScopeId): Promise<ArtifactListResult> => {
       try {
-        const scopeId = typeof rawScopeId === 'string' ? rawScopeId.trim() : '';
+        const scopeId = rawScopeId.trim();
         if (!scopeId || scopeId.length > MAX_SCOPE_ID_LENGTH) {
           return { success: false, error: 'Invalid artifact scope id.' };
         }
@@ -48,5 +49,5 @@ export const registerArtifactIpc = (): void => {
         };
       }
     },
-  );
+  });
 };

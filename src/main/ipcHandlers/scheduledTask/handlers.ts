@@ -1,14 +1,14 @@
-import { ipcMain } from 'electron';
-
 import {
   DeliveryMode as STDeliveryMode,
-  IpcChannel as ScheduledTaskIpc,
   PayloadKind as STPayloadKind,
 } from '../../../scheduledTask/constants';
+import type { RunFilter, ScheduledTaskInput } from '../../../scheduledTask/types';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { PlatformRegistry } from '../../../shared/platform';
 import { tryParseCcConnectScopedConversationId } from '../../im/ccConnectConversationId';
 import { t } from '../../i18n';
+import { handleIpcContract } from '../../ipc/handleIpcContract';
+import { scheduledTasksContract } from '../../../shared/ipc/automationContract';
 import { listScheduledTaskChannels } from './helpers';
 
 export interface ScheduledTaskHandlerDeps {
@@ -72,9 +72,8 @@ async function applyAnnounceDeliveryNormalization(
   }
 }
 
-function cloneScheduledTaskInput<T extends Record<string, any>>(input: T): T {
-  if (!input || typeof input !== 'object') return {} as T;
-  const normalized: Record<string, any> = { ...input };
+function cloneScheduledTaskInput<T>(input: T): T {
+  const normalized = { ...input } as Record<string, any>;
   if (Object.hasOwn(normalized, 'delivery') && normalized.delivery) {
     normalized.delivery = { ...normalized.delivery };
   }
@@ -84,111 +83,105 @@ function cloneScheduledTaskInput<T extends Record<string, any>>(input: T): T {
 export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): void {
   const { getCronJobService, getIMGatewayManager } = deps;
 
-  ipcMain.handle(ScheduledTaskIpc.List, async () => {
-    try {
-      const tasks = await getCronJobService().listJobs();
-      return { success: true, tasks };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to list tasks',
-      };
-    }
-  });
+  handleIpcContract(scheduledTasksContract, {
+    list: async () => {
+      try {
+        const tasks = await getCronJobService().listJobs();
+        return { success: true, tasks };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to list tasks',
+        };
+      }
+    },
 
-  ipcMain.handle(ScheduledTaskIpc.Get, async (_event, id: string) => {
-    try {
-      const task = await getCronJobService().getJob(id);
-      return { success: true, task };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get task',
-      };
-    }
-  });
+    get: async (_event, id) => {
+      try {
+        const task = await getCronJobService().getJob(id);
+        return { success: true, task };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to get task',
+        };
+      }
+    },
 
-  ipcMain.handle(ScheduledTaskIpc.Create, async (_event, input: any) => {
-    try {
-      const normalizedInput = cloneScheduledTaskInput(input);
-      await applyAnnounceDeliveryNormalization(normalizedInput);
+    create: async (_event, input) => {
+      try {
+        const taskInput = input as ScheduledTaskInput;
+        const normalizedInput = cloneScheduledTaskInput(taskInput);
+        await applyAnnounceDeliveryNormalization(normalizedInput as Record<string, any>);
 
-      const task = await getCronJobService().addJob(normalizedInput);
-      console.log(`[ScheduledTask] created task ${task.id}`);
-      return { success: true, task };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to create task',
-      };
-    }
-  });
+        const task = await getCronJobService().addJob(normalizedInput);
+        console.log(`[ScheduledTask] created task ${task.id}`);
+        return { success: true, task };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to create task',
+        };
+      }
+    },
 
-  ipcMain.handle(ScheduledTaskIpc.Update, async (_event, id: string, input: any) => {
-    try {
-      const normalizedInput = cloneScheduledTaskInput(input);
-      await applyAnnounceDeliveryNormalization(normalizedInput);
+    update: async (_event, id, input) => {
+      try {
+        const normalizedInput = cloneScheduledTaskInput(input as Partial<ScheduledTaskInput>);
+        await applyAnnounceDeliveryNormalization(normalizedInput as Record<string, any>);
 
-      const task = await getCronJobService().updateJob(id, normalizedInput);
-      console.log(`[ScheduledTask] updated task ${task.id}`);
-      return { success: true, task };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to update task',
-      };
-    }
-  });
+        const task = await getCronJobService().updateJob(id, normalizedInput);
+        console.log(`[ScheduledTask] updated task ${task.id}`);
+        return { success: true, task };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to update task',
+        };
+      }
+    },
 
-  ipcMain.handle(ScheduledTaskIpc.Delete, async (_event, id: string) => {
-    try {
-      await getCronJobService().removeJob(id);
-      return { success: true, result: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete task',
-      };
-    }
-  });
+    delete: async (_event, id) => {
+      try {
+        await getCronJobService().removeJob(id);
+        return { success: true, result: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to delete task',
+        };
+      }
+    },
 
-  ipcMain.handle(ScheduledTaskIpc.Toggle, async (_event, id: string, enabled: boolean) => {
-    try {
-      const task = await getCronJobService().toggleJob(id, enabled);
-      return { success: true, task };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to toggle task',
-      };
-    }
-  });
+    toggle: async (_event, id, enabled) => {
+      try {
+        const task = await getCronJobService().toggleJob(id, enabled);
+        return { success: true, task };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to toggle task',
+        };
+      }
+    },
 
-  ipcMain.handle(ScheduledTaskIpc.RunManually, async (_event, id: string) => {
-    try {
-      await getCronJobService().runJob(id);
-      return { success: true };
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[IPC] Manual run failed for ${id}:`, msg);
-      return { success: false, error: msg };
-    }
-  });
+    runManually: async (_event, id) => {
+      try {
+        await getCronJobService().runJob(id);
+        return { success: true };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(`[IPC] Manual run failed for ${id}:`, msg);
+        return { success: false, error: msg };
+      }
+    },
 
-  ipcMain.handle(ScheduledTaskIpc.Stop, async (_event, _id: string) => {
-    // A claimed Pi Run is allowed to finish or time out on its own.
-    return { success: true, result: false };
-  });
+    stop: async (_event, _id) => {
+      // A claimed Pi Run is allowed to finish or time out on its own.
+      return { success: true, result: false };
+    },
 
-  ipcMain.handle(
-    ScheduledTaskIpc.ListRuns,
-    async (
-      _event,
-      taskId: string,
-      limit?: number,
-      offset?: number,
-      filter?: import('../../../scheduledTask/types').RunFilter,
-    ) => {
+    listRuns: async (_event, taskId, limit?, offset?, filter?: RunFilter) => {
       try {
         const runs = await getCronJobService().listRuns(taskId, limit, offset, filter);
         return { success: true, runs };
@@ -199,40 +192,32 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
         };
       }
     },
-  );
 
-  ipcMain.handle(ScheduledTaskIpc.ListDeliveries, async (_event, runId: string) => {
-    try {
-      const deliveries = await getCronJobService().listDeliveries(runId);
-      return { success: true, deliveries };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to list deliveries',
-      };
-    }
-  });
+    listDeliveries: async (_event, runId) => {
+      try {
+        const deliveries = await getCronJobService().listDeliveries(runId);
+        return { success: true, deliveries };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to list deliveries',
+        };
+      }
+    },
 
-  ipcMain.handle(ScheduledTaskIpc.CountRuns, async (_event, taskId: string) => {
-    try {
-      const count = await getCronJobService().countRuns(taskId);
-      return { success: true, count };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to count runs',
-      };
-    }
-  });
+    countRuns: async (_event, taskId) => {
+      try {
+        const count = await getCronJobService().countRuns(taskId);
+        return { success: true, count };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to count runs',
+        };
+      }
+    },
 
-  ipcMain.handle(
-    ScheduledTaskIpc.ListAllRuns,
-    async (
-      _event,
-      limit?: number,
-      offset?: number,
-      filter?: import('../../../scheduledTask/types').RunFilter,
-    ) => {
+    listAllRuns: async (_event, limit?, offset?, filter?: RunFilter) => {
       try {
         const runs = await getCronJobService().listAllRuns(limit, offset, filter);
         return { success: true, runs };
@@ -243,68 +228,65 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
         };
       }
     },
-  );
 
-  ipcMain.handle(ScheduledTaskIpc.ResolveSession, async (_event, sessionKey: string) => {
-    try {
-      if (!sessionKey) return { success: true, session: null };
-      // Canonical Runs store their Pi session id directly. There is no remote
-      // scheduler session authority to query by an opaque legacy session key.
-      return { success: true, session: null };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to resolve session',
-      };
-    }
-  });
-
-  ipcMain.handle(ScheduledTaskIpc.ListChannels, async () => {
-    try {
-      return { success: true, channels: listScheduledTaskChannels() };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to list channels',
-      };
-    }
-  });
-
-  ipcMain.handle(ScheduledTaskIpc.Preflight, async (_event, taskId: string) => {
-    try {
-      const task = await getCronJobService().getJob(taskId);
-      if (!task) return { success: false, error: 'Task not found' };
-
-      // Only relevant for tasks with IM channel delivery.
-      const channel = task.delivery?.channel;
-      if (!channel || task.delivery?.mode === 'none') {
-        return { success: true, preflight: { hasChannel: false } };
+    resolveSession: async (_event, sessionKey) => {
+      try {
+        if (!sessionKey) return { success: true, session: null };
+        // Canonical Runs store their Pi session id directly. There is no remote
+        // scheduler session authority to query by an opaque legacy session key.
+        return { success: true, session: null as unknown as Record<string, unknown> | null };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to resolve session',
+        };
       }
+    },
 
-      const [latestRun] = await getCronJobService().listRuns(taskId, 1);
-      const [latestDelivery] = latestRun
-        ? await getCronJobService().listDeliveries(latestRun.id)
-        : [];
+    listChannels: async () => {
+      try {
+        return { success: true, channels: listScheduledTaskChannels() };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to list channels',
+        };
+      }
+    },
 
-      return {
-        success: true,
-        preflight: {
-          hasChannel: true,
-          channel,
-          latestDelivery: latestDelivery ?? null,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Preflight failed',
-      };
-    }
-  });
+    preflight: async (_event, taskId) => {
+      try {
+        const task = await getCronJobService().getJob(taskId);
+        if (!task) return { success: false, error: 'Task not found' };
 
-  ipcMain.handle(
-    ScheduledTaskIpc.ListChannelConversations,
-    async (_event, channel: string, accountId?: string, filterAccountId?: string) => {
+        // Only relevant for tasks with IM channel delivery.
+        const channel = task.delivery?.channel;
+        if (!channel || task.delivery?.mode === 'none') {
+          return { success: true, preflight: { hasChannel: false } };
+        }
+
+        const [latestRun] = await getCronJobService().listRuns(taskId, 1);
+        const [latestDelivery] = latestRun
+          ? await getCronJobService().listDeliveries(latestRun.id)
+          : [];
+
+        return {
+          success: true,
+          preflight: {
+            hasChannel: true,
+            channel,
+            latestDelivery: latestDelivery ?? null,
+          },
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Preflight failed',
+        };
+      }
+    },
+
+    listChannelConversations: async (_event, channel, accountId?, filterAccountId?) => {
       try {
         const platform = PlatformRegistry.platformOfChannel(channel);
         if (!platform) return { success: true, conversations: [] };
@@ -326,5 +308,5 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
         };
       }
     },
-  );
+  });
 }

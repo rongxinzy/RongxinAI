@@ -1,7 +1,4 @@
-import { ipcMain } from 'electron';
-
 import {
-  MemoryIpcChannel,
   type ManualMemoryCreateInput,
   type ManualMemoryUpdateInput,
   type ManagedMemoryListInput,
@@ -9,6 +6,8 @@ import {
   type MemorySessionTitle,
   type MemorySessionTitleResolveInput,
 } from '../../shared/memory';
+import { handleIpcContract } from '../ipc/handleIpcContract';
+import { memoryContract } from '../../shared/ipc/memoryContract';
 import type { ProjectMemoryService } from './projectMemoryService';
 
 export function registerMemoryIpcHandlers(options: {
@@ -23,12 +22,10 @@ export function registerMemoryIpcHandlers(options: {
     }
   };
 
-  ipcMain.handle(MemoryIpcChannel.List, (_event, input?: ManagedMemoryListInput) =>
-    handle(() => options.getService().listManagedMemories(input)),
-  );
-  ipcMain.handle(
-    MemoryIpcChannel.ResolveSessionTitles,
-    (_event, input?: MemorySessionTitleResolveInput) =>
+  handleIpcContract(memoryContract, {
+    list: (_event, input?: ManagedMemoryListInput) =>
+      handle(() => options.getService().listManagedMemories(input)),
+    resolveSessionTitles: (_event, input?: MemorySessionTitleResolveInput) =>
       handle(() =>
         options.resolveSessionTitles(
           Array.isArray(input?.sessionIds)
@@ -38,26 +35,16 @@ export function registerMemoryIpcHandlers(options: {
             : [],
         ),
       ),
-  );
-  ipcMain.handle(MemoryIpcChannel.CreateManual, (_event, input: ManualMemoryCreateInput) =>
-    handle(() => options.getService().createManualMemory(input)),
-  );
-  ipcMain.handle(MemoryIpcChannel.UpdateManual, (_event, input: ManualMemoryUpdateInput) =>
-    handle(() => options.getService().updateManualMemory(input)),
-  );
-  ipcMain.handle(MemoryIpcChannel.ConfirmCandidate, (_event, id: string) =>
-    handle(() => options.getService().confirmPersonalCandidate(id)),
-  );
-  ipcMain.handle(MemoryIpcChannel.Archive, (_event, id: string) =>
-    handle(() => options.getService().archiveMemory(id)),
-  );
-  ipcMain.handle(MemoryIpcChannel.Restore, (_event, id: string) =>
-    handle(() => options.getService().restoreMemory(id)),
-  );
-  ipcMain.handle(MemoryIpcChannel.Forget, (_event, id: string, hardDelete: boolean) =>
-    handle(() => options.getService().forgetMemory(id, hardDelete)),
-  );
-  ipcMain.handle(MemoryIpcChannel.DrainOutbox, () =>
-    handle(() => options.getService().retryPendingOutbox()),
-  );
+    createManual: (_event, input: ManualMemoryCreateInput) =>
+      handle(() => options.getService().createManualMemory(input)),
+    updateManual: (_event, input: ManualMemoryUpdateInput) =>
+      handle(() => options.getService().updateManualMemory(input)),
+    confirmCandidate: (_event, id: string) =>
+      handle(() => options.getService().confirmPersonalCandidate(id)),
+    archive: (_event, id: string) => handle(() => options.getService().archiveMemory(id)),
+    restore: (_event, id: string) => handle(() => options.getService().restoreMemory(id)),
+    forget: (_event, id: string, hardDelete: boolean) =>
+      handle(() => options.getService().forgetMemory(id, hardDelete)),
+    drainOutbox: () => handle(() => options.getService().retryPendingOutbox()),
+  });
 }

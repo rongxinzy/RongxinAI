@@ -5,46 +5,76 @@ export function createCodingAgentPart0(
   runtime: BrowserMockRuntime,
 ): Pick<
   Window['electron']['codingAgent'],
+  | 'writeAuthTerminal'
+  | 'resizeAuthTerminal'
+  | 'cancelAuthTerminal'
   | 'listProfiles'
   | 'listWorkspaces'
   | 'createWorkspace'
   | 'updateWorkspace'
   | 'deleteWorkspace'
   | 'deleteSession'
-  | 'getProfileConfigOptions'
-  | 'getProfileAvailableCommands'
-  | 'createSession'
-  | 'startSession'
-  | 'bootstrap'
-  | 'prepareLane'
-  | 'createMission'
-  | 'selectLane'
-  | 'prompt'
   | 'listPendingMessages'
   | 'enqueuePendingMessage'
+  | 'loadEventPage'
+  | 'listWorkspaceFiles'
+  | 'readWorkspaceFile'
+  | 'writeWorkspaceFile'
+  | 'onChanged'
+  | 'onEventDelta'
+  | 'onPendingMessagesChanged'
+  | 'onAuthTerminalData'
+  | 'onAuthTerminalExit'
+  | 'getProfileConfigOptions'
+  | 'getProfileAvailableCommands'
   | 'updatePendingMessage'
   | 'deletePendingMessage'
-  | 'steerPendingMessage'
-  | 'followUpPendingMessage'
-  | 'confirmSessionRecovery'
-  | 'cancel'
-  | 'respondElicitation'
-  | 'cancelElicitation'
   | 'previewHandoff'
-  | 'handoff'
-  | 'addLane'
-  | 'createCollaborationPreset'
-  | 'saveLaneView'
-  | 'setLaneConfigOption'
-  | 'setLaneModelOverride'
   | 'previewLaneChanges'
-  | 'applyLaneChanges'
   | 'getGitStatus'
   | 'getGitDiff'
   | 'stageGitPaths'
   | 'unstageGitPaths'
+  | 'commitGitChanges'
+  | 'commitAndPushGitChanges'
+  | 'pushGitBranch'
+  | 'switchGitBranch'
+  | 'createGitBranch'
+  | 'createGitPullRequest'
+  | 'startAuthTerminal'
+  | 'addLane'
+  | 'addProfile'
+  | 'applyLaneChanges'
+  | 'authenticateProfile'
+  | 'bootstrap'
+  | 'cancel'
+  | 'cancelElicitation'
+  | 'confirmSessionRecovery'
+  | 'createCollaborationPreset'
+  | 'createMission'
 > {
   return {
+    writeAuthTerminal: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.writeAuthTerminal');
+      return {
+        success: true,
+      };
+    },
+    resizeAuthTerminal: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.resizeAuthTerminal');
+      return {
+        success: true,
+      };
+    },
+    cancelAuthTerminal: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.cancelAuthTerminal');
+      return {
+        success: true,
+      };
+    },
     listProfiles: async () => {
       runtime.warnOnce('codingAgent.listProfiles');
       return {
@@ -91,197 +121,6 @@ export function createCodingAgentPart0(
         workspaces: [],
       };
     },
-    getProfileConfigOptions: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.getProfileConfigOptions');
-      return {
-        success: true,
-        configOptions: [],
-      };
-    },
-    getProfileAvailableCommands: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.getProfileAvailableCommands');
-      return {
-        success: true,
-        commands: [],
-      };
-    },
-    createSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.createSession');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    startSession: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.startSession');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    bootstrap: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.bootstrap');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    prepareLane: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.prepareLane');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    createMission: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.createMission');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    selectLane: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.selectLane');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    prompt: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.prompt');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
     listPendingMessages: async _p0 => {
       void _p0;
       runtime.warnOnce('codingAgent.listPendingMessages');
@@ -307,6 +146,82 @@ export function createCodingAgentPart0(
         },
       };
     },
+    loadEventPage: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.loadEventPage');
+      return {
+        success: true,
+        page: {
+          laneId: '',
+          events: [],
+          hasMore: false,
+          nextCursor: 0,
+        },
+      };
+    },
+    listWorkspaceFiles: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.listWorkspaceFiles');
+      return {
+        success: true,
+        entries: [],
+      };
+    },
+    readWorkspaceFile: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.readWorkspaceFile');
+      return {
+        success: true,
+        file: {
+          path: '/home/user/preview',
+          content: '',
+          sha256: '',
+        },
+      };
+    },
+    writeWorkspaceFile: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.writeWorkspaceFile');
+      return {
+        success: true,
+        file: {
+          path: '/home/user/preview',
+          content: '',
+          sha256: '',
+        },
+      };
+    },
+    onChanged: _p0 => {
+      return runtime.subscribe('codingAgent.onChanged', _p0);
+    },
+    onEventDelta: _p0 => {
+      return runtime.subscribe('codingAgent.onEventDelta', _p0);
+    },
+    onPendingMessagesChanged: _p0 => {
+      return runtime.subscribe('codingAgent.onPendingMessagesChanged', _p0);
+    },
+    onAuthTerminalData: _p0 => {
+      return runtime.subscribe('codingAgent.onAuthTerminalData', _p0);
+    },
+    onAuthTerminalExit: _p0 => {
+      return runtime.subscribe('codingAgent.onAuthTerminalExit', _p0);
+    },
+    getProfileConfigOptions: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.getProfileConfigOptions');
+      return {
+        success: true,
+        configOptions: [],
+      };
+    },
+    getProfileAvailableCommands: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.getProfileAvailableCommands');
+      return {
+        success: true,
+        commands: [],
+      };
+    },
     updatePendingMessage: async _p0 => {
       void _p0;
       runtime.warnOnce('codingAgent.updatePendingMessage');
@@ -321,312 +236,12 @@ export function createCodingAgentPart0(
         success: true,
       };
     },
-    steerPendingMessage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.steerPendingMessage');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    followUpPendingMessage: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.followUpPendingMessage');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    confirmSessionRecovery: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.confirmSessionRecovery');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    cancel: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.cancel');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    respondElicitation: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.respondElicitation');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    cancelElicitation: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.cancelElicitation');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
     previewHandoff: async _p0 => {
       void _p0;
       runtime.warnOnce('codingAgent.previewHandoff');
       return {
         success: true,
         content: {},
-      };
-    },
-    handoff: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.handoff');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    addLane: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.addLane');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    createCollaborationPreset: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.createCollaborationPreset');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    saveLaneView: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.saveLaneView');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    setLaneConfigOption: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.setLaneConfigOption');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
-      };
-    },
-    setLaneModelOverride: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.setLaneModelOverride');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
       };
     },
     previewLaneChanges: async _p0 => {
@@ -638,31 +253,6 @@ export function createCodingAgentPart0(
           laneId: '',
           diff: '',
         },
-      };
-    },
-    applyLaneChanges: async _p0 => {
-      void _p0;
-      runtime.warnOnce('codingAgent.applyLaneChanges');
-      return {
-        success: true,
-        snapshot: {
-          room: {
-            id: 'preview',
-            name: 'Preview',
-            workspaceRoot: '',
-            defaultProfileId: '',
-            activeMissionId: '',
-            activeLaneId: '',
-          },
-          profiles: [],
-          missions: [],
-          lanes: [],
-          assignments: [],
-          events: [],
-          eventWindows: [],
-          elicitations: [],
-        },
-        profiles: [],
       };
     },
     getGitStatus: async _p0 => {
@@ -757,6 +347,423 @@ export function createCodingAgentPart0(
           isBusy: false,
           canMutate: false,
         },
+      };
+    },
+    commitGitChanges: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.commitGitChanges');
+      return {
+        success: true,
+        status: {
+          isRepository: false,
+          targetRoot: '',
+          repositoryRoot: '',
+          githubRepositoryUrl: '',
+          hasOrigin: false,
+          hasRemoteBranch: false,
+          defaultBranch: '',
+          branch: '',
+          localBranches: [],
+          head: '',
+          detached: false,
+          upstream: '',
+          ahead: 0,
+          behind: 0,
+          additions: 0,
+          deletions: 0,
+          files: [],
+          isIsolated: false,
+          isBusy: false,
+          canMutate: false,
+        },
+      };
+    },
+    commitAndPushGitChanges: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.commitAndPushGitChanges');
+      return {
+        success: true,
+        result: {
+          status: {
+            isRepository: false,
+            targetRoot: '',
+            repositoryRoot: '',
+            githubRepositoryUrl: '',
+            hasOrigin: false,
+            hasRemoteBranch: false,
+            defaultBranch: '',
+            branch: '',
+            localBranches: [],
+            head: '',
+            detached: false,
+            upstream: '',
+            ahead: 0,
+            behind: 0,
+            additions: 0,
+            deletions: 0,
+            files: [],
+            isIsolated: false,
+            isBusy: false,
+            canMutate: false,
+          },
+          pushed: false,
+        },
+      };
+    },
+    pushGitBranch: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.pushGitBranch');
+      return {
+        success: true,
+        status: {
+          isRepository: false,
+          targetRoot: '',
+          repositoryRoot: '',
+          githubRepositoryUrl: '',
+          hasOrigin: false,
+          hasRemoteBranch: false,
+          defaultBranch: '',
+          branch: '',
+          localBranches: [],
+          head: '',
+          detached: false,
+          upstream: '',
+          ahead: 0,
+          behind: 0,
+          additions: 0,
+          deletions: 0,
+          files: [],
+          isIsolated: false,
+          isBusy: false,
+          canMutate: false,
+        },
+      };
+    },
+    switchGitBranch: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.switchGitBranch');
+      return {
+        success: true,
+        status: {
+          isRepository: false,
+          targetRoot: '',
+          repositoryRoot: '',
+          githubRepositoryUrl: '',
+          hasOrigin: false,
+          hasRemoteBranch: false,
+          defaultBranch: '',
+          branch: '',
+          localBranches: [],
+          head: '',
+          detached: false,
+          upstream: '',
+          ahead: 0,
+          behind: 0,
+          additions: 0,
+          deletions: 0,
+          files: [],
+          isIsolated: false,
+          isBusy: false,
+          canMutate: false,
+        },
+      };
+    },
+    createGitBranch: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.createGitBranch');
+      return {
+        success: true,
+        status: {
+          isRepository: false,
+          targetRoot: '',
+          repositoryRoot: '',
+          githubRepositoryUrl: '',
+          hasOrigin: false,
+          hasRemoteBranch: false,
+          defaultBranch: '',
+          branch: '',
+          localBranches: [],
+          head: '',
+          detached: false,
+          upstream: '',
+          ahead: 0,
+          behind: 0,
+          additions: 0,
+          deletions: 0,
+          files: [],
+          isIsolated: false,
+          isBusy: false,
+          canMutate: false,
+        },
+      };
+    },
+    createGitPullRequest: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.createGitPullRequest');
+      return {
+        success: true,
+      };
+    },
+    startAuthTerminal: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.startAuthTerminal');
+      return {
+        success: true,
+        terminal: {
+          id: 'preview',
+          profileId: '',
+          methodId: '',
+        },
+      };
+    },
+    addLane: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.addLane');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    addProfile: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.addProfile');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    applyLaneChanges: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.applyLaneChanges');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    authenticateProfile: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.authenticateProfile');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    bootstrap: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.bootstrap');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    cancel: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.cancel');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    cancelElicitation: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.cancelElicitation');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    confirmSessionRecovery: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.confirmSessionRecovery');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    createCollaborationPreset: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.createCollaborationPreset');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
+      };
+    },
+    createMission: async _p0 => {
+      void _p0;
+      runtime.warnOnce('codingAgent.createMission');
+      return {
+        success: true,
+        snapshot: {
+          room: {
+            id: 'preview',
+            name: 'Preview',
+            workspaceRoot: '',
+            defaultProfileId: '',
+            activeMissionId: '',
+            activeLaneId: '',
+          },
+          profiles: [],
+          missions: [],
+          lanes: [],
+          assignments: [],
+          events: [],
+          eventWindows: [],
+          elicitations: [],
+        },
+        profiles: [],
       };
     },
   };

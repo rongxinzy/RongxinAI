@@ -5,238 +5,6 @@ export function createScheduledTasks(
   runtime: BrowserMockRuntime,
 ): Window['electron']['scheduledTasks'] {
   return {
-    list: async () => {
-      runtime.warnOnce('scheduledTasks.list');
-      return {
-        success: true,
-        tasks: [],
-      };
-    },
-    get: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.get');
-      return {
-        success: true,
-        task: {
-          id: 'preview',
-          name: 'Preview',
-          description: '',
-          enabled: false,
-          schedule: {
-            kind: 'at',
-            at: '',
-          },
-          sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
-          payload: {
-            kind: 'agentTurn',
-            message: 'Preview',
-          },
-          delivery: {
-            mode: 'none',
-          },
-          workspaceId: '',
-          sessionKey: '',
-          state: {
-            nextRunAtMs: 0,
-            lastRunAtMs: 0,
-            lastStatus: 'success',
-            lastError: '',
-            lastDurationMs: 0,
-            runningAtMs: 0,
-            consecutiveErrors: 0,
-          },
-          createdAt: '',
-          updatedAt: '',
-        },
-      };
-    },
-    create: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.create');
-      return {
-        success: true,
-        task: {
-          id: 'preview',
-          name: 'Preview',
-          description: '',
-          enabled: false,
-          schedule: {
-            kind: 'at',
-            at: '',
-          },
-          sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
-          payload: {
-            kind: 'agentTurn',
-            message: 'Preview',
-          },
-          delivery: {
-            mode: 'none',
-          },
-          workspaceId: '',
-          sessionKey: '',
-          state: {
-            nextRunAtMs: 0,
-            lastRunAtMs: 0,
-            lastStatus: 'success',
-            lastError: '',
-            lastDurationMs: 0,
-            runningAtMs: 0,
-            consecutiveErrors: 0,
-          },
-          createdAt: '',
-          updatedAt: '',
-        },
-      };
-    },
-    update: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('scheduledTasks.update');
-      return {
-        success: true,
-        task: {
-          id: 'preview',
-          name: 'Preview',
-          description: '',
-          enabled: false,
-          schedule: {
-            kind: 'at',
-            at: '',
-          },
-          sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
-          payload: {
-            kind: 'agentTurn',
-            message: 'Preview',
-          },
-          delivery: {
-            mode: 'none',
-          },
-          workspaceId: '',
-          sessionKey: '',
-          state: {
-            nextRunAtMs: 0,
-            lastRunAtMs: 0,
-            lastStatus: 'success',
-            lastError: '',
-            lastDurationMs: 0,
-            runningAtMs: 0,
-            consecutiveErrors: 0,
-          },
-          createdAt: '',
-          updatedAt: '',
-        },
-      };
-    },
-    delete: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.delete');
-      return {
-        success: true,
-      };
-    },
-    toggle: async (_p0, _p1) => {
-      void _p0;
-      void _p1;
-      runtime.warnOnce('scheduledTasks.toggle');
-      return {
-        success: true,
-        task: {
-          id: 'preview',
-          name: 'Preview',
-          description: '',
-          enabled: false,
-          schedule: {
-            kind: 'at',
-            at: '',
-          },
-          sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
-          payload: {
-            kind: 'agentTurn',
-            message: 'Preview',
-          },
-          delivery: {
-            mode: 'none',
-          },
-          workspaceId: '',
-          sessionKey: '',
-          state: {
-            nextRunAtMs: 0,
-            lastRunAtMs: 0,
-            lastStatus: 'success',
-            lastError: '',
-            lastDurationMs: 0,
-            runningAtMs: 0,
-            consecutiveErrors: 0,
-          },
-          createdAt: '',
-          updatedAt: '',
-        },
-      };
-    },
-    runManually: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.runManually');
-      return {
-        success: true,
-      };
-    },
-    stop: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.stop');
-      return {
-        success: true,
-      };
-    },
-    preflight: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.preflight');
-      return {
-        success: true,
-        preflight: {
-          hasChannel: false,
-        },
-      };
-    },
-    listRuns: async (_p0, _p1, _p2, _p3) => {
-      void _p0;
-      void _p1;
-      void _p2;
-      void _p3;
-      runtime.warnOnce('scheduledTasks.listRuns');
-      return {
-        success: true,
-        runs: [],
-      };
-    },
-    listDeliveries: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.listDeliveries');
-      return {
-        success: true,
-        deliveries: [],
-      };
-    },
-    countRuns: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.countRuns');
-      return {
-        success: true,
-      };
-    },
-    listAllRuns: async (_p0, _p1, _p2) => {
-      void _p0;
-      void _p1;
-      void _p2;
-      runtime.warnOnce('scheduledTasks.listAllRuns');
-      return {
-        success: true,
-        runs: [],
-      };
-    },
     resolveSession: async _p0 => {
       void _p0;
       runtime.warnOnce('scheduledTasks.resolveSession');
@@ -265,13 +33,6 @@ export function createScheduledTasks(
         },
       };
     },
-    listChannels: async () => {
-      runtime.warnOnce('scheduledTasks.listChannels');
-      return {
-        success: true,
-        channels: [],
-      };
-    },
     onStatusUpdate: _p0 => {
       return runtime.subscribe('scheduledTasks.onStatusUpdate', _p0);
     },
@@ -280,6 +41,238 @@ export function createScheduledTasks(
     },
     onRefresh: _p0 => {
       return runtime.subscribe('scheduledTasks.onRefresh', _p0);
+    },
+    list: async () => {
+      runtime.warnOnce('scheduledTasks.list');
+      return {
+        success: true,
+        tasks: [],
+      };
+    },
+    get: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.get');
+      return {
+        success: true,
+        task: {
+          name: 'Preview',
+          description: '',
+          enabled: false,
+          schedule: {
+            kind: 'at',
+            at: '',
+          },
+          sessionTarget: 'isolated',
+          wakeMode: 'next-heartbeat',
+          payload: {
+            kind: 'agentTurn',
+            message: 'Preview',
+          },
+          id: 'preview',
+          workspaceId: '',
+          sessionKey: '',
+          state: {
+            nextRunAtMs: 0,
+            lastRunAtMs: 0,
+            lastStatus: 'success',
+            lastError: '',
+            lastDurationMs: 0,
+            runningAtMs: 0,
+            consecutiveErrors: 0,
+          },
+          createdAt: '',
+          updatedAt: '',
+          delivery: {
+            mode: 'none',
+          },
+        },
+      };
+    },
+    create: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.create');
+      return {
+        success: true,
+        task: {
+          name: 'Preview',
+          description: '',
+          enabled: false,
+          schedule: {
+            kind: 'at',
+            at: '',
+          },
+          sessionTarget: 'isolated',
+          wakeMode: 'next-heartbeat',
+          payload: {
+            kind: 'agentTurn',
+            message: 'Preview',
+          },
+          id: 'preview',
+          workspaceId: '',
+          sessionKey: '',
+          state: {
+            nextRunAtMs: 0,
+            lastRunAtMs: 0,
+            lastStatus: 'success',
+            lastError: '',
+            lastDurationMs: 0,
+            runningAtMs: 0,
+            consecutiveErrors: 0,
+          },
+          createdAt: '',
+          updatedAt: '',
+          delivery: {
+            mode: 'none',
+          },
+        },
+      };
+    },
+    update: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.update');
+      return {
+        success: true,
+        task: {
+          name: 'Preview',
+          description: '',
+          enabled: false,
+          schedule: {
+            kind: 'at',
+            at: '',
+          },
+          sessionTarget: 'isolated',
+          wakeMode: 'next-heartbeat',
+          payload: {
+            kind: 'agentTurn',
+            message: 'Preview',
+          },
+          id: 'preview',
+          workspaceId: '',
+          sessionKey: '',
+          state: {
+            nextRunAtMs: 0,
+            lastRunAtMs: 0,
+            lastStatus: 'success',
+            lastError: '',
+            lastDurationMs: 0,
+            runningAtMs: 0,
+            consecutiveErrors: 0,
+          },
+          createdAt: '',
+          updatedAt: '',
+          delivery: {
+            mode: 'none',
+          },
+        },
+      };
+    },
+    delete: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.delete');
+      return {
+        success: true,
+      };
+    },
+    toggle: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.toggle');
+      return {
+        success: true,
+        task: {
+          name: 'Preview',
+          description: '',
+          enabled: false,
+          schedule: {
+            kind: 'at',
+            at: '',
+          },
+          sessionTarget: 'isolated',
+          wakeMode: 'next-heartbeat',
+          payload: {
+            kind: 'agentTurn',
+            message: 'Preview',
+          },
+          id: 'preview',
+          workspaceId: '',
+          sessionKey: '',
+          state: {
+            nextRunAtMs: 0,
+            lastRunAtMs: 0,
+            lastStatus: 'success',
+            lastError: '',
+            lastDurationMs: 0,
+            runningAtMs: 0,
+            consecutiveErrors: 0,
+          },
+          createdAt: '',
+          updatedAt: '',
+          delivery: {
+            mode: 'none',
+          },
+        },
+      };
+    },
+    runManually: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.runManually');
+      return {
+        success: true,
+      };
+    },
+    stop: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.stop');
+      return {
+        success: true,
+      };
+    },
+    preflight: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.preflight');
+      return {
+        success: true,
+        preflight: {
+          hasChannel: false,
+        },
+      };
+    },
+    listRuns: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.listRuns');
+      return {
+        success: true,
+        runs: [],
+      };
+    },
+    listDeliveries: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.listDeliveries');
+      return {
+        success: true,
+        deliveries: [],
+      };
+    },
+    countRuns: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.countRuns');
+      return {
+        success: true,
+      };
+    },
+    listAllRuns: async _p0 => {
+      void _p0;
+      runtime.warnOnce('scheduledTasks.listAllRuns');
+      return {
+        success: true,
+        runs: [],
+      };
+    },
+    listChannels: async () => {
+      runtime.warnOnce('scheduledTasks.listChannels');
+      return {
+        success: true,
+        channels: [],
+      };
     },
   };
 }

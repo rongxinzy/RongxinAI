@@ -1,52 +1,35 @@
-import { ipcRenderer } from 'electron';
-
-import { ActivityIpc } from '../../shared/activity/constants';
 import type { ActivityRun } from '../../shared/activity/types';
+import { ActivityIpc } from '../../shared/activity/constants';
 import { IpcChannel as ScheduledTaskIpc } from '../../scheduledTask/constants';
+import type { IpcContractApi } from '../../shared/ipc/contract';
+import type { activityContract, scheduledTasksContract } from '../../shared/ipc/automationContract';
+import {
+  activityContractChannels,
+  scheduledTasksContractChannels,
+} from '../../shared/ipc/automationContract.channels';
 import { onPush, onPushVoid } from './pushChannel';
+import { createIpcInvokers } from './createIpcInvokers';
 
-// Scheduled tasks (cron) and the activity run feed.
+// Scheduled tasks (cron) and the activity run feed. Invoke methods come from
+// the contract channel maps; push subscriptions stay hand-wired.
 export const automationApi = {
   scheduledTasks: {
-    list: () => ipcRenderer.invoke(ScheduledTaskIpc.List),
-    get: (id: string) => ipcRenderer.invoke(ScheduledTaskIpc.Get, id),
-    create: (input: unknown) => ipcRenderer.invoke(ScheduledTaskIpc.Create, input),
-    update: (id: string, input: unknown) => ipcRenderer.invoke(ScheduledTaskIpc.Update, id, input),
-    delete: (id: string) => ipcRenderer.invoke(ScheduledTaskIpc.Delete, id),
-    toggle: (id: string, enabled: boolean) =>
-      ipcRenderer.invoke(ScheduledTaskIpc.Toggle, id, enabled),
-
-    runManually: (id: string) => ipcRenderer.invoke(ScheduledTaskIpc.RunManually, id),
-    stop: (id: string) => ipcRenderer.invoke(ScheduledTaskIpc.Stop, id),
-    preflight: (id: string) => ipcRenderer.invoke(ScheduledTaskIpc.Preflight, id),
-
-    listRuns: (taskId: string, limit?: number, offset?: number, filter?: unknown) =>
-      ipcRenderer.invoke(ScheduledTaskIpc.ListRuns, taskId, limit, offset, filter),
-    listDeliveries: (runId: string) => ipcRenderer.invoke(ScheduledTaskIpc.ListDeliveries, runId),
-    countRuns: (taskId: string) => ipcRenderer.invoke(ScheduledTaskIpc.CountRuns, taskId),
-    listAllRuns: (limit?: number, offset?: number, filter?: unknown) =>
-      ipcRenderer.invoke(ScheduledTaskIpc.ListAllRuns, limit, offset, filter),
-    resolveSession: (sessionKey: string) =>
-      ipcRenderer.invoke(ScheduledTaskIpc.ResolveSession, sessionKey),
-
-    listChannels: () => ipcRenderer.invoke(ScheduledTaskIpc.ListChannels),
-    listChannelConversations: (channel: string, accountId?: string, filterAccountId?: string) =>
-      ipcRenderer.invoke(
-        ScheduledTaskIpc.ListChannelConversations,
-        channel,
-        accountId,
-        filterAccountId,
-      ),
-
+    ...createIpcInvokers(scheduledTasksContractChannels),
     onStatusUpdate: (callback: (data: unknown) => void) =>
       onPush(ScheduledTaskIpc.StatusUpdate, callback),
     onRunUpdate: (callback: (data: unknown) => void) =>
       onPush(ScheduledTaskIpc.RunUpdate, callback),
     onRefresh: (callback: () => void) => onPushVoid(ScheduledTaskIpc.Refresh, callback),
+  } as IpcContractApi<typeof scheduledTasksContract> & {
+    onStatusUpdate: (callback: (data: unknown) => void) => () => void;
+    onRunUpdate: (callback: (data: unknown) => void) => () => void;
+    onRefresh: (callback: () => void) => () => void;
   },
 
   activity: {
-    list: () => ipcRenderer.invoke(ActivityIpc.List),
+    ...createIpcInvokers(activityContractChannels),
     onUpdated: (callback: (run: ActivityRun) => void) => onPush(ActivityIpc.Updated, callback),
+  } as IpcContractApi<typeof activityContract> & {
+    onUpdated: (callback: (run: ActivityRun) => void) => () => void;
   },
 };
