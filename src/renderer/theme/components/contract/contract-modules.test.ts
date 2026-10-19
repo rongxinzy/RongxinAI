@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { classicLight } from '../../themes/classic-light';
+import { zenithLight } from '../../themes/zenith-light';
 import { COMPONENT_SELECTORS, EXTERNAL_COMPONENTS } from '../contract';
 import { APP_SELECTORS } from './selectors-app';
 import { COMPONENT_STATES } from './component-states';
@@ -67,20 +67,20 @@ test('external components only reference registered fixed integration hooks', ()
 });
 
 test('validation rejects unknown hooks and states', () => {
-  const withUnknownHook = structuredClone(classicLight.components) as Record<string, unknown>;
-  withUnknownHook['not-a-component-hook'] = structuredClone(classicLight.components.input);
+  const withUnknownHook = structuredClone(zenithLight.components) as Record<string, unknown>;
+  withUnknownHook['not-a-component-hook'] = structuredClone(zenithLight.components.input);
   expect(() =>
     validateComponentAppearances(
       withUnknownHook as Parameters<typeof validateComponentAppearances>[0],
     ),
   ).toThrow('Unknown component appearance');
-  const withUnknownState = structuredClone(classicLight.components);
+  const withUnknownState = structuredClone(zenithLight.components);
   Reflect.set(withUnknownState.input, 'not-a-state', {});
   expect(() => validateComponentAppearances(withUnknownState)).toThrow('Unknown component state');
 });
 
 test('validation rejects non-object state declarations', () => {
-  const components = structuredClone(classicLight.components);
+  const components = structuredClone(zenithLight.components);
   Reflect.set(components.input, 'focus', []);
   expect(() => validateComponentAppearances(components)).toThrow('Missing component state');
 });
