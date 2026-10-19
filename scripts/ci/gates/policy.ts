@@ -55,7 +55,7 @@ export function planPathJobs(paths: string[], event: string): PathPlan {
       ),
     ),
     [PathJob.WindowsScripts]: pathJobSelected(paths, event, file =>
-      /^(?:scripts\/ci\/.*(?:windows|installer-budget)|scripts\/installer-shell\/|\.github\/workflows\/(?:ci|build-inference-editions|windows-installer-pr)\.yml$)/.test(
+      /^(?:scripts\/ci\/.*(?:windows|installer-budget|build-checkpoint)|scripts\/installer-shell\/|\.github\/workflows\/(?:ci|build-inference-editions|windows-installer-pr)\.yml$)/.test(
         file,
       ),
     ),

@@ -20,6 +20,10 @@ async function digest(file) {
 export async function checkpoint(action, directory, identity, paths = [], root = process.cwd()) {
   const archive = path.resolve(directory, 'payload.tar');
   const metadata = path.resolve(directory, 'identity.json');
+  // Git Bash's GNU tar treats D:\... as a remote host. Use native bsdtar on
+  // Windows so drive-qualified paths work regardless of the calling shell.
+  const tar =
+    process.platform === 'win32' ? path.join(process.env.SystemRoot, 'System32', 'tar.exe') : 'tar';
   for (const key of ['commit', 'runId', 'target', 'version']) {
     if (!identity[key]) throw new Error(`Missing checkpoint identity: ${key}`);
   }
@@ -29,7 +33,7 @@ export async function checkpoint(action, directory, identity, paths = [], root =
     }
     mkdirSync(directory, { recursive: true });
     // TAR retains executable bits and symlinks. Do not recompress signed installers/7z.
-    execFileSync('tar', ['-cf', archive, ...paths], { cwd: root, stdio: 'inherit' });
+    execFileSync(tar, ['-cf', archive, ...paths], { cwd: root, stdio: 'inherit' });
     writeFileSync(metadata, JSON.stringify({ ...identity, sha256: await digest(archive) }));
   } else if (action === 'restore') {
     const saved = JSON.parse(readFileSync(metadata, 'utf8'));
@@ -37,7 +41,7 @@ export async function checkpoint(action, directory, identity, paths = [], root =
       if (saved[key] !== identity[key]) throw new Error(`Checkpoint ${key} mismatch`);
     }
     if (saved.sha256 !== (await digest(archive))) throw new Error('Checkpoint SHA-256 mismatch');
-    execFileSync('tar', ['-xf', archive], { cwd: root, stdio: 'inherit' });
+    execFileSync(tar, ['-xf', archive], { cwd: root, stdio: 'inherit' });
     if (process.env.GITHUB_ENV && typeof saved.macAutoUpdateEnabled === 'boolean') {
       appendFileSync(
         process.env.GITHUB_ENV,

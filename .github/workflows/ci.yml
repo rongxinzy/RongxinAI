@@ -388,8 +388,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun-workspace
-      - name: Exercise Windows PowerShell 5 size gates and failure diagnostics
-        run: bun x --no-install vitest run scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-diagnostics.test.ts
+      - name: Exercise Windows PowerShell 5 gates, diagnostics and native TAR checkpoints
+        run: bun x --no-install vitest run scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-diagnostics.test.ts scripts/ci/build-checkpoint.test.ts
 
   build-verification:
     needs: changes

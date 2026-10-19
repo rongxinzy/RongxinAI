@@ -10,7 +10,8 @@ runs:
     - id: pin
       shell: bash
       run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-    - uses: actions/cache@v5
+    - uses: actions/cache/restore@v5
+      id: runtime-cache
       with:
         path: |
           .cache/magpie
@@ -45,3 +46,10 @@ runs:
       env:
         TARGET: ${{ inputs.target }}
       run: bun run magpie:verify -- --target "$TARGET"
+    - uses: actions/cache/save@v5
+      if: steps.runtime-cache.outputs.cache-hit != 'true'
+      with:
+        path: |
+          .cache/magpie
+          resources/magpie/${{ inputs.target }}
+        key: ${{ steps.runtime-cache.outputs.cache-primary-key }}
