@@ -23,6 +23,7 @@ const {
   CPU_SETUP_MARGIN,
   CPU_NSIS_MEASURED,
   CPU_NSIS_MARGIN,
+  CPU_COMPONENT_MEASURED,
   resolveEditionSetupBudget,
   resolveEditionNsisBudget,
   assertSetupBudget,
@@ -106,7 +107,7 @@ test('lite WebView2 keeps its original limits; the Magpie allowance does not lea
 
 // cpu limits = measured (build run 39032801288) + ceil(3%) whole-MiB margin.
 // Changing them requires a new measured run, never a round-number bump.
-test('cpu WebView2 limits are exactly measured + explicit margin', () => {
+test('cpu WebView2 keeps total limits and recalibrates measured component bytes', () => {
   expect(CPU_SETUP_MEASURED).toEqual({
     installerBytes: 527_673_448,
     componentArchiveBytes: 316_397_703,
@@ -124,7 +125,7 @@ test('cpu WebView2 limits are exactly measured + explicit margin', () => {
   const limits = resolveEditionSetupBudget('cpu');
   expect(limits).toEqual({
     maxInstallerBytes: 544_450_664,
-    maxComponentBytes: 326_883_463,
+    maxComponentBytes: 339_820_025,
     maxNonComponentBytes: 218_615_777,
   });
   // The measured cpu build passes its own limits.
@@ -137,14 +138,14 @@ test('cpu WebView2 limits are exactly measured + explicit margin', () => {
     assertSetupBudget(limits.maxInstallerBytes + 1, limits.maxComponentBytes, 'cpu'),
   ).toThrow(/519\.2 MiB/);
   expect(() => assertSetupBudget(500 * MiB, limits.maxComponentBytes + 1, 'cpu')).toThrow(
-    /311\.7 MiB budget/,
+    /324\.1 MiB budget/,
   );
   expect(() => assertSetupBudget(limits.maxNonComponentBytes + 1 + MiB, MiB, 'cpu')).toThrow(
     /non-component bytes exceed the 208\.5 MiB/,
   );
 });
 
-test('cpu NSIS limits are exactly measured + explicit margin', () => {
+test('cpu NSIS keeps total limits and recalibrates measured component bytes', () => {
   expect(CPU_NSIS_MEASURED).toEqual({
     installerBytes: 450_027_196,
     componentArchiveBytes: 288_987_169,
@@ -161,7 +162,7 @@ test('cpu NSIS limits are exactly measured + explicit margin', () => {
   const limits = resolveEditionNsisBudget('cpu');
   expect(limits).toMatchObject({
     maxInstallerBytes: 463_658_684,
-    maxComponentBytes: 298_424_353,
+    maxComponentBytes: 311_360_919,
     maxNonComponentBytes: 166_282_907,
     measured: CPU_NSIS_MEASURED,
   });
@@ -174,11 +175,29 @@ test('cpu NSIS limits are exactly measured + explicit margin', () => {
     /442\.2 MiB/,
   );
   expect(() => assertNsisBudget(400 * MiB, limits.maxComponentBytes + 1, 'cpu')).toThrow(
-    /284\.6 MiB/,
+    /296\.9 MiB/,
   );
   expect(() =>
     assertNsisBudget(280 * MiB + limits.maxNonComponentBytes + 1, 280 * MiB, 'cpu'),
   ).toThrow(/non-component/);
+});
+
+test('build.9 relocatable Python fits recalibrated CPU components within the original total limits', () => {
+  expect(CPU_COMPONENT_MEASURED).toEqual({ setup: 329_334_265, nsis: 301_923_735 });
+  for (const [measured, limits] of [
+    [CPU_COMPONENT_MEASURED.setup, resolveEditionSetupBudget('cpu')],
+    [CPU_COMPONENT_MEASURED.nsis, resolveEditionNsisBudget('cpu')],
+  ] as const) {
+    expect(limits.maxComponentBytes).toBe(measured + Math.ceil((measured * 0.03) / MiB) * MiB);
+  }
+  expect(assertSetupBudget(540_166_608, CPU_COMPONENT_MEASURED.setup, 'cpu')).toMatchObject({
+    maxSetupBytes: 544_450_664,
+    maxNonComponentBytes: 218_615_777,
+  });
+  expect(assertNsisBudget(462_543_176, CPU_COMPONENT_MEASURED.nsis, 'cpu')).toMatchObject({
+    maxSetupBytes: 463_658_684,
+    maxNonComponentBytes: 166_282_907,
+  });
 });
 
 // cuda is publicly released with NO size limit (krli decision); integrity only.
