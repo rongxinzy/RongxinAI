@@ -1,7 +1,7 @@
 import { resolveArtifactPath } from '../../shared/cowork/artifactPath';
 import type { Artifact } from '../types/artifact';
-import { showAppError } from './appToast';
 import { i18nService } from './i18n';
+import { showAppErrorToast } from './toastNotification';
 
 /**
  * Outcome of a renderer→main readability probe.
@@ -80,7 +80,7 @@ export async function openAvailableArtifact(
   // The verdict may land after the user switched sessions or left the view.
   if (options?.isCurrent && !options.isCurrent()) return;
   if (state === ArtifactFileAvailability.Missing) {
-    showAppError(i18nService.t('fileNotFound'));
+    showAppErrorToast(i18nService.t('fileNotFound'));
     return;
   }
   open();
