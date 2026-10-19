@@ -6,7 +6,7 @@ export function createStore(runtime: BrowserMockRuntime): Window['electron']['st
     get: async _p0 => {
       void _p0;
       runtime.warnOnce('store.get');
-      return null;
+      return {};
     },
     set: async (_p0, _p1) => {
       void _p0;

@@ -110,12 +110,12 @@ export const FeishuPanel: React.FC<FeishuPanelProps> = ({
           dispatch(
             setFeishuInstanceConfig({
               instanceId: activeInstanceId,
-              config: { instanceName: newName } as any,
+              config: { instanceName: newName },
             }),
           );
           await imService.persistFeishuInstanceConfig(activeInstanceId, {
             instanceName: newName,
-          } as any);
+          });
         }}
         onDelete={async () => {
           await imService.deleteFeishuInstance(activeInstanceId);

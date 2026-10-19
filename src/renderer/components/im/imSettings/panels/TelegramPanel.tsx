@@ -112,12 +112,12 @@ export const TelegramPanel: React.FC<TelegramPanelProps> = ({
           dispatch(
             setTelegramInstanceConfig({
               instanceId: activeInstanceId,
-              config: { instanceName: newName } as any,
+              config: { instanceName: newName },
             }),
           );
           await imService.persistTelegramInstanceConfig(activeInstanceId, {
             instanceName: newName,
-          } as any);
+          });
         }}
         onDelete={async () => {
           await imService.deleteTelegramInstance(activeInstanceId);

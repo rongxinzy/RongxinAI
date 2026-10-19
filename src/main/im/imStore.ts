@@ -644,14 +644,14 @@ export class IMStore {
   /**
    * Get persisted notification target for a platform
    */
-  getNotificationTarget(platform: Platform): any | null {
-    return this.getConfigValue<any>(`notification_target:${platform}`) ?? null;
+  getNotificationTarget(platform: Platform): unknown {
+    return this.getConfigValue<unknown>(`notification_target:${platform}`) ?? null;
   }
 
   /**
    * Persist notification target for a platform
    */
-  setNotificationTarget(platform: Platform, target: any): void {
+  setNotificationTarget(platform: Platform, target: unknown): void {
     this.setConfigValue(`notification_target:${platform}`, target);
   }
 

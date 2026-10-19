@@ -22,7 +22,18 @@ import {
  * 1. Streamdown HAST `node` prop (Streamdown v2.4)
  * 2. React `children` element (Streamdown v2.5+ fallback)
  */
-export const AiPre: React.FC<React.ComponentProps<'pre'> & { node?: any }> = ({
+/**
+ * Structural shape of the Streamdown HAST `node` prop (v2.4). Only the fields
+ * this component reads are declared; the rest of the tree stays opaque.
+ */
+type HastNode = {
+  tagName?: string;
+  value?: string;
+  properties?: { className?: unknown };
+  children?: HastNode[];
+};
+
+export const AiPre: React.FC<React.ComponentProps<'pre'> & { node?: HastNode }> = ({
   node,
   children,
   ...props
@@ -31,26 +42,23 @@ export const AiPre: React.FC<React.ComponentProps<'pre'> & { node?: any }> = ({
   let rawText = '';
 
   // Path 1: Streamdown HAST node (v2.4)
-  const codeNode: any = (node as any)?.children?.find?.((c: any) => c?.tagName === 'code');
+  const codeNode = node?.children?.find(child => child?.tagName === 'code');
   if (codeNode) {
-    const className: string =
-      (Array.isArray(codeNode.properties?.className)
-        ? codeNode.properties.className.join(' ')
-        : '') ?? '';
+    const classNameList = codeNode.properties?.className;
+    const className: string = (Array.isArray(classNameList) ? classNameList.join(' ') : '') ?? '';
     const match = /language-([\w-]+)/.exec(className);
     if (match) {
       lang = normalizeCodeLanguage(match[1]);
-      rawText =
-        (Array.isArray(codeNode.children)
-          ? codeNode.children.map((c: any) => c?.value ?? '').join('')
-          : '') ?? '';
+      rawText = Array.isArray(codeNode.children)
+        ? codeNode.children.map(child => child?.value ?? '').join('')
+        : '';
     }
   }
 
   // Path 2: React children (Streamdown v2.5+ fallback)
   if (!lang) {
     const codeChild = React.Children.toArray(children).find(
-      c => React.isValidElement(c) && (c.type as any) === 'code',
+      c => React.isValidElement(c) && typeof c.type === 'string' && c.type === 'code',
     ) as
       | React.ReactElement<{
           className?: string;
@@ -98,7 +106,7 @@ function extractTextContent(children: React.ReactNode): string {
   if (typeof children === 'string') return children;
   if (Array.isArray(children)) return children.map(extractTextContent).join('');
   if (React.isValidElement(children)) {
-    return extractTextContent((children.props as any)?.children);
+    return extractTextContent((children.props as { children?: React.ReactNode }).children);
   }
   return '';
 }

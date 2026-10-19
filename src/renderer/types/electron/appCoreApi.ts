@@ -17,8 +17,8 @@ interface WindowState {
 }
 
 export interface StoreApi {
-  get: (key: string) => Promise<any>;
-  set: (key: string, value: any) => Promise<void>;
+  get: (key: string) => Promise<unknown>;
+  set: (key: string, value: unknown) => Promise<void>;
   remove: (key: string) => Promise<void>;
 }
 

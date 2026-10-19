@@ -122,7 +122,7 @@ export const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) =
 };
 
 const PdfPageCanvas: React.FC<{
-  pdfDoc: unknown;
+  pdfDoc: PdfDocumentHandle;
   pageNumber: number;
   width: number;
 }> = ({ pdfDoc, pageNumber, width }) => {
@@ -144,7 +144,7 @@ const PdfPageCanvas: React.FC<{
 
     const renderPage = async () => {
       try {
-        const page = await (pdfDoc as any).getPage(pageNumber);
+        const page = await pdfDoc.getPage(pageNumber);
         if (cancelled) return;
 
         const viewport = page.getViewport({ scale: 1 });

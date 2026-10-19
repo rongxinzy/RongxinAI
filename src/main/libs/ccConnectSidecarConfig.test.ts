@@ -1,7 +1,6 @@
 import { expect, test } from 'vitest';
 
 import { serializeCcConnectSidecarConfig } from './ccConnectSidecarConfig';
-import { SchedulerClockAccount } from '../../scheduledTask/ccConnectCronClient';
 
 const base = {
   dataDir: 'C:\\Users\\test\\AppData\\Local\\ZhiYuanAgent\\cc-connect',
@@ -101,13 +100,13 @@ test('rejects remote control planes, unsupported platforms, and unsafe option ke
   ).toThrow('Unsafe');
 });
 
-test('serializes a credential-free scheduler clock without channel platforms', () => {
+test('serializes channel accounts without a virtual scheduler clock project', () => {
   const config = serializeCcConnectSidecarConfig({
     ...base,
-    projects: [{ accountId: SchedulerClockAccount }],
+    projects: [{ accountId: 'a', platform: 'telegram', options: { token: 't' } }],
   });
-  expect(config).toContain(`name = "${SchedulerClockAccount}"`);
+  // The control listener still hosts the health endpoint, but no scheduler
+  // clock account is injected anymore — the clock lives in the main process.
   expect(config).toContain('cron_control_listen = "127.0.0.1:0"');
-  expect(config).not.toContain('[[projects.platforms]]');
-  expect(config).not.toContain('[projects.platforms.options]');
+  expect(config).not.toContain('__zhiyuan_scheduler__');
 });

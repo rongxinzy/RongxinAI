@@ -126,18 +126,6 @@ export class ThemeManager {
         root.classList.remove('dark');
         root.classList.add('light');
       }
-
-      // Electron title-bar sync
-      try {
-        const electronAPI = (window as any).electronAPI ?? (window as any).electron;
-        electronAPI?.theme?.updateTitleBar?.({
-          bg: theme.tokens['surface'],
-          symbol: theme.tokens['text-muted-foreground'],
-          windowBg: theme.tokens['background'],
-        });
-      } catch {
-        /* not in Electron */
-      }
     }
 
     this.opts.onChange(theme);

@@ -1,10 +1,6 @@
 import type { CoworkStore } from '../coworkStore';
 import type { PiRuntimeAdapter } from '../libs/agentEngine';
-import type {
-  CcConnectCronTrigger,
-  CcConnectTurnRequest,
-  CcConnectTurnResponse,
-} from '../libs/ccConnectBridgeServer';
+import type { CcConnectTurnRequest, CcConnectTurnResponse } from '../libs/ccConnectBridgeServer';
 import { getCcConnectScopedConversationId } from './ccConnectConversationId';
 import { buildCcConnectTurnResponse, persistCcConnectMedia } from './ccConnectMedia';
 import { IMCoworkHandler } from './imCoworkHandler';
@@ -39,11 +35,9 @@ export class CcConnectPiBridge {
     coworkStore: CoworkStore;
     imStore: IMStore;
     getSkillsPrompt: () => Promise<string | null>;
-    onCronTrigger: (trigger: CcConnectCronTrigger) => Promise<void>;
     turnCoordinator: ChannelTurnCoordinator;
     activityService: ActivityService;
   }) {
-    this.onCronTrigger = options.onCronTrigger;
     this.imStore = options.imStore;
     this.coworkStore = options.coworkStore;
     this.turnCoordinator = options.turnCoordinator;
@@ -56,7 +50,6 @@ export class CcConnectPiBridge {
     });
   }
 
-  private readonly onCronTrigger: (trigger: CcConnectCronTrigger) => Promise<void>;
   private readonly turnCoordinator: ChannelTurnCoordinator;
 
   async runTurn(
@@ -115,10 +108,6 @@ export class CcConnectPiBridge {
       signal,
     );
     return buildCcConnectTurnResponse(content);
-  }
-
-  async runCronTrigger(trigger: CcConnectCronTrigger): Promise<void> {
-    await this.onCronTrigger(trigger);
   }
 }
 

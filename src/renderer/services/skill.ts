@@ -6,6 +6,7 @@ import {
   Skill,
 } from '../types/skill';
 import { i18nService } from './i18n';
+import type { SkillSecurityReport } from '../../main/libs/skillSecurity/skillSecurityTypes';
 
 export function resolveLocalizedText(text: string | LocalizedText): string {
   if (!text) return '';
@@ -160,7 +161,7 @@ class SkillService {
     skills?: Skill[];
     error?: string;
     errorCode?: string;
-    auditReport?: any;
+    auditReport?: SkillSecurityReport | undefined;
     pendingInstallId?: string;
   }> {
     try {
@@ -171,7 +172,9 @@ class SkillService {
       if (result.success && result.skills) {
         this.skills = result.skills;
       }
-      return result;
+      // The preload surface reports the audit report as unknown; the main
+      // process only ever puts a SkillSecurityReport there.
+      return { ...result, auditReport: result.auditReport as SkillSecurityReport | undefined };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to download skill';
       console.error('Failed to download skill:', error);

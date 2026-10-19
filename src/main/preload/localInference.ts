@@ -114,7 +114,7 @@ export const localInferenceApi = {
     onPullProgress: (
       callback: (payload: { name: string; chunk: Record<string, unknown> }) => void,
     ) => {
-      const handler = (_event: Electron.IpcRendererEvent, progress: any) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: Record<string, unknown>) => {
         const name = String(progress?.modelId || progress?.modelName || '');
         callback({ name, chunk: { ...progress, status: progress?.phase } });
       };
