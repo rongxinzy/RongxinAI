@@ -408,7 +408,10 @@ test('tag release publishes beta and archives build metadata for promotion', () 
 });
 
 test('published update smoke reads the electron feed of the channel it verifies', () => {
-  const script = readFileSync(path.join(root, 'scripts', 'release', 'verify-published-update.mjs'), 'utf8');
+  const script = readFileSync(
+    path.join(root, 'scripts', 'release', 'verify-published-update.mjs'),
+    'utf8',
+  );
 
   assert.match(script, /v2\/electron\/\$\{channel\}\//);
   assert.doesNotMatch(script, /v2\/electron\/stable\//);
