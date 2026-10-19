@@ -1,41 +1,16 @@
-import type { Schedule } from './types';
 import { CcConnectProtocol, type CcConnectHealth } from '../shared/ccConnect/constants';
 import { createCcConnectProtocolHeaders, isCcConnectHealth } from '../shared/ccConnect/protocol';
 
-/** Internal account identity for the credential-free canonical scheduler clock. */
-export const SchedulerClockAccount = '__zhiyuan_scheduler__';
-
-export type CcConnectCronTask = {
-  accountId: string;
-  taskId: string;
-  scheduleVersion: string;
-  schedule: Schedule;
-};
-
-/** Minimal authenticated control-plane client; it never sends payloads or commands. */
-export class CcConnectCronClient {
+/**
+ * Sidecar control-plane client: health verification only. The scheduler clock
+ * lives in the main process (work package E), so cron task upsert/remove and
+ * trigger routes are gone; the sidecar is a channel runtime, not a clock.
+ */
+export class CcConnectControlClient {
   constructor(
     private readonly baseUrl: string,
     private readonly token: string,
   ) {}
-
-  async upsert(task: CcConnectCronTask): Promise<void> {
-    await this.request('/v1/cc-connect/cron/tasks', {
-      method: 'POST',
-      body: JSON.stringify(task),
-    });
-  }
-
-  async remove(task: Pick<CcConnectCronTask, 'accountId' | 'taskId'>): Promise<void> {
-    const query = new URLSearchParams({ accountId: task.accountId });
-    await this.request(`/v1/cc-connect/cron/tasks/${encodeURIComponent(task.taskId)}?${query}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async reconcile(tasks: readonly CcConnectCronTask[]): Promise<void> {
-    for (const task of tasks) await this.upsert(task);
-  }
 
   async healthCheck(expectedPid?: number): Promise<CcConnectHealth> {
     const response = await this.request('/v1/cc-connect/cron/health', { method: 'GET' }, 200);

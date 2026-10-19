@@ -12,15 +12,12 @@ import { app, BrowserWindow } from 'electron';
 import { rt } from './runtimeState';
 import { getCoworkStore, getSkillManager, getStore } from './runtimeServices';
 import { getPiRuntimeAdapter } from './sessionServices';
-import {
-  CcConnectCronClient,
-  SchedulerClockAccount,
-} from '../../scheduledTask/ccConnectCronClient';
+import { CcConnectControlClient } from '../libs/ccConnectControlClient';
 import { CanonicalScheduledTaskService } from '../../scheduledTask/canonicalScheduledTaskService';
 import { CcConnectDeliveryClient } from '../../scheduledTask/ccConnectDeliveryClient';
 import { CcConnectDeliveryTransport } from '../../scheduledTask/ccConnectDeliveryTransport';
 import { CcConnectSchedulerRuntime } from '../../scheduledTask/ccConnectSchedulerRuntime';
-import { DeferredCcConnectCronClient } from '../../scheduledTask/deferredCcConnectCronClient';
+import { LocalCronClock } from '../../scheduledTask/localCronClock';
 import { ScheduledTaskDeliveryDispatcher } from '../../scheduledTask/deliveryDispatcher';
 import { SqliteScheduledTaskStore } from '../../scheduledTask/sqliteScheduledTaskStore';
 import { PiScheduledTaskExecutor } from '../../scheduledTask/piScheduledTaskExecutor';
@@ -38,22 +35,16 @@ import { CcConnectSidecarManager } from '../libs/ccConnectSidecarManager';
 import { serializeCcConnectSidecarConfig } from '../libs/ccConnectSidecarConfig';
 import { resolveCcConnectAccountRuntimeStatus } from '../libs/ccConnectAccountRuntimeStatus';
 
-const attachCcConnectCronControl = async (
-  accountId: string,
+const attachCcConnectControl = async (
   baseUrl: string,
   expectedPid: number,
-): Promise<Awaited<ReturnType<CcConnectCronClient['healthCheck']>>> => {
+): Promise<Awaited<ReturnType<CcConnectControlClient['healthCheck']>>> => {
   if (!rt.ccConnectBridgeToken) throw new Error('cc-connect bridge token is not initialized');
-  getCanonicalScheduledTaskService();
-  const client = new CcConnectCronClient(baseUrl, rt.ccConnectBridgeToken);
-  const health = await client.healthCheck(expectedPid);
-  await rt.deferredCcConnectCronClient!.attach(accountId, client);
-  // The sidecar intentionally has no durable task state. Rebuild its complete
-  // trigger projection from SQLite after every successful control-plane attach.
-  await rt.canonicalSchedulerRuntime!.reconcile(
-    await getCanonicalScheduledTaskService().listJobs(),
+  // The scheduler clock is in-process; attach only verifies the sidecar health
+  // contract. There is no cron projection to rebuild on attach anymore.
+  return await new CcConnectControlClient(baseUrl, rt.ccConnectBridgeToken).healthCheck(
+    expectedPid,
   );
-  return health;
 };
 /**
  * Pushes canonical scheduler Run/status changes to every renderer window.
@@ -78,16 +69,26 @@ const broadcastScheduledTaskEvent = (
 export const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
   if (!rt.canonicalScheduledTaskService) {
     const taskStore = new SqliteScheduledTaskStore(getStore().getDatabase());
-    rt.deferredCcConnectCronClient = new DeferredCcConnectCronClient();
     rt.ccConnectDeliveryTransport = new CcConnectDeliveryTransport(
       new IMStore(getStore().getDatabase()),
       getCoworkStore(),
     );
     const executor = new PiScheduledTaskExecutor(getPiRuntimeAdapter(), getCoworkStore());
     rt.activityService ??= new ActivityService(getStore().getDatabase());
+    // Main-process clock: timers survive sidecar restarts and fire with no
+    // sidecar at all; triggers go straight into the runtime's claim path.
+    rt.canonicalSchedulerClock = new LocalCronClock((task, scheduledAtMs) => {
+      void rt
+        .canonicalSchedulerRuntime!.handleTrigger({
+          taskId: task.taskId,
+          scheduleVersion: task.scheduleVersion,
+          scheduledAt: new Date(scheduledAtMs).toISOString(),
+        })
+        .catch(error => console.error('[Scheduler] clock trigger failed:', error));
+    });
     rt.canonicalSchedulerRuntime = new CcConnectSchedulerRuntime(
       taskStore,
-      rt.deferredCcConnectCronClient,
+      rt.canonicalSchedulerClock,
       executor.execute.bind(executor),
       new ScheduledTaskDeliveryDispatcher(taskStore, rt.ccConnectDeliveryTransport),
       rt.activityService,
@@ -105,6 +106,17 @@ export const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskServic
       rt.canonicalSchedulerRuntime,
     );
     rt.piRuntimeAdapter?.setScheduledTaskService(rt.canonicalScheduledTaskService);
+    // Arm every enabled task's timer from SQLite at construction; the previous
+    // design armed them only when the sidecar control plane attached.
+    void (async () => {
+      try {
+        await rt.canonicalSchedulerRuntime!.reconcile(
+          await rt.canonicalScheduledTaskService.listJobs(),
+        );
+      } catch (error) {
+        console.error('[Scheduler] startup scheduling failed:', error);
+      }
+    })();
   }
   return rt.canonicalScheduledTaskService;
 };
@@ -120,18 +132,9 @@ export const startCcConnectBridge = async (): Promise<void> => {
     activityService:
       rt.activityService ?? (rt.activityService = new ActivityService(getStore().getDatabase())),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
-    onCronTrigger: async trigger =>
-      getCanonicalScheduledTaskService() &&
-      rt.canonicalSchedulerRuntime!.handleTrigger({
-        accountId: trigger.accountId,
-        taskId: trigger.taskId,
-        scheduleVersion: trigger.scheduleVersion,
-        scheduledAt: trigger.scheduledAt,
-      }),
   });
   rt.ccConnectBridgeServer = new CcConnectBridgeServer(token, {
     onTurn: (request, signal) => rt.ccConnectPiBridge!.runTurn(request, signal),
-    onCronTrigger: trigger => rt.ccConnectPiBridge!.runCronTrigger(trigger),
   });
   rt.ccConnectBridgeUrl = await rt.ccConnectBridgeServer.start();
 };
@@ -158,14 +161,13 @@ export const resolveCcConnectSidecarExecutable = (): string | null => {
 };
 
 const waitForCcConnectCronControl = async (
-  accountId: string,
   baseUrl: string,
   expectedPid: number,
-): Promise<Awaited<ReturnType<CcConnectCronClient['healthCheck']>>> => {
+): Promise<Awaited<ReturnType<CcConnectControlClient['healthCheck']>>> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
-      return await attachCcConnectCronControl(accountId, baseUrl, expectedPid);
+      return await attachCcConnectControl(baseUrl, expectedPid);
     } catch (error) {
       lastError = error;
       await new Promise(resolve => setTimeout(resolve, 250));
@@ -177,7 +179,7 @@ const waitForCcConnectCronControl = async (
 };
 
 const applyCcConnectPlatformStatuses = (
-  statuses: Awaited<ReturnType<CcConnectCronClient['healthCheck']>>['platforms'],
+  statuses: Awaited<ReturnType<CcConnectControlClient['healthCheck']>>['platforms'],
 ): void => {
   rt.ccConnectRuntimeStatuses.replace(statuses);
 };
@@ -210,7 +212,6 @@ const startCcConnectRuntime = async (
   manager.on('error', error => console.error('[ChannelRuntime] Sidecar error:', error));
   manager.on('exit', ({ code, signal }) => {
     if (rt.ccConnectSidecarManager === manager) rt.ccConnectSidecarManager = null;
-    rt.deferredCcConnectCronClient?.detach(SchedulerClockAccount);
     for (const account of accounts) {
       rt.ccConnectRuntimeStatuses.delete(account.accountId);
       rt.ccConnectDeliveryTransport?.detach(account.accountId);
@@ -238,14 +239,14 @@ const startCcConnectRuntime = async (
         bridgeUrl: rt.ccConnectBridgeUrl,
         bridgeToken: rt.ccConnectBridgeToken,
         cronControlListen: '127.0.0.1:0',
-        projects: [{ accountId: SchedulerClockAccount }, ...accounts],
+        projects: accounts,
       }),
     );
     const pid = manager.pid;
     if (!pid) throw new Error('cc-connect runtime has no child PID');
     const baseUrl = await manager.waitForControlUrl();
-    const health = await waitForCcConnectCronControl(SchedulerClockAccount, baseUrl, pid);
-    rt.ccConnectRuntimeControlClient = new CcConnectCronClient(baseUrl, rt.ccConnectBridgeToken);
+    const health = await waitForCcConnectCronControl(baseUrl, pid);
+    rt.ccConnectRuntimeControlClient = new CcConnectControlClient(baseUrl, rt.ccConnectBridgeToken);
     const client = new CcConnectDeliveryClient(baseUrl, rt.ccConnectBridgeToken);
     for (const account of accounts) {
       rt.ccConnectDeliveryTransport?.attach(account.accountId, client);
@@ -258,7 +259,6 @@ const startCcConnectRuntime = async (
   } catch (error) {
     if (rt.ccConnectSidecarManager === manager) rt.ccConnectSidecarManager = null;
     rt.ccConnectRuntimeControlClient = null;
-    rt.deferredCcConnectCronClient?.detach(SchedulerClockAccount);
     for (const account of accounts) {
       rt.ccConnectRuntimeStatuses.delete(account.accountId);
       rt.ccConnectDeliveryTransport?.detach(account.accountId);
@@ -295,7 +295,6 @@ const reconcileCcConnectChannelSidecarsNow = async (): Promise<void> => {
     await rt.ccConnectSidecarManager?.stop();
     rt.ccConnectSidecarManager = null;
     rt.ccConnectRuntimeControlClient = null;
-    rt.deferredCcConnectCronClient?.detach(SchedulerClockAccount);
     for (const accountId of rt.ccConnectDeliveryAccounts)
       rt.ccConnectDeliveryTransport?.detach(accountId);
     rt.ccConnectDeliveryAccounts.clear();
