@@ -126,6 +126,23 @@ const CPU_NSIS_MARGIN = {
   nonComponentBytes: 5 * MiB,
 };
 
+// Component-only recalibration: release run 39262246003, CPU job 118108760017.
+// The pack-setup component counters are exact archive sizes, independent of
+// Authenticode. Making Skill Python relocatable added its required stdlib/DLLs:
+// skill-python grew from 187,943,479 B (build.7) to 201,219,105 B (build.9).
+// All fixed components total 301,923,735 B; llama.cpp adds 27,410,530 B.
+// Keep the original total/non-component limits: the measured unsigned setup
+// (540,166,608 B) and signed NSIS updater (462,543,176 B) still fit them.
+// Only these component baselines use build.9, with the same 3% whole-MiB rule.
+const CPU_COMPONENT_MEASURED = {
+  setup: 329_334_265,
+  nsis: 301_923_735,
+};
+
+function measuredComponentLimit(bytes) {
+  return bytes + Math.ceil((bytes * 0.03) / MiB) * MiB;
+}
+
 function measuredLimits(measured, margin) {
   return {
     maxInstallerBytes: measured.installerBytes + margin.installerBytes,
@@ -134,7 +151,10 @@ function measuredLimits(measured, margin) {
   };
 }
 
-const CPU_SETUP_BUDGET = measuredLimits(CPU_SETUP_MEASURED, CPU_SETUP_MARGIN);
+const CPU_SETUP_BUDGET = {
+  ...measuredLimits(CPU_SETUP_MEASURED, CPU_SETUP_MARGIN),
+  maxComponentBytes: measuredComponentLimit(CPU_COMPONENT_MEASURED.setup),
+};
 
 const EDITION_SETUP_BUDGETS = {
   lite: LITE_SETUP_BUDGET,
@@ -171,7 +191,11 @@ const LITE_NSIS_MEASURED = {
 
 const EDITION_NSIS_BUDGETS = {
   lite: { ...LITE_NSIS_BUDGET, measured: LITE_NSIS_MEASURED },
-  cpu: { ...measuredLimits(CPU_NSIS_MEASURED, CPU_NSIS_MARGIN), measured: CPU_NSIS_MEASURED },
+  cpu: {
+    ...measuredLimits(CPU_NSIS_MEASURED, CPU_NSIS_MARGIN),
+    maxComponentBytes: measuredComponentLimit(CPU_COMPONENT_MEASURED.nsis),
+    measured: CPU_NSIS_MEASURED,
+  },
   cuda: { ...UNCAPPED_BUDGET, measured: null },
 };
 
@@ -415,6 +439,7 @@ module.exports = {
   CPU_SETUP_MARGIN,
   CPU_NSIS_MEASURED,
   CPU_NSIS_MARGIN,
+  CPU_COMPONENT_MEASURED,
   reportMeasurement,
   MAGPIE_GATEWAY_COMPRESSED_BYTES,
   MAGPIE_GATEWAY_MARGIN_BYTES,
