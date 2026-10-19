@@ -1,6 +1,6 @@
 // Message persistence for the CoworkStore class chain.
 // Split from src/main/coworkStore.ts (issue #1069).
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 import { mapCoworkMessageRow, normalizeMessageTimestamp, type CoworkMessageRow } from './helpers';
 import type {
@@ -106,7 +106,7 @@ export class CoworkMessageStore extends CoworkWorkspaceStore {
     message: Omit<CoworkMessage, 'id' | 'timestamp'>,
     timestamp?: number,
   ): CoworkMessage {
-    const id = uuidv4();
+    const id = randomUUID();
     const now = timestamp ?? Date.now();
 
     const seqRow = this.db
@@ -198,7 +198,7 @@ export class CoworkMessageStore extends CoworkWorkspaceStore {
     beforeMessageId: string,
     message: Omit<CoworkMessage, 'id' | 'timestamp'>,
   ): CoworkMessage {
-    const id = uuidv4();
+    const id = randomUUID();
     const now = Date.now();
 
     // Get the target message's sequence
@@ -316,7 +316,7 @@ export class CoworkMessageStore extends CoworkWorkspaceStore {
       const insertedTimestamps: number[] = [];
 
       for (const entry of authoritative) {
-        const id = uuidv4();
+        const id = randomUUID();
         const baseMetadata = { isStreaming: false, isFinal: true };
         const finalMetadata = entry.metadata
           ? { ...baseMetadata, ...entry.metadata }

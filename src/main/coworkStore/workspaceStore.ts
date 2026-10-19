@@ -1,6 +1,6 @@
 // Workspace CRUD for the CoworkStore class chain.
 // Split from src/main/coworkStore.ts (issue #1069).
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 import type { Workspace } from '../../shared/workspace';
 import {
@@ -86,7 +86,7 @@ export class CoworkWorkspaceStore extends CoworkStoreBase {
     if (!normalizedPath) throw new Error('Workspace path is required');
     if (!normalizedName) throw new Error('Workspace name is required');
 
-    const id = `workspace-${uuidv4()}`;
+    const id = `workspace-${randomUUID()}`;
     const now = Date.now();
     this.db
       .prepare(

@@ -12,6 +12,7 @@ import { resolveGgufModelDownloadUrls } from '../../shared/llamacpp/modelDownloa
 import { resolveInstalledModelName } from './llamacppModelCatalog';
 import { MarketplaceService } from './marketplaceService';
 import type { MarketplaceModelFile } from '../../shared/marketplace';
+import { isRecord } from '../../shared/lib/isRecord';
 
 type RequestOptions = { signal?: AbortSignal };
 
@@ -412,10 +413,6 @@ function extractRecords(payload: unknown): Record<string, unknown>[] {
     });
   }
   return records;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readRecordString(value: unknown): string | undefined {
