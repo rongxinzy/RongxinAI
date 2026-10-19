@@ -6,7 +6,7 @@ import type { Artifact } from '@/types/artifact';
 
 export const t = (key: string) => i18nService.t(key);
 
-export interface PdfDocumentPage {
+interface PdfDocumentPage {
   getViewport(options: { scale: number }): { width: number; height: number };
   render(options: {
     canvasContext: CanvasRenderingContext2D;

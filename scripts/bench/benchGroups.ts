@@ -10,7 +10,7 @@
  *     PiUiEventSequencer → IPC (JSON bytes counted). Renderer model: one
  *     mock-Redux dispatch of the accumulated text per rAF frame.
  * D — phase 1+2: the same main process plus real renderer pieces — LiveTextStore
- *     + RafStreamPartBatcher on a virtual rAF; Redux written once at the
+ *     applying chunks on arrival and notifying on a virtual rAF; Redux written once at the
  *     terminal state. --render additionally mounts the jsdom + React.Profiler
  *     lower-bound component (renderHarness.ts).
  *
@@ -28,7 +28,6 @@ import {
 } from '../../src/main/libs/agentEngine/piTranslate/piTranslateUiMessageChunk';
 import { UiMessageChunkCoalescer } from '../../src/main/streaming/uiMessageChunkCoalescer';
 import { PiUiEventSequencer, PiUiEventType } from '../../src/shared/cowork/piUiEvent';
-import { RafStreamPartBatcher } from '../../src/renderer/services/rafStreamPartBatcher';
 import { LiveTextStore } from '../../src/renderer/services/liveTextStore';
 
 import { LEGACY_THINKING_MESSAGE_ID, LegacyMainPipeline } from './fixtures/legacyMainPipeline';
@@ -346,7 +345,12 @@ const runPhaseTwoScenario = async (
     },
   });
   const plan = createFeedPlan(buildCorpus(chars), config.rate, config.thinking);
-  const store = new LiveTextStore();
+  const scheduler = createVirtualRafScheduler(clock, FRAME_MS);
+  const store = new LiveTextStore({
+    schedule: callback => {
+      scheduler.request(callback);
+    },
+  });
   const textLatency = new StreamLatencyTracker();
   const reasoningLatency = new StreamLatencyTracker();
   const sqlite = new ThrottledSqliteCounter(clock);
@@ -372,29 +376,13 @@ const runPhaseTwoScenario = async (
     );
   }
 
-  const scheduler = createVirtualRafScheduler(clock, FRAME_MS);
-  const batcher = new RafStreamPartBatcher(parts => {
-    if (parts.length === 0) return;
+  const unsubscribe = store.subscribe(() => {
     const frameAt = clock.now();
-    let touched = false;
-    for (const part of parts) {
-      store.applyChunk(part.messageId, part.chunk, part.sessionId);
-      const chunk = part.chunk;
-      if (chunk.type === 'text-delta') {
-        appliedText += chunk.delta.length;
-        touched = true;
-      } else if (chunk.type === 'reasoning-delta') {
-        appliedReasoning += chunk.delta.length;
-        touched = true;
-      } else if (chunk.type === 'text-start' || chunk.type === 'reasoning-start') {
-        touched = true;
-      }
-    }
     textLatency.visible(appliedText, frameAt);
     reasoningLatency.visible(appliedReasoning, frameAt);
-    if (touched) rendererCommits += 1;
+    rendererCommits += 1;
     if (harness !== null) harness.flush();
-  }, scheduler);
+  });
 
   const pipeline = createIncrementalMainPipeline({
     onIpcEvent: bytes => {
@@ -402,7 +390,9 @@ const runPhaseTwoScenario = async (
       ipcBytes += bytes;
     },
     onStreamPart: chunk => {
-      batcher.enqueue({ sessionId: SESSION_ID, messageId: MESSAGE_ID, chunk });
+      store.applyChunk(MESSAGE_ID, chunk, SESSION_ID);
+      if (chunk.type === 'text-delta') appliedText += chunk.delta.length;
+      else if (chunk.type === 'reasoning-delta') appliedReasoning += chunk.delta.length;
     },
   });
 
@@ -417,7 +407,6 @@ const runPhaseTwoScenario = async (
       },
       onDone: () => {
         pipeline.flush();
-        batcher.flush();
         sqlite.flushFinal();
       },
     });
@@ -444,6 +433,7 @@ const runPhaseTwoScenario = async (
       notes,
     });
   } finally {
+    unsubscribe();
     restore();
     if (harness !== null) harness.dispose();
   }

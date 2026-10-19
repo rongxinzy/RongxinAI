@@ -35,6 +35,7 @@ import {
 
 type MockSkill = (typeof mockSkills)[number];
 import type { BrowserMockRuntime } from './runtime';
+import { createDesktopPetPreview } from './desktopPet';
 import type { DeepPartial } from './scenarioTypes';
 import {
   getStreamReplayTrace,
@@ -280,6 +281,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
   };
 
   return {
+    desktopPet: createDesktopPetPreview(runtime),
     store: {
       get: (key: string) => Promise.resolve(store.has(key) ? store.get(key) : null),
       set: (key: string, value: unknown) => {

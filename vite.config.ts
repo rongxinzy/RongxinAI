@@ -173,6 +173,18 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
+                entry: 'src/main/desktopPetPreload.ts',
+                vite: {
+                  build: {
+                    watch: null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // The local inference daemon is launched as an independent Node process.
                 entry: 'src/main/llamacppModelDaemonEntry.ts',
                 vite: {
@@ -321,6 +333,7 @@ export default defineConfig(async ({ command }) => {
         input: {
           main: path.resolve(projectRoot, 'index.html'),
           officePreview: path.resolve(projectRoot, 'office-preview.html'),
+          desktopPet: path.resolve(projectRoot, 'desktop-pet.html'),
         },
       },
       // CI 中指定 chrome130（Electron 40 运行时）跳过降级转译省内存

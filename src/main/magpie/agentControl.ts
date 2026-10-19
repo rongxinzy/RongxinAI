@@ -19,6 +19,13 @@ type MagpieManagementClient = {
   agents(): Promise<MagpieAgents>;
 };
 
+/** Structural fields returned by the upstream CLI version probe. */
+type MagpieAgentCliVersions = Record<string, { version?: unknown; app?: unknown }>;
+
+export function parseMagpieCliVersions(value: unknown): MagpieAgentCliVersions {
+  return (value && typeof value === 'object' ? value : {}) as MagpieAgentCliVersions;
+}
+
 export async function magpieAgentPreview(
   client: MagpieManagementClient,
   agentId: string,

@@ -58,6 +58,41 @@ describe('PiAssistantTranscript', () => {
     vi.useRealTimers();
   });
 
+  it.each(['answer', 'thinking'] as const)(
+    'does not rewrite or re-emit a finalized %s when closing idle placeholders',
+    kind => {
+      const active = baseActive();
+      const updateMessage = vi.fn();
+      const emitMessageUpdate = vi.fn();
+      const local = new PiAssistantTranscript({
+        getStore: () =>
+          ({
+            addMessage: (_sessionId: string, message: { id: string }) => message,
+            getMessage: () => ({ content: 'final body', metadata: { isFinal: true } }),
+            updateMessage,
+          }) as never,
+        emitMessage: vi.fn(),
+        emitMessageUpdate,
+        emitMessageRemoved: vi.fn(),
+        hasStreamingTextSubscribers: () => true,
+        getActiveSession: () => active,
+      });
+      if (kind === 'answer') active.answerText = 'final body';
+      else active.thinkingText = 'final body';
+      local.finalizeMessage('session', active, kind, 'final body');
+      updateMessage.mockClear();
+      emitMessageUpdate.mockClear();
+
+      // Error/settle cleanup may run after message_end already committed the
+      // final body. Repeated cleanup must leave that row and terminal event alone.
+      local.closeIdlePlaceholders('session', active, { finalize: true });
+      local.closeIdlePlaceholders('session', active, { finalize: true });
+
+      expect(updateMessage).not.toHaveBeenCalled();
+      expect(emitMessageUpdate).not.toHaveBeenCalled();
+    },
+  );
+
   it('does not delete whitespace-only or retry-prior answer rows on closeIdle', () => {
     const emitMessageRemoved = vi.fn();
     const deleteMessage = vi.fn(() => true);

@@ -156,6 +156,7 @@ describe('preload entry', () => {
       'codingAgent',
       'contextMenu',
       'cowork',
+      'desktopPet',
       'dialog',
       'dingtalk',
       'enterprise',

@@ -1,5 +1,17 @@
 // Settings and appearance
 export const enSettings: Record<string, string> = {
+  desktopPetSettingsTitle: 'Desktop companion',
+  desktopPetEnabled: 'Show Xiaoyuan',
+  desktopPetEnabledDescription:
+    'Show task status on your desktop. Click to open the related task. Off by default.',
+  desktopPetDoNotDisturb: 'Do not disturb',
+  desktopPetDoNotDisturbDescription:
+    'Temporarily hide Xiaoyuan. Tasks continue and unhandled failure reminders are kept.',
+  desktopPetHideInFullscreen: 'Hide when the app is fullscreen',
+  desktopPetHideInFullscreenDescription:
+    'Hide while ZhiYuan Agent is fullscreen and restore afterward. Also hide while locked or suspended.',
+  desktopPetTaskOpenFailed:
+    'The task could not be opened. Check the conversation list. Unacknowledged failure reminders are kept.',
   // Settings
   settings: 'Settings',
   settingsGroupGeneral: 'General',

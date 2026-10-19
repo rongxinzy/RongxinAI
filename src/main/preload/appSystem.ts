@@ -2,6 +2,8 @@ import { ipcRenderer } from 'electron';
 
 import type { ContextMenuAction, ContextMenuOpenEvent } from '../../shared/contextMenu';
 import { AppUpdateIpc } from '../../shared/appUpdate/constants';
+import { DesktopPetIpc } from '../../shared/desktopPet/constants';
+import type { DesktopPetApi } from '../../shared/desktopPet/types';
 import { ContextMenuIpc, NetworkIpc, WindowIpc } from '../../shared/ipc/channels';
 import { appSystemContractChannels } from '../../shared/ipc/appSystemContract.channels';
 import type { appSystemContract } from '../../shared/ipc/appSystemContract';
@@ -30,6 +32,15 @@ type WithExtra<E, M extends Record<string, keyof AppSystemContractApi>> = Rename
 // fire-and-forget sends (contextMenu.execute, window controls, network status)
 // and push subscriptions stay hand-wired below.
 export const appSystemApi = {
+  desktopPet: {
+    getSettings: () => ipcRenderer.invoke(DesktopPetIpc.GetSettings),
+    setSettings: patch => ipcRenderer.invoke(DesktopPetIpc.SetSettings, patch),
+    getPendingTask: () => ipcRenderer.invoke(DesktopPetIpc.GetPendingTask),
+    resolveTask: (requestId, result) =>
+      ipcRenderer.invoke(DesktopPetIpc.ResolveTask, requestId, result),
+    onSettingsChanged: listener => onPush(DesktopPetIpc.SettingsChanged, listener),
+    onOpenTask: listener => onPush(DesktopPetIpc.OpenTask, listener),
+  },
   store: {
     get: asApi('storeGet'),
     set: asApi('storeSet'),
@@ -154,6 +165,7 @@ export const appSystemApi = {
     send: (status: 'online' | 'offline') => ipcRenderer.send(NetworkIpc.StatusChange, status),
   },
 } satisfies {
+  desktopPet: DesktopPetApi;
   appEvents: {
     onOpenSettings: (callback: () => void) => () => void;
     onNewTask: (callback: () => void) => () => void;

@@ -20,6 +20,7 @@ const config: KnipConfig = {
         // rolldown inputs, not the electron() entry list in vite.config.ts.
         'src/main/main.ts',
         'src/main/preload.ts',
+        'src/main/desktopPetPreload.ts',
         'src/main/llamacppModelDaemonEntry.ts',
         'src/main/workbenchTask/artifactWorker.ts',
         'src/main/magpie/catalogWorker.ts',
