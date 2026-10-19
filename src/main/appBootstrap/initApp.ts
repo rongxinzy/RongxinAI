@@ -49,6 +49,7 @@ import { initMcpServers } from './mcpBootstrap';
 import { resolveDefaultAgentModelRef } from './messageTriage';
 import { ensureEmbeddedPiAgentDir } from '../libs/agentEngine/piAgentDir';
 import { handleDeepLink } from './communityAuth';
+import { getCronJobService } from '../ipcHandlers/scheduledTask';
 import { aisphereService, startAISphereGateway } from '../extensions/aisphere';
 import { getBranding } from '../../shared/branding';
 import { DB_FILENAME } from '../appConstants';
@@ -511,6 +512,20 @@ export const initApp = async (): Promise<void> => {
       await rt.magpieManager?.onLanAccessChanged().catch(error => {
         console.warn('[Magpie] LAN access model service start failed:', error);
       });
+    }
+
+    // Construct the canonical scheduler eagerly. getCanonicalScheduledTaskService
+    // is the only place that injects the service into the Pi adapter
+    // (setScheduledTaskService); without this call it would only be built
+    // lazily by the first scheduled-task IPC request or the cc-connect sidecar
+    // cron attach, and Work sessions started before either (sidecar missing,
+    // in crash backoff, or racing startup) would silently lack the
+    // scheduled_task tool. The old startPolling() call covered this by
+    // accident; the polling itself was a no-op and stays removed.
+    try {
+      getCronJobService();
+    } catch (error) {
+      console.warn('[Main] Canonical scheduler not available after startup:', error);
     }
 
     // ── Step 1: Show window ASAP ──────────────────────────────────────

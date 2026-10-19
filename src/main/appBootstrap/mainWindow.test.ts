@@ -42,7 +42,6 @@ const mocks = vi.hoisted(() => {
     toggleDevToolsForSender: vi.fn(),
     isAutoLaunched: vi.fn(() => false),
     registerContextMenu: vi.fn(() => unregisterContextMenu),
-    getCronJobService: vi.fn(() => ({})),
     shellOpenExternal: vi.fn(),
   };
 });
@@ -131,9 +130,6 @@ vi.mock('./windowSecurity', () => ({
   isWecomAuthUrl: (url: string) => url.startsWith('https://wecom.example/'),
 }));
 vi.mock('./appLifecycle', () => ({ logAppQuitContextOnce: vi.fn() }));
-vi.mock('../ipcHandlers/scheduledTask', () => ({
-  getCronJobService: mocks.getCronJobService,
-}));
 vi.mock('../autoLaunchManager', () => ({ isAutoLaunched: mocks.isAutoLaunched }));
 vi.mock('./runtimeServices', () => ({
   getStore: () => ({
