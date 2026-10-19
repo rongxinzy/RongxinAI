@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PiAssistantTranscript } from './piAssistantTranscript';
 import type { ActivePiSession } from './piRuntimeSessionState';
-import { STREAM_CHECKPOINT_GROWTH_CHARS, STREAM_CHECKPOINT_MIN_INTERVAL_MS } from './piRuntimeSessionState';
+import {
+  STREAM_CHECKPOINT_GROWTH_CHARS,
+  STREAM_CHECKPOINT_MIN_INTERVAL_MS,
+} from './piRuntimeSessionState';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { createPiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
