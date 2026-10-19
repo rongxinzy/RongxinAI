@@ -1,16 +1,11 @@
 import { TaskStatus } from './constants';
 import { ActivitySource, ActivityStatus } from '../shared/activity/constants';
 import type { ActivityService } from '../main/activity/activityService';
-import { SchedulerClockAccount, type CcConnectCronTask } from './ccConnectCronClient';
+import type { SchedulerClock } from './localCronClock';
 import type { ScheduledTaskDeliveryDispatcher } from './deliveryDispatcher';
 import type { SchedulerRuntime } from './schedulerRuntime';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 import type { ScheduledTask, ScheduledTaskRun, TaskState } from './types';
-
-type TriggerClient = {
-  upsert(task: CcConnectCronTask): Promise<void>;
-  remove(task: Pick<CcConnectCronTask, 'accountId' | 'taskId'>): Promise<void>;
-};
 
 /**
  * Renderer-facing projection of canonical Run/state changes. The scheduler
@@ -22,13 +17,15 @@ export interface SchedulerEventSink {
 }
 
 /**
- * The only scheduler runtime allowed for cc-connect. It persists and claims
- * work locally; the sidecar is a disposable clock that can only emit triggers.
+ * The only scheduler runtime. It persists and claims work locally and owns an
+ * in-process croner clock (work package E): no sidecar round-trip, no virtual
+ * clock account — a channel-account change or a missing sidecar cannot stop a
+ * local task from firing.
  */
 export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   constructor(
     private readonly store: SqliteScheduledTaskStore,
-    private readonly client: TriggerClient,
+    private readonly clock: SchedulerClock,
     private readonly execute: (
       task: ScheduledTask,
       run: ScheduledTaskRun,
@@ -44,13 +41,12 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
 
   async register(task: ScheduledTask): Promise<void> {
     if (!task.enabled) {
-      await this.removeProjectionTask(task);
+      this.clock.remove(task.id);
       return;
     }
     const scheduleVersion = task.scheduleVersion;
     if (!scheduleVersion) throw new Error(`Scheduled task ${task.id} has no scheduleVersion`);
-    await this.client.upsert({
-      accountId: SchedulerClockAccount,
+    this.clock.upsert({
       taskId: task.id,
       scheduleVersion,
       schedule: task.schedule,
@@ -59,15 +55,11 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
 
   async remove(taskId: string): Promise<void> {
     const task = this.store.get(taskId);
-    if (task) await this.removeProjectionTask(task);
+    if (task) this.clock.remove(taskId);
   }
 
   async removeProjection(taskId: string): Promise<void> {
-    try {
-      await this.client.remove({ accountId: SchedulerClockAccount, taskId });
-    } catch (error) {
-      if (!String(error).includes('HTTP 404')) throw error;
-    }
+    this.clock.remove(taskId);
   }
 
   async runNow(taskId: string): Promise<void> {
@@ -88,13 +80,12 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   }
 
   async handleTrigger(input: {
-    accountId: string;
     taskId: string;
     scheduleVersion: string;
     scheduledAt: string;
   }): Promise<void> {
     const task = this.store.get(input.taskId);
-    if (!task || input.accountId !== SchedulerClockAccount) return;
+    if (!task) return;
     const scheduledAtMs = Date.parse(input.scheduledAt);
     if (!Number.isFinite(scheduledAtMs)) return;
     const run = this.store.claimTrigger({
@@ -164,16 +155,6 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
       if (state) this.events.taskStateChanged(run.taskId, state);
     } catch (error) {
       console.warn(`[Scheduler] failed to publish run ${run.id} to the renderer:`, error);
-    }
-  }
-
-  private async removeProjectionTask(task: ScheduledTask): Promise<void> {
-    try {
-      await this.client.remove({ accountId: SchedulerClockAccount, taskId: task.id });
-    } catch (error) {
-      // A restarted sidecar has no in-memory registration; its 404 is already
-      // the desired state and must not prevent the canonical mutation.
-      if (!String(error).includes('HTTP 404')) throw error;
     }
   }
 }

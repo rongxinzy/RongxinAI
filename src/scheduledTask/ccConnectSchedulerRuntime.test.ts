@@ -10,7 +10,6 @@ import {
   WakeMode,
 } from './constants';
 import { CcConnectSchedulerRuntime } from './ccConnectSchedulerRuntime';
-import { SchedulerClockAccount } from './ccConnectCronClient';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 
 function setup() {
@@ -26,28 +25,26 @@ function setup() {
     delivery: { mode: DeliveryMode.None },
     workspaceId: 'workspace-1',
   });
-  const client = { upsert: vi.fn(async () => undefined), remove: vi.fn(async () => undefined) };
+  const clock = { upsert: vi.fn(), remove: vi.fn() };
   const execute = vi.fn(async () => ({ sessionId: 'pi-run' }));
   return {
     store,
     task,
-    client,
+    clock,
     execute,
-    runtime: new CcConnectSchedulerRuntime(store, client, execute),
+    runtime: new CcConnectSchedulerRuntime(store, clock, execute),
   };
 }
 
 test('projects only schedules and executes a claimed trigger once', async () => {
-  const { store, task, client, execute, runtime } = setup();
+  const { store, task, clock, execute, runtime } = setup();
   await runtime.register(task);
-  expect(client.upsert).toHaveBeenCalledWith({
-    accountId: SchedulerClockAccount,
+  expect(clock.upsert).toHaveBeenCalledWith({
     taskId: task.id,
     scheduleVersion: task.scheduleVersion,
     schedule: task.schedule,
   });
   const trigger = {
-    accountId: SchedulerClockAccount,
     taskId: task.id,
     scheduleVersion: task.scheduleVersion!,
     scheduledAt: '2026-08-11T06:00:00.000Z',
@@ -61,13 +58,11 @@ test('projects only schedules and executes a claimed trigger once', async () => 
 test('normalizes equivalent scheduledAt offsets before claiming a Run', async () => {
   const { store, task, execute, runtime } = setup();
   await runtime.handleTrigger({
-    accountId: SchedulerClockAccount,
     taskId: task.id,
     scheduleVersion: task.scheduleVersion!,
     scheduledAt: '2026-08-11T14:00:00+08:00',
   });
   await runtime.handleTrigger({
-    accountId: SchedulerClockAccount,
     taskId: task.id,
     scheduleVersion: task.scheduleVersion!,
     scheduledAt: '2026-08-11T06:00:00.000Z',
@@ -83,7 +78,6 @@ test('ignores triggers from a stale schedule version', async () => {
   });
 
   await runtime.handleTrigger({
-    accountId: SchedulerClockAccount,
     taskId: task.id,
     scheduleVersion: task.scheduleVersion!,
     scheduledAt: '2026-08-11T06:00:00.000Z',
@@ -95,7 +89,7 @@ test('ignores triggers from a stale schedule version', async () => {
 });
 
 test('rebuilds the complete trigger projection from canonical SQLite tasks', async () => {
-  const { store, task, client, runtime } = setup();
+  const { store, task, clock, runtime } = setup();
   const disabled = store.update(task.id, { enabled: false });
   const second = store.create({
     name: 'second',
@@ -109,12 +103,8 @@ test('rebuilds the complete trigger projection from canonical SQLite tasks', asy
     workspaceId: 'workspace-1',
   });
   await runtime.reconcile([disabled, second]);
-  expect(client.remove).toHaveBeenCalledWith({
-    accountId: SchedulerClockAccount,
-    taskId: disabled.id,
-  });
-  expect(client.upsert).toHaveBeenCalledWith({
-    accountId: SchedulerClockAccount,
+  expect(clock.remove).toHaveBeenCalledWith(disabled.id);
+  expect(clock.upsert).toHaveBeenCalledWith({
     taskId: second.id,
     scheduleVersion: second.scheduleVersion,
     schedule: second.schedule,
@@ -122,15 +112,11 @@ test('rebuilds the complete trigger projection from canonical SQLite tasks', asy
 });
 
 test('disabled tasks delete their sidecar projection and never execute', async () => {
-  const { store, task, client, execute, runtime } = setup();
+  const { store, task, clock, execute, runtime } = setup();
   const disabled = store.update(task.id, { enabled: false });
   await runtime.register(disabled);
-  expect(client.remove).toHaveBeenCalledWith({
-    accountId: SchedulerClockAccount,
-    taskId: task.id,
-  });
+  expect(clock.remove).toHaveBeenCalledWith(task.id);
   await runtime.handleTrigger({
-    accountId: SchedulerClockAccount,
     taskId: task.id,
     scheduleVersion: disabled.scheduleVersion!,
     scheduledAt: '2026-08-11T06:00:00.000Z',
@@ -138,11 +124,10 @@ test('disabled tasks delete their sidecar projection and never execute', async (
   expect(execute).not.toHaveBeenCalled();
 });
 
-test('rejects a trigger that did not originate from the scheduler clock before it claims a Run', async () => {
+test('ignores a trigger for an unknown task before it claims a Run', async () => {
   const { store, task, execute, runtime } = setup();
   await runtime.handleTrigger({
-    accountId: 'other-account',
-    taskId: task.id,
+    taskId: 'missing-task',
     scheduleVersion: task.scheduleVersion!,
     scheduledAt: '2026-08-11T06:00:00.000Z',
   });
@@ -151,7 +136,7 @@ test('rejects a trigger that did not originate from the scheduler clock before i
 });
 
 test('uses the scheduler clock for a task delivered through a non-default channel account', async () => {
-  const { store, task, client, execute, runtime } = setup();
+  const { store, task, clock, execute, runtime } = setup();
   const routed = store.update(task.id, {
     delivery: {
       mode: DeliveryMode.Announce,
@@ -161,14 +146,12 @@ test('uses the scheduler clock for a task delivered through a non-default channe
     },
   });
   await runtime.register(routed);
-  expect(client.upsert).toHaveBeenCalledWith({
-    accountId: SchedulerClockAccount,
+  expect(clock.upsert).toHaveBeenCalledWith({
     taskId: routed.id,
     scheduleVersion: routed.scheduleVersion,
     schedule: routed.schedule,
   });
   await runtime.handleTrigger({
-    accountId: SchedulerClockAccount,
     taskId: routed.id,
     scheduleVersion: routed.scheduleVersion!,
     scheduledAt: '2026-08-11T06:00:00.000Z',
@@ -177,13 +160,13 @@ test('uses the scheduler clock for a task delivered through a non-default channe
 });
 
 test('persists delivery separately after Pi completes without changing Run success', async () => {
-  const { store, task, client } = setup();
+  const { store, task, clock } = setup();
   const dispatch = vi.fn(async () => {
     throw new Error('sidecar offline');
   });
   const runtime = new CcConnectSchedulerRuntime(
     store,
-    client,
+    clock,
     async () => ({ sessionId: 'pi-run', output: 'done' }),
     { dispatch } as never,
   );
@@ -197,8 +180,8 @@ test('persists delivery separately after Pi completes without changing Run succe
 });
 
 test('finishes a claimed Run as error when Pi terminates unexpectedly', async () => {
-  const { store, task, client } = setup();
-  const runtime = new CcConnectSchedulerRuntime(store, client, async () => {
+  const { store, task, clock } = setup();
+  const runtime = new CcConnectSchedulerRuntime(store, clock, async () => {
     throw new Error('Pi session stopped before completion');
   });
 
@@ -215,11 +198,11 @@ test('finishes a claimed Run as error when Pi terminates unexpectedly', async ()
 });
 
 test('publishes each Run transition together with the task state it produced', async () => {
-  const { store, task, client } = setup();
+  const { store, task, clock } = setup();
   const events = { runUpdated: vi.fn(), taskStateChanged: vi.fn() };
   const runtime = new CcConnectSchedulerRuntime(
     store,
-    client,
+    clock,
     async () => ({ sessionId: 'pi-run' }),
     undefined,
     undefined,
