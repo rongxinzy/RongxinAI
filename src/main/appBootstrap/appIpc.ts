@@ -5,12 +5,12 @@ import { isDev, isEnterprise } from './appEnv';
 import { rt } from './runtimeState';
 import { getStore, setPreventSleepBlockerEnabled } from './runtimeServices';
 import { showSystemMenu } from './windowManagement';
-import { ensureZipFileName } from './fileExportHelpers';
+import { ensureZipFileName } from '../coworkIpc/fileExportHelpers';
 import path from 'path';
 
 import { shell } from 'electron';
 
-import { buildLogExportFileName } from './fileExportHelpers';
+import { buildLogExportFileName } from '../coworkIpc/fileExportHelpers';
 import { reconcileCcConnectChannelSidecars } from './ccConnectRuntime';
 import { getLogFilePath, getRecentMainLogEntries } from '../logger';
 import { getAutoLaunchEnabled, setAutoLaunchEnabled } from '../autoLaunchManager';

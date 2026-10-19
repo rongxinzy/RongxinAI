@@ -27,7 +27,7 @@ import { registerCoworkSessionIpc } from './appBootstrap/coworkSessionIpc';
 import { registerCoworkQueueIpc } from './coworkIpc/queue';
 import { registerCoworkSessionAdminIpc } from './appBootstrap/coworkSessionAdminIpc';
 import { registerArtifactIpc } from './artifactLedger/artifactIpc';
-import { registerCoworkExportIpc } from './appBootstrap/coworkExportIpc';
+import { registerCoworkExportIpc } from './coworkIpc/export';
 import { registerCoworkConfigIpc } from './coworkIpc/config';
 import { registerAgentIpc } from './appBootstrap/agentIpc';
 import { registerScheduledTaskIpc } from '../scheduledTask/ipc';
@@ -87,7 +87,7 @@ if (!gotTheLock) {
   });
   registerCoworkSessionAdminIpc();
   registerArtifactIpc();
-  registerCoworkExportIpc();
+  registerCoworkExportIpc({ getPiRuntimeAdapter });
   registerCoworkConfigIpc({
     getCoworkStore,
     getSkillManager,

@@ -10,7 +10,7 @@ import {
   inferAttachmentExtension,
   resolveInlineAttachmentDir,
   sanitizeAttachmentFileName,
-} from './fileExportHelpers';
+} from '../coworkIpc/fileExportHelpers';
 import { registerArtifactFileAvailabilityHandler } from '../artifactFileAvailability';
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';

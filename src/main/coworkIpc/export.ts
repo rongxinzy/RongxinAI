@@ -5,11 +5,15 @@ import path from 'path';
 import { app, dialog, BrowserWindow } from 'electron';
 
 import { normalizeCaptureRect, savePngWithDialog } from './fileExportHelpers';
-import { getPiRuntimeAdapter } from './sessionServices';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkExportContract } from '../../shared/ipc/coworkContract';
+import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 
-export const registerCoworkExportIpc = (): void => {
+export interface CoworkExportIpcDeps {
+  getPiRuntimeAdapter: () => PiRuntimeAdapter;
+}
+
+export const registerCoworkExportIpc = (deps: CoworkExportIpcDeps): void => {
   handleIpcContract(coworkExportContract, {
     exportResultImage: async (event, options) => {
       try {
@@ -112,7 +116,7 @@ export const registerCoworkExportIpc = (): void => {
 
     respondToPermission: async (_event, options) => {
       try {
-        const runtime = getPiRuntimeAdapter();
+        const runtime = deps.getPiRuntimeAdapter();
         runtime.respondToPermission(options.requestId, options.result);
         return { success: true as const };
       } catch (error) {
