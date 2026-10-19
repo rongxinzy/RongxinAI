@@ -47,10 +47,14 @@ test('main.ts invokes every appBootstrap helper it imports', () => {
 
   const bodyWithoutImports = mainSource.replace(/^import[\s\S]*?from\s*'[^']+';/gm, '');
   for (const name of importedNames) {
-    expect(
-      new RegExp(`\\b${name}\\(`).test(bodyWithoutImports),
-      `${name} is imported by main.ts but never called`,
-    ).toBe(true);
+    // Called (`helper()`) or referenced as a value (composition-root wiring
+    // hands helpers to `registerXxxIpc({ dep: helper })` without calling
+    // them in main.ts). Either form proves the import is used; a bare name
+    // in neither position is the dead-wrapper regression this guards against.
+    const used =
+      new RegExp(`\\b${name}\\(`).test(bodyWithoutImports) ||
+      new RegExp(`\\b${name}\\b[,})\\n]`).test(bodyWithoutImports);
+    expect(used, `${name} is imported by main.ts but never used`).toBe(true);
   }
 });
 

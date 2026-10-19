@@ -6,10 +6,10 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { ensurePosixUvRuntime } = require('./setup-mac-uv-runtime.js');
-const { BUNDLED_PYTHON_VERSION } = require('../src/main/pythonRuntime/bundledRuntime');
+const { pythonVersion } = require('../src/main/pythonRuntime/bundledRuntime.json');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const PYTHON_VERSION = BUNDLED_PYTHON_VERSION;
+const PYTHON_VERSION = pythonVersion;
 
 function outputDir(platform) {
   return path.join(

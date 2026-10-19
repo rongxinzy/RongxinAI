@@ -30,7 +30,12 @@ import { registerArtifactIpc } from './artifactLedger/artifactIpc';
 import { registerCoworkExportIpc } from './appBootstrap/coworkExportIpc';
 import { registerCoworkConfigIpc } from './appBootstrap/coworkConfigIpc';
 import { registerAgentIpc } from './appBootstrap/agentIpc';
-import { registerTaskIpc } from './appBootstrap/taskIpc';
+import { registerScheduledTaskIpc } from '../scheduledTask/ipc';
+import { getActivityService } from './appBootstrap/runtimeServices';
+import {
+  getCanonicalScheduledTaskService,
+  getIMGatewayManager,
+} from './appBootstrap/ccConnectRuntime';
 import { registerPermissionsIpc } from './appBootstrap/permissionsIpc';
 import { registerImGatewayIpc } from './appBootstrap/imGatewayIpc';
 import { registerImInstanceIpc } from './appBootstrap/imInstanceIpc';
@@ -74,7 +79,11 @@ if (!gotTheLock) {
   registerCoworkExportIpc();
   registerCoworkConfigIpc();
   registerAgentIpc();
-  registerTaskIpc();
+  registerScheduledTaskIpc({
+    getActivityService,
+    getScheduledTaskService: getCanonicalScheduledTaskService,
+    getIMGatewayManager,
+  });
   registerPermissionsIpc();
   registerImGatewayIpc();
   registerImInstanceIpc();

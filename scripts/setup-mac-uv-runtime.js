@@ -7,11 +7,11 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
-const { BUNDLED_UV_VERSION } = require('../src/main/pythonRuntime/bundledRuntime');
+const { uvVersion } = require('../src/main/pythonRuntime/bundledRuntime.json');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const CACHE_DIR = path.join(PROJECT_ROOT, 'resources', 'uv-archives');
-const UV_VERSION = BUNDLED_UV_VERSION;
+const UV_VERSION = uvVersion;
 const DOWNLOAD_TIMEOUT_MS = Number.parseInt(
   process.env.ZHIYUAN_RUNTIME_DOWNLOAD_TIMEOUT_MS || '600000',
   10,

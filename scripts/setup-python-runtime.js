@@ -17,7 +17,7 @@ const { pipeline } = require('stream/promises');
 const { spawnSync } = require('child_process');
 const extractZip = require('extract-zip');
 const { ensurePortableUvRuntime, findPortableUvExecutables } = require('./setup-uv-runtime.js');
-const { BUNDLED_PYTHON_VERSION } = require('../src/main/pythonRuntime/bundledRuntime');
+const { pythonVersion } = require('../src/main/pythonRuntime/bundledRuntime.json');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'python-win');
@@ -26,7 +26,7 @@ const DOWNLOAD_TIMEOUT_MS = Number.parseInt(
   10,
 );
 const DEFAULT_ARCHIVE_PATH = path.join(PROJECT_ROOT, 'resources', 'python-win-runtime.zip');
-const DEFAULT_WINDOWS_EMBED_PYTHON_VERSION = BUNDLED_PYTHON_VERSION;
+const DEFAULT_WINDOWS_EMBED_PYTHON_VERSION = pythonVersion;
 const DEFAULT_WINDOWS_EMBED_PYTHON_ZIP = `python-${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}-embed-amd64.zip`;
 const DEFAULT_WINDOWS_EMBED_PYTHON_URL =
   process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_URL ||
