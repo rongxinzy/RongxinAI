@@ -43,6 +43,8 @@ const config: KnipConfig = {
         'scripts/release/fetch-generation-build-metadata.sh',
         'scripts/release/publish-platform-beta-release.sh',
         'scripts/release/merge-update-manifest-collection.mjs',
+        'scripts/release/publish-update-manifest.mjs',
+        'scripts/release/verify-release-candidate.mjs',
         'scripts/release/windows/assemble-windows-edition.cjs',
         'scripts/ci/with-download-retries.sh',
         'scripts/release/upload-update-artifacts.mjs',
