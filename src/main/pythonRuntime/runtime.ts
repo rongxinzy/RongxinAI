@@ -1,12 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
 import { access, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { Readable, Transform } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
-import { x as extractTar } from 'tar';
-import extractZip from 'extract-zip';
-import manifest from './manifest.json';
 import { isolatedEnvironment, runtimeNetworkEnvironment, runProcess } from './process';
 import type { PythonExecutionResult, PythonRunnerRequest } from '../../shared/pythonRuntime';
 
@@ -37,89 +31,35 @@ async function exists(file: string) {
   }
 }
 
-export async function downloadVerifiedAsset(
-  asset: { url: string; sha256: string },
-  file: string,
-  signal: AbortSignal,
-) {
-  const response = await fetch(asset.url, { signal });
-  if (!response.ok || !response.body)
-    throw new Error(`Python runtime download failed (${response.status}).`);
-  const hash = createHash('sha256');
-  let size = 0;
-  const verifier = new Transform({
-    transform(chunk, _encoding, callback) {
-      size += chunk.length;
-      if (size > 200 * 1024 * 1024) return callback(new Error('Runtime archive is too large.'));
-      hash.update(chunk);
-      callback(null, chunk);
-    },
-  });
-  await pipeline(
-    Readable.from(
-      (async function* () {
-        const reader = response.body!.getReader();
-        try {
-          for (;;) {
-            const { done, value } = await reader.read();
-            if (done) return;
-            yield value;
-          }
-        } finally {
-          reader.releaseLock();
-        }
-      })(),
-    ),
-    verifier,
-    createWriteStream(file, { flags: 'wx' }),
-    { signal },
-  );
-  if (hash.digest('hex') !== asset.sha256)
-    throw new Error('Python runtime archive checksum mismatch.');
-}
+type PreinstalledRuntime = NonNullable<PythonRunnerRequest['preinstalledRuntime']>;
 
-async function ensureRuntime(root: string, signal: AbortSignal) {
-  const key = `${process.platform}-${process.arch}` as keyof typeof manifest.platforms;
-  const target = manifest.platforms[key];
-  if (!target) throw new Error(`Python runtime is not supported on ${key}.`);
-  const directory = join(root, 'runtimes', manifest.id, key);
-  const python = join(
-    directory,
-    'python',
-    process.platform === 'win32' ? 'python.exe' : 'bin/python3',
-  );
-  const uvFolder = target.uv.archive.replace(/\.(tar\.gz|zip)$/, '');
-  const uv = join(directory, ...(process.platform === 'win32' ? ['uv.exe'] : [uvFolder, 'uv']));
-  if ((await exists(join(directory, 'ready.json'))) && (await exists(python)) && (await exists(uv)))
-    return { python, uv };
-  const staging = `${directory}.staging-${randomUUID()}`;
-  await mkdir(staging, { recursive: true });
-  try {
-    for (const asset of [target.python, target.uv]) {
-      signal.throwIfAborted();
-      const file = join(staging, asset.archive);
-      await downloadVerifiedAsset(asset, file, signal);
-      if (asset.archive.endsWith('.zip')) await extractZip(file, { dir: staging });
-      else await extractTar({ file, cwd: staging, strict: true, preservePaths: false });
-      await rm(file);
-    }
-    signal.throwIfAborted();
-    await writeFile(
-      join(staging, 'ready.json'),
-      JSON.stringify({ runtimeId: manifest.id, assets: target }),
+/**
+ * The bundled managed runtime ships with the application (work package G);
+ * there is no runtime download. Absolute paths only — the isolated
+ * subprocess environment never carries the bundled roots on PATH.
+ */
+export async function resolvePreinstalledRuntime(
+  request: PythonRunnerRequest,
+): Promise<{ python: string; uv: string; runtimeId: string }> {
+  const preinstalled: PreinstalledRuntime | undefined = request.preinstalledRuntime;
+  if (!preinstalled) {
+    throw new Error(
+      'The managed Python runtime is not bundled with this build. Reinstall the application.',
     );
-    await mkdir(resolve(directory, '..'), { recursive: true });
-    try {
-      await rename(staging, directory);
-    } catch (error) {
-      if (!(await exists(join(directory, 'ready.json')))) throw error;
-    }
-    if (!(await exists(python)) || !(await exists(uv)))
-      throw new Error('The downloaded Python runtime is incomplete.');
-    return { python, uv };
-  } finally {
-    await rm(staging, { recursive: true, force: true });
   }
+  for (const label of ['Python interpreter', 'uv'] as const) {
+    const path = label === 'Python interpreter' ? preinstalled.pythonPath : preinstalled.uvPath;
+    try {
+      await access(path);
+    } catch {
+      throw new Error(`The bundled ${label} is missing (${path}). Reinstall the application.`);
+    }
+  }
+  return {
+    python: preinstalled.pythonPath,
+    uv: preinstalled.uvPath,
+    runtimeId: preinstalled.runtimeId,
+  };
 }
 
 type EnvironmentRecord = { runtimeId: string; environmentId: string; requirements: string[] };
@@ -132,7 +72,8 @@ export async function runPythonOperation(
     if (!request.jobRunnerPath) throw new Error('The Windows Python Job Object helper is missing.');
     await access(request.jobRunnerPath);
   }
-  if (input.runtimeId !== undefined && input.runtimeId !== manifest.id)
+  const runtime = await resolvePreinstalledRuntime(request);
+  if (input.runtimeId !== undefined && input.runtimeId !== runtime.runtimeId)
     throw new Error('Unsupported Python runtime version.');
   const workspace = await realpath(input.workspace);
   const key = createHash('sha256')
@@ -153,7 +94,7 @@ export async function runPythonOperation(
     throw new Error('Invalid Python environment record.');
   if (current) validatePackages(current.requirements);
   const rebuild = request.operation === 'install' && 'rebuild' in input && input.rebuild;
-  if (current && current.runtimeId !== manifest.id && !rebuild)
+  if (current && current.runtimeId !== runtime.runtimeId && !rebuild)
     throw new Error(
       'Python runtime version changed. Explicitly rebuild this workspace environment before continuing.',
     );
@@ -166,7 +107,6 @@ export async function runPythonOperation(
     (!('code' in input) || typeof input.code !== 'string' || input.code.length > 1024 * 1024)
   )
     throw new Error('Python code must be at most 1 MiB.');
-  const runtime = await ensureRuntime(resolve(request.storageRoot), signal);
   const env = isolatedEnvironment(join(resolve(request.storageRoot), 'uv-cache'));
   const networkEnv = runtimeNetworkEnvironment(join(resolve(request.storageRoot), 'uv-cache'));
   const run = (cmd: string, args: string[]) =>
@@ -185,8 +125,8 @@ export async function runPythonOperation(
   let installOutput = { stdout: '', stderr: '', exitCode: 0, truncated: false };
   if (!current || request.operation === 'install') {
     const candidate: EnvironmentRecord = {
-      runtimeId: manifest.id,
-      environmentId: `${manifest.id}-${randomUUID()}`,
+      runtimeId: runtime.runtimeId,
+      environmentId: `${runtime.runtimeId}-${randomUUID()}`,
       requirements: [],
     };
     const candidateRoot = join(stateRoot, candidate.environmentId);
@@ -225,7 +165,7 @@ export async function runPythonOperation(
         if (installOutput.exitCode !== 0)
           return {
             ...installOutput,
-            runtimeId: manifest.id,
+            runtimeId: runtime.runtimeId,
             environmentId: current?.environmentId ?? '',
           };
       }
@@ -252,8 +192,8 @@ export async function runPythonOperation(
   if (!current || !(await exists(pythonIn(current))))
     throw new Error('Python environment is missing. Rebuild it explicitly.');
   if (request.operation === 'install')
-    return { ...installOutput, runtimeId: manifest.id, environmentId: current.environmentId };
+    return { ...installOutput, runtimeId: runtime.runtimeId, environmentId: current.environmentId };
   env.VIRTUAL_ENV = join(stateRoot, current.environmentId);
   const result = await run(pythonIn(current), ['-u', '-c', 'code' in input ? input.code : '']);
-  return { ...result, runtimeId: manifest.id, environmentId: current.environmentId };
+  return { ...result, runtimeId: runtime.runtimeId, environmentId: current.environmentId };
 }

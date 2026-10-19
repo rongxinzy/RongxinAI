@@ -1,23 +1,19 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { expect, test, vi } from 'vitest';
-import { validatePackages, downloadVerifiedAsset } from './runtime';
-import manifest from './manifest.json';
+import { expect, test } from 'vitest';
+import { bundledRuntimeId } from './bundledRuntime';
+import { resolvePreinstalledRuntime, validatePackages } from './runtime';
 import { isolatedEnvironment, runProcess } from './process';
+import type { PythonRunnerRequest } from '../../shared/pythonRuntime';
 
-test('runtime assets pin exact official release URLs and hashes for every supported target', () => {
-  expect(manifest.pythonVersion).toMatch(/^3\.12\.\d+$/);
-  for (const assets of Object.values(manifest.platforms)) {
-    expect(assets.python.url).toMatch(
-      /^https:\/\/github.com\/astral-sh\/python-build-standalone\/releases\/download\/20261013\//,
-    );
-    expect(assets.uv.url).toMatch(
-      /^https:\/\/github.com\/astral-sh\/uv\/releases\/download\/0\.13\.0\//,
-    );
-    for (const asset of Object.values(assets)) expect(asset.sha256).toMatch(/^[0-9a-f]{64}$/);
-  }
+const requestWith = (preinstalled?: PythonRunnerRequest['preinstalledRuntime']) =>
+  ({ preinstalledRuntime: preinstalled }) as PythonRunnerRequest;
+
+test('the bundled runtime id pins the packaged interpreter and uv versions', () => {
+  expect(bundledRuntimeId()).toBe('bundled-cpython-3.14.6-uv-0.11.32');
 });
+
 test('install arguments accept pinned registry names, never shell flags or external source URLs', () => {
   expect(validatePackages(['numpy==2.2.6', 'requests[socks]==2.32.3'])).toHaveLength(2);
   for (const p of [
@@ -57,22 +53,48 @@ test('no-shell process returns both streams and the actual failure exit code', a
   expect(result).toMatchObject({ stdout: 'out\n', stderr: 'err\n', exitCode: 7, truncated: false });
 });
 
-test('an altered runtime archive is rejected before extraction', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'python-hash-'));
-  vi.stubGlobal('fetch', async () => new Response('altered archive'));
+test('a build without the bundled runtime rejects operations with a reinstall hint', async () => {
+  await expect(resolvePreinstalledRuntime(requestWith())).rejects.toThrow(
+    'Reinstall the application',
+  );
+});
+
+test('a missing bundled executable is named explicitly instead of falling back to a download', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'python-bundled-'));
+  const pythonPath = join(root, 'python3');
+  await writeFile(pythonPath, '', { mode: 0o755 });
   try {
     await expect(
-      downloadVerifiedAsset(
-        {
-          url: 'https://github.com/astral-sh/uv/releases/download/test/uv.tar.gz',
-          sha256: '0'.repeat(64),
-        },
-        join(root, 'archive'),
-        new AbortController().signal,
+      resolvePreinstalledRuntime(
+        requestWith({ pythonPath, uvPath: join(root, 'uv'), runtimeId: bundledRuntimeId() }),
       ),
-    ).rejects.toThrow('checksum mismatch');
+    ).rejects.toThrow('bundled uv is missing');
+    await expect(
+      resolvePreinstalledRuntime(
+        requestWith({
+          pythonPath: join(root, 'missing'),
+          uvPath: join(root, 'uv'),
+          runtimeId: bundledRuntimeId(),
+        }),
+      ),
+    ).rejects.toThrow('bundled Python interpreter is missing');
   } finally {
-    vi.unstubAllGlobals();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('present bundled executables resolve as absolute paths with their runtime id', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'python-bundled-'));
+  const pythonPath = join(root, 'python3');
+  const uvPath = join(root, 'uv');
+  await writeFile(pythonPath, '', { mode: 0o755 });
+  await writeFile(uvPath, '', { mode: 0o755 });
+  try {
+    const runtime = await resolvePreinstalledRuntime(
+      requestWith({ pythonPath, uvPath, runtimeId: bundledRuntimeId() }),
+    );
+    expect(runtime).toEqual({ python: pythonPath, uv: uvPath, runtimeId: bundledRuntimeId() });
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });
