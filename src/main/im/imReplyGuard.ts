@@ -45,7 +45,11 @@ const getToolInputAction = (message: CoworkMessage): string => {
 
 const isCronAddToolUseMessage = (message: CoworkMessage): boolean => {
   if (message.type !== 'tool_use') return false;
-  if (normalizeToolName(message.metadata?.toolName) !== 'cron') return false;
+  const toolName = normalizeToolName(message.metadata?.toolName);
+  // The Pi scheduled_task tool only creates tasks, so every call counts as an
+  // add. The legacy 'cron' tool name survives in older transcripts.
+  if (toolName === 'scheduled_task') return true;
+  if (toolName !== 'cron') return false;
   return getToolInputAction(message) === 'add';
 };
 

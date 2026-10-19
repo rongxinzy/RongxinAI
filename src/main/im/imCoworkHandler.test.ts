@@ -8,6 +8,7 @@ import { t } from '../i18n';
 import { ActivityStatus } from '../../shared/activity/constants';
 import { CoworkSessionSource } from '../../shared/cowork/constants';
 import { IMCoworkHandler } from './imCoworkHandler';
+import { getCcConnectScopedConversationId } from './ccConnectConversationId';
 
 const electronMocks = vi.hoisted(() => ({
   send: vi.fn(),
@@ -33,6 +34,15 @@ class FakeRuntime extends EventEmitter {
   continueCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> =
     [];
   stopCalls: string[] = [];
+  deliveryResolvers: Array<(sessionId: string) => unknown> = [];
+
+  setScheduledTaskDeliveryResolver(resolver: (sessionId: string) => unknown): () => void {
+    this.deliveryResolvers.push(resolver);
+    return () => {
+      const index = this.deliveryResolvers.indexOf(resolver);
+      if (index >= 0) this.deliveryResolvers.splice(index, 1);
+    };
+  }
 
   async startSession(sessionId: string, prompt: string, options = {}) {
     this.startCalls.push({ sessionId, prompt, options });
@@ -224,68 +234,104 @@ function createMessage(overrides: Record<string, unknown> = {}) {
   };
 }
 
-test('IM scheduled-task requests bypass agent execution and create a real cron.add turn', async () => {
+test('reminder requests run through the agent and register scheduled-task delivery', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
-  let createdParams: Record<string, unknown> | null = null;
 
   const handler = new IMCoworkHandler({
     coworkRuntime: runtime,
     coworkStore,
     imStore,
-    detectScheduledTaskRequest: async () => ({
-      kind: 'create',
-      sourceText: '2分钟后提醒我喝水',
-      reminderBody: '喝水',
-      delayMs: 120000,
-      delayLabel: '2分钟后',
-      runAt: new Date('2026-03-15T16:30:00+08:00'),
-      scheduleAt: '2026-03-15T16:30:00+08:00',
-      taskName: '喝水提醒',
-      payloadText: '⏰ 提醒：喝水',
-      confirmationText: '好的，已设置好提醒！2分钟后（16:30）会提醒你喝水。',
-    }),
-    createScheduledTask: async (params: Record<string, unknown>) => {
-      createdParams = params;
-      return {
-        id: 'job-1',
-        name: (params.request as Record<string, unknown>).taskName,
-        sessionKey: `zhiyuan:${params.sessionId}`,
-        payloadText: (params.request as Record<string, unknown>).payloadText,
-        scheduleAt: (params.request as Record<string, unknown>).scheduleAt,
-      };
-    },
   });
 
-  const reply = await handler.processMessage(createMessage(), undefined, 'workspace-1');
+  const pending = handler.processMessage(
+    createMessage({ content: '2分钟后提醒我喝水' }),
+    undefined,
+    'workspace-1',
+  );
+  await new Promise(resolve => setImmediate(resolve));
 
-  expect(reply).toMatch(/2分钟后（16:30）会提醒你喝水/u);
-  expect(runtime.startCalls.length).toBe(0);
-  expect(runtime.continueCalls.length).toBe(0);
-  expect(createdParams).toBeTruthy();
-  expect((createdParams!.request as Record<string, unknown>).taskName).toBe('喝水提醒');
-  expect((createdParams!.request as Record<string, unknown>).payloadText).toBe('⏰ 提醒：喝水');
+  // The pre-Pi detector is gone: reminder wording starts a normal agent turn
+  // and the task is created through the scheduled_task tool inside it.
+  expect(runtime.startCalls.length).toBe(1);
+  expect(runtime.startCalls[0].prompt).toContain('2分钟后提醒我喝水');
+  expect(runtime.deliveryResolvers.length).toBe(1);
 
   const [session] = [...coworkStore.sessions.values()];
   expect(session).toBeTruthy();
-  expect(session.title).toBe('钉钉会话');
-  expect((session.messages as Array<Record<string, unknown>>).map(message => message.type)).toEqual(
-    ['user', 'tool_use', 'tool_result', 'assistant'],
-  );
-  expect(
-    ((session.messages as Array<Record<string, unknown>>)[1].metadata as Record<string, unknown>)
-      .toolName,
-  ).toBe('cron');
-  expect(
-    ((session.messages as Array<Record<string, unknown>>)[1].metadata as Record<string, unknown>)
-      .toolInput as Record<string, unknown>,
-  ).toHaveProperty('action', 'add');
-  expect(
-    ((session.messages as Array<Record<string, unknown>>)[2].metadata as Record<string, unknown>)
-      .isError,
-  ).toBe(false);
+  const delivery = runtime.deliveryResolvers[0](session.id as string) as Record<string, unknown>;
+  expect(delivery).toMatchObject({
+    mode: 'announce',
+    channel: 'dingtalk',
+    to: 'conv-1',
+  });
+  expect(delivery.accountId).toBeUndefined();
 
+  // The model confirms through the Pi scheduled_task tool; the reply guard must
+  // recognize that tool as a real task creation.
+  runtime.emit('message', session.id as string, {
+    id: 'tool-use-1',
+    type: 'tool_use',
+    content: 'Using tool: scheduled_task',
+    timestamp: Date.now(),
+    metadata: { toolName: 'scheduled_task', toolUseId: 'tool-use-1', toolInput: {} },
+  });
+  runtime.emit('message', session.id as string, {
+    id: 'tool-result-1',
+    type: 'tool_result',
+    content: 'Scheduled task created: 喝水提醒',
+    timestamp: Date.now(),
+    metadata: { toolUseId: 'tool-use-1', toolResult: 'Scheduled task created', isError: false },
+  });
+  runtime.emit('message', session.id as string, {
+    id: 'assistant-1',
+    type: 'assistant',
+    content: '好的，已经通过定时任务安排了提醒。',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('complete', session.id as string);
+  const reply = await pending;
+  expect(reply).toBe('好的，已经通过定时任务安排了提醒。');
+
+  handler.destroy();
+  expect(runtime.deliveryResolvers.length).toBe(0);
+});
+
+test('scoped cc-connect conversations resolve delivery with account and native id', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore,
+  });
+
+  const scopedId = getCcConnectScopedConversationId('acct-7', 'native-conv-9');
+  const pending = handler.processMessage(
+    createMessage({ conversationId: scopedId, content: '5分钟后提醒我复盘' }),
+    undefined,
+    'workspace-1',
+  );
+  await new Promise(resolve => setImmediate(resolve));
+
+  // The session→conversation mapping must already be registered when the
+  // scheduled_task tool snapshots its default delivery at session launch.
+  const [session] = [...coworkStore.sessions.values()];
+  expect(session).toBeTruthy();
+  const delivery = runtime.deliveryResolvers[0](session.id as string) as Record<string, unknown>;
+  expect(delivery).toMatchObject({
+    mode: 'announce',
+    channel: 'dingtalk',
+    to: 'native-conv-9',
+    accountId: 'acct-7',
+  });
+
+  runtime.emit('complete', session.id as string);
+  await pending;
   handler.destroy();
 });
 
@@ -299,25 +345,6 @@ test.skip('async reminder turns on IM-created sessions relay back to the origina
     coworkRuntime: runtime,
     coworkStore,
     imStore,
-    detectScheduledTaskRequest: async () => ({
-      kind: 'create',
-      sourceText: '2分钟后提醒我喝水',
-      reminderBody: '喝水',
-      delayMs: 120000,
-      delayLabel: '2分钟后',
-      runAt: new Date('2026-03-15T16:30:00+08:00'),
-      scheduleAt: '2026-03-15T16:30:00+08:00',
-      taskName: '喝水提醒',
-      payloadText: '⏰ 提醒：喝水',
-      confirmationText: '好的，已设置好提醒！2分钟后（16:30）会提醒你喝水。',
-    }),
-    createScheduledTask: async (params: Record<string, unknown>) => ({
-      id: 'job-1',
-      name: (params.request as Record<string, unknown>).taskName,
-      sessionKey: `zhiyuan:${params.sessionId}`,
-      payloadText: (params.request as Record<string, unknown>).payloadText,
-      scheduleAt: (params.request as Record<string, unknown>).scheduleAt,
-    }),
     sendAsyncReply: async (platform: string, conversationId: string, text: string) => {
       relayedReplies.push({ platform, conversationId, text });
       return true;
@@ -481,7 +508,7 @@ test('preserves a user-renamed mapped IM session title when loading conversation
   handler.destroy();
 });
 
-test('falls back to normal agent execution when detector does not recognize a scheduled task', async () => {
+test('runs a normal agent turn for non-reminder requests', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
@@ -490,7 +517,6 @@ test('falls back to normal agent execution when detector does not recognize a sc
     coworkRuntime: runtime,
     coworkStore,
     imStore,
-    detectScheduledTaskRequest: async () => null,
   });
 
   const pending = handler.processMessage(
