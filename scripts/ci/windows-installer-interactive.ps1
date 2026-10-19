@@ -1,11 +1,12 @@
 ﻿param(
-  [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path,
+  [string]$ProjectRoot = '',
   [int]$TimeoutSeconds = 900,
   [int]$ExpectedDpi = 0
 )
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if (-not $ProjectRoot) { $ProjectRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '..', '..')) }
 if ($env:OS -ne 'Windows_NT') { throw 'Interactive NSIS acceptance requires Windows' }
 if (-not $env:RUNNER_TEMP) { throw 'Run only on a disposable Windows acceptance runner' }
 Add-Type -AssemblyName System.Drawing
