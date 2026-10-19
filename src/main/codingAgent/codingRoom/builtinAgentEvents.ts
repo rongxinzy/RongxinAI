@@ -46,6 +46,11 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
     }
   }
 
+  /** Whether this cowork session is registered to a builtin coding lane. */
+  isBuiltinLaneSession(sessionId: string): boolean {
+    return this.builtinSessionLaneMap.has(sessionId);
+  }
+
   recordBuiltinEvent(
     sessionId: string,
     kind: (typeof CodingEventKind)[keyof typeof CodingEventKind],

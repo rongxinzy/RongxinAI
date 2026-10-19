@@ -543,12 +543,13 @@ export async function getPiModules(): Promise<PiModules> {
 // ── Constants ──
 
 /**
- * How often streaming content is written to SQLite. better-sqlite3 is synchronous
- * and blocks the main-process event loop, so writing on every Pi frame causes
- * visible streaming jank. Store writes are throttled
- * and flush the latest content on finalize.
+ * How much a streaming body must grow before its next SQLite checkpoint.
+ * better-sqlite3 is synchronous and blocks the main-process event loop, so
+ * writing the accumulated body on a timer made a turn's write cost quadratic
+ * in message length. Checkpoints persist only crash protection for the
+ * in-flight turn; the finalize write is authoritative.
  */
-export const STORE_UPDATE_THROTTLE_MS = 250;
+export const STREAM_CHECKPOINT_GROWTH_CHARS = 32_768;
 
 /**
  * This throttles the in-process bus event `messageUpdate` for IM/coding-room

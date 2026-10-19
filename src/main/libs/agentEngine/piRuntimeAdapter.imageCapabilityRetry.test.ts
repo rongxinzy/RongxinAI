@@ -80,6 +80,7 @@ describe('PiRuntimeAdapter', () => {
       mockStore = {
         updateSession: vi.fn(),
         updateMessage: vi.fn(),
+        getMessage: vi.fn(() => undefined),
         addMessage: vi.fn((_sessionId: string, message: Record<string, unknown>) => ({
           ...message,
           id: (message.id as string) ?? 'stored-id',

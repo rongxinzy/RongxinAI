@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PiAssistantTranscript } from './piAssistantTranscript';
 import type { ActivePiSession } from './piRuntimeSessionState';
+import { STREAM_CHECKPOINT_GROWTH_CHARS } from './piRuntimeSessionState';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { createPiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
@@ -38,6 +39,7 @@ describe('PiAssistantTranscript', () => {
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => undefined,
     });
   });
@@ -74,13 +76,15 @@ describe('PiAssistantTranscript', () => {
       const local = new PiAssistantTranscript({
         getStore: () =>
           ({
-            getSession: () => ({ messages: [row] }),
+            getMessage: (_sessionId: string, messageId: string) =>
+              messageId === row.id ? row : null,
             updateMessage,
             deleteMessage,
           }) as never,
         emitMessage: vi.fn(),
         emitMessageUpdate: vi.fn(),
         emitMessageRemoved,
+        hasStreamingTextSubscribers: () => true,
         getActiveSession: () => active,
       });
       local.closeIdlePlaceholders('session', active, { finalize: true });
@@ -119,12 +123,14 @@ describe('PiAssistantTranscript', () => {
     const local = new PiAssistantTranscript({
       getStore: () =>
         ({
-          getSession: () => ({ messages: [thinkingRow] }),
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === thinkingRow.id ? thinkingRow : null,
           updateMessage: updateMessage,
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => active,
     });
     local.closeIdlePlaceholders('session', active, { finalize: true });
@@ -151,13 +157,15 @@ describe('PiAssistantTranscript', () => {
     const local = new PiAssistantTranscript({
       getStore: () =>
         ({
-          getSession: () => ({ messages: [row] }),
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === row.id ? row : null,
           updateMessage: vi.fn(),
           deleteMessage,
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => active,
     });
     local.closeIdlePlaceholders('session', active, { finalize: true });
@@ -179,13 +187,15 @@ describe('PiAssistantTranscript', () => {
     const local = new PiAssistantTranscript({
       getStore: () =>
         ({
-          getSession: () => ({ messages: [row] }),
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === row.id ? row : null,
           updateMessage: vi.fn(),
           deleteMessage,
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved,
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => active,
     });
     (
@@ -214,13 +224,15 @@ describe('PiAssistantTranscript', () => {
     const local = new PiAssistantTranscript({
       getStore: () =>
         ({
-          getSession: () => ({ messages: [row] }),
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === row.id ? row : null,
           updateMessage: vi.fn(),
           deleteMessage,
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => active,
     });
     local.streamInto('session', active, 'answer', 'delta text');
@@ -243,13 +255,15 @@ describe('PiAssistantTranscript', () => {
     const local = new PiAssistantTranscript({
       getStore: () =>
         ({
-          getSession: () => ({ messages: [row] }),
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === row.id ? row : null,
           updateMessage: vi.fn(),
           deleteMessage,
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => active,
     });
     local.closeIdlePlaceholders('session', active, { finalize: true });
@@ -269,13 +283,15 @@ describe('PiAssistantTranscript', () => {
     const local = new PiAssistantTranscript({
       getStore: () =>
         ({
-          getSession: () => ({ messages: [row] }),
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === row.id ? row : null,
           updateMessage,
           addMessage: vi.fn(),
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => active,
     });
     active.retryPriorAnswer = 'resolved prior answer';
@@ -301,13 +317,15 @@ describe('PiAssistantTranscript', () => {
     const local = new PiAssistantTranscript({
       getStore: () =>
         ({
-          getSession: () => ({ messages: [row] }),
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === row.id ? row : null,
           updateMessage: vi.fn(),
           deleteMessage,
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => active,
     });
     local.streamInto('session', active, 'answer', 'streamed body');
@@ -330,17 +348,64 @@ describe('PiAssistantTranscript', () => {
     const local = new PiAssistantTranscript({
       getStore: () =>
         ({
-          getSession: () => ({ messages: [emptyRow] }),
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === emptyRow.id ? emptyRow : null,
           updateMessage: vi.fn(),
           deleteMessage,
         }) as never,
       emitMessage: vi.fn(),
       emitMessageUpdate: vi.fn(),
       emitMessageRemoved,
+      hasStreamingTextSubscribers: () => true,
       getActiveSession: () => active,
     });
     local.closeIdlePlaceholders('session', active, { finalize: true });
     expect(deleteMessage).toHaveBeenCalledWith('session', emptyRow.id);
     expect(emitMessageRemoved).toHaveBeenCalledWith('session', emptyRow.id);
+  });
+
+  it('checkpoints the store only after the body grows past the threshold', () => {
+    const active = baseActive();
+    let streamed = '';
+    // Grow well past the threshold in small increments: only growth-bound
+    // checkpoints may hit the store, not one write per increment.
+    for (let i = 0; i < 100; i += 1) {
+      streamed += 'x'.repeat(1024);
+      transcript.streamInto('session', active, 'answer', streamed);
+    }
+    // 100 KiB streamed with a 32 KiB threshold: at most three checkpoints —
+    // far below the old per-tick write count — and the tail below the
+    // threshold stays unwritten until finalize.
+    expect(storeUpdates.length).toBeLessThanOrEqual(
+      Math.floor(streamed.length / STREAM_CHECKPOINT_GROWTH_CHARS) + 1,
+    );
+    expect(storeUpdates.at(-1)?.content.length).toBeLessThan(streamed.length);
+    transcript.finalizeMessage('session', active, 'answer', streamed);
+    expect(storeUpdates.at(-1)?.content).toBe(streamed);
+    expect(
+      storeUpdates.filter(update => update.content === streamed).length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('skips non-final messageUpdate when no streaming-text subscriber exists', () => {
+    const emitMessageUpdate = vi.fn();
+    const active = baseActive();
+    const local = new PiAssistantTranscript({
+      getStore: () => null,
+      emitMessage: vi.fn(),
+      emitMessageUpdate,
+      emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => false,
+      getActiveSession: () => active,
+    });
+    local.streamInto('session', active, 'answer', 'partial body');
+    expect(emitMessageUpdate).not.toHaveBeenCalled();
+    local.finalizeMessage('session', active, 'answer', 'final body');
+    expect(emitMessageUpdate).toHaveBeenCalledWith(
+      'session',
+      expect.any(String),
+      'final body',
+      expect.objectContaining({ isStreaming: false, isFinal: true }),
+    );
   });
 });
