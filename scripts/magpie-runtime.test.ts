@@ -291,12 +291,15 @@ describe('pinned Magpie runtime build', () => {
     const root = path.join(app, 'resources', 'magpie');
     const { binary, manifest } = fixture(root, 'win32-x64');
     const context = { electronPlatformName: 'win32', arch: 1, appOutDir: app };
-    const env = { CERTUM_CERT_THUMBPRINT: 'ab'.repeat(20) };
-    const calls: Array<{ command: string; args: string[] }> = [];
+    const env = {
+      CERTUM_CERT_THUMBPRINT: 'ab'.repeat(20),
+      PSModulePath: 'C:\\Program Files\\PowerShell\\7\\Modules',
+    };
+    const calls: Array<{ command: string; args: string[]; env?: Record<string, string> }> = [];
     signPackagedWindowsMagpie(context, {
       env,
-      spawn: (command: string, args: string[]) => {
-        calls.push({ command, args });
+      spawn: (command: string, args: string[], options: { env?: Record<string, string> }) => {
+        calls.push({ command, args, env: options.env });
         fs.appendFileSync(binary, 'authenticode');
         return { status: 0 };
       },
@@ -305,6 +308,7 @@ describe('pinned Magpie runtime build', () => {
     expect(calls[0]?.command).toBe('powershell.exe');
     expect(calls[0]?.args.join(' ')).toContain('sign-runtime.ps1');
     expect(calls[0]?.args).toContain(binary);
+    expect(calls[0]?.env).toEqual({ CERTUM_CERT_THUMBPRINT: 'ab'.repeat(20) });
     const signed = verifyRuntime(root, 'win32-x64', { allowSigned: true });
     expect(signed.buildSha256).toBe(manifest.buildSha256);
     expect(signed.sha256).not.toBe(signed.buildSha256);
