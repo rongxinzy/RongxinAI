@@ -130,8 +130,13 @@ export class EngramManager {
     };
     const child = (this.options.spawnProcess ?? spawnEngram)(binaryPath, childEnvironment);
     this.child = child;
-    // The runtime itself authenticates the per-launch token on loopback; the
-    // only client is the in-process adapter, so no proxy hop is needed.
+    // The boundary is the loopback bind on a reserved random port: only local
+    // processes can reach the runtime. The token is defense in depth — as of
+    // engram-cjk v1.20.0-zhiyuan.4 the runtime only enforces it on the
+    // destructive and export routes (delete observation/session, export,
+    // import, project migration); search and writes are unauthenticated, and
+    // the adapter sends the bearer token on every request anyway. The only
+    // client is the in-process adapter, so no proxy hop is needed.
     this.connection = { url: `http://${ENGRAM_LOOPBACK_HOST}:${backendPort}`, token };
     child.once('exit', () => this.handleUnexpectedExit(generation));
     child.once('error', error => this.handleUnexpectedExit(generation, error));
