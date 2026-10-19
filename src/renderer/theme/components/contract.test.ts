@@ -115,3 +115,14 @@ test('component gradients can be themed without allowing remote image requests',
     'url(https://example.com/tracker.png)';
   expect(() => validateComponentAppearances(theme.components)).toThrow();
 });
+
+test('checked switch track rules keep their order without specificity overrides', () => {
+  // The generic .theme-switch[data-checked] track rule must precede the
+  // fluid-switch checked rule so the fluid variant wins on both selectors
+  // without extra specificity. Inherited from the classic theme's generator
+  // invariant when that theme was removed.
+  const css = generateThemeCSS(zenithLight);
+  expect(css.indexOf(':where(.theme-switch[data-checked]) {')).toBeLessThan(
+    css.indexOf(':where(.theme-switch[data-fluid-switch][data-checked]):where('),
+  );
+});
