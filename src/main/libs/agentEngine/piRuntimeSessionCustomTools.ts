@@ -155,6 +155,7 @@ export function buildPiSessionCustomTools(
           host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.workspaceId ??
           null,
         sessionKey: sessionId,
+        defaultDelivery: host.getScheduledTaskDeliveryForSession?.(sessionId) ?? null,
       }),
     );
   }

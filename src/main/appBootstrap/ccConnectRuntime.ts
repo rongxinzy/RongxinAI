@@ -31,35 +31,13 @@ import { CcConnectPiBridge } from '../im/ccConnectPiBridge';
 import { ChannelInboxStore } from '../im/channelInboxStore';
 import { ChannelTurnCoordinator } from '../im/channelTurnCoordinator';
 import { IMStore } from '../im/imStore';
-import { createIMScheduledTaskRequestDetector } from '../im/imScheduledTaskHandler';
 import { listCcConnectAccountConfigs } from '../libs/ccConnectAccountConfig';
-import { parseCcConnectScopedConversationId } from '../im/ccConnectConversationId';
 import { CcConnectBridgeServer } from '../libs/ccConnectBridgeServer';
 import { CcConnectRuntimeStatusRegistry } from '../libs/ccConnectRuntimeStatusRegistry';
 import { CcConnectSidecarManager } from '../libs/ccConnectSidecarManager';
 import { serializeCcConnectSidecarConfig } from '../libs/ccConnectSidecarConfig';
 import { resolveCcConnectAccountRuntimeStatus } from '../libs/ccConnectAccountRuntimeStatus';
 
-const getScheduledTaskDetectorConfig = async (): Promise<{
-  apiKey: string;
-  baseUrl: string;
-  model?: string;
-  provider?: string;
-} | null> => {
-  const config = getStore().get<any>('app_config');
-  for (const [provider, value] of Object.entries(config?.providers ?? {}) as Array<[string, any]>) {
-    if (value?.enabled && value.apiKey)
-      return {
-        apiKey: value.apiKey,
-        baseUrl: value.baseUrl,
-        model: value.models?.[0]?.id,
-        provider,
-      };
-  }
-  return config?.api?.key
-    ? { apiKey: config.api.key, baseUrl: config.api.baseUrl, model: config.model?.defaultModel }
-    : null;
-};
 const attachCcConnectCronControl = async (
   accountId: string,
   baseUrl: string,
@@ -142,33 +120,6 @@ export const startCcConnectBridge = async (): Promise<void> => {
     activityService:
       rt.activityService ?? (rt.activityService = new ActivityService(getStore().getDatabase())),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
-    detectScheduledTaskRequest: createIMScheduledTaskRequestDetector({
-      getLLMConfig: getScheduledTaskDetectorConfig,
-    }),
-    createScheduledTask: async ({ sessionId, message, request }) => {
-      const [accountId, destination] = parseCcConnectScopedConversationId(message.conversationId);
-      const session = getCoworkStore().getSession(sessionId);
-      if (!session) throw new Error(`IM session not found: ${sessionId}`);
-      const task = await getCanonicalScheduledTaskService().addJob({
-        name: request.taskName,
-        description: '',
-        enabled: true,
-        schedule: { kind: 'at', at: request.scheduleAt },
-        sessionTarget: 'main',
-        wakeMode: 'now',
-        payload: { kind: 'agentTurn', message: request.payloadText },
-        delivery: { mode: 'announce', channel: message.platform, to: destination, accountId },
-        workspaceId: session.workspaceId,
-        sessionKey: sessionId,
-      });
-      return {
-        id: task.id,
-        name: task.name,
-        sessionKey: task.sessionKey,
-        payloadText: request.payloadText,
-        scheduleAt: request.scheduleAt,
-      };
-    },
     onCronTrigger: async trigger =>
       getCanonicalScheduledTaskService() &&
       rt.canonicalSchedulerRuntime!.handleTrigger({

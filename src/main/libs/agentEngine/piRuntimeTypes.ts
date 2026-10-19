@@ -245,5 +245,15 @@ export interface PiRuntime {
     itemId: string,
   ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
   getSessionConfirmationMode(sessionId: string): 'modal' | 'text' | null;
+  /**
+   * Resolves the delivery scheduled tasks created in a session default to
+   * (IM chats announce back to their conversation); returns an unregister
+   * function. Optional so test doubles can omit it.
+   */
+  setScheduledTaskDeliveryResolver?(
+    resolver: (
+      sessionId: string,
+    ) => import('../../../scheduledTask/types').ScheduledTaskDelivery | null,
+  ): () => void;
   onSessionDeleted?(sessionId: string): void;
 }
