@@ -53,7 +53,7 @@ test('main.ts invokes every appBootstrap helper it imports', () => {
     // in neither position is the dead-wrapper regression this guards against.
     const used =
       new RegExp(`\\b${name}\\(`).test(bodyWithoutImports) ||
-      new RegExp(`\\b${name}\\b[,})\\n]`).test(bodyWithoutImports);
+      new RegExp(`\\b${name}\\b\\s*[,})\\n]`).test(bodyWithoutImports);
     expect(used, `${name} is imported by main.ts but never used`).toBe(true);
   }
 });
