@@ -41,6 +41,9 @@ export function getPythonRuntimeService(): PythonRuntimeService {
         }
       : {}),
     preinstalledRuntime: resolvePreinstalledRuntime(),
+    // One uv cache across both managed stacks (wheels fetched for workspace
+    // venvs are reused by Skill-layer builds and vice versa); uv locks safely.
+    uvCacheDir: join(app.getPath('userData'), 'runtimes', 'uv-cache'),
   });
   return service;
 }

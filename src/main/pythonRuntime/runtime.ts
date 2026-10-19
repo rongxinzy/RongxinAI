@@ -107,8 +107,9 @@ export async function runPythonOperation(
     (!('code' in input) || typeof input.code !== 'string' || input.code.length > 1024 * 1024)
   )
     throw new Error('Python code must be at most 1 MiB.');
-  const env = isolatedEnvironment(join(resolve(request.storageRoot), 'uv-cache'));
-  const networkEnv = runtimeNetworkEnvironment(join(resolve(request.storageRoot), 'uv-cache'));
+  const uvCacheDir = request.uvCacheDir ?? join(resolve(request.storageRoot), 'uv-cache');
+  const env = isolatedEnvironment(uvCacheDir);
+  const networkEnv = runtimeNetworkEnvironment(uvCacheDir);
   const run = (cmd: string, args: string[]) =>
     runProcess(cmd, args, {
       cwd: workspace,
