@@ -30,7 +30,7 @@ afterEach(() => {
   testStore = makeStore();
 });
 
-test('recovery delegates lifecycle and history before replaying content', async () => {
+test('recovery delegates lifecycle and history with a plain run snapshot read', async () => {
   const getRunSnapshot = vi.fn().mockResolvedValue({ success: true, snapshot, running: true });
   vi.stubGlobal('window', { electron: { cowork: { getRunSnapshot } } });
   const order: string[] = [];
@@ -43,7 +43,10 @@ test('recovery delegates lifecycle and history before replaying content', async 
   await sync.recover('a');
   expect(order).toEqual(['flush', 'canonical']);
   expect(canonical).toHaveBeenCalledWith('a');
-  expect(getRunSnapshot).toHaveBeenLastCalledWith('a', true);
+  // No replay round-trip: content recovery goes through the canonical session
+  // read, and the single snapshot fetch is the only IPC call.
+  expect(getRunSnapshot).toHaveBeenCalledTimes(1);
+  expect(getRunSnapshot).toHaveBeenCalledWith('a');
   expect(testStore.getState().coworkRun.bySession.a).toEqual(snapshot);
   expect(testStore.getState().cowork.streamingSessionIds).toEqual([]);
 });

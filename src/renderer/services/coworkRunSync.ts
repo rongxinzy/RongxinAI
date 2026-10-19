@@ -2,10 +2,26 @@ import { CoworkRunPolicy, type CoworkRunSnapshot } from '../../shared/cowork/run
 import { store } from '../store';
 import { acceptsRunSnapshot, receiveRunSnapshot } from '../store/slices/coworkRunSlice';
 
+/**
+ * Renderer-side run-state sync.
+ *
+ * Push delivery (RunState) only updates the snapshot map — it never triggers
+ * recovery. Lifecycle truth flows through the sequenced UiEvent stream; a lost
+ * terminal event shows up as a UiEvent sequence gap (handled by the pipeline's
+ * resync + PiUiRecovery), so RunState-driven re-fetches would only duplicate
+ * that path. The two recovery entry points that remain:
+ *
+ * - `requestRecovery`/`recover`: canonical session reload (PiUiRecovery) for
+ *   content gaps and late attach.
+ * - focus/visibility `verify`: one cheap getRunSnapshot per session; a session
+ *   that still looks streaming while the runtime says otherwise (missed
+ *   terminal) escalates to recovery. An idle session verified idle touches
+ *   nothing — no session reload, no content replay.
+ */
 export class CoworkRunSync {
   private disposed = false;
   private readonly recovering = new Set<string>();
-  private readonly polling = new Set<string>();
+  private readonly verifying = new Set<string>();
   private readonly recoveryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   constructor(
@@ -48,13 +64,30 @@ export class CoworkRunSync {
       if (expectedStart && (!result.snapshot || result.snapshot.startedAt < expectedStart)) return;
       // Pi UI recovery owns lifecycle watermarks and history merging for Work and Chat.
       await this.recoverCanonicalSession(sessionId);
-      if (this.disposed) return;
-      const replay = await api.getRunSnapshot(sessionId, true);
-      if (!this.disposed && replay.success && replay.snapshot) this.receive(replay.snapshot);
+      if (!this.disposed && result.snapshot) this.receive(result.snapshot);
     } catch (error) {
       console.warn('[CoworkRunSync] runtime recovery failed:', error);
     } finally {
       this.recovering.delete(sessionId);
+    }
+  }
+
+  private async verify(sessionId: string): Promise<void> {
+    const api = window.electron?.cowork;
+    if (this.disposed || !api?.getRunSnapshot || this.verifying.has(sessionId)) return;
+    this.verifying.add(sessionId);
+    try {
+      const result = await api.getRunSnapshot(sessionId);
+      if (this.disposed || !result.success) return;
+      if (result.snapshot) this.receive(result.snapshot);
+      const stillStreaming = store.getState().cowork.streamingSessionIds.includes(sessionId);
+      if (stillStreaming && result.snapshot && !result.snapshot.running) {
+        this.requestRecovery(sessionId);
+      }
+    } catch (error) {
+      console.debug('[CoworkRunSync] runtime verification failed:', error);
+    } finally {
+      this.verifying.delete(sessionId);
     }
   }
 
@@ -69,38 +102,7 @@ export class CoworkRunSync {
         this.recoveryTimers.clear();
       };
     }
-    const remove = api.onStreamRunState(snapshot => {
-      const previous = store.getState().coworkRun?.bySession[snapshot.sessionId];
-      this.receive(snapshot);
-      if (
-        !snapshot.running ||
-        !previous ||
-        (previous.runId === snapshot.runId && snapshot.sequence > previous.sequence + 1)
-      ) {
-        this.requestRecovery(snapshot.sessionId);
-      }
-    });
-    const poll = async (id: string) => {
-      if (this.polling.has(id) || this.disposed) return;
-      this.polling.add(id);
-      try {
-        const result = await api.getRunSnapshot(id);
-        if (!this.disposed && result.success && result.snapshot) {
-          const previous = store.getState().coworkRun?.bySession[id];
-          if (!previous || result.snapshot.sequence > previous.sequence) this.requestRecovery(id);
-          this.receive(result.snapshot);
-        } else if (!this.disposed && result.success && !result.running) {
-          this.requestRecovery(id);
-        }
-      } catch (error) {
-        console.debug('[CoworkRunSync] runtime confirmation failed:', error);
-      } finally {
-        this.polling.delete(id);
-      }
-    };
-    const timer = window.setInterval(() => {
-      for (const id of store.getState().cowork.streamingSessionIds.slice(0, 32)) void poll(id);
-    }, CoworkRunPolicy.PollMs);
+    const remove = api.onStreamRunState(snapshot => this.receive(snapshot));
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
       const state = store.getState().cowork;
@@ -108,7 +110,7 @@ export class CoworkRunSync {
         state.currentSessionId,
         ...state.streamingSessionIds.slice(0, 32),
       ])) {
-        if (id && !id.startsWith('temp-')) this.requestRecovery(id);
+        if (id && !id.startsWith('temp-')) void this.verify(id);
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -117,7 +119,6 @@ export class CoworkRunSync {
     return () => {
       this.disposed = true;
       remove();
-      window.clearInterval(timer);
       for (const pending of this.recoveryTimers.values()) clearTimeout(pending);
       this.recoveryTimers.clear();
       document.removeEventListener('visibilitychange', onVisible);

@@ -181,7 +181,6 @@ class CoworkService {
       shouldApply: event => recovery.observe(event),
       onSequenceGap: sessionId => {
         console.warn('[CoworkService] detected a Pi UI event sequence gap, reloading the session');
-        runSync.requestRecovery(sessionId);
         void recovery
           .recover(sessionId)
           .catch(error =>
@@ -200,9 +199,6 @@ class CoworkService {
     });
     this.streamListenerCleanups.push(() => pipeline?.dispose());
     this.streamListenerCleanups.push(runSync.start());
-    this.streamListenerCleanups.push(
-      cowork.onStreamContentPatch(patch => pipeline?.handleContentPatch(patch)),
-    );
     this.streamListenerCleanups.push(
       cowork.onStreamUiEvent(event => pipeline?.handleUiEvent(event)),
     );

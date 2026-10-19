@@ -5,7 +5,7 @@ import type { todoContract } from '../../shared/ipc/todoContract';
 import { coworkContractChannels } from '../../shared/ipc/coworkContract.channels';
 import { workbenchTaskContractChannels } from '../../shared/ipc/workbenchTaskContract.channels';
 import { todoContractChannels } from '../../shared/ipc/todoContract.channels';
-import type { CoworkRunSnapshot, CoworkContentPatch } from '../../shared/cowork/runState';
+import type { CoworkRunSnapshot } from '../../shared/cowork/runState';
 import type { PiUiEvent } from '../../shared/cowork/piUiEvent';
 import { CoworkStreamIpc } from '../../shared/ipc/channels';
 import { TodoIpc } from '../../shared/todo';
@@ -21,8 +21,6 @@ export const coworkApi = {
     ...createIpcInvokers(coworkContractChannels),
     onStreamRunState: (callback: (snapshot: CoworkRunSnapshot) => void) =>
       onPush(CoworkStreamIpc.RunState, callback),
-    onStreamContentPatch: (callback: (patch: CoworkContentPatch) => void) =>
-      onPush(CoworkStreamIpc.ContentPatch, callback),
     onStreamUiEvent: (callback: (event: PiUiEvent) => void) =>
       onPush(CoworkStreamIpc.UiEvent, callback),
     onSessionsChanged: (
@@ -34,7 +32,6 @@ export const coworkApi = {
     ) => onPush(CoworkStreamIpc.SessionsChanged, callback),
   } as IpcContractApi<typeof coworkContract> & {
     onStreamRunState: (callback: (snapshot: CoworkRunSnapshot) => void) => () => void;
-    onStreamContentPatch: (callback: (patch: CoworkContentPatch) => void) => () => void;
     onStreamUiEvent: (callback: (event: PiUiEvent) => void) => () => void;
     onSessionsChanged: (
       callback: (data: {

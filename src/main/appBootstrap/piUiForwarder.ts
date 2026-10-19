@@ -188,10 +188,8 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
     }
   };
 
-  bindCoworkRunBridge(
-    runtime,
-    () => getStore().getDatabase(),
-    patch => emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
+  bindCoworkRunBridge(runtime, patch =>
+    emitUiEvent({ type: PiUiEventType.ContentPatch, sessionId: patch.sessionId, patch }),
   );
 
   runtime.on('started', (sessionId: string) => {

@@ -1,4 +1,3 @@
-import type Database from 'better-sqlite3';
 import { BrowserWindow } from 'electron';
 import { CoworkStreamIpc } from '../shared/ipc/channels';
 import {
@@ -14,7 +13,6 @@ import { coworkRunSnapshotContract } from '../shared/ipc/coworkContract';
 
 export function bindCoworkRunBridge(
   runtime: PiRuntimeAdapter,
-  getDatabase: () => Database.Database,
   publishPatch: (patch: CoworkContentPatch) => void,
 ): CoworkContentProjection {
   const projection = new CoworkContentProjection();
@@ -43,7 +41,7 @@ export function bindCoworkRunBridge(
     // The canonical message must reach the renderer before its content patches.
     setImmediate(() => {
       void projection
-        .project(sessionId, message.id, message.content, message.metadata, true)
+        .project(sessionId, message.id, message.content, message.metadata)
         .then(patches => {
           for (const patch of patches) publishPatch(patch);
         })
@@ -51,27 +49,8 @@ export function bindCoworkRunBridge(
     });
   });
   handleIpcContract(coworkRunSnapshotContract, {
-    getRunSnapshot: async (event, sessionId, replayContent) => {
+    getRunSnapshot: async (_event, sessionId) => {
       if (sessionId.length > 200) return { success: false };
-      if (replayContent === true) {
-        // SQLite lifecycle remains on main. Read only a bounded tail; transforms run in workers.
-        const stored = getDatabase()
-          .prepare(
-            'SELECT id, substr(content, 1, ?) AS content FROM cowork_messages WHERE session_id = ? AND length(content) > 120000 ORDER BY sequence DESC, created_at DESC LIMIT 8',
-          )
-          .all(CoworkRunPolicy.MaximumContentCharacters + 1, sessionId) as {
-          id: string;
-          content: string;
-        }[];
-        for (const message of stored) {
-          if (!projection.has(message.id))
-            await projection.project(sessionId, message.id, message.content);
-        }
-        const sender = event.sender;
-        for (const patch of await projection.replay(sessionId)) {
-          if (!sender.isDestroyed()) sender.send(CoworkStreamIpc.ContentPatch, patch);
-        }
-      }
       return {
         success: true,
         snapshot: tracker.snapshot(sessionId),
