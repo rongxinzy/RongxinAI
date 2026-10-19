@@ -746,10 +746,11 @@ jobs:
       - name: Verify native uninstall preserves user data
         if: ${{ !cancelled() && matrix.platform == 'windows' && steps.shell-evidence.outcome == 'success' }}
         shell: powershell
+        env:
+          EXPECTED_THUMBPRINT: ${{ inputs.mode == 'release' && secrets.CERTUM_CERT_THUMBPRINT || '' }}
         run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/windows-shell-uninstall.ps1 -Action verify
-          -ExpectedThumbprint '${{ inputs.mode == 'release' && secrets.CERTUM_CERT_THUMBPRINT || '' }}'
+          ./scripts/ci/windows-shell-uninstall.ps1 -Action verify
+          -ExpectedThumbprint $env:EXPECTED_THUMBPRINT
       - name: Collect Windows diagnostics before leaving the runner
         if: ${{ always() && matrix.platform == 'windows' }}
         shell: powershell
