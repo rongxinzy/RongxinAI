@@ -56,9 +56,7 @@ export interface MainViewCanvasProps {
   /** Local inference keep-alive view */
   hasMountedLocalInference: boolean;
   isLocalInferenceDormant: boolean;
-  localInferenceInstallRequestId: string | undefined;
   localInferenceRefreshRequestId: number;
-  onLocalInferenceInstallRequestHandled: (requestId: string) => void;
   onOpenModelSettings: () => void;
   /** Cowork inline permission prompts */
   currentSessionId: string | null;
@@ -98,9 +96,7 @@ export function MainViewCanvas({
   onCodingSelectionChange,
   hasMountedLocalInference,
   isLocalInferenceDormant,
-  localInferenceInstallRequestId,
   localInferenceRefreshRequestId,
-  onLocalInferenceInstallRequestHandled,
   onOpenModelSettings,
   currentSessionId,
   pendingPermission,
@@ -126,8 +122,6 @@ export function MainViewCanvas({
               <LazyChunkErrorBoundary resetKey={mainView}>
                 <React.Suspense fallback={null}>
                   <LocalInferenceView
-                    installRequestId={localInferenceInstallRequestId}
-                    onInstallRequestHandled={onLocalInferenceInstallRequestHandled}
                     refreshRequestId={localInferenceRefreshRequestId}
                     isSidebarCollapsed={isSidebarCollapsed}
                     isVisible={mainView === MainView.LocalInference}

@@ -332,11 +332,6 @@ export const appSystemContract = defineIpcContract({
     args: z.tuple([]),
     result: z.string(),
   },
-  appConsumePendingLocalInferenceInstall: {
-    channel: AppIpc.ConsumePendingLocalInferenceInstall,
-    args: z.tuple([]),
-    result: z.string().nullable(),
-  },
   appGetInferenceEdition: {
     channel: AppIpc.GetInferenceEdition,
     args: z.tuple([]),

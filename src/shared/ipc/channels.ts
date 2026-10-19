@@ -232,7 +232,6 @@ export const AppIpc = {
   IsDev: 'app:isDev',
   IsEnterprise: 'app:isEnterprise',
   GetSystemLocale: 'app:getSystemLocale',
-  ConsumePendingLocalInferenceInstall: 'app:consumePendingLocalInferenceInstall',
   Relaunch: 'app:relaunch',
 } as const;
 export type AppIpc = (typeof AppIpc)[keyof typeof AppIpc];

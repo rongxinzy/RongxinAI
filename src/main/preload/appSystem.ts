@@ -121,7 +121,6 @@ export const appSystemApi = {
     isDev: asApi('appIsDev'),
     isEnterprise: asApi('appIsEnterprise'),
     getSystemLocale: asApi('appGetSystemLocale'),
-    consumePendingLocalInferenceInstall: asApi('appConsumePendingLocalInferenceInstall'),
     getInferenceEdition: asApi('appGetInferenceEdition'),
     usesBundledLlamaCppRuntime: asApi('appUsesBundledLlamaCppRuntime'),
     relaunch: asApi('appRelaunch'),
@@ -235,7 +234,6 @@ export const appSystemApi = {
     isDev: 'appIsDev';
     isEnterprise: 'appIsEnterprise';
     getSystemLocale: 'appGetSystemLocale';
-    consumePendingLocalInferenceInstall: 'appConsumePendingLocalInferenceInstall';
     getInferenceEdition: 'appGetInferenceEdition';
     usesBundledLlamaCppRuntime: 'appUsesBundledLlamaCppRuntime';
     relaunch: 'appRelaunch';
