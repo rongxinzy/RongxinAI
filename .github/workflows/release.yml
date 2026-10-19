@@ -79,6 +79,10 @@ jobs:
     needs: prepare-release
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Tests assert the full seven-leg matrix; the Windows-only filter above
+      # applies to what this release publishes, not to the test suite.
+      ZHIYUAN_RELEASE_PLATFORMS: ''
     steps:
       - uses: actions/checkout@v6
         with:
