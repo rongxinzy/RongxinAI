@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PiAssistantTranscript } from './piAssistantTranscript';
 import type { ActivePiSession } from './piRuntimeSessionState';
-import { STREAM_CHECKPOINT_GROWTH_CHARS } from './piRuntimeSessionState';
+import { STREAM_CHECKPOINT_GROWTH_CHARS, STREAM_CHECKPOINT_MIN_INTERVAL_MS } from './piRuntimeSessionState';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { createPiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
@@ -385,6 +385,43 @@ describe('PiAssistantTranscript', () => {
     expect(
       storeUpdates.filter(update => update.content === streamed).length,
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  it('checkpoints a slowly growing body at least once per interval', () => {
+    vi.useFakeTimers();
+    const active = baseActive();
+    transcript.streamInto('session', active, 'answer', 'first delta');
+    // Most replies never reach the growth threshold; after the interval floor
+    // the next growth must still reach the store so a crash mid-stream cannot
+    // leave the row at the first few characters.
+    vi.advanceTimersByTime(STREAM_CHECKPOINT_MIN_INTERVAL_MS);
+    const before = storeUpdates.length;
+    transcript.streamInto('session', active, 'answer', 'first delta plus more text');
+    expect(storeUpdates.length).toBe(before + 1);
+    expect(storeUpdates.at(-1)?.content).toBe('first delta plus more text');
+    vi.useRealTimers();
+  });
+
+  it('never rewrites an unchanged body on the interval floor', () => {
+    vi.useFakeTimers();
+    const active = baseActive();
+    transcript.streamInto('session', active, 'answer', 'same body');
+    const before = storeUpdates.length;
+    vi.advanceTimersByTime(STREAM_CHECKPOINT_MIN_INTERVAL_MS * 2);
+    transcript.streamInto('session', active, 'answer', 'same body');
+    expect(storeUpdates.length).toBe(before);
+    vi.useRealTimers();
+  });
+
+  it('writes immediately when a rewrite shrinks the persisted body', () => {
+    const active = baseActive();
+    transcript.streamInto('session', active, 'answer', 'long body '.repeat(200));
+    // A non-prefix rewrite (reasoning collapse, retry reopen) makes the body
+    // shorter than what is persisted; write now instead of keeping stale text.
+    transcript.streamInto('session', active, 'answer', 'short replacement');
+    expect(storeUpdates.at(-1)?.content).toBe('short replacement');
+    transcript.finalizeMessage('session', active, 'answer', 'short replacement');
+    expect(storeUpdates.at(-1)?.content).toBe('short replacement');
   });
 
   it('skips non-final messageUpdate when no streaming-text subscriber exists', () => {

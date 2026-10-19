@@ -17,6 +17,7 @@ import type { ActivePiSession, PiStartupLatency, PiUsage } from './piRuntimeSess
 import {
   MESSAGE_UPDATE_THROTTLE_MS,
   STREAM_CHECKPOINT_GROWTH_CHARS,
+  STREAM_CHECKPOINT_MIN_INTERVAL_MS,
 } from './piRuntimeSessionState';
 
 export interface PiAssistantTranscriptHost {
@@ -37,6 +38,8 @@ export interface PiAssistantTranscriptHost {
 export class PiAssistantTranscript {
   /** Persisted body length per message id; the next checkpoint grows past it. */
   private readonly persistedContentLengthByMessageId = new Map<string, number>();
+  /** Wall clock of the last checkpoint write; backs the interval floor. */
+  private readonly lastCheckpointAtByMessageId = new Map<string, number>();
   private readonly lastMessageUpdateEmitAt = new Map<string, number>();
   private readonly pendingMessageUpdate = new Map<
     string,
@@ -215,6 +218,7 @@ export class PiAssistantTranscript {
     else active.assistantMessageId = created.id;
     if (this.host.getStore()) {
       this.persistedContentLengthByMessageId.set(created.id, initialContent.length);
+      this.lastCheckpointAtByMessageId.set(created.id, Date.now());
     }
     this.host.emitMessage(sessionId, created);
     return created.id;
@@ -222,10 +226,10 @@ export class PiAssistantTranscript {
 
   /**
    * Push a streaming (non-final) content snapshot to the answer/thinking
-   * message. SQLite only persists a growth-threshold checkpoint of the body
-   * (the finalize write is authoritative); the full-text bus event goes out —
-   * throttled — only while the session has streaming-text subscribers (IM
-   * mirrors, coding lanes). It never feeds the renderer stream.
+   * message. SQLite only persists a checkpoint of the body (growth threshold
+   * or interval floor; the finalize write is authoritative); the full-text bus
+   * event goes out — throttled — only while the session has streaming-text
+   * subscribers (IM mirrors, coding lanes). It never feeds the renderer stream.
    */
   streamInto(
     sessionId: string,
@@ -519,13 +523,18 @@ export class PiAssistantTranscript {
   }
 
   /**
-   * Growth-threshold checkpoint for the synchronous SQLite write. A streaming
-   * body is persisted only after it has grown past the last persisted length
-   * by `STREAM_CHECKPOINT_GROWTH_CHARS`, bounding both the number of full-body
-   * writes per turn and the total bytes written (the old 250 ms timer wrote the
-   * accumulated body on every tick, O(N²) bytes per turn on the main thread).
-   * The finalize write remains the authoritative copy, so a checkpoint is only
-   * crash-protection for the in-flight turn.
+   * Growth-or-time checkpoint for the synchronous SQLite write. A streaming
+   * body is persisted once it has grown past the last persisted length by
+   * `STREAM_CHECKPOINT_GROWTH_CHARS` — bounding both the number of full-body
+   * writes per turn and the total bytes written (the old 250 ms timer wrote
+   * the accumulated body on every tick, O(N²) bytes per turn on the main
+   * thread) — or, for the majority of replies that never reach that
+   * threshold, at least every `STREAM_CHECKPOINT_MIN_INTERVAL_MS` while the
+   * body keeps growing, so a crash mid-stream loses at most one interval of
+   * text instead of the whole reply. A shorter body (non-prefix rewrite,
+   * retry reopen) is written immediately so stale, longer text cannot linger.
+   * The finalize write remains the authoritative copy, so checkpoints are only
+   * crash protection for the in-flight turn.
    */
   private checkpointStoreUpdate(
     sessionId: string,
@@ -536,13 +545,23 @@ export class PiAssistantTranscript {
     this.noteThrottleMessage(sessionId, messageId);
     if (!this.host.getStore()) return;
     const persistedLength = this.persistedContentLengthByMessageId.get(messageId);
-    if (
-      persistedLength !== undefined &&
-      content.length - persistedLength < STREAM_CHECKPOINT_GROWTH_CHARS
-    ) {
-      return;
+    if (persistedLength !== undefined) {
+      const growth = content.length - persistedLength;
+      if (growth < 0) {
+        // The stream rewrote itself shorter; fall through and reset the
+        // persisted baseline in the same write.
+      } else if (growth === 0) {
+        return;
+      } else if (
+        growth < STREAM_CHECKPOINT_GROWTH_CHARS &&
+        Date.now() - (this.lastCheckpointAtByMessageId.get(messageId) ?? 0) <
+          STREAM_CHECKPOINT_MIN_INTERVAL_MS
+      ) {
+        return;
+      }
     }
     this.persistedContentLengthByMessageId.set(messageId, content.length);
+    this.lastCheckpointAtByMessageId.set(messageId, Date.now());
     this.host
       .getStore()
       .updateMessage(sessionId, messageId, { content, metadata }, { touchUpdatedAt: false });
@@ -624,6 +643,7 @@ export class PiAssistantTranscript {
     this.throttleSessionByMessageId.delete(messageId);
     this.lastStreamedContentByMessageId.delete(messageId);
     this.persistedContentLengthByMessageId.delete(messageId);
+    this.lastCheckpointAtByMessageId.delete(messageId);
   }
 
   clearThrottleStateBySession(sessionId: string, flush: boolean): void {
@@ -646,6 +666,7 @@ export class PiAssistantTranscript {
       this.throttleSessionByMessageId.delete(messageId);
       this.lastStreamedContentByMessageId.delete(messageId);
       this.persistedContentLengthByMessageId.delete(messageId);
+      this.lastCheckpointAtByMessageId.delete(messageId);
     }
     this.pruneFinalizedForSession(sessionId);
   }

@@ -118,8 +118,9 @@ export function stopActivePiRuntimeSession(
     active.workbenchContract.kind !== WorkbenchContractKind.Chat &&
     host.queue.hasPendingFollowUp(sessionId);
   releaseStoppedSession(host, sessionId);
-  // Stopping flushes the throttled store write, which may carry isStreaming; the
-  // partial answer bubble must not stay in flight after the run is gone.
+  // Stopping closes idle placeholders so a partial answer bubble with
+  // isStreaming metadata cannot stay in flight after the run is gone; any
+  // partial body it persists is bounded by the checkpoint policy.
   host.transcript.closeIdlePlaceholders(sessionId, active);
 
   if (shouldDrainFollowUp) {

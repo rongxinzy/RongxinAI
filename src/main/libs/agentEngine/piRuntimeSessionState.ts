@@ -552,6 +552,15 @@ export async function getPiModules(): Promise<PiModules> {
 export const STREAM_CHECKPOINT_GROWTH_CHARS = 32_768;
 
 /**
+ * Time floor between SQLite checkpoints. Most replies never grow past
+ * {@link STREAM_CHECKPOINT_GROWTH_CHARS}, and without this floor a crash
+ * mid-stream would leave the row at the first delta — the old 250 ms timer
+ * bounded the loss to one tick. A body that keeps growing gets a checkpoint
+ * at least this often; an unchanged body is never rewritten.
+ */
+export const STREAM_CHECKPOINT_MIN_INTERVAL_MS = 3_000;
+
+/**
  * This throttles the in-process bus event `messageUpdate` for IM/coding-room
  * consumers only. It never reaches renderer IPC (piUiForwarder drops
  * non-final messageUpdate), so it is not a second UI throttle.
