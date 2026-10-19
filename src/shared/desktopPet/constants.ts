@@ -18,6 +18,25 @@ export const DesktopPetIpc = {
   HitMask: 'desktop-pet:hit-mask',
   Motion: 'desktop-pet:motion',
   Effect: 'desktop-pet:effect',
+  GetSettings: 'desktop-pet:get-settings',
+  SetSettings: 'desktop-pet:set-settings',
+  SettingsChanged: 'desktop-pet:settings-changed',
+  OpenTask: 'desktop-pet:open-task',
+  GetPendingTask: 'desktop-pet:get-pending-task',
+  ResolveTask: 'desktop-pet:resolve-task',
+} as const;
+
+export const DesktopPetTaskResult = {
+  Opened: 'opened',
+  Missing: 'missing',
+  Failed: 'failed',
+} as const;
+export type DesktopPetTaskResult = (typeof DesktopPetTaskResult)[keyof typeof DesktopPetTaskResult];
+export const DESKTOP_PET_FAILURES_KEY = 'desktopPetFailures';
+export const DESKTOP_PET_DEFAULT_SETTINGS = {
+  enabled: false,
+  doNotDisturb: false,
+  hideInFullscreen: true,
 } as const;
 
 export const DesktopPetEffectKind = { Drag: 'drag', Impact: 'impact' } as const;

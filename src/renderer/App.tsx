@@ -13,6 +13,7 @@ import { useAppBootstrap } from './app/useAppBootstrap';
 import { useAppKeyboardShortcuts } from './app/useAppKeyboardShortcuts';
 import { useAppUpdateState } from './app/useAppUpdateState';
 import { useNetworkStatusForwarder } from './app/useNetworkStatusForwarder';
+import { useDesktopPetNavigation } from './app/useDesktopPetNavigation';
 import {
   InferenceEdition,
   isLocalInferenceEnabledForEdition,
@@ -253,6 +254,12 @@ const App: React.FC = () => {
   const handleShowCowork = useCallback(() => {
     setMainView(MainView.Cowork);
   }, []);
+  useDesktopPetNavigation(
+    isInitialized && !initError && !bootScreenVisible,
+    mainView,
+    currentSessionId,
+    handleShowCowork,
+  );
 
   const handleShowScheduledTasks = useCallback(() => {
     setMainView(MainView.ScheduledTasks);

@@ -120,6 +120,20 @@ export class DesktopPetMotion {
     clearTimeout(this.timer);
   }
 
+  pause(): void {
+    this.dragging = undefined;
+    this.flying = undefined;
+    this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
+    this.settled();
+    clearTimeout(this.timer);
+    this.window.setIgnoreMouseEvents(true);
+    this.ignoring = true;
+  }
+
+  resume(): void {
+    this.restart();
+  }
+
   private restart(): void {
     clearTimeout(this.timer);
     this.lastTime = performance.now();

@@ -143,3 +143,17 @@ test('sliding along the ground does not repeatedly trigger landing impulses', ()
   expect(position.y).toBe(708);
   expect(effect).not.toHaveBeenCalled();
 });
+
+test('quiet mode stops native polling and motion until explicitly resumed', () => {
+  motion.begin();
+  desktop.cursor.x += 100;
+  vi.advanceTimersByTime(32);
+  motion.pause();
+  const paused = { ...position };
+  expect(vi.getTimerCount()).toBe(0);
+  vi.advanceTimersByTime(1000);
+  expect(position).toEqual(paused);
+  motion.resume();
+  expect(vi.getTimerCount()).toBe(1);
+  expect(position).toEqual(paused);
+});
