@@ -12,11 +12,10 @@
 ; against that staging directory and fail; PROJECT_DIR (always passed via -D)
 ; anchors them to the repository. The relative fallback serves direct local
 ; makensis runs from this script's directory.
-; These two globals must be declared before the UI includes: ZYHeroLeave reads
-; $installLocalInference and the PrepareExistingInstallForExtraction insertion
-; expands $preparedInstallRoot while zy-pages.nsh is still being processed.
+; These two globals must be declared before the UI includes:
+; PrepareExistingInstallForExtraction expands $preparedInstallRoot while
+; zy-pages.nsh is still being processed.
 !ifndef BUILD_UNINSTALLER
-Var /GLOBAL installLocalInference
 Var /GLOBAL preparedInstallRoot
 !endif
 ; Used by customUnInstall in the uninstaller pass to mirror uninstaller.nsh's
@@ -325,9 +324,8 @@ Var /GLOBAL zyDeleteRealAppData
 ; electron-builder compiles the uninstaller before the installer. Its assisted
 ; template does not insert installation pages while BUILD_UNINSTALLER is set,
 ; so keep the page state and callbacks out of that compilation pass.
-; ($installLocalInference/$preparedInstallRoot are declared above the UI
-; includes, where ZYHeroLeave and the PrepareExistingInstallForExtraction
-; insertion can see them.)
+; ($preparedInstallRoot is declared above the UI includes, where ZYHeroLeave
+; and the PrepareExistingInstallForExtraction insertion can see it.)
 !ifndef BUILD_UNINSTALLER
 
 
@@ -791,15 +789,11 @@ Var /GLOBAL zyDeleteRealAppData
       MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
   VcRuntimeReady:
 
-  ; Local inference remains optional. The user chose on the custom options page
-  ; whether to prepare it; download, verification, extraction, cancellation and
-  ; retry happen in-app.
+  ; Local inference stays an in-app concern: download, verification,
+  ; extraction, cancellation and retry all happen inside the application.
+  ; Old installers may have left a first-launch request marker behind; remove
+  ; it so a stale marker never redirects a fresh install.
   Delete "$APPDATA\ZhiYuanAgent\pending-local-inference-install"
-  ${If} $installLocalInference == 1
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\pending-local-inference-install" w
-    FileWrite $2 "$R1"
-    FileClose $2
-  ${EndIf}
 
   ; Cleanup begins only after core application and runtime links are ready, so
   ; it no longer competes with resource expansion on slow disks.

@@ -296,7 +296,6 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       isDev: () => Promise.resolve(true),
       isEnterprise: () => Promise.resolve(false),
       getSystemLocale: () => Promise.resolve('en-US'),
-      consumePendingLocalInferenceInstall: () => Promise.resolve(null),
     },
     checkApiConfig: () => Promise.resolve({ hasConfig: true, config: null }),
     getRecentCwds: () => Promise.resolve(mockWorkspaces.map(workspace => workspace.path)),

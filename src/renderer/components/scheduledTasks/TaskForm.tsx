@@ -405,7 +405,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
       buildAgentModelValidationTargets({
         primaryModelRef: form.modelId,
         fallbackModelRef: defaultModelRef,
-        triageOverride: null,
       }),
       availableModels,
     );

@@ -1,0 +1,238 @@
+name: Build Windows release (staged)
+
+# Release-mode Windows pipeline: compile/sign the application once (lite core),
+# build CUDA llama-server on windows-2022 in parallel, then assemble cpu/cuda
+# installers with a single Certum session (installer signing only).
+
+on:
+  workflow_call:
+    inputs:
+      source-ref:
+        required: true
+        type: string
+      app-build-version:
+        required: true
+        type: string
+    secrets:
+      CERTUM_USER_ID:
+        required: true
+      CERTUM_OTP_URI:
+        required: true
+      CERTUM_CERT_THUMBPRINT:
+        required: true
+      UPDATE_MANIFEST_KEY_ID:
+        required: true
+      UPDATE_MANIFEST_PUBLIC_KEY_BASE64:
+        required: true
+      MODELSCOPE_TOKENS:
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  cuda-runtime:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Cache llama.cpp CUDA source
+        uses: actions/cache@v5
+        with:
+          path: .cache/llama.cpp-src
+          key: llamacpp-cuda-src-b9244-v1
+          restore-keys: llamacpp-cuda-src-b9244-
+      - uses: Jimver/cuda-toolkit@v0.2.22
+        with:
+          cuda: '12.4.1'
+          method: network
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
+      - run: bash scripts/ensure-llamacpp-cuda-source.sh
+      - run: choco install ninja -y
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - run: bash scripts/build-llamacpp-cuda-rtx40.sh win
+      - run: node scripts/finalize-llamacpp-cuda-edition.cjs
+        env:
+          LLAMACPP_CUDA_PLATFORM: win32
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-cuda-runtime-${{ inputs.app-build-version }}
+          path: vendor/llamacpp/cuda
+          retention-days: 2
+
+  windows-release:
+    needs: cuda-runtime
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref }}
+      - name: Resolve immutable source commit
+        id: source-commit
+        shell: bash
+        run: |
+          commit="$(git rev-parse HEAD)"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "ZHIYUAN_SOURCE_COMMIT=$commit" >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Restore packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: packaging-Windows-win-x64-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          restore-keys: |
+            packaging-Windows-win-x64-node24-bun1.4.0-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Read pinned Magpie Go toolchain
+        id: magpie-toolchain
+        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
+          cache: false
+      - name: Build and verify pinned Magpie gateway
+        env:
+          MAGPIE_TARGET: win32-x64
+        run: |
+          bun run magpie:build -- --target win32-x64
+          bun run magpie:verify -- --target win32-x64
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+      - run: |
+          bun run setup:uv-runtime
+          bun run setup:python-runtime
+          bun run engram:runtime:win-x64
+      - run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
+        env:
+          LLAMACPP_CPU_TARGET_ID: win-x64
+      - name: Download CUDA runtime bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: windows-cuda-runtime-${{ inputs.app-build-version }}
+          path: vendor/llamacpp/cuda
+      - name: Connect Certum SimplySign
+        id: certum-signing
+        uses: ./.github/actions/setup-certum-signing
+        with:
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+      - name: Build signed Windows core (lite)
+        run: bun run dist:win:signed
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Assemble Windows release payloads (lite, cpu, cuda)
+        shell: bash
+        run: |
+          set -euo pipefail
+          assemble_bundle() {
+            local edition="$1"
+            local out_dir="bundle-win32-x64-${edition}"
+            mkdir -p "$out_dir"
+            shopt -s nullglob
+            local installers=(release/ZhiYuanAgent-Setup-*.exe)
+            local updaters=()
+            local file
+            for file in release/*.exe; do
+              [[ "$(basename "$file")" == ZhiYuanAgent-Setup-* ]] || updaters+=("$file")
+            done
+            local blockmaps=(release/*.exe.blockmap)
+            local metadata="release/electron-updater/latest.yml"
+            [[ "$edition" != "lite" ]] && metadata="release/electron-updater/latest-${edition}.yml"
+            node scripts/release/normalize-electron-updater-metadata.mjs \
+              '${{ inputs.app-build-version }}' win32 x64 "$edition" \
+              release/latest.yml "$metadata"
+            node scripts/release/create-release-candidate.mjs \
+              '${{ inputs.app-build-version }}' \
+              '${{ steps.source-commit.outputs.commit }}' \
+              '${{ github.run_id }}' "$out_dir" "candidate-win32-x64-${edition}.json" \
+              "${installers[0]}:win32:x64:${edition}:installer" \
+              "${updaters[0]}:win32:x64:${edition}:updater" \
+              "${blockmaps[0]}:win32:x64:${edition}:blockmap" \
+              "${metadata}:win32:x64:${edition}:metadata"
+          }
+          assemble_bundle lite
+          node scripts/release/windows/assemble-windows-edition.cjs cpu
+          assemble_bundle cpu
+          node scripts/release/windows/assemble-windows-edition.cjs cuda
+          assemble_bundle cuda
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify Windows Authenticode signatures
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/verify-windows-authenticode.ps1
+          -ProjectRoot '${{ github.workspace }}'
+          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
+      - name: Verify Windows release size and runtimes
+        shell: powershell
+        run: |
+          foreach ($edition in @('lite','cpu','cuda')) {
+            $env:ZHIYUAN_UPDATE_VARIANT = $edition
+            powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+            powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+          }
+      - uses: ./.github/actions/verify-windows-compression
+      - name: Verify Windows cold install smoke (lite)
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-installer-smoke.ps1
+          -ProjectRoot '${{ github.workspace }}'
+      - name: Upload Windows release payloads
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-lite
+          path: bundle-win32-x64-lite/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-cpu
+          path: bundle-win32-x64-cpu/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-cuda
+          path: bundle-win32-x64-cuda/
+          if-no-files-found: error

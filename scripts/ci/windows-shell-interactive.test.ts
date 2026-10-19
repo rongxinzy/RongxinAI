@@ -384,7 +384,7 @@ test('drives real visible pointer input and screenshots without synthetic comple
   expect(shellScreenshots).toContain('launched-installed-app');
 });
 
-test('requires full main-repository components, local inference and actual failure recovery', () => {
+test('requires full main-repository components and actual failure recovery', () => {
   // The fixed component set is read from the file the installers embed, not
   // hard-coded; lite must match it exactly, cpu/cuda must contain it.
   expect(script).toContain('scripts/nsis-offline-components.json');
@@ -392,7 +392,6 @@ test('requires full main-repository components, local inference and actual failu
     'Main installer acceptance must retain fixed offline component',
     'lite installer must carry only the fixed offline components',
     '[measure] windows-shell-components',
-    'pending-local-inference-install',
     'Opening/cancelling setup terminated the existing application',
     'Cancelled upgrade did not restore the previous installation',
     'Failed upgrade changed prior installed bytes or registration',

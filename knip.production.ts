@@ -60,10 +60,9 @@ const config: KnipConfig = {
     'src/main/libs/agentEngine/piRuntimeAdapter.testHarness.ts': ['files'],
     'src/main/im/__tests__/**': ['files'],
     'src/scheduledTask/fixtures.ts': ['files'],
-    // Pending user decision (architecture review work packages N.2 and A.7):
-    // classic-* theme registration and the legacy scheduled-task surface.
-    'src/renderer/theme/themes/classic-light.ts': ['files'],
-    'src/renderer/theme/themes/classic-dark.ts': ['files'],
+    // Pending user decision (architecture review work package A.7): the legacy
+    // scheduled-task surface. The classic theme definitions were removed (N.2,
+    // #1169) and their entries retired with them.
     'src/scheduledTask/metaStore.ts': ['files'],
     'src/scheduledTask/modelMapper.ts': ['files'],
     'src/scheduledTask/origin.ts': ['files'],

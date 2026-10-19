@@ -1,3 +1,7 @@
+import { RELEASE_PLATFORMS, resolveReleasePlatforms } from './release-platform-stages.mjs';
+
+export { RELEASE_PLATFORMS, resolveReleasePlatforms };
+
 /** @typedef {'lite' | 'cpu' | 'cuda'} InferenceEditionVariant */
 
 /** @type {InferenceEditionVariant[]} */
@@ -16,7 +20,7 @@ export const MACOS_INFERENCE_VARIANTS = ['cpu'];
  * Linux ships deb + AppImage per inference edition (cpu, cuda); macOS ships
  * cpu per arch; Windows ships lite, cpu and cuda.
  */
-export function listRequiredReleaseTargets() {
+export function listRequiredReleaseTargets(platforms = resolveReleasePlatforms()) {
   /** @type {string[]} */
   const targets = [];
   for (const variant of WINDOWS_INFERENCE_VARIANTS) {
@@ -31,7 +35,7 @@ export function listRequiredReleaseTargets() {
       targets.push(`darwin:${arch}:${edition}`);
     }
   }
-  return targets;
+  return targets.filter(target => platforms.has(target.split(':')[0]));
 }
 
 export const REQUIRED_RELEASE_TARGETS = new Set(listRequiredReleaseTargets());

@@ -193,7 +193,7 @@ public sealed class SetupForm : Form
                 // Let the page settle, then drive the same path as the hero
                 // page Install click: real events, no simulated timing.
                 await Task.Delay(1200);
-                bridge.StartInstall(forcedInstallDir ?? InstallerEngine.FindExistingInstallLocation() ?? DefaultInstallDir(), false);
+                bridge.StartInstall(forcedInstallDir ?? InstallerEngine.FindExistingInstallLocation() ?? DefaultInstallDir());
             }
             if (autoUninstall && webView.CoreWebView2 is not null)
             {
@@ -379,7 +379,7 @@ public sealed class SetupForm : Form
                 SetupArguments.InstallDirectory(args) ?? InstallerEngine.FindExistingInstallLocation() ?? DefaultInstallDir(),
                 ValueAfter(args, "--runtime-root"), ValueAfter(args, "--app-data-root"),
                 !args.Contains("--skip-registration"), progress);
-            engine.RunAsync(false, CancellationToken.None).GetAwaiter().GetResult();
+            engine.RunAsync(CancellationToken.None).GetAwaiter().GetResult();
             return 0;
         }
         catch (Exception ex)
@@ -509,12 +509,12 @@ public sealed class SetupForm : Form
         }
     }
 
-    internal void StartInstall(string engineInstallDir, bool localInference)
+    internal void StartInstall(string engineInstallDir)
     {
         // The host-object Promise acknowledges admission, not engine completion.
         // Never return while the UI admission is still queued: Cancel awaits this
         // acknowledgement and must see the exact token captured below.
-        if (InvokeRequired) { Invoke(new Action(() => StartInstall(engineInstallDir, localInference))); return; }
+        if (InvokeRequired) { Invoke(new Action(() => StartInstall(engineInstallDir))); return; }
         if (uninstallMode || installState == "done") return;
         // A retry during the previous worker's final cleanup must reject its
         // admission Promise, rather than report success without starting work.
@@ -541,7 +541,7 @@ public sealed class SetupForm : Form
             {
                 var runEngine = new InstallerEngine(payloadDir, engineInstallDir,
                     runtimeRootOverride, appDataRootOverride, !skipRegistration, progress);
-                await runEngine.RunAsync(localInference, cancellationToken);
+                await runEngine.RunAsync(cancellationToken);
             }
             catch (Exception ex)
             {
@@ -720,7 +720,7 @@ public sealed class ShellBridge
         form.WindowState = FormWindowState.Minimized;
     });
 
-    public void StartInstall(string installPath, bool localInference) => form.StartInstall(installPath, localInference);
+    public void StartInstall(string installPath) => form.StartInstall(installPath);
 
     public void StartUninstall() => form.StartUninstall();
 

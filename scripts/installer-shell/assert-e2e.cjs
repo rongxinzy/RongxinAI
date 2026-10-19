@@ -136,8 +136,6 @@ try {
       fs.existsSync(path.join(installDir, 'resources', 'uv-win', 'uv.exe')),
     'fake app + sentinels installed',
   );
-  const marker = path.join(appDataRoot, 'pending-local-inference-install');
-  check(!fs.existsSync(marker), 'pending-inference marker absent (localInference=false)');
 
   // Zero pollution: the real runtime cache must not exist after the run.
   check(!fs.existsSync(realRuntimeRoot), 'real runtime cache absent after run');

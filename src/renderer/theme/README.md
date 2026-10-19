@@ -4,7 +4,7 @@ The desktop theme is presentation data. App routes, React state, focus, IPC and 
 
 ## Add a style
 
-1. Create a module alongside `themes/classic-light.ts`. Export a `ThemePlugin` with `version: THEME_PLUGIN_VERSION`, a unique kebab-case ID, localized name and both appearances.
+1. Create a module alongside `themes/zenith-light.ts`. Export a `ThemePlugin` with `version: THEME_PLUGIN_VERSION`, a unique kebab-case ID, localized name and both appearances.
 2. Derive tokens from the built-in appearance and override the relevant semantic roles. Assign unique appearance IDs. `ThemeDefinition.tokens` is a complete typed contract: colors, typography, radii, shadows, editor and syntax roles. The compatibility palette keeps existing utility classes theme-controlled; new components should use semantic names.
 3. Add the plugin to `themePlugins` in `themes/plugins.ts`. The settings style selector appears when multiple plugins exist. This is a bundled plugin API, not an arbitrary JavaScript loader or external theme marketplace.
 4. Run `bun run theme:generate`, `bun run lint`, renderer tests and browser checks in both appearances.
@@ -16,14 +16,14 @@ const paper: ThemePlugin = {
   name: { zh: '纸白', en: 'Paper' },
   appearances: {
     light: {
-      meta: { ...classicLight.meta, id: 'paper-light', name: 'Paper', appearance: 'light' },
-      components: structuredClone(classicLight.components),
-      tokens: { ...classicLight.tokens /* override semantic roles here */ },
+      meta: { ...zenithLight.meta, id: 'paper-light', name: 'Paper', appearance: 'light' },
+      components: structuredClone(zenithLight.components),
+      tokens: { ...zenithLight.tokens /* override semantic roles here */ },
     },
     dark: {
-      meta: { ...classicDark.meta, id: 'paper-dark', name: 'Paper Dark', appearance: 'dark' },
-      components: structuredClone(classicDark.components),
-      tokens: { ...classicDark.tokens /* matching dark roles */ },
+      meta: { ...zenithDark.meta, id: 'paper-dark', name: 'Paper Dark', appearance: 'dark' },
+      components: structuredClone(zenithDark.components),
+      tokens: { ...zenithDark.tokens /* matching dark roles */ },
     },
   },
 };

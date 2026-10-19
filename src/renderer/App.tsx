@@ -75,7 +75,6 @@ const App: React.FC = () => {
   // 2026/09/21 lixiang  keep-alive 视图隐藏超过该时长后真正卸载以释放内存，
   // 回到视图时重挂载（activeTab 等会话状态经 localStorage 恢复）。
   const LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS = 10 * 60 * 1000;
-  const [localInferenceInstallRequestId, setLocalInferenceInstallRequestId] = useState<string>();
   const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
   const [bootScreenVisible, setBootScreenVisible] = useState(
     () => !(import.meta.env.DEV && shouldSkipPreviewBoot()),
@@ -147,7 +146,6 @@ const App: React.FC = () => {
       if (requestId !== availableModelsRefreshRequestIdRef.current) return;
       setManagedProviderPolicy(policy);
       if (policy.mode === ManagedProviderAccessMode.Exclusive) {
-        setLocalInferenceInstallRequestId(undefined);
         setMainView(currentView =>
           currentView === MainView.LocalInference ? MainView.Cowork : currentView,
         );
@@ -232,24 +230,6 @@ const App: React.FC = () => {
     }, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS);
     return () => window.clearTimeout(timer);
   }, [mainView, hasMountedLocalInference, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS]);
-
-  useEffect(() => {
-    if (!managedProviderPolicy || managedModelsOnly || !localInferenceEnabled) return;
-    let active = true;
-    void window.electron.appInfo
-      .consumePendingLocalInferenceInstall()
-      .then(requestId => {
-        if (!active || !requestId) return;
-        setLocalInferenceInstallRequestId(requestId);
-        setMainView(MainView.LocalInference);
-      })
-      .catch(error => {
-        console.warn('[Renderer] Failed to read local inference installer request:', error);
-      });
-    return () => {
-      active = false;
-    };
-  }, [managedProviderPolicy, managedModelsOnly]);
 
   useNetworkStatusForwarder();
 
@@ -374,10 +354,6 @@ const App: React.FC = () => {
     },
     [dispatch, openNewConversation],
   );
-
-  const handleLocalInferenceInstallRequestHandled = useCallback((requestId: string) => {
-    setLocalInferenceInstallRequestId(current => (current === requestId ? undefined : current));
-  }, []);
 
   const handleChatWithExpert = useCallback(
     async (agentId: string) => {
@@ -636,9 +612,7 @@ const App: React.FC = () => {
             onCodingSelectionChange={setCodingSelection}
             hasMountedLocalInference={hasMountedLocalInference}
             isLocalInferenceDormant={isLocalInferenceDormant}
-            localInferenceInstallRequestId={localInferenceInstallRequestId}
             localInferenceRefreshRequestId={localInferenceRefreshRequestId}
-            onLocalInferenceInstallRequestHandled={handleLocalInferenceInstallRequestHandled}
             onOpenModelSettings={handleOpenLocalModelSettings}
             currentSessionId={currentSessionId}
             pendingPermission={pendingPermission}

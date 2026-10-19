@@ -8,7 +8,6 @@ import {
   resolveCoworkPromptLanguage,
   resolveSessionExpertSnapshots,
 } from './sessionExperts';
-import { applyMessageTriageRouting } from './messageTriage';
 import { resolveSessionWorkingDirectory, resolveTaskWorkingDirectory } from './workspacePaths';
 import { sanitizeCoworkSessionForIpc } from './ipcPayloadSanitize';
 import { composeCoworkSystemPrompt } from '../coworkPrompt/composer';
@@ -299,12 +298,6 @@ export const registerCoworkSessionIpc = (): void => {
 
         if (existingSession && options.prompt.trim()) {
           localStore.touchWorkspace(existingSession.workspaceId);
-        }
-
-        try {
-          await applyMessageTriageRouting(options.sessionId, options.prompt);
-        } catch (triageError) {
-          console.warn('[Triage] routing failed; continuing with the current model:', triageError);
         }
 
         runtime

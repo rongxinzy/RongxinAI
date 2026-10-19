@@ -64,15 +64,6 @@
 !define ZY_HERO_BROWSE_Y 68u
 !define ZY_HERO_BROWSE_W 44u
 !define ZY_HERO_BROWSE_H 15u
-!define ZY_HERO_INFER_Y 90u
-!define ZY_HERO_INFER_W 210u
-!define ZY_HERO_INFER_H 11u
-!define ZY_HERO_HINT_X 30u
-!define ZY_HERO_HINT_Y 100u
-!define ZY_HERO_HINT_W 256u
-!define ZY_HERO_HINT_H 10u
-!define ZY_HERO_HINT2_Y 110u
-!define ZY_HERO_HINT2_H 10u
 !define ZY_HERO_LICENSE_X 16u
 !define ZY_HERO_LICENSE_Y 122u
 !define ZY_HERO_LICENSE_W 70u

@@ -9,7 +9,7 @@ export const zhiyuanBranding: ProductBrandingConfig = {
   appUserModelId: 'com.zhiyuanagent.app',
   dataDirName: 'ZhiYuanAgent',
   dbFileName: 'zhiyuan.sqlite',
-  defaultTheme: 'classic-light',
+  defaultTheme: 'zenith-light',
   promptIdentity: {
     chinese: '我是知远智能体。',
     english: 'I am ZhiYuan Agent.',

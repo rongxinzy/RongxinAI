@@ -5,7 +5,7 @@ import path from 'path';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 
 import { rt } from './runtimeState';
-import { resolveDefaultAgentModelRef } from './messageTriage';
+import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { getAgentManager, getCoworkStore, getSkillManager, getStore } from './runtimeServices';
 import { getIMGatewayManager } from './ccConnectRuntime';
 import { bumpCodingCommandCatalog } from './codingRoomRuntime';

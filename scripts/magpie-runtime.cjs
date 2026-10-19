@@ -164,6 +164,16 @@ function certumThumbprint(env) {
   return (env.CERTUM_CERT_THUMBPRINT || '').replace(/[^0-9a-f]/gi, '').toUpperCase();
 }
 
+// electron-builder runs under pwsh on CI, and Windows PowerShell 5.1 inherits
+// PowerShell 7's PSModulePath. It then cannot load its own
+// Microsoft.PowerShell.Security module, so the Cert: drive the signing script
+// needs does not exist. Let powershell.exe rebuild its default module path.
+function windowsPowerShellEnv(env) {
+  return Object.fromEntries(
+    Object.entries(env).filter(([name]) => name.toLowerCase() !== 'psmodulepath'),
+  );
+}
+
 function signPackagedWindowsMagpie(context, deps = {}) {
   if (context.electronPlatformName !== 'win32') return;
   const spawn = deps.spawn || spawnSync;
@@ -182,13 +192,14 @@ function signPackagedWindowsMagpie(context, deps = {}) {
         verifyRuntime(root, key);
         continue;
       }
-      // extraResources live outside electron-builder's Windows sign walk
-      // (app.asar.unpacked and swiftshader). Sign with the same Certum
-      // signtool script the release environment already uses.
+      // electron-builder.json excludes magpie.exe from electron-builder's Windows
+      // sign walk (win.signExts) so the bytes still match the sealed manifest
+      // at afterPack. Sign here with the same Certum signtool script the
+      // release environment already uses, then reseal the manifest below.
       const result = spawn(
         'powershell.exe',
         ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', binary],
-        { stdio: 'inherit', windowsHide: true, env },
+        { stdio: 'inherit', windowsHide: true, env: windowsPowerShellEnv(env) },
       );
       if (result.error) throw result.error;
       if (result.status !== 0) {

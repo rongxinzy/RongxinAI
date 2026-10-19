@@ -1,7 +1,7 @@
 /**
  * System IPC contracts (channel + args + result), single source of truth for
  * the `appSystem` preload namespace, the main-side registrations it reaches
- * (store, triage, permissions, dialog, project, shell, app, appUpdate, log,
+ * (store, permissions, dialog, project, shell, app, appUpdate, log,
  * appConfig), and the renderer-facing types under
  * `src/renderer/types/electron/appSystemApi.ts`.
  *
@@ -27,7 +27,6 @@ import {
   WindowIpc,
 } from './channels';
 import { AppUpdateIpc } from '../appUpdate/constants';
-import { TriageIpcChannel } from '../triage';
 import { ProjectCreateDirectorySchema } from './schemas';
 
 // ─── Shared result shapes ───────────────────────────────────────────────────
@@ -41,21 +40,6 @@ const PathResultSchema = z.object({
 const FileFilterSchema = z.object({
   name: z.string(),
   extensions: z.array(z.string()),
-});
-
-/** `TriageConfig` from src/shared/triage.ts (getConfig returns it verbatim). */
-const TriageConfigSchema = z.object({
-  enabled: z.boolean(),
-  rules: z.object({
-    lightModelRef: z.string(),
-    heavyModelRef: z.string(),
-    maxConversationRoundsForTriage: z.number(),
-    allowCrossProviderSwitch: z.boolean(),
-    cooldownRounds: z.number(),
-    useLocalModelTriage: z.boolean(),
-    triageModelName: z.string(),
-    classifierBaseUrl: z.string(),
-  }),
 });
 
 /**
@@ -86,19 +70,6 @@ export const appSystemContract = defineIpcContract({
     channel: StoreIpc.Remove,
     args: z.tuple([z.string()]),
     result: z.void(),
-  },
-
-  // triage (settings model triage form; setConfig sends a full TriageConfig)
-  triageGetConfig: {
-    channel: TriageIpcChannel.GetConfig,
-    args: z.tuple([]),
-    result: TriageConfigSchema,
-  },
-  triageSetConfig: {
-    channel: TriageIpcChannel.SetConfig,
-    args: z.tuple([z.unknown()]),
-    // The handler sanitizes field-by-field; it echoes the sanitized config.
-    result: TriageConfigSchema,
   },
 
   // calendar permissions (settings → permissions section)
@@ -331,11 +302,6 @@ export const appSystemContract = defineIpcContract({
     channel: AppIpc.GetSystemLocale,
     args: z.tuple([]),
     result: z.string(),
-  },
-  appConsumePendingLocalInferenceInstall: {
-    channel: AppIpc.ConsumePendingLocalInferenceInstall,
-    args: z.tuple([]),
-    result: z.string().nullable(),
   },
   appGetInferenceEdition: {
     channel: AppIpc.GetInferenceEdition,

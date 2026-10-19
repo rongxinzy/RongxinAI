@@ -78,13 +78,6 @@
   .checkbox svg { opacity: 0; }
   .checkbox.on { background: var(--brand); border-color: var(--brand); }
   .checkbox.on svg { opacity: 1; }
-  .switch { position: relative; width: 40px; height: 24px; flex: none; cursor: pointer; display: inline-block; }
-  .switch input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; appearance: none; -webkit-appearance: none; }
-  .switch .track { position: absolute; inset: 0; border-radius: 999px; background: #cbd3dc; pointer-events: none; }
-  .switch .thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; pointer-events: none; transition: transform .12s; }
-  .switch input:checked ~ .track { background: var(--brand); }
-  .switch input:checked ~ .thumb { transform: translateX(16px); }
-  .switch input:focus-visible ~ .track { outline: 2px solid var(--text); outline-offset: 3px; }
   .page-progress, .page-complete { align-items: center; justify-content: center; text-align: center; }
   .loader { position: relative; width: 64px; height: 64px; margin-bottom: 28px; }
   .loader img.mark { display: none; }
@@ -128,7 +121,7 @@
   @media (max-width: 700px) { .page { padding-left: 28px; padding-right: 28px; } .opt-row { flex-wrap: wrap; } .opt-path { flex: 1; max-width: 100%; } }
   @media (max-height: 480px) { .page-progress, .page-complete, .page-uninstall { justify-content: flex-start; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
-  @media (forced-colors: active) { .window { background: Canvas; } .btn, .checkbox, .switch .track { border: 1px solid ButtonText; } .btn-primary, .checkbox.on, .switch input:checked ~ .track, .fill { background: Highlight; color: HighlightText; forced-color-adjust: none; } .btn-primary:disabled { background: Canvas; color: GrayText; border-color: GrayText; } .check .circle { fill: CanvasText; } .check .tick { stroke: Canvas; } }
+  @media (forced-colors: active) { .window { background: Canvas; } .btn, .checkbox { border: 1px solid ButtonText; } .btn-primary, .checkbox.on, .fill { background: Highlight; color: HighlightText; forced-color-adjust: none; } .btn-primary:disabled { background: Canvas; color: GrayText; border-color: GrayText; } .check .circle { fill: CanvasText; } .check .tick { stroke: Canvas; } }
 </style>
 </head>
 <body>
@@ -168,13 +161,9 @@
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
           </div>
           <div class="opt-body">
-            <div class="opt-title" data-i18n="localInference"></div>
-            <div class="opt-desc" data-i18n="localInferenceHint"></div>
+            <div class="opt-title" data-i18n="offlineComponents"></div>
+            <div class="opt-desc" data-i18n="offlineComponentsHint"></div>
           </div>
-          <label class="switch">
-            <input type="checkbox" id="toggleInference">
-            <span class="track"></span><span class="thumb"></span>
-          </label>
         </div>
       </div>
 
@@ -264,8 +253,8 @@ const I18N = {
     installLocation: '安装位置',
     locationHint: '应用与运行组件将安装到此目录',
     browse: '更改…',
-    localInference: '安装本地推理组件',
-    localInferenceHint: '开启后首次启动时会下载 CPU 或 NVIDIA CUDA 后端（16–621 MB），不勾选不影响其他功能',
+    offlineComponents: '离线组件',
+    offlineComponentsHint: '运行环境与内置组件随安装一并就绪，无需额外下载',
     licenseAgree: '我已阅读并同意',
     licenseLink: '《许可协议》',
     licenseUnavailable: '许可协议暂时无法读取，请关闭后重新运行完整安装包。',
@@ -273,7 +262,6 @@ const I18N = {
     install: '安装',
     installingTitle: '正在安装',
     completeTitle: '安装完成',
-    completeSubLocal: '本地推理组件将在首次启动时按你的硬件自动准备',
     completeSub: '知远智能体已就绪，开始你的第一个任务吧',
     done: '完成',
     launch: '启动知远智能体',
@@ -289,9 +277,8 @@ const I18N = {
       '正在连接本地运行环境', '正在安装 VC++ 运行时', '正在清理旧版本'
     ],
     tips: [
-      '提示：在线模型、联网工具与首次下载本地推理组件需要联网',
+      '提示：在线模型、联网工具与组件下载需要联网',
       '提示：Skills 让知远学会新能力，安装后可在设置中继续添加',
-      '提示：本地推理组件可按需启用，不占用安装时间',
       '提示：微信、飞书、钉钉消息渠道可在安装后随时接入'
     ]
   },
@@ -302,8 +289,8 @@ const I18N = {
     installLocation: 'Install location',
     locationHint: 'The app and runtime components go here',
     browse: 'Change…',
-    localInference: 'Install local inference components',
-    localInferenceHint: 'Downloads the CPU or NVIDIA CUDA backend on first launch (16–621 MB). Optional.',
+    offlineComponents: 'Offline components',
+    offlineComponentsHint: 'The runtime and bundled components are ready right after install; nothing extra to download',
     licenseAgree: 'I have read and agree to the',
     licenseLink: 'License Agreement',
     licenseUnavailable: 'The license could not be read. Close setup and run the complete installer again.',
@@ -311,7 +298,6 @@ const I18N = {
     install: 'Install',
     installingTitle: 'Installing',
     completeTitle: 'Installation complete',
-    completeSubLocal: 'Local inference components will be prepared on first launch',
     completeSub: 'ZhiYuan Agent is ready for your first task',
     done: 'Finish',
     launch: 'Launch ZhiYuan Agent',
@@ -327,9 +313,8 @@ const I18N = {
       'Linking local runtimes', 'Installing VC++ runtime', 'Cleaning up previous version'
     ],
     tips: [
-      'Tip: Online models, connected tools and initial inference downloads require internet access',
+      'Tip: Online models, connected tools and component downloads require internet access',
       'Tip: Skills teach ZhiYuan new abilities — add more in Settings',
-      'Tip: Local inference is optional and installs on demand',
       'Tip: Connect WeChat, Feishu or DingTalk anytime after install'
     ]
   }
@@ -403,10 +388,6 @@ document.getElementById('btnBrowse').addEventListener('click', () => {
   const path = prompt(lang === 'zh' ? '安装目录' : 'Install directory', installPath.textContent);
   if (path) setInstallPath(path);
 });
-document.getElementById('toggleInference').addEventListener('change', e => {
-  inferenceOn = e.target.checked;
-});
-let inferenceOn = false;
 btnInstall.addEventListener('click', () => {
   if (btnInstall.disabled) return;
   btnInstall.disabled = true;
@@ -414,7 +395,7 @@ btnInstall.addEventListener('click', () => {
   if (inShell) {
     resetProgressView();
     startShellOperation(() => window.chrome.webview.hostObjects.shell.StartInstall(
-      document.getElementById('installPath').textContent, inferenceOn));
+      document.getElementById('installPath').textContent));
   } else {
     runInstall();
   }
@@ -535,7 +516,7 @@ function runInstall() {
     if (raw < 1) requestAnimationFrame(frame);
     else {
       clearInterval(tipsTimer);
-      document.getElementById('completeSub').textContent = inferenceOn ? t('completeSubLocal') : t('completeSub');
+      document.getElementById('completeSub').textContent = t('completeSub');
       setTimeout(() => { if (token === simToken) showPage('complete'); }, 500);
     }
   }
@@ -621,20 +602,6 @@ if (initialPage === 'progress') {
   }
 } else if (initialPage) {
   showPage(initialPage);
-}
-if (params.has('debug')) {
-  window.addEventListener('load', () => {
-    const sw = document.querySelector('.switch');
-    const parts = {};
-    [sw, sw.querySelector('input'), sw.querySelector('.track'), sw.querySelector('.thumb')].forEach((el, i) => {
-      const r = el.getBoundingClientRect();
-      parts[['switch', 'input', 'track', 'thumb'][i]] = [r.x, r.y, r.width, r.height].map(v => Math.round(v * 10) / 10);
-    });
-    const pre = document.createElement('pre');
-    pre.id = 'debug-rects';
-    pre.textContent = JSON.stringify(parts);
-    document.body.appendChild(pre);
-  });
 }
 
 /* WebView2 shell integration: close + titlebar drag are delegated to the host window */

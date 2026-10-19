@@ -11,9 +11,7 @@ function thenOnly<T>(result: Promise<T>): PromiseLike<T> {
 }
 
 function mount(query = '?lang=en', hosted = true) {
-  const start = vi.fn<(path: string, inference: boolean) => PromiseLike<void>>(() =>
-    thenOnly(Promise.resolve()),
-  );
+  const start = vi.fn<(path: string) => PromiseLike<void>>(() => thenOnly(Promise.resolve()));
   const uninstall = vi.fn<() => PromiseLike<void>>(() => thenOnly(Promise.resolve()));
   const launch = vi.fn<() => PromiseLike<boolean>>(() => thenOnly(Promise.resolve(false)));
   const close = vi.fn<() => PromiseLike<void>>(() => thenOnly(Promise.resolve()));
@@ -102,7 +100,7 @@ describe('hosted installer Promise bridge (not Windows acceptance)', () => {
       ['#btnDone', '完成', 'Finish'],
       ['#btnLaunch', '启动知远智能体', 'Launch ZhiYuan Agent'],
       ['#btnConfirmUninstall', '卸载', 'Uninstall'],
-      ['[data-i18n="localInference"]', '安装本地推理组件', 'Install local inference components'],
+      ['[data-i18n="offlineComponents"]', '离线组件', 'Offline components'],
     ]) {
       expect(ui.document.querySelector(selector)?.textContent).toBe(english ? translated : chinese);
     }
@@ -257,7 +255,6 @@ describe('hosted installer Promise bridge (not Windows acceptance)', () => {
       const start = operation === 'install' ? ui.start : ui.uninstall;
       const button = operation === 'install' ? '#btnInstall' : '#btnConfirmUninstall';
       if (operation === 'install') {
-        ui.click('#toggleInference');
         ui.click('#licenseCheck');
       }
       ui.click(button);
@@ -278,7 +275,6 @@ describe('hosted installer Promise bridge (not Windows acceptance)', () => {
       start.mockReturnValue(thenOnly(Promise.resolve()));
       ui.click(button);
       expect(start).toHaveBeenCalledTimes(3);
-      if (operation === 'install') expect(ui.start.mock.calls[2][1]).toBe(true);
       expect(ui.document.querySelector('.page.active')?.id).toBe('page-progress');
       ui.click('#btnCancelProgress');
       await vi.waitFor(() => expect(ui.cancel).toHaveBeenCalledExactlyOnceWith());
@@ -346,17 +342,16 @@ describe('hosted installer Promise bridge (not Windows acceptance)', () => {
     expect(ui.errors).toEqual([]);
   });
 
-  it.each([false, true])('retains consent and the local-inference choice (%s)', async inference => {
+  it('retains consent across an install attempt gated on the license', async () => {
     const ui = mount();
     await vi.waitFor(() =>
       expect(ui.document.querySelector('#installPath')?.textContent).toBe('C:\\知远\\Application'),
     );
     ui.click('#btnInstall');
     expect(ui.start).not.toHaveBeenCalled();
-    if (inference) ui.click('#toggleInference');
     ui.click('#licenseCheck');
     ui.click('#btnInstall');
-    expect(ui.start).toHaveBeenCalledExactlyOnceWith('C:\\知远\\Application', inference);
+    expect(ui.start).toHaveBeenCalledExactlyOnceWith('C:\\知远\\Application');
     expect(ui.document.querySelector('#page-progress')?.classList.contains('active')).toBe(true);
     expect(ui.document.querySelector('#page-complete')?.classList.contains('active')).toBe(false);
     expect(ui.errors).toEqual([]);
