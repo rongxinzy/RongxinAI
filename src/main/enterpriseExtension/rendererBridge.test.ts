@@ -46,6 +46,13 @@ describe('Zhiyuan enterprise renderer bridge', () => {
     expect(() => capability.registerSessionGate(path.resolve(root, 'index.html'))).toThrow(
       'safe relative path',
     );
+    // Drive-relative paths are not win32.isAbsolute but path.resolve still
+    // switches drives on them; they must be rejected before that happens.
+    expect(() => capability.registerSessionGate('D:')).toThrow('safe relative path');
+    expect(() => capability.registerSessionGate('D:evil/index.html')).toThrow('safe relative path');
+    expect(() => capability.registerSessionGate('ui/D:relative.html')).toThrow(
+      'safe relative path',
+    );
     expect(() => capability.registerSessionGate('missing.html')).toThrow('not a regular file');
 
     capability.registerSessionGate('index.html');

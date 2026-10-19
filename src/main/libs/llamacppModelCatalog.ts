@@ -3,6 +3,9 @@ import path from 'path';
 
 import type { LlamaCppModel } from '../../shared/llamacpp';
 import { ggufSupportsThinkingToggle } from './ggufMetadata';
+import { isPathInside } from '../pathContainment';
+
+export { isPathInside };
 
 const MMPROJ_FILE_PATTERN = /(?:^|[._-])mmproj(?:[._-]|$)/i;
 
@@ -70,11 +73,6 @@ export function mergeLocalModels(
     });
   }
   return Array.from(merged.values()).sort((a, b) => a.name.localeCompare(b.name));
-}
-
-export function isPathInside(target: string, root: string): boolean {
-  const relative = path.relative(root, target);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
 export function resolveInstalledModelName(modelsDir: string, modelPath: string): string {

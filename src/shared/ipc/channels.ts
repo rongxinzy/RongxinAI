@@ -180,7 +180,6 @@ export type CoworkConfigIpc = (typeof CoworkConfigIpc)[keyof typeof CoworkConfig
 // ─── Cowork Stream ──────────────────────────────────────────────────────────
 export const CoworkStreamIpc = {
   RunState: 'cowork:stream:runState',
-  ContentPatch: 'cowork:stream:contentPatch',
   RuntimeSnapshots: 'cowork:stream:runtimeSnapshots',
   UiEvent: 'cowork:stream:uiEvent',
   StreamResync: 'cowork:stream:resync',

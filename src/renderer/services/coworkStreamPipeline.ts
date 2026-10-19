@@ -3,8 +3,9 @@
  *
  * Extracted verbatim from CoworkService.setupStreamListeners so the whole
  * renderer streaming path (sequence tracker → recovery watermark → content
- * buffer → rAF batchers → live text / Redux dispatch) can be driven
- * end-to-end from node vitest without the global store or `window`.
+ * buffer → live text (immediate apply, rAF notify) → rAF-committed Redux
+ * dispatch) can be driven end-to-end from node vitest without the global
+ * store or `window`.
  *
  * Invariants: StreamPart events carry deltas only; full snapshots are limited
  * to ContentPatch base sync (metadata.isStreaming === true, complete patch),
@@ -44,7 +45,6 @@ import {
   browserAnimationFrameScheduler,
   RafMessageUpdateBatcher,
 } from './rafMessageUpdateBatcher';
-import { RafStreamPartBatcher } from './rafStreamPartBatcher';
 
 export type CoworkSliceState = ReturnType<typeof coworkReducer>;
 
@@ -74,7 +74,6 @@ export interface CoworkStreamPipelineDeps {
 
 export interface CoworkStreamPipeline {
   handleUiEvent(event: unknown): void;
-  handleContentPatch(patch: CoworkContentPatch): void;
   flush(): void;
   dispose(): void;
 }
@@ -117,11 +116,10 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
     }
     deps.dispatch(updateMessageContents(updates));
   }, scheduler);
-  const liveTextBatcher = new RafStreamPartBatcher(parts => {
-    for (const part of parts) {
-      deps.liveText.applyChunk(part.messageId, part.chunk, part.sessionId);
-    }
-  }, scheduler);
+  // StreamPart chunks are applied to the live text store on arrival (the
+  // main-process coalescer already batches them per 16 ms window); the store
+  // schedules its own rAF notification, so no renderer-side part batcher and
+  // no flush points are needed.
   const contentBuffer = new CoworkContentBuffer(sessionId => deps.onContentGap(sessionId));
   const sequenceTracker = new PiUiEventSequenceTracker();
   // Finalized messages are committed to Redux; late StreamPart deltas for them
@@ -133,12 +131,11 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
     const update = contentBuffer.apply(patch);
     if (patch.metadata?.isStreaming === true) {
       // Streaming base snapshot (non-prefix rewrite / 2M truncation / resync).
-      // Only a complete patch carries the whole base: flush queued deltas
-      // first so they land on the old base, then replace it wholesale. It is
-      // never written to Redux — that would be a full-snapshot "streaming"
-      // update, which the architecture forbids.
+      // Only a complete patch carries the whole base: it replaces the base
+      // wholesale (chunks already applied on arrival, so ordering with deltas
+      // is call order). It is never written to Redux — that would be a
+      // full-snapshot "streaming" update, which the architecture forbids.
       if (update?.content !== undefined) {
-        liveTextBatcher.flush();
         deps.liveText.setSnapshot(patch.messageId, update.content, patch.sessionId);
       }
       return;
@@ -153,7 +150,6 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
     // snapshot would render text missing its prefix. resetSession marks the
     // session's live entries awaitingBase so such deltas are dropped until
     // the base snapshot lands.
-    liveTextBatcher.flush();
     deps.liveText.resetSession(sessionId);
     deps.onSequenceGap(sessionId);
     // Ordering contract: the main process first pushes the still-streaming
@@ -210,23 +206,18 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
           // Terminal states already committed the message to Redux; late
           // deltas would resurrect live text over the committed content.
           if (finalizedMessageIds.has(event.messageId)) break;
-          liveTextBatcher.enqueue({
-            sessionId: event.sessionId,
-            messageId: event.messageId,
-            chunk: event.chunk,
-          });
+          deps.liveText.applyChunk(event.messageId, event.chunk, event.sessionId);
           break;
         case PiUiEventType.MessageRemoved:
-          liveTextBatcher.flush();
           finalizedMessageIds.delete(event.messageId);
           deps.liveText.clear(event.messageId);
           deps.dispatch(removeMessage({ sessionId: event.sessionId, messageId: event.messageId }));
           break;
         case PiUiEventType.MessageUpdate:
           if (event.metadata?.isStreaming === false || event.metadata?.isFinal === true) {
-            // Final state: flush pending deltas so the live text is complete
-            // before the committed Redux update clears the live entry.
-            liveTextBatcher.flush();
+            // Final state: pending deltas are already in the live text
+            // (applied on arrival) before the committed Redux update clears
+            // the live entry.
             finalizedMessageIds.add(event.messageId);
             if (event.metadata?.metadataOnly === true) {
               // Duplicate terminal emission whose body was already
@@ -291,18 +282,15 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
           deps.dispatch(dequeuePendingPermission({ requestId: event.requestId }));
           break;
         case PiUiEventType.Interrupted:
-          liveTextBatcher.flush();
           updateBatcher.flush();
           deps.dispatch(clearPendingPermissionsForSession(event.sessionId));
           deps.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'idle' }));
           break;
         case PiUiEventType.Completed:
-          liveTextBatcher.flush();
           updateBatcher.flush();
           deps.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'completed' }));
           break;
         case PiUiEventType.Error: {
-          liveTextBatcher.flush();
           updateBatcher.flush();
           const stateBeforeStatusUpdate = deps.getCoworkState();
           const terminalMessageAlreadyReceived = hasMatchingLatestTerminalError(
@@ -327,7 +315,6 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
         case PiUiEventType.QueueUpdated:
           break;
         case PiUiEventType.Stopped:
-          liveTextBatcher.flush();
           updateBatcher.flush();
           deps.dispatch(clearPendingPermissionsForSession(event.sessionId));
           deps.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'idle' }));
@@ -337,17 +324,11 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
       }
     },
 
-    handleContentPatch(patch: CoworkContentPatch): void {
-      applyContentPatch(patch);
-    },
-
     flush(): void {
-      liveTextBatcher.flush();
       updateBatcher.flush();
     },
 
     dispose(): void {
-      liveTextBatcher.dispose();
       updateBatcher.dispose();
     },
   };

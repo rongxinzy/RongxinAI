@@ -1,5 +1,7 @@
 import path from 'node:path';
 
+import { isPathInside } from './pathContainment';
+
 const SENSITIVE_PATH_PATTERNS = [
   '/.ssh/',
   '/.ssh',
@@ -55,10 +57,7 @@ const DANGEROUS_EXEC_EXTENSIONS = new Set([
 ]);
 
 export function isPathInsideRoot(target: string, root: string): boolean {
-  const normalizedTarget = path.resolve(target);
-  const normalizedRoot = path.resolve(root);
-  const relative = path.relative(normalizedRoot, normalizedTarget);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  return isPathInside(target, root);
 }
 
 export function isSensitivePath(targetPath: string): boolean {

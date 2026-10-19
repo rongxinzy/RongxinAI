@@ -9,17 +9,16 @@
 
 import type { IpcContractApi } from '../../../shared/ipc/contract';
 import type { coworkContract } from '../../../shared/ipc/coworkContract';
-import type { CoworkRunSnapshot, CoworkContentPatch } from '../../../shared/cowork/runState';
+import type { CoworkRunSnapshot } from '../../../shared/cowork/runState';
 import type { PiUiEvent } from '../../../shared/cowork/piUiEvent';
 
 type CoworkContractApi = IpcContractApi<typeof coworkContract>;
 
 export interface CoworkApi extends Omit<
   CoworkContractApi,
-  'onStreamRunState' | 'onStreamContentPatch' | 'onStreamUiEvent' | 'onSessionsChanged'
+  'onStreamRunState' | 'onStreamUiEvent' | 'onSessionsChanged'
 > {
   onStreamRunState: (callback: (snapshot: CoworkRunSnapshot) => void) => () => void;
-  onStreamContentPatch: (callback: (patch: CoworkContentPatch) => void) => () => void;
   onStreamUiEvent: (callback: (event: PiUiEvent) => void) => () => void;
   onSessionsChanged: (
     callback: (data: {

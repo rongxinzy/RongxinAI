@@ -221,6 +221,10 @@ export function stopAllPiRuntimeSessions(host: PiRuntimeAdapterHost): void {
       'The application stopped the active session.',
       false,
     );
+    // Quit stops carry no interruption cause (no interruption record is
+    // written), but the status projection must not survive as a zombie
+    // 'running' row until the next launch's bulk reset.
+    host.getStore()?.updateSession(sessionId, { status: 'idle' });
   }
   void host.cadViewerService.stop();
 }

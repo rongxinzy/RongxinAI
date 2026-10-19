@@ -6,7 +6,7 @@
  * tests/helpers/streamingPipelineHarness: Pi SDK mock → PiRuntimeAdapter →
  * forwardPiWorkbenchRuntimeToRenderer (UiMessageChunkCoalescer → sequencer →
  * webContents.send) → intercepted CoworkStreamIpc.UiEvent → renderer pipeline
- * (sequence tracker → rAF batchers) → LiveTextStore/Redux. Nothing about the
+ * (sequence tracker → LiveTextStore with rAF notify) → Redux. Nothing about the
  * pipeline is re-implemented in the test: if production regresses (full-text
  * snapshots on the regular streaming path, per-delta IPC spam, per-delta cost
  * that grows with accumulated content, or the coalescer disappearing), the
