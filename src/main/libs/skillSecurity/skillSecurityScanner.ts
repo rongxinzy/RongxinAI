@@ -211,7 +211,8 @@ interface JsxrayWarning {
   kind: string;
   value?: unknown;
   source?: unknown;
-  location?: Array<{ start?: { line?: number } }> | { start?: { line?: number } };
+  // Structural slice of either one span or an array; only the first span is read.
+  location?: { 0?: { start?: { line?: number } }; start?: { line?: number } };
 }
 
 interface JsxrayModule {

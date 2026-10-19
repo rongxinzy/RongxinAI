@@ -1,5 +1,10 @@
-import { CoworkSessionMode, type CoworkSessionStatus } from '../shared/cowork/constants';
-import type { CoworkSession, CoworkSessionSummary, CoworkStore } from './coworkStore';
+import { CoworkSessionMode } from '../shared/cowork/constants';
+import type {
+  CoworkSession,
+  CoworkSessionStatus,
+  CoworkSessionSummary,
+  CoworkStore,
+} from './coworkStore';
 
 const CoworkRuntimeSessionStatus = {
   Idle: 'idle',

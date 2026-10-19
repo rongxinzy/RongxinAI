@@ -1,5 +1,5 @@
-import { CcConnectProtocol, type CcConnectHealth } from '../shared/ccConnect/constants';
-import { createCcConnectProtocolHeaders, isCcConnectHealth } from '../shared/ccConnect/protocol';
+import { CcConnectProtocol, type CcConnectHealth } from '../../shared/ccConnect/constants';
+import { createCcConnectProtocolHeaders, isCcConnectHealth } from '../../shared/ccConnect/protocol';
 
 /**
  * Sidecar control-plane client: health verification only. The scheduler clock

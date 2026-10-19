@@ -44,9 +44,7 @@ export interface ScheduledTaskHandlerDeps {
  * and restores native pi-connect conversation IDs. Execution binding stays
  * independent from the delivery route.
  */
-type MutableScheduledTaskInput = Record<string, unknown> & {
-  delivery?: Record<string, unknown>;
-};
+type MutableScheduledTaskInput = Partial<ScheduledTaskInput>;
 
 async function applyAnnounceDeliveryNormalization(
   normalizedInput: MutableScheduledTaskInput,
@@ -76,7 +74,7 @@ async function applyAnnounceDeliveryNormalization(
   }
 }
 
-function cloneScheduledTaskInput<T>(input: T): T {
+function cloneScheduledTaskInput<T extends MutableScheduledTaskInput>(input: T): T {
   const normalized = { ...input } as MutableScheduledTaskInput;
   if (Object.hasOwn(normalized, 'delivery') && normalized.delivery) {
     normalized.delivery = { ...normalized.delivery };

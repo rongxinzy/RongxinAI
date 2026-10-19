@@ -116,7 +116,7 @@ const buildMeta = (flags: BenchFlags, scenarioCount: number): Record<string, unk
     sqliteWrites:
       'Transcript store.updateMessage writes under the 200 ms leading+trailing throttle model (A: copied legacy throttles; C/D: the same model applied to the incremental pipeline).',
     rendererCommits:
-      'A: rAF frames carrying at least one ContentPatch; C: rAF frames dispatching to mock Redux; D: rAF frames applying chunks (with --render: React commits of the jsdom lower-bound component).',
+      'A: rAF frames carrying at least one ContentPatch; C: rAF frames dispatching to mock Redux; D: rAF notification frames after immediate chunk application (with --render: React commits of the jsdom lower-bound component).',
     ipcBytes:
       'A: legacy payload {sessionId,messageId,patch}; C/D: JSON of the sequenced PiUiEvent.',
   },
