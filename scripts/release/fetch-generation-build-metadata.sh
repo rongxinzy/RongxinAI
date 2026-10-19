@@ -21,7 +21,11 @@ if [[ ${#keys[@]} -eq 0 ]]; then
 fi
 
 expected_count="$(
-  node --input-type=module -e "import { listReleaseCandidateBundles } from './scripts/release/release-candidate-layout.mjs'; process.stdout.write(String(listReleaseCandidateBundles().length));"
+  node --input-type=module -e "
+    import { listReleaseCandidateBundles } from './scripts/release/release-candidate-layout.mjs';
+    import { resolveReleasePlatforms } from './scripts/release/release-platform-stages.mjs';
+    process.stdout.write(String(listReleaseCandidateBundles(resolveReleasePlatforms(process.env)).length));
+  "
 )"
 
 if [[ ${#keys[@]} -ne "$expected_count" ]]; then

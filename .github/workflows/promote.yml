@@ -18,9 +18,6 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   R2_BUCKET: zhiyuan-releases
-  # Must match the platforms release.yml built for this version (Windows-only
-  # hotfix, krli 2026-10-19); the metadata count and smoke targets follow it.
-  ZHIYUAN_RELEASE_PLATFORMS: win32
 
 jobs:
   promote:
