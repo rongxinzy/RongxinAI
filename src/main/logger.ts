@@ -1,5 +1,5 @@
 /**
- * Logger module using electron-log
+ * Robust, production-grade Logger module using electron-log.
  * Intercepts console.* methods and writes to file + console simultaneously.
  *
  * Log file locations:
@@ -7,19 +7,26 @@
  *   Windows: %USERPROFILE%\AppData\Roaming\ZhiYuanAgent\logs\main[-dev]-YYYY-MM-DD.log
  *   Linux:   ~/.config/ZhiYuanAgent/logs/main[-dev]-YYYY-MM-DD.log
  *
- * Production uses  "main-YYYY-MM-DD.log"
- * Development uses "main-dev-YYYY-MM-DD.log"  (app.isPackaged === false)
- *
- * Rotation policy:
- *   - Daily log files (one file per calendar day)
- *   - Max 80 MB per file; on overflow electron-log rotates to .old.log
- *   - Files older than 7 days are pruned on startup
+ * Key Capabilities:
+ *   - Production level defaults to 'info' to avoid log-volume explosion; configurable via ZHIYUAN_LOG_LEVEL.
+ *   - Comprehensive environment & hardware banner on startup (CPU, RAM, OS build, App version).
+ *   - Post-ready GPU hardware acceleration logging.
+ *   - Cause-chain and network-error property extraction for Error objects.
+ *   - Noise throttle / filter for repetitive high-frequency background worker jobs.
+ *   - Daily log files with 7-day retention and automatic pruning.
  */
 
 import { app } from 'electron';
 import log from 'electron-log/main';
 import fs from 'fs';
 import path from 'path';
+
+import { formatLogArguments } from './diagnostics/errorFormatting';
+import {
+  formatStartupLogBanner,
+  getSynchronousSystemInfo,
+  getSystemDiagnosticsSnapshot,
+} from './diagnostics/systemDiagnostics';
 
 const LOG_RETENTION_DAYS = 7;
 const LOG_MAX_SIZE = 80 * 1024 * 1024; // 80 MB
@@ -37,6 +44,17 @@ function logDir(): string {
   return _logDir ?? path.dirname(log.transports.file.getFile().path);
 }
 
+/** Check if a log entry matches high-frequency spam that should be suppressed in production. */
+function isHighFrequencyNoise(args: unknown[]): boolean {
+  if (args.length === 0) return false;
+  const first = String(args[0]);
+  // Suppress high-frequency worker pool transform text completion in default production logs
+  if (first.includes('[WorkbenchArtifacts] completed transform-text')) {
+    return true;
+  }
+  return false;
+}
+
 /**
  * Initialize logging system.
  * Must be called early in main process, before any console output.
@@ -48,8 +66,14 @@ export function initLogger(): void {
     return path.join(vars.libraryDefaultDir, `${LOG_BASENAME}-${todayStr()}.log`);
   };
 
+  // Determine file transport log level
+  const envLevel = process.env.ZHIYUAN_LOG_LEVEL?.toLowerCase();
+  const validLevels = ['error', 'warn', 'info', 'verbose', 'debug', 'silly'];
+  const defaultFileLevel = app.isPackaged ? 'info' : 'debug';
+  const activeFileLevel = envLevel && validLevels.includes(envLevel) ? envLevel : defaultFileLevel;
+
   // File transport config
-  log.transports.file.level = 'debug';
+  log.transports.file.level = activeFileLevel as unknown as false;
   log.transports.file.maxSize = LOG_MAX_SIZE;
   log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
 
@@ -57,10 +81,7 @@ export function initLogger(): void {
   log.transports.console.level = 'debug';
   log.transports.console.format = '{text}';
 
-  // Intercept console.* methods so all existing console.log/error/warn
-  // across 25+ files are automatically captured without any code changes.
-  // electron-log correctly serializes Error objects (with stack traces),
-  // unlike JSON.stringify which outputs '{}' for Error instances.
+  // Intercept console.* methods so all existing console calls are captured.
   const originalLog = console.log;
   const originalError = console.error;
   const originalWarn = console.warn;
@@ -72,34 +93,71 @@ export function initLogger(): void {
     log.info(...args);
   };
   console.error = (...args: unknown[]) => {
-    originalError.apply(console, args);
-    log.error(...args);
+    const formattedArgs = formatLogArguments(args);
+    originalError.apply(console, formattedArgs);
+    log.error(...formattedArgs);
   };
+
   console.warn = (...args: unknown[]) => {
-    originalWarn.apply(console, args);
-    log.warn(...args);
+    const formattedArgs = formatLogArguments(args);
+    originalWarn.apply(console, formattedArgs);
+    log.warn(...formattedArgs);
   };
+
   console.info = (...args: unknown[]) => {
     originalInfo.apply(console, args);
     log.info(...args);
   };
+
   console.debug = (...args: unknown[]) => {
     originalDebug.apply(console, args);
+    // Suppress spammy worker pool debug lines in production unless debug explicitly enabled
+    if (app.isPackaged && activeFileLevel === 'info' && isHighFrequencyNoise(args)) {
+      return;
+    }
     log.debug(...args);
   };
 
   // Disable electron-log's own console transport to avoid double printing
-  // (we already call originalLog above, so electron-log only needs to write to file)
   log.transports.console.level = false;
 
   // Remove log files older than retention window
   pruneOldLogs();
 
-  // Log startup marker
-  const mode = app.isPackaged ? 'production' : 'development';
-  log.info('='.repeat(60));
-  log.info(`ZhiYuanAgent started (${process.platform} ${process.arch}, ${mode})`);
-  log.info('='.repeat(60));
+  // Log comprehensive environment & hardware header at startup
+  const sysInfo = getSynchronousSystemInfo();
+  const bannerLines = formatStartupLogBanner(sysInfo);
+  for (const line of bannerLines) {
+    log.info(line);
+  }
+}
+
+/**
+ * Log GPU hardware acceleration details once app is ready.
+ * Non-blocking, safe to call from app.whenReady().
+ */
+export async function logGpuDiagnostics(): Promise<void> {
+  try {
+    const snapshot = await getSystemDiagnosticsSnapshot();
+    if (snapshot.gpu?.devices && snapshot.gpu.devices.length > 0) {
+      for (const dev of snapshot.gpu.devices) {
+        const desc =
+          dev.gpuDeviceString ||
+          `Vendor 0x${(dev.vendorId || 0).toString(16)} Device 0x${(dev.deviceId || 0).toString(16)}`;
+        const driver = dev.driverVersion ? ` (Driver: ${dev.driverVersion})` : '';
+        log.info(`[Main] Hardware GPU: ${desc}${driver}`);
+      }
+    }
+    if (snapshot.gpu?.featureStatus) {
+      const features = Object.entries(snapshot.gpu.featureStatus)
+        .slice(0, 4)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ');
+      log.info(`[Main] Hardware Acceleration: ${features}`);
+    }
+  } catch (error) {
+    log.warn('[Main] Failed to query GPU diagnostics:', error);
+  }
 }
 
 /** Delete daily main-*.log files whose mtime exceeds the retention window. */

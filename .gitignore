@@ -30,6 +30,8 @@ vendor/channel-runtime/
 MCPs/feishu/runtime/
 vendor/llamacpp-runtime/
 vendor/engram-runtime/
+vendor/openclaw-runtime/
+vendor/openclaw-plugins/
 
 # Tar archives generated during Windows packaging
 build-tar/
