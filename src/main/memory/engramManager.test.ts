@@ -43,14 +43,12 @@ afterEach(() => {
 test('starts the supervised runtime with private storage and launch credentials', async () => {
   const child = new FakeProcess();
   const spawnProcess = vi.fn(() => child);
-  const close = vi.fn(async () => undefined);
   const manager = new EngramManager({
     userDataPath: createUserDataDirectory(),
     env: {},
     fileExists: () => true,
     projectRoot: path.resolve('project'),
     reservePort: async () => 43123,
-    createProxy: async ({ token }) => ({ url: 'http://127.0.0.1:43124', close, token }),
     spawnProcess,
     checkHealth: async () => true,
   });
@@ -58,7 +56,7 @@ test('starts the supervised runtime with private storage and launch credentials'
   const connection = await manager.start();
   const [, childEnvironment] = spawnProcess.mock.calls[0];
 
-  expect(connection?.url).toBe('http://127.0.0.1:43124');
+  expect(connection?.url).toBe('http://127.0.0.1:43123');
   expect(connection?.token).toHaveLength(64);
   expect(
     childEnvironment[EngramEnvironment.DataDirectory]?.endsWith(path.join('memory', 'engram')),
@@ -71,14 +69,12 @@ test('starts the supervised runtime with private storage and launch credentials'
   });
 
   await manager.stop();
-  expect(close).toHaveBeenCalledOnce();
   expect(child.kill).toHaveBeenCalledOnce();
 });
 
 test('does not expose a connection before the runtime health check passes', async () => {
   const child = new FakeProcess();
   const spawnProcess = vi.fn(() => child);
-  const close = vi.fn(async () => undefined);
   let resolveHealth!: (healthy: boolean) => void;
   const healthCheck = new Promise<boolean>(resolve => {
     resolveHealth = resolve;
@@ -89,7 +85,6 @@ test('does not expose a connection before the runtime health check passes', asyn
     fileExists: () => true,
     projectRoot: path.resolve('project'),
     reservePort: async () => 43123,
-    createProxy: async () => ({ url: 'http://127.0.0.1:43124', close }),
     spawnProcess,
     checkHealth: () => healthCheck,
   });
@@ -99,8 +94,8 @@ test('does not expose a connection before the runtime health check passes', asyn
   expect(manager.getConnection()).toBeNull();
 
   resolveHealth(true);
-  await expect(startPromise).resolves.toMatchObject({ url: 'http://127.0.0.1:43124' });
-  expect(manager.getConnection()).toMatchObject({ url: 'http://127.0.0.1:43124' });
+  await expect(startPromise).resolves.toMatchObject({ url: 'http://127.0.0.1:43123' });
+  expect(manager.getConnection()).toMatchObject({ url: 'http://127.0.0.1:43123' });
 
   await manager.stop();
 });
@@ -129,7 +124,6 @@ test('restarts after an unexpected process exit', async () => {
     fileExists: () => true,
     projectRoot: path.resolve('project'),
     reservePort: async () => 43123,
-    createProxy: async () => ({ url: 'http://127.0.0.1:43124', close: async () => undefined }),
     spawnProcess,
     checkHealth: async () => true,
     restartDelaysMs: [1],
