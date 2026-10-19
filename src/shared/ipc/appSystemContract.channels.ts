@@ -58,7 +58,6 @@ export const appSystemContractChannels: IpcContractChannels<typeof appSystemCont
   appIsDev: AppIpc.IsDev,
   appIsEnterprise: AppIpc.IsEnterprise,
   appGetSystemLocale: AppIpc.GetSystemLocale,
-  appConsumePendingLocalInferenceInstall: AppIpc.ConsumePendingLocalInferenceInstall,
   appGetInferenceEdition: AppIpc.GetInferenceEdition,
   appUsesBundledLlamaCppRuntime: AppIpc.UsesBundledLlamaCppRuntime,
   appRelaunch: AppIpc.Relaunch,

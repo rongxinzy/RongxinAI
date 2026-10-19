@@ -19,10 +19,6 @@ export function createAppInfo(runtime: BrowserMockRuntime): Window['electron']['
       runtime.warnOnce('appInfo.getSystemLocale');
       return '';
     },
-    consumePendingLocalInferenceInstall: async () => {
-      runtime.warnOnce('appInfo.consumePendingLocalInferenceInstall');
-      return '';
-    },
     getInferenceEdition: async () => {
       runtime.warnOnce('appInfo.getInferenceEdition');
       return 'cpu';

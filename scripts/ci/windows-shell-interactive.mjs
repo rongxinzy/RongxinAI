@@ -492,16 +492,8 @@ export async function runShellAcceptance() {
     report.checks.missingWebView2ExplicitFailure = true;
 
     const fresh = await start('fresh');
-    assert.equal((await fresh.cdp.evaluate(snapshotExpression)).localInference, false);
-    await click(fresh, '.switch');
-    assert.equal((await fresh.cdp.evaluate(snapshotExpression)).localInference, true);
     await begin(fresh, 'fresh');
     await finish(fresh, 'fresh');
-    assert(
-      await exists(path.join(appData, 'pending-local-inference-install')),
-      'Selected local inference must be scheduled for the first application launch',
-    );
-    report.checks.localInferenceOption = true;
     await click(fresh, '#btnDone');
     await waitExit(fresh);
     assert.equal(

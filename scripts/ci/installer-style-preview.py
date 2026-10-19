@@ -11,7 +11,7 @@ results = []
 with sync_playwright() as p:
     browser=p.chromium.launch(headless=True,args=['--enable-unsafe-swiftshader'])
     source = root/'scripts/installer-shell/preview/index.html'
-    name = 'main' if 'toggleInference' in source.read_text() else 'zhiyuan'
+    name = 'main'
     for name, source in [(name, source)]:
         stage=out/name
         (stage/'assets').mkdir(parents=True,exist_ok=True)
@@ -67,8 +67,6 @@ with sync_playwright() as p:
             page.locator('#btnBrowse').click()
             assert page.locator('#installPath').inner_text()=='D:\\Apps\\知远智能体'
             assert page.locator('#installPath').get_attribute('title')=='D:\\Apps\\知远智能体'
-            if name=='main':
-                page.locator('#toggleInference').check()
             page.locator('#btnInstall').focus()
             page.keyboard.press('Enter' if language=='zh' else 'Space')
             page.mouse.click(cx,cy,click_count=2,delay=30)
@@ -79,7 +77,6 @@ with sync_playwright() as p:
             page.evaluate("window.engine({data:{type:'error',message:'无法写入安装目录。请关闭正在使用文件的应用后重试。',detail:'D:\\\\Apps\\\\知远智能体\\\\resources\\\\app.asar'}})")
             page.wait_for_timeout(250)
             page.screenshot(path=str(out/f'{name}-{language}-error.png'))
-            if name=='zhiyuan': page.locator('#btnRetry').click()
             assert page.locator('#btnInstall').is_enabled()
             page.locator('#btnInstall').click()
             page.evaluate("window.engine({data:{type:'done',installDir:'D:\\\\Apps\\\\知远智能体'}})")
@@ -105,7 +102,6 @@ with sync_playwright() as p:
             page.locator('#btnLaunch').click()
             page.wait_for_function("!document.getElementById('btnLaunch').disabled")
             assert page.evaluate('window.launchCalls')==2
-            if name=='zhiyuan': assert 'Launch rejected' in page.locator('#launchError').inner_text()
             assert not errors,errors
             results.append({'repo':name,'language':language,'errors':errors,'calls':page.evaluate('window.mockCalls'),'checks':['license click and real text','no implicit consent','Escape dismiss','keyboard consent','path picker result','install admission','progress event','error/retry','done/launch visibility','pointer press immediate color and zero transition','no press transform or geometry shift','release outside cancels','Tab focus visible','Enter/Space admission','repeated click admits once','busy launch disables repeat and restores retry']})
             page.close()

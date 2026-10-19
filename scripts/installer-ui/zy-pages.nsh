@@ -66,7 +66,6 @@ Var /GLOBAL zyHeaderBitmap       ; wizard-owned header, replaced on page change
 !ifndef BUILD_UNINSTALLER
 Var /GLOBAL zyLaunchApp          ; finish page: launch the app on leave
 Var /GLOBAL heroDirText          ; read-only $INSTDIR display
-Var /GLOBAL heroInference        ; local inference checkbox
 Var /GLOBAL heroLicense          ; license agreement checkbox
 Var /GLOBAL heroInstall          ; primary Install button
 Var /GLOBAL heroCancelNative     ; hidden native Cancel, driven via BM_CLICK
@@ -153,18 +152,6 @@ Var /GLOBAL zyFinishTitle
   "更改…" \
   "變更…" \
   "Change..."
-!insertmacro ZY_LangString ZY_UI_LOCAL_INFERENCE \
-  "安装本地推理组件" \
-  "安裝本地推理元件" \
-  "Install local inference components"
-!insertmacro ZY_LangString ZY_UI_LOCAL_INFERENCE_HINT \
-  "开启后首次启动时会下载 CPU 或 NVIDIA CUDA 后端（16-621 MB）。" \
-  "開啟後首次啟動時會下載 CPU 或 NVIDIA CUDA 後端（16-621 MB）。" \
-  "CPU/NVIDIA CUDA backend download: 16-621 MB."
-!insertmacro ZY_LangString ZY_UI_LOCAL_INFERENCE_HINT2 \
-  "不勾选不会影响其他功能。" \
-  "不勾選不會影響其他功能。" \
-  "On first launch if selected; other features unaffected."
 !insertmacro ZY_LangString ZY_UI_LICENSE_AGREE \
   "已阅读并同意" \
   "已閱讀並同意" \
@@ -272,9 +259,9 @@ Var /GLOBAL zyFinishTitle
 !macroend
 
 ; ---------------------------------------------------------------------------
-; Hero page: brand header + tagline + install location + local inference
-; option + license agreement + primary Install action. Installer build only:
-; the uninstaller pass never declares $installLocalInference.
+; Hero page: brand header + tagline + install location + license agreement +
+; primary Install action. Installer build only: the uninstaller pass never
+; declares the hero globals.
 ; ---------------------------------------------------------------------------
 !ifndef BUILD_UNINSTALLER
 Function ZYHeroCreate
@@ -320,22 +307,6 @@ Function ZYHeroCreate
   Pop $0
   !insertmacro ZY_SetFont $0 ${ZY_FONT_BODY_SIZE} ${ZY_FONT_BUTTON_WT}
   ${NSD_OnClick} $0 ZYHeroBrowse
-
-  ${NSD_CreateCheckbox} ${ZY_ROW_X} ${ZY_HERO_INFER_Y} ${ZY_HERO_INFER_W} ${ZY_HERO_INFER_H} "$(ZY_UI_LOCAL_INFERENCE)"
-  Pop $heroInference
-  ${NSD_SetState} $heroInference ${BST_UNCHECKED}
-  !insertmacro ZY_SetFont $heroInference ${ZY_FONT_BODY_SIZE} ${ZY_FONT_BODY_WT}
-  !insertmacro ZY_LabelStyle $heroInference ${ZY_COLOR_TEXT}
-
-  ${NSD_CreateLabel} ${ZY_HERO_HINT_X} ${ZY_HERO_HINT_Y} ${ZY_HERO_HINT_W} ${ZY_HERO_HINT_H} "$(ZY_UI_LOCAL_INFERENCE_HINT)"
-  Pop $0
-  !insertmacro ZY_SetFont $0 ${ZY_FONT_HINT_SIZE} ${ZY_FONT_HINT_WT}
-  !insertmacro ZY_LabelStyle $0 ${ZY_COLOR_MUTED}
-
-  ${NSD_CreateLabel} ${ZY_HERO_HINT_X} ${ZY_HERO_HINT2_Y} ${ZY_HERO_HINT_W} ${ZY_HERO_HINT2_H} "$(ZY_UI_LOCAL_INFERENCE_HINT2)"
-  Pop $0
-  !insertmacro ZY_SetFont $0 ${ZY_FONT_HINT_SIZE} ${ZY_FONT_HINT_WT}
-  !insertmacro ZY_LabelStyle $0 ${ZY_COLOR_MUTED}
 
   ${NSD_CreateCheckbox} ${ZY_HERO_LICENSE_X} ${ZY_HERO_LICENSE_Y} ${ZY_HERO_LICENSE_W} ${ZY_HERO_LICENSE_H} "$(ZY_UI_LICENSE_AGREE)"
   Pop $heroLicense
@@ -431,7 +402,6 @@ Function ZYHeroLeave
   ${If} $0 != ${BST_CHECKED}
     Abort
   ${EndIf}
-  ${NSD_GetState} $heroInference $installLocalInference
   ; Leaving the hero page commits the user to installing, so the destructive
   ; pre-extraction steps run here rather than in .onInit.
 !ifndef ZY_PREVIEW
@@ -595,8 +565,8 @@ FunctionEnd
 !endif ; !BUILD_UNINSTALLER
 
 ; ---------------------------------------------------------------------------
-; Finish page (installer build only; reuses $installLocalInference-era
-; defines such as APP_EXECUTABLE_FILENAME from the installer pass).
+; Finish page (installer build only; reuses installer-pass defines such as
+; APP_EXECUTABLE_FILENAME from the installer pass).
 ; ---------------------------------------------------------------------------
 !ifndef BUILD_UNINSTALLER
 Function ZYFinishCreate
