@@ -21,6 +21,30 @@ type Job = {
 const read = (file: string) =>
   load(readFileSync(`.github/workflows/${file}`, 'utf8')) as { jobs: Record<string, Job> };
 
+test('GitHub asset recovery verifies the original run without rebuilding installers', () => {
+  const release = load(readFileSync('.github/workflows/release.yml', 'utf8')) as {
+    jobs: Record<string, Job & { if?: string }>;
+    on: Record<string, unknown>;
+  };
+  expect(release.on.workflow_dispatch).toBeDefined();
+  expect(release.jobs['prepare-release'].if).toBe("github.event_name == 'push'");
+  const recovery = release.jobs['recover-github-prerelease'];
+  expect(recovery.if).toBe("github.event_name == 'workflow_dispatch'");
+  const verify = recovery.steps.findIndex(step =>
+    step.run?.includes('verify-github-release-recovery.mjs'),
+  );
+  const download = recovery.steps.findIndex(step => step.uses === 'actions/download-artifact@v8');
+  expect(verify).toBeGreaterThan(-1);
+  expect(download).toBeGreaterThan(verify);
+  expect(recovery.steps[download].with?.['run-id']).toBe('${{ steps.recovery.outputs.run-id }}');
+  expect(recovery.steps.map(step => step.run ?? '').join('\n')).not.toMatch(
+    /bun run|electron-builder|dist:win/,
+  );
+  expect(recovery.steps.some(step => step.run?.includes('collect-github-release-assets.mjs'))).toBe(
+    true,
+  );
+});
+
 test('acceptance downloads the checkpoint and never rebuilds or signs installers', () => {
   const { build, acceptance, 'cuda-runtime': cuda } = read('build-inference-editions.yml').jobs;
   expect(acceptance.needs).toContain('build');
