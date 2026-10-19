@@ -383,9 +383,9 @@ test('manual installer workflow delegates to the shared extended acceptance', ()
   assert.match(sizeSmoke, /\$_\.archiveSizeBytes/);
   assert.doesNotMatch(sizeSmoke, /\$_\.archiveBytes\b/);
   assert.match(sizeSmoke, /component archive bytes/);
-  assert.match(sizeSmoke, /MaximumInstallerBytes = 450MB/);
-  assert.match(sizeSmoke, /MaximumComponentBytes = 300MB/);
-  assert.match(sizeSmoke, /MaximumNonComponentBytes = 150MB/);
+  assert.doesNotMatch(sizeSmoke, /Maximum\w+Bytes/);
+  assert.match(sizeSmoke, /\$uncapped = \$true/);
+  assert.match(sizeSmoke, /\$nsisComponentBytes = \$componentBytes/);
 });
 
 test('tag release publishes beta and archives build metadata for promotion', () => {
