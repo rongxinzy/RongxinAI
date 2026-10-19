@@ -13,6 +13,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 started from pwsh inherits PowerShell 7's PSModulePath
+# and then cannot autoload its own security module (no Cert: drive, no
+# Get-AuthenticodeSignature). Load the module that ships with this host.
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1') -ErrorAction Stop
 
 $normalizedThumbprint = (
   $ExpectedThumbprint -replace '[^0-9A-Fa-f]', ''

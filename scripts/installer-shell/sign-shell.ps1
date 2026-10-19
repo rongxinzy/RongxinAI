@@ -4,6 +4,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 started from pwsh inherits PowerShell 7's PSModulePath
+# and then cannot autoload its own security module (no Cert: drive, no
+# Get-AuthenticodeSignature). Load the module that ships with this host.
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1') -ErrorAction Stop
 # Reuse the protected SimplySign certificate and the repository's existing
 # SHA-256 / RFC3161 Certum signing implementation. No new credentials or store.
 & (Join-Path $PSScriptRoot '..\runtime-signing\sign-runtime.ps1') `

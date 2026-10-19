@@ -2,12 +2,13 @@ import {
   LINUX_INFERENCE_VARIANTS,
   MACOS_INFERENCE_VARIANTS,
   WINDOWS_INFERENCE_VARIANTS,
+  resolveReleasePlatforms,
 } from './inference-edition-targets.mjs';
 
 /** @typedef {{ bundleId: string; manifestName: string }} ReleaseCandidateBundle */
 
 /** @returns {ReleaseCandidateBundle[]} */
-export function listReleaseCandidateBundles() {
+export function listReleaseCandidateBundles(platforms = resolveReleasePlatforms()) {
   /** @type {ReleaseCandidateBundle[]} */
   const bundles = [];
   // lite is Windows-only; Linux ships cpu + cuda; macOS ships cpu per arch.
@@ -31,5 +32,5 @@ export function listReleaseCandidateBundles() {
       });
     }
   }
-  return bundles;
+  return bundles.filter(({ bundleId }) => platforms.has(bundleId.split('-')[0]));
 }
