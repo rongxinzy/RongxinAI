@@ -29,7 +29,7 @@ import { registerCoworkSessionAdminIpc } from './coworkIpc/sessionAdmin';
 import { registerArtifactIpc } from './artifactLedger/artifactIpc';
 import { registerCoworkExportIpc } from './coworkIpc/export';
 import { registerCoworkConfigIpc } from './coworkIpc/config';
-import { registerAgentIpc } from './appBootstrap/agentIpc';
+import { registerAgentIpc } from './agentIpc';
 import { registerScheduledTaskIpc } from '../scheduledTask/ipc';
 import {
   getActivityService,
@@ -48,6 +48,8 @@ import {
   getCanonicalScheduledTaskService,
   getIMGatewayManager,
 } from './appBootstrap/ccConnectRuntime';
+import { bumpCodingCommandCatalog } from './appBootstrap/codingRoomRuntime';
+import { resolveDefaultAgentModelRef } from './appBootstrap/defaultAgentModel';
 import { registerPermissionsIpc } from './appBootstrap/permissionsIpc';
 import { registerImGatewayIpc } from './appBootstrap/imGatewayIpc';
 import { registerImInstanceIpc } from './appBootstrap/imInstanceIpc';
@@ -109,7 +111,15 @@ if (!gotTheLock) {
     getSkillManager,
     getPiRuntimeAdapter,
   });
-  registerAgentIpc();
+  registerAgentIpc({
+    getAgentManager,
+    getCoworkStore,
+    getSkillManager,
+    getStore,
+    getIMGatewayManager,
+    bumpCodingCommandCatalog,
+    resolveDefaultAgentModelRef,
+  });
   registerScheduledTaskIpc({
     getActivityService,
     getScheduledTaskService: getCanonicalScheduledTaskService,
