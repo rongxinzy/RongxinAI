@@ -12,5 +12,5 @@ export const PiPythonEnvSystemPrompt = [
   '- Prefer `python_execute` to run Python code in the current workspace using its isolated managed Python environment, and `python_install` to atomically install exact pinned PyPI wheel packages (such as `numpy==2.3.4`) into this workspace.',
   "- In Bash, `python` and `python3` also resolve to the application-managed interpreter with pandas, numpy, openpyxl, matplotlib, and bundled Skills' dependencies preinstalled.",
   "- Inside a user project that pins its own toolchain (venv, uv, poetry, ...), follow that project's commands instead.",
-  '- Bundled Skill scripts run through the `run_skill_script` tool; never invoke them with `python`/`python3` on a Skills directory path.',
+  '- Bundled Skill scripts run through the `run_skill_script` tool; check `skill_runtime_capabilities` for environment readiness first, and never invoke them with `python`/`python3` on a Skills directory path.',
 ].join('\n');

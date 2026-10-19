@@ -49,6 +49,14 @@ export const normalizePiBashTimeoutSeconds = (timeout: unknown): number => {
  * run_skill_script tool so the per-Skill dependency gate applies.
  * Workspace Python execution and package installation use python_execute
  * and python_install, so bash no longer intercepts pip/uv commands.
+ *
+ * Work-package G re-evaluation (2026-10): KEEP this gate. It is narrow —
+ * only a `python`/`python3` invocation referencing the Skills root is
+ * blocked — and it protects a real failure mode, not a style rule: bundled
+ * Skill scripts depend on the shared dependency layer and the
+ * run_skill_script harness (requirements manifest gate, timeouts, output
+ * caps); a bare-shell invocation burns a turn on missing-dependency errors
+ * after the fact. General shell python stays untouched.
  */
 export const getPiBashPythonEnvViolation = (
   command: string,
