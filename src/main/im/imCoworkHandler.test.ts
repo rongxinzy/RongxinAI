@@ -8,6 +8,7 @@ import { t } from '../i18n';
 import { ActivityStatus } from '../../shared/activity/constants';
 import { CoworkSessionSource } from '../../shared/cowork/constants';
 import { IMCoworkHandler } from './imCoworkHandler';
+import { getCcConnectScopedConversationId } from './ccConnectConversationId';
 
 const electronMocks = vi.hoisted(() => ({
   send: vi.fn(),
@@ -296,6 +297,42 @@ test('reminder requests run through the agent and register scheduled-task delive
 
   handler.destroy();
   expect(runtime.deliveryResolvers.length).toBe(0);
+});
+
+test('scoped cc-connect conversations resolve delivery with account and native id', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore,
+  });
+
+  const scopedId = getCcConnectScopedConversationId('acct-7', 'native-conv-9');
+  const pending = handler.processMessage(
+    createMessage({ conversationId: scopedId, content: '5分钟后提醒我复盘' }),
+    undefined,
+    'workspace-1',
+  );
+  await new Promise(resolve => setImmediate(resolve));
+
+  // The session→conversation mapping must already be registered when the
+  // scheduled_task tool snapshots its default delivery at session launch.
+  const [session] = [...coworkStore.sessions.values()];
+  expect(session).toBeTruthy();
+  const delivery = runtime.deliveryResolvers[0](session.id as string) as Record<string, unknown>;
+  expect(delivery).toMatchObject({
+    mode: 'announce',
+    channel: 'dingtalk',
+    to: 'native-conv-9',
+    accountId: 'acct-7',
+  });
+
+  runtime.emit('complete', session.id as string);
+  await pending;
+  handler.destroy();
 });
 
 test.skip('async reminder turns on IM-created sessions relay back to the original IM conversation', async () => {

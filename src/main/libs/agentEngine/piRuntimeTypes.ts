@@ -249,6 +249,10 @@ export interface PiRuntime {
    * Resolves the delivery scheduled tasks created in a session default to
    * (IM chats announce back to their conversation); returns an unregister
    * function. Optional so test doubles can omit it.
+   *
+   * Single slot: a later registration silently replaces the earlier one. Only
+   * one component (the IM cowork handler) owns the slot today; if a second
+   * owner ever appears, switch this to a resolver set.
    */
   setScheduledTaskDeliveryResolver?(
     resolver: (
