@@ -35,21 +35,23 @@ Windows Skill Python is finalized as a standalone interpreter inside the shared 
 
 ```mermaid
 flowchart LR
-  Source[Immutable source] --> Components[Shared Windows components + compression qualification]
+  Source[Immutable source] --> Components[Shared Windows components]
   Source --> CUDA[Pinned CUDA runtime]
   Components --> Package[Package and sign each target]
+  Components --> Compression[Qualify exact compression fingerprint]
   CUDA --> Package
   Package --> Checkpoint[Same-run package checkpoint]
   Checkpoint --> Acceptance[Independent platform acceptance]
+  Compression --> Acceptance
   Source --> Quality[Quality + memory checks]
   Acceptance --> Publish[Publish verified candidates]
   Quality --> Publish
 ```
 
-- Windows common resources, Skills and component archives have one producer for lite/cpu/cuda. Packaging rechecks content IDs, archive hashes and runtime pins; an unchanged archive is not compressed again. Compression qualification is reused only for the identical archive, source content ID, compressor and qualification script. Python probes and extraction thresholds remain mandatory on a new fingerprint.
+- Windows common resources, Skills and component archives have one producer for lite/cpu/cuda. Packaging rechecks content IDs, archive hashes and runtime pins; an unchanged archive is not compressed again. Compression qualification runs independently in parallel with packaging and is reused only for the identical archive, source content ID, compressor and qualification script. Acceptance downloads the report after restoring the package and verifies its fingerprint against the actual packaged component. Python probes and extraction thresholds remain mandatory on a new fingerprint.
 - CUDA compilation runs in parallel with common preparation. Its cache includes the source/build scripts, CUDA/SM profile, runner image and runtime pins. Every cached file is checked before transfer. Cache eviction causes a rebuild; a cache hit is never a release acceptance result.
 - Packaging uploads an uncompressed TAR checkpoint **before** acceptance. TAR preserves symlinks/executable modes. Source SHA, run ID, target, version and archive SHA-256 are verified before extraction on a fresh runner. Only acceptance creates `release-candidate-*` artifacts; publishing still verifies identity and completeness.
-- Use **Re-run failed jobs** when acceptance fails: successful producer/package jobs and their checkpoints are retained, so no recompilation/signing is needed. Re-running all jobs deliberately rebuilds; do not run competing attempts concurrently. Checkpoints expire after 14 days, common/CUDA artifacts after 7 days. GitHub retention owns expiration; the old blanket seven-day artifact deletion job is removed.
+- Use **Re-run failed jobs** when acceptance fails: successful producer/package jobs and their checkpoints are retained, so no recompilation/signing is needed. Re-running all jobs deliberately rebuilds; do not run competing attempts concurrently. Checkpoints and qualification reports expire after 14 days, common/CUDA artifacts after 7 days. GitHub retention owns expiration; the old blanket seven-day artifact deletion job is removed.
 - Each Windows check propagates its own exit code. Installer timing logs and process IDs/names are saved before bounded cleanup, and diagnostics are named by target and run attempt. Failed or cancelled targets cannot cancel other matrix legs. Missing artifacts or invalid/missing plans fail closed.
 - `compile:electron` remains an explicit developer command. Production packaging emits JS through Vite once; `typecheck:electron` is no-emit and never rebuilds native modules. Node tests cache SQLite/PTY output by Node version/ABI, runner image, lockfile and patches, always probe it before use, and rebuild only missing/incompatible modules. Electron packaging/memory tests explicitly own the Electron ABI.
 

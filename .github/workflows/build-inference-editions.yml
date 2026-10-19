@@ -244,6 +244,7 @@ jobs:
           retention-days: 7
 
   windows-components:
+    needs: plan-matrix
     if: inputs.build-windows
     runs-on: windows-latest
     timeout-minutes: 35
@@ -280,7 +281,7 @@ jobs:
           bun run engram:runtime:win-x64
           bun run build:skills
           node scripts/ci/prepare-windows-components.cjs
-      - name: Save health-checked component output before qualification and transfer
+      - name: Save health-checked component output before transfer
         if: steps.components.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
@@ -294,10 +295,6 @@ jobs:
             vendor/engram-runtime
             build-tar/windows-components
           key: ${{ steps.components.outputs.cache-primary-key }}
-      - name: Qualify shared compression once
-        uses: ./.github/actions/verify-windows-compression
-        with:
-          artifact-suffix: common-${{ github.run_attempt }}
       - name: Archive prepared resources
         shell: bash
         run: >-
@@ -313,6 +310,27 @@ jobs:
           if-no-files-found: error
           overwrite: true
           retention-days: 7
+
+  compression-qualification:
+    needs: windows-components
+    if: inputs.build-windows
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+      - uses: ./.github/actions/setup-bun-workspace
+      - uses: actions/download-artifact@v6
+        with:
+          name: windows-common-${{ github.run_id }}
+          path: prepared-resources
+      - name: Restore the exact shared component inputs
+        run: node scripts/ci/build-checkpoint.mjs restore prepared-resources windows-common
+      - name: Qualify shared compression in parallel with packaging
+        uses: ./.github/actions/verify-windows-compression
+        with:
+          artifact-suffix: common-${{ github.run_id }}
 
   build:
     needs: [plan-matrix, windows-components, cuda-runtime]
@@ -364,7 +382,9 @@ jobs:
             ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
             vendor/channel-runtime
-          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          # Cache only downloaded dependencies and these two runtime producers.
+          # Editing a CI test must not upload the multi-GB cache again.
+          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/download-engram-runtime.cjs', 'scripts/download-channel-runtime.cjs', 'scripts/channel-runtime-host.cjs') }}
           restore-keys: |
             packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
       - name: Install Electron system dependencies
@@ -565,7 +585,7 @@ jobs:
           retention-days: 14
 
   acceptance:
-    needs: [plan-matrix, build]
+    needs: [plan-matrix, build, compression-qualification]
     # Accept successful targets even if another build fails; missing artifacts fail closed.
     if: ${{ !cancelled() && needs.plan-matrix.result == 'success' }}
     strategy:
@@ -596,6 +616,12 @@ jobs:
         env:
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
         run: node scripts/ci/build-checkpoint.mjs restore package-checkpoint '${{ matrix.target }}'
+      - name: Download the independent compression qualification
+        if: matrix.platform == 'windows'
+        uses: actions/download-artifact@v6
+        with:
+          name: windows-compression-common-${{ github.run_id }}
+          path: build-tar/windows-components
       - name: Install Linux acceptance libraries
         if: matrix.platform == 'linux'
         run: |

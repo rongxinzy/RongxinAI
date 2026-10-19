@@ -60,6 +60,25 @@ test('a Windows size error cannot be overwritten by a later native command', () 
   }
 });
 
+test('compression qualification overlaps packaging and is bound before acceptance', () => {
+  const jobs = read('build-inference-editions.yml').jobs;
+  expect(jobs['windows-components'].needs).toBe('plan-matrix');
+  expect(jobs['compression-qualification'].needs).toBe('windows-components');
+  expect(jobs.build.needs).toContain('windows-components');
+  expect(jobs.build.needs).not.toContain('compression-qualification');
+  expect(jobs.acceptance.needs).toContain('compression-qualification');
+  const steps = jobs.acceptance.steps;
+  const restore = steps.findIndex(step => step.run?.includes('restore package-checkpoint'));
+  const report = steps.findIndex(
+    step => step.with?.name === 'windows-compression-common-${{ github.run_id }}',
+  );
+  const verify = steps.findIndex(
+    step => step.run === 'node scripts/ci/compression-qualification.cjs verify',
+  );
+  expect(report).toBeGreaterThan(restore);
+  expect(verify).toBeGreaterThan(report);
+});
+
 test('directory smoke cannot bypass release or extended installer acceptance', () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'matrix-plan-'));
   try {

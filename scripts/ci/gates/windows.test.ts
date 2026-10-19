@@ -49,10 +49,10 @@ test('manual install workflows share the edition pipeline and retain their exten
   }
 });
 
-test('one compression producer gates packaging and acceptance validates its exact bytes', () => {
+test('one compression qualifier gates acceptance of the exact packaged bytes', () => {
   const editions = workflow('build-inference-editions.yml');
   expect(
-    editions.jobs['windows-components'].steps.some(step => step.uses === compressionAction),
+    editions.jobs['compression-qualification'].steps.some(step => step.uses === compressionAction),
   ).toBe(true);
   expect(editions.jobs.build.steps.some(step => step.uses === compressionAction)).toBe(false);
   const acceptance = editions.jobs.acceptance.steps;
@@ -79,5 +79,6 @@ test('shared qualification fails on thresholds and retains reports without hidin
   expect(action.runs.steps.every(step => !step['continue-on-error'])).toBe(true);
   const upload = action.runs.steps.find(step => step.uses === 'actions/upload-artifact@v6');
   expect(upload?.if).toBe('always()');
-  expect(upload?.with?.['retention-days']).toBe(3);
+  expect(upload?.with?.['retention-days']).toBe(14);
+  expect(upload?.with?.overwrite).toBe(true);
 });

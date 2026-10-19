@@ -43,4 +43,5 @@ runs:
         name: windows-compression-${{ inputs.artifact-suffix }}
         path: build-tar/windows-components/skill-python-compression-benchmark.json
         if-no-files-found: warn
-        retention-days: 3
+        overwrite: true
+        retention-days: 14
