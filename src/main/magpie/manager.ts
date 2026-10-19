@@ -915,7 +915,7 @@ export class MagpieManager {
   private async managementJson(
     route: string,
     init: RequestInit = {},
-  ): Promise<Record<string, any>> {
+  ): Promise<Record<string, unknown>> {
     const response = await this.webRequest(route, init);
     const text = await response.text();
     if (!response.ok)

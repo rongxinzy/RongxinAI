@@ -94,12 +94,12 @@ export const WecomPanel: React.FC<WecomPanelProps> = ({
             dispatch(
               setWecomInstanceConfig({
                 instanceId: activeInstanceId,
-                config: { instanceName: newName } as any,
+                config: { instanceName: newName },
               }),
             );
             await imService.persistWecomInstanceConfig(activeInstanceId, {
               instanceName: newName,
-            } as any);
+            });
           }}
           onDelete={async () => {
             await imService.deleteWecomInstance(activeInstanceId);

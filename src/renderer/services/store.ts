@@ -14,7 +14,7 @@ class LocalStoreService implements LocalStore {
   async getItem<T>(key: string): Promise<T | null> {
     try {
       const value = await window.electron.store.get(key);
-      return value ?? null;
+      return (value ?? null) as T | null;
     } catch (error) {
       console.error('Failed to get item from store:', error);
       return null;

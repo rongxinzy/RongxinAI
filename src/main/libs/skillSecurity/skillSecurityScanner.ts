@@ -206,17 +206,31 @@ function auditPackageJson(pkgPath: string, relativePath: string): SecurityFindin
 
 // ── js-x-ray engine ──────────────────────────────────────────────────────────
 
-let jsxrayModule: any = null;
+/** Structural slice of @nodesecure/js-x-ray (the package ships no types). */
+interface JsxrayWarning {
+  kind: string;
+  value?: unknown;
+  source?: unknown;
+  location?: Array<{ start?: { line?: number } }> | { start?: { line?: number } };
+}
+
+interface JsxrayModule {
+  AstAnalyser: new (options: { sensitivity: string }) => {
+    analyse(content: string, options: { module: boolean }): { warnings?: JsxrayWarning[] };
+  };
+}
+
+let jsxrayModule: JsxrayModule | null = null;
 let jsxrayLoadFailed = false;
 
-async function loadJsxray(): Promise<any> {
+async function loadJsxray(): Promise<JsxrayModule | null> {
   if (jsxrayModule) return jsxrayModule;
   if (jsxrayLoadFailed) return null;
   try {
     // Use indirect import() to prevent tsc from converting it to require().
     // js-x-ray is ESM-only; CJS require() cannot load it.
     const dynamicImport = new Function('specifier', 'return import(specifier)');
-    jsxrayModule = await dynamicImport('@nodesecure/js-x-ray');
+    jsxrayModule = (await dynamicImport('@nodesecure/js-x-ray')) as JsxrayModule;
     return jsxrayModule;
   } catch (err) {
     console.warn('[SkillSecurity] Failed to load @nodesecure/js-x-ray:', err);

@@ -67,23 +67,23 @@ export function initLogger(): void {
   const originalInfo = console.info;
   const originalDebug = console.debug;
 
-  console.log = (...args: any[]) => {
+  console.log = (...args: unknown[]) => {
     originalLog.apply(console, args);
     log.info(...args);
   };
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     originalError.apply(console, args);
     log.error(...args);
   };
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     originalWarn.apply(console, args);
     log.warn(...args);
   };
-  console.info = (...args: any[]) => {
+  console.info = (...args: unknown[]) => {
     originalInfo.apply(console, args);
     log.info(...args);
   };
-  console.debug = (...args: any[]) => {
+  console.debug = (...args: unknown[]) => {
     originalDebug.apply(console, args);
     log.debug(...args);
   };
