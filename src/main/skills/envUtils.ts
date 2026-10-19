@@ -2,7 +2,7 @@ import { app } from 'electron';
 
 import { getElectronNodeRuntimePath } from '../libs/coworkUtil';
 import { appendPythonRuntimeToEnv } from '../libs/pythonRuntime';
-import { runCommandCapture } from './processRunner';
+import { runCommandCapture, extractErrorMessage } from './processRunner';
 
 /**
  * Resolve the user's login shell PATH on macOS/Linux.
@@ -42,8 +42,10 @@ export async function hasCommand(command: string, env: NodeJS.ProcessEnv): Promi
       timeoutMs: 5000,
     });
     return true;
-  } catch {
-    console.log(`[skills] hasCommand('${command}'): not found`);
+  } catch (error) {
+    console.log(
+      `[skills] hasCommand('${command}'): not found (${extractErrorMessage(error)})`,
+    );
     return false;
   }
 }

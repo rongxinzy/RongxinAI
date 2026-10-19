@@ -112,7 +112,28 @@ function repairSkillFromBundled(bundledRoot: string, skillId: string, skillDir: 
   }
 }
 
-export async function ensureSkillDirDependencies(
+/**
+ * One install per skill dir. The node_modules existence check and the npm
+ * install are not atomic; now that the flow is async, two concurrent callers
+ * could interleave and the second would see a half-built node_modules and
+ * "succeed". Concurrent callers share the in-flight promise instead.
+ */
+const inFlightInstallsByDir = new Map<string, Promise<{ success: boolean; error?: string }>>();
+
+export function ensureSkillDirDependencies(
+  skillDir: string,
+  bundledRoot: string,
+): Promise<{ success: boolean; error?: string }> {
+  const inFlight = inFlightInstallsByDir.get(skillDir);
+  if (inFlight) return inFlight;
+  const pending = installSkillDirDependencies(skillDir, bundledRoot).finally(() => {
+    inFlightInstallsByDir.delete(skillDir);
+  });
+  inFlightInstallsByDir.set(skillDir, pending);
+  return pending;
+}
+
+async function installSkillDirDependencies(
   skillDir: string,
   bundledRoot: string,
 ): Promise<{ success: boolean; error?: string }> {
