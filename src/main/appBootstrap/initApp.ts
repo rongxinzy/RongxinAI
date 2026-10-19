@@ -493,8 +493,16 @@ export const initApp = async (): Promise<void> => {
       });
     }
 
+    // Construct the canonical scheduler eagerly. getCanonicalScheduledTaskService
+    // is the only place that injects the service into the Pi adapter
+    // (setScheduledTaskService); without this call it would only be built
+    // lazily by the first scheduled-task IPC request or the cc-connect sidecar
+    // cron attach, and Work sessions started before either (sidecar missing,
+    // in crash backoff, or racing startup) would silently lack the
+    // scheduled_task tool. The old startPolling() call covered this by
+    // accident; the polling itself was a no-op and stays removed.
     try {
-      getCronJobService().startPolling();
+      getCronJobService();
     } catch (error) {
       console.warn('[Main] Canonical scheduler not available after startup:', error);
     }
