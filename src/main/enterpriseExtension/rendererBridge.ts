@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { isPathInside } from '../pathContainment';
 import {
   ZHIYUAN_ENTERPRISE_RENDERER_CAPABILITY_API_VERSION,
   ZHIYUAN_ENTERPRISE_SETTINGS_CAPABILITY_API_VERSION,
@@ -174,6 +175,10 @@ function normalizeRelativePath(value: unknown): string {
     path.win32.isAbsolute(value) ||
     path.posix.isAbsolute(normalized) ||
     normalized.includes('\0') ||
+    // A drive-relative segment ('D:' / 'D:evil') is not win32.isAbsolute, but
+    // path.resolve still switches drives on it — reject it before it can
+    // escape the root on Windows.
+    normalized.split('/').some(segment => /^[a-zA-Z]:/.test(segment)) ||
     normalized.split('/').some(segment => segment === '..' || segment.length === 0)
   ) {
     throw new Error('Zhiyuan enterprise renderer entrypoint must be a safe relative path.');
@@ -221,6 +226,8 @@ function realDirectory(directory: string): string {
 }
 
 function isWithin(rootDirectory: string, candidate: string): boolean {
-  const relative = path.relative(rootDirectory, candidate);
-  return relative.length > 0 && !relative.startsWith(`..${path.sep}`) && relative !== '..';
+  // Strictly inside, and cross-drive relatives (which path.relative returns
+  // as absolute paths on win32) must count as outside — the shared helper
+  // rejects those; the previous local version let them through.
+  return path.relative(rootDirectory, candidate) !== '' && isPathInside(candidate, rootDirectory);
 }
