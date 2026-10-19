@@ -3,6 +3,18 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createOllama(runtime: BrowserMockRuntime): Window['electron']['ollama'] {
   return {
+    onStatusChanged: _p0 => {
+      return runtime.subscribe('ollama.onStatusChanged', _p0);
+    },
+    onInstallProgress: _p0 => {
+      return runtime.subscribe('ollama.onInstallProgress', _p0);
+    },
+    onPullProgress: _p0 => {
+      return runtime.subscribe('ollama.onPullProgress', _p0);
+    },
+    onChatStreamChunk: _p0 => {
+      return runtime.subscribe('ollama.onChatStreamChunk', _p0);
+    },
     status: async () => {
       runtime.warnOnce('ollama.status');
       return {
@@ -76,9 +88,8 @@ export function createOllama(runtime: BrowserMockRuntime): Window['electron']['o
       runtime.warnOnce('ollama.showModel');
       return {};
     },
-    createModel: async (_p0, _p1) => {
+    createModel: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('ollama.createModel');
       return {
         success: true,
@@ -120,9 +131,8 @@ export function createOllama(runtime: BrowserMockRuntime): Window['electron']['o
       runtime.warnOnce('ollama.chat');
       return {};
     },
-    chatStream: async (_p0, _p1) => {
+    chatStream: async _p0 => {
       void _p0;
-      void _p1;
       runtime.warnOnce('ollama.chatStream');
       return {
         success: true,
@@ -135,18 +145,6 @@ export function createOllama(runtime: BrowserMockRuntime): Window['electron']['o
         success: true,
         cancelled: false,
       };
-    },
-    onStatusChanged: _p0 => {
-      return runtime.subscribe('ollama.onStatusChanged', _p0);
-    },
-    onInstallProgress: _p0 => {
-      return runtime.subscribe('ollama.onInstallProgress', _p0);
-    },
-    onPullProgress: _p0 => {
-      return runtime.subscribe('ollama.onPullProgress', _p0);
-    },
-    onChatStreamChunk: _p0 => {
-      return runtime.subscribe('ollama.onChatStreamChunk', _p0);
     },
   };
 }
