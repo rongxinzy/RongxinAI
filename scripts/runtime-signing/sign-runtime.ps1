@@ -6,6 +6,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 if ($TargetOS -ne 'windows') { return }
+# Windows PowerShell 5.1 started from pwsh inherits PowerShell 7's PSModulePath
+# and then cannot autoload its own security module (no Cert: drive). Load the
+# module that ships with this host.
+Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1') -ErrorAction Stop
 $thumbprint = ($ExpectedThumbprint -replace '\s', '').ToUpperInvariant()
 if ($thumbprint -notmatch '^[0-9A-F]{40}$') {
   throw 'The Certum signing certificate SHA-1 thumbprint must be configured.'
@@ -13,10 +17,17 @@ if ($thumbprint -notmatch '^[0-9A-F]{40}$') {
 if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
   throw "Windows runtime to sign was not found: $Path"
 }
-$certificates = @(
-  Get-ChildItem Cert:\CurrentUser\My |
-    Where-Object { $_.Thumbprint.ToUpperInvariant() -eq $thumbprint }
-)
+# Read the store through .NET so lookup does not depend on the Cert: provider.
+$store = New-Object System.Security.Cryptography.X509Certificates.X509Store('My', 'CurrentUser')
+$store.Open([System.Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
+try {
+  $certificates = @(
+    $store.Certificates |
+      Where-Object { $_.Thumbprint.ToUpperInvariant() -eq $thumbprint }
+  )
+} finally {
+  $store.Close()
+}
 if ($certificates.Count -ne 1 -or -not $certificates[0].HasPrivateKey) {
   throw 'The configured Certum certificate and cloud private key must be available.'
 }

@@ -20,6 +20,11 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   R2_BUCKET: zhiyuan-releases
+  # Windows-only hotfix release (krli, 2026-10-19): macOS and Linux are split
+  # out until their packaging is fixed. Publish, smoke and GitHub assets all
+  # read this through scripts/release/inference-edition-targets.mjs; keep it
+  # in sync with build-macos/build-linux below and with promote.yml.
+  ZHIYUAN_RELEASE_PLATFORMS: win32
 
 jobs:
   prepare-release:
@@ -138,6 +143,8 @@ jobs:
       app-build-version: ${{ needs.prepare-release.outputs.version }}
       mode: release
       fail-fast: true
+      build-macos: false
+      build-linux: false
     secrets:
       CERTUM_USER_ID: ${{ secrets.CERTUM_USER_ID }}
       CERTUM_OTP_URI: ${{ secrets.CERTUM_OTP_URI }}

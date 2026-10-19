@@ -11,12 +11,33 @@ export const LINUX_INFERENCE_VARIANTS = ['cpu', 'cuda'];
 /** @type {InferenceEditionVariant[]} */
 export const MACOS_INFERENCE_VARIANTS = ['cpu'];
 
+export const RELEASE_PLATFORMS = ['win32', 'linux', 'darwin'];
+
+/**
+ * Platforms a release publishes. ZHIYUAN_RELEASE_PLATFORMS (comma-separated
+ * win32,linux,darwin) narrows a release to a subset, e.g. a Windows-only
+ * hotfix; unset means every platform.
+ * @returns {Set<string>}
+ */
+export function resolveReleasePlatforms(env = process.env) {
+  const raw = (env.ZHIYUAN_RELEASE_PLATFORMS ?? '').trim();
+  if (!raw) return new Set(RELEASE_PLATFORMS);
+  const platforms = new Set(raw.split(',').map(value => value.trim()).filter(Boolean));
+  for (const platform of platforms) {
+    if (!RELEASE_PLATFORMS.includes(platform)) {
+      throw new Error(`Unsupported ZHIYUAN_RELEASE_PLATFORMS entry: ${platform}`);
+    }
+  }
+  if (platforms.size === 0) throw new Error('ZHIYUAN_RELEASE_PLATFORMS selects no platform');
+  return platforms;
+}
+
 /**
  * Stable release targets for signed update manifests.
  * Linux ships deb + AppImage per inference edition (cpu, cuda); macOS ships
  * cpu per arch; Windows ships lite, cpu and cuda.
  */
-export function listRequiredReleaseTargets() {
+export function listRequiredReleaseTargets(platforms = resolveReleasePlatforms()) {
   /** @type {string[]} */
   const targets = [];
   for (const variant of WINDOWS_INFERENCE_VARIANTS) {
@@ -31,7 +52,7 @@ export function listRequiredReleaseTargets() {
       targets.push(`darwin:${arch}:${edition}`);
     }
   }
-  return targets;
+  return targets.filter(target => platforms.has(target.split(':')[0]));
 }
 
 export const REQUIRED_RELEASE_TARGETS = new Set(listRequiredReleaseTargets());
