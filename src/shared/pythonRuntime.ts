@@ -24,6 +24,16 @@ export type PythonRunnerRequest = {
   input: PythonExecuteInput | PythonInstallInput;
   storageRoot: string;
   jobRunnerPath?: string;
+  /**
+   * The bundled managed runtime (work package G): absolute interpreter and uv
+   * paths from the packaged build. The runner never downloads a runtime —
+   * when this is absent the operation fails with a reinstall hint.
+   */
+  preinstalledRuntime?: {
+    pythonPath: string;
+    uvPath: string;
+    runtimeId: string;
+  };
 };
 export type PythonRunnerResponse =
   | { success: true; result: PythonExecutionResult }
