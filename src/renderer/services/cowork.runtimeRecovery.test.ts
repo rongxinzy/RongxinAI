@@ -88,7 +88,6 @@ beforeEach(() => {
           return () => {};
         },
         onSessionsChanged: () => () => {},
-        onStreamContentPatch: () => () => {},
         getSession,
         getRuntimeSnapshots: async (id?: string) => snapshots.read(id),
         requestStreamResync: async () => true,

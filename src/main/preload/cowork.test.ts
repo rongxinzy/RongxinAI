@@ -84,7 +84,6 @@ describe('coworkApi contract invokers', () => {
     vi.spyOn(ipcRenderer, 'on').mockImplementation(on);
 
     expect(typeof coworkApi.cowork.onStreamRunState).toBe('function');
-    expect(typeof coworkApi.cowork.onStreamContentPatch).toBe('function');
     expect(typeof coworkApi.cowork.onStreamUiEvent).toBe('function');
     expect(typeof coworkApi.cowork.onSessionsChanged).toBe('function');
     expect(typeof coworkApi.workbenchTask.onChanged).toBe('function');

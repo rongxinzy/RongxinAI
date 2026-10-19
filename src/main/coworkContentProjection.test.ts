@@ -23,19 +23,6 @@ test('keeps growing past the old IPC cap with bounded frames and exact final met
   expect(gap).not.toHaveBeenCalled();
 });
 
-test('replays a full snapshot to a newly attached consumer', async () => {
-  const projection = new CoworkContentProjection();
-  await projection.project('a', 'm', 'hello');
-  expect((await projection.project('a', 'm', 'hello world'))[0]).toMatchObject({
-    offset: 0,
-    content: 'hello world',
-  });
-  const buffer = new CoworkContentBuffer(vi.fn());
-  const replay = await projection.replay('a');
-  expect(replay[0].offset).toBe(0);
-  expect(buffer.apply(replay[0])?.content).toBe('hello world');
-});
-
 test('detects dropped frames and rejects duplicates and stale revisions', async () => {
   const projection = new CoworkContentProjection();
   const gap = vi.fn();
@@ -44,10 +31,10 @@ test('detects dropped frames and rejects duplicates and stale revisions', async 
   buffer.apply(patches[0]);
   expect(buffer.apply(patches[2])).toBeNull();
   expect(gap).toHaveBeenCalledWith('a');
-  const replay = await projection.replay('a');
-  for (const patch of replay) buffer.apply(patch);
-  expect(buffer.apply(patches[0])).toBeNull();
-  expect(buffer.apply(replay.at(-1)!)).toBeNull();
+  // A fresh projection of the same message carries a new revision; a consumer
+  // that already applied the old frames rejects it as stale.
+  const reprojected = await projection.project('a', 'm', 'x'.repeat(150_000));
+  expect(buffer.apply(reprojected[0])).toBeNull();
 });
 
 test('a rewrite emits a fresh offset-zero snapshot', async () => {
@@ -62,16 +49,12 @@ test('a rewrite emits a fresh offset-zero snapshot', async () => {
   expect(update?.content).toBe('new'.repeat(50_000));
 });
 
-test('replay uses the latest content for each message', async () => {
+test('a fresh consumer accepts a full frame set on a new revision', async () => {
   const projection = new CoworkContentProjection();
-  await projection.project('a', 'first', 'first');
-  await projection.project('a', 'second', 'old');
-  await projection.project('a', 'second', 'new live content');
-  const frames = await projection.replay('a');
-  expect(
-    frames
-      .filter(frame => frame.messageId === 'second')
-      .map(frame => frame.content)
-      .join(''),
-  ).toBe('new live content');
+  await projection.project('a', 'm', 'first');
+  const frames = await projection.project('a', 'm', 'hello world');
+  const buffer = new CoworkContentBuffer(vi.fn());
+  let update;
+  for (const frame of frames) update = buffer.apply(frame) ?? update;
+  expect(update?.content).toBe('hello world');
 });
