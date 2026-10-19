@@ -55,7 +55,7 @@ describe('LiveTextStore', () => {
     const scheduler = new ManualNotifyScheduler();
     const store = new LiveTextStore(scheduler);
 
-    store.applyChunk('m1', { type: 'text-delta', id: 'p1', delta: 7 }, 's1');
+    store.applyChunk('m1', { type: 'text-delta', id: 'p1', delta: 7 as unknown as string }, 's1');
     expect(store.getSnapshot('m1')).toBeUndefined();
 
     store.resetSession('s1');

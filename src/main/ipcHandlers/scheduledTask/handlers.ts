@@ -44,8 +44,12 @@ export interface ScheduledTaskHandlerDeps {
  * and restores native pi-connect conversation IDs. Execution binding stays
  * independent from the delivery route.
  */
+type MutableScheduledTaskInput = Record<string, unknown> & {
+  delivery?: Record<string, unknown>;
+};
+
 async function applyAnnounceDeliveryNormalization(
-  normalizedInput: Record<string, any>,
+  normalizedInput: MutableScheduledTaskInput,
 ): Promise<void> {
   const delivery = normalizedInput.delivery;
   if (!(delivery && delivery.mode === STDeliveryMode.Announce && delivery.channel && delivery.to)) {
@@ -73,7 +77,7 @@ async function applyAnnounceDeliveryNormalization(
 }
 
 function cloneScheduledTaskInput<T>(input: T): T {
-  const normalized = { ...input } as Record<string, any>;
+  const normalized = { ...input } as MutableScheduledTaskInput;
   if (Object.hasOwn(normalized, 'delivery') && normalized.delivery) {
     normalized.delivery = { ...normalized.delivery };
   }
@@ -112,7 +116,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
       try {
         const taskInput = input as ScheduledTaskInput;
         const normalizedInput = cloneScheduledTaskInput(taskInput);
-        await applyAnnounceDeliveryNormalization(normalizedInput as Record<string, any>);
+        await applyAnnounceDeliveryNormalization(normalizedInput);
 
         const task = await getCronJobService().addJob(normalizedInput);
         console.log(`[ScheduledTask] created task ${task.id}`);
@@ -128,7 +132,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
     update: async (_event, id, input) => {
       try {
         const normalizedInput = cloneScheduledTaskInput(input as Partial<ScheduledTaskInput>);
-        await applyAnnounceDeliveryNormalization(normalizedInput as Record<string, any>);
+        await applyAnnounceDeliveryNormalization(normalizedInput);
 
         const task = await getCronJobService().updateJob(id, normalizedInput);
         console.log(`[ScheduledTask] updated task ${task.id}`);

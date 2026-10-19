@@ -112,12 +112,12 @@ export const DingTalkPanel: React.FC<DingTalkPanelProps> = ({
           dispatch(
             setDingTalkInstanceConfig({
               instanceId: activeInstanceId,
-              config: { instanceName: newName } as any,
+              config: { instanceName: newName },
             }),
           );
           await imService.persistDingTalkInstanceConfig(activeInstanceId, {
             instanceName: newName,
-          } as any);
+          });
         }}
         onDelete={async () => {
           await imService.deleteDingTalkInstance(activeInstanceId);

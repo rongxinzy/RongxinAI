@@ -31,7 +31,7 @@
     "no-control-regex": "off",
     "no-useless-escape": "off",
     "no-constant-condition": "off",
-    "typescript/no-explicit-any": "off",
+    "typescript/no-explicit-any": "warn",
     "typescript/no-require-imports": "off",
     "typescript/ban-ts-comment": "off",
     "react/rules-of-hooks": "error",

@@ -112,12 +112,12 @@ export const DiscordPanel: React.FC<DiscordPanelProps> = ({
           dispatch(
             setDiscordInstanceConfig({
               instanceId: activeInstanceId,
-              config: { instanceName: newName } as any,
+              config: { instanceName: newName },
             }),
           );
           await imService.persistDiscordInstanceConfig(activeInstanceId, {
             instanceName: newName,
-          } as any);
+          });
         }}
         onDelete={async () => {
           await imService.deleteDiscordInstance(activeInstanceId);
