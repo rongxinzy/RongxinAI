@@ -2,7 +2,6 @@ import { spawn } from 'child_process';
 import { session } from 'electron';
 import extractZip from 'extract-zip';
 import fs from 'fs';
-import JSZip from 'jszip';
 import path from 'path';
 
 import { NpmCli, resolveBundledNpmRuntime } from '../libs/npmRuntime';
@@ -274,17 +273,13 @@ export const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<
 };
 
 async function extractModelScopeZip(buffer: Buffer, destination: string): Promise<void> {
-  const archive = await JSZip.loadAsync(buffer);
-  for (const [entryName, entry] of Object.entries(archive.files)) {
-    const normalized = entryName.replace(/\\/g, '/').replace(/^\/+/, '');
-    if (!normalized || normalized.split('/').some(part => part === '..')) continue;
-    const target = path.resolve(destination, normalized);
-    if (!target.startsWith(path.resolve(destination) + path.sep)) continue;
-    if (entry.dir) {
-      fs.mkdirSync(target, { recursive: true });
-      continue;
-    }
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, await entry.async('nodebuffer'));
+  // extract-zip owns entry walking and path sanitization (zip-slip); hand it
+  // the archive on disk instead of reimplementing both over JSZip.
+  const zipPath = `${destination}.zip`;
+  fs.writeFileSync(zipPath, buffer);
+  try {
+    await extractZip(zipPath, { dir: destination });
+  } finally {
+    fs.rmSync(zipPath, { force: true });
   }
 }
