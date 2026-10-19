@@ -31,6 +31,8 @@ import {
 import { LlamaCppModelResidencyMode } from '../../../shared/llamacpp';
 import { t } from '../../i18n';
 import { LlamaCppManager } from '../../libs/llamacppManager';
+import { llamacppContract } from '../../../shared/ipc/llamacppContract';
+import { handleIpcContract, handleIpcContractSubset } from '../../ipc/handleIpcContract';
 import { createLlamaCppModelLaunchLogger } from '../../libs/llamacppModelLaunchLog';
 import { isLlamaCppLanAccessEnabled } from '../../magpie/lanAccess';
 import {
@@ -333,15 +335,20 @@ export function registerLlamaCppIpcHandlers(
     return installPromise;
   };
 
-  ipcMain.handle(LlamaCppIpcChannel.Status, async () => await getDedicatedServiceStatus());
-  ipcMain.handle(LlamaCppIpcChannel.Install, async () =>
+  const impls: Record<string, unknown> = {};
+  const registerImpl = (method: string, fn: unknown): void => {
+    impls[method] = fn;
+  };
+
+  registerImpl('status', async () => await getDedicatedServiceStatus());
+  registerImpl('install', async () =>
     runRuntimeInstall(signal => manager.installRuntime({ signal })),
   );
-  ipcMain.handle(
-    LlamaCppIpcChannel.GetRuntimeInstallSnapshot,
+  registerImpl(
+    'getRuntimeInstallSnapshot',
     (): LlamaCppRuntimeInstallSnapshot => runtimeInstallState.snapshot(),
   );
-  ipcMain.handle(LlamaCppIpcChannel.CancelRuntimeInstall, async () => {
+  registerImpl('cancelRuntimeInstall', async () => {
     const controller = runtimeInstallController;
     const install = activeRuntimeInstall;
     if (!controller || controller.signal.aborted || !install) {
@@ -352,23 +359,23 @@ export function registerLlamaCppIpcHandlers(
     const result = await install.catch((): RuntimeInstallResult | undefined => undefined);
     return { success: true as const, cancelled: Boolean(result?.cancelled) };
   });
-  ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => {
+  registerImpl('uninstallRuntime', async () => {
     await daemon.stopService();
     await updateRunningModelBindings([]);
     return await manager.uninstallRuntime();
   });
-  ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async (_event, input: unknown) => {
+  registerImpl('listRuntimeDevices', async (_event: unknown, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);
     return await manager.listRuntimeDevices(ref ?? undefined);
   });
-  ipcMain.handle(LlamaCppIpcChannel.ListBackends, async () => manager.listBackends());
-  ipcMain.handle(LlamaCppIpcChannel.GetBackendDownloadSize, async (_event, input: unknown) => {
+  registerImpl('listBackends', async () => manager.listBackends());
+  registerImpl('getBackendDownloadSize', async (_event: unknown, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);
     if (!ref) return { success: false, error: 'Invalid llama.cpp backend selection.' };
     return await manager.getBackendDownloadSize(ref);
   });
-  ipcMain.handle(LlamaCppIpcChannel.GetBackendSelection, async () => manager.getBackendSelection());
-  ipcMain.handle(LlamaCppIpcChannel.SetBackendSelection, async (_event, input: unknown) => {
+  registerImpl('getBackendSelection', async () => manager.getBackendSelection());
+  registerImpl('setBackendSelection', async (_event: unknown, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);
     if (!ref) {
       return {
@@ -379,21 +386,19 @@ export function registerLlamaCppIpcHandlers(
     }
     return await runRuntimeInstall(signal => manager.setBackendSelection(ref, { signal }));
   });
-  ipcMain.handle(LlamaCppIpcChannel.InstallBackend, async (_event, input: unknown) => {
+  registerImpl('installBackend', async (_event: unknown, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);
     if (!ref) return await runRuntimeInstall(signal => manager.installRuntime({ signal }));
     return await runRuntimeInstall(signal => manager.setBackendSelection(ref, { signal }));
   });
-  ipcMain.handle(LlamaCppIpcChannel.UninstallBackend, async (_event, input: unknown) => {
+  registerImpl('uninstallBackend', async (_event: unknown, input: unknown) => {
     await daemon.stopService();
     const ref = sanitizeLlamaCppBackendRef(input);
     if (!ref) return await manager.uninstallRuntime();
     return await manager.uninstallBackend(ref);
   });
-  ipcMain.handle(LlamaCppIpcChannel.GetRuntimeCapabilities, async () =>
-    manager.getRuntimeCapabilities(),
-  );
-  ipcMain.handle(LlamaCppIpcChannel.ImportRuntime, async () => {
+  registerImpl('getRuntimeCapabilities', async () => manager.getRuntimeCapabilities());
+  registerImpl('importRuntime', async () => {
     const win = BrowserWindow.getFocusedWindow();
     if (!win) {
       return { success: false, error: '没有活动窗口' };
@@ -415,7 +420,7 @@ export function registerLlamaCppIpcHandlers(
 
     return await manager.importRuntime(result.filePaths[0]);
   });
-  ipcMain.handle(LlamaCppIpcChannel.Start, async () => {
+  registerImpl('start', async () => {
     const status = await getDedicatedServiceStatus();
     if (status.status === LlamaCppServiceStatus.Running) {
       const bindingRefresh = await refreshRunningModelBindings({
@@ -427,7 +432,7 @@ export function registerLlamaCppIpcHandlers(
     }
     return status;
   });
-  ipcMain.handle(LlamaCppIpcChannel.Stop, async () => {
+  registerImpl('stop', async () => {
     // Cancel delayed startup polling before the explicit stop clears the model bindings.
     startupBindingSyncGeneration += 1;
     await daemon.stopService();
@@ -441,8 +446,8 @@ export function registerLlamaCppIpcHandlers(
     }
     return status;
   });
-  ipcMain.handle(
-    LlamaCppIpcChannel.Restart,
+  registerImpl(
+    'restart',
     async () =>
       await runServiceTransition(async () => {
         const config = getLlamaCppServiceConfig(options.getStore());
@@ -451,27 +456,22 @@ export function registerLlamaCppIpcHandlers(
         return status;
       }),
   );
-  ipcMain.handle(LlamaCppIpcChannel.GetServiceConfig, async () =>
-    getLlamaCppServiceConfig(options.getStore()),
-  );
-  ipcMain.handle(
-    LlamaCppIpcChannel.SetServiceConfig,
-    async (_event, config: LlamaCppServiceConfig) => {
-      const previousConfig = getLlamaCppServiceConfig(options.getStore());
-      const sanitized = sanitizeLlamaCppServiceConfig(config);
-      options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
-      await daemon.applyConfigIfRunning(sanitized);
-      if (isLlamaCppLanAccessEnabled(previousConfig) !== isLlamaCppLanAccessEnabled(sanitized)) {
-        // The model gateway reads MAGPIE_ADDR only at process start.
-        await options.onLanAccessChanged?.();
-      }
-      return sanitized;
-    },
-  );
-  ipcMain.handle(LlamaCppIpcChannel.GetGatewayLanToken, async () => ({
+  registerImpl('getServiceConfig', async () => getLlamaCppServiceConfig(options.getStore()));
+  registerImpl('setServiceConfig', async (_event: unknown, config: LlamaCppServiceConfig) => {
+    const previousConfig = getLlamaCppServiceConfig(options.getStore());
+    const sanitized = sanitizeLlamaCppServiceConfig(config);
+    options.getStore().set(LLAMACPP_SERVICE_CONFIG_KEY, sanitized);
+    await daemon.applyConfigIfRunning(sanitized);
+    if (isLlamaCppLanAccessEnabled(previousConfig) !== isLlamaCppLanAccessEnabled(sanitized)) {
+      // The model gateway reads MAGPIE_ADDR only at process start.
+      await options.onLanAccessChanged?.();
+    }
+    return sanitized;
+  });
+  registerImpl('getGatewayLanToken', async () => ({
     token: daemon.getLanToken(),
   }));
-  ipcMain.handle(LlamaCppIpcChannel.RegenerateGatewayLanToken, async () => {
+  registerImpl('regenerateGatewayLanToken', async () => {
     const token = await daemon.regenerateLanToken();
     let lanAccessSynced = false;
     if (isLlamaCppLanAccessEnabled(getLlamaCppServiceConfig(options.getStore()))) {
@@ -484,10 +484,10 @@ export function registerLlamaCppIpcHandlers(
     }
     return { token, lanAccessSynced };
   });
-  ipcMain.handle(LlamaCppIpcChannel.ModelsDir, async () => manager.getModelsDir());
-  ipcMain.handle(
-    LlamaCppIpcChannel.SetModelsDir,
-    async (_event, modelsDir: unknown) =>
+  registerImpl('modelsDir', async () => manager.getModelsDir());
+  registerImpl(
+    'setModelsDir',
+    async (_event: unknown, modelsDir: unknown) =>
       await runServiceTransition(async () => {
         const store = options.getStore();
         const currentConfig = store.get<LlamaCppServiceConfig>(LLAMACPP_SERVICE_CONFIG_KEY) ?? {};
@@ -527,10 +527,10 @@ export function registerLlamaCppIpcHandlers(
       }),
   );
 
-  ipcMain.handle(LlamaCppIpcChannel.ListLocalModels, async () => {
+  registerImpl('listLocalModels', async () => {
     return await manager.listLocalModels();
   });
-  ipcMain.handle(LlamaCppIpcChannel.ListRunningModels, async () => {
+  registerImpl('listRunningModels', async () => {
     try {
       // Keep model listing read-only. Binding persistence and Gateway sync are
       // performed by explicit model lifecycle transitions below.
@@ -540,10 +540,10 @@ export function registerLlamaCppIpcHandlers(
       throw error;
     }
   });
-  ipcMain.handle(LlamaCppIpcChannel.RefreshRunningModelBindings, async () => {
+  registerImpl('refreshRunningModelBindings', async () => {
     await refreshRunningModelBindings();
   });
-  ipcMain.handle(LlamaCppIpcChannel.DeleteModel, async (_event, name: string) => {
+  registerImpl('deleteModel', async (_event: unknown, name: string) => {
     await daemon.stopModel(name);
     const result = await manager.deleteModel(name);
     if (!result.success || !result.deleted || !result.removedModelName) {
@@ -560,7 +560,7 @@ export function registerLlamaCppIpcHandlers(
     await refreshRunningModelBindings();
     return result;
   });
-  ipcMain.handle(LlamaCppIpcChannel.ShowModel, async (_event, name: string) => {
+  registerImpl('showModel', async (_event: unknown, name: string) => {
     const modelName = name.trim();
     const localModel = (await manager.listLocalModels()).find(
       model => model.name === modelName || model.id === modelName || model.model === modelName,
@@ -575,10 +575,10 @@ export function registerLlamaCppIpcHandlers(
       status: runningModel ? 'loaded' : 'unloaded',
     };
   });
-  ipcMain.handle(LlamaCppIpcChannel.GetModelPreferences, async () => {
+  registerImpl('getModelPreferences', async () => {
     return getLlamaCppModelPreferences(options.getStore());
   });
-  ipcMain.handle(LlamaCppIpcChannel.SetModelPreference, async (_event, input: unknown) => {
+  registerImpl('setModelPreference', async (_event: unknown, input: unknown) => {
     const store = options.getStore();
     const current = getLlamaCppModelPreferences(store);
     const next = sanitizeUpdatedModelPreferences(current, input);
@@ -589,7 +589,7 @@ export function registerLlamaCppIpcHandlers(
     }
     return next;
   });
-  ipcMain.handle(LlamaCppIpcChannel.ImportModelFiles, async (_event, input: unknown) => {
+  registerImpl('importModelFiles', async (_event: unknown, input: unknown) => {
     const paths = Array.isArray(input)
       ? input.filter(
           (value): value is string => typeof value === 'string' && value.trim().length > 0,
@@ -797,14 +797,14 @@ export function registerLlamaCppIpcHandlers(
         console.error('[LlamaCppDaemon] failed to reconnect to local inference daemon:', error);
       });
   })();
-  ipcMain.handle(LlamaCppIpcChannel.LoadModel, async (_event, input: LlamaCppModelLaunchInput) => {
+  registerImpl('loadModel', async (_event: unknown, input: LlamaCppModelLaunchInput) => {
     let result: LlamaCppModelLaunchResult | undefined;
     await residency.ensureReady(input.model, async () => {
       result = await loadModelCore(input);
     });
     return result ?? { success: true, runningModels: await daemon.listRunningModels() };
   });
-  ipcMain.handle(LlamaCppIpcChannel.CancelModelLoad, async (_event, input: unknown) => {
+  registerImpl('cancelModelLoad', async (_event: unknown, input: unknown) => {
     const activeLoad = activeModelLoad;
     const requestedModelName = typeof input === 'string' ? input.trim() : '';
     if (
@@ -822,7 +822,7 @@ export function registerLlamaCppIpcHandlers(
       modelName: activeLoad.modelName,
     };
   });
-  ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {
+  registerImpl('unloadModel', async (_event: unknown, name: string) => {
     const modelName = name.trim();
     if (!modelName) throw new Error('Model name is required');
     const beforeRunningModels = await daemon.listRunningModels();
@@ -868,47 +868,44 @@ export function registerLlamaCppIpcHandlers(
     }
     return result;
   });
-  ipcMain.handle(
-    LlamaCppIpcChannel.InstallModel,
-    async (_event, input: LlamaCppInstallModelInput) => {
-      const modelId = input.modelId.trim();
-      if (!modelId) throw new Error('Model ID is required');
-      if (activeInstalls.size > 0) {
-        throw new Error('Another model install is already in progress');
-      }
-      const controller = new AbortController();
-      activeInstalls.set(modelId, controller);
-      try {
-        await manager.installModel(
-          input,
-          progress => {
-            broadcast(LlamaCppIpcChannel.InstallProgress, progress);
-          },
-          { signal: controller.signal },
-        );
-        return { success: true };
-      } catch (error) {
-        if (controller.signal.aborted || isAbortError(error)) {
-          broadcast(LlamaCppIpcChannel.InstallProgress, {
-            modelId,
-            modelName: input.displayName ?? modelId,
-            phase: 'cancelled',
-          });
-          return { success: false, cancelled: true };
-        }
+  registerImpl('installModel', async (_event: unknown, input: LlamaCppInstallModelInput) => {
+    const modelId = input.modelId.trim();
+    if (!modelId) throw new Error('Model ID is required');
+    if (activeInstalls.size > 0) {
+      throw new Error('Another model install is already in progress');
+    }
+    const controller = new AbortController();
+    activeInstalls.set(modelId, controller);
+    try {
+      await manager.installModel(
+        input,
+        progress => {
+          broadcast(LlamaCppIpcChannel.InstallProgress, progress);
+        },
+        { signal: controller.signal },
+      );
+      return { success: true };
+    } catch (error) {
+      if (controller.signal.aborted || isAbortError(error)) {
         broadcast(LlamaCppIpcChannel.InstallProgress, {
           modelId,
           modelName: input.displayName ?? modelId,
-          phase: 'failed',
-          error: error instanceof Error ? error.message : String(error),
+          phase: 'cancelled',
         });
-        throw error;
-      } finally {
-        activeInstalls.delete(modelId);
+        return { success: false, cancelled: true };
       }
-    },
-  );
-  ipcMain.handle(LlamaCppIpcChannel.CancelInstall, async (_event, modelId: string) => {
+      broadcast(LlamaCppIpcChannel.InstallProgress, {
+        modelId,
+        modelName: input.displayName ?? modelId,
+        phase: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    } finally {
+      activeInstalls.delete(modelId);
+    }
+  });
+  registerImpl('cancelInstall', async (_event: unknown, modelId: string) => {
     const normalizedModelId = modelId.trim();
     const controller = activeInstalls.get(normalizedModelId);
     if (!controller) return { success: true, cancelled: false };
@@ -919,6 +916,11 @@ export function registerLlamaCppIpcHandlers(
     controller.abort(new Error('Install cancelled'));
     return { success: true, cancelled: true };
   });
+  handleIpcContractSubset(
+    llamacppContract,
+    impls as Parameters<typeof handleIpcContract<typeof llamacppContract>>[1],
+  );
+
   return daemon;
 }
 
