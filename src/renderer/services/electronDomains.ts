@@ -37,7 +37,6 @@ interface InferenceDomainApi {
   magpie: IElectronAPI['magpie'];
   modelPool: IElectronAPI['modelPool'];
   managedProviders: IElectronAPI['managedProviders'];
-  triage: IElectronAPI['triage'];
   marketplace: IElectronAPI['marketplace'];
 }
 
@@ -113,7 +112,6 @@ export const electronDomains: ElectronDomains = {
       magpie: e.magpie,
       modelPool: e.modelPool,
       managedProviders: e.managedProviders,
-      triage: e.triage,
       marketplace: e.marketplace,
     };
   },
