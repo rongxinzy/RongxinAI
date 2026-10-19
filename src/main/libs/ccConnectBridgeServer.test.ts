@@ -14,7 +14,6 @@ test('accepts only an authenticated normalized channel turn', async () => {
     onTurn: async request => ({
       content: `reply:${request.message.content}`,
     }),
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();
@@ -49,33 +48,18 @@ test('accepts only an authenticated normalized channel turn', async () => {
   await expect(accepted.json()).resolves.toEqual({ content: 'reply:hello' });
 });
 
-test('requires a complete cron trigger identity', async () => {
-  const seen: string[] = [];
+test('the cron trigger route is gone (the clock is in-process)', async () => {
   const server = new CcConnectBridgeServer('secret', {
     onTurn: async () => ({ content: 'unused' }),
-    onCronTrigger: async trigger => void seen.push(trigger.taskId),
   });
   servers.push(server);
   const url = await server.start();
-  const invalid = await fetch(`${url}/v1/cc-connect/cron/trigger`, {
+  const response = await fetch(`${url}/v1/cc-connect/cron/trigger`, {
     method: 'POST',
-    headers: { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('invalid') },
+    headers: { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('cron') },
     body: JSON.stringify({ taskId: 'task' }),
   });
-  expect(invalid.status).toBe(400);
-  const accepted = await fetch(`${url}/v1/cc-connect/cron/trigger`, {
-    method: 'POST',
-    headers: { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('accepted') },
-    body: JSON.stringify({
-      requestId: 'r',
-      accountId: 'p',
-      taskId: 'task',
-      scheduleVersion: 'v1',
-      scheduledAt: new Date().toISOString(),
-    }),
-  });
-  expect(accepted.status).toBe(204);
-  expect(seen).toEqual(['task']);
+  expect(response.status).toBe(404);
 });
 
 test('aborts the active turn when the sidecar disconnects', async () => {
@@ -88,7 +72,6 @@ test('aborts the active turn when the sidecar disconnects', async () => {
       );
       throw new Error('cancelled');
     },
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();
@@ -124,7 +107,6 @@ test('aborts the active turn when the sidecar disconnects', async () => {
 test('accepts a turn when the platform only supplies a session key', async () => {
   const server = new CcConnectBridgeServer('secret', {
     onTurn: async request => ({ content: request.message.sessionKey }),
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();
@@ -154,7 +136,6 @@ test('accepts a turn when the platform only supplies a session key', async () =>
 test('rejects the retired project identity field', async () => {
   const server = new CcConnectBridgeServer('secret', {
     onTurn: async () => ({ content: 'unused' }),
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();
@@ -184,24 +165,32 @@ test('rejects the retired project identity field', async () => {
 test('rejects replayed protocol nonces', async () => {
   const server = new CcConnectBridgeServer('secret', {
     onTurn: async () => ({ content: 'ok' }),
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();
-  const headers = { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('replay') };
+  const headers = {
+    authorization: 'Bearer secret',
+    'content-type': 'application/json',
+    ...createCcConnectProtocolHeaders('replay'),
+  };
   const body = JSON.stringify({
     requestId: 'replay',
-    accountId: 'p',
-    taskId: 't',
-    scheduleVersion: 'v1',
-    scheduledAt: new Date().toISOString(),
+    accountId: 'default',
+    message: {
+      sessionKey: 'wechat:acct:conv',
+      platform: 'wechat',
+      messageId: 'm1',
+      userId: 'user',
+      chatType: 'direct',
+      content: 'hi',
+    },
   });
-  expect(
-    (await fetch(`${url}/v1/cc-connect/cron/trigger`, { method: 'POST', headers, body })).status,
-  ).toBe(204);
-  expect(
-    (await fetch(`${url}/v1/cc-connect/cron/trigger`, { method: 'POST', headers, body })).status,
-  ).toBe(401);
+  expect((await fetch(`${url}/v1/cc-connect/turn`, { method: 'POST', headers, body })).status).toBe(
+    200,
+  );
+  expect((await fetch(`${url}/v1/cc-connect/turn`, { method: 'POST', headers, body })).status).toBe(
+    401,
+  );
 });
 
 test('accepts media-only turns and attachment-only replies', async () => {
@@ -210,7 +199,6 @@ test('accepts media-only turns and attachment-only replies', async () => {
       content: '',
       attachments: [{ kind: 'image', path: `C:\\${request.message.images?.[0].FileName}` }],
     }),
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();
@@ -245,7 +233,6 @@ test('accepts media-only turns and attachment-only replies', async () => {
 test('accepts a quoted-context-only turn', async () => {
   const server = new CcConnectBridgeServer('secret', {
     onTurn: async request => ({ content: request.message.extraContent ?? '' }),
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();
@@ -284,7 +271,6 @@ test('accepts a text turn with null media fields from the Go sidecar', async () 
       };
       return { content: `reply:${request.message.content}` };
     },
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();
@@ -324,7 +310,6 @@ test('accepts a text turn with null media fields from the Go sidecar', async () 
 test('still rejects malformed media payloads', async () => {
   const server = new CcConnectBridgeServer('secret', {
     onTurn: async () => ({ content: 'unused' }),
-    onCronTrigger: async () => undefined,
   });
   servers.push(server);
   const url = await server.start();

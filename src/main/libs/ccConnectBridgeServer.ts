@@ -51,17 +51,8 @@ export type CcConnectTurnRequest = {
   };
 };
 
-export type CcConnectCronTrigger = {
-  requestId: string;
-  accountId: string;
-  taskId: string;
-  scheduleVersion: string;
-  scheduledAt: string;
-};
-
 export interface CcConnectBridgeHandlers {
   onTurn(request: CcConnectTurnRequest, signal: AbortSignal): Promise<CcConnectTurnResponse>;
-  onCronTrigger(trigger: CcConnectCronTrigger): Promise<void>;
 }
 
 /** Loopback-only bridge between the trimmed channel sidecar and ZhiYuan. */
@@ -125,12 +116,6 @@ export class CcConnectBridgeServer {
         if (!result.content.trim() && !result.attachments?.length)
           throw new Error('Pi bridge returned an empty response');
         response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(result));
-        return;
-      }
-      if (request.url === '/v1/cc-connect/cron/trigger') {
-        if (!isCronTrigger(body)) return void response.writeHead(400).end('invalid cron trigger');
-        await this.handlers.onCronTrigger(body);
-        response.writeHead(204).end();
         return;
       }
       response.writeHead(404).end();
@@ -213,15 +198,5 @@ function isInboundAudio(value: unknown): boolean {
     nonEmptyString(value.Data) &&
     (value.Format === undefined || typeof value.Format === 'string') &&
     (value.Duration === undefined || typeof value.Duration === 'number')
-  );
-}
-
-function isCronTrigger(value: unknown): value is CcConnectCronTrigger {
-  return (
-    isRecord(value) &&
-    ['requestId', 'accountId', 'taskId', 'scheduleVersion', 'scheduledAt'].every(key =>
-      nonEmptyString(value[key]),
-    ) &&
-    !Number.isNaN(Date.parse(value.scheduledAt as string))
   );
 }

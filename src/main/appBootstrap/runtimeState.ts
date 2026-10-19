@@ -2,8 +2,8 @@ import type { BrowserWindow } from 'electron';
 
 import type { CanonicalScheduledTaskService } from '../../scheduledTask/canonicalScheduledTaskService';
 import type { CcConnectSchedulerRuntime } from '../../scheduledTask/ccConnectSchedulerRuntime';
-import type { CcConnectCronClient } from '../../scheduledTask/ccConnectCronClient';
-import type { DeferredCcConnectCronClient } from '../../scheduledTask/deferredCcConnectCronClient';
+import type { CcConnectControlClient } from '../libs/ccConnectControlClient';
+import type { LocalCronClock } from '../../scheduledTask/localCronClock';
 import type { CcConnectDeliveryTransport } from '../../scheduledTask/ccConnectDeliveryTransport';
 import type { ActivityService } from '../activity/activityService';
 import type { AgentManager } from '../agentManager';
@@ -75,12 +75,12 @@ export const rt = {
   ccConnectRuntimeStopping: false,
   ccConnectRuntimeReconcileQueue: Promise.resolve() as Promise<void>,
   ccConnectRuntimeConfigSignature: '',
-  ccConnectRuntimeControlClient: null as CcConnectCronClient | null,
+  ccConnectRuntimeControlClient: null as CcConnectControlClient | null,
   ccConnectPiBridge: null as CcConnectPiBridge | null,
   canonicalScheduledTaskService: null as CanonicalScheduledTaskService | null,
   activityService: null as ActivityService | null,
   canonicalSchedulerRuntime: null as CcConnectSchedulerRuntime | null,
-  deferredCcConnectCronClient: null as DeferredCcConnectCronClient | null,
+  canonicalSchedulerClock: null as LocalCronClock | null,
   ccConnectDeliveryTransport: null as CcConnectDeliveryTransport | null,
   ccConnectBridgeToken: null as string | null,
   ccConnectBridgeUrl: null as string | null,
