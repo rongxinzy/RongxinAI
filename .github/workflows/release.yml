@@ -5,12 +5,22 @@ name: Release (tag)
 # Stable promotion is manual via promote.yml.
 
 on:
+  workflow_dispatch:
+    inputs:
+      release-tag:
+        description: Existing tag whose beta publish and installation checks passed
+        required: true
+        type: string
+      candidate-run-id:
+        description: Original tag release run containing the verified candidate artifacts
+        required: true
+        type: string
   push:
     tags:
       - 'v*'
 
 concurrency:
-  group: zhiyuan-release-${{ github.ref_name }}
+  group: zhiyuan-release-${{ inputs.release-tag || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -28,6 +38,7 @@ env:
 
 jobs:
   prepare-release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.identity.outputs.version }}
@@ -468,4 +479,46 @@ jobs:
           name: 知远 ${{ needs.prepare-release.outputs.version }}
           prerelease: true
           generate_release_notes: true
+          files: release-assets/*
+
+  recover-github-prerelease:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+      - name: Verify original release gates and immutable tag identity
+        id: recovery
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release-tag }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidate-run-id }}
+        run: node scripts/release/verify-github-release-recovery.mjs
+      - name: Download already accepted release candidates
+        uses: actions/download-artifact@v8
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.recovery.outputs.run-id }}
+          pattern: release-candidate-${{ steps.recovery.outputs.version }}-*
+          path: candidate-staging
+      - name: Stage and verify original release assets
+        env:
+          RELEASE_VERSION: ${{ steps.recovery.outputs.version }}
+          SOURCE_COMMIT: ${{ steps.recovery.outputs.commit }}
+          CANDIDATE_RUN_ID: ${{ steps.recovery.outputs.run-id }}
+        run: |
+          bash scripts/release/stage-downloaded-release-candidates.sh "$RELEASE_VERSION"
+          node scripts/release/collect-github-release-assets.mjs \
+            "$RELEASE_VERSION" "$SOURCE_COMMIT" "$CANDIDATE_RUN_ID"
+      - name: Create recovered GitHub pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.recovery.outputs.tag }}
+          name: 知远 ${{ steps.recovery.outputs.version }}
+          prerelease: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
           files: release-assets/*
