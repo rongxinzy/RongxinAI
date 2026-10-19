@@ -1,18 +1,28 @@
-/** Cowork queue IPC: list, enqueue, update, delete, steer and follow-up. */
+/**
+ * Cowork queue IPC: list, enqueue, update, delete, steer and follow-up
+ * (work package I: domain-owned registration with injected deps).
+ */
 import { handleIpcContract } from '../ipc/handleIpcContract';
-import { getCoworkStore } from './runtimeServices';
-import { getPiRuntimeAdapter } from './sessionServices';
-import { getCoworkImageRoot } from './coworkSessionImages';
 import { coworkQueueContract } from '../../shared/ipc/coworkContract';
 import { persistCoworkImageAttachments, slimQueuedMessagesForIpc } from '../coworkImageAttachments';
+import type { CoworkStore } from '../coworkStore';
+import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 
-export const registerCoworkQueueIpc = (): void => {
+export interface CoworkQueueIpcDeps {
+  getPiRuntimeAdapter: () => PiRuntimeAdapter;
+  getCoworkStore: () => CoworkStore;
+  getCoworkImageRoot: () => string;
+}
+
+export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
   handleIpcContract(coworkQueueContract, {
     listPendingMessages: (_event, sessionId) => {
       try {
         return {
           success: true as const,
-          items: slimQueuedMessagesForIpc(getPiRuntimeAdapter().listPendingMessages(sessionId)),
+          items: slimQueuedMessagesForIpc(
+            deps.getPiRuntimeAdapter().listPendingMessages(sessionId),
+          ),
         };
       } catch (error) {
         return {
@@ -26,7 +36,7 @@ export const registerCoworkQueueIpc = (): void => {
       try {
         const storedImages = input.imageAttachments?.length
           ? persistCoworkImageAttachments(
-              getCoworkImageRoot(),
+              deps.getCoworkImageRoot(),
               input.sessionId,
               input.imageAttachments,
             )
@@ -35,17 +45,19 @@ export const registerCoworkQueueIpc = (): void => {
         // the session's capability set like a directly submitted one. Commit them
         // only once the queue accepts the item, so a rejected enqueue (e.g. the
         // turn settled first) cannot leave a skill active that nothing revealed.
-        const enqueueResult = getPiRuntimeAdapter().enqueuePendingMessage(
-          input.sessionId,
-          input.text,
-          storedImages,
-          input.fileAttachments,
-          input.skillIds,
-        );
+        const enqueueResult = deps
+          .getPiRuntimeAdapter()
+          .enqueuePendingMessage(
+            input.sessionId,
+            input.text,
+            storedImages,
+            input.fileAttachments,
+            input.skillIds,
+          );
         if (enqueueResult.success && input.skillIds?.length) {
-          const queuedSession = getCoworkStore().getSession(input.sessionId, 0);
+          const queuedSession = deps.getCoworkStore().getSession(input.sessionId, 0);
           if (queuedSession) {
-            getCoworkStore().updateSession(
+            deps.getCoworkStore().updateSession(
               input.sessionId,
               {
                 activeSkillIds: [...new Set([...queuedSession.activeSkillIds, ...input.skillIds])],
@@ -65,11 +77,9 @@ export const registerCoworkQueueIpc = (): void => {
 
     updatePendingMessage: (_event, input) => {
       try {
-        return getPiRuntimeAdapter().updatePendingMessage(
-          input.sessionId,
-          input.itemId,
-          input.text,
-        );
+        return deps
+          .getPiRuntimeAdapter()
+          .updatePendingMessage(input.sessionId, input.itemId, input.text);
       } catch (error) {
         return {
           success: false as const,
@@ -80,7 +90,7 @@ export const registerCoworkQueueIpc = (): void => {
 
     deletePendingMessage: (_event, input) => {
       try {
-        return getPiRuntimeAdapter().deletePendingMessage(input.sessionId, input.itemId);
+        return deps.getPiRuntimeAdapter().deletePendingMessage(input.sessionId, input.itemId);
       } catch (error) {
         return {
           success: false as const,
@@ -91,7 +101,7 @@ export const registerCoworkQueueIpc = (): void => {
 
     steerPendingMessage: async (_event, input) => {
       try {
-        return await getPiRuntimeAdapter().steerPendingMessage(input.sessionId, input.itemId);
+        return await deps.getPiRuntimeAdapter().steerPendingMessage(input.sessionId, input.itemId);
       } catch (error) {
         return {
           success: false as const,
@@ -102,7 +112,9 @@ export const registerCoworkQueueIpc = (): void => {
 
     followUpPendingMessage: async (_event, input) => {
       try {
-        return await getPiRuntimeAdapter().followUpPendingMessage(input.sessionId, input.itemId);
+        return await deps
+          .getPiRuntimeAdapter()
+          .followUpPendingMessage(input.sessionId, input.itemId);
       } catch (error) {
         return {
           success: false as const,
