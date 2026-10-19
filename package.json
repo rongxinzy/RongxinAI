@@ -89,6 +89,7 @@
     "build:enterprise": "tsup --config enterprise/tsup.config.ts && vite build --config enterprise/vite.ui.config.ts",
     "lint": "oxlint src/ enterprise/ && node scripts/ci/check-app-show-toast-dispatch.mjs && bun run theme:check && bun run theme:audit",
     "knip": "knip --no-progress",
+    "knip:production": "knip --config knip.production.ts --production --include files --no-progress",
     "check:python-dead-code": "node scripts/ci/check-python-dead-code.mjs",
     "check:large-files": "node scripts/ci/check-large-files.mjs",
     "check:source-line-limit": "node scripts/ci/check-source-line-limit.mjs",
