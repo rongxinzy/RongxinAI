@@ -26,6 +26,7 @@ import type {
   MagpieTestProviderResult,
 } from '../../../../shared/magpie/types';
 import { i18nService } from '../../../services/i18n';
+import { PRESET_KEYS, PRESETS, type PresetKey } from './providerPresets';
 
 interface ProviderEditDialogProps {
   open: boolean;
@@ -34,54 +35,6 @@ interface ProviderEditDialogProps {
   onSave: (input: MagpieSaveProviderInput) => Promise<boolean>;
   onTest?: (input: MagpieSaveProviderInput) => Promise<MagpieTestProviderResult>;
 }
-
-type PresetKey = 'custom' | 'openai' | 'anthropic' | 'deepseek' | 'gemini' | 'ollama';
-
-interface PresetConfig {
-  name: string;
-  api: MagpieProviderApi;
-  baseUrl: string;
-  defaultModels: string;
-}
-
-const PRESETS: Record<PresetKey, PresetConfig> = {
-  custom: {
-    name: '',
-    api: 'openai-completions',
-    baseUrl: '',
-    defaultModels: '',
-  },
-  openai: {
-    name: 'OpenAI',
-    api: 'openai-completions',
-    baseUrl: 'https://api.openai.com/v1',
-    defaultModels: 'gpt-4o, gpt-4o-mini, o1, o3-mini',
-  },
-  anthropic: {
-    name: 'Anthropic',
-    api: 'anthropic-messages',
-    baseUrl: 'https://api.anthropic.com',
-    defaultModels: 'claude-3-7-sonnet, claude-3-5-haiku, claude-3-5-sonnet',
-  },
-  deepseek: {
-    name: 'DeepSeek',
-    api: 'openai-completions',
-    baseUrl: 'https://api.deepseek.com/v1',
-    defaultModels: 'deepseek-chat, deepseek-reasoner',
-  },
-  gemini: {
-    name: 'Google Gemini',
-    api: 'openai-completions',
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    defaultModels: 'gemini-2.5-flash, gemini-2.5-pro',
-  },
-  ollama: {
-    name: 'Ollama',
-    api: 'openai-completions',
-    baseUrl: 'http://127.0.0.1:11434/v1',
-    defaultModels: 'qwen2.5-coder:7b, llama3.3:latest',
-  },
-};
 
 export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   open,
@@ -208,19 +161,22 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               <Label htmlFor="provider-preset" className="text-sm">
                 {i18nService.t('magpieProviderPreset')}
               </Label>
-              <Select value={preset} onValueChange={val => handleApplyPreset(val as PresetKey)}>
+              <Select
+                items={Object.fromEntries(
+                  PRESET_KEYS.map(key => [key, i18nService.t(PRESETS[key].labelKey)]),
+                )}
+                value={preset}
+                onValueChange={val => handleApplyPreset(val as PresetKey)}
+              >
                 <SelectTrigger id="provider-preset" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="custom">{i18nService.t('magpiePresetCustom')}</SelectItem>
-                  <SelectItem value="openai">OpenAI (Official)</SelectItem>
-                  <SelectItem value="anthropic">
-                    {i18nService.t('magpiePresetAnthropic')}
-                  </SelectItem>
-                  <SelectItem value="deepseek">{i18nService.t('magpiePresetDeepSeek')}</SelectItem>
-                  <SelectItem value="gemini">{i18nService.t('magpiePresetGemini')}</SelectItem>
-                  <SelectItem value="ollama">{i18nService.t('magpiePresetOllama')}</SelectItem>
+                  {PRESET_KEYS.map(key => (
+                    <SelectItem key={key} value={key}>
+                      {i18nService.t(PRESETS[key].labelKey)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
