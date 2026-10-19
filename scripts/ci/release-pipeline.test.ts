@@ -79,6 +79,20 @@ test('compression qualification overlaps packaging and is bound before acceptanc
   expect(verify).toBeGreaterThan(report);
 });
 
+test('enterprise signing cannot validate stale output after an earlier build command fails', () => {
+  const steps = read('sign-zhiyuan-enterprise-windows.yml').jobs.sign.steps;
+  const build = steps.find(step => step.name === 'Build signed enterprise installer')!.run!;
+  const lines = build.split('\n').map(line => line.trim());
+  const commands = lines.flatMap((line, index) =>
+    /^(?:node|bun|bunx)\s/.test(line) ? [index] : [],
+  );
+  expect(commands.length).toBeGreaterThan(0);
+  for (const index of commands) expect(lines[index + 1]).toContain('if ($LASTEXITCODE -ne 0)');
+  expect(
+    steps.find(step => step.uses === 'actions/setup-node@v6')?.with?.['node-version-file'],
+  ).toBe('zhiyuan-core/.nvmrc');
+});
+
 test('directory smoke cannot bypass release or extended installer acceptance', () => {
   const root = mkdtempSync(path.join(os.tmpdir(), 'matrix-plan-'));
   try {

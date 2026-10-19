@@ -66,22 +66,15 @@ jobs:
           echo "version=${raw#v}" >> "$GITHUB_OUTPUT"
           echo "commit=$source_commit" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-bun-workspace
         with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
+          include-electron: 'true'
+          save-cache: 'true'
 
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
           path: |
-            ~/.bun/install/cache
-            ~/.npm
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
             resources/PortableGit-*.7z.exe
             resources/uv-win-runtime.zip
             resources/mingit
@@ -90,12 +83,9 @@ jobs:
             resources/skill-python
             vendor/engram-runtime
             vendor/channel-runtime
-          key: enterprise-packaging-windows-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: enterprise-resources-v2-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
-            enterprise-packaging-windows-node24-bun1.4.0-
-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
+            enterprise-resources-v2-
 
       - name: Run enterprise quality gates
         shell: bash
@@ -227,6 +217,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: zhiyuan-enterprise-windows-${{ steps.identity.outputs.version }}-${{ github.run_number }}
+          compression-level: 0
           path: |
             release/*.exe
             release/SHA256SUMS.txt
@@ -244,6 +235,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: zhiyuan-enterprise-windows-diagnostics-${{ steps.identity.outputs.version }}-${{ github.run_number }}
+          compression-level: 0
           path: |
             release/*.exe
             ${{ runner.temp }}/zhiyuan-build-logs

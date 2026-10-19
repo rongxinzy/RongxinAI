@@ -111,10 +111,11 @@ jobs:
           path: zhiyuan-core
       - uses: actions/setup-node@v6
         with:
-          node-version-file: .nvmrc
+          node-version-file: zhiyuan-core/.nvmrc
           check-latest: true
       - name: Install and verify enterprise extension
         working-directory: aaas
+        shell: bash
         run: |
           npm ci
           npm run check
@@ -140,14 +141,26 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.0'
+      - name: Share Bun package downloads
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-1.4.0-${{ hashFiles('zhiyuan-core/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-1.4.0-
+      - name: Share Electron downloads
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: electron-downloads-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('zhiyuan-core/bun.lock') }}
+          restore-keys: electron-downloads-v1-${{ runner.os }}-${{ runner.arch }}-
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
           path: |
-            ~/.bun/install/cache
-            ~/.npm
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
             zhiyuan-core/resources/PortableGit-*.7z.exe
             zhiyuan-core/resources/uv-win-runtime.zip
             zhiyuan-core/resources/mingit
@@ -156,16 +169,18 @@ jobs:
             zhiyuan-core/resources/skill-python
             zhiyuan-core/vendor/engram-runtime
             zhiyuan-core/vendor/channel-runtime
-          key: enterprise-signing-${{ steps.manifest.outputs.core_commit }}-${{ hashFiles('aaas/package-lock.json', 'aaas/build/build-manifest.json', 'zhiyuan-core/bun.lock', 'zhiyuan-core/scripts/**') }}
+          key: enterprise-signing-resources-v2-${{ steps.manifest.outputs.core_commit }}-${{ hashFiles('aaas/package-lock.json', 'aaas/build/build-manifest.json', 'zhiyuan-core/bun.lock', 'zhiyuan-core/scripts/**') }}
           restore-keys: |
-            enterprise-signing-${{ steps.manifest.outputs.core_commit }}-
+            enterprise-signing-resources-v2-${{ steps.manifest.outputs.core_commit }}-
       - name: Install host dependencies
         working-directory: zhiyuan-core
+        shell: bash
         run: |
           bun install --frozen-lockfile --ignore-scripts
           bun run apply:patches
       - name: Prepare Windows runtimes
         working-directory: zhiyuan-core
+        shell: bash
         run: |
           bun run setup:mingit
           bun run setup:uv-runtime
@@ -211,10 +226,15 @@ jobs:
             }
           }
           node scripts/ensure-build-version.js
+          if ($LASTEXITCODE -ne 0) { throw 'Build version validation failed.' }
           bun run prepare:update-release
+          if ($LASTEXITCODE -ne 0) { throw 'Update release preparation failed.' }
           bun run build
+          if ($LASTEXITCODE -ne 0) { throw 'Application build failed.' }
           bun run build:skills
+          if ($LASTEXITCODE -ne 0) { throw 'Skill build failed.' }
           bunx electron-builder --win nsis --x64 --config "$env:GITHUB_WORKSPACE\aaas\build\electron-builder.overlay-signed.cjs" --publish never
+          if ($LASTEXITCODE -ne 0) { throw 'Signed installer packaging failed.' }
           # electron-builder only warns ("file source doesn't exist") when an
           # extraResources input is missing, so assert the injected marker here
           # instead of discovering an asset-less package at verify time.
@@ -272,6 +292,7 @@ jobs:
       - uses: actions/upload-artifact@v6
         with:
           name: zhiyuan-enterprise-windows-signed-${{ needs.prepare.outputs.package-version }}-${{ github.run_number }}
+          compression-level: 0
           path: |
             zhiyuan-core/release/*.exe
             zhiyuan-core/release/SHA256SUMS.txt

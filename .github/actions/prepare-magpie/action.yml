@@ -13,10 +13,8 @@ runs:
     - uses: actions/cache/restore@v5
       id: runtime-cache
       with:
-        path: |
-          .cache/magpie
-          resources/magpie/${{ inputs.target }}
-        key: magpie-output-v1-${{ runner.os }}-${{ inputs.target }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/*magpie*.cjs') }}
+        path: resources/magpie/${{ inputs.target }}
+        key: magpie-output-v2-${{ runner.os }}-${{ inputs.target }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/*magpie*.cjs') }}
     - name: Probe pinned compiler output
       id: probe
       shell: bash
@@ -49,7 +47,5 @@ runs:
     - uses: actions/cache/save@v5
       if: steps.runtime-cache.outputs.cache-hit != 'true'
       with:
-        path: |
-          .cache/magpie
-          resources/magpie/${{ inputs.target }}
+        path: resources/magpie/${{ inputs.target }}
         key: ${{ steps.runtime-cache.outputs.cache-primary-key }}

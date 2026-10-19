@@ -255,6 +255,8 @@ jobs:
         with:
           ref: ${{ inputs.source-ref || github.sha }}
       - uses: ./.github/actions/setup-bun-workspace
+        with:
+          save-cache: 'true'
       - name: Restore prepared Windows components
         id: components
         uses: actions/cache/restore@v5
@@ -268,7 +270,7 @@ jobs:
             vendor/channel-runtime
             vendor/engram-runtime
             build-tar/windows-components
-          key: windows-components-v1-${{ hashFiles('bun.lock', 'package.json', 'scripts/**', 'resources/magpie/upstream.json', 'SKILLs/**', 'MCPs/**') }}
+          key: windows-components-v1-${{ hashFiles('bun.lock', 'package.json', 'scripts/**', '!scripts/**/*.test.*', 'resources/magpie/upstream.json', 'SKILLs/**', 'MCPs/**') }}
           restore-keys: windows-components-v1-
       - name: Prepare shared pinned Magpie gateway
         uses: ./.github/actions/prepare-magpie
@@ -358,35 +360,24 @@ jobs:
           commit="$(git rev-parse HEAD)"
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           echo "ZHIYUAN_SOURCE_COMMIT=$commit" >> "$GITHUB_ENV"
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-bun-workspace
         with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
+          include-electron: 'true'
+          save-cache: ${{ matrix.inference_edition == 'cpu' && 'true' || 'false' }}
       - name: Restore llama.cpp runtime
         id: llama-runtime
         uses: ./.github/actions/cache-llamacpp-runtime
         with:
           mode: restore
-      - name: Restore packaging caches
+      - name: Restore packaged Go runtime output
         uses: actions/cache@v5
         with:
           path: |
-            ~/.bun/install/cache
-            ~/.npm
-            ~/.cache/electron
-            ~/.cache/electron-builder
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
             vendor/channel-runtime
-          # Cache only downloaded dependencies and these two runtime producers.
-          # Editing a CI test must not upload the multi-GB cache again.
-          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/download-engram-runtime.cjs', 'scripts/download-channel-runtime.cjs', 'scripts/channel-runtime-host.cjs') }}
+          key: packaged-go-v1-${{ runner.os }}-${{ matrix.runtime_target }}-${{ hashFiles('package.json', 'scripts/download-engram-runtime.cjs', 'scripts/download-channel-runtime.cjs', 'scripts/channel-runtime-host.cjs') }}
           restore-keys: |
-            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
+            packaged-go-v1-${{ runner.os }}-${{ matrix.runtime_target }}-
       - name: Install Electron system dependencies
         if: ${{ matrix.platform == 'linux' }}
         run: |
@@ -394,8 +385,6 @@ jobs:
           sudo apt-get install -y \
             libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
       - name: Download shared Windows components
         if: matrix.platform == 'windows'
         uses: actions/download-artifact@v6
