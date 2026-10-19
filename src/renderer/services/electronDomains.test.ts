@@ -31,7 +31,6 @@ describe('electronDomains', () => {
     magpie: { list: () => Promise.resolve([]) },
     modelPool: { list: () => Promise.resolve([]) },
     managedProviders: { list: () => Promise.resolve([]) },
-    triage: { run: () => Promise.resolve({}) },
     marketplace: { list: () => Promise.resolve([]) },
     cowork: { startSession: () => Promise.resolve('sess-1') },
     agents: { list: () => Promise.resolve([]) },

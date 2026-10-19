@@ -30,7 +30,6 @@ export interface Agent {
   isDefault: boolean;
   source: AgentSource;
   presetId: string;
-  triageOverride?: import('../../shared/triage').AgentTriageOverride;
   createdAt: number;
   updatedAt: number;
 }
@@ -48,7 +47,6 @@ export interface CreateAgentRequest {
   mcpIds?: string[];
   source?: AgentSource;
   presetId?: string;
-  triageOverride?: import('../../shared/triage').AgentTriageOverride;
 }
 
 export interface UpdateAgentRequest {
@@ -63,7 +61,6 @@ export interface UpdateAgentRequest {
   mcpIds?: string[];
   enabled?: boolean;
   pinned?: boolean;
-  triageOverride?: import('../../shared/triage').AgentTriageOverride | null;
 }
 
 export interface CoworkMessageMetadata {

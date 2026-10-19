@@ -1,5 +1,4 @@
 import { isLocalModelRef } from '@shared/providers';
-import type { AgentTriageOverride } from '@shared/triage';
 
 import { LlamaCppAgentEligibilityReason } from '../../shared/llamacpp';
 import type { Model } from '../store/slices/modelSlice';
@@ -19,8 +18,6 @@ export type AgentModelSupportReason =
 
 export const AgentModelValidationTargetKind = {
   Primary: 'primary',
-  TriageLight: 'triage_light',
-  TriageHeavy: 'triage_heavy',
 } as const;
 
 export type AgentModelValidationTargetKind =
@@ -124,7 +121,6 @@ export function resolveAgentModelSupport(
 export function buildAgentModelValidationTargets(input: {
   primaryModelRef?: string | null;
   fallbackModelRef?: string | null;
-  triageOverride?: AgentTriageOverride | null;
 }): AgentModelValidationTarget[] {
   const targets: AgentModelValidationTarget[] = [];
   const primaryModelRef =
@@ -139,19 +135,6 @@ export function buildAgentModelValidationTargets(input: {
   };
 
   pushTarget(AgentModelValidationTargetKind.Primary, primaryModelRef);
-
-  if (!input.triageOverride?.enabled) {
-    return targets;
-  }
-
-  pushTarget(
-    AgentModelValidationTargetKind.TriageLight,
-    normalizeModelRef(input.triageOverride.lightModelRef),
-  );
-  pushTarget(
-    AgentModelValidationTargetKind.TriageHeavy,
-    normalizeModelRef(input.triageOverride.heavyModelRef),
-  );
 
   return targets;
 }
