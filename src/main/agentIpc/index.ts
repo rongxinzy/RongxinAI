@@ -4,26 +4,39 @@ import path from 'path';
 
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 
-import { rt } from './runtimeState';
-import { resolveDefaultAgentModelRef } from './defaultAgentModel';
-import { getAgentManager, getCoworkStore, getSkillManager, getStore } from './runtimeServices';
-import { getIMGatewayManager } from './ccConnectRuntime';
-import { bumpCodingCommandCatalog } from './codingRoomRuntime';
-import { listAllMatchingSessionIds, forgetCoworkSession } from './coworkSessionImages';
+import {
+  listAllMatchingSessionIds,
+  forgetCoworkSession,
+} from '../appBootstrap/coworkSessionImages';
 import { listPresetExperts } from '../presetExpertCatalog';
 import { DB_FILENAME } from '../appConstants';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
 import { CoworkStreamIpc } from '../../shared/ipc/channels';
 import { providersContract } from '../../shared/ipc/providersContract';
+import type { ChannelAccountManager } from '../im/channelAccountManager';
+import type { AgentManager } from '../agentManager';
+import type { CoworkStore } from '../coworkStore';
+import type { SkillManager } from '../skillManager';
+import type { SqliteStore } from '../sqliteStore';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 
-export const registerAgentIpc = (): void => {
+export interface AgentIpcDeps {
+  getAgentManager: () => AgentManager;
+  getCoworkStore: () => CoworkStore;
+  getSkillManager: () => SkillManager;
+  getStore: () => SqliteStore;
+  getIMGatewayManager: () => ChannelAccountManager;
+  bumpCodingCommandCatalog: () => void;
+  resolveDefaultAgentModelRef: () => string;
+}
+
+export const registerAgentIpc = (deps: AgentIpcDeps): void => {
   // ========== Agent IPC Handlers ==========
 
   handleIpcContractSubset(providersContract, {
     agentsList: async () => {
       try {
-        const agents = getAgentManager().listAgents();
+        const agents = deps.getAgentManager().listAgents();
         return { success: true, agents };
       } catch (error) {
         return {
@@ -35,7 +48,7 @@ export const registerAgentIpc = (): void => {
 
     agentsGet: async (_event, id) => {
       try {
-        const agent = getAgentManager().getAgent(id);
+        const agent = deps.getAgentManager().getAgent(id);
         return { success: true, agent };
       } catch (error) {
         return {
@@ -47,8 +60,10 @@ export const registerAgentIpc = (): void => {
 
     agentsCreate: async (_event, request) => {
       try {
-        const agent = getAgentManager().createAgent(request, resolveDefaultAgentModelRef());
-        bumpCodingCommandCatalog();
+        const agent = deps
+          .getAgentManager()
+          .createAgent(request, deps.resolveDefaultAgentModelRef());
+        deps.bumpCodingCommandCatalog();
         return { success: true, agent };
       } catch (error) {
         return {
@@ -60,8 +75,8 @@ export const registerAgentIpc = (): void => {
 
     agentsUpdate: async (_event, id, updates) => {
       try {
-        const agent = getAgentManager().updateAgent(id, updates);
-        bumpCodingCommandCatalog();
+        const agent = deps.getAgentManager().updateAgent(id, updates);
+        deps.bumpCodingCommandCatalog();
         return { success: true, agent };
       } catch (error) {
         return {
@@ -73,11 +88,11 @@ export const registerAgentIpc = (): void => {
 
     agentsDelete: async (_event, id) => {
       try {
-        const result = getAgentManager().deleteAgent(id);
-        if (result) bumpCodingCommandCatalog();
+        const result = deps.getAgentManager().deleteAgent(id);
+        if (result) deps.bumpCodingCommandCatalog();
 
         // Cascade delete all Cowork sessions belonging to the deleted agent
-        const agentIpcCoworkStore = getCoworkStore();
+        const agentIpcCoworkStore = deps.getCoworkStore();
         for (const sessionId of listAllMatchingSessionIds({ agentId: id })) {
           forgetCoworkSession(sessionId);
         }
@@ -86,7 +101,7 @@ export const registerAgentIpc = (): void => {
         // Clean up IM session mappings for deleted sessions
         if (deletedSessionIds.length > 0) {
           try {
-            const imStore = getIMGatewayManager()?.getIMStore();
+            const imStore = deps.getIMGatewayManager()?.getIMStore();
             if (imStore) {
               for (const sessionId of deletedSessionIds) {
                 imStore.deleteSessionMappingByCoworkSessionId(sessionId);
@@ -118,7 +133,7 @@ export const registerAgentIpc = (): void => {
 
     agentsImportExpertPackage: async (_event, expertDir) => {
       try {
-        const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
+        const bundledSkillsRoot = deps.getSkillManager().getBundledSkillsRoot();
         const registerExpertModule = require(
           path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'scripts', 'register_expert'),
         ) as {
@@ -143,7 +158,7 @@ export const registerAgentIpc = (): void => {
         };
         const { parseExpertPackage, upsertExpertRegistry } = registerExpertModule;
         const dbPath = path.join(app.getPath('userData'), DB_FILENAME);
-        const localAgentManager = getAgentManager();
+        const localAgentManager = deps.getAgentManager();
 
         // Re-importing an installed preset upgrades it in place: existing
         // agents are updated, packaged skills are refreshed, and the stale
@@ -159,7 +174,7 @@ export const registerAgentIpc = (): void => {
           update: isUpgrade,
         });
 
-        const defaultModel = resolveDefaultAgentModelRef();
+        const defaultModel = deps.resolveDefaultAgentModelRef();
         const agentIds: string[] = [];
 
         for (const request of requests) {
@@ -188,7 +203,7 @@ export const registerAgentIpc = (): void => {
             agentIds.push(agent.id);
           }
         }
-        bumpCodingCommandCatalog();
+        deps.bumpCodingCommandCatalog();
 
         // Bundled presets are file-sourced (方案A): they never enter the
         // registry. The single registry service (register_expert.js) enforces
@@ -228,7 +243,7 @@ export const registerAgentIpc = (): void => {
 
     agentsGetPresetExperts: async () => {
       try {
-        const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
+        const bundledSkillsRoot = deps.getSkillManager().getBundledSkillsRoot();
         return { experts: listPresetExperts(bundledSkillsRoot) };
       } catch (error) {
         return {
