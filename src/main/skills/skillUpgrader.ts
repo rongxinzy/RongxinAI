@@ -118,7 +118,7 @@ async function performUpgradeDownload(
       }
 
       if (!downloaded) {
-        const gitRuntime = resolveGitCommand();
+        const gitRuntime = await resolveGitCommand();
         // For upgrades, prefer the installed skill's git remote URL over the
         // marketplace URL. The installed repo's .git/config already points at
         // the correct remote that git can fetch from directly.
