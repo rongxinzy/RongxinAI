@@ -75,11 +75,11 @@ async function applyAnnounceDeliveryNormalization(
 }
 
 function cloneScheduledTaskInput<T extends MutableScheduledTaskInput>(input: T): T {
-  const normalized = { ...input } as MutableScheduledTaskInput;
+  const normalized = { ...input };
   if (Object.hasOwn(normalized, 'delivery') && normalized.delivery) {
     normalized.delivery = { ...normalized.delivery };
   }
-  return normalized as T;
+  return normalized;
 }
 
 export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): void {

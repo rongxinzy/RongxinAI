@@ -211,8 +211,7 @@ interface JsxrayWarning {
   kind: string;
   value?: unknown;
   source?: unknown;
-  // Structural slice of either one span or an array; only the first span is read.
-  location?: { 0?: { start?: { line?: number } }; start?: { line?: number } };
+  location?: Array<{ start?: { line?: number } }> | { start?: { line?: number } };
 }
 
 interface JsxrayModule {
@@ -257,8 +256,10 @@ async function scanFileWithJsxray(
         const mapping = JSXRAY_WARNING_MAP[warning.kind];
         if (!mapping) continue;
 
-        const line =
-          warning.location?.[0]?.start?.line ?? warning.location?.start?.line ?? undefined;
+        const location = warning.location;
+        const line = Array.isArray(location)
+          ? (location[0]?.start?.line ?? undefined)
+          : (location?.start?.line ?? undefined);
 
         findings.push({
           dimension: mapping.dimension,
