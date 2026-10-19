@@ -15,10 +15,13 @@ export const PRESET_KEYS = [
   'qwen',
   'zhipu',
   'minimax',
+  'minimaxPlan',
   'volcengine',
   'qianfan',
   'stepfun',
+  'stepfunPlan',
   'xiaomi',
+  'xiaomiTokenPlan',
   'grok',
   'openrouter',
   'ollama',
@@ -99,6 +102,14 @@ export const PRESETS: Record<PresetKey, PresetConfig> = {
     baseUrl: 'https://api.minimax.cn/v1',
     defaultModels: 'MiniMax-M3.1-Flash, MiniMax-M3',
   },
+  // Subscription plan: same host as pay-as-you-go but needs the M Plan subscription key.
+  minimaxPlan: {
+    labelKey: 'magpiePresetMiniMaxPlan',
+    name: 'MiniMax M Plan',
+    api: 'openai-completions',
+    baseUrl: 'https://api.minimax.cn/v1',
+    defaultModels: 'MiniMax-M3.1-Flash-Preview',
+  },
   volcengine: {
     labelKey: 'magpiePresetVolcengine',
     name: 'Volcengine Ark',
@@ -120,12 +131,28 @@ export const PRESETS: Record<PresetKey, PresetConfig> = {
     baseUrl: 'https://api.stepfun.com/v1',
     defaultModels: 'step-3.7-flash',
   },
+  // Subscription plan endpoint; calls here draw on Step Plan credits, not account balance.
+  stepfunPlan: {
+    labelKey: 'magpiePresetStepFunPlan',
+    name: 'StepFun Step Plan',
+    api: 'openai-completions',
+    baseUrl: 'https://api.stepfun.com/step_plan/v1',
+    defaultModels: 'step-5-preview, step-3.7-flash',
+  },
   xiaomi: {
     labelKey: 'magpiePresetXiaomi',
     name: 'Xiaomi MiMo',
     api: 'openai-completions',
     baseUrl: 'https://api.xiaomimimo.com/v1',
     defaultModels: 'mimo-v2.6-pro, mimo-v2.6-flash',
+  },
+  // Subscription plan endpoint; requires a tp-/ttp- Token Plan key (not the sk- API key).
+  xiaomiTokenPlan: {
+    labelKey: 'magpiePresetXiaomiTokenPlan',
+    name: 'Xiaomi MiMo Token Plan',
+    api: 'openai-completions',
+    baseUrl: 'https://token-plan-cn.xiaomimimo.com/v1',
+    defaultModels: 'mimo-v2.6-pro',
   },
   grok: {
     labelKey: 'magpiePresetGrok',
