@@ -1,4 +1,4 @@
-import { BrowserWindow, ipcMain, shell } from 'electron';
+import { BrowserWindow, shell } from 'electron';
 import os from 'os';
 
 import type {
@@ -9,6 +9,8 @@ import type {
   OllamaStatusSnapshot,
 } from '../../shared/ollama';
 import { OllamaIpcChannel } from '../../shared/ollama';
+import { ollamaContract } from '../../shared/ipc/ollamaContract';
+import { handleIpcContract } from '../ipc/handleIpcContract';
 import {
   readOllamaProviderSnapshot,
   type OllamaProviderSnapshot,
@@ -67,134 +69,130 @@ export function registerOllamaIpcHandlers(
   const activePulls = new Map<string, AbortController>();
   const activeChats = new Map<string, AbortController>();
 
-  ipcMain.handle(OllamaIpcChannel.Status, async () => manager.detect());
-  ipcMain.handle(OllamaIpcChannel.Install, async () => {
-    const status = await manager.install();
-    if (status.status === 'not-installed' || status.status === 'error') {
-      await shell.openExternal('https://ollama.com/download').catch(error => {
-        console.warn('[Ollama] failed to open download page:', error);
-      });
-    }
-    return status;
-  });
-  ipcMain.handle(OllamaIpcChannel.Start, async () => {
-    const status = await manager.start();
-    await refreshBindings();
-    return status;
-  });
-  ipcMain.handle(OllamaIpcChannel.Stop, async () => {
-    const status = await manager.stop();
-    await clearBindings();
-    return status;
-  });
-  ipcMain.handle(OllamaIpcChannel.Restart, async () => {
-    const status = await manager.restart();
-    await refreshBindings();
-    return status;
-  });
-  ipcMain.handle(OllamaIpcChannel.GetServiceConfig, async () =>
-    getOllamaServiceConfig(options.getStore()),
-  );
-  ipcMain.handle(OllamaIpcChannel.SetServiceConfig, async (_event, config: OllamaServiceConfig) => {
-    const sanitized = sanitizeOllamaServiceConfig(config);
-    options.getStore().set(OLLAMA_SERVICE_CONFIG_KEY, sanitized);
-    return sanitized;
-  });
-  ipcMain.handle(OllamaIpcChannel.ModelsDir, async () => {
-    return process.env.OLLAMA_MODELS || `${os.homedir()}/.ollama/models`;
-  });
-
-  ipcMain.handle(OllamaIpcChannel.ListLocalModels, async () => {
-    const client = await manager.client();
-    return await client.listModels();
-  });
-  ipcMain.handle(OllamaIpcChannel.ListRunningModels, async () => {
-    const client = await manager.client();
-    const runningModels = await client.runningModels();
-    await refreshBindings();
-    return runningModels;
-  });
-  ipcMain.handle(OllamaIpcChannel.DeleteModel, async (_event, name: string) => {
-    const client = await manager.client();
-    await client.deleteModel(name);
-    await refreshBindings();
-    return { success: true };
-  });
-  ipcMain.handle(OllamaIpcChannel.ShowModel, async (_event, name: string) => {
-    const client = await manager.client();
-    const model = await client.showModel(name);
-
-    return model;
-  });
-  ipcMain.handle(OllamaIpcChannel.CreateModel, async (_event, name: string, modelfile: string) => {
-    const client = await manager.client();
-    await client.createModel(name, modelfile);
-    return { success: true };
-  });
-  ipcMain.handle(OllamaIpcChannel.PreloadModel, async (_event, input: OllamaModelLaunchInput) => {
-    const modelName = input.model.trim();
-    if (!modelName) throw new Error('Model name is required');
-    const client = await manager.client();
-    const result = await client.preloadModel({ ...input, model: modelName });
-    await refreshBindings();
-    return result;
-  });
-  ipcMain.handle(OllamaIpcChannel.UnloadModel, async (_event, name: string) => {
-    const modelName = name.trim();
-    if (!modelName) throw new Error('Model name is required');
-    const client = await manager.client();
-    await client.unloadModel(modelName);
-    const runningModels = await client.runningModels();
-    await refreshBindings();
-    return { success: true, runningModels };
-  });
-  ipcMain.handle(OllamaIpcChannel.PullModel, async (_event, name: string) => {
-    const modelName = name.trim();
-    if (!modelName) throw new Error('Model name is required');
-    if (activePulls.has(modelName)) {
-      throw new Error(`Pull already in progress: ${modelName}`);
-    }
-    const controller = new AbortController();
-    activePulls.set(modelName, controller);
-    try {
-      const client = await manager.client();
-      await client.pullModel(
-        modelName,
-        chunk => {
-          broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk });
-        },
-        { signal: controller.signal },
-      );
-      broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk: { status: 'success' } });
-      return { success: true };
-    } catch (error) {
-      if (controller.signal.aborted || isAbortError(error)) {
-        broadcast(OllamaIpcChannel.PullProgress, {
-          name: modelName,
-          chunk: { status: 'cancelled' },
+  handleIpcContract(ollamaContract, {
+    status: async () => manager.detect(),
+    install: async () => {
+      const status = await manager.install();
+      if (status.status === 'not-installed' || status.status === 'error') {
+        await shell.openExternal('https://ollama.com/download').catch(error => {
+          console.warn('[Ollama] failed to open download page:', error);
         });
-        throw new Error('Pull cancelled', { cause: error });
       }
-      throw error;
-    } finally {
-      activePulls.delete(modelName);
-    }
-  });
-  ipcMain.handle(OllamaIpcChannel.CancelPull, async (_event, name: string) => {
-    const modelName = name.trim();
-    const controller = activePulls.get(modelName);
-    if (!controller) return { success: true, cancelled: false };
-    broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk: { status: 'cancelling' } });
-    controller.abort(new Error('Pull cancelled'));
-    return { success: true, cancelled: true };
-  });
-  ipcMain.handle(OllamaIpcChannel.Chat, async (_event, payload: OllamaChatPayload) => {
-    const client = await manager.client();
-    return await client.chat({ ...payload, stream: false });
-  });
-  ipcMain.handle(
-    OllamaIpcChannel.ChatStream,
-    async (_event, requestId: string, payload: OllamaChatPayload) => {
+      return status;
+    },
+    start: async () => {
+      const status = await manager.start();
+      await refreshBindings();
+      return status;
+    },
+    stop: async () => {
+      const status = await manager.stop();
+      await clearBindings();
+      return status;
+    },
+    restart: async () => {
+      const status = await manager.restart();
+      await refreshBindings();
+      return status;
+    },
+    getServiceConfig: async () => getOllamaServiceConfig(options.getStore()),
+    setServiceConfig: async (_event, config: OllamaServiceConfig) => {
+      const sanitized = sanitizeOllamaServiceConfig(config);
+      options.getStore().set(OLLAMA_SERVICE_CONFIG_KEY, sanitized);
+      return sanitized;
+    },
+    modelsDir: async () => process.env.OLLAMA_MODELS || `${os.homedir()}/.ollama/models`,
+
+    listLocalModels: async () => {
+      const client = await manager.client();
+      return await client.listModels();
+    },
+    listRunningModels: async () => {
+      const client = await manager.client();
+      const runningModels = await client.runningModels();
+      await refreshBindings();
+      return runningModels;
+    },
+    deleteModel: async (_event, name: string) => {
+      const client = await manager.client();
+      await client.deleteModel(name);
+      await refreshBindings();
+      return { success: true } as const;
+    },
+    showModel: async (_event, name: string) => {
+      const client = await manager.client();
+      return (await client.showModel(name)) as Record<string, unknown>;
+    },
+    createModel: async (_event, name: string, modelfile: string) => {
+      const client = await manager.client();
+      await client.createModel(name, modelfile);
+      return { success: true } as const;
+    },
+    preloadModel: async (_event, input: OllamaModelLaunchInput) => {
+      const modelName = input.model.trim();
+      if (!modelName) throw new Error('Model name is required');
+      const client = await manager.client();
+      const result = await client.preloadModel({ ...input, model: modelName });
+      await refreshBindings();
+      return result;
+    },
+    unloadModel: async (_event, name: string) => {
+      const modelName = name.trim();
+      if (!modelName) throw new Error('Model name is required');
+      const client = await manager.client();
+      await client.unloadModel(modelName);
+      const runningModels = await client.runningModels();
+      await refreshBindings();
+      return { success: true as const, runningModels };
+    },
+    pullModel: async (_event, name: string) => {
+      const modelName = name.trim();
+      if (!modelName) throw new Error('Model name is required');
+      if (activePulls.has(modelName)) {
+        throw new Error(`Pull already in progress: ${modelName}`);
+      }
+      const controller = new AbortController();
+      activePulls.set(modelName, controller);
+      try {
+        const client = await manager.client();
+        await client.pullModel(
+          modelName,
+          chunk => {
+            broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk });
+          },
+          { signal: controller.signal },
+        );
+        broadcast(OllamaIpcChannel.PullProgress, { name: modelName, chunk: { status: 'success' } });
+        return { success: true } as const;
+      } catch (error) {
+        if (controller.signal.aborted || isAbortError(error)) {
+          broadcast(OllamaIpcChannel.PullProgress, {
+            name: modelName,
+            chunk: { status: 'cancelled' },
+          });
+          throw new Error('Pull cancelled', { cause: error });
+        }
+        throw error;
+      } finally {
+        activePulls.delete(modelName);
+      }
+    },
+    cancelPull: async (_event, name: string) => {
+      const modelName = name.trim();
+      const controller = activePulls.get(modelName);
+      if (!controller) return { success: true as const, cancelled: false };
+      broadcast(OllamaIpcChannel.PullProgress, {
+        name: modelName,
+        chunk: { status: 'cancelling' },
+      });
+      controller.abort(new Error('Pull cancelled'));
+      return { success: true as const, cancelled: true };
+    },
+    chat: async (_event, payload: OllamaChatPayload) => {
+      const client = await manager.client();
+      return (await client.chat({ ...payload, stream: false })) as Record<string, unknown>;
+    },
+    chatStream: async (_event, requestId: string, payload: OllamaChatPayload) => {
       if (typeof requestId !== 'string' || !requestId.trim())
         throw new Error('Request ID is required');
       if (activeChats.has(requestId))
@@ -210,7 +208,7 @@ export function registerOllamaIpcHandlers(
           },
           { signal: controller.signal },
         );
-        return { success: true };
+        return { success: true } as const;
       } catch (error) {
         if (controller.signal.aborted || isAbortError(error)) {
           throw new Error('Generation cancelled', { cause: error });
@@ -220,12 +218,12 @@ export function registerOllamaIpcHandlers(
         activeChats.delete(requestId);
       }
     },
-  );
-  ipcMain.handle(OllamaIpcChannel.CancelChatStream, async (_event, requestId: string) => {
-    const controller = activeChats.get(requestId);
-    if (!controller) return { success: true, cancelled: false };
-    controller.abort(new Error('Generation cancelled'));
-    return { success: true, cancelled: true };
+    cancelChatStream: async (_event, requestId: string) => {
+      const controller = activeChats.get(requestId);
+      if (!controller) return { success: true as const, cancelled: false };
+      controller.abort(new Error('Generation cancelled'));
+      return { success: true as const, cancelled: true };
+    },
   });
 }
 

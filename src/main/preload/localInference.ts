@@ -2,36 +2,16 @@ import { ipcRenderer } from 'electron';
 
 import { HardwareIpc } from '../../shared/ipc/channels';
 import { LlamaCppIpcChannel } from '../../shared/llamacpp/constants';
+import { ollamaContractChannels } from '../../shared/ipc/ollamaContract.channels';
 import { OllamaIpcChannel } from '../../shared/ollama/constants';
+import { createIpcInvokers } from './createIpcInvokers';
 import { onPush, onPushVoid } from './pushChannel';
 
 // Local inference runtimes (Ollama and llama.cpp) plus hardware probes.
 export const localInferenceApi = {
+  // Ollama invokes come from the zod contract; pushes stay hand-wired.
   ollama: {
-    status: () => ipcRenderer.invoke(OllamaIpcChannel.Status),
-    install: () => ipcRenderer.invoke(OllamaIpcChannel.Install),
-    start: () => ipcRenderer.invoke(OllamaIpcChannel.Start),
-    stop: () => ipcRenderer.invoke(OllamaIpcChannel.Stop),
-    restart: () => ipcRenderer.invoke(OllamaIpcChannel.Restart),
-    getServiceConfig: () => ipcRenderer.invoke(OllamaIpcChannel.GetServiceConfig),
-    setServiceConfig: (config: unknown) =>
-      ipcRenderer.invoke(OllamaIpcChannel.SetServiceConfig, config),
-    modelsDir: () => ipcRenderer.invoke(OllamaIpcChannel.ModelsDir),
-    listLocalModels: () => ipcRenderer.invoke(OllamaIpcChannel.ListLocalModels),
-    listRunningModels: () => ipcRenderer.invoke(OllamaIpcChannel.ListRunningModels),
-    deleteModel: (name: string) => ipcRenderer.invoke(OllamaIpcChannel.DeleteModel, name),
-    showModel: (name: string) => ipcRenderer.invoke(OllamaIpcChannel.ShowModel, name),
-    createModel: (name: string, modelfile: string) =>
-      ipcRenderer.invoke(OllamaIpcChannel.CreateModel, name, modelfile),
-    preloadModel: (input: unknown) => ipcRenderer.invoke(OllamaIpcChannel.PreloadModel, input),
-    unloadModel: (name: string) => ipcRenderer.invoke(OllamaIpcChannel.UnloadModel, name),
-    pullModel: (name: string) => ipcRenderer.invoke(OllamaIpcChannel.PullModel, name),
-    cancelPull: (name: string) => ipcRenderer.invoke(OllamaIpcChannel.CancelPull, name),
-    chat: (payload: unknown) => ipcRenderer.invoke(OllamaIpcChannel.Chat, payload),
-    chatStream: (requestId: string, payload: unknown) =>
-      ipcRenderer.invoke(OllamaIpcChannel.ChatStream, requestId, payload),
-    cancelChatStream: (requestId: string) =>
-      ipcRenderer.invoke(OllamaIpcChannel.CancelChatStream, requestId),
+    ...createIpcInvokers(ollamaContractChannels),
     onStatusChanged: (callback: (snapshot: unknown) => void) =>
       onPush(OllamaIpcChannel.StatusChanged, callback),
     onInstallProgress: (callback: (progress: unknown) => void) =>
