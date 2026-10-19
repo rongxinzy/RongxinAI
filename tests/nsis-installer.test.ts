@@ -28,7 +28,7 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(cacheMissIndex).toBeGreaterThan(-1);
     expect(payloadIndex).toBeGreaterThan(cacheMissIndex);
-    expect(installerScript.match(/!insertmacro QueueOfflineComponent /g)).toHaveLength(7);
+    expect(installerScript).toContain('!insertmacro QueueEditionComponents');
     expect(installerScript).toContain('phase=component-cache-hit');
     expect(installerScript).toContain('component-${KEY}.sentinel-sha256');
     expect(installerScript).toContain('File /oname=7za.exe');
@@ -189,7 +189,7 @@ describe('NSIS offline resource and local inference flow', () => {
     const offlineComponents = JSON.parse(fs.readFileSync(offlineComponentsPath, 'utf8'));
 
     expect(installerScript).toContain(
-      'File /oname=component-targets.json "${PROJECT_DIR}\\scripts\\nsis-offline-components.json"',
+      'File /oname=component-targets.json "${PROJECT_DIR}\\build-tar\\windows-components\\nsis-targets.json"',
     );
     expect(installerScript).not.toContain('component-targets.txt');
     expect(installerScript).not.toContain('FileWrite $2 "${KEY}|${PREFIX}');

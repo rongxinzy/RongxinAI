@@ -2,142 +2,45 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { expect, test } from 'vitest';
 
-import { afterEach, describe, expect, test } from 'vitest';
+const scriptPath = path.join(import.meta.dirname, 'windows-installer-size-smoke.ps1');
 
-const temporaryDirectories: string[] = [];
-const scriptPath = path.join(__dirname, 'windows-installer-size-smoke.ps1');
-
-function installBudgetFixture(root: string) {
-  fs.mkdirSync(path.join(root, 'scripts/ci'), { recursive: true });
-  fs.symlinkSync(
-    path.resolve(__dirname, '../installer-shell'),
-    path.join(root, 'scripts/installer-shell'),
-    'junction',
-  );
-  for (const file of ['windows-installer-size-smoke.ps1', 'read-installer-budget.cjs']) {
-    fs.copyFileSync(path.join(__dirname, file), path.join(root, 'scripts/ci', file));
-  }
-}
-
-function createFixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan 安装 空格-test-'));
-  temporaryDirectories.push(root);
-  installBudgetFixture(root);
-  fs.mkdirSync(path.join(root, 'release'), { recursive: true });
-  fs.mkdirSync(path.join(root, 'build-tar', 'windows-components'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'release', 'ZhiYuan-Setup.exe'), Buffer.alloc(100));
-  fs.writeFileSync(
-    path.join(root, 'build-tar', 'windows-components', 'manifest.json'),
-    JSON.stringify({
-      components: [
-        {
-          key: 'portable-git',
-          archiveSizeBytes: 40,
-          archiveCompression: 'lzma-bcj2-d128m-mx9-solid-v1',
-        },
-      ],
-    }),
-  );
-  return root;
-}
-
-function runSizeCheck(
-  projectRoot: string,
-  maximumInstallerBytes: number,
-  maximumComponentBytes: number,
-  maximumNonComponentBytes: number,
-) {
-  return spawnSync(
-    'powershell.exe',
-    [
-      '-NoProfile',
-      '-NonInteractive',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      scriptPath,
-      '-ProjectRoot',
-      projectRoot,
-      '-MaximumInstallerBytes',
-      String(maximumInstallerBytes),
-      '-MaximumComponentBytes',
-      String(maximumComponentBytes),
-      '-MaximumNonComponentBytes',
-      String(maximumNonComponentBytes),
-    ],
-    { encoding: 'utf8', env: { ...process.env, ZHIYUAN_UPDATE_VARIANT: 'lite' } },
-  );
-}
-
-afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) {
-    fs.rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-describe.skipIf(process.platform !== 'win32')('Windows installer size smoke check', () => {
-  test('reports component compression and accepts a package within every budget', () => {
-    const result = runSizeCheck(createFixture(), 100, 40, 60);
-
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('lzma-bcj2-d128m-mx9-solid-v1');
-    expect(result.stdout).toContain('non-component bytes: 60');
-  });
-
-  test('checks the NSIS budget separately when a final WebView2 installer is also present', () => {
-    const root = createFixture();
-    fs.writeFileSync(path.join(root, 'release', 'ZhiYuanAgent-Setup-1.0.0.exe'), Buffer.alloc(120));
-    const result = runSizeCheck(root, 100, 40, 60);
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain('ZhiYuan-Setup.exe');
-  });
-
-  test.each([
-    ['component', 100, 39, 60, 'component archives are unexpectedly large'],
-    ['non-component', 100, 40, 59, 'non-component payload is unexpectedly large'],
-    ['installer', 99, 40, 60, 'installer is unexpectedly large'],
-  ])('rejects an oversized %s payload', (_, installer, component, nonComponent, message) => {
-    const result = runSizeCheck(createFixture(), installer, component, nonComponent);
-
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain(message);
-  });
-});
-
-test('installer budgets distinguish required WebView2 overhead without widening NSIS or components', () => {
+test('installer telemetry has no size ceiling and counts all edition components', () => {
   const source = fs.readFileSync(scriptPath, 'utf8');
-  for (const contract of [
-    '$MaximumInstallerBytes = 450MB',
-    '$MaximumNonComponentBytes = 150MB',
-    '$MaximumComponentBytes = 300MB',
-    '$MaximumShellBytes = 500MB',
-    '$MaximumShellNonComponentBytes = 220MB',
-    '$shellBytes -gt $MaximumShellBytes',
-    '$shellNonComponentBytes -gt $MaximumShellNonComponentBytes',
-  ])
-    expect(source).toContain(contract);
+  expect(source).not.toMatch(/Maximum\w+Bytes|unexpectedly large|exceeds.*budget/);
+  expect(source).toContain('$nsisComponentBytes = $componentBytes');
+  expect(source).toContain('[measure] windows-webview2-setup');
+  expect(source).toContain('[measure] windows-nsis-updater');
 });
 
-test.skipIf(process.platform !== 'win32')(
-  'real size gate accepts separate kinds and rejects either total or non-component overflow',
-  () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'installer-budget-'));
+test.skipIf(process.platform !== 'win32').each(['lite', 'cpu', 'cuda'])(
+  '%s reports files over the former ceilings and still rejects missing manifests',
+  edition => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'installer-size-'));
     try {
-      installBudgetFixture(root);
       fs.mkdirSync(path.join(root, 'release'));
       fs.mkdirSync(path.join(root, 'build-tar/windows-components'), { recursive: true });
+      const manifestPath = path.join(root, 'build-tar/windows-components/manifest.json');
       fs.writeFileSync(
-        path.join(root, 'build-tar/windows-components/manifest.json'),
+        manifestPath,
         JSON.stringify({
-          components: [{ key: 'fixture', archiveSizeBytes: 100, archiveCompression: '7z' }],
+          components: [
+            { key: 'skill-python', archiveSizeBytes: 350 * 1024 * 1024 },
+            { key: 'llamacpp-bundled', archiveSizeBytes: 500 * 1024 * 1024 },
+          ],
         }),
       );
-      const nsis = path.join(root, 'release/Fixture-Setup.exe');
-      const shell = path.join(root, 'release/ZhiYuanAgent-Setup-fixture.exe');
-      fs.writeFileSync(nsis, Buffer.alloc(200));
-      fs.writeFileSync(shell, Buffer.alloc(300));
-      const run = (shellNonComponentLimit = 220) =>
+      // Sparse fixture: exercise real file lengths without allocating gigabytes.
+      for (const name of ['Fixture-Setup.exe', 'ZhiYuanAgent-Setup-fixture.exe']) {
+        const fd = fs.openSync(path.join(root, 'release', name), 'w');
+        try {
+          fs.ftruncateSync(fd, 1024 * 1024 * 1024);
+        } finally {
+          fs.closeSync(fd);
+        }
+      }
+      const run = () =>
         spawnSync(
           'powershell.exe',
           [
@@ -149,45 +52,17 @@ test.skipIf(process.platform !== 'win32')(
             scriptPath,
             '-ProjectRoot',
             root,
-            '-MaximumInstallerBytes',
-            '250',
-            '-MaximumNonComponentBytes',
-            '150',
-            '-MaximumComponentBytes',
-            '120',
-            '-MaximumShellBytes',
-            '350',
-            '-MaximumShellNonComponentBytes',
-            String(shellNonComponentLimit),
           ],
-          { encoding: 'utf8', env: { ...process.env, ZHIYUAN_UPDATE_VARIANT: 'lite' } },
+          { encoding: 'utf8', env: { ...process.env, ZHIYUAN_UPDATE_VARIANT: edition } },
         );
-      expect(run().status).toBe(0);
-      fs.writeFileSync(nsis, Buffer.alloc(251));
+      const result = run();
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('installerBytes=1073741824');
+      expect(result.stdout).toContain('componentArchiveBytes=891289600');
+      fs.rmSync(manifestPath);
       expect(run().status).not.toBe(0);
-      fs.writeFileSync(nsis, Buffer.alloc(200));
-      fs.writeFileSync(shell, Buffer.alloc(321));
-      expect(run().status).not.toBe(0);
-      fs.writeFileSync(shell, Buffer.alloc(351));
-      expect(run(500).status).not.toBe(0);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
-  },
-);
-
-test.skipIf(process.platform !== 'win32')(
-  'default root resolves beside the script with spaces and Unicode',
-  () => {
-    const root = createFixture();
-    const result = spawnSync(
-      'powershell.exe',
-      ['-NoProfile', '-File', path.join(root, 'scripts/ci/windows-installer-size-smoke.ps1')],
-      {
-        encoding: 'utf8',
-        env: { ...process.env, ZHIYUAN_UPDATE_VARIANT: 'lite' },
-      },
-    );
-    expect(result.status, result.stderr).toBe(0);
   },
 );
