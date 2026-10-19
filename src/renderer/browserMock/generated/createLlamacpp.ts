@@ -3,6 +3,27 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron']['llamacpp'] {
   return {
+    onStatusChanged: _p0 => {
+      return runtime.subscribe('llamacpp.onStatusChanged', _p0);
+    },
+    onModelBindingsChanged: _p0 => {
+      return runtime.subscribe('llamacpp.onModelBindingsChanged', _p0);
+    },
+    onInstallProgress: _p0 => {
+      return runtime.subscribe('llamacpp.onInstallProgress', _p0);
+    },
+    onModelLaunchLog: _p0 => {
+      return runtime.subscribe('llamacpp.onModelLaunchLog', _p0);
+    },
+    onModelLaunchLogCleared: _p0 => {
+      return runtime.subscribe('llamacpp.onModelLaunchLogCleared', _p0);
+    },
+    onModelLaunchLogWindowTargetChanged: _p0 => {
+      return runtime.subscribe('llamacpp.onModelLaunchLogWindowTargetChanged', _p0);
+    },
+    onPullProgress: _p0 => {
+      return runtime.subscribe('llamacpp.onPullProgress', _p0);
+    },
     status: async () => {
       runtime.warnOnce('llamacpp.status');
       return {
@@ -27,6 +48,12 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
         },
       };
     },
+    getRuntimeInstallSnapshot: async () => {
+      runtime.warnOnce('llamacpp.getRuntimeInstallSnapshot');
+      return {
+        active: false,
+      };
+    },
     cancelRuntimeInstall: async () => {
       runtime.warnOnce('llamacpp.cancelRuntimeInstall');
       return {
@@ -34,10 +61,17 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
         cancelled: false,
       };
     },
-    importRuntime: async () => {
-      runtime.warnOnce('llamacpp.importRuntime');
+    uninstallRuntime: async () => {
+      runtime.warnOnce('llamacpp.uninstallRuntime');
       return {
         success: true,
+        deleted: false,
+        runtimeRoot: '',
+        status: {
+          status: 'stopped',
+          managedByApp: true,
+          checkedAt: '',
+        },
         backend: {
           version: '0.0.0-preview',
           backend: '',
@@ -56,18 +90,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
           versionBackend: '',
         },
         devices: [],
-      };
-    },
-    getRuntimeCapabilities: async () => {
-      runtime.warnOnce('llamacpp.getRuntimeCapabilities');
-      return {
-        success: true,
-        flags: [],
-        deviceProbeSucceeded: false,
-        devices: [],
-        backendKinds: [],
-        gpuDeviceCount: 0,
-        supports: {},
       };
     },
     listBackends: async () => {
@@ -136,12 +158,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
         },
       };
     },
-    getRuntimeInstallSnapshot: async () => {
-      runtime.warnOnce('llamacpp.getRuntimeInstallSnapshot');
-      return {
-        active: false,
-      };
-    },
     uninstallBackend: async _p0 => {
       void _p0;
       runtime.warnOnce('llamacpp.uninstallBackend');
@@ -161,17 +177,22 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
         },
       };
     },
-    uninstallRuntime: async () => {
-      runtime.warnOnce('llamacpp.uninstallRuntime');
+    getRuntimeCapabilities: async () => {
+      runtime.warnOnce('llamacpp.getRuntimeCapabilities');
       return {
         success: true,
-        deleted: false,
-        runtimeRoot: '',
-        status: {
-          status: 'stopped',
-          managedByApp: true,
-          checkedAt: '',
-        },
+        flags: [],
+        deviceProbeSucceeded: false,
+        devices: [],
+        backendKinds: [],
+        gpuDeviceCount: 0,
+        supports: {},
+      };
+    },
+    importRuntime: async () => {
+      runtime.warnOnce('llamacpp.importRuntime');
+      return {
+        success: true,
         backend: {
           version: '0.0.0-preview',
           backend: '',
@@ -263,7 +284,10 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
     showModel: async _p0 => {
       void _p0;
       runtime.warnOnce('llamacpp.showModel');
-      return {};
+      return {
+        name: 'Preview',
+        args: [],
+      };
     },
     getModelPreferences: async () => {
       runtime.warnOnce('llamacpp.getModelPreferences');
@@ -362,27 +386,6 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
         success: true,
         cancelled: false,
       };
-    },
-    onStatusChanged: _p0 => {
-      return runtime.subscribe('llamacpp.onStatusChanged', _p0);
-    },
-    onModelBindingsChanged: _p0 => {
-      return runtime.subscribe('llamacpp.onModelBindingsChanged', _p0);
-    },
-    onInstallProgress: _p0 => {
-      return runtime.subscribe('llamacpp.onInstallProgress', _p0);
-    },
-    onModelLaunchLog: _p0 => {
-      return runtime.subscribe('llamacpp.onModelLaunchLog', _p0);
-    },
-    onModelLaunchLogCleared: _p0 => {
-      return runtime.subscribe('llamacpp.onModelLaunchLogCleared', _p0);
-    },
-    onModelLaunchLogWindowTargetChanged: _p0 => {
-      return runtime.subscribe('llamacpp.onModelLaunchLogWindowTargetChanged', _p0);
-    },
-    onPullProgress: _p0 => {
-      return runtime.subscribe('llamacpp.onPullProgress', _p0);
     },
   };
 }

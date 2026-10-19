@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron';
+import { app } from 'electron';
 
 import type {
   LlamaCppLatestModelLaunchLogSessionInput,
@@ -14,6 +14,8 @@ import {
 } from '../../shared/llamacpp';
 import { createLlamaCppModelLaunchLogFileStore } from '../libs/llamacppModelLaunchLogFile';
 import { openLlamaCppModelLaunchLogWindow } from '../libs/llamacppModelLaunchLogWindow';
+import { llamacppContract } from '../../shared/ipc/llamacppContract';
+import { handleIpcContract, handleIpcContractSubset } from '../ipc/handleIpcContract';
 
 export function registerLlamaCppModelLaunchLogIpcHandlers(input: {
   broadcast: (channel: string, payload: unknown) => void;
@@ -24,16 +26,20 @@ export function registerLlamaCppModelLaunchLogIpcHandlers(input: {
   const modelLaunchLogFiles = createLlamaCppModelLaunchLogFileStore({
     userDataPath: app.getPath('userData'),
   });
+  const impls: Record<string, unknown> = {};
+  const registerImpl = (method: string, fn: unknown): void => {
+    impls[method] = fn;
+  };
 
-  ipcMain.handle(
-    LlamaCppIpcChannel.GetLatestModelLaunchLogSession,
-    (_event, request?: LlamaCppLatestModelLaunchLogSessionInput) =>
+  registerImpl(
+    'getLatestModelLaunchLogSession',
+    (_event: unknown, request?: LlamaCppLatestModelLaunchLogSessionInput) =>
       modelLaunchLogFiles.getLatestSession(request?.modelName),
   );
 
-  ipcMain.handle(
-    LlamaCppIpcChannel.ReadModelLaunchLogFile,
-    (_event, request?: LlamaCppReadModelLaunchLogFileInput) => {
+  registerImpl(
+    'readModelLaunchLogFile',
+    (_event: unknown, request?: LlamaCppReadModelLaunchLogFileInput) => {
       const sessionId = request?.sessionId?.trim();
       if (!sessionId) {
         return {
@@ -60,9 +66,9 @@ export function registerLlamaCppModelLaunchLogIpcHandlers(input: {
     },
   );
 
-  ipcMain.handle(
-    LlamaCppIpcChannel.OpenModelLaunchLogWindow,
-    async (_event, request?: LlamaCppOpenModelLaunchLogWindowInput) => {
+  registerImpl(
+    'openModelLaunchLogWindow',
+    async (_event: unknown, request?: LlamaCppOpenModelLaunchLogWindowInput) => {
       const sessionId = request?.sessionId?.trim();
       const modelName = request?.modelName?.trim();
       const session = sessionId
@@ -86,6 +92,17 @@ export function registerLlamaCppModelLaunchLogIpcHandlers(input: {
           error: error instanceof Error ? error.message : String(error),
         };
       }
+    },
+  );
+
+  // The subset signature cannot name K here; keys drive registration and the
+  // values are the closures collected above.
+  handleIpcContractSubset(
+    llamacppContract,
+    impls as {
+      getLatestModelLaunchLogSession: never;
+      readModelLaunchLogFile: never;
+      openModelLaunchLogWindow: never;
     },
   );
 
