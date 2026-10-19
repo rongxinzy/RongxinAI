@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
-import { classicLight } from '../../theme/themes/classic-light';
+import { zenithLight } from '../../theme/themes/zenith-light';
 
 const source = readFileSync(
   fileURLToPath(new URL('./InlineSkillPromptEditor.tsx', import.meta.url)),
@@ -29,14 +29,14 @@ test('restores the mixed token and text DOM when a send is rejected', () => {
 
 test('shows removal in the icon slot only while hovering a token', () => {
   expect(source).toContain('theme-surface-skill-token');
-  expect(classicLight.components['surface-skill-token'].base['background-color']).toBe(
+  expect(zenithLight.components['surface-skill-token'].base['background-color']).toBe(
     'var(--zy-skill-blue-background)',
   );
   expect(source).toContain('inline-flex h-6');
   expect(source).toContain('theme-surface-skill-icon');
-  expect(classicLight.components['surface-skill-icon'].parentHover.opacity).toBe('0');
-  expect(classicLight.components['surface-skill-remove'].base.opacity).toBe('0');
-  expect(classicLight.components['surface-skill-remove'].parentHover.opacity).toBe('1');
+  expect(zenithLight.components['surface-skill-icon'].parentHover.opacity).toBe('0');
+  expect(zenithLight.components['surface-skill-remove'].base.opacity).toBe('0');
+  expect(zenithLight.components['surface-skill-remove'].parentHover.opacity).toBe('1');
   expect(source).toContain('group-hover:pointer-events-auto');
 });
 

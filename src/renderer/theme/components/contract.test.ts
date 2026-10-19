@@ -1,11 +1,11 @@
 import { expect, test } from 'vitest';
 import { recipe } from './recipe';
-import { classicLight } from '../themes/classic-light';
+import { zenithLight } from '../themes/zenith-light';
 import { generateThemeCSS } from '../engine/css-generator';
 import { validateComponentAppearances } from './contract';
 
 test('requires complete state declarations and rejects selector and behavior injection', () => {
-  const missing = structuredClone(classicLight.components);
+  const missing = structuredClone(zenithLight.components);
   Reflect.deleteProperty(missing.input, 'focus');
   expect(() => validateComponentAppearances(missing)).toThrow('Missing component state');
   for (const [property, value] of [
@@ -16,14 +16,14 @@ test('requires complete state declarations and rejects selector and behavior inj
     ['color', 'red !important'],
     ['color', 'var(--missing-theme-variable)'],
   ]) {
-    const invalid = structuredClone(classicLight.components);
+    const invalid = structuredClone(zenithLight.components);
     Object.assign(invalid.input.base, { [property]: value });
     expect(() => validateComponentAppearances(invalid)).toThrow();
   }
 });
 
 test('compiles theme-owned state values with disabled guards and reduced motion', () => {
-  const theme = structuredClone(classicLight);
+  const theme = structuredClone(zenithLight);
   theme.meta.id = 'recipe-proof';
   theme.components.input.hover['border-color'] = 'var(--zy-primary)';
   theme.components.input.focus['outline-width'] = '2px';
@@ -38,11 +38,11 @@ test('compiles theme-owned state values with disabled guards and reduced motion'
 });
 
 test('variant bases precede interactive states and size recipes remain theme data', () => {
-  const css = generateThemeCSS(classicLight);
+  const css = generateThemeCSS(zenithLight);
   expect(css.indexOf(':where(.theme-button-outline) {')).toBeLessThan(
     css.indexOf(':where(.theme-button):where(:not(:disabled)'),
   );
-  const theme = structuredClone(classicLight);
+  const theme = structuredClone(zenithLight);
   theme.components['button-size-default'].base.height = '2.25rem';
   expect(generateThemeCSS(theme)).toContain('height: 2.25rem');
   expect(theme.components['select-content'].entering.opacity).toBe('0');
@@ -59,7 +59,7 @@ test('font-size overrides retain theme line-height while allowing explicit typog
 });
 
 test('isolates theme motion and places pseudo-element state selectors on their owners', () => {
-  const theme = structuredClone(classicLight);
+  const theme = structuredClone(zenithLight);
   theme.meta.id = 'motion-proof';
   // Exercise the compiler with explicit motion data; the Studio composer has no glow.
   theme.components['composer-far'] = recipe({
@@ -73,7 +73,7 @@ test('isolates theme motion and places pseudo-element state selectors on their o
     motionEnd: { opacity: '1' },
   });
   const css = generateThemeCSS(theme);
-  const original = generateThemeCSS(classicLight);
+  const original = generateThemeCSS(zenithLight);
   const motion = css.match(/animation-name: (zy-component-composer-far-[\w-]+)/)?.[1];
   expect(motion).toBeTruthy();
   expect(original).not.toContain(`animation-name: ${motion};`);
@@ -90,7 +90,7 @@ test('isolates theme motion and places pseudo-element state selectors on their o
 });
 
 test('shared fluid tabs retain Codex geometry and hover feedback in theme recipes', () => {
-  const c = classicLight.components;
+  const c = zenithLight.components;
   expect(c['fluid-tab-default'].base.height).toBe('2rem');
   expect(c['fluid-tab'].base['font-weight']).toBe('var(--zy-component-font-weight-normal)');
   expect(c['fluid-hover-indicator'].base['background-color']).toBe('var(--zy-surface)');
@@ -100,18 +100,29 @@ test('shared fluid tabs retain Codex geometry and hover feedback in theme recipe
 });
 
 test('selected appearances recognize both Base UI boolean attributes and string states', () => {
-  const css = generateThemeCSS(classicLight);
+  const css = generateThemeCSS(zenithLight);
   expect(css).toContain('[data-active=""]');
   expect(css).toContain('[data-active="true"]');
   expect(css).toContain('[data-state="selected"]');
 });
 
 test('component gradients can be themed without allowing remote image requests', () => {
-  const theme = structuredClone(classicLight);
+  const theme = structuredClone(zenithLight);
   theme.components['loading-shimmer-layer'].base['background-image'] =
     'linear-gradient(90deg, transparent, var(--zy-primary), transparent)';
   expect(() => validateComponentAppearances(theme.components)).not.toThrow();
   theme.components['loading-shimmer-layer'].base['background-image'] =
     'url(https://example.com/tracker.png)';
   expect(() => validateComponentAppearances(theme.components)).toThrow();
+});
+
+test('checked switch track rules keep their order without specificity overrides', () => {
+  // The generic .theme-switch[data-checked] track rule must precede the
+  // fluid-switch checked rule so the fluid variant wins on both selectors
+  // without extra specificity. Inherited from the classic theme's generator
+  // invariant when that theme was removed.
+  const css = generateThemeCSS(zenithLight);
+  expect(css.indexOf(':where(.theme-switch[data-checked]) {')).toBeLessThan(
+    css.indexOf(':where(.theme-switch[data-fluid-switch][data-checked]):where('),
+  );
 });
