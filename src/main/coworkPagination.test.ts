@@ -6,7 +6,7 @@
  * with realistic seed data.
  */
 import initSqlJs, { Database } from 'sql.js';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ function seedData(database: Database): void {
   seedSessionId = 'session-0001';
 
   // Insert one extra session with 200 messages
-  sessionWithManyMessagesId = uuidv4();
+  sessionWithManyMessagesId = randomUUID();
   database.run(
     `INSERT INTO cowork_sessions (id, title, status, pinned, cwd, created_at, updated_at)
      VALUES (?, 'Long Session', 'idle', 0, '/tmp', ?, ?)`,
@@ -170,7 +170,7 @@ function seedData(database: Database): void {
     database.run(
       `INSERT INTO cowork_messages (id, session_id, type, content, created_at, sequence)
        VALUES (?, ?, 'user', ?, ?, ?)`,
-      [uuidv4(), sessionWithManyMessagesId, `Message ${i}`, now + i, i],
+      [randomUUID(), sessionWithManyMessagesId, `Message ${i}`, now + i, i],
     );
   }
 }

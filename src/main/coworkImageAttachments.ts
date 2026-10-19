@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import { isRecord } from '../shared/lib/isRecord';
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const MIME_EXTENSION_MAP: Record<string, string> = {
@@ -47,9 +48,6 @@ const decodeBase64Payload = (value: string): Buffer => {
   const payload = value.startsWith('data:') && comma >= 0 ? value.slice(comma + 1) : value;
   return Buffer.from(payload, 'base64');
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 export function persistCoworkImageAttachments(
   rootDir: string,

@@ -8,6 +8,7 @@ import {
 import type { ProviderConfig } from './types';
 import { resolveCodingPlanBaseUrl } from './codingPlan';
 import { findConfiguredProviderModel } from './configuredModels';
+import { isRecord } from '../lib/isRecord';
 
 type RuntimeModelKind = 'cloud' | 'ollama' | 'llamacpp';
 type RuntimeModelStatus = 'unknown' | 'stopped' | 'running' | 'loaded';
@@ -66,9 +67,6 @@ const UNKNOWN_CAPABILITIES: ModelCapabilities = {
 
 const positiveNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const capabilityStatus = (supported: boolean): ModelCapabilityStatus =>
   supported ? ModelCapabilityStatus.Supported : ModelCapabilityStatus.Unsupported;

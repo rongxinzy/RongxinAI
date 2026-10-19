@@ -1,6 +1,7 @@
 import http from 'node:http';
 
 import { CcConnectRequestAuthenticator } from './ccConnectRequestAuthenticator';
+import { isRecord } from '../../shared/lib/isRecord';
 
 const MAX_BODY_BYTES = 140 * 1024 * 1024;
 
@@ -150,10 +151,6 @@ async function readJson(request: http.IncomingMessage): Promise<unknown> {
     chunks.push(buffer);
   }
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
