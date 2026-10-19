@@ -744,7 +744,10 @@ export class MagpieManager {
     if (this.state.state !== 'running') return { agents: [], pending: false };
     const state = await this.managementJson('/api/state');
     const cli = await this.managementJson('/api/agents/cli');
-    const records = cli.agents && typeof cli.agents === 'object' ? cli.agents : {};
+    const records: Record<string, Record<string, unknown>> = cli.agents &&
+    typeof cli.agents === 'object'
+      ? (cli.agents as Record<string, Record<string, unknown>>)
+      : {};
     return {
       pending: cli.pending === true,
       agents: (Array.isArray(state.agents) ? state.agents : [])
