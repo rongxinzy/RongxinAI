@@ -136,3 +136,6 @@ preview-screenshots/
 
 # bench:stream output (default --out)
 bench-results/
+
+# Local model marketplace cache created by tests/dev runs
+/marketplace-cache/
