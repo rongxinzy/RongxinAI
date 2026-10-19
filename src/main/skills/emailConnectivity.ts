@@ -22,7 +22,7 @@ export async function testEmailConnectivityImpl(
     const skillDir = ctx.resolveSkillDir(skillId);
 
     // Ensure dependencies are installed before running scripts
-    const depsResult = ctx.ensureSkillDependencies(skillDir);
+    const depsResult = await ctx.ensureSkillDependencies(skillDir);
     if (!depsResult.success) {
       console.error('[email-connectivity] Dependency install failed:', depsResult.error);
       return { success: false, error: depsResult.error };
@@ -131,11 +131,11 @@ export async function testEmailConnectivityImpl(
   }
 }
 
-function getScriptRuntimeCandidates(
+async function getScriptRuntimeCandidates(
   env: NodeJS.ProcessEnv,
-): Array<{ command: string; extraEnv?: NodeJS.ProcessEnv }> {
+): Promise<Array<{ command: string; extraEnv?: NodeJS.ProcessEnv }>> {
   const candidates: Array<{ command: string; extraEnv?: NodeJS.ProcessEnv }> = [];
-  if (hasCommand('node', env)) {
+  if (await hasCommand('node', env)) {
     candidates.push({ command: 'node' });
   }
   candidates.push({
@@ -155,9 +155,9 @@ async function runSkillScriptWithEnv(
   let lastResult: SkillScriptRunResult | null = null;
 
   // Build base environment with user's shell PATH
-  const baseEnv = buildSkillEnv();
+  const baseEnv = await buildSkillEnv();
 
-  for (const runtime of getScriptRuntimeCandidates(baseEnv as NodeJS.ProcessEnv)) {
+  for (const runtime of await getScriptRuntimeCandidates(baseEnv as NodeJS.ProcessEnv)) {
     const env: NodeJS.ProcessEnv = {
       ...baseEnv,
       ...runtime.extraEnv,

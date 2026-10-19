@@ -244,7 +244,7 @@
     "sign": false
   },
   "win": {
-    "signExts": ["!engram.exe"],
+    "signExts": ["!engram.exe", "!magpie.exe"],
     "target": ["nsis"],
     "publish": [
       {

@@ -26,8 +26,6 @@ import { InstallProgressBar } from './Common';
 import { LocalInferenceToastKind } from '../types';
 import { formatBytes } from '../utils/progress';
 
-const handledInstallerRequests = new Set<string>();
-
 const RuntimeMetadataStatus = {
   Loading: 'loading',
   Ready: 'ready',
@@ -51,9 +49,7 @@ function translateRuntimeError(error: string | undefined): string | undefined {
 }
 
 type RuntimeInstallCardProps = {
-  installRequestId?: string;
   runtimeInstallSnapshot: LlamaCppRuntimeInstallSnapshot;
-  onInstallRequestHandled?: (requestId: string) => void;
   onNotify?: (message: string, kind: LocalInferenceToastKind, autoDismiss?: boolean) => void;
 };
 
@@ -81,12 +77,7 @@ function isRuntimeDownloadProgress(progress: LlamaCppInstallProgress | null): bo
   );
 }
 
-export function RuntimeInstallCard({
-  installRequestId,
-  runtimeInstallSnapshot,
-  onInstallRequestHandled,
-  onNotify,
-}: RuntimeInstallCardProps) {
+export function RuntimeInstallCard({ runtimeInstallSnapshot, onNotify }: RuntimeInstallCardProps) {
   const [usesBundledRuntime, setUsesBundledRuntime] = useState<boolean | null>(null);
   const [backends, setBackends] = useState<LlamaCppBackendInfo[]>([]);
   const [selectedKey, setSelectedKey] = useState('');
@@ -189,18 +180,6 @@ export function RuntimeInstallCard({
     if (!error) return;
     notify(error, LocalInferenceToastKind.Error);
   }, [error, notify]);
-
-  useEffect(() => {
-    if (!installRequestId || handledInstallerRequests.has(installRequestId)) return;
-    handledInstallerRequests.add(installRequestId);
-    // Consume the one-time navigation request before any async work can remount this card.
-    onInstallRequestHandled?.(installRequestId);
-    void loadMetadata()
-      .then(backend => startInstall(backend))
-      .catch(metadataError => {
-        setError(metadataError instanceof Error ? metadataError.message : String(metadataError));
-      });
-  }, [installRequestId, loadMetadata, onInstallRequestHandled, startInstall]);
 
   const ready = isInstalled(status);
   const selectedInstalled = Boolean(selectedBackend?.installed);

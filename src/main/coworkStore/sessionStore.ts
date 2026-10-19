@@ -1,6 +1,6 @@
 // Session CRUD and listing for the CoworkStore class chain.
 // Split from src/main/coworkStore.ts (issue #1069).
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 import {
   COWORK_MESSAGE_PAGE_SIZE,
@@ -44,7 +44,7 @@ export class CoworkSessionStore extends CoworkMessageStore {
     expertSnapshots: CoworkSessionExpertInput[] = [],
     source: CoworkSessionSource = CoworkSessionSource.Manual,
   ): CoworkSession {
-    const sessionId = id || uuidv4();
+    const sessionId = id || randomUUID();
     const now = Date.now();
     const resolvedCwd = isDefaultConversationWorkspacePath(cwd)
       ? ensureDefaultConversationWorkspacePath()

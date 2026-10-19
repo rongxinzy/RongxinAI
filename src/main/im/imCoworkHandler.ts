@@ -83,6 +83,7 @@ export class IMCoworkHandler extends EventEmitter {
   private readonly onError = this.handleError.bind(this);
   private readonly onSessionStopped = this.handleSessionStopped.bind(this);
   private readonly unregisterScheduledTaskDelivery: (() => void) | null = null;
+  private readonly unregisterStreamingInterest: (() => void) | null = null;
 
   constructor(options: IMCoworkHandlerOptions) {
     super();
@@ -125,6 +126,13 @@ export class IMCoworkHandler extends EventEmitter {
         };
         return delivery;
       }) ?? null;
+    // IM mirrors consume non-final full-text messageUpdate for their mapped
+    // sessions; declaring that interest lets unmapped sessions skip the
+    // full-text bus during streaming.
+    this.unregisterStreamingInterest =
+      this.coworkRuntime.registerStreamingTextInterestResolver?.(
+        sessionId => this.sessionRegistry.getConversation(sessionId) !== undefined,
+      ) ?? null;
 
     this.setupEventListeners();
   }
@@ -597,6 +605,7 @@ export class IMCoworkHandler extends EventEmitter {
    */
   destroy(): void {
     this.unregisterScheduledTaskDelivery?.();
+    this.unregisterStreamingInterest?.();
 
     // Clear all pending accumulators
     this.messageAccumulators.destroyAll();

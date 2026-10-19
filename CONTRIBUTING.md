@@ -135,7 +135,11 @@ CI also enforces these gates on every pull request:
 - `node scripts/ci/check-source-line-limit.mjs` fails on hand-written source files over 1000 lines. The baseline in `scripts/ci/source-line-baseline.json` only ratchets down: CI rejects new entries, raised caps, and a raised limit. The baseline is currently empty, so split a file before it reaches the limit.
 - `bun run check:python-dead-code`, `bun run format:check`, `bun run lint`, and `bun run check:openclaw-decoupling`.
 
-Packaging is platform-specific. Build and verify the bundled Magpie gateway for the target first (requires the pinned Go SDK, see [README.md](README.md#packaging)):
+## Packaging
+
+Packaging is platform-specific. Every installer bundles a pinned model gateway that is built from source before packaging. The build needs the exact Go SDK pinned in [`resources/magpie/upstream.json`](resources/magpie/upstream.json) (currently Go 1.26.8), plus Git and tar; the builder rejects any other Go version and never downloads a toolchain. Packaging fails with an explicit error when the gateway binary for the target is missing or does not match its manifest. `--target` accepts `win32-x64`, `darwin-arm64`, `linux-x64` and other platform keys, or `all`; see [`resources/magpie/README.md`](resources/magpie/README.md).
+
+Build and verify the gateway for the target, then package:
 
 ```bash
 bun run magpie:build --target win32-x64 --go /path/to/go

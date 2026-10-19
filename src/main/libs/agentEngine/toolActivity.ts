@@ -4,6 +4,7 @@ import {
   type CoworkToolActivityEvent,
   type CoworkToolActivityProgress,
 } from '../../../shared/cowork/toolActivity';
+import { isRecord } from '../../../shared/lib/isRecord';
 
 const ACTIVITY_INPUT_KEYS = [
   'action',
@@ -32,9 +33,6 @@ const ACTIVITY_INPUT_KEYS = [
 
 const MAX_ACTIVITY_VALUE_LENGTH = 240;
 const MAX_ACTIVITY_ARRAY_ITEMS = 4;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 const truncateActivityValue = (value: string): string =>
   value.length <= MAX_ACTIVITY_VALUE_LENGTH

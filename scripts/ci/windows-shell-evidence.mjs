@@ -11,7 +11,6 @@ import distributionBudget from '../installer-shell/distribution-budget.cjs';
 
 export const shellChecks = [
   'fullOfflineComponentSet',
-  'localInferenceOption',
   'freshInstall',
   'closeWithoutLaunch',
   'cancelPreservesRunningInstallation',

@@ -121,7 +121,6 @@ class AgentService {
       mcpIds?: string[];
       enabled?: boolean;
       pinned?: boolean;
-      triageOverride?: import('../../shared/triage').AgentTriageOverride | null;
     },
   ): Promise<Agent | null> {
     try {

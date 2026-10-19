@@ -91,7 +91,7 @@ for (const target of targets) {
   const metadataName = electronMetadataNames.get(target);
   if (!metadataName) continue;
   const endpoint = new URL(
-    `https://updates.rongxzyai.com/v2/electron/stable/${platform}/${arch}/${variant}/${metadataName}`,
+    `https://updates.rongxzyai.com/v2/electron/${channel}/${platform}/${arch}/${variant}/${metadataName}`,
   );
   const response = await fetch(endpoint, {
     headers: { accept: 'application/x-yaml', 'cache-control': 'no-cache' },

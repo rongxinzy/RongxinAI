@@ -176,13 +176,16 @@ test('stable release metadata does not inherit the build prerelease channel', ()
 });
 
 test('publish verification uses portable jq flags and preserves updater filenames per target', () => {
-  const workflow = readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8');
-  assert.match(workflow, /jq -s -r/);
-  assert.doesNotMatch(workflow, /jq -rsr/);
-  assert.match(workflow, /manifest\/electron\/\$\{target_file\}\/\$\{filename\}/);
-  assert.match(workflow, /print-electron-updater-verify-specs\.mjs/);
-  assert.match(workflow, /verify-electron-updater-generation\.mjs/);
-  assert.match(workflow, /print-release-candidate-layout\.mjs/);
+  const publishScript = readFileSync(
+    path.join(root, 'scripts', 'release', 'publish-platform-beta-release.sh'),
+    'utf8',
+  );
+  assert.match(publishScript, /jq -s -r/);
+  assert.doesNotMatch(publishScript, /jq -rsr/);
+  assert.match(publishScript, /manifest\/electron\/\$\{target_file\}\/\$\{filename\}/);
+  assert.match(publishScript, /print-electron-updater-verify-specs\.mjs/);
+  assert.match(publishScript, /verify-electron-updater-generation\.mjs/);
+  assert.match(publishScript, /print-release-candidate-layout\.mjs/);
 });
 
 test('release supply-chain gates track every checked-in npm lockfile', () => {
@@ -240,14 +243,14 @@ test('unsigned macOS release builds do not receive empty signing credentials', (
 test('release workflows explicitly provision the private POSIX toolchain', () => {
   for (const workflow of ['build-inference-editions.yml']) {
     const content = readFileSync(path.join(root, '.github', 'workflows', workflow), 'utf8');
-    assert.match(content, /bun run setup:posix-uv-runtime/);
-    assert.match(content, /bun run setup:posix-python-runtime/);
+    assert.match(content, /with-download-retries\.sh bun run setup:posix-uv-runtime/);
+    assert.match(content, /with-download-retries\.sh bun run setup:posix-python-runtime/);
     assert.doesNotMatch(content, /setup:pandoc-runtime/);
   }
 });
 
 test('Windows release workflow runs the clean-path bundled runtime gate', () => {
-  for (const workflowName of ['build-inference-editions.yml']) {
+  for (const workflowName of ['build-inference-editions.yml', 'build-windows-release.yml']) {
     const workflow = readFileSync(path.join(root, '.github', 'workflows', workflowName), 'utf8');
     assert.match(workflow, /windows-runtime-smoke\.ps1/);
   }
@@ -396,15 +399,31 @@ test('tag release publishes beta and archives build metadata for promotion', () 
   assert.match(workflow, /git merge-base --is-ancestor/);
   assert.match(workflow, /app-build-version:/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-inference-editions\.yml/);
+  assert.match(workflow, /uses: \.\/\.github\/workflows\/build-windows-release\.yml/);
+  assert.match(workflow, /uses: \.\/\.github\/workflows\/publish-platform-release\.yml/);
   assert.match(buildWorkflow, /create-release-candidate\.mjs/);
-  assert.match(workflow, /verify-release-candidate\.mjs/);
-  assert.match(workflow, /upload-release-candidate\.mjs/);
-  assert.match(workflow, /UPDATE_RELEASE_CHANNEL: beta/);
-  assert.match(workflow, /channels\/beta-pointer\.json/);
-  assert.match(workflow, /build-metadata/);
-  assert.match(workflow, /verify-published-update\.mjs --channel beta/);
+  const publishScript = readFileSync(
+    path.join(root, 'scripts', 'release', 'publish-platform-beta-release.sh'),
+    'utf8',
+  );
+  assert.match(publishScript, /verify-release-candidate\.mjs/);
+  assert.match(publishScript, /upload-release-candidate\.mjs/);
+  assert.match(publishScript, /UPDATE_RELEASE_CHANNEL=beta/);
+  assert.match(publishScript, /channels\/beta-pointer\.json/);
+  assert.match(publishScript, /build-metadata/);
+  assert.match(publishScript, /verify-published-update\.mjs --channel beta/);
   assert.match(workflow, /softprops\/action-gh-release@v2/);
   assert.match(workflow, /prerelease: true/);
+});
+
+test('published update smoke reads the electron feed of the channel it verifies', () => {
+  const script = readFileSync(
+    path.join(root, 'scripts', 'release', 'verify-published-update.mjs'),
+    'utf8',
+  );
+
+  assert.match(script, /v2\/electron\/\$\{channel\}\//);
+  assert.doesNotMatch(script, /v2\/electron\/stable\//);
 });
 
 test('stable promotion rechannels beta without rebuilding installers', () => {

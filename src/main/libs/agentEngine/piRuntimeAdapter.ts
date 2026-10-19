@@ -115,7 +115,29 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
       this.emit('messageRemoved', sessionId, messageId);
     },
     getActiveSession: sessionId => this.activeSessions.get(sessionId),
+    hasStreamingTextSubscribers: sessionId => this.hasStreamingTextSubscribers(sessionId),
   });
+
+  /**
+   * Resolvers declaring which sessions consume non-final full-text
+   * `messageUpdate` events (IM mirrors, coding lanes). With no resolver
+   * registered the adapter conservatively keeps emitting, which matches the
+   * pre-gating behavior; final messageUpdate events are never gated.
+   */
+  private readonly streamingTextInterestResolvers: Array<(sessionId: string) => boolean> = [];
+
+  registerStreamingTextInterestResolver(resolver: (sessionId: string) => boolean): () => void {
+    this.streamingTextInterestResolvers.push(resolver);
+    return () => {
+      const index = this.streamingTextInterestResolvers.indexOf(resolver);
+      if (index >= 0) this.streamingTextInterestResolvers.splice(index, 1);
+    };
+  }
+
+  hasStreamingTextSubscribers(sessionId: string): boolean {
+    if (this.streamingTextInterestResolvers.length === 0) return true;
+    return this.streamingTextInterestResolvers.some(resolver => resolver(sessionId));
+  }
 
   readonly queue = new PiRuntimeQueueController(this);
   readonly sessionMemory = new PiRuntimeSessionMemory({

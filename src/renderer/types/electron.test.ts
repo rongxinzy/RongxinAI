@@ -21,7 +21,6 @@ const ELECTRON_MEMBERS = [
   'ollama',
   'llamacpp',
   'marketplace',
-  'triage',
   'hardware',
   'agents',
   'checkApiConfig',

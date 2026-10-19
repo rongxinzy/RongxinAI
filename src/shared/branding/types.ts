@@ -23,7 +23,7 @@ export interface ProductBrandingConfig {
   /** SQLite database file name, e.g. 'zhiyuan.sqlite' */
   dbFileName: string;
 
-  /** Default theme ID applied on clean installs, e.g. 'classic-light' */
+  /** Default theme ID applied on clean installs, e.g. 'zenith-light' */
   defaultTheme: string;
 
   /** System prompt identity statements used by agent engines and handlers */

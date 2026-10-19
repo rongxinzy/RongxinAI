@@ -66,6 +66,8 @@ describe('PiRuntimeAdapter', () => {
           stored.push(created as never);
           return created;
         },
+        getMessage: (_sessionId: string, messageId: string) =>
+          stored.find(message => message.id === messageId) ?? null,
         getSession: () => ({ messages: stored }),
         updateMessage,
         deleteMessage: (_sessionId: string, messageId: string) => {

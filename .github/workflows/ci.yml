@@ -94,6 +94,8 @@ jobs:
         run: bun run lint
       - name: Fail on unused TypeScript files, exports, and dependencies
         run: bun run knip
+      - name: Fail on production files reachable only from tests
+        run: bun run knip:production
       - name: Fail on dead Python under scripts/
         run: bun run check:python-dead-code
 

@@ -1,7 +1,8 @@
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import {
   listRequiredReleaseTargets,
   parseLinuxReleaseVariant,
+  resolveReleasePlatforms,
 } from './inference-edition-targets.mjs';
 import { listReleaseCandidateBundles } from './release-candidate-layout.mjs';
 
@@ -31,4 +32,24 @@ test('release candidate bundles match the 7 build legs', () => {
     'darwin-arm64-cpu',
     'darwin-x64-cpu',
   ]);
+});
+
+describe('ZHIYUAN_RELEASE_PLATFORM', () => {
+  test('narrows targets and candidate bundles to the selected platform stage', () => {
+    const windowsOnly = resolveReleasePlatforms({ ZHIYUAN_RELEASE_PLATFORM: 'win32' });
+    expect(listRequiredReleaseTargets(windowsOnly)).toEqual([
+      'win32:x64:lite',
+      'win32:x64:cpu',
+      'win32:x64:cuda',
+    ]);
+    expect(listReleaseCandidateBundles(windowsOnly).map(bundle => bundle.bundleId)).toEqual([
+      'win32-x64-lite',
+      'win32-x64-cpu',
+      'win32-x64-cuda',
+    ]);
+    expect(listReleaseCandidateBundles(resolveReleasePlatforms({}))).toHaveLength(7);
+    expect(() => resolveReleasePlatforms({ ZHIYUAN_RELEASE_PLATFORM: 'windows' })).toThrow(
+      'Unsupported',
+    );
+  });
 });

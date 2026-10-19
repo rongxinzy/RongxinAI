@@ -121,8 +121,6 @@ public sealed class InstallerEngine
     private bool transactionOwned;
     private bool isUpgrade;
     private InstallRegistrationSnapshot? registrationSnapshot;
-    private bool inferenceMarkerTouched;
-    private byte[]? previousInferenceMarker;
 
     public InstallerEngine(
         string? payloadDir,
@@ -150,7 +148,7 @@ public sealed class InstallerEngine
 
     public string LaunchPath => Path.Combine(installDir, AppExeName);
 
-    public async Task RunAsync(bool localInference, CancellationToken cancellationToken)
+    public async Task RunAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -178,7 +176,6 @@ public sealed class InstallerEngine
             await StepLinkRuntimeJunctions(cancellationToken);
             StepVerifyRuntimeSentinels();
             await StepInstallVcRuntime(cancellationToken);
-            StepWritePendingInferenceMarker(localInference);
             if (registerInstall)
             {
                 registrationSnapshot = new InstallRegistrationSnapshot();
@@ -673,20 +670,7 @@ public sealed class InstallerEngine
             Type: "phase", Label: "Microsoft Visual C++ Runtime 未能自动安装，部分本地组件可能暂时不可用"));
     }
 
-    /// <summary>Step 12 — the in-app downloader reads this marker on first launch.
-    /// NSIS writes the local-inference component's content-id; the shell does not
-    /// track component ids, so it writes the app's canonical fallback request id
-    /// instead of an arbitrary word.</summary>
-    private void StepWritePendingInferenceMarker(bool localInference)
-    {
-        var marker = Path.Combine(appDataRoot, "pending-local-inference-install");
-        previousInferenceMarker = File.Exists(marker) ? File.ReadAllBytes(marker) : null;
-        inferenceMarkerTouched = true;
-        if (File.Exists(marker)) File.Delete(marker);
-        if (localInference) File.WriteAllText(marker, "installer-request");
-    }
-
-    /// <summary>Step 13 — previous-version teardown plus unused component-version
+    /// <summary>Step 12 — previous-version teardown plus unused component-version
     /// reclamation (shared script, same one the NSIS installer calls).</summary>
     private async Task StepCleanup(CancellationToken ct)
     {
@@ -702,7 +686,7 @@ public sealed class InstallerEngine
             failureMessage: "旧版本清理未完成，请关闭占用旧版本目录的程序后重试");
     }
 
-    /// <summary>Step 14 — registry keys in the exact electron-builder shape so
+    /// <summary>Step 13 — registry keys in the exact electron-builder shape so
     /// electron-updater locates this install exactly like an NSIS one. Also
     /// ships the independently signed NSIS uninstaller produced by the same
     /// electron-builder run. Copy its exact bytes and preserve its /S quiet
@@ -828,16 +812,6 @@ public sealed class InstallerEngine
         {
             transaction.Rollback(preserveJournal: failures.Count > 0);
             File.Delete(Path.Combine(appDataRoot, "old-install-path.txt"));
-        }
-        catch (Exception ex) { failures.Add(ex.Message); }
-        try
-        {
-            if (inferenceMarkerTouched)
-            {
-                var marker = Path.Combine(appDataRoot, "pending-local-inference-install");
-                if (previousInferenceMarker is null) File.Delete(marker);
-                else File.WriteAllBytes(marker, previousInferenceMarker);
-            }
         }
         catch (Exception ex) { failures.Add(ex.Message); }
         try { registrationSnapshot?.Restore(); }

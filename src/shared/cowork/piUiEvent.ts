@@ -4,6 +4,7 @@ import type { CoworkSessionInterruption } from './interruption';
 import type { CoworkToolActivityEvent } from './toolActivity';
 import { CoworkRunPolicy, type CoworkContentPatch } from './runState';
 import type { UIMessageChunk } from 'ai';
+import { isRecord } from '../lib/isRecord';
 
 export const PiUiEventType = {
   Started: 'started',
@@ -167,9 +168,6 @@ export class PiUiEventSequenceTracker {
     return gaps;
   }
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.length > 0;

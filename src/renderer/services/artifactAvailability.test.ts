@@ -3,11 +3,17 @@ import { afterEach, expect, test, vi } from 'vitest';
 
 import { CoworkArtifactSource } from '../../shared/cowork/artifacts';
 import { ArtifactRole, type Artifact } from '../types/artifact';
-import { ArtifactFileAvailability, probeArtifactFileAvailability } from './artifactAvailability';
+import {
+  ArtifactFileAvailability,
+  openAvailableArtifact,
+  probeArtifactFileAvailability,
+} from './artifactAvailability';
+import { i18nService } from './i18n';
 
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 const artifact: Artifact = {
@@ -81,4 +87,33 @@ test('resolves a relative tool path against the session workspace before checkin
     ArtifactFileAvailability.Available,
   );
   expect(checkArtifactFile).toHaveBeenCalledWith('C:/workspace/output/report.pptx');
+});
+
+test('a missing artifact dispatches an error toast instead of opening it', async () => {
+  const checkArtifactFile = vi.fn(async () => ({ success: false }));
+  vi.stubGlobal('electron', { dialog: { checkArtifactFile } });
+  const dispatch = vi.spyOn(window, 'dispatchEvent');
+  const open = vi.fn();
+
+  await openAvailableArtifact(artifact, open);
+
+  const toast = dispatch.mock.calls.at(-1)?.[0] as CustomEvent | undefined;
+  expect(toast?.type).toBe('app:showToast');
+  expect(toast?.detail).toMatchObject({
+    message: i18nService.t('fileNotFound'),
+    isError: true,
+  });
+  expect(open).not.toHaveBeenCalled();
+});
+
+test('an available artifact opens without dispatching a toast', async () => {
+  const checkArtifactFile = vi.fn(async () => ({ success: true }));
+  vi.stubGlobal('electron', { dialog: { checkArtifactFile } });
+  const dispatch = vi.spyOn(window, 'dispatchEvent');
+  const open = vi.fn();
+
+  await openAvailableArtifact(artifact, open);
+
+  expect(open).toHaveBeenCalledTimes(1);
+  expect(dispatch.mock.calls.some(([event]) => event.type === 'app:showToast')).toBe(false);
 });
