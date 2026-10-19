@@ -11,10 +11,6 @@ import {
   EngramEnvironment,
   EngramManagerPhase,
 } from './constants';
-import {
-  createAuthenticatedEngramProxy,
-  type AuthenticatedEngramProxy,
-} from './authenticatedProxy';
 import { resolveEngramBinary } from './binaryResolver';
 import type { EngramConnection, EngramManagerStatus } from './types';
 
@@ -33,7 +29,6 @@ export interface EngramManagerOptions {
   fileExists?: (candidate: string) => boolean;
   spawnProcess?: (binaryPath: string, env: NodeJS.ProcessEnv) => EngramProcess;
   reservePort?: () => Promise<number>;
-  createProxy?: typeof createAuthenticatedEngramProxy;
   checkHealth?: (connection: EngramConnection) => Promise<boolean>;
   restartDelaysMs?: readonly number[];
 }
@@ -46,7 +41,6 @@ export class EngramManager {
   };
   private connection: EngramConnection | null = null;
   private child: EngramProcess | null = null;
-  private proxy: AuthenticatedEngramProxy | null = null;
   private startPromise: Promise<EngramConnection | null> | null = null;
   private restartTimer: NodeJS.Timeout | null = null;
   private shouldRun = false;
@@ -92,12 +86,9 @@ export class EngramManager {
     this.status = { ...this.status, phase: EngramManagerPhase.Stopping, available: false };
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = null;
-    const proxy = this.proxy;
     const child = this.child;
-    this.proxy = null;
     this.child = null;
     this.connection = null;
-    if (proxy) await proxy.close().catch((): undefined => undefined);
     child?.kill();
     this.status = {
       phase: EngramManagerPhase.Stopped,
@@ -128,10 +119,6 @@ export class EngramManager {
     const generation = ++this.generation;
     const token = randomBytes(32).toString('hex');
     const backendPort = await (this.options.reservePort ?? reserveLoopbackPort)();
-    const proxy = await (this.options.createProxy ?? createAuthenticatedEngramProxy)({
-      backendPort,
-      token,
-    });
     const dataDirectory = path.join(this.options.userDataPath, ...ENGRAM_DATA_DIRECTORY_SEGMENTS);
     fs.mkdirSync(dataDirectory, { recursive: true });
     const childEnvironment: NodeJS.ProcessEnv = {
@@ -141,10 +128,16 @@ export class EngramManager {
       [EngramEnvironment.HttpToken]: token,
       [EngramEnvironment.CloudAutosync]: '0',
     };
-    this.proxy = proxy;
     const child = (this.options.spawnProcess ?? spawnEngram)(binaryPath, childEnvironment);
     this.child = child;
-    this.connection = { url: proxy.url, token };
+    // The boundary is the loopback bind on a reserved random port: only local
+    // processes can reach the runtime. The token is defense in depth — as of
+    // engram-cjk v1.20.0-zhiyuan.4 the runtime only enforces it on the
+    // destructive and export routes (delete observation/session, export,
+    // import, project migration); search and writes are unauthenticated, and
+    // the adapter sends the bearer token on every request anyway. The only
+    // client is the in-process adapter, so no proxy hop is needed.
+    this.connection = { url: `http://${ENGRAM_LOOPBACK_HOST}:${backendPort}`, token };
     child.once('exit', () => this.handleUnexpectedExit(generation));
     child.once('error', error => this.handleUnexpectedExit(generation, error));
 
@@ -185,9 +178,6 @@ export class EngramManager {
     this.generation += 1;
     this.child = null;
     this.connection = null;
-    const proxy = this.proxy;
-    this.proxy = null;
-    void proxy?.close().catch((): undefined => undefined);
     this.status = {
       phase: EngramManagerPhase.Degraded,
       available: false,
@@ -217,12 +207,9 @@ export class EngramManager {
 
   private async disposeCurrentInstance(): Promise<void> {
     this.generation += 1;
-    const proxy = this.proxy;
     const child = this.child;
-    this.proxy = null;
     this.child = null;
     this.connection = null;
-    if (proxy) await proxy.close().catch((): undefined => undefined);
     child?.kill();
   }
 }
