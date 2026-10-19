@@ -1,6 +1,7 @@
-/** Cowork config IPC: get/set configuration, embedding config, theme, proxy. */
-import { getCoworkStore, getSkillManager } from './runtimeServices';
-import { getPiRuntimeAdapter } from './sessionServices';
+/**
+ * Cowork config IPC: get/set configuration, embedding config, theme, proxy
+ * (work package I: domain-owned registration with injected deps).
+ */
 import { parseCoworkExecutionMode } from '../../shared/cowork/executionMode';
 import { getChangedSessionPermissionModes } from '../coworkPermissionModeChanges';
 import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
@@ -8,8 +9,16 @@ import type { CoworkStore } from '../coworkStore';
 import { CoworkPermissionMode } from '../../shared/cowork/constants';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkConfigContract } from '../../shared/ipc/coworkContract';
+import type { SkillManager } from '../skillManager';
+import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 
-export const registerCoworkConfigIpc = (): void => {
+export interface CoworkConfigIpcDeps {
+  getCoworkStore: () => CoworkStore;
+  getSkillManager: () => SkillManager;
+  getPiRuntimeAdapter: () => PiRuntimeAdapter;
+}
+
+export const registerCoworkConfigIpc = (deps: CoworkConfigIpcDeps): void => {
   const VALID_EMBEDDING_PROVIDERS = [
     'local',
     'openai',
@@ -61,7 +70,7 @@ export const registerCoworkConfigIpc = (): void => {
   handleIpcContract(coworkConfigContract, {
     getConfig: async () => {
       try {
-        const config = getCoworkStore().getConfig();
+        const config = deps.getCoworkStore().getConfig();
         return { success: true as const, config };
       } catch (error) {
         return {
@@ -99,28 +108,30 @@ export const registerCoworkConfigIpc = (): void => {
             typeof config.mcpNativeBridge === 'boolean' ? config.mcpNativeBridge : undefined,
           ...normalizedEmbedding,
         };
-        const previousConfig = getCoworkStore().getConfig();
+        const previousConfig = deps.getCoworkStore().getConfig();
         const previousWorkingDir = previousConfig.workingDirectory;
-        getCoworkStore().setConfig(normalizedConfig);
+        deps.getCoworkStore().setConfig(normalizedConfig);
         if (normalizedPermissionModeBySession !== undefined) {
           for (const [sessionId, mode] of getChangedSessionPermissionModes(
             previousConfig.permissionModeBySession ?? {},
             normalizedPermissionModeBySession,
             normalizedPermissionMode ?? previousConfig.permissionMode,
           )) {
-            getPiRuntimeAdapter().setApprovalModeForSession(
-              sessionId,
-              mode === CoworkPermissionMode.AllowAll
-                ? WorkbenchApprovalMode.AllowAll
-                : WorkbenchApprovalMode.Ask,
-            );
+            deps
+              .getPiRuntimeAdapter()
+              .setApprovalModeForSession(
+                sessionId,
+                mode === CoworkPermissionMode.AllowAll
+                  ? WorkbenchApprovalMode.AllowAll
+                  : WorkbenchApprovalMode.Ask,
+              );
           }
         }
         if (
           normalizedConfig.workingDirectory !== undefined &&
           normalizedConfig.workingDirectory !== previousWorkingDir
         ) {
-          getSkillManager().handleWorkingDirectoryChange();
+          deps.getSkillManager().handleWorkingDirectoryChange();
           // Main agent workspace is decoupled from workingDirectory — no MEMORY.md
           // sync needed here. The workspace is always at
           // {STATE_DIR}/workspace-main/ regardless of the user's working directory.
