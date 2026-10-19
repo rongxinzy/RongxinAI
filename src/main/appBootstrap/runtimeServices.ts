@@ -18,6 +18,7 @@ import { AgentManager } from '../agentManager';
 import { CoworkStore } from '../coworkStore';
 import { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import { SkillManager } from '../skillManager';
+import { ActivityService } from '../activity/activityService';
 import { SqliteStore } from '../sqliteStore';
 
 const PowerSaveBlockerType = {
@@ -149,4 +150,10 @@ export const getMcpStore = () => {
     rt.mcpStore = nextMcpStore;
   }
   return rt.mcpStore;
+};
+
+/** Lazily constructed shared activity service (single source in runtime state). */
+export const getActivityService = (): ActivityService => {
+  rt.activityService ??= new ActivityService(getStore().getDatabase());
+  return rt.activityService;
 };
