@@ -30,10 +30,8 @@ interface MockWindow {
 
 const mocks = vi.hoisted(() => {
   const unregisterContextMenu = vi.fn();
-  const cronStartPolling = vi.fn();
   return {
     unregisterContextMenu,
-    cronStartPolling,
     createTray: vi.fn(),
     emitWindowState: vi.fn(),
     schedulePersistAppWindowState: vi.fn(),
@@ -44,7 +42,7 @@ const mocks = vi.hoisted(() => {
     toggleDevToolsForSender: vi.fn(),
     isAutoLaunched: vi.fn(() => false),
     registerContextMenu: vi.fn(() => unregisterContextMenu),
-    getCronJobService: vi.fn(() => ({ startPolling: cronStartPolling })),
+    getCronJobService: vi.fn(() => ({})),
     shellOpenExternal: vi.fn(),
   };
 });
@@ -173,7 +171,6 @@ beforeEach(() => {
   mockWindowClass.instances = [];
   rt.mainWindow = null;
   mocks.unregisterContextMenu.mockClear();
-  mocks.cronStartPolling.mockClear();
   vi.clearAllMocks();
 });
 
@@ -231,7 +228,6 @@ describe('createMainWindow', () => {
     expect(mocks.createTray).toHaveBeenCalledTimes(1);
     const trayWindowProvider = mocks.createTray.mock.calls[0][0] as () => unknown;
     expect(trayWindowProvider()).toBe(window);
-    expect(mocks.cronStartPolling).toHaveBeenCalled();
     window.emitWebContents('did-finish-load');
   });
 

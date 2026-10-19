@@ -49,7 +49,6 @@ import { initMcpServers } from './mcpBootstrap';
 import { resolveDefaultAgentModelRef } from './messageTriage';
 import { ensureEmbeddedPiAgentDir } from '../libs/agentEngine/piAgentDir';
 import { handleDeepLink } from './communityAuth';
-import { getCronJobService } from '../ipcHandlers/scheduledTask';
 import { aisphereService, startAISphereGateway } from '../extensions/aisphere';
 import { getBranding } from '../../shared/branding';
 import { DB_FILENAME } from '../appConstants';
@@ -512,12 +511,6 @@ export const initApp = async (): Promise<void> => {
       await rt.magpieManager?.onLanAccessChanged().catch(error => {
         console.warn('[Magpie] LAN access model service start failed:', error);
       });
-    }
-
-    try {
-      getCronJobService().startPolling();
-    } catch (error) {
-      console.warn('[Main] Canonical scheduler not available after startup:', error);
     }
 
     // ── Step 1: Show window ASAP ──────────────────────────────────────

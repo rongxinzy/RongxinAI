@@ -56,7 +56,6 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 ### 渲染层 IPC 与状态
 
 - **Toast：** 全局提示只经 `showAppToast` / `showAppError`（`src/renderer/services/toastNotification.ts`、`appToast.ts`）派发；禁止直接 `CustomEvent('app:showToast')`。`bun run lint` 含 `scripts/ci/check-app-show-toast-dispatch.mjs`。
-- **`electronDomains`（实验性）：** `src/renderer/services/electronDomains.ts` 按 5 域归类 preload；新代码不强制使用，可继续 `window.electron`。
 - **持久化 vs Redux：** `src/renderer/services/store.ts` 是主进程 SQLite KV 的 IPC 适配器；Redux 在 `src/renderer/store/`，二者勿混。
 
 ### 主进程 / Worker 边界

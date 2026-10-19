@@ -74,9 +74,6 @@ export class CanonicalScheduledTaskService implements ScheduledTaskService {
   hasRunningJobs(): boolean {
     return this.store.list().some(task => task.state.runningAtMs !== null);
   }
-  /** State is pushed by the sidecar; no runtime polling is needed. */
-  startPolling(): void {}
-  stopPolling(): void {}
 
   private async projectBestEffort(task: ScheduledTask): Promise<void> {
     try {

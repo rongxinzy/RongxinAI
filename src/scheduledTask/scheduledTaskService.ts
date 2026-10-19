@@ -31,6 +31,4 @@ export interface ScheduledTaskService {
   ): Promise<ScheduledTaskRunWithName[]>;
   getJobNameSync(jobId: string): string | null;
   hasRunningJobs(): boolean;
-  startPolling(): void;
-  stopPolling(): void;
 }
