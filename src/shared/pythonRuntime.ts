@@ -34,6 +34,8 @@ export type PythonRunnerRequest = {
     uvPath: string;
     runtimeId: string;
   };
+  /** Shared uv cache (defaults to <storageRoot>/uv-cache). uv locks safely across processes. */
+  uvCacheDir?: string;
 };
 export type PythonRunnerResponse =
   | { success: true; result: PythonExecutionResult }

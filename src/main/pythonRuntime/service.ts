@@ -21,6 +21,8 @@ export class PythonRuntimeService {
       jobRunnerPath?: string;
       /** Bundled interpreter/uv paths; flows to the runner with every request. */
       preinstalledRuntime?: PythonRunnerRequest['preinstalledRuntime'];
+      /** Shared uv cache directory (work package G: one cache across stacks). */
+      uvCacheDir?: string;
     },
   ) {}
 

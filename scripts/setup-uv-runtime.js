@@ -16,10 +16,11 @@ const path = require('path');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 const extractZip = require('extract-zip');
+const { BUNDLED_UV_VERSION } = require('../src/main/pythonRuntime/bundledRuntime');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'uv-win');
-const UV_VERSION = process.env.ZHIYUAN_WINDOWS_UV_VERSION || '0.11.32';
+const UV_VERSION = BUNDLED_UV_VERSION;
 const DOWNLOAD_TIMEOUT_MS = Number.parseInt(
   process.env.ZHIYUAN_RUNTIME_DOWNLOAD_TIMEOUT_MS || '600000',
   10,
