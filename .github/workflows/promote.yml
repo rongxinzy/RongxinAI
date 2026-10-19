@@ -66,10 +66,7 @@ jobs:
           beta_key="generations/${{ inputs.version }}/legacy/beta.json"
           aws s3api get-object --bucket "$R2_BUCKET" --key "$beta_key" manifest/beta.json > /dev/null
           node scripts/release/rechannel-signed-manifest.mjs manifest/beta.json manifest/stable.json stable
-          for index in 1 2 3 4; do
-            key="generations/${{ inputs.version }}/build-metadata/update-artifacts-${index}.json"
-            aws s3api get-object --bucket "$R2_BUCKET" --key "$key" "uploaded-metadata/update-artifacts-${index}.json" > /dev/null
-          done
+          bash scripts/release/fetch-generation-build-metadata.sh '${{ inputs.version }}' uploaded-metadata
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
@@ -133,7 +130,10 @@ jobs:
         if: steps.version_check.outputs.idempotent != 'true'
         shell: bash
         run: |
-          metadata=(uploaded-metadata/update-artifacts-1.json uploaded-metadata/update-artifacts-2.json uploaded-metadata/update-artifacts-3.json uploaded-metadata/update-artifacts-4.json)
+          set -euo pipefail
+          shopt -s nullglob
+          metadata=(uploaded-metadata/update-artifacts-*.json)
+          [[ ${#metadata[@]} -gt 0 ]] || { echo 'Missing uploaded artifact metadata' >&2; exit 1; }
           mkdir -p manifest/electron
           while IFS=$'\t' read -r key target filename; do
             target_file="${target//:/-}"
