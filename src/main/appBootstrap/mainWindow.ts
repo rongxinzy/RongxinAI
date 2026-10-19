@@ -24,7 +24,8 @@ import {
 } from '../windowState';
 import { registerContextMenu } from '../contextMenu';
 import { setLanguage } from '../i18n';
-import { createTray } from '../trayManager';
+import { createTray, updateTrayMenu } from '../trayManager';
+import { initializeDesktopPet } from '../desktopPet/controller';
 import {
   getDisplayWorkAreas,
   getTitleBarOverlayOptions,
@@ -310,6 +311,11 @@ export const createMainWindow = (): void => {
       setLanguage(initLang === 'en' ? 'en' : 'zh');
       // 窗口就绪后创建系统托盘
       createTray(() => rt.mainWindow);
+      initializeDesktopPet(
+        getStore(),
+        () => rt.mainWindow,
+        () => updateTrayMenu(() => rt.mainWindow),
+      );
 
       (async () => {
         // One-time migration: import legacy SQLite task records into the

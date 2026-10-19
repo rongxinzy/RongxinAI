@@ -1,5 +1,10 @@
-import { CoworkSessionMode, CoworkSessionStatus } from '../shared/cowork/constants';
-import type { CoworkSession, CoworkSessionSummary, CoworkStore } from './coworkStore';
+import { CoworkSessionMode } from '../shared/cowork/constants';
+import type {
+  CoworkSession,
+  CoworkSessionStatus,
+  CoworkSessionSummary,
+  CoworkStore,
+} from './coworkStore';
 
 const CoworkRuntimeSessionStatus = {
   Idle: 'idle',
@@ -59,8 +64,6 @@ export function demoteStaleRunningSessions(
  * Imported / historical sessions can never be live: clamp the renderer's
  * status so a save can never resurrect a 'running' row.
  */
-export function coerceImportedSessionStatus(
-  status: unknown,
-): (typeof CoworkSessionStatus)[keyof typeof CoworkSessionStatus] {
+export function coerceImportedSessionStatus(status: unknown): CoworkSessionStatus {
   return status === 'completed' || status === 'error' ? status : 'idle';
 }

@@ -16,6 +16,7 @@ const ELECTRON_MEMBERS = [
   'platform',
   'arch',
   'store',
+  'desktopPet',
   'skills',
   'mcp',
   'ollama',

@@ -36,6 +36,7 @@ export default defineConfig(async () => ({
     rolldownOptions: {
       input: {
         main: path.resolve(projectRoot, 'index.html'),
+        desktopPet: path.resolve(projectRoot, 'desktop-pet.html'),
       },
     },
   },

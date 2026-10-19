@@ -5,6 +5,7 @@ import { rt } from './runtimeState';
 import { getStore } from './runtimeServices';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { destroyTray } from '../trayManager';
+import { disposeDesktopPet } from '../desktopPet/controller';
 import { disposeZhiyuanEnterpriseExtension } from '../enterpriseExtension/host';
 import { shutdownPythonRuntime } from '../pythonRuntime/host';
 import { getSkillServiceManager } from '../skillServices';
@@ -29,6 +30,7 @@ export const logAppQuitContextOnce = (): void => {
 const runAppCleanup = async (): Promise<void> => {
   console.log('[AppLifecycle] App cleanup started.');
   destroyTray();
+  disposeDesktopPet();
   rt.skillManager?.stopWatching();
 
   if (getStore().get<boolean>('magpie_disconnect_external_on_quit') === true) {

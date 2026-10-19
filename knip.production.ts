@@ -29,6 +29,8 @@ const config: KnipConfig = {
         // not take entry patterns from the base config, so list them here.
         'src/main/main.ts!',
         'src/main/preload.ts!',
+        // Dedicated sandbox preload loaded by desktopPet/controller.ts via its bundled path.
+        'src/main/desktopPetPreload.ts!',
         'src/main/llamacppModelDaemonEntry.ts!',
         'src/main/workbenchTask/artifactWorker.ts!',
         'src/main/magpie/catalogWorker.ts!',

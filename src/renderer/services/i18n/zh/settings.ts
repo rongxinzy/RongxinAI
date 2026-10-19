@@ -1,5 +1,14 @@
 // 设置与外观
 export const zhSettings: Record<string, string> = {
+  desktopPetSettingsTitle: '桌面伙伴',
+  desktopPetEnabled: '显示小远',
+  desktopPetEnabledDescription: '在桌面显示任务状态。点击可进入对应任务，默认关闭。',
+  desktopPetDoNotDisturb: '免打扰',
+  desktopPetDoNotDisturbDescription: '暂时隐藏小远，任务照常运行，未处理的失败提醒会保留。',
+  desktopPetHideInFullscreen: '应用全屏时隐藏',
+  desktopPetHideInFullscreenDescription:
+    '知远智能体全屏时自动隐藏，退出全屏后恢复；锁屏和休眠时也会隐藏。',
+  desktopPetTaskOpenFailed: '暂时无法打开任务，请从会话列表查看。未确认的失败提醒会保留。',
   // 设置
   settings: '设置',
   settingsGroupGeneral: '通用',
