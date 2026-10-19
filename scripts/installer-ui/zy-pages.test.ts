@@ -43,17 +43,8 @@ test('enforces consent on page leave and preserves optional local inference', ()
   expect(body('ZYHeroLeave')).toMatch(/NSD_GetState.*heroLicense[\s\S]*Abort/);
   expect(body('ZYHeroLeave')).toContain('${NSD_GetState} $heroInference $installLocalInference');
   expect(installer).toContain('pending-local-inference-install');
-  for (const key of [
-    'channel-runtime',
-    'skills',
-    'mcps',
-    'portable-git',
-    'python',
-    'skill-python',
-    'uv',
-  ]) {
-    expect(installer).toContain(`!insertmacro RecordOfflineComponentReady "${key}"`);
-  }
+  // Edition routing is generated and tested in resolve-nsis-offline-components.test.ts.
+  expect(installer).toContain('!insertmacro RecordEditionComponents');
 });
 
 test('keeps a failed launch on the usable finish page and resets launch intent', () => {

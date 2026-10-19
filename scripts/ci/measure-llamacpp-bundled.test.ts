@@ -5,13 +5,7 @@ import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const {
-  CPU_TARGET_BUDGETS,
-  resolveTargetLimit,
-  assertWithinLimit,
-  measure,
-} = require('./measure-llamacpp-bundled.cjs');
-const MiB = 1024 * 1024;
+const { resolveTargetLimit, measure } = require('./measure-llamacpp-bundled.cjs');
 const roots: string[] = [];
 afterEach(() => {
   for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -34,24 +28,13 @@ test('reports every staged llama.cpp file and the total bytes; cuda has no limit
   );
 });
 
-// cpu limits = measured staged bytes (build run 39032801288) + ceil(3%) MiB.
-test('cpu targets enforce measured + explicit margin; cuda stays uncapped', () => {
-  expect(CPU_TARGET_BUDGETS).toEqual({
-    'win32-x64-cpu': { measuredBytes: 152_004_077, marginBytes: 5 * MiB },
-    'linux-x64-cpu': { measuredBytes: 138_108_759, marginBytes: 4 * MiB },
-    'darwin-arm64-cpu': { measuredBytes: 25_936_788, marginBytes: 1 * MiB },
-    'darwin-x64-cpu': { measuredBytes: 25_171_262, marginBytes: 1 * MiB },
-  });
-  for (const { measuredBytes, marginBytes } of Object.values(
-    CPU_TARGET_BUDGETS as Record<string, { measuredBytes: number; marginBytes: number }>,
-  )) {
-    expect(marginBytes).toBe(Math.ceil((measuredBytes * 0.03) / MiB) * MiB);
-  }
-  expect(resolveTargetLimit('win32-x64-cpu')).toBe(157_246_957);
-  expect(assertWithinLimit('win32-x64-cpu', 152_004_077)).toBe(157_246_957);
-  expect(() => assertWithinLimit('win32-x64-cpu', 157_246_958)).toThrow(/over its 157246957/);
-  expect(() => assertWithinLimit('linux-x64-cpu', 142_303_064)).toThrow(/linux-x64-cpu/);
-  expect(resolveTargetLimit('win32-x64-cuda')).toBeNull();
-  expect(resolveTargetLimit('linux-x64-cuda')).toBeNull();
-  expect(assertWithinLimit('linux-x64-cuda', 4096 * MiB)).toBeNull();
+test.each([
+  'win32-x64-cpu',
+  'linux-x64-cpu',
+  'darwin-arm64-cpu',
+  'darwin-x64-cpu',
+  'win32-x64-cuda',
+  'linux-x64-cuda',
+])('%s has no runtime size ceiling', target => {
+  expect(resolveTargetLimit(target)).toBeNull();
 });
