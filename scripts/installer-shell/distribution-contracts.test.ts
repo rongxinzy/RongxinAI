@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
 
 const root = path.resolve(import.meta.dirname, '../..');
@@ -83,9 +84,18 @@ test.each(['build-inference-editions.yml'])(
     if (nativeSmoke >= 0) expect(prepareUninstall).toBeLessThan(nativeSmoke);
     expect(verifyUninstall).toBeGreaterThan(evidence);
     expect(assembly).toBeGreaterThan(verifyUninstall);
-    expect(workflow.slice(verifyUninstall, assembly)).toContain(
-      "-ExpectedThumbprint '${{ inputs.mode == 'release' && secrets.CERTUM_CERT_THUMBPRINT || '' }}'",
+    const parsed = load(workflow) as {
+      jobs: {
+        acceptance: { steps: { name?: string; run?: string; env?: Record<string, string> }[] };
+      };
+    };
+    const uninstall = parsed.jobs.acceptance.steps.find(
+      step => step.name === 'Verify native uninstall preserves user data',
+    )!;
+    expect(uninstall.env?.EXPECTED_THUMBPRINT).toBe(
+      "${{ inputs.mode == 'release' && secrets.CERTUM_CERT_THUMBPRINT || '' }}",
     );
+    expect(uninstall.run).toContain('-ExpectedThumbprint $env:EXPECTED_THUMBPRINT');
     expect(workflow).toContain('path: acceptance-diagnostics\n');
   },
 );

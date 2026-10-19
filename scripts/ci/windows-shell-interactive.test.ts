@@ -275,7 +275,7 @@ test('keeps complete packaging, existing smoke gates and both real UI flows requ
     '-File scripts/ci/windows-installer-smoke.ps1',
     './scripts/ci/windows-installer-interactive.ps1',
     'node scripts/ci/windows-shell-interactive.mjs',
-    '-File scripts/ci/windows-shell-uninstall.ps1 -Action verify',
+    './scripts/ci/windows-shell-uninstall.ps1 -Action verify',
   ]) {
     const index = steps.findIndex(step => step.run?.includes(command));
     expect(index, command).toBeGreaterThan(previous);
@@ -307,11 +307,9 @@ test.skipIf(process.platform !== 'win32')(
   'executes the actual evidence workflow as a BOM-less UTF-8 script with exact Unicode arguments',
   () => {
     const config = loadYaml(workflow) as {
-      jobs: { 'package-and-install': { steps: { id?: string; shell?: string; run?: string }[] } };
+      jobs: { acceptance: { steps: { id?: string; shell?: string; run?: string }[] } };
     };
-    const step = config.jobs['package-and-install'].steps.find(
-      item => item.id === 'shell-evidence',
-    )!;
+    const step = config.jobs.acceptance.steps.find(item => item.id === 'shell-evidence')!;
     const fixture = fs.realpathSync.native(
       fs.mkdtempSync(path.join(tmpdir(), 'shell-evidence-encoding-')),
     );
@@ -322,6 +320,10 @@ test.skipIf(process.platform !== 'win32')(
       fs.mkdirSync(path.dirname(setup), { recursive: true });
       fs.writeFileSync(setup, 'argument transport fixture, never executed');
       fs.mkdirSync(path.join(fixture, 'scripts/ci'), { recursive: true });
+      fs.writeFileSync(
+        path.join(fixture, 'scripts/ci/windows-shell-interactive.mjs'),
+        '// This fixture exercises workflow argument transport, not real installation.\n',
+      );
       fs.writeFileSync(
         path.join(fixture, 'scripts/ci/windows-shell-evidence.mjs'),
         "import fs from 'node:fs'; fs.writeFileSync(process.env.PROBE_OUTPUT, JSON.stringify(process.argv.slice(2)));",
