@@ -1,18 +1,17 @@
 /** Cowork session IPC: Start and Continue (prompt composition, experts, Pi handoff). */
-import { getCoworkImageRoot } from './coworkSessionImages';
-import { getAgentManager, getCoworkStore } from './runtimeServices';
-import { getPiRuntimeAdapter } from './sessionServices';
 import {
   haveSameExpertIds,
   haveSameExpertSnapshots,
   resolveCoworkPromptLanguage,
   resolveSessionExpertSnapshots,
-} from './sessionExperts';
-import { resolveSessionWorkingDirectory, resolveTaskWorkingDirectory } from './workspacePaths';
-import { sanitizeCoworkSessionForIpc } from './ipcPayloadSanitize';
+} from '../appBootstrap/sessionExperts';
+import { sanitizeCoworkSessionForIpc } from '../appBootstrap/ipcPayloadSanitize';
 import { composeCoworkSystemPrompt } from '../coworkPrompt/composer';
 import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
 import { createLogger } from '../libs/structuredLog';
+import type { AgentManager } from '../agentManager';
+import type { CoworkStore } from '../coworkStore';
+import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkSessionLifecycleContract } from '../../shared/ipc/coworkContract';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
@@ -28,7 +27,16 @@ import {
   CoworkSessionMode,
 } from '../../shared/cowork/constants';
 
-export const registerCoworkSessionIpc = (): void => {
+export interface CoworkSessionIpcDeps {
+  getCoworkImageRoot: () => string;
+  getAgentManager: () => AgentManager;
+  getCoworkStore: () => CoworkStore;
+  getPiRuntimeAdapter: () => PiRuntimeAdapter;
+  resolveSessionWorkingDirectory: (options: { cwd?: string }) => string;
+  resolveTaskWorkingDirectory: (workspaceRoot: string) => string;
+}
+
+export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
   // Cowork IPC handlers
   handleIpcContract(coworkSessionLifecycleContract, {
     startSession: async (_event, options) => {
@@ -43,9 +51,9 @@ export const registerCoworkSessionIpc = (): void => {
         try {
           // Work sessions use Pi (SDK mode, instant availability). No need to wait
           // for channel delivery; that gate applies only to IM/Cron paths.
-          const coworkStoreInstance = getCoworkStore();
+          const coworkStoreInstance = deps.getCoworkStore();
           const config = coworkStoreInstance.getConfig();
-          const selectedAgent = getAgentManager().getAgent(options.agentId || 'main');
+          const selectedAgent = deps.getAgentManager().getAgent(options.agentId || 'main');
           const fallbackExpertIds =
             selectedAgent &&
             (selectedAgent.source === CoworkSessionExpertSource.Package ||
@@ -72,7 +80,7 @@ export const registerCoworkSessionIpc = (): void => {
           const workspace = options.workspaceId
             ? coworkStoreInstance.getWorkspace(options.workspaceId)
             : null;
-          const selectedTaskDirectory = resolveSessionWorkingDirectory({
+          const selectedTaskDirectory = deps.resolveSessionWorkingDirectory({
             cwd: options.cwd || workspace?.path,
           });
 
@@ -90,7 +98,7 @@ export const registerCoworkSessionIpc = (): void => {
             t('coworkDefaultSessionTitle'),
           );
           const title = options.title?.trim() || fallbackTitle;
-          const taskWorkingDirectory = resolveTaskWorkingDirectory(selectedTaskDirectory);
+          const taskWorkingDirectory = deps.resolveTaskWorkingDirectory(selectedTaskDirectory);
 
           const session = coworkStoreInstance.createSession(
             title,
@@ -138,7 +146,7 @@ export const registerCoworkSessionIpc = (): void => {
             });
             // Persist once at the IPC boundary; runtime receives paths only.
             storedImages = persistCoworkImageAttachments(
-              getCoworkImageRoot(),
+              deps.getCoworkImageRoot(),
               session.id,
               options.imageAttachments,
             );
@@ -155,7 +163,7 @@ export const registerCoworkSessionIpc = (): void => {
           coworkStoreInstance.touchWorkspace(session.workspaceId);
 
           // Start the session asynchronously (skip initial user message since we already added it)
-          const runtime = getPiRuntimeAdapter();
+          const runtime = deps.getPiRuntimeAdapter();
           const runtimeSkillIds = [
             ...new Set([
               ...(options.activeSkillIds || []),
@@ -213,8 +221,8 @@ export const registerCoworkSessionIpc = (): void => {
     continueSession: async (_event, options) => {
       try {
         // Work sessions use Pi (SDK mode, instant availability).
-        const runtime = getPiRuntimeAdapter();
-        const localStore = getCoworkStore();
+        const runtime = deps.getPiRuntimeAdapter();
+        const localStore = deps.getCoworkStore();
         let existingSession = localStore.getSession(options.sessionId, 0, {
           includeArtifacts: false,
         });
@@ -260,7 +268,7 @@ export const registerCoworkSessionIpc = (): void => {
           });
           // Persist once at the IPC boundary; runtime receives paths only.
           storedImages = persistCoworkImageAttachments(
-            getCoworkImageRoot(),
+            deps.getCoworkImageRoot(),
             options.sessionId,
             options.imageAttachments,
           );
@@ -328,11 +336,11 @@ export const registerCoworkSessionIpc = (): void => {
           .catch(error => {
             console.error('[Cowork] continue error:', error);
             try {
-              const existing = getCoworkStore().getSession(options.sessionId, 0, {
+              const existing = deps.getCoworkStore().getSession(options.sessionId, 0, {
                 includeArtifacts: false,
               });
               reportPiSessionFailure(
-                getPiRuntimeAdapter(),
+                deps.getPiRuntimeAdapter(),
                 options.sessionId,
                 error,
                 existing?.status,

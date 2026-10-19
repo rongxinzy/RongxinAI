@@ -1,13 +1,13 @@
 /** Cowork session admin IPC: stop, compact, save, list, delete, update model, remote managed. */
-import { rt } from './runtimeState';
-import { getCoworkStore } from './runtimeServices';
-import { getPiRuntimeAdapter } from './sessionServices';
 import {
   forgetCoworkSession,
   getCoworkImageRoot,
   scheduleBackgroundMaterialize,
-} from './coworkSessionImages';
-import { sanitizeCoworkSessionForIpc, slimCoworkMessageForIpc } from './ipcPayloadSanitize';
+} from '../appBootstrap/coworkSessionImages';
+import {
+  sanitizeCoworkSessionForIpc,
+  slimCoworkMessageForIpc,
+} from '../appBootstrap/ipcPayloadSanitize';
 import { persistMessageImageMetadata } from '../coworkImageAttachments';
 import {
   coerceImportedSessionStatus,
@@ -15,7 +15,9 @@ import {
 } from '../coworkSessionRuntimeState';
 import type { CoworkMessageMetadata, CoworkMessageType } from '../coworkStore';
 import { parseCoworkExecutionMode } from '../../shared/cowork/executionMode';
-import { getIMGatewayManager } from './ccConnectRuntime';
+import type { ChannelAccountManager } from '../im/channelAccountManager';
+import type { CoworkStore } from '../coworkStore';
+import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkSessionAdminContract } from '../../shared/ipc/coworkContract';
 import type { z } from 'zod';
@@ -38,11 +40,17 @@ import {
   COWORK_SESSION_PAGE_SIZE,
 } from '../../shared/cowork/constants';
 
-export const registerCoworkSessionAdminIpc = (): void => {
+export interface CoworkSessionAdminIpcDeps {
+  getCoworkStore: () => CoworkStore;
+  getPiRuntimeAdapter: () => PiRuntimeAdapter;
+  getIMGatewayManager: () => ChannelAccountManager | undefined;
+}
+
+export const registerCoworkSessionAdminIpc = (deps: CoworkSessionAdminIpcDeps): void => {
   handleIpcContract(coworkSessionAdminContract, {
     stopSession: async (_event, sessionId) => {
       try {
-        const runtime = getPiRuntimeAdapter();
+        const runtime = deps.getPiRuntimeAdapter();
         runtime.stopSession(sessionId);
         return { success: true as const };
       } catch (error) {
@@ -58,7 +66,7 @@ export const registerCoworkSessionAdminIpc = (): void => {
     // runs now; failures are classified so the renderer can localize them.
     compactSession: async (_event, sessionId): Promise<CoworkCompactResult> => {
       try {
-        const runtime = getPiRuntimeAdapter();
+        const runtime = deps.getPiRuntimeAdapter();
         if (runtime.isSessionActive(sessionId) === false) {
           return { success: false, reason: CoworkCompactFailure.NoSession };
         }
@@ -100,14 +108,14 @@ export const registerCoworkSessionAdminIpc = (): void => {
 
     saveSession: async (_event, session) => {
       try {
-        const existing = rt.coworkStore.getSession(session.id);
+        const existing = deps.getCoworkStore().getSession(session.id);
         if (existing) {
           // Session already exists — update status and sync new messages
-          rt.coworkStore.updateSession(session.id, {
+          deps.getCoworkStore().updateSession(session.id, {
             status: coerceImportedSessionStatus(session.status),
           });
           for (const msg of session.messages || []) {
-            rt.coworkStore.upsertMessage(session.id, {
+            deps.getCoworkStore().upsertMessage(session.id, {
               id: msg.id,
               type: msg.type as CoworkMessageType,
               content: msg.content,
@@ -120,29 +128,31 @@ export const registerCoworkSessionAdminIpc = (): void => {
           // so the next turn rebuilds from this transcript instead of mixing
           // the import with stale structured history.
           if (session.messages?.length) {
-            getPiRuntimeAdapter().invalidatePiSessionDir(session.id);
+            deps.getPiRuntimeAdapter().invalidatePiSessionDir(session.id);
           }
-          const updated = rt.coworkStore.getSession(session.id);
+          const updated = deps.getCoworkStore().getSession(session.id);
           return {
             success: true as const,
             session: updated ? sanitizeCoworkSessionForIpc(updated) : updated,
           };
         }
         // Create new session in SQLite
-        const newSession = rt.coworkStore.createSession(
-          session.title,
-          session.cwd,
-          session.systemPrompt || '',
-          parseCoworkExecutionMode(session.executionMode) ?? CoworkExecutionMode.Local,
-          session.activeSkillIds || [],
-          session.agentId || 'main',
-          session.modelOverride || '',
-          session.mode || 'work',
-          session.id,
-        );
+        const newSession = deps
+          .getCoworkStore()
+          .createSession(
+            session.title,
+            session.cwd,
+            session.systemPrompt || '',
+            parseCoworkExecutionMode(session.executionMode) ?? CoworkExecutionMode.Local,
+            session.activeSkillIds || [],
+            session.agentId || 'main',
+            session.modelOverride || '',
+            session.mode || 'work',
+            session.id,
+          );
         // Save messages
         for (const msg of session.messages || []) {
-          rt.coworkStore.upsertMessage(newSession.id, {
+          deps.getCoworkStore().upsertMessage(newSession.id, {
             id: msg.id,
             type: msg.type as CoworkMessageType,
             content: msg.content,
@@ -152,10 +162,10 @@ export const registerCoworkSessionAdminIpc = (): void => {
           });
         }
         // Imported sessions are history: a 'running' status can never be live.
-        rt.coworkStore.updateSession(newSession.id, {
+        deps.getCoworkStore().updateSession(newSession.id, {
           status: coerceImportedSessionStatus(session.status),
         });
-        const saved = rt.coworkStore.getSession(newSession.id);
+        const saved = deps.getCoworkStore().getSession(newSession.id);
         return {
           success: true as const,
           session: saved ? sanitizeCoworkSessionForIpc(saved) : saved,
@@ -174,12 +184,15 @@ export const registerCoworkSessionAdminIpc = (): void => {
         // Purge runtime state first so late events cannot write to the session
         // after the DB row is removed.
         forgetCoworkSession(sessionId);
-        const coworkStoreInstance = getCoworkStore();
+        const coworkStoreInstance = deps.getCoworkStore();
         coworkStoreInstance.deleteSession(sessionId);
         // Clean up IM session mapping so that new channel messages
         // create a fresh session instead of referencing a deleted one.
         try {
-          getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
+          deps
+            .getIMGatewayManager()
+            ?.getIMStore()
+            ?.deleteSessionMappingByCoworkSessionId(sessionId);
         } catch {
           // IM rt.store may not be initialised yet; safe to ignore.
         }
@@ -199,11 +212,14 @@ export const registerCoworkSessionAdminIpc = (): void => {
         for (const sessionId of sessionIds) {
           forgetCoworkSession(sessionId);
         }
-        const coworkStoreInstance = getCoworkStore();
+        const coworkStoreInstance = deps.getCoworkStore();
         coworkStoreInstance.deleteSessions(sessionIds);
         for (const sessionId of sessionIds) {
           try {
-            getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
+            deps
+              .getIMGatewayManager()
+              ?.getIMStore()
+              ?.deleteSessionMappingByCoworkSessionId(sessionId);
           } catch {
             // IM rt.store may not be initialised yet; safe to ignore.
           }
@@ -219,7 +235,7 @@ export const registerCoworkSessionAdminIpc = (): void => {
 
     setSessionPinned: async (_event, options) => {
       try {
-        const coworkStoreInstance = getCoworkStore();
+        const coworkStoreInstance = deps.getCoworkStore();
         const pinOrder = coworkStoreInstance.setSessionPinned(options.sessionId, options.pinned);
         return { success: true as const, pinOrder };
       } catch (error) {
@@ -232,7 +248,7 @@ export const registerCoworkSessionAdminIpc = (): void => {
 
     renameSession: async (_event, options) => {
       try {
-        const coworkStoreInstance = getCoworkStore();
+        const coworkStoreInstance = deps.getCoworkStore();
         // Scheduled rows are identified by their `source`; the stored title keeps
         // the canonical prefix so it cannot drift from migrated/renamed rows.
         const existing = coworkStoreInstance.getSession(options.sessionId, 0);
@@ -261,7 +277,7 @@ export const registerCoworkSessionAdminIpc = (): void => {
 
     updateSessionModel: async (_event, input) => {
       try {
-        const localStore = getCoworkStore();
+        const localStore = deps.getCoworkStore();
         const existing = localStore.getSession(input.sessionId, 0);
         if (!existing) {
           return { success: false as const, error: 'Session not found' };
@@ -282,7 +298,7 @@ export const registerCoworkSessionAdminIpc = (): void => {
 
     getSession: async (_event, sessionId, options) => {
       try {
-        const localStore = getCoworkStore();
+        const localStore = deps.getCoworkStore();
         // Default: latest page only for the main transcript UI. Callers that need
         // the full history (e.g. scheduled-task run viewer) pass messageLimit: null.
         const session =
@@ -296,7 +312,7 @@ export const registerCoworkSessionAdminIpc = (): void => {
         // not heal the persisted row (startup reset / quit / relocation do).
         const reconciledSession = reconcileWorkSessionRuntimeState(
           session,
-          getPiRuntimeAdapter().isSessionRunning(sessionId),
+          deps.getPiRuntimeAdapter().isSessionRunning(sessionId),
         );
         return { success: true as const, session: sanitizeCoworkSessionForIpc(reconciledSession) };
       } catch (error) {
@@ -309,7 +325,8 @@ export const registerCoworkSessionAdminIpc = (): void => {
 
     remoteManaged: async (_event, sessionId) => {
       try {
-        const mapping = getIMGatewayManager()
+        const mapping = deps
+          .getIMGatewayManager()
           ?.getIMStore()
           ?.getSessionMappingByCoworkSessionId(sessionId);
         return { success: true as const, remoteManaged: !!mapping };
@@ -330,13 +347,13 @@ export const registerCoworkSessionAdminIpc = (): void => {
         const workspaceId = options?.workspaceId;
         const mode = options?.mode;
         const sources = options?.sources;
-        const localStore = getCoworkStore();
+        const localStore = deps.getCoworkStore();
         const sessions = localStore
           .listSessions(limit, offset, agentId, workspaceId, mode, sources)
           .map(session =>
             reconcileWorkSessionRuntimeState(
               session,
-              getPiRuntimeAdapter().isSessionRunning(session.id),
+              deps.getPiRuntimeAdapter().isSessionRunning(session.id),
             ),
           );
         const total = localStore.countSessions(agentId, workspaceId, mode, sources);
@@ -352,7 +369,7 @@ export const registerCoworkSessionAdminIpc = (): void => {
     getSessionMessages: async (_event, options) => {
       try {
         const { sessionId, limit = COWORK_MESSAGE_PAGE_SIZE, offset = 0 } = options;
-        const localStore = getCoworkStore();
+        const localStore = deps.getCoworkStore();
         const total = localStore.countSessionMessages(sessionId);
         const messages = localStore.getPagedSessionMessages(sessionId, limit, offset);
         scheduleBackgroundMaterialize(sessionId, messages);
