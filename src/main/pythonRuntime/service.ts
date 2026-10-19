@@ -15,7 +15,13 @@ export class PythonRuntimeService {
   private readonly queues = new Map<string, Promise<unknown>>();
   private closed = false;
   constructor(
-    private readonly options: { storageRoot: string; runnerPath: string; jobRunnerPath?: string },
+    private readonly options: {
+      storageRoot: string;
+      runnerPath: string;
+      jobRunnerPath?: string;
+      /** Bundled interpreter/uv paths; flows to the runner with every request. */
+      preinstalledRuntime?: PythonRunnerRequest['preinstalledRuntime'];
+    },
   ) {}
 
   execute(input: PythonExecuteInput, signal?: AbortSignal): Promise<PythonExecutionResult> {

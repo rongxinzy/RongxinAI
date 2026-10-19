@@ -1,13 +1,24 @@
 import { fork } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, realpath, rm, symlink } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { bundledRuntimeId } from './bundledRuntime';
 import { PythonRuntimeService } from './service';
+
+/** Resolve the bundled managed runtime for a standalone (non-Electron) run. */
+const probe = async (path: string): Promise<string | undefined> =>
+  (await access(path).then(
+    () => true,
+    () => false,
+  ))
+    ? path
+    : undefined;
 
 const enabled = process.env.PYTHON_RUNTIME_INTEGRATION === '1';
 describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () => {
   let root: string, workspace: string, other: string, service: PythonRuntimeService;
+  let globalPythonPath: string, globalUvPath: string;
   beforeAll(async () => {
     root = await mkdtemp(join(tmpdir(), 'zhiyuan-python-integration-'));
     workspace = join(root, 'work a 雪');
@@ -15,19 +26,31 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
     await mkdir(workspace);
     await mkdir(other);
     await mkdir(join(root, 'storage'));
-    if (process.env.PYTHON_RUNTIME_TEST_CACHE)
-      await symlink(
-        resolve(process.env.PYTHON_RUNTIME_TEST_CACHE, 'runtimes'),
-        join(root, 'storage/runtimes'),
-        process.platform === 'win32' ? 'junction' : 'dir',
-      );
+    const os =
+      process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'mac' : 'linux';
+    const pythonPath =
+      (await probe(process.env.PYTHON_RUNTIME_BUNDLED_PYTHON!)) ??
+      (await probe(
+        resolve(
+          `resources/python-${os}/${process.platform === 'win32' ? 'python.exe' : 'bin/python3'}`,
+        ),
+      ));
+    const uvPath =
+      (await probe(process.env.PYTHON_RUNTIME_BUNDLED_UV!)) ??
+      (await probe(
+        resolve(`resources/uv-${os}/${process.platform === 'win32' ? 'uv.exe' : 'uv'}`),
+      ));
+    if (!pythonPath || !uvPath)
+      throw new Error('Bundled managed runtime not found; run the setup:*-runtime scripts first.');
     service = new PythonRuntimeService({
       storageRoot: join(root, 'storage'),
       runnerPath: resolve(
         process.env.PYTHON_RUNTIME_RUNNER ?? 'dist-electron/python-runtime-runner.cjs',
       ),
       jobRunnerPath: process.env.PYTHON_RUNTIME_JOB_HELPER,
+      preinstalledRuntime: { pythonPath, uvPath, runtimeId: bundledRuntimeId() },
     });
+    ({ pythonPath: globalPythonPath, uvPath: globalUvPath } = { pythonPath, uvPath });
   });
   afterAll(async () => {
     await service?.shutdown();
@@ -39,7 +62,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       code: 'import sys,os;print(sys.version_info[:2]);print(os.getcwd());print("stderr",file=sys.stderr);sys.exit(9)',
       timeoutMs: 300000,
     });
-    expect(result.stdout).toContain('(3, 12)');
+    expect(result.stdout).toContain('(3, 14)');
     // Windows TEMP can use an 8.3 alias while Python reports the canonical long path.
     const reportedCwd = result.stdout.trim().split(/\r?\n/)[1];
     expect(await realpath(reportedCwd)).toBe(await realpath(workspace));
@@ -84,7 +107,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
   test('the pinned Python runs a compiled NumPy wheel without using system Python', async () => {
     const installed = await service.install({
       workspace,
-      packages: ['numpy==2.2.6'],
+      packages: ['numpy==2.3.4'],
       timeoutMs: 300000,
     });
     expect(installed.exitCode, installed.stderr).toBe(0);
@@ -92,7 +115,7 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
       workspace,
       code: 'import numpy,sys;print(numpy.__version__);print(int(numpy.arange(4).sum()));print(sys.prefix != sys.base_prefix)',
     });
-    expect(result.stdout.trim().split(/\r?\n/)).toEqual(['2.2.6', '6', 'True']);
+    expect(result.stdout.trim().split(/\r?\n/)).toEqual(['2.3.4', '6', 'True']);
     expect(result.exitCode).toBe(0);
   }, 310000);
   test.skipIf(process.platform === 'win32')(
@@ -124,6 +147,11 @@ describe.skipIf(!enabled)('real standalone Python + uv workspace runtime', () =>
         runner.send({
           operation: 'execute',
           storageRoot: join(root, 'storage'),
+          preinstalledRuntime: {
+            pythonPath: globalPythonPath,
+            uvPath: globalUvPath,
+            runtimeId: bundledRuntimeId(),
+          },
           input: {
             workspace,
             code: `import os,json,pathlib,subprocess,sys,time\np=subprocess.Popen([sys.executable,"-c","import time;time.sleep(60)"])\npathlib.Path(${JSON.stringify(pidFile)}).write_text(json.dumps([os.getpid(),p.pid]))\ntime.sleep(60)`,
