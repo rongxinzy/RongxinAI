@@ -2,10 +2,9 @@
  * llama.cpp IPC contract (work package M.4, second domain): the 37 invoke
  * methods of the local-inference surface bound to one zod definition.
  *
- * Strategy for this slice: **arguments are validated strictly** where the
- * shared types define them (launch inputs, install inputs, config writes,
- * log-session reads); legacy `unknown` inputs keep `z.unknown()` with a
- * `TODO(m4-tighten)` marker until their sanitizers move into schemas.
+ * Strategy for this slice: **arguments are validated strictly** (launch and
+ * install inputs, config writes, log-session reads, backend references and
+ * preference writes).
  * **Results are typed pass-through** (`z.custom<T>()`): the renderer API
  * derives exact types today, and runtime result validation tightens
  * incrementally per result type without wire changes.
@@ -128,6 +127,41 @@ const OpenModelLaunchLogWindowInputSchema = z
   .object({ sessionId: z.string().optional(), modelName: z.string().optional() })
   .passthrough();
 
+/**
+ * Backend reference: the full {version, backend, versionBackend} triple or a
+ * versionBackend shorthand — the handler sanitizer accepts both shapes, so
+ * the schema must not reject the shorthand.
+ */
+const BackendRefInputSchema = z.union([
+  z
+    .object({
+      version: z.string().optional(),
+      backend: z.string().optional(),
+      versionBackend: z.string().optional(),
+    })
+    .passthrough(),
+  z.string(),
+]);
+
+const ModelPreferenceSchema = z
+  .object({
+    ctxSize: z.number().optional(),
+    maxTokens: z.number().optional(),
+    capabilities: z.record(z.string(), z.unknown()).optional(),
+    residency: z
+      .object({ mode: z.string(), idleMinutes: z.number().optional() })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+const SetModelPreferenceInputSchema = z
+  .object({
+    modelName: z.string().min(1),
+    preference: ModelPreferenceSchema.optional(),
+  })
+  .passthrough();
+
 export const llamacppContract = defineIpcContract({
   status: {
     channel: LlamaCppIpcChannel.Status,
@@ -154,10 +188,9 @@ export const llamacppContract = defineIpcContract({
     args: emptyArgs,
     result: typed<LlamaCppRuntimeUninstallResult>(),
   },
-  // TODO(m4-tighten): legacy backend-ref inputs pass through their existing sanitizer.
   listRuntimeDevices: {
     channel: LlamaCppIpcChannel.ListRuntimeDevices,
-    args: z.tuple([z.unknown()]),
+    args: z.tuple([BackendRefInputSchema]),
     result: typed<LlamaCppRuntimeListDevicesResult>(),
   },
   listBackends: {
@@ -167,7 +200,7 @@ export const llamacppContract = defineIpcContract({
   },
   getBackendDownloadSize: {
     channel: LlamaCppIpcChannel.GetBackendDownloadSize,
-    args: z.tuple([z.unknown()]),
+    args: z.tuple([BackendRefInputSchema]),
     result: typed<LlamaCppBackendDownloadSizeResult>(),
   },
   getBackendSelection: {
@@ -177,17 +210,17 @@ export const llamacppContract = defineIpcContract({
   },
   setBackendSelection: {
     channel: LlamaCppIpcChannel.SetBackendSelection,
-    args: z.tuple([z.unknown()]),
+    args: z.tuple([BackendRefInputSchema]),
     result: typed<LlamaCppRuntimeInstallResult>(),
   },
   installBackend: {
     channel: LlamaCppIpcChannel.InstallBackend,
-    args: z.tuple([z.unknown()]),
+    args: z.tuple([BackendRefInputSchema]),
     result: typed<LlamaCppRuntimeInstallResult>(),
   },
   uninstallBackend: {
     channel: LlamaCppIpcChannel.UninstallBackend,
-    args: z.tuple([z.unknown()]),
+    args: z.tuple([BackendRefInputSchema]),
     result: typed<LlamaCppRuntimeUninstallResult>(),
   },
   getRuntimeCapabilities: {
@@ -276,10 +309,9 @@ export const llamacppContract = defineIpcContract({
     args: emptyArgs,
     result: typed<LlamaCppModelPreferences>(),
   },
-  // TODO(m4-tighten): preference writes flow through sanitizeUpdatedModelPreferences.
   setModelPreference: {
     channel: LlamaCppIpcChannel.SetModelPreference,
-    args: z.tuple([z.unknown()]),
+    args: z.tuple([SetModelPreferenceInputSchema]),
     result: typed<LlamaCppModelPreferences>(),
   },
   loadModel: {
