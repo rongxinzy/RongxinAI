@@ -127,6 +127,9 @@ jobs:
           save-cache: ${{ matrix.shard == 1 && 'true' || 'false' }}
       - name: Install Electron for ABI probe fixtures (no native rebuild)
         run: node node_modules/electron/install.js
+      - uses: ./.github/actions/prepare-node-test-native
+        with:
+          save-cache: ${{ matrix.shard == 1 && 'true' || 'false' }}
       - name: Run tests
         run: bun run test -- --shard=${{ matrix.shard }}/2
       - name: Verify Presentation Studio compiler and validator
@@ -366,6 +369,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun-workspace
+      - uses: ./.github/actions/prepare-node-test-native
+        with:
+          save-cache: 'false'
       - run: bun run test:streaming-mutations
       - uses: actions/upload-artifact@v6
         if: always()

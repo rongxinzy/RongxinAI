@@ -132,6 +132,7 @@ jobs:
         run: bun run typecheck:electron
       - name: Install Electron for ABI probe fixtures (no native rebuild)
         run: node node_modules/electron/install.js
+      - uses: ./.github/actions/prepare-node-test-native
       - name: Run tests
         run: bun run test
 

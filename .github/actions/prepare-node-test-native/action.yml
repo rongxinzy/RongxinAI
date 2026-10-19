@@ -1,0 +1,29 @@
+name: Prepare Node test native modules
+description: Reuse ABI-specific SQLite and PTY output and always verify it can load
+inputs:
+  save-cache:
+    description: Enable one writer per parallel test group
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - id: runtime
+      shell: bash
+      run: node -e "require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'identity='+[process.platform,process.arch,process.versions.node,process.versions.modules,process.env.ImageVersion||'local'].join('-')+'\n')"
+    - uses: actions/cache/restore@v5
+      id: native
+      with:
+        path: |
+          node_modules/better-sqlite3/build/Release
+          node_modules/node-pty/build/Release
+        key: node-test-native-v1-${{ steps.runtime.outputs.identity }}-${{ hashFiles('bun.lock', 'patches/**', 'scripts/ensure-node-native.cjs') }}
+    - name: Probe native modules and rebuild only missing or incompatible output
+      shell: bash
+      run: node scripts/ensure-node-native.cjs
+    - uses: actions/cache/save@v5
+      if: inputs.save-cache == 'true' && steps.native.outputs.cache-hit != 'true'
+      with:
+        path: |
+          node_modules/better-sqlite3/build/Release
+          node_modules/node-pty/build/Release
+        key: ${{ steps.native.outputs.cache-primary-key }}
