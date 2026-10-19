@@ -46,6 +46,18 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
     }
   }
 
+  /**
+   * Whether this cowork session is registered to a builtin coding lane.
+   * Lazy cache: it fills from `recordBuiltinEvent` scanning rooms on the
+   * session's first `'message'` event — which the streaming-text interest
+   * resolver can only be asked about after that event fired, so the mapping
+   * exists by then. The IM side mirrors this order (session mapping is
+   * registered before the scheduled-task tool snapshots its delivery).
+   */
+  isBuiltinLaneSession(sessionId: string): boolean {
+    return this.builtinSessionLaneMap.has(sessionId);
+  }
+
   recordBuiltinEvent(
     sessionId: string,
     kind: (typeof CodingEventKind)[keyof typeof CodingEventKind],

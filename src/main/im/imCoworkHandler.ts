@@ -98,6 +98,7 @@ export class IMCoworkHandler extends EventEmitter {
   private readonly onComplete = this.handleComplete.bind(this);
   private readonly onError = this.handleError.bind(this);
   private readonly onSessionStopped = this.handleSessionStopped.bind(this);
+  private readonly unregisterStreamingInterest: (() => void) | null = null;
 
   constructor(options: IMCoworkHandlerOptions) {
     super();
@@ -126,6 +127,14 @@ export class IMCoworkHandler extends EventEmitter {
       getConversation: sessionId => this.sessionRegistry.getConversation(sessionId),
       stopSession: sessionId => this.coworkRuntime.stopSession(sessionId),
     });
+
+    // IM mirrors consume non-final full-text messageUpdate for their mapped
+    // sessions; declaring that interest lets unmapped sessions skip the
+    // full-text bus during streaming.
+    this.unregisterStreamingInterest =
+      this.coworkRuntime.registerStreamingTextInterestResolver?.(
+        sessionId => this.sessionRegistry.getConversation(sessionId) !== undefined,
+      ) ?? null;
 
     this.setupEventListeners();
   }
@@ -611,6 +620,8 @@ export class IMCoworkHandler extends EventEmitter {
    * Cleanup when handler is destroyed
    */
   destroy(): void {
+    this.unregisterStreamingInterest?.();
+
     // Clear all pending accumulators
     this.messageAccumulators.destroyAll();
     this.sessionRegistry.clear();

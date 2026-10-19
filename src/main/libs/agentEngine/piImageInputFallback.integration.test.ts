@@ -134,6 +134,7 @@ const fakeStore = {
   addMessage: (sessionId: string, message: object) => ({ id: `m-${sessionId}`, ...message }),
   updateMessage: () => undefined,
   updateSession: () => undefined,
+  getMessage: () => undefined,
   getSession: () => undefined,
   listSessionArtifacts: () => [],
 } as unknown as CoworkStore; // test double for a wide store interface

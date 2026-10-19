@@ -18,6 +18,19 @@ export class CoworkMessageStore extends CoworkWorkspaceStore {
     return row?.count || 0;
   }
 
+  /** Single-message lookup by id; readers must not materialize a page for one row. */
+  getMessage(sessionId: string, messageId: string): CoworkMessage | null {
+    const row = this.getOne<CoworkMessageRow>(
+      `
+      SELECT id, type, content, metadata, created_at, sequence
+      FROM cowork_messages
+      WHERE id = ? AND session_id = ?
+    `,
+      [messageId, sessionId],
+    );
+    return row ? mapCoworkMessageRow(row, sessionId) : null;
+  }
+
   getPagedSessionMessages(sessionId: string, limit: number, offset: number): CoworkMessage[] {
     // Single-level query: the previous wrapped form defeated the ordering
     // index and re-sorted the whole session per page (temp b-tree).

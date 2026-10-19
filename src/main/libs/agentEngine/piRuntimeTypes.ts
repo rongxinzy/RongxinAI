@@ -245,5 +245,11 @@ export interface PiRuntime {
     itemId: string,
   ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
   getSessionConfirmationMode(sessionId: string): 'modal' | 'text' | null;
+  /**
+   * Declares which sessions consume non-final full-text `messageUpdate` events
+   * (IM mirrors, coding lanes); returns an unregister function. Optional so
+   * test doubles can omit it — without any resolver the adapter keeps emitting.
+   */
+  registerStreamingTextInterestResolver?(resolver: (sessionId: string) => boolean): () => void;
   onSessionDeleted?(sessionId: string): void;
 }
