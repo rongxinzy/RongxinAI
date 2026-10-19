@@ -111,5 +111,5 @@ export interface SkillManagerContext {
   startWatching(): void;
   stopWatching(): void;
   resolveSkillDir(skillId: string): string;
-  ensureSkillDependencies(skillDir: string): { success: boolean; error?: string };
+  ensureSkillDependencies(skillDir: string): Promise<{ success: boolean; error?: string }>;
 }

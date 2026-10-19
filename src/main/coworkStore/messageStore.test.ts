@@ -367,3 +367,16 @@ test('deleteMessage removes only the targeted message', () => {
   expect(store.deleteMessage(sid, first.id)).toBe(false);
   expect(store.getPagedSessionMessages(sid, 10, 0).map(m => m.id)).toEqual([second.id]);
 });
+
+test('getMessage returns a row only under its own session id', () => {
+  const { store } = harness;
+  const sidA = store.createSession('get-message-a', '/tmp/get-message-a').id;
+  const sidB = store.createSession('get-message-b', '/tmp/get-message-b').id;
+  const message = store.addMessage(sidA, { type: 'assistant', content: 'checkpoint body' }, 1000);
+
+  expect(store.getMessage(sidA, message.id)?.content).toBe('checkpoint body');
+  // The same message id asked under another session must not leak across rows.
+  expect(store.getMessage(sidB, message.id)).toBeNull();
+  expect(store.getMessage(sidA, 'no-such-message')).toBeNull();
+  expect(store.getMessage('no-such-session', message.id)).toBeNull();
+});

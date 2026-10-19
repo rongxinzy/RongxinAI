@@ -2,7 +2,7 @@
  * Local inference preload surface, split from `../electron.d.ts`.
  *
  * Covers the Ollama and llama.cpp runtimes, the model marketplace search,
- * triage config and hardware snapshots.
+ * hardware snapshots.
  */
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../../shared/hardware';
 import type {
@@ -50,7 +50,6 @@ import type {
   OllamaServiceConfig,
   OllamaStatusSnapshot,
 } from '../../../shared/ollama';
-import type { TriageConfig } from '../../../shared/triage';
 
 export interface OllamaApi {
   status: () => Promise<OllamaStatusSnapshot>;
@@ -168,11 +167,6 @@ export interface LlamaCppApi {
 }
 
 export interface MarketplaceApi extends IpcContractApi<typeof marketplaceContract> {}
-
-export interface TriageApi {
-  getConfig: () => Promise<TriageConfig>;
-  setConfig: (config: TriageConfig) => Promise<TriageConfig>;
-}
 
 export interface HardwareApi {
   nvidiaSmi: () => Promise<NvidiaSmiSnapshot>;

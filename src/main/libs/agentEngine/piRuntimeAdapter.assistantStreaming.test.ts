@@ -185,6 +185,8 @@ describe('PiRuntimeAdapter', () => {
       // Only the members this metadata path reads.
       adapter.setCoworkStore({
         addMessage: (_sessionId: string, message: unknown) => message,
+        getMessage: (_sessionId: string, messageId: string) =>
+          seededMessageIds.includes(messageId) ? { id: messageId, metadata: {} } : null,
         getSession: () => ({ messages: seededMessageIds.map(id => ({ id, metadata: {} })) }),
         updateMessage,
         updateSession: vi.fn(),

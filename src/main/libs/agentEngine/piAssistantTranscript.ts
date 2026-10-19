@@ -1,10 +1,12 @@
 /**
  * Assistant and thinking bubbles for one Pi turn.
  *
- * Streaming store writes and the in-process `messageUpdate` bus emit stay
- * throttled; the renderer streams from delta stream parts instead.
- * messageUpdate remains for IM and coding-room full-text consumers only —
- * piUiForwarder drops every non-final messageUpdate on the IPC path.
+ * SQLite keeps only growth-threshold checkpoints of the streaming body (the
+ * finalize write is authoritative), and the in-process `messageUpdate` bus
+ * emits non-final full text only while the session has declared streaming-text
+ * subscribers (IM mirrors, coding lanes); the renderer streams from delta
+ * stream parts instead — piUiForwarder drops every non-final messageUpdate on
+ * the IPC path.
  */
 
 import { randomUUID } from 'crypto';
@@ -12,7 +14,11 @@ import { randomUUID } from 'crypto';
 import type { CoworkMessage, CoworkStore } from '../../coworkStore';
 import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import type { ActivePiSession, PiStartupLatency, PiUsage } from './piRuntimeSessionState';
-import { MESSAGE_UPDATE_THROTTLE_MS, STORE_UPDATE_THROTTLE_MS } from './piRuntimeSessionState';
+import {
+  MESSAGE_UPDATE_THROTTLE_MS,
+  STREAM_CHECKPOINT_GROWTH_CHARS,
+  STREAM_CHECKPOINT_MIN_INTERVAL_MS,
+} from './piRuntimeSessionState';
 
 export interface PiAssistantTranscriptHost {
   getStore(): CoworkStore | null;
@@ -25,15 +31,15 @@ export interface PiAssistantTranscriptHost {
   ): void;
   emitMessageRemoved(sessionId: string, messageId: string): void;
   getActiveSession(sessionId: string): ActivePiSession | undefined;
+  /** Whether non-final full-text updates have consumers for this session. */
+  hasStreamingTextSubscribers(sessionId: string): boolean;
 }
 
 export class PiAssistantTranscript {
-  private readonly lastStoreUpdateTime = new Map<string, number>();
-  private readonly pendingStoreUpdate = new Map<
-    string,
-    { content: string; metadata: Record<string, unknown> }
-  >();
-  private readonly pendingStoreUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
+  /** Persisted body length per message id; the next checkpoint grows past it. */
+  private readonly persistedContentLengthByMessageId = new Map<string, number>();
+  /** Wall clock of the last checkpoint write; backs the interval floor. */
+  private readonly lastCheckpointAtByMessageId = new Map<string, number>();
   private readonly lastMessageUpdateEmitAt = new Map<string, number>();
   private readonly pendingMessageUpdate = new Map<
     string,
@@ -156,9 +162,7 @@ export class PiAssistantTranscript {
   ): void {
     const store = this.host.getStore();
     if (!store?.deleteMessage) return;
-    const existing = store
-      .getSession(sessionId)
-      ?.messages.find(message => message.id === messageId);
+    const existing = store.getMessage(sessionId, messageId);
     if (!existing || existing.metadata?.isThinking) return;
     if (existing.content.length > 0) return;
     const streamed = this.lastStreamedContentByMessageId.get(messageId) ?? '';
@@ -212,14 +216,20 @@ export class PiAssistantTranscript {
     const created = this.host.getStore() ? this.host.getStore().addMessage(sessionId, seed) : seed;
     if (kind === 'thinking') active.thinkingMessageId = created.id;
     else active.assistantMessageId = created.id;
+    if (this.host.getStore()) {
+      this.persistedContentLengthByMessageId.set(created.id, initialContent.length);
+      this.lastCheckpointAtByMessageId.set(created.id, Date.now());
+    }
     this.host.emitMessage(sessionId, created);
     return created.id;
   }
 
   /**
    * Push a streaming (non-final) content snapshot to the answer/thinking
-   * message. Both the SQLite write and the bus emit are throttled — the bus
-   * event feeds IM/coding-room consumers only, never the renderer stream.
+   * message. SQLite only persists a checkpoint of the body (growth threshold
+   * or interval floor; the finalize write is authoritative); the full-text bus
+   * event goes out — throttled — only while the session has streaming-text
+   * subscribers (IM mirrors, coding lanes). It never feeds the renderer stream.
    */
   streamInto(
     sessionId: string,
@@ -239,11 +249,11 @@ export class PiAssistantTranscript {
     if (kind === 'thinking') {
       active.thinkingLifecycle.markContentStreaming();
     }
-    // Throttle the synchronous SQLite write separately from the bus emit so a
-    // fast Pi stream doesn't block the main-process event loop every frame.
     this.rememberStreamedContent(messageId, content);
-    this.throttledStoreUpdate(sessionId, messageId, content, metadata);
-    this.throttledEmitMessageUpdate(sessionId, messageId, content, metadata);
+    this.checkpointStoreUpdate(sessionId, messageId, content, metadata);
+    if (this.host.hasStreamingTextSubscribers(sessionId)) {
+      this.throttledEmitMessageUpdate(sessionId, messageId, content, metadata);
+    }
   }
 
   /** Finalize the answer/thinking message: flush throttles, mark final, emit last update. */
@@ -260,7 +270,6 @@ export class PiAssistantTranscript {
         if (resolved.trim()) {
           return this.finalizeMessage(sessionId, active, kind, resolved);
         }
-        this.flushPendingStoreUpdate(sessionId, emptyId);
         this.flushPendingMessageUpdate(sessionId, emptyId);
         this.removeEmptyAnswerPlaceholder(sessionId, emptyId, active);
         this.clearThrottleMapsForMessage(emptyId);
@@ -270,7 +279,6 @@ export class PiAssistantTranscript {
     }
     const messageId = this.ensureMessage(sessionId, active, kind, content);
     this.rememberStreamedContent(messageId, content);
-    this.flushPendingStoreUpdate(sessionId, messageId);
     this.flushPendingMessageUpdate(sessionId, messageId);
     this.clearThrottleMapsForMessage(messageId);
     const thinkingDurationMs = kind === 'thinking' ? active.thinkingLifecycle.finish() : undefined;
@@ -334,7 +342,6 @@ export class PiAssistantTranscript {
               ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
             };
       const metadata = finalize ? finalMetadata : streamingMetadata;
-      this.flushPendingStoreUpdate(sessionId, entry.messageId, content, metadata);
       this.flushPendingMessageUpdate(sessionId, entry.messageId, content, metadata);
       if (!finalize) {
         if (this.host.getStore()) {
@@ -356,16 +363,26 @@ export class PiAssistantTranscript {
           if (active.assistantMessageId === entry.messageId) {
             active.assistantMessageId = null;
           }
+          // A placeholder row that survives (it holds streamed text) must
+          // still get the final metadata so later loads stop treating it as
+          // streaming; a removed row makes this write a no-op.
+          if (this.host.getStore()) {
+            this.host
+              .getStore()
+              .updateMessage(
+                sessionId,
+                entry.messageId,
+                { content, metadata },
+                { touchUpdatedAt: false },
+              );
+          }
         }
         this.clearThrottleMapsForMessage(entry.messageId);
         continue;
       }
       this.clearThrottleMapsForMessage(entry.messageId);
       if (!this.host.getStore()) continue;
-      const existing = this.host
-        .getStore()
-        .getSession(sessionId)
-        ?.messages.find(message => message.id === entry.messageId);
+      const existing = this.host.getStore().getMessage(sessionId, entry.messageId);
       const mergedMetadata = {
         ...existing?.metadata,
         ...metadata,
@@ -400,10 +417,7 @@ export class PiAssistantTranscript {
       ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
     };
     if (this.host.getStore()) {
-      const message = this.host
-        .getStore()
-        .getSession(sessionId)
-        ?.messages.find(candidate => candidate.id === messageId);
+      const message = this.host.getStore().getMessage(sessionId, messageId);
       this.host.getStore().updateMessage(sessionId, messageId, {
         content,
         metadata: { ...message?.metadata, ...metadata },
@@ -461,10 +475,7 @@ export class PiAssistantTranscript {
         return;
       }
 
-      const message = this.host
-        .getStore()
-        ?.getSession(sessionId)
-        ?.messages.find(item => item.id === messageId);
+      const message = this.host.getStore()?.getMessage(sessionId, messageId);
       if (!message) return;
 
       const usage = hasValidContextUsage
@@ -512,11 +523,20 @@ export class PiAssistantTranscript {
   }
 
   /**
-   * Throttle synchronous SQLite writes. Leading write fires immediately; further
-   * writes within the window are coalesced into a single trailing write that
-   * persists the latest content. Prevents per-frame event-loop stalls.
+   * Growth-or-time checkpoint for the synchronous SQLite write. A streaming
+   * body is persisted once it has grown past the last persisted length by
+   * `STREAM_CHECKPOINT_GROWTH_CHARS` — bounding both the number of full-body
+   * writes per turn and the total bytes written (the old 250 ms timer wrote
+   * the accumulated body on every tick, O(N²) bytes per turn on the main
+   * thread) — or, for the majority of replies that never reach that
+   * threshold, at least every `STREAM_CHECKPOINT_MIN_INTERVAL_MS` while the
+   * body keeps growing, so a crash mid-stream loses at most one interval of
+   * text instead of the whole reply. A shorter body (non-prefix rewrite,
+   * retry reopen) is written immediately so stale, longer text cannot linger.
+   * The finalize write remains the authoritative copy, so checkpoints are only
+   * crash protection for the in-flight turn.
    */
-  private throttledStoreUpdate(
+  private checkpointStoreUpdate(
     sessionId: string,
     messageId: string,
     content: string,
@@ -524,37 +544,27 @@ export class PiAssistantTranscript {
   ): void {
     this.noteThrottleMessage(sessionId, messageId);
     if (!this.host.getStore()) return;
-    const now = Date.now();
-    const lastWrite = this.lastStoreUpdateTime.get(messageId) ?? 0;
-    const elapsed = now - lastWrite;
-
-    if (elapsed >= STORE_UPDATE_THROTTLE_MS) {
-      this.clearPendingStoreUpdate(messageId);
-      this.lastStoreUpdateTime.set(messageId, now);
-      this.host
-        .getStore()
-        .updateMessage(sessionId, messageId, { content, metadata }, { touchUpdatedAt: false });
-      return;
+    const persistedLength = this.persistedContentLengthByMessageId.get(messageId);
+    if (persistedLength !== undefined) {
+      const growth = content.length - persistedLength;
+      if (growth < 0) {
+        // The stream rewrote itself shorter; fall through and reset the
+        // persisted baseline in the same write.
+      } else if (growth === 0) {
+        return;
+      } else if (
+        growth < STREAM_CHECKPOINT_GROWTH_CHARS &&
+        Date.now() - (this.lastCheckpointAtByMessageId.get(messageId) ?? 0) <
+          STREAM_CHECKPOINT_MIN_INTERVAL_MS
+      ) {
+        return;
+      }
     }
-
-    // Coalesce: remember the latest content and (re)arm a single trailing write.
-    this.pendingStoreUpdate.set(messageId, { content, metadata });
-    if (!this.pendingStoreUpdateTimer.has(messageId)) {
-      this.pendingStoreUpdateTimer.set(
-        messageId,
-        setTimeout(() => {
-          this.pendingStoreUpdateTimer.delete(messageId);
-          const pending = this.pendingStoreUpdate.get(messageId);
-          this.pendingStoreUpdate.delete(messageId);
-          this.lastStoreUpdateTime.set(messageId, Date.now());
-          if (pending && this.host.getStore()) {
-            this.host
-              .getStore()
-              .updateMessage(sessionId, messageId, pending, { touchUpdatedAt: false });
-          }
-        }, STORE_UPDATE_THROTTLE_MS - elapsed),
-      );
-    }
+    this.persistedContentLengthByMessageId.set(messageId, content.length);
+    this.lastCheckpointAtByMessageId.set(messageId, Date.now());
+    this.host
+      .getStore()
+      .updateMessage(sessionId, messageId, { content, metadata }, { touchUpdatedAt: false });
   }
 
   /**
@@ -597,34 +607,6 @@ export class PiAssistantTranscript {
     );
   }
 
-  private flushPendingStoreUpdate(
-    sessionId: string,
-    messageId: string,
-    content?: string,
-    metadata?: Record<string, unknown>,
-  ): void {
-    const timer = this.pendingStoreUpdateTimer.get(messageId);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingStoreUpdateTimer.delete(messageId);
-    }
-    const pending = this.pendingStoreUpdate.get(messageId);
-    this.pendingStoreUpdate.delete(messageId);
-    const body = content ?? pending?.content;
-    const meta = metadata ?? pending?.metadata;
-    if (body !== undefined && meta && this.host.getStore()) {
-      this.host
-        .getStore()
-        .updateMessage(
-          sessionId,
-          messageId,
-          { content: body, metadata: meta },
-          { touchUpdatedAt: false },
-        );
-      this.lastStoreUpdateTime.set(messageId, Date.now());
-    }
-  }
-
   private flushPendingMessageUpdate(
     sessionId: string,
     messageId: string,
@@ -646,15 +628,6 @@ export class PiAssistantTranscript {
     }
   }
 
-  private clearPendingStoreUpdate(messageId: string): void {
-    const timer = this.pendingStoreUpdateTimer.get(messageId);
-    if (timer) {
-      clearTimeout(timer);
-      this.pendingStoreUpdateTimer.delete(messageId);
-    }
-    this.pendingStoreUpdate.delete(messageId);
-  }
-
   private clearPendingMessageUpdate(messageId: string): void {
     const timer = this.pendingMessageUpdateTimer.get(messageId);
     if (timer) {
@@ -665,22 +638,18 @@ export class PiAssistantTranscript {
   }
 
   private clearThrottleMapsForMessage(messageId: string): void {
-    this.clearPendingStoreUpdate(messageId);
     this.clearPendingMessageUpdate(messageId);
-    this.lastStoreUpdateTime.delete(messageId);
     this.lastMessageUpdateEmitAt.delete(messageId);
     this.throttleSessionByMessageId.delete(messageId);
     this.lastStreamedContentByMessageId.delete(messageId);
+    this.persistedContentLengthByMessageId.delete(messageId);
+    this.lastCheckpointAtByMessageId.delete(messageId);
   }
 
   clearThrottleStateBySession(sessionId: string, flush: boolean): void {
     for (const [messageId, owner] of this.throttleSessionByMessageId) {
       if (owner !== sessionId) continue;
       if (flush) {
-        const pendingStore = this.pendingStoreUpdate.get(messageId);
-        if (pendingStore && this.host.getStore()) {
-          this.host.getStore().updateMessage(sessionId, messageId, pendingStore);
-        }
         const pendingMessage = this.pendingMessageUpdate.get(messageId);
         if (pendingMessage) {
           this.lastMessageUpdateEmitAt.set(messageId, Date.now());
@@ -692,11 +661,12 @@ export class PiAssistantTranscript {
           );
         }
       }
-      this.clearPendingStoreUpdate(messageId);
       this.clearPendingMessageUpdate(messageId);
-      this.lastStoreUpdateTime.delete(messageId);
       this.lastMessageUpdateEmitAt.delete(messageId);
       this.throttleSessionByMessageId.delete(messageId);
+      this.lastStreamedContentByMessageId.delete(messageId);
+      this.persistedContentLengthByMessageId.delete(messageId);
+      this.lastCheckpointAtByMessageId.delete(messageId);
     }
     this.pruneFinalizedForSession(sessionId);
   }

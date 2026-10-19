@@ -131,7 +131,6 @@ export interface AgentsApi {
       skillIds?: string[];
       enabled?: boolean;
       pinned?: boolean;
-      triageOverride?: import('../../../shared/triage').AgentTriageOverride | null;
     },
   ) => Promise<Agent>;
   delete: (id: string) => Promise<boolean>;

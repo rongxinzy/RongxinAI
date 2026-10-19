@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 import { generateThemeCSS } from '../engine/css-generator';
-import { classicLight } from '../themes/classic-light';
+import { zenithLight } from '../themes/zenith-light';
 
 test('the compact indicator icon overrides the shared spinner size without changing other spinners', () => {
-  const css = generateThemeCSS(classicLight);
+  const css = generateThemeCSS(zenithLight);
   const base = css.indexOf(':where(.theme-spinner) {');
   const compact = css.indexOf(':where(.theme-run-indicator .theme-spinner) {');
   expect(base).toBeGreaterThan(-1);

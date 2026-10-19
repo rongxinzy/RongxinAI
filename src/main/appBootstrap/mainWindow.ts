@@ -12,7 +12,6 @@ import { openDevToolsWindow, toggleDevToolsForSender } from './appIpc';
 import { isWecomAuthUrl } from './windowSecurity';
 import { logAppQuitContextOnce } from './appLifecycle';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
-import { getCronJobService } from '../ipcHandlers/scheduledTask';
 import { isAutoLaunched } from '../autoLaunchManager';
 import { getStore } from './runtimeServices';
 import { getAppIconPath } from './windowBranding';
@@ -318,14 +317,7 @@ export const createMainWindow = (): void => {
         () => updateTrayMenu(() => rt.mainWindow),
       );
 
-      // Start cron polling after the window is ready.
       (async () => {
-        try {
-          getCronJobService().startPolling();
-        } catch (err) {
-          console.warn('[Main] Canonical scheduler not available yet:', err);
-        }
-
         // One-time migration: import legacy SQLite task records into the
         // canonical scheduler. No task is delegated to another runtime.
         migrateLegacyScheduledTasksToCanonical({

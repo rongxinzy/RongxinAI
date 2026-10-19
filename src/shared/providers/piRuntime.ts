@@ -1,3 +1,4 @@
+import { isRecord } from '../lib/isRecord';
 export const ProviderModelPiApi = {
   AnthropicMessages: 'anthropic-messages',
   OpenAICompletions: 'openai-completions',
@@ -128,10 +129,6 @@ const SESSION_AFFINITY_FORMAT_VALUES = new Set<string>(
 const CACHE_CONTROL_FORMAT_VALUES = new Set<string>(
   Object.values(ProviderModelPiCacheControlFormat),
 );
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 function optionalBoolean(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;

@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { isRecord } from '../../shared/lib/isRecord';
 
 const STASH_ROOT = 'host-agent-stash';
 const OPENCODE_STASH_NAME = 'opencode-merge.json';
@@ -45,10 +46,6 @@ async function pathExists(target: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function parseJsonObject(text: string, label: string): Record<string, unknown> {

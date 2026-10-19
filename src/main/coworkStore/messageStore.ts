@@ -1,6 +1,6 @@
 // Message persistence for the CoworkStore class chain.
 // Split from src/main/coworkStore.ts (issue #1069).
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 import { mapCoworkMessageRow, normalizeMessageTimestamp, type CoworkMessageRow } from './helpers';
 import type {
@@ -16,6 +16,19 @@ export class CoworkMessageStore extends CoworkWorkspaceStore {
       .prepare('SELECT COUNT(*) as count FROM cowork_messages WHERE session_id = ?')
       .get(sessionId) as { count: number } | undefined;
     return row?.count || 0;
+  }
+
+  /** Single-message lookup by id; readers must not materialize a page for one row. */
+  getMessage(sessionId: string, messageId: string): CoworkMessage | null {
+    const row = this.getOne<CoworkMessageRow>(
+      `
+      SELECT id, type, content, metadata, created_at, sequence
+      FROM cowork_messages
+      WHERE id = ? AND session_id = ?
+    `,
+      [messageId, sessionId],
+    );
+    return row ? mapCoworkMessageRow(row, sessionId) : null;
   }
 
   getPagedSessionMessages(sessionId: string, limit: number, offset: number): CoworkMessage[] {
@@ -106,7 +119,7 @@ export class CoworkMessageStore extends CoworkWorkspaceStore {
     message: Omit<CoworkMessage, 'id' | 'timestamp'>,
     timestamp?: number,
   ): CoworkMessage {
-    const id = uuidv4();
+    const id = randomUUID();
     const now = timestamp ?? Date.now();
 
     const seqRow = this.db
@@ -198,7 +211,7 @@ export class CoworkMessageStore extends CoworkWorkspaceStore {
     beforeMessageId: string,
     message: Omit<CoworkMessage, 'id' | 'timestamp'>,
   ): CoworkMessage {
-    const id = uuidv4();
+    const id = randomUUID();
     const now = Date.now();
 
     // Get the target message's sequence
@@ -316,7 +329,7 @@ export class CoworkMessageStore extends CoworkWorkspaceStore {
       const insertedTimestamps: number[] = [];
 
       for (const entry of authoritative) {
-        const id = uuidv4();
+        const id = randomUUID();
         const baseMetadata = { isStreaming: false, isFinal: true };
         const finalMetadata = entry.metadata
           ? { ...baseMetadata, ...entry.metadata }

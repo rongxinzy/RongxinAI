@@ -123,10 +123,6 @@ Skills/MCP/Marketplace、AppSystem/Providers、CodingAgent/IM/自动化（定时
 
 跨多个注册文件的契约（如 appSystem 覆盖 store/dialog/shell/appUpdate 等）按文件用 `handleIpcContractSubset` 注册各自子集；实现收到的 event 是完整 `IpcMainInvokeEvent`（`IpcContractHandlers` 的 event 参数按注册侧绑定）。Cowork 契约则按注册模块拆为多个子契约（`coworkContract.ts` 内 `coworkSession*` / `coworkQueue*` / `coworkConfig*` / `coworkExport*` / `workspaceContract` 等）。无论哪种方式，每个 channel 只能注册一次——重复注册会在启动时抛 "Attempted to register a second handler"。
 
-### `electronDomains`（实验性）
-
-`src/renderer/services/electronDomains.ts` 将 preload 命名空间归纳为 5 域：`system`、`inference`、`agent`、`workspace`、`integration`。文件头标注 **experimental**；新代码**不强制**使用，可继续直接访问 `window.electron`。
-
 ### Toast
 
 - **唯一派发入口：** `showAppToast`（`src/renderer/services/toastNotification.ts`），经 `appToast.ts` re-export；错误场景用 `showAppError`。

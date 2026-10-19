@@ -3,7 +3,6 @@ import { app, BrowserWindow } from 'electron';
 
 import { rt } from './runtimeState';
 import { getStore } from './runtimeServices';
-import { getCronJobService } from '../ipcHandlers/scheduledTask';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { destroyTray } from '../trayManager';
 import { disposeDesktopPet } from '../desktopPet/controller';
@@ -103,13 +102,6 @@ const runAppCleanup = async (): Promise<void> => {
     await rt.codingRoomService.dispose().catch(error => {
       console.error('[CodingRoom] Failed to dispose coding agent connections on quit:', error);
     });
-  }
-
-  // Stop the cron job polling
-  try {
-    getCronJobService().stopPolling();
-  } catch {
-    // The canonical scheduler may not have been initialized — safe to ignore.
   }
 
   rt.sqliteBackupManager?.stopPeriodicBackupLoop();

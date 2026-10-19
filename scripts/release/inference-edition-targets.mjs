@@ -1,3 +1,7 @@
+import { RELEASE_PLATFORMS, resolveReleasePlatforms } from './release-platform-stages.mjs';
+
+export { RELEASE_PLATFORMS, resolveReleasePlatforms };
+
 /** @typedef {'lite' | 'cpu' | 'cuda'} InferenceEditionVariant */
 
 /** @type {InferenceEditionVariant[]} */
@@ -10,27 +14,6 @@ export const LINUX_INFERENCE_VARIANTS = ['cpu', 'cuda'];
 
 /** @type {InferenceEditionVariant[]} */
 export const MACOS_INFERENCE_VARIANTS = ['cpu'];
-
-export const RELEASE_PLATFORMS = ['win32', 'linux', 'darwin'];
-
-/**
- * Platforms a release publishes. ZHIYUAN_RELEASE_PLATFORMS (comma-separated
- * win32,linux,darwin) narrows a release to a subset, e.g. a Windows-only
- * hotfix; unset means every platform.
- * @returns {Set<string>}
- */
-export function resolveReleasePlatforms(env = process.env) {
-  const raw = (env.ZHIYUAN_RELEASE_PLATFORMS ?? '').trim();
-  if (!raw) return new Set(RELEASE_PLATFORMS);
-  const platforms = new Set(raw.split(',').map(value => value.trim()).filter(Boolean));
-  for (const platform of platforms) {
-    if (!RELEASE_PLATFORMS.includes(platform)) {
-      throw new Error(`Unsupported ZHIYUAN_RELEASE_PLATFORMS entry: ${platform}`);
-    }
-  }
-  if (platforms.size === 0) throw new Error('ZHIYUAN_RELEASE_PLATFORMS selects no platform');
-  return platforms;
-}
 
 /**
  * Stable release targets for signed update manifests.

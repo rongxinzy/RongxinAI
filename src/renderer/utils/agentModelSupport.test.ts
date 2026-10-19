@@ -127,40 +127,11 @@ describe('buildAgentModelValidationTargets', () => {
     ]);
   });
 
-  test('includes triage models when triage is enabled', () => {
-    expect(
-      buildAgentModelValidationTargets({
-        primaryModelRef: 'openai/gpt-5.2',
-        triageOverride: {
-          enabled: true,
-          lightModelRef: 'llamacpp/qwen-local-runtime-small',
-          heavyModelRef: 'llamacpp/qwen-local-trained-small',
-        },
-      }),
-    ).toEqual([
-      {
-        kind: AgentModelValidationTargetKind.Primary,
-        modelRef: 'openai/gpt-5.2',
-      },
-      {
-        kind: AgentModelValidationTargetKind.TriageLight,
-        modelRef: 'llamacpp/qwen-local-runtime-small',
-      },
-      {
-        kind: AgentModelValidationTargetKind.TriageHeavy,
-        modelRef: 'llamacpp/qwen-local-trained-small',
-      },
-    ]);
-  });
-
   test('deduplicates repeated model refs', () => {
     expect(
       buildAgentModelValidationTargets({
         primaryModelRef: 'llamacpp/qwen-local-runtime-small',
-        triageOverride: {
-          enabled: true,
-          lightModelRef: 'llamacpp/qwen-local-runtime-small',
-        },
+        fallbackModelRef: 'llamacpp/qwen-local-runtime-small',
       }),
     ).toEqual([
       {
@@ -178,15 +149,7 @@ describe('resolveFirstUnsupportedAgentModel', () => {
         [
           {
             kind: AgentModelValidationTargetKind.Primary,
-            modelRef: 'openai/gpt-5.2',
-          },
-          {
-            kind: AgentModelValidationTargetKind.TriageLight,
             modelRef: 'llamacpp/qwen-local-runtime-small',
-          },
-          {
-            kind: AgentModelValidationTargetKind.TriageHeavy,
-            modelRef: 'llamacpp/qwen-local-trained-small',
           },
         ],
         baseModels,
@@ -194,7 +157,7 @@ describe('resolveFirstUnsupportedAgentModel', () => {
     ).toEqual({
       modelRef: 'llamacpp/qwen-local-runtime-small',
       reason: AgentModelSupportReason.LocalModelRuntimeContextTooSmall,
-      targetKind: AgentModelValidationTargetKind.TriageLight,
+      targetKind: AgentModelValidationTargetKind.Primary,
     });
   });
 });

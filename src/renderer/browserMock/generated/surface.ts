@@ -6,7 +6,6 @@ import { createMcp } from './createMcp';
 import { createOllama } from './createOllama';
 import { createLlamacpp } from './createLlamacpp';
 import { createMarketplace } from './createMarketplace';
-import { createTriage } from './createTriage';
 import { createHardware } from './createHardware';
 import { createAgents } from './createAgents';
 import { createCheckApiConfig } from './createCheckApiConfig';
@@ -54,7 +53,6 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     ollama: createOllama(runtime),
     llamacpp: createLlamacpp(runtime),
     marketplace: createMarketplace(runtime),
-    triage: createTriage(runtime),
     hardware: createHardware(runtime),
     agents: createAgents(runtime),
     checkApiConfig: createCheckApiConfig(runtime),

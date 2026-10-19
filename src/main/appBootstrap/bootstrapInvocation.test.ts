@@ -53,3 +53,29 @@ test('main.ts invokes every appBootstrap helper it imports', () => {
     ).toBe(true);
   }
 });
+
+test('initApp constructs the canonical scheduler before the first window', () => {
+  const source = readSource('./initApp.ts');
+
+  // The scheduled-task service must be constructed eagerly at startup:
+  // getCanonicalScheduledTaskService is the only place that injects it into
+  // the Pi adapter, and Work sessions started before the cc-connect sidecar
+  // attaches would otherwise silently lack the scheduled_task tool.
+  const eagerCall = source.indexOf('getCronJobService();');
+  const createWindow = source.indexOf('createMainWindow();');
+  expect(eagerCall).toBeGreaterThan(-1);
+  expect(createWindow).toBeGreaterThan(eagerCall);
+});
+
+test('constructing the canonical scheduler injects it into the Pi adapter', () => {
+  const source = readSource('./ccConnectRuntime.ts');
+
+  // The lazy constructor must keep wiring setScheduledTaskService; dropping
+  // it removes the scheduled_task tool from every Work session.
+  const constructor = source.indexOf('export const getCanonicalScheduledTaskService');
+  const injection = source.indexOf(
+    'rt.piRuntimeAdapter?.setScheduledTaskService(rt.canonicalScheduledTaskService)',
+  );
+  expect(constructor).toBeGreaterThan(-1);
+  expect(injection).toBeGreaterThan(constructor);
+});

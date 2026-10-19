@@ -3,6 +3,7 @@ import {
   CoworkPermissionToolName,
 } from '../../../shared/cowork/constants';
 import type { CoworkPermissionRequest, CoworkPermissionResult } from '../../types/cowork';
+import { isRecord } from '../../../shared/lib/isRecord';
 
 export { CoworkPermissionBehavior, CoworkPermissionToolName };
 
@@ -19,9 +20,6 @@ export interface AskUserQuestionItem {
   options: AskUserQuestionOption[];
   multiSelect: boolean;
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object';
 
 export const isAskUserQuestionPermission = (permission: CoworkPermissionRequest): boolean =>
   permission.toolName === CoworkPermissionToolName.AskUserQuestion;

@@ -1,4 +1,4 @@
-import { classicLight } from '../../theme/themes/classic-light';
+import { zenithLight } from '../../theme/themes/zenith-light';
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -52,7 +52,7 @@ describe('CoworkInlineAttachments', () => {
 
     const removeButton = screen.getByLabelText(i18nService.t('coworkAttachmentRemove'));
     expect(removeButton).toHaveClass('theme-page-attachments-button-variant-6');
-    expect(classicLight.components['page-attachments-button-variant-6'].parentHover.opacity).toBe(
+    expect(zenithLight.components['page-attachments-button-variant-6'].parentHover.opacity).toBe(
       '1',
     );
     expect(attachment?.firstElementChild?.firstElementChild).toHaveClass('group-hover:opacity-0');

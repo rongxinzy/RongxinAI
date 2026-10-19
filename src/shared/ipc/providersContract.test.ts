@@ -76,27 +76,13 @@ test('agentsCreate accepts the CreateExpertDialog payload', () => {
 });
 
 test('agentsUpdate accepts the agentService partial patch', () => {
-  // agentService.updateAgent sends only changed fields, triageOverride nullable
+  // agentService.updateAgent sends only changed fields
   expect(
     providersContract.agentsUpdate.args.safeParse(['agent-1', { enabled: false, pinned: true }])
       .success,
   ).toBe(true);
   expect(
-    providersContract.agentsUpdate.args.safeParse([
-      'agent-1',
-      {
-        name: 'new name',
-        triageOverride: {
-          enabled: true,
-          lightModelRef: 'gpt-4o-mini',
-          heavyModelRef: 'claude-sonnet-5',
-          allowCrossProviderSwitch: true,
-        },
-      },
-    ]).success,
-  ).toBe(true);
-  expect(
-    providersContract.agentsUpdate.args.safeParse(['agent-1', { triageOverride: null }]).success,
+    providersContract.agentsUpdate.args.safeParse(['agent-1', { name: 'new name' }]).success,
   ).toBe(true);
   expect(
     providersContract.agentsUpdate.args.safeParse(['agent-1', { pinned: 'yes' }]).success,

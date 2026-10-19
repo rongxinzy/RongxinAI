@@ -36,11 +36,6 @@ export const appSystemApi = {
     remove: asApi('storeRemove'),
   },
 
-  triage: {
-    getConfig: asApi('triageGetConfig'),
-    setConfig: asApi('triageSetConfig'),
-  },
-
   permissions: {
     checkCalendar: asApi('permissionsCheckCalendar'),
     requestCalendar: asApi('permissionsRequestCalendar'),
@@ -121,7 +116,6 @@ export const appSystemApi = {
     isDev: asApi('appIsDev'),
     isEnterprise: asApi('appIsEnterprise'),
     getSystemLocale: asApi('appGetSystemLocale'),
-    consumePendingLocalInferenceInstall: asApi('appConsumePendingLocalInferenceInstall'),
     getInferenceEdition: asApi('appGetInferenceEdition'),
     usesBundledLlamaCppRuntime: asApi('appUsesBundledLlamaCppRuntime'),
     relaunch: asApi('appRelaunch'),
@@ -177,7 +171,6 @@ export const appSystemApi = {
     send: (status: 'online' | 'offline') => void;
   };
   store: Renamed<{ get: 'storeGet'; set: 'storeSet'; remove: 'storeRemove' }>;
-  triage: Renamed<{ getConfig: 'triageGetConfig'; setConfig: 'triageSetConfig' }>;
   permissions: Renamed<{
     checkCalendar: 'permissionsCheckCalendar';
     requestCalendar: 'permissionsRequestCalendar';
@@ -235,7 +228,6 @@ export const appSystemApi = {
     isDev: 'appIsDev';
     isEnterprise: 'appIsEnterprise';
     getSystemLocale: 'appGetSystemLocale';
-    consumePendingLocalInferenceInstall: 'appConsumePendingLocalInferenceInstall';
     getInferenceEdition: 'appGetInferenceEdition';
     usesBundledLlamaCppRuntime: 'appUsesBundledLlamaCppRuntime';
     relaunch: 'appRelaunch';

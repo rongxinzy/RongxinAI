@@ -6,18 +6,20 @@ import {
   SessionTarget,
   WakeMode,
 } from '../../../scheduledTask/constants';
-import type { ScheduledTaskInput } from '../../../scheduledTask/types';
+import type { ScheduledTaskDelivery, ScheduledTaskInput } from '../../../scheduledTask/types';
 
 export function buildPiScheduledTaskTool(input: {
   service: ScheduledTaskService;
   workspaceId?: string | null;
   sessionKey?: string | null;
+  /** Delivery used when the model omits it (e.g. back to the IM chat). */
+  defaultDelivery?: ScheduledTaskDelivery | null;
 }): Record<string, unknown> {
   return {
     name: 'scheduled_task',
     label: 'Scheduled Task',
     description:
-      'Create a scheduled task after confirming the task content, schedule, and notification method with the user.',
+      'Create a scheduled task after confirming the task content, schedule, and notification method with the user. Delivery defaults to this conversation when the session has one; pass delivery only to override it.',
     parameters: {
       type: 'object',
       properties: {
@@ -56,6 +58,10 @@ export function buildPiScheduledTaskTool(input: {
           : undefined;
       const normalizedDelivery = validateDelivery(delivery);
       if (normalizedDelivery.ok === false) return failure(normalizedDelivery.error);
+      const effectiveDelivery =
+        delivery === undefined && input.defaultDelivery
+          ? input.defaultDelivery
+          : normalizedDelivery.value;
       const taskInput: ScheduledTaskInput = {
         name,
         description: typeof params.description === 'string' ? params.description.trim() : message,
@@ -64,7 +70,7 @@ export function buildPiScheduledTaskTool(input: {
         sessionTarget: SessionTarget.Main,
         wakeMode: WakeMode.Now,
         payload: { kind: PayloadKind.AgentTurn, message },
-        delivery: normalizedDelivery.value,
+        delivery: effectiveDelivery,
         workspaceId: input.workspaceId ?? null,
         sessionKey: input.sessionKey ?? null,
       };

@@ -330,6 +330,12 @@ export const getCodingRoomService = (): CodingRoomService => {
         ),
       },
     );
+    // The coding room consumes non-final full-text messageUpdate events for
+    // Replace-mode stream records; declaring lane interest here lets every
+    // other session skip the full-text bus during streaming.
+    runtime.registerStreamingTextInterestResolver(
+      sessionId => rt.codingRoomService?.isBuiltinLaneSession(sessionId) ?? false,
+    );
     rt.codingRoomService.registry.hydrate();
     runtime.on('message', (sessionId: string, message: unknown) => {
       const metadata =

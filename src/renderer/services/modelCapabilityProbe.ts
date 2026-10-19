@@ -3,13 +3,11 @@ import {
   ModelCapabilityStatus,
   parseLlamaCppRuntimeCapabilities,
 } from '../../shared/providers';
+import { isRecord } from '../../shared/lib/isRecord';
 
 type MutableModelCapabilities = {
   -readonly [Key in keyof ModelCapabilities]?: ModelCapabilities[Key];
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const stringArray = (value: unknown): string[] | undefined =>
   Array.isArray(value) && value.every(item => typeof item === 'string')

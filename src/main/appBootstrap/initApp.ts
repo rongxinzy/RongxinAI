@@ -46,7 +46,7 @@ import { getCodingRoomService } from './codingRoomRuntime';
 import { getCoworkImageRoot } from './coworkSessionImages';
 import { bindPiWorkbenchRuntimeForwarder } from './piUiForwarder';
 import { initMcpServers } from './mcpBootstrap';
-import { resolveDefaultAgentModelRef } from './messageTriage';
+import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { ensureEmbeddedPiAgentDir } from '../libs/agentEngine/piAgentDir';
 import { handleDeepLink } from './communityAuth';
 import { getCronJobService } from '../ipcHandlers/scheduledTask';
@@ -73,13 +73,11 @@ import { registerCodingAgentIpcHandlers } from '../ipcHandlers/codingAgent';
 import { registerMemoryIpcHandlers } from '../memory/ipc';
 import { resolveMemorySessionTitles } from '../memory/sessionTitleResolver';
 import { registerLlamaCppIpcHandlers } from '../ipcHandlers/llamacpp';
-import { registerTriageIpcHandlers } from '../ipcHandlers/triage';
 import { registerOllamaIpcHandlers } from '../ipcHandlers/ollama';
 import { registerMarketplaceIpcHandlers } from '../ipcHandlers/marketplace';
 import { cleanupLegacyCopilotStoredToken } from '../legacyCredentialCleanup';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from '../libs/enterpriseConfigSync';
 import { CoworkExecutionMode } from '../../shared/cowork/constants';
-import { setTriageClassifierDeps } from '../libs/agentEngine/piClassifierTriage';
 import { ZhiyuanEnterpriseSkillBridge } from '../enterpriseExtension/skillBridge';
 import { zhiyuanEnterpriseRendererBridge } from '../enterpriseExtension/rendererBridge';
 import { allowEnterpriseRendererOpaqueOrigin } from '../enterpriseExtension/rendererProtocol';
@@ -387,7 +385,6 @@ export const initApp = async (): Promise<void> => {
     });
     // Warm the short-lived backend cache before the runtime settings dialog is opened.
     void localInferenceManager.listBackends();
-    registerTriageIpcHandlers({ getStore });
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
       onModelBindingsChanged: async snapshot => {
@@ -474,24 +471,6 @@ export const initApp = async (): Promise<void> => {
 
     bindPiWorkbenchRuntimeForwarder();
 
-    // Wire pi's classifier API for message triage; failures disable the
-    // classifier path (rules still classify).
-    void (async () => {
-      try {
-        const [codingAgent, lazyApi] = await Promise.all([
-          import('@earendil-works/pi-coding-agent'),
-          import('@earendil-works/pi-ai/api/llama-cpp-classify.lazy'),
-        ]);
-        setTriageClassifierDeps({
-          ModelRuntime: codingAgent.ModelRuntime as never,
-          llamaCppClassifyApi: lazyApi.llamaCppClassifyApi as never,
-        });
-      } catch (error) {
-        console.warn('[Triage] pi classifier API unavailable:', error);
-        setTriageClassifierDeps(null);
-      }
-    })();
-
     const defaultAgentModelRef = resolveDefaultAgentModelRef();
     const backfilledAgentModels = getCoworkStore().backfillEmptyAgentModels(defaultAgentModelRef);
     if (backfilledAgentModels > 0) {
@@ -514,8 +493,16 @@ export const initApp = async (): Promise<void> => {
       });
     }
 
+    // Construct the canonical scheduler eagerly. getCanonicalScheduledTaskService
+    // is the only place that injects the service into the Pi adapter
+    // (setScheduledTaskService); without this call it would only be built
+    // lazily by the first scheduled-task IPC request or the cc-connect sidecar
+    // cron attach, and Work sessions started before either (sidecar missing,
+    // in crash backoff, or racing startup) would silently lack the
+    // scheduled_task tool. The old startPolling() call covered this by
+    // accident; the polling itself was a no-op and stays removed.
     try {
-      getCronJobService().startPolling();
+      getCronJobService();
     } catch (error) {
       console.warn('[Main] Canonical scheduler not available after startup:', error);
     }

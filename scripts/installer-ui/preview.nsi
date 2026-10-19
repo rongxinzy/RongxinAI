@@ -36,12 +36,6 @@ BrandingText " "
 ; to browsed directories like electron-builder's stock directory page.
 !define APP_FILENAME "zhiyuan-agent"
 
-; Declared by scripts/nsis-installer.nsh in the production build; the hero
-; leave callback stores the checkbox state here (installer pass only).
-!ifndef BUILD_UNINSTALLER
-Var /GLOBAL installLocalInference
-!endif
-
 ; electron-builder generates this LogicLib condition from the "updated"
 ; command-line flag via StdUtils.TestParameter; the preview never updates.
 !macro _isUpdated _a _b _t _f

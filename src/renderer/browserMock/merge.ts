@@ -1,8 +1,5 @@
 import type { DeepPartial } from './scenarioTypes';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import { isRecord } from '../../shared/lib/isRecord';
 
 /** Deep-merge fixture overrides onto the generated surface. Functions replace wholesale. */
 export function applyOverrides<T extends object>(

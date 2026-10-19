@@ -53,13 +53,13 @@ describe('ParticleBootScreen', () => {
         expect(resolveIsDark()).toBe(true);
 
         root.className = '';
-        root.dataset.theme = 'classic-dark';
+        root.dataset.theme = 'zenith-dark';
         expect(resolveIsDark()).toBe(true);
 
         root.dataset.theme = 'changan-dark';
         expect(resolveIsDark()).toBe(true);
 
-        root.dataset.theme = 'classic-light';
+        root.dataset.theme = 'zenith-light';
         expect(resolveIsDark()).toBe(false);
 
         root.className = '';

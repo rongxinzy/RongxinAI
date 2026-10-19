@@ -11,11 +11,6 @@ import { IMCoworkHandler } from './imCoworkHandler';
 import type { ActivityService } from '../activity/activityService';
 import type { ChannelTurnCoordinator } from './channelTurnCoordinator';
 import type { IMStore } from './imStore';
-import type {
-  IMScheduledTaskRequestDetector,
-  IMScheduledTaskCreationResult,
-  ParsedIMScheduledTaskRequest,
-} from './imScheduledTaskHandler';
 import type { IMMessage, Platform } from './types';
 
 const PLATFORM_MAPPING = {
@@ -45,12 +40,6 @@ export class CcConnectPiBridge {
     imStore: IMStore;
     getSkillsPrompt: () => Promise<string | null>;
     onCronTrigger: (trigger: CcConnectCronTrigger) => Promise<void>;
-    detectScheduledTaskRequest?: IMScheduledTaskRequestDetector;
-    createScheduledTask?: (input: {
-      sessionId: string;
-      message: IMMessage;
-      request: ParsedIMScheduledTaskRequest;
-    }) => Promise<IMScheduledTaskCreationResult>;
     turnCoordinator: ChannelTurnCoordinator;
     activityService: ActivityService;
   }) {
@@ -63,8 +52,6 @@ export class CcConnectPiBridge {
       coworkStore: options.coworkStore,
       imStore: options.imStore,
       getSkillsPrompt: options.getSkillsPrompt,
-      detectScheduledTaskRequest: options.detectScheduledTaskRequest,
-      createScheduledTask: options.createScheduledTask,
       activityService: options.activityService,
     });
   }

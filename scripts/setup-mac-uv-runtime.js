@@ -61,7 +61,7 @@ function checkRuntimeHealth(root, arch = process.arch, platform = process.platfo
   return { ok: missing.length === 0, missing };
 }
 
-async function download(url, destination) {
+async function downloadOnce(url, destination) {
   let response;
   try {
     response = await fetch(url, {
@@ -82,6 +82,27 @@ async function download(url, destination) {
   } finally {
     fs.rmSync(partial, { force: true });
   }
+}
+
+async function download(url, destination) {
+  const attempts = Number.parseInt(process.env.ZHIYUAN_DOWNLOAD_RETRY_ATTEMPTS || '4', 10);
+  let delayMs = Number.parseInt(process.env.ZHIYUAN_DOWNLOAD_RETRY_INITIAL_DELAY_MS || '5000', 10);
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await downloadOnce(url, destination);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts) break;
+      console.warn(
+        `[setup-posix-uv-runtime] download attempt ${attempt}/${attempts} failed for ${url}: ${error.message}`,
+      );
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+      delayMs *= 2;
+    }
+  }
+  throw lastError;
 }
 
 async function ensurePosixUvRuntime(options = {}) {
