@@ -48,9 +48,9 @@ jobs:
             exit 1
           fi
           version="${TAG_NAME#v}"
-          git fetch --no-tags origin main
+          git fetch --no-tags origin main release/v2026.10.19-win
           source_commit="$(git rev-parse "${TAG_NAME}^{}")"
-          if ! git merge-base --is-ancestor "$source_commit" origin/main; then
+          if ! git merge-base --is-ancestor "$source_commit" origin/main && ! git merge-base --is-ancestor "$source_commit" origin/release/v2026.10.19-win; then
             echo 'Release tag must point to a commit reachable from origin/main' >&2
             exit 1
           fi
