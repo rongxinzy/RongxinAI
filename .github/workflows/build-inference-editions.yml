@@ -15,6 +15,10 @@ on:
         description: 'Also run cold NSIS install, NSIS interaction drivers or Linux deb install'
         type: boolean
         default: false
+      linux-directory-only:
+        description: 'PR smoke: build and launch the Linux app without compressing distribution installers'
+        type: boolean
+        default: false
       mode:
         description: 'release runs signing and candidate assembly; verify runs unsigned validation builds'
         type: string
@@ -88,8 +92,16 @@ jobs:
           BUILD_WINDOWS: ${{ inputs.build-windows }}
           BUILD_LINUX: ${{ inputs.build-linux }}
           LINUX_INFERENCE_EDITIONS: ${{ inputs.linux-inference-editions }}
+          BUILD_MODE: ${{ inputs.mode }}
+          LINUX_DIRECTORY_ONLY: ${{ inputs.linux-directory-only }}
+          EXTENDED_INSTALL_TESTS: ${{ inputs.extended-install-tests }}
         shell: bash
         run: |
+          [[ "$BUILD_MODE" == verify || "$BUILD_MODE" == release ]] || { echo 'Invalid build mode' >&2; exit 1; }
+          if [[ "$LINUX_DIRECTORY_ONLY" == true && ( "$BUILD_MODE" != verify || "$EXTENDED_INSTALL_TESTS" == true ) ]]; then
+            echo 'Directory-only packaging cannot replace release or install acceptance' >&2
+            exit 1
+          fi
           matrix='{"include":['
           separator=''
 
@@ -509,20 +521,17 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Linux (verify)
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'linux' }}
-        # The CUDA llama-server is already built in Docker, finalized and staged
-        # above; dist:linux:cuda would rebuild it on the host against the
-        # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
-        run: ${{ matrix.inference_edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', matrix.inference_edition) }}
+        # Every edition is already staged. PR smoke launches the packaged directory;
+        # nightly/manual builds retain AppImage + deb compression.
+        run: ${{ inputs.linux-directory-only && 'bun run dist:linux -- --dir' || 'bun run dist:linux' }}
         env:
           ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
           NODE_OPTIONS: '--max-old-space-size=4096'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Linux release
         if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
-        # The CUDA llama-server is already built in Docker, finalized and staged
-        # above; dist:linux:cuda would rebuild it on the host against the
-        # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
-        run: ${{ matrix.inference_edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', matrix.inference_edition) }}
+        # CPU/CUDA staging above is the only producer; never compile it again here.
+        run: bun run dist:linux
         env:
           ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
           NODE_OPTIONS: '--max-old-space-size=4096'
@@ -838,12 +847,14 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: release/*.dmg
+          compression-level: 0
           retention-days: 7
       - uses: actions/upload-artifact@v6
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
         with:
           name: ${{ matrix.artifact }}
           path: release/*.exe
+          compression-level: 0
           retention-days: 7
       - uses: actions/upload-artifact@v6
         if: ${{ always() && inputs.mode == 'verify' && matrix.platform == 'linux' }}
@@ -854,4 +865,5 @@ jobs:
             release/*.deb
             release/linux-render-smoke.png
             release/linux-deb-install-smoke.png
+          compression-level: 0
           retention-days: 7

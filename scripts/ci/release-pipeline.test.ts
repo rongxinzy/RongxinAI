@@ -1,4 +1,7 @@
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
 
@@ -54,5 +57,41 @@ test('a Windows size error cannot be overwritten by a later native command', () 
     expect(check).toBeGreaterThan(command.indexOf('windows-installer-size-smoke.ps1'));
     if (command.includes('windows-runtime-smoke.ps1'))
       expect(check).toBeLessThan(command.indexOf('windows-runtime-smoke.ps1'));
+  }
+});
+
+test('directory smoke cannot bypass release or extended installer acceptance', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'matrix-plan-'));
+  try {
+    const plan = read('build-inference-editions.yml').jobs['plan-matrix'].steps[0].run!;
+    const run = (mode: string, directoryOnly: boolean, extended: boolean) =>
+      spawnSync('bash', ['-e', '-o', 'pipefail', '-c', plan], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          GITHUB_OUTPUT: path.join(root, 'outputs'),
+          BUILD_MODE: mode,
+          LINUX_DIRECTORY_ONLY: String(directoryOnly),
+          EXTENDED_INSTALL_TESTS: String(extended),
+          BUILD_LINUX: 'true',
+          BUILD_WINDOWS: 'false',
+          BUILD_MACOS: 'false',
+          LINUX_INFERENCE_EDITIONS: 'cpu',
+        },
+      });
+    expect(run('verify', true, false).status).toBe(0);
+    expect(run('release', true, false).status).not.toBe(0);
+    expect(run('verify', true, true).status).not.toBe(0);
+    expect(run('release', false, true).status).toBe(0);
+    expect(run('invalid', false, false).status).not.toBe(0);
+    expect(read('ci.yml').jobs['build-verification'].with?.['linux-directory-only']).toBe(true);
+    expect(
+      read('linux-install-pr.yml').jobs['install-and-start'].with?.['linux-directory-only'],
+    ).not.toBe(true);
+    expect(
+      read('build-platforms.yml').jobs['verify-inference-editions'].with?.['linux-directory-only'],
+    ).not.toBe(true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });

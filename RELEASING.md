@@ -27,9 +27,11 @@ Beta users opt in under **Settings → About → Beta update channel**.
 
 `lite` has no llama.cpp. `cpu` bundles llama.cpp CPU + Vulkan (Metal on macOS). `cuda` bundles an RTX 40 (sm_89) / CUDA 12.4 llama-server, its CUDA libraries, and a CPU fallback. Windows editions reuse one verified Magpie build; other targets build and verify their own architecture before packaging. Hooks still validate the pinned binary and the final signed digest.
 
-**Pre-release verification:** `ci.yml` owns PR selection and `ci-gate` includes every selected job. Packaging changes run representative Windows lite and Linux CPU builds; ordinary source changes retain the full unit suite, type checks and bundle budget without an independent seven-target PR workflow. `build-platforms.yml` runs all seven targets nightly or selected platforms manually. Windows weekly/manual and Linux manual installation workflows call the same pipeline with extended acceptance, retaining NSIS UI and cold/cache-hit/uninstall checks.
+**Pre-release verification:** `ci.yml` owns PR selection and `ci-gate` includes every selected job. Packaging changes run a Windows lite installer and a Linux CPU packaged-directory launch check; PRs do not compress unused Linux distribution installers. Ordinary source changes retain the full unit suite, type checks and bundle budget without an independent seven-target PR workflow. `build-platforms.yml` runs all seven targets with full installers nightly or selected platforms manually. Windows weekly/manual and Linux manual installation workflows call the same pipeline with extended acceptance, retaining NSIS UI and cold/cache-hit/uninstall checks. Directory-only mode is rejected for release or extended install acceptance.
 
 ### Build once, accept the same bytes
+
+Windows Skill Python is finalized as a standalone interpreter inside the shared layer before compression. A Windows venv redirector retains the build host's absolute Python home even with `uv --relocatable`; it must not be shipped. The layer includes its base standard library/DLLs and one copy of the dependency wheels. A Windows regression moves the layer out of the build directory and launches both Python aliases with a clean PATH, including native stdlib and local-module imports. Fresh-runner package acceptance retains the full XLSX/PDF probes.
 
 ```mermaid
 flowchart LR

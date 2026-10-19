@@ -389,7 +389,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun-workspace
       - name: Exercise Windows PowerShell 5 gates, diagnostics and native TAR checkpoints
-        run: bun x --no-install vitest run scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-diagnostics.test.ts scripts/ci/build-checkpoint.test.ts
+        run: bun x --no-install vitest run scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-diagnostics.test.ts scripts/ci/build-checkpoint.test.ts scripts/setup-windows-skill-python.test.ts
 
   build-verification:
     needs: changes
@@ -400,6 +400,7 @@ jobs:
       build-macos: false
       build-linux: true
       linux-inference-editions: cpu
+      linux-directory-only: true
       build-windows: true
       windows-inference-editions: lite
       fail-fast: false
