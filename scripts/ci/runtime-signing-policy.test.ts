@@ -66,7 +66,15 @@ test('cold installation and cache-hit upgrade retain runtime existence and compo
 
 test('desktop signing preserves the centrally signed memory runtime bytes', () => {
   const config = JSON.parse(read('electron-builder.json')) as { win: { signExts?: string[] } };
-  expect(config.win.signExts).toEqual(['!engram.exe']);
+  expect(config.win.signExts).toContain('!engram.exe');
+});
+
+test('electron-builder leaves Magpie to the afterSign hook that reseals its manifest', () => {
+  // electron-builder's own walk signs resources\magpie\win32-x64\magpie.exe without
+  // updating manifest.json, so afterPack verification then reports a SHA-256 mismatch.
+  const config = JSON.parse(read('electron-builder.json')) as { win: { signExts?: string[] } };
+  expect(config.win.signExts).toContain('!magpie.exe');
+  expect(read('scripts/notarize.js')).toContain('signPackagedWindowsMagpie');
 });
 
 test('signed releases check the packaged Magpie helper signature and sealed digest', () => {

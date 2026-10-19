@@ -182,9 +182,10 @@ function signPackagedWindowsMagpie(context, deps = {}) {
         verifyRuntime(root, key);
         continue;
       }
-      // extraResources live outside electron-builder's Windows sign walk
-      // (app.asar.unpacked and swiftshader). Sign with the same Certum
-      // signtool script the release environment already uses.
+      // electron-builder.json excludes magpie.exe from electron-builder's Windows
+      // sign walk (win.signExts) so the bytes still match the sealed manifest
+      // at afterPack. Sign here with the same Certum signtool script the
+      // release environment already uses, then reseal the manifest below.
       const result = spawn(
         'powershell.exe',
         ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', binary],
