@@ -41,25 +41,36 @@ export const runCommand = (
 export const runCommandCapture = (
   command: string,
   args: string[],
-  options?: { cwd?: string; env?: NodeJS.ProcessEnv },
+  options?: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; shell?: boolean },
 ): Promise<{ stdout: string; stderr: string }> =>
   new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: options?.cwd,
       env: options?.env,
+      shell: options?.shell,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let stdout = '';
     let stderr = '';
+    let timeoutTimer: NodeJS.Timeout | null = null;
+    if (options?.timeoutMs !== undefined) {
+      timeoutTimer = setTimeout(() => {
+        child.kill('SIGKILL');
+      }, options.timeoutMs);
+    }
     child.stdout.on('data', chunk => {
       stdout += chunk.toString();
     });
     child.stderr.on('data', chunk => {
       stderr += chunk.toString();
     });
-    child.on('error', error => reject(error));
+    child.on('error', error => {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+      reject(error);
+    });
     child.on('close', code => {
+      if (timeoutTimer) clearTimeout(timeoutTimer);
       if (code === 0) {
         resolve({ stdout, stderr });
         return;

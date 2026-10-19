@@ -140,7 +140,7 @@ export async function downloadSkillImpl(
           cloneArgs.push('--branch', normalized.ref);
         }
         cloneArgs.push(normalized.repoUrl, clonePath);
-        const gitRuntime = resolveGitCommand();
+        const gitRuntime = await resolveGitCommand();
         try {
           await runCommand(gitRuntime.command, cloneArgs, { env: gitRuntime.env });
         } catch (error) {

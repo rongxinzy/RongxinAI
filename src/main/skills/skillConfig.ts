@@ -1,10 +1,10 @@
 import { app } from 'electron';
-import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 import { NpmCli, resolveBundledNpmRuntime } from '../libs/npmRuntime';
 import { buildSkillEnv } from './envUtils';
+import { runScriptWithTimeout } from './processRunner';
 
 export function getSkillConfigFromDir(skillDir: string): {
   success: boolean;
@@ -112,10 +112,10 @@ function repairSkillFromBundled(bundledRoot: string, skillId: string, skillDir: 
   }
 }
 
-export function ensureSkillDirDependencies(
+export async function ensureSkillDirDependencies(
   skillDir: string,
   bundledRoot: string,
-): { success: boolean; error?: string } {
+): Promise<{ success: boolean; error?: string }> {
   const nodeModulesPath = path.join(skillDir, 'node_modules');
   const packageJsonPath = path.join(skillDir, 'package.json');
   const skillId = path.basename(skillDir);
@@ -146,7 +146,7 @@ export function ensureSkillDirDependencies(
   }
 
   // Build environment with user's shell PATH (crucial for packaged apps)
-  const env = buildSkillEnv() as NodeJS.ProcessEnv;
+  const env = (await buildSkillEnv()) as NodeJS.ProcessEnv;
   const pathKeys = Object.keys(env).filter(k => k.toLowerCase() === 'path');
   console.log(`[skills]   PATH keys in env: ${JSON.stringify(pathKeys)}`);
   console.log(`[skills]   PATH (first 300 chars): ${env.PATH?.substring(0, 300)}`);
@@ -166,18 +166,15 @@ export function ensureSkillDirDependencies(
   console.log(`[skills]   Working directory: ${skillDir}`);
 
   try {
-    const isWin = process.platform === 'win32';
-    const result = spawnSync(bundledNpm.command, bundledNpm.args, {
+    const result = await runScriptWithTimeout({
+      command: bundledNpm.command,
+      args: bundledNpm.args,
       cwd: skillDir,
-      encoding: 'utf-8',
-      stdio: 'pipe',
-      timeout: 120000, // 2 minute timeout
       env: { ...env, ...bundledNpm.env },
-      shell: false,
-      windowsHide: isWin,
+      timeoutMs: 120000, // 2 minute timeout
     });
 
-    console.log(`[skills] npm install exit code: ${result.status}`);
+    console.log(`[skills] npm install exit code: ${result.exitCode}`);
     if (result.stdout) {
       console.log(`[skills] npm install stdout: ${result.stdout.substring(0, 500)}`);
     }
@@ -185,8 +182,8 @@ export function ensureSkillDirDependencies(
       console.log(`[skills] npm install stderr: ${result.stderr.substring(0, 500)}`);
     }
 
-    if (result.status !== 0) {
-      const errorMsg = result.stderr || result.stdout || 'npm install failed';
+    if (!result.success) {
+      const errorMsg = result.error || result.stderr || result.stdout || 'npm install failed';
       console.error(`[skills] Failed to install dependencies for ${skillId}:`, errorMsg);
       return { success: false, error: `Failed to install dependencies: ${errorMsg}` };
     }

@@ -1,26 +1,25 @@
-import { execSync, spawnSync } from 'child_process';
 import { app } from 'electron';
 
 import { getElectronNodeRuntimePath } from '../libs/coworkUtil';
 import { appendPythonRuntimeToEnv } from '../libs/pythonRuntime';
+import { runCommandCapture } from './processRunner';
 
 /**
  * Resolve the user's login shell PATH on macOS/Linux.
  * Packaged Electron apps on macOS don't inherit the user's shell profile,
  * so node/npm won't be in PATH unless we resolve it explicitly.
  */
-function resolveUserShellPath(): string | null {
+async function resolveUserShellPath(): Promise<string | null> {
   if (process.platform === 'win32') return null;
 
   try {
     const shell = process.env.SHELL || '/bin/bash';
     // Use non-interactive login shell to avoid side effects in interactive startup scripts.
-    const result = execSync(`${shell} -lc 'echo __PATH__=$PATH'`, {
-      encoding: 'utf-8',
-      timeout: 5000,
+    const { stdout } = await runCommandCapture(shell, ['-lc', 'echo __PATH__=$PATH'], {
       env: { ...process.env },
+      timeoutMs: 5000,
     });
-    const match = result.match(/__PATH__=(.+)/);
+    const match = stdout.match(/__PATH__=(.+)/);
     return match ? match[1].trim() : null;
   } catch (error) {
     console.warn('[skills] Failed to resolve user shell PATH:', error);
@@ -31,24 +30,22 @@ function resolveUserShellPath(): string | null {
 /**
  * Check if a command exists in the given environment.
  */
-export function hasCommand(command: string, env: NodeJS.ProcessEnv): boolean {
+export async function hasCommand(command: string, env: NodeJS.ProcessEnv): Promise<boolean> {
   const isWin = process.platform === 'win32';
   const checker = isWin ? 'where' : 'which';
   // On Windows, use shell: true so cmd.exe resolves PATH correctly
   // (avoids issues with duplicated PATH/Path keys in env)
-  const result = spawnSync(checker, [command], {
-    stdio: 'pipe',
-    env,
-    shell: isWin,
-    windowsHide: isWin,
-    timeout: 5000,
-  });
-  if (result.status !== 0) {
-    console.log(
-      `[skills] hasCommand('${command}'): not found (status=${result.status}, error=${result.error?.message || 'none'})`,
-    );
+  try {
+    await runCommandCapture(checker, [command], {
+      env,
+      shell: isWin,
+      timeoutMs: 5000,
+    });
+    return true;
+  } catch {
+    console.log(`[skills] hasCommand('${command}'): not found`);
+    return false;
   }
-  return result.status === 0;
 }
 
 /**
@@ -89,19 +86,22 @@ function normalizePathKey(env: Record<string, string | undefined>): void {
  * When an Electron app is launched from Start Menu or Explorer,
  * process.env.PATH may be stale (missing tools installed after Explorer started).
  */
-function resolveWindowsRegistryPath(): string | null {
+async function resolveWindowsRegistryPath(): Promise<string | null> {
   if (process.platform !== 'win32') return null;
 
   try {
-    const machinePath = execSync(
-      'reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path',
-      { encoding: 'utf-8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+    const machine = await runCommandCapture(
+      'reg',
+      [
+        'query',
+        'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment',
+        '/v',
+        'Path',
+      ],
+      { timeoutMs: 5000 },
     );
-    const userPath = execSync('reg query "HKCU\\Environment" /v Path', {
-      encoding: 'utf-8',
-      timeout: 5000,
-      stdio: ['ignore', 'pipe', 'ignore'],
-      windowsHide: true,
+    const user = await runCommandCapture('reg', ['query', 'HKCU\\Environment', '/v', 'Path'], {
+      timeoutMs: 5000,
     });
 
     const extract = (output: string): string => {
@@ -109,7 +109,7 @@ function resolveWindowsRegistryPath(): string | null {
       return match ? match[1].trim() : '';
     };
 
-    const combined = [extract(machinePath), extract(userPath)].filter(Boolean).join(';');
+    const combined = [extract(machine.stdout), extract(user.stdout)].filter(Boolean).join(';');
     return combined || null;
   } catch {
     return null;
@@ -120,7 +120,7 @@ function resolveWindowsRegistryPath(): string | null {
  * Build an environment for spawning skill scripts.
  * Merges the user's shell PATH with the current process environment.
  */
-export function buildSkillEnv(): Record<string, string | undefined> {
+export async function buildSkillEnv(): Promise<Record<string, string | undefined>> {
   const env: Record<string, string | undefined> = { ...process.env };
 
   // Normalize PATH key casing on Windows to avoid duplicate PATH/Path issues
@@ -141,7 +141,7 @@ export function buildSkillEnv(): Record<string, string | undefined> {
     if (process.platform === 'win32') {
       // On Windows, merge the latest PATH from the registry to pick up
       // tools installed after the Electron app (or Explorer) was started.
-      const registryPath = resolveWindowsRegistryPath();
+      const registryPath = await resolveWindowsRegistryPath();
       if (registryPath) {
         const currentPath = env.PATH || '';
         const seen = new Set(
@@ -189,7 +189,7 @@ export function buildSkillEnv(): Record<string, string | undefined> {
       }
     } else {
       // Resolve user's shell PATH to find npm/node (macOS/Linux)
-      const userPath = resolveUserShellPath();
+      const userPath = await resolveUserShellPath();
       if (userPath) {
         env.PATH = userPath;
         console.log('[skills] Resolved user shell PATH for skill scripts');

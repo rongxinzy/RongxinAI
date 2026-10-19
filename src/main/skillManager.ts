@@ -421,7 +421,7 @@ ${params.content.trim()}
     }
   }
 
-  ensureSkillDependencies(skillDir: string): { success: boolean; error?: string } {
+  async ensureSkillDependencies(skillDir: string): Promise<{ success: boolean; error?: string }> {
     return ensureSkillDirDependencies(skillDir, this.getBundledSkillsRoot());
   }
 
