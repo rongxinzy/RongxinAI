@@ -1,7 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { DesktopPetIpc } from '../shared/desktopPet/constants';
-import type { DesktopPetBridge, DesktopPetSnapshot } from '../shared/desktopPet/types';
+import type {
+  DesktopPetBridge,
+  DesktopPetEffect,
+  DesktopPetSnapshot,
+} from '../shared/desktopPet/types';
 
 const bridge: DesktopPetBridge = {
   ready: () => ipcRenderer.send(DesktopPetIpc.Ready),
@@ -16,6 +20,12 @@ const bridge: DesktopPetBridge = {
       listener(state);
     ipcRenderer.on(DesktopPetIpc.State, handler);
     return () => ipcRenderer.removeListener(DesktopPetIpc.State, handler);
+  },
+  onEffect: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, effect: DesktopPetEffect) =>
+      listener(effect);
+    ipcRenderer.on(DesktopPetIpc.Effect, handler);
+    return () => ipcRenderer.removeListener(DesktopPetIpc.Effect, handler);
   },
 };
 

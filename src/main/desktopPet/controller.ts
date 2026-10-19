@@ -129,7 +129,10 @@ export function setDesktopPetEnabled(enabled: boolean): void {
     },
   });
   pet = window;
-  motion = new DesktopPetMotion(window, persistPosition);
+  motion = new DesktopPetMotion(window, persistPosition, effect => {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed())
+      window.webContents.send(DesktopPetIpc.Effect, effect);
+  });
   motion.setReducedMotion(reducedMotion);
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));

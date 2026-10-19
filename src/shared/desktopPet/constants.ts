@@ -17,7 +17,10 @@ export const DesktopPetIpc = {
   Open: 'desktop-pet:open',
   HitMask: 'desktop-pet:hit-mask',
   Motion: 'desktop-pet:motion',
+  Effect: 'desktop-pet:effect',
 } as const;
+
+export const DesktopPetEffectKind = { Drag: 'drag', Impact: 'impact' } as const;
 
 export const DESKTOP_PET_SIZE = 192;
 export const DESKTOP_PET_STORE_KEY = 'desktopPet';

@@ -55,19 +55,6 @@ const REST_VX = 15;
 /** 单步最大 dt（s）：防后台标签页/卡顿后恢复的巨帧跳变 */
 const MAX_STEP_DT = 0.05;
 
-const SQ_SQUASH = 0.55;
-export const squashScale = (u: number, squash: number = SQ_SQUASH): number => {
-  if (u < 0.45) {
-    const p = u / 0.45;
-    return 1 - (1 - squash) * p * p;
-  }
-  const p = (u - 0.45) / 0.55;
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  const f = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
-  return Math.min(1.12, squash + (1 - squash) * Math.max(f, 0));
-};
-
 /** 一次轨迹采样（t = performance.now() 时间戳 ms；x/y = 指针绝对坐标 px） */
 export interface DragSample {
   t: number;

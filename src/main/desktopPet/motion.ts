@@ -1,6 +1,7 @@
 import { BrowserWindow, screen } from 'electron';
 
-import { DESKTOP_PET_SIZE } from '../../shared/desktopPet/constants';
+import { DESKTOP_PET_SIZE, DesktopPetEffectKind } from '../../shared/desktopPet/constants';
+import type { DesktopPetEffect } from '../../shared/desktopPet/types';
 import {
   estimateReleaseVelocity,
   throwStep,
@@ -40,6 +41,7 @@ export class DesktopPetMotion {
   constructor(
     private readonly window: BrowserWindow,
     private readonly settled: () => void,
+    private readonly effect: (effect: DesktopPetEffect) => void = () => {},
   ) {
     window.setIgnoreMouseEvents(true);
     this.tick();
@@ -67,6 +69,7 @@ export class DesktopPetMotion {
       at: performance.now(),
     };
     this.trail = [{ ...cursor, t: performance.now() }];
+    this.effect({ kind: DesktopPetEffectKind.Drag, active: true });
     this.restart();
   }
 
@@ -77,6 +80,7 @@ export class DesktopPetMotion {
       Math.hypot(cursor.x - this.dragging.start.x, cursor.y - this.dragging.start.y) < 5;
     this.sample(cursor, performance.now());
     this.dragging = undefined;
+    this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
     const velocity =
       this.reducedMotion || clicked ? null : estimateReleaseVelocity(this.trail, performance.now());
     if (velocity) {
@@ -90,6 +94,7 @@ export class DesktopPetMotion {
   }
 
   reset(): void {
+    this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
     this.dragging = undefined;
     this.flying = undefined;
     const bounds = petBounds(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea);
@@ -101,6 +106,7 @@ export class DesktopPetMotion {
   }
 
   ensureVisible(): void {
+    this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
     this.dragging = undefined;
     this.flying = undefined;
     const bounds = this.window.getBounds();
@@ -145,12 +151,23 @@ export class DesktopPetMotion {
       this.window.setPosition(point.x, point.y);
       if (now - this.dragging.at > 60_000) {
         this.dragging = undefined;
+        this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
         this.settled();
       }
     } else if (this.flying) {
       // A throw stays on its current display; dragging can move the pet between displays.
       const area = screen.getDisplayMatching(this.window.getBounds()).workArea;
       const next = throwStep(this.flying, (now - this.lastTime) / 1000, petBounds(area));
+      // Ground friction also marks a step as bounced; only a reversed normal velocity is an impact.
+      const impactSpeed = Math.max(
+        next.vx * this.flying.vx < 0 ? Math.abs(this.flying.vx) : 0,
+        next.vy * this.flying.vy < 0 ? Math.abs(this.flying.vy) : 0,
+      );
+      if (next.bounced && impactSpeed > 200 && !this.reducedMotion)
+        this.effect({
+          kind: DesktopPetEffectKind.Impact,
+          strength: Math.min(1, impactSpeed / 1800),
+        });
       this.window.setPosition(Math.round(next.x), Math.round(next.y));
       this.flying = next.atRest ? undefined : next;
       if (next.atRest) this.settled();
@@ -170,6 +187,7 @@ export class DesktopPetMotion {
       this.window.setIgnoreMouseEvents(ignore);
       this.ignoring = ignore;
     }
-    this.timer = setTimeout(this.tick, this.dragging || this.flying ? 16 : 80);
+    const interval = this.dragging || this.flying ? 1000 / 60 : 80;
+    this.timer = setTimeout(this.tick, Math.max(1, interval - (performance.now() - now)));
   };
 }

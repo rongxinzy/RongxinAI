@@ -8,6 +8,8 @@ body {
 
 canvas {
   display: block;
+  width: 192px;
+  height: 192px;
   touch-action: none;
   cursor: grab;
 }

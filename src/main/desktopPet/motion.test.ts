@@ -14,10 +14,12 @@ vi.mock('electron', () => ({
 }));
 
 import { DesktopPetMotion } from './motion';
+import { DesktopPetEffectKind } from '../../shared/desktopPet/constants';
 
 let position = { x: 400, y: 300 };
 const ignore = vi.fn();
 const settled = vi.fn();
+const effect = vi.fn();
 const window = {
   getPosition: () => [position.x, position.y],
   getBounds: () => ({ ...position, width: 192, height: 192 }),
@@ -35,7 +37,7 @@ beforeEach(() => {
   desktop.cursor = { x: 496, y: 396 };
   desktop.area = { x: 0, y: 24, width: 1440, height: 876 };
   position = { x: 400, y: 300 };
-  motion = new DesktopPetMotion(window, settled);
+  motion = new DesktopPetMotion(window, settled, effect);
 });
 afterEach(() => {
   motion.dispose();
@@ -100,4 +102,44 @@ test('a removed display clamps an ongoing drag to the remaining work area', () =
   desktop.cursor = { x: 1000, y: 1000 };
   vi.advanceTimersByTime(500);
   expect(position).toEqual({ x: -192, y: 300 });
+  expect(effect).toHaveBeenLastCalledWith({ kind: DesktopPetEffectKind.Drag, active: false });
+});
+
+test('native drag and meaningful collisions emit bounded visual effects, without per-tick messages', () => {
+  motion.begin();
+  expect(effect).toHaveBeenLastCalledWith({ kind: DesktopPetEffectKind.Drag, active: true });
+  for (let i = 0; i < 5; i++) {
+    desktop.cursor.y += 40;
+    vi.advanceTimersByTime(32);
+  }
+  expect(effect).toHaveBeenCalledOnce();
+  motion.end();
+  expect(effect).toHaveBeenLastCalledWith({ kind: DesktopPetEffectKind.Drag, active: false });
+  vi.advanceTimersByTime(1000);
+  const impacts = effect.mock.calls
+    .map(([value]) => value)
+    .filter(value => value.kind === DesktopPetEffectKind.Impact);
+  expect(impacts.length).toBeGreaterThan(0);
+  expect(impacts.every(value => value.strength > 0 && value.strength <= 1)).toBe(true);
+  motion.setReducedMotion(true);
+  effect.mockClear();
+  vi.advanceTimersByTime(1000);
+  expect(effect).not.toHaveBeenCalled();
+});
+
+test('sliding along the ground does not repeatedly trigger landing impulses', () => {
+  position = { x: 400, y: 708 };
+  desktop.cursor = { x: 496, y: 804 };
+  motion.begin();
+  for (let i = 0; i < 5; i++) {
+    desktop.cursor.x += 20;
+    vi.advanceTimersByTime(32);
+  }
+  motion.end();
+  effect.mockClear();
+  const released = position.x;
+  vi.advanceTimersByTime(300);
+  expect(position.x).toBeGreaterThan(released);
+  expect(position.y).toBe(708);
+  expect(effect).not.toHaveBeenCalled();
 });

@@ -1,12 +1,13 @@
 import {
   DESKTOP_PET_SIZE,
+  DesktopPetEffectKind,
   DesktopPetSprite,
   DesktopPetState,
 } from '../../shared/desktopPet/constants';
-import { squashScale } from '../../shared/desktopPet/physics';
 import type { DesktopPetBridge, DesktopPetSnapshot } from '../../shared/desktopPet/types';
 import atlasUrl from '../assets/desktop-pet/xiaoyuan-atlas.png';
 import stylesheetUrl from './desktop-pet.css?url';
+import { DesktopPetAnimation } from './animation';
 
 declare global {
   interface Window {
@@ -19,36 +20,34 @@ const stylesheet = document.createElement('link');
 stylesheet.rel = 'stylesheet';
 stylesheet.href = stylesheetUrl;
 document.head.append(stylesheet);
-const context = canvas?.getContext('2d', { willReadFrequently: true });
+const context = canvas?.getContext('2d');
 if (!canvas || !context) throw new Error('Desktop companion canvas is unavailable');
 const view = canvas;
 const ctx = context;
 const bridge = window.desktopPet;
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 const image = new Image();
+const animation = new DesktopPetAnimation();
+// Readback stays off the visible canvas so Chromium can keep rendering on the GPU.
+const maskCanvas = document.createElement('canvas');
+maskCanvas.width = maskCanvas.height = DESKTOP_PET_SIZE;
+const maskContext = maskCanvas.getContext('2d', { willReadFrequently: true });
 let state: DesktopPetState = DesktopPetState.Idle;
 let reducedMotion = reduced.matches;
-let timer: ReturnType<typeof setTimeout> | undefined;
-let squashAt = -Infinity;
+let systemReducedMotion = false;
+let frameId: number | undefined;
+let maskDirty = true;
+let transitionMask = false;
+let pointerActive = false;
 let disposed = false;
 
-function draw(now = performance.now(), animated = true): void {
-  if (!image.complete || image.naturalWidth === 0) return;
-  const index = DesktopPetSprite[state];
+function drawPose(target: CanvasRenderingContext2D, index: number, scaleY: number): void {
   const cellWidth = image.naturalWidth / 3;
   const cellHeight = image.naturalHeight / 2;
-  const squashProgress = (now - squashAt) / 220;
-  const scaleY =
-    !reducedMotion && animated
-      ? squashProgress < 1
-        ? squashScale(Math.max(0, squashProgress), 0.82)
-        : 1 + Math.sin(now / 1400) * 0.012
-      : 1;
-  ctx.clearRect(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE);
-  ctx.save();
-  ctx.translate(DESKTOP_PET_SIZE / 2, DESKTOP_PET_SIZE);
-  ctx.scale(1 / Math.sqrt(scaleY), scaleY);
-  ctx.drawImage(
+  target.save();
+  target.translate(DESKTOP_PET_SIZE / 2, DESKTOP_PET_SIZE);
+  target.scale(1 / Math.sqrt(scaleY), scaleY);
+  target.drawImage(
     image,
     (index % 3) * cellWidth,
     Math.floor(index / 3) * cellHeight,
@@ -59,53 +58,101 @@ function draw(now = performance.now(), animated = true): void {
     DESKTOP_PET_SIZE,
     DESKTOP_PET_SIZE,
   );
-  ctx.restore();
-  view.dataset.state = state;
+  target.restore();
 }
 
-function publishMask(): void {
-  if (!bridge) return;
-  draw(performance.now(), false);
-  const pixels = ctx.getImageData(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE).data;
+function publishMask(weights: number[]): void {
+  if (!bridge || !maskContext) return;
+  maskContext.clearRect(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE);
+  // Cover the small deformation envelope and both transition endpoints, once per change.
+  weights.forEach((weight, index) => {
+    if (weight === 0 && index !== DesktopPetSprite[state]) return;
+    if (reducedMotion) drawPose(maskContext, index, 1);
+    else for (let step = 0; step <= 15; step++) drawPose(maskContext, index, 0.92 + step * 0.01);
+  });
+  const pixels = maskContext.getImageData(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE).data;
   const alpha = new Uint8Array(DESKTOP_PET_SIZE * DESKTOP_PET_SIZE);
   for (let i = 0; i < alpha.length; i++) alpha[i] = pixels[i * 4 + 3];
   bridge.hitMask(alpha);
 }
 
-function frame(): void {
-  clearTimeout(timer);
-  if (disposed) return;
-  draw();
-  // The tiny media canvas animates at 25 fps; the main app and task stream stay idle.
-  if (!reducedMotion) timer = setTimeout(frame, 40);
+function draw(now: number): void {
+  if (!image.complete || image.naturalWidth === 0) return;
+  const ratio = Math.min(2, window.devicePixelRatio || 1);
+  const size = Math.round(DESKTOP_PET_SIZE * ratio);
+  if (view.width !== size || view.height !== size) view.width = view.height = size;
+  ctx.setTransform(size / DESKTOP_PET_SIZE, 0, 0, size / DESKTOP_PET_SIZE, 0, 0);
+  ctx.clearRect(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE);
+  const pose = animation.sample(now);
+  // Add premultiplied layers to preserve opaque body pixels through the crossfade.
+  ctx.globalCompositeOperation = 'lighter';
+  pose.weights.forEach((weight, index) => {
+    if (weight <= 0) return;
+    ctx.globalAlpha = weight;
+    drawPose(ctx, index, reducedMotion ? 1 : pose.scaleY);
+  });
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  view.dataset.state = state;
+  if (maskDirty || (transitionMask && !pose.transitioning)) {
+    publishMask(pose.weights);
+    maskDirty = false;
+    transitionMask = pose.transitioning;
+  }
+}
+
+function frame(now: number): void {
+  frameId = undefined;
+  if (disposed || document.hidden) return;
+  draw(now);
+  if (!reducedMotion) frameId = requestAnimationFrame(frame);
+}
+
+function refresh(): void {
+  if (frameId !== undefined) cancelAnimationFrame(frameId);
+  frameId = undefined;
+  if (reducedMotion) animation.settle(performance.now());
+  frame(performance.now());
 }
 
 function update(snapshot: DesktopPetSnapshot): void {
-  if (state !== snapshot.state && snapshot.state === DesktopPetState.Greeting)
-    squashAt = performance.now();
+  animation.setState(snapshot.state, performance.now());
   state = snapshot.state;
-  reducedMotion = snapshot.reducedMotion || reduced.matches;
+  systemReducedMotion = snapshot.reducedMotion;
+  reducedMotion = systemReducedMotion || reduced.matches;
   view.setAttribute('aria-label', snapshot.label);
   view.title = snapshot.label;
-  publishMask();
-  frame();
+  maskDirty = true;
+  refresh();
 }
 
 const unsubscribe = bridge?.onState(update);
+const unsubscribeEffect = bridge?.onEffect(effect => {
+  if (effect.kind === DesktopPetEffectKind.Drag) animation.setDragging(effect.active);
+  else if (!reducedMotion) animation.impact(effect.strength);
+});
 const onMotionChange = (): void => {
-  reducedMotion = reduced.matches;
+  reducedMotion = systemReducedMotion || reduced.matches;
   bridge?.motion(reduced.matches);
-  frame();
+  maskDirty = true;
+  refresh();
 };
 reduced.addEventListener('change', onMotionChange);
+document.addEventListener('visibilitychange', refresh);
+window.addEventListener('resize', refresh);
 
 view.addEventListener('pointerdown', event => {
   if (event.button !== 0) return;
+  pointerActive = true;
   view.setPointerCapture(event.pointerId);
   bridge?.dragStart();
+  if (!bridge) animation.setDragging(true);
 });
 const endDrag = (): void => {
+  if (!pointerActive) return;
+  pointerActive = false;
   bridge?.dragEnd();
+  if (!bridge) animation.setDragging(false);
 };
 view.addEventListener('pointerup', endDrag);
 view.addEventListener('pointercancel', endDrag);
@@ -119,8 +166,9 @@ view.addEventListener('contextmenu', event => {
 view.addEventListener('click', () => {
   if (!bridge) {
     state = DesktopPetState.Greeting;
-    squashAt = performance.now();
-    frame();
+    animation.setState(state, performance.now());
+    maskDirty = true;
+    refresh();
   }
 });
 
@@ -130,9 +178,10 @@ image.onload = () => {
     if (Object.values(DesktopPetState).includes(requested as DesktopPetState))
       state = requested as DesktopPetState;
   }
+  animation.setState(state, performance.now());
+  animation.settle(performance.now());
   view.setAttribute('aria-label', document.title);
-  publishMask();
-  frame();
+  refresh();
   bridge?.motion(reduced.matches);
   bridge?.ready();
 };
@@ -143,7 +192,10 @@ image.src = atlasUrl;
 
 window.addEventListener('pagehide', () => {
   disposed = true;
-  clearTimeout(timer);
+  if (frameId !== undefined) cancelAnimationFrame(frameId);
   unsubscribe?.();
+  unsubscribeEffect?.();
   reduced.removeEventListener('change', onMotionChange);
+  document.removeEventListener('visibilitychange', refresh);
+  window.removeEventListener('resize', refresh);
 });
