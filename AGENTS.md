@@ -72,11 +72,11 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 - **流式链路**：改动 translator / coalescer / `piUiForwarder` / `LiveTextStore` / `StreamingMarkdownResponse` / 相关 IPC 前，必须先读 [docs/architecture/streaming.md](docs/architecture/streaming.md)。禁止发送端拼全文再 diff、禁止第二层发送端节流、禁止 IPC 常规推送全文快照；守护测试见 `tests/streamingGuards.test.ts`。
 - `App.tsx` → `coworkService.init()` → IPC 加载配置/会话 → 流监听；`startSession()` → IPC → `PiRuntimeAdapter` → 流事件 → Redux。
 - 流式 IPC/渲染细节不在此维护，见 [docs/architecture/streaming.md](docs/architecture/streaming.md)（Pi 事件翻译为增量 UIMessageChunk，主进程仅 coalescer 一处合并，终态才落 Redux，快照只走异常路径）。
-- 流事件：`message` / `messageUpdate` / `permissionRequest` / `complete` / `error`。权限请求经 `CoworkPermissionModal` 回传引擎。
-- IPC：`cowork:startSession`、`continueSession`、`stopSession`、`getSession`、`listSessions`、`deleteSession`、`respondToPermission`、`getConfig`、`setConfig`。`cowork:stream:*` 承载 Work/Chat；Channel/Cron run 以只读 activity 投影暴露。
+- 流事件：`CoworkStreamIpc`（`src/shared/ipc/channels.ts`）——`cowork:stream:runState` / `contentPatch` / `runtimeSnapshots` / `uiEvent` / `resync` 与 `cowork:sessions:changed`。权限请求经 `CoworkPermissionModal` 回传引擎。
+- IPC（通道常量在 `src/shared/ipc/channels.ts`，契约在 `src/shared/ipc/coworkContract.ts`）：`cowork:session:start` / `continue` / `stop` / `get` / `list` / `delete`、`cowork:permission:respond`、`cowork:config:get` / `set`。`cowork:stream:*` 承载 Work/Chat；Channel/Cron run 以只读 activity 投影暴露。
 - 执行模式 `CoworkExecutionMode`：`auto` / `local`。
 - 存储：`cowork_sessions` / `cowork_messages`；应用配置在 `kv`；Cowork 配置在 `cowork_config`；Task/Run/Delivery/ChannelAccount/ChannelSession 以 ZhiYuan SQLite 为准。
-- 认证：deep-link `authCode` 换 2h access + 30d refresh token（`auth_tokens`）；`fetchWithAuth()` 在 401 或剩余 <5 分钟时刷新并轮换。见 `src/renderer/services/api.ts`。
+- 认证：社区账号登录在主进程 `src/main/appBootstrap/communityAuth.ts` 与 `src/main/communityAuthSession.ts`，deep-link `zhiyuan://auth/callback` 换取 access/refresh token，剩余 <5 分钟时刷新；未登录时为免费模型签发访客 token。
 
 ### 托管 Python 运行时
 
