@@ -1,9 +1,9 @@
-import { spawnSync } from 'child_process';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
 import { normalizeFolderName } from './skillMarkdown';
+import { runCommandCapture } from './processRunner';
 
 export type NormalizedGitSource = {
   repoUrl: string;
@@ -28,16 +28,14 @@ const appendEnvPath = (current: string | undefined, entries: string[]): string =
   return merged.join(delimiter);
 };
 
-const listWindowsCommandPaths = (command: string): string[] => {
+const listWindowsCommandPaths = async (command: string): Promise<string[]> => {
   if (process.platform !== 'win32') return [];
 
   try {
-    const result = spawnSync('cmd.exe', ['/d', '/s', '/c', command], {
-      encoding: 'utf8',
-      windowsHide: true,
+    const { stdout } = await runCommandCapture('cmd.exe', ['/d', '/s', '/c', command], {
+      timeoutMs: 5000,
     });
-    if (result.status !== 0) return [];
-    return result.stdout
+    return stdout
       .split(/\r?\n/)
       .map(line => line.trim())
       .filter(Boolean);
@@ -46,7 +44,7 @@ const listWindowsCommandPaths = (command: string): string[] => {
   }
 };
 
-const resolveWindowsGitExecutable = (): string | null => {
+const resolveWindowsGitExecutable = async (): Promise<string | null> => {
   if (process.platform !== 'win32') return null;
 
   const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
@@ -73,7 +71,7 @@ const resolveWindowsGitExecutable = (): string | null => {
     }
   }
 
-  const whereCandidates = listWindowsCommandPaths('where git');
+  const whereCandidates = await listWindowsCommandPaths('where git');
   for (const candidate of whereCandidates) {
     const normalized = candidate.trim();
     if (!normalized) continue;
@@ -106,12 +104,15 @@ const resolveWindowsGitExecutable = (): string | null => {
   return null;
 };
 
-export const resolveGitCommand = (): { command: string; env?: NodeJS.ProcessEnv } => {
+export const resolveGitCommand = async (): Promise<{
+  command: string;
+  env?: NodeJS.ProcessEnv;
+}> => {
   if (process.platform !== 'win32') {
     return { command: 'git' };
   }
 
-  const gitExe = resolveWindowsGitExecutable();
+  const gitExe = await resolveWindowsGitExecutable();
   if (!gitExe) {
     return { command: 'git' };
   }
