@@ -456,8 +456,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p release-assets
-          find candidate -type f ! -name '*.json' ! -name '*.yml' ! -name '*.blockmap' -exec cp -t release-assets {} +
+          node scripts/release/collect-github-release-assets.mjs \
+            '${{ needs.prepare-release.outputs.version }}' \
+            '${{ needs.prepare-release.outputs.commit }}' \
+            '${{ github.run_id }}'
           ls -la release-assets
       - name: Create GitHub pre-release
         uses: softprops/action-gh-release@v2
