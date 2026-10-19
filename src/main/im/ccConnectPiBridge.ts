@@ -102,7 +102,19 @@ export class CcConnectPiBridge {
         accountId: request.accountId,
         conversationId: nativeConversationId,
         messageId: request.message.messageId,
-        payload: JSON.stringify(request),
+        // Metadata only (work package L): media is already on disk by now, so
+        // the inbox row must not duplicate the full request — the base64
+        // bodies were written into SQLite with no reader ever consuming them.
+        payload: JSON.stringify({
+          messageId: request.message.messageId,
+          sessionKey: request.message.sessionKey,
+          contentPreview: request.message.content.slice(0, 200),
+          attachments: attachments.map(attachment => ({
+            type: attachment.type,
+            localPath: attachment.localPath,
+            fileSize: attachment.fileSize,
+          })),
+        }),
       },
       () => this.handler.processMessage(message, signal, workspaceId ?? undefined),
       signal,
