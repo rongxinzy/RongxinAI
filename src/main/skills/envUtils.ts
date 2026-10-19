@@ -9,7 +9,7 @@ import { runCommandCapture, extractErrorMessage } from './processRunner';
  * Packaged Electron apps on macOS don't inherit the user's shell profile,
  * so node/npm won't be in PATH unless we resolve it explicitly.
  */
-async function resolveUserShellPath(): Promise<string | null> {
+export async function resolveUserShellPath(): Promise<string | null> {
   if (process.platform === 'win32') return null;
 
   try {
