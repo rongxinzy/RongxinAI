@@ -61,3 +61,15 @@ test('rejects corrupted payload and missing input', async () => {
   writeFileSync(path.join(archive, 'payload.tar'), 'corrupted');
   await expect(checkpoint('restore', archive, identity, [], root)).rejects.toThrow('SHA-256');
 });
+
+test('a fresh acceptance checkout restores the exact release version and edition metadata', async () => {
+  const { root, archive } = fixture();
+  const builtPackage = { version: identity.version, zhiyuanUpdateVariant: 'lite' };
+  writeFileSync(path.join(root, 'package.json'), JSON.stringify(builtPackage));
+  await checkpoint('create', archive, identity, ['release', 'package.json'], root);
+  const fresh = fixture().root;
+  writeFileSync(path.join(fresh, 'package.json'), JSON.stringify({ version: '0.0.0' }));
+  await checkpoint('restore', archive, identity, [], fresh);
+  expect(JSON.parse(readFileSync(path.join(fresh, 'package.json'), 'utf8'))).toEqual(builtPackage);
+  expect(readFileSync(path.join(fresh, 'release/app'), 'utf8')).toBe('final signed bytes');
+});

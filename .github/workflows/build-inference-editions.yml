@@ -555,12 +555,21 @@ jobs:
           mode: save
           cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
           cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}
+      - name: Export public signing identity for independent acceptance
+        if: inputs.mode == 'release' && matrix.platform == 'windows'
+        shell: powershell
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+        run: |
+          . ./scripts/ci/windows-signing-certificate.ps1
+          $certificate = Resolve-WindowsSigningCertificate -ExpectedThumbprint $env:CERTUM_CERT_THUMBPRINT
+          [IO.File]::WriteAllBytes((Join-Path $PWD 'release/signing-certificate.cer'), $certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
       - name: Checkpoint exact packaged bytes before acceptance
         shell: bash
         env:
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
         run: |
-          paths=(release)
+          paths=(release package.json)
           if [[ '${{ matrix.platform }}' == windows ]]; then paths+=(build-tar/windows-components scripts/installer-shell/out); fi
           if [[ '${{ matrix.inference_edition }}' != lite ]]; then paths+=(resources/llamacpp-bundled); fi
           node scripts/ci/build-checkpoint.mjs create package-checkpoint '${{ matrix.target }}' "${paths[@]}"
@@ -663,6 +672,7 @@ jobs:
           -File scripts/ci/verify-windows-authenticode.ps1
           -ProjectRoot '${{ github.workspace }}'
           -ExpectedThumbprint '${{ secrets.CERTUM_CERT_THUMBPRINT }}'
+          -CertificatePath 'release/signing-certificate.cer'
       - name: Verify Windows release size
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
