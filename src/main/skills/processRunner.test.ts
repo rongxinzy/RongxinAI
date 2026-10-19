@@ -37,10 +37,6 @@ test('runCommandCapture rejects on timeout without waiting for pipe close', asyn
   if (process.platform === 'win32') return; // POSIX process-tree semantics
 
   await expect(
-    runCommandCapture(
-      process.execPath,
-      ['-e', leakyParentScript],
-      { timeoutMs: 500 },
-    ),
+    runCommandCapture(process.execPath, ['-e', leakyParentScript], { timeoutMs: 500 }),
   ).rejects.toThrow('Command timed out after 500ms');
 }, 8000);

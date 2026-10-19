@@ -43,9 +43,7 @@ export async function hasCommand(command: string, env: NodeJS.ProcessEnv): Promi
     });
     return true;
   } catch (error) {
-    console.log(
-      `[skills] hasCommand('${command}'): not found (${extractErrorMessage(error)})`,
-    );
+    console.log(`[skills] hasCommand('${command}'): not found (${extractErrorMessage(error)})`);
     return false;
   }
 }
