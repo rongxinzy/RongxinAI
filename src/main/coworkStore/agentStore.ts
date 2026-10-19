@@ -100,8 +100,8 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
     this.db
       .prepare(
         `
-      INSERT INTO agents (id, name, description, system_prompt, identity, model, working_directory, icon, skill_ids, mcp_ids, enabled, is_default, source, preset_id, triage_override, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?, ?)
+      INSERT INTO agents (id, name, description, system_prompt, identity, model, working_directory, icon, skill_ids, mcp_ids, enabled, is_default, source, preset_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -117,7 +117,6 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
         JSON.stringify(request.mcpIds || []),
         request.source || 'custom',
         request.presetId || '',
-        request.triageOverride ? JSON.stringify(request.triageOverride) : null,
         now,
         now,
       );
@@ -196,10 +195,6 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
         setClauses.push('pin_order = NULL');
       }
     }
-    if (updates.triageOverride !== undefined) {
-      setClauses.push('triage_override = ?');
-      values.push(updates.triageOverride ? JSON.stringify(updates.triageOverride) : null);
-    }
 
     values.push(id);
     this.db.prepare(`UPDATE agents SET ${setClauses.join(', ')} WHERE id = ?`).run(...values);
@@ -247,14 +242,6 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
         mcpIds = [];
       }
     }
-    let triageOverride = undefined;
-    if (row.triage_override) {
-      try {
-        triageOverride = JSON.parse(row.triage_override);
-      } catch {
-        triageOverride = undefined;
-      }
-    }
     return {
       id: row.id,
       name: row.name,
@@ -272,7 +259,6 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
       isDefault: Boolean(row.is_default),
       source: row.source as AgentSource,
       presetId: row.preset_id,
-      triageOverride,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

@@ -17,14 +17,11 @@ import {
   WindowIpc,
 } from './channels';
 import { AppUpdateIpc } from '../appUpdate/constants';
-import { TriageIpcChannel } from '../triage';
 
 export const appSystemContractChannels: IpcContractChannels<typeof appSystemContract> = {
   storeGet: StoreIpc.Get,
   storeSet: StoreIpc.Set,
   storeRemove: StoreIpc.Remove,
-  triageGetConfig: TriageIpcChannel.GetConfig,
-  triageSetConfig: TriageIpcChannel.SetConfig,
   permissionsCheckCalendar: PermissionsIpc.CheckCalendar,
   permissionsRequestCalendar: PermissionsIpc.RequestCalendar,
   windowIsMaximized: WindowIpc.IsMaximized,

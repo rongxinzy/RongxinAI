@@ -20,35 +20,6 @@ test('store get/set/remove accept the localStore adapter payloads', () => {
   expect(appSystemContract.storeGet.args.safeParse([42]).success).toBe(false);
 });
 
-// --- triage ----------------------------------------------------------------
-
-test('triage setConfig accepts a full TriageConfig and rejects junk', () => {
-  // SettingsModelTriage submit sends the whole config object back
-  const config = {
-    enabled: true,
-    rules: {
-      lightModelRef: 'gpt-4o-mini',
-      heavyModelRef: 'claude-sonnet-5',
-      maxConversationRoundsForTriage: 4,
-      allowCrossProviderSwitch: true,
-      cooldownRounds: 6,
-      useLocalModelTriage: false,
-      triageModelName: 'triage-v1',
-      classifierBaseUrl: 'https://api.example.com/v1',
-    },
-  };
-  expect(appSystemContract.triageSetConfig.args.safeParse([config]).success).toBe(true);
-  // The handler sanitizes field-by-field, so a partial object still passes.
-  expect(appSystemContract.triageSetConfig.args.safeParse([{ enabled: false }]).success).toBe(true);
-  // The handler sanitizes field-by-field and its arg stays z.unknown() (the
-  // sanitizer handles arbitrary legacy payloads), so strings pass through the
-  // schema and fall back to DEFAULT_TRIAGE_CONFIG inside the impl.
-  expect(appSystemContract.triageSetConfig.args.safeParse(['enable-it']).success).toBe(true);
-
-  const parsed = appSystemContract.triageGetConfig.result.safeParse(config);
-  expect(parsed.success).toBe(true);
-});
-
 // --- window / app info ---------------------------------------------------------
 
 test('window and app info methods take no arguments', () => {

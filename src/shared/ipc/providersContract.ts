@@ -98,14 +98,6 @@ const CreateAgentRequestSchema = z.object({
   presetId: z.string().optional(),
 });
 
-/** `AgentTriageOverride` from src/shared/triage.ts (partial patch fields). */
-const AgentTriageOverrideSchema = z.object({
-  enabled: z.boolean().optional(),
-  lightModelRef: z.string().optional(),
-  heavyModelRef: z.string().optional(),
-  allowCrossProviderSwitch: z.boolean().optional(),
-});
-
 /** `UpdateAgentRequest` — agentService.updateAgent sends a partial patch. */
 const UpdateAgentRequestSchema = z.object({
   name: z.string().optional(),
@@ -119,7 +111,6 @@ const UpdateAgentRequestSchema = z.object({
   mcpIds: z.array(z.string()).optional(),
   enabled: z.boolean().optional(),
   pinned: z.boolean().optional(),
-  triageOverride: AgentTriageOverrideSchema.nullable().optional(),
 });
 
 /** Localized preset-expert catalog row (presetExpertCatalog.ts). */

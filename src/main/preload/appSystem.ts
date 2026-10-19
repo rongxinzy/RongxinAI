@@ -36,11 +36,6 @@ export const appSystemApi = {
     remove: asApi('storeRemove'),
   },
 
-  triage: {
-    getConfig: asApi('triageGetConfig'),
-    setConfig: asApi('triageSetConfig'),
-  },
-
   permissions: {
     checkCalendar: asApi('permissionsCheckCalendar'),
     requestCalendar: asApi('permissionsRequestCalendar'),
@@ -177,7 +172,6 @@ export const appSystemApi = {
     send: (status: 'online' | 'offline') => void;
   };
   store: Renamed<{ get: 'storeGet'; set: 'storeSet'; remove: 'storeRemove' }>;
-  triage: Renamed<{ getConfig: 'triageGetConfig'; setConfig: 'triageSetConfig' }>;
   permissions: Renamed<{
     checkCalendar: 'permissionsCheckCalendar';
     requestCalendar: 'permissionsRequestCalendar';

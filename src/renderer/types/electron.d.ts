@@ -29,7 +29,6 @@ import type {
   LlamaCppApi,
   MarketplaceApi,
   OllamaApi,
-  TriageApi,
 } from './electron/localInferenceApi';
 import type { AgentsApi, TodoApi, WorkbenchTaskApi } from './electron/agentsApi';
 import type { CoworkApi } from './electron/coworkApi';
@@ -61,7 +60,6 @@ export interface IElectronAPI {
   ollama: OllamaApi;
   llamacpp: LlamaCppApi;
   marketplace: MarketplaceApi;
-  triage: TriageApi;
   hardware: HardwareApi;
   agents: AgentsApi;
   checkApiConfig: AppSystemContractApi['checkApiConfig'];
