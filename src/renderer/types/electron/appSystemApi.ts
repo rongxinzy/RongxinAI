@@ -50,7 +50,6 @@ export interface AppInfoApi extends Renamed<{
   isDev: 'appIsDev';
   isEnterprise: 'appIsEnterprise';
   getSystemLocale: 'appGetSystemLocale';
-  consumePendingLocalInferenceInstall: 'appConsumePendingLocalInferenceInstall';
   getInferenceEdition: 'appGetInferenceEdition';
   usesBundledLlamaCppRuntime: 'appUsesBundledLlamaCppRuntime';
   relaunch: 'appRelaunch';

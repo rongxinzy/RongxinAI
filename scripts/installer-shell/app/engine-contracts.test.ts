@@ -20,9 +20,8 @@ test('engine checks extraction and retains all main repository runtime features'
   expect(installer).not.toContain('GetArrayLength() != 7');
   expect(installer).toContain('target.GetProperty("sentinel")');
   expect(installer).toContain('"resources", "app.asar"');
-  expect(installer).toContain('StepWritePendingInferenceMarker(localInference)');
   expect(installer).toContain('StepMigrateUserSkills(cancellationToken)');
-  expect(form).toContain('public void StartInstall(string installPath, bool localInference)');
+  expect(form).toContain('public void StartInstall(string installPath)');
 });
 
 test('payload progress is bounded at its source and UI delivery has only one marshal', () => {
@@ -168,7 +167,7 @@ test('silent NSIS uninstall arguments work without a WebView2 or automatic launc
     form.indexOf('public static int RunSilentInstall'),
     form.indexOf('internal static string? ValueAfter'),
   );
-  expect(silent).toContain('engine.RunAsync(false, CancellationToken.None)');
+  expect(silent).toContain('engine.RunAsync(CancellationToken.None)');
   expect(silent).not.toMatch(/LaunchApp|Process\.Start/);
 });
 
@@ -190,7 +189,7 @@ test('retry gets a fresh cancellation token and closing waits for the engine to 
   expect(form).toContain('private readonly SetupOperation operation = new();');
   expect(form).toContain('private bool operationActive => operation.IsActive;');
   expect(form.match(/var cancellationToken = operation.Begin\(\);/g)).toHaveLength(2);
-  expect(form).toContain('await runEngine.RunAsync(localInference, cancellationToken);');
+  expect(form).toContain('await runEngine.RunAsync(cancellationToken);');
   expect(form).toContain('await uninstaller.UninstallAsync(cancellationToken);');
   expect(form).toContain('operation.Complete();');
   expect(form).not.toContain('installCts');
@@ -212,9 +211,7 @@ test('start acknowledges UI admission before cancel and never waits for an engin
     form.indexOf('internal void StartUninstall()'),
     form.indexOf('internal bool LaunchApp()'),
   );
-  expect(startInstall).toContain(
-    'Invoke(new Action(() => StartInstall(engineInstallDir, localInference)))',
-  );
+  expect(startInstall).toContain('Invoke(new Action(() => StartInstall(engineInstallDir)))');
   expect(startUninstall).toContain('Invoke(new Action(StartUninstall))');
   expect(startInstall).toContain('if (uninstallMode || installState == "done") return;');
   expect(startUninstall).toContain('if (!uninstallMode || installState == "done") return;');

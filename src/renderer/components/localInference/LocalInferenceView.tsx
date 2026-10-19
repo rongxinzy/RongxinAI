@@ -63,8 +63,6 @@ import {
 import { sameRunningModelSnapshot } from './utils/runningModels';
 
 interface LocalInferenceViewProps {
-  installRequestId?: string;
-  onInstallRequestHandled?: (requestId: string) => void;
   refreshRequestId?: number;
   isSidebarCollapsed?: boolean;
   isVisible?: boolean;
@@ -79,8 +77,6 @@ const LOCAL_INFERENCE_TAB_ORDER: LocalInferenceTab[] = ['models', 'marketplace']
 let cachedStatus: OllamaStatusSnapshot | null = null;
 
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
-  installRequestId,
-  onInstallRequestHandled,
   refreshRequestId,
   isSidebarCollapsed,
   isVisible = true,
@@ -97,13 +93,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
     restoredSession?.activeTab ?? 'models',
   );
-  const [runtimeSettingsOpen, setRuntimeSettingsOpen] = useState(Boolean(installRequestId));
-  useEffect(() => {
-    if (installRequestId) {
-      setActiveTab('models');
-      setRuntimeSettingsOpen(true);
-    }
-  }, [installRequestId]);
+  const [runtimeSettingsOpen, setRuntimeSettingsOpen] = useState(false);
   const [tabDirection, setTabDirection] = useState(1);
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
@@ -685,9 +675,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             <DialogTitle>{i18nService.t('localInferenceRuntimeSettings')}</DialogTitle>
           </DialogHeader>
           <RuntimeInstallCard
-            installRequestId={installRequestId}
             runtimeInstallSnapshot={runtimeInstallProgress.snapshot}
-            onInstallRequestHandled={onInstallRequestHandled}
             onNotify={showToast}
           />
         </DialogContent>

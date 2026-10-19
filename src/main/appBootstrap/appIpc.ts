@@ -16,7 +16,6 @@ import { getLogFilePath, getRecentMainLogEntries } from '../logger';
 import { getAutoLaunchEnabled, setAutoLaunchEnabled } from '../autoLaunchManager';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import { getSystemMemorySnapshot } from '../libs/systemMemory';
-import { consumePendingLocalInferenceInstall } from '../libs/pendingLocalInferenceInstall';
 import { exportLogsZip } from '../libs/logExport';
 import { getCoworkLogPath } from '../libs/coworkLogger';
 import { APP_DATA_DIR_NAME } from '../appConstants';
@@ -226,8 +225,6 @@ export const registerAppIpc = (): void => {
     appIsDev: async () => canUseDevTools(), // 开发环境打开调试面板
     appIsEnterprise: async () => isEnterprise,
     appGetSystemLocale: async () => app.getLocale(),
-    appConsumePendingLocalInferenceInstall: async () =>
-      consumePendingLocalInferenceInstall(app.getPath('userData')),
     appGetInferenceEdition: async () => resolveEffectiveInferenceEdition(),
     appUsesBundledLlamaCppRuntime: async () => usesBundledLlamaCppRuntime(),
   });

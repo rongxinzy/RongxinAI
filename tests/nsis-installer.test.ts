@@ -273,33 +273,34 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(15);
   });
 
-  test('records optional local inference intent via an options checkbox instead of a popup', () => {
+  test('keeps local inference fully in-app instead of an installer option', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const themeScript = fs.readFileSync(path.resolve('scripts/installer-ui/zy-pages.nsh'), 'utf8');
 
-    expect(installerScript).toContain('pending-local-inference-install');
-    expect(installerScript).toContain('!ifndef BUILD_UNINSTALLER');
-    expect(installerScript).toContain('Var /GLOBAL installLocalInference');
-    expect(installerScript.indexOf('!ifndef BUILD_UNINSTALLER')).toBeLessThan(
-      installerScript.indexOf('Var /GLOBAL installLocalInference'),
+    // The only installer-side touch is cleaning a stale marker from older
+    // installers so it never redirects a fresh install's first launch.
+    expect(installerScript).toContain(
+      'Delete "$APPDATA\\ZhiYuanAgent\\pending-local-inference-install"',
     );
+    expect(installerScript).not.toContain(
+      'FileOpen $2 "$APPDATA\\ZhiYuanAgent\\pending-local-inference-install"',
+    );
+    expect(installerScript).not.toContain('Var /GLOBAL installLocalInference');
+    expect(themeScript).not.toContain('$heroInference');
+    expect(themeScript).not.toContain('ZY_UI_LOCAL_INFERENCE');
     expect(installerScript).not.toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
     expect(installerScript).not.toContain('install-llamacpp-backend-nsis.cjs');
     expect(installerScript).not.toContain('llamacpp-backends\\manifest.json');
 
-    // The hero page hosts the checkbox; leaving it commits the install and
-    // runs the destructive pre-extraction steps. Layout positions come from
+    // The hero page hosts the license checkbox; leaving it commits the install
+    // and runs the destructive pre-extraction steps. Layout positions come from
     // the ZY_HERO_* constants in zy-theme.nsh.
-    expect(themeScript).toContain(
-      '${NSD_CreateCheckbox} ${ZY_ROW_X} ${ZY_HERO_INFER_Y} ${ZY_HERO_INFER_W} ${ZY_HERO_INFER_H} "$(ZY_UI_LOCAL_INFERENCE)"',
-    );
     expect(themeScript).toContain('Function ZYHeroCreate');
     expect(themeScript).toContain('Function ZYHeroLeave');
     const heroLeaveBlock = themeScript.slice(
       themeScript.indexOf('Function ZYHeroLeave'),
       themeScript.indexOf('FunctionEnd', themeScript.indexOf('Function ZYHeroLeave')),
     );
-    expect(heroLeaveBlock).toContain('${NSD_GetState} $heroInference $installLocalInference');
     expect(heroLeaveBlock).toContain(
       '!insertmacro PrepareExistingInstallForExtraction INTERACTIVE',
     );
