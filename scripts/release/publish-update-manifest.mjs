@@ -3,8 +3,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import {
-  REQUIRED_RELEASE_TARGETS,
+  listRequiredReleaseTargets,
   resolveReleaseArtifactFormat,
+  resolveReleasePlatforms,
 } from './inference-edition-targets.mjs';
 
 const [outputPath, releaseVersion, commitSha, ...specs] = process.argv.slice(2);
@@ -107,8 +108,9 @@ for (const { platform, arch, variant } of installerArtifacts) {
   if (targets.has(target)) throw new Error(`Duplicate release target: ${target}`);
   targets.add(target);
 }
-const missingTargets = [...REQUIRED_RELEASE_TARGETS].filter(target => !targets.has(target));
-const unexpectedTargets = [...targets].filter(target => !REQUIRED_RELEASE_TARGETS.has(target));
+const requiredTargets = new Set(listRequiredReleaseTargets(resolveReleasePlatforms()));
+const missingTargets = [...requiredTargets].filter(target => !targets.has(target));
+const unexpectedTargets = [...targets].filter(target => !requiredTargets.has(target));
 if (missingTargets.length > 0 || unexpectedTargets.length > 0) {
   throw new Error(
     `Release manifest must contain exactly the required targets; missing=${missingTargets.join(',') || 'none'} unexpected=${unexpectedTargets.join(',') || 'none'}`,

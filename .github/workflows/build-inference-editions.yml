@@ -31,6 +31,10 @@ on:
         description: 'Include Linux cpu/cuda matrix legs (lite is Windows-only)'
         type: boolean
         default: true
+      windows-release-staged:
+        description: 'Release mode only: Windows is built by build-windows-release.yml'
+        type: boolean
+        default: false
       linux-inference-editions:
         description: 'Comma-separated Linux editions to build (default cpu,cuda)'
         type: string
@@ -76,13 +80,15 @@ jobs:
           BUILD_MACOS: ${{ inputs.build-macos }}
           BUILD_WINDOWS: ${{ inputs.build-windows }}
           BUILD_LINUX: ${{ inputs.build-linux }}
+          WINDOWS_RELEASE_STAGED: ${{ inputs.windows-release-staged }}
+          MODE: ${{ inputs.mode }}
           LINUX_INFERENCE_EDITIONS: ${{ inputs.linux-inference-editions }}
         shell: bash
         run: |
           matrix='{"include":['
           separator=''
 
-          if [[ "$BUILD_WINDOWS" == "true" ]]; then
+          if [[ "$BUILD_WINDOWS" == "true" && ! ( "$MODE" == "release" && "$WINDOWS_RELEASE_STAGED" == "true" ) ]]; then
             for edition in lite cpu cuda; do
               # CUDA 12.4 nvcc rejects the VS 2026 (MSVC 14.5x) toolchain on
               # windows-latest; the CUDA leg builds on windows-2022 (VS 2022).
@@ -209,8 +215,8 @@ jobs:
       - name: Set up POSIX runtimes
         if: ${{ matrix.platform != 'windows' }}
         run: |
-          bun run setup:posix-uv-runtime
-          bun run setup:posix-python-runtime
+          bash scripts/ci/with-download-retries.sh bun run setup:posix-uv-runtime
+          bash scripts/ci/with-download-retries.sh bun run setup:posix-python-runtime
           bun run engram:runtime:${{ matrix.runtime_target }}
       - name: Sync vendor llama.cpp CPU edition
         if: ${{ matrix.inference_edition != 'lite' }}

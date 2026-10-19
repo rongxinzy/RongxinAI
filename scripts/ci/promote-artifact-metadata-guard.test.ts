@@ -13,6 +13,7 @@ test('promote loads all generation build metadata dynamically', () => {
   expect(promoteWorkflow).not.toMatch(/for index in 1 2 3 4/);
   expect(promoteWorkflow).not.toMatch(/update-artifacts-1\.json/);
   expect(promoteWorkflow).toContain('fetch-generation-build-metadata.sh');
+  expect(promoteWorkflow).not.toMatch(/ZHIYUAN_RELEASE_PLATFORMS/);
   expect(promoteWorkflow).toMatch(/metadata=\(uploaded-metadata\/update-artifacts-\*\.json\)/);
   expect(promoteWorkflow).toContain('print-electron-updater-verify-specs.mjs');
 });
