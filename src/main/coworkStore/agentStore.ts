@@ -224,7 +224,9 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
     is_default: number;
     source: string;
     preset_id: string;
-    triage_override?: string | null;
+    // NOTE: the triage_override column stays in coreSchema for now — the
+    // built-in skill SKILLs/zhiyuan-expert-manager/scripts/register_expert.js
+    // still reads and writes it — but no app code selects it anymore.
     created_at: number;
     updated_at: number;
   }): Agent {
