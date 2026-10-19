@@ -46,11 +46,6 @@ export type OllamaServiceConfig = {
   schedSpread?: boolean;
 };
 
-export type OllamaCancelPullResult = {
-  success: true;
-  cancelled: boolean;
-};
-
 export type OllamaModel = {
   name: string;
   model?: string;

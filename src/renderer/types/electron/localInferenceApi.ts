@@ -38,40 +38,21 @@ import type {
 } from '../../../shared/llamacpp';
 import type { IpcContractApi } from '../../../shared/ipc/contract';
 import type { marketplaceContract } from '../../../shared/marketplace/contract';
+import type { ollamaContract } from '../../../shared/ipc/ollamaContract';
 import type {
-  OllamaCancelPullResult,
   OllamaChatChunk,
-  OllamaChatPayload,
   OllamaInstallProgress,
-  OllamaModel,
-  OllamaModelLaunchInput,
-  OllamaModelLaunchResult,
-  OllamaRunningModel,
-  OllamaServiceConfig,
   OllamaStatusSnapshot,
 } from '../../../shared/ollama';
 
-export interface OllamaApi {
-  status: () => Promise<OllamaStatusSnapshot>;
-  install: () => Promise<OllamaStatusSnapshot>;
-  start: () => Promise<OllamaStatusSnapshot>;
-  stop: () => Promise<OllamaStatusSnapshot>;
-  restart: () => Promise<OllamaStatusSnapshot>;
-  getServiceConfig: () => Promise<OllamaServiceConfig>;
-  setServiceConfig: (config: OllamaServiceConfig) => Promise<OllamaServiceConfig>;
-  modelsDir: () => Promise<string>;
-  listLocalModels: () => Promise<OllamaModel[]>;
-  listRunningModels: () => Promise<OllamaRunningModel[]>;
-  deleteModel: (name: string) => Promise<{ success: boolean }>;
-  showModel: (name: string) => Promise<unknown>;
-  createModel: (name: string, modelfile: string) => Promise<{ success: boolean }>;
-  preloadModel: (input: OllamaModelLaunchInput) => Promise<OllamaModelLaunchResult>;
-  unloadModel: (name: string) => Promise<OllamaModelLaunchResult>;
-  pullModel: (name: string) => Promise<{ success: boolean }>;
-  cancelPull: (name: string) => Promise<OllamaCancelPullResult>;
-  chat: (payload: OllamaChatPayload) => Promise<OllamaChatChunk>;
-  chatStream: (requestId: string, payload: OllamaChatPayload) => Promise<{ success: boolean }>;
-  cancelChatStream: (requestId: string) => Promise<{ success: boolean; cancelled: boolean }>;
+/**
+ * Ollama surface: invoke methods derive from the zod contract (work package
+ * M.4); push subscriptions stay hand-typed.
+ */
+export interface OllamaApi extends Omit<
+  IpcContractApi<typeof ollamaContract>,
+  'onStatusChanged' | 'onInstallProgress' | 'onPullProgress' | 'onChatStreamChunk'
+> {
   onStatusChanged: (callback: (snapshot: OllamaStatusSnapshot) => void) => () => void;
   onInstallProgress: (callback: (progress: OllamaInstallProgress) => void) => () => void;
   onPullProgress: (
