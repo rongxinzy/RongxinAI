@@ -44,34 +44,4 @@ export const HarnessActivationType = {
 export type HarnessActivationType =
   (typeof HarnessActivationType)[keyof typeof HarnessActivationType];
 
-export const HarnessFeatureFlag = {
-  ConditionalPrototype: 'conditional_prototype',
-  IndependentCritic: 'independent_critic',
-  RepeatToolBreaker: 'repeat_tool_breaker',
-  StaleIterationRecovery: 'stale_iteration_recovery',
-} as const;
-export type HarnessFeatureFlag = (typeof HarnessFeatureFlag)[keyof typeof HarnessFeatureFlag];
-
-export const HarnessFeatureFlagDefaults: Readonly<Record<HarnessFeatureFlag, boolean>> = {
-  [HarnessFeatureFlag.ConditionalPrototype]: false,
-  [HarnessFeatureFlag.IndependentCritic]: false,
-  [HarnessFeatureFlag.RepeatToolBreaker]: false,
-  [HarnessFeatureFlag.StaleIterationRecovery]: false,
-};
-
-export const HarnessPatchStatus = {
-  Proposed: 'proposed',
-  Rejected: 'rejected',
-  Promoted: 'promoted',
-  RolledBack: 'rolled_back',
-} as const;
-export type HarnessPatchStatus = (typeof HarnessPatchStatus)[keyof typeof HarnessPatchStatus];
-
-export const HarnessPathClass = {
-  Surface: 'surface',
-  Kernel: 'kernel',
-  OutsideBoundary: 'outside_boundary',
-} as const;
-export type HarnessPathClass = (typeof HarnessPathClass)[keyof typeof HarnessPathClass];
-
 export const HarnessVersion = '237-p0-v1';
