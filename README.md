@@ -14,7 +14,7 @@
   <a href="https://github.com/rongxinzy/RongxinAI/releases"><img src="https://img.shields.io/github/v/release/rongxinzy/RongxinAI?include_prereleases" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/rongxinzy/RongxinAI" alt="AGPL-3.0"></a>
   <a href="https://github.com/rongxinzy/RongxinAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rongxinzy/RongxinAI/ci.yml?branch=main&label=CI" alt="CI"></a>
-  <img src="https://img.shields.io/badge/platform-Windows-lightgrey" alt="Platforms">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platforms">
 </p>
 
 <p align="center">
@@ -32,14 +32,14 @@
 
 - 🆓 **Free to start** — built-in ZhiYuan free model, no third-party API key needed (network required; limits shown in app). Bring your own provider anytime.
 - 💻 **Runs local models** — browse a model marketplace, pick a GGUF model & quantization, tune context / GPU / threads, powered by llama.cpp runtime.
-- 🛠️ **Actually does the work** — reads & writes files, runs commands, operates a browser; creates PPT, Word, PDF, Excel outputs.
-- 💬 **Lives in your chat apps** — WeChat, WeCom, DingTalk, Feishu/Lark, QQ, email.
+- 🛠️ **Actually does the work** — reads & writes files, runs commands, operates a browser through the Playwright connector; creates PPT, Word, PDF, Excel outputs.
+- 💬 **Lives in your chat apps** — WeChat, WeCom, DingTalk, Feishu/Lark, QQ, Telegram, Discord; plus an email (IMAP/SMTP) skill.
 - 🧩 **Extensible** — Experts, Skills and MCP; scheduled recurring tasks.
 - 🔒 **Local first** — sessions, config and task metadata stored locally; approval modes for tool execution.
 
 ## Get started
 
-1. **Download** the installer from the [official website](https://www.rongxzyai.com/#download) or [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases). GitHub Releases currently ships a **Windows** installer; macOS and Linux packages are unconfirmed—check the download page.
+1. **Download** the installer from the [official website](https://www.rongxzyai.com/#download): Windows x64 (lite, CPU and CUDA editions), macOS (Apple Silicon and Intel) and Linux x64 (`.deb` and AppImage).
 2. **Open the app** and chat with the built-in free model — no API key required.
 3. **Pick a project folder**, describe your task, then follow progress and approve actions as it works.
 
@@ -57,7 +57,7 @@ Local models reduce reliance on cloud inference. Web search, model downloads, re
 
 Sessions, configuration, and task metadata are stored locally. The desktop execution environment accesses local files. When you use a cloud model or remote tool, the content needed for that request is sent to the corresponding service.
 
-Tool execution follows the selected permission mode. Operations requiring approval display a request; automatic authorization allows some operations to run directly. Progress and results remain visible in the workspace.
+Tool execution follows the permission mode chosen in the task composer. **Allow all** (the default) runs tool calls without prompting, including irreversible ones; **Ask for permission** shows an approval request before each tool call. Progress and results remain visible in the workspace.
 
 ## How it compares
 
@@ -136,17 +136,8 @@ This builds `enterprise/`, loads this worktree's extension, and starts the same 
 
 ### Packaging
 
-Every installer bundles the pinned Magpie model gateway. Build it before packaging; this needs the exact Go SDK pinned in [`resources/magpie/upstream.json`](resources/magpie/upstream.json) (currently Go 1.26.8), plus Git and tar. The builder rejects any other Go version and never downloads a toolchain:
+Every installer bundles a pinned model gateway that is built from source with an exact Go SDK before packaging. See [CONTRIBUTING.md](CONTRIBUTING.md#packaging) for the prerequisites and build commands.
 
-```bash
-bun run magpie:build --target <platform-arch> --go /path/to/go   # e.g. win32-x64, darwin-arm64, linux-x64, or all
-bun run magpie:verify --target <platform-arch>
-```
-
-Packaging fails with an explicit error when the Magpie binary for the target is missing or does not match its manifest. See [`resources/magpie/README.md`](resources/magpie/README.md).
-
-| Command | Output |
-| --- | --- |
 #### Editions
 
 The edition is selected with `ZHIYUAN_UPDATE_VARIANT` and decides which bundled llama.cpp runtime ships. All editions bundle the offline components; nothing is downloaded on demand.

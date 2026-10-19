@@ -14,7 +14,7 @@
   <a href="https://github.com/rongxinzy/RongxinAI/releases"><img src="https://img.shields.io/github/v/release/rongxinzy/RongxinAI?include_prereleases" alt="Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/rongxinzy/RongxinAI" alt="AGPL-3.0"></a>
   <a href="https://github.com/rongxinzy/RongxinAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rongxinzy/RongxinAI/ci.yml?branch=main&label=CI" alt="CI"></a>
-  <img src="https://img.shields.io/badge/平台-Windows-lightgrey" alt="平台">
+  <img src="https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="平台">
 </p>
 
 <p align="center">
@@ -32,14 +32,14 @@
 
 - 🆓 **免费上手**：内置知远免费模型，无需第三方 API Key（需联网，额度以应用内为准），也可接入自己的模型服务。
 - 💻 **本地模型**：模型市场一键选择 GGUF 模型与量化版本，可调上下文、GPU、线程（基于 llama.cpp 运行时）。
-- 🛠️ **真能干活**：读写文件、运行命令、操作浏览器；产出 PPT、Word、PDF、Excel。
-- 💬 **接入常用 IM**：微信、企业微信、钉钉、飞书/Lark、QQ、邮箱。
+- 🛠️ **真能干活**：读写文件、运行命令，安装 Playwright 连接器后可操作浏览器；产出 PPT、Word、PDF、Excel。
+- 💬 **接入常用 IM**：微信、企业微信、钉钉、飞书/Lark、QQ（英文界面另有 Telegram、Discord），另有邮件（IMAP/SMTP）技能。
 - 🧩 **可扩展**：专家、技能（Skills）、MCP，支持定时任务。
 - 🔒 **本地优先**：会话、配置、任务数据存本地；工具执行有授权模式。
 
 ## 开始使用
 
-1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包。GitHub Releases 目前仅提供 **Windows** 安装包；macOS / Linux 安装包尚未确认，请以下载页为准。
+1. **下载**：从[官网](https://www.rongxzyai.com/#download)获取安装包：Windows x64（轻量版、CPU 版、CUDA 版）、macOS（Apple Silicon 与 Intel）、Linux x64（`.deb` 与 AppImage）。
 2. **打开应用**：直接用内置免费模型对话，无需 API Key。
 3. **派任务**：选择项目目录、描述任务，查看执行过程并处理授权请求。
 
@@ -57,7 +57,7 @@
 
 会话、配置和任务元数据保存在本机；本地文件由桌面执行环境访问。使用云端模型或远程工具时，请求所需内容会发送给相应服务。
 
-工具执行遵循当前权限模式。需要审批的操作会显示授权请求；开启自动授权后，部分操作可直接执行。任务执行过程和结果可以在工作台中查看。
+工具执行遵循任务输入区选择的权限模式。默认「全部允许」，工具调用（包括不可逆操作）直接执行；切换到「请求权限」后，每个工具调用执行前都会显示授权请求。任务执行过程和结果可以在工作台中查看。
 
 ## 横向对比
 
@@ -128,17 +128,8 @@ bun run llamacpp:runtime:download
 
 ### 打包
 
-所有安装包都内置固定版本的 Magpie 模型网关，打包前需先构建。构建要求 [`resources/magpie/upstream.json`](resources/magpie/upstream.json) 中锁定的 Go SDK 精确版本（当前为 Go 1.26.8），以及 Git 和 tar。构建脚本拒绝其他 Go 版本，也不会自动下载工具链：
+所有安装包都内置固定版本的模型网关，打包前需用锁定版本的 Go SDK 从源码构建。前置条件与构建命令见[贡献指南](CONTRIBUTING.md#packaging)。
 
-```bash
-bun run magpie:build --target <平台-架构> --go /path/to/go   # 如 win32-x64、darwin-arm64、linux-x64 或 all
-bun run magpie:verify --target <平台-架构>
-```
-
-目标平台的 Magpie 二进制缺失或与 manifest 不符时，打包会直接报错。详见 [`resources/magpie/README.md`](resources/magpie/README.md)。
-
-| 命令 | 产物 |
-| --- | --- |
 #### 版本
 
 版本由 `ZHIYUAN_UPDATE_VARIANT` 选择，决定随包内置哪种 llama.cpp 运行时。所有版本都内置离线组件，不做按需下载。
