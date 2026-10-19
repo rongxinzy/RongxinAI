@@ -9,7 +9,7 @@ const scriptPath = path.join(__dirname, 'windows-installer-interactive.ps1');
 const helperPath = path.join(__dirname, 'windows-installer-ui.cs');
 const script = readFileSync(scriptPath, 'utf8');
 const helper = readFileSync(helperPath, 'utf8');
-const workflow = readFileSync('.github/workflows/windows-installer-pr.yml', 'utf8');
+const workflow = readFileSync('.github/workflows/build-inference-editions.yml', 'utf8');
 
 test('uses real visible controls and waits for completion without clicking hidden Next', () => {
   expect(script).toContain(

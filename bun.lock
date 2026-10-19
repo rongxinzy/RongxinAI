@@ -92,6 +92,7 @@
         "motion": "^12.42.2",
         "nanoid": "^5.1.16",
         "node-downloader-helper": "^2.1.11",
+        "node-gyp": "12.4.0",
         "oxc-parser": "0.153.0",
         "oxfmt": "^0.59.0",
         "oxlint": "1.81.0",

@@ -35,11 +35,11 @@ test('hashing streams bytes and host modules cannot depend on inherited pwsh sea
 
 test('native uninstall gate runs only after real shell evidence and protects the earlier native cache', () => {
   const workflow = loadYaml(
-    fs.readFileSync('.github/workflows/windows-installer-pr.yml', 'utf8'),
+    fs.readFileSync('.github/workflows/build-inference-editions.yml', 'utf8'),
   ) as {
-    jobs: { 'package-and-install': { steps: { name?: string; run?: string }[] } };
+    jobs: { acceptance: { steps: { name?: string; run?: string }[] } };
   };
-  const steps = workflow.jobs['package-and-install'].steps;
+  const steps = workflow.jobs.acceptance.steps;
   const position = (command: string) => steps.findIndex(step => step.run?.includes(command));
   expect(position('windows-shell-uninstall.ps1 -Action prepare')).toBeGreaterThan(-1);
   expect(position('windows-shell-uninstall.ps1 -Action prepare')).toBeLessThan(
@@ -84,6 +84,51 @@ test('internal and unsigned artifact delivery also require fresh lease and real 
   expect(internal).toContain('Existing runtime data was not removed.');
   expect(internal).not.toContain('$env:GITHUB_ACTIONS =');
 });
+
+test.skipIf(process.platform !== 'win32')(
+  'the actual uninstall workflow command preserves empty and signed thumbprints in PowerShell 5',
+  () => {
+    const workflow = loadYaml(
+      fs.readFileSync('.github/workflows/build-inference-editions.yml', 'utf8'),
+    ) as { jobs: { acceptance: { steps: { name?: string; run?: string; shell?: string }[] } } };
+    const step = workflow.jobs.acceptance.steps.find(
+      item => item.name === 'Verify native uninstall preserves user data',
+    )!;
+    expect(step.shell).toBe('powershell');
+    const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'uninstall-command-'));
+    try {
+      fs.mkdirSync(path.join(fixture, 'scripts/ci'), { recursive: true });
+      // Bind the real workflow arguments without running a destructive installer.
+      fs.writeFileSync(
+        path.join(fixture, 'scripts/ci/windows-shell-uninstall.ps1'),
+        `param([string]$Action, [string]$ExpectedThumbprint)
+if ($Action -cne 'verify') { throw 'Incorrect action' }
+if ($ExpectedThumbprint -cne [string]$env:EXPECTED_THUMBPRINT) { throw 'Thumbprint was changed' }
+Write-Output ('Bound thumbprint length: ' + $ExpectedThumbprint.Length)
+`,
+      );
+      for (const thumbprint of ['', 'A'.repeat(40)]) {
+        const wrapper = path.join(fixture, 'step.ps1');
+        fs.writeFileSync(wrapper, step.run!.replace(/\$\{\{[^}]*\}\}/g, thumbprint));
+        const result = spawnSync(
+          'powershell.exe',
+          ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', wrapper],
+          {
+            cwd: fixture,
+            encoding: 'utf8',
+            env: { ...process.env, EXPECTED_THUMBPRINT: thumbprint },
+            timeout: 10_000,
+          },
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stderr || result.stdout).toBe(0);
+        expect(result.stdout).toContain(`Bound thumbprint length: ${thumbprint.length}`);
+      }
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true });
+    }
+  },
+);
 
 test.skipIf(process.platform !== 'win32')(
   'real PowerShell rejects wrong leases, commands, host bytes and restore collisions without deleting data',

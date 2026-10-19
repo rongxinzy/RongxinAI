@@ -22,7 +22,7 @@ import {
 
 const script = readFileSync('scripts/ci/windows-shell-interactive.mjs', 'utf8');
 const native = readFileSync('scripts/ci/windows-shell-native.ps1', 'utf8');
-const workflow = readFileSync('.github/workflows/windows-installer-pr.yml', 'utf8');
+const workflow = readFileSync('.github/workflows/build-inference-editions.yml', 'utf8');
 
 test('waits through a loading document without a body and observes the later real DOM', () => {
   const dom = new JSDOM('<!doctype html><html lang="en"><head></head><body></body></html>', {
@@ -257,43 +257,33 @@ test('keeps complete packaging, existing smoke gates and both real UI flows requ
       }
     >;
   };
-  const { steps } = config.jobs['package-and-install'];
-  const independentConditions: Record<string, string> = {
-    'node scripts/ci/windows-shell-interactive.mjs':
-      "${{ !cancelled() && steps.offline-build.outcome == 'success' && steps.acceptance-ownership.outcome == 'success' }}",
-    'node scripts/ci/windows-shell-evidence.mjs':
-      "${{ !cancelled() && steps.shell-interaction.outcome == 'success' }}",
-    './scripts/ci/windows-shell-uninstall.ps1 -Action verify':
-      "${{ !cancelled() && steps.shell-evidence.outcome == 'success' }}",
-  };
-  expect(steps.find(step => step.id === 'offline-build')?.run).toContain('dist:win:offline');
+  const { steps } = config.jobs.acceptance;
+  expect(
+    config.jobs.build.steps.some(step => step.run?.includes('bun run package:win:prepared')),
+  ).toBe(true);
   expect(steps.find(step => step.id === 'acceptance-ownership')?.run).toContain('-Action prepare');
-  expect(steps.find(step => step.id === 'shell-interaction')?.run).toContain(
-    'windows-shell-interactive.mjs',
-  );
-  expect(steps.find(step => step.id === 'shell-evidence')?.run).toContain(
-    'windows-shell-evidence.mjs',
-  );
-  expect(steps.find(step => step.id === 'shell-evidence')?.shell).toBe('pwsh');
-  expect(steps.find(step => step.id === 'shell-evidence')?.run).toContain(
-    "$app = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'",
-  );
+  const evidence = steps.find(step => step.id === 'shell-evidence');
+  expect(evidence?.run).toContain('windows-shell-interactive.mjs');
+  expect(evidence?.run).toContain('windows-shell-evidence.mjs');
+  expect(evidence?.shell).toBe('pwsh');
+  expect(evidence?.run).toContain("'zhiyuan-shell-acceptance/安装路径/知远.exe'");
+  expect(evidence?.if).toContain("steps.acceptance-ownership.outcome == 'success'");
   let previous = -1;
   for (const command of [
-    "'dist:win:offline'",
     '-File scripts/ci/windows-installer-size-smoke.ps1',
     '-File scripts/ci/windows-runtime-smoke.ps1',
     '-File scripts/ci/windows-installer-smoke.ps1',
     './scripts/ci/windows-installer-interactive.ps1',
     'node scripts/ci/windows-shell-interactive.mjs',
-    'node scripts/ci/windows-shell-evidence.mjs',
     './scripts/ci/windows-shell-uninstall.ps1 -Action verify',
   ]) {
     const index = steps.findIndex(step => step.run?.includes(command));
     expect(index, command).toBeGreaterThan(previous);
-    expect(steps[index].if, command).toBe(independentConditions[command]);
     previous = index;
   }
+  expect(steps.find(step => step.run?.includes('-Action verify'))?.if).toContain(
+    "steps.shell-evidence.outcome == 'success'",
+  );
   expect(workflow).toContain('actions/setup-dotnet@v5');
   expect(workflow).toContain("dotnet-version: '8.0.x'");
   expect(workflow).not.toContain('continue-on-error');
@@ -317,11 +307,9 @@ test.skipIf(process.platform !== 'win32')(
   'executes the actual evidence workflow as a BOM-less UTF-8 script with exact Unicode arguments',
   () => {
     const config = loadYaml(workflow) as {
-      jobs: { 'package-and-install': { steps: { id?: string; shell?: string; run?: string }[] } };
+      jobs: { acceptance: { steps: { id?: string; shell?: string; run?: string }[] } };
     };
-    const step = config.jobs['package-and-install'].steps.find(
-      item => item.id === 'shell-evidence',
-    )!;
+    const step = config.jobs.acceptance.steps.find(item => item.id === 'shell-evidence')!;
     const fixture = fs.realpathSync.native(
       fs.mkdtempSync(path.join(tmpdir(), 'shell-evidence-encoding-')),
     );
@@ -332,6 +320,10 @@ test.skipIf(process.platform !== 'win32')(
       fs.mkdirSync(path.dirname(setup), { recursive: true });
       fs.writeFileSync(setup, 'argument transport fixture, never executed');
       fs.mkdirSync(path.join(fixture, 'scripts/ci'), { recursive: true });
+      fs.writeFileSync(
+        path.join(fixture, 'scripts/ci/windows-shell-interactive.mjs'),
+        '// This fixture exercises workflow argument transport, not real installation.\n',
+      );
       fs.writeFileSync(
         path.join(fixture, 'scripts/ci/windows-shell-evidence.mjs'),
         "import fs from 'node:fs'; fs.writeFileSync(process.env.PROBE_OUTPUT, JSON.stringify(process.argv.slice(2)));",

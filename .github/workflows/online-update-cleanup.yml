@@ -10,7 +10,6 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  actions: write
   contents: read
 
 jobs:
@@ -184,37 +183,3 @@ jobs:
             [[ -e "$batch" ]] || continue
             aws s3api delete-objects --bucket "$XIAORUAN_BUCKET" --delete "file://$batch"
           done
-
-  github-artifacts:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete workflow artifacts older than seven days
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ARTIFACT_RETENTION_DAYS: '7'
-        run: |
-          set -euo pipefail
-          cutoff_epoch="$(date -u -d "${ARTIFACT_RETENTION_DAYS} days ago" +%s)"
-          artifact_ids="$(mktemp)"
-          trap 'rm -f "$artifact_ids"' EXIT
-
-          page=1
-          while :; do
-            response="$(gh api \
-              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&page=${page}")"
-            jq -r --argjson cutoff "$cutoff_epoch" \
-              '.artifacts[] | select(.created_at | fromdateiso8601 < $cutoff) | .id' \
-              <<< "$response" >> "$artifact_ids"
-            count="$(jq '.artifacts | length' <<< "$response")"
-            [[ "$count" -lt 100 ]] && break
-            page=$((page + 1))
-          done
-
-          deleted=0
-          while IFS= read -r artifact_id; do
-            [[ -z "$artifact_id" ]] && continue
-            gh api --method DELETE \
-              "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
-            deleted=$((deleted + 1))
-          done < "$artifact_ids"
-          echo "Deleted ${deleted} workflow artifacts older than ${ARTIFACT_RETENTION_DAYS} days."

@@ -14,22 +14,23 @@ test('release workflow packages through the reusable inference-edition workflow'
   expect(releaseWorkflow).toContain('uses: ./.github/workflows/build-inference-editions.yml');
 });
 
-test('inference-edition workflow builds and verifies Magpie before packaging', () => {
-  const buildStep = editionsWorkflow.indexOf('name: Build and verify pinned Magpie gateway');
-  expect(buildStep).toBeGreaterThan(-1);
-  expect(editionsWorkflow).toContain('bun run magpie:build -- --target');
-  expect(editionsWorkflow).toContain('bun run magpie:verify -- --target');
-  for (const packagingStep of [
-    'name: Build Windows (verify)',
-    'name: Build Windows release (lite)',
-    'name: Build macOS (verify)',
-    'name: Build unsigned macOS release',
-    'name: Build Linux (verify)',
-    'name: Build Linux release',
-  ]) {
-    const index = editionsWorkflow.indexOf(packagingStep);
-    expect(index, packagingStep).toBeGreaterThan(buildStep);
-  }
-  expect(editionsWorkflow).toContain('actions/setup-go@v6');
-  expect(editionsWorkflow).toContain('resources/magpie/upstream.json');
+test('all packaging paths prepare pinned Magpie before packaging', () => {
+  const shared = editionsWorkflow.indexOf('name: Prepare shared pinned Magpie gateway');
+  const posix = editionsWorkflow.indexOf('name: Prepare pinned Magpie gateway for POSIX');
+  expect(shared).toBeGreaterThan(-1);
+  expect(posix).toBeGreaterThan(-1);
+  expect(editionsWorkflow.indexOf('name: Build Windows (verify)')).toBeGreaterThan(shared);
+  expect(editionsWorkflow.indexOf('name: Build macOS (verify)')).toBeGreaterThan(posix);
+  expect(editionsWorkflow.indexOf('name: Build Linux (verify)')).toBeGreaterThan(posix);
+  const action = readFileSync(
+    path.join(process.cwd(), '.github/actions/prepare-magpie/action.yml'),
+    'utf8',
+  );
+  expect(action).toContain('resources/magpie/upstream.json');
+  expect(action).toContain('actions/setup-go@v6');
+  expect(action).toContain('bun run magpie:build -- --target');
+  expect(action).toContain('bun run magpie:verify -- --target');
+  expect(action.indexOf('name: Verify runtime before packaging')).toBeGreaterThan(
+    action.indexOf('name: Build pinned runtime on a cache miss'),
+  );
 });

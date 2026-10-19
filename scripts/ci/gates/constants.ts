@@ -23,10 +23,13 @@ export const BaselineJob = {
   Lint: 'lint',
   Test: 'test',
   Bundle: 'bundle-budget',
-  Enterprise: 'enterprise',
 } as const;
 
 export const PathJob = {
+  Enterprise: 'enterprise',
+  StreamingMutations: 'streaming-mutations',
+  WindowsScripts: 'windows-scripts',
+  BuildVerification: 'build-verification',
   ChannelRuntime: 'channel-runtime',
   PythonRuntimeLinux: 'python-runtime-linux',
   PythonRuntimeWindows: 'python-runtime-windows',

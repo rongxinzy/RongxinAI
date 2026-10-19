@@ -25,32 +25,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.source-ref || github.sha }}
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-bun-workspace
         with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun and Electron caches
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ~/.cache/electron
-          key: memory-leak-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            memory-leak-${{ runner.os }}-1.4.0-
-      - name: Restore Electron TypeScript cache
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            .cache/tsc/electron.tsbuildinfo
-            dist-electron
-          key: tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json', 'bun.lock') }}
-          restore-keys: |
-            tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json', 'bun.lock') }}-
-            tsc-electron-${{ runner.os }}-
+          include-electron: 'true'
       - name: Restore Vite cache
         uses: actions/cache/restore@v5
         with:
@@ -65,36 +42,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0 xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
       - name: Install Electron runtime
         run: node node_modules/electron/install.js
-      - name: Read pinned model runtime toolchain
-        id: model-runtime
-        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-      - uses: actions/setup-go@v6
+      - name: Prepare pinned model runtime
+        uses: ./.github/actions/prepare-magpie
         with:
-          go-version: ${{ steps.model-runtime.outputs.go-version }}
-          cache: false
-      - name: Restore pinned model runtime build cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            .cache/magpie/modules
-            .cache/magpie/go-build
-          key: memory-model-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs') }}
-      - name: Build and verify pinned model runtime
-        run: |
-          bun run magpie:build --target linux-x64
-          bun run magpie:verify --target linux-x64
+          target: linux-x64
       - name: Build application for the memory regression scenario
-        # Drop restored JS so Vite can emit a clean renderer, but keep the
-        # TypeScript build info so the following compile reuses typecheck work.
         run: |
-          rm -rf dist-electron
-          mkdir -p .cache/tsc
+          bun run rebuild:electron-native
           bun run build:vite
-          bun run compile:electron -- --incremental --tsBuildInfoFile .cache/tsc/electron.tsbuildinfo
         env:
           VITE_CACHE_DIR: .cache/vite
       - name: Run Electron memory regression check

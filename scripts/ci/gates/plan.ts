@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { CiEvent } from './constants.ts';
-import { enterpriseRequired, planGates, planPathJobs } from './policy.ts';
+import { planGates, planPathJobs } from './policy.ts';
 
 const event = process.env.GITHUB_EVENT_NAME ?? '';
 let paths: string[] = [];
@@ -24,7 +24,15 @@ if (event === CiEvent.PullRequest) {
     .split('\0')
     .filter(Boolean);
 } else if (event === CiEvent.Push) {
-  paths = execFileSync('git', ['show', '--name-only', '--pretty=format:', '-z', 'HEAD'], {
+  const base = process.env.PUSH_BEFORE_SHA ?? '';
+  const head = process.env.PUSH_AFTER_SHA ?? '';
+  if (![base, head].every(sha => /^[a-f0-9]{40}$/.test(sha))) {
+    throw new Error('Push before and after must be complete commit SHAs');
+  }
+  const args = /^0+$/.test(base)
+    ? ['ls-tree', '-r', '--name-only', '-z', head]
+    : ['diff', '--name-only', '--no-renames', '-z', `${base}..${head}`, '--'];
+  paths = execFileSync('git', args, {
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
   })
@@ -33,7 +41,6 @@ if (event === CiEvent.PullRequest) {
 }
 const plan = planGates(paths, event, process.env.GITHUB_REF ?? '');
 const pathPlan = planPathJobs(paths, event);
-const enterprise = enterpriseRequired(paths, event);
 if (!process.env.GITHUB_OUTPUT) throw new Error('GITHUB_OUTPUT is required');
 appendFileSync(process.env.GITHUB_OUTPUT, `plan=${JSON.stringify(plan)}\n`);
 appendFileSync(process.env.GITHUB_OUTPUT, `path-plan=${JSON.stringify(pathPlan)}\n`);
@@ -43,7 +50,6 @@ for (const [name, enabled] of Object.entries(plan)) {
 for (const [name, enabled] of Object.entries(pathPlan)) {
   appendFileSync(process.env.GITHUB_OUTPUT, `${name}=${enabled}\n`);
 }
-appendFileSync(process.env.GITHUB_OUTPUT, `enterprise=${enterprise}\n`);
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(
     process.env.GITHUB_STEP_SUMMARY,
@@ -55,6 +61,6 @@ if (process.env.GITHUB_STEP_SUMMARY) {
       Object.entries(pathPlan)
         .map(([name, enabled]) => `- ${name}: ${enabled ? 'required' : 'not required'}`)
         .join('\n') +
-      `\n- enterprise: ${enterprise ? 'required' : 'not required'}\n`,
+      '\n',
   );
 }

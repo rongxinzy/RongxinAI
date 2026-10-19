@@ -8,9 +8,22 @@ import { afterEach, describe, expect, test } from 'vitest';
 const temporaryDirectories: string[] = [];
 const scriptPath = path.join(__dirname, 'windows-installer-size-smoke.ps1');
 
+function installBudgetFixture(root: string) {
+  fs.mkdirSync(path.join(root, 'scripts/ci'), { recursive: true });
+  fs.symlinkSync(
+    path.resolve(__dirname, '../installer-shell'),
+    path.join(root, 'scripts/installer-shell'),
+    'junction',
+  );
+  for (const file of ['windows-installer-size-smoke.ps1', 'read-installer-budget.cjs']) {
+    fs.copyFileSync(path.join(__dirname, file), path.join(root, 'scripts/ci', file));
+  }
+}
+
 function createFixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-installer-size-test-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan 安装 空格-test-'));
   temporaryDirectories.push(root);
+  installBudgetFixture(root);
   fs.mkdirSync(path.join(root, 'release'), { recursive: true });
   fs.mkdirSync(path.join(root, 'build-tar', 'windows-components'), { recursive: true });
   fs.writeFileSync(path.join(root, 'release', 'ZhiYuan-Setup.exe'), Buffer.alloc(100));
@@ -53,7 +66,7 @@ function runSizeCheck(
       '-MaximumNonComponentBytes',
       String(maximumNonComponentBytes),
     ],
-    { encoding: 'utf8' },
+    { encoding: 'utf8', env: { ...process.env, ZHIYUAN_UPDATE_VARIANT: 'lite' } },
   );
 }
 
@@ -111,6 +124,7 @@ test.skipIf(process.platform !== 'win32')(
   () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'installer-budget-'));
     try {
+      installBudgetFixture(root);
       fs.mkdirSync(path.join(root, 'release'));
       fs.mkdirSync(path.join(root, 'build-tar/windows-components'), { recursive: true });
       fs.writeFileSync(
@@ -146,7 +160,7 @@ test.skipIf(process.platform !== 'win32')(
             '-MaximumShellNonComponentBytes',
             String(shellNonComponentLimit),
           ],
-          { encoding: 'utf8' },
+          { encoding: 'utf8', env: { ...process.env, ZHIYUAN_UPDATE_VARIANT: 'lite' } },
         );
       expect(run().status).toBe(0);
       fs.writeFileSync(nsis, Buffer.alloc(251));
@@ -159,5 +173,21 @@ test.skipIf(process.platform !== 'win32')(
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  },
+);
+
+test.skipIf(process.platform !== 'win32')(
+  'default root resolves beside the script with spaces and Unicode',
+  () => {
+    const root = createFixture();
+    const result = spawnSync(
+      'powershell.exe',
+      ['-NoProfile', '-File', path.join(root, 'scripts/ci/windows-installer-size-smoke.ps1')],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, ZHIYUAN_UPDATE_VARIANT: 'lite' },
+      },
+    );
+    expect(result.status, result.stderr).toBe(0);
   },
 );

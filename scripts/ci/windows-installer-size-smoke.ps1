@@ -41,10 +41,7 @@ if ($null -eq $componentBytes -or $componentBytes -le 0) {
 # The NSIS updater never carries llama.cpp, so it is deducted with the lite
 # components.
 $edition = if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT.Trim().ToLowerInvariant() } else { 'lite' }
-$budgetModule = (Join-Path $ProjectRoot 'scripts\installer-shell\distribution-budget.cjs') | ConvertTo-Json
-$budgetScript = "const b=require($budgetModule);" +
-  "process.stdout.write(JSON.stringify({setup:b.resolveEditionSetupBudget('$edition'),nsis:b.resolveEditionNsisBudget('$edition')}))"
-$budgets = (& node -e $budgetScript) | ConvertFrom-Json
+$budgets = (& node (Join-Path $PSScriptRoot 'read-installer-budget.cjs') $ProjectRoot $edition) | ConvertFrom-Json
 if ($LASTEXITCODE -ne 0 -or $null -eq $budgets) { throw "Unable to resolve installer budgets for edition $edition" }
 $nsisComponentBytes = @($manifest.components | Where-Object { $_.key -ne 'llamacpp-bundled' } |
   ForEach-Object { [int64]$_.archiveSizeBytes } | Measure-Object -Sum).Sum
@@ -54,7 +51,9 @@ if ($null -eq $budgets.nsis.maxInstallerBytes) {
   $MaximumNonComponentBytes = [int64]::MaxValue
 } else {
   # lite: includes the Magpie gateway allowance defined in distribution-budget.cjs.
-  $MaximumNonComponentBytes = [int64]$budgets.nsis.maxNonComponentBytes
+  if (-not $PSBoundParameters.ContainsKey('MaximumNonComponentBytes')) {
+    $MaximumNonComponentBytes = [int64]$budgets.nsis.maxNonComponentBytes
+  }
   if ($edition -ne 'lite') {
     $MaximumInstallerBytes = [int64]$budgets.nsis.maxInstallerBytes
     $MaximumComponentBytes = [int64]$budgets.nsis.maxComponentBytes

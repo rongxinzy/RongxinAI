@@ -116,6 +116,7 @@ reasonix.toml
 /cowork/
 /logs/
 /artifacts/memory-leak/
+/artifacts/streaming-mutations/
 
 # Installer shell build output (WebView2 host)
 /scripts/installer-shell/out/

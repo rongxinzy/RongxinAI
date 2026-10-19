@@ -8,10 +8,10 @@ export type PathPlan = Record<(typeof PathJob)[keyof typeof PathJob], boolean>;
 const packaging =
   /^(?:package\.json$|bun\.lock$|electron-builder[^/]*$|(?:electron-)?tsconfig[^/]*$|vite\.config\.|\.github\/(?:workflows\/(?:ci\.ya?ml$|linux-install|windows-installer|release|promote|sign-).*|actions\/)|patches\/|build\/|resources\/|vendor\/|scripts\/(?:build|dist|package|installer|release|electron-builder|setup-python|prepare-signing|patch-windows|rebuild-electron).*|SKILLs\/|MCPs\/|skills\.config\.json$|src\/main\/|src\/shared\/(?:llamacpp|channelRuntime)\/)/;
 const memory =
-  /^(?:src\/main\/|src\/renderer\/(?:App\.tsx$|main\.tsx$|hooks\/|store\/|services\/|components\/cowork\/(?:hooks\/|CoworkView\.tsx$|CoworkSessionViewport\.tsx$))|src\/shared\/components\/ai-elements\/)/;
+  /^(?:scripts\/ci\/memory-leak|\.github\/workflows\/memory-regression\.yml$|src\/main\/|src\/renderer\/(?:App\.tsx$|main\.tsx$|hooks\/|store\/|services\/|components\/cowork\/(?:hooks\/|CoworkView\.tsx$|CoworkSessionViewport\.tsx$))|src\/shared\/components\/ai-elements\/)/;
 // Same paths the enterprise job used to detect before checking out the toolchain.
 const enterpriseChange =
-  /^(?:enterprise\/|src\/main\/enterpriseExtension|package\.json|bun\.lock|electron-builder)/;
+  /^(?:\.github\/workflows\/enterprise-windows\.yml$|enterprise\/|src\/main\/enterpriseExtension|package\.json|bun\.lock|electron-builder)/;
 
 const channelRuntimeChange =
   /^(?:package\.json$|scripts\/channel-runtime-|scripts\/download-channel-runtime\.cjs|src\/main\/im\/|src\/main\/libs\/ccConnect|src\/scheduledTask\/ccConnect|\.github\/workflows\/channel-runtime-smoke\.ya?ml$)/;
@@ -22,21 +22,12 @@ const installerPreviewChange =
 const browserPreviewChange =
   /^(?:src\/renderer\/|src\/shared\/|vite\.config\.browser\.ts$|scripts\/preview\/)/;
 
-// CI-only edits must not pull expensive integration jobs onto the critical path.
-const ciMetaOnly =
-  /^(?:\.github\/|scripts\/ci\/(?:gates\/|check-|ruff-dead-code|large-file-allowlist|source-line-baseline)|knip\.ts$|AGENTS\.md$|DEVOPS\.md$|CLAUDE\.md$)/;
-
-function ciInfrastructureOnly(paths: string[]): boolean {
-  return (
-    paths.some(file => ciMetaOnly.test(file)) &&
-    paths.every(file => ciMetaOnly.test(file) || file === 'package.json')
-  );
-}
+// Workflows are executable inputs. Never suppress ownership because a diff is CI-only.
+const ciMetaOnly = /^(?:AGENTS\.md$|DEVOPS\.md$|CLAUDE\.md$)/;
 
 export function enterpriseRequired(paths: string[], event: string): boolean {
   if (event === CiEvent.Manual) return true;
   if (event !== CiEvent.PullRequest && event !== CiEvent.Push) return true;
-  if (ciInfrastructureOnly(paths)) return false;
   return paths.some(file => !ciMetaOnly.test(file) && enterpriseChange.test(file));
 }
 
@@ -48,7 +39,6 @@ function pathJobSelected(
   const full = event === CiEvent.Manual;
   const unknown =
     event !== CiEvent.PullRequest && event !== CiEvent.Push && event !== CiEvent.Manual;
-  if (!full && !unknown && ciInfrastructureOnly(paths)) return false;
   return full || unknown || paths.some(file => !ciMetaOnly.test(file) && matcher(file));
 }
 
@@ -58,6 +48,24 @@ export function planPathJobs(paths: string[], event: string): PathPlan {
   const installer = pathJobSelected(paths, event, file => installerPreviewChange.test(file));
   const browserPreview = pathJobSelected(paths, event, file => browserPreviewChange.test(file));
   return {
+    [PathJob.Enterprise]: enterpriseRequired(paths, event),
+    [PathJob.StreamingMutations]: pathJobSelected(paths, event, file =>
+      /^(?:src\/main\/(?:libs\/agentEngine\/|streaming\/|appBootstrap\/piUi|workbenchTask\/)|src\/renderer\/(?:services\/|store\/|components\/cowork\/)|src\/shared\/|tests\/streaming|scripts\/ci\/run-streaming|\.github\/workflows\/ci\.yml$|scripts\/ci\/gates\/|package\.json$|bun\.lock$|vitest\.config\.)/.test(
+        file,
+      ),
+    ),
+    [PathJob.WindowsScripts]: pathJobSelected(paths, event, file =>
+      /^(?:scripts\/ci\/.*(?:windows|installer-budget|build-checkpoint)|scripts\/setup-(?:windows-skill-python|skill-python-runtime)|scripts\/installer-shell\/|\.github\/workflows\/(?:ci|build-inference-editions|windows-installer-pr)\.yml$)/.test(
+        file,
+      ),
+    ),
+    [PathJob.BuildVerification]:
+      (event === CiEvent.PullRequest || event === CiEvent.Push) &&
+      pathJobSelected(paths, event, file =>
+        /^(?:electron-builder|(?:electron-)?tsconfig|vite\.config\.|resources\/|vendor\/|SKILLs\/|MCPs\/|build\/|patches\/|scripts\/(?:electron-builder|windows-resource|setup-|ensure-build-version|installer-shell\/|packaging\/|ci\/(?:build-checkpoint|compression-qualification|prepare-windows-components|runtime-tree-integrity|windows-|collect-windows)|.*llamacpp)|\.github\/(?:workflows\/(?:build-inference-editions|release|build-platforms|windows-installer-pr|linux-install-pr)\.yml$|actions\/)|package\.json$|bun\.lock$)/.test(
+          file,
+        ),
+      ),
     [PathJob.ChannelRuntime]: channel,
     [PathJob.PythonRuntimeLinux]: python,
     [PathJob.PythonRuntimeWindows]: python,
@@ -91,7 +99,6 @@ export function planGates(paths: string[], event: string, ref: string): GatePlan
       unknown ||
       isRelease ||
       (event === CiEvent.PullRequest &&
-        !ciInfrastructureOnly(paths) &&
         paths.some(file => !ciMetaOnly.test(file) && (relevant || memory.test(file)))),
   };
 }

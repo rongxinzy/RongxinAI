@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
 
 const root = path.resolve(import.meta.dirname, '../..');
@@ -63,11 +64,11 @@ test.each(['build-inference-editions.yml'])(
     const workflow = read(`.github/workflows/${name}`);
     expect(workflow).toContain('actions/setup-dotnet@v5');
     expect(workflow).toContain('uses: ./.github/actions/setup-certum-signing');
-    expect(workflow).toContain('bun run dist:win:signed');
+    expect(workflow).toContain('bun run package:win:prepared:signed');
     expect(workflow).toContain(':win32:x64:${EDITION}:installer');
     expect(workflow).toContain(':win32:x64:${EDITION}:updater');
     expect(workflow).toContain('"${blockmaps[0]}" == "${updaters[0]}.blockmap"');
-    const signed = workflow.indexOf('bun run dist:win:signed');
+    const signed = workflow.indexOf('bun run package:win:prepared:signed');
     const signature = workflow.indexOf('verify-windows-authenticode.ps1');
     const acceptance = workflow.indexOf('node scripts/ci/windows-shell-interactive.mjs');
     const evidence = workflow.indexOf('node scripts/ci/windows-shell-evidence.mjs');
@@ -83,9 +84,18 @@ test.each(['build-inference-editions.yml'])(
     if (nativeSmoke >= 0) expect(prepareUninstall).toBeLessThan(nativeSmoke);
     expect(verifyUninstall).toBeGreaterThan(evidence);
     expect(assembly).toBeGreaterThan(verifyUninstall);
-    expect(workflow.slice(verifyUninstall, assembly)).toContain(
-      "-ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'",
+    const parsed = load(workflow) as {
+      jobs: {
+        acceptance: { steps: { name?: string; run?: string; env?: Record<string, string> }[] };
+      };
+    };
+    const uninstall = parsed.jobs.acceptance.steps.find(
+      step => step.name === 'Verify native uninstall preserves user data',
+    )!;
+    expect(uninstall.env?.EXPECTED_THUMBPRINT).toBe(
+      "${{ inputs.mode == 'release' && secrets.CERTUM_CERT_THUMBPRINT || '' }}",
     );
+    expect(uninstall.run).toContain('-ExpectedThumbprint $env:EXPECTED_THUMBPRINT');
     expect(workflow).toContain('path: acceptance-diagnostics\n');
   },
 );

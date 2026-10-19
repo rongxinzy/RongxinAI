@@ -64,10 +64,6 @@ jobs:
             echo "- source commit: \`$source_commit\`"
             echo '- channel: beta (stable requires promote workflow)'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Install release tools
-        run: |
-          pipx install 'awscli>=1.45.10,<2'
-          npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
 
   memory-regression:
     needs: prepare-release
@@ -87,24 +83,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.prepare-release.outputs.commit }}
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-bun-workspace
         with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: '1.4.0' }
-      - name: Restore Bun and Electron caches
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: release-quality-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            release-quality-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
+          include-electron: 'true'
+          save-cache: 'true'
       - name: Verify npm package signatures
         shell: bash
         run: |
@@ -132,21 +114,22 @@ jobs:
           VITE_SKIP_ELECTRON: '1'
       - name: Verify Presentation Studio compiler and validator
         run: npm test --prefix SKILLs/presentation-studio
-      - name: Compile Electron sources used by integration tests
-        run: bun run compile:electron
-      - name: Install Electron for native ABI integration tests
+      - name: Typecheck Electron
+        run: bun run typecheck:electron
+      - name: Install Electron for ABI probe fixtures (no native rebuild)
         run: node node_modules/electron/install.js
+      - uses: ./.github/actions/prepare-node-test-native
       - name: Run tests
         run: bun run test
 
   build-release:
-    needs: [prepare-release, quality, memory-regression]
+    needs: prepare-release
     uses: ./.github/workflows/build-inference-editions.yml
     with:
       source-ref: ${{ needs.prepare-release.outputs.commit }}
       app-build-version: ${{ needs.prepare-release.outputs.version }}
       mode: release
-      fail-fast: true
+      fail-fast: false
       build-macos: false
       build-linux: false
     secrets:
@@ -166,7 +149,7 @@ jobs:
   # (same-run artifacts). Any smoke failure stops the pipeline here and the
   # stable channel keeps its previous version.
   publish:
-    needs: [prepare-release, build-release]
+    needs: [prepare-release, quality, memory-regression, build-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

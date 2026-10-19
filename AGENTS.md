@@ -18,7 +18,8 @@ bun run build              # 生产构建（TS + Vite）
 bun run lint               # oxlint，含 theme:check / theme:audit
 bun run format             # oxfmt；提交前 bun run format:check
 bun run test               # Vitest；bun run test -- <name> 过滤
-bun run compile:electron   # 仅主进程
+bun run compile:electron   # 显式生成主进程 JS，不触发原生重编译
+bun run typecheck:electron # 主进程纯类型检查
 bun run dist:mac|dist:win|dist:linux
 bun run theme:generate     # 改 token/recipe/生成器后必跑
 bun run rebuild:electron-native   # 原生模块依赖变更后
@@ -234,7 +235,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 **PR**：标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)：改动、原因、验证；bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，不强制为小修复新建 issue。必需检查 `ci-gate` 通过后，作者或 agent 可自行 squash 合并；高影响变更仍建议维护者确认。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
 
-**CI**：统一必需检查 `ci-gate`（`scripts/ci/gates/verify.ts` 汇总全部 baseline 与路径归属 job）；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint，含 Knip 与 `scripts/` Python 死代码 / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）。默认分支保护：须经 PR、不要求 approval、不要求解决评审讨论、必需检查仅 `ci-gate`、禁止强推与删除。发布流水线（`release.yml` 打 tag 发 beta、`promote.yml` 晋升 stable）独立于 PR 门禁；见 [RELEASING.md](RELEASING.md)。
+**CI**：`main` 与 `release/**` 共用门禁；普通测试与纯类型检查并行，流式变异/Windows 脚本/代表性打包按路径选择，企业检查按计划 skipped。全七目标仅定时或手动运行。统一必需检查 `ci-gate`（`scripts/ci/gates/verify.ts` 汇总全部 baseline 与路径归属 job）；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint，含 Knip 与 `scripts/` Python 死代码 / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）。默认分支保护：须经 PR、不要求 approval、不要求解决评审讨论、必需检查仅 `ci-gate`、禁止强推与删除。发布流水线（`release.yml` 打 tag 发 beta、`promote.yml` 晋升 stable）独立于 PR 门禁；见 [RELEASING.md](RELEASING.md)。
 
 **项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 

@@ -66,22 +66,15 @@ jobs:
           echo "version=${raw#v}" >> "$GITHUB_OUTPUT"
           echo "commit=$source_commit" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup-bun-workspace
         with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
+          include-electron: 'true'
+          save-cache: 'true'
 
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
           path: |
-            ~/.bun/install/cache
-            ~/.npm
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
             resources/PortableGit-*.7z.exe
             resources/uv-win-runtime.zip
             resources/mingit
@@ -90,20 +83,16 @@ jobs:
             resources/skill-python
             vendor/engram-runtime
             vendor/channel-runtime
-          key: enterprise-packaging-windows-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: enterprise-resources-v2-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
-            enterprise-packaging-windows-node24-bun1.4.0-
-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
+            enterprise-resources-v2-
 
       - name: Run enterprise quality gates
+        shell: bash
         run: |
           bun run lint
           bun run typecheck:enterprise
           bun run test:enterprise
-          bun run build:enterprise
-          bun run verify:enterprise:bundle
 
       - name: Render enterprise AEP config
         shell: pwsh
@@ -121,10 +110,16 @@ jobs:
           'ZHIYUAN_ENTERPRISE_CONFIG_FILE=build/.enterprise-config.generated.json' >> $env:GITHUB_ENV
 
       - name: Set up Windows runtimes
+        shell: bash
         run: |
           bun run setup:mingit
           bun run setup:uv-runtime
           bun run setup:python-runtime
+
+      - name: Prepare pinned Magpie gateway
+        uses: ./.github/actions/prepare-magpie
+        with:
+          target: win32-x64
 
       - name: Connect Certum SimplySign
         id: certum-signing
@@ -151,6 +146,9 @@ jobs:
             -ArgumentList @('run', 'dist:win:enterprise') `
             -TimeoutMinutes 55 `
             -HeartbeatSeconds 60
+
+      - name: Verify the enterprise bundle built during packaging
+        run: bun run verify:enterprise:bundle
 
       - name: Verify packaged enterprise version
         shell: bash
@@ -183,6 +181,7 @@ jobs:
           ZHIYUAN_ELECTRON_EXECUTABLE_NAME: 知远企业版
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
 
       - name: Qualify Windows compression
@@ -218,6 +217,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: zhiyuan-enterprise-windows-${{ steps.identity.outputs.version }}-${{ github.run_number }}
+          compression-level: 0
           path: |
             release/*.exe
             release/SHA256SUMS.txt
@@ -225,14 +225,21 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Collect Windows installer diagnostics
+        if: always()
+        shell: powershell
+        run: ./scripts/ci/collect-windows-diagnostics.ps1
+
       - name: Upload packaging diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
         with:
           name: zhiyuan-enterprise-windows-diagnostics-${{ steps.identity.outputs.version }}-${{ github.run_number }}
+          compression-level: 0
           path: |
             release/*.exe
             ${{ runner.temp }}/zhiyuan-build-logs
+            acceptance-diagnostics
           if-no-files-found: ignore
           retention-days: 7
 

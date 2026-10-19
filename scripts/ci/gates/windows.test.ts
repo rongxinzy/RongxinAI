@@ -24,60 +24,47 @@ function workflow(file: string): Workflow {
 }
 
 const compressionAction = './.github/actions/verify-windows-compression';
-const windows = workflow('windows-installer-pr.yml');
-const steps = windows.jobs['package-and-install'].steps;
-
-test('PRs defer compression qualification while manual and scheduled builds retain it', () => {
+test('manual install workflows share the edition pipeline and retain their extended acceptance', () => {
+  const windows = workflow('windows-installer-pr.yml');
   expect(windows.on).toHaveProperty('schedule');
   expect(windows.on).toHaveProperty('workflow_dispatch');
   expect(windows.on).toHaveProperty('workflow_call');
-  expect(steps.find(step => step.uses === compressionAction)?.if).toBe(
-    "${{ github.event_name != 'pull_request' }}",
-  );
-  for (const script of [
-    'windows-installer-size-smoke.ps1',
-    'windows-runtime-smoke.ps1',
-    'windows-installer-smoke.ps1',
+  expect(windows.on).not.toHaveProperty('pull_request');
+  for (const [file, name] of [
+    ['windows-installer-pr.yml', 'package-and-install'],
+    ['linux-install-pr.yml', 'install-and-start'],
   ]) {
-    const gate = steps.find(step => step.run?.includes(script));
-    expect(gate).toBeDefined();
-    expect(gate?.if).toBeUndefined();
+    const job = workflow(file).jobs[name] as unknown as {
+      uses: string;
+      with: Record<string, unknown>;
+    };
+    expect(job.uses).toBe('./.github/workflows/build-inference-editions.yml');
+    expect(job.with['extended-install-tests']).toBe(true);
+  }
+  const acceptance = workflow('build-inference-editions.yml').jobs.acceptance.steps;
+  for (const script of ['windows-installer-smoke.ps1', 'windows-installer-interactive.ps1']) {
+    const gate = acceptance.find(step => step.run?.includes(script));
+    expect(gate?.if).toContain('inputs.extended-install-tests');
     expect(gate?.['continue-on-error']).toBeUndefined();
   }
 });
 
-test('PRs restore without saving; verified main runs publish the same cache graph', () => {
-  expect(steps.some(step => step.uses === 'actions/cache@v5')).toBe(false);
-  const restore = steps.find(step => step.uses === 'actions/cache/restore@v5');
-  const saveIndex = steps.findIndex(step => step.uses === 'actions/cache/save@v5');
-  const save = steps[saveIndex];
-  expect(restore?.id).toBe('packaging-cache');
-  expect(save.if).toBe(
-    "${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.packaging-cache.outputs.cache-hit != 'true' }}",
+test('one compression qualifier gates acceptance of the exact packaged bytes', () => {
+  const editions = workflow('build-inference-editions.yml');
+  expect(
+    editions.jobs['compression-qualification'].steps.some(step => step.uses === compressionAction),
+  ).toBe(true);
+  expect(editions.jobs.build.steps.some(step => step.uses === compressionAction)).toBe(false);
+  const acceptance = editions.jobs.acceptance.steps;
+  const verification = acceptance.findIndex(
+    step => step.run === 'node scripts/ci/compression-qualification.cjs verify',
   );
-  expect(save.with?.path).toBe(restore?.with?.path);
-  expect(save.with?.key).toBe('${{ steps.packaging-cache.outputs.cache-primary-key }}');
-  expect(saveIndex).toBeGreaterThan(
-    steps.findIndex(step => step.run?.includes('windows-installer-smoke.ps1')),
-  );
-  const install = steps.find(step => step.run === 'bun install --frozen-lockfile --ignore-scripts');
-  expect(install).toBeDefined();
-  expect(install?.if).toBeUndefined();
+  expect(verification).toBeGreaterThan(-1);
+  expect(acceptance[verification]['continue-on-error']).toBeUndefined();
+  expect(
+    acceptance.findIndex(step => step.name === 'Assemble Windows release payload'),
+  ).toBeGreaterThan(verification);
 });
-
-test.each([['build-inference-editions.yml', 'build', 'Assemble Windows release payload']])(
-  'compression qualification blocks the publication path in %s',
-  (file, job, publishName) => {
-    const releaseSteps = workflow(file).jobs[job].steps;
-    const index = releaseSteps.findIndex(step => step.uses === compressionAction);
-    expect(index).toBeGreaterThan(-1);
-    expect(releaseSteps[index].if).toContain("matrix.platform == 'windows'");
-    expect(releaseSteps[index]['continue-on-error']).toBeUndefined();
-    const publishIndex = releaseSteps.findIndex(step => step.name === publishName);
-    expect(publishIndex).toBeGreaterThan(index);
-    expect(releaseSteps[publishIndex].if).toContain("matrix.platform == 'windows'");
-  },
-);
 
 test('shared qualification fails on thresholds and retains reports without hiding failure', () => {
   const action = load(
@@ -86,9 +73,12 @@ test('shared qualification fails on thresholds and retains reports without hidin
       'utf8',
     ),
   ) as { runs: { steps: Step[] } };
-  expect(action.runs.steps[0].run).toContain('-RequireQualified');
-  expect(action.runs.steps[0].run).not.toContain('-SkipPythonProbe');
+  const benchmark = action.runs.steps.find(step => step.run?.includes('-RequireQualified'));
+  expect(benchmark).toBeDefined();
+  expect(benchmark?.run).not.toContain('-SkipPythonProbe');
   expect(action.runs.steps.every(step => !step['continue-on-error'])).toBe(true);
-  expect(action.runs.steps[1].if).toBe('always()');
-  expect(action.runs.steps[1].with?.['retention-days']).toBe(3);
+  const upload = action.runs.steps.find(step => step.uses === 'actions/upload-artifact@v6');
+  expect(upload?.if).toBe('always()');
+  expect(upload?.with?.['retention-days']).toBe(14);
+  expect(upload?.with?.overwrite).toBe(true);
 });

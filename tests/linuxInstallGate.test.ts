@@ -6,7 +6,7 @@ import { test } from 'vitest';
 
 const root = path.resolve(__dirname, '..');
 
-test('selected pull requests install and start the generated Ubuntu package', () => {
+test('manual Linux gate delegates to shared packaging and installs its exact deb', () => {
   const workflow = readFileSync(
     path.join(root, '.github', 'workflows', 'linux-install-pr.yml'),
     'utf8',
@@ -15,12 +15,17 @@ test('selected pull requests install and start the generated Ubuntu package', ()
   assert.match(workflow, /workflow_call:/);
   assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /paths:/);
-  assert.match(workflow, /runs-on: ubuntu-latest/);
-  assert.match(workflow, /bun run dist:linux/);
-  assert.match(workflow, /sudo apt-get install -y/);
-  assert.match(workflow, /realpath/);
-  assert.match(workflow, /'\/opt\/知远智能体 \(ZhiYuan Agent\)\/知远'/);
-  assert.match(workflow, /verify-linux-renderer\.mjs/);
-  assert.match(workflow, /linux-deb-install-smoke\.png/);
-  assert.match(workflow, /actions\/upload-artifact@v6/);
+  assert.match(workflow, /extended-install-tests: true/);
+  assert.match(workflow, /uses: \.\/\.github\/workflows\/build-inference-editions\.yml/);
+  const shared = readFileSync(
+    path.join(root, '.github/workflows/build-inference-editions.yml'),
+    'utf8',
+  );
+  assert.match(shared, /bun run dist:linux/);
+  assert.match(shared, /sudo apt-get install -y/);
+  assert.match(shared, /realpath/);
+  assert.match(shared, /electron-builder.json/);
+  assert.match(shared, /verify-linux-renderer\.mjs/);
+  assert.match(shared, /linux-deb-install-smoke\.png/);
+  assert.match(shared, /actions\/upload-artifact@v6/);
 });
