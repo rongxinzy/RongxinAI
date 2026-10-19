@@ -8,13 +8,17 @@ import { expect, test } from 'vitest';
 const readSource = (relativePath: string): string =>
   readFileSync(fileURLToPath(new URL(relativePath, import.meta.url)), 'utf8');
 
-const appBootstrapDir = fileURLToPath(new URL('./appBootstrap', import.meta.url));
-const appBootstrapSources = readdirSync(appBootstrapDir)
-  .filter(fileName => fileName.endsWith('.ts') && !fileName.endsWith('.test.ts'))
-  .map(fileName => readFileSync(`${appBootstrapDir}/${fileName}`, 'utf8'))
+const domainDirs = ['./appBootstrap', './coworkIpc'] as const;
+const domainSources = domainDirs
+  .flatMap(dir => {
+    const full = fileURLToPath(new URL(dir, import.meta.url));
+    return readdirSync(full)
+      .filter(fileName => fileName.endsWith('.ts') && !fileName.endsWith('.test.ts'))
+      .map(fileName => readFileSync(`${full}/${fileName}`, 'utf8'));
+  })
   .join('\n');
 
-const source = `${readSource('./main.ts')}\n${appBootstrapSources}`;
+const source = `${readSource('./main.ts')}\n${domainSources}`;
 const forwarderSource = readSource('./appBootstrap/piUiForwarder.ts');
 
 test('sends structured errors from asynchronous Cowork fallbacks', () => {

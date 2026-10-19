@@ -23,9 +23,9 @@ import { registerMcpIpc } from './appBootstrap/mcpIpc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { registerProjectIpc } from './appBootstrap/projectIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
-import { registerCoworkSessionIpc } from './appBootstrap/coworkSessionIpc';
 import { registerCoworkQueueIpc } from './coworkIpc/queue';
-import { registerCoworkSessionAdminIpc } from './appBootstrap/coworkSessionAdminIpc';
+import { registerCoworkSessionIpc } from './coworkIpc/session';
+import { registerCoworkSessionAdminIpc } from './coworkIpc/sessionAdmin';
 import { registerArtifactIpc } from './artifactLedger/artifactIpc';
 import { registerCoworkExportIpc } from './coworkIpc/export';
 import { registerCoworkConfigIpc } from './coworkIpc/config';
@@ -39,6 +39,11 @@ import {
 } from './appBootstrap/runtimeServices';
 import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
 import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
+import { getAgentManager } from './appBootstrap/runtimeServices';
+import {
+  resolveSessionWorkingDirectory,
+  resolveTaskWorkingDirectory,
+} from './appBootstrap/workspacePaths';
 import {
   getCanonicalScheduledTaskService,
   getIMGatewayManager,
@@ -79,13 +84,24 @@ if (!gotTheLock) {
   registerWorkspaceIpc();
   registerProjectIpc();
   setupMagpieRuntime();
-  registerCoworkSessionIpc();
+  registerCoworkSessionIpc({
+    getCoworkImageRoot,
+    getAgentManager,
+    getCoworkStore,
+    getPiRuntimeAdapter,
+    resolveSessionWorkingDirectory,
+    resolveTaskWorkingDirectory,
+  });
   registerCoworkQueueIpc({
     getPiRuntimeAdapter,
     getCoworkStore,
     getCoworkImageRoot,
   });
-  registerCoworkSessionAdminIpc();
+  registerCoworkSessionAdminIpc({
+    getCoworkStore,
+    getPiRuntimeAdapter,
+    getIMGatewayManager,
+  });
   registerArtifactIpc();
   registerCoworkExportIpc({ getPiRuntimeAdapter });
   registerCoworkConfigIpc({
