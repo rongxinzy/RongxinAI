@@ -2,13 +2,14 @@
  * Skill Services Manager - Manages background services for skills
  */
 
-import { execSync, spawn, spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
 import { cpRecursiveSync } from './fsCompat';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
+import { hasCommand, resolveUserShellPath } from './skills/envUtils';
 import { NpmCli, resolveBundledNpmRuntime } from './libs/npmRuntime';
 import { NpmCommandAbortedError, runNpmCommand } from './libs/npmRuntimeExec';
 import { settleWithin, StartupGate } from './libs/startupGate';
@@ -18,35 +19,7 @@ const WEB_SEARCH_STOP_SETTLE_TIMEOUT_MS = 5_000;
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
 
-/**
- * Resolve the user's login shell PATH on macOS/Linux.
- * Packaged Electron apps on macOS don't inherit the user's shell profile,
- * so node/npm won't be in PATH unless we resolve it explicitly.
- */
-function resolveUserShellPath(): string | null {
-  if (process.platform === 'win32') return null;
-
-  try {
-    const shell = process.env.SHELL || '/bin/bash';
-    // Use non-interactive login shell to avoid side effects in interactive startup scripts.
-    const result = execSync(`${shell} -lc 'echo __PATH__=$PATH'`, {
-      encoding: 'utf-8',
-      timeout: 5000,
-      env: { ...process.env },
-    });
-    const match = result.match(/__PATH__=(.+)/);
-    return match ? match[1].trim() : null;
-  } catch (error) {
-    console.warn('[SkillServices] Failed to resolve user shell PATH:', error);
-    return null;
-  }
-}
-
-/**
- * Build an environment for spawning skill service scripts.
- * Merges the user's shell PATH with the current process environment.
- */
-function buildSkillServiceEnv(): Record<string, string | undefined> {
+async function buildSkillServiceEnv(): Promise<Record<string, string | undefined>> {
   const env: Record<string, string | undefined> = { ...process.env };
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
 
@@ -55,7 +28,7 @@ function buildSkillServiceEnv(): Record<string, string | undefined> {
       env.HOME = app.getPath('home');
     }
 
-    const userPath = resolveUserShellPath();
+    const userPath = await resolveUserShellPath();
     if (userPath) {
       env.PATH = userPath;
       console.log('[SkillServices] Resolved user shell PATH for skill services');
@@ -198,16 +171,6 @@ export class SkillServiceManager {
     );
   }
 
-  private hasCommand(command: string, env: NodeJS.ProcessEnv): boolean {
-    const checker = process.platform === 'win32' ? 'where' : 'which';
-    const result = spawnSync(checker, [command], {
-      stdio: 'ignore',
-      env,
-      windowsHide: process.platform === 'win32',
-    });
-    return result.status === 0;
-  }
-
   private repairWebSearchRuntimeFromBundled(skillPath: string): void {
     if (!app.isPackaged) return;
 
@@ -236,12 +199,12 @@ export class SkillServiceManager {
     }
   }
 
-  private resolveNodeRuntime(env: NodeJS.ProcessEnv): {
+  private async resolveNodeRuntime(env: NodeJS.ProcessEnv): Promise<{
     command: string;
     args: string[];
     extraEnv?: NodeJS.ProcessEnv;
-  } {
-    if (this.hasCommand('node', env)) {
+  }> {
+    if (await hasCommand('node', env)) {
       return { command: 'node', args: [] };
     }
 
@@ -341,7 +304,7 @@ export class SkillServiceManager {
     console.log('[SkillServices] Starting skill services...');
 
     // Resolve environment once for all service spawns
-    this.skillEnv = buildSkillServiceEnv();
+    this.skillEnv = await buildSkillServiceEnv();
 
     try {
       await this.startWebSearchService();
@@ -442,7 +405,7 @@ export class SkillServiceManager {
       return;
     }
     const baseEnv = (this.skillEnv as NodeJS.ProcessEnv) ?? process.env;
-    const runtime = this.resolveNodeRuntime(baseEnv);
+    const runtime = await this.resolveNodeRuntime(baseEnv);
     const electronNodeRuntimePath = getElectronNodeRuntimePath();
     const env = {
       ...baseEnv,
