@@ -306,7 +306,7 @@ export class StreamingHarness {
   public readonly sessionId: string;
   public readonly store: StreamingHarnessStore;
   public readonly pipeline: CoworkStreamPipeline;
-  public readonly live: LiveTextStore = new LiveTextStore();
+  public readonly live: LiveTextStore;
   /** Every UiEvent payload sent to webContents, in send order. */
   public readonly ipcEvents: PiUiEvent[] = [];
   public readonly handlers: ReadonlyMap<string, IpcHandler> = ipcHandlers;
@@ -342,6 +342,9 @@ export class StreamingHarness {
     this.prompt = options.prompt ?? 'Hi';
     this.deliveryControls = options.delivery ?? null;
     this.useSqliteStore = options.useSqliteStore === true;
+    // Live-text notifications drain in runFrames() together with the update
+    // batcher, mirroring the single rAF cadence of the production renderer.
+    this.live = new LiveTextStore({ schedule: callback => this.frames.request(callback) });
 
     this.store = createHarnessStore();
     this.store.dispatch(setCurrentSession(buildHarnessSession(options.sessionId)));

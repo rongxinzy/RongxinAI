@@ -1,8 +1,12 @@
 /**
  * Cowork streaming — renderer live text store (apply UIMessageChunk increments).
  *
- * Flow: Pi delta → translator → coalescer → IPC StreamPart → rAF batcher → **this file** → AssistantBubble / ThinkingItem.
+ * Flow: Pi delta → translator → coalescer → IPC StreamPart → **this file** (immediate apply) → rAF notify → AssistantBubble / ThinkingItem.
  * Holds partial assistant/thinking text outside Redux; applies text/reasoning deltas incrementally.
+ * Chunks are applied on arrival (the main-process coalescer already batches per
+ * 16 ms window); only the listener notification is scheduled — one rAF per
+ * frame of updates — so components re-render at paint cadence without a
+ * separate renderer-side part batcher.
  *
  * Each message keeps a `base` (last authoritative snapshot, usually empty) plus ordered `parts`;
  * text = base + parts concatenated in insertion order. `setSnapshot` replaces the base and clears
@@ -17,6 +21,16 @@ import type { UIMessageChunk } from 'ai';
 import { CoworkRunPolicy } from '../../shared/cowork/runState';
 
 type Listener = () => void;
+
+/** Schedules one notification; the default paints via rAF and falls back to a microtask where rAF is unavailable (node tests). */
+type NotifyScheduler = { schedule(callback: () => void): void };
+
+const defaultNotifyScheduler: NotifyScheduler = {
+  schedule: callback => {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => callback());
+    else queueMicrotask(callback);
+  },
+};
 
 type LiveTextEntry = {
   sessionId?: string;
@@ -39,6 +53,8 @@ export class LiveTextStore {
   private readonly resyncingSessions = new Set<string>();
   private readonly listeners = new Set<Listener>();
   private notifyScheduled = false;
+
+  constructor(private readonly notifyScheduler: NotifyScheduler = defaultNotifyScheduler) {}
 
   subscribe(listener: Listener): () => void {
     this.listeners.add(listener);
@@ -194,7 +210,7 @@ export class LiveTextStore {
   private scheduleNotify(): void {
     if (this.notifyScheduled) return;
     this.notifyScheduled = true;
-    queueMicrotask(() => {
+    this.notifyScheduler.schedule(() => {
       this.notifyScheduled = false;
       for (const listener of this.listeners) listener();
     });
