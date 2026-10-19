@@ -129,7 +129,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 | 主输入区是视觉中心 | 正式字标、克制说明、居中输入岛；工具入口就近，无装饰光晕 | [CoworkView.tsx](src/renderer/components/cowork/CoworkView.tsx)、[classic-message-surfaces.ts](src/renderer/theme/components/classic-message-surfaces.ts) |
 | 控件规格一致 | 复用 ai-elements 输入与共享选择器；窄窗口下文件夹/权限/模型/提交仍可达 | [CoworkPromptInput.tsx](src/renderer/components/cowork/CoworkPromptInput.tsx)、[PromptWorkspaceSelector.tsx](src/renderer/components/cowork/PromptWorkspaceSelector.tsx)、[PromptSelectorButton.tsx](src/renderer/components/cowork/PromptSelectorButton.tsx) |
 | 引导项轻量中性 | 共享按钮 + Lucide 图标，胶囊对应真实任务，不做彩色装饰卡 | [QuickActionBar.tsx](src/renderer/components/quick-actions/QuickActionBar.tsx)、[classic-page-controls.ts](src/renderer/theme/components/classic-page-controls.ts) |
-| 明暗成套、外观与行为分离 | token + 注册 hook + recipe；切主题原位更新，保留输入与交互状态 | [home-studio.ts](src/renderer/theme/components/home-studio.ts)、[home-studio-contract.ts](src/renderer/theme/components/home-studio-contract.ts)、[classic-light.ts](src/renderer/theme/themes/classic-light.ts)、[classic-dark.ts](src/renderer/theme/themes/classic-dark.ts) |
+| 明暗成套、外观与行为分离 | token + 注册 hook + recipe；切主题原位更新，保留输入与交互状态 | [home-studio.ts](src/renderer/theme/components/home-studio.ts)、[home-studio-contract.ts](src/renderer/theme/components/home-studio-contract.ts)、[zenith-light.ts](src/renderer/theme/themes/zenith-light.ts)、[zenith-dark.ts](src/renderer/theme/themes/zenith-dark.ts) |
 
 范例确立的是克制层级、统一控件、主题归属与状态连续性。设置页、列表页用 DESIGN.md 对应范式，不复制首页 Hero；引用文件中的遗留代码不因此豁免。
 

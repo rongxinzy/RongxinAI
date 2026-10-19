@@ -1,4 +1,4 @@
-import { classicLight } from '../../theme/themes/classic-light';
+import { zenithLight } from '../../theme/themes/zenith-light';
 /**
  * Source-structure guard for the compact MCP control beside the prompt plus
  * button. Rendering needs Electron IPC and browser-only renderer services, so
@@ -46,7 +46,7 @@ test('does not highlight the first MCP until the pointer enters its row while pr
 });
 
 test('MCP row recipes preserve pointer focus versus keyboard highlight', () => {
-  const row = classicLight.components['page-active-mcp-badge-dropdown-menu-item-1'];
+  const row = zenithLight.components['page-active-mcp-badge-dropdown-menu-item-1'];
   expect(row.focused['background-color']).toBe('transparent');
   expect(row.focus['background-color']).toBe('var(--muted)');
   expect(row.focusHover['background-color']).toBe('var(--muted)');
