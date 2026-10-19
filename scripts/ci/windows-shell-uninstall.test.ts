@@ -35,11 +35,11 @@ test('hashing streams bytes and host modules cannot depend on inherited pwsh sea
 
 test('native uninstall gate runs only after real shell evidence and protects the earlier native cache', () => {
   const workflow = loadYaml(
-    fs.readFileSync('.github/workflows/windows-installer-pr.yml', 'utf8'),
+    fs.readFileSync('.github/workflows/build-inference-editions.yml', 'utf8'),
   ) as {
-    jobs: { 'package-and-install': { steps: { name?: string; run?: string }[] } };
+    jobs: { acceptance: { steps: { name?: string; run?: string }[] } };
   };
-  const steps = workflow.jobs['package-and-install'].steps;
+  const steps = workflow.jobs.acceptance.steps;
   const position = (command: string) => steps.findIndex(step => step.run?.includes(command));
   expect(position('windows-shell-uninstall.ps1 -Action prepare')).toBeGreaterThan(-1);
   expect(position('windows-shell-uninstall.ps1 -Action prepare')).toBeLessThan(

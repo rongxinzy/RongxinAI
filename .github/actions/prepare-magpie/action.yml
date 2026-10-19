@@ -1,0 +1,47 @@
+name: Prepare pinned Magpie runtime
+description: Reuse verified compiler output; install Go and compile only when needed
+inputs:
+  target:
+    description: Runtime target (win32-x64, linux-x64, darwin-arm64 or darwin-x64)
+    required: true
+runs:
+  using: composite
+  steps:
+    - id: pin
+      shell: bash
+      run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+    - uses: actions/cache@v5
+      with:
+        path: |
+          .cache/magpie
+          resources/magpie/${{ inputs.target }}
+        key: magpie-output-v1-${{ runner.os }}-${{ inputs.target }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/*magpie*.cjs') }}
+    - name: Probe pinned compiler output
+      id: probe
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        if bun run magpie:verify -- --target "$TARGET"; then
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+        else
+          echo 'ready=false' >> "$GITHUB_OUTPUT"
+        fi
+    - uses: actions/setup-go@v6
+      if: steps.probe.outputs.ready != 'true'
+      with:
+        go-version: ${{ steps.pin.outputs.go-version }}
+        cache: false
+    - name: Build pinned runtime on a cache miss
+      if: steps.probe.outputs.ready != 'true'
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: |
+        go version | grep -Fq 'go${{ steps.pin.outputs.go-version }}'
+        bun run magpie:build -- --target "$TARGET"
+    - name: Verify runtime before packaging
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+      run: bun run magpie:verify -- --target "$TARGET"

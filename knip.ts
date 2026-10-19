@@ -35,6 +35,8 @@ const config: KnipConfig = {
         'scripts/write-windows-dev-shortcut.cjs',
         'scripts/prepare-visual-blind-review.mjs',
         'scripts/ci/validate-docx-smoke.mjs',
+        // Windows PowerShell passes the project root as argv to this helper.
+        'scripts/ci/read-installer-budget.cjs',
         // Invoked from release.yml and publish workflows, not static imports.
         'scripts/release/print-electron-updater-verify-specs.mjs',
         'scripts/release/print-release-candidate-layout.mjs',

@@ -12,6 +12,10 @@ import {
 } from './policy.ts';
 
 const noPathJobs: PathPlan = {
+  [PathJob.Enterprise]: false,
+  [PathJob.StreamingMutations]: false,
+  [PathJob.WindowsScripts]: false,
+  [PathJob.BuildVerification]: false,
   [PathJob.ChannelRuntime]: false,
   [PathJob.PythonRuntimeLinux]: false,
   [PathJob.PythonRuntimeWindows]: false,
@@ -83,12 +87,9 @@ test.each([
   },
 );
 
-test.each(['.github/workflows/ci.yml', 'scripts/ci/gates/policy.ts'])(
-  'CI planner edits stay on baseline checks: %s',
-  file => {
-    expect(planGates([file], CiEvent.PullRequest, prRef)).toEqual(light);
-  },
-);
+test.each(['scripts/ci/gates/policy.ts'])('CI planner edits stay on baseline checks: %s', file => {
+  expect(planGates([file], CiEvent.PullRequest, prRef)).toEqual(light);
+});
 
 test.each([
   'src/renderer/services/cowork.ts',
@@ -120,11 +121,15 @@ test('enterprise toolchain follows the extension diff on pull requests only', ()
   expect(enterpriseRequired([], CiEvent.Manual)).toBe(true);
 });
 
-test('CI infrastructure diffs skip expensive integration and enterprise jobs', () => {
+test('CI changes cannot suppress ownership of package and workflow inputs', () => {
   const paths = ['.github/workflows/ci.yml', 'scripts/ci/gates/policy.ts', 'package.json'];
-  expect(planGates(paths, CiEvent.PullRequest, prRef)).toEqual(light);
-  expect(planPathJobs(paths, CiEvent.PullRequest)).toEqual(noPathJobs);
-  expect(enterpriseRequired(paths, CiEvent.PullRequest)).toBe(false);
+  expect(planGates(paths, CiEvent.PullRequest, prRef)).toEqual(prPackaging);
+  expect(planPathJobs(paths, CiEvent.PullRequest)).toMatchObject({
+    [PathJob.StreamingMutations]: true,
+    [PathJob.WindowsScripts]: true,
+    [PathJob.BuildVerification]: true,
+  });
+  expect(enterpriseRequired(paths, CiEvent.PullRequest)).toBe(true);
 });
 
 test('path-owned checks follow the same diff ownership as the former standalone workflows', () => {
@@ -140,6 +145,8 @@ test('path-owned checks follow the same diff ownership as the former standalone 
   expect(planPathJobs(['scripts/installer-shell/preview/page.tsx'], CiEvent.PullRequest)).toEqual({
     ...noPathJobs,
     [PathJob.InstallerPreview]: true,
+    [PathJob.WindowsScripts]: true,
+    [PathJob.BuildVerification]: true,
   });
   expect(planPathJobs(['src/renderer/components/Settings.tsx'], CiEvent.PullRequest)).toEqual({
     ...noPathJobs,
@@ -224,17 +231,18 @@ function workflow(name: string) {
   };
 }
 
-test('pull request tests compile Electron once and shard the suite', () => {
+test('pull request tests shard the suite independently of pure Electron typechecking', () => {
   const ci = workflow('ci.yml');
   expect(ci.jobs.test.strategy?.matrix?.shard).toEqual(
     Array.from({ length: TestShardCount }, (_, index) => index + 1),
   );
   expect(ci.jobs.test.strategy?.['fail-fast']).toBe(false);
-  expect(ci.jobs.test.needs).toBe(BaselineJob.ElectronCompile);
+  expect(ci.jobs.test.needs).toBeUndefined();
   const compileCommands = ci.jobs[BaselineJob.ElectronCompile].steps
     ?.map(step => step.run ?? '')
     .join('\n');
-  expect(compileCommands).toContain('bun run compile:electron');
+  expect(compileCommands).toContain('bun run typecheck:electron');
+  expect(compileCommands).not.toContain('rebuild:electron-native');
   const testCommands = ci.jobs.test.steps?.map(step => step.run ?? '').join('\n');
   expect(testCommands).toContain(`--shard=\${{ matrix.shard }}/${TestShardCount}`);
   expect(testCommands).not.toContain('bun run compile:electron');
@@ -282,13 +290,16 @@ test('CI waits for every selected reusable check and always runs the merge gate'
   }
 });
 
-test('tag release checks bind the source commit and block packaging before memory succeeds', () => {
+test('tag release overlaps independent checks but blocks publishing on all gates', () => {
   const release = workflow('release.yml');
   expect(release.on).toHaveProperty('push');
   const memoryJob = release.jobs['memory-regression'];
   expect(memoryJob.uses).toBe('./.github/workflows/memory-regression.yml');
   expect(memoryJob.with?.['source-ref']).toBe('${{ needs.prepare-release.outputs.commit }}');
-  expect(release.jobs['build-release'].needs).toContain('memory-regression');
+  expect(release.jobs.publish.needs).toEqual(
+    expect.arrayContaining(['quality', 'memory-regression', 'build-release']),
+  );
+  expect(release.jobs['build-release'].needs).toBe('prepare-release');
   expect(release.jobs['build-release'].uses).toBe(
     './.github/workflows/build-inference-editions.yml',
   );
@@ -296,7 +307,7 @@ test('tag release checks bind the source commit and block packaging before memor
   expect(qualityCommands).toContain('bun run build:tsc');
   expect(qualityCommands).toContain('bun run test:bundle-budget');
   const build = workflow('build-inference-editions.yml');
-  const steps = build.jobs.build.steps ?? [];
+  const steps = build.jobs.acceptance.steps ?? [];
   const install = steps.findIndex(step =>
     step.run?.includes('sudo apt-get install -y "$(realpath'),
   );

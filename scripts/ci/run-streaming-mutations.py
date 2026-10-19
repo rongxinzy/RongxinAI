@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 import sys
-import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 TESTS = [
@@ -211,7 +209,7 @@ def is_allowlisted(name: str) -> bool:
 
 def ensure_node_sqlite() -> None:
     subprocess.run(
-        ['npm', 'rebuild', 'better-sqlite3', '--build-from-source'],
+        ['node', 'scripts/ensure-node-native.cjs'],
         cwd=ROOT,
         check=True,
         stdout=subprocess.DEVNULL,
@@ -220,14 +218,19 @@ def ensure_node_sqlite() -> None:
 
 
 def run_vitest() -> subprocess.CompletedProcess[str]:
+    report = os.path.join(ROOT, 'artifacts/streaming-mutations/vitest.json')
+    os.makedirs(os.path.dirname(report), exist_ok=True)
+    if os.path.exists(report):
+        os.remove(report)
     env = {**os.environ, 'CI': 'true'}
     return subprocess.run(
         [
-            'npm',
-            'exec',
-            '--',
-            'vitest',
+            'node',
+            'node_modules/vitest/vitest.mjs',
             'run',
+            '--reporter=default',
+            '--reporter=json',
+            f'--outputFile.json={report}',
             '--pool=forks',
             '--maxWorkers=1',
             *TESTS,
@@ -238,6 +241,23 @@ def run_vitest() -> subprocess.CompletedProcess[str]:
         timeout=900,
         env=env,
     )
+
+
+def classify_result(returncode: int, report: dict) -> str:
+    # A crashed runner/import error/no-tests run is not a caught mutation.
+    assertions = [row for suite in report.get('testResults', [])
+                  for row in suite.get('assertionResults', [])]
+    if (not assertions or report.get('numRuntimeErrorTestSuites', 0)
+            or report.get('unhandledErrors')
+            or any(suite.get('status') == 'failed' and not suite.get('assertionResults')
+                   for suite in report.get('testResults', []))):
+        return 'error'
+    if (returncode == 0 and any(row.get('status') == 'passed' for row in assertions)
+            and not any(row.get('status') == 'failed' for row in assertions)):
+        return 'survived'
+    if returncode == 1 and any(row.get('status') == 'failed' for row in assertions):
+        return 'caught'
+    return 'error'
 
 
 def main() -> int:
@@ -258,28 +278,37 @@ def main() -> int:
     for name, patches in M.items():
         if only and not any(name.startswith(o) for o in only):
             continue
+        originals = {}
+        for path, _, _ in patches:
+            with open(os.path.join(ROOT, path), 'rb') as handle:
+                originals[path] = handle.read()
         try:
             for path, old, new in patches:
                 sub(path, old, new)
             proc = run_vitest()
             out = proc.stdout + proc.stderr
-            fails = sorted(set(re.findall(r'FAIL\s+(\S+)\s+>\s*(.*)', out)))
-            summ = re.findall(r'Tests\s+(.*)', out)
+            with open(os.path.join(ROOT, 'artifacts/streaming-mutations/vitest.json'), encoding='utf-8') as handle:
+                report = json.load(handle)
+            outcome = classify_result(proc.returncode, report)
             results[name] = {
                 'exit': proc.returncode,
-                'caught': proc.returncode != 0,
+                'caught': outcome == 'caught',
                 'allowlisted': is_allowlisted(name),
-                'summary': summ[-1] if summ else out[-400:],
-                'failing': [f'{a} > {b[:90]}' for a, b in fails][:8],
+                'outcome': outcome,
             }
-        except AssertionError as error:
+            if outcome == 'error':
+                results[name]['error'] = 'Vitest failed without a completed failing assertion'
+            with open(os.path.join(ROOT, f'artifacts/streaming-mutations/{len(results):02d}.log'), 'w', encoding='utf-8') as handle:
+                handle.write(out)
+        except (AssertionError, OSError, ValueError, subprocess.TimeoutExpired) as error:
             results[name] = {'error': str(error), 'caught': False, 'allowlisted': is_allowlisted(name)}
         finally:
-            restore_paths = sorted({path for path, _, _ in patches})
-            subprocess.run(['git', 'checkout', '--', *restore_paths], cwd=ROOT, check=False)
+            for path, content in originals.items():
+                with open(os.path.join(ROOT, path), 'wb') as handle:
+                    handle.write(content)
         print(name, json.dumps(results[name])[:700], flush=True)
 
-    out_path = os.path.join(tempfile.gettempdir(), 'streaming-mutations-results.json')
+    out_path = os.path.join(ROOT, 'artifacts/streaming-mutations/results.json')
     with open(out_path, 'w', encoding='utf-8') as handle:
         json.dump(results, handle, indent=1)
     print(f'Wrote {out_path}', flush=True)

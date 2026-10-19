@@ -43,6 +43,8 @@ runs:
           ~/.bun/install/cache
           ~/.cache/electron
           ~/.cache/electron-builder
+          ~/AppData/Local/electron/Cache
+          ~/AppData/Local/electron-builder/Cache
         key: ${{ inputs.cache-prefix }}-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
         restore-keys: |
           ${{ inputs.cache-prefix }}-${{ runner.os }}-1.4.0-
@@ -68,4 +70,6 @@ runs:
           ~/.bun/install/cache
           ~/.cache/electron
           ~/.cache/electron-builder
+          ~/AppData/Local/electron/Cache
+          ~/AppData/Local/electron-builder/Cache
         key: ${{ steps.electron-cache.outputs.cache-primary-key }}

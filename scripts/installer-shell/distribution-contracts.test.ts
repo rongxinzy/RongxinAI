@@ -63,11 +63,11 @@ test.each(['build-inference-editions.yml'])(
     const workflow = read(`.github/workflows/${name}`);
     expect(workflow).toContain('actions/setup-dotnet@v5');
     expect(workflow).toContain('uses: ./.github/actions/setup-certum-signing');
-    expect(workflow).toContain('bun run dist:win:signed');
+    expect(workflow).toContain('bun run package:win:prepared:signed');
     expect(workflow).toContain(':win32:x64:${EDITION}:installer');
     expect(workflow).toContain(':win32:x64:${EDITION}:updater');
     expect(workflow).toContain('"${blockmaps[0]}" == "${updaters[0]}.blockmap"');
-    const signed = workflow.indexOf('bun run dist:win:signed');
+    const signed = workflow.indexOf('bun run package:win:prepared:signed');
     const signature = workflow.indexOf('verify-windows-authenticode.ps1');
     const acceptance = workflow.indexOf('node scripts/ci/windows-shell-interactive.mjs');
     const evidence = workflow.indexOf('node scripts/ci/windows-shell-evidence.mjs');
@@ -84,7 +84,7 @@ test.each(['build-inference-editions.yml'])(
     expect(verifyUninstall).toBeGreaterThan(evidence);
     expect(assembly).toBeGreaterThan(verifyUninstall);
     expect(workflow.slice(verifyUninstall, assembly)).toContain(
-      "-ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'",
+      "-ExpectedThumbprint '${{ inputs.mode == 'release' && secrets.CERTUM_CERT_THUMBPRINT || '' }}'",
     );
     expect(workflow).toContain('path: acceptance-diagnostics\n');
   },

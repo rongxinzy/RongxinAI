@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**']
   push:
-    branches: [main]
+    branches: [main, 'release/**']
   workflow_dispatch:
   workflow_call:
     secrets:
@@ -37,6 +37,9 @@ jobs:
       installer-preview: ${{ steps.plan.outputs.installer-preview }}
       browser-preview: ${{ steps.plan.outputs.browser-preview }}
       enterprise: ${{ steps.plan.outputs.enterprise }}
+      streaming-mutations: ${{ steps.plan.outputs.streaming-mutations }}
+      windows-scripts: ${{ steps.plan.outputs.windows-scripts }}
+      build-verification: ${{ steps.plan.outputs.build-verification }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -52,6 +55,8 @@ jobs:
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_AFTER_SHA: ${{ github.sha }}
 
   lint:
     runs-on: ubuntu-latest
@@ -103,44 +108,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-bun-workspace
-        with:
-          cache-prefix: test
-          include-electron: 'true'
-          save-cache: 'true'
-      - name: Restore Electron TypeScript cache
-        id: electron-tsc
-        uses: actions/cache/restore@v5
-        with:
-          path: |
-            .cache/tsc/electron.tsbuildinfo
-            dist-electron
-          key: tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json', 'bun.lock') }}
-          restore-keys: |
-            tsc-electron-${{ runner.os }}-${{ hashFiles('electron-tsconfig.json', 'package.json', 'bun.lock') }}-
-            tsc-electron-${{ runner.os }}-
-      - name: Compile Electron sources used by integration tests
-        run: |
-          mkdir -p .cache/tsc
-          bun run compile:electron -- --incremental --tsBuildInfoFile .cache/tsc/electron.tsbuildinfo
-      - name: Save Electron TypeScript cache
-        if: steps.electron-tsc.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: |
-            .cache/tsc/electron.tsbuildinfo
-            dist-electron
-          key: ${{ steps.electron-tsc.outputs.cache-primary-key }}
-      - name: Upload compiled Electron artifacts for test shards
-        uses: actions/upload-artifact@v4
-        with:
-          name: electron-dist-${{ github.run_id }}
-          path: |
-            dist-electron
-            .cache/tsc/electron.tsbuildinfo
-          retention-days: 1
+      - name: Typecheck Electron without emitting or rebuilding native modules
+        run: bun run typecheck:electron
 
   test:
-    needs: electron-compile
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -153,21 +124,11 @@ jobs:
         with:
           cache-prefix: test
           include-electron: 'true'
-      - name: Download compiled Electron artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: electron-dist-${{ github.run_id }}
-      - name: Install Electron for native ABI integration tests
+          save-cache: ${{ matrix.shard == 1 && 'true' || 'false' }}
+      - name: Install Electron for ABI probe fixtures (no native rebuild)
         run: node node_modules/electron/install.js
-      - name: Rebuild native modules skipped by ignore-scripts
-        # node-pty has no Linux prebuild. Compiling Electron used to rebuild it
-        # in this job; that compile now runs elsewhere, so tests must rebuild it.
-        run: bun run rebuild:electron-native
       - name: Run tests
         run: bun run test -- --shard=${{ matrix.shard }}/2
-      - name: Streaming mutation guard (must-catch subset)
-        if: matrix.shard == 1
-        run: bun run test:streaming-mutations
       - name: Verify Presentation Studio compiler and validator
         if: matrix.shard == 1
         run: |
@@ -213,30 +174,21 @@ jobs:
 
   enterprise:
     needs: changes
+    if: needs.changes.outputs.enterprise == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Skip enterprise toolchain
-        if: needs.changes.outputs.enterprise != 'true'
-        run: echo "No enterprise changes; baseline job stays green without an install."
       - uses: actions/checkout@v6
-        if: needs.changes.outputs.enterprise == 'true'
       - uses: ./.github/actions/setup-bun-workspace
-        if: needs.changes.outputs.enterprise == 'true'
       - name: Typecheck enterprise extension
-        if: needs.changes.outputs.enterprise == 'true'
         run: bun run typecheck:enterprise
       - name: Run enterprise extension tests
-        if: needs.changes.outputs.enterprise == 'true'
         run: bun run test:enterprise
       - name: Build enterprise extension bundle and renderer
-        if: needs.changes.outputs.enterprise == 'true'
         run: bun run build:enterprise
       - name: Verify enterprise extension bundle
-        if: needs.changes.outputs.enterprise == 'true'
         run: bun run verify:enterprise:bundle
       - name: Verify enterprise packaging config
-        if: needs.changes.outputs.enterprise == 'true'
         run: bun run verify:enterprise:packaging-config
 
   channel-runtime:
@@ -406,6 +358,46 @@ jobs:
     if: needs.changes.outputs.windows-install == 'true'
     uses: ./.github/workflows/windows-installer-pr.yml
 
+  streaming-mutations:
+    needs: changes
+    if: needs.changes.outputs.streaming-mutations == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun-workspace
+      - run: bun run test:streaming-mutations
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: streaming-mutations-${{ github.run_attempt }}
+          path: artifacts/streaming-mutations
+          retention-days: 7
+
+  windows-scripts:
+    needs: changes
+    if: needs.changes.outputs.windows-scripts == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Exercise Windows PowerShell 5 size gates and failure diagnostics
+        run: bun x --no-install vitest run scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-diagnostics.test.ts
+
+  build-verification:
+    needs: changes
+    if: needs.changes.outputs.build-verification == 'true'
+    uses: ./.github/workflows/build-inference-editions.yml
+    with:
+      mode: verify
+      build-macos: false
+      build-linux: true
+      linux-inference-editions: cpu
+      build-windows: true
+      windows-inference-editions: lite
+      fail-fast: false
+
   ci-gate:
     name: ci-gate
     if: always()
@@ -425,6 +417,9 @@ jobs:
         memory-leak,
         linux-install,
         windows-install,
+        streaming-mutations,
+        windows-scripts,
+        build-verification,
       ]
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -57,7 +57,7 @@ function Invoke-Installer {
         $processIds += $newIds
       } while ($newIds.Count -gt 0)
       $allProcesses | Where-Object { $_.ProcessId -in $processIds } |
-        Select-Object ProcessId, ParentProcessId, Name, CommandLine |
+        Select-Object ProcessId, ParentProcessId, Name |
         Format-Table -Wrap | Out-String | Write-Host
       if ($DiagnosticLogPath -and (Test-Path -LiteralPath $DiagnosticLogPath)) {
         Write-Host "[WindowsInstallerSmoke] Complete installer timing log:"
@@ -156,7 +156,7 @@ function Wait-ForUninstallCompletion {
       Get-CimInstance Win32_Process | Where-Object {
         $_.Name -like 'Uninstall*.exe' -or $_.Name -like 'Un_*.exe' -or
         $_.CommandLine -like '*ZhiYuanAgent*' -or $_.CommandLine -like '*zhiyuan-agent*'
-      } | Select-Object ProcessId, ParentProcessId, Name, CommandLine |
+      } | Select-Object ProcessId, ParentProcessId, Name |
         Format-Table -Wrap | Out-String | Write-Host
       throw "Background uninstall did not remove the managed roots within $TimeoutSeconds seconds"
     }
@@ -258,11 +258,21 @@ try {
       throw "Uninstall changed personal/unknown runtime content: $file"
     }
   }
+} catch {
+  & (Join-Path $PSScriptRoot 'collect-windows-diagnostics.ps1') -ProjectRoot $ProjectRoot -Label 'failure'
+  throw
 } finally {
-  if (Test-Path -LiteralPath $installRoot) {
-    $remainingUninstallers = @(Get-ChildItem -LiteralPath $installRoot -Filter 'Uninstall*.exe' -File -ErrorAction SilentlyContinue)
-    if ($remainingUninstallers.Count -eq 1) {
-      Start-Process -FilePath $remainingUninstallers[0].FullName -ArgumentList @('/S') -Wait | Out-Null
+  & (Join-Path $PSScriptRoot 'collect-windows-diagnostics.ps1') -ProjectRoot $ProjectRoot -Label 'before-cleanup'
+  try {
+    if (Test-Path -LiteralPath $installRoot) {
+      $remainingUninstallers = @(Get-ChildItem -LiteralPath $installRoot -Filter 'Uninstall*.exe' -File -ErrorAction SilentlyContinue)
+      if ($remainingUninstallers.Count -eq 1) {
+        $cleanup = Start-Process -FilePath $remainingUninstallers[0].FullName -ArgumentList @('/S') -PassThru
+        if (-not $cleanup.WaitForExit(60000)) {
+          & taskkill.exe /PID $cleanup.Id /T /F 2>&1 | Out-Host
+          Write-Warning 'Acceptance cleanup exceeded 60 seconds; installer evidence was retained.'
+        }
+      }
     }
-  }
+  } catch { Write-Warning "Acceptance cleanup failed: $_" }
 }

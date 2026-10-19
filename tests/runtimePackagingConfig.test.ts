@@ -297,7 +297,7 @@ test('protected Windows releases authenticate with Certum and require valid sign
     'utf8',
   );
   assert.match(buildWorkflow, /\.\/\.github\/actions\/setup-certum-signing/);
-  assert.match(buildWorkflow, /bun run dist:win:signed/);
+  assert.match(buildWorkflow, /bun run package:win:prepared:signed/);
   assert.match(buildWorkflow, /verify-windows-authenticode\.ps1/);
 
   const setupAction = readFileSync(
@@ -345,7 +345,7 @@ test('protected Windows releases authenticate with Certum and require valid sign
   );
 });
 
-test('installer-related pull requests build and exercise the Windows installer', () => {
+test('manual installer workflow delegates to the shared extended acceptance', () => {
   const workflow = readFileSync(
     path.join(root, '.github', 'workflows', 'windows-installer-pr.yml'),
     'utf8',
@@ -353,11 +353,15 @@ test('installer-related pull requests build and exercise the Windows installer',
   assert.match(workflow, /workflow_call:/);
   assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /paths:/);
-  assert.match(workflow, /runs-on: windows-latest/);
-  assert.match(workflow, /@\('run', 'dist:win:offline'\)/);
-  assert.match(workflow, /windows-runtime-smoke\.ps1/);
-  assert.match(workflow, /windows-installer-size-smoke\.ps1/);
-  assert.match(workflow, /windows-installer-smoke\.ps1/);
+  assert.match(workflow, /extended-install-tests: true/);
+  const shared = readFileSync(
+    path.join(root, '.github/workflows/build-inference-editions.yml'),
+    'utf8',
+  );
+  assert.match(shared, /bun run package:win:prepared/);
+  assert.match(shared, /windows-runtime-smoke\.ps1/);
+  assert.match(shared, /windows-installer-size-smoke\.ps1/);
+  assert.match(shared, /windows-installer-smoke\.ps1/);
 
   const smoke = readFileSync(
     path.join(root, 'scripts', 'ci', 'windows-installer-smoke.ps1'),

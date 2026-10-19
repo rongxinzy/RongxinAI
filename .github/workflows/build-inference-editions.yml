@@ -11,6 +11,10 @@ on:
         description: 'SemVer embedded in release artifacts (release mode only)'
         type: string
         default: ''
+      extended-install-tests:
+        description: 'Also run cold NSIS install, NSIS interaction drivers or Linux deb install'
+        type: boolean
+        default: false
       mode:
         description: 'release runs signing and candidate assembly; verify runs unsigned validation builds'
         type: string
@@ -27,6 +31,10 @@ on:
         description: 'Include Windows lite/cpu/cuda matrix legs'
         type: boolean
         default: true
+      windows-inference-editions:
+        description: 'Comma-separated Windows editions; PR smoke uses lite only'
+        type: string
+        default: 'lite,cpu,cuda'
       build-linux:
         description: 'Include Linux cpu/cuda matrix legs (lite is Windows-only)'
         type: boolean
@@ -70,10 +78,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      cuda-matrix: ${{ steps.cuda.outputs.matrix }}
+      has-cuda: ${{ steps.cuda.outputs.enabled }}
     steps:
       - id: plan
         env:
           BUILD_MACOS: ${{ inputs.build-macos }}
+          WINDOWS_INFERENCE_EDITIONS: ${{ inputs.windows-inference-editions }}
           BUILD_WINDOWS: ${{ inputs.build-windows }}
           BUILD_LINUX: ${{ inputs.build-linux }}
           LINUX_INFERENCE_EDITIONS: ${{ inputs.linux-inference-editions }}
@@ -83,7 +94,9 @@ jobs:
           separator=''
 
           if [[ "$BUILD_WINDOWS" == "true" ]]; then
-            for edition in lite cpu cuda; do
+            IFS=',' read -r -a windows_editions <<< "$WINDOWS_INFERENCE_EDITIONS"
+            for edition in "${windows_editions[@]}"; do
+              [[ "$edition" =~ ^(lite|cpu|cuda)$ ]] || { echo 'Invalid Windows edition' >&2; exit 1; }
               # CUDA 12.4 nvcc rejects the VS 2026 (MSVC 14.5x) toolchain on
               # windows-latest; the CUDA leg builds on windows-2022 (VS 2022).
               runner='windows-latest'
@@ -99,7 +112,7 @@ jobs:
             IFS=',' read -r -a linux_editions <<< "$LINUX_INFERENCE_EDITIONS"
             for edition in "${linux_editions[@]}"; do
               edition="${edition// /}"
-              if [[ -z "$edition" ]]; then continue; fi
+              [[ "$edition" =~ ^(cpu|cuda)$ ]] || { echo 'Invalid Linux edition' >&2; exit 1; }
               matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-${edition}-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"${edition}\",\"target\":\"linux-x64-${edition}\"}"
               separator=','
             done
@@ -112,9 +125,165 @@ jobs:
 
           matrix+=']}'
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+      - id: cuda
+        shell: bash
+        env:
+          MATRIX: ${{ steps.plan.outputs.matrix }}
+        run: |
+          matrix="$(jq -c '{include: [.include[] | select(.inference_edition == "cuda")]}' <<< "$MATRIX")"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "enabled=$(jq '.include | length > 0' <<< "$matrix")" >> "$GITHUB_OUTPUT"
+
+  cuda-runtime:
+    needs: plan-matrix
+    if: needs.plan-matrix.outputs.has-cuda == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan-matrix.outputs.cuda-matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Resolve runner toolchain image
+        id: image
+        shell: bash
+        run: echo "version=$ImageVersion" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/cache-llamacpp-runtime
+        with:
+          mode: restore
+      - name: Stage pinned CPU fallback
+        run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
+        env:
+          LLAMACPP_CPU_TARGET_ID: ${{ matrix.runtime_target }}
+      - name: Restore compiled CUDA runtime
+        if: matrix.inference_edition == 'cuda'
+        id: cuda-binary
+        uses: actions/cache@v5
+        with:
+          path: vendor/llamacpp/cuda
+          key: cuda-b9244-sm89-cuda12.4.1-${{ matrix.runner }}-${{ steps.image.outputs.version }}-${{ hashFiles('scripts/*llamacpp*', 'scripts/ci/*llamacpp*', 'scripts/ci/runtime-tree-integrity.cjs', 'scripts/windows-pe-imports.cjs', 'scripts/stage-linux-cuda-runtime-libs.cjs', 'resources/llamacpp-backends/manifest.json', 'package.json') }}
+      - name: Cache llama.cpp CUDA source
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+        uses: actions/cache@v5
+        with:
+          path: .cache/llama.cpp-src
+          key: llamacpp-cuda-src-b9244-v1
+          restore-keys: llamacpp-cuda-src-b9244-
+      - name: Set up CUDA 12.4 toolkit (Windows)
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        uses: Jimver/cuda-toolkit@v0.2.22
+        id: cuda-toolkit
+        with:
+          cuda: '12.4.1'
+          method: network
+          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
+      - name: Verify CUDA compiler (Windows)
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        shell: bash
+        run: nvcc --version
+      - name: Prepare llama.cpp CUDA source (Windows)
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        shell: bash
+        run: bash scripts/ensure-llamacpp-cuda-source.sh
+      - name: Install Ninja (Windows CUDA)
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        run: choco install ninja -y
+      - name: Set up MSVC developer environment (Windows CUDA)
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Compile llama-server (Windows CUDA)
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
+        shell: bash
+        run: bash scripts/build-llamacpp-cuda-rtx40.sh win
+      - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
+        shell: bash
+        run: bash scripts/ci/build-llamacpp-cuda-linux-in-docker.sh
+      - name: Finalize CUDA llama.cpp edition bundle
+        if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+        run: node scripts/finalize-llamacpp-cuda-edition.cjs
+        env:
+          LLAMACPP_CUDA_PLATFORM: ${{ matrix.platform == 'windows' && 'win32' || 'linux' }}
+      - name: Seal fresh CUDA runtime contents
+        if: steps.cuda-binary.outputs.cache-hit != 'true'
+        run: node scripts/ci/runtime-tree-integrity.cjs seal vendor/llamacpp/cuda
+      - name: Verify cached CUDA contents
+        run: node scripts/ci/runtime-tree-integrity.cjs verify vendor/llamacpp/cuda
+      - name: Seal compiled runtime for edition packaging
+        run: node scripts/ci/build-checkpoint.mjs create cuda-checkpoint '${{ matrix.target }}' vendor/llamacpp/cuda
+      - uses: actions/upload-artifact@v6
+        with:
+          name: cuda-${{ matrix.target }}-${{ github.run_id }}
+          path: cuda-checkpoint/
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
+
+  windows-components:
+    if: inputs.build-windows
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      ZHIYUAN_UPDATE_VARIANT: lite
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Restore prepared Windows components
+        uses: actions/cache@v5
+        with:
+          path: |
+            resources/mingit
+            resources/python-win
+            resources/uv-win
+            resources/skill-python
+            resources/magpie/win32-x64
+            vendor/channel-runtime
+            vendor/engram-runtime
+            build-tar/windows-components
+          key: windows-components-v1-${{ hashFiles('bun.lock', 'package.json', 'scripts/**', 'resources/magpie/upstream.json', 'SKILLs/**', 'MCPs/**') }}
+          restore-keys: windows-components-v1-
+      - name: Prepare shared pinned Magpie gateway
+        uses: ./.github/actions/prepare-magpie
+        with:
+          target: win32-x64
+      - name: Build shared Windows runtimes and Skills
+        shell: bash
+        run: |
+          bun run channel:runtime:win-x64
+          bun run engram:runtime:win-x64
+          bun run build:skills
+          node scripts/ci/prepare-windows-components.cjs
+      - name: Qualify shared compression once
+        uses: ./.github/actions/verify-windows-compression
+        with:
+          artifact-suffix: common-${{ github.run_attempt }}
+      - name: Archive prepared resources
+        shell: bash
+        run: >-
+          node scripts/ci/build-checkpoint.mjs create prepared-resources windows-common
+          resources/mingit resources/python-win resources/uv-win resources/skill-python
+          resources/magpie/win32-x64 vendor/channel-runtime vendor/engram-runtime
+          SKILLs MCPs build-tar/windows-components
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-common-${{ github.run_id }}
+          path: prepared-resources/
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 7
 
   build:
-    needs: plan-matrix
+    needs: [plan-matrix, windows-components, cuda-runtime]
+    if: ${{ !cancelled() && needs.plan-matrix.result == 'success' }}
     strategy:
       fail-fast: ${{ inputs.fail-fast }}
       matrix: ${{ fromJSON(needs.plan-matrix.outputs.matrix) }}
@@ -174,38 +343,25 @@ jobs:
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
-      - name: Read pinned Magpie Go toolchain
-        id: magpie-toolchain
-        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-      - uses: actions/setup-go@v6
+      - name: Download shared Windows components
+        if: matrix.platform == 'windows'
+        uses: actions/download-artifact@v6
         with:
-          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
-          cache: false
-      - name: Cache Magpie module and build scratch
-        uses: actions/cache@v5
+          name: windows-common-${{ github.run_id }}
+          path: prepared-resources
+      - name: Verify and restore shared Windows components
+        if: matrix.platform == 'windows'
+        run: node scripts/ci/build-checkpoint.mjs restore prepared-resources windows-common
+      - name: Prepare pinned Magpie gateway for POSIX
+        if: matrix.platform != 'windows'
+        uses: ./.github/actions/prepare-magpie
         with:
-          path: .cache/magpie
-          key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go${{ steps.magpie-toolchain.outputs.go-version }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
-      - name: Build and verify pinned Magpie gateway
-        shell: bash
-        env:
-          MAGPIE_TARGET: ${{ matrix.platform == 'linux' && 'linux-x64' || matrix.platform == 'windows' && 'win32-x64' || (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
-        run: |
-          set -euo pipefail
-          go version | grep -Fq "go${{ steps.magpie-toolchain.outputs.go-version }}"
-          bun run magpie:build -- --target "${MAGPIE_TARGET}"
-          bun run magpie:verify -- --target "${MAGPIE_TARGET}"
+          target: ${{ matrix.platform == 'linux' && 'linux-x64' || (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
       - name: Set up installer shell SDK
         if: ${{ matrix.platform == 'windows' }}
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
-      - name: Set up Windows runtimes
-        if: ${{ matrix.platform == 'windows' }}
-        run: |
-          bun run setup:uv-runtime
-          bun run setup:python-runtime
-          bun run engram:runtime:${{ matrix.runtime_target }}
       - name: Set up POSIX runtimes
         if: ${{ matrix.platform != 'windows' }}
         run: |
@@ -217,50 +373,15 @@ jobs:
         run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
         env:
           LLAMACPP_CPU_TARGET_ID: ${{ matrix.runtime_target }}
-      - name: Cache llama.cpp CUDA source
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
-        uses: actions/cache@v5
+      - name: Download compiled CUDA runtime
+        if: matrix.inference_edition == 'cuda'
+        uses: actions/download-artifact@v6
         with:
-          path: .cache/llama.cpp-src
-          key: llamacpp-cuda-src-b9244-v1
-          restore-keys: llamacpp-cuda-src-b9244-
-      - name: Set up CUDA 12.4 toolkit (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        uses: Jimver/cuda-toolkit@v0.2.22
-        id: cuda-toolkit
-        with:
-          cuda: '12.4.1'
-          method: network
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
-      - name: Verify CUDA compiler (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: nvcc --version
-      - name: Prepare llama.cpp CUDA source (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: bash scripts/ensure-llamacpp-cuda-source.sh
-      - name: Install Ninja (Windows CUDA)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        run: choco install ninja -y
-      - name: Set up MSVC developer environment (Windows CUDA)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-      - name: Compile llama-server (Windows CUDA)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: bash scripts/build-llamacpp-cuda-rtx40.sh win
-      - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
-        shell: bash
-        run: bash scripts/ci/build-llamacpp-cuda-linux-in-docker.sh
-      - name: Finalize CUDA llama.cpp edition bundle
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
-        run: node scripts/finalize-llamacpp-cuda-edition.cjs
-        env:
-          LLAMACPP_CUDA_PLATFORM: ${{ matrix.platform == 'windows' && 'win32' || 'linux' }}
+          name: cuda-${{ matrix.target }}-${{ github.run_id }}
+          path: cuda-checkpoint
+      - name: Restore verified CUDA runtime
+        if: matrix.inference_edition == 'cuda'
+        run: node scripts/ci/build-checkpoint.mjs restore cuda-checkpoint '${{ matrix.target }}'
       - name: Stage bundled llama.cpp runtime
         if: ${{ matrix.inference_edition != 'lite' }}
         run: bun run prepare:inference-edition-runtime
@@ -276,14 +397,14 @@ jobs:
           certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
       - name: Build Windows (verify)
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
-        run: bun run dist:win:${{ matrix.inference_edition }}
+        run: bun run package:win:prepared
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Windows release (lite)
         if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'lite' }}
-        run: bun run dist:win:signed
+        run: bun run package:win:prepared:signed
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
@@ -293,7 +414,7 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Windows release (cpu)
         if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'cpu' }}
-        run: bun run dist:win:signed:cpu
+        run: bun run package:win:prepared:signed
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
@@ -303,7 +424,7 @@ jobs:
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Windows release (cuda)
         if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'cuda' }}
-        run: bun run dist:win:signed:cuda
+        run: bun run package:win:prepared:signed
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
@@ -388,6 +509,68 @@ jobs:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Save llama.cpp runtime
+        if: success()
+        uses: ./.github/actions/cache-llamacpp-runtime
+        with:
+          mode: save
+          cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
+          cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}
+      - name: Checkpoint exact packaged bytes before acceptance
+        shell: bash
+        env:
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+        run: |
+          paths=(release)
+          if [[ '${{ matrix.platform }}' == windows ]]; then paths+=(build-tar/windows-components scripts/installer-shell/out); fi
+          if [[ '${{ matrix.inference_edition }}' != lite ]]; then paths+=(resources/llamacpp-bundled); fi
+          node scripts/ci/build-checkpoint.mjs create package-checkpoint '${{ matrix.target }}' "${paths[@]}"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: package-${{ matrix.target }}-${{ github.run_id }}
+          path: package-checkpoint/
+          compression-level: 0
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
+
+  acceptance:
+    needs: [plan-matrix, build]
+    # Accept successful targets even if another build fails; missing artifacts fail closed.
+    if: ${{ !cancelled() && needs.plan-matrix.result == 'success' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan-matrix.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    environment: ${{ inputs.mode == 'release' && 'release' || '' }}
+    timeout-minutes: ${{ inputs.extended-install-tests && 120 || 60 }}
+    env:
+      ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+      - name: Resolve immutable source commit
+        id: source-commit
+        shell: bash
+        run: |
+          commit="$(git rev-parse HEAD)"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "ZHIYUAN_SOURCE_COMMIT=$commit" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup-bun-workspace
+      - uses: actions/download-artifact@v6
+        with:
+          name: package-${{ matrix.target }}-${{ github.run_id }}
+          path: package-checkpoint
+      - name: Verify and restore exact packaged bytes
+        env:
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+        run: node scripts/ci/build-checkpoint.mjs restore package-checkpoint '${{ matrix.target }}'
+      - name: Install Linux acceptance libraries
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - name: Smoke bundled llama-server
         if: ${{ matrix.inference_edition != 'lite' }}
         shell: bash
@@ -434,46 +617,49 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/verify-windows-authenticode.ps1
           -ProjectRoot '${{ github.workspace }}'
-          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
-      - name: Verify Windows release size and runtimes
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+          -ExpectedThumbprint '${{ secrets.CERTUM_CERT_THUMBPRINT }}'
+      - name: Verify Windows release size
+        if: ${{ matrix.platform == 'windows' }}
         shell: powershell
         env:
           ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify Windows package runtimes with a clean PATH
-        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        if: ${{ matrix.platform == 'windows' }}
         shell: powershell
         env:
           ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-runtime-smoke.ps1
-          -ProjectRoot ${{ github.workspace }}
-      - name: Qualify Windows compression before release assembly
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
-        uses: ./.github/actions/verify-windows-compression
-      - name: Prepare isolated native uninstall acceptance (verify)
-        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+          -ProjectRoot '${{ github.workspace }}'
+      - name: Verify shared compression qualification matches packaged bytes
+        if: matrix.platform == 'windows'
+        run: node scripts/ci/compression-qualification.cjs verify
+      - name: Prepare isolated native uninstall acceptance
+        id: acceptance-ownership
+        if: matrix.platform == 'windows'
         shell: powershell
         run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
-      - name: Prepare isolated native uninstall acceptance (release)
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
-        shell: powershell
-        env:
-          ZHIYUAN_SOURCE_COMMIT: ${{ steps.source-commit.outputs.commit }}
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/windows-shell-uninstall.ps1 -Action prepare
+      - name: Validate real Windows interaction drivers
+        if: inputs.extended-install-tests && matrix.platform == 'windows'
+        # These suites spawn real PowerShell processes and a C# compiler. Avoid
+        # cross-suite CPU contention on the hosted runner; retain every timeout.
+        run: bunx vitest run --maxWorkers=1 scripts/ci/windows-installer-size-smoke.test.ts scripts/ci/windows-installer-interactive.test.ts scripts/ci/windows-shell-interactive.test.ts scripts/ci/windows-shell-uninstall.test.ts scripts/installer-shell/app/engine-contracts.test.ts scripts/installer-shell/preview-ui.test.ts scripts/installer-shell/powershell-environment.test.ts scripts/installer/cleanup-after-install.test.ts scripts/installer/recover-component-switch.test.ts scripts/installer/migrate-user-skills.test.ts scripts/installer/validate-install-root.test.ts tests/nsis-installer.test.ts
       - name: Verify Windows cold install, cache-hit upgrade, and uninstall
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
+        if: ${{ (inputs.mode == 'release' || inputs.extended-install-tests) && matrix.platform == 'windows' }}
         shell: powershell
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-installer-smoke.ps1
           -ProjectRoot '${{ github.workspace }}'
+      - name: Verify real NSIS install, completion, launch, cancel, and retry
+        if: inputs.extended-install-tests && matrix.platform == 'windows'
+        timeout-minutes: 40
+        shell: powershell
+        run: ./scripts/ci/windows-installer-interactive.ps1
       - name: Verify the packaged renderer in a virtual Ubuntu desktop
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'linux' }}
         run: >-
@@ -484,7 +670,7 @@ jobs:
         if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
         run: xvfb-run -a node scripts/verify-linux-renderer.mjs release/linux-unpacked release/linux-render-smoke.png
       - name: Install and start the exact Linux release deb
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
+        if: ${{ (inputs.mode == 'release' || inputs.extended-install-tests) && matrix.platform == 'linux' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -499,8 +685,10 @@ jobs:
             exit 1
           }
           node scripts/verify-linux-renderer.mjs "$app_exec" release/linux-deb-install-smoke.png
-      - name: Verify the final WebView2 installer interactively
-        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+      - name: Verify final WebView2 installer and bind evidence
+        id: shell-evidence
+        # Keep shell diagnostics independent of an earlier NSIS failure.
+        if: ${{ !cancelled() && matrix.platform == 'windows' && steps.acceptance-ownership.outcome == 'success' }}
         shell: pwsh
         run: |
           node scripts/ci/windows-shell-interactive.mjs
@@ -510,37 +698,22 @@ jobs:
           $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
           node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
           if ($LASTEXITCODE -ne 0) { throw 'Shell evidence is invalid.' }
-      - name: Verify the final signed WebView2 installer interactively
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
-        shell: pwsh
-        env:
-          ZHIYUAN_SOURCE_COMMIT: ${{ steps.source-commit.outputs.commit }}
-        run: |
-          node scripts/ci/windows-shell-interactive.mjs
-          if ($LASTEXITCODE -ne 0) { throw 'Signed shell interactive acceptance failed.' }
-          $installer = @(Get-ChildItem -LiteralPath release -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
-          if ($installer.Count -ne 1) { throw 'Expected exactly one signed shell installer.' }
-          $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
-          node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
-          if ($LASTEXITCODE -ne 0) { throw 'Signed shell evidence is invalid.' }
       - name: Verify native uninstall preserves user data
-        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
+        if: ${{ !cancelled() && matrix.platform == 'windows' && steps.shell-evidence.outcome == 'success' }}
         shell: powershell
-        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action verify
-      - name: Verify signed native uninstall preserves user data
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
-        shell: powershell
-        env:
-          ZHIYUAN_SOURCE_COMMIT: ${{ steps.source-commit.outputs.commit }}
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-shell-uninstall.ps1 -Action verify
-          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
+          -ExpectedThumbprint '${{ inputs.mode == 'release' && secrets.CERTUM_CERT_THUMBPRINT || '' }}'
+      - name: Collect Windows diagnostics before leaving the runner
+        if: ${{ always() && matrix.platform == 'windows' }}
+        shell: powershell
+        run: ./scripts/ci/collect-windows-diagnostics.ps1
       - name: Upload shell acceptance evidence
         if: ${{ always() && inputs.mode == 'verify' && matrix.platform == 'windows' }}
         uses: actions/upload-artifact@v6
         with:
-          name: shell-acceptance-${{ github.run_id }}
+          name: shell-acceptance-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: acceptance-diagnostics
           if-no-files-found: error
           retention-days: 7
@@ -548,7 +721,7 @@ jobs:
         if: ${{ always() && inputs.mode == 'release' && matrix.platform == 'windows' }}
         uses: actions/upload-artifact@v6
         with:
-          name: signed-shell-acceptance-${{ github.run_id }}
+          name: signed-shell-acceptance-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: acceptance-diagnostics
           if-no-files-found: error
           retention-days: 7
@@ -635,6 +808,8 @@ jobs:
         with:
           name: release-candidate-${{ inputs.app-build-version }}-${{ matrix.target }}
           path: candidate/
+          compression-level: 0
+          overwrite: true
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v6
@@ -657,11 +832,5 @@ jobs:
             release/*.AppImage
             release/*.deb
             release/linux-render-smoke.png
+            release/linux-deb-install-smoke.png
           retention-days: 7
-      - name: Save llama.cpp runtime
-        if: success()
-        uses: ./.github/actions/cache-llamacpp-runtime
-        with:
-          mode: save
-          cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
-          cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}
