@@ -10,7 +10,6 @@
  * - ./imCoworkHandler/prompt           – system prompt assembly
  * - ./imCoworkHandler/accumulator      – message accumulation and run projection
  * - ./imCoworkHandler/permissions      – channel permission confirmation flow
- * - ./imCoworkHandler/scheduledTaskTurn– direct cron.add turns
  * - ./imCoworkHandler/turnLauncher     – Pi runtime start/continue dispatch
  * - ./imCoworkHandler/replies          – reply and media formatting helpers
  */
@@ -42,16 +41,13 @@ import {
   formatIMReply,
   formatIMReplyRaw,
 } from './imCoworkHandler/replies';
-import { runIMDirectScheduledTaskTurn } from './imCoworkHandler/scheduledTaskTurn';
 import { IMCoworkSessionRegistry } from './imCoworkHandler/sessionRegistry';
 import { launchIMCoworkRuntimeTurn } from './imCoworkHandler/turnLauncher';
 import { toPiAttachments } from './imPiAttachments';
-import {
-  isReminderSystemTurn,
-  type IMScheduledTaskCreationResult,
-  type IMScheduledTaskRequestDetector,
-  type ParsedIMScheduledTaskRequest,
-} from './imScheduledTaskHandler';
+import { isReminderSystemTurn } from './imReminderTurn';
+import { tryParseCcConnectScopedConversationId } from './ccConnectConversationId';
+import { DeliveryMode } from '../../scheduledTask/constants';
+import type { ScheduledTaskDelivery } from '../../scheduledTask/types';
 import type { IMStore } from './imStore';
 import type { IMMessage } from './types';
 
@@ -60,12 +56,6 @@ export interface IMCoworkHandlerOptions {
   coworkStore: CoworkStore;
   imStore: IMStore;
   getSkillsPrompt?: () => Promise<string | null>;
-  detectScheduledTaskRequest?: IMScheduledTaskRequestDetector;
-  createScheduledTask?: (params: {
-    sessionId: string;
-    message: IMMessage;
-    request: ParsedIMScheduledTaskRequest;
-  }) => Promise<IMScheduledTaskCreationResult>;
   sendAsyncReply?: (platform: Platform, conversationId: string, text: string) => Promise<boolean>;
   activityService?: ActivityService;
 }
@@ -75,12 +65,6 @@ export class IMCoworkHandler extends EventEmitter {
   private coworkStore: CoworkStore;
   private imStore: IMStore;
   private getSkillsPrompt?: () => Promise<string | null>;
-  private detectScheduledTaskRequest?: IMScheduledTaskRequestDetector;
-  private createScheduledTask?: (params: {
-    sessionId: string;
-    message: IMMessage;
-    request: ParsedIMScheduledTaskRequest;
-  }) => Promise<IMScheduledTaskCreationResult>;
   private sendAsyncReply?: (
     platform: Platform,
     conversationId: string,
@@ -98,6 +82,7 @@ export class IMCoworkHandler extends EventEmitter {
   private readonly onComplete = this.handleComplete.bind(this);
   private readonly onError = this.handleError.bind(this);
   private readonly onSessionStopped = this.handleSessionStopped.bind(this);
+  private readonly unregisterScheduledTaskDelivery: (() => void) | null = null;
   private readonly unregisterStreamingInterest: (() => void) | null = null;
 
   constructor(options: IMCoworkHandlerOptions) {
@@ -106,8 +91,6 @@ export class IMCoworkHandler extends EventEmitter {
     this.coworkStore = options.coworkStore;
     this.imStore = options.imStore;
     this.getSkillsPrompt = options.getSkillsPrompt;
-    this.detectScheduledTaskRequest = options.detectScheduledTaskRequest;
-    this.createScheduledTask = options.createScheduledTask;
     this.sendAsyncReply = options.sendAsyncReply;
     this.activityService = options.activityService;
 
@@ -128,6 +111,21 @@ export class IMCoworkHandler extends EventEmitter {
       stopSession: sessionId => this.coworkRuntime.stopSession(sessionId),
     });
 
+    // Scheduled tasks the model creates through the Pi tool in this session
+    // deliver back to the originating IM conversation unless overridden.
+    this.unregisterScheduledTaskDelivery =
+      this.coworkRuntime.setScheduledTaskDeliveryResolver?.(sessionId => {
+        const conversation = this.sessionRegistry.getConversation(sessionId);
+        if (!conversation) return null;
+        const scoped = tryParseCcConnectScopedConversationId(conversation.conversationId);
+        const delivery: ScheduledTaskDelivery = {
+          mode: DeliveryMode.Announce,
+          channel: conversation.platform,
+          to: scoped ? scoped[1] : conversation.conversationId,
+          ...(scoped?.[0] ? { accountId: scoped[0] } : {}),
+        };
+        return delivery;
+      }) ?? null;
     // IM mirrors consume non-final full-text messageUpdate for their mapped
     // sessions; declaring that interest lets unmapped sessions skip the
     // full-text bus during streaming.
@@ -199,20 +197,6 @@ export class IMCoworkHandler extends EventEmitter {
 
       const formattedContent = formatIMMessageWithMedia(message);
       const piAttachments = await toPiAttachments(message.attachments);
-      const directScheduledTaskRequest =
-        this.createScheduledTask && this.detectScheduledTaskRequest
-          ? await this.detectScheduledTaskRequest(message)
-          : null;
-
-      if (directScheduledTaskRequest && this.createScheduledTask) {
-        return runIMDirectScheduledTaskTurn(
-          { coworkStore: this.coworkStore, createScheduledTask: this.createScheduledTask },
-          coworkSessionId,
-          message,
-          formattedContent,
-          directScheduledTaskRequest,
-        );
-      }
 
       const responsePromise = this.messageAccumulators.createResponsePromise(coworkSessionId, cid);
       const cancelTurn = () => {
@@ -620,6 +604,7 @@ export class IMCoworkHandler extends EventEmitter {
    * Cleanup when handler is destroyed
    */
   destroy(): void {
+    this.unregisterScheduledTaskDelivery?.();
     this.unregisterStreamingInterest?.();
 
     // Clear all pending accumulators

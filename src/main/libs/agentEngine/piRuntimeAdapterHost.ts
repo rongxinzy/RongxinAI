@@ -15,6 +15,7 @@ import type { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
 import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtractor';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
+import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import type { McpServerManager } from '../mcpServerManager';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
@@ -53,6 +54,8 @@ export interface PiRuntimeAdapterHost {
   getProjectMemoryService(): ProjectMemoryService | null;
   getConversationHistoryService(): ConversationHistoryService | null;
   getScheduledTaskService(): ScheduledTaskService | null;
+  /** Delivery a scheduled task created in this session defaults to (IM chats). */
+  getScheduledTaskDeliveryForSession?(sessionId: string): ScheduledTaskDelivery | null;
   getMcpServerManager(): McpServerManager | null;
   getMcpToolManifestGeneration(): number;
   getOcrCommandFor(): ((imagePath: string) => string) | undefined;

@@ -49,6 +49,7 @@ import type { SessionSummaryBackfillService } from '../../memory/sessionSummaryB
 import type { SessionSummaryService } from '../../memory/sessionSummaryService';
 import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
+import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
 import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
@@ -300,6 +301,25 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
   setScheduledTaskService(service: ScheduledTaskService): void {
     this.scheduledTaskService = service;
   }
+  /** Resolves the delivery scheduled tasks in a session default to (IM chats). */
+  private scheduledTaskDeliveryResolver:
+    | ((sessionId: string) => ScheduledTaskDelivery | null)
+    | null = null;
+
+  setScheduledTaskDeliveryResolver(
+    resolver: (sessionId: string) => ScheduledTaskDelivery | null,
+  ): () => void {
+    this.scheduledTaskDeliveryResolver = resolver;
+    return () => {
+      if (this.scheduledTaskDeliveryResolver === resolver)
+        this.scheduledTaskDeliveryResolver = null;
+    };
+  }
+
+  getScheduledTaskDeliveryForSession(sessionId: string): ScheduledTaskDelivery | null {
+    return this.scheduledTaskDeliveryResolver?.(sessionId) ?? null;
+  }
+
   setWorkbenchTaskService(service: WorkbenchTaskService): void {
     if (this.workbenchTaskService && this.workbenchApprovalListener) {
       this.workbenchTaskService.off('approvalRequested', this.workbenchApprovalListener);
