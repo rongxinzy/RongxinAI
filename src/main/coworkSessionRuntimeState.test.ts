@@ -2,7 +2,11 @@ import { test, expect } from 'vitest';
 
 import { CoworkSessionMode, CoworkSessionSource } from '../shared/cowork/constants';
 import type { CoworkSessionSummary } from './coworkStore';
-import { reconcileWorkSessionRuntimeState } from './coworkSessionRuntimeState';
+import {
+  coerceImportedSessionStatus,
+  demoteStaleRunningSessions,
+  reconcileWorkSessionRuntimeState,
+} from './coworkSessionRuntimeState';
 
 const makeSession = (overrides: Partial<CoworkSessionSummary> = {}): CoworkSessionSummary => ({
   id: 'session-1',
@@ -31,4 +35,31 @@ test('does not reconcile direct Chat sessions through the Work runtime', () => {
   expect(
     reconcileWorkSessionRuntimeState(makeSession({ mode: CoworkSessionMode.Chat }), false).status,
   ).toBe('running');
+});
+
+test('demoteStaleRunningSessions writes corrections only for stale Work rows', () => {
+  const updates: Array<{ id: string; status: string }> = [];
+  const store = {
+    updateSession: (id: string, patch: { status: string }) => {
+      updates.push({ id, status: patch.status });
+    },
+  };
+  const sessions = [
+    makeSession({ id: 'stale' }),
+    makeSession({ id: 'live' }),
+    makeSession({ id: 'idle-row', status: 'idle' }),
+    makeSession({ id: 'chat', mode: CoworkSessionMode.Chat }),
+  ];
+
+  demoteStaleRunningSessions(store, sessionId => sessionId === 'live', sessions);
+
+  expect(updates).toEqual([{ id: 'stale', status: 'idle' }]);
+});
+
+test('imported session statuses never resurrect a running row', () => {
+  expect(coerceImportedSessionStatus('running')).toBe('idle');
+  expect(coerceImportedSessionStatus('completed')).toBe('completed');
+  expect(coerceImportedSessionStatus('error')).toBe('error');
+  expect(coerceImportedSessionStatus('idle')).toBe('idle');
+  expect(coerceImportedSessionStatus(undefined)).toBe('idle');
 });

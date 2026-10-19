@@ -123,6 +123,29 @@ describe('PiRuntimeAdapter', () => {
       ]);
     });
 
+    it('stopAllSessions (quit path) clears the persisted status without an interruption record', async () => {
+      await adapter.startSession('quit-session', 'Hello');
+      const addMessage = vi.fn(
+        (_sessionId: string, message: Parameters<CoworkStore['addMessage']>[1]) => ({
+          ...message,
+          id: 'persisted-message',
+          timestamp: Date.now(),
+        }),
+      );
+      const updateSession = vi.fn();
+      adapter.setCoworkStore({ addMessage, updateSession } as unknown as CoworkStore);
+      const interruptions: unknown[] = [];
+      adapter.on('sessionInterrupted', event => interruptions.push(event));
+
+      adapter.stopAllSessions();
+
+      // Quit stops carry no cause, so no interruption record is written, but
+      // the status projection must not stay a zombie 'running' row.
+      expect(addMessage).not.toHaveBeenCalled();
+      expect(interruptions).toEqual([]);
+      expect(updateSession).toHaveBeenCalledWith('quit-session', { status: 'idle' });
+    });
+
     it('should cause continueSession to reconstruct after stop', async () => {
       await adapter.startSession('test', 'Hello');
       adapter.stopSession('test');

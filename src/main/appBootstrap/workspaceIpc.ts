@@ -11,6 +11,8 @@ import { WorkspaceStoreKey } from '../../shared/workspace';
 import { getDefaultProjectBaseDir, isInternalWorkspacePath } from './workspacePaths';
 import { forgetCoworkSession, listAllMatchingSessionIds } from './coworkSessionImages';
 import { handleIpcContract } from '../ipc/handleIpcContract';
+import { demoteStaleRunningSessions } from '../coworkSessionRuntimeState';
+import { getPiRuntimeAdapter } from './sessionServices';
 import { workspaceContract } from '../../shared/ipc/coworkContract';
 
 export const registerWorkspaceIpc = (): void => {
@@ -154,6 +156,14 @@ export const registerWorkspaceIpc = (): void => {
           if (!stat?.isDirectory()) {
             return { success: false as const, error: 'Workspace path is not a directory' };
           }
+          // The store's guard reads the raw status column; demote 'running'
+          // rows the runtime no longer runs so a stale projection cannot
+          // block relocation forever (read paths only derive, never heal).
+          demoteStaleRunningSessions(
+            localCoworkStore,
+            sessionId => getPiRuntimeAdapter().isSessionRunning(sessionId),
+            localCoworkStore.listSessions(1000, 0, undefined, id),
+          );
           const relocated = localCoworkStore.relocateWorkspace(
             id,
             resolvedPath,

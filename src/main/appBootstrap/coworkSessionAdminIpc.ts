@@ -9,8 +9,11 @@ import {
 } from './coworkSessionImages';
 import { sanitizeCoworkSessionForIpc, slimCoworkMessageForIpc } from './ipcPayloadSanitize';
 import { persistMessageImageMetadata } from '../coworkImageAttachments';
-import { reconcileWorkSessionRuntimeState } from '../coworkSessionRuntimeState';
-import type { CoworkMessageMetadata, CoworkMessageType, CoworkSessionStatus } from '../coworkStore';
+import {
+  coerceImportedSessionStatus,
+  reconcileWorkSessionRuntimeState,
+} from '../coworkSessionRuntimeState';
+import type { CoworkMessageMetadata, CoworkMessageType } from '../coworkStore';
 import { parseCoworkExecutionMode } from '../../shared/cowork/executionMode';
 import { getIMGatewayManager } from './ccConnectRuntime';
 import { handleIpcContract } from '../ipc/handleIpcContract';
@@ -101,7 +104,7 @@ export const registerCoworkSessionAdminIpc = (): void => {
         if (existing) {
           // Session already exists — update status and sync new messages
           rt.coworkStore.updateSession(session.id, {
-            status: session.status as CoworkSessionStatus,
+            status: coerceImportedSessionStatus(session.status),
           });
           for (const msg of session.messages || []) {
             rt.coworkStore.upsertMessage(session.id, {
@@ -148,9 +151,9 @@ export const registerCoworkSessionAdminIpc = (): void => {
               .metadata as CoworkMessageMetadata | undefined,
           });
         }
-        // Update status
+        // Imported sessions are history: a 'running' status can never be live.
         rt.coworkStore.updateSession(newSession.id, {
-          status: session.status as CoworkSessionStatus,
+          status: coerceImportedSessionStatus(session.status),
         });
         const saved = rt.coworkStore.getSession(newSession.id);
         return {
@@ -289,13 +292,12 @@ export const registerCoworkSessionAdminIpc = (): void => {
         if (!session) return { success: true as const, session: null };
         scheduleBackgroundMaterialize(sessionId, session.messages);
 
+        // Derive only: the runtime is the running authority; read paths do
+        // not heal the persisted row (startup reset / quit / relocation do).
         const reconciledSession = reconcileWorkSessionRuntimeState(
           session,
           getPiRuntimeAdapter().isSessionRunning(sessionId),
         );
-        if (reconciledSession.status !== session.status) {
-          localStore.updateSession(sessionId, { status: reconciledSession.status });
-        }
         return { success: true as const, session: sanitizeCoworkSessionForIpc(reconciledSession) };
       } catch (error) {
         return {
@@ -331,16 +333,12 @@ export const registerCoworkSessionAdminIpc = (): void => {
         const localStore = getCoworkStore();
         const sessions = localStore
           .listSessions(limit, offset, agentId, workspaceId, mode, sources)
-          .map(session => {
-            const reconciledSession = reconcileWorkSessionRuntimeState(
+          .map(session =>
+            reconcileWorkSessionRuntimeState(
               session,
               getPiRuntimeAdapter().isSessionRunning(session.id),
-            );
-            if (reconciledSession.status !== session.status) {
-              localStore.updateSession(session.id, { status: reconciledSession.status });
-            }
-            return reconciledSession;
-          });
+            ),
+          );
         const total = localStore.countSessions(agentId, workspaceId, mode, sources);
         return { success: true as const, sessions, hasMore: offset + sessions.length < total };
       } catch (error) {
