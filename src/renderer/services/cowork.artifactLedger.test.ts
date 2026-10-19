@@ -109,7 +109,6 @@ test('loading a session folds the ledger rows in without opening the panel', asy
       cowork: {
         onStreamUiEvent: () => () => {},
         onSessionsChanged: () => () => {},
-        onStreamContentPatch: () => () => {},
         getSession: async () => ({
           success: true,
           session: {

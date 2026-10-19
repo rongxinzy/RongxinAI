@@ -74,7 +74,6 @@ export interface CoworkStreamPipelineDeps {
 
 export interface CoworkStreamPipeline {
   handleUiEvent(event: unknown): void;
-  handleContentPatch(patch: CoworkContentPatch): void;
   flush(): void;
   dispose(): void;
 }
@@ -335,10 +334,6 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
         default:
           break;
       }
-    },
-
-    handleContentPatch(patch: CoworkContentPatch): void {
-      applyContentPatch(patch);
     },
 
     flush(): void {

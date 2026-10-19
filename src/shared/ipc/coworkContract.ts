@@ -235,14 +235,14 @@ const CaptureRectSchema = z.object({
 
 /**
  * Streaming methods, registered in two files: `coworkRunBridge.ts` owns the
- * run snapshot replay, `piUiForwarder.ts` owns the runtime snapshot read and
+ * run snapshot read, `piUiForwarder.ts` owns the runtime snapshot read and
  * renderer-initiated resync. Exported per-file so each module registers only
  * what it owns; the union is composed into `coworkContract` below.
  */
 export const coworkRunSnapshotContract = defineIpcContract({
   getRunSnapshot: {
     channel: CoworkSessionIpc.RunSnapshot,
-    args: z.tuple([z.string(), z.boolean().optional()]),
+    args: z.tuple([z.string()]),
     // Oversized ids (>200 chars) short-circuit to `{ success: false }` with no
     // snapshot fields; the renderer only checks `success` on that path.
     result: z.object({

@@ -85,7 +85,7 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 
 - `PiUiStreamReplayBuffer` + `CoworkStreamIpc.UiEventReplay`, `piUiEventBatcher.ts` (a second batching layer), `streamCompactReplay.ts` (derivative of Cherry Studio `buildCompactReplay.ts`, AGPL-3.0), `TextWorkerKind.Content` prefix diff, and `piEvents.parseNativeEvent`.
 - Full event replay after attach is deferred to a follow-up PR; when it lands, overflow must write a snapshot first — replaying holes is forbidden.
-- `CoworkContentProjection` remains but only serves `coworkRunBridge`: chunking oversized `message` events and RunSnapshot restore replay into `ContentPatch`es (`snapshotToContentPatches`). It performs no prefix diff and is **not** on the live streaming body path.
+- `CoworkContentProjection` remains but only serves `coworkRunBridge`: chunking oversized `message` events into `ContentPatch`es (`snapshotToContentPatches`) on the sequenced UiEvent stream. It performs no prefix diff and is **not** on the live streaming body path; there is no replay and no side channel — recovery reloads content through the session read.
 
 ## Historical lessons (do not repeat)
 
@@ -136,7 +136,7 @@ All streaming tests are behavioral (no source-text scanning) and drive **product
 
 - The append check is conservative: one event that grows the last segment **and** opens a new one is classified as a rewrite and sends a base snapshot (Pi's embedded session never does this; correctness is unaffected).
 - Terminal de-duplication compares against the last forwarded final body only: an A → B → A sequence re-sends A.
-- `ContentPatch` revisions come from two sources (the forwarder and `CoworkContentProjection` for `coworkRunBridge`); this is safe only because the two paths never share a messageId.
+- `ContentPatch` revisions still come from two generators (the forwarder and `CoworkContentProjection`); both ride the sequenced UiEvent stream and never share a messageId.
 - Resync relies on Electron delivering the `webContents.send` events issued inside the `cowork:stream:resync` handler before the invoke reply; an explicit resync-done event would remove that dependency.
 
 ## Related IPC

@@ -6,9 +6,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
     onStreamRunState: _p0 => {
       return runtime.subscribe('cowork.onStreamRunState', _p0);
     },
-    onStreamContentPatch: _p0 => {
-      return runtime.subscribe('cowork.onStreamContentPatch', _p0);
-    },
     onStreamUiEvent: _p0 => {
       return runtime.subscribe('cowork.onStreamUiEvent', _p0);
     },
