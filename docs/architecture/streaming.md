@@ -21,8 +21,8 @@ piUiForwarder.ts         UiMessageChunkCoalescer (16 ms / 32 ms / 2048 chars) �
                          → webContents.send(CoworkStreamIpc.UiEvent)
         │
         ▼
-coworkStreamPipeline.ts  PiUiEventSequenceTracker → RafStreamPartBatcher → LiveTextStore;
-(renderer)               sequence gap → flush → resetSession → requestStreamResync → endSessionResync
+coworkStreamPipeline.ts  PiUiEventSequenceTracker → LiveTextStore (chunks applied on arrival);
+(renderer)               sequence gap → resetSession → requestStreamResync → endSessionResync
         │
         ▼
 LiveTextStore            base + ordered parts, held outside Redux
@@ -65,7 +65,7 @@ The **single** merge point before IPC: consecutive deltas of the same stream par
 
 ### Renderer — `src/renderer/services/coworkStreamPipeline.ts`
 
-Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → `RafStreamPartBatcher` → `LiveTextStore`; a lifecycle watermark drops stale events and `CoworkContentBuffer` reassembles `ContentPatch` fan-out. Finalized messages enter Redux once. Non-final full-text `MessageUpdate` is dropped with a warning. Metadata-only terminal updates merge metadata without touching the committed body. On a sequence gap: flush batchers → `resetSession` → `onSequenceGap` (session recovery) → `requestStreamResync` (main pushes the base snapshots before the call settles) → `endSessionResync`.
+Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → `LiveTextStore` (StreamPart chunks are applied on arrival — the main-process coalescer already batches them — and the store schedules one rAF notification per frame of updates); a lifecycle watermark drops stale events and `CoworkContentBuffer` reassembles `ContentPatch` fan-out. Finalized messages enter Redux once, committed by `RafMessageUpdateBatcher` (terminal commits only). Non-final full-text `MessageUpdate` is dropped with a warning. Metadata-only terminal updates merge metadata without touching the committed body. On a sequence gap: `resetSession` → `onSequenceGap` (session recovery) → `requestStreamResync` (main pushes the base snapshots before the call settles) → `endSessionResync`.
 
 ### Live text & render
 
@@ -77,7 +77,7 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 
 1. **Increments on the wire:** routine streaming uses `StreamPart` events with `text-delta` / `reasoning-delta`; per-event payload size must not grow with total message length (G1/G3).
 2. **Merge once upstream:** only `UiMessageChunkCoalescer` may batch deltas before IPC.
-3. **Throttle once downstream:** only `RafStreamPartBatcher` + `StreamingMarkdownResponse` reduce render frequency. The throttled in-process `messageUpdate` bus and the SQLite growth checkpoints are not on the UI IPC path and do not count as UI throttles.
+3. **Throttle once downstream:** only the LiveTextStore rAF notification + `StreamingMarkdownResponse` reduce render frequency. The throttled in-process `messageUpdate` bus and the SQLite growth checkpoints are not on the UI IPC path and do not count as UI throttles.
 4. **Snapshots are exceptional:** full text on IPC only for non-prefix rewrites, 2M truncation, gap/attach resync, and terminal state — never for ordinary token streaming. Streaming snapshots (`isStreaming: true`) are LiveTextStore bases, not Redux commits.
 5. **Terminal text exactly once:** the final body reaches the renderer once per message; duplicates degrade to metadata-only updates.
 
@@ -114,7 +114,7 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 | `piTranslate/piTranslateUtils.ts` | **Ported** from `packages/harness-pi/src/pi-utils.ts`. |
 | `piTranslate/piTranslateUiMessageChunk.test.ts` · `piTranslateUiMessageChunk.tools.test.ts` | **Ported & rewritten** from `packages/harness-pi/src/pi-translate.test.ts` (text/reasoning/toolcall cases; finish-step/usage/compaction excluded). |
 | `src/main/streaming/uiMessageChunkCoalescer.ts` · `streamLimits.ts` | **New**; design reference Cherry Studio `WebContentsListener` (AGPL-3.0) — independent implementation, no code copied. |
-| `liveTextStore.ts` · `coworkStreamPipeline.ts` · `rafStreamPartBatcher.ts` · `piStreamChunkEmit.ts` · resync IPC · guard/consistency tests + harness | **New.** |
+| `liveTextStore.ts` · `coworkStreamPipeline.ts` · `piStreamChunkEmit.ts` · resync IPC · guard/consistency tests + harness | **New.** |
 
 ## Tests
 
