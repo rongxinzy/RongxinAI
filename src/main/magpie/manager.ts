@@ -25,6 +25,7 @@ import {
   magpieAgentPreview,
   magpieDisconnectAllManaged,
   magpieReapplyConnectedAgents,
+  parseMagpieCliVersions,
 } from './agentControl';
 import { isolatedMagpieEnvironment, prepareMagpieHome } from './environment';
 import { syncMagpieLanAccessKey } from './lanAccess';
@@ -744,10 +745,7 @@ export class MagpieManager {
     if (this.state.state !== 'running') return { agents: [], pending: false };
     const state = await this.managementJson('/api/state');
     const cli = await this.managementJson('/api/agents/cli');
-    const records = (cli.agents && typeof cli.agents === 'object' ? cli.agents : {}) as Record<
-      string,
-      { version?: unknown; app?: unknown }
-    >;
+    const records = parseMagpieCliVersions(cli.agents);
     return {
       pending: cli.pending === true,
       agents: (Array.isArray(state.agents) ? state.agents : [])
