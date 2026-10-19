@@ -10,8 +10,8 @@ import bundled from './bundledRuntime.json';
  * bundled pair changes so existing workspace environments demand an explicit
  * rebuild.
  */
-export const BUNDLED_PYTHON_VERSION: string = bundled.pythonVersion;
-export const BUNDLED_UV_VERSION: string = bundled.uvVersion;
+const BUNDLED_PYTHON_VERSION: string = bundled.pythonVersion;
+const BUNDLED_UV_VERSION: string = bundled.uvVersion;
 
 export const bundledRuntimeId = (): string =>
   `bundled-cpython-${BUNDLED_PYTHON_VERSION}-uv-${BUNDLED_UV_VERSION}`;
