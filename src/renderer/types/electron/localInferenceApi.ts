@@ -6,39 +6,15 @@
  */
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../../shared/hardware';
 import type {
-  LlamaCppCancelModelLoadResult,
-  LlamaCppCancelInstallResult,
-  LlamaCppGatewayLanTokenResult,
-  LlamaCppImportModelFilesResult,
-  LlamaCppInstallModelInput,
-  LlamaCppInstallProgress,
-  LlamaCppLatestModelLaunchLogSessionInput,
-  LlamaCppModel,
-  LlamaCppModelLaunchInput,
   LlamaCppModelLaunchLogClearedEvent,
   LlamaCppModelLaunchLogEvent,
-  LlamaCppModelLaunchLogSession,
   LlamaCppModelLaunchLogWindowTarget,
-  LlamaCppModelLaunchResult,
-  LlamaCppModelPreferences,
-  LlamaCppModelUnloadResult,
-  LlamaCppOpenModelLaunchLogWindowInput,
-  LlamaCppOpenModelLaunchLogWindowResult,
-  LlamaCppReadModelLaunchLogFileInput,
-  LlamaCppReadModelLaunchLogFileResult,
-  LlamaCppRunningModel,
-  LlamaCppRuntimeCapabilities,
-  LlamaCppRuntimeImportResult,
-  LlamaCppRuntimeInstallResult,
-  LlamaCppRuntimeListDevicesResult,
-  LlamaCppRuntimeUninstallResult,
-  LlamaCppServiceConfig,
-  LlamaCppSetModelPreferenceInput,
-  LlamaCppStatusSnapshot,
 } from '../../../shared/llamacpp';
+import type { LlamaCppStatusSnapshot, LlamaCppInstallProgress } from '../../../shared/llamacpp';
 import type { IpcContractApi } from '../../../shared/ipc/contract';
 import type { marketplaceContract } from '../../../shared/marketplace/contract';
 import type { ollamaContract } from '../../../shared/ipc/ollamaContract';
+import type { llamacppContract } from '../../../shared/ipc/llamacppContract';
 import type {
   OllamaChatChunk,
   OllamaInstallProgress,
@@ -63,75 +39,20 @@ export interface OllamaApi extends Omit<
   ) => () => void;
 }
 
-export interface LlamaCppApi {
-  status: () => Promise<LlamaCppStatusSnapshot>;
-  install: () => Promise<LlamaCppRuntimeInstallResult>;
-  cancelRuntimeInstall: () => Promise<LlamaCppCancelInstallResult>;
-  importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
-  listRuntimeDevices: (
-    input?: import('../../../shared/llamacpp').LlamaCppBackendRef,
-  ) => Promise<LlamaCppRuntimeListDevicesResult>;
-  getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
-  listBackends: () => Promise<import('../../../shared/llamacpp').LlamaCppBackendListResult>;
-  getBackendDownloadSize: (
-    input: import('../../../shared/llamacpp').LlamaCppBackendRef,
-  ) => Promise<import('../../../shared/llamacpp').LlamaCppBackendDownloadSizeResult>;
-  getBackendSelection: () => Promise<
-    import('../../../shared/llamacpp').LlamaCppBackendRef | undefined
-  >;
-  setBackendSelection: (
-    input: import('../../../shared/llamacpp').LlamaCppBackendRef,
-  ) => Promise<LlamaCppRuntimeInstallResult>;
-  installBackend: (
-    input?: import('../../../shared/llamacpp').LlamaCppBackendRef,
-  ) => Promise<LlamaCppRuntimeInstallResult>;
-  getRuntimeInstallSnapshot: () => Promise<
-    import('../../../shared/llamacpp').LlamaCppRuntimeInstallSnapshot
-  >;
-  uninstallBackend: (
-    input?: import('../../../shared/llamacpp').LlamaCppBackendRef,
-  ) => Promise<LlamaCppRuntimeUninstallResult>;
-  uninstallRuntime: () => Promise<LlamaCppRuntimeUninstallResult>;
-  start: () => Promise<LlamaCppStatusSnapshot>;
-  stop: () => Promise<LlamaCppStatusSnapshot>;
-  restart: () => Promise<LlamaCppStatusSnapshot>;
-  getServiceConfig: () => Promise<LlamaCppServiceConfig>;
-  setServiceConfig: (config: LlamaCppServiceConfig) => Promise<LlamaCppServiceConfig>;
-  getGatewayLanToken: () => Promise<LlamaCppGatewayLanTokenResult>;
-  regenerateGatewayLanToken: () => Promise<LlamaCppGatewayLanTokenResult>;
-  modelsDir: () => Promise<string>;
-  setModelsDir: (modelsDir: string) => Promise<string>;
-  listLocalModels: () => Promise<LlamaCppModel[]>;
-  listRunningModels: () => Promise<LlamaCppRunningModel[]>;
-  refreshRunningModelBindings: () => Promise<void>;
-  importModelFiles: (paths: string[]) => Promise<LlamaCppImportModelFilesResult>;
-  deleteModel: (name: string) => Promise<{
-    success: boolean;
-    deleted?: boolean;
-    reason?: 'not-local-file' | 'not-app-managed';
-    error?: string;
-    removedModelName?: string;
-    clearedDefaultModel?: boolean;
-  }>;
-  showModel: (name: string) => Promise<unknown>;
-  getModelPreferences: () => Promise<LlamaCppModelPreferences>;
-  setModelPreference: (input: LlamaCppSetModelPreferenceInput) => Promise<LlamaCppModelPreferences>;
-  loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
-  cancelModelLoad: (modelName?: string) => Promise<LlamaCppCancelModelLoadResult>;
-  unloadModel: (name: string) => Promise<LlamaCppModelUnloadResult>;
-  getLatestModelLaunchLogSession: (
-    input?: LlamaCppLatestModelLaunchLogSessionInput,
-  ) => Promise<LlamaCppModelLaunchLogSession | null>;
-  readModelLaunchLogFile: (
-    input: LlamaCppReadModelLaunchLogFileInput,
-  ) => Promise<LlamaCppReadModelLaunchLogFileResult>;
-  openModelLaunchLogWindow: (
-    input?: LlamaCppOpenModelLaunchLogWindowInput,
-  ) => Promise<LlamaCppOpenModelLaunchLogWindowResult>;
-  installModel: (
-    input: LlamaCppInstallModelInput,
-  ) => Promise<{ success: boolean; cancelled?: boolean }>;
-  cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
+/**
+ * llama.cpp surface: invoke methods derive from the zod contract (work
+ * package M.4); push subscriptions stay hand-typed.
+ */
+export interface LlamaCppApi extends Omit<
+  IpcContractApi<typeof llamacppContract>,
+  | 'onStatusChanged'
+  | 'onModelBindingsChanged'
+  | 'onInstallProgress'
+  | 'onModelLaunchLog'
+  | 'onModelLaunchLogCleared'
+  | 'onModelLaunchLogWindowTargetChanged'
+  | 'onPullProgress'
+> {
   onStatusChanged: (callback: (snapshot: LlamaCppStatusSnapshot) => void) => () => void;
   onModelBindingsChanged: (callback: () => void) => () => void;
   onInstallProgress: (callback: (progress: LlamaCppInstallProgress) => void) => () => void;
