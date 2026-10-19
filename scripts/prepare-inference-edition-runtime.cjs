@@ -12,6 +12,16 @@ function sha256File(filePath) {
   return hash.digest('hex');
 }
 
+// The official macOS and Linux llama.cpp archives ship versioned shared
+// libraries behind relative symlinks (libllama.dylib -> libllama.0.dylib).
+// fs.cpSync rewrites those to absolute paths into vendor/ by default, which
+// leaves links pointing outside the app bundle: codesign rejects the macOS
+// .app and the installed Linux package would carry dangling links.
+function copyRuntimeTree(sourceRoot, targetRoot) {
+  fs.rmSync(targetRoot, { recursive: true, force: true });
+  fs.cpSync(sourceRoot, targetRoot, { recursive: true, verbatimSymlinks: true });
+}
+
 function main() {
   const edition = (process.env.ZHIYUAN_UPDATE_VARIANT || 'cpu').trim().toLowerCase();
   if (edition === 'lite') {
@@ -29,8 +39,7 @@ function main() {
     return;
   }
 
-  fs.rmSync(targetRoot, { recursive: true, force: true });
-  fs.cpSync(sourceRoot, targetRoot, { recursive: true });
+  copyRuntimeTree(sourceRoot, targetRoot);
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
   const executablePath = path.join(targetRoot, manifest.executable);
@@ -59,4 +68,8 @@ function main() {
   );
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { copyRuntimeTree };
