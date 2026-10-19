@@ -407,6 +407,13 @@ test('tag release publishes beta and archives build metadata for promotion', () 
   assert.match(workflow, /prerelease: true/);
 });
 
+test('published update smoke reads the electron feed of the channel it verifies', () => {
+  const script = readFileSync(path.join(root, 'scripts', 'release', 'verify-published-update.mjs'), 'utf8');
+
+  assert.match(script, /v2\/electron\/\$\{channel\}\//);
+  assert.doesNotMatch(script, /v2\/electron\/stable\//);
+});
+
 test('stable promotion rechannels beta without rebuilding installers', () => {
   const workflowText = readFileSync(path.join(root, '.github', 'workflows', 'promote.yml'), 'utf8');
 
