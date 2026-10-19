@@ -301,6 +301,17 @@ jobs:
       - run: bun run apply:patches
       - name: Bundle the independent Runner
         run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
+      - name: Restore the bundled managed runtime cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            resources/python-linux
+            resources/uv-linux
+          key: bundled-runtime-linux-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json') }}
+      - name: Provision the bundled managed runtime
+        run: |
+          bun run setup:posix-python-runtime
+          bun run setup:posix-uv-runtime
       - name: Verify pinned Python, isolated packages, rebuild and process cancellation
         run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
 
@@ -341,6 +352,17 @@ jobs:
       - run: bun run apply:patches
       - name: Bundle the independent Runner
         run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
+      - name: Restore the bundled managed runtime cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            resources/python-win
+            resources/uv-win
+          key: bundled-runtime-win-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json') }}
+      - name: Provision the bundled managed runtime
+        run: |
+          bun run setup:python-runtime
+          bun run setup:uv-runtime
       - name: Verify Windows standalone Python and real uv wheel environments
         run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
 
