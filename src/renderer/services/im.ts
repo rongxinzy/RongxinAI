@@ -335,9 +335,11 @@ class IMService {
     return PlatformRegistry.platforms.some(p => {
       const s = status[p];
       if (p === 'qq' || p === 'feishu' || p === 'dingtalk' || p === 'wecom' || p === 'discord') {
-        return (s as any)?.instances?.some((i: any) => i.connected);
+        const multi = s as { instances?: Array<{ connected?: boolean }> } | undefined;
+        return Boolean(multi?.instances?.some(instance => instance.connected));
       }
-      return (s as any)?.connected;
+      const single = s as { connected?: boolean } | undefined;
+      return Boolean(single?.connected);
     });
   }
 

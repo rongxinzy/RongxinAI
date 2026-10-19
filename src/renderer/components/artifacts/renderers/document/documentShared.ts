@@ -6,9 +6,18 @@ import type { Artifact } from '@/types/artifact';
 
 export const t = (key: string) => i18nService.t(key);
 
+export interface PdfDocumentPage {
+  getViewport(options: { scale: number }): { width: number; height: number };
+  render(options: {
+    canvasContext: CanvasRenderingContext2D;
+    viewport: { width: number; height: number };
+  }): { promise: Promise<void>; cancel: () => void };
+}
+
 export interface PdfDocumentHandle {
   numPages: number;
   destroy: () => Promise<void>;
+  getPage(pageNumber: number): Promise<PdfDocumentPage>;
 }
 
 export async function destroyPdfDocument(

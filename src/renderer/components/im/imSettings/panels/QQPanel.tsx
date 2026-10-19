@@ -103,12 +103,12 @@ export const QQPanel: React.FC<QQPanelProps> = ({
           dispatch(
             setQQInstanceConfig({
               instanceId: activeInstanceId,
-              config: { instanceName: newName } as any,
+              config: { instanceName: newName },
             }),
           );
           await imService.persistQQInstanceConfig(activeInstanceId, {
             instanceName: newName,
-          } as any);
+          });
         }}
         onDelete={async () => {
           await imService.deleteQQInstance(activeInstanceId);
