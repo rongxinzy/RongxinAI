@@ -1,7 +1,12 @@
-/** Skills IPC: list/enable/pin/delete/config and ModelScope marketplace access. */
+/**
+ * Skills IPC: list/enable/pin/delete/config and ModelScope marketplace access
+ * (work package I: domain-owned registration, `registerXxxIpc(deps)` shape —
+ * no appBootstrap imports).
+ */
 import { session } from 'electron';
 
-import { getSkillManager, getStore } from './runtimeServices';
+import type { SkillManager } from '../skillManager';
+import type { SqliteStore } from '../sqliteStore';
 import {
   fetchModelScopeSkillContent,
   fetchModelScopeSkillMarketplace,
@@ -10,11 +15,16 @@ import { createModelScopeTokenPool, ModelScopeStoreKey } from '../libs/modelscop
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { skillsContract } from '../../shared/ipc/skillsContract';
 
-export const registerSkillsIpc = (): void => {
+export interface SkillsIpcDeps {
+  getSkillManager: () => SkillManager;
+  getStore: () => SqliteStore;
+}
+
+export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
   handleIpcContract(skillsContract, {
     list: () => {
       try {
-        const skills = getSkillManager().listSkills();
+        const skills = deps.getSkillManager().listSkills();
         return { success: true, skills };
       } catch (error) {
         return {
@@ -26,7 +36,7 @@ export const registerSkillsIpc = (): void => {
 
     setEnabled: (_event, options) => {
       try {
-        const skills = getSkillManager().setSkillEnabled(options.id, options.enabled);
+        const skills = deps.getSkillManager().setSkillEnabled(options.id, options.enabled);
         return { success: true, skills };
       } catch (error) {
         return {
@@ -38,7 +48,7 @@ export const registerSkillsIpc = (): void => {
 
     setEnabledBatch: (_event, options) => {
       try {
-        const skills = getSkillManager().setSkillsEnabled(options.ids, options.enabled);
+        const skills = deps.getSkillManager().setSkillsEnabled(options.ids, options.enabled);
         return { success: true, skills };
       } catch (error) {
         return {
@@ -50,7 +60,7 @@ export const registerSkillsIpc = (): void => {
 
     setPinned: (_event, options) => {
       try {
-        const skills = getSkillManager().setSkillPinned(options.id, options.pinned);
+        const skills = deps.getSkillManager().setSkillPinned(options.id, options.pinned);
         return { success: true, skills };
       } catch (error) {
         return {
@@ -60,11 +70,11 @@ export const registerSkillsIpc = (): void => {
       }
     },
 
-    createCustom: (_event, params) => getSkillManager().createCustomSkill(params),
+    createCustom: (_event, params) => deps.getSkillManager().createCustomSkill(params),
 
     delete: async (_event, id) => {
       try {
-        const skills = await getSkillManager().deleteSkill(id);
+        const skills = await deps.getSkillManager().deleteSkill(id);
         return { success: true, skills };
       } catch (error) {
         console.error('[skills] Failed to delete skill:', id, error);
@@ -75,14 +85,14 @@ export const registerSkillsIpc = (): void => {
       }
     },
 
-    download: (_event, source, options) => getSkillManager().downloadSkill(source, options),
+    download: (_event, source, options) => deps.getSkillManager().downloadSkill(source, options),
 
     confirmInstall: (_event, pendingId, action) =>
-      getSkillManager().confirmPendingInstall(pendingId, action),
+      deps.getSkillManager().confirmPendingInstall(pendingId, action),
 
     getRoot: () => {
       try {
-        const root = getSkillManager().getSkillsRoot();
+        const root = deps.getSkillManager().getSkillsRoot();
         return { success: true, path: root };
       } catch (error) {
         return {
@@ -92,11 +102,11 @@ export const registerSkillsIpc = (): void => {
       }
     },
 
-    getContent: (_event, skillId) => getSkillManager().getSkillContent(skillId),
+    getContent: (_event, skillId) => deps.getSkillManager().getSkillContent(skillId),
 
     autoRoutingPrompt: () => {
       try {
-        const prompt = getSkillManager().buildAutoRoutingPrompt();
+        const prompt = deps.getSkillManager().buildAutoRoutingPrompt();
         return { success: true, prompt };
       } catch (error) {
         return {
@@ -106,16 +116,16 @@ export const registerSkillsIpc = (): void => {
       }
     },
 
-    getConfig: (_event, skillId) => getSkillManager().getSkillConfig(skillId),
+    getConfig: (_event, skillId) => deps.getSkillManager().getSkillConfig(skillId),
 
-    setConfig: (_event, skillId, config) => getSkillManager().setSkillConfig(skillId, config),
+    setConfig: (_event, skillId, config) => deps.getSkillManager().setSkillConfig(skillId, config),
 
     testEmailConnectivity: (_event, skillId, config) =>
-      getSkillManager().testEmailConnectivity(skillId, config),
+      deps.getSkillManager().testEmailConnectivity(skillId, config),
 
     fetchMarketplace: async (_event, options) => {
       try {
-        const userToken = getStore().get<string>(ModelScopeStoreKey.ApiToken);
+        const userToken = deps.getStore().get<string>(ModelScopeStoreKey.ApiToken);
         const token = createModelScopeTokenPool({
           extraTokens: userToken ? [userToken] : [],
         }).nextToken();
@@ -141,7 +151,7 @@ export const registerSkillsIpc = (): void => {
 
     fetchMarketplaceContent: async (_event, skillId) => {
       try {
-        const userToken = getStore().get<string>(ModelScopeStoreKey.ApiToken);
+        const userToken = deps.getStore().get<string>(ModelScopeStoreKey.ApiToken);
         const token = createModelScopeTokenPool({
           extraTokens: userToken ? [userToken] : [],
         }).nextToken();

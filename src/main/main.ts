@@ -18,7 +18,7 @@ import {
 import { registerCoreIpc } from './appBootstrap/coreIpc';
 import { registerManagedProvidersIpc } from './appBootstrap/managedProvidersIpc';
 import { registerAppIpc } from './appBootstrap/appIpc';
-import { registerSkillsIpc } from './appBootstrap/skillsIpc';
+import { registerSkillsIpc } from './skills/ipc';
 import { registerMcpIpc } from './appBootstrap/mcpIpc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { registerProjectIpc } from './appBootstrap/projectIpc';
@@ -31,7 +31,7 @@ import { registerCoworkExportIpc } from './appBootstrap/coworkExportIpc';
 import { registerCoworkConfigIpc } from './appBootstrap/coworkConfigIpc';
 import { registerAgentIpc } from './appBootstrap/agentIpc';
 import { registerScheduledTaskIpc } from '../scheduledTask/ipc';
-import { getActivityService } from './appBootstrap/runtimeServices';
+import { getActivityService, getSkillManager, getStore } from './appBootstrap/runtimeServices';
 import {
   getCanonicalScheduledTaskService,
   getIMGatewayManager,
@@ -67,7 +67,7 @@ if (!gotTheLock) {
   registerManagedProvidersIpc();
   registerAppIpc();
   registerCommunityAuthIpc();
-  registerSkillsIpc();
+  registerSkillsIpc({ getSkillManager, getStore });
   registerMcpIpc();
   registerWorkspaceIpc();
   registerProjectIpc();
