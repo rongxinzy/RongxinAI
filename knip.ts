@@ -41,6 +41,10 @@ const config: KnipConfig = {
         'scripts/release/print-required-release-targets.mjs',
         'scripts/release/stage-downloaded-release-candidates.sh',
         'scripts/release/fetch-generation-build-metadata.sh',
+        'scripts/release/publish-platform-beta-release.sh',
+        'scripts/release/merge-update-manifest-collection.mjs',
+        'scripts/release/windows/assemble-windows-edition.cjs',
+        'scripts/ci/with-download-retries.sh',
         'scripts/release/upload-update-artifacts.mjs',
         'tests/setup/rebuild-sqlite-for-node.cjs',
         // Bundled by `bun build` in the bench:stream script; Knip does not parse that form.

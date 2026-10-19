@@ -1,0 +1,100 @@
+name: Publish platform release (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        description: 'Platform stage: win32, darwin, or linux'
+        required: true
+        type: string
+      version:
+        description: 'Release SemVer embedded in artifacts'
+        required: true
+        type: string
+      commit:
+        description: 'Source commit SHA'
+        required: true
+        type: string
+    secrets:
+      R2_ACCESS_KEY_ID:
+        required: true
+      R2_SECRET_ACCESS_KEY:
+        required: true
+      CLOUDFLARE_ACCOUNT_ID:
+        required: true
+      UPDATE_MANIFEST_KEY_ID:
+        required: true
+      UPDATE_MANIFEST_PRIVATE_KEY_BASE64:
+        required: true
+      UPDATE_MANIFEST_PUBLIC_KEY_BASE64:
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  R2_BUCKET: zhiyuan-releases
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      ZHIYUAN_RELEASE_PLATFORM: ${{ inputs.platform }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.commit }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+      - name: Install release tools
+        run: |
+          pipx install 'awscli>=1.45.10,<2'
+          npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Download verified release payloads for this platform
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-candidate-${{ inputs.version }}-*
+          path: candidate-staging
+      - name: Stage release candidates by bundle id
+        shell: bash
+        run: bash scripts/release/stage-downloaded-release-candidates.sh '${{ inputs.version }}'
+      - name: Configure protected R2 access
+        shell: bash
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          {
+            echo "AWS_ACCESS_KEY_ID=$R2_ACCESS_KEY_ID"
+            echo "AWS_SECRET_ACCESS_KEY=$R2_SECRET_ACCESS_KEY"
+            echo 'AWS_DEFAULT_REGION=auto'
+            echo "AWS_ENDPOINT_URL_S3=https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          } >> "$GITHUB_ENV"
+      - name: Publish beta channel for platform stage
+        shell: bash
+        run: |
+          chmod +x scripts/release/publish-platform-beta-release.sh
+          bash scripts/release/publish-platform-beta-release.sh \
+            '${{ inputs.platform }}' \
+            '${{ inputs.version }}' \
+            '${{ inputs.commit }}' \
+            '${{ github.run_id }}'
+        env:
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+      - name: Summarize platform publish
+        shell: bash
+        run: |
+          {
+            echo "### Published beta (${{ inputs.platform }})"
+            echo
+            echo "- version: \`${{ inputs.version }}\`"
+            echo "- platform stage: \`${{ inputs.platform }}\`"
+            echo "- pipeline run: \`${{ github.run_id }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

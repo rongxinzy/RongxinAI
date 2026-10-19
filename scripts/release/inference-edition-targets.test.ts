@@ -34,9 +34,9 @@ test('release candidate bundles match the 7 build legs', () => {
   ]);
 });
 
-describe('ZHIYUAN_RELEASE_PLATFORMS', () => {
-  test('narrows targets and candidate bundles to the selected platforms', () => {
-    const windowsOnly = resolveReleasePlatforms({ ZHIYUAN_RELEASE_PLATFORMS: 'win32' });
+describe('ZHIYUAN_RELEASE_PLATFORM', () => {
+  test('narrows targets and candidate bundles to the selected platform stage', () => {
+    const windowsOnly = resolveReleasePlatforms({ ZHIYUAN_RELEASE_PLATFORM: 'win32' });
     expect(listRequiredReleaseTargets(windowsOnly)).toEqual([
       'win32:x64:lite',
       'win32:x64:cpu',
@@ -48,7 +48,7 @@ describe('ZHIYUAN_RELEASE_PLATFORMS', () => {
       'win32-x64-cuda',
     ]);
     expect(listReleaseCandidateBundles(resolveReleasePlatforms({}))).toHaveLength(7);
-    expect(() => resolveReleasePlatforms({ ZHIYUAN_RELEASE_PLATFORMS: 'windows' })).toThrow(
+    expect(() => resolveReleasePlatforms({ ZHIYUAN_RELEASE_PLATFORM: 'windows' })).toThrow(
       'Unsupported',
     );
   });
