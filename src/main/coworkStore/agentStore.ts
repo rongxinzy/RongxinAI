@@ -1,6 +1,6 @@
 // Agent CRUD for the CoworkStore class chain.
 // Split from src/main/coworkStore.ts (issue #1069).
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 import { normalizeAgentAvatarIcon } from '../../shared/agent/avatar';
 import { CoworkConversationSearchStore } from './conversationSearchStore';
@@ -72,7 +72,7 @@ export class CoworkAgentStore extends CoworkConversationSearchStore {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '') ||
-      uuidv4();
+      randomUUID();
     const now = Date.now();
 
     // Ensure no duplicate ID
