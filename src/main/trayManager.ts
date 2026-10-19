@@ -4,6 +4,7 @@ import path from 'path';
 import { APP_NAME } from './appConstants';
 import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { t } from './i18n';
+import { isDesktopPetEnabled, setDesktopPetEnabled } from './desktopPet/controller';
 
 let tray: Tray | null = null;
 let contextMenu: Menu | null = null;
@@ -65,6 +66,12 @@ function buildContextMenu(getWindow: () => BrowserWindow | null): Menu {
       },
     },
     { type: 'separator' },
+    {
+      label: t('desktopPetTitle'),
+      type: 'checkbox',
+      checked: isDesktopPetEnabled(),
+      click: item => setDesktopPetEnabled(item.checked),
+    },
     {
       label: labels.settings,
       click: () => {

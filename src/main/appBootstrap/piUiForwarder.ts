@@ -21,6 +21,7 @@ import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { UiMessageChunkCoalescer } from '../streaming/uiMessageChunkCoalescer';
 import { snapshotToContentPatches } from '../piUiStreamGateway';
 import { PiUiRuntimeSnapshots } from '../../shared/cowork/piUiRuntimeSnapshot';
+import { isDesktopPetWindow, observeDesktopPetEvent } from '../desktopPet/controller';
 import {
   type PiUiEvent,
   type PiUiEventPayload,
@@ -102,9 +103,10 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
 
   const broadcastUiEvent = (event: PiUiEvent): void => {
     runtimeSnapshots.observe(event);
+    observeDesktopPetEvent(event);
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
-      if (win.isDestroyed()) return;
+      if (win.isDestroyed() || isDesktopPetWindow(win)) return;
       try {
         win.webContents.send(CoworkStreamIpc.UiEvent, event);
       } catch (error) {

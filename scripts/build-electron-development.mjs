@@ -63,6 +63,7 @@ fs.mkdirSync(outputDirectory, { recursive: true });
 fs.rmSync(readyPath, { force: true });
 
 await build(createBuildOptions('src/main/preload.ts'));
+await build(createBuildOptions('src/main/desktopPetPreload.ts'));
 await build(createBuildOptions('src/main/llamacppModelDaemonEntry.ts'));
 await build(createBuildOptions('src/main/workbenchTask/artifactWorker.ts'));
 await build(createBuildOptions('src/main/magpie/catalogWorker.ts'));
