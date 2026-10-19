@@ -164,7 +164,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: vendor/llamacpp/cuda
-          key: cuda-b9244-sm89-cuda12.4.1-${{ matrix.runner }}-${{ steps.image.outputs.version }}-${{ hashFiles('scripts/*llamacpp*', 'scripts/ci/*llamacpp*', 'scripts/ci/runtime-tree-integrity.cjs', 'scripts/windows-pe-imports.cjs', 'scripts/stage-linux-cuda-runtime-libs.cjs', 'resources/llamacpp-backends/manifest.json', 'package.json') }}
+          key: cuda-b9244-sm89-cuda12.4.1-${{ matrix.runner }}-${{ steps.image.outputs.version }}-${{ hashFiles('.github/workflows/build-inference-editions.yml', 'scripts/*llamacpp*', 'scripts/ci/*llamacpp*', 'scripts/ci/runtime-tree-integrity.cjs', 'scripts/windows-pe-imports.cjs', 'scripts/stage-linux-cuda-runtime-libs.cjs', 'scripts/ci/stage-linux-cuda-runtime-libs.sh', 'resources/llamacpp-backends/manifest.json', 'package.json') }}
       - name: Cache llama.cpp CUDA source
         if: ${{ steps.cuda-binary.outputs.cache-hit != 'true' && matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
         uses: actions/cache@v5
