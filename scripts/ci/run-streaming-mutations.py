@@ -207,13 +207,11 @@ def is_allowlisted(name: str) -> bool:
     return any(name.startswith(prefix) for prefix in ALLOWLIST_SURVIVORS)
 
 
-def ensure_node_sqlite() -> None:
+def ensure_node_native() -> None:
     subprocess.run(
         ['node', 'scripts/ensure-node-native.cjs'],
         cwd=ROOT,
         check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
     )
 
 
@@ -266,9 +264,11 @@ def main() -> int:
     only = args
     results: dict[str, object] = {}
 
-    ensure_node_sqlite()
+    ensure_node_native()
     baseline = run_vitest()
     baseline_out = baseline.stdout + baseline.stderr
+    with open(os.path.join(ROOT, 'artifacts/streaming-mutations/baseline.log'), 'w', encoding='utf-8') as handle:
+        handle.write(baseline_out)
     if baseline.returncode != 0:
         print('Baseline vitest subset failed before mutations:', flush=True)
         print(baseline_out[-2000:], flush=True)
