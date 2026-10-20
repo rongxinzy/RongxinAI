@@ -35,6 +35,8 @@ import {
 
 type MockSkill = (typeof mockSkills)[number];
 import type { BrowserMockRuntime } from './runtime';
+import { createCodingPreview } from './codingPreview';
+import { PreviewScenario, readPreviewScenario } from './previewQuery';
 import { createDesktopPetPreview } from './desktopPet';
 import type { DeepPartial } from './scenarioTypes';
 import {
@@ -78,6 +80,8 @@ function sessionMode(options: object): CoworkSessionMode {
 }
 
 export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPartial<ElectronApi> {
+  const codingPreview =
+    readPreviewScenario() === PreviewScenario.Coding ? createCodingPreview(runtime) : null;
   const streamReplayFixtureId = readStreamReplayFixtureId();
   let preferences = { ...mockMagpiePreferences };
   const store = new Map<string, unknown>();
@@ -281,6 +285,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
   };
 
   return {
+    ...(codingPreview ?? {}),
     desktopPet: createDesktopPetPreview(runtime),
     store: {
       get: (key: string) => Promise.resolve(store.has(key) ? store.get(key) : null),
