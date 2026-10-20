@@ -21,10 +21,10 @@ import {
   CoworkQueueDelivery,
   CoworkQueueItemStatus,
 } from '../../../shared/cowork/pendingMessageQueue';
-import { CodingRoomServiceCollaborationStages } from './collaborationStages';
+import { CodingRoomServiceBuiltinControlCommands } from './builtinControlCommands';
 
 /** Prompt dispatch, cancellation, recovery and the turn execution engine. */
-export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCollaborationStages {
+export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceBuiltinControlCommands {
   async steerPendingMessage(
     workspaceRoot: string,
     laneId: string,
