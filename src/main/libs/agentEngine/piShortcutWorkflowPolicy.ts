@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import { isIP } from 'node:net';
 import { inflateSync } from 'node:zlib';
-import JSZip from 'jszip';
+import yauzl from 'yauzl';
 
 import { CoreSkillId } from '../../../shared/skills/constants';
 
@@ -294,16 +294,115 @@ const officeRequiredEntries = (kind: ShortcutWorkflowKind): string[] => {
   return [];
 };
 
+/**
+ * Decompressed head bytes read per entry and per file. Every XML check looks
+ * at the root element's opening tag, which sits in the first bytes of the
+ * entry, so bounded heads keep hostile archives from streaming unbounded
+ * data through the main process while accepting large workbooks (4KB per
+ * worksheet covers ~2000 sheets under the total cap).
+ */
+const OFFICE_ROOT_HEAD_BYTES = 256 * 1024;
+const OFFICE_SHEET_HEAD_BYTES = 4 * 1024;
+const OFFICE_TOTAL_HEAD_BYTES = 8 * 1024 * 1024;
+
+const openOfficeZip = (filePath: string): Promise<yauzl.ZipFile> =>
+  new Promise((resolve, reject) => {
+    yauzl.open(filePath, { lazyEntries: true, autoClose: false }, (error, zipFile) => {
+      if (error || !zipFile) reject(error ?? new Error('Unable to open Office package'));
+      else resolve(zipFile);
+    });
+  });
+
+/** Read at most maxBytes from an entry; resolve early once the head is in. */
+const entryTextHead = (
+  zipFile: yauzl.ZipFile,
+  entry: yauzl.Entry,
+  maxBytes: number,
+): Promise<string> =>
+  new Promise((resolve, reject) => {
+    zipFile.openReadStream(entry, (error, stream) => {
+      if (error || !stream) {
+        reject(error ?? new Error('Unable to read Office package entry'));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      let total = 0;
+      let settled = false;
+      const settle = (failure?: Error): void => {
+        if (settled) return;
+        settled = true;
+        if (failure) reject(failure);
+        else resolve(Buffer.concat(chunks).toString('utf8'));
+      };
+      stream.on('data', (chunk: Buffer) => {
+        chunks.push(chunk);
+        total += chunk.length;
+        if (total >= maxBytes) {
+          stream.destroy();
+          settle();
+        }
+      });
+      stream.on('error', reject);
+      stream.on('end', () => settle());
+      stream.on('close', () => settle());
+    });
+  });
+
+/**
+ * One lazy pass over the central directory: collect every entry name and the
+ * text of the few XML entries the kind's checks need. Unlike a whole-archive
+ * JSZip load, nothing else is decompressed and the file is never fully read
+ * into memory.
+ */
+const readOfficeEntries = async (
+  zipFile: yauzl.ZipFile,
+  kind: ShortcutWorkflowKind,
+): Promise<{ names: string[]; texts: Map<string, string> }> => {
+  const names: string[] = [];
+  const texts = new Map<string, string>();
+  let budget = OFFICE_TOTAL_HEAD_BYTES;
+  // The checks only inspect each root element's opening tag, so entries map
+  // to how much of their head must be read.
+  const wanted = (name: string): number | null => {
+    if (name === 'word/document.xml' || name === 'xl/workbook.xml') return OFFICE_ROOT_HEAD_BYTES;
+    if (kind === ShortcutWorkflowKind.Sheets && /^xl\/worksheets\/sheet\d+\.xml$/i.test(name))
+      return OFFICE_SHEET_HEAD_BYTES;
+    return null;
+  };
+  await new Promise<void>((resolve, reject) => {
+    zipFile.on('error', reject);
+    zipFile.on('entry', (entry: yauzl.Entry) => {
+      names.push(entry.fileName);
+      const headBytes = wanted(entry.fileName);
+      if (headBytes !== null) {
+        void entryTextHead(zipFile, entry, headBytes)
+          .then(text => {
+            budget -= text.length;
+            if (budget < 0) throw new Error('Office package entries exceed the read limit');
+            texts.set(entry.fileName, text);
+            zipFile.readEntry();
+          })
+          .catch(reject);
+        return;
+      }
+      zipFile.readEntry();
+    });
+    zipFile.on('end', () => resolve());
+    zipFile.readEntry();
+  });
+  return { names, texts };
+};
+
 export const isValidOfficePackage = async (
   filePath: string,
   kind: ShortcutWorkflowKind,
 ): Promise<boolean> => {
+  let zipFile: yauzl.ZipFile | null = null;
   try {
-    const archive = await JSZip.loadAsync(fs.readFileSync(filePath), { checkCRC32: true });
-    const names = Object.keys(archive.files);
-    if (!officeRequiredEntries(kind).every(entry => archive.file(entry))) return false;
-    const readXml = async (entry: string): Promise<string> =>
-      (await archive.file(entry)?.async('text')) || '';
+    zipFile = await openOfficeZip(filePath);
+    const { names, texts } = await readOfficeEntries(zipFile, kind);
+    const readXml = (entry: string): string => texts.get(entry) ?? '';
+    if (!officeRequiredEntries(kind).every(entry => names.includes(entry))) return false;
     if (
       kind === ShortcutWorkflowKind.Ppt &&
       !names.some(name => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
@@ -315,21 +414,23 @@ export const isValidOfficePackage = async (
     )
       return false;
     if (kind === ShortcutWorkflowKind.Docs) {
-      const document = await readXml('word/document.xml');
+      const document = readXml('word/document.xml');
       if (!/<w:document\b[^>]*xmlns:w=/i.test(document) || !/<w:body\b/i.test(document))
         return false;
     }
     if (kind === ShortcutWorkflowKind.Sheets) {
-      const workbook = await readXml('xl/workbook.xml');
+      const workbook = readXml('xl/workbook.xml');
       const sheets = names.filter(name => /^xl\/worksheets\/sheet\d+\.xml$/i.test(name));
       if (!/<workbook\b[^>]*xmlns=/i.test(workbook)) return false;
       for (const sheet of sheets) {
-        if (!/<worksheet\b[^>]*xmlns=/i.test(await readXml(sheet))) return false;
+        if (!/<worksheet\b[^>]*xmlns=/i.test(readXml(sheet))) return false;
       }
     }
     return true;
   } catch {
     return false;
+  } finally {
+    zipFile?.close();
   }
 };
 
