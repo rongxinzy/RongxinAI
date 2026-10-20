@@ -2,6 +2,7 @@ import { app, powerSaveBlocker } from 'electron';
 
 import { isEnterprise } from './appEnv';
 import { rt } from './runtimeState';
+import { inferenceRuntime } from './inferenceRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
 import {
   APP_UPDATE_POLL_INTERVAL_MS,
@@ -70,17 +71,19 @@ export const getStore = (): SqliteStore => {
 };
 
 export const getLlamaCppManager = (): LlamaCppManager => {
-  if (!rt.llamaCppManager) {
-    rt.llamaCppManager = new LlamaCppManager(() => getLlamaCppServiceConfig(getStore()));
+  if (!inferenceRuntime.llamaCppManager) {
+    inferenceRuntime.llamaCppManager = new LlamaCppManager(() =>
+      getLlamaCppServiceConfig(getStore()),
+    );
   }
-  return rt.llamaCppManager;
+  return inferenceRuntime.llamaCppManager;
 };
 
 export const getOllamaManager = (): OllamaManager => {
-  if (!rt.ollamaManager) {
-    rt.ollamaManager = new OllamaManager(() => getOllamaServiceConfig(getStore()));
+  if (!inferenceRuntime.ollamaManager) {
+    inferenceRuntime.ollamaManager = new OllamaManager(() => getOllamaServiceConfig(getStore()));
   }
-  return rt.ollamaManager;
+  return inferenceRuntime.ollamaManager;
 };
 
 export const getAppUpdateCoordinator = (): AppUpdateCoordinator => {

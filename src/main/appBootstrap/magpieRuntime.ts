@@ -4,6 +4,7 @@ import path from 'path';
 import { app } from 'electron';
 
 import { rt } from './runtimeState';
+import { inferenceRuntime } from './inferenceRuntimeState';
 import { getOllamaManager, getStore } from './runtimeServices';
 import { MagpieManager } from '../magpie/manager';
 import { MagpieModelService, installMagpieModelService } from '../magpie/modelService';
@@ -30,7 +31,7 @@ const getLanCredentialVault = (): LlamaCppGatewayCredentialVault => {
 };
 
 export const setupMagpieRuntime = (): void => {
-  rt.magpieManager = new MagpieManager({
+  inferenceRuntime.magpieManager = new MagpieManager({
     resourcesRoot: app.isPackaged
       ? path.join(process.resourcesPath, 'magpie')
       : path.join(app.getAppPath(), 'resources/magpie'),
@@ -63,13 +64,15 @@ export const setupMagpieRuntime = (): void => {
       },
     },
   });
-  rt.managedMagpieBindings = new ManagedMagpieProviderBindings(
+  inferenceRuntime.managedMagpieBindings = new ManagedMagpieProviderBindings(
     zhiyuanManagedProviderBridge,
-    rt.magpieManager,
+    inferenceRuntime.magpieManager,
   );
-  rt.managedMagpieBindings.setOllamaReader(() => readOllamaProviderSnapshot(getOllamaManager()));
-  rt.managedMagpieBindings.setGpuReader(async () => {
-    const orchestrator = rt.llamaCppModelOrchestrator;
+  inferenceRuntime.managedMagpieBindings.setOllamaReader(() =>
+    readOllamaProviderSnapshot(getOllamaManager()),
+  );
+  inferenceRuntime.managedMagpieBindings.setGpuReader(async () => {
+    const orchestrator = inferenceRuntime.llamaCppModelOrchestrator;
     if (!orchestrator) return { baseUrl: null, models: [] };
     const models = await orchestrator.listRunningModels();
     return {
@@ -79,31 +82,35 @@ export const setupMagpieRuntime = (): void => {
         .filter((model): model is NonNullable<typeof model> => Boolean(model)),
     };
   });
-  const modelService = new MagpieModelService(rt.magpieManager, {
+  const modelService = new MagpieModelService(inferenceRuntime.magpieManager, {
     readDefaultModelId: () => getStore().get<string>('magpie_default_model_id'),
     writeDefaultModelId: id => getStore().set('magpie_default_model_id', id),
-    beforeCatalog: () => rt.managedMagpieBindings!.beforeCatalog(),
-    allowedModel: model => rt.managedMagpieBindings!.allowedModel(model.id),
+    beforeCatalog: () => inferenceRuntime.managedMagpieBindings!.beforeCatalog(),
+    allowedModel: model => inferenceRuntime.managedMagpieBindings!.allowedModel(model.id),
   });
-  rt.disposeMagpieModels = installMagpieModelService(modelService);
+  inferenceRuntime.disposeMagpieModels = installMagpieModelService(modelService);
   magpieModelService = modelService;
   registerAcpMagpieModelApply(async modelId => {
-    const snapshot = await rt.magpieManager?.agents();
+    const snapshot = await inferenceRuntime.magpieManager?.agents();
     for (const agent of snapshot?.agents ?? []) {
       if (agent.cliMissing) continue;
       for (const field of agent.models) {
         if (field.value === modelId) continue;
         if (!field.options.some(option => option.value === modelId)) continue;
         try {
-          await rt.magpieManager?.setModel({ agentId: agent.id, field: field.key, value: modelId });
+          await inferenceRuntime.magpieManager?.setModel({
+            agentId: agent.id,
+            field: field.key,
+            value: modelId,
+          });
         } catch (error) {
           console.warn(`[CodingAgent] could not apply gateway model to ${agent.id}:`, error);
         }
       }
     }
   });
-  rt.disposeMagpie = registerMagpieIpc(
-    rt.magpieManager,
+  inferenceRuntime.disposeMagpie = registerMagpieIpc(
+    inferenceRuntime.magpieManager,
     event =>
       Boolean(
         rt.mainWindow &&
@@ -116,8 +123,9 @@ export const setupMagpieRuntime = (): void => {
 };
 
 /** Whether the bundled model gateway is currently running (work package I indirection). */
-export const isMagpieGatewayRunning = (): boolean => rt.magpieManager?.status().state === 'running';
+export const isMagpieGatewayRunning = (): boolean =>
+  inferenceRuntime.magpieManager?.status().state === 'running';
 
 /** Runs one managed-catalog synchronization, if bindings exist (work package I indirection). */
 export const synchronizeManagedMagpieCatalog = (): Promise<void> | undefined =>
-  rt.managedMagpieBindings?.synchronize();
+  inferenceRuntime.managedMagpieBindings?.synchronize();
