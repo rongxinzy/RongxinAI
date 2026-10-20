@@ -1,0 +1,115 @@
+/*
+ * 知远智能体 · 设计 token 参考实现（DESIGN.md v4.0）
+ *
+ * 变量名与产品主题契约（src/renderer/theme/tokens/contract.ts）保持一致，
+ * 方便对照迁移。数值若与 DESIGN.md 冲突，以 DESIGN.md 为准。
+ * 本文件只用于 docs/design/reference，不得被 renderer 引用。
+ */
+
+:root {
+  /* 字体：系统字体优先，不加载网络字体 */
+  --zy-style-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --zy-style-font-mono: 'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+
+  /* 字阶：六档，字号与行高成对 */
+  --text-xs: 12px;   --text-xs--lh: 16px;   /* 元信息、分组标签、Kbd、状态 */
+  --text-sm: 14px;   --text-sm--lh: 20px;   /* 默认界面文字、按钮、列表、菜单 */
+  --text-base: 16px; --text-base--lh: 24px; /* 主输入框、区块标题、弹窗标题 */
+  --text-lg: 18px;   --text-lg--lh: 28px;   /* PageHeader 标题、空状态标题 */
+  --text-xl: 20px;   --text-xl--lh: 28px;   /* 展示短标题 */
+  --text-2xl: 24px;  --text-2xl--lh: 32px;  /* 首页问候语，一屏至多一处 */
+
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+
+  /* 间距：4px 网格；6px、10px 为紧凑控件半步 */
+  --sp-1: 4px;  --sp-1h: 6px; --sp-2: 8px;  --sp-2h: 10px; --sp-3: 12px;
+  --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;  --sp-12: 48px;
+
+  /* 圆角：越大的面越圆，子元素不大于外壳 */
+  --radius-sm: 4px;    /* 行内代码、小标签 */
+  --radius-md: 6px;    /* Kbd、分段滑块、窗口按钮 */
+  --radius-lg: 8px;    /* 按钮、输入控件、导航行、菜单项、芯片 */
+  --radius-xl: 12px;   /* 主内容面板、卡片、Dialog */
+  --radius-2xl: 16px;  /* 搜索弹层、分步配置容器 */
+  --radius-3xl: 20px;  /* 主输入岛专用 */
+  --radius-full: 9999px;
+
+  /* 尺寸 */
+  --size-control: 32px;     /* 默认按钮、导航行、菜单项、工具芯片 */
+  --size-control-sm: 28px;  /* 紧凑图标按钮 */
+  --size-control-lg: 36px;  /* 新建任务 */
+  --size-header: 48px;      /* PageHeader */
+  --size-sidebar: 260px;
+  --size-composer: 768px;   /* max-w-3xl */
+  --size-icon: 16px;
+  --shell-gutter: 8px;      /* 主面板与窗口边的间隙 */
+
+  /* 动效：只过渡颜色、阴影、透明度；按压 1px */
+  --duration-fast: 120ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ---------------- 浅色 ---------------- */
+[data-theme='light'] {
+  --zy-surface: #f4f5f7;          /* 窗口底 / 侧栏（同 --sidebar） */
+  --zy-background: #ffffff;       /* 内容画布：主面板 */
+  --card: #ffffff;                /* 抬升表面：输入岛、新建按钮、卡片 */
+  --popover: #ffffff;             /* 浮层：菜单、Popover、Dialog、Toast */
+  --accent: rgba(16, 24, 40, 0.05);        /* shadcn 语义：hover 填充（不是品牌色） */
+  --sidebar-accent: rgba(16, 24, 40, 0.08); /* selected / pressed 填充、分段轨道 */
+
+  --zy-text-primary: #101828;            /* 16.9:1 标题、正文、选中项 */
+  --zy-text-muted-foreground: #475467;   /* 7.6:1 次级文字、控件文字 */
+  --zy-text-muted: #667085;              /* 4.8:1 元信息、分组标签、占位符、行内图标 */
+
+  --zy-border: rgba(16, 24, 40, 0.08);
+  --zy-input-border: rgba(16, 24, 40, 0.14);
+
+  --zy-primary: #0f6bf2;          /* 品牌蓝：只表示「可执行的主动作」与焦点 */
+  --zy-primary-foreground: #ffffff;
+  --zy-primary-muted: rgba(15, 107, 242, 0.1);
+  --ring: rgba(15, 107, 242, 0.4);
+
+  --zy-success: #079455;
+  --zy-warning: #dc6803;
+  --zy-destructive: #d92d20;
+
+  --zy-style-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --zy-style-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -8px rgba(16, 24, 40, 0.08);
+  --zy-style-shadow-md: 0 1px 2px rgba(16, 24, 40, 0.05), 0 12px 32px -8px rgba(16, 24, 40, 0.14);
+  --zy-style-shadow-lg: 0 16px 48px -12px rgba(16, 24, 40, 0.18);
+}
+
+/* ---------------- 深色：重新定义层级，不是反色 ---------------- */
+[data-theme='dark'] {
+  --zy-surface: #0f1013;
+  --zy-background: #17181c;
+  --card: #1e2025;
+  --popover: #22252b;
+  --accent: rgba(255, 255, 255, 0.05);
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+
+  --zy-text-primary: #edeef0;
+  --zy-text-muted-foreground: #a8adb7;
+  --zy-text-muted: #858b96;
+
+  --zy-border: rgba(255, 255, 255, 0.07);
+  --zy-input-border: rgba(255, 255, 255, 0.13);
+
+  --zy-primary: #4c8dff;
+  --zy-primary-foreground: #ffffff;
+  --zy-primary-muted: rgba(76, 141, 255, 0.16);
+  --ring: rgba(76, 141, 255, 0.5);
+
+  --zy-success: #47cd89;
+  --zy-warning: #fdb022;
+  --zy-destructive: #f97066;
+
+  --zy-style-shadow-xs: none;
+  --zy-style-shadow-sm: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  --zy-style-shadow-md: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --zy-style-shadow-lg: 0 16px 48px -12px rgba(0, 0, 0, 0.7);
+}
