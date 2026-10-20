@@ -253,3 +253,8 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 ## 跨仓协作规范
 
 提交、PR 标题与说明、review、bug fix 验证遵循 [DEVOPS.md](DEVOPS.md)。本仓已有专项安全、设计与发布门继续执行。
+
+## 文件大小
+
+- 新增文件不得超过 5000 token（按 ceil(字符数 / 4) 估算）；修改时碰到已有的超限文件，由修改者负责拆分。Markdown（`*.md`、`*.mdx`）不受此限。
+- `.husky/pre-commit`（`scripts/check-new-file-tokens.mjs`） 拦截超过 5000 token 的新增文件，这是唯一的 git hook；lint、测试等检查由 CI 负责。`bun install` 时由 husky 自动安装。
