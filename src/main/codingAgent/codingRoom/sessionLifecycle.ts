@@ -76,7 +76,7 @@ export abstract class CodingRoomServiceSessionLifecycle extends CodingRoomServic
       getWorkspaceBaseline: sourceRoot => this.getWorkspaceBaseline(sourceRoot),
     });
     const { room, profile, lane, driver, driverSession } = prepared;
-    this.stagedLaneIds.add(lane.id);
+    this.turnTracker.stageLane(lane.id);
     // Register builtin session → lane mapping so recordBuiltinEvent can find
     // the lane without scanning every room.
     if (profile.driverKind === CodingAgentDriverKind.Builtin) {
@@ -96,10 +96,10 @@ export abstract class CodingRoomServiceSessionLifecycle extends CodingRoomServic
         prompt,
         attachments: input.attachments,
       });
-      this.stagedLaneIds.delete(lane.id);
+      this.turnTracker.unstageLane(lane.id);
       return snapshot;
     } catch (error) {
-      this.stagedLaneIds.delete(lane.id);
+      this.turnTracker.unstageLane(lane.id);
       await this.rollbackCreatedSession(room.id, lane);
       this.publish(room.workspaceRoot);
       throw error;

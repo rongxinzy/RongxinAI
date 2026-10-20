@@ -425,7 +425,7 @@ export class CodingRoomService extends CodingRoomServiceBuiltinAgentEvents {
     // Disposing the drivers terminates their streams, which settles in-flight
     // turns. Wait for those turns so their completion/failure handlers finish
     // writing to the repository before callers close the database.
-    await Promise.all([...this.inFlightTurns]);
+    await this.turnTracker.settleInFlightTurns();
   }
 
   protected async completeTerminalAuthentication(event: {
