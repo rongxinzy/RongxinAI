@@ -132,7 +132,7 @@ export abstract class CodingRoomServiceWorkspaceAdmin extends CodingRoomServiceD
       this.driverProfileIds.delete(lane.id);
       this.driverSessionIds.delete(lane.id);
       this.driverSessionPromises.delete(lane.id);
-      this.builtinSessionLaneMap.delete(lane.localSessionId);
+      this.laneSessionIndex.forget(lane.localSessionId);
     }
     this.repository.deleteWorkspace(room.id);
     return this.listWorkspaces();
@@ -168,7 +168,7 @@ export abstract class CodingRoomServiceWorkspaceAdmin extends CodingRoomServiceD
       this.driverProfileIds.delete(removed.id);
       this.driverSessionIds.delete(removed.id);
       this.driverSessionPromises.delete(removed.id);
-      this.builtinSessionLaneMap.delete(removed.localSessionId);
+      this.laneSessionIndex.forget(removed.localSessionId);
     }
     if (isPrimaryLane) {
       this.repository.deleteMission(room.id, lane.missionId);

@@ -88,7 +88,7 @@ export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomService
     this.driverProfileIds.delete(lane.id);
     this.driverSessionIds.delete(lane.id);
     this.driverSessionPromises.delete(lane.id);
-    this.builtinSessionLaneMap.delete(lane.localSessionId);
+    this.laneSessionIndex.forget(lane.localSessionId);
     this.repository.deleteMission(roomId, lane.missionId);
   }
 

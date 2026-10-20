@@ -20,7 +20,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
     if (!question) return;
     // Fast path: a mapped session resolves its lane and room directly instead
     // of rebuilding full snapshots of every room per question.
-    const mappedLaneId = this.builtinSessionLaneMap.get(sessionId);
+    const mappedLaneId = this.laneSessionIndex.laneIdFor(sessionId);
     if (mappedLaneId) {
       const lane = this.repository.getLaneById(mappedLaneId);
       const room = lane ? this.repository.getRoomByLaneId(mappedLaneId) : null;
@@ -41,7 +41,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
       );
       if (!lane) continue;
       if (this.registry.get(lane.profileId)?.driverKind !== CodingAgentDriverKind.Builtin) return;
-      this.builtinSessionLaneMap.set(sessionId, lane.id);
+      this.laneSessionIndex.register(sessionId, lane.id);
       this.applyBuiltinElicitation(workspaceRoot, snapshot.room.id, lane, request, question);
       return;
     }
@@ -84,7 +84,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
    * registered before the scheduled-task tool snapshots its delivery).
    */
   isBuiltinLaneSession(sessionId: string): boolean {
-    return this.builtinSessionLaneMap.has(sessionId);
+    return this.laneSessionIndex.isLaneSession(sessionId);
   }
 
   /**
@@ -94,7 +94,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
    * by the runtime before any normalization work.
    */
   shouldTrackSession(sessionId: string): boolean {
-    return !this.nonLaneSessionIds.has(sessionId);
+    return this.laneSessionIndex.shouldTrackSession(sessionId);
   }
 
   recordBuiltinEvent(
@@ -102,7 +102,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
     kind: (typeof CodingEventKind)[keyof typeof CodingEventKind],
     payload: Record<string, unknown>,
   ): void {
-    const laneId = this.builtinSessionLaneMap.get(sessionId);
+    const laneId = this.laneSessionIndex.laneIdFor(sessionId);
     if (laneId) {
       // Fast path: load the lane and its room directly instead of rebuilding
       // full snapshots of every room per streamed event.
@@ -117,7 +117,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
     // one later unless a new lane registers it — sessionLifecycle clears this
     // set whenever a builtin lane mapping is added — so stop rescanning every
     // room per streamed event. A positive mapping above always wins.
-    if (this.nonLaneSessionIds.has(sessionId)) return;
+    if (!this.laneSessionIndex.shouldTrackSession(sessionId)) return;
     // Cache miss or stale mapping: scan rooms once to find the lane, then
     // cache the mapping.
     for (const workspaceRoot of this.knownRooms()) {
@@ -126,11 +126,11 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
         candidate => candidate.localSessionId === sessionId || candidate.id === laneId,
       );
       if (!lane) continue;
-      this.builtinSessionLaneMap.set(sessionId, lane.id);
+      this.laneSessionIndex.register(sessionId, lane.id);
       this.applyBuiltinEvent(workspaceRoot, snapshot.room.id, lane, kind, payload);
       return;
     }
-    this.nonLaneSessionIds.add(sessionId);
+    this.laneSessionIndex.markNonLane(sessionId);
   }
 
   private applyBuiltinEvent(
@@ -167,7 +167,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
 
   recordBuiltinInterruption(interruption: CoworkSessionInterruption): void {
     // Fast path: resolve the lane and room directly for a mapped session.
-    const mappedLaneId = this.builtinSessionLaneMap.get(interruption.sessionId);
+    const mappedLaneId = this.laneSessionIndex.laneIdFor(interruption.sessionId);
     if (mappedLaneId) {
       const lane = this.repository.getLaneById(mappedLaneId);
       const room = lane ? this.repository.getRoomByLaneId(mappedLaneId) : null;
@@ -182,7 +182,7 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
         candidate => candidate.localSessionId === interruption.sessionId,
       );
       if (!lane) continue;
-      this.builtinSessionLaneMap.set(interruption.sessionId, lane.id);
+      this.laneSessionIndex.register(interruption.sessionId, lane.id);
       this.applyBuiltinInterruption(workspaceRoot, lane, interruption);
       return;
     }

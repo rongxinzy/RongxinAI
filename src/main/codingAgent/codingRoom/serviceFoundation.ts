@@ -22,6 +22,7 @@ import {
   type CodingRoomSnapshot,
 } from '../../../shared/codingAgent';
 import { CodingPendingMessageQueue } from './codingPendingMessageQueue';
+import { CodingLaneSessionIndex } from './codingLaneSessionIndex';
 import type { CodingRoomRuntime, DriverSession } from './runtimeContract';
 
 /**
@@ -47,10 +48,7 @@ export abstract class CodingRoomServiceFoundation extends EventEmitter {
   protected readonly pendingMessageQueue = new CodingPendingMessageQueue();
   protected readonly stagedLaneIds = new Set<string>();
   protected readonly inFlightTurns = new Set<Promise<void>>();
-  /** Maps builtin sessionId → laneId to avoid scanning all rooms per event. */
-  protected readonly builtinSessionLaneMap = new Map<string, string>();
-  /** Sessions known to map to no builtin lane; guards recordBuiltinEvent room scans. */
-  protected readonly nonLaneSessionIds = new Set<string>();
+  protected readonly laneSessionIndex = new CodingLaneSessionIndex();
 
   constructor(
     protected readonly repository: CodingRoomRepository,
