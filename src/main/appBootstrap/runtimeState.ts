@@ -9,16 +9,11 @@ import type { OllamaManager } from '../libs/ollamaManager';
 import type { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
 import type { MagpieManager } from '../magpie/manager';
 import type { ManagedMagpieProviderBindings } from '../magpie/managedProviderBindings';
-import type { EngramManager } from '../memory/engramManager';
-import type { ProjectMemoryService } from '../memory/projectMemoryService';
-import type { MemoryRepository } from '../memory/repository';
-import type { ZhiYuanEngramAdapter } from '../memory/zhiyuanEngramAdapter';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import type { CoworkStore } from '../coworkStore';
 import type { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import type { SkillManager } from '../skillManager';
 import type { SqliteStore } from '../sqliteStore';
-import type { TodoReminderScheduler } from '../todo/reminderScheduler';
 import type { WorkbenchTaskService } from '../workbenchTask/taskService';
 
 /**
@@ -34,11 +29,6 @@ export const rt = {
   piRuntimeAdapter: null as PiRuntimeAdapter | null,
   workbenchTaskService: null as WorkbenchTaskService | null,
   codingRoomService: null as CodingRoomService | null,
-  engramManager: null as EngramManager | null,
-  engramAdapter: null as ZhiYuanEngramAdapter | null,
-  memoryRepository: null as MemoryRepository | null,
-  projectMemoryService: null as ProjectMemoryService | null,
-  todoReminderScheduler: null as TodoReminderScheduler | null,
 
   skillManager: null as SkillManager | null,
 
