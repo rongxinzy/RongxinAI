@@ -31,7 +31,7 @@ import {
   type CodingWorkspaceFileInput,
   type CodingWorkspaceFileWriteInput,
 } from '../../shared/codingAgent';
-import { CodingRoomServiceBuiltinAgentEvents } from './codingRoom/builtinAgentEvents';
+import { CodingRoomServiceTurnExecution } from './codingRoom/turnExecution';
 
 /** @knipignore Kept importable from the historical codingRoomService path. */
 export type { CodingRoomRuntime } from './codingRoom/runtimeContract';
@@ -40,7 +40,7 @@ export type { CodingRoomRuntime } from './codingRoom/runtimeContract';
  * Facade over the coding-room layers: git integration, workspace file
  * browsing, agent profile management and permission/elicitation responses.
  */
-export class CodingRoomService extends CodingRoomServiceBuiltinAgentEvents {
+export class CodingRoomService extends CodingRoomServiceTurnExecution {
   async getGitStatus(input: CodingGitTargetInput): Promise<CodingGitStatus> {
     return await this.git.getStatus(input);
   }
