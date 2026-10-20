@@ -5,7 +5,8 @@ import path from 'path';
 
 import { cpRecursiveSync } from '../fsCompat';
 import { t } from '../i18n';
-import { mergeReports, scanMultipleSkillDirs } from '../libs/skillSecurity/skillSecurityScanner';
+import { mergeReports } from '../libs/skillSecurity/skillSecurityScanner';
+import { scanSkillDirsAsync } from '../libs/skillSecurity/skillSecurityScanPool';
 import type { SkillSecurityReport } from '../libs/skillSecurity/skillSecurityTypes';
 import { SKILL_FILE_NAME } from './constants';
 import { downloadGithubArchive, downloadZipUrl, isRemoteZipUrl } from './downloadUtils';
@@ -207,7 +208,7 @@ async function performUpgradeDownload(
     // Security scan
     let auditReport: SkillSecurityReport | null = null;
     try {
-      const reports = await scanMultipleSkillDirs([matchingSkillDir]);
+      const reports = await scanSkillDirsAsync([matchingSkillDir]);
       auditReport = mergeReports(reports);
     } catch (err) {
       console.warn('[SkillManager] Security scan failed (non-blocking):', err);
