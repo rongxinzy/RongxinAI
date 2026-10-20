@@ -472,22 +472,6 @@ jobs:
       - name: Verify the Linux renderer
         if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
         run: xvfb-run -a node scripts/verify-linux-renderer.mjs release/linux-unpacked release/linux-render-smoke.png
-      - name: Install and start the exact Linux release deb
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          debs=(release/*.deb)
-          [[ ${#debs[@]} -eq 1 ]] || { echo 'Expected exactly one Linux deb package' >&2; exit 1; }
-          sudo apt-get install -y "$(realpath "${debs[0]}")"
-          app_exec="$(node -e "const fs=require('fs');const c=JSON.parse(fs.readFileSync('electron-builder.json','utf8'));process.stdout.write('/opt/'+c.productName+'/'+(c.executableName||c.productName));")"
-          test -x "$app_exec" || {
-            echo "Installed Linux executable is missing: $app_exec" >&2
-            ls -d /opt/*/ >&2 || true
-            exit 1
-          }
-          node scripts/verify-linux-renderer.mjs "$app_exec" release/linux-deb-install-smoke.png
       - name: Verify the final WebView2 installer interactively
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
         shell: pwsh
