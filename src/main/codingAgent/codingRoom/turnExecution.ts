@@ -30,8 +30,7 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
     laneId: string,
     itemId: string,
   ): Promise<CodingRoomSnapshot> {
-    const items = this.acpPendingMessages.get(laneId) ?? [];
-    const item = items.find(candidate => candidate.id === itemId);
+    const item = this.pendingMessageQueue.find(laneId, itemId);
     if (!item) throw new Error(CodingErrorMessage.PendingMessageNotFound);
     if (item.status === CoworkQueueItemStatus.Sending) {
       throw new Error(CodingErrorMessage.PendingMessageSending);
@@ -54,9 +53,7 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
     laneId: string,
     itemId: string,
   ): Promise<CodingRoomSnapshot> {
-    const item = (this.acpPendingMessages.get(laneId) ?? []).find(
-      candidate => candidate.id === itemId,
-    );
+    const item = this.pendingMessageQueue.find(laneId, itemId);
     if (!item) throw new Error(CodingErrorMessage.PendingMessageNotFound);
     if (item.delivery !== CoworkQueueDelivery.FollowUp) {
       throw new Error(CodingErrorMessage.PendingMessageSteerOnly);
@@ -445,9 +442,7 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
   private startNextAcpPendingMessage(workspaceRoot: string, lane: CodingAgentLane): void {
     const profile = this.registry.get(lane.profileId);
     if (profile?.driverKind !== CodingAgentDriverKind.Acp) return;
-    const next = this.acpPendingMessages
-      .get(lane.id)
-      ?.find(item => item.status === CoworkQueueItemStatus.Pending);
+    const next = this.pendingMessageQueue.findNextPending(lane.id);
     if (!next) return;
     next.status = CoworkQueueItemStatus.Sending;
     this.emitPendingMessagesChanged(lane.id);
