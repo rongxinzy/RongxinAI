@@ -9,6 +9,10 @@ import { shell } from 'electron';
 import { buildLogExportFileName } from '../coworkIpc/fileExportHelpers';
 import type { SqliteStore } from '../sqliteStore';
 import { getLogFilePath, getRecentMainLogEntries } from '../logger';
+import {
+  formatDiagnosticsSummaryText,
+  getSystemDiagnosticsSnapshot,
+} from '../diagnostics/systemDiagnostics';
 import { getAutoLaunchEnabled, setAutoLaunchEnabled } from '../autoLaunchManager';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
 import { getSystemMemorySnapshot } from '../libs/systemMemory';
@@ -105,8 +109,16 @@ export const registerAppIpc = (deps: AppIpcDeps): void => {
         }
 
         const outputPath = ensureZipFileName(saveResult.filePath);
+        const diagnosticsSnapshot = await getSystemDiagnosticsSnapshot();
+        const diagnosticsJson = JSON.stringify(diagnosticsSnapshot, null, 2);
+        const diagnosticsSummary = formatDiagnosticsSummaryText(diagnosticsSnapshot);
+
         const archiveResult = await exportLogsZip({
           outputPath,
+          virtualEntries: [
+            { archiveName: 'system-diagnostics.json', content: diagnosticsJson },
+            { archiveName: 'system-summary.txt', content: diagnosticsSummary },
+          ],
           entries: [
             ...getRecentMainLogEntries(),
             { archiveName: 'cowork.log', filePath: getCoworkLogPath() },

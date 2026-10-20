@@ -29,6 +29,46 @@ import {
 import { UiMessageChunkCoalescer } from '../../src/main/streaming/uiMessageChunkCoalescer';
 import { PiUiEventSequencer, PiUiEventType } from '../../src/shared/cowork/piUiEvent';
 import { LiveTextStore } from '../../src/renderer/services/liveTextStore';
+import type { AnimationFrameScheduler } from '../../src/renderer/services/rafMessageUpdateBatcher';
+
+type PendingPart = {
+  sessionId: string;
+  messageId: string;
+  chunk: UIMessageChunk;
+};
+
+class RafStreamPartBatcher {
+  private frameId: number | null = null;
+  private readonly pending: PendingPart[] = [];
+
+  constructor(
+    private readonly apply: (parts: PendingPart[]) => void,
+    private readonly scheduler: AnimationFrameScheduler,
+  ) {}
+
+  enqueue(part: PendingPart): void {
+    this.pending.push(part);
+    if (this.frameId !== null) return;
+    this.frameId = this.scheduler.request(() => {
+      this.frameId = null;
+      const batch = this.pending.splice(0, this.pending.length);
+      if (batch.length > 0) this.apply(batch);
+    });
+  }
+
+  flush(): void {
+    if (this.frameId !== null) {
+      this.scheduler.cancel(this.frameId);
+      this.frameId = null;
+    }
+    const batch = this.pending.splice(0, this.pending.length);
+    if (batch.length > 0) this.apply(batch);
+  }
+
+  dispose(): void {
+    this.flush();
+  }
+}
 
 import { LEGACY_THINKING_MESSAGE_ID, LegacyMainPipeline } from './fixtures/legacyMainPipeline';
 import { createRenderHarness, type RenderHarness } from './renderHarness';
