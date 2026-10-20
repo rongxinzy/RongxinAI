@@ -28,6 +28,7 @@ import type {
 } from '../../../shared/magpie/types';
 import { localStore } from '../../services/store';
 import { i18nService } from '../../services/i18n';
+import { neutralRuntimeName } from '../../services/runtimeNameNeutralizer';
 import { ExternalAgentRow } from './ExternalAgentRow';
 
 const STORE_DISCONNECT_ON_QUIT = 'magpie_disconnect_external_on_quit';
@@ -349,7 +350,9 @@ export function MagpieAgentsPanel() {
               ))}
             </ul>
           )}
-          {preview?.error && <p className="text-sm text-destructive">{preview.error}</p>}
+          {preview?.error && (
+            <p className="text-sm text-destructive">{neutralRuntimeName(preview.error)}</p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
               {i18nService.t('magpieExternalCancel')}

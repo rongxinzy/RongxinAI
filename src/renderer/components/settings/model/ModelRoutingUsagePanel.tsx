@@ -11,6 +11,7 @@ import {
   type MagpieUsageSummary,
 } from '../../../../shared/magpie/routingUsage';
 import { i18nService } from '../../../services/i18n';
+import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
 import { ModelRoutingGroupsSection } from './ModelRoutingGroupsSection';
 import {
   ModelRoutingCallsSection,
@@ -32,7 +33,7 @@ const CALLS_PAGE_SIZE = 25;
 
 function formatLoadError(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : String(cause);
-  return i18nService.t('modelUsageLoadFailed').replace('{message}', message);
+  return i18nService.t('modelUsageLoadFailed').replace('{message}', neutralRuntimeName(message));
 }
 
 export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRoutingUsagePanelProps) {

@@ -56,7 +56,11 @@ export const magpieTranslations = {
     magpieExternalAgentClaude: 'Claude Code',
     magpieExternalAgentOpenCode: 'OpenCode',
     magpieExternalAgentGemini: 'Gemini CLI',
+    magpieExternalAgentPi: 'Pi CLI',
     magpieExternalAgentCodex: 'Codex',
+    magpieTitle: '外部 Agent',
+    magpieExternalPanelDescription:
+      '让本机 CLI Agent 接入知远模型网关，统一管理模型渠道与默认模型。',
     magpieExternalConnectHintClaude:
       '将修改 ~/.claude/settings.json 中的 ANTHROPIC_BASE_URL 等环境变量，并写入知远网关模型。',
     magpieExternalConnectHintOpenCode:
@@ -387,7 +391,11 @@ export const magpieTranslations = {
     magpieExternalAgentClaude: 'Claude Code',
     magpieExternalAgentOpenCode: 'OpenCode',
     magpieExternalAgentGemini: 'Gemini CLI',
+    magpieExternalAgentPi: 'Pi CLI',
     magpieExternalAgentCodex: 'Codex',
+    magpieTitle: 'External Agents',
+    magpieExternalPanelDescription:
+      'Connect local CLI Agents to the ZhiYuan model gateway to manage providers and default models in one place.',
     magpieExternalConnectHintClaude:
       'Updates ANTHROPIC_BASE_URL and related keys in ~/.claude/settings.json and selects a gateway model.',
     magpieExternalConnectHintOpenCode:

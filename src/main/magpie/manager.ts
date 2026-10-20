@@ -44,7 +44,7 @@ import {
 import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
 import type { MagpieRoutingGateway } from './magpieRoutingGateway';
 import { MagpieRoutingUsageService } from './routingUsageService';
-import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort, maskApiKey } from './magpieManagerUtils';
+import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort } from './magpieManagerUtils';
 import { projectMagpieProviderSummaries } from './projectMagpieProviders';
 export interface MagpieManagerOptions {
   resourcesRoot: string;
@@ -197,7 +197,7 @@ export class MagpieManager implements MagpieRoutingGateway {
       const deadline = Date.now() + (this.options.startupTimeoutMs ?? 30_000);
       while (Date.now() < deadline) {
         signal.throwIfAborted();
-        if (exited) throw new Error('Magpie process exited during startup');
+        if (exited) throw new Error('Model service process exited during startup');
         try {
           const hello = await this.request(`${gatewayUrl}/api/hello`, { signal });
           const data = (await hello.json()) as { name?: string; version?: string };
@@ -213,7 +213,7 @@ export class MagpieManager implements MagpieRoutingGateway {
         }
         await delay(100);
       }
-      throw new Error('Magpie startup timed out');
+      throw new Error('Model service startup timed out');
     } catch {
       await this.terminate();
       this.state = {

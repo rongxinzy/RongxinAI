@@ -22,6 +22,7 @@ import {
 } from '../../../services/availableModels';
 import { i18nService } from '../../../services/i18n';
 import { showAppError } from '../../../services/appToast';
+import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
 import { MagpieAgentsPanel } from '../../coding/MagpieAgentsPanel';
 import { MagpieAboutPreferences } from './MagpieAboutPreferences';
 import { MagpieModelPreferences } from './MagpieModelPreferences';
@@ -352,9 +353,9 @@ export default function ModelSettingsPanel() {
                 <Badge
                   variant="destructive"
                   className="max-w-full truncate font-normal"
-                  title={diagnostics.recentErrors[0].message}
+                  title={neutralRuntimeName(diagnostics.recentErrors[0].message)}
                 >
-                  {diagnostics.recentErrors[0].message}
+                  {neutralRuntimeName(diagnostics.recentErrors[0].message)}
                 </Badge>
               )}
             </div>
