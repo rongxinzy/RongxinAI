@@ -1,4 +1,5 @@
-import { Message, MessageContent, MessageResponse } from '@shared/components/ai-elements/message';
+import { Message, MessageContent } from '@shared/components/ai-elements/message';
+import { StreamingMarkdownResponse } from '@shared/components/ai-elements/streamingMarkdownResponse';
 import {
   Reasoning,
   ReasoningContent,
@@ -17,7 +18,6 @@ import ArtifactPreviewCard from '../artifacts/ArtifactPreviewCard';
 import { CopyButton, ReEditButton } from '../cowork/components/CopyButton';
 import { CodingActivity } from './CodingActivityView';
 import { CodingAgentWorkingIndicator } from './CodingAgentWorkingIndicator';
-import { replaceLocalFileLinksWithLabels } from './codingMessageContent';
 import {
   CodingConversationActivityKind,
   CodingConversationSegmentKind,
@@ -36,6 +36,8 @@ interface CodingConversationTurnProps {
   expandedActivityIds: ReadonlySet<string>;
   onActivityOpenChange: (activityId: string, open: boolean) => void;
   onReEditUserMessage: (content: string) => void;
+  /** Workspace root used to resolve local-path links in assistant markdown. */
+  cwd?: string;
 }
 
 const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
@@ -136,19 +138,19 @@ const CodingAssistantMessage = ({
   content,
   createdAt,
   isStreaming,
+  cwd,
   children,
 }: {
   content: string;
   createdAt: number;
   isStreaming: boolean;
+  cwd?: string;
   children?: ReactNode;
 }) => (
   <div className="flex flex-col items-start">
     <Message from="assistant" className="animate-message-in">
       <MessageContent>
-        <MessageResponse isAnimating={isStreaming}>
-          {replaceLocalFileLinksWithLabels(content)}
-        </MessageResponse>
+        <StreamingMarkdownResponse content={content} isStreaming={isStreaming} cwd={cwd} />
         {children}
       </MessageContent>
     </Message>
@@ -168,6 +170,7 @@ const CodingConversationTurnComponent = ({
   expandedActivityIds,
   onActivityOpenChange,
   onReEditUserMessage,
+  cwd,
 }: CodingConversationTurnProps) => {
   const hasPermission = turn.activities.some(
     activity => activity.kind === CodingConversationActivityKind.Permission,
@@ -263,6 +266,7 @@ const CodingConversationTurnComponent = ({
               content={message.content}
               createdAt={message.createdAt}
               isStreaming={isStreaming}
+              cwd={cwd}
             >
               {artifacts.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-2">
@@ -385,6 +389,7 @@ const conversationTurnPropsEqual = (
   prev.expandedActivityIds === next.expandedActivityIds &&
   prev.onActivityOpenChange === next.onActivityOpenChange &&
   prev.onReEditUserMessage === next.onReEditUserMessage &&
+  prev.cwd === next.cwd &&
   turnContentsEqual(prev.turn, next.turn);
 
 export const CodingConversationTurn = memo(

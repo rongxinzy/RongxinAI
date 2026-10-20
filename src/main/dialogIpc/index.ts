@@ -225,7 +225,10 @@ export const registerDialogIpc = (deps: DialogIpcDeps): void => {
   registerArtifactFileAvailabilityHandler();
 };
 
-export const getAllowedShellProbeRoots = (getCoworkStore: () => CoworkStore): string[] => {
+export const getAllowedShellProbeRoots = (
+  getCoworkStore: () => CoworkStore,
+  getCodingWorkspaceRoots?: () => string[],
+): string[] => {
   const roots: string[] = [];
   try {
     roots.push(app.getPath('userData'));
@@ -249,6 +252,18 @@ export const getAllowedShellProbeRoots = (getCoworkStore: () => CoworkStore): st
     }
   } catch {
     // Ignore
+  }
+  // Coding workspaces are user-selected project folders; the coding assistant
+  // surfaces file:// links under them, so the probe allowlist must cover them
+  // the same way it covers cowork workspaces.
+  if (getCodingWorkspaceRoots) {
+    try {
+      for (const root of getCodingWorkspaceRoots()) {
+        if (root) roots.push(root);
+      }
+    } catch {
+      // Ignore
+    }
   }
   roots.push(process.cwd());
   return roots;
