@@ -8,14 +8,19 @@
  */
 import { app } from 'electron';
 
-import { applyAppIdentity, configureRendererSwitches } from './appBootstrap/appEnv';
+import {
+  applyAppIdentity,
+  configureRendererSwitches,
+  isDev,
+  isEnterprise,
+} from './appBootstrap/appEnv';
 import { bootstrapProcess } from './appBootstrap/processGuards';
 import { handleSecondInstanceExit } from './appBootstrap/singleInstance';
 import {
   registerCommunityAuthBootstrap,
   registerCommunityAuthIpc,
 } from './appBootstrap/communityAuth';
-import { registerAppIpc } from './appBootstrap/appIpc';
+import { registerAppIpc } from './appIpc';
 import { registerSkillsIpc } from './skills/ipc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
@@ -45,7 +50,8 @@ import {
 } from './appBootstrap/runtimeServices';
 import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
 import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
-import { getAgentManager } from './appBootstrap/runtimeServices';
+import { rt } from './appBootstrap/runtimeState';
+import { getAgentManager, setPreventSleepBlockerEnabled } from './appBootstrap/runtimeServices';
 import {
   getActiveMcpAuthorizations,
   setActiveMcpAuthorizations,
@@ -68,10 +74,17 @@ import {
   getCanonicalScheduledTaskService,
   getIMGatewayManager,
 } from './appBootstrap/ccConnectRuntime';
+import {
+  reconcileCcConnectChannelSidecars,
+  refreshCcConnectPlatformStatuses,
+  resolveCcConnectSidecarExecutable,
+} from './appBootstrap/ccConnectRuntime';
+import { resolveCcConnectAccountRuntimeStatus } from './libs/ccConnectAccountRuntimeStatus';
+import { showSystemMenu } from './appBootstrap/windowManagement';
 import { bumpCodingCommandCatalog } from './appBootstrap/codingRoomRuntime';
 import { resolveDefaultAgentModelRef } from './appBootstrap/defaultAgentModel';
-import { registerImGatewayIpc } from './appBootstrap/imGatewayIpc';
-import { registerImInstanceIpc } from './appBootstrap/imInstanceIpc';
+import { registerImGatewayIpc } from './imIpc/gateway';
+import { registerImInstanceIpc } from './imIpc/instance';
 import { registerAppLifecycleHandlers } from './appBootstrap/appLifecycle';
 import { initApp } from './appBootstrap/initApp';
 import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
@@ -97,7 +110,16 @@ if (!gotTheLock) {
     isMagpieRunning: isMagpieGatewayRunning,
     synchronizeManagedCatalog: synchronizeManagedMagpieCatalog,
   });
-  registerAppIpc();
+  registerAppIpc({
+    isDev: () => isDev,
+    isEnterprise: () => isEnterprise,
+    getStore,
+    setPreventSleepBlockerEnabled,
+    showSystemMenu,
+    reconcileCcConnectChannelSidecars,
+    getMainWindow: () => rt.mainWindow,
+    hasIMGatewayManager: () => rt.imGatewayManager !== null,
+  });
   registerCommunityAuthIpc();
   registerSkillsIpc({ getSkillManager, getStore });
   registerMcpIpc({
@@ -153,8 +175,22 @@ if (!gotTheLock) {
     getIMGatewayManager,
   });
   registerPermissionsIpc();
-  registerImGatewayIpc();
-  registerImInstanceIpc();
+  registerImGatewayIpc({
+    getIMGatewayManager,
+    reconcileCcConnectChannelSidecars,
+    refreshCcConnectPlatformStatuses,
+    resolveCcConnectSidecarExecutable,
+    resolveCcConnectAccountRuntimeStatus: accountId =>
+      resolveCcConnectAccountRuntimeStatus(
+        rt.ccConnectRuntimeStatuses,
+        accountId,
+        rt.ccConnectSidecarManager?.running === true,
+      ),
+  });
+  registerImInstanceIpc({
+    getIMGatewayManager,
+    reconcileCcConnectChannelSidecars,
+  });
   registerIntegrationsIpc({
     getIMGatewayManager,
     getMagpieModelService,

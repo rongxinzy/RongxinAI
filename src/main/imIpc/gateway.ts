@@ -1,16 +1,19 @@
 /** IM gateway IPC: config get/sync (debounced sidecar reconcile), gateway start/stop, local IP. */
+import type { ChannelAccountManager } from '../im/channelAccountManager';
+import type { CcConnectAccountRuntimeStatus } from '../libs/ccConnectRuntimeStatusRegistry';
+
+export interface ImGatewayIpcDeps {
+  getIMGatewayManager: () => ChannelAccountManager;
+  reconcileCcConnectChannelSidecars: () => Promise<void>;
+  refreshCcConnectPlatformStatuses: () => Promise<void>;
+  resolveCcConnectSidecarExecutable: () => string | null;
+  resolveCcConnectAccountRuntimeStatus: (accountId: string) => CcConnectAccountRuntimeStatus;
+}
+
 import os from 'os';
 
-import { rt } from './runtimeState';
-import {
-  getIMGatewayManager,
-  reconcileCcConnectChannelSidecars,
-  refreshCcConnectPlatformStatuses,
-  resolveCcConnectSidecarExecutable,
-} from './ccConnectRuntime';
 import { type IMGatewayConfigPatch, sanitizeRendererIMConfigPatch } from '../im/configPatch';
 import { IMGatewayConfig } from '../im';
-import { resolveCcConnectAccountRuntimeStatus } from '../libs/ccConnectAccountRuntimeStatus';
 import {
   formatWeixinSetupErrorForLog,
   isWeixinSetupTransportError,
@@ -34,22 +37,22 @@ let imConfigSyncRunning = false;
 let imConfigSyncPending = false;
 const IM_CONFIG_SYNC_DEBOUNCE_MS = 600;
 
-const doImConfigSync = async () => {
+const doImConfigSync = async (reconcile: () => Promise<void>) => {
   imConfigSyncRunning = true;
   try {
-    await reconcileCcConnectChannelSidecars();
+    await reconcile();
   } catch (error) {
     console.error('[IM] Sidecar reconciliation failed:', error);
   } finally {
     imConfigSyncRunning = false;
     if (imConfigSyncPending) {
       imConfigSyncPending = false;
-      scheduleImConfigSync();
+      scheduleImConfigSync(reconcile);
     }
   }
 };
 
-export const scheduleImConfigSync = () => {
+export const scheduleImConfigSync = (reconcile: () => Promise<void>) => {
   if (imConfigSyncRunning) {
     // A sync is already in progress; mark pending so it re-runs after completion.
     imConfigSyncPending = true;
@@ -58,22 +61,22 @@ export const scheduleImConfigSync = () => {
   if (imConfigSyncTimer) clearTimeout(imConfigSyncTimer);
   imConfigSyncTimer = setTimeout(() => {
     imConfigSyncTimer = null;
-    void doImConfigSync();
+    void doImConfigSync(reconcile);
   }, IM_CONFIG_SYNC_DEBOUNCE_MS);
 };
 
-const reconcileImConfigImmediately = async (): Promise<void> => {
+const reconcileImConfigImmediately = async (reconcile: () => Promise<void>): Promise<void> => {
   if (imConfigSyncTimer) clearTimeout(imConfigSyncTimer);
   imConfigSyncTimer = null;
   imConfigSyncPending = false;
-  await reconcileCcConnectChannelSidecars();
+  await reconcile();
 };
 
-export const registerImGatewayIpc = (): void => {
+export const registerImGatewayIpc = (deps: ImGatewayIpcDeps): void => {
   handleIpcContract(imContract, {
     getConfig: async () => {
       try {
-        const config = getIMGatewayManager().getConfig();
+        const config = deps.getIMGatewayManager().getConfig();
         return { success: true, config };
       } catch (error) {
         return {
@@ -90,7 +93,7 @@ export const registerImGatewayIpc = (): void => {
     ) => {
       try {
         const sanitizedConfig = sanitizeRendererIMConfigPatch(config);
-        getIMGatewayManager().setConfig(sanitizedConfig, {
+        deps.getIMGatewayManager().setConfig(sanitizedConfig, {
           syncGateway: options?.syncGateway,
         });
 
@@ -103,7 +106,7 @@ export const registerImGatewayIpc = (): void => {
           sanitizedConfig.wecom ||
           sanitizedConfig.weixin;
         if (options?.syncGateway && hasChannelChange) {
-          scheduleImConfigSync();
+          scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         }
         return { success: true };
       } catch (error) {
@@ -117,7 +120,7 @@ export const registerImGatewayIpc = (): void => {
     // Apply persisted channel configuration to cc-connect sidecars.
     syncConfig: async () => {
       try {
-        await reconcileCcConnectChannelSidecars();
+        await deps.reconcileCcConnectChannelSidecars();
         return { success: true };
       } catch (error) {
         return {
@@ -130,9 +133,9 @@ export const registerImGatewayIpc = (): void => {
     startGateway: async (_event, platform: Platform) => {
       try {
         // Persist enabled state
-        const manager = getIMGatewayManager();
+        const manager = deps.getIMGatewayManager();
         manager.setConfig({ [platform]: { enabled: true } });
-        await reconcileCcConnectChannelSidecars();
+        await deps.reconcileCcConnectChannelSidecars();
         return { success: true };
       } catch (error) {
         return {
@@ -145,9 +148,9 @@ export const registerImGatewayIpc = (): void => {
     stopGateway: async (_event, platform: Platform) => {
       try {
         // Persist disabled state
-        const manager = getIMGatewayManager();
+        const manager = deps.getIMGatewayManager();
         manager.setConfig({ [platform]: { enabled: false } });
-        await reconcileCcConnectChannelSidecars();
+        await deps.reconcileCcConnectChannelSidecars();
         return { success: true };
       } catch (error) {
         return {
@@ -159,7 +162,7 @@ export const registerImGatewayIpc = (): void => {
 
     weixinLoginStart: async () => {
       try {
-        const executable = resolveCcConnectSidecarExecutable();
+        const executable = deps.resolveCcConnectSidecarExecutable();
         if (!executable) throw new Error('Channel runtime is not bundled');
         const result = await runCcConnectWeixinSetup(executable, 'start');
         return {
@@ -193,23 +196,23 @@ export const registerImGatewayIpc = (): void => {
     }> => {
       try {
         if (!qrcode?.trim()) throw new Error('Weixin QR code is required');
-        const executable = resolveCcConnectSidecarExecutable();
+        const executable = deps.resolveCcConnectSidecarExecutable();
         if (!executable) throw new Error('Channel runtime is not bundled');
         const result = await runCcConnectWeixinSetup(executable, 'poll', qrcode);
         if (result.status === 'confirmed') {
           if (!result.accountId || !result.botToken || !result.baseUrl) {
             throw new Error('Weixin login result is incomplete');
           }
-          getIMGatewayManager().setConfig({
+          deps.getIMGatewayManager().setConfig({
             weixin: {
-              ...getIMGatewayManager().getConfig().weixin,
+              ...deps.getIMGatewayManager().getConfig().weixin,
               enabled: true,
               accountId: result.accountId,
               token: result.botToken,
               baseUrl: result.baseUrl,
             },
           });
-          await reconcileImConfigImmediately();
+          await reconcileImConfigImmediately(deps.reconcileCcConnectChannelSidecars);
         }
         return {
           success: true,
@@ -238,7 +241,9 @@ export const registerImGatewayIpc = (): void => {
       accountId?: string,
     ) => {
       try {
-        const result = await getIMGatewayManager().testGateway(platform, configOverride, accountId);
+        const result = await deps
+          .getIMGatewayManager()
+          .testGateway(platform, configOverride, accountId);
         return { success: true, result };
       } catch (error) {
         return {
@@ -250,14 +255,10 @@ export const registerImGatewayIpc = (): void => {
 
     getStatus: async () => {
       try {
-        await refreshCcConnectPlatformStatuses();
-        const status = getIMGatewayManager().getStatus(instanceId => {
-          return resolveCcConnectAccountRuntimeStatus(
-            rt.ccConnectRuntimeStatuses,
-            instanceId,
-            rt.ccConnectSidecarManager?.running === true,
-          );
-        });
+        await deps.refreshCcConnectPlatformStatuses();
+        const status = deps
+          .getIMGatewayManager()
+          .getStatus(instanceId => deps.resolveCcConnectAccountRuntimeStatus(instanceId));
         return { success: true, status };
       } catch (error) {
         return {
