@@ -94,7 +94,6 @@ export const magpieTranslations = {
     magpieState_running: '运行中',
     magpieState_stopping: '停止中',
     magpieState_failed: '启动失败',
-    magpieLicenseNotice: 'Apache-2.0 · 知远智能体',
 
     magpieProvidersTitle: '模型渠道管理',
     magpieProvidersDescription: '管理连接到统一网关的模型渠道。企业与本地 GPU 渠道由系统托管。',
@@ -301,7 +300,6 @@ export const magpieTranslations = {
       '从本机已登录的 Claude Code、Codex、Copilot 等读取订阅账号，作为模型渠道使用。',
     magpieAccountDiscoveryEnv: '本次运行由启动参数关闭了账号发现。',
     magpieDataDirectory: '数据目录',
-    magpieLicense: '许可证',
     magpieAboutHint: '模型服务与渠道由知远托管；版本、数据目录与本机网关地址如下。',
     magpieRedactKind_ssn: '社保号',
     magpieRedactKindHint_ssn: '美国社保号，仅覆盖实际发放的号段。',
@@ -569,7 +567,6 @@ export const magpieTranslations = {
       'Read the accounts Claude Code, Codex, Copilot, and other local agents are signed in to, and serve them as providers.',
     magpieAccountDiscoveryEnv: 'Account discovery is off for this run because of a launch setting.',
     magpieDataDirectory: 'Data directory',
-    magpieLicense: 'License',
     magpieAboutHint:
       'ZhiYuan owns the model service and providers. The version, data directory, and local gateway address are shown below.',
     magpieRedactKind_ssn: 'Social Security numbers',
@@ -597,7 +594,6 @@ export const magpieTranslations = {
     magpieState_running: 'Running',
     magpieState_stopping: 'Stopping',
     magpieState_failed: 'Failed',
-    magpieLicenseNotice: 'Apache-2.0 · ZhiYuan Agent',
 
     magpieProvidersTitle: 'Model Providers',
     magpieProvidersDescription:
