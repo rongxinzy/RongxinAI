@@ -1,4 +1,13 @@
 import type { MagpiePreferences, MagpiePreferencesPatch } from './preferences';
+import type {
+  MagpieRoutingGroupSaveInput,
+  MagpieRoutingState,
+  MagpieSubscriptionQuota,
+  MagpieUsageBudget,
+  MagpieUsagePeriod,
+  MagpieUsageRequestPage,
+  MagpieUsageSummary,
+} from './routingUsage';
 
 export const MagpieIpc = {
   status: 'magpie:status',
@@ -22,6 +31,14 @@ export const MagpieIpc = {
   diagnostics: 'magpie:diagnostics',
   preferences: 'magpie:preferences',
   updatePreferences: 'magpie:updatePreferences',
+  routingGroups: 'magpie:routingGroups',
+  saveRoutingGroup: 'magpie:saveRoutingGroup',
+  deleteRoutingGroup: 'magpie:deleteRoutingGroup',
+  arrangeRoutingGroups: 'magpie:arrangeRoutingGroups',
+  usageSummary: 'magpie:usageSummary',
+  usageRequests: 'magpie:usageRequests',
+  usageQuotas: 'magpie:usageQuotas',
+  usageBudget: 'magpie:usageBudget',
 } as const;
 
 export type MagpieProviderApi = 'openai-completions' | 'openai-responses' | 'anthropic-messages';
@@ -114,6 +131,18 @@ export interface MagpieApi {
   diagnostics(): Promise<MagpieDiagnosticSummary>;
   preferences(): Promise<MagpiePreferences>;
   updatePreferences(patch: MagpiePreferencesPatch): Promise<MagpiePreferences>;
+  routingGroups(): Promise<MagpieRoutingState>;
+  saveRoutingGroup(input: MagpieRoutingGroupSaveInput): Promise<MagpieRoutingState>;
+  deleteRoutingGroup(id: string): Promise<MagpieRoutingState>;
+  arrangeRoutingGroups(order: string[]): Promise<MagpieRoutingState>;
+  usageSummary(period: MagpieUsagePeriod): Promise<MagpieUsageSummary>;
+  usageRequests(
+    period: MagpieUsagePeriod,
+    offset: number,
+    limit: number,
+  ): Promise<MagpieUsageRequestPage>;
+  usageQuotas(asked?: boolean): Promise<MagpieSubscriptionQuota[]>;
+  usageBudget(): Promise<MagpieUsageBudget>;
 }
 
 export interface MagpieAgent {

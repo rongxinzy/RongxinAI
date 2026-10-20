@@ -82,12 +82,16 @@ export const setupMagpieRuntime = (): void => {
         .filter((model): model is NonNullable<typeof model> => Boolean(model)),
     };
   });
-  const modelService = new MagpieModelService(inferenceRuntime.magpieManager, {
-    readDefaultModelId: () => getStore().get<string>('magpie_default_model_id'),
-    writeDefaultModelId: id => getStore().set('magpie_default_model_id', id),
-    beforeCatalog: () => inferenceRuntime.managedMagpieBindings!.beforeCatalog(),
-    allowedModel: model => inferenceRuntime.managedMagpieBindings!.allowedModel(model.id),
-  });
+  const modelService = new MagpieModelService(
+    inferenceRuntime.magpieManager,
+    {
+      readDefaultModelId: () => getStore().get<string>('magpie_default_model_id'),
+      writeDefaultModelId: id => getStore().set('magpie_default_model_id', id),
+      beforeCatalog: () => inferenceRuntime.managedMagpieBindings!.beforeCatalog(),
+      allowedModel: model => inferenceRuntime.managedMagpieBindings!.allowedModel(model.id),
+    },
+    inferenceRuntime.magpieManager.routingUsage,
+  );
   inferenceRuntime.disposeMagpieModels = installMagpieModelService(modelService);
   magpieModelService = modelService;
   registerAcpMagpieModelApply(async modelId => {
@@ -119,6 +123,7 @@ export const setupMagpieRuntime = (): void => {
         event.senderFrame === lifecycleRuntime.mainWindow.webContents.mainFrame,
       ),
     modelService,
+    inferenceRuntime.magpieManager.routingUsage,
   );
 };
 

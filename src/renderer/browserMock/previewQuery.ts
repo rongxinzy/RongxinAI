@@ -3,7 +3,15 @@ export const PreviewQuery = {
   Scenario: 'previewScenario',
   Edition: 'previewEdition',
   SkipBoot: 'previewSkipBoot',
+  MagpieUsage: 'previewMagpieUsage',
 } as const;
+
+export const PreviewMagpieUsage = {
+  Populated: 'populated',
+  Empty: 'empty',
+  Error: 'error',
+} as const;
+export type PreviewMagpieUsage = (typeof PreviewMagpieUsage)[keyof typeof PreviewMagpieUsage];
 
 export const PreviewScenario = {
   Default: 'default',
@@ -39,6 +47,15 @@ export function readPreviewEdition(searchParams = readPreviewSearchParams()): Pr
   const raw = searchParams.get(PreviewQuery.Edition)?.trim().toLowerCase();
   if (raw === PreviewEdition.Xiaoruan) return PreviewEdition.Xiaoruan;
   return PreviewEdition.Zhiyuan;
+}
+
+export function readPreviewMagpieUsage(
+  searchParams = readPreviewSearchParams(),
+): PreviewMagpieUsage {
+  const raw = searchParams.get(PreviewQuery.MagpieUsage)?.trim().toLowerCase();
+  if (raw === PreviewMagpieUsage.Empty) return PreviewMagpieUsage.Empty;
+  if (raw === PreviewMagpieUsage.Error) return PreviewMagpieUsage.Error;
+  return PreviewMagpieUsage.Populated;
 }
 
 export function shouldSkipPreviewBoot(searchParams = readPreviewSearchParams()): boolean {

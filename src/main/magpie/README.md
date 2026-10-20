@@ -13,8 +13,10 @@ action calls `start()`. Do not label `agents()` a read-only scan.
 
 Production retains HOME/USERPROFILE for real local CLI management, while
 XDG_CONFIG_HOME puts Magpie's own files below the supplied app-private directory.
-Account discovery defaults off via MAGPIE_NO_ACCOUNTS=1; telemetry is disabled by
-DO_NOT_TRACK=1 and upstream settings. The gateway and Web UI bind to loopback.
+Account discovery defaults off via MAGPIE_NO_ACCOUNTS=1. Upstream PostHog telemetry
+stays off through `DO_NOT_TRACK=1` and persisted `noStats` / `noUsageStats` (those
+flags are not the local usage ledger; `usage.jsonl` is still written). The gateway
+and Web UI bind to loopback.
 The host does not copy application provider credentials into Magpie. Its ephemeral
 Web key remains in Main; renderer IPC receives only projected preferences and
 provider summaries, never the key or the full upstream settings document.
@@ -41,6 +43,9 @@ generic URL or HTTP proxy.
 - preferences: official GET /api/settings projected to non-secret fields
 - updatePreferences: official POST /api/settings, merged inside Main from a
   fresh full document so secrets and host-owned fields stay in Main
+- routing groups / usage: official `/api/groups*`, `/api/usage*`, `/api/usage/quotas`,
+  and budget fields on `/api/settings`, projected by `MagpieRoutingUsageService`
+  (owned by `MagpieManager`, registered alongside model IPC)
 
 The caller registers `registerMagpieIpc` once and awaits its returned disposer
 before application shutdown. The shared MagpieApi is exposed as

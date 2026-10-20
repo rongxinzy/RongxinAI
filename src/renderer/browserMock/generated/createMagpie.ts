@@ -209,5 +209,81 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
         noAccountsEnv: false,
       };
     },
+    routingGroups: async () => {
+      runtime.warnOnce('magpie.routingGroups');
+      return {
+        groups: [],
+        models: [],
+      };
+    },
+    saveRoutingGroup: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.saveRoutingGroup');
+      return {
+        groups: [],
+        models: [],
+      };
+    },
+    deleteRoutingGroup: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.deleteRoutingGroup');
+      return {
+        groups: [],
+        models: [],
+      };
+    },
+    arrangeRoutingGroups: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.arrangeRoutingGroups');
+      return {
+        groups: [],
+        models: [],
+      };
+    },
+    usageSummary: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.usageSummary');
+      return {
+        period: '30d',
+        calls: 0,
+        errors: 0,
+        input: 0,
+        output: 0,
+        cost: 0,
+        unpriced: 0,
+      };
+    },
+    usageRequests: async (_p0, _p1, _p2) => {
+      void _p0;
+      void _p1;
+      void _p2;
+      runtime.warnOnce('magpie.usageRequests');
+      return {
+        period: '30d',
+        rows: [],
+        offset: 0,
+        total: 0,
+        totals: {
+          calls: 0,
+          errors: 0,
+          input: 0,
+          output: 0,
+          cost: 0,
+          unpriced: 0,
+        },
+      };
+    },
+    usageQuotas: async _p0 => {
+      void _p0;
+      runtime.warnOnce('magpie.usageQuotas');
+      return [];
+    },
+    usageBudget: async () => {
+      runtime.warnOnce('magpie.usageBudget');
+      return {
+        usageAlertPercent: 0,
+        balanceAlert: 0,
+      };
+    },
   };
 }
