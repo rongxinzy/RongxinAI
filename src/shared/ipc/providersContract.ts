@@ -32,6 +32,14 @@ import type {
   MagpieTestProviderResult,
 } from '../magpie/types';
 import type { MagpiePreferences, MagpiePreferencesPatch } from '../magpie/preferences';
+import type {
+  MagpieRoutingState,
+  MagpieSubscriptionQuota,
+  MagpieUsageBudget,
+  MagpieUsagePeriod,
+  MagpieUsageRequestPage,
+  MagpieUsageSummary,
+} from '../magpie/routingUsage';
 import type { AISphereSnapshot } from '../aisphere';
 import type { ManagedProviderAccessPolicy, ManagedProviderCatalogModel } from '../managedProviders';
 import type { EnterpriseRendererSettingsPage } from '../enterpriseRenderer';
@@ -166,6 +174,25 @@ const MagpiePreferencesSchema = z.custom<MagpiePreferences>(value => typeof valu
 const MagpiePreferencesPatchSchema = z.custom<MagpiePreferencesPatch>(
   value => typeof value === 'object' && value !== null,
 );
+const MagpieUsagePeriodSchema = z.custom<MagpieUsagePeriod>(value => typeof value === 'string');
+const MagpieRoutingStateSchema = z.custom<MagpieRoutingState>(value => typeof value === 'object');
+const MagpieRoutingGroupSaveInputSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  members: z.array(z.string()),
+  routing: z.string().optional(),
+  affinity: z.string().optional(),
+  off: z.array(z.string()).optional(),
+  renameFrom: z.string().optional(),
+});
+const MagpieUsageSummarySchema = z.custom<MagpieUsageSummary>(value => typeof value === 'object');
+const MagpieUsageRequestPageSchema = z.custom<MagpieUsageRequestPage>(
+  value => typeof value === 'object',
+);
+const MagpieSubscriptionQuotaListSchema = z.custom<MagpieSubscriptionQuota[]>(value =>
+  Array.isArray(value),
+);
+const MagpieUsageBudgetSchema = z.custom<MagpieUsageBudget>(value => typeof value === 'object');
 
 /**
  * Enterprise config rows come from the enterprise_config KV blob; the renderer
@@ -363,6 +390,46 @@ export const providersContract = defineIpcContract({
     channel: MagpieIpc.updatePreferences,
     args: z.tuple([MagpiePreferencesPatchSchema]),
     result: MagpiePreferencesSchema,
+  },
+  magpieRoutingGroups: {
+    channel: MagpieIpc.routingGroups,
+    args: z.tuple([]),
+    result: MagpieRoutingStateSchema,
+  },
+  magpieSaveRoutingGroup: {
+    channel: MagpieIpc.saveRoutingGroup,
+    args: z.tuple([MagpieRoutingGroupSaveInputSchema]),
+    result: MagpieRoutingStateSchema,
+  },
+  magpieDeleteRoutingGroup: {
+    channel: MagpieIpc.deleteRoutingGroup,
+    args: z.tuple([z.string()]),
+    result: MagpieRoutingStateSchema,
+  },
+  magpieArrangeRoutingGroups: {
+    channel: MagpieIpc.arrangeRoutingGroups,
+    args: z.tuple([z.array(z.string())]),
+    result: MagpieRoutingStateSchema,
+  },
+  magpieUsageSummary: {
+    channel: MagpieIpc.usageSummary,
+    args: z.tuple([MagpieUsagePeriodSchema]),
+    result: MagpieUsageSummarySchema,
+  },
+  magpieUsageRequests: {
+    channel: MagpieIpc.usageRequests,
+    args: z.tuple([MagpieUsagePeriodSchema, z.number(), z.number()]),
+    result: MagpieUsageRequestPageSchema,
+  },
+  magpieUsageQuotas: {
+    channel: MagpieIpc.usageQuotas,
+    args: z.tuple([z.boolean().optional()]),
+    result: MagpieSubscriptionQuotaListSchema,
+  },
+  magpieUsageBudget: {
+    channel: MagpieIpc.usageBudget,
+    args: z.tuple([]),
+    result: MagpieUsageBudgetSchema,
   },
 
   // enterprise (useAppBootstrap, LoginButton, EnterpriseSettingsPage/SessionGate)

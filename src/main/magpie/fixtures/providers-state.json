@@ -1,0 +1,23 @@
+{
+  "providers": [
+    {
+      "id": "zhiyuan-host-enterprise",
+      "name": "Enterprise Host",
+      "chat": "http://127.0.0.1:8000/v1",
+      "key": { "set": false, "masked": "" },
+      "models": [{ "id": "ent-1", "name": "Enterprise 1" }],
+      "off": false
+    },
+    {
+      "id": "custom-openai",
+      "name": "My OpenAI",
+      "chat": "https://api.openai.com/v1",
+      "key": { "set": true, "masked": "sk-…7890" },
+      "models": [
+        { "id": "gpt-4o", "name": "GPT-4o" },
+        { "id": "gpt-4o-mini", "name": "GPT-4o mini" }
+      ],
+      "off": false
+    }
+  ]
+}

@@ -13,17 +13,25 @@ function fixture() {
     models: vi.fn(async () => [{ id: 'vendor/model' }, { id: 'private/model' }]),
   };
   const beforeCatalog = vi.fn(async () => {});
-  const service = new MagpieModelService(backend, {
-    readDefaultModelId: () => selected,
-    writeDefaultModelId: id => {
-      selected = id;
+  const routingUsage = {
+    routingGroups: vi.fn(async () => ({ groups: [], models: [] })),
+  };
+  const service = new MagpieModelService(
+    backend,
+    {
+      readDefaultModelId: () => selected,
+      writeDefaultModelId: id => {
+        selected = id;
+      },
+      beforeCatalog,
+      allowedModel: model => model.id !== 'private/model',
     },
-    beforeCatalog,
-    allowedModel: model => model.id !== 'private/model',
-  });
+    routingUsage,
+  );
   return {
     service,
     backend,
+    routingUsage,
     beforeCatalog,
     setState: (s: MagpieStatus) => {
       state = s;
@@ -72,6 +80,35 @@ describe('single authoritative model service', () => {
     f.backend.models.mockResolvedValue([]);
     await expect(f.service.resolve()).rejects.toThrow('no longer available');
   });
+  it('hides routing groups whose leaf models fail managed policy', async () => {
+    const f = fixture();
+    f.routingUsage.routingGroups = vi.fn(async () => ({
+      groups: [
+        {
+          id: 'mix',
+          name: 'Mix',
+          members: ['vendor/model', 'group/nested'],
+          ready: true,
+          memberInfo: [],
+        },
+        {
+          id: 'nested',
+          name: 'Nested',
+          members: ['private/model'],
+          ready: true,
+          memberInfo: [],
+        },
+      ],
+      models: [],
+    }));
+    f.backend.models.mockResolvedValue([
+      { id: 'vendor/model' },
+      { id: 'private/model' },
+      { id: 'group/mix', display_name: 'Looks fine' },
+    ]);
+    expect((await f.service.catalog()).models.map(model => model.id)).toEqual(['vendor/model']);
+  });
+
   it('enforces managed policy on selection and explicit session overrides', async () => {
     const f = fixture();
     await expect(f.service.selectDefault('private/model')).rejects.toThrow('unavailable');
