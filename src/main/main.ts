@@ -19,10 +19,10 @@ import { registerCoreIpc } from './appBootstrap/coreIpc';
 import { registerManagedProvidersIpc } from './appBootstrap/managedProvidersIpc';
 import { registerAppIpc } from './appBootstrap/appIpc';
 import { registerSkillsIpc } from './skills/ipc';
-import { registerMcpIpc } from './appBootstrap/mcpIpc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
 import { registerCoworkQueueIpc } from './coworkIpc/queue';
+import { registerMcpIpc } from './mcpIpc';
 import { registerProjectIpc } from './projectIpc';
 import { registerPermissionsIpc } from './permissionsIpc';
 import { registerDialogIpc } from './dialogIpc';
@@ -36,12 +36,17 @@ import { registerScheduledTaskIpc } from '../scheduledTask/ipc';
 import {
   getActivityService,
   getCoworkStore,
+  getMcpStore,
   getSkillManager,
   getStore,
 } from './appBootstrap/runtimeServices';
 import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
 import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
 import { getAgentManager } from './appBootstrap/runtimeServices';
+import {
+  getActiveMcpAuthorizations,
+  setActiveMcpAuthorizations,
+} from './appBootstrap/runtimeState';
 import {
   getDefaultProjectBaseDir,
   getUnmanagedWorkspaceBaseDir,
@@ -85,7 +90,12 @@ if (!gotTheLock) {
   registerAppIpc();
   registerCommunityAuthIpc();
   registerSkillsIpc({ getSkillManager, getStore });
-  registerMcpIpc();
+  registerMcpIpc({
+    getMcpStore,
+    getStore,
+    getActiveMcpAuthorizations,
+    setActiveMcpAuthorizations,
+  });
   registerWorkspaceIpc();
   registerProjectIpc({
     getDefaultProjectBaseDir,
