@@ -2,6 +2,7 @@
 import { app, BrowserWindow } from 'electron';
 
 import { rt } from './runtimeState';
+import { memoryRuntime } from './memoryRuntimeState';
 import { getStore } from './runtimeServices';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { destroyTray } from '../trayManager';
@@ -93,8 +94,8 @@ const runAppCleanup = async (): Promise<void> => {
     });
   }
 
-  if (rt.engramManager) {
-    await rt.engramManager.stop().catch(error => {
+  if (memoryRuntime.engramManager) {
+    await memoryRuntime.engramManager.stop().catch(error => {
       console.error('[MemoryRuntime] Failed to stop local memory service:', error);
     });
   }
@@ -106,8 +107,8 @@ const runAppCleanup = async (): Promise<void> => {
   }
 
   rt.sqliteBackupManager?.stopPeriodicBackupLoop();
-  rt.todoReminderScheduler?.stop();
-  rt.todoReminderScheduler = null;
+  memoryRuntime.todoReminderScheduler?.stop();
+  memoryRuntime.todoReminderScheduler = null;
 
   // Close the SQLite database to flush the WAL and release the file lock.
   try {

@@ -12,6 +12,7 @@ import { app, BrowserWindow, dialog, net, powerMonitor, protocol } from 'electro
 
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
 import { rt } from './runtimeState';
+import { memoryRuntime } from './memoryRuntimeState';
 import {
   AppConfigSettings,
   applyProxyPreference,
@@ -330,10 +331,10 @@ export const initApp = async (): Promise<void> => {
         );
       },
     });
-    rt.todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());
-    rt.todoReminderScheduler.start();
+    memoryRuntime.todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());
+    memoryRuntime.todoReminderScheduler.start();
     registerTodoIpcHandlers(() => getStore().getDatabase(), {
-      onMutation: () => rt.todoReminderScheduler?.refresh(),
+      onMutation: () => memoryRuntime.todoReminderScheduler?.refresh(),
     });
     registerCodingAgentIpcHandlers(getCodingRoomService);
     const recoveredCodingLanes = getCodingRoomService().recoverInterruptedState();

@@ -3,6 +3,7 @@ import path from 'path';
 import { app } from 'electron';
 
 import { rt } from './runtimeState';
+import { memoryRuntime } from './memoryRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
 import { getCoworkStore, getArtifactLedger, getSkillManager, getStore } from './runtimeServices';
 import { EngramManager } from '../memory/engramManager';
@@ -46,28 +47,30 @@ export const getWorkbenchTaskService = (): WorkbenchTaskService => {
 };
 
 export const getEngramManager = (): EngramManager => {
-  if (!rt.engramManager) {
-    rt.engramManager = new EngramManager({
+  if (!memoryRuntime.engramManager) {
+    memoryRuntime.engramManager = new EngramManager({
       userDataPath: app.getPath('userData'),
       resourcesPath: process.resourcesPath,
       projectRoot: app.isPackaged ? undefined : process.cwd(),
     });
   }
-  return rt.engramManager;
+  return memoryRuntime.engramManager;
 };
 
 export const getProjectMemoryService = (): ProjectMemoryService => {
-  if (!rt.engramAdapter) rt.engramAdapter = new ZhiYuanEngramAdapter(getEngramManager());
-  if (!rt.memoryRepository) rt.memoryRepository = new MemoryRepository(getStore().getDatabase());
-  if (!rt.projectMemoryService) {
-    rt.projectMemoryService = new ProjectMemoryService(
-      rt.memoryRepository,
-      rt.engramAdapter,
+  if (!memoryRuntime.engramAdapter)
+    memoryRuntime.engramAdapter = new ZhiYuanEngramAdapter(getEngramManager());
+  if (!memoryRuntime.memoryRepository)
+    memoryRuntime.memoryRepository = new MemoryRepository(getStore().getDatabase());
+  if (!memoryRuntime.projectMemoryService) {
+    memoryRuntime.projectMemoryService = new ProjectMemoryService(
+      memoryRuntime.memoryRepository,
+      memoryRuntime.engramAdapter,
       resolveProjectIdentity,
       path.join(app.getPath('userData'), 'memory'),
     );
   }
-  return rt.projectMemoryService;
+  return memoryRuntime.projectMemoryService;
 };
 
 export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
