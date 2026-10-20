@@ -1,6 +1,15 @@
 name: Memory regression
 
 on:
+  workflow_dispatch:
+    inputs:
+      source-ref:
+        description: Source commit to verify with the real Electron runtime
+        type: string
+        default: ''
+      analyze-heap:
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       source-ref:
@@ -69,6 +78,12 @@ jobs:
       - run: bun run apply:patches
       - name: Install Electron runtime
         run: node node_modules/electron/install.js
+      - name: Prepare native modules for the actual Electron runtime
+        # Dependencies are installed without lifecycle scripts. TypeScript
+        # compilation intentionally no longer rebuilds native modules.
+        run: |
+          bun run rebuild:electron-native
+          node scripts/electron-native-abi.mjs
       - name: Read pinned model runtime toolchain
         id: model-runtime
         run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"

@@ -5,6 +5,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from 'playwright';
+import { describeNativeAbi, inspectNativeAbi, NativeAbiStatus } from '../electron-native-abi.mjs';
+import { captureElectronStartup } from './electron-startup-diagnostics.mjs';
 
 const CYCLE_COUNT = 20;
 const SAMPLE_COUNT = 5;
@@ -129,7 +131,12 @@ const provider = createServer((request, response) => {
 });
 await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve));
 let electronApp;
+let retainStartupOutput;
+let phase = 'native-abi';
 try {
+  const nativeAbi = inspectNativeAbi(projectDirectory);
+  if (nativeAbi !== NativeAbiStatus.Compatible) throw new Error(describeNativeAbi(nativeAbi));
+  phase = 'electron-launch';
   electronApp = await electron.launch({
     executablePath: resolveElectronExecutable(),
     args: [projectDirectory, '--no-sandbox', '--js-flags=--expose-gc'],
@@ -146,14 +153,17 @@ try {
       ZHIYUAN_MEMORY_LEAK_TEST_USER_DATA: path.join(isolatedHome, 'user-data'),
     },
   });
-
+  retainStartupOutput = captureElectronStartup(electronApp.process());
+  phase = 'first-window';
   const page = await electronApp.firstWindow();
+  phase = 'renderer-ready';
   await page
     .getByTestId('sidebar-new-conversation')
     .waitFor({ state: 'visible', timeout: 120_000 });
 
   // Use the same verified runtime, provider management API and selected catalog
   // model as the product. No legacy config or readiness bypass is seeded.
+  phase = 'model-service';
   const started = await page.evaluate(() => window.electron.magpie.start());
   if (started.state !== 'running') throw new Error('Memory test model service did not start.');
   const savedProvider = await page.evaluate(async baseUrl => {
@@ -174,6 +184,7 @@ try {
   const readiness = await page.evaluate(() => window.electron.checkApiConfig());
   if (!readiness.hasConfig) throw new Error(`Memory test model setup failed: ${readiness.error}`);
 
+  phase = 'memory-measurement';
   const baselineSnapshots = await takeSnapshots(electronApp, 'before');
   const baselineSamples = await sampleMetrics(electronApp);
   await runCycles(page);
@@ -219,8 +230,23 @@ try {
 
   console.log(`Memory leak check passed after ${CYCLE_COUNT} Cowork view cycles.`);
 } catch (error) {
+  await writeFile(
+    path.join(diagnosticsDirectory, 'failure.json'),
+    JSON.stringify(
+      {
+        phase,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        platform: process.platform,
+        architecture: process.arch,
+      },
+      null,
+      2,
+    ),
+  );
+  await retainStartupOutput?.(diagnosticsDirectory);
   for (const entry of await readdir(isolatedHome, { recursive: true })) {
-    if (/main(?:-dev)?-.*\.log$/.test(entry)) {
+    if (/main(?:-dev)?(?:-.*)?\.log$/.test(entry)) {
       await copyFile(
         path.join(isolatedHome, entry),
         path.join(diagnosticsDirectory, path.basename(entry)),
@@ -230,7 +256,7 @@ try {
   throw error;
 } finally {
   try {
-    await electronApp?.close();
+    await electronApp?.close().catch(error => console.warn('Electron cleanup failed:', error));
   } finally {
     await new Promise(resolve => provider.close(resolve));
     await rm(isolatedHome, { recursive: true, force: true });
