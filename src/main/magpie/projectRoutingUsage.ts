@@ -29,9 +29,8 @@ function bool(value: unknown): boolean {
 }
 
 function int(value: unknown, max = Number.MAX_SAFE_INTEGER): number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= max
-    ? Math.floor(value)
-    : 0;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return 0;
+  return Math.min(Math.floor(value), max);
 }
 
 function float(value: unknown): number {
@@ -82,10 +81,12 @@ function projectGroup(value: unknown): MagpieRoutingGroup | null {
         .filter((m): m is MagpieRoutingMemberInfo => m !== null)
         .slice(0, 200)
     : [];
+  const matched = strings(item.matched, 200);
   return {
     id,
     name,
     members: strings(item.members, 200),
+    ...(matched.length ? { matched } : {}),
     ...(text(item.routing, 40) ? { routing: text(item.routing, 40) } : {}),
     ...(text(item.affinity, 40) ? { affinity: text(item.affinity, 40) } : {}),
     ...(Array.isArray(item.off) ? { off: strings(item.off, 200) } : {}),
@@ -187,7 +188,9 @@ export function projectUsageRequestPage(
           if (!time) return [];
           const status = int(item.status);
           const vendorError = text(item.err, 2000) || text(item.error, 500);
+          const priced = item.priced;
           const cost = item.cost;
+          const includeCost = priced !== false && typeof cost === 'number' && Number.isFinite(cost);
           return [
             {
               time,
@@ -196,7 +199,7 @@ export function projectUsageRequestPage(
               model: text(item.model, 200) || text(item.req, 200) || '—',
               input: int(item.in ?? item.input),
               output: int(item.out ?? item.output),
-              ...(typeof cost === 'number' && Number.isFinite(cost) ? { cost } : {}),
+              ...(includeCost ? { cost } : {}),
               failed: status >= 400 || vendorError.length > 0,
             },
           ];

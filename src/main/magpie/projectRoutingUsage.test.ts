@@ -100,7 +100,7 @@ describe('projectRoutingUsage', () => {
             name: 'Astra',
             members: ['relay/a'],
             routing: 'order',
-            match: { prefix: 'relay/' },
+            match: ['relay/*'],
             weights: { 'relay/a': 2 },
           },
         ],
@@ -117,8 +117,41 @@ describe('projectRoutingUsage', () => {
       name: 'Astra renamed',
       members: ['relay/a', 'relay/b'],
       routing: 'rotate',
-      match: { prefix: 'relay/' },
+      match: ['relay/*'],
       weights: { 'relay/a': 2 },
     });
+  });
+
+  it('merges routing group rename via from', () => {
+    const merged = mergeRoutingGroupSaveBody(
+      {
+        groups: [{ id: 'old-id', name: 'Old', members: ['relay/a'], routing: 'order' }],
+      },
+      {
+        id: 'new-id',
+        name: 'Renamed',
+        members: ['relay/a'],
+        renameFrom: 'old-id',
+      },
+    );
+    expect(merged).toMatchObject({
+      id: 'new-id',
+      name: 'Renamed',
+      from: 'old-id',
+    });
+  });
+
+  it('omits cost when priced is false', () => {
+    const page = projectUsageRequestPage(
+      {
+        rows: [
+          { t: '2026-10-16T07:00:00.000Z', model: 'm', in: 1, out: 1, cost: 0, priced: false },
+        ],
+        offset: 0,
+        total: 1,
+      },
+      MagpieUsagePeriod.Today,
+    );
+    expect(page.rows[0]?.cost).toBeUndefined();
   });
 });

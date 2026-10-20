@@ -20,6 +20,7 @@ import {
 import { i18nService } from '../../../services/i18n';
 import { showAppError } from '../../../services/appToast';
 import { routingGroupIdFromName } from './modelRoutingGroupId';
+import { memberSelectItems, membersEqual } from './modelRoutingMemberSelect';
 import { MODEL_ROUTING_OPTIONS, routingModeLabel } from './modelRoutingUsageConstants';
 
 interface ModelRoutingGroupsSectionProps {
@@ -40,21 +41,19 @@ export function ModelRoutingGroupsSection({
   onRoutingChange,
 }: ModelRoutingGroupsSectionProps) {
   const [newName, setNewName] = useState('');
-  const [newMembers, setNewMembers] = useState<string[]>(['', '']);
+  const [newMembers, setNewMembers] = useState<string[]>(['']);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [memberDrafts, setMemberDrafts] = useState<Record<string, string[]>>({});
   const api = window.electron.magpie;
 
   useEffect(() => {
-    if (!routing) return;
-    setMemberDrafts(previous => {
-      const next = { ...previous };
-      for (const group of routing.groups) {
-        const key = memberDraftKey(group);
-        if (!next[key]) next[key] = [...group.members];
-      }
-      return next;
-    });
+    if (!routing) {
+      setMemberDrafts({});
+      return;
+    }
+    setMemberDrafts(
+      Object.fromEntries(routing.groups.map(group => [memberDraftKey(group), [...group.members]])),
+    );
   }, [routing]);
 
   const moveGroup = async (index: number, direction: -1 | 1) => {
@@ -75,10 +74,7 @@ export function ModelRoutingGroupsSection({
     if (!api?.saveRoutingGroup) return;
     const name = newName.trim();
     const members = newMembers.map(m => m.trim()).filter(Boolean);
-    if (!name || members.length < 2) {
-      showAppError(i18nService.t('modelRoutingMembersRequired'));
-      return;
-    }
+    if (!name || members.length < 1) return;
     const id = routingGroupIdFromName(name);
     if (!id) return;
     try {
@@ -91,7 +87,7 @@ export function ModelRoutingGroupsSection({
         }),
       );
       setNewName('');
-      setNewMembers(['', '']);
+      setNewMembers(['']);
     } catch (cause) {
       showAppError(cause instanceof Error ? cause.message : String(cause));
     }
@@ -102,10 +98,7 @@ export function ModelRoutingGroupsSection({
     const members = (memberDrafts[memberDraftKey(group)] ?? group.members)
       .map(m => m.trim())
       .filter(Boolean);
-    if (members.length < 2) {
-      showAppError(i18nService.t('modelRoutingMembersRequired'));
-      return;
-    }
+    if (members.length < 1) return;
     try {
       onRoutingChange(
         await api.saveRoutingGroup({
@@ -180,9 +173,7 @@ export function ModelRoutingGroupsSection({
     setMemberDrafts({ ...memberDrafts, [key]: base });
   };
 
-  const modelItems = Object.fromEntries(
-    (routing?.models ?? []).map(model => [model.id, model.name]),
-  );
+  const catalog = routing?.models ?? [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -195,6 +186,8 @@ export function ModelRoutingGroupsSection({
           {routing.groups.map((group, index) => {
             const draft = memberDrafts[memberDraftKey(group)] ?? group.members;
             const routingValue = group.routing ?? MagpieProviderRouting.Smart;
+            const membersDirty = !membersEqual(draft, group.members);
+            const selectItems = memberSelectItems(catalog, draft);
             return (
               <li
                 key={group.id}
@@ -282,7 +275,7 @@ export function ModelRoutingGroupsSection({
                           {memberIndex + 1}.
                         </span>
                         <Select
-                          items={modelItems}
+                          items={selectItems}
                           value={member}
                           onValueChange={value =>
                             updateDraftMember(group, memberIndex, value ?? '')
@@ -293,9 +286,9 @@ export function ModelRoutingGroupsSection({
                             <SelectValue placeholder={i18nService.t('modelRoutingPickModel')} />
                           </SelectTrigger>
                           <SelectContent>
-                            {(routing?.models ?? []).map(model => (
-                              <SelectItem key={model.id} value={model.id}>
-                                {model.name}
+                            {Object.entries(selectItems).map(([id, label]) => (
+                              <SelectItem key={id} value={id}>
+                                {label}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -324,7 +317,7 @@ export function ModelRoutingGroupsSection({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          disabled={disabled || draft.length <= 2}
+                          disabled={disabled || draft.length <= 1}
                           onClick={() => removeDraftMember(group, memberIndex)}
                           aria-label={i18nService.t('modelRoutingRemoveMember')}
                         >
@@ -347,12 +340,23 @@ export function ModelRoutingGroupsSection({
                     <Button
                       type="button"
                       size="sm"
-                      disabled={disabled}
+                      disabled={disabled || !membersDirty}
                       onClick={() => void saveGroupMembers(group)}
                     >
                       {i18nService.t('modelRoutingSaveMembers')}
                     </Button>
                   </div>
+                  {group.matched?.length ? (
+                    <ul className="flex flex-col gap-1 border-t border-border-subtle pt-2 text-sm text-muted-foreground">
+                      {group.matched.map(pattern => (
+                        <li key={`${group.id}-match-${pattern}`}>
+                          {i18nService
+                            .t('modelRoutingMatchedPattern')
+                            .replace('{pattern}', pattern)}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
                 </div>
               </li>
             );
@@ -379,7 +383,7 @@ export function ModelRoutingGroupsSection({
                   {i18nService.t('modelRoutingMemberSlot').replace('{n}', String(index + 1))}
                 </Label>
                 <Select
-                  items={modelItems}
+                  items={memberSelectItems(catalog, newMembers)}
                   value={member}
                   onValueChange={value => {
                     const next = [...newMembers];
@@ -417,7 +421,7 @@ export function ModelRoutingGroupsSection({
               disabled={
                 disabled ||
                 !newName.trim() ||
-                newMembers.map(m => m.trim()).filter(Boolean).length < 2
+                newMembers.map(m => m.trim()).filter(Boolean).length < 1
               }
               onClick={() => void createGroup()}
             >

@@ -254,24 +254,18 @@ export function ModelRoutingCostSection({
         <div className="rounded-lg border border-border-subtle px-4 py-3 text-sm text-muted-foreground">
           <p className="font-medium text-foreground">{i18nService.t('modelBudgetTitle')}</p>
           <p>
-            {i18nService
-              .t('modelBudgetUsageAlert')
-              .replace(
-                '{percent}',
-                budget.usageAlertPercent > 0
-                  ? String(budget.usageAlertPercent)
-                  : i18nService.t('modelBudgetOff'),
-              )}
+            {budget.usageAlertPercent > 0
+              ? i18nService
+                  .t('modelBudgetUsageAlert')
+                  .replace('{percent}', String(budget.usageAlertPercent))
+              : i18nService.t('modelBudgetUsageOff')}
           </p>
           <p>
-            {i18nService
-              .t('modelBudgetBalanceAlert')
-              .replace(
-                '{amount}',
-                budget.balanceAlert > 0
-                  ? String(budget.balanceAlert)
-                  : i18nService.t('modelBudgetOff'),
-              )}
+            {budget.balanceAlert > 0
+              ? i18nService
+                  .t('modelBudgetBalanceAlert')
+                  .replace('{amount}', String(budget.balanceAlert))
+              : i18nService.t('modelBudgetBalanceOff')}
           </p>
         </div>
       ) : null}

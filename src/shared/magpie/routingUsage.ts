@@ -34,6 +34,8 @@ export interface MagpieRoutingGroup {
   id: string;
   name: string;
   members: string[];
+  /** Upstream pattern-hit rows; read-only in the UI. */
+  matched?: string[];
   routing?: string;
   affinity?: string;
   off?: string[];

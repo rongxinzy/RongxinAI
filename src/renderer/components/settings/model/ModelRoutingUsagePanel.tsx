@@ -1,7 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { RefreshCw } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   MagpieUsagePeriod,
   type MagpieRoutingState,
@@ -46,6 +46,7 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
   const [budget, setBudget] = useState<MagpieUsageBudget | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const callsFetchGen = useRef(0);
 
   const api = window.electron.magpie;
 
@@ -64,7 +65,10 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
 
   const loadCalls = useCallback(async () => {
     if (!api?.usageRequests) return;
-    setRequests(await api.usageRequests(period, callsOffset, CALLS_PAGE_SIZE));
+    const generation = ++callsFetchGen.current;
+    const page = await api.usageRequests(period, callsOffset, CALLS_PAGE_SIZE);
+    if (generation !== callsFetchGen.current) return;
+    setRequests(page);
   }, [api, period, callsOffset]);
 
   const loadCost = useCallback(async () => {
@@ -84,7 +88,7 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
       setError(null);
       try {
         if (tab === ModelUsageTab.Routing) await loadRouting();
-        if (tab === ModelUsageTab.Quota) await loadQuotas(options?.quotaAsked === true);
+        if (tab === ModelUsageTab.Quota) await loadQuotas(options?.quotaAsked ?? true);
         if (tab === ModelUsageTab.Calls) await loadCalls();
         if (tab === ModelUsageTab.Cost) await loadCost();
       } catch (cause) {
@@ -100,14 +104,16 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
     void refreshTab();
   }, [refreshTab]);
 
-  useEffect(() => {
-    setCallsOffset(0);
-  }, [period]);
-
   const handleRefresh = () => {
     void refreshTab({
       quotaAsked: tab === ModelUsageTab.Quota,
     });
+  };
+
+  const handlePeriodChange = (next: MagpieUsagePeriod) => {
+    callsFetchGen.current += 1;
+    setPeriod(next);
+    setCallsOffset(0);
   };
 
   if (!running) {
@@ -121,12 +127,9 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
   return (
     <section className="flex flex-col gap-4" aria-busy={loading}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold">{i18nService.t('modelUsageTitle')}</h2>
-          <p className="max-w-prose text-sm text-muted-foreground">
-            {i18nService.t('modelUsageDescription')}
-          </p>
-        </div>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          {i18nService.t('modelUsageDescription')}
+        </p>
         <Button
           type="button"
           variant="ghost"
@@ -172,7 +175,7 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
           requests={requests}
           pageSize={CALLS_PAGE_SIZE}
           offset={callsOffset}
-          onPeriodChange={setPeriod}
+          onPeriodChange={handlePeriodChange}
           onOffsetChange={setCallsOffset}
         />
       )}
@@ -182,7 +185,7 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
           disabled={disabled}
           summary={summary}
           budget={budget}
-          onPeriodChange={setPeriod}
+          onPeriodChange={handlePeriodChange}
         />
       )}
     </section>

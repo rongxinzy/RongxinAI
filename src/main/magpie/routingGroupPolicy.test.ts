@@ -38,6 +38,25 @@ describe('routingGroupAllowed', () => {
     ]);
   });
 
+  it('hides routing groups when effort suffix stripping would mask a disallowed leaf', () => {
+    const effortGroups = new Map<string, MagpieRoutingGroup>([
+      [
+        'pro',
+        {
+          id: 'pro',
+          name: 'Pro',
+          members: ['vendor/model:high'],
+          ready: true,
+          memberInfo: [],
+        },
+      ],
+    ]);
+    const allowed = (model: { id: string }) => model.id === 'vendor/model:high';
+    expect(
+      routingGroupAllowed({ id: 'group/pro', display_name: 'Pro bundle' }, effortGroups, allowed),
+    ).toBe(false);
+  });
+
   it('keeps routing groups visible when every leaf is allowed, including effort suffixes', () => {
     const effortGroups = new Map<string, MagpieRoutingGroup>([
       [

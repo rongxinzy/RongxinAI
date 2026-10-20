@@ -42,6 +42,7 @@ import {
   mockMagpieUsageRequests,
   mockMagpieUsageSummary,
 } from './fixtures/magpieRoutingUsage';
+import { mockMagpieProviders } from './fixtures/magpieProviders';
 import { readPreviewMagpieUsage, PreviewMagpieUsage } from './previewQuery';
 import type { BrowserMockRuntime } from './runtime';
 import { createDesktopPetPreview } from './desktopPet';
@@ -344,7 +345,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       status: () => Promise.resolve(mockMagpieCatalog.status),
       models: () => Promise.resolve(mockMagpieCatalog.models),
       agents: () => Promise.resolve(mockMagpieAgents),
-      providers: () => Promise.resolve([]),
+      providers: () => Promise.resolve(mockMagpieProviders),
       preferences: () => Promise.resolve(preferences),
       updatePreferences: patch => {
         preferences = { ...preferences, ...patch };
@@ -416,14 +417,21 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
         }
         return Promise.resolve(mockMagpieUsageSummary);
       },
-      usageRequests: () => {
+      usageRequests: (_period, offset = 0, limit = 25) => {
         if (magpieUsagePreview === PreviewMagpieUsage.Error) {
           return Promise.reject(new Error('Preview call log failed'));
         }
         if (magpieUsagePreview === PreviewMagpieUsage.Empty) {
           return Promise.resolve({ ...mockMagpieUsageRequests, rows: [], total: 0 });
         }
-        return Promise.resolve(mockMagpieUsageRequests);
+        const safeOffset = Math.max(0, offset);
+        const safeLimit = Math.max(1, limit);
+        const rows = mockMagpieUsageRequests.rows.slice(safeOffset, safeOffset + safeLimit);
+        return Promise.resolve({
+          ...mockMagpieUsageRequests,
+          offset: safeOffset,
+          rows,
+        });
       },
       usageQuotas: () => {
         if (magpieUsagePreview === PreviewMagpieUsage.Error) {

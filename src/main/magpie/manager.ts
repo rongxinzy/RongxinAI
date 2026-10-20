@@ -16,7 +16,6 @@ import type {
   MagpieSaveProviderInput,
   MagpieTestProviderResult,
   MagpieDiagnosticSummary,
-  MagpieProviderApi,
 } from '../../shared/magpie/types';
 import {
   magpieAgentConnect,
@@ -46,6 +45,7 @@ import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
 import type { MagpieRoutingGateway } from './magpieRoutingGateway';
 import { MagpieRoutingUsageService } from './routingUsageService';
 import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort, maskApiKey } from './magpieManagerUtils';
+import { projectMagpieProviderSummaries } from './projectMagpieProviders';
 export interface MagpieManagerOptions {
   resourcesRoot: string;
   privateHome: string;
@@ -444,49 +444,7 @@ export class MagpieManager implements MagpieRoutingGateway {
     if (this.state.state !== 'running') return [];
     try {
       const state = await this.managementJson('/api/providers');
-      const rawList = Array.isArray(state.providers) ? state.providers : [];
-      const list = rawList.flatMap((p: Record<string, unknown>) => {
-        if (!p || typeof p !== 'object' || typeof p.id !== 'string') return [];
-        const id = p.id;
-        const isHostManaged = id.startsWith(HOST_PROVIDER_PREFIX);
-        const chat = typeof p.chat === 'string' ? p.chat : '';
-        const responses = typeof p.responses === 'string' ? p.responses : '';
-        const anthropic = typeof p.anthropic === 'string' ? p.anthropic : '';
-        let api: MagpieProviderApi = 'openai-completions';
-        let baseUrl = chat;
-        if (anthropic) {
-          api = 'anthropic-messages';
-          baseUrl = anthropic;
-        } else if (responses) {
-          api = 'openai-responses';
-          baseUrl = responses;
-        }
-        const models = (
-          Array.isArray(p.models) ? p.models : Array.isArray(p.chosen) ? p.chosen : []
-        ).filter((m): m is string => typeof m === 'string');
-        const fallback = (Array.isArray(p.fallback) ? p.fallback : []).filter(
-          (f): f is string => typeof f === 'string',
-        );
-        const key = typeof p.key === 'string' ? p.key : undefined;
-        const hasKey = Boolean(key && key !== 'magpie-local');
-        return [
-          {
-            id,
-            name: typeof p.name === 'string' ? p.name : id,
-            api,
-            baseUrl,
-            chat: chat || undefined,
-            responses: responses || undefined,
-            anthropic: anthropic || undefined,
-            models,
-            off: p.off === true,
-            isHostManaged,
-            hasKey,
-            keyMasked: isHostManaged ? 'system-managed' : maskApiKey(key),
-            fallback,
-          },
-        ];
-      });
+      const list = projectMagpieProviderSummaries(state);
       this.cachedActiveProviderCount = list.filter(p => !p.off).length;
       return list;
     } catch {

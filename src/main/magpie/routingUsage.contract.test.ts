@@ -10,6 +10,7 @@ import { MagpieUsagePeriod } from '../../shared/magpie/routingUsage';
 import { MagpieManager } from './manager';
 import { MAGPIE_RUNTIME_API_KEY } from './modelService';
 import { verifyMagpieBinary } from './integrity';
+import { delay } from './magpieManagerUtils';
 import { MagpieRoutingUsageService } from './routingUsageService';
 
 function startUpstreamFixture(): Promise<{ server: Server; port: number }> {
@@ -100,14 +101,25 @@ describe('magpie routing and usage API contract', () => {
           name: 'Smoke upstream',
           api: 'openai-completions',
           baseUrl: `http://127.0.0.1:${upstream.port}/v1`,
+          key: 'none',
           models: ['smoke-model'],
         });
         const provider = providers.find(p => p.models.includes('smoke-model'));
         expect(provider?.id).toBeTruthy();
-        if (provider && provider.off) await manager.setProviderEnabled(provider.id, true);
+        await manager.setProviderEnabled(provider!.id, true);
+        const probe = await manager.testProvider({
+          id: provider!.id,
+          name: 'Smoke upstream',
+          api: 'openai-completions',
+          baseUrl: `http://127.0.0.1:${upstream.port}/v1`,
+          models: ['smoke-model'],
+          key: 'none',
+        });
+        expect(probe.ok).toBe(true);
 
         const gatewayUrl = manager.status().gatewayUrl;
         expect(gatewayUrl).toBeTruthy();
+        const modelRef = `${provider!.id}/smoke-model`;
         const chat = await fetch(`${gatewayUrl}/v1/chat/completions`, {
           method: 'POST',
           headers: {
@@ -115,15 +127,23 @@ describe('magpie routing and usage API contract', () => {
             Authorization: `Bearer ${MAGPIE_RUNTIME_API_KEY}`,
           },
           body: JSON.stringify({
-            model: `${provider!.id}/smoke-model`,
+            model: modelRef,
             messages: [{ role: 'user', content: 'ping' }],
           }),
         });
         expect(chat.ok).toBe(true);
 
-        const pageAfter = await usage.usageRequests(MagpieUsagePeriod.All, 0, 25);
+        let pageAfter = await usage.usageRequests(MagpieUsagePeriod.All, 0, 25);
+        for (let attempt = 0; attempt < 40 && pageAfter.total < 1; attempt++) {
+          await delay(250);
+          pageAfter = await usage.usageRequests(MagpieUsagePeriod.All, 0, 25);
+        }
         expect(pageAfter.total).toBeGreaterThanOrEqual(1);
-        expect(pageAfter.rows.some(row => row.model.includes('smoke-model'))).toBe(true);
+        expect(
+          pageAfter.rows.some(
+            row => row.model.includes('smoke-model') || row.model.includes(modelRef),
+          ),
+        ).toBe(true);
       } finally {
         await manager.stop();
         await new Promise<void>(resolve => upstream.server.close(() => resolve()));
