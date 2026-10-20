@@ -78,7 +78,7 @@ test('constructing the canonical scheduler injects it into the Pi adapter', () =
   // it removes the scheduled_task tool from every Work session.
   const constructor = source.indexOf('export const getCanonicalScheduledTaskService');
   const injection = source.indexOf(
-    'rt.piRuntimeAdapter?.setScheduledTaskService(rt.canonicalScheduledTaskService)',
+    'rt.piRuntimeAdapter?.setScheduledTaskService(channelRuntime.scheduledTaskService)',
   );
   expect(constructor).toBeGreaterThan(-1);
   expect(injection).toBeGreaterThan(constructor);

@@ -51,6 +51,7 @@ import {
 import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
 import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
 import { rt } from './appBootstrap/runtimeState';
+import { channelRuntime } from './appBootstrap/channelRuntimeState';
 import {
   getActiveMcpAuthorizations,
   setActiveMcpAuthorizations,
@@ -118,7 +119,7 @@ if (!gotTheLock) {
     showSystemMenu,
     reconcileCcConnectChannelSidecars,
     getMainWindow: () => rt.mainWindow,
-    hasIMGatewayManager: () => rt.imGatewayManager !== null,
+    hasIMGatewayManager: () => channelRuntime.gatewayManager !== null,
   });
   registerCommunityAuthIpc();
   registerSkillsIpc({ getSkillManager, getStore });
@@ -182,9 +183,9 @@ if (!gotTheLock) {
     resolveCcConnectSidecarExecutable,
     resolveCcConnectAccountRuntimeStatus: accountId =>
       resolveCcConnectAccountRuntimeStatus(
-        rt.ccConnectRuntimeStatuses,
+        channelRuntime.statuses,
         accountId,
-        rt.ccConnectSidecarManager?.running === true,
+        channelRuntime.sidecarManager?.running === true,
       ),
   });
   registerImInstanceIpc({
