@@ -6,6 +6,7 @@ import type {
   MagpieStatus,
 } from '../../shared/magpie/types';
 import { routingGroupAllowed } from './routingGroupPolicy';
+import type { MagpieRoutingUsageService } from './routingUsageService';
 
 /** Loopback credential the runtime presents to the owned gateway. The gateway, not this process, holds upstream keys. */
 export const MAGPIE_RUNTIME_API_KEY = 'magpie-zhiyuan';
@@ -15,7 +16,6 @@ export interface MagpieModelBackend {
   ensureRunning?(): Promise<MagpieStatus>;
   models(): Promise<MagpieModel[]>;
   providers?(): Promise<MagpieProviderSummary[]>;
-  routingGroups?(): Promise<MagpieRoutingState>;
   recordError?(message: string, providerId?: string): void;
 }
 export interface MagpieModelServiceOptions {
@@ -32,6 +32,7 @@ export class MagpieModelService {
   constructor(
     private readonly backend: MagpieModelBackend,
     private readonly options: MagpieModelServiceOptions,
+    private readonly routingUsage?: MagpieRoutingUsageService,
   ) {}
   recordError(message: string, providerId?: string): void {
     this.backend.recordError?.(message, providerId);
@@ -47,9 +48,9 @@ export class MagpieModelService {
       return { status, models: [], defaultModelId: this.options.readDefaultModelId() || null };
     await this.options.beforeCatalog?.();
     let groupsById = new Map<string, MagpieRoutingGroup>();
-    if (this.backend.routingGroups) {
+    if (this.routingUsage) {
       try {
-        const routing = await this.backend.routingGroups();
+        const routing = await this.routingUsage.routingGroups();
         groupsById = new Map(routing.groups.map(group => [group.id, group]));
       } catch {
         /* routing metadata is optional for catalog reads */

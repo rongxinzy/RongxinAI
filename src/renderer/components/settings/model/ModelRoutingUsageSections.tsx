@@ -1,4 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
+import { Button } from '@shared/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -14,7 +15,11 @@ import {
   type MagpieUsageSummary,
 } from '../../../../shared/magpie/routingUsage';
 import { i18nService } from '../../../services/i18n';
-import { MODEL_USAGE_PERIODS, usagePeriodLabel } from './modelRoutingUsageConstants';
+import {
+  MODEL_USAGE_PERIODS,
+  quotaWindowLabel,
+  usagePeriodLabel,
+} from './modelRoutingUsageConstants';
 
 interface PeriodSelectProps {
   period: MagpieUsagePeriod;
@@ -70,13 +75,18 @@ export function ModelRoutingQuotaSection({ quotas }: { quotas: MagpieSubscriptio
           ) : (
             <ul className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">
               {quota.windows.map(window => (
-                <li key={window.name}>
-                  {window.name}
+                <li key={`${quota.provider}-${window.name}`}>
+                  {quotaWindowLabel(window.name)}
                   {window.unlimited
                     ? ` · ${i18nService.t('modelQuotaUnlimited')}`
                     : typeof window.used === 'number'
                       ? ` · ${window.used}%`
                       : ''}
+                  {window.resetsAt
+                    ? ` · ${i18nService
+                        .t('modelQuotaResetsAt')
+                        .replace('{time}', new Date(window.resetsAt).toLocaleString())}`
+                    : ''}
                 </li>
               ))}
             </ul>
@@ -91,15 +101,25 @@ interface ModelRoutingCallsSectionProps {
   period: MagpieUsagePeriod;
   disabled?: boolean;
   requests: MagpieUsageRequestPage | null;
+  pageSize: number;
+  offset: number;
   onPeriodChange: (period: MagpieUsagePeriod) => void;
+  onOffsetChange: (offset: number) => void;
 }
 
 export function ModelRoutingCallsSection({
   period,
   disabled,
   requests,
+  pageSize,
+  offset,
   onPeriodChange,
+  onOffsetChange,
 }: ModelRoutingCallsSectionProps) {
+  const total = requests?.total ?? 0;
+  const canPrev = offset > 0;
+  const canNext = offset + pageSize < total;
+
   return (
     <div className="flex flex-col gap-3">
       <UsagePeriodSelect period={period} disabled={disabled} onPeriodChange={onPeriodChange} />
@@ -118,8 +138,11 @@ export function ModelRoutingCallsSection({
               </tr>
             </thead>
             <tbody>
-              {requests.rows.map(row => (
-                <tr key={`${row.time}-${row.model}`} className="border-b border-border-subtle/60">
+              {requests.rows.map((row, index) => (
+                <tr
+                  key={`${row.time}-${row.model}-${row.agentName}-${index}`}
+                  className="border-b border-border-subtle/60"
+                >
                   <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
                     {new Date(row.time).toLocaleString()}
                   </td>
@@ -142,6 +165,37 @@ export function ModelRoutingCallsSection({
           </table>
         </div>
       )}
+      {total > pageSize ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+          <span>
+            {i18nService
+              .t('modelCallsPage')
+              .replace('{from}', String(offset + 1))
+              .replace('{to}', String(Math.min(offset + pageSize, total)))
+              .replace('{total}', String(total))}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled || !canPrev}
+              onClick={() => onOffsetChange(Math.max(0, offset - pageSize))}
+            >
+              {i18nService.t('modelCallsPrev')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={disabled || !canNext}
+              onClick={() => onOffsetChange(offset + pageSize)}
+            >
+              {i18nService.t('modelCallsNext')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -152,6 +206,12 @@ interface ModelRoutingCostSectionProps {
   summary: MagpieUsageSummary | null;
   budget: MagpieUsageBudget | null;
   onPeriodChange: (period: MagpieUsagePeriod) => void;
+}
+
+function formatCostSummary(summary: MagpieUsageSummary): string {
+  if (summary.calls === 0 && summary.cost === 0) return '$0.00';
+  if (summary.cost > 0) return `≈$${summary.cost.toFixed(2)}`;
+  return i18nService.t('modelCostNoPrice');
 }
 
 export function ModelRoutingCostSection({
@@ -172,11 +232,11 @@ export function ModelRoutingCostSection({
           </div>
           <div className="rounded-lg border border-border-subtle px-4 py-3">
             <dt className="text-sm text-muted-foreground">{i18nService.t('modelCostTotal')}</dt>
-            <dd className="text-lg font-semibold">
-              {summary.cost > 0
-                ? `≈$${summary.cost.toFixed(2)}`
-                : i18nService.t('modelCostNoPrice')}
-            </dd>
+            <dd className="text-lg font-semibold">{formatCostSummary(summary)}</dd>
+          </div>
+          <div className="rounded-lg border border-border-subtle px-4 py-3">
+            <dt className="text-sm text-muted-foreground">{i18nService.t('modelCostUnpriced')}</dt>
+            <dd className="text-lg font-semibold">{summary.unpriced}</dd>
           </div>
           <div className="rounded-lg border border-border-subtle px-4 py-3">
             <dt className="text-sm text-muted-foreground">{i18nService.t('modelCostTokens')}</dt>
@@ -208,8 +268,8 @@ export function ModelRoutingCostSection({
               .t('modelBudgetBalanceAlert')
               .replace(
                 '{amount}',
-                budget.balanceAlertUsd > 0
-                  ? `$${budget.balanceAlertUsd.toFixed(2)}`
+                budget.balanceAlert > 0
+                  ? String(budget.balanceAlert)
                   : i18nService.t('modelBudgetOff'),
               )}
           </p>

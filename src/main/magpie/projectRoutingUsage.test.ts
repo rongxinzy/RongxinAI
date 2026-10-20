@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MagpieUsagePeriod } from '../../shared/magpie/routingUsage';
 import {
+  mergeRoutingGroupSaveBody,
   projectRoutingGroups,
   projectUsageBudget,
   projectUsageQuotas,
@@ -36,7 +37,6 @@ describe('projectRoutingUsage', () => {
       period: MagpieUsagePeriod.Week,
       calls: 3,
       cost: 0.42,
-      path: '~/log',
     });
   });
 
@@ -61,8 +61,8 @@ describe('projectRoutingUsage', () => {
             model: 'gpt-6',
             in: 5,
             out: 1,
-            status: 500,
-            error: 'rate limited',
+            status: 0,
+            err: 'rate limited',
           },
         ],
         offset: 0,
@@ -87,7 +87,38 @@ describe('projectRoutingUsage', () => {
     expect(quotas[0]?.windows[0]?.used).toBe(40);
     expect(projectUsageBudget({ usageAlert: 75, balanceAlert: 3.5 })).toEqual({
       usageAlertPercent: 75,
-      balanceAlertUsd: 3.5,
+      balanceAlert: 3.5,
+    });
+  });
+
+  it('merges routing group saves without dropping upstream-only fields', () => {
+    const merged = mergeRoutingGroupSaveBody(
+      {
+        groups: [
+          {
+            id: 'astra',
+            name: 'Astra',
+            members: ['relay/a'],
+            routing: 'order',
+            match: { prefix: 'relay/' },
+            weights: { 'relay/a': 2 },
+          },
+        ],
+      },
+      {
+        id: 'astra',
+        name: 'Astra renamed',
+        members: ['relay/a', 'relay/b'],
+        routing: 'rotate',
+      },
+    );
+    expect(merged).toMatchObject({
+      id: 'astra',
+      name: 'Astra renamed',
+      members: ['relay/a', 'relay/b'],
+      routing: 'rotate',
+      match: { prefix: 'relay/' },
+      weights: { 'relay/a': 2 },
     });
   });
 });

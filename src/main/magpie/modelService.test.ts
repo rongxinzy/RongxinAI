@@ -13,17 +13,25 @@ function fixture() {
     models: vi.fn(async () => [{ id: 'vendor/model' }, { id: 'private/model' }]),
   };
   const beforeCatalog = vi.fn(async () => {});
-  const service = new MagpieModelService(backend, {
-    readDefaultModelId: () => selected,
-    writeDefaultModelId: id => {
-      selected = id;
+  const routingUsage = {
+    routingGroups: vi.fn(async () => ({ groups: [], models: [] })),
+  };
+  const service = new MagpieModelService(
+    backend,
+    {
+      readDefaultModelId: () => selected,
+      writeDefaultModelId: id => {
+        selected = id;
+      },
+      beforeCatalog,
+      allowedModel: model => model.id !== 'private/model',
     },
-    beforeCatalog,
-    allowedModel: model => model.id !== 'private/model',
-  });
+    routingUsage,
+  );
   return {
     service,
     backend,
+    routingUsage,
     beforeCatalog,
     setState: (s: MagpieStatus) => {
       state = s;
@@ -74,7 +82,7 @@ describe('single authoritative model service', () => {
   });
   it('hides routing groups whose leaf models fail managed policy', async () => {
     const f = fixture();
-    f.backend.routingGroups = vi.fn(async () => ({
+    f.routingUsage.routingGroups = vi.fn(async () => ({
       groups: [
         {
           id: 'mix',

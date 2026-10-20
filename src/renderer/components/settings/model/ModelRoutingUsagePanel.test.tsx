@@ -71,7 +71,7 @@ beforeEach(() => {
     cost: 0.5,
     unpriced: 0,
   });
-  usageBudget.mockResolvedValue({ usageAlertPercent: 80, balanceAlertUsd: 5 });
+  usageBudget.mockResolvedValue({ usageAlertPercent: 80, balanceAlert: 5 });
 });
 
 afterEach(() => cleanup());

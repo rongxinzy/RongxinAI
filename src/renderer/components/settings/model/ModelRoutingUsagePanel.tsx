@@ -28,9 +28,17 @@ interface ModelRoutingUsagePanelProps {
   disabled?: boolean;
 }
 
+const CALLS_PAGE_SIZE = 25;
+
+function formatLoadError(cause: unknown): string {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  return i18nService.t('modelUsageLoadFailed').replace('{message}', message);
+}
+
 export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRoutingUsagePanelProps) {
   const [tab, setTab] = useState<ModelUsageTabType>(ModelUsageTab.Routing);
   const [period, setPeriod] = useState<MagpieUsagePeriod>(MagpieUsagePeriod.Week);
+  const [callsOffset, setCallsOffset] = useState(0);
   const [routing, setRouting] = useState<MagpieRoutingState | null>(null);
   const [quotas, setQuotas] = useState<MagpieSubscriptionQuota[] | null>(null);
   const [requests, setRequests] = useState<MagpieUsageRequestPage | null>(null);
@@ -46,15 +54,18 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
     setRouting(await api.routingGroups());
   }, [api]);
 
-  const loadQuotas = useCallback(async () => {
-    if (!api?.usageQuotas) return;
-    setQuotas(await api.usageQuotas(true));
-  }, [api]);
+  const loadQuotas = useCallback(
+    async (asked: boolean) => {
+      if (!api?.usageQuotas) return;
+      setQuotas(await api.usageQuotas(asked));
+    },
+    [api],
+  );
 
   const loadCalls = useCallback(async () => {
     if (!api?.usageRequests) return;
-    setRequests(await api.usageRequests(period, 0, 25));
-  }, [api, period]);
+    setRequests(await api.usageRequests(period, callsOffset, CALLS_PAGE_SIZE));
+  }, [api, period, callsOffset]);
 
   const loadCost = useCallback(async () => {
     if (!api?.usageSummary || !api?.usageBudget) return;
@@ -66,26 +77,38 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
     setBudget(nextBudget);
   }, [api, period]);
 
-  const refreshTab = useCallback(async () => {
-    if (!running || disabled) return;
-    setLoading(true);
-    setError(null);
-    try {
-      if (tab === ModelUsageTab.Routing) await loadRouting();
-      if (tab === ModelUsageTab.Quota) await loadQuotas();
-      if (tab === ModelUsageTab.Calls) await loadCalls();
-      if (tab === ModelUsageTab.Cost) await loadCost();
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [disabled, loadCalls, loadCost, loadQuotas, loadRouting, running, tab]);
+  const refreshTab = useCallback(
+    async (options?: { quotaAsked?: boolean }) => {
+      if (!running || disabled) return;
+      setLoading(true);
+      setError(null);
+      try {
+        if (tab === ModelUsageTab.Routing) await loadRouting();
+        if (tab === ModelUsageTab.Quota) await loadQuotas(options?.quotaAsked === true);
+        if (tab === ModelUsageTab.Calls) await loadCalls();
+        if (tab === ModelUsageTab.Cost) await loadCost();
+      } catch (cause) {
+        setError(formatLoadError(cause));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [disabled, loadCalls, loadCost, loadQuotas, loadRouting, running, tab],
+  );
 
   useEffect(() => {
     void refreshTab();
   }, [refreshTab]);
+
+  useEffect(() => {
+    setCallsOffset(0);
+  }, [period]);
+
+  const handleRefresh = () => {
+    void refreshTab({
+      quotaAsked: tab === ModelUsageTab.Quota,
+    });
+  };
 
   if (!running) {
     return (
@@ -109,7 +132,7 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
           variant="ghost"
           size="icon"
           disabled={disabled || loading}
-          onClick={() => void refreshTab()}
+          onClick={handleRefresh}
           aria-label={i18nService.t('modelUsageRefresh')}
           title={i18nService.t('modelUsageRefresh')}
         >
@@ -137,19 +160,23 @@ export function ModelRoutingUsagePanel({ running, disabled = false }: ModelRouti
         <ModelRoutingGroupsSection
           routing={routing}
           disabled={disabled}
+          loadError={Boolean(error)}
           onRoutingChange={setRouting}
         />
       )}
-      {tab === ModelUsageTab.Quota && <ModelRoutingQuotaSection quotas={quotas} />}
-      {tab === ModelUsageTab.Calls && (
+      {tab === ModelUsageTab.Quota && !error && <ModelRoutingQuotaSection quotas={quotas} />}
+      {tab === ModelUsageTab.Calls && !error && (
         <ModelRoutingCallsSection
           period={period}
           disabled={disabled}
           requests={requests}
+          pageSize={CALLS_PAGE_SIZE}
+          offset={callsOffset}
           onPeriodChange={setPeriod}
+          onOffsetChange={setCallsOffset}
         />
       )}
-      {tab === ModelUsageTab.Cost && (
+      {tab === ModelUsageTab.Cost && !error && (
         <ModelRoutingCostSection
           period={period}
           disabled={disabled}

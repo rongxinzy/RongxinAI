@@ -245,7 +245,6 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
       runtime.warnOnce('magpie.usageSummary');
       return {
         period: '30d',
-        path: '/home/user/preview',
         calls: 0,
         errors: 0,
         input: 0,
@@ -283,7 +282,7 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
       runtime.warnOnce('magpie.usageBudget');
       return {
         usageAlertPercent: 0,
-        balanceAlertUsd: 0,
+        balanceAlert: 0,
       };
     },
   };

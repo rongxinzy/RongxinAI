@@ -48,7 +48,6 @@ export const mockMagpieRoutingEmpty: MagpieRoutingState = {
 
 export const mockMagpieUsageSummary: MagpieUsageSummary = {
   period: MagpieUsagePeriod.Week,
-  path: '~/usage/requests.jsonl',
   calls: 42,
   errors: 1,
   input: 128_400,
@@ -107,5 +106,5 @@ export const mockMagpieUsageQuotas: MagpieSubscriptionQuota[] = [
 
 export const mockMagpieUsageBudget: MagpieUsageBudget = {
   usageAlertPercent: 80,
-  balanceAlertUsd: 5,
+  balanceAlert: 5,
 };

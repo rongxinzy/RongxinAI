@@ -123,6 +123,10 @@ export function projectRoutingGroups(raw: unknown): MagpieRoutingState {
   return { groups, models };
 }
 
+function sanitizeMembers(members: string[]): string[] {
+  return members.filter(m => typeof m === 'string' && m.length <= 500).slice(0, 200);
+}
+
 export function buildRoutingGroupSaveBody(
   input: MagpieRoutingGroupSaveInput,
 ): Record<string, unknown> {
@@ -132,13 +136,36 @@ export function buildRoutingGroupSaveBody(
   const payload: Record<string, unknown> = {
     id,
     name,
-    members: input.members.filter(m => typeof m === 'string' && m.length <= 500).slice(0, 200),
+    members: sanitizeMembers(input.members),
   };
-  if (input.routing) payload.routing = input.routing;
+  if (input.routing !== undefined) payload.routing = input.routing;
   if (input.affinity) payload.affinity = input.affinity;
   if (input.off?.length) payload.off = input.off.slice(0, 200);
   const from = input.renameFrom?.trim();
   if (from) payload.from = from;
+  return payload;
+}
+
+/** Preserve upstream-only fields (match, rules, weights, …) when updating a group. */
+export function mergeRoutingGroupSaveBody(
+  groupsState: Record<string, unknown>,
+  input: MagpieRoutingGroupSaveInput,
+): Record<string, unknown> {
+  const sourceId = (input.renameFrom?.trim() || input.id).trim();
+  const groups = Array.isArray(groupsState.groups) ? groupsState.groups : [];
+  const existing = groups.find((entry: unknown) => text(record(entry).id, 120) === sourceId);
+  if (!existing || typeof existing !== 'object') {
+    return buildRoutingGroupSaveBody(input);
+  }
+  const payload: Record<string, unknown> = { ...(existing as Record<string, unknown>) };
+  payload.id = input.id.trim();
+  payload.name = input.name.trim();
+  payload.members = sanitizeMembers(input.members);
+  if (input.routing !== undefined) payload.routing = input.routing;
+  if (input.affinity !== undefined) payload.affinity = input.affinity;
+  if (input.off !== undefined) payload.off = input.off.slice(0, 200);
+  const from = input.renameFrom?.trim();
+  if (from && from !== input.id.trim()) payload.from = from;
   return payload;
 }
 
@@ -147,7 +174,6 @@ export function projectUsageSummary(raw: unknown, period: MagpieUsagePeriod): Ma
   const totals = projectTotals(body);
   return {
     period,
-    path: text(body.path, 1000),
     ...totals,
   };
 }
@@ -164,7 +190,7 @@ export function projectUsageRequestPage(
           const time = text(item.t) || text(item.time);
           if (!time) return [];
           const status = int(item.status);
-          const error = text(item.error, 500);
+          const vendorError = text(item.err, 2000) || text(item.error, 500);
           const cost = item.cost;
           return [
             {
@@ -175,7 +201,7 @@ export function projectUsageRequestPage(
               input: int(item.in ?? item.input),
               output: int(item.out ?? item.output),
               ...(typeof cost === 'number' && Number.isFinite(cost) ? { cost } : {}),
-              failed: status >= 400 || error.length > 0,
+              failed: status >= 400 || vendorError.length > 0,
             },
           ];
         })
@@ -237,6 +263,6 @@ export function projectUsageBudget(raw: unknown): MagpieUsageBudget {
   const balanceAlert = float(body.balanceAlert);
   return {
     usageAlertPercent: usageAlert,
-    balanceAlertUsd: balanceAlert,
+    balanceAlert,
   };
 }

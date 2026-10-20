@@ -7,7 +7,6 @@ import {
 } from './hostProviders';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import net from 'node:net';
 import type {
   MagpieStatus,
   MagpieModel,
@@ -44,20 +43,9 @@ import {
   canonicalHostAgentId,
 } from './externalAgentHostConfig';
 import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
-const MODEL_FIELDS = new Set(['model', 'large', 'small', 'executor', 'planner']);
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-const maskApiKey = (key?: string) =>
-  !key ? undefined : key.length <= 8 ? '****' : `${key.slice(0, 3)}...${key.slice(-4)}`;
-async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const port = (server.address() as net.AddressInfo).port;
-      server.close(error => (error ? reject(error) : resolve(port)));
-    });
-  });
-}
+import type { MagpieRoutingGateway } from './magpieRoutingGateway';
+import { MagpieRoutingUsageService } from './routingUsageService';
+import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort, maskApiKey } from './magpieManagerUtils';
 export interface MagpieManagerOptions {
   resourcesRoot: string;
   privateHome: string;
@@ -80,7 +68,7 @@ export interface MagpieManagerOptions {
   lanAccess?: { read(): { enabled: boolean; lanToken: string | null } };
 }
 /** Owns exactly one verified, isolated upstream process. Never attaches to existing gateways. */
-export class MagpieManager {
+export class MagpieManager implements MagpieRoutingGateway {
   private state: MagpieStatus = { state: 'stopped', version: MAGPIE_VERSION };
   private child?: ChildProcess;
   private pending?: Promise<MagpieStatus>;
@@ -99,7 +87,10 @@ export class MagpieManager {
   private cachedActiveProviderCount = 0;
   private reapplyErrors = new Map<string, string>();
   private lanAccessChange?: Promise<MagpieStatus>;
-  constructor(private readonly options: MagpieManagerOptions) {}
+  readonly routingUsage: MagpieRoutingUsageService;
+  constructor(private readonly options: MagpieManagerOptions) {
+    this.routingUsage = new MagpieRoutingUsageService(this);
+  }
   status(): MagpieStatus {
     return {
       ...this.state,
@@ -233,20 +224,27 @@ export class MagpieManager {
       return this.status();
     }
   }
-  private request(url: string, init: RequestInit = {}): Promise<Response> {
-    const timeout = AbortSignal.timeout(init.method === 'POST' ? 15_000 : 2_000);
+  private request(url: string, init: RequestInit = {}, timeoutMs?: number): Promise<Response> {
+    const timeout = AbortSignal.timeout(timeoutMs ?? (init.method === 'POST' ? 15_000 : 2_000));
     return (this.options.fetch ?? fetch)(url, {
       ...init,
       redirect: 'error',
       signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout,
     });
   }
-  private webRequest(route: string, init: RequestInit = {}): Promise<Response> {
+  private webRequest(route: string, init: RequestInit = {}, timeoutMs?: number): Promise<Response> {
     if (!this.webPort || !this.webKey) throw new Error('Local model service is unavailable');
-    return this.request(`http://127.0.0.1:${this.webPort}${route}`, {
-      ...init,
-      headers: { ...init.headers, Cookie: `magpie_web_${this.webPort}=${this.webKey}` },
-    });
+    return this.request(
+      `http://127.0.0.1:${this.webPort}${route}`,
+      {
+        ...init,
+        headers: { ...init.headers, Cookie: `magpie_web_${this.webPort}=${this.webKey}` },
+      },
+      timeoutMs,
+    );
+  }
+  managementRequest(route: string, init: RequestInit = {}, timeoutMs?: number): Promise<Response> {
+    return this.webRequest(route, init, timeoutMs);
   }
   preferences(): Promise<MagpiePreferences> {
     return this.managementJson('/api/settings').then(projectMagpiePreferences);
@@ -765,7 +763,7 @@ export class MagpieManager {
                 .filter(
                   (f: Record<string, unknown>) =>
                     typeof f.key === 'string' &&
-                    MODEL_FIELDS.has(f.key) &&
+                    MAGPIE_AGENT_MODEL_FIELDS.has(f.key) &&
                     typeof f.value === 'string',
                 )
                 .map((f: Record<string, unknown>) => ({
@@ -880,7 +878,7 @@ export class MagpieManager {
       !selection ||
       typeof selection.agentId !== 'string' ||
       selection.agentId.length > 100 ||
-      !MODEL_FIELDS.has(selection.field) ||
+      !MAGPIE_AGENT_MODEL_FIELDS.has(selection.field) ||
       typeof selection.value !== 'string' ||
       selection.value.length > 500
     )

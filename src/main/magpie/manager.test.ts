@@ -54,8 +54,8 @@ describe('Magpie isolation and integrity', () => {
         noAccountDiscovery: true,
         noWSLAgents: true,
         noAutoUpdate: true,
-        noStats: false,
-        noUsageStats: false,
+        noStats: true,
+        noUsageStats: true,
         lan: false,
         gatewayMode: 'off',
       });

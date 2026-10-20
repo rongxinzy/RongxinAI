@@ -9,6 +9,7 @@ export const MagpieUsagePeriod = {
 export type MagpieUsagePeriod = (typeof MagpieUsagePeriod)[keyof typeof MagpieUsagePeriod];
 
 export const MagpieProviderRouting = {
+  Smart: '',
   Ordered: 'order',
   Rotate: 'rotate',
   LeastUsed: 'usage',
@@ -74,7 +75,6 @@ export interface MagpieUsageTotals {
 
 export interface MagpieUsageSummary extends MagpieUsageTotals {
   period: MagpieUsagePeriod;
-  path: string;
 }
 
 export interface MagpieUsageRequestRow {
@@ -115,5 +115,5 @@ export interface MagpieSubscriptionQuota {
 
 export interface MagpieUsageBudget {
   usageAlertPercent: number;
-  balanceAlertUsd: number;
+  balanceAlert: number;
 }

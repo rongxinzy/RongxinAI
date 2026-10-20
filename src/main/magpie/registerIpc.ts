@@ -1,11 +1,11 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 
-import './magpieRoutingUsage.patch';
 import { MagpieIpc } from '../../shared/magpie/types';
 import { providersContract } from '../../shared/ipc/providersContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 import type { MagpieManager } from './manager';
 import type { MagpieModelService } from './modelService';
+import type { MagpieRoutingUsageService } from './routingUsageService';
 import { HOST_PROVIDER_PREFIX } from './hostProviders';
 
 /** The app supplies its existing trusted-main-frame predicate. No arbitrary URL/HTTP IPC. */
@@ -13,7 +13,9 @@ export function registerMagpieIpc(
   manager: MagpieManager,
   trusted: (event: IpcMainInvokeEvent) => boolean,
   models?: MagpieModelService,
+  routingUsage?: MagpieRoutingUsageService,
 ): () => Promise<void> {
+  const usage = routingUsage ?? manager.routingUsage;
   // All magpie channels share one trust gate (main-frame sender only); apply
   // it around each impl so the contract layer keeps its arg validation.
   const gated =
@@ -70,16 +72,16 @@ export function registerMagpieIpc(
     magpieDiagnostics: gated(() => manager.diagnostics()),
     magpiePreferences: gated(() => manager.preferences()),
     magpieUpdatePreferences: gated((_event, patch) => manager.updatePreferences(patch)),
-    magpieRoutingGroups: gated(() => manager.routingGroups()),
-    magpieSaveRoutingGroup: gated((_event, input) => manager.saveRoutingGroup(input)),
-    magpieDeleteRoutingGroup: gated((_event, id) => manager.deleteRoutingGroup(id)),
-    magpieArrangeRoutingGroups: gated((_event, order) => manager.arrangeRoutingGroups(order)),
-    magpieUsageSummary: gated((_event, period) => manager.usageSummary(period)),
+    magpieRoutingGroups: gated(() => usage.routingGroups()),
+    magpieSaveRoutingGroup: gated((_event, input) => usage.saveRoutingGroup(input)),
+    magpieDeleteRoutingGroup: gated((_event, id) => usage.deleteRoutingGroup(id)),
+    magpieArrangeRoutingGroups: gated((_event, order) => usage.arrangeRoutingGroups(order)),
+    magpieUsageSummary: gated((_event, period) => usage.usageSummary(period)),
     magpieUsageRequests: gated((_event, period, offset, limit) =>
-      manager.usageRequests(period, offset, limit),
+      usage.usageRequests(period, offset, limit),
     ),
-    magpieUsageQuotas: gated((_event, asked) => manager.usageQuotas(asked)),
-    magpieUsageBudget: gated(() => manager.usageBudget()),
+    magpieUsageQuotas: gated((_event, asked) => usage.usageQuotas(asked)),
+    magpieUsageBudget: gated(() => usage.usageBudget()),
   });
   return async () => {
     for (const channel of Object.values(MagpieIpc)) ipcMain.removeHandler(channel);

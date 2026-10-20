@@ -24,6 +24,7 @@ export const MODEL_USAGE_PERIODS = [
 ] as const;
 
 export const MODEL_ROUTING_OPTIONS = [
+  MagpieProviderRouting.Smart,
   MagpieProviderRouting.Ordered,
   MagpieProviderRouting.Rotate,
   MagpieProviderRouting.LeastUsed,
@@ -34,3 +35,20 @@ export const MODEL_ROUTING_OPTIONS = [
 
 export const usagePeriodLabel = (period: MagpieUsagePeriod) =>
   i18nService.t(`modelUsagePeriod_${period}`);
+
+const QUOTA_WINDOW_KEYS: Record<string, string> = {
+  weekly: 'modelQuotaWindow_weekly',
+  monthly: 'modelQuotaWindow_monthly',
+  daily: 'modelQuotaWindow_daily',
+};
+
+export const quotaWindowLabel = (name: string) => {
+  const key = QUOTA_WINDOW_KEYS[name.trim().toLowerCase()];
+  return key ? i18nService.t(key) : name;
+};
+
+export const routingModeLabel = (mode: string | undefined) => {
+  const value = mode ?? MagpieProviderRouting.Smart;
+  if (value === MagpieProviderRouting.Smart) return i18nService.t('modelRoutingMode_smart');
+  return i18nService.t(`modelRoutingMode_${value}`);
+};
