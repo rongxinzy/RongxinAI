@@ -66,7 +66,7 @@
       }
     },
     "data-analysis": {
-      "label": "数据分析",
+      "label": "分析数据",
       "prompts": {
         "excel-budget": {
           "label": "Q4 预算控制台",
@@ -131,7 +131,7 @@
       }
     },
     "website": {
-      "label": "创建网站",
+      "label": "搭建网站",
       "prompts": {
         "web-learning-lab": {
           "label": "潮汐实验室",
@@ -326,7 +326,7 @@
       }
     },
     "docs": {
-      "label": "文档",
+      "label": "撰写文档",
       "prompts": {
         "docs-meeting": {
           "label": "供应商接入会议纪要",
@@ -393,7 +393,7 @@
   },
   "en": {
     "pptx": {
-      "label": "Create Slides",
+      "label": "Create slides",
       "prompts": {
         "pptx-work-report": {
           "label": "Quarterly operating review",
@@ -458,7 +458,7 @@
       }
     },
     "data-analysis": {
-      "label": "Data Analysis",
+      "label": "Analyze data",
       "prompts": {
         "excel-budget": {
           "label": "Q4 budget control",
@@ -523,7 +523,7 @@
       }
     },
     "website": {
-      "label": "Create Website",
+      "label": "Build a website",
       "prompts": {
         "web-learning-lab": {
           "label": "Tide science lab",
@@ -588,7 +588,7 @@
       }
     },
     "deep-research": {
-      "label": "Deep Research",
+      "label": "Deep research",
       "prompts": {
         "research-industry": {
           "label": "AI data center cooling",
@@ -653,7 +653,7 @@
       }
     },
     "academic-research": {
-      "label": "Academic Research",
+      "label": "Academic research",
       "prompts": {
         "academic-outline": {
           "label": "Human-AI teamwork study",
@@ -718,7 +718,7 @@
       }
     },
     "docs": {
-      "label": "Documents",
+      "label": "Write documents",
       "prompts": {
         "docs-meeting": {
           "label": "Decision-ready meeting record",

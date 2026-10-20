@@ -10,7 +10,9 @@ const mix = (token: string, amount: number) =>
 
 export function classicButtons(): ButtonAppearances {
   const hover = { 'background-color': 'var(--muted)', color: 'var(--foreground)' };
-  const raised = { 'background-color': 'var(--zy-surface-raised)' };
+  // Toolbar chips sit on the raised composer/card surface, so their hover
+  // needs the neutral fill step, not another coat of the same raised color.
+  const chip = { 'background-color': 'var(--accent)' };
   const small = { 'border-radius': 'var(--zy-style-radius-md)' };
   return {
     button: recipe({
@@ -23,8 +25,8 @@ export function classicButtons(): ButtonAppearances {
         'font-weight': 'var(--zy-component-font-weight-medium)',
         'outline-style': 'none',
         'transition-property': 'color, background-color, border-color, box-shadow, translate',
-        'transition-duration': '150ms',
-        'transition-timing-function': 'ease-out',
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
       },
       focus: { 'border-color': 'var(--ring)', 'box-shadow': `0 0 0 3px ${mix('ring', 50)}` },
       pressed: { translate: '0 1px' },
@@ -48,10 +50,17 @@ export function classicButtons(): ButtonAppearances {
       hover: { ...hover, 'background-color': 'var(--zy-state-input-hover)' },
       expanded: hover,
     }),
+    // v4 secondary: neutral raised surface (card + border + shadow-xs), the
+    // shape that carries emphasis without spending the brand color.
     'button-secondary': recipe({
-      base: { 'background-color': 'var(--secondary)', color: 'var(--secondary-foreground)' },
-      hover: { 'background-color': 'color-mix(in oklch, var(--secondary), var(--foreground) 5%)' },
-      expanded: { 'background-color': 'var(--secondary)', color: 'var(--secondary-foreground)' },
+      base: {
+        'background-color': 'var(--card)',
+        color: 'var(--foreground)',
+        'border-color': 'var(--zy-border)',
+        'box-shadow': 'var(--zy-style-shadow-xs)',
+      },
+      hover: { 'background-color': 'var(--accent)', color: 'var(--foreground)' },
+      expanded: { 'background-color': 'var(--card)', color: 'var(--foreground)' },
     }),
     'button-ghost': recipe({
       hover: { ...hover, 'background-color': 'var(--zy-state-muted-hover)' },
@@ -61,15 +70,15 @@ export function classicButtons(): ButtonAppearances {
       base: { color: 'inherit', 'background-color': 'transparent' },
     }),
     'button-prompt-selector': recipe({
-      base: { 'transition-duration': '150ms' },
-      hover: { ...raised, color: 'var(--foreground)' },
-      expanded: { ...raised, color: 'var(--foreground)' },
+      base: { 'transition-duration': '120ms' },
+      hover: { ...chip, color: 'var(--foreground)' },
+      expanded: { ...chip, color: 'var(--foreground)' },
     }),
     'button-navigation': recipe({
       base: {
         color: 'var(--muted-foreground)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
-        'transition-duration': '150ms',
+        'transition-duration': '120ms',
       },
       hover: {
         'background-color': mix('sidebar-foreground', 6),
@@ -83,9 +92,9 @@ export function classicButtons(): ButtonAppearances {
     }),
 
     'button-toolbar': recipe({
-      base: { color: 'var(--muted-foreground)' },
-      hover: { ...raised, color: 'var(--foreground)' },
-      expanded: { ...raised, color: 'var(--foreground)' },
+      base: { color: 'var(--muted-foreground)', 'transition-duration': '120ms' },
+      hover: { ...chip, color: 'var(--foreground)' },
+      expanded: { ...chip, color: 'var(--foreground)' },
     }),
     'button-destructive': recipe({
       base: {

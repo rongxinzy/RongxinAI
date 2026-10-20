@@ -5,7 +5,7 @@ const surface = (amount: number) =>
 const feedback = {
   'transition-property': 'color, background-color, box-shadow, translate',
   'transition-duration': '120ms',
-  'transition-timing-function': 'cubic-bezier(0.22, 1, 0.36, 1)',
+  'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
 } as const;
 const focus = {
   'outline-style': 'solid',
@@ -17,12 +17,11 @@ const focus = {
 export function shellSidebarAppearances() {
   return {
     'shell-sidebar': recipe({
+      // The sidebar sits directly on the window base; no divider line between
+      // sidebar and the raised content panel (DESIGN.md v4 §五.4, §六.1).
       base: {
         'background-color': 'var(--sidebar)',
         color: 'var(--sidebar-foreground)',
-        'border-right-width': '1px',
-        'border-style': 'solid',
-        'border-color': 'var(--zy-border-subtle)',
       },
     }),
     'shell-sidebar-header': recipe({
@@ -215,21 +214,21 @@ export function shellSidebarAppearances() {
     }),
     'shell-mode': recipe({
       base: {
-        height: '1.75rem',
+        height: '2rem',
         width: '100%',
         'border-width': '0px',
-        'border-radius': 'var(--zy-style-work-chat-thumb-radius)',
-        'background-color': surface(8),
+        'border-radius': 'var(--zy-style-radius-lg)',
+        'background-color': 'var(--sidebar-accent)',
         'box-shadow': 'none',
       },
-      checked: { 'background-color': surface(8) },
+      checked: { 'background-color': 'var(--sidebar-accent)' },
       focus,
     }),
     'shell-mode-thumb': recipe({
       base: {
         height: '1.5rem',
         width: 'calc(50% - 4px)',
-        'border-radius': 'var(--zy-style-work-chat-thumb-radius)',
+        'border-radius': 'var(--zy-style-radius-md)',
         'background-color': 'var(--zy-style-work-chat-thumb)',
         'box-shadow': 'var(--zy-style-shadow-xs)',
         'transition-property': 'translate',
@@ -241,13 +240,26 @@ export function shellSidebarAppearances() {
       base: {
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
-        color: 'var(--sidebar-foreground)',
+        color: 'var(--muted-foreground)',
       },
     }),
+    // Selected segment is expressed by type hierarchy only — no brand color.
     'shell-mode-label-selected': recipe({
       base: {
         'font-weight': 'var(--zy-component-font-weight-medium)',
-        color: 'var(--zy-switch-thumb-foreground)',
+        color: 'var(--sidebar-foreground)',
+      },
+    }),
+    // v4 §五.4/§六.1: the content panel is a raised card floating on the
+    // window base — border + xs shadow instead of a divider line.
+    'app-main-canvas': recipe({
+      base: {
+        'background-color': 'var(--background)',
+        'border-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'var(--border)',
+        'border-radius': 'var(--zy-style-radius-xl)',
+        'box-shadow': 'var(--zy-style-shadow-xs)',
       },
     }),
   };

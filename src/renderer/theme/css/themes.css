@@ -3,79 +3,79 @@
 :root, [data-theme="zenith-light"] {
   color-scheme: light;
   --zy-style-body-leading: 1.5;
-  --zy-style-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --zy-style-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
   --zy-syntax-shiki-ansi-bright-white: #F8FAFC;
   --zy-syntax-shiki-ansi-white: #E2E8F0;
   --zy-syntax-shiki-ansi-bright-cyan: #22D3EE;
-  --zy-syntax-shiki-ansi-cyan: #06B6D4;
+  --zy-syntax-shiki-ansi-cyan: #0891B2;
   --zy-syntax-shiki-ansi-bright-magenta: #A78BFA;
-  --zy-syntax-shiki-ansi-magenta: #8B5CF6;
-  --zy-syntax-shiki-ansi-bright-blue: #60A5FA;
-  --zy-syntax-shiki-ansi-blue: #3B82F6;
-  --zy-syntax-shiki-ansi-bright-yellow: #FBBF24;
-  --zy-syntax-shiki-ansi-yellow: #F59E0B;
-  --zy-syntax-shiki-ansi-bright-green: #34D399;
-  --zy-syntax-shiki-ansi-green: #10B981;
-  --zy-syntax-shiki-ansi-bright-red: #F87171;
-  --zy-syntax-shiki-ansi-red: #EF4444;
-  --zy-syntax-shiki-ansi-bright-black: #475569;
-  --zy-syntax-shiki-ansi-black: #0F172A;
-  --zy-syntax-shiki-token-link: #2563EB;
-  --zy-syntax-shiki-token-punctuation: #475569;
-  --zy-syntax-shiki-token-function: #06B6D4;
-  --zy-syntax-shiki-token-parameter: #3B82F6;
-  --zy-syntax-shiki-token-constant: #F59E0B;
-  --zy-syntax-shiki-token-string-expression: #059669;
-  --zy-syntax-shiki-token-string: #10B981;
-  --zy-syntax-shiki-token-keyword: #8B5CF6;
-  --zy-syntax-shiki-token-comment: #64748B;
-  --zy-syntax-shiki-background: rgba(255, 255, 255, 0.95);
-  --zy-syntax-shiki-foreground: #0A1628;
-  --zy-syntax-codemirror-18: #FB923C;
-  --zy-syntax-codemirror-17: #14B8A6;
-  --zy-syntax-codemirror-16: #A855F7;
-  --zy-syntax-codemirror-15: #F97316;
-  --zy-syntax-codemirror-14: #84CC16;
-  --zy-syntax-codemirror-13: #06B6D4;
-  --zy-syntax-codemirror-12: #EC4899;
-  --zy-syntax-codemirror-11: #EF4444;
-  --zy-syntax-codemirror-10: #F59E0B;
-  --zy-syntax-codemirror-9: #8B5CF6;
-  --zy-syntax-codemirror-8: #10B981;
-  --zy-syntax-codemirror-7: #3B82F6;
-  --zy-syntax-codemirror-6: #64748B;
-  --zy-syntax-codemirror-0: rgba(255, 255, 255, 0.95);
-  --zy-component-shimmer: rgba(59, 130, 246, 0.1);
-  --zy-component-font-weight-bold: 700;
+  --zy-syntax-shiki-ansi-magenta: #7C3AED;
+  --zy-syntax-shiki-ansi-bright-blue: #4C8DFF;
+  --zy-syntax-shiki-ansi-blue: #0F6BF2;
+  --zy-syntax-shiki-ansi-bright-yellow: #F79009;
+  --zy-syntax-shiki-ansi-yellow: #DC6803;
+  --zy-syntax-shiki-ansi-bright-green: #12B76A;
+  --zy-syntax-shiki-ansi-green: #079455;
+  --zy-syntax-shiki-ansi-bright-red: #F04438;
+  --zy-syntax-shiki-ansi-red: #D92D20;
+  --zy-syntax-shiki-ansi-bright-black: #475467;
+  --zy-syntax-shiki-ansi-black: #101828;
+  --zy-syntax-shiki-token-link: #0C5FD9;
+  --zy-syntax-shiki-token-punctuation: #475467;
+  --zy-syntax-shiki-token-function: #0891B2;
+  --zy-syntax-shiki-token-parameter: #0F6BF2;
+  --zy-syntax-shiki-token-constant: #DC6803;
+  --zy-syntax-shiki-token-string-expression: #067647;
+  --zy-syntax-shiki-token-string: #079455;
+  --zy-syntax-shiki-token-keyword: #7C3AED;
+  --zy-syntax-shiki-token-comment: #667085;
+  --zy-syntax-shiki-background: #FFFFFF;
+  --zy-syntax-shiki-foreground: #101828;
+  --zy-syntax-codemirror-18: #F97316;
+  --zy-syntax-codemirror-17: #0D9488;
+  --zy-syntax-codemirror-16: #9333EA;
+  --zy-syntax-codemirror-15: #EA580C;
+  --zy-syntax-codemirror-14: #65A30D;
+  --zy-syntax-codemirror-13: #0891B2;
+  --zy-syntax-codemirror-12: #DB2777;
+  --zy-syntax-codemirror-11: #D92D20;
+  --zy-syntax-codemirror-10: #DC6803;
+  --zy-syntax-codemirror-9: #7C3AED;
+  --zy-syntax-codemirror-8: #079455;
+  --zy-syntax-codemirror-7: #0F6BF2;
+  --zy-syntax-codemirror-6: #667085;
+  --zy-syntax-codemirror-0: #FFFFFF;
+  --zy-component-shimmer: rgba(16, 24, 40, 0.06);
+  --zy-component-font-weight-bold: 600;
   --zy-component-font-weight-semibold: 600;
   --zy-component-font-weight-medium: 500;
   --zy-component-font-weight-normal: 400;
-  --zy-component-text-9xl--line-height: 64px;
-  --zy-component-text-9xl: 56px;
-  --zy-component-text-8xl--line-height: 56px;
-  --zy-component-text-8xl: 48px;
-  --zy-component-text-7xl--line-height: 48px;
-  --zy-component-text-7xl: 40px;
-  --zy-component-text-6xl--line-height: 44px;
-  --zy-component-text-6xl: 36px;
-  --zy-component-text-5xl--line-height: 40px;
-  --zy-component-text-5xl: 32px;
-  --zy-component-text-4xl--line-height: 36px;
-  --zy-component-text-4xl: 28px;
-  --zy-component-text-3xl--line-height: 32px;
-  --zy-component-text-3xl: 24px;
-  --zy-component-text-2xl--line-height: 28px;
-  --zy-component-text-2xl: 20px;
-  --zy-component-text-xl--line-height: 24px;
-  --zy-component-text-xl: 17px;
-  --zy-component-text-lg--line-height: 22px;
-  --zy-component-text-lg: 15px;
-  --zy-component-text-base--line-height: 20px;
-  --zy-component-text-base: 13px;
-  --zy-component-text-sm--line-height: 18px;
-  --zy-component-text-sm: 12px;
+  --zy-component-text-9xl--line-height: 88px;
+  --zy-component-text-9xl: 80px;
+  --zy-component-text-8xl--line-height: 80px;
+  --zy-component-text-8xl: 72px;
+  --zy-component-text-7xl--line-height: 72px;
+  --zy-component-text-7xl: 64px;
+  --zy-component-text-6xl--line-height: 64px;
+  --zy-component-text-6xl: 56px;
+  --zy-component-text-5xl--line-height: 56px;
+  --zy-component-text-5xl: 48px;
+  --zy-component-text-4xl--line-height: 44px;
+  --zy-component-text-4xl: 36px;
+  --zy-component-text-3xl--line-height: 38px;
+  --zy-component-text-3xl: 30px;
+  --zy-component-text-2xl--line-height: 32px;
+  --zy-component-text-2xl: 24px;
+  --zy-component-text-xl--line-height: 28px;
+  --zy-component-text-xl: 20px;
+  --zy-component-text-lg--line-height: 28px;
+  --zy-component-text-lg: 18px;
+  --zy-component-text-base--line-height: 24px;
+  --zy-component-text-base: 16px;
+  --zy-component-text-sm--line-height: 20px;
+  --zy-component-text-sm: 14px;
   --zy-component-text-xs--line-height: 16px;
-  --zy-component-text-xs: 11px;
+  --zy-component-text-xs: 12px;
   --zy-component-palette-zinc-950: #09090B;
   --zy-component-palette-zinc-800: #27272A;
   --zy-component-palette-zinc-400: #A1A1AA;
@@ -123,79 +123,79 @@
   --zy-component-palette-amber-50: #FFFBEB;
   --zy-component-palette-amber-400: #FBBF24;
   --zy-component-palette-amber-200: #FDE68A;
-  --zy-component-diff-removed-background: rgba(239, 68, 68, 0.1);
-  --zy-component-diff-added-background: rgba(16, 185, 129, 0.1);
-  --zy-component-diff-removed: #EF4444;
-  --zy-component-diff-added: #10B981;
-  --zy-component-overlay-strong: rgba(10, 22, 40, 0.4);
-  --zy-component-editor-indent-active-fallback: rgba(59, 130, 246, 0.1);
-  --zy-component-editor-indent-fallback: rgba(0, 0, 0, 0.03);
-  --zy-component-editor-error: rgba(239, 68, 68, 0.15);
-  --zy-component-editor-search-selected: rgba(245, 158, 11, 0.4);
-  --zy-component-editor-search: rgba(245, 158, 11, 0.25);
-  --zy-component-editor-changed: rgba(245, 158, 11, 0.15);
-  --zy-component-editor-inserted-chunk: rgba(16, 185, 129, 0.08);
-  --zy-component-editor-deleted-chunk: rgba(239, 68, 68, 0.08);
-  --zy-component-editor-indent-active: rgba(59, 130, 246, 0.15);
-  --zy-component-editor-indent: rgba(0, 0, 0, 0.03);
-  --zy-component-editor-inserted: rgba(16, 185, 129, 0.1);
-  --zy-component-editor-deleted: rgba(239, 68, 68, 0.1);
-  --zy-component-editor-active-line: rgba(59, 130, 246, 0.05);
-  --zy-component-editor-selection: rgba(59, 130, 246, 0.15);
-  --zy-component-editor-gutter: rgba(248, 250, 252, 0.8);
-  --zy-component-editor-foreground: #0A1628;
-  --zy-component-editor-background: rgba(255, 255, 255, 0.95);
-  --background: #FAFBFD;
-  --foreground: #0A1628;
-  --card: rgba(255, 255, 255, 0.85);
-  --card-foreground: #0A1628;
-  --popover: rgba(255, 255, 255, 0.98);
-  --popover-foreground: #0A1628;
-  --primary: #3B82F6;
+  --zy-component-diff-removed-background: rgba(217, 45, 32, 0.1);
+  --zy-component-diff-added-background: rgba(7, 148, 85, 0.1);
+  --zy-component-diff-removed: #D92D20;
+  --zy-component-diff-added: #079455;
+  --zy-component-overlay-strong: rgba(16, 24, 40, 0.4);
+  --zy-component-editor-indent-active-fallback: rgba(15, 107, 242, 0.12);
+  --zy-component-editor-indent-fallback: rgba(16, 24, 40, 0.04);
+  --zy-component-editor-error: rgba(217, 45, 32, 0.14);
+  --zy-component-editor-search-selected: rgba(220, 104, 3, 0.36);
+  --zy-component-editor-search: rgba(220, 104, 3, 0.22);
+  --zy-component-editor-changed: rgba(220, 104, 3, 0.14);
+  --zy-component-editor-inserted-chunk: rgba(7, 148, 85, 0.08);
+  --zy-component-editor-deleted-chunk: rgba(217, 45, 32, 0.08);
+  --zy-component-editor-indent-active: rgba(15, 107, 242, 0.16);
+  --zy-component-editor-indent: rgba(16, 24, 40, 0.04);
+  --zy-component-editor-inserted: rgba(7, 148, 85, 0.1);
+  --zy-component-editor-deleted: rgba(217, 45, 32, 0.1);
+  --zy-component-editor-active-line: rgba(16, 24, 40, 0.04);
+  --zy-component-editor-selection: rgba(15, 107, 242, 0.14);
+  --zy-component-editor-gutter: #F4F5F7;
+  --zy-component-editor-foreground: #101828;
+  --zy-component-editor-background: #FFFFFF;
+  --background: #FFFFFF;
+  --foreground: #101828;
+  --card: #FFFFFF;
+  --card-foreground: #101828;
+  --popover: #FFFFFF;
+  --popover-foreground: #101828;
+  --primary: #0F6BF2;
   --primary-foreground: #FFFFFF;
-  --secondary: rgba(241, 245, 249, 0.9);
-  --secondary-foreground: #0A1628;
-  --muted: rgba(241, 245, 249, 0.9);
-  --muted-foreground: #4A5568;
-  --accent: rgba(59, 130, 246, 0.08);
-  --accent-foreground: #3B82F6;
-  --destructive: #EF4444;
-  --border: rgba(0, 0, 0, 0.06);
-  --input: rgba(0, 0, 0, 0.08);
-  --ring: #3B82F6;
-  --chart-1: #3B82F6;
-  --chart-2: #8B5CF6;
-  --chart-3: #10B981;
-  --chart-4: #F59E0B;
-  --chart-5: #EF4444;
-  --radius: 12px;
-  --sidebar: rgba(255, 255, 255, 0.85);
-  --sidebar-foreground: #0A1628;
-  --sidebar-primary: #3B82F6;
+  --secondary: rgba(16, 24, 40, 0.05);
+  --secondary-foreground: #101828;
+  --muted: rgba(16, 24, 40, 0.05);
+  --muted-foreground: #475467;
+  --accent: rgba(16, 24, 40, 0.05);
+  --accent-foreground: #101828;
+  --destructive: #D92D20;
+  --border: rgba(16, 24, 40, 0.08);
+  --input: rgba(16, 24, 40, 0.14);
+  --ring: rgba(15, 107, 242, 0.4);
+  --chart-1: #0F6BF2;
+  --chart-2: #7C3AED;
+  --chart-3: #079455;
+  --chart-4: #DC6803;
+  --chart-5: #D92D20;
+  --radius: 8px;
+  --sidebar: #F4F5F7;
+  --sidebar-foreground: #101828;
+  --sidebar-primary: #0F6BF2;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: rgba(59, 130, 246, 0.08);
-  --sidebar-accent-foreground: #3B82F6;
-  --sidebar-border: rgba(0, 0, 0, 0.06);
-  --sidebar-ring: #3B82F6;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --zy-style-text-xxl: 18px;
-  --zy-style-text-xxl--line-height: 26px;
-  --zy-style-shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --zy-style-shadow-card: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 20px rgba(59, 130, 246, 0.08);
-  --zy-style-shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.10), 0 0 32px rgba(59, 130, 246, 0.12);
-  --zy-style-shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.15), 0 0 64px rgba(59, 130, 246, 0.12);
-  --zy-style-shadow-popover: 0 12px 40px rgba(0, 0, 0, 0.12), 0 0 48px rgba(59, 130, 246, 0.18);
-  --zy-style-shadow-glow-accent: 0 0 32px rgba(59, 130, 246, 0.3);
-  --zy-style-shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.06);
-  --zy-style-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06), 0 0 12px rgba(59, 130, 246, 0.04);
-  --zy-style-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08), 0 0 20px rgba(59, 130, 246, 0.08);
-  --zy-style-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10), 0 0 32px rgba(59, 130, 246, 0.12);
-  --zy-style-shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.12), 0 0 48px rgba(59, 130, 246, 0.18);
-  --zy-style-shadow-2xl: 0 24px 80px rgba(0, 0, 0, 0.15), 0 0 64px rgba(59, 130, 246, 0.12);
-  --zy-style-ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --sidebar-accent: rgba(16, 24, 40, 0.08);
+  --sidebar-accent-foreground: #101828;
+  --sidebar-border: rgba(16, 24, 40, 0.08);
+  --sidebar-ring: rgba(15, 107, 242, 0.4);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --zy-style-text-xxl: 24px;
+  --zy-style-text-xxl--line-height: 32px;
+  --zy-style-shadow-subtle: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --zy-style-shadow-card: none;
+  --zy-style-shadow-elevated: 0 8px 24px -8px rgba(16, 24, 40, 0.12);
+  --zy-style-shadow-modal: 0 16px 48px -12px rgba(16, 24, 40, 0.18);
+  --zy-style-shadow-popover: 0 16px 48px -12px rgba(16, 24, 40, 0.18);
+  --zy-style-shadow-glow-accent: none;
+  --zy-style-shadow-inset: inset 0 1px 2px rgba(16, 24, 40, 0.05);
+  --zy-style-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -8px rgba(16, 24, 40, 0.08);
+  --zy-style-shadow-md: 0 1px 2px rgba(16, 24, 40, 0.05), 0 12px 32px -8px rgba(16, 24, 40, 0.14);
+  --zy-style-shadow-lg: 0 16px 48px -12px rgba(16, 24, 40, 0.18);
+  --zy-style-shadow-xl: 0 20px 56px -12px rgba(16, 24, 40, 0.2);
+  --zy-style-shadow-2xl: 0 24px 64px -16px rgba(16, 24, 40, 0.24);
+  --zy-style-ease-smooth: cubic-bezier(0.2, 0, 0, 1);
   --zy-style-switch-width: 36px;
   --zy-style-switch-height: 20px;
   --zy-style-switch-thumb-size: 16px;
@@ -207,66 +207,66 @@
   --zy-style-switch-press-extend: 2px;
   --zy-style-switch-press-shrink: 1px;
   --zy-style-switch-motion-ms: 150;
-  --zy-style-switch-thumb: #ffffff;
-  --zy-style-work-chat-thumb-radius: 8px;
-  --zy-style-work-chat-thumb: rgba(255, 255, 255, 0.95);
-  --zy-style-font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --zy-style-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --zy-style-font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
-  --zy-style-radius-sm: 8px;
-  --zy-style-radius-md: 12px;
-  --zy-style-radius-lg: 16px;
-  --zy-style-radius-xl: 20px;
-  --zy-style-radius-2xl: 24px;
-  --zy-style-radius-3xl: 32px;
-  --zy-style-destructive-confirm: #DC2626;
-  --zy-style-work-chat-track: rgba(59, 130, 246, 0.08);
-  --zy-primary: #3B82F6;
+  --zy-style-switch-thumb: #FFFFFF;
+  --zy-style-work-chat-thumb-radius: 6px;
+  --zy-style-work-chat-thumb: #FFFFFF;
+  --zy-style-font-heading: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --zy-style-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --zy-style-font-mono: 'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+  --zy-style-radius-sm: 4px;
+  --zy-style-radius-md: 6px;
+  --zy-style-radius-lg: 8px;
+  --zy-style-radius-xl: 12px;
+  --zy-style-radius-2xl: 16px;
+  --zy-style-radius-3xl: 20px;
+  --zy-style-destructive-confirm: #D92D20;
+  --zy-style-work-chat-track: rgba(16, 24, 40, 0.08);
+  --zy-primary: #0F6BF2;
   --zy-primary-foreground: #FFFFFF;
-  --zy-primary-hover: #2563EB;
-  --zy-primary-muted: rgba(59, 130, 246, 0.1);
-  --zy-primary-strong: #3B82F6;
-  --zy-switch-thumb-foreground: #3B82F6;
-  --zy-switch-track-checked: #3B82F6;
-  --zy-switch-track-checked-hover: #2563EB;
-  --zy-accent: rgba(59, 130, 246, 0.08);
-  --zy-accent-foreground: #3B82F6;
-  --zy-background: #FAFBFD;
-  --zy-foreground: #0A1628;
-  --zy-surface: rgba(255, 255, 255, 0.85);
-  --zy-surface-foreground: #0A1628;
-  --zy-surface-raised: rgba(255, 255, 255, 0.95);
-  --zy-surface-tertiary: rgba(248, 250, 252, 0.9);
-  --zy-surface-overlay: rgba(255, 255, 255, 0.98);
-  --zy-chat-user: rgba(59, 130, 246, 0.08);
-  --zy-chat-user-foreground: #0A1628;
-  --zy-chat-bot: rgba(255, 255, 255, 0.85);
-  --zy-chat-bot-foreground: #0A1628;
-  --zy-model-tag-neutral-background: rgba(226, 232, 240, 0.5);
-  --zy-model-tag-neutral-foreground: #475569;
-  --zy-model-tag-neutral-border: rgba(203, 213, 225, 0.6);
+  --zy-primary-hover: #0C5FD9;
+  --zy-primary-muted: rgba(15, 107, 242, 0.1);
+  --zy-primary-strong: #0F6BF2;
+  --zy-switch-thumb-foreground: #0F6BF2;
+  --zy-switch-track-checked: #0F6BF2;
+  --zy-switch-track-checked-hover: #0C5FD9;
+  --zy-accent: rgba(16, 24, 40, 0.05);
+  --zy-accent-foreground: #101828;
+  --zy-background: #FFFFFF;
+  --zy-foreground: #101828;
+  --zy-surface: #F4F5F7;
+  --zy-surface-foreground: #101828;
+  --zy-surface-raised: #FFFFFF;
+  --zy-surface-tertiary: #F0F1F4;
+  --zy-surface-overlay: #FFFFFF;
+  --zy-chat-user: rgba(16, 24, 40, 0.06);
+  --zy-chat-user-foreground: #101828;
+  --zy-chat-bot: transparent;
+  --zy-chat-bot-foreground: #101828;
+  --zy-model-tag-neutral-background: rgba(16, 24, 40, 0.05);
+  --zy-model-tag-neutral-foreground: #475467;
+  --zy-model-tag-neutral-border: rgba(16, 24, 40, 0.1);
   --zy-model-tag-violet-background: rgba(139, 92, 246, 0.1);
   --zy-model-tag-violet-foreground: #7C3AED;
   --zy-model-tag-violet-border: rgba(139, 92, 246, 0.3);
-  --zy-model-tag-green-background: rgba(16, 185, 129, 0.1);
-  --zy-model-tag-green-foreground: #059669;
-  --zy-model-tag-green-border: rgba(16, 185, 129, 0.3);
-  --zy-skill-blue-background: rgba(59, 130, 246, 0.08);
-  --zy-skill-blue-foreground: #3B82F6;
-  --zy-text-primary: #0A1628;
-  --zy-text-secondary: #4A5568;
-  --zy-text-muted: #A0AEC0;
-  --zy-border: rgba(0, 0, 0, 0.06);
-  --zy-border-subtle: rgba(0, 0, 0, 0.03);
-  --zy-input-border: rgba(0, 0, 0, 0.08);
-  --zy-scroll-thumb: rgba(0, 0, 0, 0.15);
-  --zy-scroll-thumb-hover: rgba(0, 0, 0, 0.25);
-  --zy-gradient-1: rgba(59, 130, 246, 0.05);
-  --zy-gradient-2: rgba(139, 92, 246, 0.05);
-  --zy-destructive: #EF4444;
+  --zy-model-tag-green-background: rgba(7, 148, 85, 0.1);
+  --zy-model-tag-green-foreground: #079455;
+  --zy-model-tag-green-border: rgba(7, 148, 85, 0.3);
+  --zy-skill-blue-background: rgba(15, 107, 242, 0.08);
+  --zy-skill-blue-foreground: #0F6BF2;
+  --zy-text-primary: #101828;
+  --zy-text-secondary: #475467;
+  --zy-text-muted: #667085;
+  --zy-border: rgba(16, 24, 40, 0.08);
+  --zy-border-subtle: rgba(16, 24, 40, 0.04);
+  --zy-input-border: rgba(16, 24, 40, 0.14);
+  --zy-scroll-thumb: rgba(16, 24, 40, 0.18);
+  --zy-scroll-thumb-hover: rgba(16, 24, 40, 0.28);
+  --zy-gradient-1: transparent;
+  --zy-gradient-2: transparent;
+  --zy-destructive: #D92D20;
   --zy-destructive-foreground: #FFFFFF;
-  --zy-success: #10B981;
-  --zy-warning: #F59E0B;
+  --zy-success: #079455;
+  --zy-warning: #DC6803;
   --zy-gray-1: #FFFFFF;
   --zy-gray-2: #F8FAFC;
   --zy-gray-3: #F1F5F9;
@@ -278,8 +278,8 @@
   --zy-gray-9: #334155;
   --zy-gray-10: #1E293B;
   --zy-gray-11: #0F172A;
-  --zy-ring: #3B82F6;
-  --zy-radius: 12px;
+  --zy-ring: rgba(15, 107, 242, 0.4);
+  --zy-radius: 8px;
   --zy-state-destructive-tint-percent: 10%;
   --zy-state-destructive-border: var(--destructive);
   --zy-state-destructive-focus-ring: 20%;
@@ -288,7 +288,7 @@
   --zy-state-primary-fill-tint-percent: 5%;
   --zy-state-input-tint-percent: 50%;
   --zy-state-input-disabled-tint-percent: 50%;
-  --zy-state-input-solid: var(--zy-surface);
+  --zy-state-input-solid: var(--zy-surface-raised);
   --zy-state-input-hover: var(--muted);
   --zy-state-muted-hover: var(--muted);
   --zy-state-avatar-blend: darken;
@@ -311,34 +311,34 @@
 [data-theme="zenith-dark"] {
   color-scheme: dark;
   --zy-style-body-leading: 1.5;
-  --zy-style-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --zy-style-shadow-xs: none;
   --zy-syntax-shiki-ansi-bright-white: #F1F5F9;
   --zy-syntax-shiki-ansi-white: #CBD5E1;
   --zy-syntax-shiki-ansi-bright-cyan: #67E8F9;
   --zy-syntax-shiki-ansi-cyan: #22D3EE;
   --zy-syntax-shiki-ansi-bright-magenta: #C4B5FD;
   --zy-syntax-shiki-ansi-magenta: #A78BFA;
-  --zy-syntax-shiki-ansi-bright-blue: #93C5FD;
-  --zy-syntax-shiki-ansi-blue: #60A5FA;
-  --zy-syntax-shiki-ansi-bright-yellow: #FDE047;
-  --zy-syntax-shiki-ansi-yellow: #FBBF24;
-  --zy-syntax-shiki-ansi-bright-green: #6EE7B7;
-  --zy-syntax-shiki-ansi-green: #34D399;
-  --zy-syntax-shiki-ansi-bright-red: #FCA5A5;
-  --zy-syntax-shiki-ansi-red: #F87171;
-  --zy-syntax-shiki-ansi-bright-black: #475569;
-  --zy-syntax-shiki-ansi-black: #0F172A;
-  --zy-syntax-shiki-token-link: #3B82F6;
-  --zy-syntax-shiki-token-punctuation: #CBD5E1;
+  --zy-syntax-shiki-ansi-bright-blue: #84ADFF;
+  --zy-syntax-shiki-ansi-blue: #4C8DFF;
+  --zy-syntax-shiki-ansi-bright-yellow: #FEC84B;
+  --zy-syntax-shiki-ansi-yellow: #FDB022;
+  --zy-syntax-shiki-ansi-bright-green: #75E0A7;
+  --zy-syntax-shiki-ansi-green: #47CD89;
+  --zy-syntax-shiki-ansi-bright-red: #FDA29B;
+  --zy-syntax-shiki-ansi-red: #F97066;
+  --zy-syntax-shiki-ansi-bright-black: #475467;
+  --zy-syntax-shiki-ansi-black: #101828;
+  --zy-syntax-shiki-token-link: #6FA4FF;
+  --zy-syntax-shiki-token-punctuation: #A8ADB7;
   --zy-syntax-shiki-token-function: #22D3EE;
-  --zy-syntax-shiki-token-parameter: #60A5FA;
-  --zy-syntax-shiki-token-constant: #FBBF24;
-  --zy-syntax-shiki-token-string-expression: #10B981;
-  --zy-syntax-shiki-token-string: #34D399;
+  --zy-syntax-shiki-token-parameter: #4C8DFF;
+  --zy-syntax-shiki-token-constant: #FDB022;
+  --zy-syntax-shiki-token-string-expression: #34D399;
+  --zy-syntax-shiki-token-string: #47CD89;
   --zy-syntax-shiki-token-keyword: #A78BFA;
-  --zy-syntax-shiki-token-comment: #94A3B8;
-  --zy-syntax-shiki-background: rgba(15, 20, 30, 0.95);
-  --zy-syntax-shiki-foreground: #E8EBF0;
+  --zy-syntax-shiki-token-comment: #858B96;
+  --zy-syntax-shiki-background: #17181C;
+  --zy-syntax-shiki-foreground: #EDEEF0;
   --zy-syntax-codemirror-18: #FDBA74;
   --zy-syntax-codemirror-17: #2DD4BF;
   --zy-syntax-codemirror-16: #C084FC;
@@ -346,44 +346,44 @@
   --zy-syntax-codemirror-14: #A3E635;
   --zy-syntax-codemirror-13: #22D3EE;
   --zy-syntax-codemirror-12: #F472B6;
-  --zy-syntax-codemirror-11: #F87171;
-  --zy-syntax-codemirror-10: #FBBF24;
+  --zy-syntax-codemirror-11: #F97066;
+  --zy-syntax-codemirror-10: #FDB022;
   --zy-syntax-codemirror-9: #A78BFA;
-  --zy-syntax-codemirror-8: #34D399;
-  --zy-syntax-codemirror-7: #60A5FA;
-  --zy-syntax-codemirror-6: #94A3B8;
-  --zy-syntax-codemirror-0: rgba(15, 20, 30, 0.95);
-  --zy-component-shimmer: rgba(96, 165, 250, 0.15);
-  --zy-component-font-weight-bold: 700;
+  --zy-syntax-codemirror-8: #47CD89;
+  --zy-syntax-codemirror-7: #4C8DFF;
+  --zy-syntax-codemirror-6: #858B96;
+  --zy-syntax-codemirror-0: #17181C;
+  --zy-component-shimmer: rgba(255, 255, 255, 0.08);
+  --zy-component-font-weight-bold: 600;
   --zy-component-font-weight-semibold: 600;
   --zy-component-font-weight-medium: 500;
   --zy-component-font-weight-normal: 400;
-  --zy-component-text-9xl--line-height: 64px;
-  --zy-component-text-9xl: 56px;
-  --zy-component-text-8xl--line-height: 56px;
-  --zy-component-text-8xl: 48px;
-  --zy-component-text-7xl--line-height: 48px;
-  --zy-component-text-7xl: 40px;
-  --zy-component-text-6xl--line-height: 44px;
-  --zy-component-text-6xl: 36px;
-  --zy-component-text-5xl--line-height: 40px;
-  --zy-component-text-5xl: 32px;
-  --zy-component-text-4xl--line-height: 36px;
-  --zy-component-text-4xl: 28px;
-  --zy-component-text-3xl--line-height: 32px;
-  --zy-component-text-3xl: 24px;
-  --zy-component-text-2xl--line-height: 28px;
-  --zy-component-text-2xl: 20px;
-  --zy-component-text-xl--line-height: 24px;
-  --zy-component-text-xl: 17px;
-  --zy-component-text-lg--line-height: 22px;
-  --zy-component-text-lg: 15px;
-  --zy-component-text-base--line-height: 20px;
-  --zy-component-text-base: 13px;
-  --zy-component-text-sm--line-height: 18px;
-  --zy-component-text-sm: 12px;
+  --zy-component-text-9xl--line-height: 88px;
+  --zy-component-text-9xl: 80px;
+  --zy-component-text-8xl--line-height: 80px;
+  --zy-component-text-8xl: 72px;
+  --zy-component-text-7xl--line-height: 72px;
+  --zy-component-text-7xl: 64px;
+  --zy-component-text-6xl--line-height: 64px;
+  --zy-component-text-6xl: 56px;
+  --zy-component-text-5xl--line-height: 56px;
+  --zy-component-text-5xl: 48px;
+  --zy-component-text-4xl--line-height: 44px;
+  --zy-component-text-4xl: 36px;
+  --zy-component-text-3xl--line-height: 38px;
+  --zy-component-text-3xl: 30px;
+  --zy-component-text-2xl--line-height: 32px;
+  --zy-component-text-2xl: 24px;
+  --zy-component-text-xl--line-height: 28px;
+  --zy-component-text-xl: 20px;
+  --zy-component-text-lg--line-height: 28px;
+  --zy-component-text-lg: 18px;
+  --zy-component-text-base--line-height: 24px;
+  --zy-component-text-base: 16px;
+  --zy-component-text-sm--line-height: 20px;
+  --zy-component-text-sm: 14px;
   --zy-component-text-xs--line-height: 16px;
-  --zy-component-text-xs: 11px;
+  --zy-component-text-xs: 12px;
   --zy-component-palette-zinc-950: #FAFAFA;
   --zy-component-palette-zinc-800: #F4F4F5;
   --zy-component-palette-zinc-400: #A1A1AA;
@@ -431,79 +431,79 @@
   --zy-component-palette-amber-50: #78350F;
   --zy-component-palette-amber-400: #FBBF24;
   --zy-component-palette-amber-200: #B45309;
-  --zy-component-diff-removed-background: rgba(248, 113, 113, 0.15);
-  --zy-component-diff-added-background: rgba(52, 211, 153, 0.15);
-  --zy-component-diff-removed: #F87171;
-  --zy-component-diff-added: #34D399;
-  --zy-component-overlay-strong: rgba(10, 14, 26, 0.6);
-  --zy-component-editor-indent-active-fallback: rgba(96, 165, 250, 0.15);
+  --zy-component-diff-removed-background: rgba(249, 112, 102, 0.15);
+  --zy-component-diff-added-background: rgba(71, 205, 137, 0.15);
+  --zy-component-diff-removed: #F97066;
+  --zy-component-diff-added: #47CD89;
+  --zy-component-overlay-strong: rgba(0, 0, 0, 0.6);
+  --zy-component-editor-indent-active-fallback: rgba(76, 141, 255, 0.16);
   --zy-component-editor-indent-fallback: rgba(255, 255, 255, 0.04);
-  --zy-component-editor-error: rgba(248, 113, 113, 0.20);
-  --zy-component-editor-search-selected: rgba(251, 191, 36, 0.45);
-  --zy-component-editor-search: rgba(251, 191, 36, 0.30);
-  --zy-component-editor-changed: rgba(251, 191, 36, 0.20);
-  --zy-component-editor-inserted-chunk: rgba(52, 211, 153, 0.12);
-  --zy-component-editor-deleted-chunk: rgba(248, 113, 113, 0.12);
-  --zy-component-editor-indent-active: rgba(96, 165, 250, 0.20);
+  --zy-component-editor-error: rgba(249, 112, 102, 0.2);
+  --zy-component-editor-search-selected: rgba(253, 176, 34, 0.45);
+  --zy-component-editor-search: rgba(253, 176, 34, 0.28);
+  --zy-component-editor-changed: rgba(253, 176, 34, 0.2);
+  --zy-component-editor-inserted-chunk: rgba(71, 205, 137, 0.12);
+  --zy-component-editor-deleted-chunk: rgba(249, 112, 102, 0.12);
+  --zy-component-editor-indent-active: rgba(76, 141, 255, 0.22);
   --zy-component-editor-indent: rgba(255, 255, 255, 0.04);
-  --zy-component-editor-inserted: rgba(52, 211, 153, 0.15);
-  --zy-component-editor-deleted: rgba(248, 113, 113, 0.15);
-  --zy-component-editor-active-line: rgba(96, 165, 250, 0.08);
-  --zy-component-editor-selection: rgba(96, 165, 250, 0.20);
-  --zy-component-editor-gutter: rgba(20, 24, 36, 0.8);
-  --zy-component-editor-foreground: #E8EBF0;
-  --zy-component-editor-background: rgba(15, 20, 30, 0.95);
-  --background: #0A0E1A;
-  --foreground: #E8EBF0;
-  --card: rgba(20, 24, 36, 0.85);
-  --card-foreground: #E8EBF0;
-  --popover: rgba(30, 35, 50, 0.98);
-  --popover-foreground: #E8EBF0;
-  --primary: #60A5FA;
-  --primary-foreground: #0A0E1A;
-  --secondary: rgba(30, 35, 50, 0.90);
-  --secondary-foreground: #E8EBF0;
-  --muted: rgba(30, 35, 50, 0.90);
-  --muted-foreground: #A0AEC0;
-  --accent: rgba(96, 165, 250, 0.12);
-  --accent-foreground: #60A5FA;
-  --destructive: #F87171;
-  --border: rgba(255, 255, 255, 0.08);
-  --input: rgba(255, 255, 255, 0.10);
-  --ring: #60A5FA;
-  --chart-1: #60A5FA;
+  --zy-component-editor-inserted: rgba(71, 205, 137, 0.15);
+  --zy-component-editor-deleted: rgba(249, 112, 102, 0.15);
+  --zy-component-editor-active-line: rgba(255, 255, 255, 0.05);
+  --zy-component-editor-selection: rgba(76, 141, 255, 0.22);
+  --zy-component-editor-gutter: #121317;
+  --zy-component-editor-foreground: #EDEEF0;
+  --zy-component-editor-background: #17181C;
+  --background: #17181C;
+  --foreground: #EDEEF0;
+  --card: #1E2025;
+  --card-foreground: #EDEEF0;
+  --popover: #22252B;
+  --popover-foreground: #EDEEF0;
+  --primary: #4C8DFF;
+  --primary-foreground: #0F1013;
+  --secondary: rgba(255, 255, 255, 0.07);
+  --secondary-foreground: #EDEEF0;
+  --muted: rgba(255, 255, 255, 0.06);
+  --muted-foreground: #A8ADB7;
+  --accent: rgba(255, 255, 255, 0.05);
+  --accent-foreground: #EDEEF0;
+  --destructive: #F97066;
+  --border: rgba(255, 255, 255, 0.07);
+  --input: rgba(255, 255, 255, 0.13);
+  --ring: rgba(76, 141, 255, 0.5);
+  --chart-1: #4C8DFF;
   --chart-2: #A78BFA;
-  --chart-3: #34D399;
-  --chart-4: #FBBF24;
-  --chart-5: #F87171;
-  --radius: 12px;
-  --sidebar: rgba(20, 24, 36, 0.85);
-  --sidebar-foreground: #E8EBF0;
-  --sidebar-primary: #60A5FA;
-  --sidebar-primary-foreground: #0A0E1A;
-  --sidebar-accent: rgba(96, 165, 250, 0.12);
-  --sidebar-accent-foreground: #60A5FA;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #60A5FA;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --zy-style-text-xxl: 18px;
-  --zy-style-text-xxl--line-height: 26px;
-  --zy-style-shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.5);
-  --zy-style-shadow-card: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 24px rgba(96, 165, 250, 0.12);
-  --zy-style-shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 40px rgba(96, 165, 250, 0.16);
-  --zy-style-shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.9), 0 0 96px rgba(96, 165, 250, 0.20);
-  --zy-style-shadow-popover: 0 12px 40px rgba(0, 0, 0, 0.8), 0 0 64px rgba(96, 165, 250, 0.24);
-  --zy-style-shadow-glow-accent: 0 0 48px rgba(96, 165, 250, 0.4);
-  --zy-style-shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-  --zy-style-shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 16px rgba(96, 165, 250, 0.08);
-  --zy-style-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 24px rgba(96, 165, 250, 0.12);
-  --zy-style-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.7), 0 0 40px rgba(96, 165, 250, 0.16);
-  --zy-style-shadow-xl: 0 12px 40px rgba(0, 0, 0, 0.8), 0 0 64px rgba(96, 165, 250, 0.24);
-  --zy-style-shadow-2xl: 0 24px 80px rgba(0, 0, 0, 0.9), 0 0 96px rgba(96, 165, 250, 0.20);
-  --zy-style-ease-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+  --chart-3: #47CD89;
+  --chart-4: #FDB022;
+  --chart-5: #F97066;
+  --radius: 8px;
+  --sidebar: #0F1013;
+  --sidebar-foreground: #EDEEF0;
+  --sidebar-primary: #4C8DFF;
+  --sidebar-primary-foreground: #0F1013;
+  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --sidebar-accent-foreground: #EDEEF0;
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+  --sidebar-ring: rgba(76, 141, 255, 0.5);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --zy-style-text-xxl: 24px;
+  --zy-style-text-xxl--line-height: 32px;
+  --zy-style-shadow-subtle: none;
+  --zy-style-shadow-card: none;
+  --zy-style-shadow-elevated: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
+  --zy-style-shadow-modal: 0 16px 48px -12px rgba(0, 0, 0, 0.65);
+  --zy-style-shadow-popover: 0 16px 48px -12px rgba(0, 0, 0, 0.65);
+  --zy-style-shadow-glow-accent: none;
+  --zy-style-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+  --zy-style-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -8px rgba(0, 0, 0, 0.5);
+  --zy-style-shadow-md: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -8px rgba(0, 0, 0, 0.6);
+  --zy-style-shadow-lg: 0 16px 48px -12px rgba(0, 0, 0, 0.65);
+  --zy-style-shadow-xl: 0 20px 56px -12px rgba(0, 0, 0, 0.7);
+  --zy-style-shadow-2xl: 0 24px 64px -16px rgba(0, 0, 0, 0.75);
+  --zy-style-ease-smooth: cubic-bezier(0.2, 0, 0, 1);
   --zy-style-switch-width: 36px;
   --zy-style-switch-height: 20px;
   --zy-style-switch-thumb-size: 16px;
@@ -516,65 +516,65 @@
   --zy-style-switch-press-shrink: 1px;
   --zy-style-switch-motion-ms: 150;
   --zy-style-switch-thumb: #FFFFFF;
-  --zy-style-work-chat-thumb-radius: 8px;
-  --zy-style-work-chat-thumb: color-mix(in oklab, var(--zy-foreground) 20%, var(--zy-background));
-  --zy-style-font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --zy-style-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --zy-style-font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace;
-  --zy-style-radius-sm: 8px;
-  --zy-style-radius-md: 12px;
-  --zy-style-radius-lg: 16px;
-  --zy-style-radius-xl: 20px;
-  --zy-style-radius-2xl: 24px;
-  --zy-style-radius-3xl: 32px;
-  --zy-style-destructive-confirm: #EF4444;
-  --zy-style-work-chat-track: rgba(96, 165, 250, 0.12);
-  --zy-primary: #60A5FA;
-  --zy-primary-foreground: #0A0E1A;
-  --zy-primary-hover: #3B82F6;
-  --zy-primary-muted: rgba(96, 165, 250, 0.15);
-  --zy-primary-strong: #3B82F6;
-  --zy-switch-thumb-foreground: #60A5FA;
-  --zy-switch-track-checked: #60A5FA;
-  --zy-switch-track-checked-hover: #3B82F6;
-  --zy-accent: rgba(96, 165, 250, 0.12);
-  --zy-accent-foreground: #60A5FA;
-  --zy-background: #0A0E1A;
-  --zy-foreground: #E8EBF0;
-  --zy-surface: rgba(20, 24, 36, 0.85);
-  --zy-surface-foreground: #E8EBF0;
-  --zy-surface-raised: rgba(30, 35, 50, 0.90);
-  --zy-surface-tertiary: rgba(25, 30, 45, 0.88);
-  --zy-surface-overlay: rgba(30, 35, 50, 0.98);
-  --zy-chat-user: rgba(96, 165, 250, 0.12);
-  --zy-chat-user-foreground: #E8EBF0;
-  --zy-chat-bot: rgba(20, 24, 36, 0.85);
-  --zy-chat-bot-foreground: #E8EBF0;
-  --zy-model-tag-neutral-background: rgba(71, 85, 105, 0.3);
-  --zy-model-tag-neutral-foreground: #CBD5E1;
-  --zy-model-tag-neutral-border: rgba(100, 116, 139, 0.4);
+  --zy-style-work-chat-thumb-radius: 6px;
+  --zy-style-work-chat-thumb: color-mix(in oklab, var(--zy-foreground) 26%, var(--zy-surface-raised));
+  --zy-style-font-heading: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --zy-style-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --zy-style-font-mono: 'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+  --zy-style-radius-sm: 4px;
+  --zy-style-radius-md: 6px;
+  --zy-style-radius-lg: 8px;
+  --zy-style-radius-xl: 12px;
+  --zy-style-radius-2xl: 16px;
+  --zy-style-radius-3xl: 20px;
+  --zy-style-destructive-confirm: #D92D20;
+  --zy-style-work-chat-track: rgba(255, 255, 255, 0.08);
+  --zy-primary: #4C8DFF;
+  --zy-primary-foreground: #0F1013;
+  --zy-primary-hover: #6FA4FF;
+  --zy-primary-muted: rgba(76, 141, 255, 0.16);
+  --zy-primary-strong: #2E6DE6;
+  --zy-switch-thumb-foreground: #4C8DFF;
+  --zy-switch-track-checked: #4C8DFF;
+  --zy-switch-track-checked-hover: #6FA4FF;
+  --zy-accent: rgba(255, 255, 255, 0.05);
+  --zy-accent-foreground: #EDEEF0;
+  --zy-background: #17181C;
+  --zy-foreground: #EDEEF0;
+  --zy-surface: #0F1013;
+  --zy-surface-foreground: #EDEEF0;
+  --zy-surface-raised: #1E2025;
+  --zy-surface-tertiary: #26282E;
+  --zy-surface-overlay: #22252B;
+  --zy-chat-user: rgba(255, 255, 255, 0.08);
+  --zy-chat-user-foreground: #EDEEF0;
+  --zy-chat-bot: transparent;
+  --zy-chat-bot-foreground: #EDEEF0;
+  --zy-model-tag-neutral-background: rgba(255, 255, 255, 0.07);
+  --zy-model-tag-neutral-foreground: #A8ADB7;
+  --zy-model-tag-neutral-border: rgba(255, 255, 255, 0.12);
   --zy-model-tag-violet-background: rgba(167, 139, 250, 0.15);
   --zy-model-tag-violet-foreground: #A78BFA;
   --zy-model-tag-violet-border: rgba(167, 139, 250, 0.35);
-  --zy-model-tag-green-background: rgba(52, 211, 153, 0.15);
-  --zy-model-tag-green-foreground: #34D399;
-  --zy-model-tag-green-border: rgba(52, 211, 153, 0.35);
-  --zy-skill-blue-background: rgba(96, 165, 250, 0.12);
-  --zy-skill-blue-foreground: #60A5FA;
-  --zy-text-primary: #E8EBF0;
-  --zy-text-secondary: #A0AEC0;
-  --zy-text-muted: #4A5568;
-  --zy-border: rgba(255, 255, 255, 0.08);
+  --zy-model-tag-green-background: rgba(71, 205, 137, 0.15);
+  --zy-model-tag-green-foreground: #47CD89;
+  --zy-model-tag-green-border: rgba(71, 205, 137, 0.35);
+  --zy-skill-blue-background: rgba(76, 141, 255, 0.14);
+  --zy-skill-blue-foreground: #4C8DFF;
+  --zy-text-primary: #EDEEF0;
+  --zy-text-secondary: #A8ADB7;
+  --zy-text-muted: #858B96;
+  --zy-border: rgba(255, 255, 255, 0.07);
   --zy-border-subtle: rgba(255, 255, 255, 0.04);
-  --zy-input-border: rgba(255, 255, 255, 0.10);
-  --zy-scroll-thumb: rgba(255, 255, 255, 0.12);
-  --zy-scroll-thumb-hover: rgba(255, 255, 255, 0.20);
-  --zy-gradient-1: rgba(96, 165, 250, 0.08);
-  --zy-gradient-2: rgba(167, 139, 250, 0.08);
-  --zy-destructive: #F87171;
-  --zy-destructive-foreground: #0A0E1A;
-  --zy-success: #34D399;
-  --zy-warning: #FBBF24;
+  --zy-input-border: rgba(255, 255, 255, 0.13);
+  --zy-scroll-thumb: rgba(255, 255, 255, 0.14);
+  --zy-scroll-thumb-hover: rgba(255, 255, 255, 0.24);
+  --zy-gradient-1: transparent;
+  --zy-gradient-2: transparent;
+  --zy-destructive: #F97066;
+  --zy-destructive-foreground: #0F1013;
+  --zy-success: #47CD89;
+  --zy-warning: #FDB022;
   --zy-gray-1: #0F172A;
   --zy-gray-2: #1E293B;
   --zy-gray-3: #334155;
@@ -586,8 +586,8 @@
   --zy-gray-9: #F1F5F9;
   --zy-gray-10: #F8FAFC;
   --zy-gray-11: #FFFFFF;
-  --zy-ring: #60A5FA;
-  --zy-radius: 12px;
+  --zy-ring: rgba(76, 141, 255, 0.5);
+  --zy-radius: 8px;
   --zy-state-destructive-tint-percent: 20%;
   --zy-state-destructive-border: color-mix(in oklab, var(--destructive) 50%, transparent);
   --zy-state-destructive-focus-ring: 40%;
@@ -1718,8 +1718,8 @@
   font-weight: var(--zy-component-font-weight-medium);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow, translate;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-button-default) {
@@ -1731,23 +1731,26 @@
   background-color: var(--zy-state-input-solid);
 }
 :where(:root, [data-theme]) :where(.theme-button-secondary) {
-  background-color: var(--secondary);
-  color: var(--secondary-foreground);
+  background-color: var(--card);
+  color: var(--foreground);
+  border-color: var(--zy-border);
+  box-shadow: var(--zy-style-shadow-xs);
 }
 :where(:root, [data-theme]) :where(.theme-button-embedded) {
   color: inherit;
   background-color: transparent;
 }
 :where(:root, [data-theme]) :where(.theme-button-prompt-selector) {
-  transition-duration: 150ms;
+  transition-duration: 120ms;
 }
 :where(:root, [data-theme]) :where(.theme-button-navigation) {
   color: var(--muted-foreground);
   font-weight: var(--zy-component-font-weight-normal);
-  transition-duration: 150ms;
+  transition-duration: 120ms;
 }
 :where(:root, [data-theme]) :where(.theme-button-toolbar) {
   color: var(--muted-foreground);
+  transition-duration: 120ms;
 }
 :where(:root, [data-theme]) :where(.theme-button-destructive) {
   background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
@@ -3107,16 +3110,17 @@
   color: var(--muted-foreground);
 }
 :where(:root, [data-theme]) :where(.theme-page-quick-action-bar-button-1) {
+  height: 2rem;
   gap: 0.5rem;
   padding-inline: 0.75rem;
-  padding-block: 0.5rem;
+  padding-block: 0rem;
   border-radius: 9999px;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
   transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
-  background-color: var(--zy-surface);
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  background-color: transparent;
   border-color: var(--zy-border);
   box-shadow: none;
   color: var(--muted-foreground);
@@ -4120,8 +4124,8 @@
 :where(:root, [data-theme]) :where(.theme-input-submit) {
   border-radius: 9999px;
   transition-property: background-color, translate;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 :where(:root, [data-theme]) :where(.theme-control-content-height) {
   height: auto;
@@ -4859,8 +4863,8 @@
   border-radius: var(--zy-style-radius-3xl);
   box-shadow: var(--zy-style-shadow-sm);
   transition-property: box-shadow;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 :where(:root, [data-theme]) :where(.theme-composer-drop-active) {
   box-shadow: 0 0 0 2px var(--primary), var(--zy-style-shadow-elevated);
@@ -4885,8 +4889,8 @@
 }
 :where(:root, [data-theme]) :where(.theme-composer-surface .theme-input-group) {
   border-radius: var(--zy-style-radius-3xl);
-  background-color: var(--zy-surface-overlay);
-  border-color: var(--border);
+  background-color: var(--card);
+  border-color: var(--zy-input-border);
 }
 :where(:root, [data-theme]) :where(.group.is-user .theme-message-body) {
   border-radius: var(--zy-style-radius-lg);
@@ -5061,9 +5065,6 @@
 :where(:root, [data-theme]) :where(.theme-shell-sidebar) {
   background-color: var(--sidebar);
   color: var(--sidebar-foreground);
-  border-right-width: 1px;
-  border-style: solid;
-  border-color: var(--zy-border-subtle);
 }
 :where(:root, [data-theme]) :where(.theme-sidebar-header) {
   height: 2.5rem;
@@ -5098,7 +5099,7 @@
 :where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-button-navigation, .theme-shell-sidebar .chat-skill-shortcut) {
   transition-property: color, background-color, box-shadow, translate;
   transition-duration: 120ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   height: 2rem;
   gap: 0.5rem;
   padding-inline: 0.625rem;
@@ -5119,7 +5120,7 @@
 :where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-surface-agent-row) {
   transition-property: color, background-color, box-shadow, translate;
   transition-duration: 120ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   height: 2rem;
   padding: 0px;
   border-width: 0px;
@@ -5141,7 +5142,7 @@
 :where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-sidebar-task-main) {
   transition-property: color, background-color, box-shadow, translate;
   transition-duration: 120ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   height: 2rem;
   padding-left: 0.625rem;
   padding-right: 3.625rem;
@@ -5156,7 +5157,7 @@
 :where(:root, [data-theme]) :where(.theme-sidebar-workspace) {
   transition-property: color, background-color, box-shadow, translate;
   transition-duration: 120ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   height: 2rem;
   background-color: transparent;
   color: var(--sidebar-foreground);
@@ -5169,7 +5170,7 @@
 :where(:root, [data-theme]) :where(.theme-sidebar-workspace-main) {
   transition-property: color, background-color, box-shadow, translate;
   transition-duration: 120ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   height: 2rem;
   padding-inline: 0.625rem;
   gap: 0.5rem;
@@ -5194,7 +5195,7 @@
 :where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-sidebar-row-action) {
   transition-property: color, background-color, box-shadow, translate;
   transition-duration: 120ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   opacity: 0;
   color: var(--muted-foreground);
   border-width: 0px;
@@ -5219,17 +5220,17 @@
   background-image: linear-gradient(to top, var(--sidebar), transparent);
 }
 :where(:root, [data-theme]) :where(.theme-switch[data-mode="work-chat"]) {
-  height: 1.75rem;
+  height: 2rem;
   width: 100%;
   border-width: 0px;
-  border-radius: var(--zy-style-work-chat-thumb-radius);
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  border-radius: var(--zy-style-radius-lg);
+  background-color: var(--sidebar-accent);
   box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]) {
   height: 1.5rem;
   width: calc(50% - 4px);
-  border-radius: var(--zy-style-work-chat-thumb-radius);
+  border-radius: var(--zy-style-radius-md);
   background-color: var(--zy-style-work-chat-thumb);
   box-shadow: var(--zy-style-shadow-xs);
   transition-property: translate;
@@ -5239,27 +5240,49 @@
 :where(:root, [data-theme]) :where(.theme-sidebar-mode-label) {
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-normal);
-  color: var(--sidebar-foreground);
+  color: var(--muted-foreground);
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-sidebar-mode-label[data-mode-selected="true"]) {
   font-weight: var(--zy-component-font-weight-medium);
-  color: var(--zy-switch-thumb-foreground);
+  color: var(--sidebar-foreground);
+}
+:where(:root, [data-theme]) :where([data-main-canvas]) {
+  background-color: var(--background);
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: var(--zy-style-radius-xl);
+  box-shadow: var(--zy-style-shadow-xs);
 }
 :where(:root, [data-theme]) :where(.theme-home-brand) {
   height: 3rem;
 }
+:where(:root, [data-theme]) :where(.theme-home-greeting) {
+  font-size: var(--zy-component-text-2xl);
+  font-weight: var(--zy-component-font-weight-semibold);
+  color: var(--zy-text-primary);
+  text-align: center;
+  line-height: var(--zy-component-text-2xl--line-height);
+}
 :where(:root, [data-theme]) :where(.theme-home-caption) {
   font-size: var(--zy-component-text-sm);
-  color: var(--muted-foreground);
+  color: var(--zy-text-muted);
+  text-align: center;
   line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-home-footnote) {
+  font-size: var(--zy-component-text-xs);
+  color: var(--zy-text-muted);
+  text-align: center;
+  line-height: var(--zy-component-text-xs--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-home-sticky) {
   background-color: var(--background);
 }
 :where(:root, [data-theme]) :where(.theme-home-prompt-editor) {
   font-size: var(--zy-component-text-base);
-  min-height: 6rem;
+  min-height: 3rem;
   line-height: var(--zy-component-text-base--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-home-folder-warning) {
@@ -5430,7 +5453,8 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-button-secondary):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklch, var(--secondary), var(--foreground) 5%);
+  background-color: var(--accent);
+  color: var(--foreground);
 }
 }
 @media (hover: hover) {
@@ -5441,7 +5465,7 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-button-prompt-selector):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--zy-surface-raised);
+  background-color: var(--accent);
   color: var(--foreground);
 }
 }
@@ -5453,7 +5477,7 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-button-toolbar):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--zy-surface-raised);
+  background-color: var(--accent);
   color: var(--foreground);
 }
 }
@@ -5784,7 +5808,7 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-page-quick-action-bar-button-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--zy-surface-raised);
+  background-color: var(--accent);
   border-color: var(--zy-border);
   color: var(--foreground);
 }
@@ -6536,26 +6560,26 @@
   background-color: var(--zy-surface-raised);
 }
 :where(:root, [data-theme]) :where(.theme-switch[data-mode="work-chat"]):where(:is([aria-checked="true"], [data-checked])) {
-  background-color: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
+  background-color: var(--sidebar-accent);
 }
 :where(:root, [data-theme]) :where(.theme-button-outline):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
   color: var(--foreground);
 }
 :where(:root, [data-theme]) :where(.theme-button-secondary):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
-  background-color: var(--secondary);
-  color: var(--secondary-foreground);
+  background-color: var(--card);
+  color: var(--foreground);
 }
 :where(:root, [data-theme]) :where(.theme-button-ghost):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
   background-color: var(--muted);
   color: var(--foreground);
 }
 :where(:root, [data-theme]) :where(.theme-button-prompt-selector):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
-  background-color: var(--zy-surface-raised);
+  background-color: var(--accent);
   color: var(--foreground);
 }
 :where(:root, [data-theme]) :where(.theme-button-toolbar):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
-  background-color: var(--zy-surface-raised);
+  background-color: var(--accent);
   color: var(--foreground);
 }
 :where(:root, [data-theme]) :where(.theme-menu-sub-trigger):where(:is([aria-expanded="true"], [data-open], [data-popup-open], [data-state="open"])) {
@@ -7000,6 +7024,11 @@
 :where(:root, [data-theme]) :where(.theme-page-model-selector-select-trigger-variant-1):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
   opacity: 0.7;
 }
+:where(:root, [data-theme]) :where(.theme-input-submit):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
+  background-color: var(--sidebar-accent);
+  color: var(--zy-text-muted);
+  opacity: 1;
+}
 :where(:root, [data-theme]) :where(.theme-surface-skill-editor):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
   opacity: 0.5;
 }
@@ -7121,7 +7150,7 @@
   box-shadow: var(--zy-style-shadow-md);
 }
 :where(:root, [data-theme]) :where(.theme-composer-surface .theme-input-group):where(:has(:is([data-slot="input-group-control"], [contenteditable]):focus-visible)) {
-  border-color: var(--ring);
+  border-color: var(--zy-text-muted);
   box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-input-group):where(:has([data-slot="input-group-control"]:focus-visible)) {
@@ -7138,7 +7167,7 @@
   box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-composer-surface .theme-input-group):where(:has([data-slot="input-group-control"]:focus-visible)) {
-  border-color: var(--ring);
+  border-color: var(--zy-text-muted);
   box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-input-group):where(:has([data-slot][aria-invalid="true"])) {
@@ -8165,8 +8194,11 @@ to {
 :where(:root, [data-theme]) :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]),
 :where(:root, [data-theme]) :where(.theme-sidebar-mode-label),
 :where(:root, [data-theme]) :where(.theme-sidebar-mode-label[data-mode-selected="true"]),
+:where(:root, [data-theme]) :where([data-main-canvas]),
 :where(:root, [data-theme]) :where(.theme-home-brand),
+:where(:root, [data-theme]) :where(.theme-home-greeting),
 :where(:root, [data-theme]) :where(.theme-home-caption),
+:where(:root, [data-theme]) :where(.theme-home-footnote),
 :where(:root, [data-theme]) :where(.theme-home-sticky),
 :where(:root, [data-theme]) :where(.theme-home-prompt-editor),
 :where(:root, [data-theme]) :where(.theme-home-folder-warning),

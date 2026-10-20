@@ -3,18 +3,35 @@ import { recipe } from './recipe';
 /** Studio home surfaces inherit every package's colors and typography. */
 export function homeStudioAppearances() {
   return {
+    // v4: the home stage opens with a greeting, not a second brand wordmark.
     'home-brand': recipe({ base: { height: '3rem' } }),
+    'home-greeting': recipe({
+      base: {
+        'font-size': 'var(--zy-component-text-2xl)',
+        'font-weight': 'var(--zy-component-font-weight-semibold)',
+        color: 'var(--zy-text-primary)',
+        'text-align': 'center',
+      },
+    }),
     'home-caption': recipe({
       base: {
         'font-size': 'var(--zy-component-text-sm)',
-        color: 'var(--muted-foreground)',
+        color: 'var(--zy-text-muted)',
+        'text-align': 'center',
+      },
+    }),
+    'home-footnote': recipe({
+      base: {
+        'font-size': 'var(--zy-component-text-xs)',
+        color: 'var(--zy-text-muted)',
+        'text-align': 'center',
       },
     }),
     'home-sticky': recipe({ base: { 'background-color': 'var(--background)' } }),
     'home-prompt-editor': recipe({
       base: {
         'font-size': 'var(--zy-component-text-base)',
-        'min-height': '6rem',
+        'min-height': '3rem',
       },
     }),
     'home-folder-warning': recipe({

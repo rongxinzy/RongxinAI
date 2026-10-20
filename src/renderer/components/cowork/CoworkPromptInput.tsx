@@ -631,7 +631,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                         event.preventDefault();
                         event.stopPropagation();
                       }}
-                      className="cursor-not-allowed opacity-40"
+                      className="cursor-not-allowed"
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top">{i18nService.t('chatSubmitEmptyHint')}</TooltipContent>

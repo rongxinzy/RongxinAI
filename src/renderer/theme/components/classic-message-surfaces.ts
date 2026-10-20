@@ -53,19 +53,20 @@ export function classicMessageSurfaces() {
         'border-radius': 'var(--zy-style-radius-3xl)',
         'box-shadow': 'var(--zy-style-shadow-sm)',
         'transition-property': 'box-shadow',
-        'transition-duration': '150ms',
-        'transition-timing-function': 'cubic-bezier(0.4, 0, 0.2, 1)',
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
       },
       composerFocus: { 'box-shadow': 'var(--zy-style-shadow-md)' },
     }),
     'composer-input-surface': recipe({
       base: {
         'border-radius': 'var(--zy-style-radius-3xl)',
-        'background-color': 'var(--zy-surface-overlay)',
-        'border-color': 'var(--border)',
+        'background-color': 'var(--card)',
+        'border-color': 'var(--zy-input-border)',
       },
-      groupFocus: { 'border-color': 'var(--ring)', 'box-shadow': 'none' },
-      composerFocus: { 'border-color': 'var(--ring)', 'box-shadow': 'none' },
+      // Focus deepens the border to the meta text color; no brand glow (v4 §六.3).
+      groupFocus: { 'border-color': 'var(--zy-text-muted)', 'box-shadow': 'none' },
+      composerFocus: { 'border-color': 'var(--zy-text-muted)', 'box-shadow': 'none' },
     }),
     'composer-drop-active': recipe({
       base: { 'box-shadow': '0 0 0 2px var(--primary), var(--zy-style-shadow-elevated)' },

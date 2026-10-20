@@ -554,23 +554,26 @@ export function classicPageControls() {
       hover: { color: 'var(--zy-destructive)' },
     }),
     'page-quick-action-bar-button-1': recipe({
+      // v4 §六.3: 32px neutral pill, 1px border, secondary text; hover swaps
+      // to a neutral fill, no shadow.
       base: {
+        height: '2rem',
         gap: '0.5rem',
         'padding-inline': '0.75rem',
-        'padding-block': '0.5rem',
+        'padding-block': '0rem',
         'border-radius': '9999px',
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
         'transition-property': 'color, background-color, border-color, box-shadow',
-        'transition-duration': '150ms',
-        'transition-timing-function': 'ease-out',
-        'background-color': 'var(--zy-surface)',
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
+        'background-color': 'transparent',
         'border-color': 'var(--zy-border)',
         'box-shadow': 'none',
         color: 'var(--muted-foreground)',
       },
       hover: {
-        'background-color': 'var(--zy-surface-raised)',
+        'background-color': 'var(--accent)',
         'border-color': 'var(--zy-border)',
         color: 'var(--foreground)',
       },

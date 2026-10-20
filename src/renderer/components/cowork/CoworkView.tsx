@@ -108,6 +108,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const taskResume = useTaskResumeContext(currentSession?.id);
   const displayedSessionId = useSelector(selectDisplayedSessionId);
   const workMode = useSelector(selectWorkMode);
+  // v4: the home view leads with a time-of-day greeting instead of a wordmark.
+  const homeGreeting = (() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return i18nService.t('coworkGreetingMorning');
+    if (hour < 18) return i18nService.t('coworkGreetingAfternoon');
+    return i18nService.t('coworkGreetingEvening');
+  })();
   // Clear session when workMode changes and current session mode doesn't match.
   // Sessions without an explicit mode field (legacy) are treated as work mode.
   const prevWorkModeRef = useRef(workMode);
@@ -748,16 +755,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               against, so it holds all the way to the last case. */}
           <div className="sticky theme-home-sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
             <div className="flex flex-col items-center justify-center gap-4 text-center">
-              <img
-                src="zhiyuan-logo-light.svg"
-                alt={i18nService.t('cowork')}
-                className="theme-home-brand logo-light w-auto mx-auto"
-              />
-              <img
-                src="zhiyuan-logo-dark.svg"
-                alt={i18nService.t('cowork')}
-                className="theme-home-brand logo-dark w-auto mx-auto"
-              />
+              <h1 className="theme-home-greeting text-balance px-2">{homeGreeting}</h1>
               <p
                 className={cn(
                   'theme-home-caption min-h-5 max-w-md px-2',
@@ -817,6 +815,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   }}
                 />
               </div>
+              <p className="theme-home-footnote px-2">{i18nService.t('coworkHomeFootnote')}</p>
             </div>
           </div>
 

@@ -3,74 +3,245 @@ import { classicComponentAppearances } from '../components/classic';
 import type { ThemeDefinition } from './types';
 
 /**
- * Zenith Dark - Premium Futuristic Design
+ * Zenith Dark — DESIGN.md v4 "Quiet Studio".
  *
- * Philosophy: 清新 (fresh) · 轻盈 (light/airy) · 畅快 (smooth, fluid) · 科技感 (tech-forward)
- * Features: Glassmorphism, generous spacing, fluid motion, luminous gradients
+ * Dark mode redefines hierarchy instead of inverting it: surfaces step up in
+ * brightness, shadows are pure black (shadow-xs is none), and the brightened
+ * brand blue stays reserved for executable actions, focus and running state.
  */
 export const zenithDark: ThemeDefinition = {
   meta: {
     id: 'zenith-dark',
     name: 'Zenith Dark',
-    description: 'Premium futuristic dark theme with glassmorphism',
+    description: 'Quiet Studio dark theme: neutral hierarchy, brand blue for action only',
     appearance: 'dark',
   },
   components: classicComponentAppearances(),
   background: {
     ...DEFAULT_BACKGROUND,
     kind: BackgroundKind.Color,
-    color: '#0A0E1A',
+    color: '#0F1013',
     opacity: 1,
   },
   tokens: {
-    // ── Typography Scale (Desktop-optimized: light and dense) ──
-    'component-text-xs': '11px',
+    // ── Typography Scale (six steps: 12/14/16/18/20/24) ──
+    'component-text-xs': '12px',
     'component-text-xs--line-height': '16px',
-    'component-text-sm': '12px',
-    'component-text-sm--line-height': '18px',
-    'component-text-base': '13px',
-    'component-text-base--line-height': '20px',
-    'component-text-lg': '15px',
-    'component-text-lg--line-height': '22px',
-    'component-text-xl': '17px',
-    'component-text-xl--line-height': '24px',
-    'component-text-2xl': '20px',
-    'component-text-2xl--line-height': '28px',
-    'component-text-3xl': '24px',
-    'component-text-3xl--line-height': '32px',
-    'component-text-4xl': '28px',
-    'component-text-4xl--line-height': '36px',
-    'component-text-5xl': '32px',
-    'component-text-5xl--line-height': '40px',
-    'component-text-6xl': '36px',
-    'component-text-6xl--line-height': '44px',
-    'component-text-7xl': '40px',
-    'component-text-7xl--line-height': '48px',
-    'component-text-8xl': '48px',
-    'component-text-8xl--line-height': '56px',
-    'component-text-9xl': '56px',
-    'component-text-9xl--line-height': '64px',
-    'style-text-xxl': '18px',
-    'style-text-xxl--line-height': '26px',
+    'component-text-sm': '14px',
+    'component-text-sm--line-height': '20px',
+    'component-text-base': '16px',
+    'component-text-base--line-height': '24px',
+    'component-text-lg': '18px',
+    'component-text-lg--line-height': '28px',
+    'component-text-xl': '20px',
+    'component-text-xl--line-height': '28px',
+    'component-text-2xl': '24px',
+    'component-text-2xl--line-height': '32px',
+    'component-text-3xl': '30px',
+    'component-text-3xl--line-height': '38px',
+    'component-text-4xl': '36px',
+    'component-text-4xl--line-height': '44px',
+    'component-text-5xl': '48px',
+    'component-text-5xl--line-height': '56px',
+    'component-text-6xl': '56px',
+    'component-text-6xl--line-height': '64px',
+    'component-text-7xl': '64px',
+    'component-text-7xl--line-height': '72px',
+    'component-text-8xl': '72px',
+    'component-text-8xl--line-height': '80px',
+    'component-text-9xl': '80px',
+    'component-text-9xl--line-height': '88px',
+    'style-text-xxl': '24px',
+    'style-text-xxl--line-height': '32px',
     'style-body-leading': '1.5',
 
-    // ── Font Weights ──
+    // ── Font Weights (400/500/600 only; bold maps down to 600) ──
     'component-font-weight-normal': '400',
     'component-font-weight-medium': '500',
     'component-font-weight-semibold': '600',
-    'component-font-weight-bold': '700',
+    'component-font-weight-bold': '600',
 
     // ── Font Stacks ──
     'style-font-sans':
-      "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
-    'style-font-mono':
-      "'SF Mono', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace",
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif",
+    'style-font-mono': "'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace",
     'style-font-heading':
-      "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif",
 
-    // ── Border Radius (Larger, modern) ──
-    radius: '12px',
-    // Appearance-conditioned component values (work package N) — dark
+    // ── Border Radius (4/6/8/12/16/20) ──
+    radius: '8px',
+    'style-radius-sm': '4px',
+    'style-radius-md': '6px',
+    'style-radius-lg': '8px',
+    'style-radius-xl': '12px',
+    'style-radius-2xl': '16px',
+    'style-radius-3xl': '20px',
+    'semantic-radius': '8px',
+    'semantic-radius-sm': '4px',
+    'semantic-radius-md': '6px',
+    'semantic-radius-lg': '8px',
+    'semantic-radius-xl': '12px',
+
+    // ── Shadows (pure black; xs is none, layers separate via brightness) ──
+    'style-shadow-xs': 'none',
+    'style-shadow-sm': '0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px -8px rgba(0, 0, 0, 0.5)',
+    'style-shadow-md': '0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -8px rgba(0, 0, 0, 0.6)',
+    'style-shadow-lg': '0 16px 48px -12px rgba(0, 0, 0, 0.65)',
+    'style-shadow-xl': '0 20px 56px -12px rgba(0, 0, 0, 0.7)',
+    'style-shadow-2xl': '0 24px 64px -16px rgba(0, 0, 0, 0.75)',
+    'style-shadow-subtle': 'none',
+    'style-shadow-card': 'none',
+    'style-shadow-elevated': '0 8px 24px -8px rgba(0, 0, 0, 0.55)',
+    'style-shadow-modal': '0 16px 48px -12px rgba(0, 0, 0, 0.65)',
+    'style-shadow-popover': '0 16px 48px -12px rgba(0, 0, 0, 0.65)',
+    'style-shadow-glow-accent': 'none',
+    'style-shadow-inset': 'inset 0 1px 2px rgba(0, 0, 0, 0.4)',
+
+    // ── Animation Easing ──
+    'style-ease-smooth': 'cubic-bezier(0.2, 0, 0, 1)',
+
+    // ── Switch Control ──
+    'style-switch-width': '36px',
+    'style-switch-height': '20px',
+    'style-switch-thumb-size': '16px',
+    'style-switch-width-sm': '28px',
+    'style-switch-height-sm': '16px',
+    'style-switch-thumb-size-sm': '12px',
+    'style-switch-thumb-offset': '2px',
+    'style-switch-hover-extend': '1px',
+    'style-switch-press-extend': '2px',
+    'style-switch-press-shrink': '1px',
+    'style-switch-motion-ms': '150',
+    'style-switch-thumb': '#FFFFFF',
+    'style-work-chat-thumb-radius': '6px',
+    'style-work-chat-thumb':
+      'color-mix(in oklab, var(--zy-foreground) 26%, var(--zy-surface-raised))',
+    'style-work-chat-track': 'rgba(255, 255, 255, 0.08)',
+
+    // ── Brand (signal color: executable actions, focus, running) ──
+    primary: '#4C8DFF',
+    'primary-foreground': '#0F1013',
+    'primary-hover': '#6FA4FF',
+    'primary-muted': 'rgba(76, 141, 255, 0.16)',
+    // Button-grade primary: deep enough for AA white text on filled buttons.
+    'primary-strong': '#2E6DE6',
+    'switch-thumb-foreground': '#4C8DFF',
+    'switch-track-checked': '#4C8DFF',
+    'switch-track-checked-hover': '#6FA4FF',
+
+    // ── Surfaces (opaque, four fixed levels) ──
+    background: '#17181C',
+    foreground: '#EDEEF0',
+    surface: '#0F1013',
+    'surface-foreground': '#EDEEF0',
+    'surface-raised': '#1E2025',
+    'surface-tertiary': '#26282E',
+    'surface-overlay': '#22252B',
+
+    // ── Accent (neutral hover fill) ──
+    accent: 'rgba(255, 255, 255, 0.05)',
+    'accent-foreground': '#EDEEF0',
+
+    // ── Chat Bubbles (assistant sits directly on the canvas) ──
+    'chat-user': 'rgba(255, 255, 255, 0.08)',
+    'chat-user-foreground': '#EDEEF0',
+    'chat-bot': 'transparent',
+    'chat-bot-foreground': '#EDEEF0',
+
+    // ── Model Tags ──
+    'model-tag-neutral-background': 'rgba(255, 255, 255, 0.07)',
+    'model-tag-neutral-foreground': '#A8ADB7',
+    'model-tag-neutral-border': 'rgba(255, 255, 255, 0.12)',
+    'model-tag-violet-background': 'rgba(167, 139, 250, 0.15)',
+    'model-tag-violet-foreground': '#A78BFA',
+    'model-tag-violet-border': 'rgba(167, 139, 250, 0.35)',
+    'model-tag-green-background': 'rgba(71, 205, 137, 0.15)',
+    'model-tag-green-foreground': '#47CD89',
+    'model-tag-green-border': 'rgba(71, 205, 137, 0.35)',
+
+    // ── Skill Colors ──
+    'skill-blue-background': 'rgba(76, 141, 255, 0.14)',
+    'skill-blue-foreground': '#4C8DFF',
+
+    // ── Text Hierarchy ──
+    'text-primary': '#EDEEF0',
+    'text-muted-foreground': '#A8ADB7',
+    'text-muted': '#858B96',
+
+    // ── Borders ──
+    border: 'rgba(255, 255, 255, 0.07)',
+    'border-subtle': 'rgba(255, 255, 255, 0.04)',
+    'input-border': 'rgba(255, 255, 255, 0.13)',
+
+    // ── Scrollbar ──
+    'scroll-thumb': 'rgba(255, 255, 255, 0.14)',
+    'scroll-thumb-hover': 'rgba(255, 255, 255, 0.24)',
+
+    // ── Gradients (decorative gradients are retired in v4) ──
+    'gradient-1': 'transparent',
+    'gradient-2': 'transparent',
+
+    // ── Status Colors ──
+    destructive: '#F97066',
+    'destructive-foreground': '#0F1013',
+    'style-destructive-confirm': '#D92D20',
+    success: '#47CD89',
+    warning: '#FDB022',
+
+    // ── Gray Scale (11 steps) ──
+    'gray-1': '#0F172A',
+    'gray-2': '#1E293B',
+    'gray-3': '#334155',
+    'gray-4': '#475569',
+    'gray-5': '#64748B',
+    'gray-6': '#94A3B8',
+    'gray-7': '#CBD5E1',
+    'gray-8': '#E2E8F0',
+    'gray-9': '#F1F5F9',
+    'gray-10': '#F8FAFC',
+    'gray-11': '#FFFFFF',
+
+    // ── Focus Ring ──
+    ring: 'rgba(76, 141, 255, 0.5)',
+
+    // ── Semantic Aliases ──
+    'semantic-background': '#17181C',
+    'semantic-foreground': '#EDEEF0',
+    'semantic-card': '#1E2025',
+    'semantic-card-foreground': '#EDEEF0',
+    'semantic-popover': '#22252B',
+    'semantic-popover-foreground': '#EDEEF0',
+    'semantic-primary': '#4C8DFF',
+    'semantic-primary-foreground': '#0F1013',
+    'semantic-secondary': 'rgba(255, 255, 255, 0.07)',
+    'semantic-secondary-foreground': '#EDEEF0',
+    'semantic-muted': 'rgba(255, 255, 255, 0.06)',
+    'semantic-muted-foreground': '#A8ADB7',
+    'semantic-accent': 'rgba(255, 255, 255, 0.05)',
+    'semantic-accent-foreground': '#EDEEF0',
+    'semantic-destructive': '#F97066',
+    'semantic-border': 'rgba(255, 255, 255, 0.07)',
+    'semantic-input': 'rgba(255, 255, 255, 0.13)',
+    'semantic-ring': 'rgba(76, 141, 255, 0.5)',
+
+    // ── Charts ──
+    'semantic-chart-1': '#4C8DFF',
+    'semantic-chart-2': '#A78BFA',
+    'semantic-chart-3': '#47CD89',
+    'semantic-chart-4': '#FDB022',
+    'semantic-chart-5': '#F97066',
+
+    // ── Sidebar (sits directly on the window base) ──
+    'semantic-sidebar': '#0F1013',
+    'semantic-sidebar-foreground': '#EDEEF0',
+    'semantic-sidebar-primary': '#4C8DFF',
+    'semantic-sidebar-primary-foreground': '#0F1013',
+    'semantic-sidebar-accent': 'rgba(255, 255, 255, 0.08)',
+    'semantic-sidebar-accent-foreground': '#EDEEF0',
+    'semantic-sidebar-border': 'rgba(255, 255, 255, 0.07)',
+    'semantic-sidebar-ring': 'rgba(76, 141, 255, 0.5)',
+
+    // ── Appearance-conditioned component values (work package N) — dark ──
     'state-destructive-tint-percent': '20%',
     'state-destructive-border': 'color-mix(in oklab, var(--destructive) 50%, transparent)',
     'state-destructive-focus-ring': '40%',
@@ -93,180 +264,12 @@ export const zenithDark: ThemeDefinition = {
     'state-banner-warning-bg': 'color-mix(in oklab, var(--zy-warning) 14%, transparent)',
     'state-banner-warning-border': 'color-mix(in oklab, var(--zy-warning) 35%, transparent)',
     'state-banner-warning-text': 'var(--zy-warning)',
-    'style-radius-sm': '8px',
     'state-login-hover-tint':
       'color-mix(in oklab, var(--zy-component-palette-white) 4%, transparent)',
     'state-muted-tab-text': 'var(--muted-foreground)',
     'state-page-pill-bg': 'var(--zy-background)',
     'state-page-pill-hover': 'var(--muted)',
     'state-session-tint': 'color-mix(in oklab, var(--zy-component-palette-white) 5%, transparent)',
-    'style-radius-md': '12px',
-    'style-radius-lg': '16px',
-    'style-radius-xl': '20px',
-    'style-radius-2xl': '24px',
-    'style-radius-3xl': '32px',
-    'semantic-radius': '12px',
-    'semantic-radius-sm': '8px',
-    'semantic-radius-md': '12px',
-    'semantic-radius-lg': '16px',
-    'semantic-radius-xl': '20px',
-
-    // ── Shadows (Multi-layer with colored glow) ──
-    'style-shadow-xs': '0 1px 2px rgba(0, 0, 0, 0.4)',
-    'style-shadow-sm': '0 2px 4px rgba(0, 0, 0, 0.5), 0 0 16px rgba(96, 165, 250, 0.08)',
-    'style-shadow-md': '0 4px 12px rgba(0, 0, 0, 0.6), 0 0 24px rgba(96, 165, 250, 0.12)',
-    'style-shadow-lg': '0 8px 24px rgba(0, 0, 0, 0.7), 0 0 40px rgba(96, 165, 250, 0.16)',
-    'style-shadow-xl': '0 12px 40px rgba(0, 0, 0, 0.8), 0 0 64px rgba(96, 165, 250, 0.24)',
-    'style-shadow-2xl': '0 24px 80px rgba(0, 0, 0, 0.9), 0 0 96px rgba(96, 165, 250, 0.20)',
-    'style-shadow-subtle': '0 1px 3px rgba(0, 0, 0, 0.5)',
-    'style-shadow-card': '0 4px 12px rgba(0, 0, 0, 0.6), 0 0 24px rgba(96, 165, 250, 0.12)',
-    'style-shadow-elevated': '0 8px 24px rgba(0, 0, 0, 0.7), 0 0 40px rgba(96, 165, 250, 0.16)',
-    'style-shadow-modal': '0 24px 80px rgba(0, 0, 0, 0.9), 0 0 96px rgba(96, 165, 250, 0.20)',
-    'style-shadow-popover': '0 12px 40px rgba(0, 0, 0, 0.8), 0 0 64px rgba(96, 165, 250, 0.24)',
-    'style-shadow-glow-accent': '0 0 48px rgba(96, 165, 250, 0.4)',
-    'style-shadow-inset': 'inset 0 2px 4px rgba(0, 0, 0, 0.3)',
-
-    // ── Animation Easing ──
-    'style-ease-smooth': 'cubic-bezier(0.16, 1, 0.3, 1)',
-
-    // ── Switch Control (Compact) ──
-    'style-switch-width': '36px',
-    'style-switch-height': '20px',
-    'style-switch-thumb-size': '16px',
-    'style-switch-width-sm': '28px',
-    'style-switch-height-sm': '16px',
-    'style-switch-thumb-size-sm': '12px',
-    'style-switch-thumb-offset': '2px',
-    'style-switch-hover-extend': '1px',
-    'style-switch-press-extend': '2px',
-    'style-switch-press-shrink': '1px',
-    'style-switch-motion-ms': '150',
-    'style-switch-thumb': '#FFFFFF',
-    'style-work-chat-thumb-radius': '8px',
-    'style-work-chat-thumb': 'color-mix(in oklab, var(--zy-foreground) 20%, var(--zy-background))',
-    'style-work-chat-track': 'rgba(96, 165, 250, 0.12)',
-
-    // ── Brand Colors (Gradient primary) ──
-    primary: '#60A5FA',
-    'primary-foreground': '#0A0E1A',
-    'primary-hover': '#3B82F6',
-    'primary-muted': 'rgba(96, 165, 250, 0.15)',
-    'primary-strong': '#3B82F6',
-    'switch-thumb-foreground': '#60A5FA',
-    'switch-track-checked': '#60A5FA',
-    'switch-track-checked-hover': '#3B82F6',
-
-    // ── Surfaces (Glassmorphic) ──
-    background: '#0A0E1A',
-    foreground: '#E8EBF0',
-    surface: 'rgba(20, 24, 36, 0.85)',
-    'surface-foreground': '#E8EBF0',
-    'surface-raised': 'rgba(30, 35, 50, 0.90)',
-    'surface-tertiary': 'rgba(25, 30, 45, 0.88)',
-    'surface-overlay': 'rgba(30, 35, 50, 0.98)',
-
-    // ── Accent ──
-    accent: 'rgba(96, 165, 250, 0.12)',
-    'accent-foreground': '#60A5FA',
-
-    // ── Chat Bubbles ──
-    'chat-user': 'rgba(96, 165, 250, 0.12)',
-    'chat-user-foreground': '#E8EBF0',
-    'chat-bot': 'rgba(20, 24, 36, 0.85)',
-    'chat-bot-foreground': '#E8EBF0',
-
-    // ── Model Tags ──
-    'model-tag-neutral-background': 'rgba(71, 85, 105, 0.3)',
-    'model-tag-neutral-foreground': '#CBD5E1',
-    'model-tag-neutral-border': 'rgba(100, 116, 139, 0.4)',
-    'model-tag-violet-background': 'rgba(167, 139, 250, 0.15)',
-    'model-tag-violet-foreground': '#A78BFA',
-    'model-tag-violet-border': 'rgba(167, 139, 250, 0.35)',
-    'model-tag-green-background': 'rgba(52, 211, 153, 0.15)',
-    'model-tag-green-foreground': '#34D399',
-    'model-tag-green-border': 'rgba(52, 211, 153, 0.35)',
-
-    // ── Skill Colors ──
-    'skill-blue-background': 'rgba(96, 165, 250, 0.12)',
-    'skill-blue-foreground': '#60A5FA',
-
-    // ── Text Hierarchy ──
-    'text-primary': '#E8EBF0',
-    'text-muted-foreground': '#A0AEC0',
-    'text-muted': '#4A5568',
-
-    // ── Borders ──
-    border: 'rgba(255, 255, 255, 0.08)',
-    'border-subtle': 'rgba(255, 255, 255, 0.04)',
-    'input-border': 'rgba(255, 255, 255, 0.10)',
-
-    // ── Scrollbar ──
-    'scroll-thumb': 'rgba(255, 255, 255, 0.12)',
-    'scroll-thumb-hover': 'rgba(255, 255, 255, 0.20)',
-
-    // ── Gradients ──
-    'gradient-1': 'rgba(96, 165, 250, 0.08)',
-    'gradient-2': 'rgba(167, 139, 250, 0.08)',
-
-    // ── Status Colors ──
-    destructive: '#F87171',
-    'destructive-foreground': '#0A0E1A',
-    'style-destructive-confirm': '#EF4444',
-    success: '#34D399',
-    warning: '#FBBF24',
-
-    // ── Gray Scale (11 steps) ──
-    'gray-1': '#0F172A',
-    'gray-2': '#1E293B',
-    'gray-3': '#334155',
-    'gray-4': '#475569',
-    'gray-5': '#64748B',
-    'gray-6': '#94A3B8',
-    'gray-7': '#CBD5E1',
-    'gray-8': '#E2E8F0',
-    'gray-9': '#F1F5F9',
-    'gray-10': '#F8FAFC',
-    'gray-11': '#FFFFFF',
-
-    // ── Focus Ring ──
-    ring: '#60A5FA',
-
-    // ── Semantic Aliases ──
-    'semantic-background': '#0A0E1A',
-    'semantic-foreground': '#E8EBF0',
-    'semantic-card': 'rgba(20, 24, 36, 0.85)',
-    'semantic-card-foreground': '#E8EBF0',
-    'semantic-popover': 'rgba(30, 35, 50, 0.98)',
-    'semantic-popover-foreground': '#E8EBF0',
-    'semantic-primary': '#60A5FA',
-    'semantic-primary-foreground': '#0A0E1A',
-    'semantic-secondary': 'rgba(30, 35, 50, 0.90)',
-    'semantic-secondary-foreground': '#E8EBF0',
-    'semantic-muted': 'rgba(30, 35, 50, 0.90)',
-    'semantic-muted-foreground': '#A0AEC0',
-    'semantic-accent': 'rgba(96, 165, 250, 0.12)',
-    'semantic-accent-foreground': '#60A5FA',
-    'semantic-destructive': '#F87171',
-    'semantic-border': 'rgba(255, 255, 255, 0.08)',
-    'semantic-input': 'rgba(255, 255, 255, 0.10)',
-    'semantic-ring': '#60A5FA',
-
-    // ── Charts ──
-    'semantic-chart-1': '#60A5FA',
-    'semantic-chart-2': '#A78BFA',
-    'semantic-chart-3': '#34D399',
-    'semantic-chart-4': '#FBBF24',
-    'semantic-chart-5': '#F87171',
-
-    // ── Sidebar ──
-    'semantic-sidebar': 'rgba(20, 24, 36, 0.85)',
-    'semantic-sidebar-foreground': '#E8EBF0',
-    'semantic-sidebar-primary': '#60A5FA',
-    'semantic-sidebar-primary-foreground': '#0A0E1A',
-    'semantic-sidebar-accent': 'rgba(96, 165, 250, 0.12)',
-    'semantic-sidebar-accent-foreground': '#60A5FA',
-    'semantic-sidebar-border': 'rgba(255, 255, 255, 0.08)',
-    'semantic-sidebar-ring': '#60A5FA',
 
     // ── Component Palettes ──
     'component-palette-white': '#FFFFFF',
@@ -318,44 +321,44 @@ export const zenithDark: ThemeDefinition = {
     'component-palette-zinc-950': '#FAFAFA',
 
     // ── Editor Colors ──
-    'component-editor-background': 'rgba(15, 20, 30, 0.95)',
-    'component-editor-foreground': '#E8EBF0',
-    'component-editor-gutter': 'rgba(20, 24, 36, 0.8)',
-    'component-editor-selection': 'rgba(96, 165, 250, 0.20)',
-    'component-editor-active-line': 'rgba(96, 165, 250, 0.08)',
-    'component-editor-deleted': 'rgba(248, 113, 113, 0.15)',
-    'component-editor-inserted': 'rgba(52, 211, 153, 0.15)',
+    'component-editor-background': '#17181C',
+    'component-editor-foreground': '#EDEEF0',
+    'component-editor-gutter': '#121317',
+    'component-editor-selection': 'rgba(76, 141, 255, 0.22)',
+    'component-editor-active-line': 'rgba(255, 255, 255, 0.05)',
+    'component-editor-deleted': 'rgba(249, 112, 102, 0.15)',
+    'component-editor-inserted': 'rgba(71, 205, 137, 0.15)',
     'component-editor-indent': 'rgba(255, 255, 255, 0.04)',
-    'component-editor-indent-active': 'rgba(96, 165, 250, 0.20)',
-    'component-editor-deleted-chunk': 'rgba(248, 113, 113, 0.12)',
-    'component-editor-inserted-chunk': 'rgba(52, 211, 153, 0.12)',
-    'component-editor-changed': 'rgba(251, 191, 36, 0.20)',
-    'component-editor-search': 'rgba(251, 191, 36, 0.30)',
-    'component-editor-search-selected': 'rgba(251, 191, 36, 0.45)',
-    'component-editor-error': 'rgba(248, 113, 113, 0.20)',
+    'component-editor-indent-active': 'rgba(76, 141, 255, 0.22)',
+    'component-editor-deleted-chunk': 'rgba(249, 112, 102, 0.12)',
+    'component-editor-inserted-chunk': 'rgba(71, 205, 137, 0.12)',
+    'component-editor-changed': 'rgba(253, 176, 34, 0.2)',
+    'component-editor-search': 'rgba(253, 176, 34, 0.28)',
+    'component-editor-search-selected': 'rgba(253, 176, 34, 0.45)',
+    'component-editor-error': 'rgba(249, 112, 102, 0.2)',
     'component-editor-indent-fallback': 'rgba(255, 255, 255, 0.04)',
-    'component-editor-indent-active-fallback': 'rgba(96, 165, 250, 0.15)',
+    'component-editor-indent-active-fallback': 'rgba(76, 141, 255, 0.16)',
 
     // ── Overlay ──
-    'component-overlay-strong': 'rgba(10, 14, 26, 0.6)',
+    'component-overlay-strong': 'rgba(0, 0, 0, 0.6)',
 
     // ── Diff Colors ──
-    'component-diff-added': '#34D399',
-    'component-diff-removed': '#F87171',
-    'component-diff-added-background': 'rgba(52, 211, 153, 0.15)',
-    'component-diff-removed-background': 'rgba(248, 113, 113, 0.15)',
+    'component-diff-added': '#47CD89',
+    'component-diff-removed': '#F97066',
+    'component-diff-added-background': 'rgba(71, 205, 137, 0.15)',
+    'component-diff-removed-background': 'rgba(249, 112, 102, 0.15)',
 
     // ── Component Misc ──
-    'component-shimmer': 'rgba(96, 165, 250, 0.15)',
+    'component-shimmer': 'rgba(255, 255, 255, 0.08)',
 
     // ── Syntax Highlighting (CodeMirror) ──
-    'syntax-codemirror-0': 'rgba(15, 20, 30, 0.95)',
-    'syntax-codemirror-6': '#94A3B8',
-    'syntax-codemirror-7': '#60A5FA',
-    'syntax-codemirror-8': '#34D399',
+    'syntax-codemirror-0': '#17181C',
+    'syntax-codemirror-6': '#858B96',
+    'syntax-codemirror-7': '#4C8DFF',
+    'syntax-codemirror-8': '#47CD89',
     'syntax-codemirror-9': '#A78BFA',
-    'syntax-codemirror-10': '#FBBF24',
-    'syntax-codemirror-11': '#F87171',
+    'syntax-codemirror-10': '#FDB022',
+    'syntax-codemirror-11': '#F97066',
     'syntax-codemirror-12': '#F472B6',
     'syntax-codemirror-13': '#22D3EE',
     'syntax-codemirror-14': '#A3E635',
@@ -365,27 +368,27 @@ export const zenithDark: ThemeDefinition = {
     'syntax-codemirror-18': '#FDBA74',
 
     // ── Syntax Highlighting (Shiki) ──
-    'syntax-shiki-foreground': '#E8EBF0',
-    'syntax-shiki-background': 'rgba(15, 20, 30, 0.95)',
-    'syntax-shiki-token-comment': '#94A3B8',
+    'syntax-shiki-foreground': '#EDEEF0',
+    'syntax-shiki-background': '#17181C',
+    'syntax-shiki-token-comment': '#858B96',
     'syntax-shiki-token-keyword': '#A78BFA',
-    'syntax-shiki-token-string': '#34D399',
-    'syntax-shiki-token-string-expression': '#10B981',
-    'syntax-shiki-token-constant': '#FBBF24',
-    'syntax-shiki-token-parameter': '#60A5FA',
+    'syntax-shiki-token-string': '#47CD89',
+    'syntax-shiki-token-string-expression': '#34D399',
+    'syntax-shiki-token-constant': '#FDB022',
+    'syntax-shiki-token-parameter': '#4C8DFF',
     'syntax-shiki-token-function': '#22D3EE',
-    'syntax-shiki-token-punctuation': '#CBD5E1',
-    'syntax-shiki-token-link': '#3B82F6',
-    'syntax-shiki-ansi-black': '#0F172A',
-    'syntax-shiki-ansi-bright-black': '#475569',
-    'syntax-shiki-ansi-red': '#F87171',
-    'syntax-shiki-ansi-bright-red': '#FCA5A5',
-    'syntax-shiki-ansi-green': '#34D399',
-    'syntax-shiki-ansi-bright-green': '#6EE7B7',
-    'syntax-shiki-ansi-yellow': '#FBBF24',
-    'syntax-shiki-ansi-bright-yellow': '#FDE047',
-    'syntax-shiki-ansi-blue': '#60A5FA',
-    'syntax-shiki-ansi-bright-blue': '#93C5FD',
+    'syntax-shiki-token-punctuation': '#A8ADB7',
+    'syntax-shiki-token-link': '#6FA4FF',
+    'syntax-shiki-ansi-black': '#101828',
+    'syntax-shiki-ansi-bright-black': '#475467',
+    'syntax-shiki-ansi-red': '#F97066',
+    'syntax-shiki-ansi-bright-red': '#FDA29B',
+    'syntax-shiki-ansi-green': '#47CD89',
+    'syntax-shiki-ansi-bright-green': '#75E0A7',
+    'syntax-shiki-ansi-yellow': '#FDB022',
+    'syntax-shiki-ansi-bright-yellow': '#FEC84B',
+    'syntax-shiki-ansi-blue': '#4C8DFF',
+    'syntax-shiki-ansi-bright-blue': '#84ADFF',
     'syntax-shiki-ansi-magenta': '#A78BFA',
     'syntax-shiki-ansi-bright-magenta': '#C4B5FD',
     'syntax-shiki-ansi-cyan': '#22D3EE',

@@ -28,4 +28,5 @@ export const SHELL_SIDEBAR_SELECTORS = {
   'shell-mode-thumb': '.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]',
   'shell-mode-label': '.theme-sidebar-mode-label',
   'shell-mode-label-selected': '.theme-sidebar-mode-label[data-mode-selected="true"]',
+  'app-main-canvas': '[data-main-canvas]',
 } as const;
