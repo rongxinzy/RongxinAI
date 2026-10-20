@@ -7,4 +7,5 @@ export const PreviewScenario = {
   Empty: 'empty',
   Error: 'error',
   Loading: 'loading',
+  Coding: 'coding',
 };
