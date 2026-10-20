@@ -46,6 +46,11 @@ import type { MagpieRoutingGateway } from './magpieRoutingGateway';
 import { MagpieRoutingUsageService } from './routingUsageService';
 import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort } from './magpieManagerUtils';
 import {
+  enrichMagpieProviderSummariesWithStoredKeys,
+  isUsableMagpieProviderKey,
+  parseMagpieProviderKeyResponse,
+} from './magpieProviderKey';
+import {
   buildMagpieProviderSavePayload,
   projectMagpieProviderSummaries,
   resolveMagpieProviderSaveKey,
@@ -89,6 +94,7 @@ export class MagpieManager implements MagpieRoutingGateway {
   private hostSignatures = new Map<string, string>();
   private recentErrors: { timestamp: number; message: string; providerId?: string }[] = [];
   private cachedActiveProviderCount = 0;
+  private providersListHydrated = false;
   private reapplyErrors = new Map<string, string>();
   private lanAccessChange?: Promise<MagpieStatus>;
   readonly routingUsage: MagpieRoutingUsageService;
@@ -434,6 +440,7 @@ export class MagpieManager implements MagpieRoutingGateway {
           }
           this.hostSignatures.set(id, signature);
         }
+        this.providersListHydrated = false;
       });
     this.hostSync = run;
     return run;
@@ -448,12 +455,26 @@ export class MagpieManager implements MagpieRoutingGateway {
     if (this.state.state !== 'running') return [];
     try {
       const state = await this.managementJson('/api/providers');
+      const rawList = Array.isArray(state.providers) ? state.providers : [];
       const list = projectMagpieProviderSummaries(state);
+      await enrichMagpieProviderSummariesWithStoredKeys(list, rawList, id =>
+        this.fetchStoredProviderKey(id),
+      );
       this.cachedActiveProviderCount = list.filter(p => !p.off).length;
+      this.providersListHydrated = true;
       return list;
     } catch {
       return [];
     }
+  }
+
+  private async fetchStoredProviderKey(providerId: string): Promise<string | undefined> {
+    const body = await this.managementJson('/api/provider/key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: providerId }),
+    });
+    return parseMagpieProviderKeyResponse(body);
   }
 
   async saveProvider(input: MagpieSaveProviderInput): Promise<MagpieProviderSummary[]> {
@@ -548,21 +569,16 @@ export class MagpieManager implements MagpieRoutingGateway {
     if (!input.baseUrl) return { ok: false, error: 'Base URL is required' };
     const start = Date.now();
     try {
-      let key = resolveMagpieProviderSaveKey(undefined, input.key);
-      if (!key && input.id) {
-        const state = await this.managementJson('/api/providers');
-        const existing = (Array.isArray(state.providers) ? state.providers : []).find(
-          (p: Record<string, unknown>) => p.id === input.id,
-        );
-        if (existing && typeof existing.key === 'string' && existing.key !== 'none') {
-          key = existing.key;
-        }
+      let key = resolveMagpieProviderSaveKey(input.key);
+      if (!isUsableMagpieProviderKey(key) && input.id) {
+        const stored = await this.fetchStoredProviderKey(input.id);
+        if (isUsableMagpieProviderKey(stored)) key = stored;
       }
       const url = input.baseUrl.replace(/\/+$/, '');
       const testEndpoint =
         input.api === 'anthropic-messages' ? `${url}/v1/messages` : `${url}/models`;
       const headers: Record<string, string> = {};
-      if (key && key !== 'none') {
+      if (isUsableMagpieProviderKey(key)) {
         if (input.api === 'anthropic-messages') {
           headers['x-api-key'] = key;
           headers['anthropic-version'] = '2023-06-01';
@@ -607,12 +623,14 @@ export class MagpieManager implements MagpieRoutingGateway {
         /* ignore ping error */
       }
     }
-    let activeProviderCount = 0;
-    try {
-      const all = await this.providers();
-      activeProviderCount = all.filter(p => !p.off).length;
-    } catch {
-      /* ignore */
+    let activeProviderCount = this.cachedActiveProviderCount;
+    if (this.state.state === 'running' && !this.providersListHydrated) {
+      try {
+        const all = await this.providers();
+        activeProviderCount = all.filter(p => !p.off).length;
+      } catch {
+        activeProviderCount = 0;
+      }
     }
     return {
       latencyMs,
@@ -893,6 +911,8 @@ export class MagpieManager implements MagpieRoutingGateway {
         await this.terminate();
       }
       this.state = { state: 'stopped', version: MAGPIE_VERSION };
+      this.providersListHydrated = false;
+      this.cachedActiveProviderCount = 0;
       return this.status();
     })()
       .catch(error => {

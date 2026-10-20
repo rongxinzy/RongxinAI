@@ -64,11 +64,10 @@ describe('projectMagpieProviderSummaries', () => {
 
 describe('resolveMagpieProviderSaveKey', () => {
   it('keeps stored keys on edit by sending a blank key and never sends none', () => {
-    expect(resolveMagpieProviderSaveKey({ id: 'p1' }, undefined)).toBe('');
-    expect(resolveMagpieProviderSaveKey({ id: 'p1' }, '   ')).toBe('');
-    expect(resolveMagpieProviderSaveKey({ id: 'p1' }, 'none')).toBe('');
-    expect(resolveMagpieProviderSaveKey(undefined, 'sk-test-1234')).toBe('sk-test-1234');
-    expect(resolveMagpieProviderSaveKey(undefined, undefined)).toBe('');
+    expect(resolveMagpieProviderSaveKey(undefined)).toBe('');
+    expect(resolveMagpieProviderSaveKey('   ')).toBe('');
+    expect(resolveMagpieProviderSaveKey('none')).toBe('');
+    expect(resolveMagpieProviderSaveKey('sk-test-1234')).toBe('sk-test-1234');
   });
 });
 

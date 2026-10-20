@@ -106,7 +106,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
       .filter(Boolean);
     return {
       ...(provider?.id ? { id: provider.id } : {}),
-      name: name.trim() || 'Custom Provider',
+      name: name.trim() || i18nService.t('magpieProviderDefaultName'),
       api,
       baseUrl: baseUrl.trim(),
       ...(apiKey.trim() ? { key: apiKey.trim() } : {}),
@@ -190,7 +190,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               id="provider-name"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. OpenAI Production"
+              placeholder={i18nService.t('magpieProviderNamePlaceholder')}
               required
               disabled={isSaving}
             />
@@ -206,12 +206,14 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="openai-completions">
-                  OpenAI Chat Completions (/v1/chat/completions)
+                  {i18nService.t('magpieProviderApiOpenAIChat')}
                 </SelectItem>
                 <SelectItem value="anthropic-messages">
-                  Anthropic Messages (/v1/messages)
+                  {i18nService.t('magpieProviderApiAnthropicMessages')}
                 </SelectItem>
-                <SelectItem value="openai-responses">OpenAI Responses (/v1/responses)</SelectItem>
+                <SelectItem value="openai-responses">
+                  {i18nService.t('magpieProviderApiOpenAIResponses')}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -247,9 +249,9 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               }
               disabled={isSaving}
             />
-            {isEditing && provider?.hasKey && (
+            {isEditing && provider?.hasKey && provider.keyMasked && (
               <p className="text-xs text-muted-foreground">
-                {provider.keyMasked ? `Key: ${provider.keyMasked}` : ''}
+                {i18nService.t('magpieProviderKeyMasked').replace('{masked}', provider.keyMasked)}
               </p>
             )}
           </div>
@@ -278,7 +280,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               id="provider-fallback"
               value={fallbackText}
               onChange={e => setFallbackText(e.target.value)}
-              placeholder="e.g. deepseek-chat, qwen2.5-coder:7b"
+              placeholder={i18nService.t('magpieProviderFallbackPlaceholder')}
               disabled={isSaving}
             />
             <p className="text-xs text-muted-foreground">
@@ -301,7 +303,9 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
                     {i18nService.t('magpieTestSuccess')}
                     {testResult.latencyMs !== undefined ? ` (${testResult.latencyMs}ms)` : ''}
                     {testResult.modelCount !== undefined
-                      ? ` · ${testResult.modelCount} models found`
+                      ? ` · ${i18nService
+                          .t('magpieTestModelsFound')
+                          .replace('{count}', String(testResult.modelCount))}`
                       : ''}
                   </span>
                 </>
