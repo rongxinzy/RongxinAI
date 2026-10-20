@@ -2,7 +2,7 @@ import path from 'path';
 
 import { app, BrowserWindow } from 'electron';
 
-import { rt } from './runtimeState';
+import { agentRuntime } from './agentRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
 import {
   getAgentManager,
@@ -52,9 +52,9 @@ const ensureCodingCommandCatalogWatch = (): void => {
 
 export const getCodingRoomService = (): CodingRoomService => {
   ensureCodingCommandCatalogWatch();
-  if (!rt.codingRoomService) {
+  if (!agentRuntime.codingRoomService) {
     const runtime = getPiRuntimeAdapter();
-    rt.codingRoomService = new CodingRoomService(
+    agentRuntime.codingRoomService = new CodingRoomService(
       new CodingRoomRepository(getStore().getDatabase()),
       new CodingAgentRegistry(
         new CodingAgentProfileRepository(getStore().getDatabase()),
@@ -198,7 +198,7 @@ export const getCodingRoomService = (): CodingRoomService => {
           );
           const manifest = mcpRuntime.serverManager?.toolManifest ?? [];
           return {
-            gatewayAvailable: rt.piRuntimeAdapter?.hasMcpServerManager() ?? false,
+            gatewayAvailable: agentRuntime.piRuntimeAdapter?.hasMcpServerManager() ?? false,
             target: target ?? null,
             servers: getMcpStore()
               .listServers()
@@ -335,14 +335,14 @@ export const getCodingRoomService = (): CodingRoomService => {
     // Replace-mode stream records; declaring lane interest here lets every
     // other session skip the full-text bus during streaming.
     runtime.registerStreamingTextInterestResolver(
-      sessionId => rt.codingRoomService?.isBuiltinLaneSession(sessionId) ?? false,
+      sessionId => agentRuntime.codingRoomService?.isBuiltinLaneSession(sessionId) ?? false,
     );
-    rt.codingRoomService.registry.hydrate();
+    agentRuntime.codingRoomService.registry.hydrate();
     // Precise routing: sessions cached as non-lane skip normalization and
     // recording entirely; a session's first event still flows through so the
     // lazy lane mapping can register (see shouldTrackSession).
     const isTrackedSession = (sessionId: string): boolean =>
-      rt.codingRoomService?.shouldTrackSession(sessionId) ?? true;
+      agentRuntime.codingRoomService?.shouldTrackSession(sessionId) ?? true;
     runtime.on('message', (sessionId: string, message: unknown) => {
       if (!isTrackedSession(sessionId)) return;
       const metadata =
@@ -354,7 +354,7 @@ export const getCodingRoomService = (): CodingRoomService => {
           ? (metadata as { isThinking?: unknown }).isThinking === true
           : false;
       if (isThinking) {
-        rt.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Reasoning, {
+        agentRuntime.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Reasoning, {
           message,
           streamUpdateMode: CodingStreamUpdateMode.Replace,
         });
@@ -362,7 +362,11 @@ export const getCodingRoomService = (): CodingRoomService => {
       }
       const normalized = normalizePiMessage(message);
       if (normalized)
-        rt.codingRoomService?.recordBuiltinEvent(sessionId, normalized.kind, normalized.payload);
+        agentRuntime.codingRoomService?.recordBuiltinEvent(
+          sessionId,
+          normalized.kind,
+          normalized.payload,
+        );
     });
     runtime.on(
       'messageUpdate',
@@ -374,7 +378,7 @@ export const getCodingRoomService = (): CodingRoomService => {
       ) => {
         if (!isTrackedSession(sessionId)) return;
         const isThinking = metadata?.isThinking === true;
-        rt.codingRoomService?.recordBuiltinEvent(
+        agentRuntime.codingRoomService?.recordBuiltinEvent(
           sessionId,
           isThinking ? CodingEventKind.Reasoning : CodingEventKind.MessageDelta,
           {
@@ -389,7 +393,11 @@ export const getCodingRoomService = (): CodingRoomService => {
       if (!isTrackedSession(sessionId)) return;
       const normalized = normalizePiToolActivity(event);
       if (normalized)
-        rt.codingRoomService?.recordBuiltinEvent(sessionId, normalized.kind, normalized.payload);
+        agentRuntime.codingRoomService?.recordBuiltinEvent(
+          sessionId,
+          normalized.kind,
+          normalized.payload,
+        );
     });
     runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
       if (!isTrackedSession(sessionId)) return;
@@ -399,14 +407,14 @@ export const getCodingRoomService = (): CodingRoomService => {
         typeof (request as { requestId?: unknown }).requestId === 'string'
           ? (request as { requestId: string }).requestId
           : null;
-      rt.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Permission, {
+      agentRuntime.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Permission, {
         requestId,
         request,
       });
     });
     runtime.on('plan', (sessionId: string, plan: { entries?: unknown }) => {
       if (!isTrackedSession(sessionId)) return;
-      rt.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Plan, {
+      agentRuntime.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Plan, {
         entries: Array.isArray(plan?.entries) ? plan.entries : [],
       });
     });
@@ -414,16 +422,22 @@ export const getCodingRoomService = (): CodingRoomService => {
       'codingElicitationRequest',
       (sessionId: string, request: { requestId: string; question: string }) => {
         if (!isTrackedSession(sessionId)) return;
-        rt.codingRoomService?.recordBuiltinElicitation(sessionId, request);
+        agentRuntime.codingRoomService?.recordBuiltinElicitation(sessionId, request);
       },
     );
     runtime.on('complete', (sessionId: string) => {
       if (!isTrackedSession(sessionId)) return;
-      rt.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnComplete, {});
+      agentRuntime.codingRoomService?.recordBuiltinEvent(
+        sessionId,
+        CodingEventKind.TurnComplete,
+        {},
+      );
     });
     runtime.on('error', (sessionId: string, error: unknown) => {
       if (!isTrackedSession(sessionId)) return;
-      rt.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, { error });
+      agentRuntime.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, {
+        error,
+      });
     });
     runtime.on(
       'retryNotice',
@@ -439,9 +453,9 @@ export const getCodingRoomService = (): CodingRoomService => {
     );
     runtime.on('sessionInterrupted', interruption => {
       if (interruption.cause !== CoworkInterruptionCause.UserStop) {
-        rt.codingRoomService?.recordBuiltinInterruption(interruption);
+        agentRuntime.codingRoomService?.recordBuiltinInterruption(interruption);
       }
     });
   }
-  return rt.codingRoomService;
+  return agentRuntime.codingRoomService;
 };
