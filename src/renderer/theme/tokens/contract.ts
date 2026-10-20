@@ -311,6 +311,36 @@ export const TOKEN_CONTRACT = {
 
   // ── Radius ──
   radius: '--zy-radius',
+
+  // ── Appearance-conditioned component values (work package N) ──
+  // These carry the only light/dark differences in component recipes, so the
+  // recipe layer can emit one shared rule set that only references tokens.
+  'state-destructive-tint-percent': '--zy-state-destructive-tint-percent',
+  'state-destructive-border': '--zy-state-destructive-border',
+  'state-destructive-focus-ring': '--zy-state-destructive-focus-ring',
+  'state-destructive-hover-tint-percent': '--zy-state-destructive-hover-tint-percent',
+  'state-primary-border-tint-percent': '--zy-state-primary-border-tint-percent',
+  'state-primary-fill-tint-percent': '--zy-state-primary-fill-tint-percent',
+  'state-input-tint-percent': '--zy-state-input-tint-percent',
+  'state-input-disabled-tint-percent': '--zy-state-input-disabled-tint-percent',
+  'state-input-solid': '--zy-state-input-solid',
+  'state-input-hover': '--zy-state-input-hover',
+  'state-muted-hover': '--zy-state-muted-hover',
+  'state-avatar-blend': '--zy-state-avatar-blend',
+  'state-input-border': '--zy-state-input-border',
+  'state-tab-selected-border': '--zy-state-tab-selected-border',
+  'state-input-field': '--zy-state-input-field',
+  'state-banner-destructive-bg': '--zy-state-banner-destructive-bg',
+  'state-banner-destructive-border': '--zy-state-banner-destructive-border',
+  'state-banner-destructive-text': '--zy-state-banner-destructive-text',
+  'state-banner-warning-bg': '--zy-state-banner-warning-bg',
+  'state-banner-warning-border': '--zy-state-banner-warning-border',
+  'state-banner-warning-text': '--zy-state-banner-warning-text',
+  'state-login-hover-tint': '--zy-state-login-hover-tint',
+  'state-muted-tab-text': '--zy-state-muted-tab-text',
+  'state-page-pill-bg': '--zy-state-page-pill-bg',
+  'state-page-pill-hover': '--zy-state-page-pill-hover',
+  'state-session-tint': '--zy-state-session-tint',
 } as const;
 
 export type TokenName = keyof typeof TOKEN_CONTRACT;

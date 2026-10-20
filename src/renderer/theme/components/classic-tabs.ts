@@ -31,9 +31,7 @@ export function classicTabs(dark: boolean) {
         'padding-block': '0.125rem',
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
-        color: dark
-          ? 'var(--muted-foreground)'
-          : 'color-mix(in oklab, var(--foreground) 60%, transparent)',
+        color: 'var(--zy-state-muted-tab-text)',
       },
       hover: { color: 'var(--foreground)' },
       focus: {
@@ -44,18 +42,16 @@ export function classicTabs(dark: boolean) {
         'outline-color': 'var(--ring)',
       },
       selected: {
-        'background-color': dark
-          ? 'color-mix(in oklab, var(--input) 30%, transparent)'
-          : 'var(--background)',
+        'background-color': 'var(--zy-state-input-field)',
         color: 'var(--foreground)',
-        ...(dark ? { 'border-color': 'var(--input)' } : {}),
+        'border-color': 'var(--zy-state-input-border)',
       },
       disabled: { opacity: '0.5' },
     }),
     'tabs-default-trigger': recipe({ selected: { 'box-shadow': 'var(--zy-style-shadow-sm)' } }),
     'tabs-line-trigger': recipe({
       base: { 'background-color': 'transparent' },
-      selected: { ...clear, ...(dark ? { 'border-color': 'transparent' } : {}) },
+      selected: { ...clear, 'border-color': 'var(--zy-state-tab-selected-border)' },
     }),
     'tabs-trigger-leading': recipe({ base: { 'padding-left': '0.25rem' } }),
     'tabs-trigger-trailing': recipe({ base: { 'padding-right': '0.25rem' } }),
