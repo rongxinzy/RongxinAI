@@ -9,7 +9,6 @@ export function MagpieAboutPreferences({ preferences }: { preferences: MagpiePre
     [i18nService.t('aboutVersion'), preferences.version || '—'],
     [i18nService.t('magpieDataDirectory'), displayDataDir],
     [i18nService.t('magpieGatewayAddress'), preferences.gateway || '—'],
-    [i18nService.t('magpieLicense'), i18nService.t('magpieLicenseNotice')],
   ] as const;
   return (
     <div className="flex flex-col gap-6">
