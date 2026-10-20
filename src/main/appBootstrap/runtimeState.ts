@@ -1,19 +1,7 @@
 import type { BrowserWindow } from 'electron';
 
-import type { CanonicalScheduledTaskService } from '../../scheduledTask/canonicalScheduledTaskService';
-import type { CcConnectSchedulerRuntime } from '../../scheduledTask/ccConnectSchedulerRuntime';
-import type { CcConnectControlClient } from '../libs/ccConnectControlClient';
-import type { LocalCronClock } from '../../scheduledTask/localCronClock';
-import type { CcConnectDeliveryTransport } from '../../scheduledTask/ccConnectDeliveryTransport';
-import type { ActivityService } from '../activity/activityService';
 import type { AgentManager } from '../agentManager';
 import type { CodingRoomService } from '../codingAgent/codingRoomService';
-import type { ChannelAccountManager } from '../im/channelAccountManager';
-import type { CcConnectPiBridge } from '../im/ccConnectPiBridge';
-import type { CcConnectBridgeServer } from '../libs/ccConnectBridgeServer';
-import type { CcConnectRuntimeStatusRegistry } from '../libs/ccConnectRuntimeStatusRegistry';
-import { CcConnectRuntimeStatusRegistry as CcConnectRuntimeStatusRegistryCtor } from '../libs/ccConnectRuntimeStatusRegistry';
-import type { CcConnectSidecarManager } from '../libs/ccConnectSidecarManager';
 import type { AppUpdateCoordinator } from '../libs/appUpdateCoordinator';
 import type { LlamaCppManager } from '../libs/llamacppManager';
 import type { LlamaCppModelOrchestrator } from '../libs/llamacppModelOrchestrator';
@@ -53,27 +41,6 @@ export const rt = {
   todoReminderScheduler: null as TodoReminderScheduler | null,
 
   skillManager: null as SkillManager | null,
-
-  imGatewayManager: null as ChannelAccountManager | null,
-  ccConnectBridgeServer: null as CcConnectBridgeServer | null,
-  ccConnectSidecarManager: null as CcConnectSidecarManager | null,
-  ccConnectRuntimeStatuses:
-    new CcConnectRuntimeStatusRegistryCtor() as CcConnectRuntimeStatusRegistry,
-  ccConnectDeliveryAccounts: new Set<string>(),
-  ccConnectRuntimeRestartTimer: null as NodeJS.Timeout | null,
-  ccConnectRuntimeStopping: false,
-  ccConnectRuntimeReconcileQueue: Promise.resolve() as Promise<void>,
-  ccConnectRuntimeConfigSignature: '',
-  ccConnectRuntimeControlClient: null as CcConnectControlClient | null,
-  ccConnectPiBridge: null as CcConnectPiBridge | null,
-  canonicalScheduledTaskService: null as CanonicalScheduledTaskService | null,
-  activityService: null as ActivityService | null,
-  canonicalSchedulerRuntime: null as CcConnectSchedulerRuntime | null,
-  canonicalSchedulerClock: null as LocalCronClock | null,
-  ccConnectDeliveryTransport: null as CcConnectDeliveryTransport | null,
-  ccConnectBridgeToken: null as string | null,
-  ccConnectBridgeUrl: null as string | null,
-  ccConnectRuntimeRestartAttempts: 0,
 
   storeInitPromise: null as Promise<SqliteStore> | null,
   sqliteBackupManager: null as SqliteBackupManager | null,

@@ -93,6 +93,7 @@ import { StartupProfiler } from '../startupProfiler';
 import { setAutoLaunchEnabled } from '../autoLaunchManager';
 import { updateTrayMenu } from '../trayManager';
 import { APP_UPDATE_POLL_INTERVAL_MS } from '../../shared/appUpdate/constants';
+import { channelRuntime } from './channelRuntimeState';
 
 export const initApp = async (): Promise<void> => {
   // Original bootstrap body, kept as one unit; invoked below so exported
@@ -258,21 +259,21 @@ export const initApp = async (): Promise<void> => {
     if (resetCount > 0) {
       console.log(`[Main] Reset ${resetCount} stuck cowork session(s) from running -> idle`);
     }
-    rt.activityService ??= new ActivityService(getStore().getDatabase());
-    const recoveredActivityRuns = rt.activityService.recoverInterruptedRuns();
+    channelRuntime.activityService ??= new ActivityService(getStore().getDatabase());
+    const recoveredActivityRuns = channelRuntime.activityService.recoverInterruptedRuns();
     if (recoveredActivityRuns > 0) {
       console.warn(
         `[Activity] marked ${recoveredActivityRuns} interrupted activity run(s) as failed`,
       );
     }
-    const prunedActivityRuns = rt.activityService.pruneExpired();
+    const prunedActivityRuns = channelRuntime.activityService.pruneExpired();
     if (prunedActivityRuns > 0) {
       console.log(`[Activity] removed ${prunedActivityRuns} expired activity run(s)`);
     }
     const recoveredScheduledRuns = new SqliteScheduledTaskStore(
       getStore().getDatabase(),
     ).recoverInterruptedRuns(run => {
-      rt.activityService?.upsertBestEffort({
+      channelRuntime.activityService?.upsertBestEffort({
         id: run.id,
         source: ActivitySource.ScheduledTask,
         status: ActivityStatus.Failed,
