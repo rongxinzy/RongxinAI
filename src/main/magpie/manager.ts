@@ -46,11 +46,8 @@ import {
 import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
 const MODEL_FIELDS = new Set(['model', 'large', 'small', 'executor', 'planner']);
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-function maskApiKey(key: string | undefined): string | undefined {
-  if (!key) return undefined;
-  if (key.length <= 8) return '****';
-  return `${key.slice(0, 3)}...${key.slice(-4)}`;
-}
+const maskApiKey = (key?: string) =>
+  !key ? undefined : key.length <= 8 ? '****' : `${key.slice(0, 3)}...${key.slice(-4)}`;
 async function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
