@@ -296,10 +296,10 @@ ${params.content.trim()}
     return upgradeSkillImpl(this, skillId, downloadUrl);
   }
 
-  confirmPendingInstall(
+  async confirmPendingInstall(
     pendingId: string,
     action: SecurityReportAction,
-  ): { success: boolean; skills?: SkillRecord[]; error?: string } {
+  ): Promise<{ success: boolean; skills?: SkillRecord[]; error?: string }> {
     return confirmPendingInstallImpl(this, pendingId, action);
   }
 

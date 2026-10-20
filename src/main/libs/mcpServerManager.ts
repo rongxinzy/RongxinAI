@@ -10,7 +10,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { spawnSync } from 'child_process';
+import { runCommandCapture } from '../skills/processRunner';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
@@ -249,35 +249,28 @@ export interface ResolvedStdioCommand {
 
 /**
  * Check whether a system-installed Node.js runtime is available on the PATH.
- * Caches the result for the lifetime of the process to avoid repeated lookups.
+ * Caches the in-flight promise for the lifetime of the process to avoid
+ * repeated lookups; the lookup itself never blocks the main thread.
  */
-let _systemNodePath: string | false | undefined;
+let _systemNodePathPromise: Promise<string | null> | undefined;
 
-function findSystemNodePath(): string | null {
-  if (_systemNodePath !== undefined) {
-    return _systemNodePath || null;
-  }
-  try {
-    const whichCmd = process.platform === 'win32' ? 'where' : 'which';
-    const result = spawnSync(whichCmd, ['node'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-      windowsHide: true,
-    });
-    if (result.status === 0 && result.stdout) {
-      const resolved = result.stdout.trim().split(/\r?\n/)[0].trim();
+function findSystemNodePathAsync(): Promise<string | null> {
+  _systemNodePathPromise ??= (async () => {
+    try {
+      const whichCmd = process.platform === 'win32' ? 'where' : 'which';
+      const { stdout } = await runCommandCapture(whichCmd, ['node'], { timeoutMs: 5000 });
+      const resolved = stdout.trim().split(/\r?\n/)[0]?.trim();
       if (resolved) {
-        _systemNodePath = resolved;
         log('INFO', `System Node.js found: ${resolved}`);
         return resolved;
       }
+    } catch {
+      /* ignore */
     }
-  } catch {
-    /* ignore */
-  }
-  _systemNodePath = false;
-  log('INFO', 'System Node.js not found on PATH');
-  return null;
+    log('INFO', 'System Node.js not found on PATH');
+    return null;
+  })();
+  return _systemNodePathPromise;
 }
 
 /**
@@ -427,7 +420,7 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
             'The bundled npm runtime is unavailable. Please reinstall the application.',
           );
         } else {
-          const systemNode = findSystemNodePath();
+          const systemNode = await findSystemNodePathAsync();
           if (systemNode) {
             effectiveCommand = systemNode;
             log(
