@@ -39,9 +39,9 @@ test('keeps shared Python ahead of base Python on repeated environment preparati
 
 test.skipIf(process.platform === 'win32')(
   'dev sessions receive Python dependencies and managed uv',
-  () => {
+  async () => {
     const env: NodeJS.ProcessEnv = { PATH: '/system/bin' };
-    applyApplicationRuntimeEnv(env);
+    await applyApplicationRuntimeEnv(env);
     expect(env.PATH?.split(path.delimiter)).toContain('/managed/shared');
     expect(env.PATH?.indexOf('/managed/shared')).toBeLessThan(
       env.PATH?.indexOf('/managed/base') ?? -1,

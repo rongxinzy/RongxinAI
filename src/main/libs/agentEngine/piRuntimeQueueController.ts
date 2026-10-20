@@ -177,7 +177,7 @@ export class PiRuntimeQueueController {
         await active.piSession.reload();
         // AgentSession.reload() reloads SettingsManager from disk, so restore
         // the per-process bundled PortableGit override after every reload.
-        applyPiShellOverride(active.settingsManager);
+        await applyPiShellOverride(active.settingsManager);
         applyPiCompactionOverrides(
           active.settingsManager,
           typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,

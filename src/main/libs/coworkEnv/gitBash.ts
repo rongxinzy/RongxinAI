@@ -1,31 +1,35 @@
-import { execSync, spawnSync } from 'child_process';
 import { app } from 'electron';
 import { existsSync } from 'fs';
 import { dirname, join } from 'path';
 
+import { runCommandCapture } from '../../skills/processRunner';
 import { coworkLog } from '../coworkLogger';
 import { normalizeWindowsPath, truncateDiagnostic } from './pathUtils';
 
 /**
- * Cached git-bash path on Windows. Resolved once and reused.
+ * Cached git-bash resolution on Windows. Resolved once and reused.
  */
-let cachedGitBashPath: string | null | undefined;
-let cachedGitBashResolutionError: string | null | undefined;
+let cachedGitBashResolution: Promise<{ path: string | null; error: string | null }> | undefined;
 
-function listWindowsCommandPaths(command: string): string[] {
+/** `where`-style lookup: split output lines into normalized existing paths. */
+function parseCommandPaths(output: string): string[] {
+  const parsed = output
+    .split(/\r?\n/)
+    .map(line => normalizeWindowsPath(line))
+    .filter((line): line is string => Boolean(line && existsSync(line)));
+  return Array.from(new Set(parsed));
+}
+
+async function listWindowsCommandPaths(command: string): Promise<string[]> {
   try {
-    const output = execSync(command, { encoding: 'utf-8', timeout: 5000, windowsHide: true });
-    const parsed = output
-      .split(/\r?\n/)
-      .map(line => normalizeWindowsPath(line))
-      .filter((line): line is string => Boolean(line && existsSync(line)));
-    return Array.from(new Set(parsed));
+    const { stdout } = await runCommandCapture('where', [command], { timeoutMs: 5000 });
+    return parseCommandPaths(stdout);
   } catch {
     return [];
   }
 }
 
-function listGitInstallPathsFromRegistry(): string[] {
+async function listGitInstallPathsFromRegistry(): Promise<string[]> {
   const registryKeys = [
     'HKCU\\Software\\GitForWindows',
     'HKLM\\Software\\GitForWindows',
@@ -36,12 +40,10 @@ function listGitInstallPathsFromRegistry(): string[] {
 
   for (const key of registryKeys) {
     try {
-      const output = execSync(`reg query "${key}" /v InstallPath`, {
-        encoding: 'utf-8',
-        timeout: 5000,
-        windowsHide: true,
+      const { stdout } = await runCommandCapture('reg', ['query', key, '/v', 'InstallPath'], {
+        timeoutMs: 5000,
       });
-      for (const line of output.split(/\r?\n/)) {
+      for (const line of stdout.split(/\r?\n/)) {
         const match = line.match(/InstallPath\s+REG_\w+\s+(.+)$/i);
         const root = normalizeWindowsPath(match?.[1]);
         if (root) {
@@ -74,7 +76,10 @@ function getBundledGitBashCandidates(): string[] {
   return candidates;
 }
 
-export function checkWindowsGitBashHealth(bashPath: string): { ok: boolean; reason?: string } {
+export async function checkWindowsGitBashHealth(bashPath: string): Promise<{
+  ok: boolean;
+  reason?: string;
+}> {
   try {
     if (!existsSync(bashPath)) {
       return { ok: false, reason: 'path does not exist' };
@@ -92,40 +97,28 @@ export function checkWindowsGitBashHealth(bashPath: string): { ok: boolean; reas
     // Try non-login shell first (-c instead of -lc) for speed.
     // Login shells source /etc/profile which can be slow on some systems.
     // cygpath is a standalone binary and does not require a login shell.
-    const fastResult = spawnSync(bashPath, ['-c', 'cygpath -u "C:\\\\Windows"'], {
-      encoding: 'utf-8',
-      timeout: 5000,
-      windowsHide: true,
-      env: healthEnv,
-    });
-
-    const result =
-      fastResult.error || (typeof fastResult.status === 'number' && fastResult.status !== 0)
-        ? // Non-login shell failed — retry with login shell and a longer timeout.
-          // Some Git Bash builds require login shell to set up PATH for cygpath.
-          spawnSync(bashPath, ['-lc', 'cygpath -u "C:\\\\Windows"'], {
-            encoding: 'utf-8',
-            timeout: 15000,
-            windowsHide: true,
-            env: healthEnv,
-          })
-        : fastResult;
-
-    if (result.error) {
-      return { ok: false, reason: result.error.message };
+    let stdout = '';
+    let stderr = '';
+    try {
+      const fast = await runCommandCapture(bashPath, ['-c', 'cygpath -u "C:\\\\Windows"'], {
+        timeoutMs: 5000,
+        env: healthEnv as NodeJS.ProcessEnv,
+      });
+      stdout = fast.stdout;
+    } catch {
+      // Non-login shell failed — retry with login shell and a longer timeout.
+      // Some Git Bash builds require login shell to set up PATH for cygpath.
+      try {
+        const login = await runCommandCapture(bashPath, ['-lc', 'cygpath -u "C:\\\\Windows"'], {
+          timeoutMs: 15000,
+          env: healthEnv as NodeJS.ProcessEnv,
+        });
+        stdout = login.stdout;
+      } catch (error) {
+        stderr = error instanceof Error ? error.message : String(error);
+      }
     }
 
-    if (typeof result.status === 'number' && result.status !== 0) {
-      const stderr = (result.stderr || '').trim();
-      const stdout = (result.stdout || '').trim();
-      return {
-        ok: false,
-        reason: `exit ${result.status}${stderr ? `, stderr: ${stderr}` : ''}${stdout ? `, stdout: ${stdout}` : ''}`,
-      };
-    }
-
-    const stdout = (result.stdout || '').trim();
-    const stderr = (result.stderr || '').trim();
     const lines = stdout
       .split(/\r?\n/)
       .map(line => line.trim())
@@ -182,129 +175,128 @@ export function getWindowsGitToolDirs(bashPath: string): string[] {
  * Priority: env var override > bundled PortableGit > installed Git > PATH lookup.
  * Every candidate must pass a health check (`cygpath -u`) before use.
  */
-export function resolveGitBashPathForPi(): string | null {
+export function resolveGitBashPathForPi(): Promise<string | null> {
   return resolveWindowsGitBashPath();
 }
 
-export function getGitBashResolutionErrorForPi(): string | null {
-  return cachedGitBashResolutionError;
+export function getGitBashResolutionErrorForPi(): Promise<string | null> {
+  return resolveGitBashResolution().then(resolution => resolution.error);
 }
 
-export function resolveWindowsGitBashPath(): string | null {
-  if (cachedGitBashPath !== undefined) return cachedGitBashPath;
+export function resolveWindowsGitBashPath(): Promise<string | null> {
+  return resolveGitBashResolution().then(resolution => resolution.path);
+}
 
-  if (process.platform !== 'win32') {
-    cachedGitBashPath = null;
-    cachedGitBashResolutionError = null;
-    return null;
-  }
+function resolveGitBashResolution(): Promise<{ path: string | null; error: string | null }> {
+  cachedGitBashResolution ??= (async (): Promise<{ path: string | null; error: string | null }> => {
+    if (process.platform !== 'win32') {
+      return { path: null, error: null };
+    }
 
-  const candidates: Array<{ path: string; source: string }> = [];
-  const seen = new Set<string>();
-  const failedCandidates: string[] = [];
+    const candidates: Array<{ path: string; source: string }> = [];
+    const seen = new Set<string>();
+    const failedCandidates: string[] = [];
 
-  const pushCandidate = (candidatePath: string | null, source: string): void => {
-    if (!candidatePath) return;
-    const normalized = normalizeWindowsPath(candidatePath);
-    if (!normalized) return;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    candidates.push({ path: normalized, source });
-  };
+    const pushCandidate = (candidatePath: string | null, source: string): void => {
+      if (!candidatePath) return;
+      const normalized = normalizeWindowsPath(candidatePath);
+      if (!normalized) return;
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push({ path: normalized, source });
+    };
 
-  // 1. Explicit env var (user override)
-  pushCandidate(process.env.CLAUDE_CODE_GIT_BASH_PATH ?? null, 'env:CLAUDE_CODE_GIT_BASH_PATH');
+    // 1. Explicit env var (user override)
+    pushCandidate(process.env.CLAUDE_CODE_GIT_BASH_PATH ?? null, 'env:CLAUDE_CODE_GIT_BASH_PATH');
 
-  // 2. Bundled PortableGit (preferred default in ZhiYuanAgent package)
-  for (const bundledCandidate of getBundledGitBashCandidates()) {
-    pushCandidate(bundledCandidate, 'bundled:resources/mingit');
-  }
+    // 2. Bundled PortableGit (preferred default in ZhiYuanAgent package)
+    for (const bundledCandidate of getBundledGitBashCandidates()) {
+      pushCandidate(bundledCandidate, 'bundled:resources/mingit');
+    }
 
-  // 3. Common Git for Windows installation paths
-  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
-  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
-  const localAppData = process.env.LOCALAPPDATA || '';
-  const userProfile = process.env.USERPROFILE || '';
+    // 3. Common Git for Windows installation paths
+    const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    const localAppData = process.env.LOCALAPPDATA || '';
+    const userProfile = process.env.USERPROFILE || '';
 
-  const installCandidates = [
-    join(programFiles, 'Git', 'bin', 'bash.exe'),
-    join(programFiles, 'Git', 'usr', 'bin', 'bash.exe'),
-    join(programFilesX86, 'Git', 'bin', 'bash.exe'),
-    join(programFilesX86, 'Git', 'usr', 'bin', 'bash.exe'),
-    join(localAppData, 'Programs', 'Git', 'bin', 'bash.exe'),
-    join(localAppData, 'Programs', 'Git', 'usr', 'bin', 'bash.exe'),
-    join(userProfile, 'scoop', 'apps', 'git', 'current', 'bin', 'bash.exe'),
-    join(userProfile, 'scoop', 'apps', 'git', 'current', 'usr', 'bin', 'bash.exe'),
-    'C:\\Git\\bin\\bash.exe',
-    'C:\\Git\\usr\\bin\\bash.exe',
-  ];
-
-  for (const installCandidate of installCandidates) {
-    pushCandidate(installCandidate, 'installed:common-paths');
-  }
-
-  // 4. Query Git for Windows install root from registry
-  const registryInstallRoots = listGitInstallPathsFromRegistry();
-  for (const installRoot of registryInstallRoots) {
-    const registryCandidates = [
-      join(installRoot, 'bin', 'bash.exe'),
-      join(installRoot, 'usr', 'bin', 'bash.exe'),
+    const installCandidates = [
+      join(programFiles, 'Git', 'bin', 'bash.exe'),
+      join(programFiles, 'Git', 'usr', 'bin', 'bash.exe'),
+      join(programFilesX86, 'Git', 'bin', 'bash.exe'),
+      join(programFilesX86, 'Git', 'usr', 'bin', 'bash.exe'),
+      join(localAppData, 'Programs', 'Git', 'bin', 'bash.exe'),
+      join(localAppData, 'Programs', 'Git', 'usr', 'bin', 'bash.exe'),
+      join(userProfile, 'scoop', 'apps', 'git', 'current', 'bin', 'bash.exe'),
+      join(userProfile, 'scoop', 'apps', 'git', 'current', 'usr', 'bin', 'bash.exe'),
+      'C:\\Git\\bin\\bash.exe',
+      'C:\\Git\\usr\\bin\\bash.exe',
     ];
-    for (const registryCandidate of registryCandidates) {
-      pushCandidate(registryCandidate, `registry:${installRoot}`);
-    }
-  }
 
-  // 5. Try `where bash`
-  const bashPaths = listWindowsCommandPaths('where bash');
-  for (const bashPath of bashPaths) {
-    if (bashPath.toLowerCase().endsWith('\\bash.exe')) {
-      pushCandidate(bashPath, 'path:where bash');
-    }
-  }
-
-  // 6. Try `where git` and derive bash from git location
-  const gitPaths = listWindowsCommandPaths('where git');
-  for (const gitPath of gitPaths) {
-    const gitRoot = dirname(dirname(gitPath));
-    const bashCandidates = [
-      join(gitRoot, 'bin', 'bash.exe'),
-      join(gitRoot, 'usr', 'bin', 'bash.exe'),
-    ];
-    for (const bashCandidate of bashCandidates) {
-      pushCandidate(bashCandidate, `path:where git (${gitPath})`);
-    }
-  }
-
-  for (const candidate of candidates) {
-    if (!existsSync(candidate.path)) {
-      continue;
+    for (const installCandidate of installCandidates) {
+      pushCandidate(installCandidate, 'installed:common-paths');
     }
 
-    const health = checkWindowsGitBashHealth(candidate.path);
-    if (health.ok) {
-      coworkLog(
-        'INFO',
-        'resolveGitBash',
-        `Selected git-bash (${candidate.source}): ${candidate.path}`,
-      );
-      cachedGitBashPath = candidate.path;
-      cachedGitBashResolutionError = null;
-      return candidate.path;
+    // 4. Query Git for Windows install root from registry
+    const registryInstallRoots = await listGitInstallPathsFromRegistry();
+    for (const installRoot of registryInstallRoots) {
+      const registryCandidates = [
+        join(installRoot, 'bin', 'bash.exe'),
+        join(installRoot, 'usr', 'bin', 'bash.exe'),
+      ];
+      for (const registryCandidate of registryCandidates) {
+        pushCandidate(registryCandidate, `registry:${installRoot}`);
+      }
     }
 
-    const failure = `${candidate.path} [${candidate.source}] failed health check (${health.reason || 'unknown reason'})`;
-    failedCandidates.push(failure);
-    coworkLog('WARN', 'resolveGitBash', failure);
-  }
+    // 5. Try `where bash`
+    const bashPaths = await listWindowsCommandPaths('bash');
+    for (const bashPath of bashPaths) {
+      if (bashPath.toLowerCase().endsWith('\\bash.exe')) {
+        pushCandidate(bashPath, 'path:where bash');
+      }
+    }
 
-  const diagnostic =
-    failedCandidates.length > 0
-      ? `No healthy git-bash found. Failures: ${failedCandidates.join('; ')}`
-      : 'No git-bash candidates found on this system';
-  coworkLog('WARN', 'resolveGitBash', diagnostic);
-  cachedGitBashPath = null;
-  cachedGitBashResolutionError = truncateDiagnostic(diagnostic);
-  return null;
+    // 6. Try `where git` and derive bash from git location
+    const gitPaths = await listWindowsCommandPaths('git');
+    for (const gitPath of gitPaths) {
+      const gitRoot = dirname(dirname(gitPath));
+      const bashCandidates = [
+        join(gitRoot, 'bin', 'bash.exe'),
+        join(gitRoot, 'usr', 'bin', 'bash.exe'),
+      ];
+      for (const bashCandidate of bashCandidates) {
+        pushCandidate(bashCandidate, `path:where git (${gitPath})`);
+      }
+    }
+
+    for (const candidate of candidates) {
+      if (!existsSync(candidate.path)) {
+        continue;
+      }
+
+      const health = await checkWindowsGitBashHealth(candidate.path);
+      if (health.ok) {
+        coworkLog(
+          'INFO',
+          'resolveGitBash',
+          `Selected git-bash (${candidate.source}): ${candidate.path}`,
+        );
+        return { path: candidate.path, error: null };
+      }
+
+      const failure = `${candidate.path} [${candidate.source}] failed health check (${health.reason || 'unknown reason'})`;
+      failedCandidates.push(failure);
+      coworkLog('WARN', 'resolveGitBash', failure);
+    }
+
+    const diagnostic =
+      failedCandidates.length > 0
+        ? `No healthy git-bash found. Failures: ${failedCandidates.join('; ')}`
+        : 'No git-bash candidates found on this system';
+    coworkLog('WARN', 'resolveGitBash', diagnostic);
+    return { path: null, error: truncateDiagnostic(diagnostic) };
+  })();
+  return cachedGitBashResolution;
 }

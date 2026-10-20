@@ -182,17 +182,18 @@ export function resolveSkillScriptPath(
   return { scriptPath, skillDir };
 }
 
-function resolveRuntime(
+async function resolveRuntime(
   scriptPath: string,
   skillDir: string,
-):
+): Promise<
   | {
       runtime: SkillScriptRuntime;
       command: string;
       prefixArgs: string[];
       env: Record<string, string>;
     }
-  | { errorCode: SkillScriptErrorCode; error: string } {
+  | { errorCode: SkillScriptErrorCode; error: string }
+> {
   const extension = path.extname(scriptPath).toLowerCase();
 
   if (extension === '.py') {
@@ -260,16 +261,17 @@ function resolveRuntime(
   if (extension === '.sh') {
     const command =
       process.platform === 'win32'
-        ? resolveGitBashPathForPi()
+        ? await resolveGitBashPathForPi()
         : fs.existsSync('/bin/bash')
           ? '/bin/bash'
           : process.env.SHELL || 'bash';
     if (!command) {
+      const resolutionError = await getGitBashResolutionErrorForPi().catch((): null => null);
       return {
         errorCode: 'SKILL_RUNTIME_UNAVAILABLE',
         error:
           'No healthy Git Bash runtime is available for this Skill script.' +
-          (getGitBashResolutionErrorForPi() ? ` ${getGitBashResolutionErrorForPi()}` : ''),
+          (resolutionError ? ` ${resolutionError}` : ''),
       };
     }
     const requirementsPath = path.join(skillDir, 'requirements.txt');
@@ -352,7 +354,7 @@ async function prepareSkillScript(
     };
   }
 
-  const runtime = resolveRuntime(resolved.scriptPath, resolved.skillDir);
+  const runtime = await resolveRuntime(resolved.scriptPath, resolved.skillDir);
   if ('errorCode' in runtime) {
     return { result: invalidInputResult(resolved.scriptPath, runtime.errorCode, runtime.error) };
   }

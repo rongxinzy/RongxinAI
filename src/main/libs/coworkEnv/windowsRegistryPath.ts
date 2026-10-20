@@ -1,22 +1,19 @@
-import { execSync } from 'child_process';
 import { delimiter } from 'path';
 
+import { runCommandCapture } from '../../skills/processRunner';
 import { coworkLog } from '../coworkLogger';
 
 /**
- * Cached Windows registry PATH. Resolved once and reused.
+ * Cached Windows registry PATH promise. Resolved once and reused.
  */
-let cachedWindowsRegistryPath: string | null | undefined;
+let cachedWindowsRegistryPathPromise: Promise<string | null> | undefined;
 
-function readWindowsRegistryPathValue(registryKey: string): string {
+async function readWindowsRegistryPathValue(registryKey: string): Promise<string> {
   try {
-    const output = execSync(`reg query "${registryKey}" /v Path`, {
-      encoding: 'utf-8',
-      timeout: 8000,
-      windowsHide: true,
+    const { stdout } = await runCommandCapture('reg', ['query', registryKey, '/v', 'Path'], {
+      timeoutMs: 8000,
     });
-
-    for (const line of output.split(/\r?\n/)) {
+    for (const line of stdout.split(/\r?\n/)) {
       const match = line.match(/^\s*Path\s+REG_\w+\s+(.+)$/i);
       if (match?.[1]) {
         return match[1].trim();
@@ -44,46 +41,43 @@ function readWindowsRegistryPathValue(registryKey: string): string {
  * to get the most up-to-date values, similar to how `resolveUserShellPath()` works
  * for macOS/Linux.
  */
-function resolveWindowsRegistryPath(): string | null {
-  if (cachedWindowsRegistryPath !== undefined) return cachedWindowsRegistryPath;
-
-  if (process.platform !== 'win32') {
-    cachedWindowsRegistryPath = null;
-    return null;
-  }
-
-  try {
-    const machinePath = readWindowsRegistryPathValue(
-      'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment',
-    );
-    const userPath = readWindowsRegistryPathValue('HKCU\\Environment');
-    const registryPath = [machinePath, userPath].filter(Boolean).join(';');
-    if (registryPath.trim()) {
-      // Deduplicate and remove empty entries
-      const entries = registryPath
-        .split(';')
-        .map(entry => entry.trim())
-        .filter(Boolean);
-      const unique = Array.from(new Set(entries));
-      cachedWindowsRegistryPath = unique.join(';');
-      coworkLog(
-        'INFO',
-        'resolveWindowsRegistryPath',
-        `Resolved ${unique.length} PATH entries from Windows registry`,
-      );
-    } else {
-      cachedWindowsRegistryPath = null;
+function resolveWindowsRegistryPath(): Promise<string | null> {
+  cachedWindowsRegistryPathPromise ??= (async (): Promise<string | null> => {
+    if (process.platform !== 'win32') {
+      return null;
     }
-  } catch (error) {
-    coworkLog(
-      'WARN',
-      'resolveWindowsRegistryPath',
-      `Failed to read PATH from Windows registry: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    cachedWindowsRegistryPath = null;
-  }
 
-  return cachedWindowsRegistryPath;
+    try {
+      const machinePath = await readWindowsRegistryPathValue(
+        'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment',
+      );
+      const userPath = await readWindowsRegistryPathValue('HKCU\\Environment');
+      const registryPath = [machinePath, userPath].filter(Boolean).join(';');
+      if (registryPath.trim()) {
+        // Deduplicate and remove empty entries
+        const entries = registryPath
+          .split(';')
+          .map(entry => entry.trim())
+          .filter(Boolean);
+        const unique = Array.from(new Set(entries));
+        coworkLog(
+          'INFO',
+          'resolveWindowsRegistryPath',
+          `Resolved ${unique.length} PATH entries from Windows registry`,
+        );
+        return unique.join(';');
+      }
+      return null;
+    } catch (error) {
+      coworkLog(
+        'WARN',
+        'resolveWindowsRegistryPath',
+        `Failed to read PATH from Windows registry: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
+  })();
+  return cachedWindowsRegistryPathPromise;
 }
 
 /**
@@ -94,8 +88,10 @@ function resolveWindowsRegistryPath(): string | null {
  * Explorer. The registry PATH entries are appended after the current entries
  * so that any overrides already in the env (like Git toolchain, shims) take priority.
  */
-export function ensureWindowsRegistryPathEntries(env: Record<string, string | undefined>): void {
-  const registryPath = resolveWindowsRegistryPath();
+export async function ensureWindowsRegistryPathEntries(
+  env: Record<string, string | undefined>,
+): Promise<void> {
+  const registryPath = await resolveWindowsRegistryPath();
   if (!registryPath) return;
 
   const currentPath = env.PATH || '';

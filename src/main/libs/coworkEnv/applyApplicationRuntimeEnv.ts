@@ -1,4 +1,4 @@
-import { spawnSync } from 'child_process';
+import { runCommandCapture } from '../../skills/processRunner';
 import { app } from 'electron';
 import { existsSync } from 'fs';
 import { delimiter, join } from 'path';
@@ -58,10 +58,10 @@ function applyDomesticPackageMirrorDefaults(env: Record<string, string | undefin
  * app's Node/npm shim, managed Python, uv, and Windows Git Bash PATH handling
  * can use it without exposing a session's API configuration globally.
  */
-export function applyApplicationRuntimeEnv(
+export async function applyApplicationRuntimeEnv(
   env: Record<string, string | undefined>,
   options: EnhancedEnvOptions = {},
-): void {
+): Promise<void> {
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
   const includePackageMirrors = options.includePackageMirrors === true;
 
@@ -146,18 +146,18 @@ export function applyApplicationRuntimeEnv(
     // may be stale and missing tools installed after Explorer started (e.g. Python,
     // Node.js, npm). Reading from the registry ensures we get the latest values,
     // similar to how a freshly opened terminal would.
-    ensureWindowsRegistryPathEntries(env);
+    await ensureWindowsRegistryPathEntries(env);
 
     const configuredBashPath = normalizeWindowsPath(env.CLAUDE_CODE_GIT_BASH_PATH);
     let bashPath =
       configuredBashPath && existsSync(configuredBashPath)
         ? configuredBashPath
-        : resolveWindowsGitBashPath();
+        : await resolveWindowsGitBashPath();
 
     if (configuredBashPath && bashPath === configuredBashPath) {
-      const configuredHealth = checkWindowsGitBashHealth(configuredBashPath);
+      const configuredHealth = await checkWindowsGitBashHealth(configuredBashPath);
       if (!configuredHealth.ok) {
-        const fallbackPath = resolveWindowsGitBashPath();
+        const fallbackPath = await resolveWindowsGitBashPath();
         if (fallbackPath && fallbackPath !== configuredBashPath) {
           coworkLog(
             'WARN',
@@ -190,7 +190,7 @@ export function applyApplicationRuntimeEnv(
       ensureWindowsBashBootstrapPath(env);
     } else {
       const diagnostic =
-        getGitBashResolutionErrorForPi() || 'git-bash not found or failed health checks';
+        (await getGitBashResolutionErrorForPi()) || 'git-bash not found or failed health checks';
       env.ZHIYUAN_GIT_BASH_RESOLUTION_ERROR = truncateDiagnostic(diagnostic);
     }
 
@@ -254,7 +254,7 @@ export function applyApplicationRuntimeEnv(
   }
 
   // Resolve user's shell PATH so that node, npm, and other tools are findable
-  const userPath = resolveUserShellPath();
+  const userPath = await resolveUserShellPath();
   if (userPath) {
     env.PATH = userPath;
     coworkLog(
@@ -305,9 +305,11 @@ export function applyApplicationRuntimeEnv(
   // non-ASCII characters (which break on Windows when cmd.exe uses GBK code page).
   env.ZHIYUAN_NPM_BIN_DIR = npmBinDir;
 
-  const hasSystemNode = hasCommandInEnv('node', env);
-  const hasSystemNpx = hasCommandInEnv('npx', env);
-  const hasSystemNpm = hasCommandInEnv('npm', env);
+  const [hasSystemNode, hasSystemNpx, hasSystemNpm] = await Promise.all([
+    hasCommandInEnv('node', env),
+    hasCommandInEnv('npx', env),
+    hasCommandInEnv('npm', env),
+  ]);
   const shouldForcePackagedDarwinShim = app.isPackaged && process.platform === 'darwin';
   const shouldInjectShim =
     shouldForcePackagedDarwinShim ||
@@ -373,14 +375,14 @@ export function applyApplicationRuntimeEnv(
   }
 
   // Verify node/npx/npm resolution in the constructed environment
-  verifyNodeEnvironment(env);
+  await verifyNodeEnvironment(env);
 }
 
 /**
  * Verify that node/npx/npm can be resolved from the constructed environment PATH.
  * Logs diagnostic info for debugging MCP server startup issues on macOS.
  */
-function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
+async function verifyNodeEnvironment(env: Record<string, string | undefined>): Promise<void> {
   const tag = 'verifyNodeEnv';
   const pathValue = env.PATH || '';
 
@@ -397,14 +399,12 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
   const whichCmd = process.platform === 'win32' ? 'where' : 'which';
   for (const tool of ['node', 'npx', 'npm']) {
     try {
-      const result = spawnSync(whichCmd, [tool], {
+      const { stdout } = await runCommandCapture(whichCmd, [tool], {
         env: { ...env } as NodeJS.ProcessEnv,
-        encoding: 'utf-8',
-        timeout: 5000,
-        windowsHide: process.platform === 'win32',
+        timeoutMs: 5000,
       });
-      if (result.status === 0 && result.stdout) {
-        const resolved = result.stdout.trim();
+      {
+        const resolved = stdout.trim();
         coworkLog('INFO', tag, `${whichCmd} ${tool} => ${resolved}`);
         const resolvedCandidates = resolved
           .split(/\r?\n/)
@@ -423,22 +423,17 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
             if (process.platform === 'win32' && /\.cmd$/i.test(resolvedForExec)) {
               execTarget = env.ZHIYUAN_ELECTRON_PATH || process.execPath;
             }
-            const versionResult = spawnSync(execTarget, ['--version'], {
-              env: { ...env, ELECTRON_RUN_AS_NODE: '1' } as NodeJS.ProcessEnv,
-              encoding: 'utf-8',
-              timeout: 5000,
-              windowsHide: process.platform === 'win32',
-            });
-            coworkLog(
-              'INFO',
-              tag,
-              `node --version (${execTarget}) => ${(versionResult.stdout || '').trim()} (exit: ${versionResult.status})`,
+            const { stdout: versionStdout, stderr: versionStderr } = await runCommandCapture(
+              execTarget,
+              ['--version'],
+              {
+                env: { ...env, ELECTRON_RUN_AS_NODE: '1' } as NodeJS.ProcessEnv,
+                timeoutMs: 5000,
+              },
             );
-            if (versionResult.error) {
-              coworkLog('WARN', tag, `node --version spawn error: ${versionResult.error.message}`);
-            }
-            if (versionResult.stderr) {
-              coworkLog('WARN', tag, `node --version stderr: ${versionResult.stderr.trim()}`);
+            coworkLog('INFO', tag, `node --version (${execTarget}) => ${versionStdout.trim()}`);
+            if (versionStderr) {
+              coworkLog('WARN', tag, `node --version stderr: ${versionStderr.trim()}`);
             }
           } catch (e) {
             coworkLog(
@@ -448,12 +443,6 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
             );
           }
         }
-      } else {
-        coworkLog(
-          'WARN',
-          tag,
-          `${whichCmd} ${tool} => NOT FOUND (exit: ${result.status}, stderr: ${(result.stderr || '').trim()})`,
-        );
       }
     } catch (e) {
       coworkLog(
