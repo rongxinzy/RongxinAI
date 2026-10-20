@@ -15,13 +15,13 @@ import {
   registerCommunityAuthBootstrap,
   registerCommunityAuthIpc,
 } from './appBootstrap/communityAuth';
-import { registerCoreIpc } from './appBootstrap/coreIpc';
-import { registerManagedProvidersIpc } from './appBootstrap/managedProvidersIpc';
 import { registerAppIpc } from './appBootstrap/appIpc';
 import { registerSkillsIpc } from './skills/ipc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
 import { registerCoworkQueueIpc } from './coworkIpc/queue';
+import { registerCoreIpc } from './appSystemIpc/core';
+import { registerManagedProvidersIpc } from './appSystemIpc/managedProviders';
 import { registerAppUpdateIpc } from './appUpdateIpc';
 import { registerShellIpc } from './shellIpc';
 import { registerIntegrationsIpc } from './integrationsIpc';
@@ -58,7 +58,11 @@ import {
   resolveTaskWorkingDirectory,
 } from './appBootstrap/workspacePaths';
 import { getDefaultConversationWorkspacePath } from './defaultConversationWorkspace';
-import { getMagpieModelService } from './appBootstrap/magpieRuntime';
+import {
+  getMagpieModelService,
+  isMagpieGatewayRunning,
+  synchronizeManagedMagpieCatalog,
+} from './appBootstrap/magpieRuntime';
 import { getAppUpdateCoordinator } from './appBootstrap/runtimeServices';
 import {
   getCanonicalScheduledTaskService,
@@ -88,8 +92,11 @@ if (!gotTheLock) {
   handleSecondInstanceExit();
 } else {
   registerCommunityAuthBootstrap();
-  registerCoreIpc();
-  registerManagedProvidersIpc();
+  registerCoreIpc({ getStore });
+  registerManagedProvidersIpc({
+    isMagpieRunning: isMagpieGatewayRunning,
+    synchronizeManagedCatalog: synchronizeManagedMagpieCatalog,
+  });
   registerAppIpc();
   registerCommunityAuthIpc();
   registerSkillsIpc({ getSkillManager, getStore });
