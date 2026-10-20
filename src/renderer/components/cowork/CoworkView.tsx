@@ -749,7 +749,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               against, so it holds all the way to the last case. */}
           <div className="theme-home-sticky sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
             <div className="flex flex-col items-center justify-center gap-2 text-center">
-              <h1 className="theme-home-greeting max-w-2xl px-2">
+              <h1 className="theme-home-greeting max-w-3xl px-2 text-balance">
                 {i18nService.t(homeGreetingKey)}
               </h1>
               <p

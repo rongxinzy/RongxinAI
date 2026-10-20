@@ -1,6 +1,8 @@
 import { test, expect, expectTypeOf } from 'vitest';
 
-import { browserMockElectron } from '../browserMock';
+import { createBrowserMockElectron } from '../browserMock';
+
+const browserMockElectron = createBrowserMockElectron();
 import type { IElectronAPI } from './electron';
 
 /**

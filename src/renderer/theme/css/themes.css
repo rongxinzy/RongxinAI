@@ -5266,9 +5266,6 @@
   color: var(--muted-foreground);
   text-align: center;
 }
-:where(:root, [data-theme]) :where(.theme-home-sticky) {
-  background-color: var(--background);
-}
 :where(:root, [data-theme]) :where(.theme-home-prompt-editor) {
   font-size: var(--zy-component-text-base);
   line-height: var(--zy-component-text-base--line-height);

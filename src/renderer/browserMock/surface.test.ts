@@ -1,6 +1,8 @@
 import { test, expect } from 'vitest';
 
-import { browserMockElectron } from './index';
+import { createBrowserMockElectron } from './index';
+
+const browserMockElectron = createBrowserMockElectron();
 import { createGeneratedSurface } from './generated/surface';
 import { createBrowserMockRuntime } from './runtime';
 import { PiUiEventType } from '../../shared/cowork/piUiEvent';

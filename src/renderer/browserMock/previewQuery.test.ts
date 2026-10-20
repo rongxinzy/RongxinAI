@@ -5,7 +5,9 @@ import {
   PreviewQuery,
   PreviewScenario,
   buildPreviewSearch,
+  PreviewLocale,
   readPreviewEdition,
+  readPreviewLocale,
   readPreviewScenario,
   shouldSkipPreviewBoot,
 } from './previewQuery';
@@ -18,6 +20,16 @@ describe('previewQuery', () => {
     expect(readPreviewScenario(params)).toBe(PreviewScenario.Empty);
     expect(readPreviewEdition(params)).toBe(PreviewEdition.Xiaoruan);
     expect(shouldSkipPreviewBoot(params)).toBe(true);
+  });
+
+  test('parses preview locale', () => {
+    expect(readPreviewLocale(new URLSearchParams(`${PreviewQuery.Locale}=zh`))).toBe(
+      PreviewLocale.Chinese,
+    );
+    expect(readPreviewLocale(new URLSearchParams(`${PreviewQuery.Locale}=en`))).toBe(
+      PreviewLocale.English,
+    );
+    expect(readPreviewLocale(new URLSearchParams())).toBeNull();
   });
 
   test('buildPreviewSearch omits default values', () => {

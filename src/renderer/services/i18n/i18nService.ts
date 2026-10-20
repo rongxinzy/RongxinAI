@@ -1,3 +1,4 @@
+import { PreviewLocale, readPreviewLocale } from '../../browserMock/previewQuery';
 import { configService } from '../config';
 
 import { translations } from './translations';
@@ -15,6 +16,18 @@ class I18nService {
   // 初始化语言设置
   async initialize(): Promise<void> {
     try {
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
+        const previewLocale = readPreviewLocale();
+        if (previewLocale === PreviewLocale.Chinese || previewLocale === PreviewLocale.English) {
+          this.currentLanguage = previewLocale;
+          await configService.updateConfig({
+            language: previewLocale,
+            language_initialized: true,
+          });
+          return;
+        }
+      }
+
       const config = configService.getConfig();
 
       // 检查是否已经初始化过语言设置

@@ -3,8 +3,15 @@ export const PreviewQuery = {
   Scenario: 'previewScenario',
   Edition: 'previewEdition',
   SkipBoot: 'previewSkipBoot',
+  Locale: 'previewLocale',
   MagpieUsage: 'previewMagpieUsage',
 } as const;
+
+export const PreviewLocale = {
+  Chinese: 'zh',
+  English: 'en',
+} as const;
+export type PreviewLocale = (typeof PreviewLocale)[keyof typeof PreviewLocale];
 
 export const PreviewMagpieUsage = {
   Populated: 'populated',
@@ -56,6 +63,13 @@ export function readPreviewMagpieUsage(
   if (raw === PreviewMagpieUsage.Empty) return PreviewMagpieUsage.Empty;
   if (raw === PreviewMagpieUsage.Error) return PreviewMagpieUsage.Error;
   return PreviewMagpieUsage.Populated;
+}
+
+export function readPreviewLocale(searchParams = readPreviewSearchParams()): PreviewLocale | null {
+  const raw = searchParams.get(PreviewQuery.Locale)?.trim().toLowerCase();
+  if (raw === PreviewLocale.Chinese || raw === 'zh-cn') return PreviewLocale.Chinese;
+  if (raw === PreviewLocale.English || raw === 'en-us') return PreviewLocale.English;
+  return null;
 }
 
 export function shouldSkipPreviewBoot(searchParams = readPreviewSearchParams()): boolean {

@@ -34,7 +34,7 @@ async function renderRoot(): Promise<void> {
   // Gated on DEV so the mock is tree-shaken out of production bundles.
   if (import.meta.env.DEV && typeof window.electron?.platform !== 'string') {
     const { installBrowserMock } = await import('./browserMock/installMock');
-    installBrowserMock();
+    await installBrowserMock();
   }
 
   if (isModelLaunchLogWindow) {

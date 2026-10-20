@@ -43,7 +43,12 @@ import {
   mockMagpieUsageSummary,
 } from './fixtures/magpieRoutingUsage';
 import { mockMagpieProviders } from './fixtures/magpieProviders';
-import { readPreviewMagpieUsage, PreviewMagpieUsage } from './previewQuery';
+import {
+  PreviewLocale,
+  readPreviewLocale,
+  readPreviewMagpieUsage,
+  PreviewMagpieUsage,
+} from './previewQuery';
 import type { BrowserMockRuntime } from './runtime';
 import { createDesktopPetPreview } from './desktopPet';
 import type { DeepPartial } from './scenarioTypes';
@@ -312,7 +317,12 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       getVersion: () => Promise.resolve('0.0.0-preview'),
       isDev: () => Promise.resolve(true),
       isEnterprise: () => Promise.resolve(false),
-      getSystemLocale: () => Promise.resolve('en-US'),
+      getSystemLocale: () => {
+        const locale = readPreviewLocale();
+        if (locale === PreviewLocale.Chinese) return Promise.resolve('zh-CN');
+        if (locale === PreviewLocale.English) return Promise.resolve('en-US');
+        return Promise.resolve('en-US');
+      },
     },
     checkApiConfig: () => Promise.resolve({ hasConfig: true, config: null }),
     getRecentCwds: () => Promise.resolve(mockWorkspaces.map(workspace => workspace.path)),

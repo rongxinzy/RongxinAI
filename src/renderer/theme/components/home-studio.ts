@@ -28,7 +28,7 @@ export function homeStudioAppearances() {
         'text-align': 'center',
       },
     }),
-    'home-sticky': recipe({ base: { 'background-color': 'var(--background)' } }),
+    'home-sticky': recipe({ base: {} }),
     'home-prompt-editor': recipe({
       base: {
         'font-size': 'var(--zy-component-text-base)',

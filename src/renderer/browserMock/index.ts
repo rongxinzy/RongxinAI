@@ -23,4 +23,7 @@ function buildBrowserMockElectron(): Window['electron'] {
   return electron;
 }
 
-export const browserMockElectron: Window['electron'] = buildBrowserMockElectron();
+/** Built lazily so preview query params (e.g. locale) are read after the page URL is known. */
+export function createBrowserMockElectron(): Window['electron'] {
+  return buildBrowserMockElectron();
+}

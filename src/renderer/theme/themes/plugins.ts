@@ -4,6 +4,7 @@ import {
   quietStudioV4DarkOverrides,
   quietStudioV4LightOverrides,
 } from './quiet-studio-v4-overrides';
+import { BackgroundKind, DEFAULT_BACKGROUND } from '../background/background';
 import { validateComponentAppearances } from '../components/contract';
 import type { ThemeDefinition } from './types';
 import { TOKEN_NAMES } from '../tokens/contract';
@@ -19,11 +20,21 @@ export interface ThemePlugin {
   appearances: { light: ThemeDefinition; dark: ThemeDefinition };
 }
 
+const quietStudioV4Background = {
+  ...DEFAULT_BACKGROUND,
+  kind: BackgroundKind.None,
+  opacity: 0,
+};
+
 function withQuietStudioV4Tokens(
   theme: ThemeDefinition,
   overrides: Record<string, string>,
 ): ThemeDefinition {
-  return { ...theme, tokens: { ...theme.tokens, ...overrides } };
+  return {
+    ...theme,
+    background: quietStudioV4Background,
+    tokens: { ...theme.tokens, ...overrides },
+  };
 }
 
 export function validateTheme(theme: ThemeDefinition): void {
