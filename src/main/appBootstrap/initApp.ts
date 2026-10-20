@@ -12,6 +12,7 @@ import { app, BrowserWindow, dialog, net, powerMonitor, protocol } from 'electro
 
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
 import { rt } from './runtimeState';
+import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
 import {
@@ -191,7 +192,7 @@ export const initApp = async (): Promise<void> => {
     profiler.mark('initStore');
     console.log('[Main] initApp: starting initStore()');
     try {
-      rt.store = await initStore();
+      storageRuntime.store = await initStore();
     } catch (error) {
       // Schema migrations are transactional and rethrow instead of silently
       // skipping; without a store the app cannot run, so say so and exit
@@ -206,13 +207,13 @@ export const initApp = async (): Promise<void> => {
       return;
     }
     startSqliteDiagnostics({
-      db: rt.store.getDatabase(),
+      db: storageRuntime.store.getDatabase(),
       dbPath: path.join(app.getPath('userData'), DB_FILENAME),
     });
     if (getBranding().features.enableAISphere) {
       try {
         const aisphereGateway = await startAISphereGateway();
-        await aisphereService.initialize(rt.store, aisphereGateway.baseUrl);
+        await aisphereService.initialize(storageRuntime.store, aisphereGateway.baseUrl);
         aisphereService.busy = () => Boolean(rt.piRuntimeAdapter?.hasRunningSessions());
         app.once('before-quit', () => {
           void aisphereGateway.close();
@@ -231,8 +232,8 @@ export const initApp = async (): Promise<void> => {
         return getProjectMemoryService().drainOutbox();
       })
       .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
-    refreshEndpointsTestMode(rt.store);
-    rt.sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
+    refreshEndpointsTestMode(storageRuntime.store);
+    storageRuntime.sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
     await startCcConnectBridge().catch(error =>
       console.error('[cc-connect] Failed to start local bridge:', error),
     );
@@ -240,12 +241,14 @@ export const initApp = async (): Promise<void> => {
       console.error('[ChannelRuntime] Failed to start unified runtime:', error);
     });
     const startSqliteBackupLoop = async (): Promise<void> => {
-      if (!rt.sqliteBackupManager) return;
-      await rt.sqliteBackupManager.startPeriodicBackupLoop(() => getStore().getDatabase());
+      if (!storageRuntime.sqliteBackupManager) return;
+      await storageRuntime.sqliteBackupManager.startPeriodicBackupLoop(() =>
+        getStore().getDatabase(),
+      );
     };
 
     const stopSqliteBackupLoop = (): void => {
-      rt.sqliteBackupManager?.stopPeriodicBackupLoop();
+      storageRuntime.sqliteBackupManager?.stopPeriodicBackupLoop();
     };
 
     if (getSqliteAutoBackupEnabledFromConfig(getStore().get<AppConfigSettings>('app_config'))) {
@@ -416,7 +419,7 @@ export const initApp = async (): Promise<void> => {
         const mcpStoreInstance = getMcpStore();
         syncEnterpriseConfig(
           enterpriseConfigPath,
-          rt.store,
+          storageRuntime.store,
           server => {
             const existing = mcpStoreInstance.listServers().find(s => s.name === server.name);
             if (existing) {
@@ -456,9 +459,9 @@ export const initApp = async (): Promise<void> => {
     } else {
       // No enterprise config package found — clear any previously stored config
       // so the app exits enterprise mode after the package is removed.
-      const hadEnterprise = rt.store.get('enterprise_config');
+      const hadEnterprise = storageRuntime.store.get('enterprise_config');
       if (hadEnterprise) {
-        rt.store.delete('enterprise_config');
+        storageRuntime.store.delete('enterprise_config');
         // Restore the default execution mode after removing enterprise configuration.
         const cs = getCoworkStore();
         cs.setConfig({ executionMode: CoworkExecutionMode.Local });

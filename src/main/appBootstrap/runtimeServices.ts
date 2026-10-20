@@ -2,6 +2,7 @@ import { app, powerSaveBlocker } from 'electron';
 
 import { isEnterprise } from './appEnv';
 import { rt } from './runtimeState';
+import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
 import {
@@ -46,28 +47,28 @@ export function setPreventSleepBlockerEnabled(enabled: boolean): void {
 }
 
 export const initStore = async (): Promise<SqliteStore> => {
-  if (!rt.storeInitPromise) {
+  if (!storageRuntime.storeInitPromise) {
     if (!app.isReady()) {
       throw new Error('Store accessed before app is ready.');
     }
     // better-sqlite3 opens the database synchronously, so Promise.resolve() resolves
     // immediately. The timeout acts as a safety net for unexpected OS-level
     // blocking during store initialization and recovery.
-    rt.storeInitPromise = Promise.race([
+    storageRuntime.storeInitPromise = Promise.race([
       SqliteStore.create(app.getPath('userData')),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Store initialization timed out after 15s')), 15_000),
       ),
     ]);
   }
-  return rt.storeInitPromise;
+  return storageRuntime.storeInitPromise;
 };
 
 export const getStore = (): SqliteStore => {
-  if (!rt.store) {
+  if (!storageRuntime.store) {
     throw new Error('Store not initialized. Call initStore() first.');
   }
-  return rt.store;
+  return storageRuntime.store;
 };
 
 export const getLlamaCppManager = (): LlamaCppManager => {
@@ -115,19 +116,19 @@ export const startAppUpdatePolling = (): void => {
 };
 
 export const getCoworkStore = () => {
-  if (!rt.coworkStore) {
+  if (!storageRuntime.coworkStore) {
     const sqliteStore = getStore();
-    rt.coworkStore = new CoworkStore(sqliteStore.getDatabase(), getArtifactLedger());
+    storageRuntime.coworkStore = new CoworkStore(sqliteStore.getDatabase(), getArtifactLedger());
   }
-  return rt.coworkStore;
+  return storageRuntime.coworkStore;
 };
 
 /** Shared artifact ledger over the main SQLite database (event-time source of truth). */
 export const getArtifactLedger = (): ArtifactLedger => {
-  if (!rt.artifactLedger) {
-    rt.artifactLedger = new ArtifactLedger(getStore().getDatabase());
+  if (!storageRuntime.artifactLedger) {
+    storageRuntime.artifactLedger = new ArtifactLedger(getStore().getDatabase());
   }
-  return rt.artifactLedger;
+  return storageRuntime.artifactLedger;
 };
 
 export const getAgentManager = () => {

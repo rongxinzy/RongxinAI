@@ -3,12 +3,8 @@ import type { BrowserWindow } from 'electron';
 import type { AgentManager } from '../agentManager';
 import type { CodingRoomService } from '../codingAgent/codingRoomService';
 import type { AppUpdateCoordinator } from '../libs/appUpdateCoordinator';
-import type { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
-import type { CoworkStore } from '../coworkStore';
-import type { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import type { SkillManager } from '../skillManager';
-import type { SqliteStore } from '../sqliteStore';
 import type { WorkbenchTaskService } from '../workbenchTask/taskService';
 
 /**
@@ -18,17 +14,11 @@ import type { WorkbenchTaskService } from '../workbenchTask/taskService';
  * behavior in main.ts.
  */
 export const rt = {
-  store: null as SqliteStore | null,
-  coworkStore: null as CoworkStore | null,
-  artifactLedger: null as ArtifactLedger | null,
   piRuntimeAdapter: null as PiRuntimeAdapter | null,
   workbenchTaskService: null as WorkbenchTaskService | null,
   codingRoomService: null as CodingRoomService | null,
 
   skillManager: null as SkillManager | null,
-
-  storeInitPromise: null as Promise<SqliteStore> | null,
-  sqliteBackupManager: null as SqliteBackupManager | null,
 
   piWorkbenchRuntimeForwarderBound: false,
   preventSleepBlockerId: null as number | null,
