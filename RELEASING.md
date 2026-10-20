@@ -4,6 +4,8 @@ Two workflows, one build, two channels: a `v*` tag runs `release.yml`, which pub
 
 Daily PR/push CI runs lint and unit tests only (`bun run test`, alias `test:unit`), without application builds or Electron downloads. Real runtime integration tests and Electron ABI fixtures remain in `test:full` and release preflight.
 
+Local unit runs preserve the existing native addons, reuse separately cached Node ABI output, and restore the original files on completion. Switching back to Electron does not force another rebuild just because tests ran.
+
 Before tagging, run **Release preflight** (`release-preflight.yml`) against the intended source commit. Its default `include-packaging=true` also builds and installs unsigned Windows/Linux packages. All checks use one resolved commit and must pass. Tag releases run the same preflight with `include-packaging=false`: their own signed packages already undergo installation acceptance, so an extra unsigned build would duplicate that work. Quality, runtime, browser, enterprise and memory checks remain mandatory.
 
 ## 1. Tag → beta (`release.yml`)
