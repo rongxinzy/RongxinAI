@@ -157,7 +157,7 @@ export async function startPiRuntimeSession(
     // that snapshot the same app-managed Node/npm, Python, uv, and Git Bash
     // PATH configuration used by direct Skill execution.
     if (!hasAppliedApplicationRuntimeEnv) {
-      applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
+      await applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
       hasAppliedApplicationRuntimeEnv = true;
     }
     const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };

@@ -23,10 +23,10 @@ afterEach(() => {
 
 test.skipIf(process.platform === 'win32' || !fs.existsSync(sharedPython))(
   'a clean dev profile runs actual shared Python imports and binds uv',
-  () => {
+  async () => {
     userDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-python-probe-'));
     const env: NodeJS.ProcessEnv = { PATH: '/usr/bin:/bin', HOME: userDataRoot };
-    applyApplicationRuntimeEnv(env);
+    await applyApplicationRuntimeEnv(env);
     const run = spawnSync(
       '/bin/bash',
       ['-c', 'python3 -c "import sys,pandas,numpy,docx,pptx; print(sys.executable)"'],

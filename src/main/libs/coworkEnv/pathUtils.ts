@@ -1,5 +1,6 @@
-import { spawnSync } from 'child_process';
 import { delimiter } from 'path';
+
+import { runCommandCapture } from '../../skills/processRunner';
 
 /**
  * Append entries to a delimited PATH-style environment variable, dropping
@@ -31,18 +32,19 @@ export function appendEnvPath(
 
 /**
  * Check whether a command resolves via `which`/`where` when run with the
- * given environment.
+ * given environment. The lookup never blocks the main thread.
  */
-export function hasCommandInEnv(command: string, env: Record<string, string | undefined>): boolean {
+export async function hasCommandInEnv(
+  command: string,
+  env: Record<string, string | undefined>,
+): Promise<boolean> {
   const whichCmd = process.platform === 'win32' ? 'where' : 'which';
   try {
-    const result = spawnSync(whichCmd, [command], {
+    await runCommandCapture(whichCmd, [command], {
       env: { ...env } as NodeJS.ProcessEnv,
-      encoding: 'utf-8',
-      timeout: 5000,
-      windowsHide: process.platform === 'win32',
+      timeoutMs: 5000,
     });
-    return result.status === 0;
+    return true;
   } catch {
     return false;
   }

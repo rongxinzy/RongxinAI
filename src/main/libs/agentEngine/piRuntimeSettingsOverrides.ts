@@ -91,9 +91,11 @@ export function resolveConversationHistoryCharLimit(
   return chatMode ? Math.min(calculated, PiChatRuntimeLimit.HistoryChars) : calculated;
 }
 
-export function applyPiShellOverride(settingsManager: PiSettingsManager | null): void {
+export async function applyPiShellOverride(
+  settingsManager: PiSettingsManager | null,
+): Promise<void> {
   if (!settingsManager || process.platform !== 'win32') return;
-  const bashPath = resolveGitBashPathForPi();
+  const bashPath = await resolveGitBashPathForPi();
   if (bashPath) {
     settingsManager.applyOverrides({ shellPath: bashPath });
   }
