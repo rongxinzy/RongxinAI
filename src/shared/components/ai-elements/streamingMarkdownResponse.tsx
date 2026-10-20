@@ -18,7 +18,10 @@ import type { ComponentProps, MouseEvent, ReactNode } from 'react';
 import { useContext, useMemo, useState } from 'react';
 import { StreamdownContext } from 'streamdown';
 
-import { isLocalPathCandidate, useResolvedLocalPath } from '../../../services/useResolvedLocalPath';
+import {
+  isLocalPathCandidate,
+  useResolvedLocalPath,
+} from '../../../renderer/services/useResolvedLocalPath';
 
 const EXTERNAL_LINK_PATTERN = /^(https?|mailto|tel):/i;
 

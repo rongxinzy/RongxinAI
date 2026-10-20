@@ -33,6 +33,7 @@ interface CodingEventStreamProps {
   onScrollPositionChange: (scrollPosition: number) => void;
   onLoadOlderEvents?: () => void;
   onReEditUserMessage: (content: string) => void;
+  cwd?: string;
   emptyDescription?: string;
   headerActions?: ReactNode;
   /**
@@ -65,6 +66,7 @@ export const CodingEventStream = ({
   onScrollPositionChange,
   onLoadOlderEvents,
   onReEditUserMessage,
+  cwd,
   emptyDescription,
   headerActions,
   artifactSessionKey = null,
@@ -173,6 +175,7 @@ export const CodingEventStream = ({
                 expandedActivityIds={expandedActivityIds}
                 onActivityOpenChange={setActivityOpen}
                 onReEditUserMessage={onReEditUserMessage}
+                cwd={cwd}
               />
             ))
           )}
