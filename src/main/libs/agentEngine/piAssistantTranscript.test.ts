@@ -182,6 +182,37 @@ describe('PiAssistantTranscript', () => {
     );
   });
 
+  it('skips already finalized messages in closeIdlePlaceholders', () => {
+    const emitMessageUpdate = vi.fn();
+    const updateMessage = vi.fn();
+    const active = baseActive();
+    active.assistantMessageId = 'msg-ans';
+    active.thinkingMessageId = 'msg-think';
+
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getMessage: () => null,
+          updateMessage,
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate,
+      emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
+      getActiveSession: () => active,
+    });
+
+    local.finalizeMessage('session', active, 'answer', 'final answer text');
+    local.finalizeMessage('session', active, 'thinking', 'final thinking text');
+    emitMessageUpdate.mockClear();
+    updateMessage.mockClear();
+
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+
+    expect(emitMessageUpdate).not.toHaveBeenCalled();
+    expect(updateMessage).not.toHaveBeenCalled();
+  });
+
   it('does not delete a placeholder when persisted content is non-empty', () => {
     const deleteMessage = vi.fn(() => true);
     const row = {

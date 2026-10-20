@@ -2,17 +2,24 @@ import fs from 'fs';
 import { pipeline } from 'stream/promises';
 import yazl from 'yazl';
 
-type LogArchiveEntry = {
+type LogArchiveFileEntry = {
   archiveName: string;
   filePath: string;
 };
 
+type LogVirtualArchiveEntry = {
+  archiveName: string;
+  content: string | Buffer;
+};
+
 export type ExportLogsZipInput = {
   outputPath: string;
-  entries: LogArchiveEntry[];
+  entries?: LogArchiveFileEntry[];
+  virtualEntries?: LogVirtualArchiveEntry[];
 };
 
 export type ExportLogsZipResult = {
+  exportedEntries: string[];
   missingEntries: string[];
 };
 
@@ -20,28 +27,36 @@ const EXPORT_TIMEOUT_MS = 30_000;
 
 export async function exportLogsZip(input: ExportLogsZipInput): Promise<ExportLogsZipResult> {
   const zipFile = new yazl.ZipFile();
+  const exportedEntries: string[] = [];
   const missingEntries: string[] = [];
 
   // Defensive: propagate ZipFile-level errors into the output stream so
   // pipeline() can reject immediately instead of hanging until timeout.
-  // Cast needed because @types/yazl types outputStream as NodeJS.ReadableStream,
-  // but the runtime value is a PassThrough which has destroy().
   zipFile.on('error', err => {
     (zipFile.outputStream as unknown as { destroy(err: Error): void }).destroy(err as Error);
   });
 
-  for (const entry of input.entries) {
+  // 1. Process virtual in-memory entries (e.g. system diagnostics json, summary text)
+  if (input.virtualEntries && input.virtualEntries.length > 0) {
+    for (const vEntry of input.virtualEntries) {
+      try {
+        const buffer = Buffer.isBuffer(vEntry.content)
+          ? vEntry.content
+          : Buffer.from(vEntry.content, 'utf-8');
+        zipFile.addBuffer(buffer, vEntry.archiveName);
+        exportedEntries.push(vEntry.archiveName);
+      } catch {
+        missingEntries.push(vEntry.archiveName);
+      }
+    }
+  }
+
+  // 2. Process physical file entries
+  const fileEntries = input.entries || [];
+  for (const entry of fileEntries) {
     try {
-      // Single stat call: avoids redundant existsSync + statSync and reduces the
-      // TOCTOU window compared to calling stat twice.
       const stat = fs.statSync(entry.filePath);
       if (stat.isFile()) {
-        // Snapshot the file at its current size using a bounded read stream.
-        // This avoids yazl's stat-vs-read race condition when the file is being
-        // actively written to (e.g. the current-day log file or cowork.log during
-        // an active session). yazl.addFile() stats the file eagerly but reads it
-        // lazily; if more bytes are appended between stat and read, yazl emits a
-        // size-mismatch error that pipeline() cannot catch, leaving a corrupt zip.
         const { size } = stat;
         if (size > 0) {
           const readStream = fs.createReadStream(entry.filePath, { start: 0, end: size - 1 });
@@ -49,6 +64,7 @@ export async function exportLogsZip(input: ExportLogsZipInput): Promise<ExportLo
         } else {
           zipFile.addBuffer(Buffer.alloc(0), entry.archiveName);
         }
+        exportedEntries.push(entry.archiveName);
         continue;
       }
     } catch {
@@ -71,12 +87,8 @@ export async function exportLogsZip(input: ExportLogsZipInput): Promise<ExportLo
   try {
     await Promise.race([pipelinePromise, timeoutPromise]);
   } catch (err) {
-    // Destroy the write stream first to release the file descriptor. On Windows,
-    // unlinkSync fails with EBUSY if the fd is still open. Swallow the subsequent
-    // pipeline rejection that destroy() triggers.
     outputStream.destroy();
     pipelinePromise.catch(() => {});
-    // Remove the partial zip so users don't find a corrupt file on disk.
     try {
       fs.unlinkSync(input.outputPath);
     } catch {
@@ -87,5 +99,5 @@ export async function exportLogsZip(input: ExportLogsZipInput): Promise<ExportLo
     clearTimeout(timer);
   }
 
-  return { missingEntries };
+  return { exportedEntries, missingEntries };
 }
