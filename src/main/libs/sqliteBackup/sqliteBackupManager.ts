@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { DB_FILENAME } from '../../appConstants';
+import { sha256FileStream } from '../fileHasher';
 import {
   SQLITE_BACKUP_ALWAYS_ON_STARTUP_ENV,
   SQLITE_BACKUP_DIR_NAME,
@@ -12,6 +13,7 @@ import {
   SQLITE_BACKUP_INTERVAL_MS,
   SQLITE_BACKUP_MANIFEST_FILE_NAME,
   SQLITE_BACKUP_MANIFEST_VERSION,
+  SQLITE_BACKUP_MAX_SNAPSHOT_BYTES,
   SQLITE_BACKUP_QUARANTINE_DIR_NAME,
   SQLITE_BACKUP_RETENTION_COUNT,
   SQLITE_BACKUP_SNAPSHOTS_DIR_NAME,
@@ -20,6 +22,7 @@ import {
   SqliteBackupTrigger,
   type SqliteBackupTrigger as SqliteBackupTriggerType,
 } from './constants';
+import { verifySqliteFile } from './sqliteVerify';
 
 export type SqliteBackupPaths = {
   backupDir: string;
@@ -67,11 +70,6 @@ const isRecoverableSqliteStartupError = (error: unknown): boolean => {
   );
 };
 
-const readPragmaNumber = (db: Database.Database, pragma: string): number | undefined => {
-  const value = db.pragma(pragma, { simple: true });
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-};
-
 const fileExists = (filePath: string): boolean => {
   try {
     return fs.existsSync(filePath);
@@ -117,19 +115,12 @@ export const formatTimestampForLocalPath = (value: number): string => {
   );
 };
 
-const computeFileSha256 = (filePath: string): string => {
-  const hash = crypto.createHash('sha256');
-  hash.update(fs.readFileSync(filePath));
-  return hash.digest('hex');
-};
+/** Streaming hash in the shared worker; the main thread never reads the file. */
+const computeFileSha256 = (filePath: string): Promise<string> =>
+  sha256FileStream(filePath, { maxBytes: SQLITE_BACKUP_MAX_SNAPSHOT_BYTES });
 
 const readQuickCheck = (db: Database.Database): string => {
   const row = db.prepare('PRAGMA quick_check').pluck().get() as string | undefined;
-  return typeof row === 'string' ? row : '';
-};
-
-const readIntegrityCheck = (db: Database.Database): string => {
-  const row = db.prepare('PRAGMA integrity_check').pluck().get() as string | undefined;
   return typeof row === 'string' ? row : '';
 };
 
@@ -293,11 +284,14 @@ export class SqliteBackupManager {
         },
       });
 
-      const verifyDb = new Database(tempFilePath, { readonly: true });
-      const quickCheck = readQuickCheck(verifyDb);
-      const sourceUserVersion = readPragmaNumber(verifyDb, 'user_version');
-      const sourceSchemaVersion = readPragmaNumber(verifyDb, 'schema_version');
-      verifyDb.close();
+      // Off-thread verification: quick_check walks every page of the temp
+      // snapshot, which must not block the main-process event loop.
+      const verification = await verifySqliteFile(tempFilePath, 'quick_check');
+      const {
+        check: quickCheck,
+        userVersion: sourceUserVersion,
+        schemaVersion: sourceSchemaVersion,
+      } = verification;
 
       if (quickCheck !== SQLITE_BACKUP_HEALTH_OK) {
         throw new Error(`Backup quick_check failed: ${quickCheck}`);
@@ -312,7 +306,7 @@ export class SqliteBackupManager {
         createdAt,
         trigger: input.trigger,
         sizeBytes: stat.size,
-        checksumSha256: computeFileSha256(finalFilePath),
+        checksumSha256: await computeFileSha256(finalFilePath),
         quickCheck: 'ok',
         sourceUserVersion,
         sourceSchemaVersion,
@@ -336,7 +330,7 @@ export class SqliteBackupManager {
     }
   }
 
-  restoreLatestBackup(dbFilePath: string): SqliteRestoreResult {
+  async restoreLatestBackup(dbFilePath: string): Promise<SqliteRestoreResult> {
     const manifest = this.readManifest();
     const { snapshotsDir, quarantineDir } = this.getPaths();
     const quarantineStamp = formatTimestampForLocalPath(Date.now());
@@ -359,12 +353,11 @@ export class SqliteBackupManager {
         removeFileIfExists(`${dbFilePath}-wal`);
         removeFileIfExists(`${dbFilePath}-shm`);
 
-        const restoredDb = new Database(dbFilePath);
-        const integrityCheck = readIntegrityCheck(restoredDb);
-        restoredDb.close();
+        // Off-thread integrity_check on the restored file (reads every page).
+        const verification = await verifySqliteFile(dbFilePath, 'integrity_check');
 
-        if (integrityCheck !== SQLITE_BACKUP_HEALTH_OK) {
-          throw new Error(`integrity_check failed: ${integrityCheck}`);
+        if (verification.check !== SQLITE_BACKUP_HEALTH_OK) {
+          throw new Error(`integrity_check failed: ${verification.check}`);
         }
 
         this.markSnapshotAsRestoreTested(snapshot.fileName);
@@ -481,10 +474,10 @@ const getSqliteMainDbPath = (userDataPath: string): string => {
   return path.join(userDataPath, DB_FILENAME);
 };
 
-export const openSqliteDatabaseWithRecovery = (
+export const openSqliteDatabaseWithRecovery = async (
   userDataPath: string,
   dbFilePath = getSqliteMainDbPath(userDataPath),
-): Database.Database => {
+): Promise<Database.Database> => {
   let db: Database.Database | null = null;
 
   try {
@@ -504,7 +497,7 @@ export const openSqliteDatabaseWithRecovery = (
 
     console.warn('[SqliteBackup] SQLite startup failed; attempting snapshot recovery:', error);
     const backupManager = new SqliteBackupManager(userDataPath);
-    const restoreResult = backupManager.restoreLatestBackup(dbFilePath);
+    const restoreResult = await backupManager.restoreLatestBackup(dbFilePath);
     if (!restoreResult.restored) {
       console.warn('[SqliteBackup] Snapshot recovery did not restore any database file');
       throw error;

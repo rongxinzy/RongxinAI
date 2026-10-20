@@ -1,5 +1,30 @@
 import Database from 'better-sqlite3';
+import crypto from 'crypto';
 import fs from 'fs';
+
+// The real implementations spawn compiled workers (dist-electron/*.js);
+// tests run the same checks in-process instead.
+vi.mock('./sqliteVerify', () => ({
+  verifySqliteFile: async (filePath: string, mode: string) => {
+    const db = new Database(filePath, { readonly: true });
+    try {
+      return {
+        check: String(db.prepare(`PRAGMA ${mode}`).pluck().get() ?? ''),
+        userVersion: Number(db.pragma('user_version', { simple: true })) || 0,
+        schemaVersion: Number(db.pragma('schema_version', { simple: true })) || 0,
+      };
+    } finally {
+      db.close();
+    }
+  },
+}));
+vi.mock('../fileHasher', () => ({
+  sha256FileStream: async (filePath: string) => {
+    const hash = crypto.createHash('sha256');
+    hash.update(fs.readFileSync(filePath));
+    return hash.digest('hex');
+  },
+}));
 import os from 'os';
 import path from 'path';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -56,7 +81,7 @@ test('restoreLatestBackup replaces broken database with newest valid snapshot', 
   const dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(restoreStamp);
 
   try {
-    const result = manager.restoreLatestBackup(dbPath);
+    const result = await manager.restoreLatestBackup(dbPath);
     expect(result.restored).toBe(true);
 
     const restoredDb = new Database(dbPath, { readonly: true });
@@ -89,7 +114,7 @@ test('openSqliteDatabaseWithRecovery restores the latest snapshot before startup
 
   fs.writeFileSync(dbPath, 'not-a-sqlite-db', 'utf8');
 
-  const restoredDb = openSqliteDatabaseWithRecovery(userDataPath, dbPath);
+  const restoredDb = await openSqliteDatabaseWithRecovery(userDataPath, dbPath);
   expect(restoredDb.prepare('SELECT value FROM demo WHERE id = 1').get()).toEqual({
     value: 'restored',
   });
@@ -113,7 +138,7 @@ test('restoreLatestBackup falls back to the previous backup file when publish wa
 
   fs.writeFileSync(dbPath, 'not-a-sqlite-db', 'utf8');
 
-  const result = manager.restoreLatestBackup(dbPath);
+  const result = await manager.restoreLatestBackup(dbPath);
   expect(result.restored).toBe(true);
 
   const restoredDb = new Database(dbPath, { readonly: true });

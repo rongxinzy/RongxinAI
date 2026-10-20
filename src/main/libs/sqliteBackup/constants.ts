@@ -15,6 +15,8 @@ export const SQLITE_BACKUP_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000;
 export const SQLITE_BACKUP_ALWAYS_ON_STARTUP_ENV = 'ZHIYUAN_SQLITE_BACKUP_ALWAYS_ON_STARTUP';
 export const SQLITE_BACKUP_MANIFEST_VERSION = 1 as const;
 export const SQLITE_BACKUP_HEALTH_OK = 'ok' as const;
+/** Upper bound for a snapshot the worker will hash and verify. */
+export const SQLITE_BACKUP_MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024 * 1024;
 
 export type SqliteBackupRecord = {
   id: string;
