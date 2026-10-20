@@ -407,26 +407,6 @@ jobs:
             echo "- pipeline run: \`${{ github.run_id }}\`"
             echo '- installer smoke: cold install, cache-hit upgrade, uninstall, signatures — all passed'
           } >> "$GITHUB_STEP_SUMMARY"
-
-  github-prerelease:
-    needs: [prepare-release, publish]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare-release.outputs.commit }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - name: Download release payloads for GitHub assets
-        uses: actions/download-artifact@v8
-        with:
-          pattern: release-candidate-${{ needs.prepare-release.outputs.version }}-*
-          path: candidate-staging
-      - name: Stage GitHub release assets by bundle id
-        shell: bash
-        run: bash scripts/release/stage-downloaded-release-candidates.sh '${{ needs.prepare-release.outputs.version }}'
       - name: Collect GitHub release assets
         shell: bash
         run: |

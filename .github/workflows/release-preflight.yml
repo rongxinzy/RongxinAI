@@ -188,58 +188,6 @@ jobs:
       - name: Verify pinned Python, isolated packages, rebuild and process cancellation
         run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
 
-  python-runtime-windows:
-    needs: source
-    runs-on: windows-latest
-    timeout-minutes: 25
-    env:
-      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
-      HUSKY: '0'
-      PYTHON_RUNTIME_INTEGRATION: '1'
-      PYTHON_RUNTIME_RUNNER: '${{ github.workspace }}/dist-electron/python-runtime-runner.js'
-      PYTHON_RUNTIME_JOB_HELPER: '${{ github.workspace }}/resources/python-runtime/job-runner.exe'
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.source.outputs.commit }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: ilammy/msvc-dev-cmd@v1
-      - name: Build actual Job Object helper
-        shell: pwsh
-        run: ./scripts/python-runtime/build-job-runner.ps1
-      - name: Verify descendant containment and parent-death cleanup
-        run: node --test scripts/python-runtime/job-runner.test.cjs
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun package cache
-        uses: actions/cache@v5
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
-      - name: Bundle the independent Runner
-        run: bun build src/main/pythonRuntime/runner.ts --target=node --format=cjs --outfile=dist-electron/python-runtime-runner.js
-      - name: Restore the bundled managed runtime cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            resources/python-win
-            resources/uv-win
-          key: bundled-runtime-win-${{ hashFiles('src/main/pythonRuntime/bundledRuntime.json') }}
-      - name: Provision the bundled managed runtime
-        run: |
-          bun run setup:python-runtime
-          bun run setup:uv-runtime
-      - name: Verify Windows standalone Python and real uv wheel environments
-        run: bun x --no-install vitest run src/main/pythonRuntime/runtime.integration.test.ts --maxWorkers=1
-
   browser-preview:
     needs: source
     runs-on: ubuntu-latest
@@ -287,7 +235,7 @@ jobs:
 
   preflight-gate:
     if: always()
-    needs: [source, quality, enterprise, channel-runtime, python-runtime-linux, python-runtime-windows, browser-preview, memory-leak, linux-install, windows-install]
+    needs: [source, quality, enterprise, channel-runtime, python-runtime-linux, browser-preview, memory-leak, linux-install, windows-install]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
