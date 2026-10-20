@@ -15,7 +15,7 @@ import {
   type CreateCodingCollaborationPresetInput,
 } from '../../../shared/codingAgent';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
-import { CodingRoomServiceSessionLifecycle } from './sessionLifecycle';
+import { CodingRoomServiceWorkspaceAdmin } from './workspaceAdmin';
 import { randomUUID } from 'crypto';
 
 /**
@@ -24,7 +24,7 @@ import { randomUUID } from 'crypto';
  * and the commands share a single scheduling boundary — a command waits
  * behind queued prompts while a turn is in flight.
  */
-export abstract class CodingRoomServiceBuiltinControlCommands extends CodingRoomServiceSessionLifecycle {
+export abstract class CodingRoomServiceBuiltinControlCommands extends CodingRoomServiceWorkspaceAdmin {
   // ── Follow-up prompt queue (delegates to the CodingPendingMessageQueue collaborator) ──
 
   listPendingMessages(laneId: string): CoworkPendingMessage[] {
