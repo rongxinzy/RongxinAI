@@ -12,6 +12,7 @@ import { app, BrowserWindow, dialog, net, powerMonitor, protocol } from 'electro
 
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
 import { rt } from './runtimeState';
+import { agentRuntime } from './agentRuntimeState';
 import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
@@ -214,7 +215,7 @@ export const initApp = async (): Promise<void> => {
       try {
         const aisphereGateway = await startAISphereGateway();
         await aisphereService.initialize(storageRuntime.store, aisphereGateway.baseUrl);
-        aisphereService.busy = () => Boolean(rt.piRuntimeAdapter?.hasRunningSessions());
+        aisphereService.busy = () => Boolean(agentRuntime.piRuntimeAdapter?.hasRunningSessions());
         app.once('before-quit', () => {
           void aisphereGateway.close();
         });

@@ -9,7 +9,7 @@ import path from 'path';
 
 import { app, BrowserWindow } from 'electron';
 
-import { rt } from './runtimeState';
+import { agentRuntime } from './agentRuntimeState';
 import { getCoworkStore, getSkillManager, getStore } from './runtimeServices';
 import { getPiRuntimeAdapter } from './sessionServices';
 import { CcConnectControlClient } from '../libs/ccConnectControlClient';
@@ -30,7 +30,6 @@ import { ChannelTurnCoordinator } from '../im/channelTurnCoordinator';
 import { IMStore } from '../im/imStore';
 import { listCcConnectAccountConfigs } from '../libs/ccConnectAccountConfig';
 import { CcConnectBridgeServer } from '../libs/ccConnectBridgeServer';
-import { CcConnectRuntimeStatusRegistry } from '../libs/ccConnectRuntimeStatusRegistry';
 import { CcConnectSidecarManager } from '../libs/ccConnectSidecarManager';
 import { serializeCcConnectSidecarConfig } from '../libs/ccConnectSidecarConfig';
 import { resolveCcConnectAccountRuntimeStatus } from '../libs/ccConnectAccountRuntimeStatus';
@@ -106,7 +105,7 @@ export const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskServic
       taskStore,
       channelRuntime.schedulerRuntime,
     );
-    rt.piRuntimeAdapter?.setScheduledTaskService(channelRuntime.scheduledTaskService);
+    agentRuntime.piRuntimeAdapter?.setScheduledTaskService(channelRuntime.scheduledTaskService);
     // Arm every enabled task's timer from SQLite at construction; the previous
     // design armed them only when the sidecar control plane attached.
     void (async () => {
