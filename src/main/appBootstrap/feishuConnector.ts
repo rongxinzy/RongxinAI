@@ -37,18 +37,18 @@ const decodeFeishuCliOutput = (chunks: Buffer[]): string => {
   return new TextDecoder('gb18030', { fatal: false }).decode(bytes);
 };
 
-const runFeishuCliCommand = (
+const runFeishuCliCommand = async (
   command: string,
   args: string[],
   cwd?: string,
   timeoutMs = FEISHU_CLI_TIMEOUT_MS,
   signal?: AbortSignal,
-): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const env: Record<string, string | undefined> = { ...process.env };
-    // Keep the Agent process environment consistent with the app-managed
-    // connector binary directory.
-    applyApplicationRuntimeEnv(env, { includePackageMirrors: true });
+): Promise<string> => {
+  const env: Record<string, string | undefined> = { ...process.env };
+  // Keep the Agent process environment consistent with the app-managed
+  // connector binary directory.
+  await applyApplicationRuntimeEnv(env, { includePackageMirrors: true });
+  return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
@@ -105,6 +105,7 @@ const runFeishuCliCommand = (
       reject(new Error(output || `${command} exited with code ${code ?? 'unknown'}`));
     });
   });
+};
 
 const findFeishuCliCommand = async (): Promise<string | null> => {
   return getLocalFeishuCliCommand();
@@ -115,7 +116,7 @@ const installFeishuCli = async (): Promise<void> => {
   await writeFeishuCliLauncher(app.getPath('userData'));
   // Pi's bash tool snapshots this process environment. Refresh the managed
   // PATH now so a connector installed after the first session is usable.
-  applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
+  await applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
 };
 
 const verifyFeishuCli = async (command: string): Promise<void> => {

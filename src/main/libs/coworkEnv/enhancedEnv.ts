@@ -12,7 +12,7 @@ export async function getEnhancedEnv(
 ): Promise<Record<string, string | undefined>> {
   const env = { ...process.env };
 
-  applyApplicationRuntimeEnv(env, options);
+  await applyApplicationRuntimeEnv(env, options);
 
   // Inject SKILLs directory path for skill scripts.
   // On Windows, normalise backslashes to forward slashes so the value is usable

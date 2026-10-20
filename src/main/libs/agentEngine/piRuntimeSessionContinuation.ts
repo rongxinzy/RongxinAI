@@ -280,7 +280,7 @@ export async function continuePiRuntimeSession(
       await active.piSession.reload();
       // AgentSession.reload() reloads SettingsManager from disk, so restore
       // the per-process bundled PortableGit override after every reload.
-      applyPiShellOverride(active.settingsManager);
+      await applyPiShellOverride(active.settingsManager);
       applyPiCompactionOverrides(
         active.settingsManager,
         typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
@@ -518,7 +518,7 @@ export async function patchPiRuntimeSession(
     if (active.resourceState.maxOutputTokens !== maxOutputTokens) {
       active.resourceState.maxOutputTokens = maxOutputTokens;
       await active.piSession.reload();
-      applyPiShellOverride(active.settingsManager);
+      await applyPiShellOverride(active.settingsManager);
       applyPiCompactionOverrides(
         active.settingsManager,
         typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
