@@ -35,7 +35,7 @@ export function magpieImageInput(model: MagpieModel): ModelCapabilityStatus {
 
 const MAGPIE_THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 
-function buildMagpiePiModel(
+export function buildMagpiePiModel(
   selected: MagpieModel,
   gatewayUrl: string,
   modelPoolRequestContext?: ModelPoolRequestContext,
