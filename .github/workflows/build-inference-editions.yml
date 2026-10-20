@@ -223,47 +223,15 @@ jobs:
         run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
         env:
           LLAMACPP_CPU_TARGET_ID: ${{ matrix.runtime_target }}
-      - name: Cache llama.cpp CUDA source
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
-        uses: actions/cache@v5
-        with:
-          path: .cache/llama.cpp-src
-          key: llamacpp-cuda-src-b9244-v1
-          restore-keys: llamacpp-cuda-src-b9244-
-      - name: Set up CUDA 12.4 toolkit (Windows)
+      - name: Prepare pinned Windows CUDA runtime
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        uses: Jimver/cuda-toolkit@v0.2.22
-        id: cuda-toolkit
-        with:
-          cuda: '12.4.1'
-          method: network
-          sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
-      - name: Verify CUDA compiler (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: nvcc --version
-      - name: Prepare llama.cpp CUDA source (Windows)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: bash scripts/ensure-llamacpp-cuda-source.sh
-      - name: Install Ninja (Windows CUDA)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        run: choco install ninja -y
-      - name: Set up MSVC developer environment (Windows CUDA)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-      - name: Compile llama-server (Windows CUDA)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        shell: bash
-        run: bash scripts/build-llamacpp-cuda-rtx40.sh win
+        uses: ./.github/actions/prepare-windows-cuda
       - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
         shell: bash
         run: bash scripts/ci/build-llamacpp-cuda-linux-in-docker.sh
       - name: Finalize CUDA llama.cpp edition bundle
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform != 'macos' }}
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
         run: node scripts/finalize-llamacpp-cuda-edition.cjs
         env:
           LLAMACPP_CUDA_PLATFORM: ${{ matrix.platform == 'windows' && 'win32' || 'linux' }}

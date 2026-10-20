@@ -1,6 +1,6 @@
 const { spawnSync } = require('node:child_process');
 
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const bunCommand = process.platform === 'win32' ? 'bun.exe' : 'bun';
 const spawnOptions = {
   shell: process.platform === 'win32',
   stdio: 'inherit',
@@ -15,10 +15,10 @@ function run(command, args) {
   return result.status ?? 1;
 }
 
-const nodeBuildStatus = run(npmCommand, ['rebuild', 'better-sqlite3', '--build-from-source']);
+const nodeBuildStatus = run(process.execPath, ['scripts/ensure-node-native.cjs']);
 const testStatus =
   nodeBuildStatus === 0
-    ? run(npmCommand, ['exec', '--', 'vitest', 'run', ...process.argv.slice(2)])
+    ? run(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', ...process.argv.slice(2)])
     : nodeBuildStatus;
 
 // CI jobs end after tests, so restoring Electron's ABI only adds a network dependency.
@@ -27,6 +27,6 @@ if (process.env.CI === 'true') {
 }
 
 // Tests use Node's ABI; restore Electron's ABI before returning to the caller.
-const electronRestoreStatus = run(npmCommand, ['run', 'rebuild:electron-native']);
+const electronRestoreStatus = run(bunCommand, ['run', 'rebuild:electron-native']);
 
 process.exit(testStatus !== 0 ? testStatus : electronRestoreStatus);

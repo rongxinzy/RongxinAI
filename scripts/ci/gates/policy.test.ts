@@ -1,309 +1,150 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
-import { BaselineJob, CiEvent, HeavyJob, JobResult, PathJob, TestShardCount } from './constants.ts';
-import {
-  enterpriseRequired,
-  planGates,
-  planPathJobs,
-  verifyGateResults,
-  type GatePlan,
-  type PathPlan,
-} from './policy.ts';
+import { BaselineJob, JobResult, PackagingJob, PreflightJob, TestShardCount } from './constants.ts';
+import { verifyGateResults, verifyPreflightResults } from './policy.ts';
 
-const noPathJobs: PathPlan = {
-  [PathJob.ChannelRuntime]: false,
-  [PathJob.PythonRuntimeLinux]: false,
-  [PathJob.PythonRuntimeWindows]: false,
-  [PathJob.InstallerPreview]: false,
-  [PathJob.BrowserPreview]: false,
+type Step = { name?: string; run?: string; uses?: string; with?: Record<string, unknown> };
+type Job = {
+  name?: string;
+  if?: string;
+  needs?: string | string[];
+  uses?: string;
+  with?: Record<string, unknown>;
+  steps?: Step[];
+  strategy?: { matrix?: { shard?: number[] } };
 };
+type Workflow = { on: Record<string, unknown>; jobs: Record<string, Job> };
+const workflow = (name: string) =>
+  load(readFileSync(`.github/workflows/${name}`, 'utf8')) as Workflow;
+const resultsFor = (names: string[]) =>
+  Object.fromEntries(names.map(name => [name, { result: JobResult.Success as string }]));
 
-const prRef = 'refs/pull/42/merge';
-const light = planGates(['src/renderer/components/Settings.tsx'], CiEvent.PullRequest, prRef);
-const full: GatePlan = {
-  [HeavyJob.Linux]: true,
-  [HeavyJob.Windows]: true,
-  [HeavyJob.Memory]: true,
-};
-const prPackaging: GatePlan = {
-  [HeavyJob.Linux]: false,
-  [HeavyJob.Windows]: false,
-  [HeavyJob.Memory]: true,
-};
-
-test.each([
-  'README.md',
-  'docs/development.md',
-  'docs/2026-10-15-installer-website-style.md',
-  'website/index.html',
-  'website/README.md',
-  'src/renderer/components/Settings.tsx',
-  'src/renderer/theme/themes.css',
-  'src/renderer/components/artifacts/renderers/DxfRenderer.tsx',
-  'src/renderer/components/cowork/components/UserBubble.tsx',
-  'src/renderer/components/cowork/CoworkPromptInput.tsx',
-  'scripts/ensure-build-version.js',
-  'scripts/find-dev-port.mjs',
-  '.github/workflows/stale.yml',
-  'unknown/new-module.ts',
-])('ordinary and unknown paths retain only baseline checks: %s', file => {
-  expect(Object.values(planGates([file], CiEvent.PullRequest, prRef))).toEqual([
-    false,
-    false,
-    false,
-  ]);
-});
-
-test.each([
-  'bun.lock',
-  'package.json',
-  'electron-builder.json',
-  'electron-builder.windows-signed.cjs',
-  'electron-tsconfig.json',
-  'vite.config.ts',
-  'patches/runtime.patch',
-  'resources/python-linux/bin/python',
-  'build/installer.nsh',
-  'scripts/setup-python-runtime.js',
-  'scripts/nsis-installer.nsh',
-  'scripts/nsis-offline-components.json',
-  'scripts/installer-ui/zy-pages.nsh',
-  'scripts/ci/windows-installer-interactive.ps1',
-  'scripts/ci/windows-shell-interactive.mjs',
-  'tests/nsis-installer.test.ts',
-  'SKILLs/pdf/requirements.txt',
-  'MCPs/feishu/server.js',
-  'src/main/main.ts',
-  'src/main/newPlatformModule.ts',
-])(
-  'packaging and main-process changes in PR run memory regression without install checks: %s',
-  file => {
-    expect(planGates([file], CiEvent.PullRequest, prRef)).toEqual(prPackaging);
-  },
-);
-
-test.each(['.github/workflows/ci.yml', 'scripts/ci/gates/policy.ts'])(
-  'CI planner edits stay on baseline checks: %s',
-  file => {
-    expect(planGates([file], CiEvent.PullRequest, prRef)).toEqual(light);
-  },
-);
-
-test.each([
-  'src/renderer/services/cowork.ts',
-  'src/renderer/services/piUiRecovery.ts',
-  'src/renderer/hooks/useSession.ts', // Synthetic path guards the hooks directory policy.
-  'src/renderer/store/slices/coworkSlice.ts',
-  'src/renderer/components/cowork/hooks/useTodoQueueLifecycle.ts',
-  'src/shared/components/ai-elements/conversation.tsx',
-  'src/renderer/App.tsx',
-])('renderer lifecycle changes run memory without packaging: %s', file => {
-  expect(planGates([file], CiEvent.PullRequest, prRef)).toEqual({
-    ...light,
-    [HeavyJob.Memory]: true,
-  });
-});
-
-test('enterprise toolchain follows the extension diff on pull requests only', () => {
-  expect(enterpriseRequired(['docs/readme.md', 'website/index.html'], CiEvent.PullRequest)).toBe(
-    false,
+test('daily feature CI runs only lint and parallel unit tests before its gate', () => {
+  const ci = workflow('ci.yml');
+  expect(Object.keys(ci.jobs).sort()).toEqual(['ci-gate', 'lint', 'test']);
+  expect(ci.jobs.test.needs).toBeUndefined();
+  expect(ci.jobs.test.strategy?.matrix?.shard).toEqual(
+    Array.from({ length: TestShardCount }, (_, i) => i + 1),
   );
-  expect(enterpriseRequired(['enterprise/src/index.ts'], CiEvent.PullRequest)).toBe(true);
-  expect(enterpriseRequired(['src/main/enterpriseExtension/host.ts'], CiEvent.PullRequest)).toBe(
-    true,
+  const steps = ci.jobs.test.steps ?? [];
+  const commands = steps.map(step => step.run ?? '').join('\n');
+  expect(commands).toContain('bun run test:unit');
+  expect(commands).toContain('bun run test:enterprise');
+  expect(commands).not.toMatch(
+    /compile:electron|rebuild:electron-native|build:vite|dist:|streaming-mutations/,
   );
-  expect(enterpriseRequired(['package.json'], CiEvent.PullRequest)).toBe(true);
-  expect(enterpriseRequired(['electron-builder.enterprise.cjs'], CiEvent.PullRequest)).toBe(true);
-  expect(enterpriseRequired(['src/renderer/App.tsx'], CiEvent.PullRequest)).toBe(false);
-  expect(enterpriseRequired(['docs/readme.md'], CiEvent.Push)).toBe(false);
-  expect(enterpriseRequired([], CiEvent.Manual)).toBe(true);
+  expect(steps.some(step => step.uses?.startsWith('actions/download-artifact'))).toBe(false);
+  expect(ci.jobs['ci-gate'].if).toBe('always()');
+  expect(ci.jobs['ci-gate'].needs).toEqual(Object.values(BaselineJob));
 });
 
-test('CI infrastructure diffs skip expensive integration and enterprise jobs', () => {
-  const paths = ['.github/workflows/ci.yml', 'scripts/ci/gates/policy.ts', 'package.json'];
-  expect(planGates(paths, CiEvent.PullRequest, prRef)).toEqual(light);
-  expect(planPathJobs(paths, CiEvent.PullRequest)).toEqual(noPathJobs);
-  expect(enterpriseRequired(paths, CiEvent.PullRequest)).toBe(false);
-});
-
-test('path-owned checks follow the same diff ownership as the former standalone workflows', () => {
-  expect(planPathJobs(['src/main/im/wechat.ts'], CiEvent.PullRequest)).toEqual({
-    ...noPathJobs,
-    [PathJob.ChannelRuntime]: true,
-  });
-  expect(planPathJobs(['src/main/pythonRuntime/runner.ts'], CiEvent.PullRequest)).toEqual({
-    ...noPathJobs,
-    [PathJob.PythonRuntimeLinux]: true,
-    [PathJob.PythonRuntimeWindows]: true,
-  });
-  expect(planPathJobs(['scripts/installer-shell/preview/page.tsx'], CiEvent.PullRequest)).toEqual({
-    ...noPathJobs,
-    [PathJob.InstallerPreview]: true,
-  });
-  expect(planPathJobs(['src/renderer/components/Settings.tsx'], CiEvent.PullRequest)).toEqual({
-    ...noPathJobs,
-    [PathJob.BrowserPreview]: true,
-  });
-  expect(planPathJobs(['scripts/preview/web-preview-check.mjs'], CiEvent.PullRequest)).toEqual({
-    ...noPathJobs,
-    [PathJob.BrowserPreview]: true,
-  });
-  expect(planPathJobs(['README.md'], CiEvent.PullRequest)).toEqual(noPathJobs);
-});
-
-test('manual runs and unknown events fail closed to the complete suite', () => {
-  expect(planGates([], CiEvent.Manual, 'refs/heads/main')).toEqual(full);
-  expect(planGates([], 'unexpected-event', 'refs/heads/main')).toEqual(full);
-});
-
-test('main pushes are light while tag releases retain all heavy checks', () => {
-  expect(planGates(['package.json'], CiEvent.Push, 'refs/heads/main')).toEqual(light);
-  expect(planGates([], CiEvent.Push, 'refs/tags/v2026.9.5')).toEqual(full);
-});
-
-function resultsFor(plan: GatePlan, pathPlan: PathPlan = noPathJobs) {
-  const results: Record<string, { result: string }> = Object.fromEntries(
-    Object.values(BaselineJob).map(name => [name, { result: JobResult.Success }]),
-  );
-  for (const [name, enabled] of Object.entries(plan)) {
-    results[name] = { result: enabled ? JobResult.Success : JobResult.Skipped };
-  }
-  for (const [name, enabled] of Object.entries(pathPlan)) {
-    results[name] = { result: enabled ? JobResult.Success : JobResult.Skipped };
-  }
-  return results;
-}
-
-test('merge gate permits only intentional skips', () => {
-  expect(() => verifyGateResults(light, noPathJobs, resultsFor(light))).not.toThrow();
-  expect(() => verifyGateResults(full, noPathJobs, resultsFor(full))).not.toThrow();
-});
-
-test.each([JobResult.Failure, JobResult.Cancelled, JobResult.Skipped])(
-  'required check %s cannot pass the gate',
+test.each([JobResult.Failure, JobResult.Cancelled, JobResult.Skipped, 'missing'])(
+  'daily gate rejects a %s unit or lint result',
   result => {
-    for (const name of [...Object.values(BaselineJob), ...Object.values(HeavyJob)]) {
-      const results = resultsFor(full);
-      results[name] = { result };
-      expect(() => verifyGateResults(full, noPathJobs, results)).toThrow();
+    for (const name of Object.values(BaselineJob)) {
+      const results = resultsFor(Object.values(BaselineJob));
+      if (result === 'missing') delete results[name];
+      else results[name].result = result;
+      expect(() => verifyGateResults(results)).toThrow();
     }
   },
 );
 
-test('missing jobs and incomplete decisions cannot pass the gate', () => {
-  const results = resultsFor(full);
-  delete results[HeavyJob.Linux];
-  expect(() => verifyGateResults(full, noPathJobs, results)).toThrow();
-  expect(() => verifyGateResults({} as GatePlan, noPathJobs, resultsFor(light))).toThrow();
-});
-
-test('unexpected failure of an optional check cannot be hidden', () => {
-  const results = resultsFor(light);
-  results[HeavyJob.Memory] = { result: JobResult.Failure };
-  expect(() => verifyGateResults(light, noPathJobs, results)).toThrow();
-});
-
-interface WorkflowJob {
-  needs?: string | string[];
-  if?: string;
-  uses?: string;
-  with?: Record<string, unknown>;
-  outputs?: Record<string, string>;
-  strategy?: { 'fail-fast'?: boolean; matrix?: { shard?: number[] } };
-  steps?: Array<{ name?: string; run?: string; uses?: string; with?: Record<string, unknown> }>;
-}
-
-function workflow(name: string) {
-  return load(
-    readFileSync(new URL(`../../../.github/workflows/${name}`, import.meta.url), 'utf8'),
-  ) as {
-    on: Record<string, unknown>;
-    concurrency?: { 'cancel-in-progress'?: boolean };
-    jobs: Record<string, WorkflowJob>;
-  };
-}
-
-test('pull request tests compile Electron once and shard the suite', () => {
-  const ci = workflow('ci.yml');
-  expect(ci.jobs.test.strategy?.matrix?.shard).toEqual(
-    Array.from({ length: TestShardCount }, (_, index) => index + 1),
-  );
-  expect(ci.jobs.test.strategy?.['fail-fast']).toBe(false);
-  expect(ci.jobs.test.needs).toBe(BaselineJob.ElectronCompile);
-  const compileCommands = ci.jobs[BaselineJob.ElectronCompile].steps
-    ?.map(step => step.run ?? '')
-    .join('\n');
-  expect(compileCommands).toContain('bun run compile:electron');
-  const testCommands = ci.jobs.test.steps?.map(step => step.run ?? '').join('\n');
-  expect(testCommands).toContain(`--shard=\${{ matrix.shard }}/${TestShardCount}`);
-  expect(testCommands).not.toContain('bun run compile:electron');
-  expect(testCommands).toContain('npm test --prefix SKILLs/presentation-studio');
-  expect(ci.jobs.enterprise.needs).toBe(BaselineJob.Changes);
-  expect(ci.jobs.changes.outputs).toHaveProperty('enterprise');
-  expect(ci.jobs.changes.outputs).toHaveProperty('path-plan');
-});
-
-test('channel runtime checks live in CI and manual smoke remains dispatch-only', () => {
-  const ci = workflow('ci.yml');
-  expect(ci.jobs[PathJob.ChannelRuntime].if).toBe(
-    `needs.changes.outputs.${PathJob.ChannelRuntime} == 'true'`,
-  );
-  const smoke = workflow('channel-runtime-smoke.yml');
-  expect(smoke.on).toEqual({ workflow_dispatch: null });
-  expect(smoke.concurrency?.['cancel-in-progress']).toBe(true);
-});
-
-test('CI waits for every selected reusable check and always runs the merge gate', () => {
-  const ci = workflow('ci.yml');
-  expect(ci.on).toHaveProperty(CiEvent.PullRequest);
-  expect(ci.jobs['ci-gate'].name).toBe('ci-gate');
-  const gate = ci.jobs['ci-gate'];
+test('release preflight gates every retained heavy check and binds one source commit', () => {
+  const preflight = workflow('release-preflight.yml');
+  expect(preflight.on).toHaveProperty('workflow_dispatch');
+  expect(preflight.on).toHaveProperty('workflow_call');
+  expect(preflight.on).not.toHaveProperty('pull_request');
+  const gate = preflight.jobs['preflight-gate'];
   expect(gate.if).toBe('always()');
   expect(gate.needs).toEqual(
-    expect.arrayContaining([
-      ...Object.values(BaselineJob),
-      ...Object.values(HeavyJob),
-      ...Object.values(PathJob),
-    ]),
+    expect.arrayContaining([...Object.values(PreflightJob), ...Object.values(PackagingJob)]),
   );
-  for (const job of Object.values(HeavyJob)) {
-    expect(ci.jobs[job].needs).toBe(BaselineJob.Changes);
-    expect(ci.jobs[job].if).toBe(`needs.changes.outputs.${job} == 'true'`);
-    expect(ci.jobs[job].uses).toMatch(/\.yml$/);
+  for (const name of Object.values(PreflightJob).filter(name => name !== PreflightJob.Source)) {
+    const job = preflight.jobs[name];
+    expect(job.needs).toBe('source');
+    const checkout = job.steps?.find(step => step.uses === 'actions/checkout@v6');
+    expect(checkout?.with?.ref ?? job.with?.['source-ref']).toBe(
+      '${{ needs.source.outputs.commit }}',
+    );
   }
-  for (const job of Object.values(PathJob)) {
-    expect(ci.jobs[job].needs).toBe(BaselineJob.Changes);
-    expect(ci.jobs[job].if).toBe(`needs.changes.outputs.${job} == 'true'`);
-  }
-  for (const file of ['linux-install-pr.yml', 'windows-installer-pr.yml']) {
-    expect(workflow(file).on).toHaveProperty('workflow_call');
-    expect(workflow(file).on).not.toHaveProperty(CiEvent.PullRequest);
+  const quality = preflight.jobs.quality.steps?.map(step => step.run ?? '').join('\n');
+  expect(quality).toContain('bun run test:full');
+  expect(quality).toContain('bun run test:streaming-mutations');
+  expect(quality).toContain('bun run test:bundle-budget');
+});
+
+test('preflight refuses every missing, skipped, failed, or cancelled mandatory check', () => {
+  const required = Object.values(PreflightJob);
+  for (const name of required) {
+    for (const result of Object.values(JobResult).filter(value => value !== JobResult.Success)) {
+      const results = resultsFor([...required, ...Object.values(PackagingJob)]);
+      results[name].result = result;
+      expect(() => verifyPreflightResults(results, true)).toThrow();
+      delete results[name];
+      expect(() => verifyPreflightResults(results, true)).toThrow();
+    }
   }
 });
 
-test('tag release checks bind the source commit and block packaging before memory succeeds', () => {
+test('only tag builds may replace unsigned install runs with their signed package acceptance', () => {
+  const results = resultsFor(Object.values(PreflightJob));
+  for (const name of Object.values(PackagingJob)) results[name] = { result: JobResult.Skipped };
+  expect(() => verifyPreflightResults(results, false)).not.toThrow();
+  expect(() => verifyPreflightResults(results, true)).toThrow();
+  for (const name of Object.values(PackagingJob)) results[name].result = JobResult.Success;
+  expect(() => verifyPreflightResults(results, true)).not.toThrow();
+});
+
+test('release builds overlap preflight and publication waits for both', () => {
   const release = workflow('release.yml');
-  expect(release.on).toHaveProperty('push');
-  const memoryJob = release.jobs['memory-regression'];
-  expect(memoryJob.uses).toBe('./.github/workflows/memory-regression.yml');
-  expect(memoryJob.with?.['source-ref']).toBe('${{ needs.prepare-release.outputs.commit }}');
-  for (const jobName of ['build-windows', 'build-macos', 'build-linux']) {
-    expect(release.jobs[jobName].needs).toContain('memory-regression');
+  expect(release.jobs.preflight.uses).toBe('./.github/workflows/release-preflight.yml');
+  expect(release.jobs.preflight.with?.['include-packaging']).toBe(false);
+  for (const platform of ['windows', 'macos', 'linux']) {
+    expect(release.jobs[`build-${platform}`].needs).toBe('prepare-release');
+    expect(release.jobs[`publish-${platform}`].needs).toEqual(
+      expect.arrayContaining(['preflight', `build-${platform}`]),
+    );
+    expect(release.jobs[`publish-${platform}`].if).toContain("needs.preflight.result == 'success'");
   }
-  expect(release.jobs['build-windows'].uses).toBe('./.github/workflows/build-windows-release.yml');
-  expect(release.jobs['build-macos'].uses).toBe('./.github/workflows/build-inference-editions.yml');
-  const qualityCommands = release.jobs.quality.steps?.map(step => step.run ?? '').join('\n');
-  expect(qualityCommands).toContain('bun run build:tsc');
-  expect(qualityCommands).toContain('bun run test:bundle-budget');
-  const build = workflow('build-inference-editions.yml');
-  const steps = build.jobs.build.steps ?? [];
-  const install = steps.findIndex(step =>
-    step.run?.includes('sudo apt-get install -y "$(realpath'),
-  );
-  const payload = steps.findIndex(step => step.name === 'Assemble Linux release payload');
-  expect(install).toBeGreaterThan(-1);
-  expect(payload).toBeGreaterThan(install);
-  expect(steps[install].run).toContain('electron-builder.json');
-  expect(steps[install].run).not.toContain("'/opt/知远/知远'");
+});
+
+test('no secondary workflow can start heavy builds for a feature pull request', () => {
+  for (const file of readdirSync('.github/workflows').filter(
+    file => file.endsWith('.yml') && file !== 'ci.yml',
+  )) {
+    const triggers = workflow(file).on;
+    expect(triggers, file).not.toHaveProperty('pull_request');
+    expect(triggers, file).not.toHaveProperty('pull_request_target');
+  }
+  for (const file of [
+    'build-platforms.yml',
+    'windows-installer-pr.yml',
+    'memory-leak-nightly.yml',
+  ]) {
+    expect(workflow(file).on, file).not.toHaveProperty('schedule');
+  }
+});
+
+test('Windows CUDA preflight and release share exact caches and always verify restored output', () => {
+  for (const file of ['build-windows-release.yml', 'build-inference-editions.yml']) {
+    expect(readFileSync(`.github/workflows/${file}`, 'utf8')).toContain(
+      'uses: ./.github/actions/prepare-windows-cuda',
+    );
+  }
+  const action = load(readFileSync('.github/actions/prepare-windows-cuda/action.yml', 'utf8')) as {
+    runs: { steps: Array<Step & { if?: string }> };
+  };
+  const steps = action.runs.steps;
+  const restore = steps.find(step => step.uses === 'actions/cache/restore@v5');
+  expect(restore?.with).not.toHaveProperty('restore-keys');
+  expect(restore?.with?.key).not.toContain("hashFiles('package.json'");
+  const verify = steps.findIndex(step => step.run?.includes('runtime-tree-integrity.cjs verify'));
+  expect(steps[verify].if).toBeUndefined();
+  expect(steps[verify].run).toContain('verifyWindowsDllClosure');
+  const save = steps.findIndex(step => step.uses === 'actions/cache/save@v5');
+  expect(save).toBeGreaterThan(verify);
+  const build = steps.find(step => step.run?.includes('build-llamacpp-cuda-rtx40.sh win'));
+  expect(build?.if).toBe("steps.runtime.outputs.cache-hit != 'true'");
 });

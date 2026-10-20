@@ -1,0 +1,61 @@
+name: Prepare pinned Windows CUDA runtime
+description: Reuse exact toolchain output across preflight and release; verify restored bytes before use.
+
+runs:
+  using: composite
+  steps:
+    - id: identity
+      shell: bash
+      run: node -e "const fs=require('node:fs');const p=require('./package.json');const tag=p.llamacpp.runtimeReleaseTag;if(!/^[A-Za-z0-9._-]+$/.test(tag))throw new Error('Invalid runtime tag');fs.appendFileSync(process.env.GITHUB_OUTPUT,'tag='+tag+'\nimage='+(process.env.ImageVersion||'unknown')+'\n')"
+    - uses: actions/cache/restore@v5
+      id: runtime
+      with:
+        path: vendor/llamacpp/cuda
+        key: windows-cuda-v1-msvc2022-cuda12.4.1-sm89-${{ steps.identity.outputs.image }}-${{ steps.identity.outputs.tag }}-${{ hashFiles('resources/llamacpp-backends/manifest.json', 'scripts/*llamacpp*', 'scripts/windows-pe-imports*', 'scripts/bash-windows-path.sh', 'scripts/ci/runtime-tree-integrity.cjs', '.github/actions/prepare-windows-cuda/action.yml') }}
+    - name: Restore pinned CUDA source
+      if: steps.runtime.outputs.cache-hit != 'true'
+      uses: actions/cache@v5
+      with:
+        path: .cache/llama.cpp-src
+        key: cuda-source-${{ steps.identity.outputs.tag }}
+    - uses: Jimver/cuda-toolkit@v0.2.22
+      if: steps.runtime.outputs.cache-hit != 'true'
+      with:
+        cuda: '12.4.1'
+        method: network
+        sub-packages: '["nvcc", "cudart", "cublas", "cublas_dev"]'
+    - shell: bash
+      if: steps.runtime.outputs.cache-hit != 'true'
+      run: bash scripts/ensure-llamacpp-cuda-source.sh
+    - shell: powershell
+      if: steps.runtime.outputs.cache-hit != 'true'
+      run: choco install ninja -y
+    - uses: ilammy/msvc-dev-cmd@v1
+      if: steps.runtime.outputs.cache-hit != 'true'
+      with:
+        arch: x64
+    - name: Compile the pinned CUDA runtime only on a cache miss
+      if: steps.runtime.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        bash scripts/build-llamacpp-cuda-rtx40.sh win
+        LLAMACPP_CUDA_PLATFORM=win32 node scripts/finalize-llamacpp-cuda-edition.cjs
+        node scripts/ci/runtime-tree-integrity.cjs seal vendor/llamacpp/cuda
+    - name: Verify every cached file and the CUDA DLL closure
+      shell: bash
+      run: |
+        set -euo pipefail
+        node scripts/ci/runtime-tree-integrity.cjs verify vendor/llamacpp/cuda
+        node -e "const fs=require('node:fs');const root='vendor/llamacpp/cuda/bin';require('./scripts/windows-pe-imports.cjs').verifyWindowsDllClosure(root,'llama-server.exe',{extraRoots:fs.readdirSync(root).filter(n=>/^ggml-.*\.dll\$/i.test(n))})"
+    - name: Launch the CPU fallback with a clean PATH
+      shell: powershell
+      run: |
+        $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+        & .\vendor\llamacpp\cuda\cpu-fallback\llama-server.exe --version
+        if ($LASTEXITCODE -ne 0) { throw 'Cached CPU fallback cannot start' }
+    - uses: actions/cache/save@v5
+      if: steps.runtime.outputs.cache-hit != 'true'
+      with:
+        path: vendor/llamacpp/cuda
+        key: ${{ steps.runtime.outputs.cache-primary-key }}

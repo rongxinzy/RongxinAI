@@ -3,6 +3,10 @@ name: Linux install and startup gate
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      source-ref:
+        type: string
+        default: ''
     secrets:
       MODELSCOPE_TOKENS:
         required: false
@@ -19,6 +23,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
