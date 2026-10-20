@@ -33,7 +33,7 @@ export class SqliteStore {
     const basePath = userDataPath ?? app.getPath('userData');
     const dbPath = path.join(basePath, DB_FILENAME);
 
-    let db = openSqliteDatabaseWithRecovery(basePath, dbPath);
+    let db = await openSqliteDatabaseWithRecovery(basePath, dbPath);
 
     const autoBackupEnabled = SqliteStore.readSqliteAutoBackupEnabled(db);
     if (autoBackupEnabled) {
@@ -47,13 +47,13 @@ export class SqliteStore {
         } catch {
           // Ignore close failures before restore.
         }
-        const restoreResult = backupManager.restoreLatestBackup(dbPath);
+        const restoreResult = await backupManager.restoreLatestBackup(dbPath);
         if (!restoreResult.restored) {
           console.warn(
             '[SqliteBackup] No valid snapshot was restored; continuing with database reinitialization',
           );
         }
-        db = openSqliteDatabaseWithRecovery(basePath, dbPath);
+        db = await openSqliteDatabaseWithRecovery(basePath, dbPath);
       }
     }
 
