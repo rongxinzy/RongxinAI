@@ -269,8 +269,8 @@ export function applyApplicationRuntimeEnv(
         `  PATH entry: ${entry} (exists: ${existsSync(entry)})`,
       );
     }
-  } else {
-    // Fallback: append common node installation paths
+  } else if (process.platform !== 'win32') {
+    // Fallback on macOS/Linux: append common node installation paths
     const home = env.HOME || app.getPath('home');
     const commonPaths = [
       '/usr/local/bin',

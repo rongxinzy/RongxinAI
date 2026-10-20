@@ -34,6 +34,8 @@ export const CoworkSessionStatus = {
   Error: 'error',
 } as const;
 
+export type CoworkSessionStatus = (typeof CoworkSessionStatus)[keyof typeof CoworkSessionStatus];
+
 export const CoworkSessionMode = {
   Work: 'work',
   Chat: 'chat',

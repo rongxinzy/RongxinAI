@@ -9,7 +9,7 @@ import { rt } from './runtimeState';
 import { scheduleReload } from './windowManagement';
 import { reloadOnChildProcessGone } from './appEnv';
 import { agentResourceDiagnostics } from '../agentResourceDiagnostics';
-import { initLogger, log } from '../logger';
+import { initLogger, log, logGpuDiagnostics } from '../logger';
 import { shouldReloadRendererProcess } from '../rendererProcessRecovery';
 import { createUncaughtReporter, installStdioErrorGuards } from '../stdioErrorGuard';
 
@@ -17,8 +17,9 @@ export const bootstrapProcess = (): void => {
   configureUserDataPath();
   initLogger();
 
-  // 配置网络服务
+  // 配置网络服务与硬件诊断
   app.on('ready', () => {
+    void logGpuDiagnostics();
     agentResourceDiagnostics.setElectronMetricsProvider(() => app.getAppMetrics());
     // 配置网络服务重启策略
     app.configureHostResolver({
