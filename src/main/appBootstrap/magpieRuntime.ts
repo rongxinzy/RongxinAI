@@ -3,7 +3,7 @@ import path from 'path';
 
 import { app } from 'electron';
 
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { getOllamaManager, getStore } from './runtimeServices';
 import { MagpieManager } from '../magpie/manager';
@@ -113,10 +113,10 @@ export const setupMagpieRuntime = (): void => {
     inferenceRuntime.magpieManager,
     event =>
       Boolean(
-        rt.mainWindow &&
-        !rt.mainWindow.isDestroyed() &&
-        event.sender === rt.mainWindow.webContents &&
-        event.senderFrame === rt.mainWindow.webContents.mainFrame,
+        lifecycleRuntime.mainWindow &&
+        !lifecycleRuntime.mainWindow.isDestroyed() &&
+        event.sender === lifecycleRuntime.mainWindow.webContents &&
+        event.senderFrame === lifecycleRuntime.mainWindow.webContents.mainFrame,
       ),
     modelService,
   );

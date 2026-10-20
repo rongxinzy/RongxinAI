@@ -50,7 +50,7 @@ import {
 } from './appBootstrap/runtimeServices';
 import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
 import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
-import { rt } from './appBootstrap/runtimeState';
+import { lifecycleRuntime } from './appBootstrap/lifecycleRuntimeState';
 import { channelRuntime } from './appBootstrap/channelRuntimeState';
 import {
   getActiveMcpAuthorizations,
@@ -118,7 +118,7 @@ if (!gotTheLock) {
     setPreventSleepBlockerEnabled,
     showSystemMenu,
     reconcileCcConnectChannelSidecars,
-    getMainWindow: () => rt.mainWindow,
+    getMainWindow: () => lifecycleRuntime.mainWindow,
     hasIMGatewayManager: () => channelRuntime.gatewayManager !== null,
   });
   registerCommunityAuthIpc();

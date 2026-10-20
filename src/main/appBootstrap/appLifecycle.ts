@@ -1,7 +1,7 @@
 /** App quit lifecycle: cleanup orchestration, termination-signal handling, quit logging. */
 import { app, BrowserWindow } from 'electron';
 
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { agentRuntime } from './agentRuntimeState';
 import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
@@ -129,7 +129,7 @@ const handleTerminationSignal = (signal: NodeJS.Signals, origin: AppQuitOrigin) 
   logAppQuitContextOnce();
   console.log(`[AppLifecycle] Received ${signal}; running cleanup before exit.`);
   isCleanupInProgress = true;
-  rt.isQuitting = true;
+  lifecycleRuntime.isQuitting = true;
   void runAppCleanup()
     .catch(error => {
       console.error(`[Main] Cleanup error during ${signal}:`, error);
@@ -152,7 +152,7 @@ export const registerAppLifecycleHandlers = (): void => {
 
     logAppQuitContextOnce();
     isCleanupInProgress = true;
-    rt.isQuitting = true;
+    lifecycleRuntime.isQuitting = true;
 
     // The cleanup chain stops many services sequentially with no per-service
     // deadline; a single wedged stop used to block app.exit(0) forever, which

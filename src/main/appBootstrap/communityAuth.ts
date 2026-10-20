@@ -9,7 +9,7 @@ import { app, ipcMain, net, shell } from 'electron';
 
 import { isEnterprise } from './appEnv';
 import { getStore } from './runtimeServices';
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { COMMUNITY_AUTH_ORIGIN, configureCommunityAuthSession } from '../communityAuthSession';
 import { registerZhiyuanDeepLinkProtocol } from '../deepLinkRegistration';
 import { registerModelPoolIpcHandlers } from '../modelPoolIpc';
@@ -89,10 +89,10 @@ export const registerCommunityAuthBootstrap = (): void => {
     }
 
     // Focus main window
-    if (rt.mainWindow) {
-      if (rt.mainWindow.isMinimized()) rt.mainWindow.restore();
-      if (!rt.mainWindow.isVisible()) rt.mainWindow.show();
-      if (!rt.mainWindow.isFocused()) rt.mainWindow.focus();
+    if (lifecycleRuntime.mainWindow) {
+      if (lifecycleRuntime.mainWindow.isMinimized()) lifecycleRuntime.mainWindow.restore();
+      if (!lifecycleRuntime.mainWindow.isVisible()) lifecycleRuntime.mainWindow.show();
+      if (!lifecycleRuntime.mainWindow.isFocused()) lifecycleRuntime.mainWindow.focus();
     }
   });
 };
@@ -120,19 +120,20 @@ async function completeCommunityLogin(code: string, state: string): Promise<void
       throw new Error('Token exchange failed');
     }
     const user = communityAuthSession!.saveTokenPayload(payload);
-    rt.mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
+    lifecycleRuntime.mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
       success: true,
       user: { id: user.id, email: user.email, name: user.email },
     });
-    if (rt.mainWindow?.isMinimized()) rt.mainWindow.restore();
-    if (rt.mainWindow && !rt.mainWindow.isVisible()) rt.mainWindow.show();
-    rt.mainWindow?.focus();
+    if (lifecycleRuntime.mainWindow?.isMinimized()) lifecycleRuntime.mainWindow.restore();
+    if (lifecycleRuntime.mainWindow && !lifecycleRuntime.mainWindow.isVisible())
+      lifecycleRuntime.mainWindow.show();
+    lifecycleRuntime.mainWindow?.focus();
   } catch (error) {
     console.warn(
       '[CommunityAuth] login callback failed:',
       error instanceof Error ? error.message : error,
     );
-    rt.mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
+    lifecycleRuntime.mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
       success: false,
       error: t('communityAuthLoginIncomplete'),
     });

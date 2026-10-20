@@ -11,7 +11,7 @@ import { pathToFileURL } from 'url';
 import { app, BrowserWindow, dialog, net, powerMonitor, protocol } from 'electron';
 
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { agentRuntime } from './agentRuntimeState';
 import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
@@ -628,7 +628,10 @@ export const initApp = async (): Promise<void> => {
     }
 
     powerMonitor.on('resume', () => {
-      if (Date.now() - rt.lastSuccessfulAppUpdateCheckAt >= APP_UPDATE_POLL_INTERVAL_MS) {
+      if (
+        Date.now() - lifecycleRuntime.lastSuccessfulAppUpdateCheckAt >=
+        APP_UPDATE_POLL_INTERVAL_MS
+      ) {
         checkForAppUpdate();
       }
     });
@@ -664,7 +667,7 @@ export const initApp = async (): Promise<void> => {
       if (currentLanguage !== lastLanguage) {
         lastLanguage = currentLanguage;
         setLanguage(currentLanguage === 'en' ? 'en' : 'zh');
-        updateTrayMenu(() => rt.mainWindow);
+        updateTrayMenu(() => lifecycleRuntime.mainWindow);
       }
 
       const previousUseSystemProxy = oldConfig
@@ -697,9 +700,9 @@ export const initApp = async (): Promise<void> => {
 
     // 在 macOS 上，当点击 dock 图标时显示已有窗口或重新创建
     app.on('activate', () => {
-      if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
-        if (!rt.mainWindow.isVisible()) rt.mainWindow.show();
-        if (!rt.mainWindow.isFocused()) rt.mainWindow.focus();
+      if (lifecycleRuntime.mainWindow && !lifecycleRuntime.mainWindow.isDestroyed()) {
+        if (!lifecycleRuntime.mainWindow.isVisible()) lifecycleRuntime.mainWindow.show();
+        if (!lifecycleRuntime.mainWindow.isFocused()) lifecycleRuntime.mainWindow.focus();
         return;
       }
       if (BrowserWindow.getAllWindows().length === 0) {

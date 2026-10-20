@@ -152,7 +152,7 @@ vi.mock('../../scheduledTask/sqliteScheduledTaskStore', () => ({
 import { BrowserWindow } from 'electron';
 
 import { createMainWindow } from './mainWindow';
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 
 const mockWindowClass = BrowserWindow as unknown as {
   instances: MockWindow[];
@@ -166,7 +166,7 @@ const currentWindow = (): MockWindow => {
 
 beforeEach(() => {
   mockWindowClass.instances = [];
-  rt.mainWindow = null;
+  lifecycleRuntime.mainWindow = null;
   mocks.unregisterContextMenu.mockClear();
   vi.clearAllMocks();
 });
@@ -177,7 +177,7 @@ describe('createMainWindow', () => {
 
     expect(mockWindowClass.instances).toHaveLength(1);
     const window = currentWindow();
-    expect(rt.mainWindow).toBe(window);
+    expect(lifecycleRuntime.mainWindow).toBe(window);
     expect(window.loadFile).toHaveBeenCalledTimes(1);
     expect(window.loadFile.mock.calls[0][0]).toContain('dist/index.html');
     expect(window.setMinimumSize).toHaveBeenCalledWith(1024, 740);
@@ -234,7 +234,7 @@ describe('createMainWindow', () => {
 
     window.emit('closed');
 
-    expect(rt.mainWindow).toBeNull();
+    expect(lifecycleRuntime.mainWindow).toBeNull();
     expect(mocks.unregisterContextMenu).toHaveBeenCalled();
     window.emitWebContents('did-finish-load');
   });
