@@ -65,6 +65,10 @@ try {
   assert.equal(unsigned.executableName, '知远企业版');
   assert.equal(unsigned.appId, 'com.zhiyuanagent.enterprise');
   assert.deepEqual(unsigned.protocols, []);
+  // The ASCII-only fallback in electron-builder's install-dir resolution uses
+  // the package.json name; without this override both editions share it and
+  // default into the same Programs\zhiyuan-agent directory.
+  assert.equal(unsigned.extraMetadata.name, 'zhiyuan-agent-enterprise');
   assert.equal(unsigned.win.signtoolOptions, undefined);
   assert.deepEqual(unsigned.win.signExts, base.win.signExts);
   assert.ok(unsigned.win.extraResources.length > 0, 'win extraResources must be preserved');
@@ -120,7 +124,7 @@ try {
       {
         status: 'passed',
         checks: [
-          'enterprise product identity overrides (productName, executableName, appId, protocols)',
+          'enterprise product identity overrides (productName, executableName, appId, protocols, extraMetadata.name)',
           'base extraResources and win options preserved',
           'enterprise extraResources mapping honors env overrides',
           'signtoolOptions present only with a valid CERTUM_CERT_THUMBPRINT',

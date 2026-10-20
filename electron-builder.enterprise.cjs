@@ -63,11 +63,18 @@ const config = {
   ...baseConfig,
   // Enterprise packages must be distinguishable from the public Zhiyuan build
   // in Windows Explorer, the Start menu, the taskbar, and the installer
-  // filename. A distinct appId keeps both products fully isolated: otherwise
-  // the NSIS installer treats the community install as the same product.
+  // filename. The distinct appId separates the uninstall registry entries but
+  // NOT the install directory: electron-builder derives the default directory
+  // from the product name only when it is pure ASCII and otherwise falls back
+  // to the package.json name, which this overlay shares with the community
+  // build — so both products used to default into the same
+  // %LocalAppData%\Programs\zhiyuan-agent and overwrite each other's files.
+  // extraMetadata.name gives this build its own sanitizedName and therefore
+  // its own default directory (Programs\zhiyuan-agent-enterprise).
   productName: '知远企业版',
   executableName: '知远企业版',
   appId: 'com.zhiyuanagent.enterprise',
+  extraMetadata: { ...(baseConfig.extraMetadata || {}), name: 'zhiyuan-agent-enterprise' },
   // The community browser-login deep link belongs to the community build. The
   // enterprise build uses in-app password login and must not claim the scheme.
   protocols: [],
