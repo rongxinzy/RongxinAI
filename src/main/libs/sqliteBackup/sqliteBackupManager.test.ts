@@ -1,5 +1,31 @@
 import Database from 'better-sqlite3';
+import crypto from 'crypto';
 import fs from 'fs';
+import { vi } from 'vitest';
+
+// The real implementations spawn compiled workers (dist-electron/*.js);
+// tests run the same checks in-process instead.
+vi.mock('./sqliteVerify', () => ({
+  verifySqliteFile: async (filePath: string, mode: string) => {
+    const db = new Database(filePath, { readonly: true });
+    try {
+      return {
+        check: String(db.prepare(`PRAGMA ${mode}`).pluck().get() ?? ''),
+        userVersion: Number(db.pragma('user_version', { simple: true })) || 0,
+        schemaVersion: Number(db.pragma('schema_version', { simple: true })) || 0,
+      };
+    } finally {
+      db.close();
+    }
+  },
+}));
+vi.mock('../fileHasher', () => ({
+  sha256FileStream: async (filePath: string) => {
+    const hash = crypto.createHash('sha256');
+    hash.update(fs.readFileSync(filePath));
+    return hash.digest('hex');
+  },
+}));
 import os from 'os';
 import path from 'path';
 import { afterEach, expect, test } from 'vitest';
