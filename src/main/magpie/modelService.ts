@@ -1,4 +1,4 @@
-import type { MagpieRoutingGroup, MagpieRoutingState } from '../../shared/magpie/routingUsage';
+import type { MagpieRoutingGroup } from '../../shared/magpie/routingUsage';
 import type {
   MagpieModel,
   MagpieModelCatalog,

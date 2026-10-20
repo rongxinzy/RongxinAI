@@ -14,8 +14,6 @@ import {
   type MagpieUsageTotals,
 } from '../../shared/magpie/routingUsage';
 
-const USAGE_PERIODS = new Set<string>(Object.values(MagpieUsagePeriod));
-
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -127,7 +125,7 @@ function sanitizeMembers(members: string[]): string[] {
   return members.filter(m => typeof m === 'string' && m.length <= 500).slice(0, 200);
 }
 
-export function buildRoutingGroupSaveBody(
+function buildRoutingGroupSaveBody(
   input: MagpieRoutingGroupSaveInput,
 ): Record<string, unknown> {
   const id = input.id.trim();
