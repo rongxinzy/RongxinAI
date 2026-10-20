@@ -12,15 +12,11 @@ vi.mock('electron', () => ({
 
 import { getAllowedShellProbeRoots } from './index';
 
-const getCoworkStore = () =>
-  ({ listWorkspaces: () => [{ path: '/ws/cowork' }] }) as never;
+const getCoworkStore = () => ({ listWorkspaces: () => [{ path: '/ws/cowork' }] }) as never;
 
 describe('getAllowedShellProbeRoots', () => {
   test('includes coding workspace roots alongside cowork and standard roots', () => {
-    const roots = getAllowedShellProbeRoots(getCoworkStore, () => [
-      '/ws/coding-a',
-      '/ws/coding-b',
-    ]);
+    const roots = getAllowedShellProbeRoots(getCoworkStore, () => ['/ws/coding-a', '/ws/coding-b']);
     expect(roots).toContain('/ws/coding-a');
     expect(roots).toContain('/ws/coding-b');
     expect(roots).toContain('/ws/cowork');
