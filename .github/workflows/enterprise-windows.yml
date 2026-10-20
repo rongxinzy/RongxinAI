@@ -194,6 +194,7 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-installer-smoke.ps1
           -ProjectRoot '${{ github.workspace }}'
+          -InstallDirName 'zhiyuan-agent-enterprise'
 
       - name: Write installer checksums
         shell: pwsh
