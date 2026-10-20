@@ -27,8 +27,8 @@ const compressionAction = './.github/actions/verify-windows-compression';
 const windows = workflow('windows-installer-pr.yml');
 const steps = windows.jobs['package-and-install'].steps;
 
-test('PRs defer compression qualification while manual and scheduled builds retain it', () => {
-  expect(windows.on).toHaveProperty('schedule');
+test('compression qualification is explicit release preparation and never starts for feature PRs', () => {
+  expect(windows.on).not.toHaveProperty('schedule');
   expect(windows.on).toHaveProperty('workflow_dispatch');
   expect(windows.on).toHaveProperty('workflow_call');
   expect(steps.find(step => step.uses === compressionAction)?.if).toBe(

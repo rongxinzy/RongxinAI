@@ -201,14 +201,17 @@ test('release supply-chain gates track every checked-in npm lockfile', () => {
     path.join(root, 'scripts', 'ci', 'check-supply-chain-inputs.mjs'),
     'utf8',
   );
-  const workflow = readFileSync(path.join(root, '.github', 'workflows', 'release.yml'), 'utf8');
+  const workflow = readFileSync(
+    path.join(root, '.github', 'workflows', 'release-preflight.yml'),
+    'utf8',
+  );
   const policyLockfiles = Array.from(
     policy.matchAll(/^\s+'([^']+package-lock\.json)',?$/gm),
     match => match[1],
   ).sort();
   const signatureStep = workflow.slice(
     workflow.indexOf('- name: Verify npm package signatures'),
-    workflow.indexOf('- name: Enforce approved package sources'),
+    workflow.indexOf('- name: Validate source and dependency policy'),
   );
   const workflowLockfiles = Array.from(
     signatureStep.matchAll(/^\s+([^\s]+package-lock\.json)(?: \\|; do)?$/gm),

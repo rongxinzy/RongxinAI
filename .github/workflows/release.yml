@@ -59,79 +59,17 @@ jobs:
             echo "- source commit: \`$source_commit\`"
             echo '- channel: beta (stable requires promote workflow)'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Install release tools
-        run: |
-          pipx install 'awscli>=1.45.10,<2'
-          npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
-
-  memory-regression:
+  preflight:
     needs: prepare-release
-    uses: ./.github/workflows/memory-regression.yml
+    uses: ./.github/workflows/release-preflight.yml
     with:
       source-ref: ${{ needs.prepare-release.outputs.commit }}
-
-  quality:
-    needs: prepare-release
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare-release.outputs.commit }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: oven-sh/setup-bun@v2
-        with: { bun-version: '1.4.0' }
-      - name: Restore Bun and Electron caches
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ~/.cache/electron
-            ~/.cache/electron-builder
-          key: release-quality-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            release-quality-${{ runner.os }}-1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
-      - name: Verify npm package signatures
-        shell: bash
-        run: |
-          set -euo pipefail
-          for lockfile in \
-            SKILLs/presentation-studio/package-lock.json \
-            SKILLs/web-search/package-lock.json \
-            scripts/release/package-lock.json; do
-            directory="$(dirname "$lockfile")"
-            npm --prefix "$directory" ci --ignore-scripts
-            npm --prefix "$directory" audit signatures --package-lock-only --ignore-scripts
-          done
-      - name: Validate source and dependency policy
-        run: |
-          bun run validate:skills
-          node scripts/ci/check-openclaw-decoupling.mjs
-          bun run check:supply-chain-inputs
-          bun run lint
-      - name: Typecheck and enforce renderer bundle budgets
-        run: |
-          bun run build:tsc
-          bun run build:vite
-          bun run test:bundle-budget
-        env:
-          VITE_SKIP_ELECTRON: '1'
-      - name: Verify Presentation Studio compiler and validator
-        run: npm test --prefix SKILLs/presentation-studio
-      - name: Compile Electron sources used by integration tests
-        run: bun run compile:electron
-      - name: Install Electron for native ABI integration tests
-        run: node node_modules/electron/install.js
-      - name: Run tests
-        run: bun run test
+      include-packaging: false
+    secrets:
+      MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
 
   build-windows:
-    needs: [prepare-release, quality, memory-regression]
+    needs: prepare-release
     uses: ./.github/workflows/build-windows-release.yml
     with:
       source-ref: ${{ needs.prepare-release.outputs.commit }}
@@ -145,7 +83,7 @@ jobs:
       MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
 
   build-macos:
-    needs: [prepare-release, quality, memory-regression]
+    needs: prepare-release
     uses: ./.github/workflows/build-inference-editions.yml
     with:
       source-ref: ${{ needs.prepare-release.outputs.commit }}
@@ -166,7 +104,7 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
   build-linux:
-    needs: [prepare-release, quality, memory-regression]
+    needs: prepare-release
     uses: ./.github/workflows/build-inference-editions.yml
     with:
       source-ref: ${{ needs.prepare-release.outputs.commit }}
@@ -182,8 +120,8 @@ jobs:
       MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
 
   publish-windows:
-    needs: [prepare-release, build-windows]
-    if: ${{ needs.build-windows.result == 'success' }}
+    needs: [prepare-release, preflight, build-windows]
+    if: ${{ needs.preflight.result == 'success' && needs.build-windows.result == 'success' }}
     uses: ./.github/workflows/publish-platform-release.yml
     with:
       platform: win32
@@ -198,8 +136,8 @@ jobs:
       UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
 
   publish-macos:
-    needs: [prepare-release, build-macos]
-    if: ${{ needs.build-macos.result == 'success' }}
+    needs: [prepare-release, preflight, build-macos]
+    if: ${{ needs.preflight.result == 'success' && needs.build-macos.result == 'success' }}
     uses: ./.github/workflows/publish-platform-release.yml
     with:
       platform: darwin
@@ -214,8 +152,8 @@ jobs:
       UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
 
   publish-linux:
-    needs: [prepare-release, build-linux]
-    if: ${{ needs.build-linux.result == 'success' }}
+    needs: [prepare-release, preflight, build-linux]
+    if: ${{ needs.preflight.result == 'success' && needs.build-linux.result == 'success' }}
     uses: ./.github/workflows/publish-platform-release.yml
     with:
       platform: linux
