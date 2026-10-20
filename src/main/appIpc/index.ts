@@ -1,17 +1,13 @@
 /** App-level IPC: hardware, network, logs, auto-launch, prevent-sleep, window controls, devtools. */
 import { app, BrowserWindow, dialog, ipcMain, type WebContents } from 'electron';
 
-import { isDev, isEnterprise } from './appEnv';
-import { rt } from './runtimeState';
-import { getStore, setPreventSleepBlockerEnabled } from './runtimeServices';
-import { showSystemMenu } from './windowManagement';
 import { ensureZipFileName } from '../coworkIpc/fileExportHelpers';
 import path from 'path';
 
 import { shell } from 'electron';
 
 import { buildLogExportFileName } from '../coworkIpc/fileExportHelpers';
-import { reconcileCcConnectChannelSidecars } from './ccConnectRuntime';
+import type { SqliteStore } from '../sqliteStore';
 import { getLogFilePath, getRecentMainLogEntries } from '../logger';
 import { getAutoLaunchEnabled, setAutoLaunchEnabled } from '../autoLaunchManager';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
@@ -29,29 +25,39 @@ import {
 } from '../libs/inferenceEditionPolicy';
 
 /** 2026/09/14 lisa  打开开发调试面板 **/
-const canUseDevTools = (): boolean => isDev || !app.isPackaged;
+const canUseDevTools = (isDev: () => boolean): boolean => isDev() || !app.isPackaged;
 
 export const openDevToolsWindow = (webContents: WebContents): void => {
   // Docked mode is more discoverable than a detached window that can open
   // off-screen on multi-monitor Windows setups.
   webContents.openDevTools({ mode: 'right', activate: true });
-  if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
-    rt.mainWindow.show();
-    rt.mainWindow.focus();
-  }
 };
 
-export const toggleDevToolsForSender = (webContents?: WebContents | null): boolean => {
-  if (!canUseDevTools()) return false;
-  const target =
-    webContents && !webContents.isDestroyed() ? webContents : rt.mainWindow?.webContents;
-  if (!target || target.isDestroyed()) return false;
-  if (target.isDevToolsOpened()) target.closeDevTools();
-  else openDevToolsWindow(target);
+export const toggleDevToolsForSender = (
+  webContents: WebContents | null | undefined,
+  isDev: () => boolean,
+): boolean => {
+  if (!canUseDevTools(isDev)) return false;
+  if (!webContents || webContents.isDestroyed()) return false;
+  if (webContents.isDevToolsOpened()) webContents.closeDevTools();
+  else openDevToolsWindow(webContents);
   return true;
 };
 
-export const registerAppIpc = (): void => {
+export interface AppIpcDeps {
+  isDev: () => boolean;
+  isEnterprise: () => boolean;
+  getStore: () => SqliteStore;
+  setPreventSleepBlockerEnabled: (enabled: boolean) => void;
+  showSystemMenu: (position?: { x?: number; y?: number }) => void;
+  reconcileCcConnectChannelSidecars: () => Promise<void>;
+  getMainWindow: () => Electron.BrowserWindow | null;
+  hasIMGatewayManager: () => boolean;
+}
+
+export const registerAppIpc = (deps: AppIpcDeps): void => {
+  const toggleDevToolsForSenderSafe = (webContents: WebContents | null | undefined): boolean =>
+    toggleDevToolsForSender(webContents, deps.isDev);
   ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
   ipcMain.handle(HardwareIpc.SystemMemory, async () => getSystemMemorySnapshot());
 
@@ -61,9 +67,9 @@ export const registerAppIpc = (): void => {
   ipcMain.on('network:status-change', (_event, status: 'online' | 'offline') => {
     console.log(`[Main] Network status changed: ${status}`);
 
-    if (status === 'online' && rt.imGatewayManager) {
+    if (status === 'online' && deps.hasIMGatewayManager()) {
       console.log('[Main] Network restored, reconciling channel sidecars...');
-      void reconcileCcConnectChannelSidecars();
+      void deps.reconcileCcConnectChannelSidecars();
     }
   });
 
@@ -135,11 +141,11 @@ export const registerAppIpc = (): void => {
     },
 
     // Auto-launch IPC handlers
-    // Use SQLite rt.store as the source of truth for UI state, because
+    // Use SQLite deps.getStore() as the source of truth for UI state, because
     // app.getLoginItemSettings() returns unreliable values on macOS and
     // requires matching args on Windows.
     autoLaunchGet: async () => {
-      const stored = getStore().get<boolean>('auto_launch_enabled');
+      const stored = deps.getStore().get<boolean>('auto_launch_enabled');
       // Fall back to OS API if SQLite has no record yet (e.g. upgraded from older version)
       const enabled = stored ?? getAutoLaunchEnabled();
       return { enabled };
@@ -148,7 +154,7 @@ export const registerAppIpc = (): void => {
     autoLaunchSet: async (_event, enabled) => {
       try {
         setAutoLaunchEnabled(enabled);
-        getStore().set('auto_launch_enabled', enabled);
+        deps.getStore().set('auto_launch_enabled', enabled);
         return { success: true };
       } catch (error) {
         return {
@@ -159,14 +165,14 @@ export const registerAppIpc = (): void => {
     },
 
     preventSleepGet: async () => {
-      const enabled = getStore().get<boolean>('prevent_sleep_enabled') ?? false;
+      const enabled = deps.getStore().get<boolean>('prevent_sleep_enabled') ?? false;
       return { enabled };
     },
 
     preventSleepSet: async (_event, enabled) => {
       try {
-        setPreventSleepBlockerEnabled(enabled);
-        getStore().set('prevent_sleep_enabled', enabled);
+        deps.setPreventSleepBlockerEnabled(enabled);
+        deps.getStore().set('prevent_sleep_enabled', enabled);
         return { success: true };
       } catch (error) {
         return {
@@ -186,44 +192,46 @@ export const registerAppIpc = (): void => {
 
   // Window control IPC handlers
   ipcMain.on('window-minimize', () => {
-    rt.mainWindow?.minimize();
+    deps.getMainWindow()?.minimize();
   });
 
   ipcMain.on('window-maximize', () => {
-    if (rt.mainWindow?.isMaximized()) {
-      rt.mainWindow.unmaximize();
+    if (deps.getMainWindow()?.isMaximized()) {
+      deps.getMainWindow().unmaximize();
     } else {
-      rt.mainWindow?.maximize();
+      deps.getMainWindow()?.maximize();
     }
   });
 
   ipcMain.on('window-close', () => {
-    rt.mainWindow?.close();
+    deps.getMainWindow()?.close();
   });
 
   ipcMain.on(
     'window:showSystemMenu',
     (_event, position: { x?: number; y?: number } | undefined) => {
-      showSystemMenu(position);
+      deps.showSystemMenu(position);
     },
   );
 
   handleIpcContractSubset(appSystemContract, {
     windowIsMaximized: async () => {
-      return rt.mainWindow?.isMaximized() ?? false;
+      return deps.getMainWindow()?.isMaximized() ?? false;
     },
-    windowToggleDevTools: async event => toggleDevToolsForSender(event.sender),
+    windowToggleDevTools: async event => toggleDevToolsForSenderSafe(event.sender),
     windowOpenDevTools: async event => {
-      if (!canUseDevTools()) return false;
-      const target = event.sender?.isDestroyed?.() ? rt.mainWindow?.webContents : event.sender;
+      if (!canUseDevTools(deps.isDev)) return false;
+      const target = event.sender?.isDestroyed?.()
+        ? deps.getMainWindow()?.webContents
+        : event.sender;
       if (!target || target.isDestroyed()) return false;
       openDevToolsWindow(target);
       return true;
     },
 
     appGetVersion: async () => app.getVersion(),
-    appIsDev: async () => canUseDevTools(), // 开发环境打开调试面板
-    appIsEnterprise: async () => isEnterprise,
+    appIsDev: async () => canUseDevTools(deps.isDev), // 开发环境打开调试面板
+    appIsEnterprise: async () => deps.isEnterprise(),
     appGetSystemLocale: async () => app.getLocale(),
     appGetInferenceEdition: async () => resolveEffectiveInferenceEdition(),
     appUsesBundledLlamaCppRuntime: async () => usesBundledLlamaCppRuntime(),

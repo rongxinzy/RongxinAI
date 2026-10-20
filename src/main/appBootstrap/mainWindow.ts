@@ -8,7 +8,7 @@ import { DEV_SERVER_URL, isDev, isLinuxRendererSmoke, isMac } from './appEnv';
 import { rt } from './runtimeState';
 import { PRELOAD_PATH, applyWindowsWindowIcon } from './windowBranding';
 import { emitWindowState, schedulePersistAppWindowState } from './windowManagement';
-import { openDevToolsWindow, toggleDevToolsForSender } from './appIpc';
+import { openDevToolsWindow, toggleDevToolsForSender } from '../appIpc';
 import { isWecomAuthUrl } from './windowSecurity';
 import { logAppQuitContextOnce } from './appLifecycle';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
@@ -226,7 +226,7 @@ export const createMainWindow = (): void => {
           ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i');
         if (!isToggleShortcut) return;
         event.preventDefault();
-        toggleDevToolsForSender(rt.mainWindow?.webContents);
+        toggleDevToolsForSender(rt.mainWindow?.webContents, () => isDev);
       });
     } else {
       // 生产环境

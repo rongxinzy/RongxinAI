@@ -1,6 +1,4 @@
 /** IM per-instance IPC: DingTalk / QQ / Feishu / WeCom / Telegram / Discord add & delete. */
-import { getIMGatewayManager } from './ccConnectRuntime';
-import { scheduleImConfigSync } from './imGatewayIpc';
 import type {
   DingTalkInstanceConfig,
   DiscordInstanceConfig,
@@ -12,7 +10,16 @@ import type {
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { feishuInstallContract, imInstanceContract } from '../../shared/ipc/imContract';
 
-export const registerImInstanceIpc = (): void => {
+import { scheduleImConfigSync } from './gateway';
+
+import type { ChannelAccountManager } from '../im/channelAccountManager';
+
+export interface ImInstanceIpcDeps {
+  getIMGatewayManager: () => ChannelAccountManager;
+  reconcileCcConnectChannelSidecars: () => Promise<void>;
+}
+
+export const registerImInstanceIpc = (deps: ImInstanceIpcDeps): void => {
   handleIpcContract(imInstanceContract, {
     addDingTalkInstance: async (_event, name: string, workspaceId: string) => {
       try {
@@ -24,8 +31,8 @@ export const registerImInstanceIpc = (): void => {
           instanceName: name || 'DingTalk Bot',
           workspaceId,
         };
-        getIMGatewayManager().getIMStore().setDingTalkInstanceConfig(instanceId, instance);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().setDingTalkInstanceConfig(instanceId, instance);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true, instance };
       } catch (error) {
         return {
@@ -37,8 +44,8 @@ export const registerImInstanceIpc = (): void => {
 
     deleteDingTalkInstance: async (_event, instanceId: string) => {
       try {
-        getIMGatewayManager().getIMStore().deleteDingTalkInstance(instanceId);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().deleteDingTalkInstance(instanceId);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true };
       } catch (error) {
         return {
@@ -55,9 +62,9 @@ export const registerImInstanceIpc = (): void => {
       options?: { syncGateway?: boolean },
     ) => {
       try {
-        getIMGatewayManager().getIMStore().setDingTalkInstanceConfig(instanceId, config);
+        deps.getIMGatewayManager().getIMStore().setDingTalkInstanceConfig(instanceId, config);
         if (options?.syncGateway) {
-          scheduleImConfigSync();
+          scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         }
         return { success: true };
       } catch (error) {
@@ -79,8 +86,8 @@ export const registerImInstanceIpc = (): void => {
           instanceName: name || 'QQ Bot',
           workspaceId,
         };
-        getIMGatewayManager().getIMStore().setQQInstanceConfig(instanceId, instance);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().setQQInstanceConfig(instanceId, instance);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true, instance };
       } catch (error) {
         return {
@@ -92,8 +99,8 @@ export const registerImInstanceIpc = (): void => {
 
     deleteQQInstance: async (_event, instanceId: string) => {
       try {
-        getIMGatewayManager().getIMStore().deleteQQInstance(instanceId);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().deleteQQInstance(instanceId);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true };
       } catch (error) {
         return {
@@ -110,9 +117,9 @@ export const registerImInstanceIpc = (): void => {
       options?: { syncGateway?: boolean },
     ) => {
       try {
-        getIMGatewayManager().getIMStore().setQQInstanceConfig(instanceId, config);
+        deps.getIMGatewayManager().getIMStore().setQQInstanceConfig(instanceId, config);
         if (options?.syncGateway) {
-          scheduleImConfigSync();
+          scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         }
         return { success: true };
       } catch (error) {
@@ -134,8 +141,8 @@ export const registerImInstanceIpc = (): void => {
           instanceName: name || 'Feishu Bot',
           workspaceId,
         };
-        getIMGatewayManager().getIMStore().setFeishuInstanceConfig(instanceId, instance);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().setFeishuInstanceConfig(instanceId, instance);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true, instance };
       } catch (error) {
         return {
@@ -147,8 +154,8 @@ export const registerImInstanceIpc = (): void => {
 
     deleteFeishuInstance: async (_event, instanceId: string) => {
       try {
-        getIMGatewayManager().getIMStore().deleteFeishuInstance(instanceId);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().deleteFeishuInstance(instanceId);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true };
       } catch (error) {
         return {
@@ -165,9 +172,9 @@ export const registerImInstanceIpc = (): void => {
       options?: { syncGateway?: boolean },
     ) => {
       try {
-        getIMGatewayManager().getIMStore().setFeishuInstanceConfig(instanceId, config);
+        deps.getIMGatewayManager().getIMStore().setFeishuInstanceConfig(instanceId, config);
         if (options?.syncGateway) {
-          scheduleImConfigSync();
+          scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         }
         return { success: true };
       } catch (error) {
@@ -189,8 +196,8 @@ export const registerImInstanceIpc = (): void => {
           instanceName: name || 'WeCom Bot',
           workspaceId,
         };
-        getIMGatewayManager().getIMStore().setWecomInstanceConfig(instanceId, instance);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().setWecomInstanceConfig(instanceId, instance);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true, instance };
       } catch (error) {
         return {
@@ -202,8 +209,8 @@ export const registerImInstanceIpc = (): void => {
 
     deleteWecomInstance: async (_event, instanceId: string) => {
       try {
-        getIMGatewayManager().getIMStore().deleteWecomInstance(instanceId);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().deleteWecomInstance(instanceId);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true };
       } catch (error) {
         return {
@@ -220,9 +227,9 @@ export const registerImInstanceIpc = (): void => {
       options?: { syncGateway?: boolean },
     ) => {
       try {
-        getIMGatewayManager().getIMStore().setWecomInstanceConfig(instanceId, config);
+        deps.getIMGatewayManager().getIMStore().setWecomInstanceConfig(instanceId, config);
         if (options?.syncGateway) {
-          scheduleImConfigSync();
+          scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         }
         return { success: true };
       } catch (error) {
@@ -244,8 +251,8 @@ export const registerImInstanceIpc = (): void => {
           instanceName: name || 'Telegram Bot',
           workspaceId,
         };
-        getIMGatewayManager().getIMStore().setTelegramInstanceConfig(instanceId, instance);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().setTelegramInstanceConfig(instanceId, instance);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true, instance };
       } catch (error) {
         return {
@@ -257,8 +264,8 @@ export const registerImInstanceIpc = (): void => {
 
     deleteTelegramInstance: async (_event, instanceId: string) => {
       try {
-        getIMGatewayManager().getIMStore().deleteTelegramInstance(instanceId);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().deleteTelegramInstance(instanceId);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true };
       } catch (error) {
         return {
@@ -275,9 +282,9 @@ export const registerImInstanceIpc = (): void => {
       options?: { syncGateway?: boolean },
     ) => {
       try {
-        getIMGatewayManager().getIMStore().setTelegramInstanceConfig(instanceId, config);
+        deps.getIMGatewayManager().getIMStore().setTelegramInstanceConfig(instanceId, config);
         if (options?.syncGateway) {
-          scheduleImConfigSync();
+          scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         }
         return { success: true };
       } catch (error) {
@@ -299,8 +306,8 @@ export const registerImInstanceIpc = (): void => {
           instanceName: name || 'Discord Bot',
           workspaceId,
         };
-        getIMGatewayManager().getIMStore().setDiscordInstanceConfig(instanceId, instance);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().setDiscordInstanceConfig(instanceId, instance);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true, instance };
       } catch (error) {
         return {
@@ -312,8 +319,8 @@ export const registerImInstanceIpc = (): void => {
 
     deleteDiscordInstance: async (_event, instanceId: string) => {
       try {
-        getIMGatewayManager().getIMStore().deleteDiscordInstance(instanceId);
-        scheduleImConfigSync();
+        deps.getIMGatewayManager().getIMStore().deleteDiscordInstance(instanceId);
+        scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         return { success: true };
       } catch (error) {
         return {
@@ -330,9 +337,9 @@ export const registerImInstanceIpc = (): void => {
       options?: { syncGateway?: boolean },
     ) => {
       try {
-        getIMGatewayManager().getIMStore().setDiscordInstanceConfig(instanceId, config);
+        deps.getIMGatewayManager().getIMStore().setDiscordInstanceConfig(instanceId, config);
         if (options?.syncGateway) {
-          scheduleImConfigSync();
+          scheduleImConfigSync(deps.reconcileCcConnectChannelSidecars);
         }
         return { success: true };
       } catch (error) {
@@ -348,7 +355,7 @@ export const registerImInstanceIpc = (): void => {
   handleIpcContract(feishuInstallContract, {
     verify: async (_event, { appId, appSecret }) => {
       try {
-        return await getIMGatewayManager().verifyFeishuCredentials(appId, appSecret);
+        return await deps.getIMGatewayManager().verifyFeishuCredentials(appId, appSecret);
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : '验证失败' };
       }
