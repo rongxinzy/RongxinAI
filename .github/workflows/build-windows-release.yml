@@ -173,8 +173,8 @@ jobs:
               [[ "$(basename "$file")" == ZhiYuanAgent-Setup-* ]] || updaters+=("$file")
             done
             local blockmaps=(release/*.exe.blockmap)
-            local metadata="release/electron-updater/latest.yml"
-            [[ "$edition" != "lite" ]] && metadata="release/electron-updater/latest-${edition}.yml"
+            local metadata="release/electron-updater/${edition}/latest.yml"
+            mkdir -p "release/electron-updater/${edition}"
             node scripts/release/normalize-electron-updater-metadata.mjs \
               '${{ inputs.app-build-version }}' win32 x64 "$edition" \
               release/latest.yml "$metadata"
