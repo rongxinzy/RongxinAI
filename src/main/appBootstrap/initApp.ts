@@ -12,6 +12,7 @@ import { app, BrowserWindow, dialog, net, powerMonitor, protocol } from 'electro
 
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
 import { rt } from './runtimeState';
+import { inferenceRuntime } from './inferenceRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
 import {
   AppConfigSettings,
@@ -371,28 +372,31 @@ export const initApp = async (): Promise<void> => {
     });
     const localInferenceManager = getLlamaCppManager();
     localInferenceManager.initializeModelsDir();
-    rt.llamaCppModelOrchestrator = registerLlamaCppIpcHandlers(localInferenceManager, {
-      getStore,
-      onModelBindingsChanged: async (url, models) => {
-        rt.managedMagpieBindings?.setGpuSnapshot(url, models);
-        if (rt.magpieManager?.status().state === 'running')
-          await rt.managedMagpieBindings?.synchronize();
+    inferenceRuntime.llamaCppModelOrchestrator = registerLlamaCppIpcHandlers(
+      localInferenceManager,
+      {
+        getStore,
+        onModelBindingsChanged: async (url, models) => {
+          inferenceRuntime.managedMagpieBindings?.setGpuSnapshot(url, models);
+          if (inferenceRuntime.magpieManager?.status().state === 'running')
+            await inferenceRuntime.managedMagpieBindings?.synchronize();
+        },
+        onLanAccessChanged: async () => {
+          await inferenceRuntime.magpieManager?.onLanAccessChanged();
+        },
+        onLanAccessTokenRegenerated: async () => {
+          await inferenceRuntime.magpieManager?.onLanAccessTokenRegenerated();
+        },
       },
-      onLanAccessChanged: async () => {
-        await rt.magpieManager?.onLanAccessChanged();
-      },
-      onLanAccessTokenRegenerated: async () => {
-        await rt.magpieManager?.onLanAccessTokenRegenerated();
-      },
-    });
+    );
     // Warm the short-lived backend cache before the runtime settings dialog is opened.
     void localInferenceManager.listBackends();
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
       onModelBindingsChanged: async snapshot => {
-        rt.managedMagpieBindings?.setOllamaSnapshot(snapshot);
-        if (rt.magpieManager?.status().state === 'running')
-          await rt.managedMagpieBindings?.synchronize();
+        inferenceRuntime.managedMagpieBindings?.setOllamaSnapshot(snapshot);
+        if (inferenceRuntime.magpieManager?.status().state === 'running')
+          await inferenceRuntime.managedMagpieBindings?.synchronize();
       },
     });
     registerMarketplaceIpcHandlers({
@@ -484,13 +488,13 @@ export const initApp = async (): Promise<void> => {
     await applyProxyPreference(getUseSystemProxyFromConfig(appConfig));
     profiler.measure('applyProxyPreference');
     if (getStore().get<boolean>('magpie_service_enabled') === true) {
-      await rt.magpieManager?.ensureRunning().catch(error => {
+      await inferenceRuntime.magpieManager?.ensureRunning().catch(error => {
         console.warn('[Magpie] Previously enabled model service could not start:', error);
       });
     } else {
       // LAN access is served by the bundled model gateway; the toggle alone may
       // start it even when unified model management was never enabled.
-      await rt.magpieManager?.onLanAccessChanged().catch(error => {
+      await inferenceRuntime.magpieManager?.onLanAccessChanged().catch(error => {
         console.warn('[Magpie] LAN access model service start failed:', error);
       });
     }
