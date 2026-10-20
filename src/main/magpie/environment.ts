@@ -51,10 +51,10 @@ export async function prepareMagpieHome(
   let settings: Record<string, unknown> = {};
   try {
     const stat = await fs.stat(file);
-    if (stat.size > 1024 * 1024) throw new Error('Magpie settings exceed size limit');
+    if (stat.size > 1024 * 1024) throw new Error('Model service settings exceed size limit');
     settings = JSON.parse(await fs.readFile(file, 'utf8'));
     if (!settings || Array.isArray(settings) || typeof settings !== 'object')
-      throw new Error('Invalid Magpie settings');
+      throw new Error('Invalid model service settings');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }

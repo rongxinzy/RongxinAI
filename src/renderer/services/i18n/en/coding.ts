@@ -467,4 +467,8 @@ export const enCoding: Record<string, string> = {
   codingErrorAcpAgentExited: 'The coding agent process exited. Try again.',
   codingErrorAcpProtocolUnsupported:
     'This coding agent speaks an unsupported protocol version. Use another agent.',
+  magpieTitle: 'External Agents',
+  magpieExternalPanelDescription:
+    'Connect local CLI Agents to the ZhiYuan model gateway to manage providers and default models in one place.',
+  magpieExternalAgentPi: 'Pi CLI',
 };

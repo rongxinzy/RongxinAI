@@ -80,7 +80,7 @@ export async function mergeOpenCodeConfigToUser(privateHome: string, home: strin
   const from = privateOpenCodeConfig(privateHome);
   if (!(await pathExists(from))) return;
 
-  const magpie = parseJsonObject(await fs.readFile(from, 'utf8'), 'Magpie OpenCode config');
+  const magpie = parseJsonObject(await fs.readFile(from, 'utf8'), 'Gateway OpenCode config');
   const userPath = userOpenCodeConfig(home);
   const hadFile = await pathExists(userPath);
   const user = hadFile

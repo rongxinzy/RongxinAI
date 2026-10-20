@@ -1,3 +1,8 @@
+/** Upstream management responses may embed the internal runtime name; user-facing errors stay neutral. */
+export function neutralizeUpstreamBrand(text: string): string {
+  return text.replace(/magpie/gi, 'local model service');
+}
+
 export function formatMagpieManagementError(
   status: number,
   statusText: string,
@@ -6,12 +11,14 @@ export function formatMagpieManagementError(
   if (text.length > 4096) return `HTTP ${status}: ${statusText}`;
   try {
     const body = JSON.parse(text) as { error?: unknown; message?: unknown };
-    if (typeof body.error === 'string' && body.error.trim()) return body.error.trim();
-    if (typeof body.message === 'string' && body.message.trim()) return body.message.trim();
+    if (typeof body.error === 'string' && body.error.trim())
+      return neutralizeUpstreamBrand(body.error.trim());
+    if (typeof body.message === 'string' && body.message.trim())
+      return neutralizeUpstreamBrand(body.message.trim());
   } catch {
     /* fall through */
   }
   const trimmed = text.trim();
-  if (trimmed && trimmed.length <= 500) return trimmed;
+  if (trimmed && trimmed.length <= 500) return neutralizeUpstreamBrand(trimmed);
   return `HTTP ${status}: ${statusText}`;
 }
