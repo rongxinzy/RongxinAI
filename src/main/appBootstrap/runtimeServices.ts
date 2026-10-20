@@ -1,7 +1,7 @@
 import { app, powerSaveBlocker } from 'electron';
 
 import { isEnterprise } from './appEnv';
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { agentRuntime } from './agentRuntimeState';
 import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
@@ -33,18 +33,23 @@ const PowerSaveBlockerType = {
 export function setPreventSleepBlockerEnabled(enabled: boolean): void {
   if (enabled) {
     if (
-      rt.preventSleepBlockerId === null ||
-      !powerSaveBlocker.isStarted(rt.preventSleepBlockerId)
+      lifecycleRuntime.preventSleepBlockerId === null ||
+      !powerSaveBlocker.isStarted(lifecycleRuntime.preventSleepBlockerId)
     ) {
-      rt.preventSleepBlockerId = powerSaveBlocker.start(PowerSaveBlockerType.PreventAppSuspension);
+      lifecycleRuntime.preventSleepBlockerId = powerSaveBlocker.start(
+        PowerSaveBlockerType.PreventAppSuspension,
+      );
     }
     return;
   }
 
-  if (rt.preventSleepBlockerId !== null && powerSaveBlocker.isStarted(rt.preventSleepBlockerId)) {
-    powerSaveBlocker.stop(rt.preventSleepBlockerId);
+  if (
+    lifecycleRuntime.preventSleepBlockerId !== null &&
+    powerSaveBlocker.isStarted(lifecycleRuntime.preventSleepBlockerId)
+  ) {
+    powerSaveBlocker.stop(lifecycleRuntime.preventSleepBlockerId);
   }
-  rt.preventSleepBlockerId = null;
+  lifecycleRuntime.preventSleepBlockerId = null;
 }
 
 export const initStore = async (): Promise<SqliteStore> => {
@@ -89,31 +94,36 @@ export const getOllamaManager = (): OllamaManager => {
 };
 
 export const getAppUpdateCoordinator = (): AppUpdateCoordinator => {
-  if (!rt.appUpdateCoordinator) {
-    rt.appUpdateCoordinator = new AppUpdateCoordinator(getStore(), undefined, undefined, {
-      enterpriseBuild: isEnterprise,
-    });
+  if (!lifecycleRuntime.appUpdateCoordinator) {
+    lifecycleRuntime.appUpdateCoordinator = new AppUpdateCoordinator(
+      getStore(),
+      undefined,
+      undefined,
+      {
+        enterpriseBuild: isEnterprise,
+      },
+    );
   }
-  return rt.appUpdateCoordinator;
+  return lifecycleRuntime.appUpdateCoordinator;
 };
 
 export const checkForAppUpdate = (): void => {
   void getAppUpdateCoordinator()
     .checkNow()
     .then(result => {
-      if (result.success) rt.lastSuccessfulAppUpdateCheckAt = Date.now();
+      if (result.success) lifecycleRuntime.lastSuccessfulAppUpdateCheckAt = Date.now();
     });
 };
 
 export const startAppUpdatePolling = (): void => {
   // Enterprise builds receive updates through the enterprise distribution
   // channel; the client never runs startup or periodic update checks.
-  if (isEnterprise || rt.appUpdatePollTimer) return;
+  if (isEnterprise || lifecycleRuntime.appUpdatePollTimer) return;
   const startupDelay =
     APP_UPDATE_STARTUP_DELAY_MIN_MS +
     Math.floor(Math.random() * APP_UPDATE_STARTUP_DELAY_JITTER_MS);
   setTimeout(checkForAppUpdate, startupDelay);
-  rt.appUpdatePollTimer = setInterval(checkForAppUpdate, APP_UPDATE_POLL_INTERVAL_MS);
+  lifecycleRuntime.appUpdatePollTimer = setInterval(checkForAppUpdate, APP_UPDATE_POLL_INTERVAL_MS);
 };
 
 export const getCoworkStore = () => {

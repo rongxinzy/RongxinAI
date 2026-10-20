@@ -5,7 +5,7 @@ import path from 'path';
 import { app, nativeImage, shell, BrowserWindow } from 'electron';
 
 import { DEV_SERVER_URL, isDev, isLinuxRendererSmoke, isMac } from './appEnv';
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { PRELOAD_PATH, applyWindowsWindowIcon } from './windowBranding';
 import { emitWindowState, schedulePersistAppWindowState } from './windowManagement';
 import { openDevToolsWindow, toggleDevToolsForSender } from '../appIpc';
@@ -43,10 +43,10 @@ export const createMainWindow = (): void => {
   // 创建主窗口
   const createWindow = () => {
     // 如果窗口已经存在，就不再创建新窗口
-    if (rt.mainWindow) {
-      if (rt.mainWindow.isMinimized()) rt.mainWindow.restore();
-      if (!rt.mainWindow.isVisible()) rt.mainWindow.show();
-      if (!rt.mainWindow.isFocused()) rt.mainWindow.focus();
+    if (lifecycleRuntime.mainWindow) {
+      if (lifecycleRuntime.mainWindow.isMinimized()) lifecycleRuntime.mainWindow.restore();
+      if (!lifecycleRuntime.mainWindow.isVisible()) lifecycleRuntime.mainWindow.show();
+      if (!lifecycleRuntime.mainWindow.isFocused()) lifecycleRuntime.mainWindow.focus();
       return;
     }
 
@@ -56,7 +56,7 @@ export const createMainWindow = (): void => {
     );
     const { isMaximized: shouldRestoreMaximized, ...initialWindowBounds } = initialWindowState;
 
-    rt.mainWindow = new BrowserWindow({
+    lifecycleRuntime.mainWindow = new BrowserWindow({
       ...initialWindowBounds,
       title: runtimeAppName,
       icon: getAppIconPath(),
@@ -99,7 +99,7 @@ export const createMainWindow = (): void => {
     });
 
     // Windows 任务栏在设置 AppUserModelID 后仍要显式套用 ico，否则继续显示 Electron 图标
-    applyWindowsWindowIcon(rt.mainWindow);
+    applyWindowsWindowIcon(lifecycleRuntime.mainWindow);
 
     // 设置 macOS Dock 图标（开发模式下 Electron 默认图标不是应用 Logo）
     if (isMac && isDev) {
@@ -113,11 +113,11 @@ export const createMainWindow = (): void => {
     }
 
     // 禁用窗口菜单
-    rt.mainWindow.setMenu(null);
-    const unregisterContextMenu = registerContextMenu(rt.mainWindow);
+    lifecycleRuntime.mainWindow.setMenu(null);
+    const unregisterContextMenu = registerContextMenu(lifecycleRuntime.mainWindow);
 
     // 处理 window.open 请求（企微 SDK 授权弹窗等）
-    rt.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    lifecycleRuntime.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
       if (isWecomAuthUrl(url)) {
         return {
           action: 'allow',
@@ -139,7 +139,7 @@ export const createMainWindow = (): void => {
     });
 
     // 监听子窗口创建事件（企微授权弹窗安全限制）
-    rt.mainWindow.webContents.on('did-create-window', childWindow => {
+    lifecycleRuntime.mainWindow.webContents.on('did-create-window', childWindow => {
       // 限制子窗口只能导航到企微域名，防止被劫持到其他站点
       childWindow.webContents.on('will-navigate', (event, navUrl) => {
         if (!isWecomAuthUrl(navUrl)) {
@@ -149,40 +149,43 @@ export const createMainWindow = (): void => {
     });
 
     // 设置窗口的最小尺寸
-    rt.mainWindow.setMinimumSize(MIN_APP_WINDOW_WIDTH, MIN_APP_WINDOW_HEIGHT);
+    lifecycleRuntime.mainWindow.setMinimumSize(MIN_APP_WINDOW_WIDTH, MIN_APP_WINDOW_HEIGHT);
     if (shouldRestoreMaximized) {
-      rt.mainWindow.maximize();
+      lifecycleRuntime.mainWindow.maximize();
     }
 
     // 设置窗口加载超时
     const loadTimeout = setTimeout(() => {
-      if (rt.mainWindow && rt.mainWindow.webContents.isLoadingMainFrame()) {
+      if (
+        lifecycleRuntime.mainWindow &&
+        lifecycleRuntime.mainWindow.webContents.isLoadingMainFrame()
+      ) {
         console.log('Window load timed out, attempting to reload...');
         scheduleReload('load-timeout');
       }
     }, 30000);
 
     // 清除超时
-    rt.mainWindow.webContents.once('did-finish-load', () => {
+    lifecycleRuntime.mainWindow.webContents.once('did-finish-load', () => {
       clearTimeout(loadTimeout);
     });
-    rt.mainWindow.webContents.on('did-finish-load', () => {
+    lifecycleRuntime.mainWindow.webContents.on('did-finish-load', () => {
       emitWindowState();
     });
 
     // 处理窗口关闭
-    rt.mainWindow.on('close', e => {
-      if (rt.windowStateSaveTimer) {
-        clearTimeout(rt.windowStateSaveTimer);
-        rt.windowStateSaveTimer = null;
+    lifecycleRuntime.mainWindow.on('close', e => {
+      if (lifecycleRuntime.windowStateSaveTimer) {
+        clearTimeout(lifecycleRuntime.windowStateSaveTimer);
+        lifecycleRuntime.windowStateSaveTimer = null;
       }
       persistAppWindowState();
 
       // In development, close should actually quit so `npm run electron:dev`
       // restarts from a clean process. In production we keep tray behavior.
-      if (rt.mainWindow && !rt.isQuitting && !isDev) {
+      if (lifecycleRuntime.mainWindow && !lifecycleRuntime.isQuitting && !isDev) {
         e.preventDefault();
-        rt.mainWindow.hide();
+        lifecycleRuntime.mainWindow.hide();
       }
     });
 
@@ -192,7 +195,7 @@ export const createMainWindow = (): void => {
       let retryCount = 0;
 
       const tryLoadURL = () => {
-        rt.mainWindow?.loadURL(DEV_SERVER_URL).catch(err => {
+        lifecycleRuntime.mainWindow?.loadURL(DEV_SERVER_URL).catch(err => {
           console.error('Failed to load URL:', err);
           retryCount++;
 
@@ -201,8 +204,8 @@ export const createMainWindow = (): void => {
             setTimeout(tryLoadURL, 3000);
           } else {
             console.error('Failed to load URL after maximum retries');
-            if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
-              rt.mainWindow.loadFile(path.join(__dirname, '../resources/error.html'));
+            if (lifecycleRuntime.mainWindow && !lifecycleRuntime.mainWindow.isDestroyed()) {
+              lifecycleRuntime.mainWindow.loadFile(path.join(__dirname, '../resources/error.html'));
             }
           }
         });
@@ -212,29 +215,29 @@ export const createMainWindow = (): void => {
 
       // 开发环境默认在窗口右侧打开 DevTools；关闭后可用 F12 / Ctrl+Shift+I
       const openDevToolsIfNeeded = () => {
-        if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return;
-        openDevToolsWindow(rt.mainWindow.webContents);
+        if (!lifecycleRuntime.mainWindow || lifecycleRuntime.mainWindow.isDestroyed()) return;
+        openDevToolsWindow(lifecycleRuntime.mainWindow.webContents);
       };
       // Wait until the page is ready so the docked panel is attached to a live view.
-      rt.mainWindow.webContents.once('did-finish-load', () => {
+      lifecycleRuntime.mainWindow.webContents.once('did-finish-load', () => {
         setTimeout(openDevToolsIfNeeded, 300);
       });
-      rt.mainWindow.webContents.on('before-input-event', (event, input) => {
+      lifecycleRuntime.mainWindow.webContents.on('before-input-event', (event, input) => {
         if (input.type !== 'keyDown') return;
         const isToggleShortcut =
           input.key === 'F12' ||
           ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i');
         if (!isToggleShortcut) return;
         event.preventDefault();
-        toggleDevToolsForSender(rt.mainWindow?.webContents, () => isDev);
+        toggleDevToolsForSender(lifecycleRuntime.mainWindow?.webContents, () => isDev);
       });
     } else {
       // 生产环境
-      rt.mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+      lifecycleRuntime.mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
 
     // 添加错误处理
-    rt.mainWindow.webContents.on(
+    lifecycleRuntime.mainWindow.webContents.on(
       'did-fail-load',
       (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
         if (!isMainFrame) return;
@@ -249,13 +252,13 @@ export const createMainWindow = (): void => {
     );
 
     // 当窗口关闭时，清除引用
-    rt.mainWindow.on('closed', () => {
+    lifecycleRuntime.mainWindow.on('closed', () => {
       unregisterContextMenu();
-      if (rt.windowStateSaveTimer) {
-        clearTimeout(rt.windowStateSaveTimer);
-        rt.windowStateSaveTimer = null;
+      if (lifecycleRuntime.windowStateSaveTimer) {
+        clearTimeout(lifecycleRuntime.windowStateSaveTimer);
+        lifecycleRuntime.windowStateSaveTimer = null;
       }
-      rt.mainWindow = null;
+      lifecycleRuntime.mainWindow = null;
     });
 
     const forwardWindowState = () => emitWindowState();
@@ -263,58 +266,58 @@ export const createMainWindow = (): void => {
       emitWindowState();
       schedulePersistAppWindowState();
     };
-    rt.mainWindow.on('resize', schedulePersistAppWindowState);
-    rt.mainWindow.on('move', schedulePersistAppWindowState);
-    rt.mainWindow.on('maximize', forwardAndPersistWindowState);
-    rt.mainWindow.on('unmaximize', forwardAndPersistWindowState);
-    rt.mainWindow.on('enter-full-screen', forwardAndPersistWindowState);
-    rt.mainWindow.on('leave-full-screen', forwardAndPersistWindowState);
-    rt.mainWindow.on('focus', forwardWindowState);
-    rt.mainWindow.on('blur', forwardWindowState);
-    rt.mainWindow.on('session-end', () => {
+    lifecycleRuntime.mainWindow.on('resize', schedulePersistAppWindowState);
+    lifecycleRuntime.mainWindow.on('move', schedulePersistAppWindowState);
+    lifecycleRuntime.mainWindow.on('maximize', forwardAndPersistWindowState);
+    lifecycleRuntime.mainWindow.on('unmaximize', forwardAndPersistWindowState);
+    lifecycleRuntime.mainWindow.on('enter-full-screen', forwardAndPersistWindowState);
+    lifecycleRuntime.mainWindow.on('leave-full-screen', forwardAndPersistWindowState);
+    lifecycleRuntime.mainWindow.on('focus', forwardWindowState);
+    lifecycleRuntime.mainWindow.on('blur', forwardWindowState);
+    lifecycleRuntime.mainWindow.on('session-end', () => {
       recordAppQuitOrigin(AppQuitOrigin.OperatingSystemSessionEnd);
       logAppQuitContextOnce();
     });
 
     // Some Linux desktop/GPU combinations finish loading without emitting ready-to-show.
     // Show the loaded window so the first launch does not remain hidden until a second click.
-    rt.mainWindow.webContents.once('did-finish-load', () => {
+    lifecycleRuntime.mainWindow.webContents.once('did-finish-load', () => {
       if (
-        rt.mainWindow &&
-        !rt.mainWindow.isDestroyed() &&
-        !rt.mainWindow.isVisible() &&
+        lifecycleRuntime.mainWindow &&
+        !lifecycleRuntime.mainWindow.isDestroyed() &&
+        !lifecycleRuntime.mainWindow.isVisible() &&
         (isLinuxRendererSmoke || !isAutoLaunched())
       ) {
         console.warn(
           '[MainWindow] Page loaded before ready-to-show; showing the initial window now.',
         );
-        rt.mainWindow.show();
+        lifecycleRuntime.mainWindow.show();
       }
     });
 
     // 等待内容加载完成后再显示窗口
-    rt.mainWindow.once('ready-to-show', () => {
+    lifecycleRuntime.mainWindow.once('ready-to-show', () => {
       // 2026/09/20 lixiang  显示前再套一次图标，避免 Windows 任务栏仍缓存 electron 默认图标
-      if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
-        applyWindowsWindowIcon(rt.mainWindow);
+      if (lifecycleRuntime.mainWindow && !lifecycleRuntime.mainWindow.isDestroyed()) {
+        applyWindowsWindowIcon(lifecycleRuntime.mainWindow);
       }
       emitWindowState();
       // 开机自启时不显示窗口，仅显示托盘图标
       if (isLinuxRendererSmoke || !isAutoLaunched()) {
-        rt.mainWindow?.show();
-        if (rt.mainWindow && !rt.mainWindow.isDestroyed()) {
-          applyWindowsWindowIcon(rt.mainWindow);
+        lifecycleRuntime.mainWindow?.show();
+        if (lifecycleRuntime.mainWindow && !lifecycleRuntime.mainWindow.isDestroyed()) {
+          applyWindowsWindowIcon(lifecycleRuntime.mainWindow);
         }
       }
       // Initialize main-process i18n from stored language before creating UI elements.
       const initLang = getStore().get<{ language?: string }>('app_config')?.language;
       setLanguage(initLang === 'en' ? 'en' : 'zh');
       // 窗口就绪后创建系统托盘
-      createTray(() => rt.mainWindow);
+      createTray(() => lifecycleRuntime.mainWindow);
       initializeDesktopPet(
         getStore(),
-        () => rt.mainWindow,
-        () => updateTrayMenu(() => rt.mainWindow),
+        () => lifecycleRuntime.mainWindow,
+        () => updateTrayMenu(() => lifecycleRuntime.mainWindow),
       );
 
       (async () => {
