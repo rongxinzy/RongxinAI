@@ -1,5 +1,8 @@
 param(
-  [string]$ProjectRoot = ''
+  [string]$ProjectRoot = '',
+  # electron-builder derives the default install directory from the sanitized
+  # package name; the enterprise overlay overrides it to zhiyuan-agent-enterprise.
+  [string]$InstallDirName = 'zhiyuan-agent'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -173,7 +176,7 @@ if ($installers.Count -ne 1) {
 }
 
 $installer = $installers[0].FullName
-$installRoot = Join-Path $env:LOCALAPPDATA 'Programs\zhiyuan-agent'
+$installRoot = Join-Path $env:LOCALAPPDATA "Programs\$InstallDirName"
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'ZhiYuanAgent\runtimes'
 $timingLog = Join-Path $env:APPDATA 'ZhiYuanAgent\install-timing.log'
 $componentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')
