@@ -7,7 +7,7 @@ type SelectAppearances = Pick<
 >;
 const mix = (token: string, amount: number) =>
   `color-mix(in oklab, var(--${token}) ${amount}%, transparent)`;
-export function classicSelect(dark: boolean): SelectAppearances {
+export function classicSelect(): SelectAppearances {
   const highlight = { 'background-color': 'var(--accent)', color: 'var(--accent-foreground)' };
   return {
     'select-trigger': recipe({

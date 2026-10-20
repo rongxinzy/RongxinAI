@@ -6,7 +6,7 @@ type BadgeAppearances = Pick<
 >;
 const mix = (token: string, amount: number) =>
   `color-mix(in oklab, var(--${token}) ${amount}%, transparent)`;
-export function classicBadges(dark: boolean): BadgeAppearances {
+export function classicBadges(): BadgeAppearances {
   return {
     badge: recipe({
       base: {

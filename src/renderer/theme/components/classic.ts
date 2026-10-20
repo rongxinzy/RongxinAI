@@ -42,7 +42,7 @@ import { homeStudioAppearances } from './home-studio';
 import type { ComponentAppearance, ComponentAppearances } from './contract';
 
 /** Codex appearance recipes are package data, never imported by React controls. */
-export function classicComponentAppearances(dark: boolean): ComponentAppearances {
+export function classicComponentAppearances(): ComponentAppearances {
   const field: ComponentAppearance = recipe({
     base: {
       'border-radius': 'var(--zy-style-radius-lg)',
@@ -81,21 +81,21 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     ...runIndicatorAppearances(),
     ...logoLoadingAppearances(),
     ...codingSidebarAppearances(),
-    ...classicButtons(dark),
+    ...classicButtons(),
     ...classicCodingDiff(),
     ...classicSurfaces(),
     ...classicCommand(),
-    ...classicMenu(dark),
+    ...classicMenu(),
     ...classicExtraOverlays(),
-    ...classicProductControls(dark),
+    ...classicProductControls(),
     ...classicSettingsControls(),
     ...classicControlModifiers(),
-    ...classicPartControls(dark),
+    ...classicPartControls(),
     ...classicCompositionControls(),
-    ...classicPageControls(dark),
-    ...classicConditionalControls(dark),
-    ...classicBadges(dark),
-    ...classicSelect(dark),
+    ...classicPageControls(),
+    ...classicConditionalControls(),
+    ...classicBadges(),
+    ...classicSelect(),
     'input-group': recipe({
       base: {
         ...field.base,
@@ -165,18 +165,18 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     ...classicLocalControls(),
     ...classicModalEffects(),
     ...classicNativeControls(),
-    ...classicInteractiveSurfaces(dark),
+    ...classicInteractiveSurfaces(),
     ...classicEditorControls(),
     ...classicControlSizing(),
     ...classicControlPieces(),
     ...classicPromptActions(),
     ...classicMessageSurfaces(),
-    ...classicTabs(dark),
-    ...classicSupplementaryControls(dark),
-    ...classicChoiceControls(dark),
+    ...classicTabs(),
+    ...classicSupplementaryControls(),
+    ...classicChoiceControls(),
     ...classicDisplay(),
-    ...classicMisc(dark),
-    ...classicFields(dark),
+    ...classicMisc(),
+    ...classicFields(),
     ...classicSidebar(),
     ...classicScenes(),
     ...chatToolAppearances(),

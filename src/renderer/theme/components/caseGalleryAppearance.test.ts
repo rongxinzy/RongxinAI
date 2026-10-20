@@ -7,23 +7,21 @@ import { classicComponentAppearances } from './classic';
  * 背后画底色。hover 由标题的层级变化表达，选中态用围绕整块的外描边。
  */
 test('case tiles stack the caption under the artwork without overlaying it', () => {
-  for (const dark of [false, true]) {
-    const card = classicComponentAppearances(dark)['page-case-gallery-card'];
+  const card = classicComponentAppearances()['page-case-gallery-card'];
 
-    expect(card.base['border-width']).toBeUndefined();
-    expect(card.base['border-style']).toBe('none');
-    expect(card.base['background-color']).toBe('transparent');
-    expect(card.base['border-radius']).toBe('var(--zy-style-radius-lg)');
-    expect(card.base.padding).toBe('0');
-    expect(card.base.gap).toBe('0.5rem');
-    expect(card.hover['background-color']).toBeUndefined();
-    expect(card.hover['box-shadow']).toBeUndefined();
-    expect(card.selected['background-color']).toBeUndefined();
-    expect(card.selected['outline-style']).toBe('solid');
-    expect(card.selected['outline-width']).toBe('2px');
-    expect(card.selected['outline-color']).toBe('var(--zy-primary)');
-    expect(card.selected['outline-offset']).toBe('2px');
-  }
+  expect(card.base['border-width']).toBeUndefined();
+  expect(card.base['border-style']).toBe('none');
+  expect(card.base['background-color']).toBe('transparent');
+  expect(card.base['border-radius']).toBe('var(--zy-style-radius-lg)');
+  expect(card.base.padding).toBe('0');
+  expect(card.base.gap).toBe('0.5rem');
+  expect(card.hover['background-color']).toBeUndefined();
+  expect(card.hover['box-shadow']).toBeUndefined();
+  expect(card.selected['background-color']).toBeUndefined();
+  expect(card.selected['outline-style']).toBe('solid');
+  expect(card.selected['outline-width']).toBe('2px');
+  expect(card.selected['outline-color']).toBe('var(--zy-primary)');
+  expect(card.selected['outline-offset']).toBe('2px');
 });
 
 /**
@@ -31,7 +29,7 @@ test('case tiles stack the caption under the artwork without overlaying it', () 
  * 曾经的 border-bottom 分隔线属于旧卡片样式，不得回来。
  */
 test('case thumbnails round their own corners instead of sitting inside a frame', () => {
-  const media = classicComponentAppearances(false)['page-case-gallery-media'];
+  const media = classicComponentAppearances()['page-case-gallery-media'];
 
   expect(media.base['border-radius']).toBe('var(--zy-style-radius-md)');
   expect(media.base['border-bottom-width']).toBeUndefined();
@@ -42,7 +40,7 @@ test('case thumbnails round their own corners instead of sitting inside a frame'
  * hover 时升到正文色（DESIGN.md 允许的「文字层级变化」）。
  */
 test('case captions are plain secondary text that steps up on hover', () => {
-  const body = classicComponentAppearances(false)['page-case-gallery-body'];
+  const body = classicComponentAppearances()['page-case-gallery-body'];
 
   expect(body.base.color).toBe('var(--muted-foreground)');
   expect(body.base['font-size']).toBe('var(--zy-component-text-sm)');

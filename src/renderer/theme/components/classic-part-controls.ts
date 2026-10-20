@@ -1,7 +1,6 @@
 import { recipe } from './recipe';
 /** Page-specific compositions, extracted without moving event handlers or application state. */
-export function classicPartControls(dark: boolean) {
-  void dark;
+export function classicPartControls() {
   return {
     'part-coding-agent-manager-dialog-header-1': recipe({
       base: {

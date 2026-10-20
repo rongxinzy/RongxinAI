@@ -4,7 +4,7 @@ type MenuAppearances = Pick<
   ComponentAppearances,
   Extract<keyof ComponentAppearances, `menu-${string}`>
 >;
-export function classicMenu(dark: boolean): MenuAppearances {
+export function classicMenu(): MenuAppearances {
   const highlight = { 'background-color': 'var(--muted)', color: 'var(--foreground)' };
   const danger = {
     'background-color': `color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent)`,
