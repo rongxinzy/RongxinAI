@@ -22,6 +22,7 @@ import { registerSkillsIpc } from './skills/ipc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
 import { registerCoworkQueueIpc } from './coworkIpc/queue';
+import { registerAppUpdateIpc } from './appUpdateIpc';
 import { registerShellIpc } from './shellIpc';
 import { registerIntegrationsIpc } from './integrationsIpc';
 import { registerMcpIpc } from './mcpIpc';
@@ -58,6 +59,7 @@ import {
 } from './appBootstrap/workspacePaths';
 import { getDefaultConversationWorkspacePath } from './defaultConversationWorkspace';
 import { getMagpieModelService } from './appBootstrap/magpieRuntime';
+import { getAppUpdateCoordinator } from './appBootstrap/runtimeServices';
 import {
   getCanonicalScheduledTaskService,
   getIMGatewayManager,
@@ -66,7 +68,6 @@ import { bumpCodingCommandCatalog } from './appBootstrap/codingRoomRuntime';
 import { resolveDefaultAgentModelRef } from './appBootstrap/defaultAgentModel';
 import { registerImGatewayIpc } from './appBootstrap/imGatewayIpc';
 import { registerImInstanceIpc } from './appBootstrap/imInstanceIpc';
-import { registerAppUpdateIpc } from './appBootstrap/appUpdateIpc';
 import { registerAppLifecycleHandlers } from './appBootstrap/appLifecycle';
 import { initApp } from './appBootstrap/initApp';
 import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
@@ -155,7 +156,10 @@ if (!gotTheLock) {
   });
   registerDialogIpc({ getCoworkStore });
   registerShellIpc({ getCoworkStore });
-  registerAppUpdateIpc();
+  registerAppUpdateIpc({
+    getAppUpdateCoordinator,
+    hasRunningSessions: () => getPiRuntimeAdapter().hasRunningSessions(),
+  });
   registerAppLifecycleHandlers();
 
   // 启动应用
