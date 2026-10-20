@@ -34,11 +34,11 @@ export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomService
   ): void {
     driver.onAvailableCommandsChanged((_sessionId, commands) => {
       this.repository.updateLaneAvailableCommands(lane.id, commands);
-      if (!this.stagedLaneIds.has(lane.id)) this.publishLane(lane.id);
+      if (!this.turnTracker.isLaneStaged(lane.id)) this.publishLane(lane.id);
     });
     driver.onSessionTitleChanged((_sessionId, title) => {
       this.repository.updateMissionTitle(lane.missionId, title);
-      if (!this.stagedLaneIds.has(lane.id)) this.publishLane(lane.id);
+      if (!this.turnTracker.isLaneStaged(lane.id)) this.publishLane(lane.id);
     });
     this.driverPool.register(lane.id, driver, profile.id);
   }
