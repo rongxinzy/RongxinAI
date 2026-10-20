@@ -114,3 +114,10 @@ export const setupMagpieRuntime = (): void => {
     modelService,
   );
 };
+
+/** Whether the bundled model gateway is currently running (work package I indirection). */
+export const isMagpieGatewayRunning = (): boolean => rt.magpieManager?.status().state === 'running';
+
+/** Runs one managed-catalog synchronization, if bindings exist (work package I indirection). */
+export const synchronizeManagedMagpieCatalog = (): Promise<void> | undefined =>
+  rt.managedMagpieBindings?.synchronize();
