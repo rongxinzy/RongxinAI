@@ -59,10 +59,23 @@ runs:
         if ($signature.SignerCertificate.Subject -notmatch 'Asseco Data Systems') {
           throw 'SimplySign Desktop installer is not signed by Asseco Data Systems.'
         }
+        $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList '/i SimplySignDesktop.msi /qn /norestart' -Wait -PassThru -NoNewWindow
+        if ($proc.ExitCode -ne 0) {
+          throw "SimplySign Desktop MSI installation failed with exit code $($proc.ExitCode)."
+        }
+
+    - name: Align TOTP window for SimplySign attempt 1
+      shell: pwsh
+      run: |
+        Stop-Process -Name 'SimplySignDesktop*' -Force -ErrorAction SilentlyContinue
+        while (([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() % 30) -ne 25) {
+          Start-Sleep -Milliseconds 250
+        }
 
     # This action receives the long-lived TOTP credential, so it is pinned to
     # the exact revision reviewed for this repository.
-    - name: Connect Certum SimplySign
+    - name: Connect Certum SimplySign (attempt 1)
+      continue-on-error: true
       uses: dismine/windows-app-signing-setup-action@89ae3b032d4bc7a5b98d1a42a34e61ecb6faad64
       with:
         certum-username: ${{ inputs.user-id }}
@@ -71,6 +84,70 @@ runs:
         simplysign-url: https://files.certum.eu/software/SimplySignDesktop/Windows/9.4.3.90/SimplySignDesktop-9.4.3.90-64-bit-en.msi
         capture-diagnostics: false
 
-    - name: Remove SimplySign installer
+    - name: Check certificate after attempt 1 and align TOTP window
+      id: check-attempt-1
       shell: pwsh
-      run: Remove-Item -LiteralPath SimplySignDesktop.msi -Force -ErrorAction SilentlyContinue
+      env:
+        THUMBPRINT: ${{ steps.validate.outputs.thumbprint }}
+      run: |
+        if (Test-Path -LiteralPath "Cert:\CurrentUser\My\$env:THUMBPRINT") {
+          "mounted=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          exit 0
+        }
+        Write-Warning 'Certum certificate not mounted on attempt 1; resetting SimplySign Desktop for attempt 2.'
+        Stop-Process -Name 'SimplySignDesktop*' -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        while (([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() % 30) -ne 25) {
+          Start-Sleep -Milliseconds 250
+        }
+        "mounted=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+    - name: Connect Certum SimplySign (attempt 2)
+      if: steps.check-attempt-1.outputs.mounted != 'true'
+      continue-on-error: true
+      uses: dismine/windows-app-signing-setup-action@89ae3b032d4bc7a5b98d1a42a34e61ecb6faad64
+      with:
+        certum-username: ${{ inputs.user-id }}
+        certum-otp-uri: ${{ inputs.otp-uri }}
+        certum-key-id: ${{ steps.validate.outputs.thumbprint }}
+        simplysign-url: https://files.certum.eu/software/SimplySignDesktop/Windows/9.4.3.90/SimplySignDesktop-9.4.3.90-64-bit-en.msi
+        capture-diagnostics: false
+
+    - name: Check certificate after attempt 2 and align TOTP window
+      id: check-attempt-2
+      shell: pwsh
+      env:
+        THUMBPRINT: ${{ steps.validate.outputs.thumbprint }}
+      run: |
+        if (Test-Path -LiteralPath "Cert:\CurrentUser\My\$env:THUMBPRINT") {
+          "mounted=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          exit 0
+        }
+        Write-Warning 'Certum certificate not mounted on attempt 2; resetting SimplySign Desktop for attempt 3.'
+        Stop-Process -Name 'SimplySignDesktop*' -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        while (([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() % 30) -ne 25) {
+          Start-Sleep -Milliseconds 250
+        }
+        "mounted=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+    - name: Connect Certum SimplySign (attempt 3)
+      if: steps.check-attempt-2.outputs.mounted != 'true'
+      uses: dismine/windows-app-signing-setup-action@89ae3b032d4bc7a5b98d1a42a34e61ecb6faad64
+      with:
+        certum-username: ${{ inputs.user-id }}
+        certum-otp-uri: ${{ inputs.otp-uri }}
+        certum-key-id: ${{ steps.validate.outputs.thumbprint }}
+        simplysign-url: https://files.certum.eu/software/SimplySignDesktop/Windows/9.4.3.90/SimplySignDesktop-9.4.3.90-64-bit-en.msi
+        capture-diagnostics: false
+
+    - name: Verify mounted Certum certificate and clean up installer
+      if: always()
+      shell: pwsh
+      env:
+        THUMBPRINT: ${{ steps.validate.outputs.thumbprint }}
+      run: |
+        Remove-Item -LiteralPath SimplySignDesktop.msi -Force -ErrorAction SilentlyContinue
+        if (-not (Test-Path -LiteralPath "Cert:\CurrentUser\My\$env:THUMBPRINT")) {
+          throw "Certum certificate $env:THUMBPRINT was not found in Cert:\CurrentUser\My after SimplySign authentication."
+        }

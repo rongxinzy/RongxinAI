@@ -8,9 +8,15 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and publish (e.g. v2026.10.20-build.6)'
+        required: true
+        type: string
 
 concurrency:
-  group: zhiyuan-release-${{ github.ref_name }}
+  group: zhiyuan-release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -35,7 +41,7 @@ jobs:
         id: identity
         shell: bash
         env:
-          TAG_NAME: ${{ github.ref_name }}
+          TAG_NAME: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           if [[ ! "$TAG_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
@@ -43,7 +49,7 @@ jobs:
             exit 1
           fi
           version="${TAG_NAME#v}"
-          git fetch --no-tags origin main
+          git fetch --tags --force origin main
           source_commit="$(git rev-parse "${TAG_NAME}^{}")"
           if ! git merge-base --is-ancestor "$source_commit" origin/main; then
             echo 'Release tag must point to a commit reachable from origin/main' >&2
@@ -231,7 +237,7 @@ jobs:
       - name: Create GitHub pre-release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: v${{ needs.prepare-release.outputs.version }}
           name: 知远 ${{ needs.prepare-release.outputs.version }}
           prerelease: true
           generate_release_notes: true

@@ -23,7 +23,10 @@ const {
   extractTarArchive,
   treeDigest,
 } = require('./build-magpie-runtime.cjs');
-const { signWithRuntimeManifest } = require('./sign-magpie-macos.cjs');
+const {
+  signWithRuntimeManifest,
+  shouldIgnoreNonMachOResource,
+} = require('./sign-magpie-macos.cjs');
 const temporaryDirectories: string[] = [];
 
 function temporaryRoot() {
@@ -366,5 +369,26 @@ describe('pinned Magpie runtime build', () => {
     fixture(root, 'darwin-x64');
     fixture(root, 'darwin-arm64');
     await expect(signWithRuntimeManifest({ app }, async () => {})).rejects.toThrow('never sealed');
+  });
+
+  test('ignores non-Mach-O data files under Contents/Resources while keeping Mach-O and helpers signed', () => {
+    const app = path.join(temporaryRoot(), 'Test.app');
+    const resources = path.join(app, 'Contents', 'Resources');
+    const macosDir = path.join(app, 'Contents', 'MacOS');
+    fs.mkdirSync(resources, { recursive: true });
+    fs.mkdirSync(macosDir, { recursive: true });
+
+    const pycFile = path.join(resources, 'skill.pyc');
+    fs.writeFileSync(pycFile, Buffer.from([0xa7, 0x0d, 0x0d, 0x0a, 0x00, 0x00, 0x00, 0x00]));
+    const dylibFile = path.join(resources, 'libtest.dylib');
+    fs.writeFileSync(dylibFile, Buffer.from([0xcf, 0xfa, 0xed, 0xfe, 0x07, 0x00, 0x00, 0x01]));
+    const mainExec = path.join(macosDir, 'Test');
+    fs.writeFileSync(mainExec, 'placeholder');
+    const magpieHelper = fixture(path.join(resources, 'magpie'), 'darwin-arm64').binary;
+
+    expect(shouldIgnoreNonMachOResource(app, pycFile)).toBe(true);
+    expect(shouldIgnoreNonMachOResource(app, dylibFile)).toBe(false);
+    expect(shouldIgnoreNonMachOResource(app, mainExec)).toBe(false);
+    expect(shouldIgnoreNonMachOResource(app, magpieHelper)).toBe(false);
   });
 });
