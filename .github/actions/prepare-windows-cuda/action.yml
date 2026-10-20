@@ -6,12 +6,12 @@ runs:
   steps:
     - id: identity
       shell: bash
-      run: node -e "const fs=require('node:fs');const p=require('./package.json');const tag=p.llamacpp.runtimeReleaseTag;if(!/^[A-Za-z0-9._-]+$/.test(tag))throw new Error('Invalid runtime tag');fs.appendFileSync(process.env.GITHUB_OUTPUT,'tag='+tag+'\nimage='+(process.env.ImageVersion||'unknown')+'\n')"
+      run: node -e "const fs=require('node:fs');const p=require('./package.json');const tag=p.llamacpp.runtimeReleaseTag;if(!/^[A-Za-z0-9._-]+$/.test(tag))throw new Error('Invalid runtime tag');fs.appendFileSync(process.env.GITHUB_OUTPUT,'tag='+tag+'\n')"
     - uses: actions/cache/restore@v5
       id: runtime
       with:
         path: vendor/llamacpp/cuda
-        key: windows-cuda-v1-msvc2022-cuda12.4.1-sm89-${{ steps.identity.outputs.image }}-${{ steps.identity.outputs.tag }}-${{ hashFiles('resources/llamacpp-backends/manifest.json', 'scripts/*llamacpp*', 'scripts/windows-pe-imports*', 'scripts/bash-windows-path.sh', 'scripts/ci/runtime-tree-integrity.cjs', '.github/actions/prepare-windows-cuda/action.yml') }}
+        key: windows-cuda-v1-msvc2022-cuda12.4.1-sm89-${{ steps.identity.outputs.tag }}-${{ hashFiles('resources/llamacpp-backends/manifest.json', 'scripts/*llamacpp*', 'scripts/windows-pe-imports*', 'scripts/bash-windows-path.sh', 'scripts/ci/runtime-tree-integrity.cjs', '.github/actions/prepare-windows-cuda/action.yml') }}
     - name: Restore pinned CUDA source
       if: steps.runtime.outputs.cache-hit != 'true'
       uses: actions/cache@v5
