@@ -25,7 +25,7 @@
       "id": "keyless-none",
       "name": "Keyless",
       "chat": "http://127.0.0.1:9/v1",
-      "key": { "set": true, "masked": "none" },
+      "key": { "set": true, "masked": "••••" },
       "models": [],
       "off": false
     }
