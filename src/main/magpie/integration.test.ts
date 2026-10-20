@@ -337,3 +337,145 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
   },
   60_000,
 );
+
+it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
+  'keeps a stored provider key when the editor saves with a blank key field',
+  async () => {
+    const { createServer } = await import('node:http');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-provider-key-'));
+    const dummyKey = 'sk-zhiyuan-fixture-00000001';
+    const upstream = createServer((req, res) => {
+      res.setHeader('content-type', 'application/json');
+      if (req.url === '/v1/models') {
+        res.end(JSON.stringify({ data: [{ id: 'fixture-key-model', object: 'model' }] }));
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
+    });
+    await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
+    const address = upstream.address() as { port: number };
+    const manager = new MagpieManager({
+      resourcesRoot: path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie'),
+      privateHome: path.join(root, 'service'),
+      environment: { HOME: root, USERPROFILE: root, PATH: process.env.PATH, TEMP: root, TMP: root },
+      parseCatalog: async bytes =>
+        projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
+      verify: (dir, signal) =>
+        verifyMagpieBinary(dir, signal, async file => {
+          const hash = createHash('sha256');
+          for await (const chunk of createReadStream(file)) hash.update(chunk);
+          return hash.digest('hex');
+        }),
+    });
+    try {
+      expect((await manager.start()).state).toBe('running');
+      const created = await manager.saveProvider({
+        name: 'Key retention fixture',
+        api: 'openai-completions',
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        key: dummyKey,
+        models: ['fixture-key-model'],
+      });
+      const provider = created.find(p => p.name === 'Key retention fixture');
+      expect(provider?.hasKey).toBe(true);
+      expect(provider?.keyMasked).toBeTruthy();
+      const maskedBefore = provider!.keyMasked!;
+
+      const renamed = await manager.saveProvider({
+        id: provider!.id,
+        name: 'Key retention fixture renamed',
+        api: 'openai-completions',
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        models: provider!.models,
+      });
+      const after = renamed.find(p => p.id === provider!.id);
+      expect(after).toMatchObject({
+        hasKey: true,
+        keyMasked: maskedBefore,
+        models: ['fixture-key-model'],
+      });
+    } finally {
+      await manager.stop();
+      await new Promise<void>(resolve => upstream.close(() => resolve()));
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  60_000,
+);
+
+it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
+  'does not promote the full vendor catalog into picks when editing a provider',
+  async () => {
+    const { createServer } = await import('node:http');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-provider-models-'));
+    const catalog = ['fixture/a', 'fixture/b', 'fixture/c', 'fixture/d', 'fixture/e'];
+    const upstream = createServer((req, res) => {
+      res.setHeader('content-type', 'application/json');
+      if (req.url === '/v1/models') {
+        res.end(
+          JSON.stringify({
+            data: catalog.map(id => ({ id, object: 'model' })),
+          }),
+        );
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
+    });
+    await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
+    const address = upstream.address() as { port: number };
+    const manager = new MagpieManager({
+      resourcesRoot: path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie'),
+      privateHome: path.join(root, 'service'),
+      environment: { HOME: root, USERPROFILE: root, PATH: process.env.PATH, TEMP: root, TMP: root },
+      parseCatalog: async bytes =>
+        projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
+      verify: (dir, signal) =>
+        verifyMagpieBinary(dir, signal, async file => {
+          const hash = createHash('sha256');
+          for await (const chunk of createReadStream(file)) hash.update(chunk);
+          return hash.digest('hex');
+        }),
+    });
+    const readExposed = async (id: string) => {
+      const connection = manager.managementConnection();
+      const response = await fetch(`${connection.url}/api/providers`, {
+        headers: { Cookie: `${connection.cookieName}=${connection.key}` },
+      });
+      const body = (await response.json()) as {
+        providers?: Array<{ id: string; exposed?: number }>;
+      };
+      const row = body.providers?.find(p => p.id === id);
+      if (!row) throw new Error(`provider ${id} missing from upstream state`);
+      return row.exposed ?? 0;
+    };
+    try {
+      expect((await manager.start()).state).toBe('running');
+      const created = await manager.saveProvider({
+        name: 'Exposure fixture',
+        api: 'openai-completions',
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        models: ['fixture/a', 'fixture/b'],
+      });
+      const provider = created.find(p => p.name === 'Exposure fixture');
+      expect(provider?.models).toEqual(['fixture/a', 'fixture/b']);
+      expect(await readExposed(provider!.id)).toBe(2);
+
+      const edited = await manager.saveProvider({
+        id: provider!.id,
+        name: 'Exposure fixture renamed',
+        api: 'openai-completions',
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        models: provider!.models,
+      });
+      expect(edited.find(p => p.id === provider!.id)?.models).toEqual(['fixture/a', 'fixture/b']);
+      expect(await readExposed(provider!.id)).toBe(2);
+    } finally {
+      await manager.stop();
+      await new Promise<void>(resolve => upstream.close(() => resolve()));
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  60_000,
+);

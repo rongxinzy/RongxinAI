@@ -98,7 +98,7 @@ export const magpieTranslations = {
     magpieState_running: '运行中',
     magpieState_stopping: '停止中',
     magpieState_failed: '启动失败',
-    magpieLicenseNotice: 'MIT · © 2026 yetone',
+    magpieLicenseNotice: 'Apache-2.0 · 知远智能体',
 
     magpieProvidersTitle: '模型渠道管理',
     magpieProvidersDescription: '管理连接到统一网关的模型渠道。企业与本地 GPU 渠道由系统托管。',
@@ -605,7 +605,7 @@ export const magpieTranslations = {
     magpieState_running: 'Running',
     magpieState_stopping: 'Stopping',
     magpieState_failed: 'Failed',
-    magpieLicenseNotice: 'MIT · © 2026 yetone',
+    magpieLicenseNotice: 'Apache-2.0 · ZhiYuan Agent',
 
     magpieProvidersTitle: 'Model Providers',
     magpieProvidersDescription:

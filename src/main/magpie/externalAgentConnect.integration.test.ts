@@ -179,7 +179,6 @@ describe('magpie external agent connect smoke', () => {
           name: 'Smoke Fixture Provider',
           api: 'openai-completions',
           baseUrl: `http://127.0.0.1:${modelsPort}/v1`,
-          key: 'none',
           models: ['fixture/smoke-model'],
         });
         const provider = saved.find(entry => entry.name === 'Smoke Fixture Provider');

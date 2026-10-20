@@ -5,7 +5,7 @@
       "name": "Enterprise Host",
       "chat": "http://127.0.0.1:8000/v1",
       "key": { "set": false, "masked": "" },
-      "models": [{ "id": "ent-1", "name": "Enterprise 1" }],
+      "models": [{ "id": "ent-1", "name": "Enterprise 1", "on": true }],
       "off": false
     },
     {
@@ -14,9 +14,19 @@
       "chat": "https://api.openai.com/v1",
       "key": { "set": true, "masked": "sk-…7890" },
       "models": [
-        { "id": "gpt-4o", "name": "GPT-4o" },
-        { "id": "gpt-4o-mini", "name": "GPT-4o mini" }
+        { "id": "gpt-4o", "name": "GPT-4o", "on": true },
+        { "id": "gpt-4o-mini", "name": "GPT-4o mini", "on": true },
+        { "id": "gpt-4.1", "name": "GPT-4.1", "on": false },
+        { "id": "o3", "name": "o3", "on": false }
       ],
+      "off": false
+    },
+    {
+      "id": "keyless-none",
+      "name": "Keyless",
+      "chat": "http://127.0.0.1:9/v1",
+      "key": { "set": true, "masked": "••••" },
+      "models": [],
       "off": false
     }
   ]
