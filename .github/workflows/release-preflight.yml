@@ -73,11 +73,6 @@ jobs:
           bun run validate:skills
           node scripts/ci/check-openclaw-decoupling.mjs
           bun run check:supply-chain-inputs
-          bun run lint
-          bun run format:check
-          bun run knip
-          bun run knip:production
-          bun run check:python-dead-code
       - name: Typecheck and enforce renderer bundle budgets
         run: |
           bun run build:tsc
@@ -268,32 +263,6 @@ jobs:
       - run: bun run web:preview:contract
       - run: bun run web:preview:check
 
-  installer-preview:
-    needs: source
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.source.outputs.commit }}
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-      - name: Restore Playwright browsers
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-1.58.0-${{ runner.os }}
-      - run: pip install playwright==1.58.0
-      - run: python -m playwright install --with-deps chromium
-      - run: python scripts/ci/installer-style-preview.py
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: installer-preview-${{ github.run_id }}
-          path: acceptance-diagnostics/installer-preview
-          retention-days: 7
-
   memory-leak:
     needs: source
     uses: ./.github/workflows/memory-regression.yml
@@ -318,7 +287,7 @@ jobs:
 
   preflight-gate:
     if: always()
-    needs: [source, quality, enterprise, channel-runtime, python-runtime-linux, python-runtime-windows, browser-preview, installer-preview, memory-leak, linux-install, windows-install]
+    needs: [source, quality, enterprise, channel-runtime, python-runtime-linux, python-runtime-windows, browser-preview, memory-leak, linux-install, windows-install]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

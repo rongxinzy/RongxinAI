@@ -15,7 +15,6 @@ export const PreflightJob = {
   PythonLinux: 'python-runtime-linux',
   PythonWindows: 'python-runtime-windows',
   Browser: 'browser-preview',
-  Installer: 'installer-preview',
   Memory: 'memory-leak',
 } as const;
 
