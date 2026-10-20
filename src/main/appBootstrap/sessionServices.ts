@@ -3,6 +3,7 @@ import path from 'path';
 import { app } from 'electron';
 
 import { rt } from './runtimeState';
+import { mcpRuntime } from './mcpRuntimeState';
 import { getCoworkStore, getArtifactLedger, getSkillManager, getStore } from './runtimeServices';
 import { EngramManager } from '../memory/engramManager';
 import { ProjectMemoryService } from '../memory/projectMemoryService';
@@ -97,14 +98,17 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     // main-session preset snapshot, not the userData skills copy.
     rt.piRuntimeAdapter.setBundledSkillsRoot(getSkillManager().getBundledSkillsRoot());
     // MCP initialization runs asynchronously, so late injection may still be needed.
-    console.log('[PiRuntime] mcpServerManager available at init:', rt.mcpServerManager !== null);
+    console.log(
+      '[PiRuntime] mcpServerManager available at init:',
+      mcpRuntime.serverManager !== null,
+    );
   }
   // Late-injection: mcpServerManager is created async after Pi init.
   // On subsequent calls (e.g. from IPC handlers), it is available and
   // we inject it so Pi sessions can use MCP tools.
-  if (rt.mcpServerManager && !rt.piRuntimeAdapter.hasMcpServerManager()) {
+  if (mcpRuntime.serverManager && !rt.piRuntimeAdapter.hasMcpServerManager()) {
     console.log('[PiRuntime] Late-injecting mcpServerManager (was null at init)');
-    rt.piRuntimeAdapter.setMcpServerManager(rt.mcpServerManager);
+    rt.piRuntimeAdapter.setMcpServerManager(mcpRuntime.serverManager);
   }
   return rt.piRuntimeAdapter;
 };
