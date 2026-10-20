@@ -10,7 +10,8 @@ import { shell } from 'electron';
 import { normalizeWindowsShellPath } from './shellPathNormalize';
 import { isAllowedShellOpenPath, isSensitivePath } from '../shellPathValidation';
 import { resolveLocalPathCandidate } from '../localPathResolver';
-import { getAllowedShellProbeRoots } from './dialogIpc';
+import { getAllowedShellProbeRoots } from '../dialogIpc';
+import { getCoworkStore } from './runtimeServices';
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 
@@ -52,7 +53,7 @@ export const registerShellIpc = (): void => {
     // 允许根目录内真实存在的文件路径；目录与不存在的路径返回 null。
     shellResolveLocalPath: async (_event, candidate, cwd) => {
       try {
-        const allowedRoots = getAllowedShellProbeRoots();
+        const allowedRoots = getAllowedShellProbeRoots(getCoworkStore);
         const resolved = await resolveLocalPathCandidate(
           typeof candidate === 'string' ? candidate : '',
           typeof cwd === 'string' && cwd ? cwd : undefined,

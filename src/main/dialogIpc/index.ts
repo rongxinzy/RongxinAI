@@ -4,7 +4,6 @@ import path from 'path';
 
 import { app, BrowserWindow, dialog } from 'electron';
 
-import { getCoworkStore } from './runtimeServices';
 import {
   MAX_INLINE_ATTACHMENT_BYTES,
   inferAttachmentExtension,
@@ -13,9 +12,14 @@ import {
 } from '../coworkIpc/fileExportHelpers';
 import { registerArtifactFileAvailabilityHandler } from '../artifactFileAvailability';
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
+import type { CoworkStore } from '../coworkStore';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 
-export const registerDialogIpc = (): void => {
+export interface DialogIpcDeps {
+  getCoworkStore: () => CoworkStore;
+}
+
+export const registerDialogIpc = (deps: DialogIpcDeps): void => {
   // Dialog handlers
   handleIpcContractSubset(appSystemContract, {
     dialogSelectDirectory: async (event, options) => {
@@ -221,7 +225,7 @@ export const registerDialogIpc = (): void => {
   registerArtifactFileAvailabilityHandler();
 };
 
-export const getAllowedShellProbeRoots = (): string[] => {
+export const getAllowedShellProbeRoots = (getCoworkStore: () => CoworkStore): string[] => {
   const roots: string[] = [];
   try {
     roots.push(app.getPath('userData'));
