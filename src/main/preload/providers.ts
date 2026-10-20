@@ -103,6 +103,14 @@ export const providersApi = {
     diagnostics: asApi('magpieDiagnostics'),
     preferences: asApi('magpiePreferences'),
     updatePreferences: asApi('magpieUpdatePreferences'),
+    routingGroups: asApi('magpieRoutingGroups'),
+    saveRoutingGroup: asApi('magpieSaveRoutingGroup'),
+    deleteRoutingGroup: asApi('magpieDeleteRoutingGroup'),
+    arrangeRoutingGroups: asApi('magpieArrangeRoutingGroups'),
+    usageSummary: asApi('magpieUsageSummary'),
+    usageRequests: asApi('magpieUsageRequests'),
+    usageQuotas: asApi('magpieUsageQuotas'),
+    usageBudget: asApi('magpieUsageBudget'),
   },
 
   auth: {
@@ -204,6 +212,14 @@ export const providersApi = {
     diagnostics: 'magpieDiagnostics';
     preferences: 'magpiePreferences';
     updatePreferences: 'magpieUpdatePreferences';
+    routingGroups: 'magpieRoutingGroups';
+    saveRoutingGroup: 'magpieSaveRoutingGroup';
+    deleteRoutingGroup: 'magpieDeleteRoutingGroup';
+    arrangeRoutingGroups: 'magpieArrangeRoutingGroups';
+    usageSummary: 'magpieUsageSummary';
+    usageRequests: 'magpieUsageRequests';
+    usageQuotas: 'magpieUsageQuotas';
+    usageBudget: 'magpieUsageBudget';
   }>;
   auth: WithExtra<
     {

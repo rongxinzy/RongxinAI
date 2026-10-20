@@ -72,6 +72,35 @@ describe('single authoritative model service', () => {
     f.backend.models.mockResolvedValue([]);
     await expect(f.service.resolve()).rejects.toThrow('no longer available');
   });
+  it('hides routing groups whose leaf models fail managed policy', async () => {
+    const f = fixture();
+    f.backend.routingGroups = vi.fn(async () => ({
+      groups: [
+        {
+          id: 'mix',
+          name: 'Mix',
+          members: ['vendor/model', 'group/nested'],
+          ready: true,
+          memberInfo: [],
+        },
+        {
+          id: 'nested',
+          name: 'Nested',
+          members: ['private/model'],
+          ready: true,
+          memberInfo: [],
+        },
+      ],
+      models: [],
+    }));
+    f.backend.models.mockResolvedValue([
+      { id: 'vendor/model' },
+      { id: 'private/model' },
+      { id: 'group/mix', display_name: 'Looks fine' },
+    ]);
+    expect((await f.service.catalog()).models.map(model => model.id)).toEqual(['vendor/model']);
+  });
+
   it('enforces managed policy on selection and explicit session overrides', async () => {
     const f = fixture();
     await expect(f.service.selectDefault('private/model')).rejects.toThrow('unavailable');

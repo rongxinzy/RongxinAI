@@ -1,0 +1,29 @@
+{
+  "groups": [
+    {
+      "id": "astra",
+      "name": "Astra fallback",
+      "members": ["relay/gpt-6-astra", "relay/gpt-6-mini"],
+      "routing": "order",
+      "ready": true,
+      "memberInfo": [
+        {
+          "id": "relay/gpt-6-astra",
+          "ready": true,
+          "provider": "relay",
+          "name": "Relay",
+          "model": "gpt-6-astra"
+        }
+      ]
+    }
+  ],
+  "models": [
+    {
+      "id": "relay/gpt-6-astra",
+      "name": "GPT 6 Astra",
+      "provider": "relay",
+      "providerName": "Relay"
+    }
+  ],
+  "pools": []
+}

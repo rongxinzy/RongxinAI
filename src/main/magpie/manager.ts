@@ -44,6 +44,19 @@ import {
   canonicalHostAgentId,
 } from './externalAgentHostConfig';
 import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
+import {
+  MagpieUsagePeriod,
+  type MagpieRoutingGroupSaveInput,
+  type MagpieUsagePeriod as MagpieUsagePeriodType,
+} from '../../shared/magpie/routingUsage';
+import {
+  buildRoutingGroupSaveBody,
+  projectRoutingGroups,
+  projectUsageBudget,
+  projectUsageQuotas,
+  projectUsageRequestPage,
+  projectUsageSummary,
+} from './projectRoutingUsage';
 const MODEL_FIELDS = new Set(['model', 'large', 'small', 'executor', 'planner']);
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const maskApiKey = (key?: string) =>
@@ -657,6 +670,89 @@ export class MagpieManager {
     }
   }
 
+  async routingGroups() {
+    await this.ensureRunning();
+    return projectRoutingGroups(await this.managementJson('/api/groups'));
+  }
+
+  async saveRoutingGroup(input: MagpieRoutingGroupSaveInput) {
+    if (!input || typeof input !== 'object') throw new Error('Invalid routing group');
+    await this.ensureRunning();
+    const body = buildRoutingGroupSaveBody(input);
+    return projectRoutingGroups(
+      await this.managementJson('/api/groups/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    );
+  }
+
+  async deleteRoutingGroup(id: string) {
+    if (typeof id !== 'string' || !id.trim() || id.length > 120) {
+      throw new Error('Invalid routing group id');
+    }
+    await this.ensureRunning();
+    return projectRoutingGroups(
+      await this.managementJson('/api/groups/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id.trim() }),
+      }),
+    );
+  }
+
+  async arrangeRoutingGroups(order: string[]) {
+    if (!Array.isArray(order) || order.length > 500) throw new Error('Invalid group order');
+    const sanitized = order.filter(id => typeof id === 'string' && id.length <= 120).slice(0, 500);
+    await this.ensureRunning();
+    return projectRoutingGroups(
+      await this.managementJson('/api/groups/arrange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: sanitized }),
+      }),
+    );
+  }
+
+  async usageSummary(period: MagpieUsagePeriodType) {
+    if (!Object.values(MagpieUsagePeriod).includes(period)) {
+      throw new Error('Invalid usage period');
+    }
+    await this.ensureRunning();
+    const query = new URLSearchParams({ period });
+    return projectUsageSummary(await this.managementJson(`/api/usage?${query.toString()}`), period);
+  }
+
+  async usageRequests(period: MagpieUsagePeriodType, offset: number, limit: number) {
+    if (!Object.values(MagpieUsagePeriod).includes(period)) {
+      throw new Error('Invalid usage period');
+    }
+    const safeOffset = Math.max(0, Math.min(Math.floor(offset), 1_000_000));
+    const safeLimit = Math.max(1, Math.min(Math.floor(limit), 100));
+    await this.ensureRunning();
+    const query = new URLSearchParams({
+      period,
+      offset: String(safeOffset),
+      limit: String(safeLimit),
+    });
+    return projectUsageRequestPage(
+      await this.managementJson(`/api/usage/requests?${query.toString()}`),
+      period,
+    );
+  }
+
+  async usageQuotas(asked = false) {
+    await this.ensureRunning();
+    const query = asked ? '?asked=1' : '';
+    return projectUsageQuotas(await this.managementValue(`/api/usage/quotas${query}`));
+  }
+
+  async usageBudget() {
+    await this.ensureRunning();
+    return projectUsageBudget(await this.managementJson('/api/settings'));
+  }
+
   async diagnostics(): Promise<MagpieDiagnosticSummary> {
     let latencyMs: number | undefined;
     if (this.state.state === 'running' && this.state.gatewayUrl) {
@@ -910,16 +1006,24 @@ export class MagpieManager {
     });
     return this.agents();
   }
-  private async managementJson(
-    route: string,
-    init: RequestInit = {},
-  ): Promise<Record<string, unknown>> {
+  private async managementValue(route: string, init: RequestInit = {}): Promise<unknown> {
     const response = await this.webRequest(route, init);
     const text = await response.text();
     if (!response.ok)
       throw new Error(formatMagpieManagementError(response.status, response.statusText, text));
     if (text.length > 1024 * 1024) throw new Error('Management response exceeds size limit');
     return JSON.parse(text);
+  }
+
+  private async managementJson(
+    route: string,
+    init: RequestInit = {},
+  ): Promise<Record<string, unknown>> {
+    const body = await this.managementValue(route, init);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw new Error('Invalid management response');
+    }
+    return body as Record<string, unknown>;
   }
   /** Explicit user disable. Application exit and internal restarts must use shutdown/stopOwned. */
   stop(): Promise<MagpieStatus> {

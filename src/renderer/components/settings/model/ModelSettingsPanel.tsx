@@ -29,6 +29,7 @@ import { MagpieNetworkPreferences } from './MagpieNetworkPreferences';
 import { MagpiePrivacyPreferences } from './MagpiePrivacyPreferences';
 import { MagpieSubscriptionControl } from './MagpieSubscriptionControl';
 import { ModelCatalogBrowser } from './ModelCatalogBrowser';
+import { ModelRoutingUsagePanel } from './ModelRoutingUsagePanel';
 import { ProviderManagerSection } from './ProviderManagerSection';
 import { useMagpiePreferences } from './useMagpiePreferences';
 
@@ -36,6 +37,7 @@ const ModelSection = {
   Service: 'service',
   Agents: 'agents',
   Providers: 'providers',
+  RoutingUsage: 'routingUsage',
   Models: 'models',
   Network: 'network',
   Privacy: 'privacy',
@@ -47,6 +49,7 @@ const MODEL_SECTIONS = [
   ModelSection.Service,
   ModelSection.Agents,
   ModelSection.Providers,
+  ModelSection.RoutingUsage,
   ModelSection.Models,
   ModelSection.Network,
   ModelSection.Privacy,
@@ -57,6 +60,7 @@ const SECTION_LABEL_KEYS: Record<ModelSection, string> = {
   [ModelSection.Service]: 'magpieSectionService',
   [ModelSection.Agents]: 'magpieSectionAgents',
   [ModelSection.Providers]: 'magpieSectionProviders',
+  [ModelSection.RoutingUsage]: 'magpieSectionRoutingUsage',
   [ModelSection.Models]: 'magpieSectionModels',
   [ModelSection.Network]: 'magpieSectionNetwork',
   [ModelSection.Privacy]: 'magpieSectionPrivacy',
@@ -429,6 +433,10 @@ export default function ModelSettingsPanel() {
             preferencesUnavailable
           )}
         </div>
+      )}
+
+      {section === ModelSection.RoutingUsage && (
+        <ModelRoutingUsagePanel running={running} disabled={busy} />
       )}
 
       {section === ModelSection.Models && (

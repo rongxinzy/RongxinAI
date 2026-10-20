@@ -69,6 +69,16 @@ export function registerMagpieIpc(
     magpieDiagnostics: gated(() => manager.diagnostics()),
     magpiePreferences: gated(() => manager.preferences()),
     magpieUpdatePreferences: gated((_event, patch) => manager.updatePreferences(patch)),
+    magpieRoutingGroups: gated(() => manager.routingGroups()),
+    magpieSaveRoutingGroup: gated((_event, input) => manager.saveRoutingGroup(input)),
+    magpieDeleteRoutingGroup: gated((_event, id) => manager.deleteRoutingGroup(id)),
+    magpieArrangeRoutingGroups: gated((_event, order) => manager.arrangeRoutingGroups(order)),
+    magpieUsageSummary: gated((_event, period) => manager.usageSummary(period)),
+    magpieUsageRequests: gated((_event, period, offset, limit) =>
+      manager.usageRequests(period, offset, limit),
+    ),
+    magpieUsageQuotas: gated((_event, asked) => manager.usageQuotas(asked)),
+    magpieUsageBudget: gated(() => manager.usageBudget()),
   });
   return async () => {
     for (const channel of Object.values(MagpieIpc)) ipcMain.removeHandler(channel);

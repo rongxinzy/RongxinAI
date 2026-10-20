@@ -34,6 +34,15 @@ import {
 } from './fixtures';
 
 type MockSkill = (typeof mockSkills)[number];
+import {
+  mockMagpieRoutingEmpty,
+  mockMagpieRoutingPopulated,
+  mockMagpieUsageBudget,
+  mockMagpieUsageQuotas,
+  mockMagpieUsageRequests,
+  mockMagpieUsageSummary,
+} from './fixtures/magpieRoutingUsage';
+import { readPreviewMagpieUsage, PreviewMagpieUsage } from './previewQuery';
 import type { BrowserMockRuntime } from './runtime';
 import { createDesktopPetPreview } from './desktopPet';
 import type { DeepPartial } from './scenarioTypes';
@@ -79,7 +88,12 @@ function sessionMode(options: object): CoworkSessionMode {
 
 export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPartial<ElectronApi> {
   const streamReplayFixtureId = readStreamReplayFixtureId();
+  const magpieUsagePreview = readPreviewMagpieUsage();
   let preferences = { ...mockMagpiePreferences };
+  let routingState =
+    magpieUsagePreview === PreviewMagpieUsage.Empty
+      ? { ...mockMagpieRoutingEmpty }
+      : { ...mockMagpieRoutingPopulated };
   const store = new Map<string, unknown>();
   const sessions = new Map<string, PreviewEntry>();
   if (!streamReplayFixtureId) {
@@ -330,6 +344,7 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
       status: () => Promise.resolve(mockMagpieCatalog.status),
       models: () => Promise.resolve(mockMagpieCatalog.models),
       agents: () => Promise.resolve(mockMagpieAgents),
+      providers: () => Promise.resolve([]),
       preferences: () => Promise.resolve(preferences),
       updatePreferences: patch => {
         preferences = { ...preferences, ...patch };
@@ -339,6 +354,87 @@ export function createInteractiveOverrides(runtime: BrowserMockRuntime): DeepPar
         }
         return Promise.resolve(preferences);
       },
+      routingGroups: () => {
+        if (magpieUsagePreview === PreviewMagpieUsage.Error) {
+          return Promise.reject(new Error('Preview routing data unavailable'));
+        }
+        return Promise.resolve(routingState);
+      },
+      saveRoutingGroup: input => {
+        if (magpieUsagePreview === PreviewMagpieUsage.Error) {
+          return Promise.reject(new Error('Preview routing save failed'));
+        }
+        routingState = {
+          ...routingState,
+          groups: [
+            ...routingState.groups.filter(group => group.id !== input.id),
+            {
+              id: input.id,
+              name: input.name,
+              members: input.members,
+              routing: input.routing,
+              off: input.off,
+              ready: true,
+              memberInfo: input.members.map(member => ({ id: member, ready: true })),
+            },
+          ],
+        };
+        return Promise.resolve(routingState);
+      },
+      deleteRoutingGroup: id => {
+        routingState = {
+          ...routingState,
+          groups: routingState.groups.filter(group => group.id !== id),
+        };
+        return Promise.resolve(routingState);
+      },
+      arrangeRoutingGroups: order => {
+        const byId = new Map(routingState.groups.map(group => [group.id, group]));
+        routingState = {
+          ...routingState,
+          groups: order.flatMap(groupId => {
+            const group = byId.get(groupId);
+            return group ? [group] : [];
+          }),
+        };
+        return Promise.resolve(routingState);
+      },
+      usageSummary: () => {
+        if (magpieUsagePreview === PreviewMagpieUsage.Error) {
+          return Promise.reject(new Error('Preview usage summary failed'));
+        }
+        if (magpieUsagePreview === PreviewMagpieUsage.Empty) {
+          return Promise.resolve({
+            ...mockMagpieUsageSummary,
+            calls: 0,
+            errors: 0,
+            input: 0,
+            output: 0,
+            cost: 0,
+            unpriced: 0,
+          });
+        }
+        return Promise.resolve(mockMagpieUsageSummary);
+      },
+      usageRequests: () => {
+        if (magpieUsagePreview === PreviewMagpieUsage.Error) {
+          return Promise.reject(new Error('Preview call log failed'));
+        }
+        if (magpieUsagePreview === PreviewMagpieUsage.Empty) {
+          return Promise.resolve({ ...mockMagpieUsageRequests, rows: [], total: 0 });
+        }
+        return Promise.resolve(mockMagpieUsageRequests);
+      },
+      usageQuotas: () => {
+        if (magpieUsagePreview === PreviewMagpieUsage.Error) {
+          return Promise.reject(new Error('Preview quota read failed'));
+        }
+        if (magpieUsagePreview === PreviewMagpieUsage.Empty) {
+          return Promise.resolve([]);
+        }
+        return Promise.resolve(mockMagpieUsageQuotas);
+      },
+      usageBudget: () => Promise.resolve(mockMagpieUsageBudget),
     },
     llamacpp: {
       status: () =>
