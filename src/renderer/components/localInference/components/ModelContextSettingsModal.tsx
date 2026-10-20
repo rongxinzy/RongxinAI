@@ -49,13 +49,20 @@ type ModelContextSettingsModalProps = {
   isOpen: boolean;
   model: LlamaCppModel | null;
   savedContextSize?: number;
+  savedNCpuMoe?: number;
   runningContextSize?: number;
   onClose: () => void;
-  onSave: (ctxSize?: number, contextChanged?: boolean) => void;
+  /** nCpuMoe is `{ value: number | undefined }` only when the field was edited; clearing it passes undefined inside the box. */
+  onSave: (
+    ctxSize?: number,
+    contextChanged?: boolean,
+    nCpuMoe?: { value: number | undefined },
+  ) => void;
   onValidationError?: (message: string) => void;
   presentation?: ModelContextSettingsPresentation;
   inlineClassName?: string;
   hideContextEditor?: boolean;
+  hideNCpuMoeEditor?: boolean;
 };
 
 export type ModelContextEditorState = {
@@ -172,6 +179,7 @@ export function ModelContextSettingsModal({
   isOpen,
   model,
   savedContextSize,
+  savedNCpuMoe,
   runningContextSize,
   onClose,
   onSave,
@@ -179,12 +187,15 @@ export function ModelContextSettingsModal({
   presentation = ModelContextSettingsPresentation.Modal,
   inlineClassName,
   hideContextEditor = false,
+  hideNCpuMoeEditor = false,
 }: ModelContextSettingsModalProps) {
   const [editorState, setEditorState] = useState<ModelContextEditorState>({
     contextSize: CONTEXT_DEFAULT_VALUE,
     mode: ModelContextEditorMode.Preset,
     customContextValue: '',
   });
+  const [nCpuMoeValue, setNCpuMoeValue] = useState('');
+  const [savedNCpuMoeValue, setSavedNCpuMoeValue] = useState<string | null>(null);
 
   const trainedLimit = model?.trained_context_length ?? model?.details?.context_length;
   const contextPresets = useMemo(() => getContextPresets(trainedLimit), [trainedLimit]);
@@ -214,7 +225,9 @@ export function ModelContextSettingsModal({
         ? ''
         : formatContextKInput(initialContextSize),
     });
-  }, [contextPresets, initialContextSize, isOpen, model?.name]);
+    setNCpuMoeValue(savedNCpuMoe === undefined ? '' : String(savedNCpuMoe));
+    setSavedNCpuMoeValue(savedNCpuMoe === undefined ? '' : String(savedNCpuMoe));
+  }, [contextPresets, initialContextSize, isOpen, model?.name, savedNCpuMoe]);
 
   if (!model) return null;
 
@@ -254,6 +267,32 @@ export function ModelContextSettingsModal({
         </div>
       ) : null}
 
+      {!hideNCpuMoeEditor ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex min-h-7 items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">
+              {i18nService.t('localInferenceNCpuMoeLabel')}
+            </span>
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={nCpuMoeValue}
+              aria-invalid={Boolean(getNCpuMoeError(nCpuMoeValue))}
+              className="theme-control-sizing-22 h-7 w-28 rounded-md border border-border-subtle bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-border"
+              onChange={event => setNCpuMoeValue(event.target.value)}
+            />
+          </div>
+          {getNCpuMoeError(nCpuMoeValue) ? (
+            <p className="text-xs text-destructive">{getNCpuMoeError(nCpuMoeValue)}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {i18nService.t('localInferenceNCpuMoeHint')}
+            </p>
+          )}
+        </div>
+      ) : null}
+
       {runningContextSize ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border-subtle pt-3 text-xs">
           <span>
@@ -284,7 +323,17 @@ export function ModelContextSettingsModal({
                 return;
               }
             }
-            onSave(editorState.contextSize, editorState.contextSize !== initialContextSize);
+            if (!hideNCpuMoeEditor && getNCpuMoeError(nCpuMoeValue)) {
+              onValidationError?.(getNCpuMoeError(nCpuMoeValue) as string);
+              return;
+            }
+            const nCpuMoeEdited =
+              !hideNCpuMoeEditor && nCpuMoeValue.trim() !== (savedNCpuMoeValue ?? '');
+            onSave(
+              editorState.contextSize,
+              editorState.contextSize !== initialContextSize,
+              nCpuMoeEdited ? { value: parseNCpuMoeValue(nCpuMoeValue) } : undefined,
+            );
           }}
         >
           {i18nService.t('save')}
@@ -370,4 +419,20 @@ export function parseCustomContextValue(value: string | null): number | undefine
   if (!value?.trim()) return undefined;
   const parsedK = Number(value.trim());
   return Number.isFinite(parsedK) ? Math.round(parsedK * TOKENS_PER_K) : undefined;
+}
+
+/** Empty means automatic (no saved value); undefined means "not edited". */
+function parseNCpuMoeValue(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function getNCpuMoeError(value: string): string | null {
+  if (!value.trim()) return null;
+  if (parseNCpuMoeValue(value) === undefined) {
+    return i18nService.t('localInferenceNCpuMoeInvalid');
+  }
+  return null;
 }

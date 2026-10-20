@@ -12,6 +12,7 @@ export {
   waitForLlamaCppStartupModelBindings,
 } from './llamacpp/helpers';
 export {
+  applyStoredModelPreferencesToLaunchInput,
   enforceLlamaCppParallelTwo,
   getLlamaCppModelPreferences,
   getLlamaCppServiceConfig,

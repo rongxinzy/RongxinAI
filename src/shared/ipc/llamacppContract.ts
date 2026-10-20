@@ -55,6 +55,7 @@ const ModelLaunchInputSchema = z
         batchSize: z.number().optional(),
         ubatchSize: z.number().optional(),
         gpuLayers: z.union([z.number(), z.literal('auto'), z.literal('all')]).optional(),
+        nCpuMoe: z.number().optional(),
         threads: z.number().optional(),
         device: z.string().optional(),
         mainGpu: z.number().optional(),
@@ -147,6 +148,7 @@ const ModelPreferenceSchema = z
   .object({
     ctxSize: z.number().optional(),
     maxTokens: z.number().optional(),
+    nCpuMoe: z.number().optional(),
     capabilities: z.record(z.string(), z.unknown()).optional(),
     residency: z
       .object({ mode: z.string(), idleMinutes: z.number().optional() })

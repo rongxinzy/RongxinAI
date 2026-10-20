@@ -12,6 +12,7 @@ import { ModelCapabilityStatus } from '../../shared/providers';
 import type { LlamaCppManager } from '../libs/llamacppManager';
 import { LlamaCppModelDaemonController } from '../libs/llamacppModelDaemonController';
 import {
+  applyStoredModelPreferencesToLaunchInput,
   enforceLlamaCppParallelTwo,
   getLlamaCppLoadedModelLimitViolation,
   getLlamaCppServiceConfig,
@@ -69,7 +70,66 @@ test('sanitizeLlamaCppModelPreference retains a timed residency policy', () => {
     sanitizeLlamaCppModelPreference({
       residency: { mode: LlamaCppModelResidencyMode.Timed, idleMinutes: 30 },
     }),
-  ).toEqual({ residency: { mode: LlamaCppModelResidencyMode.Timed, idleMinutes: 30 } });
+  ).toEqual({
+    residency: { mode: LlamaCppModelResidencyMode.Timed, idleMinutes: 30 },
+  });
+});
+
+test('sanitizeLlamaCppModelPreference accepts a non-negative integer MoE CPU layer count', () => {
+  expect(sanitizeLlamaCppModelPreference({ nCpuMoe: 0 })).toEqual({
+    nCpuMoe: 0,
+  });
+  expect(sanitizeLlamaCppModelPreference({ ctxSize: 8192, nCpuMoe: 12 })).toEqual({
+    ctxSize: 8192,
+    nCpuMoe: 12,
+  });
+});
+
+test('sanitizeLlamaCppModelPreference drops invalid MoE CPU layer counts', () => {
+  expect(sanitizeLlamaCppModelPreference({ nCpuMoe: -1 })).toBeNull();
+  expect(sanitizeLlamaCppModelPreference({ nCpuMoe: 1.5 })).toBeNull();
+  expect(sanitizeLlamaCppModelPreference({ nCpuMoe: '12' })).toBeNull();
+});
+
+test('applyStoredModelPreferencesToLaunchInput applies ctxSize and nCpuMoe independently', () => {
+  const preferences = {
+    'qwen3-30b-a3b': { ctxSize: 16384, nCpuMoe: 12 },
+    dense: { ctxSize: 4096 },
+  };
+  const store = {
+    get: <T>(key: string) =>
+      key === 'llamacpp_model_preferences' ? (preferences as T) : undefined,
+  } as unknown as Parameters<typeof applyStoredModelPreferencesToLaunchInput>[0];
+
+  expect(applyStoredModelPreferencesToLaunchInput(store, { model: 'qwen3-30b-a3b' })).toEqual({
+    model: 'qwen3-30b-a3b',
+    options: { ctxSize: 16384, nCpuMoe: 12 },
+  });
+  // Explicit launch ctxSize wins, nCpuMoe still applies.
+  expect(
+    applyStoredModelPreferencesToLaunchInput(store, {
+      model: 'qwen3-30b-a3b',
+      options: { ctxSize: 8192 },
+    }),
+  ).toEqual({
+    model: 'qwen3-30b-a3b',
+    options: { ctxSize: 8192, nCpuMoe: 12 },
+  });
+  // Explicit launch nCpuMoe wins, ctxSize still applies.
+  expect(
+    applyStoredModelPreferencesToLaunchInput(store, {
+      model: 'qwen3-30b-a3b',
+      options: { nCpuMoe: 0 },
+    }),
+  ).toEqual({
+    model: 'qwen3-30b-a3b',
+    options: { ctxSize: 16384, nCpuMoe: 0 },
+  });
+  // Dense model without nCpuMoe: no n-cpu-moe emitted.
+  expect(applyStoredModelPreferencesToLaunchInput(store, { model: 'dense' })).toEqual({
+    model: 'dense',
+    options: { ctxSize: 4096 },
+  });
 });
 
 test('does not refresh model bindings when only residency changes', () => {
