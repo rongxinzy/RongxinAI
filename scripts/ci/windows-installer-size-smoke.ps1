@@ -1,5 +1,5 @@
 param(
-  [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
+  [string]$ProjectRoot = '',
   # CAD expert runtime dependencies add a bounded shared Python layer to the
   # installer. Keep explicit headroom for that payload while retaining the
   # independent non-component ceiling below.
@@ -13,6 +13,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $ProjectRoot) { $ProjectRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '..', '..')) }
 
 $installers = @(Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'release') -Filter '*.exe' -File |
   Where-Object { $_.Name -notlike '*Uninstall*' -and $_.Name -notlike 'ZhiYuanAgent-Setup-*' })
