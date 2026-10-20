@@ -46,9 +46,9 @@ import type { MagpieRoutingGateway } from './magpieRoutingGateway';
 import { MagpieRoutingUsageService } from './routingUsageService';
 import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort } from './magpieManagerUtils';
 import {
+  enrichMagpieProviderSummariesWithStoredKeys,
   isUsableMagpieProviderKey,
   parseMagpieProviderKeyResponse,
-  providerRowNeedsStoredKeyLookup,
 } from './magpieProviderKey';
 import {
   buildMagpieProviderSavePayload,
@@ -94,6 +94,7 @@ export class MagpieManager implements MagpieRoutingGateway {
   private hostSignatures = new Map<string, string>();
   private recentErrors: { timestamp: number; message: string; providerId?: string }[] = [];
   private cachedActiveProviderCount = 0;
+  private providersListHydrated = false;
   private reapplyErrors = new Map<string, string>();
   private lanAccessChange?: Promise<MagpieStatus>;
   readonly routingUsage: MagpieRoutingUsageService;
@@ -455,8 +456,11 @@ export class MagpieManager implements MagpieRoutingGateway {
       const state = await this.managementJson('/api/providers');
       const rawList = Array.isArray(state.providers) ? state.providers : [];
       const list = projectMagpieProviderSummaries(state);
-      await this.applyStoredProviderKeySummaries(list, rawList);
+      await enrichMagpieProviderSummariesWithStoredKeys(list, rawList, id =>
+        this.fetchStoredProviderKey(id),
+      );
       this.cachedActiveProviderCount = list.filter(p => !p.off).length;
+      this.providersListHydrated = true;
       return list;
     } catch {
       return [];
@@ -470,26 +474,6 @@ export class MagpieManager implements MagpieRoutingGateway {
       body: JSON.stringify({ id: providerId }),
     });
     return parseMagpieProviderKeyResponse(body);
-  }
-
-  private async applyStoredProviderKeySummaries(
-    list: MagpieProviderSummary[],
-    rawList: unknown[],
-  ): Promise<void> {
-    const rows = rawList.filter(
-      (row): row is Record<string, unknown> =>
-        Boolean(row) && typeof row === 'object' && !Array.isArray(row),
-    );
-    await Promise.all(
-      list.map(async summary => {
-        if (summary.isHostManaged) return;
-        const row = rows.find(entry => entry.id === summary.id);
-        if (!row || !providerRowNeedsStoredKeyLookup(row)) return;
-        const stored = await this.fetchStoredProviderKey(summary.id);
-        summary.hasKey = isUsableMagpieProviderKey(stored);
-        if (!summary.hasKey) summary.keyMasked = undefined;
-      }),
-    );
   }
 
   async saveProvider(input: MagpieSaveProviderInput): Promise<MagpieProviderSummary[]> {
@@ -584,7 +568,7 @@ export class MagpieManager implements MagpieRoutingGateway {
     if (!input.baseUrl) return { ok: false, error: 'Base URL is required' };
     const start = Date.now();
     try {
-      let key = resolveMagpieProviderSaveKey(undefined, input.key);
+      let key = resolveMagpieProviderSaveKey(input.key);
       if (!isUsableMagpieProviderKey(key) && input.id) {
         const stored = await this.fetchStoredProviderKey(input.id);
         if (isUsableMagpieProviderKey(stored)) key = stored;
@@ -638,12 +622,14 @@ export class MagpieManager implements MagpieRoutingGateway {
         /* ignore ping error */
       }
     }
-    let activeProviderCount = 0;
-    try {
-      const all = await this.providers();
-      activeProviderCount = all.filter(p => !p.off).length;
-    } catch {
-      /* ignore */
+    let activeProviderCount = this.cachedActiveProviderCount;
+    if (this.state.state === 'running' && !this.providersListHydrated) {
+      try {
+        const all = await this.providers();
+        activeProviderCount = all.filter(p => !p.off).length;
+      } catch {
+        activeProviderCount = 0;
+      }
     }
     return {
       latencyMs,
@@ -924,6 +910,8 @@ export class MagpieManager implements MagpieRoutingGateway {
         await this.terminate();
       }
       this.state = { state: 'stopped', version: MAGPIE_VERSION };
+      this.providersListHydrated = false;
+      this.cachedActiveProviderCount = 0;
       return this.status();
     })()
       .catch(error => {

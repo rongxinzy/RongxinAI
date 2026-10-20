@@ -213,7 +213,7 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
     const { createServer } = await import('node:http');
     const { BACKGROUND_CONTEXT: context } = await import('@earendil-works/chord/context');
     const { createRegistry, Harness, MemoryStorage } = await import('@earendil-works/pi-durable');
-    const { resolveDurableProvider } = await import('../libs/agentEngine/durable/provider');
+    const { resolveDurableProvider } = await import('./__fixtures__/durableProvider');
     const { MagpieModelService, installMagpieModelService } = await import('./modelService');
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-durable-'));
     const requests: Record<string, unknown>[] = [];

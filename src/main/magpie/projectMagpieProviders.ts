@@ -115,10 +115,7 @@ export function projectMagpieProviderSummaries(state: unknown): MagpieProviderSu
 }
 
 /** Blank means keep the stored key on edit; never send the placeholder `none`. */
-export function resolveMagpieProviderSaveKey(
-  _existing: Record<string, unknown> | undefined,
-  inputKey?: string,
-): string {
+export function resolveMagpieProviderSaveKey(inputKey?: string): string {
   const trimmed = inputKey?.trim();
   if (trimmed && trimmed !== 'none') return trimmed;
   return '';
@@ -145,7 +142,7 @@ export function buildMagpieProviderSavePayload(
     responses: '',
     anthropic: '',
     [targetField]: baseUrl,
-    key: resolveMagpieProviderSaveKey(existing, input.key),
+    key: resolveMagpieProviderSaveKey(input.key),
     models,
     noModels: models.length === 0,
     fallback,

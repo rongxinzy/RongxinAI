@@ -73,7 +73,7 @@ describe('ProviderManagerSection', () => {
     expect(screen.getByRole('dialog')).toBeTruthy();
 
     // Fill in required fields
-    fireEvent.change(screen.getByPlaceholderText('e.g. OpenAI Production'), {
+    fireEvent.change(screen.getByPlaceholderText(i18nService.t('magpieProviderNamePlaceholder')), {
       target: { value: 'New Test Provider' },
     });
     fireEvent.change(screen.getByPlaceholderText('https://api.openai.com/v1'), {

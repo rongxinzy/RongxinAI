@@ -348,6 +348,52 @@ describe('Magpie owned lifecycle', () => {
     expect(manager.status()).toMatchObject({ state: 'failed', enabled: true });
   });
 
+  it('keeps the provider list when a stored-key probe fails for one row', async () => {
+    const { manager, root, fetcher } = await setup();
+    const originalFetch = fetcher.getMockImplementation();
+    fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/api/providers')) {
+        return Response.json({
+          providers: [
+            {
+              id: 'legacy-none',
+              name: 'Legacy',
+              chat: 'https://api.example/v1',
+              key: { set: true, masked: '••••' },
+              models: ['m1'],
+              off: false,
+            },
+            {
+              id: 'custom-openai',
+              name: 'My OpenAI',
+              chat: 'https://api.openai.com/v1',
+              key: { set: true, masked: 'sk-…6789' },
+              models: [{ id: 'gpt-4o', on: true }],
+              off: false,
+            },
+          ],
+        });
+      }
+      if (url.endsWith('/api/provider/key')) {
+        return new Response('error', { status: 500 });
+      }
+      return originalFetch ? await originalFetch(url, init) : Response.json({});
+    });
+    try {
+      await manager.start();
+      const list = await manager.providers();
+      expect(list).toHaveLength(2);
+      expect(list.find(p => p.id === 'custom-openai')).toMatchObject({ hasKey: true });
+      expect(list.find(p => p.id === 'legacy-none')).toMatchObject({
+        hasKey: false,
+        keyMasked: '••••',
+      });
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('lists providers with key masking and host managed flag (A2)', async () => {
     const { manager, root } = await setup();
     try {

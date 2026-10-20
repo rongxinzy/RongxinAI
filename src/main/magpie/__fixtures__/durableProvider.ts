@@ -3,19 +3,20 @@ import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy';
 import type { ModelRef } from '@earendil-works/pi-durable';
-import { ZhiyuanModelPoolWorkload } from '../../../../shared/modelPool/constants';
+import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
+import { buildMagpiePiModel } from '../../libs/agentEngine/piMagpiePiModel';
 import {
   getMagpieModelService,
   hasMagpieModelService,
   MAGPIE_RUNTIME_API_KEY,
-} from '../../../magpie/modelService';
-import { buildMagpiePiModel } from '../piMagpiePiModel';
+} from '../modelService';
 
 export interface DurableMagpieProvider {
   model: ModelRef;
   models: Models;
 }
 
+/** Smoke-test helper: wire Pi Durable to the live Magpie model service. */
 export async function resolveDurableProvider(
   conversationId: string,
 ): Promise<DurableMagpieProvider> {

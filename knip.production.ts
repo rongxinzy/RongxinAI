@@ -64,6 +64,8 @@ const config: KnipConfig = {
     'src/main/libs/agentEngine/piRuntimeAdapter.testHarness.ts': ['files'],
     'src/main/im/__tests__/**': ['files'],
     'src/scheduledTask/fixtures.ts': ['files'],
+    // Opt-in Magpie SMOKE (`integration.test.ts` dynamic import); not bundled in app.
+    'src/main/magpie/__fixtures__/durableProvider.ts': ['files'],
     // Pending user decision (architecture review work package A.7): the legacy
     // scheduled-task surface. The classic theme definitions were removed (N.2,
     // #1169) and their entries retired with them.

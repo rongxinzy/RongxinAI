@@ -106,7 +106,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
       .filter(Boolean);
     return {
       ...(provider?.id ? { id: provider.id } : {}),
-      name: name.trim() || 'Custom Provider',
+      name: name.trim() || i18nService.t('magpieProviderDefaultName'),
       api,
       baseUrl: baseUrl.trim(),
       ...(apiKey.trim() ? { key: apiKey.trim() } : {}),
@@ -190,7 +190,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               id="provider-name"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="e.g. OpenAI Production"
+              placeholder={i18nService.t('magpieProviderNamePlaceholder')}
               required
               disabled={isSaving}
             />
@@ -206,12 +206,14 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="openai-completions">
-                  OpenAI Chat Completions (/v1/chat/completions)
+                  {i18nService.t('magpieProviderApiOpenAIChat')}
                 </SelectItem>
                 <SelectItem value="anthropic-messages">
-                  Anthropic Messages (/v1/messages)
+                  {i18nService.t('magpieProviderApiAnthropicMessages')}
                 </SelectItem>
-                <SelectItem value="openai-responses">OpenAI Responses (/v1/responses)</SelectItem>
+                <SelectItem value="openai-responses">
+                  {i18nService.t('magpieProviderApiOpenAIResponses')}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -301,7 +303,9 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
                     {i18nService.t('magpieTestSuccess')}
                     {testResult.latencyMs !== undefined ? ` (${testResult.latencyMs}ms)` : ''}
                     {testResult.modelCount !== undefined
-                      ? ` · ${testResult.modelCount} models found`
+                      ? ` · ${i18nService
+                          .t('magpieTestModelsFound')
+                          .replace('{count}', String(testResult.modelCount))}`
                       : ''}
                   </span>
                 </>
