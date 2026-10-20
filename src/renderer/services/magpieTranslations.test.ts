@@ -47,6 +47,5 @@ test('model service copy does not name the internal runtime', () => {
   expect(magpieTranslations.en.magpieApplyNotice).toBe(
     'Applying uses the model service to change this Agent’s model configuration. Start a new session in that Agent to use it.',
   );
-  expect(magpieTranslations.zh.magpieLicenseNotice).toBe('Apache-2.0 · 知远智能体');
-  expect(magpieTranslations.en.magpieLicenseNotice).toBe('Apache-2.0 · ZhiYuan Agent');
+  expect('magpieLicenseNotice' in magpieTranslations.zh).toBe(false);
 });
