@@ -43,10 +43,9 @@ export function projectSelectedProviderModelIds(row: Record<string, unknown>): s
 function providerHasKey(raw: Record<string, unknown>): boolean {
   const key = raw.key;
   if (isRecord(key)) {
-    if (key.set !== true) return false;
-    const masked = key.masked;
-    if (typeof masked === 'string' && /^•+$/.test(masked)) return false;
-    return true;
+    // Mask('none') and a real four-character key both yield '••••'.
+    // Summaries refine bullet-masked rows via stored-key lookup in MagpieManager.providers().
+    return key.set === true;
   }
   if (typeof key === 'string') {
     return key.length > 0 && key !== 'magpie-local' && key !== 'none';
@@ -114,7 +113,7 @@ export function projectMagpieProviderSummaries(state: unknown): MagpieProviderSu
   });
 }
 
-/** Blank means keep the stored key on edit; never send the placeholder `none`. */
+/** Blank means keep the stored key on edit; probes also treat `none` as no key. */
 export function resolveMagpieProviderSaveKey(inputKey?: string): string {
   const trimmed = inputKey?.trim();
   if (trimmed && trimmed !== 'none') return trimmed;
@@ -142,7 +141,9 @@ export function buildMagpieProviderSavePayload(
     responses: '',
     anthropic: '',
     [targetField]: baseUrl,
-    key: resolveMagpieProviderSaveKey(input.key),
+    // Without a NoKey preset, upstream requires a nonempty key for LAN endpoints.
+    // Only creation needs this sentinel; blank edits must keep the stored secret.
+    key: resolveMagpieProviderSaveKey(input.key) || (existing ? '' : 'none'),
     models,
     noModels: models.length === 0,
     fallback,

@@ -348,6 +348,39 @@ describe('Magpie owned lifecycle', () => {
     expect(manager.status()).toMatchObject({ state: 'failed', enabled: true });
   });
 
+  it('resets provider hydration after host sync so diagnostics refetches providers', async () => {
+    const { manager, root, fetcher } = await setup();
+    let providersListFetches = 0;
+    const originalFetch = fetcher.getMockImplementation();
+    fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/api/providers')) providersListFetches++;
+      return originalFetch ? await originalFetch(url, init) : Response.json({});
+    });
+    try {
+      await manager.start();
+      await manager.providers();
+      const afterHydrate = providersListFetches;
+      await manager.diagnostics();
+      expect(providersListFetches).toBe(afterHydrate);
+
+      await manager.syncHostProviders([
+        {
+          id: 'zhiyuan-host-loopback',
+          name: 'Loopback host',
+          api: 'openai-completions',
+          baseUrl: 'http://127.0.0.1:11434/v1',
+          models: [{ id: 'local-model' }],
+        },
+      ]);
+      const afterHostSync = providersListFetches;
+      await manager.diagnostics();
+      expect(providersListFetches).toBe(afterHostSync + 1);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('keeps the provider list when a stored-key probe fails for one row', async () => {
     const { manager, root, fetcher } = await setup();
     const originalFetch = fetcher.getMockImplementation();
@@ -385,7 +418,7 @@ describe('Magpie owned lifecycle', () => {
       expect(list).toHaveLength(2);
       expect(list.find(p => p.id === 'custom-openai')).toMatchObject({ hasKey: true });
       expect(list.find(p => p.id === 'legacy-none')).toMatchObject({
-        hasKey: false,
+        hasKey: true,
         keyMasked: '••••',
       });
     } finally {

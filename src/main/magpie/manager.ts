@@ -440,6 +440,7 @@ export class MagpieManager implements MagpieRoutingGateway {
           }
           this.hostSignatures.set(id, signature);
         }
+        this.providersListHydrated = false;
       });
     this.hostSync = run;
     return run;

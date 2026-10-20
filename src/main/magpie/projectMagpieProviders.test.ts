@@ -31,8 +31,23 @@ describe('projectMagpieProviderSummaries', () => {
       keyMasked: 'system-managed',
       isHostManaged: true,
     });
-    const keyless = list.find(p => p.id === 'keyless-none');
-    expect(keyless).toMatchObject({ hasKey: false });
+    // Mask('none') is indistinguishable from Mask('abcd') in the pinned API.
+    const legacy = list.find(p => p.id === 'keyless-none');
+    expect(legacy).toMatchObject({ hasKey: true, keyMasked: '••••' });
+  });
+
+  it.each([false, true])('keeps real four-character keys set, optional=%s', optional => {
+    const [provider] = projectMagpieProviderSummaries({
+      providers: [{ id: 'short-key', key: { set: true, masked: '••••', optional } }],
+    });
+    expect(provider).toMatchObject({ hasKey: true, keyMasked: '••••' });
+  });
+
+  it('uses key.set even when a masked display value resembles the placeholder', () => {
+    const [provider] = projectMagpieProviderSummaries({
+      providers: [{ id: 'stored-key', key: { set: true, masked: 'none' } }],
+    });
+    expect(provider?.hasKey).toBe(true);
   });
 
   it('prefers chosen over catalog rows when upstream sends explicit picks', () => {
@@ -57,6 +72,47 @@ describe('resolveMagpieProviderSaveKey', () => {
 });
 
 describe('buildMagpieProviderSavePayload', () => {
+  it.each([undefined, '', '   ', 'none', ' none '])(
+    'creates keyless LAN providers with the upstream sentinel for input %s',
+    key => {
+      const baseUrl = 'http://192.168.1.10:11434/v1';
+      const input = {
+        name: 'LAN Ollama',
+        api: 'openai-completions' as const,
+        baseUrl,
+        key,
+        models: ['local-model'],
+      };
+      const created = buildMagpieProviderSavePayload(input, undefined, 'lan', 'chat', baseUrl);
+      expect(created).toMatchObject({ new: true, key: 'none', chat: baseUrl });
+      expect(created).not.toHaveProperty('preset');
+
+      const edited = buildMagpieProviderSavePayload(
+        input,
+        { id: 'lan', key: { set: true, masked: '••••' } },
+        'lan',
+        'chat',
+        baseUrl,
+      );
+      expect(edited).toMatchObject({ new: false, key: '' });
+    },
+  );
+
+  it.each([undefined, { id: 'lan', key: { set: true, masked: '••••' } }])(
+    'sends an explicitly supplied real key when existing=%s',
+    existing => {
+      const baseUrl = 'http://192.168.1.10:8080/v1';
+      const payload = buildMagpieProviderSavePayload(
+        { name: 'LAN llama-server', api: 'openai-completions', baseUrl, key: ' abcd ' },
+        existing,
+        'lan',
+        'chat',
+        baseUrl,
+      );
+      expect(payload.key).toBe('abcd');
+    },
+  );
+
   it('omits placeholder keys and sends only explicit model picks', () => {
     const payload = buildMagpieProviderSavePayload(
       {
