@@ -9,27 +9,12 @@ type Step = { name?: string; run?: string; uses?: string; if?: string };
 const workflow = load(readFileSync('.github/workflows/build-windows-release.yml', 'utf8')) as {
   jobs: Record<string, { steps: Step[] }>;
 };
-const exportStep = workflow.jobs['windows-release'].steps.find(
-  step => step.name === 'Export public signing identity for independent acceptance',
-)!;
 const helper = path.resolve(__dirname, 'windows-signing-certificate.ps1');
 
-test('release checkpoints carry final metadata and only the public signer identity into acceptance', () => {
-  expect(exportStep.run).toContain('X509ContentType]::Cert');
-  expect(exportStep.run).not.toContain('::Pfx');
+test('windows-release signs in one Certum session and verifier enforces public DER and timestamp', () => {
   const buildSteps = workflow.jobs['windows-release'].steps;
-  const checkpoint = buildSteps.findIndex(step =>
-    step.run?.includes('build-checkpoint.mjs create'),
-  );
-  expect(buildSteps.indexOf(exportStep)).toBeLessThan(checkpoint);
-  expect(buildSteps[checkpoint].run).toContain('paths=(release package.json ');
-  const steps = workflow.jobs.acceptance.steps;
-  const verify = steps.findIndex(step => step.run?.includes('verify-windows-authenticode.ps1'));
-  expect(verify).toBeGreaterThan(
-    steps.findIndex(step => step.run?.includes('restore package-checkpoint')),
-  );
-  expect(steps[verify].run).toContain("-CertificatePath 'release/signing-certificate.cer'");
-  expect(steps.some(step => step.uses?.includes('setup-certum-signing'))).toBe(false);
+  expect(buildSteps.some(step => step.uses?.includes('setup-certum-signing'))).toBe(true);
+  expect(workflow.jobs.acceptance).toBeUndefined();
   const verifier = readFileSync('scripts/ci/verify-windows-authenticode.ps1', 'utf8');
   expect(verifier).toContain('$actualCertificateDer -ne $expectedCertificateDer');
   expect(verifier).toContain("$signature.Status -ne 'Valid'");

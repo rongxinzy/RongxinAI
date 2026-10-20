@@ -15,7 +15,7 @@ test('release builds platforms independently and publishes one complete generati
   expect(releaseWorkflow).toContain('build-macos:');
   expect(releaseWorkflow).toContain('build-linux:');
   expect(releaseWorkflow).toContain(
-    'needs: [prepare-release, preflight, build-windows, build-macos, build-linux]',
+    'needs: [prepare-release, build-windows, build-macos, build-linux]',
   );
   expect(releaseWorkflow).not.toContain('publish-windows:');
   expect(releaseWorkflow).not.toContain('publish-macos:');
@@ -23,7 +23,7 @@ test('release builds platforms independently and publishes one complete generati
   expect(releaseWorkflow).toContain('fail-fast: false');
   expect(releaseWorkflow).toContain('build-windows-release.yml');
   expect(releaseWorkflow).toContain('collect-github-release-assets.mjs');
-  expect(releaseWorkflow).toContain('verify-release-candidate.mjs');
+  expect(releaseWorkflow).toContain('upload-release-candidate.mjs');
   expect(RELEASE_PLATFORM_STAGES).toEqual(['win32', 'darwin', 'linux']);
 });
 

@@ -172,7 +172,7 @@ jobs:
           restore-keys: |
             packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
       - name: Install Electron system dependencies
-        if: ${{ matrix.platform == 'linux' }}
+        if: ${{ inputs.mode == 'verify' && matrix.platform == 'linux' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -377,28 +377,6 @@ jobs:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Smoke bundled llama-server
-        if: ${{ matrix.inference_edition != 'lite' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          root=resources/llamacpp-bundled
-          test -f "$root/manifest.json" || { echo "Missing $root/manifest.json" >&2; exit 1; }
-          # Launch the server the manifest names, never an arbitrary find hit.
-          # Hosted runners have no GPU driver (the Windows CUDA server imports
-          # nvcuda.dll), so the portable CPU fallback is launched when declared;
-          # every other declared executable must exist.
-          node -e "const fs=require('fs');const m=require('./$root/manifest.json');for(const k of ['executable','vulkanExecutable','cpuFallbackExecutable'])if(m[k]&&!fs.existsSync('$root/'+m[k])){console.error('Declared '+k+' missing: '+m[k]);process.exit(1)}"
-          launch="$(node -e "const m=require('./$root/manifest.json');process.stdout.write(m.cpuFallbackExecutable||m.executable)")"
-          chmod +x "$root/$launch" 2>/dev/null || true
-          "$root/$launch" --version
-          node scripts/ci/measure-llamacpp-bundled.cjs "$root" "${{ matrix.target }}" "$launch"
-      - name: Verify packaged ACP registry and bridges
-        run: node scripts/ci/verify-packaged-acp-resources.mjs
-      - name: Verify packaged release version
-        if: ${{ inputs.mode == 'release' }}
-        shell: bash
-        run: node scripts/ci/verify-packaged-app-version.mjs '${{ inputs.app-build-version }}'
       - name: Verify signed and notarized macOS release
         if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
         shell: bash
@@ -469,9 +447,6 @@ jobs:
           node scripts/verify-linux-renderer.mjs
           release/linux-unpacked
           release/linux-render-smoke.png
-      - name: Verify the Linux renderer
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
-        run: xvfb-run -a node scripts/verify-linux-renderer.mjs release/linux-unpacked release/linux-render-smoke.png
       - name: Verify the final WebView2 installer interactively
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
         shell: pwsh

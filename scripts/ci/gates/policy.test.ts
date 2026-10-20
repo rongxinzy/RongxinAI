@@ -97,14 +97,13 @@ test('only tag builds may replace unsigned install runs with their signed packag
   expect(() => verifyPreflightResults(results, true)).not.toThrow();
 });
 
-test('release builds overlap preflight and publication waits for both', () => {
+test('release builds platforms in parallel and publication waits for all platforms', () => {
   const release = workflow('release.yml');
-  expect(release.jobs.preflight.uses).toBe('./.github/workflows/release-preflight.yml');
-  expect(release.jobs.preflight.with?.['include-packaging']).toBe(false);
+  expect(release.jobs.preflight).toBeUndefined();
   for (const platform of ['windows', 'macos', 'linux']) {
     expect(release.jobs[`build-${platform}`].needs).toBe('prepare-release');
     expect(release.jobs.publish.needs).toEqual(
-      expect.arrayContaining(['preflight', `build-${platform}`]),
+      expect.arrayContaining(['prepare-release', `build-${platform}`]),
     );
   }
   expect(release.jobs.publish.if).toBeUndefined();
