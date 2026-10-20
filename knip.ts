@@ -28,6 +28,7 @@ const config: KnipConfig = {
         'src/main/magpie/catalogWorker.ts',
         'src/main/magpie/hashWorker.ts',
         'src/main/libs/appUpdateHashWorker.ts',
+        'src/main/libs/skillSecurity/skillSecurityScanWorker.ts',
         'src/main/pythonRuntime/runner.ts',
         // Spawned by path.join(__dirname, '...js'), not a static import.
         'src/main/extensions/aisphere/requestWorker.ts',
