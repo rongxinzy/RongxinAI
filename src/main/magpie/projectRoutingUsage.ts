@@ -125,9 +125,7 @@ function sanitizeMembers(members: string[]): string[] {
   return members.filter(m => typeof m === 'string' && m.length <= 500).slice(0, 200);
 }
 
-function buildRoutingGroupSaveBody(
-  input: MagpieRoutingGroupSaveInput,
-): Record<string, unknown> {
+function buildRoutingGroupSaveBody(input: MagpieRoutingGroupSaveInput): Record<string, unknown> {
   const id = input.id.trim();
   const name = input.name.trim();
   if (!id || !name) throw new Error('Group id and name are required');
