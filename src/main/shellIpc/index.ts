@@ -17,6 +17,8 @@ import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 
 export interface ShellIpcDeps {
   getCoworkStore: () => CoworkStore;
+  /** User-selected coding workspace roots, so coding file:// links resolve. */
+  getCodingWorkspaceRoots?: () => string[];
 }
 
 export const registerShellIpc = (deps: ShellIpcDeps): void => {
@@ -57,7 +59,7 @@ export const registerShellIpc = (deps: ShellIpcDeps): void => {
     // 允许根目录内真实存在的文件路径；目录与不存在的路径返回 null。
     shellResolveLocalPath: async (_event, candidate, cwd) => {
       try {
-        const allowedRoots = getAllowedShellProbeRoots(deps.getCoworkStore);
+        const allowedRoots = getAllowedShellProbeRoots(deps.getCoworkStore, deps.getCodingWorkspaceRoots);
         const resolved = await resolveLocalPathCandidate(
           typeof candidate === 'string' ? candidate : '',
           typeof cwd === 'string' && cwd ? cwd : undefined,
