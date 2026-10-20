@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { PreviewScenario } from '../shared/constants.mjs';
-import { attachConsoleGuards, previewSearch } from '../shared/harness.mjs';
+import { applyDeterministicRendering, attachConsoleGuards, previewSearch } from '../shared/harness.mjs';
 
 test('coding mode streams reasoning + markdown and surfaces artifact and elicitation cards', async ({
   page,
@@ -9,6 +9,8 @@ test('coding mode streams reasoning + markdown and surfaces artifact and elicita
 }) => {
   const failures = [];
   attachConsoleGuards(page, failures, 'coding');
+  await applyDeterministicRendering(page);
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
 
   await page.goto(`${baseURL}${previewSearch({ scenario: PreviewScenario.Coding })}`, {
     waitUntil: 'domcontentloaded',
