@@ -17,6 +17,7 @@ const {
   symlinkSync,
 } = require('fs');
 const { spawnSync } = require('child_process');
+const { writeNsisOfflineComponentRouting } = require('./resolve-nsis-offline-components.cjs');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
 const { configureMagpieResources } = require('./magpie-runtime.cjs');
 const { verifyPackagedDeliverables } = require('./packaging/verify-packaged-runtimes.cjs');
@@ -698,6 +699,7 @@ async function beforePack(context) {
       `${JSON.stringify(buildWindowsResourceBundleManifest(componentManifests), null, 2)}\n`,
       'utf8',
     );
+    writeNsisOfflineComponentRouting(componentsDir, componentManifests);
   }
 
   // Pin after resource checks so a missing runtime still fails with its own

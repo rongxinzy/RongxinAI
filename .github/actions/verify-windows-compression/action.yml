@@ -1,20 +1,47 @@
 name: Verify Windows compression qualification
 description: Require compression size, extraction time, content identity and Python probes before publication
+inputs:
+  artifact-suffix:
+    description: Unique target or producer identity within this run
+    default: '${{ github.job }}-${{ github.run_attempt }}'
 runs:
   using: composite
   steps:
+    - name: Identify exact compression qualification inputs
+      id: identity
+      shell: bash
+      run: node scripts/ci/compression-qualification.cjs key
+    - uses: actions/cache/restore@v5
+      id: qualification
+      with:
+        key: ${{ steps.identity.outputs.key }}
+        path: build-tar/windows-components/skill-python-compression-benchmark.json
     - name: Qualify the packaged Skill Python archive
+      if: steps.qualification.outputs.cache-hit != 'true'
       shell: powershell
       run: >-
         powershell -NoProfile -ExecutionPolicy Bypass
         -File scripts/ci/benchmark-skill-python-compression.ps1
         -ProjectRoot '${{ github.workspace }}'
         -RequireQualified
+    - name: Bind qualification to content and compressor
+      if: steps.qualification.outputs.cache-hit != 'true'
+      shell: bash
+      run: node scripts/ci/compression-qualification.cjs seal
+    - name: Verify qualification even on a cache hit
+      shell: bash
+      run: node scripts/ci/compression-qualification.cjs verify
+    - uses: actions/cache/save@v5
+      if: steps.qualification.outputs.cache-hit != 'true'
+      with:
+        key: ${{ steps.identity.outputs.key }}
+        path: build-tar/windows-components/skill-python-compression-benchmark.json
     - name: Preserve compression qualification report
       if: always()
       uses: actions/upload-artifact@v6
       with:
-        name: windows-compression-${{ github.job }}
+        name: windows-compression-${{ inputs.artifact-suffix }}
         path: build-tar/windows-components/skill-python-compression-benchmark.json
         if-no-files-found: warn
-        retention-days: 3
+        overwrite: true
+        retention-days: 14
