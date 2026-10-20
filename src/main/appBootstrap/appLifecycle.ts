@@ -2,6 +2,7 @@
 import { app, BrowserWindow } from 'electron';
 
 import { rt } from './runtimeState';
+import { inferenceRuntime } from './inferenceRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
 import { getStore } from './runtimeServices';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
@@ -37,21 +38,21 @@ const runAppCleanup = async (): Promise<void> => {
 
   if (getStore().get<boolean>('magpie_disconnect_external_on_quit') === true) {
     try {
-      await rt.magpieManager?.disconnectAllAgents();
+      await inferenceRuntime.magpieManager?.disconnectAllAgents();
     } catch (error) {
       console.warn('[Magpie] Failed to disconnect external agents before quit:', error);
     }
   }
 
-  await rt.disposeMagpie?.();
-  rt.disposeMagpie = undefined;
+  await inferenceRuntime.disposeMagpie?.();
+  inferenceRuntime.disposeMagpie = undefined;
 
   await disposeZhiyuanEnterpriseExtension().catch(error => {
     console.error('[EnterpriseExtension] Failed to dispose enterprise extension:', error);
   });
 
-  rt.disposeMagpieModels?.();
-  rt.disposeMagpieModels = undefined;
+  inferenceRuntime.disposeMagpieModels?.();
+  inferenceRuntime.disposeMagpieModels = undefined;
 
   // Stop all active Pi sessions without blocking shutdown.
   console.log('[Main] Stopping cowork sessions...');
@@ -76,20 +77,20 @@ const runAppCleanup = async (): Promise<void> => {
   channelRuntime.sidecarManager = null;
   channelRuntime.controlClient = null;
 
-  if (rt.ollamaManager) {
-    await rt.ollamaManager.shutdownForQuit().catch(error => {
+  if (inferenceRuntime.ollamaManager) {
+    await inferenceRuntime.ollamaManager.shutdownForQuit().catch(error => {
       console.error('[Ollama] Failed to stop service on quit:', error);
     });
   }
 
-  if (rt.llamaCppManager) {
-    await rt.llamaCppManager.shutdownForQuit().catch(error => {
+  if (inferenceRuntime.llamaCppManager) {
+    await inferenceRuntime.llamaCppManager.shutdownForQuit().catch(error => {
       console.error('[LlamaCpp] Failed to stop service on quit:', error);
     });
   }
 
-  if (rt.llamaCppModelOrchestrator) {
-    await rt.llamaCppModelOrchestrator.shutdownForQuit().catch(error => {
+  if (inferenceRuntime.llamaCppModelOrchestrator) {
+    await inferenceRuntime.llamaCppModelOrchestrator.shutdownForQuit().catch(error => {
       console.error('[LlamaCpp] Failed to stop local inference orchestrator on quit:', error);
     });
   }
