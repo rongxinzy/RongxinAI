@@ -163,8 +163,8 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
         });
         this.linkLaneAssignment(snapshot, lane.id, workbench.taskId, workbench.runId);
       }
-      const turnGeneration = this.beginLaneTurn(lane.id);
-      this.trackTurn(
+      const turnGeneration = this.turnTracker.beginLaneTurn(lane.id);
+      this.turnTracker.trackTurn(
         this.runTurn(
           workspaceRoot,
           executionRoot,
@@ -241,8 +241,8 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
         });
         this.linkLaneAssignment(snapshot, lane.id, workbench.taskId, workbench.runId);
       }
-      const turnGeneration = this.beginLaneTurn(lane.id);
-      this.trackTurn(
+      const turnGeneration = this.turnTracker.beginLaneTurn(lane.id);
+      this.turnTracker.trackTurn(
         this.runTurn(
           workspaceRoot,
           executionRoot,
@@ -302,10 +302,7 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
       lane,
       this.executionRoot(lane, workspaceRoot),
     );
-    const activeTurnGeneration = this.laneTurnGenerations.get(lane.id);
-    if (activeTurnGeneration !== undefined) {
-      this.cancelledTurnGenerations.set(lane.id, activeTurnGeneration);
-    }
+    this.turnTracker.cancelCurrentTurn(lane.id);
     await driver.cancel(session.id);
     const assignment = this.repository.getLatestAssignmentForLane(lane.id);
     if (assignment?.workbenchRunId) {
@@ -380,7 +377,7 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
           this.eventDeltaBatcher.enqueue(roomWorkspaceRoot, storedEvent);
         }
       }
-      if (this.consumeCancelledTurn(lane.id, turnGeneration)) {
+      if (this.turnTracker.consumeCancelledTurn(lane.id, turnGeneration)) {
         if (queuedItemId) this.deletePendingMessage(lane.id, queuedItemId);
         return;
       }
@@ -416,7 +413,7 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
       }
       this.publish(roomWorkspaceRoot);
     } catch (error) {
-      if (this.consumeCancelledTurn(lane.id, turnGeneration)) {
+      if (this.turnTracker.consumeCancelledTurn(lane.id, turnGeneration)) {
         if (queuedItemId) this.deletePendingMessage(lane.id, queuedItemId);
         return;
       }
@@ -451,33 +448,6 @@ export abstract class CodingRoomServiceTurnExecution extends CodingRoomServiceCo
         console.error('[CodingRoom] failed to start queued ACP message:', error);
       },
     );
-  }
-
-  private trackTurn(turn: Promise<void>): void {
-    const tracked = turn
-      .catch(error => {
-        // runTurn records turn failures itself; a rejection here means the
-        // failure handler itself threw, e.g. the repository was closed first.
-        console.error('[CodingRoom] turn failure handling did not complete:', error);
-      })
-      .finally(() => {
-        this.inFlightTurns.delete(tracked);
-      });
-    this.inFlightTurns.add(tracked);
-  }
-
-  private beginLaneTurn(laneId: string): number {
-    const turnGeneration = (this.laneTurnGenerations.get(laneId) ?? 0) + 1;
-    this.laneTurnGenerations.set(laneId, turnGeneration);
-    return turnGeneration;
-  }
-
-  private consumeCancelledTurn(laneId: string, turnGeneration: number): boolean {
-    if (this.cancelledTurnGenerations.get(laneId) !== turnGeneration) {
-      return false;
-    }
-    this.cancelledTurnGenerations.delete(laneId);
-    return true;
   }
 
   protected finishTurn(

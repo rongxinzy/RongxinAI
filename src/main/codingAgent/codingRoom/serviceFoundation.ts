@@ -23,6 +23,7 @@ import {
 import { CodingPendingMessageQueue } from './codingPendingMessageQueue';
 import { CodingLaneSessionIndex } from './codingLaneSessionIndex';
 import { CodingDriverPool } from './codingDriverPool';
+import { CodingTurnTracker } from './codingTurnTracker';
 import type { CodingRoomRuntime } from './runtimeContract';
 
 /**
@@ -37,11 +38,9 @@ export abstract class CodingRoomServiceFoundation extends EventEmitter {
   protected readonly git: CodingGitController;
   private readonly eventWindowReader: CodingEventWindowReader;
   protected readonly eventDeltaBatcher: CodingEventDeltaBatcher;
-  protected readonly laneTurnGenerations = new Map<string, number>();
-  protected readonly cancelledTurnGenerations = new Map<string, number>();
+
   protected readonly pendingMessageQueue = new CodingPendingMessageQueue();
-  protected readonly stagedLaneIds = new Set<string>();
-  protected readonly inFlightTurns = new Set<Promise<void>>();
+  protected readonly turnTracker = new CodingTurnTracker();
   protected readonly laneSessionIndex = new CodingLaneSessionIndex();
 
   constructor(
