@@ -190,7 +190,9 @@ jobs:
       - name: Cache Magpie module and build scratch
         uses: actions/cache@v5
         with:
-          path: .cache/magpie
+          path: |
+            .cache/magpie
+            resources/magpie
           key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go${{ steps.magpie-toolchain.outputs.go-version }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
       - name: Build and verify pinned Magpie gateway
         shell: bash
@@ -226,15 +228,28 @@ jobs:
       - name: Prepare pinned Windows CUDA runtime
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
         uses: ./.github/actions/prepare-windows-cuda
-      - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
+      - name: Restore Linux CUDA llama.cpp runtime
         if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
+        id: linux-cuda-runtime
+        uses: actions/cache/restore@v5
+        with:
+          path: vendor/llamacpp/cuda
+          key: linux-cuda-v1-ubuntu2204-cuda12.4.1-sm89-${{ hashFiles('package.json', 'resources/llamacpp-backends/manifest.json', 'scripts/ci/build-llamacpp-cuda-linux-in-docker.sh', 'scripts/build-llamacpp-cuda-rtx40.sh', 'scripts/ci/stage-linux-cuda-runtime-libs.sh', 'scripts/finalize-llamacpp-cuda-edition.cjs', 'scripts/finalize-llamacpp-cuda-edition.lib.cjs') }}
+      - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' && steps.linux-cuda-runtime.outputs.cache-hit != 'true' }}
         shell: bash
         run: bash scripts/ci/build-llamacpp-cuda-linux-in-docker.sh
       - name: Finalize CUDA llama.cpp edition bundle
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' && steps.linux-cuda-runtime.outputs.cache-hit != 'true' }}
         run: node scripts/finalize-llamacpp-cuda-edition.cjs
         env:
           LLAMACPP_CUDA_PLATFORM: ${{ matrix.platform == 'windows' && 'win32' || 'linux' }}
+      - name: Save Linux CUDA llama.cpp runtime
+        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' && steps.linux-cuda-runtime.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: vendor/llamacpp/cuda
+          key: ${{ steps.linux-cuda-runtime.outputs.cache-primary-key }}
       - name: Stage bundled llama.cpp runtime
         if: ${{ matrix.inference_edition != 'lite' }}
         run: bun run prepare:inference-edition-runtime
