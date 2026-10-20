@@ -126,9 +126,10 @@ function configureMagpieResources(context) {
   const targets = contextTargets(context);
   for (const key of targets) verifyRuntime(root, key);
   const config = context.packager.config;
-  // All macOS .apps keep both helpers, so universal merging sees identical
-  // resources and never rewrites a pinned binary with lipo. The running
-  // Electron process selects its own architecture at startup.
+  // Per-arch macOS .apps ship only their own helper; a universal .app keeps
+  // both, so universal merging sees identical resources and never rewrites a
+  // pinned binary with lipo (x64ArchFiles). The running Electron process
+  // selects its own architecture at startup.
   const resources = (config.extraResources || []).filter(resource => {
     return !(typeof resource === 'object' && /^magpie(?:\/|$)/.test(resource.to || ''));
   });
