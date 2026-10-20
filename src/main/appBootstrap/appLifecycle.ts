@@ -2,6 +2,7 @@
 import { app, BrowserWindow } from 'electron';
 
 import { rt } from './runtimeState';
+import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
 import { getStore } from './runtimeServices';
@@ -107,7 +108,7 @@ const runAppCleanup = async (): Promise<void> => {
     });
   }
 
-  rt.sqliteBackupManager?.stopPeriodicBackupLoop();
+  storageRuntime.sqliteBackupManager?.stopPeriodicBackupLoop();
   memoryRuntime.todoReminderScheduler?.stop();
   memoryRuntime.todoReminderScheduler = null;
 
