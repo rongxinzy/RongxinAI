@@ -602,6 +602,13 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('!macro ForgetOldInstallRegistry');
     expect(installerScript).toContain('!insertmacro ForgetOldInstallRegistry');
     expect(installerScript).toContain('DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"');
+    // The install-info key must survive: its InstallLocation is the only way
+    // the next installer run rediscovers a custom directory. The macro runs
+    // before extraction while electron-builder rewrites the key only after a
+    // successful install, so deleting it lets an interrupted install strand
+    // the path memory and silently revert to the default Programs directory.
+    expect(installerScript).not.toContain('DeleteRegKey HKCU "${INSTALL_REGISTRY_KEY}"');
+    expect(installerScript).not.toContain('DeleteRegKey HKLM "${INSTALL_REGISTRY_KEY}"');
     expect(installerScript).toContain('!macro customUnInstallCheck');
     expect(installerScript).toContain('!macro customUnInstallCheckCurrentUser');
   });
