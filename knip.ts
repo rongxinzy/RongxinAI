@@ -40,6 +40,9 @@ const config: KnipConfig = {
         'scripts/write-windows-dev-shortcut.cjs',
         'scripts/prepare-visual-blind-review.mjs',
         'scripts/ci/validate-docx-smoke.mjs',
+        'scripts/ci/verify-packaged-acp-resources.mjs',
+        'scripts/ci/measure-llamacpp-bundled.cjs',
+        'scripts/ci/build-checkpoint.mjs',
         // Invoked from release.yml and publish workflows, not static imports.
         'scripts/release/print-electron-updater-verify-specs.mjs',
         'scripts/release/print-release-candidate-layout.mjs',

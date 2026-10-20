@@ -67,7 +67,10 @@ await build(createBuildOptions('src/main/desktopPetPreload.ts'));
 await build(createBuildOptions('src/main/llamacppModelDaemonEntry.ts'));
 await build(createBuildOptions('src/main/workbenchTask/artifactWorker.ts'));
 await build(createBuildOptions('src/main/magpie/catalogWorker.ts'));
-await build(createBuildOptions('src/main/magpie/hashWorker.ts'));
+await build(createBuildOptions('src/main/libs/hashWorker.ts'));
+await build(createBuildOptions('src/main/libs/sqliteBackup/sqliteVerifyWorker.ts'));
+await build(createBuildOptions('src/main/libs/skillSecurity/skillSecurityScanWorker.ts'));
+await build(createBuildOptions('src/main/extensions/aisphere/requestWorker.ts'));
 await build(createBuildOptions('src/main/libs/appUpdateHashWorker.ts'));
 await build(
   createBuildOptions('src/main/pythonRuntime/runner.ts', {
