@@ -13,7 +13,6 @@ export const PreflightJob = {
   Enterprise: 'enterprise',
   ChannelRuntime: 'channel-runtime',
   PythonLinux: 'python-runtime-linux',
-  PythonWindows: 'python-runtime-windows',
   Browser: 'browser-preview',
   Memory: 'memory-leak',
 } as const;
