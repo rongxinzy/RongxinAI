@@ -44,8 +44,12 @@ import {
 import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
 import type { MagpieRoutingGateway } from './magpieRoutingGateway';
 import { MagpieRoutingUsageService } from './routingUsageService';
-import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort, maskApiKey } from './magpieManagerUtils';
-import { projectMagpieProviderSummaries } from './projectMagpieProviders';
+import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort } from './magpieManagerUtils';
+import {
+  buildMagpieProviderSavePayload,
+  projectMagpieProviderSummaries,
+  resolveMagpieProviderSaveKey,
+} from './projectMagpieProviders';
 export interface MagpieManagerOptions {
   resourcesRoot: string;
   privateHome: string;
@@ -482,12 +486,6 @@ export class MagpieManager implements MagpieRoutingGateway {
       throw new Error('Invalid provider id');
     }
 
-    let key = input.key?.trim();
-    if (!key && existing && typeof existing.key === 'string') {
-      key = existing.key;
-    }
-    if (!key) key = 'none';
-
     const targetField =
       input.api === 'anthropic-messages'
         ? 'anthropic'
@@ -495,32 +493,13 @@ export class MagpieManager implements MagpieRoutingGateway {
           ? 'responses'
           : 'chat';
 
-    const models = Array.isArray(input.models)
-      ? input.models.filter(m => typeof m === 'string' && m.trim())
-      : [];
-    const fallback = Array.isArray(input.fallback)
-      ? input.fallback.filter(f => typeof f === 'string')
-      : [];
-
-    const payload = {
+    const payload = buildMagpieProviderSavePayload(
+      { ...input, name },
+      existing as Record<string, unknown> | undefined,
       id,
-      from: id,
-      name,
-      chat: '',
-      responses: '',
-      anthropic: '',
-      [targetField]: baseUrl,
-      key,
-      models,
-      noModels: models.length === 0,
-      fallback,
-      proxy: 'direct',
-      unredacted: true,
-      off: existing ? existing.off === true : false,
-      headers: {},
-      extraBody: {},
-      new: !existing,
-    };
+      targetField,
+      baseUrl,
+    );
 
     await this.managementJson('/api/provider/save', {
       method: 'POST',
@@ -569,13 +548,15 @@ export class MagpieManager implements MagpieRoutingGateway {
     if (!input.baseUrl) return { ok: false, error: 'Base URL is required' };
     const start = Date.now();
     try {
-      let key = input.key?.trim();
+      let key = resolveMagpieProviderSaveKey(undefined, input.key);
       if (!key && input.id) {
         const state = await this.managementJson('/api/providers');
         const existing = (Array.isArray(state.providers) ? state.providers : []).find(
           (p: Record<string, unknown>) => p.id === input.id,
         );
-        if (existing && typeof existing.key === 'string') key = existing.key;
+        if (existing && typeof existing.key === 'string' && existing.key !== 'none') {
+          key = existing.key;
+        }
       }
       const url = input.baseUrl.replace(/\/+$/, '');
       const testEndpoint =

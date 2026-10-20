@@ -188,8 +188,11 @@ describe('Magpie owned lifecycle', () => {
               id: 'custom-openai',
               name: 'My OpenAI',
               chat: 'https://api.openai.com/v1',
-              key: 'sk-secret123456789',
-              models: ['gpt-4o'],
+              key: { set: true, masked: 'sk-…6789' },
+              models: [
+                { id: 'gpt-4o', on: true },
+                { id: 'gpt-4o-mini', on: false },
+              ],
               off: false,
             },
           ],
@@ -354,7 +357,8 @@ describe('Magpie owned lifecycle', () => {
         api: 'openai-completions',
         baseUrl: 'https://api.openai.com/v1',
         hasKey: true,
-        keyMasked: 'sk-...6789',
+        keyMasked: 'sk-…6789',
+        models: ['gpt-4o'],
       });
       // Ensure the raw secret key is never projected
       expect((custom as Record<string, unknown>).key).toBeUndefined();
@@ -408,8 +412,8 @@ describe('Magpie owned lifecycle', () => {
       const body = JSON.parse(saveCall![1]?.body as string);
       expect(body.id).toBe('custom-openai');
       expect(body.name).toBe('My OpenAI Renamed');
-      // Key retained from existing provider in upstream state
-      expect(body.key).toBe('sk-secret123456789');
+      // Upstream keeps the stored key when the editor leaves the field blank
+      expect(body.key).toBe('');
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });
