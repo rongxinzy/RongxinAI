@@ -4,7 +4,7 @@ import type { MagpieModel } from '../../shared/magpie/types';
 
 const MAX_GROUP_DEPTH = 24;
 
-export function memberModelRef(memberId: string): string {
+function memberModelRef(memberId: string): string {
   if (memberId.startsWith(MAGPIE_ROUTING_GROUP_PREFIX)) return memberId;
   return memberId.split(':')[0] ?? memberId;
 }
