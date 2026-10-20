@@ -1,7 +1,7 @@
 import { Menu, screen, type WebContents } from 'electron';
 
 import { isMac, isWindows, TITLEBAR_COLORS, TITLEBAR_HEIGHT } from './appEnv';
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { getStore } from './runtimeServices';
 import { AppWindowStoreKey, type WindowRectangle } from '../windowState';
 import type { AppConfigSettings } from './appConfigSettings';
@@ -21,23 +21,23 @@ export const getTitleBarOverlayOptions = () => {
 };
 
 export const updateTitleBarOverlay = () => {
-  if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return;
+  if (!lifecycleRuntime.mainWindow || lifecycleRuntime.mainWindow.isDestroyed()) return;
   if (!isMac && !isWindows) {
-    rt.mainWindow.setTitleBarOverlay(getTitleBarOverlayOptions());
+    lifecycleRuntime.mainWindow.setTitleBarOverlay(getTitleBarOverlayOptions());
   }
   // Also update the window background color to match the theme
   const config = getStore().get<AppConfigSettings>('app_config');
   const theme = resolveThemeFromConfig(config);
-  rt.mainWindow.setBackgroundColor(theme === 'dark' ? '#0F1117' : '#F8F9FB');
+  lifecycleRuntime.mainWindow.setBackgroundColor(theme === 'dark' ? '#0F1117' : '#F8F9FB');
 };
 
 export const emitWindowState = () => {
-  if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return;
-  if (rt.mainWindow.webContents.isDestroyed()) return;
-  rt.mainWindow.webContents.send('window:state-changed', {
-    isMaximized: rt.mainWindow.isMaximized(),
-    isFullscreen: rt.mainWindow.isFullScreen(),
-    isFocused: rt.mainWindow.isFocused(),
+  if (!lifecycleRuntime.mainWindow || lifecycleRuntime.mainWindow.isDestroyed()) return;
+  if (lifecycleRuntime.mainWindow.webContents.isDestroyed()) return;
+  lifecycleRuntime.mainWindow.webContents.send('window:state-changed', {
+    isMaximized: lifecycleRuntime.mainWindow.isMaximized(),
+    isFullscreen: lifecycleRuntime.mainWindow.isFullScreen(),
+    isFocused: lifecycleRuntime.mainWindow.isFocused(),
   });
 };
 
@@ -46,20 +46,20 @@ export const getDisplayWorkAreas = (): WindowRectangle[] => {
 };
 
 const getCurrentAppWindowState = () => {
-  if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return null;
+  if (!lifecycleRuntime.mainWindow || lifecycleRuntime.mainWindow.isDestroyed()) return null;
 
-  const bounds = rt.mainWindow.isFullScreen()
-    ? rt.mainWindow.getNormalBounds()
-    : rt.mainWindow.isMaximized()
-      ? rt.mainWindow.getNormalBounds()
-      : rt.mainWindow.getBounds();
+  const bounds = lifecycleRuntime.mainWindow.isFullScreen()
+    ? lifecycleRuntime.mainWindow.getNormalBounds()
+    : lifecycleRuntime.mainWindow.isMaximized()
+      ? lifecycleRuntime.mainWindow.getNormalBounds()
+      : lifecycleRuntime.mainWindow.getBounds();
 
   return {
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
     height: bounds.height,
-    isMaximized: rt.mainWindow.isMaximized(),
+    isMaximized: lifecycleRuntime.mainWindow.isMaximized(),
   };
 };
 
@@ -70,51 +70,57 @@ export const persistAppWindowState = () => {
 };
 
 export const schedulePersistAppWindowState = () => {
-  if (rt.windowStateSaveTimer) {
-    clearTimeout(rt.windowStateSaveTimer);
+  if (lifecycleRuntime.windowStateSaveTimer) {
+    clearTimeout(lifecycleRuntime.windowStateSaveTimer);
   }
 
-  rt.windowStateSaveTimer = setTimeout(() => {
-    rt.windowStateSaveTimer = null;
+  lifecycleRuntime.windowStateSaveTimer = setTimeout(() => {
+    lifecycleRuntime.windowStateSaveTimer = null;
     persistAppWindowState();
   }, WINDOW_STATE_SAVE_DEBOUNCE_MS);
 };
 
 export const showSystemMenu = (position?: { x?: number; y?: number }) => {
   if (!isWindows) return;
-  if (!rt.mainWindow || rt.mainWindow.isDestroyed()) return;
+  if (!lifecycleRuntime.mainWindow || lifecycleRuntime.mainWindow.isDestroyed()) return;
 
-  const isMaximized = rt.mainWindow.isMaximized();
+  const isMaximized = lifecycleRuntime.mainWindow.isMaximized();
   const menu = Menu.buildFromTemplate([
-    { label: 'Restore', enabled: isMaximized, click: () => rt.mainWindow?.restore() },
+    { label: 'Restore', enabled: isMaximized, click: () => lifecycleRuntime.mainWindow?.restore() },
     { role: 'minimize' },
-    { label: 'Maximize', enabled: !isMaximized, click: () => rt.mainWindow?.maximize() },
+    {
+      label: 'Maximize',
+      enabled: !isMaximized,
+      click: () => lifecycleRuntime.mainWindow?.maximize(),
+    },
     { type: 'separator' },
     { role: 'close' },
   ]);
 
   menu.popup({
-    window: rt.mainWindow,
+    window: lifecycleRuntime.mainWindow,
     x: Math.max(0, Math.round(position?.x ?? 0)),
     y: Math.max(0, Math.round(position?.y ?? 0)),
   });
 };
 
 export const scheduleReload = (reason: string, webContents?: WebContents) => {
-  if (rt.isQuitting) {
+  if (lifecycleRuntime.isQuitting) {
     console.debug(`[RendererProcess] Skipping reload during shutdown (${reason}).`);
     return;
   }
-  const target = webContents ?? rt.mainWindow?.webContents;
+  const target = webContents ?? lifecycleRuntime.mainWindow?.webContents;
   if (!target || target.isDestroyed()) {
     return;
   }
   const now = Date.now();
-  if (now - rt.lastReloadAt < MIN_RELOAD_INTERVAL_MS) {
-    console.warn(`Skipping reload (${reason}); last reload was ${now - rt.lastReloadAt}ms ago.`);
+  if (now - lifecycleRuntime.lastReloadAt < MIN_RELOAD_INTERVAL_MS) {
+    console.warn(
+      `Skipping reload (${reason}); last reload was ${now - lifecycleRuntime.lastReloadAt}ms ago.`,
+    );
     return;
   }
-  rt.lastReloadAt = now;
+  lifecycleRuntime.lastReloadAt = now;
   console.warn(`Reloading window due to ${reason}`);
   target.reloadIgnoringCache();
 };

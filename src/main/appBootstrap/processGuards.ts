@@ -5,7 +5,7 @@
 import { app } from 'electron';
 
 import { configureUserDataPath } from './appEnv';
-import { rt } from './runtimeState';
+import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { scheduleReload } from './windowManagement';
 import { reloadOnChildProcessGone } from './appEnv';
 import { agentResourceDiagnostics } from '../agentResourceDiagnostics';
@@ -32,7 +32,7 @@ export const bootstrapProcess = (): void => {
   app.on('render-process-gone', (_event, webContents, details) => {
     console.error('[RendererProcess] Render process exited:', details);
     agentResourceDiagnostics.logRendererProcessGone(details.reason);
-    if (shouldReloadRendererProcess(details.reason, rt.isQuitting)) {
+    if (shouldReloadRendererProcess(details.reason, lifecycleRuntime.isQuitting)) {
       scheduleReload(`render-process-gone (${details.reason})`, webContents);
     }
   });
