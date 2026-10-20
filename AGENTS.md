@@ -18,6 +18,8 @@ bun run build              # 生产构建（TS + Vite）
 bun run lint               # oxlint，含 theme:check / theme:audit
 bun run format             # oxfmt；提交前 bun run format:check
 bun run test               # Vitest；bun run test -- <name> 过滤
+bun run test:unit          # 日常单测，无应用构建或 Electron 原生重编译
+bun run test:full          # 发版前完整测试，包含真实 Electron ABI 夹具
 bun run compile:electron   # 仅主进程
 bun run dist:mac|dist:win|dist:linux
 bun run theme:generate     # 改 token/recipe/生成器后必跑
@@ -31,7 +33,7 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 - 仅在 `import.meta.env.DEV` 且没有 preload bridge 时，`main.tsx` 才动态加载 `src/renderer/browserMock/`。生产构建不含 mock。
 - 完整表面由 `scripts/preview/generate-browser-mock.ts` 按 `Window['electron']`（`src/renderer/types/electron.d.ts`）生成。没有单独实现的方法返回类型上合法的默认值，每个路径只 `console.warn` 一次，不抛异常。`on*` 订阅注册到进程内事件总线，fixture 用同一条总线回放流式事件。
 - 会话、流式回复、设置、Skills、MCP、自动化、本地推理和 IM 的数据在 `browserMock/interactive.ts` 与 `browserMock/fixtures/`。改了 preload 契约后跑 `bun run web:preview:codegen`，并提交 `src/renderer/browserMock/generated/`。`bun run web:preview:codegen:check` 会在生成结果过期时失败。
-- `bun run web:preview:check`（先 `bunx playwright install chromium`）在 headless Chromium 中跑 Playwright 交互测试与 warn-only 的 axe 抽检；mock 仍支持 URL 参数 `previewScenario` / `previewEdition` / `previewSkipBoot` 供本地走查。`console.error` 与 `pageerror` 会让检查失败。Preload 契约：`bun run web:preview:contract`；生成面校验：`bun run web:preview:codegen:check`（与 `web:preview:check` 一起在 CI 的 `browser-preview` job 运行）。CI 在渲染器、共享契约或 `scripts/preview` 变更时跑上述检查。
+- `bun run web:preview:check`（先 `bunx playwright install chromium`）在 headless Chromium 中跑 Playwright 交互测试与 warn-only 的 axe 抽检；mock 仍支持 URL 参数 `previewScenario` / `previewEdition` / `previewSkipBoot` 供本地走查。`console.error` 与 `pageerror` 会让检查失败。Preload 契约：`bun run web:preview:contract`；生成面校验：`bun run web:preview:codegen:check`。这些检查由发布前 `release-preflight.yml` 的 `browser-preview` job 统一执行，日常 PR 不自动启动浏览器。
 
 Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
 
@@ -233,7 +235,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 **PR**：标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)：改动、原因、验证；bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，不强制为小修复新建 issue。必需检查 `ci-gate` 通过后，作者或 agent 可自行 squash 合并；高影响变更仍建议维护者确认。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
 
-**CI**：统一必需检查 `ci-gate`（`scripts/ci/gates/verify.ts` 汇总全部 baseline 与路径归属 job）；`.github/devops-ci.json` 与触发范围同步。`.github/workflows/ci.yml` 的基线（lint，含 Knip 与 `scripts/` Python 死代码 / test / bundle-budget）永远运行；重型检查（linux-install、windows-install、memory-leak）由 `scripts/ci/gates/plan.ts` + `policy.ts` 控制：PR 阶段仅对核心改动运行 memory-leak 回归，不再触发 install 回归（留待发版与手动触发验证）。默认分支保护：须经 PR、不要求 approval、不要求解决评审讨论、必需检查仅 `ci-gate`、禁止强推与删除。发布流水线（`release.yml` 打 tag 发 beta、`promote.yml` 晋升 stable）独立于 PR 门禁；见 [RELEASING.md](RELEASING.md)。
+**CI**：`main` 与 `release/**` 的日常 PR/push 仅运行 lint（含格式、Knip、Python 死代码及工作流静态检查）、两片并行单测与 `ci-gate`。单测直接加载 TypeScript；不编译应用、不下载 Electron、不运行浏览器、内存、变异测试或打包安装。重检查统一在 `release-preflight.yml`：手动运行默认包含未签名打包安装；tag 发布调用时由本轮已签名安装验收替代重复的未签名打包。预检各 job 绑定同一个解析后的 commit；类型检查、构建、完整测试、企业工具链、渠道/Python 运行时、浏览器/安装器预览与内存回归全部必须通过。tag 构建与预检并行，publish 同时等待预检和对应平台构建成功。全平台构建、安装和堆分析仅保留手动入口，不因功能改动自动启动。统一必需检查仍为 `ci-gate`；`.github/devops-ci.json` 与触发范围同步。默认分支保护：须经 PR、不要求 approval、不要求解决评审讨论、必需检查仅 `ci-gate`、禁止强推与删除。见 [RELEASING.md](RELEASING.md)。
 
 **项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 

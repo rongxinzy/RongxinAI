@@ -2,13 +2,19 @@
 
 Two workflows, one build, two channels: a `v*` tag runs `release.yml`, which publishes **beta**; `promote.yml` re-signs that same build as **stable**.
 
+Daily PR/push CI runs lint and unit tests only (`bun run test`, alias `test:unit`), without application builds or Electron downloads. Real runtime integration tests and Electron ABI fixtures remain in `test:full` and release preflight.
+
+Local unit runs preserve the existing native addons, reuse separately cached Node ABI output, and restore the original files on completion. Switching back to Electron does not force another rebuild just because tests ran.
+
+Before tagging, run **Release preflight** (`release-preflight.yml`) against the intended source commit. Its default `include-packaging=true` also builds and installs unsigned Windows/Linux packages. All checks use one resolved commit and must pass. Tag releases run the same preflight with `include-packaging=false`: their own signed packages already undergo installation acceptance, so an extra unsigned build would duplicate that work. Quality, runtime, browser, enterprise and memory checks remain mandatory.
+
 ## 1. Tag → beta (`release.yml`)
 
 1. Merge fixes/features to `main`.
 2. Create and push an annotated tag on `main`: `v<semver>` (no spaces), e.g. `v2026.10.16-build.1`.  
    The tag is the **only** version source; CI sets `APP_BUILD_VERSION` from it.
 3. Push triggers **Release (tag)**:
-   - Quality gates + memory regression + signed Windows/macOS/Linux builds and installer smokes
+   - Release preflight and signed Windows/macOS/Linux builds run in parallel; each platform publishes only after preflight and its own build/installation acceptance pass
    - Upload immutable artifacts to R2
    - Publish the **beta** update feed (`channels/beta-pointer.json`)
    - Create a GitHub **pre-release** with auto-generated release notes and attached installers
@@ -27,11 +33,7 @@ Beta users opt in under **Settings → About → Beta update channel**.
 
 `lite` has no llama.cpp. `cpu` bundles llama.cpp CPU + Vulkan (Metal on macOS). `cuda` bundles an RTX 40 (sm_89) / CUDA 12.4 llama-server, its CUDA libraries, and a CPU fallback. Every leg builds and verifies the pinned Magpie gateway (`magpie:build` + `magpie:verify`) before packaging.
 
-**Pre-release verification:** `build-platforms.yml` (optional on PRs) runs the same unsigned
-verify builds as release, scoped by change type: full 7 legs when packaging definitions
-change; one Linux x64 cpu leg as smoke when only dependencies or bundled assets drift;
-nightly on `main` plus manual dispatch for the full matrix. Tag **`release.yml`** remains
-the authoritative signed build and is unchanged by that workflow.
+**Full platform rehearsal:** `build-platforms.yml` is manual-only and runs the full seven-leg unsigned matrix. It never starts on PRs or a schedule. Windows CUDA output uses the same exact source/toolchain cache as signed releases; run this rehearsal on `main` before tagging to warm the cache for subsequent tags. A cache hit still verifies every file hash, DLL closure and CPU fallback startup. Changes to the pinned runtime, compiler image or build inputs invalidate the cache. Tag **`release.yml`** remains the authoritative signed build.
 
 Windows size gates live in `scripts/installer-shell/distribution-budget.cjs`: lite keeps hard limits (WebView2 setup 500 MiB total / 220 MiB non-component, components 300 MiB; NSIS updater 450 MiB). cpu enforces limits = measured size + an explicit margin (ceil 3%, whole MiB) for the WebView2 setup, the NSIS updater and the staged llama.cpp runtime (`scripts/ci/measure-llamacpp-bundled.cjs`); the measured run id is recorded next to each value, and these limits change only through a PR that cites a new measured run. cuda is publicly released but has no size limit (a deliberate decision for the public release); CI still measures and reports its sizes and enforces sha256/runtime integrity.
 

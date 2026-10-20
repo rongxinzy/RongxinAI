@@ -1,8 +1,6 @@
-name: Memory Leak Nightly
+name: Memory heap analysis (manual)
 
 on:
-  schedule:
-    - cron: '17 2 * * *'
   workflow_dispatch:
 
 permissions:

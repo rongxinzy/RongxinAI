@@ -1,12 +1,8 @@
 name: Verify inference edition builds (manual)
 
-# pull_request: full 7-leg matrix only when packaging definitions change; otherwise
-# one Linux x64 cpu smoke leg for dependency/resource/script drift. Nightly on main
-# and workflow_dispatch run the full matrix. Tag releases use release.yml unchanged.
+# Full unsigned matrix is explicit release preparation, never a feature PR check.
 
 on:
-  schedule:
-    - cron: '47 2 * * *'
   workflow_dispatch:
     inputs:
       build_macos:
@@ -24,20 +20,6 @@ on:
         required: true
         default: true
         type: boolean
-  pull_request:
-    paths:
-      - '.github/workflows/build-inference-editions.yml'
-      - '.github/workflows/build-platforms.yml'
-      - '.github/workflows/release.yml'
-      - 'package.json'
-      - 'bun.lock'
-      - 'patches/**'
-      - 'build/**'
-      - 'electron-builder*.json'
-      - 'electron-builder*.cjs'
-      - 'scripts/**'
-      - 'resources/**'
-      - 'vendor/llamacpp/**'
 
 permissions:
   contents: read
@@ -50,38 +32,15 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  plan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      mode: ${{ steps.plan.outputs.mode }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          filter: blob:none
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - id: plan
-        run: node scripts/ci/gates/plan-inference-build.ts
-        env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-
   verify-inference-editions:
-    needs: plan
-    if: needs.plan.outputs.mode != 'skip'
     uses: ./.github/workflows/build-inference-editions.yml
     with:
-      source-ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      source-ref: ${{ github.sha }}
       mode: verify
       fail-fast: false
-      build-macos: ${{ needs.plan.outputs.mode == 'full' && (github.event_name != 'workflow_dispatch' || inputs.build_macos) }}
-      build-windows: ${{ needs.plan.outputs.mode == 'full' && (github.event_name != 'workflow_dispatch' || inputs.build_windows) }}
-      build-linux: ${{ (needs.plan.outputs.mode == 'full' || needs.plan.outputs.mode == 'smoke') && (github.event_name != 'workflow_dispatch' || inputs.build_linux) }}
-      linux-inference-editions: ${{ needs.plan.outputs.mode == 'smoke' && 'cpu' || 'cpu,cuda' }}
+      build-macos: ${{ inputs.build_macos }}
+      build-windows: ${{ inputs.build_windows }}
+      build-linux: ${{ inputs.build_linux }}
+      linux-inference-editions: 'cpu,cuda'
     secrets:
       MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
