@@ -79,7 +79,7 @@ test('anchors the hero on a viewport spacer instead of centring the column', () 
  */
 test('pins the prompt input while the case list scrolls underneath it', () => {
   const columnIndex = source.indexOf(columnWrapper);
-  const stickyIndex = source.indexOf('className="sticky');
+  const stickyIndex = source.indexOf('sticky top-0');
   const galleryIndex = source.indexOf(galleryWrapper);
 
   expect(stickyIndex).toBeGreaterThan(columnIndex);
@@ -90,19 +90,19 @@ test('pins the prompt input while the case list scrolls underneath it', () => {
   const closeDivs = (between.match(/<\/div>/g) ?? []).length;
   expect(openDivs - closeDivs).toBeGreaterThan(0);
 
-  const stickyClass = /<div className="(sticky[^"]*)"/.exec(source)?.[1] ?? '';
-  expect(stickyClass).toContain('top-0');
-  expect(stickyClass).toContain('z-10');
-  expect(stickyClass).toContain('theme-home-sticky');
-  expect(stickyClass).toContain('w-full');
+  expect(source).toContain('theme-home-sticky sticky top-0 z-10');
+  expect(source).toContain('w-full flex-col items-center gap-8');
 
-  // The brand mark travels in the same layer: it has to stay on screen next to the
+  // The greeting travels in the same layer: it has to stay on screen next to the
   // input rather than sliding away with the cases, so it must be nested inside it.
-  const brandIndex = source.indexOf('flex-col items-center justify-center gap-4');
-  expect(brandIndex).toBeGreaterThan(stickyIndex);
-  expect(source.indexOf('max-w-3xl flex-col gap-3')).toBeGreaterThan(brandIndex);
+  const greetingIndex = source.indexOf('theme-home-greeting');
+  expect(greetingIndex).toBeGreaterThan(stickyIndex);
+  expect(source.indexOf('max-w-3xl flex-col gap-3')).toBeGreaterThan(greetingIndex);
 
-  const stickyInner = source.slice(source.indexOf('<div className="sticky'), brandIndex);
+  const stickyInner = source.slice(
+    source.indexOf('<div className="theme-home-sticky'),
+    greetingIndex,
+  );
   const openInSticky = (stickyInner.match(/<div/g) ?? []).length;
   const closedInSticky = (stickyInner.match(/<\/div>/g) ?? []).length;
   expect(openInSticky - closedInSticky).toBeGreaterThan(0);

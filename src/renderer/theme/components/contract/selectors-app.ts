@@ -1,5 +1,6 @@
 import { CHAT_TOOL_SELECTORS } from '../chat-tool-contract';
 import { SHELL_SIDEBAR_SELECTORS } from '../shell-sidebar-contract';
+import { SHELL_MAIN_SELECTORS } from '../shell-main-contract';
 import { HOME_STUDIO_SELECTORS } from '../home-studio-contract';
 
 /** App-level part, piece, surface, composition and tab hooks. */
@@ -284,5 +285,6 @@ export const APP_SELECTORS = {
   // Transcript compositions refine the primitive Badge and Collapsible recipes.
   ...CHAT_TOOL_SELECTORS,
   ...SHELL_SIDEBAR_SELECTORS,
+  ...SHELL_MAIN_SELECTORS,
   ...HOME_STUDIO_SELECTORS,
 } as const;

@@ -1,11 +1,9 @@
 import { recipe } from './recipe';
 
-const surface = (amount: number) =>
-  `color-mix(in oklab, var(--sidebar-foreground) ${amount}%, transparent)`;
 const feedback = {
   'transition-property': 'color, background-color, box-shadow, translate',
   'transition-duration': '120ms',
-  'transition-timing-function': 'cubic-bezier(0.22, 1, 0.36, 1)',
+  'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
 } as const;
 const focus = {
   'outline-style': 'solid',
@@ -20,18 +18,12 @@ export function shellSidebarAppearances() {
       base: {
         'background-color': 'var(--sidebar)',
         color: 'var(--sidebar-foreground)',
-        'border-right-width': '1px',
-        'border-style': 'solid',
-        'border-color': 'var(--zy-border-subtle)',
       },
     }),
     'shell-sidebar-header': recipe({
       base: {
-        height: '2.5rem',
-        'padding-inline': '0.5rem',
-        'border-bottom-width': '1px',
-        'border-style': 'solid',
-        'border-color': 'var(--border)',
+        height: '2rem',
+        'padding-inline': '0.625rem',
       },
     }),
     'shell-sidebar-logo': recipe({ base: { height: '1rem' } }),
@@ -65,30 +57,30 @@ export function shellSidebarAppearances() {
         'padding-inline': '0.625rem',
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
-        'border-radius': 'var(--zy-style-work-chat-thumb-radius)',
+        'border-radius': 'var(--zy-style-radius-lg)',
         'border-width': '0px',
         'box-shadow': 'none',
         'background-color': 'transparent',
         color: 'var(--sidebar-foreground)',
       },
-      hover: { 'background-color': surface(5), color: 'var(--sidebar-foreground)' },
-      pressed: { 'background-color': surface(10), translate: '0px 1px' },
+      hover: { 'background-color': 'var(--accent)', color: 'var(--foreground)' },
+      pressed: { 'background-color': 'var(--sidebar-accent)', translate: '0px 1px' },
       focus,
       disabled: { opacity: '0.5' },
     }),
     'shell-sidebar-nav-selected': recipe({
       base: {
-        'background-color': surface(8),
-        color: 'var(--sidebar-foreground)',
+        'background-color': 'var(--sidebar-accent)',
+        color: 'var(--foreground)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
       },
-      hover: { 'background-color': surface(10), color: 'var(--sidebar-foreground)' },
+      hover: { 'background-color': 'var(--sidebar-accent)', color: 'var(--foreground)' },
       selected: {
-        'background-color': surface(8),
-        color: 'var(--sidebar-foreground)',
+        'background-color': 'var(--sidebar-accent)',
+        color: 'var(--foreground)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
       },
-      pressed: { 'background-color': surface(12) },
+      pressed: { 'background-color': 'var(--sidebar-accent)' },
     }),
     'shell-sidebar-task': recipe({
       base: {
@@ -99,19 +91,19 @@ export function shellSidebarAppearances() {
         'box-shadow': 'none',
         'font-size': 'var(--zy-component-text-sm)',
         'font-weight': 'var(--zy-component-font-weight-normal)',
-        'border-radius': 'var(--zy-style-work-chat-thumb-radius)',
+        'border-radius': 'var(--zy-style-radius-lg)',
       },
     }),
     'shell-sidebar-task-selected': recipe({
       base: {
-        'background-color': surface(8),
-        color: 'var(--sidebar-foreground)',
+        'background-color': 'var(--sidebar-accent)',
+        color: 'var(--foreground)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
       },
     }),
     'shell-sidebar-task-idle': recipe({
       base: { 'background-color': 'transparent', color: 'var(--sidebar-foreground)' },
-      hover: { 'background-color': surface(5), color: 'var(--sidebar-foreground)' },
+      hover: { 'background-color': 'var(--accent)', color: 'var(--foreground)' },
     }),
     'shell-sidebar-task-main': recipe({
       base: {
@@ -125,10 +117,10 @@ export function shellSidebarAppearances() {
         'font-weight': 'inherit',
         'text-align': 'left',
         color: 'inherit',
-        'border-radius': 'var(--zy-style-work-chat-thumb-radius)',
+        'border-radius': 'var(--zy-style-radius-lg)',
       },
       hover: { 'background-color': 'transparent' },
-      pressed: { 'background-color': surface(10), translate: '0px 1px' },
+      pressed: { 'background-color': 'var(--sidebar-accent)', translate: '0px 1px' },
       focus,
     }),
     'shell-sidebar-caption': recipe({
@@ -190,15 +182,15 @@ export function shellSidebarAppearances() {
       },
       parentHover: { opacity: '1' },
       parentFocus: { opacity: '1' },
-      hover: { color: 'var(--sidebar-foreground)', 'background-color': surface(10) },
+      hover: { color: 'var(--foreground)', 'background-color': 'var(--accent)' },
       focus: { ...focus, opacity: '1' },
-      expanded: { opacity: '1', 'background-color': surface(10) },
+      expanded: { opacity: '1', 'background-color': 'var(--accent)' },
     }),
     'shell-sidebar-resize': recipe({
       base: { 'background-color': 'transparent' },
-      hover: { 'background-color': surface(5) },
+      hover: { 'background-color': 'var(--accent)' },
     }),
-    'shell-sidebar-resizing': recipe({ base: { 'background-color': surface(10) } }),
+    'shell-sidebar-resizing': recipe({ base: { 'background-color': 'var(--sidebar-accent)' } }),
     'shell-sidebar-fade': recipe({
       base: {
         height: '2rem',
@@ -218,18 +210,18 @@ export function shellSidebarAppearances() {
         height: '1.75rem',
         width: '100%',
         'border-width': '0px',
-        'border-radius': 'var(--zy-style-work-chat-thumb-radius)',
-        'background-color': surface(8),
+        'border-radius': 'var(--zy-style-radius-lg)',
+        'background-color': 'var(--sidebar-accent)',
         'box-shadow': 'none',
       },
-      checked: { 'background-color': surface(8) },
+      checked: { 'background-color': 'var(--sidebar-accent)' },
       focus,
     }),
     'shell-mode-thumb': recipe({
       base: {
         height: '1.5rem',
         width: 'calc(50% - 4px)',
-        'border-radius': 'var(--zy-style-work-chat-thumb-radius)',
+        'border-radius': 'var(--zy-style-radius-lg)',
         'background-color': 'var(--zy-style-work-chat-thumb)',
         'box-shadow': 'var(--zy-style-shadow-xs)',
         'transition-property': 'translate',
@@ -247,7 +239,7 @@ export function shellSidebarAppearances() {
     'shell-mode-label-selected': recipe({
       base: {
         'font-weight': 'var(--zy-component-font-weight-medium)',
-        color: 'var(--zy-switch-thumb-foreground)',
+        color: 'var(--foreground)',
       },
     }),
   };

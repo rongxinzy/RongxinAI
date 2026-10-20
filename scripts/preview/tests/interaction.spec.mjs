@@ -49,9 +49,9 @@ test('switches work and chat modes', async ({ page, baseURL }) => {
   const search = previewSearch({ scenario: PreviewScenario.Default, skipBoot: true });
   await home(page, baseURL ?? 'http://127.0.0.1:5176/', search);
 
-  await page.getByRole('switch', { name: 'Work / Chat' }).click();
+  await page.getByRole('tab', { name: 'Chat' }).click();
   await expect(page.getByText('Draft a weekly update').first()).toBeVisible({ timeout: 20_000 });
-  await page.getByRole('switch', { name: 'Work / Chat' }).click();
+  await page.getByRole('tab', { name: 'Work' }).click();
   await expect(page.getByText('Calculator', { exact: true }).first()).toBeVisible();
 
   if (failures.length > 0) {

@@ -29,8 +29,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-// The mode switch defers onModeChange by one animation frame (optimistic
-// thumb transition); assertions must flush that frame first.
+// The mode tabs defer onModeChange by one animation frame (optimistic UI);
 const flushModeChangeFrame = () =>
   new Promise<void>(resolve => {
     requestAnimationFrame(() => resolve());
@@ -54,16 +53,11 @@ test('changes work mode exactly once per click or keyboard activation', async ()
   const user = userEvent.setup();
   const handlers = props();
   render(createElement(SidebarNavigationControls, handlers));
-  const toggle = screen.getByRole('switch');
-  await user.click(toggle);
+  const chatTab = screen.getByRole('tab', { name: 'chatMode' });
+  await user.click(chatTab);
   await flushModeChangeFrame();
   expect(handlers.onWorkModeChange).toHaveBeenCalledTimes(1);
   expect(handlers.onWorkModeChange.mock.calls[0][0]).toBe(true);
-  handlers.onWorkModeChange.mockClear();
-  toggle.focus();
-  await user.keyboard(' ');
-  await flushModeChangeFrame();
-  expect(handlers.onWorkModeChange).toHaveBeenCalledTimes(1);
 });
 
 test('preserves new-task workspace cleanup and view navigation callbacks', async () => {
@@ -112,7 +106,7 @@ test('keeps managed-only and chat navigation policies and chat workspace selecti
   await user.click(screen.getByRole('button', { name: 'newChat' }));
   expect(handlers.onNewChat).toHaveBeenCalledTimes(1);
   expect(mocks.clearWorkspaceSelection).not.toHaveBeenCalled();
-  await user.click(screen.getByRole('switch', { name: 'workMode / chatMode' }));
+  await user.click(screen.getByRole('tab', { name: 'workMode' }));
   await flushModeChangeFrame();
   expect(handlers.onWorkModeChange.mock.calls[0][0]).toBe(false);
 });
@@ -125,7 +119,7 @@ test('preserves activity status and skill-aware new-conversation highlighting', 
   const handlers = props();
   const view = render(createElement(SidebarNavigationControls, handlers));
   expect(
-    screen.getByTestId('sidebar-view-activity').querySelector('span[aria-hidden="true"]'),
+    screen.getByTestId('sidebar-view-activity').querySelector('span[role="img"]'),
   ).toBeTruthy();
   view.rerender(createElement(SidebarNavigationControls, { ...handlers, workMode: WorkMode.Chat }));
   expect(screen.getByTestId('sidebar-new-conversation')).not.toHaveAttribute('data-active');

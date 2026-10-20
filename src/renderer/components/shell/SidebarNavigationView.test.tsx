@@ -3,7 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
 import { SidebarNavigationView } from './SidebarNavigationView';
-
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -46,16 +45,16 @@ function stubAnimationFrame() {
   };
 }
 
-test('flips the thumb optimistically and defers the mode change to the next frame', () => {
+test('selects chat optimistically and defers the mode change to the next frame', () => {
   const raf = stubAnimationFrame();
   const props = baseProps();
   const view = render(createElement(SidebarNavigationView, props));
-  const toggle = screen.getByRole('switch', { name: 'Work / Chat' });
-  expect(toggle).toHaveAttribute('aria-checked', 'false');
+  const chatTab = screen.getByRole('tab', { name: 'Chat' });
+  expect(chatTab).toHaveAttribute('aria-selected', 'false');
 
-  fireEvent.click(toggle);
+  fireEvent.click(chatTab);
 
-  expect(toggle).toHaveAttribute('aria-checked', 'true');
+  expect(chatTab).toHaveAttribute('aria-selected', 'true');
   expect(props.onModeChange).not.toHaveBeenCalled();
   expect(raf.pending).toBe(1);
 
@@ -63,19 +62,20 @@ test('flips the thumb optimistically and defers the mode change to the next fram
   expect(props.onModeChange).toHaveBeenCalledExactlyOnceWith(true);
 
   view.rerender(createElement(SidebarNavigationView, { ...props, isChat: true }));
-  expect(toggle).toHaveAttribute('aria-checked', 'true');
+  expect(chatTab).toHaveAttribute('aria-selected', 'true');
 });
 
 test('a rapid second toggle cancels the stale deferred change', () => {
   const raf = stubAnimationFrame();
   const props = baseProps();
   render(createElement(SidebarNavigationView, props));
-  const toggle = screen.getByRole('switch', { name: 'Work / Chat' });
+  const chatTab = screen.getByRole('tab', { name: 'Chat' });
+  const workTab = screen.getByRole('tab', { name: 'Work' });
 
-  fireEvent.click(toggle);
-  fireEvent.click(toggle);
+  fireEvent.click(chatTab);
+  fireEvent.click(workTab);
 
-  expect(toggle).toHaveAttribute('aria-checked', 'false');
+  expect(workTab).toHaveAttribute('aria-selected', 'true');
   expect(raf.pending).toBe(1);
   raf.flush();
   expect(props.onModeChange).toHaveBeenCalledExactlyOnceWith(false);

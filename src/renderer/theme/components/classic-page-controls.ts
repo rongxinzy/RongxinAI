@@ -570,8 +570,8 @@ export function classicPageControls() {
         color: 'var(--muted-foreground)',
       },
       hover: {
-        'background-color': 'var(--zy-surface-raised)',
-        'border-color': 'var(--zy-border)',
+        'background-color': 'var(--accent)',
+        'border-color': 'var(--border)',
         color: 'var(--foreground)',
       },
     }),

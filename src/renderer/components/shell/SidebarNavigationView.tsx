@@ -1,20 +1,12 @@
 import { Button } from '@shared/components/ui/button';
-import { Switch } from '@shared/components/ui/switch';
-import { cn } from '@shared/lib/utils';
-import {
-  Activity,
-  AlarmClock,
-  Bot,
-  ListTodo,
-  MessageCirclePlus,
-  Plus,
-  Terminal,
-  Users,
-} from 'lucide-react';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
+import { Activity, AlarmClock, Bot, ListTodo, SquarePen, Terminal, Users } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { SidebarModeTab } from './sidebarModeTabsConstants';
+
 const icons = {
-  conversation: MessageCirclePlus,
+  conversation: SquarePen,
   localInference: Bot,
   coding: Terminal,
   todo: ListTodo,
@@ -50,13 +42,14 @@ function SidebarNavigationItem({ entry }: { entry: SidebarNavigationEntry }) {
       onFocus={entry.onIntent}
     >
       <div className="flex size-4 shrink-0 items-center justify-center">
-        <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+        <Icon aria-hidden="true" className="size-4 text-muted-foreground" strokeWidth={1.75} />
       </div>
       <span className="min-w-0 truncate">{entry.label}</span>
       {entry.running && (
         <span
-          className="ml-auto size-1.5 shrink-0 rounded-full bg-primary motion-safe:animate-pulse"
-          aria-hidden="true"
+          className="ml-auto size-1.5 shrink-0 rounded-full bg-primary"
+          role="img"
+          aria-label="running"
         />
       )}
     </Button>
@@ -80,10 +73,6 @@ export function SidebarNavigationView({
   newConversation,
   entries,
 }: SidebarNavigationViewProps) {
-  // The mode flip re-renders the whole app (sidebar tree + main view) in one
-  // blocking commit. Reflect the toggle optimistically in this tiny tree and
-  // defer the heavy dispatch one frame, so the thumb's CSS transition starts
-  // immediately and keeps running on the compositor during the view swap.
   const [optimisticIsChat, setOptimisticIsChat] = useState<boolean | null>(null);
   const pendingModeChange = useRef<number | null>(null);
   useEffect(() => {
@@ -104,34 +93,26 @@ export function SidebarNavigationView({
       onModeChange(checked);
     });
   };
+
+  const modeTabValue = shownIsChat ? SidebarModeTab.Chat : SidebarModeTab.Work;
+
   return (
-    <div className="flex flex-col gap-4 px-2 py-4">
-      <div className="relative h-7 w-full">
-        <Switch
-          checked={shownIsChat}
-          onCheckedChange={handleModeChange}
-          data-mode="work-chat"
-          aria-label={`${workLabel} / ${chatLabel}`}
-        />
-        {[workLabel, chatLabel].map((label, index) => (
-          <span
-            key={index}
-            data-mode-selected={shownIsChat === (index === 1)}
-            aria-hidden="true"
-            className={cn(
-              'theme-sidebar-mode-label pointer-events-none absolute inset-y-0 flex w-1/2 items-center justify-center',
-              index === 0 ? 'left-0' : 'left-1/2',
-            )}
-          >
-            {label}
-          </span>
-        ))}
-      </div>
+    <div className="flex flex-col gap-4 px-2 py-3">
+      <FluidTabs
+        aria-label={`${workLabel} / ${chatLabel}`}
+        className="w-full"
+        value={modeTabValue}
+        items={[
+          { label: workLabel, value: SidebarModeTab.Work },
+          { label: chatLabel, value: SidebarModeTab.Chat },
+        ]}
+        onValueChange={value => handleModeChange(value === SidebarModeTab.Chat)}
+      />
       <Button
         type="button"
-        variant="default"
+        variant="secondary"
         size="lg"
-        className="w-full justify-start gap-2"
+        className="w-full justify-start gap-2.5"
         data-testid={newConversation.testId}
         data-active={newConversation.active || undefined}
         aria-current={newConversation.currentPage ? 'page' : undefined}
@@ -139,11 +120,16 @@ export function SidebarNavigationView({
         onMouseEnter={newConversation.onIntent}
         onFocus={newConversation.onIntent}
       >
-        <Plus data-icon="inline-start" aria-hidden="true" />
+        <SquarePen
+          data-icon="inline-start"
+          aria-hidden="true"
+          className="size-4"
+          strokeWidth={1.75}
+        />
         <span className="min-w-0 truncate">{newConversation.label}</span>
       </Button>
       {entries.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5">
           {entries.map(entry => (
             <SidebarNavigationItem key={entry.id} entry={entry} />
           ))}

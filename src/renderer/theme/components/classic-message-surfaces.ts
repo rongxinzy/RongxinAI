@@ -61,11 +61,17 @@ export function classicMessageSurfaces() {
     'composer-input-surface': recipe({
       base: {
         'border-radius': 'var(--zy-style-radius-3xl)',
-        'background-color': 'var(--zy-surface-overlay)',
-        'border-color': 'var(--border)',
+        'background-color': 'var(--card)',
+        'border-color': 'var(--input)',
       },
-      groupFocus: { 'border-color': 'var(--ring)', 'box-shadow': 'none' },
-      composerFocus: { 'border-color': 'var(--ring)', 'box-shadow': 'none' },
+      groupFocus: {
+        'border-color': 'var(--muted-foreground)',
+        'box-shadow': 'var(--zy-style-shadow-md)',
+      },
+      composerFocus: {
+        'border-color': 'var(--muted-foreground)',
+        'box-shadow': 'var(--zy-style-shadow-md)',
+      },
     }),
     'composer-drop-active': recipe({
       base: { 'box-shadow': '0 0 0 2px var(--primary), var(--zy-style-shadow-elevated)' },

@@ -49,9 +49,18 @@ export function classicButtons(): ButtonAppearances {
       expanded: hover,
     }),
     'button-secondary': recipe({
-      base: { 'background-color': 'var(--secondary)', color: 'var(--secondary-foreground)' },
-      hover: { 'background-color': 'color-mix(in oklch, var(--secondary), var(--foreground) 5%)' },
-      expanded: { 'background-color': 'var(--secondary)', color: 'var(--secondary-foreground)' },
+      base: {
+        'background-color': 'var(--card)',
+        color: 'var(--foreground)',
+        'border-color': 'var(--border)',
+        'box-shadow': 'var(--zy-style-shadow-xs)',
+      },
+      hover: {
+        'background-color': 'var(--card)',
+        'border-color': 'var(--input)',
+        'box-shadow': 'var(--zy-style-shadow-xs)',
+      },
+      expanded: { 'background-color': 'var(--card)', color: 'var(--foreground)' },
     }),
     'button-ghost': recipe({
       hover: { ...hover, 'background-color': 'var(--zy-state-muted-hover)' },

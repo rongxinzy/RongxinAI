@@ -1,5 +1,9 @@
 import { zenithLight } from './zenith-light';
 import { zenithDark } from './zenith-dark';
+import {
+  quietStudioV4DarkOverrides,
+  quietStudioV4LightOverrides,
+} from './quiet-studio-v4-overrides';
 import { validateComponentAppearances } from '../components/contract';
 import type { ThemeDefinition } from './types';
 import { TOKEN_NAMES } from '../tokens/contract';
@@ -13,6 +17,13 @@ export interface ThemePlugin {
   id: string;
   name: { zh: string; en: string };
   appearances: { light: ThemeDefinition; dark: ThemeDefinition };
+}
+
+function withQuietStudioV4Tokens(
+  theme: ThemeDefinition,
+  overrides: Record<string, string>,
+): ThemeDefinition {
+  return { ...theme, tokens: { ...theme.tokens, ...overrides } };
 }
 
 export function validateTheme(theme: ThemeDefinition): void {
@@ -65,7 +76,10 @@ export const themePlugins = defineThemePlugins([
     version: THEME_PLUGIN_VERSION,
     id: DEFAULT_THEME_PLUGIN_ID,
     name: { zh: 'Zenith', en: 'Zenith' },
-    appearances: { light: zenithLight, dark: zenithDark },
+    appearances: {
+      light: withQuietStudioV4Tokens(zenithLight, quietStudioV4LightOverrides),
+      dark: withQuietStudioV4Tokens(zenithDark, quietStudioV4DarkOverrides),
+    },
   },
 ]);
 

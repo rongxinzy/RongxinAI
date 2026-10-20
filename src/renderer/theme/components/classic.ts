@@ -38,6 +38,7 @@ import { classicCodingDiff } from './classic-coding-diff';
 import { runIndicatorAppearances } from './run-indicator';
 import { chatToolAppearances } from './chat-tool';
 import { shellSidebarAppearances } from './shell-sidebar';
+import { shellMainAppearances } from './shell-main';
 import { homeStudioAppearances } from './home-studio';
 import type { ComponentAppearance, ComponentAppearances } from './contract';
 
@@ -181,6 +182,7 @@ export function classicComponentAppearances(): ComponentAppearances {
     ...classicScenes(),
     ...chatToolAppearances(),
     ...shellSidebarAppearances(),
+    ...shellMainAppearances(),
     ...classicAppearancePreview(),
     ...homeStudioAppearances(),
   };
