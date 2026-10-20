@@ -18,7 +18,7 @@ const projectsEqual = (left: readonly unknown[], right: readonly unknown[]): boo
 /** Owns the per-lane agent drivers and their live sessions. */
 export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomServiceFoundation {
   protected getDriver(lane: CodingAgentLane): CodingAgentDriver {
-    const existing = this.drivers.get(lane.id);
+    const existing = this.driverPool.driverFor(lane.id);
     if (existing) return existing;
     const profile = this.registry.get(lane.profileId);
     if (!profile) throw new Error(CodingErrorMessage.ProfileNotFound);
@@ -40,8 +40,7 @@ export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomService
       this.repository.updateMissionTitle(lane.missionId, title);
       if (!this.stagedLaneIds.has(lane.id)) this.publishLane(lane.id);
     });
-    this.drivers.set(lane.id, driver);
-    this.driverProfileIds.set(lane.id, profile.id);
+    this.driverPool.register(lane.id, driver, profile.id);
   }
 
   /**
@@ -68,8 +67,8 @@ export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomService
   }
 
   protected async rollbackCreatedSession(roomId: string, lane: CodingAgentLane): Promise<void> {
-    const driver = this.drivers.get(lane.id);
-    const session = this.driverSessionIds.get(lane.id);
+    const driver = this.driverPool.driverFor(lane.id);
+    const session = this.driverPool.sessionFor(lane.id);
     if (driver && session) {
       try {
         await driver.disposeSession(session.id);
@@ -84,10 +83,7 @@ export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomService
         // The failed creation is already being rolled back locally.
       }
     }
-    this.drivers.delete(lane.id);
-    this.driverProfileIds.delete(lane.id);
-    this.driverSessionIds.delete(lane.id);
-    this.driverSessionPromises.delete(lane.id);
+    this.driverPool.forget(lane.id);
     this.laneSessionIndex.forget(lane.localSessionId);
     this.repository.deleteMission(roomId, lane.missionId);
   }
@@ -97,7 +93,7 @@ export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomService
     lane: CodingAgentLane,
     workspaceRoot: string,
   ): Promise<{ id: string; recoveryContext: string | null }> {
-    const activeSession = this.driverSessionIds.get(lane.id);
+    const activeSession = this.driverPool.sessionFor(lane.id);
     if (
       activeSession &&
       (activeSession.connectionGeneration === null ||
@@ -110,16 +106,14 @@ export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomService
       this.syncLaneDriverSnapshot(lane, driver, activeSession.id);
       return { id: activeSession.id, recoveryContext: null };
     }
-    const pendingSession = this.driverSessionPromises.get(lane.id);
+    const pendingSession = this.driverPool.pendingSessionFor(lane.id);
     if (pendingSession) return await pendingSession;
     const sessionPromise = this.openDriverSession(driver, lane, workspaceRoot);
-    this.driverSessionPromises.set(lane.id, sessionPromise);
+    this.driverPool.setPendingSession(lane.id, sessionPromise);
     try {
       return await sessionPromise;
     } finally {
-      if (this.driverSessionPromises.get(lane.id) === sessionPromise) {
-        this.driverSessionPromises.delete(lane.id);
-      }
+      this.driverPool.clearPendingSessionIf(lane.id, sessionPromise);
     }
   }
 
@@ -156,7 +150,7 @@ export abstract class CodingRoomServiceDriverLifecycle extends CodingRoomService
         existingConfigOptions: lane.configOptions,
       });
     }
-    this.driverSessionIds.set(lane.id, {
+    this.driverPool.setSession(lane.id, {
       id: session.id,
       connectionGeneration: driver.getConnectionGeneration?.() ?? null,
     });

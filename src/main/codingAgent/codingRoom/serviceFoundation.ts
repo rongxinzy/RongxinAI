@@ -1,7 +1,6 @@
 import { EventEmitter } from 'events';
 import path from 'path';
 import { getCodingAgentEnvironment } from '../agentEnvironment';
-import type { CodingAgentDriver } from '../drivers/codingAgentDriver';
 import { BuiltinCodingConfigId } from '../drivers/builtinCodingDriver';
 import { CodingDriverFactory } from '../drivers/driverFactory';
 import { CodingAgentRegistry } from '../codingAgentRegistry';
@@ -23,20 +22,15 @@ import {
 } from '../../../shared/codingAgent';
 import { CodingPendingMessageQueue } from './codingPendingMessageQueue';
 import { CodingLaneSessionIndex } from './codingLaneSessionIndex';
-import type { CodingRoomRuntime, DriverSession } from './runtimeContract';
+import { CodingDriverPool } from './codingDriverPool';
+import type { CodingRoomRuntime } from './runtimeContract';
 
 /**
  * Shared state and cross-cutting helpers every coding-room layer builds on:
  * repository/registry/runtime wiring, snapshots, publishing and lane lookups.
  */
 export abstract class CodingRoomServiceFoundation extends EventEmitter {
-  protected readonly drivers = new Map<string, CodingAgentDriver>();
-  protected readonly driverSessionIds = new Map<string, DriverSession>();
-  protected readonly driverSessionPromises = new Map<
-    string,
-    Promise<{ id: string; recoveryContext: string | null }>
-  >();
-  protected readonly driverProfileIds = new Map<string, string>();
+  protected readonly driverPool = new CodingDriverPool();
   protected readonly driverFactory: CodingDriverFactory;
   protected readonly collaboration = new CollaborationService();
   protected readonly authTerminals = new AuthTerminalService();
