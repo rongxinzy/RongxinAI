@@ -12,6 +12,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { finalizeWindowsSkillPython } = require('./setup-windows-skill-python.cjs');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const SKILLS_ROOT = path.join(PROJECT_ROOT, 'SKILLs');
@@ -617,6 +618,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
     uvVersion,
   );
   const existingPython = pythonExecutableForEnvironment(sharedRoot, platform);
+  if (existingPython) finalizeWindowsSkillPython(sharedRoot, base.pythonPath, platform);
   // Self-heal layers built before the python3.exe alias existed; on read-only
   // runtime roots the copy inside the helper fails softly and the health
   // check below reports the missing alias.
@@ -694,6 +696,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
       '--no-python-downloads',
     ];
     run(base.uvPath, installArgs, { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } });
+    finalizeWindowsSkillPython(sharedRoot, base.pythonPath, platform);
     rebaseEnvironmentSymlinks(sharedRoot, base.pythonPath);
     ensureWindowsPython3Alias(sharedRoot, platform);
     for (const entry of requirements) {

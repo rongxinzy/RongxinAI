@@ -4,9 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { sha256File } = require('../windows-resource-pack.cjs');
 
-// WebView2's self-contained .NET shell has its own approved distribution
-// budget. The separate NSIS updater retains its 450 MiB limit.
-const MAX_SETUP_BYTES = 500 * 1024 * 1024;
+// All release editions report size without a delivery ceiling (2026-10-19).
+const MAX_SETUP_BYTES = null;
 const FOOTER_BYTES = 24;
 const MAGIC = 'ZYP2';
 
@@ -66,19 +65,8 @@ function inspectPe(fd, size) {
   return { headerEnd, certificateOffset, certificateBytes, contentEnd: certificateOffset };
 }
 
-// maxBytes is the edition's WebView2 setup ceiling (see distribution-budget.cjs);
-// null means the edition has no size cap (cuda). The footer offsets are 64-bit.
-function assertSetupSize(bytes, maxBytes) {
-  if (maxBytes != null && bytes > maxBytes) {
-    throw new Error(
-      `Final setup exceeds the ${maxBytes / 1024 / 1024} MiB WebView2 installer budget`,
-    );
-  }
-}
-
-function inspectSetup(file, { maxBytes = MAX_SETUP_BYTES } = {}) {
+function inspectSetup(file) {
   const size = fs.statSync(file).size;
-  assertSetupSize(size, maxBytes);
   const fd = fs.openSync(file, 'r');
   try {
     const pe = inspectPe(fd, size);
@@ -124,14 +112,13 @@ function inspectSetup(file, { maxBytes = MAX_SETUP_BYTES } = {}) {
   }
 }
 
-function appendPayload(shell, zip, output, { maxBytes = MAX_SETUP_BYTES } = {}) {
+function appendPayload(shell, zip, output) {
   if ([shell, zip].some(file => path.resolve(file) === path.resolve(output))) {
     throw new Error('Setup output must not overwrite its inputs');
   }
   const shellBytes = fs.statSync(shell).size;
   const payloadBytes = fs.statSync(zip).size;
   const padding = (8 - ((shellBytes + payloadBytes + FOOTER_BYTES) % 8)) % 8;
-  assertSetupSize(shellBytes + payloadBytes + padding + FOOTER_BYTES, maxBytes);
   const shellFd = fs.openSync(shell, 'r');
   try {
     if (inspectPe(shellFd, shellBytes).certificateBytes !== 0) {
@@ -161,11 +148,11 @@ function appendPayload(shell, zip, output, { maxBytes = MAX_SETUP_BYTES } = {}) 
     fs.closeSync(input);
     fs.closeSync(target);
   }
-  return inspectSetup(output, { maxBytes });
+  return inspectSetup(output);
 }
 
-function writeSetupManifest(file, version, { maxBytes = MAX_SETUP_BYTES } = {}) {
-  const manifest = { ...inspectSetup(file, { maxBytes }), version, sha256: sha256File(file) };
+function writeSetupManifest(file, version) {
+  const manifest = { ...inspectSetup(file), version, sha256: sha256File(file) };
   fs.writeFileSync(`${file}.manifest.json`, `${JSON.stringify(manifest, null, 2)}\n`);
   return manifest;
 }

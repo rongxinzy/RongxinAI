@@ -3,6 +3,7 @@
 !include "nsDialogs.nsh"
 !ifdef PROJECT_DIR
 !include "${PROJECT_DIR}\scripts\installer-shell\retain-uninstaller.nsh"
+!include "${PROJECT_DIR}\build-tar\windows-components\nsis-components.nsh"
 !endif
 
 ; Fully custom-drawn installer UI (palette, drawing helpers, page functions
@@ -613,7 +614,7 @@ Var /GLOBAL zyDeleteRealAppData
   File /oname=uninstall-cleanup.ps1 "${PROJECT_DIR}\scripts\installer\uninstall-cleanup.ps1"
   ; Embed the routing table as a compile-time asset. Building it incrementally
   ; with NSIS FileWrite can split the skill-python key on Windows runners.
-  File /oname=component-targets.json "${PROJECT_DIR}\scripts\nsis-offline-components.json"
+  File /oname=component-targets.json "${PROJECT_DIR}\build-tar\windows-components\nsis-targets.json"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\7za.exe\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
   Pop $0
   Pop $1
@@ -634,13 +635,7 @@ Var /GLOBAL zyDeleteRealAppData
 
   ; Stage the per-component metadata before deciding which archives to queue.
   !insertmacro ZY_ProgressPhase STAGING "$(ZY_PHASE_STAGING)"
-  !insertmacro StageOfflineComponentMetadata "channel-runtime"
-  !insertmacro StageOfflineComponentMetadata "skills"
-  !insertmacro StageOfflineComponentMetadata "mcps"
-  !insertmacro StageOfflineComponentMetadata "portable-git"
-  !insertmacro StageOfflineComponentMetadata "python"
-  !insertmacro StageOfflineComponentMetadata "skill-python"
-  !insertmacro StageOfflineComponentMetadata "uv"
+  !insertmacro StageEditionComponents
 
   ; Verify all reusable cache entries in one PowerShell process before deciding
   ; which archives NSIS needs to unpack from the installer.
@@ -652,13 +647,7 @@ Var /GLOBAL zyDeleteRealAppData
     Goto OfflineComponentInstallFailed
   ComponentCacheValidated:
 
-  !insertmacro QueueOfflineComponent CHANNEL_RUNTIME "channel-runtime" "频道运行环境"
-  !insertmacro QueueOfflineComponent SKILLS "skills" "内置 Skills"
-  !insertmacro QueueOfflineComponent MCPS "mcps" "内置 MCPs"
-  !insertmacro QueueOfflineComponent PORTABLE_GIT "portable-git" "PortableGit"
-  !insertmacro QueueOfflineComponent PYTHON "python" "Python 离线运行环境"
-  !insertmacro QueueOfflineComponent SKILL_PYTHON "skill-python" "Skill Python dependency layer"
-  !insertmacro QueueOfflineComponent UV "uv" "uv 离线运行环境"
+  !insertmacro QueueEditionComponents
 
   ; The changed archives are now present in $PLUGINSDIR. Validate their entries
   ; and sentinels, then extract them in one PowerShell batch. This keeps cache
@@ -690,13 +679,7 @@ Var /GLOBAL zyDeleteRealAppData
     Goto OfflineComponentInstallFailed
   ComponentBatchExpanded:
 
-  !insertmacro RecordOfflineComponentReady "channel-runtime"
-  !insertmacro RecordOfflineComponentReady "skills"
-  !insertmacro RecordOfflineComponentReady "mcps"
-  !insertmacro RecordOfflineComponentReady "portable-git"
-  !insertmacro RecordOfflineComponentReady "python"
-  !insertmacro RecordOfflineComponentReady "skill-python"
-  !insertmacro RecordOfflineComponentReady "uv"
+  !insertmacro RecordEditionComponents
 
   DetailPrint "[Installer] Activating offline components"
   !insertmacro ZY_ProgressPhase ACTIVATING "$(ZY_PHASE_ACTIVATING)"

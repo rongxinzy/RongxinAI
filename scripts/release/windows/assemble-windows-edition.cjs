@@ -2,9 +2,9 @@
 'use strict';
 
 /**
- * Build one Windows inference edition from a signed win-unpacked tree produced
- * by the shared core job. Lite is assembled in the core job; cpu/cuda reuse the
- * signed application bytes and only rebuild NSIS + WebView2 setup (installer signing).
+ * Package another Windows edition from the already compiled application.
+ * Edition metadata and offline components must be regenerated before signing;
+ * --prepackaged skips those hooks and would leave cpu/cuda labeled as lite.
  */
 
 const { spawnSync } = require('node:child_process');
@@ -35,12 +35,21 @@ if (!fs.existsSync(unpacked)) {
   throw new Error(`Missing signed win-unpacked directory: ${unpacked}`);
 }
 
+for (const entry of fs.readdirSync(path.join(root, 'release'), { withFileTypes: true })) {
+  if (entry.isFile() && (/\.exe(?:\.blockmap)?$/i.test(entry.name) || entry.name === 'latest.yml')) {
+    fs.rmSync(path.join(root, 'release', entry.name));
+  }
+}
+
 run(process.execPath, [path.join(root, 'scripts/prepare-inference-edition-runtime.cjs')], {
   ZHIYUAN_UPDATE_VARIANT: edition,
 });
 
 const signedConfig = path.join(root, 'electron-builder.windows-signed.cjs');
-run('bun', ['x', 'electron-builder', '--win', 'nsis', '--x64', '--config', signedConfig, '--publish', 'never', '--prepackaged', unpacked], {
+run(process.execPath, [path.join(root, 'scripts/ensure-build-version.js')], {
+  ZHIYUAN_UPDATE_VARIANT: edition,
+});
+run('bun', ['x', 'electron-builder', '--win', 'nsis', '--x64', '--config', signedConfig, '--publish', 'never'], {
   ZHIYUAN_UPDATE_VARIANT: edition,
 });
 

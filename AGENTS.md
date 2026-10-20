@@ -235,7 +235,7 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 
 **PR**：标题与三段说明遵循 [DEVOPS.md](DEVOPS.md)：改动、原因、验证；bug fix 补充触发条件、原行为、根因与修复后行为。有 issue 时关联，不强制为小修复新建 issue。必需检查 `ci-gate` 通过后，作者或 agent 可自行 squash 合并；高影响变更仍建议维护者确认。说明适用的 Electron 行为变化（IPC、存储、窗口）。UI 变更必须附设计自查：规范依据、主题与窗口尺寸、已验证状态/操作、明暗截图位置、命令结果、获准偏离、未验证项。禁止只写「符合设计」「已自测」；环境阻塞如实列出，不标通过。有未通过的设计项或缺必要验收时不得建议合并。
 
-**CI**：`main` 与 `release/**` 的日常 PR/push 仅运行 lint（含格式、Knip、Python 死代码及工作流静态检查）、两片并行单测与 `ci-gate`。单测直接加载 TypeScript；不编译应用、不下载 Electron、不运行浏览器、内存、变异测试或打包安装。重检查统一在 `release-preflight.yml`：手动运行默认包含未签名打包安装；tag 发布调用时由本轮已签名安装验收替代重复的未签名打包。预检各 job 绑定同一个解析后的 commit；类型检查、构建、完整测试、企业工具链、渠道/Python 运行时、浏览器/安装器预览与内存回归全部必须通过。tag 构建与预检并行，publish 同时等待预检和对应平台构建成功。全平台构建、安装和堆分析仅保留手动入口，不因功能改动自动启动。统一必需检查仍为 `ci-gate`；`.github/devops-ci.json` 与触发范围同步。默认分支保护：须经 PR、不要求 approval、不要求解决评审讨论、必需检查仅 `ci-gate`、禁止强推与删除。见 [RELEASING.md](RELEASING.md)。
+**CI**：`main` 与 `release/**` 的日常 PR/push 仅运行 lint（含格式、Knip、Python 死代码及工作流静态检查）、两片并行单测与 `ci-gate`。单测直接加载 TypeScript；不编译应用、不下载 Electron、不运行浏览器、内存、变异测试或打包安装。重检查统一在 `release-preflight.yml`：手动运行默认包含未签名打包安装；tag 发布调用时由本轮已签名安装验收替代重复的未签名打包。预检各 job 绑定同一个解析后的 commit；类型检查、构建、完整测试、企业工具链、渠道/Python 运行时、浏览器/安装器预览与内存回归全部必须通过。tag 构建与预检并行，publish 等待预检与全部平台构建及安装验收通过后，一次发布完整清单。全平台构建、安装和堆分析仅保留手动入口，不因功能改动自动启动。统一必需检查仍为 `ci-gate`；`.github/devops-ci.json` 与触发范围同步。默认分支保护：须经 PR、不要求 approval、不要求解决评审讨论、必需检查仅 `ci-gate`、禁止强推与删除。见 [RELEASING.md](RELEASING.md)。
 
 **项目管理**：使用 [知远数字员工平台](https://github.com/orgs/rongxinzy/projects/2)，主要协作团队为 opensource。需求、缺陷与交付事项加入 Project，复用 Assignees 记录实际负责人，并维护 Status、Priority；Target date 仅填写承诺日期。PR 加入同一 Project，有关联 Issue 时互链；合并完成不代替部署或业务验收。不另建重复台账。
 

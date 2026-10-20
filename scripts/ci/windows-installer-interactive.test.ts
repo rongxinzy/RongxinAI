@@ -224,7 +224,7 @@ test('keeps native and WebView2 artifacts separate and preserves the full silent
   expect(workflow).toContain('-File scripts/ci/windows-installer-smoke.ps1');
   expect(workflow).not.toContain('continue-on-error');
   expect(readFileSync('scripts/ci/windows-installer-smoke.ps1', 'utf8')).toContain(
-    'exactly seven offline components',
+    'the complete $edition component set',
   );
 });
 

@@ -14,9 +14,9 @@ Before tagging, run **Release preflight** (`release-preflight.yml`) against the 
 2. Create and push an annotated tag on `main`: `v<semver>` (no spaces), e.g. `v2026.10.16-build.1`.  
    The tag is the **only** version source; CI sets `APP_BUILD_VERSION` from it.
 3. Push triggers **Release (tag)**:
-   - Release preflight and signed Windows/macOS/Linux builds run in parallel; each platform publishes only after preflight and its own build/installation acceptance pass
+   - Release preflight and Windows/macOS/Linux builds run in parallel; publication waits for preflight and every platform's build/installation acceptance
    - Upload immutable artifacts to R2
-   - Publish the **beta** update feed (`channels/beta-pointer.json`)
+   - Publish one complete **beta** update feed (`channels/beta-pointer.json`), preventing platform jobs from overwriting shared metadata or exposing a partial generation
    - Create a GitHub **pre-release** with auto-generated release notes and attached installers
 
 Beta users opt in under **Settings → About → Beta update channel**.
@@ -35,7 +35,9 @@ Beta users opt in under **Settings → About → Beta update channel**.
 
 **Full platform rehearsal:** `build-platforms.yml` is manual-only and runs the full seven-leg unsigned matrix. It never starts on PRs or a schedule. Windows CUDA output uses the same exact source/toolchain cache as signed releases; run this rehearsal on `main` before tagging to warm the cache for subsequent tags. A cache hit still verifies every file hash, DLL closure and CPU fallback startup. Changes to the pinned runtime, compiler image or build inputs invalidate the cache. Tag **`release.yml`** remains the authoritative signed build.
 
-Windows size gates live in `scripts/installer-shell/distribution-budget.cjs`: lite keeps hard limits (WebView2 setup 500 MiB total / 220 MiB non-component, components 300 MiB; NSIS updater 450 MiB). cpu enforces limits = measured size + an explicit margin (ceil 3%, whole MiB) for the WebView2 setup, the NSIS updater and the staged llama.cpp runtime (`scripts/ci/measure-llamacpp-bundled.cjs`); the measured run id is recorded next to each value, and these limits change only through a PR that cites a new measured run. cuda is publicly released but has no size limit (a deliberate decision for the public release); CI still measures and reports its sizes and enforces sha256/runtime integrity.
+Release size policy (krli, 2026-10-19): all editions report installer, component and staged runtime sizes without size ceilings. `scripts/installer-shell/distribution-budget.cjs` and `scripts/ci/measure-llamacpp-bundled.cjs` retain measurements; SHA-256, complete component identity, signatures and runtime/install acceptance remain mandatory. Both NSIS updates and WebView2 installers carry the complete edition component set: seven base components for lite, plus the bundled inference runtime for CPU/CUDA. NSIS cold-install and cache-hit-upgrade acceptance must launch the installed CPU runtime/fallback on a clean PATH. Size optimization and any future ceilings are a separate post-release decision.
+
+Windows compiles application code once, then packages and signs each edition with its own metadata and component routing. Packaging must run the normal hooks: `--prepackaged` would reuse lite metadata and skip the CPU/CUDA component preparation. Each edition is checkpointed with its public signing certificate, final package metadata and candidate payload before the next edition changes the output directory. Three independent acceptance jobs restore those exact bytes, check signatures and runtimes, exercise NSIS cold install/cache upgrade/uninstall and WebView2/native uninstall, then upload the accepted candidates. The shared compression qualification is measured once and verified against each restored archive.
 
 ## 2. Promote → stable (`promote.yml`)
 
