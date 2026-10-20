@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 
 import { PreviewScenario } from '../shared/constants.mjs';
-import { applyDeterministicRendering, attachConsoleGuards, previewSearch } from '../shared/harness.mjs';
+import {
+  applyDeterministicRendering,
+  attachConsoleGuards,
+  previewSearch,
+} from '../shared/harness.mjs';
 
 test('coding mode streams reasoning + markdown and surfaces artifact and elicitation cards', async ({
   page,
