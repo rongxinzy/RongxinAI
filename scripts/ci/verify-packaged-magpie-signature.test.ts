@@ -62,27 +62,26 @@ test('requires the sealed manifest to keep the compiler digest and the shipped d
   );
 });
 
-test('checks both packaged macOS helpers', () => {
-  const app = path.join(temporaryRoot(), 'App.app');
-  const verified: string[] = [];
-  for (const key of ['darwin-x64', 'darwin-arm64']) {
-    const directory = path.join(app, 'Contents', 'Resources', 'magpie', key);
-    fs.mkdirSync(directory, { recursive: true });
-    const bytes = `signed ${key}`;
-    fs.writeFileSync(path.join(directory, 'magpie'), bytes);
-    const digest = crypto.createHash('sha256').update(bytes).digest('hex');
-    fs.writeFileSync(
-      path.join(directory, 'manifest.json'),
-      JSON.stringify({
-        version: upstream.version,
-        source: { commit: upstream.commit },
-        sha256: digest,
-        buildSha256: 'd'.repeat(64),
-        signing: { platform: 'darwin', format: 'codesign' },
-      }),
-    );
-  }
-  verifyPackagedMagpieApp(app, {
+function writeSignedHelper(app: string, key: string) {
+  const directory = path.join(app, 'Contents', 'Resources', 'magpie', key);
+  fs.mkdirSync(directory, { recursive: true });
+  const bytes = `signed ${key}`;
+  fs.writeFileSync(path.join(directory, 'magpie'), bytes);
+  const digest = crypto.createHash('sha256').update(bytes).digest('hex');
+  fs.writeFileSync(
+    path.join(directory, 'manifest.json'),
+    JSON.stringify({
+      version: upstream.version,
+      source: { commit: upstream.commit },
+      sha256: digest,
+      buildSha256: 'd'.repeat(64),
+      signing: { platform: 'darwin', format: 'codesign' },
+    }),
+  );
+}
+
+function fakeCodesign(verified: string[]) {
+  return {
     execFile: (_command: string, args: string[]) => {
       verified.push(args[args.length - 1] ?? '');
     },
@@ -91,7 +90,40 @@ test('checks both packaged macOS helpers', () => {
       stdout: '',
       stderr: 'flags=0x10000(runtime)\nAuthority=Developer ID Application: Example (TEAMID)\n',
     }),
-  });
+  };
+}
+
+test('checks both packaged macOS helpers of a universal app', () => {
+  const app = path.join(temporaryRoot(), 'App.app');
+  const verified: string[] = [];
+  for (const key of ['darwin-x64', 'darwin-arm64']) writeSignedHelper(app, key);
+  verifyPackagedMagpieApp(app, fakeCodesign(verified));
   expect(verified).toHaveLength(2);
   expect(verified.every(filename => filename.endsWith(`${path.sep}magpie`))).toBe(true);
+});
+
+test('checks only the helper a per-arch app ships', () => {
+  const app = path.join(temporaryRoot(), 'App.app');
+  const verified: string[] = [];
+  writeSignedHelper(app, 'darwin-arm64');
+  verifyPackagedMagpieApp(app, fakeCodesign(verified), ['darwin-arm64']);
+  expect(verified).toEqual([
+    path.join(app, 'Contents', 'Resources', 'magpie', 'darwin-arm64', 'magpie'),
+  ]);
+});
+
+test('fails when the expected architecture helper is missing', () => {
+  const app = path.join(temporaryRoot(), 'App.app');
+  writeSignedHelper(app, 'darwin-arm64');
+  expect(() => verifyPackagedMagpieApp(app, fakeCodesign([]), ['darwin-x64'])).toThrow(
+    'Packaged Magpie binary is missing',
+  );
+  expect(() => verifyPackagedMagpieApp(app, fakeCodesign([]), ['linux-x64'])).toThrow(
+    'Unknown macOS Magpie target',
+  );
+  const empty = path.join(temporaryRoot(), 'Empty.app');
+  fs.mkdirSync(empty);
+  expect(() => verifyPackagedMagpieApp(empty, fakeCodesign([]))).toThrow(
+    'No packaged macOS Magpie helper',
+  );
 });

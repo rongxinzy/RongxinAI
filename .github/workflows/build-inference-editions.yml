@@ -399,7 +399,7 @@ jobs:
             fi
             sleep $((attempt * 10))
           done
-          node scripts/ci/verify-packaged-magpie-signature.mjs "$app_path"
+          node scripts/ci/verify-packaged-magpie-signature.mjs "$app_path" "darwin-${{ matrix.arch }}"
           spctl --assess --type execute --verbose=4 "$app_path"
       - name: Verify Windows Authenticode signatures
         if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
