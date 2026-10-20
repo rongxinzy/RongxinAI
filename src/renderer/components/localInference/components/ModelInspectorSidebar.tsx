@@ -83,6 +83,8 @@ type ModelResidency = NonNullable<LlamaCppModelPreference['residency']>;
 
 type ModelInspectorSaveInput = {
   ctxSize?: number;
+  /** Present (possibly undefined inside) only when the field was edited. */
+  nCpuMoe?: { value: number | undefined };
   residency?: ModelResidency;
 };
 
@@ -444,13 +446,14 @@ export function ModelInspectorSidebar({
                 isOpen={open}
                 model={inspectedModel}
                 savedContextSize={preferenceWithDraft?.ctxSize}
+                savedNCpuMoe={activeSnapshot.preference?.nCpuMoe}
                 hideContextEditor
                 onClose={() => {
                   setContextDraft(null);
                   setResidencyDraft(null);
                   onOpenChange(false);
                 }}
-                onSave={(_ctxSize, _contextChanged) => {
+                onSave={(_ctxSize, _contextChanged, nCpuMoe) => {
                   if (contextEditorState.mode === ModelContextEditorMode.Custom) {
                     if (!contextEditorState.customContextValue.trim()) {
                       onValidationError(i18nService.t('localInferenceContextInvalid'));
@@ -463,6 +466,7 @@ export function ModelInspectorSidebar({
                   }
                   void onSavePreferences({
                     ...(contextDraft ? { ctxSize: contextEditorState.contextSize } : {}),
+                    ...(nCpuMoe !== undefined ? { nCpuMoe } : {}),
                     ...(residencyDraft ? { residency: residencyDraft } : {}),
                   }).then(saved => {
                     if (saved) {

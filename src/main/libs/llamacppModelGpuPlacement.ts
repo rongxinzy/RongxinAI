@@ -12,7 +12,7 @@ import {
   LlamaCppModelLoadFailureReason,
   type LlamaCppModelLoadFailureReason as LlamaCppModelLoadFailureReasonType,
 } from './llamacppModelLoadErrors';
-import { readGgufKvBytesPerToken } from './ggufMetadata';
+import { readGgufBlockCount, readGgufKvBytesPerToken } from './ggufMetadata';
 import { resolveLlamaCppDeviceSelection } from './llamacppServe';
 
 export const LlamaCppModelGpuPlacementMode = {
@@ -67,6 +67,9 @@ export function planLlamaCppModelGpuPlacement(
 ): LlamaCppModelGpuPlacementResult {
   const memoryBudgetFailure = validateManualMemoryBudget(input);
   if (memoryBudgetFailure) return memoryBudgetFailure;
+
+  const nCpuMoeFailure = validateNCpuMoeAgainstBlockCount(input.launchInput);
+  if (nCpuMoeFailure) return nCpuMoeFailure;
 
   if (hasExplicitGpuPlacement(input.launchInput)) {
     return {
@@ -224,6 +227,43 @@ function selectGpuIndexes(input: LlamaCppModelGpuPlacementInput): number[] {
   return selected;
 }
 
+/**
+ * Rejects nCpuMoe values exceeding the model's layer count. Unreadable
+ * block_count (non-GGUF or malformed metadata) passes through: llama.cpp
+ * itself rejects impossible overrides at load time.
+ */
+function validateNCpuMoeAgainstBlockCount(
+  launchInput: LlamaCppModelLaunchInput,
+): Extract<LlamaCppModelGpuPlacementResult, { success: false }> | null {
+  const nCpuMoe = launchInput.options?.nCpuMoe;
+  if (nCpuMoe === undefined || !launchInput.modelPath) return null;
+
+  const blockCount = readGgufBlockCount(launchInput.modelPath);
+  if (blockCount === undefined || nCpuMoe <= blockCount) return null;
+
+  return {
+    success: false,
+    reason: LlamaCppModelLoadFailureReason.ModelFileInvalid,
+    detail: `The configured MoE CPU layer count (${nCpuMoe}) exceeds the model's layer count (${blockCount}).`,
+  };
+}
+
+/**
+ * Automatic GPU placement must keep llama.cpp's `--fit` enabled: fit (ON by
+ * default, common/fit.cpp in llama-server b9244) keeps dense/attention
+ * weights on GPU and moves overflow layers' expert tensors to CPU across
+ * devices — which is exactly the behavior the auto path wants, for free.
+ * fit ABORTS (common/fit.cpp:352-375) when the user set a numeric/all
+ * n_gpu_layers (anything other than `auto`), tensor_split, split-mode `row`,
+ * or any tensor_buft_override (which `--n-cpu-moe`, `--cpu-moe` and
+ * `--override-tensor` produce). So this path must emit gpuLayers === 'auto'
+ * and none of those keys; nCpuMoe is deliberately NOT an explicit GPU
+ * placement trigger (device selection stays automatic, gpuLayers stays
+ * 'auto') — when set, modelLaunchOptionsToPreset writes `n-cpu-moe` and
+ * disables fit for that model, which is expected for a manual override.
+ * The planner has no explicit per-device VRAM margin, so --fit-target is
+ * deliberately not passed and fit's own default margin applies.
+ */
 function withLlamaCppAutoGpuLayers(
   input: LlamaCppModelLaunchInput,
   selectedGpuIndexes: number[],
