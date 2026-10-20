@@ -87,7 +87,7 @@ export abstract class CodingRoomServiceSessionLifecycle extends CodingRoomServic
     }
     try {
       this.registerDriver(lane, profile, driver);
-      this.driverSessionIds.set(lane.id, {
+      this.driverPool.setSession(lane.id, {
         id: driverSession.id,
         connectionGeneration: driver.getConnectionGeneration?.() ?? null,
       });

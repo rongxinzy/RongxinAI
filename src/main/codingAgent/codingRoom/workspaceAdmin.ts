@@ -127,11 +127,8 @@ export abstract class CodingRoomServiceWorkspaceAdmin extends CodingRoomServiceD
       throw new Error(CodingErrorMessage.WorkspaceSessionsRunning);
     }
     for (const lane of lanes) {
-      void this.drivers.get(lane.id)?.dispose();
-      this.drivers.delete(lane.id);
-      this.driverProfileIds.delete(lane.id);
-      this.driverSessionIds.delete(lane.id);
-      this.driverSessionPromises.delete(lane.id);
+      void this.driverPool.driverFor(lane.id)?.dispose();
+      this.driverPool.forget(lane.id);
       this.laneSessionIndex.forget(lane.localSessionId);
     }
     this.repository.deleteWorkspace(room.id);
@@ -163,11 +160,8 @@ export abstract class CodingRoomServiceWorkspaceAdmin extends CodingRoomServiceD
     // included); deleting a collaborator removes only that lane.
     const removedLanes = isPrimaryLane ? missionLanes : [lane];
     for (const removed of removedLanes) {
-      void this.drivers.get(removed.id)?.dispose();
-      this.drivers.delete(removed.id);
-      this.driverProfileIds.delete(removed.id);
-      this.driverSessionIds.delete(removed.id);
-      this.driverSessionPromises.delete(removed.id);
+      void this.driverPool.driverFor(removed.id)?.dispose();
+      this.driverPool.forget(removed.id);
       this.laneSessionIndex.forget(removed.localSessionId);
     }
     if (isPrimaryLane) {

@@ -418,11 +418,8 @@ export class CodingRoomService extends CodingRoomServiceBuiltinAgentEvents {
     this.isDisposed = true;
     this.eventDeltaBatcher.dispose();
     this.repository.flushPendingStreamWrites();
-    await Promise.all([...this.drivers.values()].map(driver => driver.dispose()));
-    this.drivers.clear();
-    this.driverProfileIds.clear();
-    this.driverSessionIds.clear();
-    this.driverSessionPromises.clear();
+    await Promise.all(this.driverPool.allDrivers().map(driver => driver.dispose()));
+    this.driverPool.clear();
     this.authTerminals.dispose();
     this.laneSessionIndex.clear();
     // Disposing the drivers terminates their streams, which settles in-flight
@@ -439,13 +436,7 @@ export class CodingRoomService extends CodingRoomServiceBuiltinAgentEvents {
     exitCode: number;
     signal?: number;
   }): Promise<void> {
-    for (const [laneId, profileId] of this.driverProfileIds) {
-      if (profileId !== event.profileId) continue;
-      await this.drivers.get(laneId)?.dispose();
-      this.drivers.delete(laneId);
-      this.driverProfileIds.delete(laneId);
-      this.driverSessionIds.delete(laneId);
-    }
+    await this.driverPool.disposeWhereProfile(event.profileId);
     if (event.exitCode === 0) {
       const profile = this.registry.get(event.profileId);
       if (!profile) {
