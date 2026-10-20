@@ -272,7 +272,7 @@ export async function downloadSkillImpl(
       };
     }
 
-    const installedIds = installSkillDirsToRoot(skillDirs, root);
+    const installedIds = await installSkillDirsToRoot(skillDirs, root);
 
     ctx.persistSkillInstallState(installedIds, options);
 
@@ -291,7 +291,7 @@ export async function downloadSkillImpl(
   }
 }
 
-function installSkillDirsToRoot(skillDirs: string[], root: string): string[] {
+async function installSkillDirsToRoot(skillDirs: string[], root: string): Promise<string[]> {
   const installedIds: string[] = [];
   for (const skillDir of skillDirs) {
     const folderName = normalizeFolderName(path.basename(skillDir));
@@ -302,7 +302,7 @@ function installSkillDirsToRoot(skillDirs: string[], root: string): string[] {
       suffix += 1;
     }
     cpRecursiveSync(skillDir, targetDir);
-    const normalizeResult = normalizeWindowsSkillDirectoryAttrs(targetDir);
+    const normalizeResult = await normalizeWindowsSkillDirectoryAttrs(targetDir);
     if (normalizeResult.success) {
       console.log('[skills] install normalization applied for "%s" at %s', folderName, targetDir);
     } else {
@@ -318,11 +318,11 @@ function installSkillDirsToRoot(skillDirs: string[], root: string): string[] {
   return installedIds;
 }
 
-export function confirmPendingInstallImpl(
+export async function confirmPendingInstallImpl(
   ctx: SkillManagerContext,
   pendingId: string,
   action: SecurityReportAction,
-): { success: boolean; skills?: SkillRecord[]; error?: string } {
+): Promise<{ success: boolean; skills?: SkillRecord[]; error?: string }> {
   console.log(`[SkillManager] confirmPendingInstall: id=${pendingId}, action=${action}`);
   const pending = ctx.pendingInstalls.get(pendingId);
   if (!pending) {
@@ -363,7 +363,7 @@ export function confirmPendingInstallImpl(
     }
   } else {
     // Fresh install path: find unique directory name
-    installedIds.push(...installSkillDirsToRoot(pending.skillDirs, pending.root));
+    installedIds.push(...(await installSkillDirsToRoot(pending.skillDirs, pending.root)));
   }
 
   ctx.persistSkillInstallState(installedIds, pending);

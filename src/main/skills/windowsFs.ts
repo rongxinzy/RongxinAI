@@ -1,4 +1,6 @@
-import { spawn, spawnSync } from 'child_process';
+import { spawn } from 'child_process';
+
+import { extractErrorMessage, runCommandCapture } from './processRunner';
 import fs from 'fs';
 
 export function isWindowsDeletePermissionError(error: unknown): boolean {
@@ -63,31 +65,23 @@ export function tryWindowsDeleteFallbackAsync(
   });
 }
 
-export function normalizeWindowsSkillDirectoryAttrs(targetDir: string): {
+export async function normalizeWindowsSkillDirectoryAttrs(targetDir: string): Promise<{
   success: boolean;
   detail?: string;
-} {
+}> {
   if (process.platform !== 'win32') return { success: true };
 
   const escapedPath = targetDir.replace(/"/g, '""');
-  const result = spawnSync(
-    'cmd.exe',
-    ['/d', '/s', '/c', `attrib -r -s -h "${escapedPath}" /s /d`],
-    {
-      stdio: 'pipe',
-      windowsHide: true,
-      timeout: 10000,
-    },
-  );
-
-  if (result.status === 0) {
+  try {
+    await runCommandCapture(
+      'cmd.exe',
+      ['/d', '/s', '/c', `attrib -r -s -h "${escapedPath}" /s /d`],
+      { timeoutMs: 10000 },
+    );
     return { success: true };
+  } catch (error) {
+    return { success: false, detail: extractErrorMessage(error) };
   }
-
-  const stderr = result.stderr?.toString('utf-8').trim();
-  const stdout = result.stdout?.toString('utf-8').trim();
-  const detail = stderr || stdout || result.error?.message || `status=${result.status ?? 'null'}`;
-  return { success: false, detail };
 }
 
 export function cleanupPathSafely(targetPath: string | null): void {
