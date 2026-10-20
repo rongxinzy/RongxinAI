@@ -58,7 +58,7 @@ test('windows-release assembles and directly uploads all three edition release c
   const workflow = load(readFileSync('.github/workflows/build-windows-release.yml', 'utf8')) as {
     jobs: Record<string, { needs?: string; steps: Step[] }>;
   };
-  expect(workflow.jobs['windows-release'].needs).toBe('cuda-runtime');
+  expect(workflow.jobs['windows-release'].needs).toBeUndefined();
   expect(workflow.jobs.acceptance).toBeUndefined();
   const steps = workflow.jobs['windows-release'].steps;
   const uploads = steps

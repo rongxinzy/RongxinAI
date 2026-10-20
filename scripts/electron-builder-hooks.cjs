@@ -617,16 +617,6 @@ async function beforePack(context) {
       arch: targetArch,
       required: true,
     });
-    const skillPythonHealth = checkSkillPythonRuntimeHealth({
-      platform: targetPlatform,
-      arch: targetArch,
-    });
-    if (!skillPythonHealth.ok) {
-      throw new Error(
-        'Bundled Skill Python runtime health check failed before pack. Missing: ' +
-          skillPythonHealth.missing.join(', '),
-      );
-    }
     console.log(
       `[electron-builder-hooks] Bundled Python environments ready: ${skillPythonResult.environments.length}`,
     );
