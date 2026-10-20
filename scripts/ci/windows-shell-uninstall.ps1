@@ -1,11 +1,12 @@
 param(
   [Parameter(Mandatory = $true)][ValidateSet('prepare', 'verify')][string]$Action,
-  [string]$ProjectRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '../..')),
+  [string]$ProjectRoot = '',
   [string]$ExpectedThumbprint = '',
   [switch]$OwnedAcceptanceContext
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+if (-not $ProjectRoot) { $ProjectRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '..', '..')) }
 . ([IO.Path]::Combine($PSScriptRoot, 'windows-shell-uninstall-helpers.ps1'))
 if ($env:OS -ne 'Windows_NT' -or -not $env:RUNNER_TEMP -or
     ($env:GITHUB_ACTIONS -cne 'true' -and -not $OwnedAcceptanceContext)) {

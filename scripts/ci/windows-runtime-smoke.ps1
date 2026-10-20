@@ -1,5 +1,5 @@
 param(
-  [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
+  [string]$ProjectRoot = '',
   [string]$ComponentsDir = '',
   # lite must ship exactly the fixed component set (scripts/nsis-offline-components.json).
   # cpu/cuda are new editions: the fixed set must be present, and anything
@@ -8,6 +8,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $ProjectRoot) { $ProjectRoot = [IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, '..', '..')) }
 
 function Assert-Path {
   param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string]$Label)
