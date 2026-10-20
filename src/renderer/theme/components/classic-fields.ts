@@ -66,8 +66,8 @@ export function classicFields(dark: boolean) {
     'toast-icon': recipe({ base: { width: '1rem', height: '1rem' } }),
     'field-label-checked': recipe({
       base: {
-        'border-color': `color-mix(in oklab, var(--primary) ${dark ? 20 : 30}%, transparent)`,
-        'background-color': `color-mix(in oklab, var(--primary) ${dark ? 10 : 5}%, transparent)`,
+        'border-color': `color-mix(in oklab, var(--primary) var(--zy-state-primary-border-tint-percent), transparent)`,
+        'background-color': `color-mix(in oklab, var(--primary) var(--zy-state-primary-fill-tint-percent), transparent)`,
       },
     }),
     'control-caption': recipe({ base: { 'font-size': 'var(--zy-component-text-xs)' } }),

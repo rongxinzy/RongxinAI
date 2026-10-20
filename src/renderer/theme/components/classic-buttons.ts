@@ -30,8 +30,8 @@ export function classicButtons(dark: boolean): ButtonAppearances {
       pressed: { translate: '0 1px' },
       disabled: { opacity: '0.5' },
       invalid: {
-        'border-color': dark ? mix('destructive', 50) : 'var(--destructive)',
-        'box-shadow': `0 0 0 3px ${mix('destructive', dark ? 40 : 20)}`,
+        'border-color': 'var(--zy-state-destructive-border)',
+        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent)`,
       },
     }),
     'button-default': recipe({
@@ -42,10 +42,10 @@ export function classicButtons(dark: boolean): ButtonAppearances {
     }),
     'button-outline': recipe({
       base: {
-        'border-color': dark ? 'var(--input)' : 'var(--border)',
-        'background-color': dark ? mix('input', 30) : 'var(--background)',
+        'border-color': 'var(--zy-state-input-border)',
+        'background-color': 'var(--zy-state-input-solid)',
       },
-      hover: { ...hover, ...(dark ? { 'background-color': mix('input', 50) } : {}) },
+      hover: { ...hover, 'background-color': 'var(--zy-state-input-hover)' },
       expanded: hover,
     }),
     'button-secondary': recipe({
@@ -54,7 +54,7 @@ export function classicButtons(dark: boolean): ButtonAppearances {
       expanded: { 'background-color': 'var(--secondary)', color: 'var(--secondary-foreground)' },
     }),
     'button-ghost': recipe({
-      hover: { ...hover, ...(dark ? { 'background-color': mix('muted', 50) } : {}) },
+      hover: { ...hover, 'background-color': 'var(--zy-state-muted-hover)' },
       expanded: hover,
     }),
     'button-embedded': recipe({
@@ -88,11 +88,16 @@ export function classicButtons(dark: boolean): ButtonAppearances {
       expanded: { ...raised, color: 'var(--foreground)' },
     }),
     'button-destructive': recipe({
-      base: { 'background-color': mix('destructive', dark ? 20 : 10), color: 'var(--destructive)' },
-      hover: { 'background-color': mix('destructive', dark ? 30 : 20) },
+      base: {
+        'background-color': `color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent)`,
+        color: 'var(--destructive)',
+      },
+      hover: {
+        'background-color': `color-mix(in oklab, var(--destructive) var(--zy-state-destructive-hover-tint-percent), transparent)`,
+      },
       focus: {
         'border-color': mix('destructive', 40),
-        'box-shadow': `0 0 0 3px ${mix('destructive', dark ? 40 : 20)}`,
+        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent)`,
       },
     }),
     'button-link': recipe({

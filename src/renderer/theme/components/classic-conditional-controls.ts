@@ -680,22 +680,14 @@ export function classicConditionalControls(dark: boolean) {
         'box-shadow': 'none',
       },
     }),
-    'page-conversation-button-variant-1': recipe(
-      dark
-        ? {
-            base: { 'border-radius': '9999px', 'background-color': 'var(--zy-background)' },
-            hover: { 'background-color': 'var(--muted)' },
-          }
-        : { base: { 'border-radius': '9999px' } },
-    ),
-    'page-conversation-button-variant-2': recipe(
-      dark
-        ? {
-            base: { 'border-radius': '9999px', 'background-color': 'var(--zy-background)' },
-            hover: { 'background-color': 'var(--muted)' },
-          }
-        : { base: { 'border-radius': '9999px' } },
-    ),
+    'page-conversation-button-variant-1': recipe({
+      base: { 'border-radius': '9999px', 'background-color': 'var(--zy-state-page-pill-bg)' },
+      hover: { 'background-color': 'var(--zy-state-page-pill-hover)' },
+    }),
+    'page-conversation-button-variant-2': recipe({
+      base: { 'border-radius': '9999px', 'background-color': 'var(--zy-state-page-pill-bg)' },
+      hover: { 'background-color': 'var(--zy-state-page-pill-hover)' },
+    }),
     'page-prompt-input-select-trigger-variant-1': recipe({
       base: {
         'border-style': 'none',

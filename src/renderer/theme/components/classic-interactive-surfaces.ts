@@ -19,9 +19,7 @@ export function classicInteractiveSurfaces(dark: boolean) {
     'border-style': 'solid',
     'border-color': 'var(--border)',
   };
-  const session = dark
-    ? 'color-mix(in oklab, var(--zy-component-palette-white) 5%, transparent)'
-    : 'color-mix(in oklab, var(--zy-component-palette-black) 4%, transparent)';
+  const session = 'var(--zy-state-session-tint)';
   const accent = 'color-mix(in oklab, var(--accent) 40%, transparent)';
   const fade = {
     'transition-property': 'opacity',

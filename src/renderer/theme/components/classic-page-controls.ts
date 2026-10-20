@@ -16,43 +16,20 @@ export function classicPageControls(dark: boolean) {
     'page-lazy-chunk-error-boundary-button-1': recipe({
       base: { gap: '0.5rem', color: 'var(--muted-foreground)' },
     }),
-    'page-login-button-button-1': recipe(
-      dark
-        ? {
-            base: {
-              height: '2rem',
-              gap: '0.5rem',
-              'border-radius': 'var(--zy-style-radius-lg)',
-              'padding-inline': '0.5rem',
-              'font-size': 'var(--zy-component-text-sm)',
-              'font-weight': 'var(--zy-component-font-weight-normal)',
-              color: 'var(--sidebar-foreground)',
-              'transition-property': 'color, background-color, border-color, box-shadow',
-              'transition-duration': '150ms',
-            },
-            hover: {
-              'background-color':
-                'color-mix(in oklab, var(--zy-component-palette-white) 4%, transparent)',
-            },
-          }
-        : {
-            base: {
-              height: '2rem',
-              gap: '0.5rem',
-              'border-radius': 'var(--zy-style-radius-lg)',
-              'padding-inline': '0.5rem',
-              'font-size': 'var(--zy-component-text-sm)',
-              'font-weight': 'var(--zy-component-font-weight-normal)',
-              color: 'var(--sidebar-foreground)',
-              'transition-property': 'color, background-color, border-color, box-shadow',
-              'transition-duration': '150ms',
-            },
-            hover: {
-              'background-color':
-                'color-mix(in oklab, var(--zy-component-palette-black) 3%, transparent)',
-            },
-          },
-    ),
+    'page-login-button-button-1': recipe({
+      base: {
+        height: '2rem',
+        gap: '0.5rem',
+        'border-radius': 'var(--zy-style-radius-lg)',
+        'padding-inline': '0.5rem',
+        'font-size': 'var(--zy-component-text-sm)',
+        'font-weight': 'var(--zy-component-font-weight-normal)',
+        color: 'var(--sidebar-foreground)',
+        'transition-property': 'color, background-color, border-color, box-shadow',
+        'transition-duration': '150ms',
+      },
+      hover: { 'background-color': 'var(--zy-state-login-hover-tint)' },
+    }),
     'page-login-button-button-2': recipe({
       base: {
         height: '2.25rem',

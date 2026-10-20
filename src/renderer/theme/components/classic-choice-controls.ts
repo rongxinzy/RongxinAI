@@ -6,10 +6,8 @@ export function classicChoiceControls(dark: boolean) {
     'box-shadow': '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
   };
   const invalid = {
-    'border-color': dark
-      ? 'color-mix(in oklab, var(--destructive) 50%, transparent)'
-      : 'var(--destructive)',
-    'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) ${dark ? 40 : 20}%, transparent)`,
+    'border-color': 'var(--zy-state-destructive-border)',
+    'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent)`,
   };
   return {
     radio: recipe({
@@ -21,9 +19,7 @@ export function classicChoiceControls(dark: boolean) {
         'border-style': 'solid',
         'border-color': 'var(--input)',
         'outline-style': 'none',
-        'background-color': dark
-          ? 'color-mix(in oklab, var(--input) 30%, transparent)'
-          : 'transparent',
+        'background-color': 'var(--zy-state-input-field)',
       },
       focus,
       invalid,
@@ -58,8 +54,8 @@ export function classicChoiceControls(dark: boolean) {
       selected: { 'background-color': 'var(--muted)', color: 'var(--foreground)' },
       focus,
       invalid: {
-        'border-color': 'var(--destructive)',
-        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) ${dark ? 40 : 20}%, transparent)`,
+        'border-color': 'var(--zy-state-destructive-border)',
+        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent)`,
       },
       disabled: { opacity: '0.5' },
     }),
