@@ -168,7 +168,6 @@ export const magpieTranslations = {
     magpieSectionModels: '模型',
     magpieSectionNetwork: '网络与共享',
     magpieSectionPrivacy: '隐私',
-    magpieSectionAbout: '关于',
     magpieSectionRoutingUsage: '路由与用量',
     modelUsageTitle: '路由与用量',
     modelUsageDescription:
@@ -299,8 +298,6 @@ export const magpieTranslations = {
     magpieAccountDiscoveryHint:
       '从本机已登录的 Claude Code、Codex、Copilot 等读取订阅账号，作为模型渠道使用。',
     magpieAccountDiscoveryEnv: '本次运行由启动参数关闭了账号发现。',
-    magpieDataDirectory: '数据目录',
-    magpieAboutHint: '模型服务与渠道由知远托管；版本、数据目录与本机网关地址如下。',
     magpieRedactKind_ssn: '社保号',
     magpieRedactKindHint_ssn: '美国社保号，仅覆盖实际发放的号段。',
     magpieRedactKind_passport: '护照号',
@@ -428,7 +425,6 @@ export const magpieTranslations = {
     magpieSectionModels: 'Models',
     magpieSectionNetwork: 'Network & sharing',
     magpieSectionPrivacy: 'Privacy',
-    magpieSectionAbout: 'About',
     magpieSectionRoutingUsage: 'Routing & usage',
     modelUsageTitle: 'Routing & usage',
     modelUsageDescription:
@@ -566,9 +562,6 @@ export const magpieTranslations = {
     magpieAccountDiscoveryHint:
       'Read the accounts Claude Code, Codex, Copilot, and other local agents are signed in to, and serve them as providers.',
     magpieAccountDiscoveryEnv: 'Account discovery is off for this run because of a launch setting.',
-    magpieDataDirectory: 'Data directory',
-    magpieAboutHint:
-      'ZhiYuan owns the model service and providers. The version, data directory, and local gateway address are shown below.',
     magpieRedactKind_ssn: 'Social Security numbers',
     magpieRedactKindHint_ssn: 'US SSNs, in the ranges that are given out.',
     magpieRedactKind_passport: 'Passport numbers',

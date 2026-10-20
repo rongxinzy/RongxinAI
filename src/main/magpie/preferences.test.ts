@@ -46,7 +46,7 @@ const raw = {
 
 test('projects only renderer-safe preference fields', () => {
   const preferences = projectMagpiePreferences(raw);
-  expect(preferences.dataDir).toBe('/home/user/.model-service');
+  expect('dataDir' in preferences).toBe(false);
   expect(preferences.visionAuto).toBe('openai/vision');
   expect(preferences.visionModels).toEqual([
     { id: 'openai/vision', name: 'Vision', providerName: 'OpenAI' },

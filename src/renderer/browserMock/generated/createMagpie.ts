@@ -141,8 +141,6 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
     preferences: async () => {
       runtime.warnOnce('magpie.preferences');
       return {
-        version: '0.0.0-preview',
-        dataDir: '',
         gateway: '',
         proxy: '',
         proxyNow: '',
@@ -177,8 +175,6 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
       void _p0;
       runtime.warnOnce('magpie.updatePreferences');
       return {
-        version: '0.0.0-preview',
-        dataDir: '',
         gateway: '',
         proxy: '',
         proxyNow: '',

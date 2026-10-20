@@ -24,7 +24,6 @@ import { i18nService } from '../../../services/i18n';
 import { showAppError } from '../../../services/appToast';
 import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
 import { MagpieAgentsPanel } from '../../coding/MagpieAgentsPanel';
-import { MagpieAboutPreferences } from './MagpieAboutPreferences';
 import { MagpieModelPreferences } from './MagpieModelPreferences';
 import { MagpieNetworkPreferences } from './MagpieNetworkPreferences';
 import { MagpiePrivacyPreferences } from './MagpiePrivacyPreferences';
@@ -42,7 +41,6 @@ const ModelSection = {
   Models: 'models',
   Network: 'network',
   Privacy: 'privacy',
-  About: 'about',
 } as const;
 type ModelSection = (typeof ModelSection)[keyof typeof ModelSection];
 
@@ -54,7 +52,6 @@ const MODEL_SECTIONS = [
   ModelSection.Models,
   ModelSection.Network,
   ModelSection.Privacy,
-  ModelSection.About,
 ] as const;
 
 const SECTION_LABEL_KEYS: Record<ModelSection, string> = {
@@ -65,7 +62,6 @@ const SECTION_LABEL_KEYS: Record<ModelSection, string> = {
   [ModelSection.Models]: 'magpieSectionModels',
   [ModelSection.Network]: 'magpieSectionNetwork',
   [ModelSection.Privacy]: 'magpieSectionPrivacy',
-  [ModelSection.About]: 'magpieSectionAbout',
 };
 
 export default function ModelSettingsPanel() {
@@ -500,28 +496,6 @@ export default function ModelSettingsPanel() {
                 }}
               />
             </div>
-          ) : null}
-        </div>
-      )}
-
-      {section === ModelSection.About && (
-        <div className="flex flex-col gap-4">
-          {preferences ? (
-            <MagpieAboutPreferences preferences={preferences} />
-          ) : (
-            <div className="flex flex-col gap-2">
-              {preferencesUnavailable}
-              {catalog?.status.version ? (
-                <p className="text-sm text-muted-foreground">
-                  {i18nService.t('aboutVersion')}: {catalog.status.version}
-                </p>
-              ) : null}
-            </div>
-          )}
-          {preferencesError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {preferencesError}
-            </p>
           ) : null}
         </div>
       )}
