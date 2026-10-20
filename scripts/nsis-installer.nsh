@@ -110,10 +110,20 @@ Var /GLOBAL zyDeleteRealAppData
 ; quitting the install. The previous version is already detached (renamed
 ; away) here, so that uninstaller is redundant — and when the detach could not
 ; run, a locked file makes the old uninstaller exit with code 2, producing
-; exactly that misleading dialog. Remove the old registration so
+; exactly that misleading dialog. Remove the old uninstall registration so
 ; uninstallOldVersion returns early; only entries pointing at $INSTDIR are
 ; touched, an installation in a different directory keeps its entry and is
 ; removed by electron-builder as usual.
+;
+; ${INSTALL_REGISTRY_KEY} is deliberately kept: its InstallLocation is the
+; only record setInstallModePerUser has for finding a custom install
+; directory on the next run. This macro executes before any file is
+; extracted, while electron-builder rewrites that key only near the end of a
+; successful install — deleting it here meant an aborted or interrupted
+; install erased the path memory and the next installer silently fell back
+; to the default %LocalAppData%\Programs directory. A stale value is safe:
+; the detach already renamed the old directory away, so it can only point at
+; the location the next install will recreate anyway.
 !macro ForgetOldInstallRegistry TOKEN
   ReadRegStr $R7 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
   StrCmp $R7 "" ForgetOldInstallRegistry_Do_${TOKEN}
@@ -121,14 +131,10 @@ Var /GLOBAL zyDeleteRealAppData
   ForgetOldInstallRegistry_Do_${TOKEN}:
     SetRegView 64
     DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"
-    DeleteRegKey HKCU "${INSTALL_REGISTRY_KEY}"
     DeleteRegKey HKLM "${UNINSTALL_REGISTRY_KEY}"
-    DeleteRegKey HKLM "${INSTALL_REGISTRY_KEY}"
     SetRegView 32
     DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"
-    DeleteRegKey HKCU "${INSTALL_REGISTRY_KEY}"
     DeleteRegKey HKLM "${UNINSTALL_REGISTRY_KEY}"
-    DeleteRegKey HKLM "${INSTALL_REGISTRY_KEY}"
     SetRegView 64
     !ifdef UNINSTALL_REGISTRY_KEY_2
       SetRegView 32
