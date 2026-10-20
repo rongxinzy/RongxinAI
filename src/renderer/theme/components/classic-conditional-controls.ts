@@ -1,6 +1,6 @@
 import { recipe } from './recipe';
 /** Conditional appearance branches. Components retain the original state predicates. */
-export function classicConditionalControls(dark: boolean) {
+export function classicConditionalControls() {
   return {
     'page-model-selector-select-trigger-variant-1': recipe({
       base: {

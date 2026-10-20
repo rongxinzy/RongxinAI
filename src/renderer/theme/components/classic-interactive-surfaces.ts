@@ -1,7 +1,7 @@
 import { recipe } from './recipe';
 
 /** Custom rows and overlays keep their selection predicates and event handlers. */
-export function classicInteractiveSurfaces(dark: boolean) {
+export function classicInteractiveSurfaces() {
   const mix = (token: string, amount: number) =>
     `color-mix(in oklab, var(--${token}) ${amount}%, transparent)`;
   const transition = {
