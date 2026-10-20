@@ -97,12 +97,11 @@ export function applyStoredModelPreferencesToLaunchInput(
   store: SqliteStore,
   input: LlamaCppModelLaunchInput,
 ): LlamaCppModelLaunchInput {
-  if (input.options?.ctxSize) {
-    return input;
-  }
-
   const preference = getLlamaCppModelPreferences(store)[input.model.trim()];
-  if (!preference?.ctxSize) {
+  // ctxSize and nCpuMoe apply independently: either may be absent.
+  const ctxSize = input.options?.ctxSize ? undefined : preference?.ctxSize;
+  const nCpuMoe = input.options?.nCpuMoe !== undefined ? undefined : preference?.nCpuMoe;
+  if (!ctxSize && !nCpuMoe) {
     return input;
   }
 
@@ -110,7 +109,8 @@ export function applyStoredModelPreferencesToLaunchInput(
     ...input,
     options: {
       ...input.options,
-      ctxSize: preference.ctxSize,
+      ...(ctxSize ? { ctxSize } : {}),
+      ...(nCpuMoe !== undefined ? { nCpuMoe } : {}),
     },
   };
 }
@@ -190,6 +190,7 @@ export function sanitizeLlamaCppModelPreference(
   const candidate = preference as {
     ctxSize?: unknown;
     maxTokens?: unknown;
+    nCpuMoe?: unknown;
     capabilities?: Record<string, unknown>;
     residency?: { mode?: unknown; idleMinutes?: unknown };
   };
@@ -221,6 +222,12 @@ export function sanitizeLlamaCppModelPreference(
     parsedMaxTokens > 0
       ? parsedMaxTokens
       : undefined;
+  const nCpuMoe =
+    typeof candidate.nCpuMoe === 'number' &&
+    Number.isSafeInteger(candidate.nCpuMoe) &&
+    candidate.nCpuMoe >= 0
+      ? candidate.nCpuMoe
+      : undefined;
   const capabilities = Object.fromEntries(
     LLAMACPP_MODEL_PREFERENCE_CAPABILITY_KEYS.flatMap(key => {
       const status = candidate.capabilities?.[key];
@@ -245,10 +252,11 @@ export function sanitizeLlamaCppModelPreference(
           }
         : undefined;
 
-  return ctxSize || maxTokens || Object.keys(capabilities).length > 0 || residency
+  return ctxSize || maxTokens || nCpuMoe !== undefined || Object.keys(capabilities).length > 0 || residency
     ? {
         ...(ctxSize ? { ctxSize } : {}),
         ...(maxTokens ? { maxTokens } : {}),
+        ...(nCpuMoe !== undefined ? { nCpuMoe } : {}),
         ...(Object.keys(capabilities).length > 0 ? { capabilities } : {}),
         ...(residency ? { residency } : {}),
       }

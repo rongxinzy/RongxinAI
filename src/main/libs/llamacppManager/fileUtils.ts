@@ -58,6 +58,9 @@ export function modelLaunchOptionsToPreset(
     ...(options.batchSize !== undefined ? { 'batch-size': options.batchSize } : {}),
     ...(options.ubatchSize !== undefined ? { 'ubatch-size': options.ubatchSize } : {}),
     ...(options.gpuLayers !== undefined ? { 'n-gpu-layers': options.gpuLayers } : {}),
+    // n-cpu-moe is a tensor override, so writing it intentionally disables
+    // llama.cpp's automatic VRAM fitting (--fit) for this model.
+    ...(options.nCpuMoe !== undefined ? { 'n-cpu-moe': options.nCpuMoe } : {}),
     ...(options.threads !== undefined ? { threads: options.threads } : {}),
     ...(options.device ? { device: options.device } : {}),
     ...(options.mainGpu !== undefined ? { 'main-gpu': options.mainGpu } : {}),
