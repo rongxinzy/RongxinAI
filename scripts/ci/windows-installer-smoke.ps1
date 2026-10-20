@@ -57,7 +57,7 @@ function Invoke-Installer {
         $processIds += $newIds
       } while ($newIds.Count -gt 0)
       $allProcesses | Where-Object { $_.ProcessId -in $processIds } |
-        Select-Object ProcessId, ParentProcessId, Name, CommandLine |
+        Select-Object ProcessId, ParentProcessId, Name |
         Format-Table -Wrap | Out-String | Write-Host
       if ($DiagnosticLogPath -and (Test-Path -LiteralPath $DiagnosticLogPath)) {
         Write-Host "[WindowsInstallerSmoke] Complete installer timing log:"
@@ -113,7 +113,7 @@ function Assert-InstallDurationBudget {
 
 function Get-OwnedRuntimeEntries {
   param([Parameter(Mandatory = $true)][string]$RuntimeRoot)
-  foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')) {
+  foreach ($key in $componentKeys) {
     $root = Join-Path $RuntimeRoot $key
     if (-not (Test-Path -LiteralPath $root)) { continue }
     foreach ($item in @(Get-ChildItem -LiteralPath $root -Force)) {
@@ -144,7 +144,7 @@ function Wait-ForUninstallCompletion {
   $startedAt = Get-Date
   $lastProgressAt = -30
   # The runtime root may contain personal/unknown directories. Completion
-  # means the application and its seven owned component sets are gone.
+  # means the application and its edition's owned component sets are gone.
   while ((Test-Path -LiteralPath $InstallRoot) -or @(Get-OwnedRuntimeEntries $RuntimeRoot).Count -gt 0) {
     $elapsedSeconds = [int]((Get-Date) - $startedAt).TotalSeconds
     if ($elapsedSeconds - $lastProgressAt -ge 30) {
@@ -156,7 +156,7 @@ function Wait-ForUninstallCompletion {
       Get-CimInstance Win32_Process | Where-Object {
         $_.Name -like 'Uninstall*.exe' -or $_.Name -like 'Un_*.exe' -or
         $_.CommandLine -like '*ZhiYuanAgent*' -or $_.CommandLine -like '*zhiyuan-agent*'
-      } | Select-Object ProcessId, ParentProcessId, Name, CommandLine |
+      } | Select-Object ProcessId, ParentProcessId, Name |
         Format-Table -Wrap | Out-String | Write-Host
       throw "Background uninstall did not remove the managed roots within $TimeoutSeconds seconds"
     }
@@ -177,6 +177,29 @@ $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\zhiyuan-agent'
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'ZhiYuanAgent\runtimes'
 $timingLog = Join-Path $env:APPDATA 'ZhiYuanAgent\install-timing.log'
 $componentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')
+$edition = if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT.Trim().ToLowerInvariant() } else { 'lite' }
+if ($edition -in @('cpu', 'cuda')) { $componentKeys += 'llamacpp-bundled' }
+
+function Assert-InstalledInferenceRuntime {
+  if ($edition -notin @('cpu', 'cuda')) { return }
+  $root = Join-Path $installRoot 'resources\llamacpp-bundled'
+  $manifestPath = Join-Path $root 'manifest.json'
+  Assert-Path $manifestPath 'installed inference runtime manifest'
+  $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $executable = if ($manifest.cpuFallbackExecutable) { $manifest.cpuFallbackExecutable } else { $manifest.executable }
+  $expectedHash = if ($manifest.cpuFallbackExecutable) { $manifest.cpuFallbackSha256 } else { $manifest.sha256 }
+  $server = Join-Path $root $executable
+  Assert-Path $server 'installed inference runtime executable'
+  if ((Get-FileHash -LiteralPath $server -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expectedHash) {
+    throw 'Installed inference runtime executable hash mismatch'
+  }
+  Assert-Path (Join-Path $root $manifest.executable) 'installed primary inference runtime'
+  $savedPath = $env:PATH
+  try {
+    $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
+    Invoke-Checked $server @('--version') 'installed inference runtime clean-PATH launch'
+  } finally { $env:PATH = $savedPath }
+}
 
 try {
   Invoke-Installer $installer 'cold installation' 2700 $timingLog
@@ -196,8 +219,8 @@ try {
   Assert-Path $timingLog 'cold installation timing log'
 
   $coldLog = Get-LatestRunLog $timingLog
-  if (($coldLog | Select-String -AllMatches 'phase=component-cache-miss ').Matches.Count -ne 7) {
-    throw 'Cold installation did not expand exactly seven offline components'
+  if (($coldLog | Select-String -AllMatches 'phase=component-cache-miss ').Matches.Count -ne $componentKeys.Count) {
+    throw "Cold installation did not expand the complete $edition component set"
   }
   if ($coldLog -notmatch 'phase=custom-install-start ') {
     throw 'Cold installation did not record the application-files phase marker'
@@ -206,6 +229,7 @@ try {
     throw 'Cold installation did not record a ready component set'
   }
   Assert-InstallDurationBudget $coldLog 'cold installation' 300
+  Assert-InstalledInferenceRuntime
 
   # Existing user-owned/unknown runtime content is outside uninstall ownership.
   $preservedFiles = @(
@@ -232,8 +256,8 @@ try {
   Assert-Path (Join-Path $installRoot 'resources\memory\engram.exe') 'upgraded memory runtime'
   Assert-Path $timingLog 'upgrade timing log'
   $upgradeLog = Get-LatestRunLog $timingLog
-  if (($upgradeLog | Select-String -AllMatches 'phase=component-cache-hit ').Matches.Count -ne 7) {
-    throw 'Repeated installation did not reuse exactly seven offline components'
+  if (($upgradeLog | Select-String -AllMatches 'phase=component-cache-hit ').Matches.Count -ne $componentKeys.Count) {
+    throw "Repeated installation did not reuse the complete $edition component set"
   }
   if ($upgradeLog -match 'phase=component-cache-miss ') {
     throw 'Repeated installation unexpectedly expanded an offline component'
@@ -242,6 +266,7 @@ try {
     throw 'Repeated installation did not record a ready component set'
   }
   Assert-InstallDurationBudget $upgradeLog 'cache-hit upgrade' 180
+  Assert-InstalledInferenceRuntime
 
   $uninstallers = @(Get-ChildItem -LiteralPath $installRoot -Filter 'Uninstall*.exe' -File)
   if ($uninstallers.Count -ne 1) {
@@ -258,11 +283,21 @@ try {
       throw "Uninstall changed personal/unknown runtime content: $file"
     }
   }
+} catch {
+  & (Join-Path $PSScriptRoot 'collect-windows-diagnostics.ps1') -ProjectRoot $ProjectRoot -Label 'failure'
+  throw
 } finally {
-  if (Test-Path -LiteralPath $installRoot) {
-    $remainingUninstallers = @(Get-ChildItem -LiteralPath $installRoot -Filter 'Uninstall*.exe' -File -ErrorAction SilentlyContinue)
-    if ($remainingUninstallers.Count -eq 1) {
-      Start-Process -FilePath $remainingUninstallers[0].FullName -ArgumentList @('/S') -Wait | Out-Null
+  & (Join-Path $PSScriptRoot 'collect-windows-diagnostics.ps1') -ProjectRoot $ProjectRoot -Label 'before-cleanup'
+  try {
+    if (Test-Path -LiteralPath $installRoot) {
+      $remainingUninstallers = @(Get-ChildItem -LiteralPath $installRoot -Filter 'Uninstall*.exe' -File -ErrorAction SilentlyContinue)
+      if ($remainingUninstallers.Count -eq 1) {
+        $cleanup = Start-Process -FilePath $remainingUninstallers[0].FullName -ArgumentList @('/S') -PassThru
+        if (-not $cleanup.WaitForExit(60000)) {
+          & taskkill.exe /PID $cleanup.Id /T /F 2>&1 | Out-Host
+          Write-Warning 'Acceptance cleanup exceeded 60 seconds; installer evidence was retained.'
+        }
+      }
     }
-  }
+  } catch { Write-Warning "Acceptance cleanup failed: $_" }
 }

@@ -43,17 +43,7 @@ test('enforces consent on page leave and keeps the offline component contract', 
   expect(body('ZYHeroLeave')).toMatch(/NSD_GetState.*heroLicense[\s\S]*Abort/);
   expect(pages).not.toContain('$heroInference');
   expect(installer).toContain('Delete "$APPDATA\\ZhiYuanAgent\\pending-local-inference-install"');
-  for (const key of [
-    'channel-runtime',
-    'skills',
-    'mcps',
-    'portable-git',
-    'python',
-    'skill-python',
-    'uv',
-  ]) {
-    expect(installer).toContain(`!insertmacro RecordOfflineComponentReady "${key}"`);
-  }
+  expect(installer).toContain('!insertmacro RecordEditionComponents');
 });
 
 test('keeps a failed launch on the usable finish page and resets launch intent', () => {

@@ -5,6 +5,10 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$ExpectedThumbprint,
 
+  # Public certificate sealed into the package checkpoint by the signing runner.
+  # Existing same-runner enterprise callers may still use their local store.
+  [string]$CertificatePath = '',
+
   # Packaged executable base name without extension. Defaults to the
   # executableName from the project electron-builder.json; enterprise overlay
   # builds pass their own product executable name instead.
@@ -25,18 +29,10 @@ if ($normalizedThumbprint -notmatch '^[0-9A-F]{40}$') {
   throw 'ExpectedThumbprint must contain a 40-character SHA-1 thumbprint.'
 }
 
-$expectedCertificates = @(
-  Get-ChildItem Cert:\CurrentUser\My |
-    Where-Object {
-      ($_.Thumbprint -replace '[^0-9A-Fa-f]', '').ToUpperInvariant() -eq
-        $normalizedThumbprint
-    }
-)
-if ($expectedCertificates.Count -ne 1) {
-  throw "Expected exactly one configured Certum certificate; found $($expectedCertificates.Count)."
-}
+. (Join-Path $PSScriptRoot 'windows-signing-certificate.ps1')
+$expectedCertificate = Resolve-WindowsSigningCertificate -ExpectedThumbprint $normalizedThumbprint -CertificatePath $CertificatePath
 $expectedCertificateDer = [Convert]::ToBase64String(
-  $expectedCertificates[0].RawData
+  $expectedCertificate.RawData
 )
 
 $appExecutableName = $ExecutableName

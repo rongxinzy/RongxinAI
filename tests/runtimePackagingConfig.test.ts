@@ -385,9 +385,9 @@ test('installer-related pull requests build and exercise the Windows installer',
   assert.match(sizeSmoke, /\$_\.archiveSizeBytes/);
   assert.doesNotMatch(sizeSmoke, /\$_\.archiveBytes\b/);
   assert.match(sizeSmoke, /component archive bytes/);
-  assert.match(sizeSmoke, /MaximumInstallerBytes = 450MB/);
-  assert.match(sizeSmoke, /MaximumComponentBytes = 300MB/);
-  assert.match(sizeSmoke, /MaximumNonComponentBytes = 150MB/);
+  assert.doesNotMatch(sizeSmoke, /Maximum\w+Bytes/);
+  assert.match(sizeSmoke, /\$uncapped = \$true/);
+  assert.match(sizeSmoke, /\$nsisComponentBytes = \$componentBytes/);
 });
 
 test('tag release publishes beta and archives build metadata for promotion', () => {
@@ -403,7 +403,10 @@ test('tag release publishes beta and archives build metadata for promotion', () 
   assert.match(workflow, /app-build-version:/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-inference-editions\.yml/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-windows-release\.yml/);
-  assert.match(workflow, /uses: \.\/\.github\/workflows\/publish-platform-release\.yml/);
+  assert.match(
+    workflow,
+    /needs: \[prepare-release, preflight, build-windows, build-macos, build-linux\]/,
+  );
   assert.match(buildWorkflow, /create-release-candidate\.mjs/);
   const publishScript = readFileSync(
     path.join(root, 'scripts', 'release', 'publish-platform-beta-release.sh'),

@@ -86,9 +86,16 @@ test('shared qualification fails on thresholds and retains reports without hidin
       'utf8',
     ),
   ) as { runs: { steps: Step[] } };
-  expect(action.runs.steps[0].run).toContain('-RequireQualified');
-  expect(action.runs.steps[0].run).not.toContain('-SkipPythonProbe');
+  const qualification = action.runs.steps.find(step => step.run?.includes('-RequireQualified'))!;
+  expect(qualification).toBeDefined();
+  expect(qualification.run).not.toContain('-SkipPythonProbe');
+  const verify = action.runs.steps.find(step =>
+    step.run?.includes('compression-qualification.cjs verify'),
+  )!;
+  expect(verify).toBeDefined();
+  expect(verify.if).toBeUndefined();
   expect(action.runs.steps.every(step => !step['continue-on-error'])).toBe(true);
-  expect(action.runs.steps[1].if).toBe('always()');
-  expect(action.runs.steps[1].with?.['retention-days']).toBe(3);
+  const report = action.runs.steps.find(step => step.uses === 'actions/upload-artifact@v6')!;
+  expect(report.if).toBe('always()');
+  expect(report.with?.['retention-days']).toBe(14);
 });

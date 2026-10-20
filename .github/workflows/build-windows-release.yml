@@ -1,8 +1,8 @@
 name: Build Windows release (staged)
 
 # Release-mode Windows pipeline: compile/sign the application once (lite core),
-# build CUDA llama-server on windows-2022 in parallel, then assemble cpu/cuda
-# installers with a single Certum session (installer signing only).
+# build CUDA llama-server on windows-2022, then package/sign each edition's
+# metadata and components in one Certum session. Acceptance runs in parallel.
 
 on:
   workflow_call:
@@ -139,6 +139,17 @@ jobs:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Export public signing identity for independent acceptance
+        shell: powershell
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+        run: |
+          . ./scripts/ci/windows-signing-certificate.ps1
+          $certificate = Resolve-WindowsSigningCertificate -ExpectedThumbprint $env:CERTUM_CERT_THUMBPRINT
+          [IO.File]::WriteAllBytes((Join-Path $PWD 'release/signing-certificate.cer'), $certificate.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+      - uses: ./.github/actions/verify-windows-compression
+        with:
+          artifact-suffix: windows-common-${{ github.run_id }}
       - name: Assemble Windows release payloads (lite, cpu, cuda)
         shell: bash
         run: |
@@ -168,6 +179,9 @@ jobs:
               "${updaters[0]}:win32:x64:${edition}:updater" \
               "${blockmaps[0]}:win32:x64:${edition}:blockmap" \
               "${metadata}:win32:x64:${edition}:metadata"
+            paths=(release package.json build-tar/windows-components scripts/installer-shell/out "$out_dir")
+            if [[ "$edition" != lite ]]; then paths+=(resources/llamacpp-bundled); fi
+            node scripts/ci/build-checkpoint.mjs create "checkpoint-${edition}" "win32-x64-${edition}" "${paths[@]}"
           }
           assemble_bundle lite
           node scripts/release/windows/assemble-windows-edition.cjs cpu
@@ -175,45 +189,119 @@ jobs:
           node scripts/release/windows/assemble-windows-edition.cjs cuda
           assemble_bundle cuda
         env:
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
           CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-package-lite-${{ github.run_id }}
+          path: checkpoint-lite/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-package-cpu-${{ github.run_id }}
+          path: checkpoint-cpu/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows-package-cuda-${{ github.run_id }}
+          path: checkpoint-cuda/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+
+  acceptance:
+    needs: windows-release
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [lite, cpu, cuda]
+    runs-on: windows-latest
+    environment: release
+    timeout-minutes: 90
+    env:
+      APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+      ZHIYUAN_UPDATE_VARIANT: ${{ matrix.edition }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref }}
+      - name: Resolve immutable source commit
+        shell: bash
+        run: echo "ZHIYUAN_SOURCE_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/setup-bun-workspace
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-package-${{ matrix.edition }}-${{ github.run_id }}
+          path: package-checkpoint
+      - name: Restore and verify the exact edition package
+        run: node scripts/ci/build-checkpoint.mjs restore package-checkpoint 'win32-x64-${{ matrix.edition }}'
       - name: Verify Windows Authenticode signatures
         shell: powershell
         run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/verify-windows-authenticode.ps1
+          ./scripts/ci/verify-windows-authenticode.ps1
           -ProjectRoot '${{ github.workspace }}'
-          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
-      - name: Verify Windows release size and runtimes
+          -ExpectedThumbprint '${{ secrets.CERTUM_CERT_THUMBPRINT }}'
+          -CertificatePath 'release/signing-certificate.cer'
+      - name: Verify packaged ACP registry and bridges
+        run: node scripts/ci/verify-packaged-acp-resources.mjs
+      - name: Verify packaged release version
+        run: node scripts/ci/verify-packaged-app-version.mjs '${{ inputs.app-build-version }}'
+      - name: Measure Windows release without size ceilings
         shell: powershell
+        run: ./scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+      - name: Verify Windows package runtimes with a clean PATH
+        shell: powershell
+        run: ./scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+      - name: Verify the shared compression qualification against this package
+        run: node scripts/ci/compression-qualification.cjs verify
+      - name: Prepare isolated native uninstall acceptance
+        id: ownership
+        shell: powershell
+        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
+      - name: Verify Windows cold install, cache-hit upgrade, and uninstall
+        shell: powershell
+        run: ./scripts/ci/windows-installer-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+      - name: Verify final signed WebView2 installer and bind evidence
+        id: shell-evidence
+        if: ${{ !cancelled() && steps.ownership.outcome == 'success' }}
+        shell: pwsh
         run: |
-          foreach ($edition in @('lite','cpu','cuda')) {
-            $env:ZHIYUAN_UPDATE_VARIANT = $edition
-            powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
-            powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
-          }
-      - uses: ./.github/actions/verify-windows-compression
-      - name: Verify Windows cold install smoke (lite)
+          node scripts/ci/windows-shell-interactive.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Signed shell interactive acceptance failed.' }
+          $installer = @(Get-ChildItem -LiteralPath release -Filter 'ZhiYuanAgent-Setup-*.exe' -File)
+          if ($installer.Count -ne 1) { throw 'Expected exactly one signed shell installer.' }
+          $installed = Join-Path $env:RUNNER_TEMP 'zhiyuan-shell-acceptance/安装路径/知远.exe'
+          node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $installer[0].FullName $installed
+          if ($LASTEXITCODE -ne 0) { throw 'Signed shell evidence is invalid.' }
+      - name: Verify signed native uninstall preserves user data
+        if: ${{ !cancelled() && steps.shell-evidence.outcome == 'success' }}
         shell: powershell
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/windows-installer-smoke.ps1
-          -ProjectRoot '${{ github.workspace }}'
-      - name: Upload Windows release payloads
+        env:
+          EXPECTED_THUMBPRINT: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+        run: ./scripts/ci/windows-shell-uninstall.ps1 -Action verify -ExpectedThumbprint $env:EXPECTED_THUMBPRINT
+      - name: Collect Windows diagnostics
+        if: always()
+        shell: powershell
+        run: ./scripts/ci/collect-windows-diagnostics.ps1
+      - name: Upload signed shell acceptance evidence
+        if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-lite
-          path: bundle-win32-x64-lite/
+          name: signed-shell-acceptance-win32-x64-${{ matrix.edition }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: acceptance-diagnostics
           if-no-files-found: error
-      - uses: actions/upload-artifact@v6
+          retention-days: 14
+      - name: Upload accepted Windows release payload
+        uses: actions/upload-artifact@v6
         with:
-          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-cpu
-          path: bundle-win32-x64-cpu/
+          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-${{ matrix.edition }}
+          path: bundle-win32-x64-${{ matrix.edition }}/
           if-no-files-found: error
-      - uses: actions/upload-artifact@v6
-        with:
-          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-cuda
-          path: bundle-win32-x64-cuda/
-          if-no-files-found: error
+          retention-days: 14

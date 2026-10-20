@@ -231,8 +231,7 @@ try {
       componentArchiveBytes === null || nsisUpdaterBytes === null
         ? null
         : nsisUpdaterBytes - componentArchiveBytes,
-    // Per-edition limits (distribution-budget.cjs): lite keeps the original
-    // ceilings; cpu = measured + margin; cuda is uncapped (null limits).
+    // Release sizes are telemetry only for all editions.
     edition: setupBudgetEdition,
     maxSetupBytes: setupBudget.maxInstallerBytes,
     maxComponentBytes: setupBudget.maxComponentBytes,

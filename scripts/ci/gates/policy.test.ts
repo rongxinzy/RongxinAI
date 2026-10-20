@@ -103,11 +103,11 @@ test('release builds overlap preflight and publication waits for both', () => {
   expect(release.jobs.preflight.with?.['include-packaging']).toBe(false);
   for (const platform of ['windows', 'macos', 'linux']) {
     expect(release.jobs[`build-${platform}`].needs).toBe('prepare-release');
-    expect(release.jobs[`publish-${platform}`].needs).toEqual(
+    expect(release.jobs.publish.needs).toEqual(
       expect.arrayContaining(['preflight', `build-${platform}`]),
     );
-    expect(release.jobs[`publish-${platform}`].if).toContain("needs.preflight.result == 'success'");
   }
+  expect(release.jobs.publish.if).toBeUndefined();
 });
 
 test('no secondary workflow can start heavy builds for a feature pull request', () => {
