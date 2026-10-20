@@ -13,8 +13,6 @@ export interface MagpieSearchChoice {
 }
 
 export interface MagpiePreferences {
-  version: string;
-  dataDir: string;
   gateway: string;
   publicUrl?: string;
   proxy: string;
