@@ -11,7 +11,7 @@ import { CodingGitController } from '../codingGitController';
 import { CodingRoomRepository } from '../codingRoomRepository';
 import { CodingEventWindowReader } from '../codingEventWindowReader';
 import { CodingEventDeltaBatcher } from '../codingEventDeltaBatcher';
-import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
+
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import {
   CodingAssignmentStatus,
@@ -21,6 +21,7 @@ import {
   type CodingEventPage,
   type CodingRoomSnapshot,
 } from '../../../shared/codingAgent';
+import { CodingPendingMessageQueue } from './codingPendingMessageQueue';
 import type { CodingRoomRuntime, DriverSession } from './runtimeContract';
 
 /**
@@ -43,7 +44,7 @@ export abstract class CodingRoomServiceFoundation extends EventEmitter {
   protected readonly eventDeltaBatcher: CodingEventDeltaBatcher;
   protected readonly laneTurnGenerations = new Map<string, number>();
   protected readonly cancelledTurnGenerations = new Map<string, number>();
-  protected readonly acpPendingMessages = new Map<string, CoworkPendingMessage[]>();
+  protected readonly pendingMessageQueue = new CodingPendingMessageQueue();
   protected readonly stagedLaneIds = new Set<string>();
   protected readonly inFlightTurns = new Set<Promise<void>>();
   /** Maps builtin sessionId → laneId to avoid scanning all rooms per event. */

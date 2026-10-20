@@ -1,5 +1,3 @@
-import { randomUUID } from 'crypto';
-
 import { t } from '../../i18n';
 import {
   BuiltinCodingControlCommand,
@@ -7,16 +5,11 @@ import {
 } from '../drivers/builtinCodingCommands';
 import { buildBuiltinCodingMcpReport } from '../builtinCodingMcpReport';
 import {
-  CodingErrorMessage,
   CodingEventKind,
   type CodingAgentLane,
   type CodingRoomSnapshot,
 } from '../../../shared/codingAgent';
-import {
-  CoworkQueueDelivery,
-  CoworkQueueItemStatus,
-  type CoworkPendingMessage,
-} from '../../../shared/cowork/pendingMessageQueue';
+import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
 import { CodingRoomServiceSessionLifecycle } from './sessionLifecycle';
 
 /**
@@ -26,10 +19,10 @@ import { CodingRoomServiceSessionLifecycle } from './sessionLifecycle';
  * behind queued prompts while a turn is in flight.
  */
 export abstract class CodingRoomServiceBuiltinControlCommands extends CodingRoomServiceSessionLifecycle {
-  // ── Follow-up prompt queue ────────────────────────────────────────────────
+  // ── Follow-up prompt queue (delegates to the CodingPendingMessageQueue collaborator) ──
 
   listPendingMessages(laneId: string): CoworkPendingMessage[] {
-    return (this.acpPendingMessages.get(laneId) ?? []).map(item => ({ ...item }));
+    return this.pendingMessageQueue.list(laneId);
   }
 
   protected emitPendingMessagesChanged(laneId: string): void {
@@ -40,20 +33,9 @@ export abstract class CodingRoomServiceBuiltinControlCommands extends CodingRoom
     laneId: string,
     text: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
-    const normalized = text.trim();
-    if (!normalized) return { success: false, error: CodingErrorMessage.MessageTextRequired };
-    const item: CoworkPendingMessage = {
-      id: randomUUID(),
-      text: normalized,
-      delivery: CoworkQueueDelivery.FollowUp,
-      createdAt: Date.now(),
-      status: CoworkQueueItemStatus.Pending,
-    };
-    const items = this.acpPendingMessages.get(laneId) ?? [];
-    items.push(item);
-    this.acpPendingMessages.set(laneId, items);
-    this.emitPendingMessagesChanged(laneId);
-    return { success: true, item };
+    const result = this.pendingMessageQueue.enqueue(laneId, text);
+    if (result.success) this.emitPendingMessagesChanged(laneId);
+    return result;
   }
 
   updatePendingMessage(
@@ -61,39 +43,19 @@ export abstract class CodingRoomServiceBuiltinControlCommands extends CodingRoom
     itemId: string,
     text: string,
   ): { success: boolean; error?: string } {
-    const normalized = text.trim();
-    if (!normalized) return { success: false, error: CodingErrorMessage.MessageTextRequired };
-    const items = this.acpPendingMessages.get(laneId) ?? [];
-    const item = items.find(candidate => candidate.id === itemId);
-    if (!item) return { success: false, error: CodingErrorMessage.PendingMessageNotFound };
-    if (item.status === CoworkQueueItemStatus.Sending) {
-      return { success: false, error: CodingErrorMessage.PendingMessageEditWhileSending };
-    }
-    item.text = normalized;
-    item.status = CoworkQueueItemStatus.Pending;
-    delete item.error;
-    this.emitPendingMessagesChanged(laneId);
-    return { success: true };
+    const result = this.pendingMessageQueue.update(laneId, itemId, text);
+    if (result.success) this.emitPendingMessagesChanged(laneId);
+    return result;
   }
 
   deletePendingMessage(laneId: string, itemId: string): { success: boolean; error?: string } {
-    const items = this.acpPendingMessages.get(laneId) ?? [];
-    const next = items.filter(item => item.id !== itemId);
-    if (next.length === items.length)
-      return { success: false, error: CodingErrorMessage.PendingMessageNotFound };
-    if (next.length) this.acpPendingMessages.set(laneId, next);
-    else this.acpPendingMessages.delete(laneId);
-    this.emitPendingMessagesChanged(laneId);
-    return { success: true };
+    const result = this.pendingMessageQueue.delete(laneId, itemId);
+    if (result.success) this.emitPendingMessagesChanged(laneId);
+    return result;
   }
 
   protected failAcpPendingMessage(laneId: string, itemId: string, error: unknown): void {
-    const item = (this.acpPendingMessages.get(laneId) ?? []).find(
-      candidate => candidate.id === itemId,
-    );
-    if (!item) return;
-    item.status = CoworkQueueItemStatus.Failed;
-    item.error = this.errorMessage(error);
+    this.pendingMessageQueue.fail(laneId, itemId, error, message => this.errorMessage(message));
     this.emitPendingMessagesChanged(laneId);
   }
 
