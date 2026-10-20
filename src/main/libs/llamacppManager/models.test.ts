@@ -58,6 +58,28 @@ test('modelLaunchOptionsToPreset writes model startup parameters for models-pres
   });
 });
 
+test('modelLaunchOptionsToPreset writes n-cpu-moe only when set (dense models stay fit-enabled)', () => {
+  expect(modelLaunchOptionsToPreset({ ctxSize: 8192, gpuLayers: 'auto' })).toEqual({
+    'ctx-size': 8192,
+    'n-gpu-layers': 'auto',
+  });
+  // Writing n-cpu-moe intentionally disables llama.cpp --fit for this model.
+  expect(
+    modelLaunchOptionsToPreset({
+      ctxSize: 8192,
+      gpuLayers: 'auto',
+      nCpuMoe: 12,
+    }),
+  ).toEqual({
+    'ctx-size': 8192,
+    'n-gpu-layers': 'auto',
+    'n-cpu-moe': 12,
+  });
+  expect(modelLaunchOptionsToPreset({ nCpuMoe: 0 })).toEqual({
+    'n-cpu-moe': 0,
+  });
+});
+
 test('mergeLocalModels ignores router aliases and non-GGUF paths in the local file list', () => {
   const scannedModel = {
     name: 'qwen-local',

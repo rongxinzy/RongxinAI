@@ -363,6 +363,11 @@ export type LlamaCppCancelInstallResult = {
 export type LlamaCppModelPreference = {
   ctxSize?: number;
   maxTokens?: number;
+  /**
+   * Moves the expert tensors of the first N layers to CPU (`n-cpu-moe`).
+   * Unset keeps automatic VRAM fitting enabled.
+   */
+  nCpuMoe?: number;
   capabilities?: Partial<ModelCapabilities>;
   residency?: {
     mode: LlamaCppModelResidencyMode;
@@ -410,6 +415,8 @@ export type LlamaCppModelLaunchInput = {
     batchSize?: number;
     ubatchSize?: number;
     gpuLayers?: number | 'auto' | 'all';
+    /** Disables automatic VRAM fitting for this model (`n-cpu-moe`). */
+    nCpuMoe?: number;
     threads?: number;
     device?: string;
     mainGpu?: number;

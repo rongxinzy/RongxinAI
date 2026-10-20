@@ -13,6 +13,8 @@ import { getLocalInferenceUserFacingErrorMessage } from '../utils/errors';
 
 type ModelPreferenceInput = {
   ctxSize?: number;
+  /** Boxed so "edited and cleared" (undefined inside) differs from "not edited". */
+  nCpuMoe?: { value: number | undefined };
   residency?: NonNullable<LlamaCppModelPreferences[string]['residency']>;
 };
 
@@ -48,6 +50,11 @@ export function useModelPreferences(input: UseModelPreferencesInput): UseModelPr
       const nextPreference = {
         ...previousPreference,
         ...(input.ctxSize !== undefined ? { ctxSize: input.ctxSize } : {}),
+        ...(input.nCpuMoe
+          ? input.nCpuMoe.value !== undefined
+            ? { nCpuMoe: input.nCpuMoe.value }
+            : { nCpuMoe: undefined }
+          : {}),
         ...(input.residency ? { residency: input.residency } : {}),
       };
       setModelPreferences(current => ({

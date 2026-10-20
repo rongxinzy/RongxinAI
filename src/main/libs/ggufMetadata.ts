@@ -54,6 +54,20 @@ export function readGgufMetadataMap(filePath: string): Map<string, unknown> | un
   }
 }
 
+/** Layer count from `<general.architecture>.block_count`, if readable. */
+export function readGgufBlockCount(filePath: string): number | undefined {
+  const metadata = readGgufMetadataMap(filePath);
+  if (!metadata) return undefined;
+  for (const [key, value] of metadata.entries()) {
+    if (!key.endsWith('.block_count')) continue;
+    const parsed = typeof value === 'bigint' ? Number(value) : value;
+    return typeof parsed === 'number' && Number.isSafeInteger(parsed) && parsed >= 0
+      ? parsed
+      : undefined;
+  }
+  return undefined;
+}
+
 export function readGgufKvBytesPerToken(
   filePath: string,
   cacheTypeK?: string,
