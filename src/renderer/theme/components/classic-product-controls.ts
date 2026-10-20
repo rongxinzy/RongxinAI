@@ -64,28 +64,16 @@ export function classicProductControls(dark: boolean): ProductAppearances {
     // contrast on the tinted surface; dark tokens are already bright enough.
     'permission-danger-banner-destructive': recipe({
       base: {
-        'background-color': dark
-          ? 'color-mix(in oklab, var(--zy-destructive) 16%, transparent)'
-          : 'color-mix(in oklab, var(--zy-destructive) 8%, transparent)',
-        'border-color': dark
-          ? 'color-mix(in oklab, var(--zy-destructive) 40%, transparent)'
-          : 'color-mix(in oklab, var(--zy-destructive) 25%, transparent)',
-        color: dark
-          ? 'var(--zy-destructive)'
-          : 'color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black))',
+        'background-color': 'var(--zy-state-banner-destructive-bg)',
+        'border-color': 'var(--zy-state-banner-destructive-border)',
+        color: 'var(--zy-state-banner-destructive-text)',
       },
     }),
     'permission-danger-banner-warning': recipe({
       base: {
-        'background-color': dark
-          ? 'color-mix(in oklab, var(--zy-warning) 14%, transparent)'
-          : 'color-mix(in oklab, var(--zy-warning) 10%, transparent)',
-        'border-color': dark
-          ? 'color-mix(in oklab, var(--zy-warning) 35%, transparent)'
-          : 'color-mix(in oklab, var(--zy-warning) 30%, transparent)',
-        color: dark
-          ? 'var(--zy-warning)'
-          : 'color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black))',
+        'background-color': 'var(--zy-state-banner-warning-bg)',
+        'border-color': 'var(--zy-state-banner-warning-border)',
+        color: 'var(--zy-state-banner-warning-text)',
       },
     }),
   };

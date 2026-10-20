@@ -280,6 +280,32 @@
   --zy-gray-11: #0F172A;
   --zy-ring: #3B82F6;
   --zy-radius: 12px;
+  --zy-state-destructive-tint-percent: 10%;
+  --zy-state-destructive-border: var(--destructive);
+  --zy-state-destructive-focus-ring: 20%;
+  --zy-state-destructive-hover-tint-percent: 20%;
+  --zy-state-primary-border-tint-percent: 30%;
+  --zy-state-primary-fill-tint-percent: 5%;
+  --zy-state-input-tint-percent: 50%;
+  --zy-state-input-disabled-tint-percent: 50%;
+  --zy-state-input-solid: var(--zy-surface);
+  --zy-state-input-hover: var(--muted);
+  --zy-state-muted-hover: var(--muted);
+  --zy-state-avatar-blend: darken;
+  --zy-state-input-border: var(--border);
+  --zy-state-tab-selected-border: var(--input);
+  --zy-state-input-field: transparent;
+  --zy-state-banner-destructive-bg: color-mix(in oklab, var(--zy-destructive) 8%, transparent);
+  --zy-state-banner-destructive-border: color-mix(in oklab, var(--zy-destructive) 25%, transparent);
+  --zy-state-banner-destructive-text: color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black));
+  --zy-state-banner-warning-bg: color-mix(in oklab, var(--zy-warning) 10%, transparent);
+  --zy-state-banner-warning-border: color-mix(in oklab, var(--zy-warning) 30%, transparent);
+  --zy-state-banner-warning-text: color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black));
+  --zy-state-login-hover-tint: color-mix(in oklab, var(--zy-component-palette-black) 3%, transparent);
+  --zy-state-muted-tab-text: color-mix(in oklab, var(--foreground) 60%, transparent);
+  --zy-state-page-pill-bg: transparent;
+  --zy-state-page-pill-hover: var(--muted);
+  --zy-state-session-tint: color-mix(in oklab, var(--zy-component-palette-black) 4%, transparent);
 }
 @layer components {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-logo-loading-mark) {
@@ -370,7 +396,7 @@
   border-style: solid;
   border-color: var(--input);
   outline-style: none;
-  background-color: transparent;
+  background-color: var(--zy-state-input-field);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-radio-indicator) {
   width: 1rem;
@@ -769,7 +795,7 @@
   height: 0.75rem;
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-avatar)::after {
-  mix-blend-mode: darken;
+  mix-blend-mode: var(--zy-state-avatar-blend);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-avatar-badge) {
   background-blend-mode: color;
@@ -860,8 +886,8 @@
   height: 1rem;
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-field-label:has([data-checked])) {
-  border-color: color-mix(in oklab, var(--primary) 30%, transparent);
-  background-color: color-mix(in oklab, var(--primary) 5%, transparent);
+  border-color: color-mix(in oklab, var(--primary) var(--zy-state-primary-border-tint-percent), transparent);
+  background-color: color-mix(in oklab, var(--primary) var(--zy-state-primary-fill-tint-percent), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where([data-slot="sidebar-wrapper"]:has([data-variant="inset"])) {
   background-color: var(--sidebar);
@@ -1316,7 +1342,7 @@
   border-style: solid;
   border-color: var(--input);
   outline-style: none;
-  background-color: transparent;
+  background-color: var(--zy-state-input-field);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.group\/field:has(:disabled) .theme-check) {
   opacity: 0.5;
@@ -1392,8 +1418,8 @@
   color: var(--primary-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button-outline) {
-  border-color: var(--border);
-  background-color: var(--background);
+  border-color: var(--zy-state-input-border);
+  background-color: var(--zy-state-input-solid);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button-secondary) {
   background-color: var(--secondary);
@@ -1415,7 +1441,7 @@
   color: var(--muted-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button-destructive) {
-  background-color: color-mix(in oklab, var(--destructive) 10%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button-link) {
@@ -1491,7 +1517,7 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--input);
-  background-color: var(--zy-surface);
+  background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -1565,7 +1591,7 @@
   color: var(--secondary-foreground);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-badge-destructive) {
-  background-color: color-mix(in oklab, var(--destructive) 10%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-badge-outline) {
@@ -1708,7 +1734,7 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--input);
-  background-color: transparent;
+  background-color: var(--zy-state-input-field);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -2134,7 +2160,7 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--input);
-  background-color: var(--zy-surface);
+  background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -2150,7 +2176,7 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--input);
-  background-color: var(--zy-surface);
+  background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -3535,9 +3561,11 @@
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-page-conversation-button-variant-1) {
   border-radius: 9999px;
+  background-color: var(--zy-state-page-pill-bg);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-page-conversation-button-variant-2) {
   border-radius: 9999px;
+  background-color: var(--zy-state-page-pill-bg);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-page-prompt-input-select-trigger-variant-1) {
   border-style: none;
@@ -4045,7 +4073,7 @@
   border-radius: var(--zy-style-radius-lg);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-surface-session-selected) {
-  background-color: color-mix(in oklab, var(--zy-component-palette-black) 4%, transparent);
+  background-color: var(--zy-state-session-tint);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-surface-image-overlay) {
   background-color: color-mix(in oklab, var(--zy-component-palette-neutral-950) 70%, transparent);
@@ -4196,14 +4224,14 @@
   padding: 0.75rem;
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-permission-danger-banner-destructive) {
-  background-color: color-mix(in oklab, var(--zy-destructive) 8%, transparent);
-  border-color: color-mix(in oklab, var(--zy-destructive) 25%, transparent);
-  color: color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black));
+  background-color: var(--zy-state-banner-destructive-bg);
+  border-color: var(--zy-state-banner-destructive-border);
+  color: var(--zy-state-banner-destructive-text);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-permission-danger-banner-warning) {
-  background-color: color-mix(in oklab, var(--zy-warning) 10%, transparent);
-  border-color: color-mix(in oklab, var(--zy-warning) 30%, transparent);
-  color: color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black));
+  background-color: var(--zy-state-banner-warning-bg);
+  border-color: var(--zy-state-banner-warning-border);
+  color: var(--zy-state-banner-warning-text);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-local-context-modal) {
   border-width: 1px;
@@ -4589,7 +4617,7 @@
   padding-block: 0.125rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-medium);
-  color: color-mix(in oklab, var(--foreground) 60%, transparent);
+  color: var(--zy-state-muted-tab-text);
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-tabs-list-line .theme-tabs-trigger) {
@@ -5087,7 +5115,7 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button-outline):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  background-color: var(--zy-state-input-hover);
   color: var(--foreground);
 }
 }
@@ -5098,7 +5126,7 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button-ghost):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  background-color: var(--zy-state-muted-hover);
   color: var(--foreground);
 }
 }
@@ -5122,7 +5150,7 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button-destructive):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--destructive) 20%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-hover-tint-percent), transparent);
 }
 }
 @media (hover: hover) {
@@ -5138,6 +5166,7 @@
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-select-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   border-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  background-color: var(--zy-state-input-hover);
 }
 }
 @media (hover: hover) {
@@ -5148,7 +5177,7 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-badge-ghost):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  background-color: var(--zy-state-muted-hover);
   color: var(--muted-foreground);
 }
 }
@@ -5202,7 +5231,7 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-menu-item[data-variant="destructive"]):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--destructive) 10%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 }
@@ -5321,7 +5350,7 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-page-login-button-button-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-palette-black) 3%, transparent);
+  background-color: var(--zy-state-login-hover-tint);
 }
 }
 @media (hover: hover) {
@@ -5708,6 +5737,16 @@
 }
 }
 @media (hover: hover) {
+:where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-page-conversation-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--zy-state-page-pill-hover);
+}
+}
+@media (hover: hover) {
+:where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-page-conversation-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--zy-state-page-pill-hover);
+}
+}
+@media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-page-prompt-input-select-trigger-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   background-color: var(--zy-accent);
   color: var(--zy-foreground);
@@ -5806,7 +5845,7 @@
 }
 @media (hover: hover) {
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-surface-session-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-palette-black) 4%, transparent);
+  background-color: var(--zy-state-session-tint);
 }
 }
 @media (hover: hover) {
@@ -6140,8 +6179,9 @@
   outline-offset: 2px;
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-tabs-trigger):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: var(--background);
+  background-color: var(--zy-state-input-field);
   color: var(--foreground);
+  border-color: var(--zy-state-input-border);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-tabs-list-default .theme-tabs-trigger):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   box-shadow: var(--zy-style-shadow-sm);
@@ -6149,6 +6189,7 @@
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-tabs-list-line .theme-tabs-trigger):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   background-color: transparent;
   box-shadow: none;
+  border-color: var(--zy-state-tab-selected-border);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-tabs-list-line .theme-tabs-trigger):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"]))::after {
   opacity: 1;
@@ -6365,7 +6406,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button-destructive):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   border-color: color-mix(in oklab, var(--destructive) 40%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-select-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   border-color: var(--ring);
@@ -6380,7 +6421,7 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-badge-destructive):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-card:is([role="button"], a[href], button)):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   outline-width: 2px;
@@ -6397,7 +6438,7 @@
   color: var(--foreground);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-menu-item[data-variant="destructive"]):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  background-color: color-mix(in oklab, var(--destructive) 10%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-shortcut-recording):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -6535,48 +6576,48 @@
   outline-offset: -2px;
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-radio):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-radio[aria-checked="true"]):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--primary);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-toggle):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-field):where(:is([aria-invalid="true"], [data-invalid])) {
   color: var(--destructive);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-switch):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-check):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-check[data-checked]):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--primary);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-button):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-select-trigger):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
+  border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-badge):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-input):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
+  border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-textarea):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
+  border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-input-embedded):where(:is([aria-invalid="true"], [data-invalid])) {
@@ -6632,11 +6673,11 @@
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-input):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
   opacity: 0.5;
-  background-color: color-mix(in oklab, var(--input) 50%, transparent);
+  background-color: color-mix(in oklab, var(--input) var(--zy-state-input-disabled-tint-percent), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-textarea):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
   opacity: 0.5;
-  background-color: color-mix(in oklab, var(--input) 50%, transparent);
+  background-color: color-mix(in oklab, var(--input) var(--zy-state-input-disabled-tint-percent), transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-input-embedded):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
   background-color: transparent;
@@ -6792,7 +6833,7 @@
   box-shadow: none;
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-input-group):where(:has([data-slot][aria-invalid="true"])) {
-  border-color: var(--destructive);
+  border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-part-session-expert-picker-command-1 [data-slot="input-group"]):where(:has([data-slot][aria-invalid="true"])) {
@@ -6803,7 +6844,7 @@
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-input-group):where(:has([data-slot="input-group-control"]:disabled)) {
   opacity: 0.5;
-  background-color: color-mix(in oklab, var(--input) 50%, transparent);
+  background-color: color-mix(in oklab, var(--input) var(--zy-state-input-disabled-tint-percent), transparent);
   border-color: var(--input);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-select-item):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):is([data-highlighted], [data-selected="true"])) {
@@ -6815,7 +6856,7 @@
   color: var(--foreground);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-menu-item[data-variant="destructive"]):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):is([data-highlighted], [data-selected="true"])) {
-  background-color: color-mix(in oklab, var(--destructive) 10%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 :where(:root:not([data-theme]), [data-theme="zenith-light"]) :where(.theme-send-shortcut-option):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):is([data-highlighted], [data-selected="true"])) {
@@ -8240,6 +8281,32 @@ to {
   --zy-gray-11: #FFFFFF;
   --zy-ring: #60A5FA;
   --zy-radius: 12px;
+  --zy-state-destructive-tint-percent: 20%;
+  --zy-state-destructive-border: color-mix(in oklab, var(--destructive) 50%, transparent);
+  --zy-state-destructive-focus-ring: 40%;
+  --zy-state-destructive-hover-tint-percent: 30%;
+  --zy-state-primary-border-tint-percent: 20%;
+  --zy-state-primary-fill-tint-percent: 10%;
+  --zy-state-input-tint-percent: 30%;
+  --zy-state-input-disabled-tint-percent: 80%;
+  --zy-state-input-solid: color-mix(in oklab, var(--input) 30%, transparent);
+  --zy-state-input-hover: color-mix(in oklab, var(--input) 50%, transparent);
+  --zy-state-muted-hover: color-mix(in oklab, var(--muted) 50%, transparent);
+  --zy-state-avatar-blend: lighten;
+  --zy-state-input-border: var(--input);
+  --zy-state-tab-selected-border: transparent;
+  --zy-state-input-field: color-mix(in oklab, var(--input) 30%, transparent);
+  --zy-state-banner-destructive-bg: color-mix(in oklab, var(--zy-destructive) 16%, transparent);
+  --zy-state-banner-destructive-border: color-mix(in oklab, var(--zy-destructive) 40%, transparent);
+  --zy-state-banner-destructive-text: var(--zy-destructive);
+  --zy-state-banner-warning-bg: color-mix(in oklab, var(--zy-warning) 14%, transparent);
+  --zy-state-banner-warning-border: color-mix(in oklab, var(--zy-warning) 35%, transparent);
+  --zy-state-banner-warning-text: var(--zy-warning);
+  --zy-state-login-hover-tint: color-mix(in oklab, var(--zy-component-palette-white) 4%, transparent);
+  --zy-state-muted-tab-text: var(--muted-foreground);
+  --zy-state-page-pill-bg: var(--zy-background);
+  --zy-state-page-pill-hover: var(--muted);
+  --zy-state-session-tint: color-mix(in oklab, var(--zy-component-palette-white) 5%, transparent);
 }
 @layer components {
 [data-theme="zenith-dark"] :where(.theme-logo-loading-mark) {
@@ -8330,7 +8397,7 @@ to {
   border-style: solid;
   border-color: var(--input);
   outline-style: none;
-  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  background-color: var(--zy-state-input-field);
 }
 [data-theme="zenith-dark"] :where(.theme-radio-indicator) {
   width: 1rem;
@@ -8729,7 +8796,7 @@ to {
   height: 0.75rem;
 }
 [data-theme="zenith-dark"] :where(.theme-avatar)::after {
-  mix-blend-mode: lighten;
+  mix-blend-mode: var(--zy-state-avatar-blend);
 }
 [data-theme="zenith-dark"] :where(.theme-avatar-badge) {
   background-blend-mode: color;
@@ -8820,8 +8887,8 @@ to {
   height: 1rem;
 }
 [data-theme="zenith-dark"] :where(.theme-field-label:has([data-checked])) {
-  border-color: color-mix(in oklab, var(--primary) 20%, transparent);
-  background-color: color-mix(in oklab, var(--primary) 10%, transparent);
+  border-color: color-mix(in oklab, var(--primary) var(--zy-state-primary-border-tint-percent), transparent);
+  background-color: color-mix(in oklab, var(--primary) var(--zy-state-primary-fill-tint-percent), transparent);
 }
 [data-theme="zenith-dark"] :where([data-slot="sidebar-wrapper"]:has([data-variant="inset"])) {
   background-color: var(--sidebar);
@@ -9276,7 +9343,7 @@ to {
   border-style: solid;
   border-color: var(--input);
   outline-style: none;
-  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  background-color: var(--zy-state-input-field);
 }
 [data-theme="zenith-dark"] :where(.group\/field:has(:disabled) .theme-check) {
   opacity: 0.5;
@@ -9352,8 +9419,8 @@ to {
   color: var(--primary-foreground);
 }
 [data-theme="zenith-dark"] :where(.theme-button-outline) {
-  border-color: var(--input);
-  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  border-color: var(--zy-state-input-border);
+  background-color: var(--zy-state-input-solid);
 }
 [data-theme="zenith-dark"] :where(.theme-button-secondary) {
   background-color: var(--secondary);
@@ -9375,7 +9442,7 @@ to {
   color: var(--muted-foreground);
 }
 [data-theme="zenith-dark"] :where(.theme-button-destructive) {
-  background-color: color-mix(in oklab, var(--destructive) 20%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 [data-theme="zenith-dark"] :where(.theme-button-link) {
@@ -9451,7 +9518,7 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--input);
-  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -9525,7 +9592,7 @@ to {
   color: var(--secondary-foreground);
 }
 [data-theme="zenith-dark"] :where(.theme-badge-destructive) {
-  background-color: color-mix(in oklab, var(--destructive) 20%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 [data-theme="zenith-dark"] :where(.theme-badge-outline) {
@@ -9668,7 +9735,7 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--input);
-  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  background-color: var(--zy-state-input-field);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -10094,7 +10161,7 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--input);
-  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -10110,7 +10177,7 @@ to {
   border-width: 1px;
   border-style: solid;
   border-color: var(--input);
-  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
   transition-duration: 150ms;
@@ -11495,11 +11562,11 @@ to {
 }
 [data-theme="zenith-dark"] :where(.theme-page-conversation-button-variant-1) {
   border-radius: 9999px;
-  background-color: var(--zy-background);
+  background-color: var(--zy-state-page-pill-bg);
 }
 [data-theme="zenith-dark"] :where(.theme-page-conversation-button-variant-2) {
   border-radius: 9999px;
-  background-color: var(--zy-background);
+  background-color: var(--zy-state-page-pill-bg);
 }
 [data-theme="zenith-dark"] :where(.theme-page-prompt-input-select-trigger-variant-1) {
   border-style: none;
@@ -12007,7 +12074,7 @@ to {
   border-radius: var(--zy-style-radius-lg);
 }
 [data-theme="zenith-dark"] :where(.theme-surface-session-selected) {
-  background-color: color-mix(in oklab, var(--zy-component-palette-white) 5%, transparent);
+  background-color: var(--zy-state-session-tint);
 }
 [data-theme="zenith-dark"] :where(.theme-surface-image-overlay) {
   background-color: color-mix(in oklab, var(--zy-component-palette-neutral-950) 70%, transparent);
@@ -12158,14 +12225,14 @@ to {
   padding: 0.75rem;
 }
 [data-theme="zenith-dark"] :where(.theme-permission-danger-banner-destructive) {
-  background-color: color-mix(in oklab, var(--zy-destructive) 16%, transparent);
-  border-color: color-mix(in oklab, var(--zy-destructive) 40%, transparent);
-  color: var(--zy-destructive);
+  background-color: var(--zy-state-banner-destructive-bg);
+  border-color: var(--zy-state-banner-destructive-border);
+  color: var(--zy-state-banner-destructive-text);
 }
 [data-theme="zenith-dark"] :where(.theme-permission-danger-banner-warning) {
-  background-color: color-mix(in oklab, var(--zy-warning) 14%, transparent);
-  border-color: color-mix(in oklab, var(--zy-warning) 35%, transparent);
-  color: var(--zy-warning);
+  background-color: var(--zy-state-banner-warning-bg);
+  border-color: var(--zy-state-banner-warning-border);
+  color: var(--zy-state-banner-warning-text);
 }
 [data-theme="zenith-dark"] :where(.theme-local-context-modal) {
   border-width: 1px;
@@ -12551,7 +12618,7 @@ to {
   padding-block: 0.125rem;
   font-size: var(--zy-component-text-sm);
   font-weight: var(--zy-component-font-weight-medium);
-  color: var(--muted-foreground);
+  color: var(--zy-state-muted-tab-text);
   line-height: var(--zy-component-text-sm--line-height);
 }
 [data-theme="zenith-dark"] :where(.theme-tabs-list-line .theme-tabs-trigger) {
@@ -13049,7 +13116,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-button-outline):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--input) 50%, transparent);
+  background-color: var(--zy-state-input-hover);
   color: var(--foreground);
 }
 }
@@ -13060,7 +13127,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-button-ghost):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--muted) 50%, transparent);
+  background-color: var(--zy-state-muted-hover);
   color: var(--foreground);
 }
 }
@@ -13084,7 +13151,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-button-destructive):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--destructive) 30%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-hover-tint-percent), transparent);
 }
 }
 @media (hover: hover) {
@@ -13100,7 +13167,7 @@ to {
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-select-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   border-color: color-mix(in oklab, var(--ring) 50%, transparent);
-  background-color: color-mix(in oklab, var(--input) 50%, transparent);
+  background-color: var(--zy-state-input-hover);
 }
 }
 @media (hover: hover) {
@@ -13111,7 +13178,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-badge-ghost):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--muted) 50%, transparent);
+  background-color: var(--zy-state-muted-hover);
   color: var(--muted-foreground);
 }
 }
@@ -13165,7 +13232,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-menu-item[data-variant="destructive"]):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--destructive) 20%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 }
@@ -13284,7 +13351,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-page-login-button-button-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-palette-white) 4%, transparent);
+  background-color: var(--zy-state-login-hover-tint);
 }
 }
 @media (hover: hover) {
@@ -13672,12 +13739,12 @@ to {
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-page-conversation-button-variant-1):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  background-color: var(--zy-state-page-pill-hover);
 }
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-page-conversation-button-variant-2):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: var(--muted);
+  background-color: var(--zy-state-page-pill-hover);
 }
 }
 @media (hover: hover) {
@@ -13779,7 +13846,7 @@ to {
 }
 @media (hover: hover) {
 [data-theme="zenith-dark"] :where(.theme-surface-session-idle):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  background-color: color-mix(in oklab, var(--zy-component-palette-white) 5%, transparent);
+  background-color: var(--zy-state-session-tint);
 }
 }
 @media (hover: hover) {
@@ -14113,9 +14180,9 @@ to {
   outline-offset: 2px;
 }
 [data-theme="zenith-dark"] :where(.theme-tabs-trigger):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
-  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  background-color: var(--zy-state-input-field);
   color: var(--foreground);
-  border-color: var(--input);
+  border-color: var(--zy-state-input-border);
 }
 [data-theme="zenith-dark"] :where(.theme-tabs-list-default .theme-tabs-trigger):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   box-shadow: var(--zy-style-shadow-sm);
@@ -14123,7 +14190,7 @@ to {
 [data-theme="zenith-dark"] :where(.theme-tabs-list-line .theme-tabs-trigger):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"])) {
   background-color: transparent;
   box-shadow: none;
-  border-color: transparent;
+  border-color: var(--zy-state-tab-selected-border);
 }
 [data-theme="zenith-dark"] :where(.theme-tabs-list-line .theme-tabs-trigger):where(:is([aria-selected="true"], [aria-pressed="true"], [data-selected=""], [data-selected="true"], [data-active=""], [data-active="true"], [data-state="selected"]))::after {
   opacity: 1;
@@ -14340,7 +14407,7 @@ to {
 }
 [data-theme="zenith-dark"] :where(.theme-button-destructive):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   border-color: color-mix(in oklab, var(--destructive) 40%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 40%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-select-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   border-color: var(--ring);
@@ -14355,7 +14422,7 @@ to {
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-badge-destructive):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 40%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-card:is([role="button"], a[href], button)):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   outline-width: 2px;
@@ -14372,7 +14439,7 @@ to {
   color: var(--foreground);
 }
 [data-theme="zenith-dark"] :where(.theme-menu-item[data-variant="destructive"]):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  background-color: color-mix(in oklab, var(--destructive) 20%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 [data-theme="zenith-dark"] :where(.theme-shortcut-recording):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
@@ -14510,48 +14577,48 @@ to {
   outline-offset: -2px;
 }
 [data-theme="zenith-dark"] :where(.theme-radio):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: color-mix(in oklab, var(--destructive) 50%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 40%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-radio[aria-checked="true"]):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--primary);
 }
 [data-theme="zenith-dark"] :where(.theme-toggle):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 40%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-field):where(:is([aria-invalid="true"], [data-invalid])) {
   color: var(--destructive);
 }
 [data-theme="zenith-dark"] :where(.theme-switch):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: color-mix(in oklab, var(--destructive) 50%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 40%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-check):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: color-mix(in oklab, var(--destructive) 50%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 40%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-check[data-checked]):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--primary);
 }
 [data-theme="zenith-dark"] :where(.theme-button):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: color-mix(in oklab, var(--destructive) 50%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 40%, transparent);
+  border-color: var(--zy-state-destructive-border);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-select-trigger):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: color-mix(in oklab, var(--destructive) 50%, transparent);
+  border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-badge):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--destructive);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) 40%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-input):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: color-mix(in oklab, var(--destructive) 50%, transparent);
+  border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-textarea):where(:is([aria-invalid="true"], [data-invalid])) {
-  border-color: color-mix(in oklab, var(--destructive) 50%, transparent);
+  border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-input-embedded):where(:is([aria-invalid="true"], [data-invalid])) {
@@ -14607,11 +14674,11 @@ to {
 }
 [data-theme="zenith-dark"] :where(.theme-input):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
   opacity: 0.5;
-  background-color: color-mix(in oklab, var(--input) 80%, transparent);
+  background-color: color-mix(in oklab, var(--input) var(--zy-state-input-disabled-tint-percent), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-textarea):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
   opacity: 0.5;
-  background-color: color-mix(in oklab, var(--input) 80%, transparent);
+  background-color: color-mix(in oklab, var(--input) var(--zy-state-input-disabled-tint-percent), transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-input-embedded):where(:is(:disabled, [aria-disabled="true"], [data-disabled=""], [data-disabled="true"])) {
   background-color: transparent;
@@ -14767,7 +14834,7 @@ to {
   box-shadow: none;
 }
 [data-theme="zenith-dark"] :where(.theme-input-group):where(:has([data-slot][aria-invalid="true"])) {
-  border-color: color-mix(in oklab, var(--destructive) 50%, transparent);
+  border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent);
 }
 [data-theme="zenith-dark"] :where(.theme-part-session-expert-picker-command-1 [data-slot="input-group"]):where(:has([data-slot][aria-invalid="true"])) {
@@ -14778,7 +14845,7 @@ to {
 }
 [data-theme="zenith-dark"] :where(.theme-input-group):where(:has([data-slot="input-group-control"]:disabled)) {
   opacity: 0.5;
-  background-color: color-mix(in oklab, var(--input) 80%, transparent);
+  background-color: color-mix(in oklab, var(--input) var(--zy-state-input-disabled-tint-percent), transparent);
   border-color: var(--input);
 }
 [data-theme="zenith-dark"] :where(.theme-select-item):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):is([data-highlighted], [data-selected="true"])) {
@@ -14790,7 +14857,7 @@ to {
   color: var(--foreground);
 }
 [data-theme="zenith-dark"] :where(.theme-menu-item[data-variant="destructive"]):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):is([data-highlighted], [data-selected="true"])) {
-  background-color: color-mix(in oklab, var(--destructive) 20%, transparent);
+  background-color: color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent);
   color: var(--destructive);
 }
 [data-theme="zenith-dark"] :where(.theme-send-shortcut-option):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):is([data-highlighted], [data-selected="true"])) {

@@ -7,7 +7,7 @@ type MenuAppearances = Pick<
 export function classicMenu(dark: boolean): MenuAppearances {
   const highlight = { 'background-color': 'var(--muted)', color: 'var(--foreground)' };
   const danger = {
-    'background-color': `color-mix(in oklab, var(--destructive) ${dark ? 20 : 10}%, transparent)`,
+    'background-color': `color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent)`,
     color: 'var(--destructive)',
   };
   return {

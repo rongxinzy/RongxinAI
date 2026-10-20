@@ -26,7 +26,7 @@ export function classicBadges(dark: boolean): BadgeAppearances {
       focus: { 'border-color': 'var(--ring)', 'box-shadow': `0 0 0 3px ${mix('ring', 50)}` },
       invalid: {
         'border-color': 'var(--destructive)',
-        'box-shadow': `0 0 0 3px ${mix('destructive', dark ? 40 : 20)}`,
+        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent)`,
       },
       disabled: { opacity: '0.5' },
     }),
@@ -37,15 +37,20 @@ export function classicBadges(dark: boolean): BadgeAppearances {
       base: { 'background-color': 'var(--secondary)', color: 'var(--secondary-foreground)' },
     }),
     'badge-destructive': recipe({
-      base: { 'background-color': mix('destructive', dark ? 20 : 10), color: 'var(--destructive)' },
-      focus: { 'box-shadow': `0 0 0 3px ${mix('destructive', dark ? 40 : 20)}` },
+      base: {
+        'background-color': `color-mix(in oklab, var(--destructive) var(--zy-state-destructive-tint-percent), transparent)`,
+        color: 'var(--destructive)',
+      },
+      focus: {
+        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent)`,
+      },
     }),
     'badge-outline': recipe({
       base: { 'border-color': 'var(--border)', color: 'var(--foreground)' },
     }),
     'badge-ghost': recipe({
       hover: {
-        'background-color': dark ? mix('muted', 50) : 'var(--muted)',
+        'background-color': 'var(--zy-state-muted-hover)',
         color: 'var(--muted-foreground)',
       },
     }),

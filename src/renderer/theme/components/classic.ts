@@ -49,9 +49,7 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
       'border-width': '1px',
       'border-style': 'solid',
       'border-color': 'var(--input)',
-      'background-color': dark
-        ? 'color-mix(in oklab, var(--input) 30%, transparent)'
-        : 'var(--zy-surface)',
+      'background-color': 'var(--zy-state-input-solid)',
       'outline-style': 'none',
       'transition-property': 'color, background-color, border-color, box-shadow',
       'transition-duration': '150ms',
@@ -66,14 +64,12 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
       'box-shadow': '0 0 0 1px color-mix(in oklab, var(--ring) 40%, transparent)',
     },
     invalid: {
-      'border-color': dark
-        ? 'color-mix(in oklab, var(--destructive) 50%, transparent)'
-        : 'var(--destructive)',
+      'border-color': 'var(--zy-state-destructive-border)',
       'box-shadow': '0 0 0 1px color-mix(in oklab, var(--destructive) 40%, transparent)',
     },
     disabled: {
       opacity: '0.5',
-      'background-color': `color-mix(in oklab, var(--input) ${dark ? 80 : 50}%, transparent)`,
+      'background-color': `color-mix(in oklab, var(--input) var(--zy-state-input-disabled-tint-percent), transparent)`,
     },
     placeholder: { color: 'var(--muted-foreground)' },
     highlighted: {},
@@ -103,9 +99,7 @@ export function classicComponentAppearances(dark: boolean): ComponentAppearances
     'input-group': recipe({
       base: {
         ...field.base,
-        'background-color': dark
-          ? 'color-mix(in oklab, var(--input) 30%, transparent)'
-          : 'transparent',
+        'background-color': 'var(--zy-state-input-field)',
         height: '2rem',
       },
       hover: field.hover,

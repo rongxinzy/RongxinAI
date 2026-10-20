@@ -102,7 +102,7 @@ export function classicMisc(dark: boolean) {
     'avatar-count-icon-lg': recipe({ base: { width: '1.25rem', height: '1.25rem' } }),
     'avatar-count-sm': recipe({ base: { width: '1.5rem', height: '1.5rem' } }),
     'avatar-count-icon-sm': recipe({ base: { width: '0.75rem', height: '0.75rem' } }),
-    'avatar-outline-blend': recipe({ base: { 'mix-blend-mode': dark ? 'lighten' : 'darken' } }),
+    'avatar-outline-blend': recipe({ base: { 'mix-blend-mode': 'var(--zy-state-avatar-blend)' } }),
     'avatar-badge-blend': recipe({ base: { 'background-blend-mode': 'color' } }),
     spinner: recipe({
       base: {

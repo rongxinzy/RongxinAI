@@ -70,7 +70,38 @@ export const zenithLight: ThemeDefinition = {
 
     // ── Border Radius (Larger, modern) ──
     radius: '12px',
+    // Appearance-conditioned component values (work package N) — light
+    'state-destructive-tint-percent': '10%',
+    'state-destructive-border': 'var(--destructive)',
+    'state-destructive-focus-ring': '20%',
+    'state-destructive-hover-tint-percent': '20%',
+    'state-primary-border-tint-percent': '30%',
+    'state-primary-fill-tint-percent': '5%',
+    'state-input-tint-percent': '50%',
+    'state-input-disabled-tint-percent': '50%',
+    'state-input-solid': 'var(--zy-surface)',
+    'state-input-hover': 'var(--muted)',
+    'state-muted-hover': 'var(--muted)',
+    'state-avatar-blend': 'darken',
+    'state-input-border': 'var(--border)',
+    'state-tab-selected-border': 'var(--input)',
+    'state-input-field': 'transparent',
+    'state-banner-destructive-bg': 'color-mix(in oklab, var(--zy-destructive) 8%, transparent)',
+    'state-banner-destructive-border':
+      'color-mix(in oklab, var(--zy-destructive) 25%, transparent)',
+    'state-banner-destructive-text':
+      'color-mix(in oklab, var(--zy-destructive) 70%, var(--zy-component-palette-black))',
+    'state-banner-warning-bg': 'color-mix(in oklab, var(--zy-warning) 10%, transparent)',
+    'state-banner-warning-border': 'color-mix(in oklab, var(--zy-warning) 30%, transparent)',
+    'state-banner-warning-text':
+      'color-mix(in oklab, var(--zy-warning) 60%, var(--zy-component-palette-black))',
     'style-radius-sm': '8px',
+    'state-login-hover-tint':
+      'color-mix(in oklab, var(--zy-component-palette-black) 3%, transparent)',
+    'state-muted-tab-text': 'color-mix(in oklab, var(--foreground) 60%, transparent)',
+    'state-page-pill-bg': 'transparent',
+    'state-page-pill-hover': 'var(--muted)',
+    'state-session-tint': 'color-mix(in oklab, var(--zy-component-palette-black) 4%, transparent)',
     'style-radius-md': '12px',
     'style-radius-lg': '16px',
     'style-radius-xl': '20px',

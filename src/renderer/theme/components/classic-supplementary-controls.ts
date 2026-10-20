@@ -31,10 +31,8 @@ export function classicSupplementaryControls(dark: boolean) {
       },
       focus,
       invalid: {
-        'border-color': dark
-          ? 'color-mix(in oklab, var(--destructive) 50%, transparent)'
-          : 'var(--destructive)',
-        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) ${dark ? 40 : 20}%, transparent)`,
+        'border-color': 'var(--zy-state-destructive-border)',
+        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent)`,
       },
       disabled: { opacity: '0.5' },
     }),
@@ -134,9 +132,7 @@ export function classicSupplementaryControls(dark: boolean) {
         'border-style': 'solid',
         'border-color': 'var(--input)',
         'outline-style': 'none',
-        'background-color': dark
-          ? 'color-mix(in oklab, var(--input) 30%, transparent)'
-          : 'transparent',
+        'background-color': 'var(--zy-state-input-field)',
       },
       focus,
       checked: {
@@ -145,10 +141,8 @@ export function classicSupplementaryControls(dark: boolean) {
         color: 'var(--primary-foreground)',
       },
       invalid: {
-        'border-color': dark
-          ? 'color-mix(in oklab, var(--destructive) 50%, transparent)'
-          : 'var(--destructive)',
-        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) ${dark ? 40 : 20}%, transparent)`,
+        'border-color': 'var(--zy-state-destructive-border)',
+        'box-shadow': `0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent)`,
       },
       disabled: { opacity: '0.5' },
     }),
