@@ -405,6 +405,137 @@ it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
 );
 
 it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
+  'reports legacy none placeholder keys as keyless after provider/key lookup',
+  async () => {
+    const { createServer } = await import('node:http');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-provider-legacy-none-'));
+    const upstream = createServer((req, res) => {
+      res.setHeader('content-type', 'application/json');
+      if (req.url === '/v1/models') {
+        res.end(JSON.stringify({ data: [{ id: 'fixture-none-model', object: 'model' }] }));
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
+    });
+    await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
+    const address = upstream.address() as { port: number };
+    const manager = new MagpieManager({
+      resourcesRoot: path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie'),
+      privateHome: path.join(root, 'service'),
+      environment: { HOME: root, USERPROFILE: root, PATH: process.env.PATH, TEMP: root, TMP: root },
+      parseCatalog: async bytes =>
+        projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
+      verify: (dir, signal) =>
+        verifyMagpieBinary(dir, signal, async file => {
+          const hash = createHash('sha256');
+          for await (const chunk of createReadStream(file)) hash.update(chunk);
+          return hash.digest('hex');
+        }),
+    });
+    try {
+      expect((await manager.start()).state).toBe('running');
+      const connection = manager.managementConnection();
+      const saveResponse = await fetch(`${connection.url}/api/provider/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: `${connection.cookieName}=${connection.key}`,
+        },
+        body: JSON.stringify({
+          id: 'legacy-none-fixture',
+          from: 'legacy-none-fixture',
+          name: 'Legacy none fixture',
+          chat: `http://127.0.0.1:${address.port}/v1`,
+          responses: '',
+          anthropic: '',
+          key: 'none',
+          models: ['fixture-none-model'],
+          noModels: false,
+          fallback: [],
+          proxy: 'direct',
+          unredacted: true,
+          off: false,
+          headers: {},
+          extraBody: {},
+          new: true,
+        }),
+      });
+      expect(saveResponse.ok).toBe(true);
+      const provider = (await manager.providers()).find(p => p.id === 'legacy-none-fixture');
+      expect(provider?.hasKey).toBe(false);
+      expect(provider?.keyMasked).toBeUndefined();
+    } finally {
+      await manager.stop();
+      await new Promise<void>(resolve => upstream.close(() => resolve()));
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  60_000,
+);
+
+it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
+  'testProvider uses the stored key when the key field is blank',
+  async () => {
+    const { createServer } = await import('node:http');
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-magpie-provider-testconn-'));
+    const dummyKey = 'sk-zhiyuan-fixture-testconn01';
+    let sawStoredKey = false;
+    const upstream = createServer((req, res) => {
+      res.setHeader('content-type', 'application/json');
+      if (req.url === '/v1/models') {
+        if (req.headers.authorization === `Bearer ${dummyKey}`) sawStoredKey = true;
+        res.end(JSON.stringify({ data: [{ id: 'fixture-key-model', object: 'model' }] }));
+        return;
+      }
+      res.statusCode = 404;
+      res.end('{}');
+    });
+    await new Promise<void>(resolve => upstream.listen(0, '127.0.0.1', resolve));
+    const address = upstream.address() as { port: number };
+    const manager = new MagpieManager({
+      resourcesRoot: path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie'),
+      privateHome: path.join(root, 'service'),
+      environment: { HOME: root, USERPROFILE: root, PATH: process.env.PATH, TEMP: root, TMP: root },
+      parseCatalog: async bytes =>
+        projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
+      verify: (dir, signal) =>
+        verifyMagpieBinary(dir, signal, async file => {
+          const hash = createHash('sha256');
+          for await (const chunk of createReadStream(file)) hash.update(chunk);
+          return hash.digest('hex');
+        }),
+    });
+    try {
+      expect((await manager.start()).state).toBe('running');
+      const created = await manager.saveProvider({
+        name: 'Test connection fixture',
+        api: 'openai-completions',
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        key: dummyKey,
+        models: ['fixture-key-model'],
+      });
+      const provider = created.find(p => p.name === 'Test connection fixture');
+      expect(provider?.hasKey).toBe(true);
+      const result = await manager.testProvider({
+        id: provider!.id,
+        name: provider!.name,
+        api: 'openai-completions',
+        baseUrl: `http://127.0.0.1:${address.port}/v1`,
+        models: provider!.models,
+      });
+      expect(result.ok).toBe(true);
+      expect(sawStoredKey).toBe(true);
+    } finally {
+      await manager.stop();
+      await new Promise<void>(resolve => upstream.close(() => resolve()));
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  },
+  60_000,
+);
+
+it.skipIf(process.env.ZHIYUAN_MAGPIE_SMOKE !== '1')(
   'does not promote the full vendor catalog into picks when editing a provider',
   async () => {
     const { createServer } = await import('node:http');

@@ -247,9 +247,9 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               }
               disabled={isSaving}
             />
-            {isEditing && provider?.hasKey && (
+            {isEditing && provider?.hasKey && provider.keyMasked && (
               <p className="text-xs text-muted-foreground">
-                {provider.keyMasked ? `Key: ${provider.keyMasked}` : ''}
+                {i18nService.t('magpieProviderKeyMasked').replace('{masked}', provider.keyMasked)}
               </p>
             )}
           </div>
@@ -278,7 +278,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               id="provider-fallback"
               value={fallbackText}
               onChange={e => setFallbackText(e.target.value)}
-              placeholder="e.g. deepseek-chat, qwen2.5-coder:7b"
+              placeholder={i18nService.t('magpieProviderFallbackPlaceholder')}
               disabled={isSaving}
             />
             <p className="text-xs text-muted-foreground">

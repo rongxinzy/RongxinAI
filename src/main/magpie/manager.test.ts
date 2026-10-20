@@ -197,6 +197,18 @@ describe('Magpie owned lifecycle', () => {
             },
           ],
         });
+      if (url.endsWith('/api/provider/key')) {
+        const body = JSON.parse(String(_init?.body ?? '{}')) as { id?: string };
+        if (body.id === 'custom-openai') return Response.json({ key: 'sk-secret123456789' });
+        return Response.json({ key: '' });
+      }
+      if (url.includes('api.openai.com') && url.endsWith('/models')) {
+        const headers = _init?.headers as Record<string, string> | undefined;
+        if (headers?.Authorization === 'Bearer sk-secret123456789') {
+          return Response.json({ data: [{ id: 'gpt-4o' }] });
+        }
+        return new Response('Unauthorized', { status: 401 });
+      }
       if (
         url.endsWith('/api/provider/save') ||
         url.endsWith('/api/provider/on') ||
@@ -388,6 +400,25 @@ describe('Magpie owned lifecycle', () => {
       await expect(manager.deleteProvider('zhiyuan-host-enterprise')).rejects.toThrow(
         'Host-managed',
       );
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('testProvider loads the stored key from provider/key when the key field is blank', async () => {
+    const { manager, root } = await setup();
+    try {
+      await manager.start();
+      const result = await manager.testProvider({
+        id: 'custom-openai',
+        name: 'My OpenAI',
+        api: 'openai-completions',
+        baseUrl: 'https://api.openai.com/v1',
+        models: ['gpt-4o'],
+      });
+      expect(result.ok).toBe(true);
+      expect(result.modelCount).toBe(1);
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });

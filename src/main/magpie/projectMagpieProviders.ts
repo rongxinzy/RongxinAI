@@ -45,7 +45,7 @@ function providerHasKey(raw: Record<string, unknown>): boolean {
   if (isRecord(key)) {
     if (key.set !== true) return false;
     const masked = key.masked;
-    if (typeof masked === 'string' && masked.trim().toLowerCase() === 'none') return false;
+    if (typeof masked === 'string' && /^•+$/.test(masked)) return false;
     return true;
   }
   if (typeof key === 'string') {
@@ -116,12 +116,11 @@ export function projectMagpieProviderSummaries(state: unknown): MagpieProviderSu
 
 /** Blank means keep the stored key on edit; never send the placeholder `none`. */
 export function resolveMagpieProviderSaveKey(
-  existing: Record<string, unknown> | undefined,
+  _existing: Record<string, unknown> | undefined,
   inputKey?: string,
 ): string {
   const trimmed = inputKey?.trim();
   if (trimmed && trimmed !== 'none') return trimmed;
-  if (existing) return '';
   return '';
 }
 

@@ -137,8 +137,6 @@ const config: KnipConfig = {
     'dotenv',
     'typebox',
     '@earendil-works/pi-agent-core',
-    '@earendil-works/chord',
-    '@earendil-works/pi-durable',
   ],
   // llama.cpp sources stay untouched. Suppress findings instead of editing them.
   // Root-level only: workspace ignoreIssues are not applied to ".".
@@ -162,11 +160,7 @@ const config: KnipConfig = {
   },
   // @knipignore marks a dynamic import() type query Knip cannot see.
   tags: ['-knipignore'],
-  ignoreUnresolved: [
-    // Opt-in Magpie smoke imports a durable provider the gateway refactor owns.
-    // The module is not in this tree; the test stays skipped without the env flag.
-    '../libs/agentEngine/durable/provider',
-  ],
+  ignoreUnresolved: [],
   // Intentional aliases (parseX = createX, marketplace counts sharing one value).
   exclude: ['duplicates'],
 };
