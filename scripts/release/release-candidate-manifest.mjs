@@ -96,25 +96,41 @@ function parseSpec(spec) {
   return { filePath, platform, arch, variant, target, kind };
 }
 
-async function hashFile(filePath, algorithm, encoding) {
-  const hash = crypto.createHash(algorithm);
+const fileDigestCache = new Map();
+
+async function hashFileBoth(filePath) {
+  const sha256 = crypto.createHash('sha256');
+  const sha512 = crypto.createHash('sha512');
   await new Promise((resolve, reject) => {
     const stream = fs.createReadStream(filePath);
-    stream.on('data', chunk => hash.update(chunk));
+    stream.on('data', chunk => {
+      sha256.update(chunk);
+      sha512.update(chunk);
+    });
     stream.on('error', reject);
     stream.on('end', resolve);
   });
-  return hash.digest(encoding);
+  return {
+    sha256: sha256.digest('hex'),
+    sha512: sha512.digest('base64'),
+  };
 }
 
 async function describeFile(filePath) {
-  const stat = await fsp.stat(filePath);
+  const resolved = path.resolve(filePath);
+  const stat = await fsp.stat(resolved);
   if (!stat.isFile() || stat.size === 0) throw new Error(`Candidate artifact is missing or empty: ${filePath}`);
-  return {
+  const cacheKey = `${resolved}:${stat.size}:${stat.mtimeMs}`;
+  const cached = fileDigestCache.get(cacheKey);
+  if (cached) return cached;
+  const { sha256, sha512 } = await hashFileBoth(resolved);
+  const result = {
     size: stat.size,
-    sha256: await hashFile(filePath, 'sha256', 'hex'),
-    sha512: await hashFile(filePath, 'sha512', 'base64'),
+    sha256,
+    sha512,
   };
+  fileDigestCache.set(cacheKey, result);
+  return result;
 }
 
 function validateIdentity(manifest, expectedVersion, expectedCommit, expectedRunId) {
@@ -149,6 +165,7 @@ export async function createCandidateManifest({
   if (!Array.isArray(specs) || specs.length === 0) throw new Error('Candidate artifact specs are required');
 
   const artifacts = [];
+  const copiedTargets = new Set();
   for (const spec of specs) {
     const { filePath, platform, arch, variant, target, kind } = parseSpec(spec);
     const { size, sha256, sha512 } = await describeFile(filePath);
@@ -156,8 +173,11 @@ export async function createCandidateManifest({
     validateFilename(filename);
     const relativePath = `payload/${target}/${filename}`;
     validateRelativePath(relativePath);
-    await fsp.mkdir(path.join(outputDirectory, 'payload', target), { recursive: true });
-    await fsp.copyFile(filePath, path.join(outputDirectory, relativePath));
+    if (!copiedTargets.has(relativePath)) {
+      await fsp.mkdir(path.join(outputDirectory, 'payload', target), { recursive: true });
+      await fsp.copyFile(filePath, path.join(outputDirectory, relativePath));
+      copiedTargets.add(relativePath);
+    }
     artifacts.push({ platform, arch, variant, kind, filename, relativePath, size, sha256, sha512 });
   }
 
@@ -173,7 +193,7 @@ export async function createCandidateManifest({
     sourceCommit,
     candidateRunId,
     manifests: [manifest],
-    payloadRoots: [outputDirectory],
+    payloadRoots: [],
     requireComplete: false,
   });
   await fsp.mkdir(outputDirectory, { recursive: true });

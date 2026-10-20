@@ -524,6 +524,14 @@ function checkSkillPythonRuntimeHealth(options = {}) {
   if (!fs.existsSync(sharedLock)) missing.push('shared: requirements lock');
   if (!isEnvironmentRelocatable(sharedRoot)) missing.push('shared: relocatable symlinks');
 
+  const allImports = [
+    ...new Set(requirements.flatMap(entry => parseImportNames(entry.requirementsPath))),
+  ];
+  const combinedProbe =
+    pythonPath && allImports.length > 0
+      ? probePython(pythonPath, allImports)
+      : { ok: true, detail: '' };
+
   for (const entry of requirements) {
     const environmentRoot = skillManifestRoot(runtimeRoot, entry.skillId);
     const importNames = parseImportNames(entry.requirementsPath);
@@ -540,7 +548,7 @@ function checkSkillPythonRuntimeHealth(options = {}) {
     ) {
       entryMissing.push('matching runtime.json');
     }
-    if (pythonPath) {
+    if (pythonPath && !combinedProbe.ok) {
       const probe = probePython(pythonPath, importNames);
       if (!probe.ok) entryMissing.push(`imports (${probe.detail || 'probe failed'})`);
     }
@@ -623,15 +631,16 @@ async function ensureSkillPythonRuntimes(options = {}) {
   // runtime roots the copy inside the helper fails softly and the health
   // check below reports the missing alias.
   ensureWindowsPython3Alias(sharedRoot, platform);
+  const allImports = [
+    ...new Set(requirements.flatMap(entry => parseImportNames(entry.requirementsPath))),
+  ];
   const healthyExistingLayer =
     existingPython &&
     isEnvironmentRelocatable(sharedRoot) &&
     manifestMatches(readManifest(sharedRoot), sharedExpected) &&
     fs.existsSync(sharedLock) &&
     lockPaths.every(lockPath => fs.existsSync(lockPath)) &&
-    requirements.every(
-      entry => probePython(existingPython, parseImportNames(entry.requirementsPath)).ok,
-    );
+    probePython(existingPython, allImports).ok;
 
   if (!healthyExistingLayer) {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
@@ -699,11 +708,6 @@ async function ensureSkillPythonRuntimes(options = {}) {
     finalizeWindowsSkillPython(sharedRoot, base.pythonPath, platform);
     rebaseEnvironmentSymlinks(sharedRoot, base.pythonPath);
     ensureWindowsPython3Alias(sharedRoot, platform);
-    for (const entry of requirements) {
-      const probe = probePython(environmentPython, parseImportNames(entry.requirementsPath));
-      if (!probe.ok)
-        throw new Error(`${entry.skillId}: dependency health check failed: ${probe.detail}`);
-    }
     fs.writeFileSync(
       path.join(sharedRoot, 'runtime.json'),
       `${JSON.stringify(sharedExpected, null, 2)}\n`,
@@ -721,6 +725,19 @@ async function ensureSkillPythonRuntimes(options = {}) {
       'utf8',
     );
     console.log(`[setup-skill-python-runtime] ${entry.skillId}: linked to shared layer`);
+  }
+
+  if (healthyExistingLayer) {
+    return {
+      ok: true,
+      skipped: true,
+      environments: requirements.map(entry => ({
+        skillId: entry.skillId,
+        environmentRoot: skillManifestRoot(runtimeRoot, entry.skillId),
+        pythonPath: existingPython,
+        missing: [],
+      })),
+    };
   }
 
   const health = checkSkillPythonRuntimeHealth({ platform, arch, skillsRoot, runtimeRoot });

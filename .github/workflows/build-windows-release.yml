@@ -1,8 +1,8 @@
 name: Build Windows release (staged)
 
-# Release-mode Windows pipeline: compile/sign the application once (lite core),
-# build CUDA llama-server on windows-2022, then package/sign each edition's
-# metadata and components in one Certum session and upload release candidates.
+# Release-mode Windows pipeline: prepare/restore cached runtimes, authenticate
+# Certum SimplySign with TOTP window alignment and automatic retries, build and
+# sign lite/cpu/cuda installers in one session, and upload release candidates.
 
 on:
   workflow_call:
@@ -34,32 +34,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  cuda-runtime:
-    runs-on: windows-2022
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: ${{ inputs.source-ref }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
-      - uses: ./.github/actions/prepare-windows-cuda
-      - uses: actions/upload-artifact@v6
-        with:
-          name: windows-cuda-runtime-${{ inputs.app-build-version }}
-          path: vendor/llamacpp/cuda
-          retention-days: 2
-
   windows-release:
-    needs: cuda-runtime
-    runs-on: windows-latest
+    runs-on: windows-2022
     environment: release
     timeout-minutes: 120
     steps:
@@ -90,7 +66,14 @@ jobs:
             ~/.cache/electron-builder
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
-          key: packaging-Windows-win-x64-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+            resources/mingit
+            resources/uv-win
+            resources/python-win
+            resources/skill-python
+            vendor/engram-runtime
+            vendor/channel-runtime
+            build-tar/windows-components
+          key: packaging-Windows-win-x64-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js', 'scripts/windows-resource-pack.cjs') }}
           restore-keys: |
             packaging-Windows-win-x64-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
@@ -125,11 +108,7 @@ jobs:
       - run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
         env:
           LLAMACPP_CPU_TARGET_ID: win-x64
-      - name: Download CUDA runtime bundle
-        uses: actions/download-artifact@v8
-        with:
-          name: windows-cuda-runtime-${{ inputs.app-build-version }}
-          path: vendor/llamacpp/cuda
+      - uses: ./.github/actions/prepare-windows-cuda
       - name: Connect Certum SimplySign
         id: certum-signing
         uses: ./.github/actions/setup-certum-signing
