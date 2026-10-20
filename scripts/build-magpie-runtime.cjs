@@ -152,6 +152,20 @@ function build(options = {}) {
   keys.forEach(targetFor);
   const cache = path.join(projectRoot, '.cache', 'magpie');
   const outputRoot = path.join(projectRoot, 'resources', 'magpie');
+  if (!options.force) {
+    const allValid = keys.every(key => {
+      try {
+        verifyRuntime(outputRoot, key);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (allValid) {
+      console.log(`[magpie-build] Reusing verified runtime in ${outputRoot}`);
+      return;
+    }
+  }
   fs.mkdirSync(cache, { recursive: true });
   const work = fs.mkdtempSync(path.join(cache, 'build-'));
   const source = path.join(work, 'source');
