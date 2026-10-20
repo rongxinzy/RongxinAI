@@ -46,16 +46,33 @@ function codesignInfo(binary, spawn = spawnSync) {
   return output;
 }
 
-export function verifyPackagedMagpieApp(appPath, deps = {}) {
+// Each per-arch .app only ships the helper for its own architecture (see
+// contextTargets in scripts/magpie-runtime.cjs); a universal .app ships both.
+export function resolveMagpieTargets(appPath, targets = []) {
+  if (targets.length > 0) {
+    for (const key of targets) {
+      if (!MAC_TARGETS.includes(key)) throw new Error(`Unknown macOS Magpie target: ${key}`);
+    }
+    return targets;
+  }
+  const root = path.join(appPath, 'Contents', 'Resources', 'magpie');
+  const present = MAC_TARGETS.filter(key => fs.existsSync(path.join(root, key)));
+  if (present.length === 0) {
+    throw new Error(`No packaged macOS Magpie helper was found under ${root}`);
+  }
+  return present;
+}
+
+export function verifyPackagedMagpieApp(appPath, deps = {}, targets = []) {
   const execFile = deps.execFile || execFileSync;
   const spawn = deps.spawn || spawnSync;
   if (!appPath || !fs.existsSync(appPath)) {
     throw new Error(`Packaged macOS app was not found: ${appPath || ''}`);
   }
-  for (const key of MAC_TARGETS) {
+  for (const key of resolveMagpieTargets(appPath, targets)) {
     const directory = path.join(appPath, 'Contents', 'Resources', 'magpie', key);
     const binary = path.join(directory, 'magpie');
-    if (!fs.statSync(binary).isFile()) {
+    if (!fs.existsSync(binary) || !fs.statSync(binary).isFile()) {
       throw new Error(`Packaged Magpie binary is missing: ${binary}`);
     }
     execFile('codesign', ['--verify', '--strict', '--verbose=2', binary], { stdio: 'inherit' });
@@ -68,7 +85,7 @@ export function verifyPackagedMagpieApp(appPath, deps = {}) {
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   try {
-    verifyPackagedMagpieApp(process.argv[2]);
+    verifyPackagedMagpieApp(process.argv[2], {}, process.argv.slice(3));
     console.log(
       'Magpie helpers are Developer ID signed with the hardened runtime and match the sealed manifests.',
     );
