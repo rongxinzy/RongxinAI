@@ -337,7 +337,13 @@ export const getCodingRoomService = (): CodingRoomService => {
       sessionId => rt.codingRoomService?.isBuiltinLaneSession(sessionId) ?? false,
     );
     rt.codingRoomService.registry.hydrate();
+    // Precise routing: sessions cached as non-lane skip normalization and
+    // recording entirely; a session's first event still flows through so the
+    // lazy lane mapping can register (see shouldTrackSession).
+    const isTrackedSession = (sessionId: string): boolean =>
+      rt.codingRoomService?.shouldTrackSession(sessionId) ?? true;
     runtime.on('message', (sessionId: string, message: unknown) => {
+      if (!isTrackedSession(sessionId)) return;
       const metadata =
         message && typeof message === 'object' && 'metadata' in message
           ? (message as { metadata?: unknown }).metadata
@@ -365,6 +371,7 @@ export const getCodingRoomService = (): CodingRoomService => {
         content: string,
         metadata?: Record<string, unknown>,
       ) => {
+        if (!isTrackedSession(sessionId)) return;
         const isThinking = metadata?.isThinking === true;
         rt.codingRoomService?.recordBuiltinEvent(
           sessionId,
@@ -378,11 +385,13 @@ export const getCodingRoomService = (): CodingRoomService => {
       },
     );
     runtime.on('toolActivity', (sessionId: string, event: CoworkToolActivityEvent) => {
+      if (!isTrackedSession(sessionId)) return;
       const normalized = normalizePiToolActivity(event);
       if (normalized)
         rt.codingRoomService?.recordBuiltinEvent(sessionId, normalized.kind, normalized.payload);
     });
     runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
+      if (!isTrackedSession(sessionId)) return;
       const requestId =
         request &&
         typeof request === 'object' &&
@@ -395,6 +404,7 @@ export const getCodingRoomService = (): CodingRoomService => {
       });
     });
     runtime.on('plan', (sessionId: string, plan: { entries?: unknown }) => {
+      if (!isTrackedSession(sessionId)) return;
       rt.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Plan, {
         entries: Array.isArray(plan?.entries) ? plan.entries : [],
       });
@@ -402,13 +412,16 @@ export const getCodingRoomService = (): CodingRoomService => {
     runtime.on(
       'codingElicitationRequest',
       (sessionId: string, request: { requestId: string; question: string }) => {
+        if (!isTrackedSession(sessionId)) return;
         rt.codingRoomService?.recordBuiltinElicitation(sessionId, request);
       },
     );
     runtime.on('complete', (sessionId: string) => {
+      if (!isTrackedSession(sessionId)) return;
       rt.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnComplete, {});
     });
     runtime.on('error', (sessionId: string, error: unknown) => {
+      if (!isTrackedSession(sessionId)) return;
       rt.codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, { error });
     });
     runtime.on(

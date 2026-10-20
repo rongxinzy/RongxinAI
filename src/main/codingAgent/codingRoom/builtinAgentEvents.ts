@@ -16,34 +16,63 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
     sessionId: string,
     request: { requestId: string; question: string },
   ): void {
-    const laneId = this.builtinSessionLaneMap.get(sessionId);
     const question = request.question.trim();
     if (!question) return;
+    // Fast path: a mapped session resolves its lane and room directly instead
+    // of rebuilding full snapshots of every room per question.
+    const mappedLaneId = this.builtinSessionLaneMap.get(sessionId);
+    if (mappedLaneId) {
+      const lane = this.repository.getLaneById(mappedLaneId);
+      const room = lane ? this.repository.getRoomByLaneId(mappedLaneId) : null;
+      if (lane && room) {
+        if (this.registry.get(lane.profileId)?.driverKind !== CodingAgentDriverKind.Builtin) {
+          return;
+        }
+        this.applyBuiltinElicitation(room.workspaceRoot, room.id, lane, request, question);
+        return;
+      }
+    }
+    // A lane started without a prompt has not cached its session mapping yet,
+    // so fall back to scanning rooms by the persisted local session id.
     for (const workspaceRoot of this.knownRooms()) {
       const snapshot = this.bootstrap(workspaceRoot);
-      // A lane started without a prompt has not cached its session mapping yet,
-      // so fall back to the persisted local session id before giving up.
       const lane = snapshot.lanes.find(
-        candidate => candidate.id === laneId || candidate.localSessionId === sessionId,
+        candidate => candidate.id === mappedLaneId || candidate.localSessionId === sessionId,
       );
       if (!lane) continue;
       if (this.registry.get(lane.profileId)?.driverKind !== CodingAgentDriverKind.Builtin) return;
       this.builtinSessionLaneMap.set(sessionId, lane.id);
-      this.repository.createElicitation(lane.id, question, request.requestId);
-      this.repository.appendEvent(lane.id, CodingEventKind.Elicitation, {
-        requestId: request.requestId,
-        question,
-        status: CodingElicitationStatus.Pending,
-      });
-      this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingElicitation);
-      this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingElicitation);
-      this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.WaitingElicitation);
-      if (this.requiresWriterLease(lane.sourceRoot, this.executionRoot(lane, workspaceRoot))) {
-        this.repository.releaseWriterLease(snapshot.room.id, lane.sourceRoot, lane.id);
-      }
-      this.publish(workspaceRoot);
+      this.applyBuiltinElicitation(workspaceRoot, snapshot.room.id, lane, request, question);
       return;
     }
+  }
+
+  private applyBuiltinElicitation(
+    workspaceRoot: string,
+    roomId: string,
+    lane: CodingAgentLane,
+    request: { requestId: string; question: string },
+    question: string,
+  ): void {
+    this.repository.createElicitation(lane.id, question, request.requestId);
+    this.repository.appendEvent(lane.id, CodingEventKind.Elicitation, {
+      requestId: request.requestId,
+      question,
+      status: CodingElicitationStatus.Pending,
+    });
+    this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingElicitation);
+    this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingElicitation);
+    const assignment = this.repository.getLatestAssignmentForLane(lane.id);
+    if (assignment) {
+      this.repository.updateAssignmentStatus(
+        assignment.id,
+        CodingAssignmentStatus.WaitingElicitation,
+      );
+    }
+    if (this.requiresWriterLease(lane.sourceRoot, this.executionRoot(lane, workspaceRoot))) {
+      this.repository.releaseWriterLease(roomId, lane.sourceRoot, lane.id);
+    }
+    this.publish(workspaceRoot);
   }
 
   /**
@@ -56,6 +85,16 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
    */
   isBuiltinLaneSession(sessionId: string): boolean {
     return this.builtinSessionLaneMap.has(sessionId);
+  }
+
+  /**
+   * Whether an event for this session is worth normalizing at all: a mapped
+   * lane session, or a session whose mapping has not been resolved yet (its
+   * first event may register a lane). Sessions cached as non-lane are skipped
+   * by the runtime before any normalization work.
+   */
+  shouldTrackSession(sessionId: string): boolean {
+    return !this.nonLaneSessionIds.has(sessionId);
   }
 
   recordBuiltinEvent(
@@ -127,21 +166,43 @@ export abstract class CodingRoomServiceBuiltinAgentEvents extends CodingRoomServ
   }
 
   recordBuiltinInterruption(interruption: CoworkSessionInterruption): void {
+    // Fast path: resolve the lane and room directly for a mapped session.
+    const mappedLaneId = this.builtinSessionLaneMap.get(interruption.sessionId);
+    if (mappedLaneId) {
+      const lane = this.repository.getLaneById(mappedLaneId);
+      const room = lane ? this.repository.getRoomByLaneId(mappedLaneId) : null;
+      if (lane && room) {
+        this.applyBuiltinInterruption(room.workspaceRoot, lane, interruption);
+        return;
+      }
+    }
     for (const workspaceRoot of this.knownRooms()) {
       const snapshot = this.bootstrap(workspaceRoot);
       const lane = snapshot.lanes.find(
         candidate => candidate.localSessionId === interruption.sessionId,
       );
       if (!lane) continue;
-      this.repository.appendEvent(lane.id, CodingEventKind.TurnCancelled, {
-        reason: interruption.cause,
-        interruption,
-      });
-      this.repository.updateLaneStatus(lane.id, CodingLaneStatus.Idle);
-      this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.NeedsReview);
-      this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.Planned);
-      this.publish(workspaceRoot);
+      this.builtinSessionLaneMap.set(interruption.sessionId, lane.id);
+      this.applyBuiltinInterruption(workspaceRoot, lane, interruption);
       return;
     }
+  }
+
+  private applyBuiltinInterruption(
+    workspaceRoot: string,
+    lane: CodingAgentLane,
+    interruption: CoworkSessionInterruption,
+  ): void {
+    this.repository.appendEvent(lane.id, CodingEventKind.TurnCancelled, {
+      reason: interruption.cause,
+      interruption,
+    });
+    this.repository.updateLaneStatus(lane.id, CodingLaneStatus.Idle);
+    this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.NeedsReview);
+    const assignment = this.repository.getLatestAssignmentForLane(lane.id);
+    if (assignment) {
+      this.repository.updateAssignmentStatus(assignment.id, CodingAssignmentStatus.Planned);
+    }
+    this.publish(workspaceRoot);
   }
 }
