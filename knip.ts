@@ -18,6 +18,8 @@ const config: KnipConfig = {
       entry: [
         // vite-plugin-electron bundle entries. Knip's Vite plugin reads HTML and
         // rolldown inputs, not the electron() entry list in vite.config.ts.
+        // Run from .husky/pre-commit.
+        'scripts/check-new-file-tokens.mjs',
         'src/main/main.ts',
         'src/main/preload.ts',
         'src/main/desktopPetPreload.ts',
