@@ -2,9 +2,12 @@ import type { MagpiePreferences } from '../../../../shared/magpie/preferences';
 import { i18nService } from '../../../services/i18n';
 
 export function MagpieAboutPreferences({ preferences }: { preferences: MagpiePreferences }) {
+  const displayDataDir = preferences.dataDir
+    ? preferences.dataDir.replace(/([/\\.]|\b)magpie(?=[/\\.]|$)/gi, '$1model-service')
+    : '—';
   const rows = [
     [i18nService.t('aboutVersion'), preferences.version || '—'],
-    [i18nService.t('magpieDataDirectory'), preferences.dataDir || '—'],
+    [i18nService.t('magpieDataDirectory'), displayDataDir],
     [i18nService.t('magpieGatewayAddress'), preferences.gateway || '—'],
     [i18nService.t('magpieLicense'), i18nService.t('magpieLicenseNotice')],
   ] as const;

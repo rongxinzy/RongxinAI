@@ -13,7 +13,7 @@ test('model service copy does not name the internal runtime', () => {
   for (const language of ['zh', 'en'] as const) {
     i18nService.setLanguage(language, { persist: false });
     for (const [key, value] of Object.entries(magpieTranslations[language])) {
-      expect(value, `${language}.${key}`).not.toMatch(/magpie|喜鹊/i);
+      expect(value, `${language}.${key}`).not.toMatch(/magpie|喜鹊|yetone/i);
       expect(i18nService.t(key)).toBe(value);
     }
   }
@@ -47,6 +47,6 @@ test('model service copy does not name the internal runtime', () => {
   expect(magpieTranslations.en.magpieApplyNotice).toBe(
     'Applying uses the model service to change this Agent’s model configuration. Start a new session in that Agent to use it.',
   );
-  expect(magpieTranslations.zh.magpieLicenseNotice).toBe('MIT · © 2026 yetone');
-  expect(magpieTranslations.en.magpieLicenseNotice).toBe('MIT · © 2026 yetone');
+  expect(magpieTranslations.zh.magpieLicenseNotice).toBe('Apache-2.0 · 知远智能体');
+  expect(magpieTranslations.en.magpieLicenseNotice).toBe('Apache-2.0 · ZhiYuan Agent');
 });

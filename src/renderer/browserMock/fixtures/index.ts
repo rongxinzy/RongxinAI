@@ -222,7 +222,7 @@ export const mockMcpServers: MockMcpServer[] = [
 
 export const mockMagpiePreferences: MagpiePreferences = {
   version: 'preview',
-  dataDir: '~/.zhiyuan/magpie',
+  dataDir: '~/.zhiyuan/model-service',
   gateway: 'http://127.0.0.1:3425',
   proxy: '',
   proxyNow: '',
