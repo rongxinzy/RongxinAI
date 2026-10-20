@@ -9,9 +9,7 @@ afterEach(() => {
 test('replaces the internal runtime name in both cases for Chinese copy', () => {
   i18nService.setLanguage('zh', { persist: false });
   expect(neutralRuntimeName('Magpie startup timed out')).toBe('本地模型服务 startup timed out');
-  expect(neutralRuntimeName('magpie gateway unreachable')).toBe(
-    '本地模型服务 gateway unreachable',
-  );
+  expect(neutralRuntimeName('magpie gateway unreachable')).toBe('本地模型服务 gateway unreachable');
 });
 
 test('uses the English neutral name for English copy', () => {
