@@ -1,7 +1,7 @@
 /** Calendar permission check/request IPC. */
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
-import { isDev } from './appEnv';
+import { isDev } from '../appBootstrap/appEnv';
 import { checkCalendarPermission, requestCalendarPermission } from './calendarPermissions';
 
 export const registerPermissionsIpc = (): void => {

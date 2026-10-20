@@ -3,16 +3,20 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
-import { getDefaultProjectBaseDir, getUnmanagedWorkspaceBaseDir } from './workspacePaths';
-import { getDefaultConversationWorkspacePath } from '../defaultConversationWorkspace';
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 
-export const registerProjectIpc = (): void => {
+export interface ProjectIpcDeps {
+  getDefaultProjectBaseDir: () => string;
+  getUnmanagedWorkspaceBaseDir: () => string;
+  getDefaultConversationWorkspacePath: () => string;
+}
+
+export const registerProjectIpc = (deps: ProjectIpcDeps): void => {
   handleIpcContractSubset(appSystemContract, {
     projectGetDefaultBaseDir: async () => {
       try {
-        return { success: true, path: getDefaultProjectBaseDir() };
+        return { success: true, path: deps.getDefaultProjectBaseDir() };
       } catch (error) {
         return {
           success: false,
@@ -33,7 +37,7 @@ export const registerProjectIpc = (): void => {
             error: 'Invalid project name',
           };
         }
-        const baseDir = options.baseDir?.trim() || getDefaultProjectBaseDir();
+        const baseDir = options.baseDir?.trim() || deps.getDefaultProjectBaseDir();
         const targetPath = path.join(baseDir, name);
         if (fs.existsSync(targetPath)) {
           return {
@@ -57,7 +61,7 @@ export const registerProjectIpc = (): void => {
 
     projectEnsureScratchDir: async () => {
       try {
-        const scratchDir = getDefaultConversationWorkspacePath();
+        const scratchDir = deps.getDefaultConversationWorkspacePath();
         await fs.promises.mkdir(scratchDir, { recursive: true });
         return { success: true, path: scratchDir };
       } catch (error) {
@@ -71,7 +75,10 @@ export const registerProjectIpc = (): void => {
 
     projectCreateRandomWorkspace: async () => {
       try {
-        const randomWorkspacePath = path.join(getUnmanagedWorkspaceBaseDir(), crypto.randomUUID());
+        const randomWorkspacePath = path.join(
+          deps.getUnmanagedWorkspaceBaseDir(),
+          crypto.randomUUID(),
+        );
         await fs.promises.mkdir(randomWorkspacePath, { recursive: true });
         return { success: true, path: randomWorkspacePath };
       } catch (error) {

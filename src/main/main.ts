@@ -21,9 +21,10 @@ import { registerAppIpc } from './appBootstrap/appIpc';
 import { registerSkillsIpc } from './skills/ipc';
 import { registerMcpIpc } from './appBootstrap/mcpIpc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
-import { registerProjectIpc } from './appBootstrap/projectIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
 import { registerCoworkQueueIpc } from './coworkIpc/queue';
+import { registerProjectIpc } from './projectIpc';
+import { registerPermissionsIpc } from './permissionsIpc';
 import { registerDialogIpc } from './dialogIpc';
 import { registerCoworkSessionIpc } from './coworkIpc/session';
 import { registerCoworkSessionAdminIpc } from './coworkIpc/sessionAdmin';
@@ -42,16 +43,18 @@ import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
 import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
 import { getAgentManager } from './appBootstrap/runtimeServices';
 import {
+  getDefaultProjectBaseDir,
+  getUnmanagedWorkspaceBaseDir,
   resolveSessionWorkingDirectory,
   resolveTaskWorkingDirectory,
 } from './appBootstrap/workspacePaths';
+import { getDefaultConversationWorkspacePath } from './defaultConversationWorkspace';
 import {
   getCanonicalScheduledTaskService,
   getIMGatewayManager,
 } from './appBootstrap/ccConnectRuntime';
 import { bumpCodingCommandCatalog } from './appBootstrap/codingRoomRuntime';
 import { resolveDefaultAgentModelRef } from './appBootstrap/defaultAgentModel';
-import { registerPermissionsIpc } from './appBootstrap/permissionsIpc';
 import { registerImGatewayIpc } from './appBootstrap/imGatewayIpc';
 import { registerImInstanceIpc } from './appBootstrap/imInstanceIpc';
 import { registerIntegrationsIpc } from './appBootstrap/integrationsIpc';
@@ -84,7 +87,11 @@ if (!gotTheLock) {
   registerSkillsIpc({ getSkillManager, getStore });
   registerMcpIpc();
   registerWorkspaceIpc();
-  registerProjectIpc();
+  registerProjectIpc({
+    getDefaultProjectBaseDir,
+    getUnmanagedWorkspaceBaseDir,
+    getDefaultConversationWorkspacePath,
+  });
   setupMagpieRuntime();
   registerCoworkSessionIpc({
     getCoworkImageRoot,
