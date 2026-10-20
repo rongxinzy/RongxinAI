@@ -111,3 +111,12 @@ export const rt = {
   lastReloadAt: 0,
   windowStateSaveTimer: null as ReturnType<typeof setTimeout> | null,
 };
+
+/** Accessors for the active MCP OAuth authorization controllers (work package I indirection). */
+export const getActiveMcpAuthorizations = (): Map<string, AbortController> | undefined =>
+  rt.activeMcpAuthorizations;
+export const setActiveMcpAuthorizations = (
+  value: Map<string, AbortController> | undefined,
+): void => {
+  rt.activeMcpAuthorizations = value;
+};
