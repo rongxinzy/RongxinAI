@@ -422,4 +422,7 @@ export const zhCoding: Record<string, string> = {
     '该 Agent 连接上了，但没有任何回复：它可能尚未登录、API Key 不可用，或它配置的模型服务不可达。请先完成登录或检查其模型配置，然后重新检测连接。',
   codingErrorAcpAgentExited: '编程 Agent 进程已退出，请重试。',
   codingErrorAcpProtocolUnsupported: '该编程 Agent 的协议版本不受支持，请更换 Agent。',
+  magpieTitle: '外部 Agent',
+  magpieExternalPanelDescription: '让本机 CLI Agent 接入知远模型网关，统一管理模型渠道与默认模型。',
+  magpieExternalAgentPi: 'Pi CLI',
 };

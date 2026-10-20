@@ -7,6 +7,7 @@ import type {
   MagpieAgentFileChange,
   MagpieAgents,
 } from '../../shared/magpie/types';
+import { neutralizeUpstreamBrand } from './managementErrors';
 
 function assertManagedMagpieAgentId(agentId: string): void {
   if (typeof agentId !== 'string' || !isMagpieManagedAgentId(agentId)) {
@@ -35,7 +36,7 @@ export async function magpieAgentPreview(
   const body = await client.managementJson(`/api/agents/preview/${encoded}`);
   return {
     changes: Array.isArray(body.changes) ? (body.changes as MagpieAgentFileChange[]) : [],
-    ...(typeof body.error === 'string' ? { error: body.error } : {}),
+    ...(typeof body.error === 'string' ? { error: neutralizeUpstreamBrand(body.error) } : {}),
     ...(typeof body.revision === 'string' ? { revision: body.revision } : {}),
   };
 }
