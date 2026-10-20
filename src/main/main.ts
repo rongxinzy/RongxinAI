@@ -22,6 +22,8 @@ import { registerSkillsIpc } from './skills/ipc';
 import { registerWorkspaceIpc } from './appBootstrap/workspaceIpc';
 import { setupMagpieRuntime } from './appBootstrap/magpieRuntime';
 import { registerCoworkQueueIpc } from './coworkIpc/queue';
+import { registerShellIpc } from './shellIpc';
+import { registerIntegrationsIpc } from './integrationsIpc';
 import { registerMcpIpc } from './mcpIpc';
 import { registerProjectIpc } from './projectIpc';
 import { registerPermissionsIpc } from './permissionsIpc';
@@ -50,10 +52,12 @@ import {
 import {
   getDefaultProjectBaseDir,
   getUnmanagedWorkspaceBaseDir,
+  isInternalWorkspacePath,
   resolveSessionWorkingDirectory,
   resolveTaskWorkingDirectory,
 } from './appBootstrap/workspacePaths';
 import { getDefaultConversationWorkspacePath } from './defaultConversationWorkspace';
+import { getMagpieModelService } from './appBootstrap/magpieRuntime';
 import {
   getCanonicalScheduledTaskService,
   getIMGatewayManager,
@@ -62,8 +66,6 @@ import { bumpCodingCommandCatalog } from './appBootstrap/codingRoomRuntime';
 import { resolveDefaultAgentModelRef } from './appBootstrap/defaultAgentModel';
 import { registerImGatewayIpc } from './appBootstrap/imGatewayIpc';
 import { registerImInstanceIpc } from './appBootstrap/imInstanceIpc';
-import { registerIntegrationsIpc } from './appBootstrap/integrationsIpc';
-import { registerShellIpc } from './appBootstrap/shellIpc';
 import { registerAppUpdateIpc } from './appBootstrap/appUpdateIpc';
 import { registerAppLifecycleHandlers } from './appBootstrap/appLifecycle';
 import { initApp } from './appBootstrap/initApp';
@@ -145,9 +147,14 @@ if (!gotTheLock) {
   registerPermissionsIpc();
   registerImGatewayIpc();
   registerImInstanceIpc();
-  registerIntegrationsIpc();
+  registerIntegrationsIpc({
+    getIMGatewayManager,
+    getMagpieModelService,
+    isInternalWorkspacePath,
+    getCoworkStore,
+  });
   registerDialogIpc({ getCoworkStore });
-  registerShellIpc();
+  registerShellIpc({ getCoworkStore });
   registerAppUpdateIpc();
   registerAppLifecycleHandlers();
 

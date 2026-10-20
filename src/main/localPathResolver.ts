@@ -14,7 +14,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { isAllowedShellProbePath } from './shellPathValidation';
-import { normalizeWindowsShellPath } from './appBootstrap/shellPathNormalize';
+import { normalizeWindowsShellPath } from './shellIpc/shellPathNormalize';
 
 const MAX_LOCAL_PATH_CANDIDATE_LENGTH = 1024;
 
