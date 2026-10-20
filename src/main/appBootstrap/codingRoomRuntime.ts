@@ -3,6 +3,7 @@ import path from 'path';
 import { app, BrowserWindow } from 'electron';
 
 import { rt } from './runtimeState';
+import { mcpRuntime } from './mcpRuntimeState';
 import {
   getAgentManager,
   getCoworkStore,
@@ -191,11 +192,11 @@ export const getCodingRoomService = (): CodingRoomService => {
         compactBuiltinSession: sessionId => runtime.compactSession(sessionId),
         describeBuiltinMcp: (target?: string) => {
           const statuses = new Map(
-            (rt.mcpServerManager?.serverStatuses ?? []).map(
+            (mcpRuntime.serverManager?.serverStatuses ?? []).map(
               status => [status.name, status] as const,
             ),
           );
-          const manifest = rt.mcpServerManager?.toolManifest ?? [];
+          const manifest = mcpRuntime.serverManager?.toolManifest ?? [];
           return {
             gatewayAvailable: rt.piRuntimeAdapter?.hasMcpServerManager() ?? false,
             target: target ?? null,
