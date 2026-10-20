@@ -29,6 +29,7 @@ import { registerCoreIpc } from './appSystemIpc/core';
 import { registerManagedProvidersIpc } from './appSystemIpc/managedProviders';
 import { registerAppUpdateIpc } from './appUpdateIpc';
 import { registerShellIpc } from './shellIpc';
+import { getCodingRoomService } from './appBootstrap/codingRoomRuntime';
 import { registerIntegrationsIpc } from './integrationsIpc';
 import { registerMcpIpc } from './mcpIpc';
 import { registerProjectIpc } from './projectIpc';
@@ -199,7 +200,16 @@ if (!gotTheLock) {
     getCoworkStore,
   });
   registerDialogIpc({ getCoworkStore });
-  registerShellIpc({ getCoworkStore });
+  registerShellIpc({
+    getCoworkStore,
+    getCodingWorkspaceRoots: () =>
+      getCodingRoomService()
+        .listWorkspaces()
+        .flatMap(workspace => [
+          workspace.primaryRoot,
+          ...workspace.sources.map(source => source.path),
+        ]),
+  });
   registerAppUpdateIpc({
     getAppUpdateCoordinator,
     hasRunningSessions: () => getPiRuntimeAdapter().hasRunningSessions(),

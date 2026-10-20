@@ -509,6 +509,7 @@ export const CodingWorkbenchView = ({
             <CodingEventStream
               events={activeEvents}
               isStreaming={activeLane?.status === CodingLaneStatus.Running}
+              cwd={workspaceRoot}
               headerActions={
                 <>
                   <CodingGitQuickActions

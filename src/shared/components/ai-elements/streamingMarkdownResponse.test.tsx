@@ -3,8 +3,8 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { clearResolvedLocalPathCache } from '../../../services/useResolvedLocalPath';
-import { StreamingMarkdownResponse } from './StreamingMarkdownResponse';
+import { clearResolvedLocalPathCache } from '../../../renderer/services/useResolvedLocalPath';
+import { StreamingMarkdownResponse } from './streamingMarkdownResponse';
 
 const installElectronMock = (resolvedPath: string | null) => {
   const resolveLocalPath = vi.fn(async () => ({ path: resolvedPath }));
