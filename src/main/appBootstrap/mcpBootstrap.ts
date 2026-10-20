@@ -5,6 +5,7 @@
 import { BrowserWindow } from 'electron';
 
 import { rt } from './runtimeState';
+import { mcpRuntime } from './mcpRuntimeState';
 import { getMcpStore, getStore } from './runtimeServices';
 import { bumpCodingCommandCatalog } from './codingRoomRuntime';
 import { FEISHU_MCP_REGISTRY_ID } from './feishuConnector';
@@ -73,10 +74,10 @@ export const refreshMcpOAuthHeaders = async <
  * Returns the tool manifest (may be empty if no MCP servers are configured).
  */
 export const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
-  if (rt.mcpInitPromise) return rt.mcpInitPromise;
-  const generation = rt.mcpLifecycleGeneration;
+  if (mcpRuntime.initPromise) return mcpRuntime.initPromise;
+  const generation = mcpRuntime.lifecycleGeneration;
 
-  rt.mcpInitPromise = (async (): Promise<McpToolManifestEntry[]> => {
+  mcpRuntime.initPromise = (async (): Promise<McpToolManifestEntry[]> => {
     try {
       ensureBuiltInMcpDefaultsDisabled();
       const enabledServers = await refreshMcpOAuthHeaders(getMcpStore().getEnabledServers());
@@ -85,22 +86,22 @@ export const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
         return [];
       }
 
-      if (!rt.mcpServerManager) {
-        rt.mcpServerManager = new McpServerManager();
+      if (!mcpRuntime.serverManager) {
+        mcpRuntime.serverManager = new McpServerManager();
       }
 
       // If already running (e.g. initMcpServers called before startMcpBridge),
       // reuse the existing connections instead of restarting.
-      if (rt.mcpServerManager.isRunning) {
-        const count = rt.mcpServerManager.toolManifest.length;
+      if (mcpRuntime.serverManager.isRunning) {
+        const count = mcpRuntime.serverManager.toolManifest.length;
         console.log(`[McpInit] MCP already running, reusing ${count} tools`);
-        return rt.mcpServerManager.toolManifest;
+        return mcpRuntime.serverManager.toolManifest;
       }
 
       console.log(`[McpInit] Starting ${enabledServers.length} MCP servers...`);
-      const tools = await rt.mcpServerManager.startServers(enabledServers);
-      if (generation !== rt.mcpLifecycleGeneration) {
-        await rt.mcpServerManager.stopServers();
+      const tools = await mcpRuntime.serverManager.startServers(enabledServers);
+      if (generation !== mcpRuntime.lifecycleGeneration) {
+        await mcpRuntime.serverManager.stopServers();
         return [];
       }
       console.log(`[McpInit] MCP servers started: ${tools.length} tools discovered`);
@@ -112,10 +113,10 @@ export const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
       return [];
     }
   })().finally(() => {
-    rt.mcpInitPromise = null;
+    mcpRuntime.initPromise = null;
   });
 
-  return rt.mcpInitPromise;
+  return mcpRuntime.initPromise;
 };
 
 /**
@@ -124,9 +125,9 @@ export const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
  * later connector refreshes without instantiating Pi just for MCP bootstrap.
  */
 const syncPiMcpToolManifest = (): void => {
-  if (!rt.piRuntimeAdapter || !rt.mcpServerManager) return;
+  if (!rt.piRuntimeAdapter || !mcpRuntime.serverManager) return;
   if (!rt.piRuntimeAdapter.hasMcpServerManager()) {
-    rt.piRuntimeAdapter.setMcpServerManager(rt.mcpServerManager);
+    rt.piRuntimeAdapter.setMcpServerManager(mcpRuntime.serverManager);
     return;
   }
   rt.piRuntimeAdapter.refreshMcpTools();
@@ -149,28 +150,28 @@ const broadcastMcpBridgeSync = (channel: string, data?: Record<string, unknown>)
 };
 
 export const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
-  if (rt.mcpBridgeRefreshPromise) {
+  if (mcpRuntime.bridgeRefreshPromise) {
     // A server setting changed while the current pass was reading the enabled
     // list. Schedule one more pass after it completes so the bridge converges
     // on the latest persisted configuration.
-    rt.mcpBridgeRefreshPending = true;
-    return rt.mcpBridgeRefreshPromise;
+    mcpRuntime.bridgeRefreshPending = true;
+    return mcpRuntime.bridgeRefreshPromise;
   }
-  rt.mcpBridgeRefreshPromise = (async () => {
+  mcpRuntime.bridgeRefreshPromise = (async () => {
     try {
-      const generation = ++rt.mcpLifecycleGeneration;
+      const generation = ++mcpRuntime.lifecycleGeneration;
       console.log('[McpBridge] refreshing after config change...');
       broadcastMcpBridgeSync('mcp:bridge:syncStart');
 
       ensureBuiltInMcpDefaultsDisabled();
       const enabledServers = await refreshMcpOAuthHeaders(getMcpStore().getEnabledServers());
-      if (!rt.mcpServerManager) {
-        rt.mcpServerManager = new McpServerManager();
+      if (!mcpRuntime.serverManager) {
+        mcpRuntime.serverManager = new McpServerManager();
       }
       // Reconcile preserves healthy, unchanged connections. A change to one
       // integration must not interrupt every other configured MCP server.
-      const tools = await rt.mcpServerManager.reconcileServers(enabledServers);
-      if (generation !== rt.mcpLifecycleGeneration) {
+      const tools = await mcpRuntime.serverManager.reconcileServers(enabledServers);
+      if (generation !== mcpRuntime.lifecycleGeneration) {
         return { tools: 0, error: 'MCP configuration changed during refresh' };
       }
       const toolCount = tools.length;
@@ -200,11 +201,11 @@ export const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> =
       return { tools: 0, error };
     })
     .finally(() => {
-      rt.mcpBridgeRefreshPromise = null;
-      if (rt.mcpBridgeRefreshPending) {
-        rt.mcpBridgeRefreshPending = false;
+      mcpRuntime.bridgeRefreshPromise = null;
+      if (mcpRuntime.bridgeRefreshPending) {
+        mcpRuntime.bridgeRefreshPending = false;
         void refreshMcpBridge();
       }
     });
-  return rt.mcpBridgeRefreshPromise;
+  return mcpRuntime.bridgeRefreshPromise;
 };

@@ -17,8 +17,6 @@ import type { CcConnectSidecarManager } from '../libs/ccConnectSidecarManager';
 import type { AppUpdateCoordinator } from '../libs/appUpdateCoordinator';
 import type { LlamaCppManager } from '../libs/llamacppManager';
 import type { LlamaCppModelOrchestrator } from '../libs/llamacppModelOrchestrator';
-import type { McpIntegrationRuntime } from '../libs/mcpIntegrationRuntime';
-import type { McpToolManifestEntry, McpServerManager } from '../libs/mcpServerManager';
 import type { OllamaManager } from '../libs/ollamaManager';
 import type { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
 import type { MagpieManager } from '../magpie/manager';
@@ -28,7 +26,6 @@ import type { ProjectMemoryService } from '../memory/projectMemoryService';
 import type { MemoryRepository } from '../memory/repository';
 import type { ZhiYuanEngramAdapter } from '../memory/zhiyuanEngramAdapter';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
-import type { McpStore } from '../mcpStore';
 import type { CoworkStore } from '../coworkStore';
 import type { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import type { SkillManager } from '../skillManager';
@@ -56,14 +53,6 @@ export const rt = {
   todoReminderScheduler: null as TodoReminderScheduler | null,
 
   skillManager: null as SkillManager | null,
-  mcpStore: null as McpStore | null,
-  mcpServerManager: null as McpServerManager | null,
-  mcpInitPromise: null as Promise<McpToolManifestEntry[]> | null,
-  mcpLifecycleGeneration: 0,
-  activeMcpAuthorizations: new Map<string, AbortController>(),
-  mcpIntegrationRuntime: null as McpIntegrationRuntime | null,
-  mcpBridgeRefreshPromise: null as Promise<{ tools: number; error?: string }> | null,
-  mcpBridgeRefreshPending: false,
 
   imGatewayManager: null as ChannelAccountManager | null,
   ccConnectBridgeServer: null as CcConnectBridgeServer | null,
@@ -110,13 +99,4 @@ export const rt = {
   isQuitting: false,
   lastReloadAt: 0,
   windowStateSaveTimer: null as ReturnType<typeof setTimeout> | null,
-};
-
-/** Accessors for the active MCP OAuth authorization controllers (work package I indirection). */
-export const getActiveMcpAuthorizations = (): Map<string, AbortController> | undefined =>
-  rt.activeMcpAuthorizations;
-export const setActiveMcpAuthorizations = (
-  value: Map<string, AbortController> | undefined,
-): void => {
-  rt.activeMcpAuthorizations = value;
 };

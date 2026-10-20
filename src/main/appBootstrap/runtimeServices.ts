@@ -2,6 +2,7 @@ import { app, powerSaveBlocker } from 'electron';
 
 import { isEnterprise } from './appEnv';
 import { rt } from './runtimeState';
+import { mcpRuntime } from './mcpRuntimeState';
 import {
   APP_UPDATE_POLL_INTERVAL_MS,
   APP_UPDATE_STARTUP_DELAY_JITTER_MS,
@@ -140,16 +141,16 @@ export const getSkillManager = () => {
 };
 
 export const getMcpStore = () => {
-  if (!rt.mcpStore) {
+  if (!mcpRuntime.store) {
     const sqliteStore = getStore();
     const nextMcpStore = new McpStore(
       sqliteStore.getDatabase(),
       new McpCredentialVault(sqliteStore),
     );
     nextMcpStore.migrateLegacyCredentials();
-    rt.mcpStore = nextMcpStore;
+    mcpRuntime.store = nextMcpStore;
   }
-  return rt.mcpStore;
+  return mcpRuntime.store;
 };
 
 /** Lazily constructed shared activity service (single source in runtime state). */

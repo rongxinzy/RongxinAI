@@ -9,7 +9,7 @@ import { spawn } from 'child_process';
 
 import { app, shell } from 'electron';
 
-import { rt } from './runtimeState';
+import { mcpRuntime } from './mcpRuntimeState';
 import { applyApplicationRuntimeEnv } from '../libs/coworkUtil';
 import { getFeishuCliRoot, getFeishuConnectorSkillsRoot } from '../libs/feishuConnectorPaths';
 import { getFeishuCliLauncherPath, writeFeishuCliLauncher } from '../libs/feishuCliLauncher';
@@ -246,7 +246,7 @@ const repairFeishuConnector = async (): Promise<void> => {
 };
 
 export const getMcpIntegrationRuntime = (): McpIntegrationRuntime => {
-  if (rt.mcpIntegrationRuntime) return rt.mcpIntegrationRuntime;
+  if (mcpRuntime.integrationRuntime) return mcpRuntime.integrationRuntime;
   const runtime = new McpIntegrationRuntime();
   runtime.register({
     manifest: OfficialIntegrationManifests[OfficialIntegrationId.Feishu],
@@ -265,6 +265,6 @@ export const getMcpIntegrationRuntime = (): McpIntegrationRuntime => {
       }
     },
   });
-  rt.mcpIntegrationRuntime = runtime;
+  mcpRuntime.integrationRuntime = runtime;
   return runtime;
 };

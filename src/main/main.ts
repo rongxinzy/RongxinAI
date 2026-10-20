@@ -51,11 +51,11 @@ import {
 import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
 import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
 import { rt } from './appBootstrap/runtimeState';
-import { getAgentManager, setPreventSleepBlockerEnabled } from './appBootstrap/runtimeServices';
 import {
   getActiveMcpAuthorizations,
   setActiveMcpAuthorizations,
-} from './appBootstrap/runtimeState';
+} from './appBootstrap/mcpRuntimeState';
+import { getAgentManager, setPreventSleepBlockerEnabled } from './appBootstrap/runtimeServices';
 import {
   getDefaultProjectBaseDir,
   getUnmanagedWorkspaceBaseDir,
