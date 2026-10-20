@@ -51,6 +51,7 @@ export const APP_SELECTORS = {
   'reasoning-panel-open': '.theme-reasoning-panel[data-state="open"]',
   'reasoning-panel-closed': '.theme-reasoning-panel[data-state="closed"]',
   'input-submit': '.theme-input-submit',
+  'input-submit-idle': '.theme-input-submit[aria-disabled="true"]',
   'control-content-height': '.theme-control-content-height',
   'composition-button-icon': '.theme-button svg:not([class*="size-"])',
   'composition-button-icon-xs':

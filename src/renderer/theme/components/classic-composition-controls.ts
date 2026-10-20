@@ -11,11 +11,18 @@ export function classicCompositionControls() {
     'input-submit': recipe({
       base: {
         'border-radius': '9999px',
-        'transition-property': 'background-color, translate',
-        'transition-duration': '150ms',
-        'transition-timing-function': 'ease-out',
+        'transition-property': 'background-color, color, translate',
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
       },
       pressed: { translate: '0 1px' },
+    }),
+    'input-submit-idle': recipe({
+      base: {
+        'background-color': 'var(--sidebar-accent)',
+        color: 'var(--zy-text-muted)',
+        opacity: '1',
+      },
     }),
     'local-compact-action': recipe({
       base: {

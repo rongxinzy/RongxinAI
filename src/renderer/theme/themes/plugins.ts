@@ -1,8 +1,10 @@
+import { BackgroundKind } from '../background/background';
 import { zenithLight } from './zenith-light';
 import { zenithDark } from './zenith-dark';
 import { validateComponentAppearances } from '../components/contract';
 import type { ThemeDefinition } from './types';
 import { TOKEN_NAMES } from '../tokens/contract';
+import { quietStudioV4DarkOverrides, quietStudioV4LightOverrides } from './quiet-studio-v4';
 
 export const THEME_PLUGIN_VERSION = 1 as const;
 export const DEFAULT_THEME_PLUGIN_ID = 'zenith';
@@ -53,19 +55,37 @@ export function defineThemePlugins(plugins: ThemePlugin[]): ThemePlugin[] {
   return plugins;
 }
 
+function withQuietStudio(
+  theme: ThemeDefinition,
+  overrides: Partial<ThemeDefinition['tokens']>,
+): ThemeDefinition {
+  return {
+    ...theme,
+    background: {
+      kind: BackgroundKind.None,
+      color: theme.background?.color ?? '#F4F5F7',
+      opacity: 0,
+      texture: theme.background?.texture ?? 'paper',
+      fit: theme.background?.fit ?? 'cover',
+    },
+    tokens: { ...theme.tokens, ...overrides },
+  };
+}
+
 /**
- * Zenith - Premium Futuristic Design System
- *
- * Consolidated to a single world-class theme pair for stronger brand identity.
- * Traditional themes (Daming, Changan, Weiyang, Xiaoruan) removed to focus on
- * premium, tech-forward aesthetic.
+ * One theme pair. Quiet Studio v4 replaces the Zenith glass, glow, and
+ * enlarged type scale; the plugin id stays `zenith` so saved appearance
+ * preferences keep resolving.
  */
 export const themePlugins = defineThemePlugins([
   {
     version: THEME_PLUGIN_VERSION,
     id: DEFAULT_THEME_PLUGIN_ID,
     name: { zh: 'Zenith', en: 'Zenith' },
-    appearances: { light: zenithLight, dark: zenithDark },
+    appearances: {
+      light: withQuietStudio(zenithLight, quietStudioV4LightOverrides),
+      dark: withQuietStudio(zenithDark, quietStudioV4DarkOverrides),
+    },
   },
 ]);
 

@@ -22,6 +22,7 @@ import { AgentSidebarIndicator } from './agentSidebar/constants';
 import type WorkspaceTreeNode from './agentSidebar/WorkspaceTreeNode';
 import type AgentTaskRow from './agentSidebar/AgentTaskRow';
 import type { SidebarNavigationControls } from './SidebarNavigationControls';
+import { SidebarNavSection } from './shell/SidebarNavigationView';
 import { consumeScheduledTaskCreateRequest } from './scheduledTasks/createRequest';
 import Sidebar from './Sidebar';
 
@@ -55,13 +56,15 @@ vi.mock('../services/i18n', () => ({
 }));
 vi.mock('./SidebarNavigationControls', () => ({
   SidebarNavigationControls: (props: ComponentProps<typeof SidebarNavigationControls>) =>
-    createElement(
-      'button',
-      {
-        onClick: () => props.onWorkModeChange(props.workMode !== WorkMode.Chat),
-      },
-      'switch mode',
-    ),
+    props.section === SidebarNavSection.Destinations
+      ? null
+      : createElement(
+          'button',
+          {
+            onClick: () => props.onWorkModeChange(props.workMode !== WorkMode.Chat),
+          },
+          'switch mode',
+        ),
 }));
 vi.mock('./agentSidebar/AgentTaskRow', () => ({
   default: (props: ComponentProps<typeof AgentTaskRow>) =>

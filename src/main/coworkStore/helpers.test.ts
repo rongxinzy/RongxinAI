@@ -28,13 +28,13 @@ test('parseBooleanConfig accepts common boolean spellings and falls back otherwi
   expect(parseBooleanConfig('garbage', false)).toBe(false);
 });
 
-test('normalizePermissionMode keeps known modes and defaults to allow-all', () => {
+test('normalizePermissionMode keeps known modes and defaults to ask', () => {
   expect(normalizePermissionMode(CoworkPermissionMode.Ask)).toBe(CoworkPermissionMode.Ask);
   expect(normalizePermissionMode(CoworkPermissionMode.AllowAll)).toBe(
     CoworkPermissionMode.AllowAll,
   );
-  expect(normalizePermissionMode(undefined)).toBe(CoworkPermissionMode.AllowAll);
-  expect(normalizePermissionMode('nonsense')).toBe(CoworkPermissionMode.AllowAll);
+  expect(normalizePermissionMode(undefined)).toBe(CoworkPermissionMode.Ask);
+  expect(normalizePermissionMode('nonsense')).toBe(CoworkPermissionMode.Ask);
 });
 
 test('parseEmbeddingVectorWeight clamps to [0, 1] and defaults to 0.7', () => {

@@ -2,6 +2,7 @@ import { cn } from '@shared/lib/utils';
 import React from 'react';
 
 import { i18nService } from '../services/i18n';
+import { needsTrafficLightInset } from '../utils/trafficLightInset';
 import { SidebarAnimatedMessageCirclePlusIcon } from './icons/SidebarAnimatedMessageCirclePlusIcon';
 import { SidebarAnimatedPanelLeftCloseIcon } from './icons/SidebarAnimatedPanelLeftCloseIcon';
 import WindowTitleBar from './window/WindowTitleBar';
@@ -44,7 +45,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   onNewChat,
   updateBadge,
 }) => {
-  const isMac = window.electron.platform === 'darwin';
+  const isMac = needsTrafficLightInset();
   return (
     <PageHeaderLayout
       navigation={

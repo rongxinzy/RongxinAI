@@ -43,14 +43,14 @@ test('facade keeps the shared public surface importable from the original path',
     assistant: 'assistant',
   };
 
-  expect(update.permissionMode).toBe(CoworkPermissionMode.AllowAll);
+  expect(update.permissionMode).toBe(CoworkPermissionMode.Ask);
   expect(replacement.timestamp).toBeUndefined();
   expect(record.sessionId).toBe('session');
 });
 
-test('defaults to allow-all while retaining an explicit permission choice', () => {
+test('defaults to ask while retaining an explicit permission choice', () => {
   const { db, store } = harness;
-  expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.AllowAll);
+  expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.Ask);
   db.prepare('INSERT OR REPLACE INTO cowork_config (key, value, updated_at) VALUES (?, ?, ?)').run(
     'permissionMode',
     CoworkPermissionMode.Ask,
@@ -66,7 +66,7 @@ test('getConfig returns built-in defaults when no config rows exist', () => {
     workingDirectory: getDefaultWorkingDirectory(),
     systemPrompt: '',
     executionMode: 'local',
-    permissionMode: CoworkPermissionMode.AllowAll,
+    permissionMode: CoworkPermissionMode.Ask,
     embeddingEnabled: false,
     embeddingProvider: 'openai',
     embeddingModel: '',
@@ -138,7 +138,7 @@ test('getConfig normalizes an invalid stored permission mode', () => {
     Date.now(),
   );
 
-  expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.AllowAll);
+  expect(store.getConfig().permissionMode).toBe(CoworkPermissionMode.Ask);
 });
 
 test('getAppLanguage defaults to zh and follows the persisted app config', () => {

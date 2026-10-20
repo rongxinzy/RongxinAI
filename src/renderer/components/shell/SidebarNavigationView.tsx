@@ -1,23 +1,26 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
-import {
-  Activity,
-  AlarmClock,
-  Bot,
-  ListTodo,
-  MessageCirclePlus,
-  Plus,
-  Terminal,
-  Users,
-} from 'lucide-react';
+import { Activity, AlarmClock, Bot, CodeXml, ListChecks, SquarePen, Users } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
+import { DEFAULT_SHORTCUTS } from '../../config';
+import { configService } from '../../services/config';
+import { formatShortcutLabel } from '../../services/shortcutLabel';
+
+export const SidebarNavSection = {
+  All: 'all',
+  Actions: 'actions',
+  Destinations: 'destinations',
+} as const;
+export type SidebarNavSection = (typeof SidebarNavSection)[keyof typeof SidebarNavSection];
+
 const icons = {
-  conversation: MessageCirclePlus,
+  conversation: SquarePen,
   localInference: Bot,
-  coding: Terminal,
-  todo: ListTodo,
+  coding: CodeXml,
+  todo: ListChecks,
   scheduledTasks: AlarmClock,
   activity: Activity,
   expert: Users,
@@ -54,10 +57,7 @@ function SidebarNavigationItem({ entry }: { entry: SidebarNavigationEntry }) {
       </div>
       <span className="min-w-0 truncate">{entry.label}</span>
       {entry.running && (
-        <span
-          className="ml-auto size-1.5 shrink-0 rounded-full bg-primary motion-safe:animate-pulse"
-          aria-hidden="true"
-        />
+        <span className="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
       )}
     </Button>
   );
@@ -70,6 +70,9 @@ interface SidebarNavigationViewProps {
   onModeChange: (checked: boolean) => void;
   newConversation: SidebarNavigationEntry;
   entries: SidebarNavigationEntry[];
+  /** Actions sit above search; destinations are the feature rows below it. */
+  section?: SidebarNavSection;
+  searchRow?: ReactNode;
 }
 
 export function SidebarNavigationView({
@@ -79,6 +82,8 @@ export function SidebarNavigationView({
   onModeChange,
   newConversation,
   entries,
+  section = SidebarNavSection.All,
+  searchRow,
 }: SidebarNavigationViewProps) {
   // The mode flip re-renders the whole app (sidebar tree + main view) in one
   // blocking commit. Reflect the toggle optimistically in this tiny tree and
@@ -96,6 +101,12 @@ export function SidebarNavigationView({
     [],
   );
   const shownIsChat = optimisticIsChat ?? isChat;
+  const shortcutHint = formatShortcutLabel(
+    configService.getConfig().shortcuts?.newChat ?? DEFAULT_SHORTCUTS.newChat,
+    window.electron?.platform === 'darwin',
+  );
+  const showActions = section !== SidebarNavSection.Destinations;
+  const showDestinations = section !== SidebarNavSection.Actions;
   const handleModeChange = (checked: boolean) => {
     setOptimisticIsChat(checked);
     if (pendingModeChange.current !== null) cancelAnimationFrame(pendingModeChange.current);
@@ -104,46 +115,58 @@ export function SidebarNavigationView({
       onModeChange(checked);
     });
   };
+  if (!showActions && entries.length === 0) return null;
+
   return (
-    <div className="flex flex-col gap-4 px-2 py-4">
-      <div className="relative h-7 w-full">
-        <Switch
-          checked={shownIsChat}
-          onCheckedChange={handleModeChange}
-          data-mode="work-chat"
-          aria-label={`${workLabel} / ${chatLabel}`}
-        />
-        {[workLabel, chatLabel].map((label, index) => (
-          <span
-            key={index}
-            data-mode-selected={shownIsChat === (index === 1)}
-            aria-hidden="true"
-            className={cn(
-              'theme-sidebar-mode-label pointer-events-none absolute inset-y-0 flex w-1/2 items-center justify-center',
-              index === 0 ? 'left-0' : 'left-1/2',
-            )}
-          >
-            {label}
-          </span>
-        ))}
-      </div>
-      <Button
-        type="button"
-        variant="default"
-        size="lg"
-        className="w-full justify-start gap-2"
-        data-testid={newConversation.testId}
-        data-active={newConversation.active || undefined}
-        aria-current={newConversation.currentPage ? 'page' : undefined}
-        onClick={newConversation.onClick}
-        onMouseEnter={newConversation.onIntent}
-        onFocus={newConversation.onIntent}
-      >
-        <Plus data-icon="inline-start" aria-hidden="true" />
-        <span className="min-w-0 truncate">{newConversation.label}</span>
-      </Button>
-      {entries.length > 0 && (
-        <div className="flex flex-col gap-1">
+    <div className={cn('flex flex-col gap-4 px-2', showActions ? 'pt-3' : 'pt-4')}>
+      {showActions && (
+        <>
+          <div className="relative h-7 w-full">
+            <Switch
+              checked={shownIsChat}
+              onCheckedChange={handleModeChange}
+              data-mode="work-chat"
+              aria-label={`${workLabel} / ${chatLabel}`}
+            />
+            {[workLabel, chatLabel].map((label, index) => (
+              <span
+                key={index}
+                data-mode-selected={shownIsChat === (index === 1)}
+                aria-hidden="true"
+                className={cn(
+                  'theme-sidebar-mode-label pointer-events-none absolute inset-y-0 flex w-1/2 items-center justify-center',
+                  index === 0 ? 'left-0' : 'left-1/2',
+                )}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              className="w-full justify-start"
+              data-testid={newConversation.testId}
+              data-active={newConversation.active || undefined}
+              aria-current={newConversation.currentPage ? 'page' : undefined}
+              onClick={newConversation.onClick}
+              onMouseEnter={newConversation.onIntent}
+              onFocus={newConversation.onIntent}
+            >
+              <SquarePen data-icon="inline-start" aria-hidden="true" strokeWidth={1.75} />
+              <span className="min-w-0 flex-1 truncate text-left">{newConversation.label}</span>
+              <span className="theme-sidebar-kbd" aria-hidden="true">
+                {shortcutHint}
+              </span>
+            </Button>
+            {searchRow}
+          </div>
+        </>
+      )}
+      {showDestinations && entries.length > 0 && (
+        <div className="flex flex-col gap-0.5">
           {entries.map(entry => (
             <SidebarNavigationItem key={entry.id} entry={entry} />
           ))}

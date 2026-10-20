@@ -99,12 +99,12 @@ test('switches packaged backgrounds with the complete theme and clears them on d
   );
   expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('0.4');
   await manager.setTheme('zenith-light');
-  // Zenith has its own background, not transparent
+  // Quiet Studio paints the window from surface tokens, not a second canvas image.
   expect(document.documentElement.style.getPropertyValue('--main-background-color')).toBe(
-    '#FAFBFD',
+    'transparent',
   );
   expect(document.documentElement.style.getPropertyValue('--main-background-image')).toBe('none');
-  expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('1');
+  expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('0');
   expect(input.value).toBe('draft');
   expect(document.activeElement).toBe(input);
 });

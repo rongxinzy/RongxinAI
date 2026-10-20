@@ -104,10 +104,14 @@ export function MainViewCanvas({
   onRespondToPermission,
 }: MainViewCanvasProps) {
   return (
-    <div className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}>
+    <div
+      className={`min-w-0 flex-1 p-2 transition-[padding] duration-200 ease-out ${
+        isSidebarCollapsed ? '' : 'pl-0'
+      }`}
+    >
       <div
         data-main-canvas
-        className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]"
+        className="theme-shell-canvas relative h-full min-h-0 overflow-hidden contain-[layout_style_paint]"
       >
         {hasMountedLocalInference &&
           !isLocalInferenceDormant &&

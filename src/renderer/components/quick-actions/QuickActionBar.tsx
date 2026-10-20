@@ -34,9 +34,9 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect
   }
 
   return (
-    // One centered row on wide screens; below the composer width the actions
-    // become a balanced grid so a wrapped tail never leaves a lonely pill.
-    <div className="mx-auto grid w-full max-w-4xl grid-cols-2 gap-2 md:grid-cols-3 xl:flex xl:flex-wrap xl:items-center xl:justify-center">
+    // One centered row when the stage is wide enough for every pill. Narrower
+    // stages use a 3-column grid so six actions stay two even rows.
+    <div className="mx-auto grid w-full grid-cols-3 justify-items-center gap-2 @min-[960px]:flex @min-[960px]:flex-nowrap @min-[960px]:items-center @min-[960px]:justify-center">
       {actions.map(action => {
         const IconComponent = iconMap[action.icon];
 

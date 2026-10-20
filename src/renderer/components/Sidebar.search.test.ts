@@ -61,7 +61,9 @@ vi.mock('../services/i18n', () => ({
   // The search dialog resolves scheduled titles through i18nService.getLanguage().
   i18nService: { t: (key: string) => key, getLanguage: () => 'zh', subscribe: () => () => {} },
 }));
-vi.mock('./SidebarNavigationControls', () => ({ SidebarNavigationControls: () => null }));
+vi.mock('./SidebarNavigationControls', () => ({
+  SidebarNavigationControls: ({ searchRow }: { searchRow?: React.ReactNode }) => searchRow ?? null,
+}));
 vi.mock('./LoginButton', () => ({ default: () => null }));
 vi.mock('./chat/ChatSkillShortcuts', () => ({ default: () => null }));
 vi.mock('./coding/CodingWorkspaceSidebar', () => ({ CodingWorkspaceSidebar: () => null }));

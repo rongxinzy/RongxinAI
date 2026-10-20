@@ -53,9 +53,9 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
   ...overrides,
 });
 
-test('initial permission mode allows all tools', () => {
+test('initial permission mode asks before a sensitive step', () => {
   expect(coworkReducer(undefined, { type: 'init' }).config.permissionMode).toBe(
-    CoworkPermissionMode.AllowAll,
+    CoworkPermissionMode.Ask,
   );
 });
 

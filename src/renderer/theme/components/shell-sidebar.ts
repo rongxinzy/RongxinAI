@@ -20,21 +20,21 @@ export function shellSidebarAppearances() {
       base: {
         'background-color': 'var(--sidebar)',
         color: 'var(--sidebar-foreground)',
-        'border-right-width': '1px',
+        'border-right-width': '0px',
         'border-style': 'solid',
-        'border-color': 'var(--zy-border-subtle)',
+        'border-color': 'transparent',
       },
     }),
     'shell-sidebar-header': recipe({
       base: {
-        height: '2.5rem',
+        height: '2rem',
         'padding-inline': '0.5rem',
-        'border-bottom-width': '1px',
+        'border-bottom-width': '0px',
         'border-style': 'solid',
-        'border-color': 'var(--border)',
+        'border-color': 'transparent',
       },
     }),
-    'shell-sidebar-logo': recipe({ base: { height: '1rem' } }),
+    'shell-sidebar-logo': recipe({ base: { height: '1.25rem' } }),
     'shell-sidebar-section': recipe({
       base: {
         height: '1.75rem',
@@ -79,13 +79,13 @@ export function shellSidebarAppearances() {
     'shell-sidebar-nav-selected': recipe({
       base: {
         'background-color': surface(8),
-        color: 'var(--sidebar-foreground)',
+        color: 'var(--foreground)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
       },
-      hover: { 'background-color': surface(10), color: 'var(--sidebar-foreground)' },
+      hover: { 'background-color': surface(10), color: 'var(--foreground)' },
       selected: {
         'background-color': surface(8),
-        color: 'var(--sidebar-foreground)',
+        color: 'var(--foreground)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
       },
       pressed: { 'background-color': surface(12) },
@@ -247,7 +247,18 @@ export function shellSidebarAppearances() {
     'shell-mode-label-selected': recipe({
       base: {
         'font-weight': 'var(--zy-component-font-weight-medium)',
-        color: 'var(--zy-switch-thumb-foreground)',
+        color: 'var(--foreground)',
+      },
+    }),
+    'shell-sidebar-kbd': recipe({
+      base: {
+        height: '18px',
+        'padding-inline': '6px',
+        'border-radius': 'var(--zy-style-radius-md)',
+        'font-size': 'var(--zy-component-text-xs)',
+        'line-height': '18px',
+        color: 'var(--zy-text-muted)',
+        'box-shadow': 'inset 0 0 0 1px var(--border)',
       },
     }),
   };

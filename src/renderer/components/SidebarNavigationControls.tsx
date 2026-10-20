@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useSelector } from 'react-redux';
 
 import { i18nService } from '../services/i18n';
@@ -7,7 +8,11 @@ import type { RootState } from '../store';
 import { selectHasActiveActivityRun } from '../store/selectors/activitySelectors';
 import { WorkMode } from '../store/workMode/constants';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
-import { SidebarNavigationView, type SidebarNavigationEntry } from './shell/SidebarNavigationView';
+import {
+  SidebarNavSection,
+  SidebarNavigationView,
+  type SidebarNavigationEntry,
+} from './shell/SidebarNavigationView';
 
 export type SidebarActiveView =
   | 'cowork'
@@ -36,6 +41,8 @@ interface SidebarNavigationControlsProps {
   inferenceEdition?: import('../../shared/inferenceEdition').InferenceEdition;
   /** Warms the lazily loaded chunk for a view on hover/focus intent. */
   onPrefetchView?: (view: PrefetchableFeatureView) => void;
+  section?: SidebarNavSection;
+  searchRow?: ReactNode;
 }
 
 export const SidebarNavigationControls = ({
@@ -52,6 +59,8 @@ export const SidebarNavigationControls = ({
   managedModelsOnly = false,
   inferenceEdition,
   onPrefetchView,
+  section = SidebarNavSection.All,
+  searchRow,
 }: SidebarNavigationControlsProps) => {
   const hasActiveActivityRun = useSelector((state: RootState) => selectHasActiveActivityRun(state));
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
@@ -115,6 +124,8 @@ export const SidebarNavigationControls = ({
         testId: 'sidebar-new-conversation',
       }}
       entries={entries}
+      section={section}
+      searchRow={searchRow}
     />
   );
 };

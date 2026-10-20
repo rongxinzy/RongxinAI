@@ -434,6 +434,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           multiple
           className={cn(
             'theme-composer-surface input-aura',
+            size === 'large' && 'theme-home-composer',
             isDraggingFiles && 'theme-composer-drop-active',
           )}
           onDragEnter={handleDragEnter}
@@ -631,7 +632,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                         event.preventDefault();
                         event.stopPropagation();
                       }}
-                      className="cursor-not-allowed opacity-40"
+                      className="cursor-not-allowed"
                     />
                   </TooltipTrigger>
                   <TooltipContent side="top">{i18nService.t('chatSubmitEmptyHint')}</TooltipContent>

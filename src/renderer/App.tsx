@@ -524,7 +524,7 @@ const App: React.FC = () => {
     />
   ) : null;
   const windowsStandaloneTitleBar = isWindows ? (
-    <div className="draggable relative h-9 shrink-0 bg-surface-raised">
+    <div className="draggable relative h-9 shrink-0 bg-surface">
       <WindowTitleBar isOverlayActive={false} />
     </div>
   ) : null;
@@ -563,7 +563,7 @@ const App: React.FC = () => {
       <div
         ref={appShellRef}
         tabIndex={-1}
-        className="h-screen overflow-hidden flex flex-col bg-surface-raised outline-none"
+        className="flex h-screen flex-col overflow-hidden bg-surface outline-none"
       >
         {toastMessage && (
           <Toast message={toastMessage} isError={isToastError} isSuccess={isToastSuccess} />

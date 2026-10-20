@@ -19,12 +19,7 @@ export function PageHeaderLayout({
 }: PageHeaderLayoutProps) {
   return (
     <header className="shrink-0 bg-background">
-      <div
-        className={cn(
-          'draggable flex h-12 items-center justify-between gap-3 px-4',
-          !tabs && 'border-b border-border-subtle',
-        )}
-      >
+      <div className={cn('draggable flex h-12 items-center justify-between gap-3 px-4')}>
         <div className="flex h-8 min-w-0 flex-1 items-center gap-3">
           {navigation}
           {content}

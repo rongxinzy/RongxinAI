@@ -58,6 +58,8 @@ import { toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
 import LoginButton from './LoginButton';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import { SidebarNavigationControls, type SidebarActiveView } from './SidebarNavigationControls';
+import { SidebarNavSection } from './shell/SidebarNavigationView';
+import { needsTrafficLightInset } from '../utils/trafficLightInset';
 
 interface SidebarProps {
   onShowSettings: () => void;
@@ -174,7 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
   const visibleSessionIds =
     workMode === WorkMode.Chat ? chatVisibleSessionIds : workVisibleSessionIdsRef.current;
-  const isMac = window.electron.platform === 'darwin';
+  const isMac = needsTrafficLightInset();
 
   useEffect(() => {
     const handleSearch = () => {
@@ -443,6 +445,28 @@ const Sidebar: React.FC<SidebarProps> = ({
               </ShellIconButton>
             </div>
             <SidebarNavigationControls
+              section={SidebarNavSection.Actions}
+              searchRow={
+                activeView !== 'coding' && workMode !== WorkMode.Chat
+                  ? renderSearchControl(true)
+                  : null
+              }
+              activeView={activeView}
+              onNewChat={onNewChat}
+              onShowExpert={onShowExpert}
+              onShowCoding={onShowCoding}
+              onShowTodo={onShowTodo}
+              onShowLocalInference={onShowLocalInference}
+              onShowScheduledTasks={onShowScheduledTasks}
+              onShowActivity={onShowActivity}
+              onWorkModeChange={handleWorkModeChange}
+              workMode={workMode}
+              managedModelsOnly={managedModelsOnly}
+              inferenceEdition={inferenceEdition}
+              onPrefetchView={onPrefetchView}
+            />
+            <SidebarNavigationControls
+              section={SidebarNavSection.Destinations}
               activeView={activeView}
               onNewChat={onNewChat}
               onShowExpert={onShowExpert}
@@ -467,8 +491,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 />
               </div>
             ) : null}
-            {activeView !== 'coding' && workMode !== WorkMode.Chat && renderSearchControl()}
-
             <div
               ref={agentScrollContainerRef}
               className={cn(

@@ -29,9 +29,7 @@ export const PromptInputSubmit = ({
   // Circular send button: arrow nudges up on hover, the disc scales down on
   // press. Transform/opacity only, so the interaction stays on the compositor
   // and never triggers layout or React re-renders.
-  let Icon = (
-    <ArrowUpIcon className="size-4 transition-transform duration-150 ease-out group-hover/button:-translate-y-0.5 group-active/button:translate-y-0 motion-reduce:transform-none motion-reduce:transition-none" />
-  );
+  let Icon = <ArrowUpIcon className="size-4" />;
 
   if (status === 'submitted') {
     Icon = <Spinner />;

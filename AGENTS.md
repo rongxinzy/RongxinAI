@@ -113,26 +113,27 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 ### 事实来源与优先级
 
-- 视觉规范唯一来源是 [DESIGN.md](DESIGN.md)，具体数值只在那里维护。优先级：AGENTS.md / DESIGN.md > 项目 UI skills（`frontend-ui-change-strategy`、`rongxinai-ui-adapter`）> `design-taste-frontend` > `high-end-visual-design` > 组件库默认、历史代码、个人审美。规范间有实质冲突时指出冲突点，不得自选较宽松的一方。
-- 改 UI 前必须读 DESIGN.md 相关章节、受影响组件及其 token/recipe，并看下方范例。「原来就是这么写的」不是理由。
-- 「美化/优化/现代化」不是自由发挥许可。禁止擅自新增色系、字号/圆角/阴影档、装饰光晕、动画、嵌套卡片、Hero、导航层级或虚构状态。
+- 视觉规范唯一来源是 [DESIGN.md](DESIGN.md)（v4.0 Quiet Studio），具体数值只在那里维护；主界面的参考实现与 CSS 写法标杆见 [docs/design/reference/index.html](docs/design/reference/index.html)（不被 renderer 引用，与 DESIGN.md 冲突时以 DESIGN.md 为准）。优先级：AGENTS.md / DESIGN.md > 参考实现 > 项目 UI skills（`frontend-ui-change-strategy`、`rongxinai-ui-adapter`）> `design-taste-frontend` > `high-end-visual-design` > 组件库默认、历史代码、个人审美。规范间有实质冲突时指出冲突点，不得自选较宽松的一方。
+- 改 UI 前必须读 DESIGN.md 相关章节、对照参考实现、读受影响组件及其 token/recipe，并看下方范例。「原来就是这么写的」不是理由。
+- 「美化/优化/现代化」不是自由发挥许可。禁止擅自新增色系、字号/圆角/阴影档、毛玻璃、渐变按钮、装饰光晕、悬停上浮/缩放、呼吸动画、嵌套卡片、Hero、导航层级或虚构状态。
 - 新视觉语义：先更新 DESIGN.md 与契约，再实现全部主题；禁止先实现再改规范背书。
 - 偏离已批准设计须取得用户明确授权（本轮已授权的不重复问），写入 DESIGN.md 并在 PR 列出。其他 agent 同意或工具默认不算授权。
 - 禁止绕过验收：不删弱检查项、不关审计、不扩白名单、不加无依据例外、不未经用户验收覆盖基准截图。
 
-### 已验收范例：2026-10-05 主界面
+### 主界面参考标杆（2026-10-20，DESIGN.md v4.0）
 
-后续产品界面必须继承此版理念，不得退回早期风格。基准截图（1280×800）：[浅色](docs/theme-previews/main-interface-2026-10-05-light.png)、[深色](docs/theme-previews/main-interface-2026-10-05-dark.png)；新基准须经用户验收并记录日期与理由。
+用户审阅 v3 主界面后授权废止 Zenith 的毛玻璃、渐变主按钮、外发光、悬停上浮和放大 30% 字阶，确立 v4.0 Quiet Studio 标准。参考实现位于 [docs/design/reference/index.html](docs/design/reference/index.html)（含 `tokens.css`、`shell.css`、`stage.css`、`main.js`）；代码改造完成前，旧基准截图（[浅色](docs/theme-previews/main-interface-2026-10-05-light.png)、[深色](docs/theme-previews/main-interface-2026-10-05-dark.png)）保留供回归参考，待 v4 实现通过用户验收后再替换。
 
-| 特征 | 做法 | 入口 |
+| 特征 | v4 做法 | 代码入口 |
 | --- | --- | --- |
-| 侧栏分组清楚、主动作突出 | 模式/新建/功能/项目历史分层，靠留白与文字角色区分；新建用共享主按钮 | [SidebarNavigationView.tsx](src/renderer/components/shell/SidebarNavigationView.tsx)、[shell-sidebar.ts](src/renderer/theme/components/shell-sidebar.ts) |
-| 主输入区是视觉中心 | 正式字标、克制说明、居中输入岛；工具入口就近，无装饰光晕 | [CoworkView.tsx](src/renderer/components/cowork/CoworkView.tsx)、[classic-message-surfaces.ts](src/renderer/theme/components/classic-message-surfaces.ts) |
-| 控件规格一致 | 复用 ai-elements 输入与共享选择器；窄窗口下文件夹/权限/模型/提交仍可达 | [CoworkPromptInput.tsx](src/renderer/components/cowork/CoworkPromptInput.tsx)、[PromptWorkspaceSelector.tsx](src/renderer/components/cowork/PromptWorkspaceSelector.tsx)、[PromptSelectorButton.tsx](src/renderer/components/cowork/PromptSelectorButton.tsx) |
-| 引导项轻量中性 | 共享按钮 + Lucide 图标，胶囊对应真实任务，不做彩色装饰卡 | [QuickActionBar.tsx](src/renderer/components/quick-actions/QuickActionBar.tsx)、[classic-page-controls.ts](src/renderer/theme/components/classic-page-controls.ts) |
-| 明暗成套、外观与行为分离 | token + 注册 hook + recipe；切主题原位更新，保留输入与交互状态 | [home-studio.ts](src/renderer/theme/components/home-studio.ts)、[home-studio-contract.ts](src/renderer/theme/components/home-studio-contract.ts)、[zenith-light.ts](src/renderer/theme/themes/zenith-light.ts)、[zenith-dark.ts](src/renderer/theme/themes/zenith-dark.ts) |
+| 一屏一个重心 | 首页重心是输入岛（20px 圆角、强边框、`shadow-sm`→聚焦 `shadow-md`）；品牌只在侧栏出现一次，首页用时段问候语（24px/600），不放大字标 | [HomeStudio.tsx](src/renderer/components/cowork/HomeStudio.tsx)、[CoworkView.tsx](src/renderer/components/cowork/CoworkView.tsx)、[classic-message-surfaces.ts](src/renderer/theme/components/classic-message-surfaces.ts) |
+| 品牌色只表示「可执行」 | 品牌蓝只用于有内容时的发送键、对话框主确认、焦点环、链接与运行点；侧栏「新建任务」改用 `secondary-lg` 中性抬升按钮 + 快捷键提示；分段控件与导航选中不用品牌色 | [SidebarNavigationView.tsx](src/renderer/components/shell/SidebarNavigationView.tsx)、[shell-sidebar.ts](src/renderer/theme/components/shell-sidebar.ts) |
+| 用面分区，不用线 | 侧栏直接放在窗口底色上；主内容是一块距窗口边 8px、12px 圆角、1px 边框的抬升面板 | [home-studio.ts](src/renderer/theme/components/home-studio.ts)、[zenith-light.ts](src/renderer/theme/themes/zenith-light.ts)、[zenith-dark.ts](src/renderer/theme/themes/zenith-dark.ts) |
+| 同一规格、次要信息按需 | 行、按钮、芯片统一 32px 高、8px 圆角、16px 图标，文字起点对齐；会话按「今天/本周」分组，相对时间在 hover/focus 时显示 | [CoworkPromptInput.tsx](src/renderer/components/cowork/CoworkPromptInput.tsx)、[PromptWorkspaceSelector.tsx](src/renderer/components/cowork/PromptWorkspaceSelector.tsx)、[PromptSelectorButton.tsx](src/renderer/components/cowork/PromptSelectorButton.tsx) |
+| 引导项轻量、文案一致 | 中性胶囊、动宾短语（制作幻灯片、分析数据、搭建网站、深度调研、学术研究、撰写文档）；默认权限为「敏感操作需确认」，与安全状态文案一致 | [QuickActionBar.tsx](src/renderer/components/quick-actions/QuickActionBar.tsx)、[classic-page-controls.ts](src/renderer/theme/components/classic-page-controls.ts) |
+| 明暗成套、外观与行为分离 | token + 注册 hook + recipe；切主题原位更新，保留输入与交互状态；动效只过渡颜色/阴影/透明度（120ms），按压 1px | [home-studio-contract.ts](src/renderer/theme/components/home-studio-contract.ts)、[zenith-light.ts](src/renderer/theme/themes/zenith-light.ts)、[zenith-dark.ts](src/renderer/theme/themes/zenith-dark.ts) |
 
-范例确立的是克制层级、统一控件、主题归属与状态连续性。设置页、列表页用 DESIGN.md 对应范式，不复制首页 Hero；引用文件中的遗留代码不因此豁免。
+设置页、列表页用 DESIGN.md 对应范式（行式列表为主，不套多余卡片），不复制首页问候区；引用文件中的遗留代码不因此豁免。
 
 ### 已验收范例：2026-10-13 弹窗密度基准
 
@@ -163,12 +164,12 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 ### 前端工作流程
 
-1. **改前**：列出涉及的 DESIGN.md 章节、复用组件、token/recipe 入口、受影响页面/状态。
-2. **委派**：传递规范、范例与验收条件；委派方负责最终逐项验收，不只接受「已完成」。
-3. **改后**：逐项完成 DESIGN.md「十、落地检查清单」，每项标「通过 / 不适用（理由）/ 未通过（问题）」，未通过继续修。
+1. **改前**：列出涉及的 DESIGN.md 章节、对照 [docs/design/reference/index.html](docs/design/reference/index.html)、列出复用组件、token/recipe 入口、受影响页面/状态。
+2. **委派**：传递规范、参考标杆与验收条件；委派方负责最终逐项验收，不只接受「已完成」。
+3. **改后**：逐项完成 DESIGN.md「十、落地检查清单」（含视觉判断、规格、交互、命令四组），每项标「通过 / 不适用（理由）/ 未通过（问题）」，未通过继续修。
 4. **实际渲染**：先用 `bun run web:preview` 在浏览器中迭代和检查 light/dark、适用状态（hover/pressed/selected/disabled/invalid/open）、键盘焦点、窄窗口、长文本、动态内容、portal、reduced-motion、实际尺寸与溢出；用改了 recipe 的主题热切换，确认新值生效且草稿/焦点/选中/弹层/滚动保留。运行 `bun run web:preview:check` 确认交互与控制台；mock 未覆盖的行为如实记为未验证。
 5. **Electron 验证**：涉及真实 IPC、主进程、文件/系统能力、原生窗口或完整业务流程时，用 `bun run electron:dev` 复验受影响操作；浏览器 mock 不能证明这些行为。
-6. **自查要点**：视觉中心与主动作是否清楚、分组是否靠留白与字阶；是否新增多余颜色/边框/阴影/动效/卡片层/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
+6. **自查要点**：一屏是否只有一个重心（缩小到 25% 看第一眼落在哪）、品牌蓝是否只用于可执行的主动作（单屏 ≤2 处）、分组是否靠留白与三级灰阶；是否残留毛玻璃/渐变按钮/光晕/悬停上浮/卡片嵌套/重复标题；是否有调用点绕过 recipe 或只适配单一主题。
 
 截图、测试、lint 各证明不同事项，互不替代；自动检查不覆盖设计判断。纯文档改动只做一致性与链接检查，不宣称 UI 验收。
 

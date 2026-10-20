@@ -34,7 +34,7 @@ export function classicMessageSurfaces() {
     'message-role-user': recipe({
       base: {
         'border-radius': 'var(--zy-style-radius-lg)',
-        'background-color': 'var(--secondary)',
+        'background-color': 'var(--sidebar-accent)',
         'padding-inline': '1rem',
         'padding-block': '0.75rem',
         color: 'var(--foreground)',
@@ -83,7 +83,7 @@ export function classicMessageSurfaces() {
         ...bubble,
         'border-radius': 'var(--zy-style-radius-2xl)',
         'border-bottom-right-radius': 'var(--zy-style-radius-md)',
-        'background-color': 'var(--secondary)',
+        'background-color': 'var(--sidebar-accent)',
         'font-size': 'var(--zy-component-text-sm)',
         color: 'var(--foreground)',
       },

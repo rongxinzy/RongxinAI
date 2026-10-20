@@ -1,5 +1,4 @@
 import { configService } from '../../services/config';
-import { cn } from '@shared/lib/utils';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -46,7 +45,7 @@ import {
 } from '../../types/cowork';
 import { toAgentModelRef } from '../../utils/agentModelRef';
 import { isScratchWorkspacePath } from '../../utils/path';
-import { PromptPanel, QuickActionBar } from '../quick-actions';
+import { HomeStudio } from './HomeStudio';
 import type { SettingsOpenOptions } from '../settings/types';
 import PageHeader from '../PageHeader';
 import { LogoLoadingState } from '../LogoLoadingState';
@@ -683,6 +682,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const homeHeader = (
     <PageHeader
+      leftContent={
+        <span className="theme-home-title min-w-0 truncate">
+          {i18nService.t(workMode === WorkMode.Chat ? 'coworkHomeTitleChat' : 'coworkHomeTitle')}
+        </span>
+      }
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       onNewChat={onNewChat}
@@ -728,116 +732,59 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     );
   }
 
-  // Home view - no current session
   return (
-    <div data-page-canvas className="flex-1 flex flex-col bg-background h-full">
-      {/* Header */}
-      {homeHeader}
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto min-h-0 relative">
-        {/* Anchor to the viewport so opening a long case gallery never moves the input. */}
-        <div aria-hidden className="min-h-[max(1.5rem,calc(45%-10rem))]" />
-
-        <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-6 px-6">
-          {/* Welcome Section and the prompt input share one sticky layer: once the
-              cases start scrolling, the brand mark and the input both stay on screen
-              instead of sliding away with the list. The layer is opaque and full
-              width so the cases pass behind it rather than through it. It sits in the
-              same column as the list, which is the box the sticky range is measured
-              against, so it holds all the way to the last case. */}
-          <div className="sticky theme-home-sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
-            <div className="flex flex-col items-center justify-center gap-4 text-center">
-              <img
-                src="zhiyuan-logo-light.svg"
-                alt={i18nService.t('cowork')}
-                className="theme-home-brand logo-light w-auto mx-auto"
-              />
-              <img
-                src="zhiyuan-logo-dark.svg"
-                alt={i18nService.t('cowork')}
-                className="theme-home-brand logo-dark w-auto mx-auto"
-              />
-              <p
-                className={cn(
-                  'theme-home-caption min-h-5 max-w-md px-2',
-                  workMode === WorkMode.Chat && 'invisible',
-                )}
-              >
-                {i18nService.t('coworkHomeSubtitle')}
-              </p>
-            </div>
-
-            {/* Prompt Input Area - Large version with folder selector */}
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-              <div className="min-w-0">
-                <CoworkPromptInput
-                  ref={promptInputRef}
-                  onSubmit={handleStartSession}
-                  onStop={handleStopSession}
-                  isStreaming={isStreaming}
-                  disabled={false}
-                  placeholder={
-                    workMode === WorkMode.Chat
-                      ? i18nService.t(
-                          resolveSkillPlaceholderKey(activeSkillIds) ?? 'chatPlaceholder',
-                        )
-                      : i18nService.t('coworkPlaceholder')
-                  }
-                  size="large"
-                  workingDirectory={currentWorkspacePath}
-                  workingDirectoryName={currentWorkspaceDisplayName}
-                  onWorkingDirectoryChange={async (dir: string) => {
-                    clearUnmanagedWorkingDirectory();
-                    const workspace = await workspaceService.ensureWorkspace(dir);
-                    if (workspace) await workspaceService.selectWorkspace(workspace.id);
-                  }}
-                  onCreateProject={async (dir, name) => {
-                    clearUnmanagedWorkingDirectory();
-                    const workspace = await workspaceService.createWorkspace(dir, name);
-                    if (!workspace) return false;
-                    await workspaceService.selectWorkspace(workspace.id);
-                    return true;
-                  }}
-                  onUseNoFolder={async dir => {
-                    const selected = await selectUnmanagedWorkingDirectory(dir);
-                    if (!selected) {
-                      showAppErrorToast(i18nService.t('projectCreateFailed'));
-                    }
-                  }}
-                  showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}
-                  showNoFolderAction={!currentWorkspaceId}
-                  showModelSelector
-                  onManageSkills={() => onShowSkills?.()}
-                  onManageConnectors={() => onShowConnectors?.()}
-                  showPermissionModeSelector={workMode !== WorkMode.Chat}
-                  permissionMode={config.permissionMode}
-                  onPermissionModeChange={(mode: CoworkPermissionMode) => {
-                    void coworkService.updateConfig({ permissionMode: mode });
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions. The category bar is the entry point only: once a category is
-              open the cases own the column, so the bar steps aside instead of sitting on
-              top of the gallery. The gallery shares the column with the input on purpose:
-              that is the box the input's sticky positioning is measured against, so the
-              cases can scroll all the way to the end while the input stays in place.
-              The column keeps the full width: the bar needs it for its labels, and the case
-              panel narrows itself to the composer width (see PromptPanel). */}
-          <div className="flex w-full flex-col gap-4 pb-8">
-            {!selectedAction && (
-              <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
-            )}
-            {selectedAction && (
-              <PromptPanel action={selectedAction} onPromptSelect={handleQuickActionPromptSelect} />
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <HomeStudio
+      header={homeHeader}
+      quickActions={quickActions}
+      selectedAction={selectedAction}
+      onActionSelect={handleActionSelect}
+      onPromptSelect={handleQuickActionPromptSelect}
+      composer={
+        <CoworkPromptInput
+          ref={promptInputRef}
+          onSubmit={handleStartSession}
+          onStop={handleStopSession}
+          isStreaming={isStreaming}
+          disabled={false}
+          placeholder={
+            workMode === WorkMode.Chat
+              ? i18nService.t(resolveSkillPlaceholderKey(activeSkillIds) ?? 'chatPlaceholder')
+              : i18nService.t('coworkPlaceholder')
+          }
+          size="large"
+          workingDirectory={currentWorkspacePath}
+          workingDirectoryName={currentWorkspaceDisplayName}
+          onWorkingDirectoryChange={async (dir: string) => {
+            clearUnmanagedWorkingDirectory();
+            const workspace = await workspaceService.ensureWorkspace(dir);
+            if (workspace) await workspaceService.selectWorkspace(workspace.id);
+          }}
+          onCreateProject={async (dir, name) => {
+            clearUnmanagedWorkingDirectory();
+            const workspace = await workspaceService.createWorkspace(dir, name);
+            if (!workspace) return false;
+            await workspaceService.selectWorkspace(workspace.id);
+            return true;
+          }}
+          onUseNoFolder={async dir => {
+            const selected = await selectUnmanagedWorkingDirectory(dir);
+            if (!selected) {
+              showAppErrorToast(i18nService.t('projectCreateFailed'));
+            }
+          }}
+          showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}
+          showNoFolderAction={!currentWorkspaceId}
+          showModelSelector
+          onManageSkills={() => onShowSkills?.()}
+          onManageConnectors={() => onShowConnectors?.()}
+          showPermissionModeSelector={workMode !== WorkMode.Chat}
+          permissionMode={config.permissionMode}
+          onPermissionModeChange={(mode: CoworkPermissionMode) => {
+            void coworkService.updateConfig({ permissionMode: mode });
+          }}
+        />
+      }
+    />
   );
 };
 

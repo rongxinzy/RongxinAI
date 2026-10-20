@@ -57,7 +57,7 @@ Local models reduce reliance on cloud inference. Web search, model downloads, re
 
 Sessions, configuration, and task metadata are stored locally. The desktop execution environment accesses local files. When you use a cloud model or remote tool, the content needed for that request is sent to the corresponding service.
 
-Tool execution follows the permission mode chosen in the task composer. **Allow all** (the default) runs tool calls without prompting, including irreversible ones; **Ask for permission** shows an approval request before each tool call. Progress and results remain visible in the workspace.
+Tool execution follows the permission mode chosen in the task composer. **Confirm first** (the default) asks before a sensitive step runs; **Allow all** runs tool calls without prompting, including irreversible ones. Progress and results remain visible in the workspace.
 
 ## How it compares
 
