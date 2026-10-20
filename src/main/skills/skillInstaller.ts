@@ -6,7 +6,8 @@ import path from 'path';
 
 import { cpRecursiveSync } from '../fsCompat';
 import { t } from '../i18n';
-import { mergeReports, scanMultipleSkillDirs } from '../libs/skillSecurity/skillSecurityScanner';
+import { mergeReports } from '../libs/skillSecurity/skillSecurityScanner';
+import { scanSkillDirsAsync } from '../libs/skillSecurity/skillSecurityScanPool';
 import type {
   SecurityReportAction,
   SkillSecurityReport,
@@ -205,7 +206,7 @@ export async function downloadSkillImpl(
     let auditReport: SkillSecurityReport | null = null;
     try {
       console.log(`[SkillManager] Starting security scan for ${skillDirs.length} skill dir(s)...`);
-      const reports = await scanMultipleSkillDirs(skillDirs);
+      const reports = await scanSkillDirsAsync(skillDirs);
       auditReport = mergeReports(reports);
       if (auditReport) {
         console.log(

@@ -331,7 +331,8 @@ function parseSkillName(skillDir: string): string {
 
 // ── Main scanner ─────────────────────────────────────────────────────────────
 
-async function scanSkillSecurity(skillDir: string): Promise<SkillSecurityReport> {
+/** Scan one skill directory. Runs inside the scan worker (skillSecurityScanWorker). */
+export async function scanSkillSecurity(skillDir: string): Promise<SkillSecurityReport> {
   const startTime = Date.now();
   const allFindings: SecurityFinding[] = [];
   const skillName = parseSkillName(skillDir);
@@ -414,18 +415,6 @@ async function scanSkillSecurity(skillDir: string): Promise<SkillSecurityReport>
     dimensionSummary: buildDimensionSummary(truncatedFindings),
     scanDurationMs: Date.now() - startTime,
   };
-}
-
-/**
- * Scan multiple skill directories and merge results.
- * Used when a download source contains multiple skills.
- */
-export async function scanMultipleSkillDirs(skillDirs: string[]): Promise<SkillSecurityReport[]> {
-  const reports: SkillSecurityReport[] = [];
-  for (const dir of skillDirs) {
-    reports.push(await scanSkillSecurity(dir));
-  }
-  return reports;
 }
 
 /**
