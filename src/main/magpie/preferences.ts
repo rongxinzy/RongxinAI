@@ -79,16 +79,9 @@ function projectRedactKinds(value: unknown): Record<string, boolean> {
   return result;
 }
 
-function sanitizeDataDir(dir: string): string {
-  if (!dir) return '';
-  return dir.replace(/([/\\.]|\b)magpie(?=[/\\.]|$)/gi, '$1model-service');
-}
-
 export function projectMagpiePreferences(raw: unknown): MagpiePreferences {
   const value = record(raw);
   return {
-    version: text(value.version),
-    dataDir: sanitizeDataDir(text(value.dir)),
     gateway: text(value.gateway),
     ...(text(value.publicURL) ? { publicUrl: text(value.publicURL) } : {}),
     proxy: text(value.proxy),
