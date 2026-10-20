@@ -16,10 +16,10 @@ import {
   type CodingWorkspaceSummary,
   type UpdateCodingWorkspaceInput,
 } from '../../../shared/codingAgent';
-import { CodingRoomServiceDriverLifecycle } from './driverLifecycle';
+import { CodingRoomServiceFoundation } from './serviceFoundation';
 
 /** Workspace CRUD plus per-lane view and config settings. */
-export abstract class CodingRoomServiceWorkspaceAdmin extends CodingRoomServiceDriverLifecycle {
+export abstract class CodingRoomServiceWorkspaceAdmin extends CodingRoomServiceFoundation {
   listWorkspaces(): CodingWorkspaceSummary[] {
     return this.repository.listRooms().map(room => {
       const missions = this.repository.listMissions(room.id);
