@@ -1,5 +1,6 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron';
 
+import './magpieRoutingUsage.patch';
 import { MagpieIpc } from '../../shared/magpie/types';
 import { providersContract } from '../../shared/ipc/providersContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';

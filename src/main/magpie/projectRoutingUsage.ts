@@ -47,10 +47,6 @@ function strings(value: unknown, limit = 200): string[] {
     .slice(0, limit);
 }
 
-function usagePeriod(value: string): MagpieUsagePeriod {
-  return USAGE_PERIODS.has(value) ? (value as MagpieUsagePeriod) : MagpieUsagePeriod.Month;
-}
-
 function projectTotals(raw: Record<string, unknown>): MagpieUsageTotals {
   return {
     calls: int(raw.calls),
