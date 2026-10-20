@@ -6,7 +6,7 @@ import crypto from 'crypto';
 
 import { BrowserWindow } from 'electron';
 
-import { rt } from './runtimeState';
+import { agentRuntime } from './agentRuntimeState';
 import { getCoworkStore, getStore } from './runtimeServices';
 import { getPiRuntimeAdapter } from './sessionServices';
 import { sanitizeCoworkMessageForIpc, sanitizePermissionRequestForIpc } from './ipcPayloadSanitize';
@@ -392,8 +392,8 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
 };
 
 export const bindPiWorkbenchRuntimeForwarder = (): void => {
-  if (rt.piWorkbenchRuntimeForwarderBound) return;
+  if (agentRuntime.piWorkbenchRuntimeForwarderBound) return;
 
   forwardPiWorkbenchRuntimeToRenderer(getPiRuntimeAdapter());
-  rt.piWorkbenchRuntimeForwarderBound = true;
+  agentRuntime.piWorkbenchRuntimeForwarderBound = true;
 };

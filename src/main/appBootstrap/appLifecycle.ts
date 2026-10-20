@@ -2,6 +2,7 @@
 import { app, BrowserWindow } from 'electron';
 
 import { rt } from './runtimeState';
+import { agentRuntime } from './agentRuntimeState';
 import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
@@ -35,7 +36,7 @@ const runAppCleanup = async (): Promise<void> => {
   console.log('[AppLifecycle] App cleanup started.');
   destroyTray();
   disposeDesktopPet();
-  rt.skillManager?.stopWatching();
+  agentRuntime.skillManager?.stopWatching();
 
   if (getStore().get<boolean>('magpie_disconnect_external_on_quit') === true) {
     try {
@@ -57,7 +58,7 @@ const runAppCleanup = async (): Promise<void> => {
 
   // Stop all active Pi sessions without blocking shutdown.
   console.log('[Main] Stopping cowork sessions...');
-  if (rt.piRuntimeAdapter) rt.piRuntimeAdapter.stopAllSessions();
+  if (agentRuntime.piRuntimeAdapter) agentRuntime.piRuntimeAdapter.stopAllSessions();
 
   await shutdownPythonRuntime().catch(error => {
     console.error('[PythonRuntime] Failed to shut down Python runtime on quit:', error);
@@ -102,8 +103,8 @@ const runAppCleanup = async (): Promise<void> => {
     });
   }
 
-  if (rt.codingRoomService) {
-    await rt.codingRoomService.dispose().catch(error => {
+  if (agentRuntime.codingRoomService) {
+    await agentRuntime.codingRoomService.dispose().catch(error => {
       console.error('[CodingRoom] Failed to dispose coding agent connections on quit:', error);
     });
   }

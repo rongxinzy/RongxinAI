@@ -2,6 +2,7 @@ import { app, powerSaveBlocker } from 'electron';
 
 import { isEnterprise } from './appEnv';
 import { rt } from './runtimeState';
+import { agentRuntime } from './agentRuntimeState';
 import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
@@ -132,17 +133,17 @@ export const getArtifactLedger = (): ArtifactLedger => {
 };
 
 export const getAgentManager = () => {
-  if (!rt.agentManager) {
-    rt.agentManager = new AgentManager(getCoworkStore());
+  if (!agentRuntime.agentManager) {
+    agentRuntime.agentManager = new AgentManager(getCoworkStore());
   }
-  return rt.agentManager;
+  return agentRuntime.agentManager;
 };
 
 export const getSkillManager = () => {
-  if (!rt.skillManager) {
-    rt.skillManager = new SkillManager(getStore);
+  if (!agentRuntime.skillManager) {
+    agentRuntime.skillManager = new SkillManager(getStore);
   }
-  return rt.skillManager;
+  return agentRuntime.skillManager;
 };
 
 export const getMcpStore = () => {

@@ -2,7 +2,7 @@ import path from 'path';
 
 import { app } from 'electron';
 
-import { rt } from './runtimeState';
+import { agentRuntime } from './agentRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
 import { getCoworkStore, getArtifactLedger, getSkillManager, getStore } from './runtimeServices';
@@ -24,8 +24,8 @@ import { WorkbenchTaskService } from '../workbenchTask/taskService';
 import { promoteVerifiedWorkbenchRun } from '../memory/taskMemoryPromotion';
 
 export const getWorkbenchTaskService = (): WorkbenchTaskService => {
-  if (!rt.workbenchTaskService) {
-    rt.workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
+  if (!agentRuntime.workbenchTaskService) {
+    agentRuntime.workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
       listLedgerArtifacts: scopeId => getArtifactLedger().list(scopeId),
       onVerifiedRun: event => {
         const complete = getPiRuntimeAdapter().getSessionMemoryCompletion(event.task.sessionId);
@@ -43,7 +43,7 @@ export const getWorkbenchTaskService = (): WorkbenchTaskService => {
       },
     });
   }
-  return rt.workbenchTaskService;
+  return agentRuntime.workbenchTaskService;
 };
 
 export const getEngramManager = (): EngramManager => {
@@ -74,32 +74,32 @@ export const getProjectMemoryService = (): ProjectMemoryService => {
 };
 
 export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
-  if (!rt.piRuntimeAdapter) {
+  if (!agentRuntime.piRuntimeAdapter) {
     // Pi shell tools inherit the main-process environment. Keep the gateway
     // credential here so installed builds work without user configuration.
     process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN = resolveAnySearchGatewayToken();
     process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL = resolveAnySearchGatewayUrl();
-    rt.piRuntimeAdapter = new PiRuntimeAdapter();
-    rt.piRuntimeAdapter.setImageAttachmentRoot(coworkImageRoot(app.getPath('userData')));
+    agentRuntime.piRuntimeAdapter = new PiRuntimeAdapter();
+    agentRuntime.piRuntimeAdapter.setImageAttachmentRoot(coworkImageRoot(app.getPath('userData')));
     // File-backed Pi sessions live beside the SQLite transcript under
     // userData; one directory per Cowork session id.
-    rt.piRuntimeAdapter.setPiSessionStoreRoot(app.getPath('userData'));
-    rt.piRuntimeAdapter.setCoworkStore(getCoworkStore());
-    rt.piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
-    rt.piRuntimeAdapter.setArtifactLedger(getArtifactLedger());
-    rt.piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
-    rt.piRuntimeAdapter.setSessionSummaryService(
+    agentRuntime.piRuntimeAdapter.setPiSessionStoreRoot(app.getPath('userData'));
+    agentRuntime.piRuntimeAdapter.setCoworkStore(getCoworkStore());
+    agentRuntime.piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
+    agentRuntime.piRuntimeAdapter.setArtifactLedger(getArtifactLedger());
+    agentRuntime.piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
+    agentRuntime.piRuntimeAdapter.setSessionSummaryService(
       new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),
     );
-    rt.piRuntimeAdapter.setSessionSummaryBackfillService(
+    agentRuntime.piRuntimeAdapter.setSessionSummaryBackfillService(
       new SessionSummaryBackfillService(getProjectMemoryService(), getCoworkStore()),
     );
-    rt.piRuntimeAdapter.setConversationHistoryService(
+    agentRuntime.piRuntimeAdapter.setConversationHistoryService(
       new ConversationHistoryService(getStore().getDatabase()),
     );
     // Live team member definitions must read the same bundled truth as the
     // main-session preset snapshot, not the userData skills copy.
-    rt.piRuntimeAdapter.setBundledSkillsRoot(getSkillManager().getBundledSkillsRoot());
+    agentRuntime.piRuntimeAdapter.setBundledSkillsRoot(getSkillManager().getBundledSkillsRoot());
     // MCP initialization runs asynchronously, so late injection may still be needed.
     console.log(
       '[PiRuntime] mcpServerManager available at init:',
@@ -109,9 +109,9 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
   // Late-injection: mcpServerManager is created async after Pi init.
   // On subsequent calls (e.g. from IPC handlers), it is available and
   // we inject it so Pi sessions can use MCP tools.
-  if (mcpRuntime.serverManager && !rt.piRuntimeAdapter.hasMcpServerManager()) {
+  if (mcpRuntime.serverManager && !agentRuntime.piRuntimeAdapter.hasMcpServerManager()) {
     console.log('[PiRuntime] Late-injecting mcpServerManager (was null at init)');
-    rt.piRuntimeAdapter.setMcpServerManager(mcpRuntime.serverManager);
+    agentRuntime.piRuntimeAdapter.setMcpServerManager(mcpRuntime.serverManager);
   }
-  return rt.piRuntimeAdapter;
+  return agentRuntime.piRuntimeAdapter;
 };

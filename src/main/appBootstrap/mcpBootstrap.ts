@@ -4,7 +4,7 @@
  */
 import { BrowserWindow } from 'electron';
 
-import { rt } from './runtimeState';
+import { agentRuntime } from './agentRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
 import { getMcpStore, getStore } from './runtimeServices';
 import { bumpCodingCommandCatalog } from './codingRoomRuntime';
@@ -125,12 +125,12 @@ export const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
  * later connector refreshes without instantiating Pi just for MCP bootstrap.
  */
 const syncPiMcpToolManifest = (): void => {
-  if (!rt.piRuntimeAdapter || !mcpRuntime.serverManager) return;
-  if (!rt.piRuntimeAdapter.hasMcpServerManager()) {
-    rt.piRuntimeAdapter.setMcpServerManager(mcpRuntime.serverManager);
+  if (!agentRuntime.piRuntimeAdapter || !mcpRuntime.serverManager) return;
+  if (!agentRuntime.piRuntimeAdapter.hasMcpServerManager()) {
+    agentRuntime.piRuntimeAdapter.setMcpServerManager(mcpRuntime.serverManager);
     return;
   }
-  rt.piRuntimeAdapter.refreshMcpTools();
+  agentRuntime.piRuntimeAdapter.refreshMcpTools();
 };
 
 /**
