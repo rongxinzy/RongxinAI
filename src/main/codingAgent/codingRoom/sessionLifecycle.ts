@@ -80,10 +80,10 @@ export abstract class CodingRoomServiceSessionLifecycle extends CodingRoomServic
     // Register builtin session → lane mapping so recordBuiltinEvent can find
     // the lane without scanning every room.
     if (profile.driverKind === CodingAgentDriverKind.Builtin) {
-      this.builtinSessionLaneMap.set(lane.localSessionId, lane.id);
+      this.laneSessionIndex.register(lane.localSessionId, lane.id);
       // A newly registered lane may own sessions that previously missed the
       // mapping, so the negative cache must be reset, not patched.
-      this.nonLaneSessionIds.clear();
+      this.laneSessionIndex.clearNonLaneSessions();
     }
     try {
       this.registerDriver(lane, profile, driver);
