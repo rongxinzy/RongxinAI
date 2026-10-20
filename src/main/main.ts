@@ -205,7 +205,10 @@ if (!gotTheLock) {
     getCodingWorkspaceRoots: () =>
       getCodingRoomService()
         .listWorkspaces()
-        .map(workspace => workspace.primaryRoot),
+        .flatMap(workspace => [
+          workspace.primaryRoot,
+          ...workspace.sources.map(source => source.path),
+        ]),
   });
   registerAppUpdateIpc({
     getAppUpdateCoordinator,
