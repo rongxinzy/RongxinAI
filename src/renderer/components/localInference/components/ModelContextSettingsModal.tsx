@@ -422,14 +422,14 @@ export function parseCustomContextValue(value: string | null): number | undefine
 }
 
 /** Empty means automatic (no saved value); undefined means "not edited". */
-export function parseNCpuMoeValue(value: string): number | undefined {
+function parseNCpuMoeValue(value: string): number | undefined {
   const trimmed = value.trim();
   if (!trimmed) return undefined;
   const parsed = Number(trimmed);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
-export function getNCpuMoeError(value: string): string | null {
+function getNCpuMoeError(value: string): string | null {
   if (!value.trim()) return null;
   if (parseNCpuMoeValue(value) === undefined) {
     return i18nService.t('localInferenceNCpuMoeInvalid');

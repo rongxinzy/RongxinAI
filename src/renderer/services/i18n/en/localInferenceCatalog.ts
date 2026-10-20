@@ -48,6 +48,10 @@ export const enLocalInferenceCatalog: Record<string, string> = {
   localInferenceContextSaved: 'Model context saved',
   localInferenceContextSavedReloadRequired: 'Model context saved. Reload the model to apply it.',
   localInferenceContextInvalid: 'Enter a valid context length',
+  localInferenceNCpuMoeLabel: 'MoE expert layers on CPU',
+  localInferenceNCpuMoeHint:
+    'Leave empty to fit VRAM automatically; a manual value disables automatic fitting.',
+  localInferenceNCpuMoeInvalid: 'Enter a non-negative whole number of layers',
   localInferenceDeleteConfirmMessage: 'Confirm deletion of model "{name}"?',
   localInferenceDeleteRunningBlocked: 'This model is currently running. Unload it before deleting.',
   localInferenceAccessSettings: 'Access Settings',

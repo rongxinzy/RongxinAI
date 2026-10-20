@@ -101,7 +101,7 @@ export function applyStoredModelPreferencesToLaunchInput(
   // ctxSize and nCpuMoe apply independently: either may be absent.
   const ctxSize = input.options?.ctxSize ? undefined : preference?.ctxSize;
   const nCpuMoe = input.options?.nCpuMoe !== undefined ? undefined : preference?.nCpuMoe;
-  if (!ctxSize && !nCpuMoe) {
+  if (!ctxSize && nCpuMoe === undefined) {
     return input;
   }
 
@@ -252,7 +252,11 @@ export function sanitizeLlamaCppModelPreference(
           }
         : undefined;
 
-  return ctxSize || maxTokens || nCpuMoe !== undefined || Object.keys(capabilities).length > 0 || residency
+  return ctxSize ||
+    maxTokens ||
+    nCpuMoe !== undefined ||
+    Object.keys(capabilities).length > 0 ||
+    residency
     ? {
         ...(ctxSize ? { ctxSize } : {}),
         ...(maxTokens ? { maxTokens } : {}),

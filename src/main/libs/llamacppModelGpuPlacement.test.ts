@@ -80,7 +80,6 @@ describe('llamacppModelGpuPlacement', () => {
       expect(result.input.options?.splitMode).not.toBe('row');
 
       const preset = modelLaunchOptionsToPreset(result.input.options ?? {});
-      expect(Object.keys(preset)).not.toContain('n-gpu-layers-other-than-auto');
       if (preset['n-gpu-layers'] !== undefined) {
         expect(preset['n-gpu-layers']).toBe('auto');
       }
@@ -93,14 +92,20 @@ describe('llamacppModelGpuPlacement', () => {
 
   test('does not treat nCpuMoe as explicit GPU placement and keeps gpuLayers auto', () => {
     const result = planLlamaCppModelGpuPlacement({
-      launchInput: modelLaunchInput({ modelPath: '/models/qwen3-30b.gguf', options: { nCpuMoe: 12 } }),
+      launchInput: modelLaunchInput({
+        modelPath: '/models/qwen3-30b.gguf',
+        options: { nCpuMoe: 12 },
+      }),
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
       runtimeCapabilities: gpuCapabilities(),
       nvidiaSnapshot: availableSnapshot([{ index: 0, memoryFreeMiB: 24_000 }]),
       modelSizeBytes: gib(18),
     });
 
-    expect(result).toMatchObject({ success: true, mode: LlamaCppModelGpuPlacementMode.Auto });
+    expect(result).toMatchObject({
+      success: true,
+      mode: LlamaCppModelGpuPlacementMode.Auto,
+    });
     expect(result.success && result.input.options?.gpuLayers).toBe('auto');
     expect(result.success && result.input.options?.nCpuMoe).toBe(12);
     expect(
@@ -141,7 +146,10 @@ describe('llamacppModelGpuPlacement', () => {
       modelSizeBytes: gib(18),
     });
 
-    expect(result).toMatchObject({ success: true, mode: LlamaCppModelGpuPlacementMode.Auto });
+    expect(result).toMatchObject({
+      success: true,
+      mode: LlamaCppModelGpuPlacementMode.Auto,
+    });
   });
 
   test('passes nCpuMoe through when the block count is unreadable', () => {

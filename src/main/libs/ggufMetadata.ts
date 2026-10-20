@@ -28,7 +28,6 @@ const GgufValueType = {
 /**
  * Reads GGUF metadata only. Models whose chat template declares
  * `enable_thinking` can expose a safe on/off control in the chat UI.
- * Scalar integer lookups (e.g. block_count) read `<arch>.block_count`.
  */
 export function readGgufMetadataMap(filePath: string): Map<string, unknown> | undefined {
   let descriptor: number | undefined;
@@ -55,6 +54,7 @@ export function readGgufMetadataMap(filePath: string): Map<string, unknown> | un
   }
 }
 
+/** Layer count from `<general.architecture>.block_count`, if readable. */
 export function readGgufBlockCount(filePath: string): number | undefined {
   const metadata = readGgufMetadataMap(filePath);
   if (!metadata) return undefined;
