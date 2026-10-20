@@ -1,7 +1,6 @@
 /** AISphere / enterprise managed model provider IPC handlers. */
 import { BrowserWindow } from 'electron';
 
-import { rt } from './runtimeState';
 import { aisphereService } from '../extensions/aisphere';
 import { zhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
 import { AISphere } from '../../shared/aisphere';
@@ -10,7 +9,12 @@ import { providersContract } from '../../shared/ipc/providersContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 import { getBranding } from '../../shared/branding';
 
-export const registerManagedProvidersIpc = (): void => {
+export interface ManagedProvidersIpcDeps {
+  isMagpieRunning: () => boolean;
+  synchronizeManagedCatalog: () => Promise<void> | undefined;
+}
+
+export const registerManagedProvidersIpc = (deps: ManagedProvidersIpcDeps): void => {
   if (getBranding().features.enableAISphere) {
     handleIpcContractSubset(providersContract, {
       aisphereSnapshot: async () => aisphereService.snapshot(),
@@ -40,10 +44,10 @@ export const registerManagedProvidersIpc = (): void => {
       managedProviderCatalog: async () => zhiyuanManagedProviderBridge.catalog(),
     });
     zhiyuanManagedProviderBridge.onDidChange(() => {
-      if (rt.magpieManager?.status().state === 'running')
-        void rt.managedMagpieBindings
-          ?.synchronize()
-          .catch(error => console.error('[Magpie] Managed catalog sync failed', error));
+      if (deps.isMagpieRunning())
+        void deps
+          .synchronizeManagedCatalog()
+          ?.catch(error => console.error('[Magpie] Managed catalog sync failed', error));
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(ManagedProviderIpc.Changed);
       }
