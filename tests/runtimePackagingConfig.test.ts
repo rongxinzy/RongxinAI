@@ -253,7 +253,7 @@ test('release workflows explicitly provision the private POSIX toolchain', () =>
 });
 
 test('Windows release workflow runs the clean-path bundled runtime gate', () => {
-  for (const workflowName of ['build-inference-editions.yml', 'build-windows-release.yml']) {
+  for (const workflowName of ['build-inference-editions.yml', 'windows-installer-pr.yml']) {
     const workflow = readFileSync(path.join(root, '.github', 'workflows', workflowName), 'utf8');
     assert.match(workflow, /windows-runtime-smoke\.ps1/);
   }
@@ -403,10 +403,7 @@ test('tag release publishes beta and archives build metadata for promotion', () 
   assert.match(workflow, /app-build-version:/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-inference-editions\.yml/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-windows-release\.yml/);
-  assert.match(
-    workflow,
-    /needs: \[prepare-release, preflight, build-windows, build-macos, build-linux\]/,
-  );
+  assert.match(workflow, /needs: \[prepare-release, build-windows, build-macos, build-linux\]/);
   assert.match(buildWorkflow, /create-release-candidate\.mjs/);
   const publishScript = readFileSync(
     path.join(root, 'scripts', 'release', 'publish-platform-beta-release.sh'),
@@ -481,4 +478,22 @@ test('macOS notarization is delegated to afterSign with staple retry', () => {
   };
   assert.equal(config.afterSign, 'scripts/notarize.js');
   assert.equal(config.mac?.notarize, false);
+});
+
+test('every Electron main, preload, and worker entry in vite.config.ts and build-electron-development.mjs exists on disk', () => {
+  const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
+  const devBuild = readFileSync(
+    path.join(root, 'scripts', 'build-electron-development.mjs'),
+    'utf8',
+  );
+  const viteEntries = [...viteConfig.matchAll(/entry:\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
+  const devEntries = [...devBuild.matchAll(/createBuildOptions\(\s*['"]([^'"]+)['"]/g)].map(
+    m => m[1],
+  );
+
+  assert.ok(viteEntries.length >= 10);
+  assert.deepEqual(viteEntries.slice().sort(), devEntries.slice().sort());
+  for (const entry of viteEntries) {
+    assert.equal(existsSync(path.join(root, entry)), true, `Missing Electron entry: ${entry}`);
+  }
 });

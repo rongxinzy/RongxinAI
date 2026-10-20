@@ -230,8 +230,53 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
-                // Verify the bundled CLI service without blocking the main process.
-                entry: 'src/main/magpie/hashWorker.ts',
+                // Stream SHA-256 file digests without blocking the main process.
+                entry: 'src/main/libs/hashWorker.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
+                // Run SQLite quick_check/integrity_check off the main thread.
+                entry: 'src/main/libs/sqliteBackup/sqliteVerifyWorker.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                    rolldownOptions: {
+                      external:
+                        command === 'serve'
+                          ? isElectronDevelopmentExternal
+                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                    },
+                  },
+                },
+                onstart() {},
+              },
+              {
+                // Scan skill directories off the main thread.
+                entry: 'src/main/libs/skillSecurity/skillSecurityScanWorker.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
+                // Prepare large AISphere request bodies off the main thread.
+                entry: 'src/main/extensions/aisphere/requestWorker.ts',
                 vite: {
                   build: {
                     watch: command === 'serve' ? {} : null,

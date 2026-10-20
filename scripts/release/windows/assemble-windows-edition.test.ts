@@ -53,18 +53,20 @@ test('a failed edition package cannot continue to assemble an installer from sta
   expect(f.calls.some(call => call.args[0].endsWith('build-distribution.cjs'))).toBe(false);
 });
 
-test('all three accepted checkpoints gate Windows publication', () => {
-  type Step = { run?: string; uses?: string };
+test('windows-release assembles and directly uploads all three edition release candidates', () => {
+  type Step = { name?: string; run?: string; uses?: string; with?: Record<string, unknown> };
   const workflow = load(readFileSync('.github/workflows/build-windows-release.yml', 'utf8')) as {
-    jobs: Record<string, { needs?: string; strategy: { matrix: { edition: string[] } }; steps: Step[] }>;
+    jobs: Record<string, { needs?: string; steps: Step[] }>;
   };
-  expect(workflow.jobs.acceptance.needs).toBe('windows-release');
-  expect(workflow.jobs.acceptance.strategy.matrix.edition).toEqual(['lite', 'cpu', 'cuda']);
-  const steps = workflow.jobs.acceptance.steps;
-  const upload = steps.findIndex(step => step.run === undefined && step.uses === 'actions/upload-artifact@v6');
-  for (const script of ['verify-windows-authenticode.ps1', 'windows-installer-smoke.ps1', 'windows-shell-interactive.mjs', 'windows-shell-uninstall.ps1 -Action verify']) {
-    const index = steps.findIndex(step => step.run?.includes(script));
-    expect(index).toBeGreaterThan(-1);
-    expect(index).toBeLessThan(upload);
-  }
+  expect(workflow.jobs['windows-release'].needs).toBe('cuda-runtime');
+  expect(workflow.jobs.acceptance).toBeUndefined();
+  const steps = workflow.jobs['windows-release'].steps;
+  const uploads = steps
+    .filter(step => step.uses === 'actions/upload-artifact@v6')
+    .map(step => step.with?.name);
+  expect(uploads).toEqual([
+    'release-candidate-${{ inputs.app-build-version }}-win32-x64-lite',
+    'release-candidate-${{ inputs.app-build-version }}-win32-x64-cpu',
+    'release-candidate-${{ inputs.app-build-version }}-win32-x64-cuda',
+  ]);
 });
