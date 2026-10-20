@@ -1,69 +1,72 @@
 /** App auto-update IPC: state, check, retry, pause/resume/cancel, install. */
 import { shell } from 'electron';
 
-import { rt } from './runtimeState';
-
-import { getAppUpdateCoordinator } from './runtimeServices';
 import { AppUpdateStatus } from '../../shared/appUpdate/constants';
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
+import type { AppUpdateCoordinator } from '../libs/appUpdateCoordinator';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
 import { t } from '../i18n';
 
-export const registerAppUpdateIpc = (): void => {
+export interface AppUpdateIpcDeps {
+  getAppUpdateCoordinator: () => AppUpdateCoordinator;
+  hasRunningSessions: () => boolean;
+}
+
+export const registerAppUpdateIpc = (deps: AppUpdateIpcDeps): void => {
   handleIpcContractSubset(appSystemContract, {
     appUpdateGetChannel: async () => {
-      return getAppUpdateCoordinator().getChannelPreference();
+      return deps.getAppUpdateCoordinator().getChannelPreference();
     },
 
     appUpdateSetChannel: async (_event, channel) => {
-      getAppUpdateCoordinator().setChannelPreference(channel);
-      return getAppUpdateCoordinator().getChannelPreference();
+      deps.getAppUpdateCoordinator().setChannelPreference(channel);
+      return deps.getAppUpdateCoordinator().getChannelPreference();
     },
 
     appUpdateGetState: async () => {
-      return getAppUpdateCoordinator().getState();
+      return deps.getAppUpdateCoordinator().getState();
     },
 
     appUpdateCheckNow: async (_event, options) => {
-      return getAppUpdateCoordinator().checkNow(options);
+      return deps.getAppUpdateCoordinator().checkNow(options);
     },
 
     appUpdateRetryDownload: async () => {
-      const state = await getAppUpdateCoordinator().retryDownload();
+      const state = await deps.getAppUpdateCoordinator().retryDownload();
       return { success: true, state };
     },
 
     appUpdatePauseDownload: async () => {
-      const state = getAppUpdateCoordinator().pauseDownload();
+      const state = deps.getAppUpdateCoordinator().pauseDownload();
       return { success: true, state };
     },
 
     appUpdateResumeDownload: async () => {
-      const state = getAppUpdateCoordinator().resumeDownload();
+      const state = deps.getAppUpdateCoordinator().resumeDownload();
       return { success: true, state };
     },
 
     appUpdateCancelDownload: async () => {
-      const state = getAppUpdateCoordinator().cancelDownload();
+      const state = deps.getAppUpdateCoordinator().cancelDownload();
       return { success: true, state };
     },
 
     appUpdateInstallReady: async () => {
-      if (rt.piRuntimeAdapter?.hasRunningSessions()) {
+      if (deps.hasRunningSessions()) {
         return {
           success: false,
-          state: getAppUpdateCoordinator().getState(),
+          state: deps.getAppUpdateCoordinator().getState(),
           error: t('update.activeTask'),
         };
       }
-      return getAppUpdateCoordinator().installReadyUpdate();
+      return deps.getAppUpdateCoordinator().installReadyUpdate();
     },
 
     // The downloaded installer lives in electron-updater's cache directory,
     // which is not discoverable from the UI. Reveal it in the file manager so
     // users can find, back up, or manually run the exact verified payload.
     appUpdateRevealDownload: async () => {
-      const state = getAppUpdateCoordinator().getState();
+      const state = deps.getAppUpdateCoordinator().getState();
       if (state.status !== AppUpdateStatus.Ready || !state.readyFilePath) {
         return { success: false, error: 'No downloaded update file is ready to reveal.' };
       }
