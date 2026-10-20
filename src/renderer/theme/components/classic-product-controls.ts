@@ -10,7 +10,7 @@ type ProductAppearances = Pick<
     | `market-card${string}`
   >
 >;
-export function classicProductControls(dark: boolean): ProductAppearances {
+export function classicProductControls(): ProductAppearances {
   return {
     'permission-menu': recipe({ base: { padding: '0.5rem' } }),
     'permission-option': recipe({

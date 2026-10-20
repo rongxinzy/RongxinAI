@@ -15,7 +15,7 @@ export const zenithDark: ThemeDefinition = {
     description: 'Premium futuristic dark theme with glassmorphism',
     appearance: 'dark',
   },
-  components: classicComponentAppearances(true),
+  components: classicComponentAppearances(),
   background: {
     ...DEFAULT_BACKGROUND,
     kind: BackgroundKind.Color,

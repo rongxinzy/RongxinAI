@@ -1,5 +1,5 @@
 import { recipe } from './recipe';
-export function classicFields(dark: boolean) {
+export function classicFields() {
   return {
     'field-legend': recipe({ base: { 'font-weight': 'var(--zy-component-font-weight-medium)' } }),
     'field-legend-label': recipe({ base: { 'font-size': 'var(--zy-component-text-sm)' } }),

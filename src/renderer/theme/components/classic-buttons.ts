@@ -8,7 +8,7 @@ type ButtonAppearances = Pick<
 const mix = (token: string, amount: number) =>
   `color-mix(in oklab, var(--${token}) ${amount}%, transparent)`;
 
-export function classicButtons(dark: boolean): ButtonAppearances {
+export function classicButtons(): ButtonAppearances {
   const hover = { 'background-color': 'var(--muted)', color: 'var(--foreground)' };
   const raised = { 'background-color': 'var(--zy-surface-raised)' };
   const small = { 'border-radius': 'var(--zy-style-radius-md)' };

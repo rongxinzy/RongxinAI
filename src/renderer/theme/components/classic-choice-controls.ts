@@ -1,6 +1,6 @@
 import { recipe } from './recipe';
 
-export function classicChoiceControls(dark: boolean) {
+export function classicChoiceControls() {
   const focus = {
     'border-color': 'var(--ring)',
     'box-shadow': '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',

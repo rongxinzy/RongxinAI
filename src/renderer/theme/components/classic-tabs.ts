@@ -1,5 +1,5 @@
 import { recipe } from './recipe';
-export function classicTabs(dark: boolean) {
+export function classicTabs() {
   const clear = { 'background-color': 'transparent', 'box-shadow': 'none' };
   const transition = {
     'transition-property': 'color, background-color, border-color, box-shadow',

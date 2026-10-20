@@ -1,6 +1,6 @@
 import { recipe } from './recipe';
 /** Page-specific compositions, extracted without moving event handlers or application state. */
-export function classicPageControls(dark: boolean) {
+export function classicPageControls() {
   return {
     'page-code-block-button-1': recipe({
       base: {

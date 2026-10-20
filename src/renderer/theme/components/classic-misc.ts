@@ -1,5 +1,5 @@
 import { recipe } from './recipe';
-export function classicMisc(dark: boolean) {
+export function classicMisc() {
   return {
     label: recipe({
       base: {
