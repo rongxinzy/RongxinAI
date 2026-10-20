@@ -9,6 +9,7 @@ import { disposeDesktopPet } from '../desktopPet/controller';
 import { disposeZhiyuanEnterpriseExtension } from '../enterpriseExtension/host';
 import { shutdownPythonRuntime } from '../pythonRuntime/host';
 import { getSkillServiceManager } from '../skillServices';
+import { channelRuntime } from './channelRuntimeState';
 
 let isCleanupFinished = false;
 let isCleanupInProgress = false;
@@ -63,16 +64,16 @@ const runAppCleanup = async (): Promise<void> => {
   const skillServices = getSkillServiceManager();
   await skillServices.stopAll();
 
-  await rt.ccConnectBridgeServer?.stop().catch(error => {
+  await channelRuntime.bridgeServer?.stop().catch(error => {
     console.error('[cc-connect] Failed to stop bridge on quit:', error);
   });
-  rt.ccConnectBridgeServer = null;
-  rt.ccConnectRuntimeStopping = true;
-  if (rt.ccConnectRuntimeRestartTimer) clearTimeout(rt.ccConnectRuntimeRestartTimer);
-  rt.ccConnectRuntimeRestartTimer = null;
-  await rt.ccConnectSidecarManager?.stop();
-  rt.ccConnectSidecarManager = null;
-  rt.ccConnectRuntimeControlClient = null;
+  channelRuntime.bridgeServer = null;
+  channelRuntime.stopping = true;
+  if (channelRuntime.restartTimer) clearTimeout(channelRuntime.restartTimer);
+  channelRuntime.restartTimer = null;
+  await channelRuntime.sidecarManager?.stop();
+  channelRuntime.sidecarManager = null;
+  channelRuntime.controlClient = null;
 
   if (rt.ollamaManager) {
     await rt.ollamaManager.shutdownForQuit().catch(error => {

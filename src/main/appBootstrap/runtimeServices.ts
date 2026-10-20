@@ -21,6 +21,7 @@ import { ArtifactLedger } from '../artifactLedger/artifactLedger';
 import { SkillManager } from '../skillManager';
 import { ActivityService } from '../activity/activityService';
 import { SqliteStore } from '../sqliteStore';
+import { channelRuntime } from './channelRuntimeState';
 
 const PowerSaveBlockerType = {
   PreventAppSuspension: 'prevent-app-suspension',
@@ -155,6 +156,6 @@ export const getMcpStore = () => {
 
 /** Lazily constructed shared activity service (single source in runtime state). */
 export const getActivityService = (): ActivityService => {
-  rt.activityService ??= new ActivityService(getStore().getDatabase());
-  return rt.activityService;
+  channelRuntime.activityService ??= new ActivityService(getStore().getDatabase());
+  return channelRuntime.activityService;
 };
