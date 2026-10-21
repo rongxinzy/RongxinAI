@@ -143,6 +143,7 @@ export function SidebarNavigationView({
           variant="secondary"
           size="lg"
           className="w-full justify-start gap-2.5"
+          aria-label={newConversation.label}
           data-testid={newConversation.testId}
           data-active={newConversation.active || undefined}
           aria-current={newConversation.currentPage ? 'page' : undefined}
