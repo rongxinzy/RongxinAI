@@ -563,7 +563,7 @@ const App: React.FC = () => {
       <div
         ref={appShellRef}
         tabIndex={-1}
-        className="h-screen overflow-hidden flex flex-col bg-surface-raised outline-none"
+        className="h-screen overflow-hidden flex flex-col bg-surface outline-none"
       >
         {toastMessage && (
           <Toast message={toastMessage} isError={isToastError} isSuccess={isToastSuccess} />

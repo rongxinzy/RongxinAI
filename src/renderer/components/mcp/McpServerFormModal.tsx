@@ -545,7 +545,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
 
           {error ? <FieldError>{error}</FieldError> : null}
         </FieldGroup>
-        <DialogFooter>
+        <DialogFooter className="sticky bottom-0 z-10 border-t border-border bg-surface-overlay">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
             {i18nService.t('cancel')}
           </Button>

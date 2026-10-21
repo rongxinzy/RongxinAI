@@ -43,6 +43,8 @@ export const enTodoActivity: Record<string, string> = {
   todoListNamePlaceholder: 'List name',
   todoSearchPlaceholder: 'Search todos',
   todoEmpty: 'No todos yet. Add one to get started.',
+  todoEmptyTitle: 'No todos yet',
+  todoEmptyDescription: 'Add one thing to start your first todo.',
   todoNoSearchResults: 'No matching todos found.',
   todoLoading: 'Loading todos',
   todoLoadError: 'Todos could not be loaded.',

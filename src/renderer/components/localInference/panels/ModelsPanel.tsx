@@ -395,11 +395,8 @@ export function ModelsPanel({
           </>
         ) : (
           <Empty className="theme-scene-model-empty mx-auto min-h-80 w-full max-w-[800px]">
-            <EmptyMedia
-              className="size-12 rounded-lg bg-muted text-muted-foreground"
-              variant="icon"
-            >
-              <Box size={32} className="size-8 text-foreground" />
+            <EmptyMedia variant="icon">
+              <Box className="size-5" />
             </EmptyMedia>
             <EmptyHeader>
               <EmptyTitle className="theme-scene-model-empty-title">

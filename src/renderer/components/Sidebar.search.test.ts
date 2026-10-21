@@ -61,7 +61,18 @@ vi.mock('../services/i18n', () => ({
   // The search dialog resolves scheduled titles through i18nService.getLanguage().
   i18nService: { t: (key: string) => key, getLanguage: () => 'zh', subscribe: () => () => {} },
 }));
-vi.mock('./SidebarNavigationControls', () => ({ SidebarNavigationControls: () => null }));
+// The real control now owns the v4 search row; keep the trigger reachable for
+// these search-behavior tests without mounting the whole navigation tree.
+vi.mock('./SidebarNavigationControls', () => ({
+  SidebarNavigationControls: (props: { onSearch?: () => void; searchLabel?: string }) =>
+    props.onSearch
+      ? createElement(
+          'button',
+          { type: 'button', onClick: props.onSearch },
+          props.searchLabel ?? 'search',
+        )
+      : null,
+}));
 vi.mock('./LoginButton', () => ({ default: () => null }));
 vi.mock('./chat/ChatSkillShortcuts', () => ({ default: () => null }));
 vi.mock('./coding/CodingWorkspaceSidebar', () => ({ CodingWorkspaceSidebar: () => null }));

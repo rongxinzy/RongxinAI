@@ -1,6 +1,7 @@
 import { CHAT_TOOL_SELECTORS } from '../chat-tool-contract';
 import { SHELL_SIDEBAR_SELECTORS } from '../shell-sidebar-contract';
 import { HOME_STUDIO_SELECTORS } from '../home-studio-contract';
+import { QUIET_STUDIO_SELECTORS } from '../quiet-studio-contract';
 
 /** App-level part, piece, surface, composition and tab hooks. */
 export const APP_SELECTORS = {
@@ -285,4 +286,5 @@ export const APP_SELECTORS = {
   ...CHAT_TOOL_SELECTORS,
   ...SHELL_SIDEBAR_SELECTORS,
   ...HOME_STUDIO_SELECTORS,
+  ...QUIET_STUDIO_SELECTORS,
 } as const;

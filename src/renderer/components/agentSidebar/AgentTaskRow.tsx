@@ -153,7 +153,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         <div className="absolute right-1 top-1/2 flex h-6 w-[52px] -translate-y-1/2 items-center justify-end">
           {showRelativeTime && (
             <span
-              className="theme-sidebar-caption absolute inset-y-0 right-0 flex items-center whitespace-nowrap transition-opacity group-hover:pointer-events-none group-hover:opacity-0 group-focus-within:pointer-events-none group-focus-within:opacity-0"
+              className="theme-sidebar-caption theme-sidebar-time pointer-events-none absolute inset-y-0 right-[52px] flex items-center whitespace-nowrap"
               title={relativeTime.full}
             >
               {relativeTime.compact}

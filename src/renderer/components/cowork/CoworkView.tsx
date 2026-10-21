@@ -20,6 +20,7 @@ import {
 import { coworkService } from '../../services/cowork';
 import { coworkQueueService } from '../../services/coworkQueue';
 import { i18nService } from '../../services/i18n';
+import { homeGreetingKey } from '../../utils/homeGreeting';
 import { normalizeError } from '../../services/errorNormalization';
 import { showAppErrorToast, showAppToast } from '../../services/toastNotification';
 import { quickActionService } from '../../services/quickAction';
@@ -683,11 +684,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const homeHeader = (
     <PageHeader
+      title={i18nService.t(workMode === WorkMode.Chat ? 'newChat' : 'newTaskTitle')}
+      divider={false}
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       onNewChat={onNewChat}
       updateBadge={updateBadge}
-      actions={<SecurityStatusIndicator />}
+      actions={<SecurityStatusIndicator permissionMode={config.permissionMode} />}
     />
   );
 
@@ -748,19 +751,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               against, so it holds all the way to the last case. */}
           <div className="sticky theme-home-sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
             <div className="flex flex-col items-center justify-center gap-4 text-center">
-              <img
-                src="zhiyuan-logo-light.svg"
-                alt={i18nService.t('cowork')}
-                className="theme-home-brand logo-light w-auto mx-auto"
-              />
-              <img
-                src="zhiyuan-logo-dark.svg"
-                alt={i18nService.t('cowork')}
-                className="theme-home-brand logo-dark w-auto mx-auto"
-              />
+              <h1 className="theme-home-greeting max-w-2xl">{i18nService.t(homeGreetingKey())}</h1>
               <p
                 className={cn(
-                  'theme-home-caption min-h-5 max-w-md px-2',
+                  'theme-home-caption max-w-md px-2',
                   workMode === WorkMode.Chat && 'invisible',
                 )}
               >

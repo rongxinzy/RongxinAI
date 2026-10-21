@@ -1,6 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import { Progress } from '@shared/components/ui/progress';
 import { Switch } from '@shared/components/ui/switch';
+import { getBranding } from '@shared/branding';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -111,18 +112,11 @@ export default function AboutSettingsPanel({
 
   return (
     <div className="flex min-h-full flex-col items-center pt-6 pb-3">
-      {/* Logo & App Name */}
-      <img
-        src="zhiyuan-logo-light.svg"
-        alt="知远"
-        className="logo-light h-16 w-auto mb-3 select-none"
-      />
-      <img
-        src="zhiyuan-logo-dark.svg"
-        alt="知远"
-        className="logo-dark h-16 w-auto mb-3 select-none"
-      />
-      <span className="text-xs text-muted-foreground mt-1">v{appVersion}</span>
+      {/* Product identity. The sidebar owns the only brand mark. */}
+      <span className="text-xl font-semibold text-foreground">{getBranding().productName}</span>
+      <span className="text-xs text-muted-foreground mt-1">
+        {getBranding().englishName} · v{appVersion}
+      </span>
       <span className="text-xs text-muted-foreground mt-0.5">{i18nService.t('aboutTagline')}</span>
 
       {/* Info Card */}

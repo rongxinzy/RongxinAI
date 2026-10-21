@@ -265,6 +265,8 @@ export const zhMcpSkills: Record<string, string> = {
   mcpOptionalConfig: '可选配置',
   mcpViewOnGithub: '在 GitHub 上查看',
   mcpNoInstalledServers: '尚未安装任何 MCP 服务',
+  mcpNoInstalledDescription: '从市场安装连接器，或导入本地 MCP 配置。',
+  mcpMarketplaceEmptyDescription: '可配置本地连接器，或从官方目录安装。',
   mcpCategoryAll: '全部',
   mcpCategorySearch: '搜索',
   mcpCategoryBrowser: '浏览器',

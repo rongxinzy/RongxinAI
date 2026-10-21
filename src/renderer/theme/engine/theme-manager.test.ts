@@ -101,10 +101,10 @@ test('switches packaged backgrounds with the complete theme and clears them on d
   await manager.setTheme('zenith-light');
   // Zenith has its own background, not transparent
   expect(document.documentElement.style.getPropertyValue('--main-background-color')).toBe(
-    '#FAFBFD',
+    '#F4F5F7',
   );
   expect(document.documentElement.style.getPropertyValue('--main-background-image')).toBe('none');
-  expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('1');
+  expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('0');
   expect(input.value).toBe('draft');
   expect(document.activeElement).toBe(input);
 });

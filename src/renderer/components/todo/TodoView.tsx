@@ -3,6 +3,7 @@ import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-conf
 import {
   Empty,
   EmptyContent,
+  EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
@@ -458,8 +459,11 @@ const TodoView: React.FC<TodoViewProps> = ({
                     <EmptyTitle>
                       {query.trim()
                         ? i18nService.t('todoNoSearchResults')
-                        : i18nService.t('todoEmpty')}
+                        : i18nService.t('todoEmptyTitle')}
                     </EmptyTitle>
+                    {!query.trim() && (
+                      <EmptyDescription>{i18nService.t('todoEmptyDescription')}</EmptyDescription>
+                    )}
                   </EmptyHeader>
                   {!query.trim() && activeView !== TodoViewFilter.Completed ? (
                     <EmptyContent>

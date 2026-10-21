@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>知远智能体 · 主界面参考实现（DESIGN.md v4.0）</title>
+  <!-- 参考页通过 CDN 加载 lucide；产品代码只用 lucide-react -->
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <link rel="stylesheet" href="./tokens.css" />
+  <link rel="stylesheet" href="./shell.css" />
+  <link rel="stylesheet" href="./stage.css" />
+</head>
+<body>
+  <div class="stage-bar" role="toolbar" aria-label="演示控制">
+    <button data-view="app" aria-pressed="true">界面</button>
+    <button data-view="spec" aria-pressed="false">规范</button>
+    <span class="sep"></span>
+    <button data-theme-set="light" aria-pressed="true">浅色</button>
+    <button data-theme-set="dark" aria-pressed="false">深色</button>
+  </div>
+
+  <main class="stage view" id="view-app">
+    <div class="app">
+      <aside class="sidebar" aria-label="侧栏">
+        <div class="sb-head">
+          <div class="brand"><span class="brand-mark">知</span>知远</div>
+          <button class="icon-btn" aria-label="收起侧栏" title="收起侧栏 Ctrl B"><i data-lucide="panel-left"></i></button>
+        </div>
+
+        <div class="seg" role="tablist" aria-label="模式">
+          <button role="tab" aria-selected="true">工作</button>
+          <button role="tab" aria-selected="false">对话</button>
+        </div>
+
+        <div class="sb-group">
+          <button class="row btn-new"><i data-lucide="square-pen"></i><span class="label">新建任务</span><span class="kbd">Ctrl N</span></button>
+          <button class="row"><i data-lucide="search"></i><span class="label">搜索</span><span class="kbd">Ctrl K</span></button>
+        </div>
+
+        <nav class="sb-group" aria-label="功能">
+          <button class="row" data-nav aria-current="page"><i data-lucide="code-xml"></i><span class="label">编程</span></button>
+          <button class="row" data-nav><i data-lucide="list-checks"></i><span class="label">待办</span></button>
+          <button class="row" data-nav><i data-lucide="alarm-clock"></i><span class="label">自动化</span></button>
+          <button class="row" data-nav><i data-lucide="activity"></i><span class="label">活动</span></button>
+          <button class="row" data-nav><i data-lucide="users"></i><span class="label">专家</span></button>
+        </nav>
+
+        <div class="sb-scroll">
+          <div class="sb-group">
+            <div class="sb-label"><span>项目</span><button class="icon-btn" aria-label="新建项目"><i data-lucide="plus"></i></button></div>
+            <button class="row folder" aria-expanded="true"><i data-lucide="chevron-down" class="chev"></i><span class="label">默认文件夹</span></button>
+            <div class="time-label">今天</div>
+            <button class="row thread" data-nav><span class="label">整理 Q3 销售数据并生成周报图表</span><span class="running" role="img" aria-label="运行中"></span></button>
+            <button class="row thread" data-nav title="52 分钟前"><span class="label">hello</span><span class="meta">52 分钟</span></button>
+            <div class="time-label">本周</div>
+            <button class="row thread" data-nav title="2 天前"><span class="label">把会议录音转写为纪要</span><span class="meta">2 天</span></button>
+            <button class="row thread" data-nav title="4 天前"><span class="label">检查合同里的付款条款</span><span class="meta">4 天</span></button>
+            <button class="row thread" data-nav title="6 天前"><span class="label">你好</span><span class="meta">6 天</span></button>
+            <button class="row more">显示更多</button>
+            <button class="row folder" aria-expanded="false"><i data-lucide="chevron-down" class="chev"></i><span class="label">专利 · 王裕明</span></button>
+          </div>
+        </div>
+
+        <div class="sb-foot">
+          <button class="row account">
+            <span class="avatar"><i data-lucide="user-round"></i></span>
+            <span class="stack"><span class="t1">登录</span><span class="t2">同步任务与设置</span></span>
+            <i data-lucide="settings"></i>
+          </button>
+        </div>
+      </aside>
+
+      <section class="main">
+        <header class="topbar">
+          <span class="title">新任务</span>
+          <button class="status" title="文件操作在本机完成，敏感操作执行前需要你确认"><span class="dot"></span>本地安全模式</button>
+          <div class="win">
+            <button class="icon-btn" aria-label="最小化"><i data-lucide="minus"></i></button>
+            <button class="icon-btn" aria-label="最大化"><i data-lucide="square" style="width: 13px; height: 13px"></i></button>
+            <button class="icon-btn close" aria-label="关闭"><i data-lucide="x"></i></button>
+          </div>
+        </header>
+
+        <div class="home">
+          <div class="hero">
+            <h1 id="greet">下午好，今天想完成什么？</h1>
+            <p>读取本地文件、执行多步任务，关键操作前会先征得你的同意</p>
+          </div>
+
+          <form class="composer" onsubmit="return false">
+            <textarea id="prompt" rows="2" placeholder="描述一个任务，或者问任何问题" aria-label="任务描述"></textarea>
+            <div class="toolbar">
+              <button type="button" class="chip icon-only" aria-label="添加附件"><i data-lucide="plus"></i></button>
+              <button type="button" class="chip"><i data-lucide="folder"></i>默认文件夹<i data-lucide="chevron-down" class="caret"></i></button>
+              <button type="button" class="chip"><i data-lucide="shield-check"></i>敏感操作需确认<i data-lucide="chevron-down" class="caret"></i></button>
+              <span class="spacer"></span>
+              <button type="button" class="chip">GLM-5.3 Flash<i data-lucide="chevron-down" class="caret"></i></button>
+              <button type="submit" class="send" id="send" aria-label="发送" disabled><i data-lucide="arrow-up"></i></button>
+            </div>
+          </form>
+
+          <div class="quick">
+            <button class="pill"><i data-lucide="presentation"></i>制作幻灯片</button>
+            <button class="pill"><i data-lucide="chart-column"></i>分析数据</button>
+            <button class="pill"><i data-lucide="globe"></i>搭建网站</button>
+            <button class="pill"><i data-lucide="telescope"></i>深度调研</button>
+            <button class="pill"><i data-lucide="graduation-cap"></i>学术研究</button>
+            <button class="pill"><i data-lucide="file-text"></i>撰写文档</button>
+          </div>
+        </div>
+
+        <div class="footnote">知远可能会出错，请核对重要信息</div>
+      </section>
+    </div>
+  </main>
+
+  <main class="stage view" id="view-spec" hidden>
+    <article class="spec">
+      <h2>主界面参考实现 · 速查</h2>
+      <p class="lead">完整规则见仓库根目录 DESIGN.md。本页色板直接读取当前主题的计算值，切换浅色/深色即可对照。</p>
+
+      <h3>六条原则</h3>
+      <ol>
+        <li><b>一屏一个重心。</b>首页的重心是输入岛，其余元素降一级。</li>
+        <li><b>品牌蓝是信号，不是装饰。</b>只用于可执行的主动作、焦点与运行状态。</li>
+        <li><b>层级靠灰阶与字重。</b>三级文字色 + 400/500/600，不靠字号跳变。</li>
+        <li><b>用面分区，不用线。</b>窗口底色 + 一块抬升的内容面板。</li>
+        <li><b>同一行高、圆角、左边线。</b>32px / 8px / 16px 图标，文字起点对齐。</li>
+        <li><b>次要信息按需出现。</b>时间、次要操作在 hover / focus 时显示。</li>
+      </ol>
+
+      <h3>颜色</h3>
+      <div class="swatches" id="swatches"></div>
+
+      <h3>字阶</h3>
+      <table class="tbl">
+        <tr><th>档位</th><th>用途</th><th>示例</th></tr>
+        <tr><td><code>text-2xl 24/32 · 600</code></td><td>首页问候（一屏至多一处）</td><td style="font-size: 24px; font-weight: 600; color: var(--zy-text-primary)">今天想完成什么？</td></tr>
+        <tr><td><code>text-lg 18/28 · 600</code></td><td>PageHeader 标题</td><td style="font-size: 18px; font-weight: 600; color: var(--zy-text-primary)">自动化</td></tr>
+        <tr><td><code>text-base 16/24</code></td><td>主输入框、区块标题</td><td style="font-size: 16px; color: var(--zy-text-primary)">描述一个任务，或者问任何问题</td></tr>
+        <tr><td><code>text-sm 14/20</code></td><td>默认界面文字</td><td>新建任务　编程　整理 Q3 销售数据</td></tr>
+        <tr><td><code>text-xs 12/16</code></td><td>元信息、分组标签</td><td style="font-size: 12px; color: var(--zy-text-muted)">项目　今天　52 分钟</td></tr>
+      </table>
+
+      <h3>间距与圆角</h3>
+      <table class="tbl">
+        <tr><td><code>4</code></td><td><div class="bar" style="width: 4px"></div></td><td>工具栏按钮间</td><td><div class="rbox" style="border-radius: 6px"></div></td><td><code>6</code> Kbd、分段滑块</td></tr>
+        <tr><td><code>8</code></td><td><div class="bar" style="width: 8px"></div></td><td>侧栏外侧留白、引导项间</td><td><div class="rbox" style="border-radius: 8px"></div></td><td><code>8</code> 按钮、导航行、芯片</td></tr>
+        <tr><td><code>12</code></td><td><div class="bar" style="width: 12px"></div></td><td>输入岛内边距、输入与工具栏间</td><td><div class="rbox" style="border-radius: 12px"></div></td><td><code>12</code> 内容面板、卡片、Dialog</td></tr>
+        <tr><td><code>16</code></td><td><div class="bar" style="width: 16px"></div></td><td>侧栏分组间、表单字段间</td><td><div class="rbox" style="border-radius: 16px"></div></td><td><code>16</code> 搜索弹层</td></tr>
+        <tr><td><code>32</code></td><td><div class="bar" style="width: 32px"></div></td><td>问候语与输入岛间</td><td><div class="rbox" style="border-radius: 20px"></div></td><td><code>20</code> 主输入岛</td></tr>
+      </table>
+
+      <h3>该做 / 不该做</h3>
+      <div class="dos">
+        <div class="y"><b>✓</b> 新建任务用中性抬升按钮，配快捷键提示</div>
+        <div class="n"><b>✗</b> 侧栏顶部大面积饱和蓝按钮，与输入岛抢重心</div>
+        <div class="y"><b>✓</b> 会话按「今天 / 本周」分组，时间按需显示</div>
+        <div class="n"><b>✗</b> 每行右侧重复「1 周前」</div>
+        <div class="y"><b>✓</b> 默认权限「敏感操作需确认」</div>
+        <div class="n"><b>✗</b> 顶栏写「安全防护中」，输入框默认「全部允许」</div>
+        <div class="y"><b>✓</b> 只过渡颜色与阴影，120ms；按压 1px</div>
+        <div class="n"><b>✗</b> 毛玻璃、渐变按钮、彩色光晕、悬停上浮放大、呼吸动画</div>
+      </div>
+    </article>
+  </main>
+
+  <script src="./main.js"></script>
+</body>
+</html>
