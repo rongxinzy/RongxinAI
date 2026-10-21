@@ -155,6 +155,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings, settingsActiv
         onClick={() => setShowMenu(open => !open)}
         aria-expanded={showMenu}
         aria-haspopup="menu"
+        aria-label={accountLabel}
         className="theme-page-login-button-button-1 inline-flex w-full items-center justify-start"
       >
         <span className="theme-shell-account-avatar flex shrink-0 items-center justify-center">
