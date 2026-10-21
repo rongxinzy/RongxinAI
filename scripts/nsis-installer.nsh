@@ -72,9 +72,20 @@ Var /GLOBAL zyDeleteRealAppData
 
 !macro StopAppProcesses
   System::Call 'kernel32::GetCurrentProcessId()i .r9'
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\manage-install-processes.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -SelfPid $9 -Mode stop'
-  Pop $0
-  Pop $1
+  StrCpy $R7 0
+  ${Do}
+    IntOp $R7 $R7 + 1
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\manage-install-processes.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -SelfPid $9 -Mode stop'
+    Pop $0
+    Pop $1
+    ${If} $0 == "0"
+      ${ExitDo}
+    ${EndIf}
+    ${If} $R7 >= 3
+      ${ExitDo}
+    ${EndIf}
+    Sleep 500
+  ${Loop}
   DetailPrint "$1"
   ${If} $0 != "0"
     IfSilent +2
@@ -200,14 +211,29 @@ Var /GLOBAL zyDeleteRealAppData
     ; shared resource pack, and physical cleanup is delayed until installation ends.
     DetailPrint "[Installer] Detaching previous application version"
     System::Call 'kernel32::GetTickCount()i .r7'
+    ; Windows refuses to rename a directory that any process has as its working
+    ; directory. Move the installer's CWD to a normal user directory: the plugin
+    ; directory can live under the low-integrity Temp\Low on some systems.
+    CreateDirectory "$APPDATA\ZhiYuanAgent\installer-tmp"
+    System::Call 'kernel32::SetCurrentDirectory(t "$APPDATA\ZhiYuanAgent\installer-tmp")'
     OldInstallDetachRetry_${TOKEN}:
     ${If} ${FileExists} "$INSTDIR\*.*"
       System::Call 'kernel32::GetTickCount()i .r4'
       StrCpy $3 "$INSTDIR.old.$4"
-      ClearErrors
-      Rename "$INSTDIR" "$3"
-      ${If} ${Errors}
-        ; A failed rename is a sharing violation, not a running app. Report the
+      StrCpy $R7 0
+      RenameRetry_${TOKEN}:
+      ; MoveFileExW exposes the real Win32 error instead of NSIS's opaque
+      ; Rename error flag; retry a few times to ride out transient holders
+      ; (AV scanners, Explorer/indexer opening a just-written file).
+      System::Call 'kernel32::MoveFileExW(w "$INSTDIR", w "$3", i 0) i .r0 ?e'
+      Pop $R8
+      ${If} $R0 == 0
+        IntOp $R7 $R7 + 1
+        ${If} $R7 < 10
+          Sleep 500
+          Goto RenameRetry_${TOKEN}
+        ${EndIf}
+        ; A failed move is a sharing violation, not a running app. Report the
         ; actual cause instead of electron-builder's blanket "cannot be closed".
         !insertmacro CountInstallDirProcesses $R0
         ${If} $R0 > 0
@@ -215,10 +241,10 @@ Var /GLOBAL zyDeleteRealAppData
           !insertmacro StopAppProcesses
           MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_APP_UNCLOSABLE)" /SD IDCANCEL IDRETRY OldInstallDetachRetry_${TOKEN}
         ${Else}
-          DetailPrint "[Installer] Detach blocked: install directory is in use by another program"
+          DetailPrint "[Installer] Detach blocked: install directory is in use by another program (error $R8)"
           MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "$(ZY_DIR_OCCUPIED)" /SD IDCANCEL IDRETRY OldInstallDetachRetry_${TOKEN}
         ${EndIf}
-        StrCpy $3 "result=detach-aborted processes=$R0"
+        StrCpy $3 "result=detach-aborted error=$R8 processes=$R0"
         !insertmacro OpenTimingLogForAppend $8
         FileWrite $8 "phase=old-install-detach-aborted $3$\r$\n"
         FileClose $8
@@ -263,6 +289,10 @@ Var /GLOBAL zyDeleteRealAppData
   "无法安全关闭应用进程。请退出知远后重试。" \
   "無法安全關閉應用程式。請結束知遠後重試。" \
   "Application processes could not be stopped safely. Exit ZhiYuan and try again."
+!insertmacro ZY_LangString ZY_LOW_INTEGRITY \
+  "安装器当前以受限（低完整性）权限运行，无法写入用户目录。请将安装包复制到“下载”或桌面等普通文件夹后重新运行。" \
+  "安裝器目前以受限（低完整性）權限執行，無法寫入使用者目錄。請將安裝包複製到「下載」或桌面等一般資料夾後重新執行。" \
+  "Setup is running with restricted (low integrity) permissions and cannot write to your user folders. Copy the installer to a normal folder such as Downloads or the Desktop and run it again."
 !ifndef BUILD_UNINSTALLER
 !insertmacro ZY_LangString ZY_SKILL_MIGRATION_FAILED \
   "未能保留用户创建的 Skills。安装已停止，原安装目录保持不变。请检查访问权限后重新运行安装器。" \
@@ -517,6 +547,21 @@ Var /GLOBAL zyDeleteRealAppData
   !insertmacro StageInstallSafetyScripts
   SetDetailsPrint textonly
   CreateDirectory "$APPDATA\ZhiYuanAgent"
+  ; Fail fast with an actionable message when this process cannot write the
+  ; per-user directories. Low-integrity launches (a restricted folder that the
+  ; system runs sandboxed) otherwise surface as an opaque access-denied abort.
+  ClearErrors
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\.write-probe" w
+  IfErrors LowIntegrityDetected
+  FileClose $2
+  Delete "$APPDATA\ZhiYuanAgent\.write-probe"
+  Goto LowIntegrityProbeDone
+  LowIntegrityDetected:
+    IfSilent +2
+      MessageBox MB_OK|MB_ICONSTOP "$(ZY_LOW_INTEGRITY)"
+    SetErrorLevel 2
+    Quit
+  LowIntegrityProbeDone:
   ; Stage the branded UI bitmaps (and license text) the wizard pages load.
   ; File extraction only: this macro also runs for silent installs, where no
   ; page callback ever fires, so no GUI calls are allowed here.
@@ -586,6 +631,10 @@ Var /GLOBAL zyDeleteRealAppData
 !macroend
 
 !macro customInstall
+  ; electron-builder only writes InstallLocation to the private install key;
+  ; mirror it into the uninstall entry so ARP/enterprise tooling can resolve
+  ; the installation directory.
+  WriteRegStr SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "InstallLocation" "$INSTDIR"
   CreateDirectory "$APPDATA\ZhiYuanAgent"
   CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
   ; Marks the end of the application file extraction span (customInit up to

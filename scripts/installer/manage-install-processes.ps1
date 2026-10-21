@@ -9,13 +9,27 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 Set-StrictMode -Version Latest
-$installPrefix = [IO.Path]::GetFullPath($InstallDir).TrimEnd([char]0x5c) + [char]0x5c
+$installRoot = [IO.Path]::GetFullPath($InstallDir).TrimEnd([char]0x5c)
+$installPrefix = $installRoot + [char]0x5c
 $runtimePrefix = [IO.Path]::GetFullPath($RuntimeRoot).TrimEnd([char]0x5c) + [char]0x5c
+# Some processes report no ExecutablePath (protected/zoned); fall back to the
+# names of the executables that ship inside the install directory.
+$exeNames = @()
+try {
+  $exeNames = @(Get-ChildItem -LiteralPath $installRoot -Filter '*.exe' -ErrorAction SilentlyContinue |
+    ForEach-Object { $_.Name })
+} catch {
+  $exeNames = @()
+}
 function Get-InstallProcesses([bool]$IncludeRuntime) {
   return @(Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
+    if ($_.ProcessId -eq $SelfPid) { return $false }
     $image = $_.ExecutablePath
-    $_.ProcessId -ne $SelfPid -and $image -and ($image.StartsWith($installPrefix, [StringComparison]::OrdinalIgnoreCase) -or
-      ($IncludeRuntime -and $image.StartsWith($runtimePrefix, [StringComparison]::OrdinalIgnoreCase)))
+    if ($image) {
+      return $image.StartsWith($installPrefix, [StringComparison]::OrdinalIgnoreCase) -or
+        ($IncludeRuntime -and $image.StartsWith($runtimePrefix, [StringComparison]::OrdinalIgnoreCase))
+    }
+    return $IncludeRuntime -and $_.Name -and ($exeNames -contains $_.Name)
   })
 }
 if ($Mode -eq 'count') {
@@ -33,5 +47,17 @@ for ($attempt = 0; $attempt -lt 20; $attempt++) {
   if ($remaining.Count -eq 0) { break }
   Start-Sleep -Milliseconds 500
 }
-Write-Output "stopped=$stopped remaining=$($remaining.Count)"
-if ($remaining.Count -gt 0) { exit 1 }
+$forced = 0
+if ($remaining.Count -gt 0) {
+  foreach ($process in $remaining) {
+    & taskkill.exe /F /T /PID $process.ProcessId 2>$null | Out-Null
+    $forced += 1
+  }
+  Start-Sleep -Milliseconds 700
+  $remaining = @(Get-InstallProcesses $true | Where-Object { $_.ProcessId -ne $SelfPid })
+}
+Write-Output "stopped=$stopped forced=$forced remaining=$($remaining.Count)"
+if ($remaining.Count -gt 0) {
+  Write-Output ("remaining_ids=" + (($remaining | ForEach-Object { "$($_.Name):$($_.ProcessId)" }) -join ','))
+  exit 1
+}
