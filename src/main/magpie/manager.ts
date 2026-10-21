@@ -595,15 +595,41 @@ export class MagpieManager implements MagpieRoutingGateway {
       const latencyMs = Date.now() - start;
       if (res.ok) {
         let modelCount: number | undefined;
+        let discoveredModels: string[] | undefined;
         try {
           const body = (await res.json()) as { data?: unknown[] };
-          if (Array.isArray(body.data)) modelCount = body.data.length;
+          if (Array.isArray(body.data)) {
+            const rawModels = body.data
+              .map(item => {
+                if (typeof item === 'string') return item.trim();
+                if (
+                  item &&
+                  typeof item === 'object' &&
+                  'id' in item &&
+                  typeof (item as { id: unknown }).id === 'string'
+                ) {
+                  return (item as { id: string }).id.trim();
+                }
+                return '';
+              })
+              .filter(Boolean);
+            discoveredModels = Array.from(new Set(rawModels));
+            modelCount = discoveredModels.length;
+          }
         } catch {
           /* ignore json parse on non-json body */
         }
-        return { ok: true, latencyMs, modelCount };
+        return { ok: true, latencyMs, modelCount, discoveredModels };
       }
-      return { ok: false, latencyMs, error: `HTTP ${res.status}: ${res.statusText}` };
+      const requiresKey = res.status === 401 || res.status === 403;
+      return {
+        ok: false,
+        latencyMs,
+        requiresKey,
+        error: requiresKey
+          ? 'API Key is required or invalid (HTTP 401/403)'
+          : `HTTP ${res.status}: ${res.statusText}`,
+      };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       return { ok: false, error: message };
