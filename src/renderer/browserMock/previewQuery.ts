@@ -4,6 +4,8 @@ export const PreviewQuery = {
   Edition: 'previewEdition',
   SkipBoot: 'previewSkipBoot',
   MagpieUsage: 'previewMagpieUsage',
+  Locale: 'previewLocale',
+  Platform: 'previewPlatform',
 } as const;
 
 export const PreviewMagpieUsage = {
@@ -49,6 +51,32 @@ export function readPreviewEdition(searchParams = readPreviewSearchParams()): Pr
   const raw = searchParams.get(PreviewQuery.Edition)?.trim().toLowerCase();
   if (raw === PreviewEdition.Xiaoruan) return PreviewEdition.Xiaoruan;
   return PreviewEdition.Zhiyuan;
+}
+
+export const PreviewPlatform = {
+  Darwin: 'darwin',
+  Win32: 'win32',
+  Linux: 'linux',
+} as const;
+
+export type PreviewPlatform = (typeof PreviewPlatform)[keyof typeof PreviewPlatform];
+
+/** Optional window-chrome override for design walkthroughs and screenshots. */
+export function readPreviewPlatform(
+  searchParams = readPreviewSearchParams(),
+): PreviewPlatform | null {
+  const raw = searchParams.get(PreviewQuery.Platform)?.trim().toLowerCase();
+  if (raw === PreviewPlatform.Darwin) return PreviewPlatform.Darwin;
+  if (raw === PreviewPlatform.Win32) return PreviewPlatform.Win32;
+  if (raw === PreviewPlatform.Linux) return PreviewPlatform.Linux;
+  return null;
+}
+
+/** Optional system-locale override; accepts the same zh-CN / en-US values as Electron. */
+export function readPreviewLocale(searchParams = readPreviewSearchParams()): string | null {
+  const raw = searchParams.get(PreviewQuery.Locale)?.trim();
+  if (raw === 'zh-CN' || raw === 'en-US') return raw;
+  return null;
 }
 
 export function readPreviewMagpieUsage(

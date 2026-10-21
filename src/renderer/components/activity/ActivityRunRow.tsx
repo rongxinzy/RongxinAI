@@ -96,26 +96,11 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
   };
 
   const row = (
-    <div
-      className={cn(
-        'theme-surface-activity-row group relative flex flex-col p-4 transition-all duration-200',
-        isRunning && 'border-primary/40 bg-primary/[0.02]',
-        isFailed && 'border-destructive/30 bg-destructive/[0.01]',
-      )}
-    >
+    <div className="theme-surface-activity-row group relative flex flex-col p-4 transition-colors duration-200">
       {/* Top Header Row */}
       <div className="flex items-start gap-3.5 min-w-0">
         {/* Icon Tile */}
-        <div
-          className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-lg border',
-            isRunning
-              ? 'border-primary/30 bg-primary/10 text-primary'
-              : isFailed
-                ? 'border-destructive/30 bg-destructive/10 text-destructive'
-                : 'border-border/60 bg-surface-raised text-muted-foreground',
-          )}
-        >
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-surface-raised text-muted-foreground">
           {platform ? (
             <img
               src={imPlatformLogo(platform)}
@@ -204,7 +189,6 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
         <div
           className={cn(
             'mt-3 rounded-lg border border-border/50 bg-muted/20 px-3.5 py-2.5 transition-colors',
-            isFailed && 'border-destructive/20 bg-destructive/5',
             hasExpandableBody && 'cursor-pointer hover:bg-muted/30',
           )}
           onClick={hasExpandableBody ? toggleBodyExpanded : undefined}

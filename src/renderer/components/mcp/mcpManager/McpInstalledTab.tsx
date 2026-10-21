@@ -6,6 +6,14 @@
  */
 import { Button } from '@shared/components/ui/button';
 import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -57,14 +65,21 @@ export function McpInstalledTab({
     <div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {filteredInstalled.length === 0 ? (
-          <div className="col-span-full flex min-h-60 flex-col items-center justify-center gap-3 p-6 text-center">
-            <Cable className="size-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              {i18nService.t('mcpNoInstalledServers')}
-            </p>
-            <Button type="button" variant="outline" size="sm" onClick={onOpenMarketplace}>
-              {i18nService.t('mcpMarketplace')}
-            </Button>
+          <div className="col-span-full">
+            <Empty className="min-h-60">
+              <EmptyMedia variant="icon">
+                <Cable className="size-5" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>{i18nService.t('mcpNoInstalledServers')}</EmptyTitle>
+                <EmptyDescription>{i18nService.t('mcpNoInstalledDescription')}</EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button type="button" variant="outline" onClick={onOpenMarketplace}>
+                  {i18nService.t('mcpMarketplace')}
+                </Button>
+              </EmptyContent>
+            </Empty>
           </div>
         ) : (
           paginatedInstalled.map(server => {

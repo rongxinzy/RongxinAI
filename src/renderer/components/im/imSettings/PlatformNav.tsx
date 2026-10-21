@@ -257,7 +257,7 @@ export const IMPlatformNav: React.FC<IMPlatformNavProps> = ({
           className={cn(
             'flex items-center rounded-lg border transition-colors',
             activePlatform === platform
-              ? 'border-primary bg-primary-muted'
+              ? 'border-input bg-sidebar-accent'
               : 'border-transparent bg-surface hover:bg-surface-raised',
           )}
         >

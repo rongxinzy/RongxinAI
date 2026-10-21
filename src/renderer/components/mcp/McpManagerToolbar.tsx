@@ -62,17 +62,17 @@ export function McpManagerToolbar({
   onImportConfig,
 }: McpManagerToolbarProps) {
   return (
-    <header className="flex flex-col gap-4 border-b border-border">
+    <header className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
-          <Cable className="size-6 text-primary" aria-hidden="true" />
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+          <Cable className="size-5 text-muted-foreground" aria-hidden="true" />
         </div>
         <p className="min-w-0 text-sm text-muted-foreground">
           {i18nService.t('connectorsDescription')}
         </p>
       </div>
 
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center justify-between">
+      <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center justify-between">
         <InputGroup className="flex-1 max-w-md">
           <InputGroupAddon>
             <InputGroupText>

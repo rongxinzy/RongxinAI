@@ -172,13 +172,22 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
               size="sm"
               onClick={handleCreateByChat}
               className="gap-1.5"
+              aria-label={i18nService.t('scheduledTasksCreateByChat')}
             >
               <MessageCirclePlus className="size-4" />
-              <span>{i18nService.t('scheduledTasksCreateByChat')}</span>
+              <span className="hidden xl:inline">
+                {i18nService.t('scheduledTasksCreateByChat')}
+              </span>
             </Button>
-            <Button type="button" size="sm" onClick={() => openCreateModal()} className="gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => openCreateModal()}
+              className="gap-1.5"
+              aria-label={i18nService.t('scheduledTasksNewTask')}
+            >
               <Plus className="size-4" />
-              <span>{i18nService.t('scheduledTasksNewTask')}</span>
+              <span className="hidden xl:inline">{i18nService.t('scheduledTasksNewTask')}</span>
             </Button>
           </div>
         }

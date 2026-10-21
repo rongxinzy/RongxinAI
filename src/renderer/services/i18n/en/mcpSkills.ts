@@ -281,6 +281,8 @@ export const enMcpSkills: Record<string, string> = {
   mcpOptionalConfig: 'Optional Configuration',
   mcpViewOnGithub: 'View on GitHub',
   mcpNoInstalledServers: 'No MCP servers installed yet',
+  mcpNoInstalledDescription: 'Install a connector from the registry, or import a local MCP config.',
+  mcpMarketplaceEmptyDescription: 'Configure a local connector, or install one from the registry.',
   mcpCategoryAll: 'All',
   mcpCategorySearch: 'Search',
   mcpCategoryBrowser: 'Browser',

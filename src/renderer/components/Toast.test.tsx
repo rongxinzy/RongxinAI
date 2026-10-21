@@ -18,13 +18,15 @@ test('renders the message with the neutral info icon and no backing disc', () =>
   expect(icon?.getAttribute('stroke-width')).toBe('2');
 });
 
-test('keeps the filled red disc for errors and the filled green disc for successes', () => {
+test('colors error and success icons without a filled disc', () => {
   const error = render(<Toast message="操作失败" isError />);
   expect(error.container.querySelector('.lucide-x')).not.toBeNull();
-  expect(error.container.querySelector('.bg-destructive')).not.toBeNull();
+  expect(error.container.querySelector('.text-destructive')).not.toBeNull();
+  expect(error.container.querySelector('.bg-destructive')).toBeNull();
   cleanup();
 
   const success = render(<Toast message="已保存" isSuccess />);
   expect(success.container.querySelector('.lucide-check')).not.toBeNull();
-  expect(success.container.querySelector('.bg-success')).not.toBeNull();
+  expect(success.container.querySelector('.text-success')).not.toBeNull();
+  expect(success.container.querySelector('.bg-success')).toBeNull();
 });

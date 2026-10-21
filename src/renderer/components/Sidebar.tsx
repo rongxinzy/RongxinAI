@@ -423,16 +423,18 @@ const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className="shrink-0">
             <div className="theme-sidebar-header draggable sidebar-header-drag flex items-center justify-between">
-              <div className={cn('flex items-center gap-2', isMac && 'pl-[68px]')}>
+              <div
+                className={cn('theme-shell-brand flex items-center gap-2', isMac && 'pl-[68px]')}
+              >
                 <img
                   src={`${getBranding().appId}-logo-light.svg`}
                   alt={getBranding().shortName}
-                  className="logo-light w-auto select-none"
+                  className="theme-shell-brand-mark logo-light w-auto select-none"
                 />
                 <img
                   src={`${getBranding().appId}-logo-dark.svg`}
                   alt={getBranding().shortName}
-                  className="logo-dark w-auto select-none"
+                  className="theme-shell-brand-mark logo-dark w-auto select-none"
                 />
               </div>
               <ShellIconButton
@@ -453,6 +455,8 @@ const Sidebar: React.FC<SidebarProps> = ({
               onShowActivity={onShowActivity}
               onWorkModeChange={handleWorkModeChange}
               workMode={workMode}
+              onSearch={workMode === WorkMode.Work ? () => setSearchActive(true) : undefined}
+              searchLabel={i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
               managedModelsOnly={managedModelsOnly}
               inferenceEdition={inferenceEdition}
               onPrefetchView={onPrefetchView}
@@ -467,7 +471,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 />
               </div>
             ) : null}
-            {activeView !== 'coding' && workMode !== WorkMode.Chat && renderSearchControl()}
 
             <div
               ref={agentScrollContainerRef}

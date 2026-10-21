@@ -5,7 +5,15 @@
  * references were lifted into props.
  */
 import { Button } from '@shared/components/ui/button';
-import { LoaderCircle, X } from 'lucide-react';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
+import { Cable, LoaderCircle, X } from 'lucide-react';
 
 import { i18nService } from '../../../services/i18n';
 import type { McpRegistryEntry } from '../../../types/mcp';
@@ -32,6 +40,7 @@ interface McpMarketplaceTabProps {
   getRegistryEntryDescription: (entry: McpRegistryEntry) => string;
   onInstallFromRegistry: (entry: McpRegistryEntry) => void;
   onCancelOfficialAuthorization: () => void;
+  onConfigureLocal: () => void;
 }
 
 export function McpMarketplaceTab({
@@ -47,13 +56,29 @@ export function McpMarketplaceTab({
   getRegistryEntryDescription,
   onInstallFromRegistry,
   onCancelOfficialAuthorization,
+  onConfigureLocal,
 }: McpMarketplaceTabProps) {
   return (
     <div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {filteredMarketplace.length === 0 ? (
-          <div className="col-span-full text-center py-12 text-sm text-muted-foreground">
-            {i18nService.t('noMcpServersAvailable')}
+          <div className="col-span-full">
+            <Empty className="min-h-60">
+              <EmptyMedia variant="icon">
+                <Cable className="size-5" />
+              </EmptyMedia>
+              <EmptyHeader>
+                <EmptyTitle>{i18nService.t('noMcpServersAvailable')}</EmptyTitle>
+                <EmptyDescription>
+                  {i18nService.t('mcpMarketplaceEmptyDescription')}
+                </EmptyDescription>
+              </EmptyHeader>
+              <EmptyContent>
+                <Button type="button" variant="outline" onClick={onConfigureLocal}>
+                  {i18nService.t('configureLocalMcp')}
+                </Button>
+              </EmptyContent>
+            </Empty>
           </div>
         ) : (
           paginatedMarketplace.map(entry => (

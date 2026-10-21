@@ -183,5 +183,18 @@ export function classicComponentAppearances(): ComponentAppearances {
     ...shellSidebarAppearances(),
     ...classicAppearancePreview(),
     ...homeStudioAppearances(),
+
+    // Quiet Studio composition hooks are supplied by the active theme package.
+    'shell-main-panel': recipe({}),
+    'shell-brand': recipe({}),
+    'shell-brand-mark': recipe({}),
+    'shell-kbd': recipe({}),
+    'shell-sidebar-time': recipe({}),
+    'shell-account-avatar': recipe({}),
+    'shell-account-name': recipe({}),
+    'shell-account-hint': recipe({}),
+    'shell-status-dot': recipe({}),
+    'shell-status-dot-warning': recipe({}),
+    'home-greeting': recipe({}),
   };
 }

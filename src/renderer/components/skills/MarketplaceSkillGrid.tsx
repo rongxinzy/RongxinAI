@@ -51,7 +51,7 @@ export function MarketplaceSkillGrid({
   if (skills.length === 0) {
     if (searchQuery.trim()) {
       return (
-        <Empty className="min-h-48 border border-dashed">
+        <Empty className="min-h-48">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               <PlusMenuSkillsIcon />
@@ -72,7 +72,7 @@ export function MarketplaceSkillGrid({
       );
     }
     return (
-      <Empty className="min-h-48 border border-dashed">
+      <Empty className="min-h-48">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <PlusMenuSkillsIcon />

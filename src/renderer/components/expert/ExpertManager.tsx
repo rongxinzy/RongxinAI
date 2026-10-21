@@ -214,7 +214,7 @@ const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
   return (
     <div className="flex flex-col gap-5 pb-12">
       {/* Top Action Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
         <div className="flex items-center gap-2.5 flex-1 max-w-md">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -269,10 +269,10 @@ const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-foreground">
+                <span className="text-xs font-medium text-muted-foreground">
                   {i18nService.t('expertFilterCustom')}
                 </span>
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {filteredCustomAgents.length}
                 </span>
               </div>
@@ -404,10 +404,10 @@ const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-foreground">
+                <span className="text-xs font-medium text-muted-foreground">
                   {i18nService.t('expertFilterPreset')}
                 </span>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {filteredPresetExperts.length}
                 </span>
               </div>
