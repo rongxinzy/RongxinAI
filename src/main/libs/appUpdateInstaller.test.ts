@@ -48,8 +48,21 @@ test('confirms the Windows helper started before quitting and records the target
   );
   const script = await fs.promises.readFile(scriptPath, 'utf8');
   expect(script).toContain('Start-Process -FilePath $installerPath -Wait -PassThru');
+  expect(script).toContain('Wait-Process -Id $appPid -Timeout 120');
+  expect(script).not.toContain('Start-Sleep');
+  // A bare $null binds as an empty path and throws; [NullString]::Value is the
+  // documented way to ask .NET for "no backup file".
+  expect(script).toContain('[IO.File]::Replace($tmp, $receiptPath, [NullString]::Value)');
+  expect(script).not.toContain('[IO.File]::Replace($tmp, $receiptPath, $null)');
+  expect(script).toContain('if ($installerExitCode -ne 0)');
   expect(script).toContain('Write-Receipt "failed"');
   expect(script).not.toContain("-ArgumentList '/S'");
+  const vbsPath = path.join(
+    mocks.root,
+    fs.readdirSync(mocks.root).find(name => name.endsWith('.vbs'))!,
+  );
+  const vbs = await fs.promises.readFile(vbsPath, 'utf8');
+  expect(vbs).toContain('-NoProfile -NonInteractive -NoLogo');
 });
 
 test('keeps the app open and records a failed handoff when the helper cannot launch', async () => {

@@ -1,6 +1,5 @@
 import React, { type Dispatch, type SetStateAction } from 'react';
 
-import { type AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { CodingSidebarSelection } from '../components/coding/CodingWorkspaceSidebar';
 import type { ExpertTab } from '../components/expert/ExpertView';
 import { LazyChunkErrorBoundary } from '../components/LazyChunkErrorBoundary';
@@ -33,7 +32,6 @@ export interface MainViewCanvasProps {
   onLeaveSettings: () => void;
   onRequestAppSettings: (options?: SettingsOpenOptions) => void;
   enterpriseConfig: SettingsEnterpriseConfig | null;
-  appUpdateState: AppUpdateRuntimeState;
   managedModelsOnly: boolean;
   inferenceEdition: InferenceEdition;
   localInferenceEnabled: boolean;
@@ -78,7 +76,6 @@ export function MainViewCanvas({
   onLeaveSettings,
   onRequestAppSettings,
   enterpriseConfig,
-  appUpdateState,
   managedModelsOnly,
   inferenceEdition,
   localInferenceEnabled,
@@ -143,7 +140,6 @@ export function MainViewCanvas({
                 initialProvider={settingsOptions.initialProvider}
                 notice={settingsOptions.notice}
                 enterpriseConfig={enterpriseConfig}
-                appUpdateState={appUpdateState}
                 managedModelsOnly={managedModelsOnly}
                 inferenceEdition={inferenceEdition}
                 isSidebarCollapsed={isSidebarCollapsed}

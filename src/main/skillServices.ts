@@ -12,12 +12,39 @@ import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { hasCommand, resolveUserShellPath } from './skills/envUtils';
 import { NpmCli, resolveBundledNpmRuntime } from './libs/npmRuntime';
 import { NpmCommandAbortedError, runNpmCommand } from './libs/npmRuntimeExec';
+import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 import { settleWithin, StartupGate } from './libs/startupGate';
+import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
 
 /** How long a stop waits for a cancelled search start-up to unwind. */
 const WEB_SEARCH_STOP_SETTLE_TIMEOUT_MS = 5_000;
-import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
-import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
+/** Upper bound for the SIGTERM'd bridge process to disappear before quit continues. */
+const WEB_SEARCH_STOP_EXIT_TIMEOUT_MS = 2_000;
+/** Poll interval while waiting for that process to exit. */
+const WEB_SEARCH_STOP_EXIT_POLL_MS = 100;
+
+/**
+ * Whether a process is still alive. `EPERM` means the pid exists but belongs to
+ * another user, which still counts as running.
+ */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** Waits for a process to exit, bounded by a timeout. */
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!isProcessAlive(pid)) return;
+    await new Promise(resolve => setTimeout(resolve, WEB_SEARCH_STOP_EXIT_POLL_MS));
+  }
+  console.warn(`[SkillServices] Web Search process ${pid} did not exit within ${timeoutMs} ms`);
+}
 
 async function buildSkillServiceEnv(): Promise<Record<string, string | undefined>> {
   const env: Record<string, string | undefined> = { ...process.env };
@@ -466,9 +493,10 @@ export class SkillServiceManager {
 
       console.log('[SkillServices] Stopping Web Search Bridge Server...');
 
-      if (this.webSearchPid) {
+      const pid = this.webSearchPid;
+      if (pid) {
         try {
-          process.kill(this.webSearchPid, 'SIGTERM');
+          process.kill(pid, 'SIGTERM');
         } catch (error) {
           console.warn('[SkillServices] Failed to kill process:', error);
         }
@@ -479,8 +507,10 @@ export class SkillServiceManager {
         fs.unlinkSync(pidFile);
       }
 
-      // Wait for graceful shutdown
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait for the process to actually go away instead of always burning a
+      // fixed sleep on every quit. The timeout is the same upper bound; the
+      // common case now returns as soon as the port is released.
+      if (pid) await waitForProcessExit(pid, WEB_SEARCH_STOP_EXIT_TIMEOUT_MS);
 
       console.log('[SkillServices] Web Search Bridge Server stopped');
       this.webSearchPid = null;

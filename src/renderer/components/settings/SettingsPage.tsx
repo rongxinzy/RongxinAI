@@ -39,7 +39,6 @@ export default function SettingsPage({
   noticeI18nKey,
   noticeExtra,
   enterpriseConfig,
-  appUpdateState,
   managedModelsOnly = false,
   inferenceEdition: _inferenceEdition,
   isSidebarCollapsed,
@@ -328,13 +327,7 @@ export default function SettingsPage({
         return <ImSettingsPanel />;
 
       case 'about':
-        return (
-          <AboutSettingsPanel
-            appUpdateState={appUpdateState}
-            setError={setError}
-            setNoticeMessage={setNoticeMessage}
-          />
-        );
+        return <AboutSettingsPanel setError={setError} setNoticeMessage={setNoticeMessage} />;
 
       default:
         return null;

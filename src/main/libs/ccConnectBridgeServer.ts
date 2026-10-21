@@ -85,9 +85,20 @@ export class CcConnectBridgeServer {
     const server = this.server;
     this.server = null;
     if (!server) return;
-    await new Promise<void>((resolve, reject) =>
-      server.close(error => (error ? reject(error) : resolve())),
-    );
+    // Idle keep-alive sockets are not closed by server.close(), which used to
+    // hold app quit until the socket timeout expired. Drop them immediately and
+    // force-close whatever is still in flight, then wait for the server.
+    server.closeIdleConnections();
+    const closed = new Promise<void>((resolve, reject) => {
+      server.close(error => (error ? reject(error) : resolve()));
+    });
+    const forceCloseTimer = setTimeout(() => server.closeAllConnections(), 250);
+    forceCloseTimer.unref?.();
+    try {
+      await closed;
+    } finally {
+      clearTimeout(forceCloseTimer);
+    }
   }
 
   private async handle(

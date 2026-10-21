@@ -71,6 +71,8 @@ export const zhArtifactsUpdates: Record<string, string> = {
   updateDownloadingBackground: '正在后台下载更新...',
   updateDownloadingPill: '正在下载',
   updateDownloadCancel: '取消下载',
+  updateVerifying: '正在校验安装包...',
+  updateVerifyingPill: '正在校验',
   updateSectionTitle: '软件更新',
   updateReadyTitle: '检测到新版本',
   updateReadyConfirm: '重启更新',

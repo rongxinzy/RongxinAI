@@ -7,10 +7,10 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   AppUpdateFailureStage,
   AppUpdateInstallOutcome,
-  type AppUpdateRuntimeState,
   AppUpdateChannelPreference,
   AppUpdateStatus,
 } from '../../../../shared/appUpdate/constants';
+import { useAppUpdateState } from '../../../app/useAppUpdateState';
 import { normalizeError } from '../../../services/errorNormalization';
 import { i18nService } from '../../../services/i18n';
 import { showAppToast } from '../../../services/toastNotification';
@@ -19,21 +19,21 @@ import { useIsEnterpriseBuild } from '../useIsEnterpriseBuild';
 const OFFICIAL_WEBSITE_URL = 'https://www.rongxzyai.com';
 
 interface AboutSettingsPanelProps {
-  appUpdateState?: AppUpdateRuntimeState;
   setError: (message: string | null) => void;
   setNoticeMessage: (message: string | null) => void;
 }
 
 export default function AboutSettingsPanel({
-  appUpdateState,
   setError,
   setNoticeMessage,
 }: AboutSettingsPanelProps) {
+  const update = useAppUpdateState();
   const [appVersion, setAppVersion] = useState('');
   const [isDevBuild, setIsDevBuild] = useState(false);
   const isEnterpriseBuild = useIsEnterpriseBuild();
   const [isExportingLogs, setIsExportingLogs] = useState(false);
   const [betaChannelEnabled, setBetaChannelEnabled] = useState(false);
+  const [isInstallStarting, setIsInstallStarting] = useState(false);
 
   useEffect(() => {
     void window.electron.appInfo.getVersion().then(setAppVersion);
@@ -87,10 +87,9 @@ export default function AboutSettingsPanel({
     }
   }, [isExportingLogs, setError, setNoticeMessage]);
 
-  const update = appUpdateState;
-  const progress = update?.progress;
-  const isDownloading = update?.status === AppUpdateStatus.Downloading;
-  const failureStage = update?.failureStage;
+  const progress = update.progress;
+  const isDownloading = update.status === AppUpdateStatus.Downloading;
+  const failureStage = update.failureStage;
   const failureLabel =
     failureStage === AppUpdateFailureStage.Download
       ? i18nService.t('updateDownloadFailed')
@@ -158,18 +157,18 @@ export default function AboutSettingsPanel({
                   {i18nService.t('updateSectionTitle')}
                 </span>
                 <span className="text-sm text-muted-foreground">
-                  {update?.status === AppUpdateStatus.Checking
+                  {update.status === AppUpdateStatus.Checking
                     ? i18nService.t('updateChecking')
-                    : update?.status === AppUpdateStatus.UpToDate
+                    : update.status === AppUpdateStatus.UpToDate
                       ? i18nService.t('updateUpToDate')
-                      : update?.status === AppUpdateStatus.Error
+                      : update.status === AppUpdateStatus.Error
                         ? failureLabel
-                        : update?.info?.latestVersion
+                        : update.info?.latestVersion
                           ? `v${update.info.latestVersion}`
                           : i18nService.t('updateNotChecked')}
                 </span>
               </div>
-              {update?.lastInstallResult && update.status !== AppUpdateStatus.Installing ? (
+              {update.lastInstallResult && update.status !== AppUpdateStatus.Installing ? (
                 <div className="text-xs text-muted-foreground" role="status">
                   {update.lastInstallResult.outcome === AppUpdateInstallOutcome.Succeeded
                     ? i18nService
@@ -192,7 +191,9 @@ export default function AboutSettingsPanel({
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>
                       {progress
-                        ? `${formatBytes(progress.received)}${progress.total ? ` / ${formatBytes(progress.total)}` : ''}`
+                        ? progress.percent !== undefined && progress.total
+                          ? `${formatBytes(progress.received)} / ${formatBytes(progress.total)}`
+                          : formatBytes(progress.received)
                         : i18nService.t('updateDownloading')}
                     </span>
                     <span>
@@ -212,25 +213,43 @@ export default function AboutSettingsPanel({
                     </Button>
                   </div>
                 </>
-              ) : update?.status === AppUpdateStatus.Installing ? (
+              ) : update.status === AppUpdateStatus.Verifying ? (
+                <div className="text-xs text-muted-foreground" role="status">
+                  {i18nService.t('updateVerifying')}
+                </div>
+              ) : update.status === AppUpdateStatus.Installing ? (
                 <div className="text-xs text-muted-foreground" role="status">
                   {i18nService.t('updateInstalling')}
                 </div>
-              ) : update?.status === AppUpdateStatus.Ready ? (
+              ) : update.status === AppUpdateStatus.Ready ? (
                 <div className="space-y-2">
                   <Button
                     size="sm"
+                    disabled={isInstallStarting}
+                    aria-busy={isInstallStarting}
                     onClick={() => {
-                      void window.electron.appUpdate.installReady().then(result => {
-                        if (!result.success) {
+                      if (isInstallStarting) return;
+                      setIsInstallStarting(true);
+                      void window.electron.appUpdate
+                        .installReady()
+                        .then(result => {
+                          if (!result.success) {
+                            setIsInstallStarting(false);
+                            showAppToast({
+                              message: normalizeError(
+                                result.error || i18nService.t('updateInstallFailed'),
+                              ),
+                              isError: true,
+                            });
+                          }
+                        })
+                        .catch(error => {
+                          setIsInstallStarting(false);
                           showAppToast({
-                            message: normalizeError(
-                              result.error || i18nService.t('updateInstallFailed'),
-                            ),
+                            message: normalizeError(error || i18nService.t('updateInstallFailed')),
                             isError: true,
                           });
-                        }
-                      });
+                        });
                     }}
                   >
                     {i18nService.t('updateReadyConfirm')}
@@ -262,7 +281,7 @@ export default function AboutSettingsPanel({
                     </div>
                   ) : null}
                 </div>
-              ) : update?.status === AppUpdateStatus.Error && update.info ? (
+              ) : update.status === AppUpdateStatus.Error && update.info ? (
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-destructive">
                     {failureLabel} · {i18nService.t('updateFailureHint')}
@@ -271,7 +290,7 @@ export default function AboutSettingsPanel({
                     {retryLabel}
                   </Button>
                 </div>
-              ) : update?.status === AppUpdateStatus.Available ? (
+              ) : update.status === AppUpdateStatus.Available ? (
                 <div className="space-y-2">
                   {update.info?.manualDownloadOnly ? (
                     <div className="text-xs text-muted-foreground">
@@ -286,8 +305,8 @@ export default function AboutSettingsPanel({
                     )}
                   </Button>
                 </div>
-              ) : update?.status !== AppUpdateStatus.Checking &&
-                update?.status !== AppUpdateStatus.UpToDate ? (
+              ) : update.status !== AppUpdateStatus.Checking &&
+                update.status !== AppUpdateStatus.UpToDate ? (
                 <Button
                   size="sm"
                   variant="outline"
@@ -296,12 +315,12 @@ export default function AboutSettingsPanel({
                   {i18nService.t('updateCheckNow')}
                 </Button>
               ) : null}
-              {update?.status === AppUpdateStatus.Error && !update.info ? (
+              {update.status === AppUpdateStatus.Error && !update.info ? (
                 <div className="text-xs text-destructive">
                   {failureLabel} · {i18nService.t('updateFailureHint')}
                 </div>
               ) : null}
-              {update?.lastCheckedAt ? (
+              {update.lastCheckedAt ? (
                 <div className="text-xs text-muted-foreground">
                   {i18nService.t('updateLastChecked')}
                   {new Date(update.lastCheckedAt).toLocaleString()}

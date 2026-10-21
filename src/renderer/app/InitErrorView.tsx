@@ -2,7 +2,6 @@ import { Button } from '@shared/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import React from 'react';
 
-import { type AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import { LazyChunkErrorBoundary } from '../components/LazyChunkErrorBoundary';
 import type { InferenceEdition } from '../../shared/inferenceEdition';
 import type { SettingsEnterpriseConfig, SettingsOpenOptions } from '../components/settings/types';
@@ -18,7 +17,6 @@ interface InitErrorViewProps {
   onCloseSettings: () => void;
   settingsOptions: SettingsOpenOptions;
   enterpriseConfig: SettingsEnterpriseConfig | null;
-  appUpdateState: AppUpdateRuntimeState;
   managedModelsOnly: boolean;
   inferenceEdition: InferenceEdition;
 }
@@ -35,7 +33,6 @@ export function InitErrorView({
   onCloseSettings,
   settingsOptions,
   enterpriseConfig,
-  appUpdateState,
   managedModelsOnly,
   inferenceEdition,
 }: InitErrorViewProps) {
@@ -52,7 +49,6 @@ export function InitErrorView({
                 initialProvider={settingsOptions.initialProvider}
                 notice={settingsOptions.notice}
                 enterpriseConfig={enterpriseConfig}
-                appUpdateState={appUpdateState}
                 managedModelsOnly={managedModelsOnly}
                 inferenceEdition={inferenceEdition}
               />

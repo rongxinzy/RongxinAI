@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { CcConnectBridgeServer } from './ccConnectBridgeServer';
@@ -131,6 +132,34 @@ test('accepts a turn when the platform only supplies a session key', async () =>
     }),
   });
   expect(response.status).toBe(200);
+});
+
+test('does not wait for idle keep-alive sockets when stopping', async () => {
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async () => ({ content: 'ok' }),
+    onCronTrigger: async () => undefined,
+  });
+  servers.push(server);
+  const url = await server.start();
+  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const request = http.request(`${url}/not-a-route`, { method: 'GET', agent }, response => {
+        response.resume();
+        response.once('end', resolve);
+      });
+      request.once('error', reject);
+      request.end();
+    });
+
+    // Closing used to wait for the server keep-alive timeout because idle
+    // sockets were left open; quitting the app must not pay that timeout.
+    const startedAt = Date.now();
+    await server.stop();
+    expect(Date.now() - startedAt).toBeLessThan(1_500);
+  } finally {
+    agent.destroy();
+  }
 });
 
 test('rejects the retired project identity field', async () => {
