@@ -69,17 +69,17 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 | 角色 | 变量 | Light | Dark | 用途 |
 | --- | --- | --- | --- | --- |
-| 窗口底 | `--zy-surface` / `--sidebar` | `#F4F5F7` | `#0F1013` | 窗口底色、侧栏 |
-| 内容画布 | `--zy-background` / `--background` | `#FFFFFF` | `#17181C` | 主内容面板 |
-| 抬升表面 | `--zy-surface-raised` / `--card` | `#FFFFFF` | `#1E2025` | 输入岛、新建按钮、卡片、分段滑块 |
-| 浮层 | `--zy-surface-overlay` / `--popover` | `#FFFFFF` | `#22252B` | 菜单、Popover、Dialog、Toast，必须带 1px 边框 |
-| hover 填充 | `--accent` | `rgba(16,24,40,.05)` | `rgba(255,255,255,.05)` | 行、芯片、图标按钮的 hover |
-| 选中填充 | `--sidebar-accent` | `rgba(16,24,40,.08)` | `rgba(255,255,255,.08)` | selected、pressed、分段轨道、禁用发送键底 |
-| 主文字 | `--zy-text-primary` / `--foreground` | `#101828` | `#EDEEF0` | 标题、正文、选中项 |
-| 次文字 | `--zy-text-muted-foreground` / `--muted-foreground` | `#475467` | `#A8ADB7` | 控件文字、导航常态、说明 |
-| 元信息 | `--zy-text-muted` | `#667085` | `#858B96` | 时间、分组标签、占位符、行内图标 |
-| 边框 | `--zy-border` / `--border` | `rgba(16,24,40,.08)` | `rgba(255,255,255,.07)` | 面板描边、分隔线、胶囊描边 |
-| 强边框 | `--zy-input-border` / `--input` | `rgba(16,24,40,.14)` | `rgba(255,255,255,.13)` | 输入岛、输入框、浮层 |
+| 窗口底 | `--zy-surface` / `--sidebar` | `#F4F5F7` | `#121316` | 窗口底色、侧栏 |
+| 内容画布 | `--zy-background` / `--background` | `#FFFFFF` | `#18191D` | 主内容面板 |
+| 抬升表面 | `--zy-surface-raised` / `--card` | `#FFFFFF` | `#1F2126` | 输入岛、新建按钮、卡片、分段滑块 |
+| 浮层 | `--zy-surface-overlay` / `--popover` | `#FFFFFF` | `#25272F` | 菜单、Popover、Dialog、Toast，必须带 1px 边框 |
+| hover 填充 | `--accent` | `rgba(16,24,40,.04)` | `rgba(255,255,255,.04)` | 行、芯片、图标按钮的 hover |
+| 选中填充 | `--sidebar-accent` | `rgba(16,24,40,.06)` | `rgba(255,255,255,.06)` | selected、pressed、分段轨道、禁用发送键底 |
+| 主文字 | `--zy-text-primary` / `--foreground` | `#181D27` | `#DFE1E6` | 标题、正文、选中项 |
+| 次文字 | `--zy-text-muted-foreground` / `--muted-foreground` | `#535862` | `#969DA8` | 控件文字、导航常态、说明 |
+| 元信息 | `--zy-text-muted` | `#717680` | `#6E7480` | 时间、分组标签、占位符、行内图标 |
+| 边框 | `--zy-border` / `--border` | `rgba(16,24,40,.06)` | `rgba(255,255,255,.05)` | 面板描边、分隔线、胶囊描边 |
+| 强边框 | `--zy-input-border` / `--input` | `rgba(16,24,40,.08)` | `rgba(255,255,255,.08)` | 输入岛、输入框、浮层 |
 | 品牌蓝 | `--zy-primary` / `--primary` | `#3D70E0` | `#3D70E0` | 可执行的主动作、链接、运行点 |
 | 品牌弱底 | `--zy-primary-muted` | `rgba(61,112,224,.10)` | `rgba(61,112,224,.16)` | 已定义强调语义的轻背景，不铺满选中项 |
 | 焦点环 | `--ring` | `rgba(61,112,224,.40)` | `rgba(61,112,224,.50)` | focus-visible |
@@ -204,10 +204,10 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 | 刻度 | Light | 场景 |
 | --- | --- | --- |
-| `shadow-xs` | `0 1px 2px rgba(16,24,40,.05)` | 内容面板、新建按钮、分段滑块 |
-| `shadow-sm` | `0 1px 2px rgba(16,24,40,.04), 0 8px 24px -8px rgba(16,24,40,.08)` | 输入岛静止 |
-| `shadow-md` | `0 1px 2px rgba(16,24,40,.05), 0 12px 32px -8px rgba(16,24,40,.14)` | 输入岛聚焦 |
-| `shadow-lg` | `0 16px 48px -12px rgba(16,24,40,.18)` | 菜单、Popover、Dialog、Toast |
+| `shadow-xs` | `0 1px 2px rgba(16,24,40,.04)` | 内容面板、新建按钮、分段滑块 |
+| `shadow-sm` | `0 1px 3px rgba(16,24,40,.04), 0 6px 16px -4px rgba(16,24,40,.06)` | 输入岛静止 |
+| `shadow-md` | `0 2px 4px rgba(16,24,40,.04), 0 12px 32px -6px rgba(16,24,40,.10)` | 输入岛聚焦 |
+| `shadow-lg` | `0 16px 48px -12px rgba(16,24,40,.16)` | 菜单、Popover、Dialog、Toast |
 
 - 深色模式下阴影改为纯黑高透明度，`shadow-xs` 为 none，主要靠表面亮度和边框区分层级。
 - 普通按钮、列表、卡片静止和 hover 都无阴影，hover 只换中性表面。
@@ -244,7 +244,7 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 - **布局**：问候语 → 说明 → 输入岛 → 引导项，整体垂直居中，底部多留 48px，让视觉中心略高于几何中心。
 - **问候语**：24px / 600 / 主文字色，按时段变化（「下午好，今天想完成什么？」）。说明一行，14px 元信息色，讲清能力和安全边界。问候语与输入岛间距 32px。**首页不放大号品牌字标。**
-- **输入岛**：最大宽度 768px，20px 圆角，抬升表面，1px 强边框 + `shadow-sm`；聚焦时边框加深到元信息色、阴影升到 `shadow-md`，不使用品牌色发光。内边距上 16px、左右和底部 12px。
+- **输入岛**：最大宽度 768px，20px 圆角，抬升表面，1px 细边框 + `shadow-sm`；聚焦时边框平滑过渡、阴影升到 `shadow-md`，不使用粗黑边线与彩色发光。内边距上 16px、左右和底部 12px。
 - **输入区**：复用 ai-elements `PromptInput`，16px / 24px，无内层边框，最小高度 48px、最大 200px 后滚动。草稿、附件和焦点不因页面切换或主题切换而丢失。
 - **工具栏**：左侧为附件（纯图标）、工作区、权限；右侧为模型和圆形发送键。选择器复用 `PromptSelectorButton`，32px 高，常态无边框无阴影，hover 换中性表面；图标用元信息色，尾部 14px 下拉箭头。纯动作不加箭头。模型选择器只显示模型名，不加无意义的图标。
 - **发送键**：32px 圆形。无内容时为选中填充 + 元信息色 + `not-allowed` 指针；有内容时为品牌蓝 + 白色箭头；运行中切换为停止状态。空间不足时使用共享紧凑模式，不能挤掉发送和权限入口。

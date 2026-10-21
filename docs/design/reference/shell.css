@@ -166,7 +166,7 @@ svg.lucide { width: var(--size-icon); height: var(--size-icon); stroke-width: 1.
   box-shadow: 0 0 0 1px var(--zy-input-border), var(--zy-style-shadow-sm);
   transition: box-shadow var(--duration-fast) var(--ease-out);
 }
-.composer:focus-within { box-shadow: 0 0 0 1px var(--zy-text-muted), var(--zy-style-shadow-md); }
+.composer:focus-within { box-shadow: 0 0 0 1px color-mix(in oklab, var(--zy-input-border) 60%, var(--zy-primary)), var(--zy-style-shadow-md); }
 .composer textarea {
   display: block; width: 100%; min-height: 48px; max-height: 200px; padding: 0 var(--sp-1);
   font-size: var(--text-base); line-height: var(--text-base--lh); color: var(--zy-text-primary);

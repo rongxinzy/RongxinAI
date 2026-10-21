@@ -20,7 +20,7 @@ export const zenithDark: ThemeDefinition = {
   background: {
     ...DEFAULT_BACKGROUND,
     kind: BackgroundKind.Color,
-    color: '#0F1013',
+    color: '#121316',
     opacity: 0,
   },
   tokens: {

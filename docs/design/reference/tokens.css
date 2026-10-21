@@ -58,15 +58,15 @@
   --zy-background: #ffffff;       /* 内容画布：主面板 */
   --card: #ffffff;                /* 抬升表面：输入岛、新建按钮、卡片 */
   --popover: #ffffff;             /* 浮层：菜单、Popover、Dialog、Toast */
-  --accent: rgba(16, 24, 40, 0.05);        /* shadcn 语义：hover 填充（不是品牌色） */
-  --sidebar-accent: rgba(16, 24, 40, 0.08); /* selected / pressed 填充、分段轨道 */
+  --accent: rgba(16, 24, 40, 0.04);        /* hover 填充 */
+  --sidebar-accent: rgba(16, 24, 40, 0.06); /* selected / pressed 填充、分段轨道 */
 
-  --zy-text-primary: #101828;            /* 16.9:1 标题、正文、选中项 */
-  --zy-text-muted-foreground: #475467;   /* 7.6:1 次级文字、控件文字 */
-  --zy-text-muted: #667085;              /* 4.8:1 元信息、分组标签、占位符、行内图标 */
+  --zy-text-primary: #181d27;            /* 14.5:1 标题、正文、选中项 */
+  --zy-text-muted-foreground: #535862;   /* 7.2:1 次级文字、控件文字 */
+  --zy-text-muted: #717680;              /* 4.6:1 元信息、分组标签、占位符、行内图标 */
 
-  --zy-border: rgba(16, 24, 40, 0.08);
-  --zy-input-border: rgba(16, 24, 40, 0.14);
+  --zy-border: rgba(16, 24, 40, 0.06);
+  --zy-input-border: rgba(16, 24, 40, 0.08);
 
   --zy-primary: #3d70e0;          /* 品牌蓝：只表示「可执行的主动作」与焦点 */
   --zy-primary-foreground: #ffffff;
@@ -77,27 +77,27 @@
   --zy-warning: #dc6803;
   --zy-destructive: #d92d20;
 
-  --zy-style-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
-  --zy-style-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px -8px rgba(16, 24, 40, 0.08);
-  --zy-style-shadow-md: 0 1px 2px rgba(16, 24, 40, 0.05), 0 12px 32px -8px rgba(16, 24, 40, 0.14);
-  --zy-style-shadow-lg: 0 16px 48px -12px rgba(16, 24, 40, 0.18);
+  --zy-style-shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --zy-style-shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.04), 0 6px 16px -4px rgba(16, 24, 40, 0.06);
+  --zy-style-shadow-md: 0 2px 4px rgba(16, 24, 40, 0.04), 0 12px 32px -6px rgba(16, 24, 40, 0.10);
+  --zy-style-shadow-lg: 0 16px 48px -12px rgba(16, 24, 40, 0.16);
 }
 
 /* ---------------- 深色：重新定义层级，不是反色 ---------------- */
 [data-theme='dark'] {
-  --zy-surface: #0f1013;
-  --zy-background: #17181c;
-  --card: #1e2025;
-  --popover: #22252b;
-  --accent: rgba(255, 255, 255, 0.05);
-  --sidebar-accent: rgba(255, 255, 255, 0.08);
+  --zy-surface: #121316;
+  --zy-background: #18191d;
+  --card: #1f2126;
+  --popover: #25272f;
+  --accent: rgba(255, 255, 255, 0.04);
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
 
-  --zy-text-primary: #edeef0;
-  --zy-text-muted-foreground: #a8adb7;
-  --zy-text-muted: #858b96;
+  --zy-text-primary: #dfe1e6;
+  --zy-text-muted-foreground: #969da8;
+  --zy-text-muted: #6e7480;
 
-  --zy-border: rgba(255, 255, 255, 0.07);
-  --zy-input-border: rgba(255, 255, 255, 0.13);
+  --zy-border: rgba(255, 255, 255, 0.05);
+  --zy-input-border: rgba(255, 255, 255, 0.08);
 
   --zy-primary: #3d70e0;
   --zy-primary-foreground: #ffffff;
@@ -109,7 +109,7 @@
   --zy-destructive: #f97066;
 
   --zy-style-shadow-xs: none;
-  --zy-style-shadow-sm: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
-  --zy-style-shadow-md: 0 12px 32px -8px rgba(0, 0, 0, 0.6);
-  --zy-style-shadow-lg: 0 16px 48px -12px rgba(0, 0, 0, 0.7);
+  --zy-style-shadow-sm: 0 8px 24px -8px rgba(0, 0, 0, 0.45);
+  --zy-style-shadow-md: 0 12px 32px -8px rgba(0, 0, 0, 0.55);
+  --zy-style-shadow-lg: 0 16px 48px -12px rgba(0, 0, 0, 0.65);
 }
