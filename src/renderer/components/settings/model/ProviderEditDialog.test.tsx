@@ -119,4 +119,82 @@ describe('ProviderEditDialog', () => {
     expect(screen.getByText('model-1')).toBeTruthy();
     expect(screen.getByText('model-2')).toBeTruthy();
   });
+
+  it('drops outdated discovery results when user modifies form while test is in flight (P1 race condition)', async () => {
+    let resolveTest: (value: MagpieTestProviderResult) => void = () => {};
+    const testPromise = new Promise<MagpieTestProviderResult>(resolve => {
+      resolveTest = resolve;
+    });
+    const onTest = vi.fn().mockImplementation(() => testPromise);
+    const onSave = vi.fn().mockResolvedValue(true);
+
+    render(
+      <ProviderEditDialog open={true} onOpenChange={vi.fn()} onSave={onSave} onTest={onTest} />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('https://api.openai.com/v1'), {
+      target: { value: 'https://api.test.com/v1' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(i18nService.t('magpieProviderNamePlaceholder')), {
+      target: { value: 'Vendor A' },
+    });
+
+    // 触发探测（处于 flight 中）
+    fireEvent.click(screen.getByText(i18nService.t('magpieTestAndDiscover')));
+    expect(onTest).toHaveBeenCalledTimes(1);
+
+    // 在请求未返回期间，用户切换了名字或手动添加了新模型
+    const addInput = screen.getByPlaceholderText(i18nService.t('magpieModelAddPlaceholder'));
+    fireEvent.change(addInput, { target: { value: 'user-added-during-flight' } });
+    fireEvent.click(screen.getByText(i18nService.t('magpieModelAdd')));
+    expect(screen.getByText('user-added-during-flight')).toBeTruthy();
+
+    // 此时旧请求返回
+    resolveTest({
+      ok: true,
+      latencyMs: 100,
+      modelCount: 2,
+      discoveredModels: ['old-flight-model-1', 'old-flight-model-2'],
+    });
+
+    // 等待异步完成，旧请求结果不应覆盖用户在请求期间添加的新模型
+    await waitFor(() => {
+      expect(screen.queryByText('old-flight-model-1')).toBeNull();
+      expect(screen.getByText('user-added-during-flight')).toBeTruthy();
+    });
+  });
+
+  it('preserves comma and trailing whitespace while typing in fallback models (P2)', async () => {
+    const onSave = vi.fn().mockResolvedValue(true);
+    render(<ProviderEditDialog open={true} onOpenChange={vi.fn()} onSave={onSave} />);
+
+    fireEvent.change(screen.getByPlaceholderText(i18nService.t('magpieProviderNamePlaceholder')), {
+      target: { value: 'Fallback Test' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('https://api.openai.com/v1'), {
+      target: { value: 'https://api.test.com/v1' },
+    });
+
+    const fallbackInput = screen.getByPlaceholderText(
+      i18nService.t('magpieProviderFallbackPlaceholder'),
+    ) as HTMLInputElement;
+
+    // 用户键入第一个模型及逗号和空格
+    fireEvent.change(fallbackInput, { target: { value: 'model-a, ' } });
+    expect(fallbackInput.value).toBe('model-a, ');
+
+    // 用户继续键入第二个模型
+    fireEvent.change(fallbackInput, { target: { value: 'model-a, model-b' } });
+    expect(fallbackInput.value).toBe('model-a, model-b');
+
+    // 点击保存，验证 payload 携带解析后的数组
+    fireEvent.click(screen.getByText(i18nService.t('save')));
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fallback: ['model-a', 'model-b'],
+        }),
+      );
+    });
+  });
 });

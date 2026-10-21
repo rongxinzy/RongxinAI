@@ -26,7 +26,7 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
   MagpieProviderApi,
@@ -58,6 +58,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState<string[]>([]);
   const [fallbackModels, setFallbackModels] = useState<string[]>([]);
+  const [fallbackRawText, setFallbackRawText] = useState('');
   const [preset, setPreset] = useState<PresetKey>('custom');
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -67,6 +68,10 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   const [hasUserModifiedModels, setHasUserModifiedModels] = useState(false);
   // 当已有自定义修改，且探测拉回新模型时，暂存以供用户选择 [全部替换 / 增量追加 / 保持当前]
   const [pendingDiscoveredModels, setPendingDiscoveredModels] = useState<string[] | null>(null);
+
+  // 请求版本与表单编辑版本校验，避免网络延时导致旧请求覆盖期间新编辑 (P1)
+  const testRequestIdRef = useRef(0);
+  const editVersionRef = useRef(0);
 
   // 视图模式：'chips' 标签胶囊 / 'text' 纯文本
   const [viewMode, setViewMode] = useState<'chips' | 'text'>('chips');
@@ -91,6 +96,8 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
 
   useEffect(() => {
     if (open) {
+      editVersionRef.current = 0;
+      testRequestIdRef.current = 0;
       if (provider) {
         setName(provider.name || '');
         setApi(provider.api || 'openai-completions');
@@ -101,6 +108,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
         setRawText(initialModels.join(', '));
         const initialFallback = provider.fallback || [];
         setFallbackModels(initialFallback);
+        setFallbackRawText(initialFallback.join(', '));
         setPreset('custom');
         setHasUserModifiedModels(true);
       } else {
@@ -111,6 +119,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
         setModels([]);
         setRawText('');
         setFallbackModels([]);
+        setFallbackRawText('');
         setPreset('custom');
         setHasUserModifiedModels(false);
       }
@@ -124,6 +133,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   }, [open, provider]);
 
   const handleApplyPreset = (key: PresetKey) => {
+    editVersionRef.current += 1;
     setPreset(key);
     if (key === 'custom') return;
     const config = PRESETS[key];
@@ -146,6 +156,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   };
 
   const syncModelsFromText = (text: string) => {
+    editVersionRef.current += 1;
     setRawText(text);
     const parsed = text
       .split(',')
@@ -158,6 +169,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   const handleAddModel = (nameToAdd: string) => {
     const trimmed = nameToAdd.trim();
     if (!trimmed) return;
+    editVersionRef.current += 1;
     if (!models.includes(trimmed)) {
       const updated = [...models, trimmed];
       setModels(updated);
@@ -168,22 +180,30 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   };
 
   const handleRemoveModel = (target: string) => {
+    editVersionRef.current += 1;
     const updated = models.filter(m => m !== target);
     setModels(updated);
     setRawText(updated.join(', '));
-    setFallbackModels(prev => prev.filter(f => f !== target));
+    const nextFallback = fallbackModels.filter(f => f !== target);
+    setFallbackModels(nextFallback);
+    setFallbackRawText(nextFallback.join(', '));
     setHasUserModifiedModels(true);
   };
 
   const handleToggleFallback = (target: string) => {
+    editVersionRef.current += 1;
+    let nextFallback: string[];
     if (fallbackModels.includes(target)) {
-      setFallbackModels(prev => prev.filter(f => f !== target));
+      nextFallback = fallbackModels.filter(f => f !== target);
     } else {
-      setFallbackModels(prev => [...prev, target]);
+      nextFallback = [...fallbackModels, target];
     }
+    setFallbackModels(nextFallback);
+    setFallbackRawText(nextFallback.join(', '));
   };
 
   const handleSetPrimary = (target: string) => {
+    editVersionRef.current += 1;
     // 将指定模型提升到模型列表第一位
     const filtered = models.filter(m => m !== target);
     const updated = [target, ...filtered];
@@ -193,6 +213,10 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   };
 
   const getPayload = (): MagpieSaveProviderInput => {
+    const fallback = fallbackRawText
+      .split(',')
+      .map(f => f.trim())
+      .filter(Boolean);
     return {
       ...(provider?.id ? { id: provider.id } : {}),
       name: name.trim() || i18nService.t('magpieProviderDefaultName'),
@@ -200,17 +224,29 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
       baseUrl: baseUrl.trim(),
       ...(apiKey.trim() ? { key: apiKey.trim() } : {}),
       models,
-      fallback: fallbackModels,
+      fallback,
     };
   };
 
   const handleTest = async () => {
     if (!onTest || !baseUrl.trim()) return;
+    const requestId = ++testRequestIdRef.current;
+    const capturedEditVersion = editVersionRef.current;
+
     setIsTesting(true);
     setTestResult(null);
     setPendingDiscoveredModels(null);
     try {
       const result = await onTest(getPayload());
+
+      // P1 校验：若有新探测请求发起或请求期间表单被修改，直接丢弃过期结果
+      if (
+        requestId !== testRequestIdRef.current ||
+        capturedEditVersion !== editVersionRef.current
+      ) {
+        return;
+      }
+
       setTestResult(result);
 
       if (result.ok && result.discoveredModels && result.discoveredModels.length > 0) {
@@ -235,22 +271,33 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
         }
       }
     } catch (err: unknown) {
+      if (
+        requestId !== testRequestIdRef.current ||
+        capturedEditVersion !== editVersionRef.current
+      ) {
+        return;
+      }
       setTestResult({
         ok: false,
         error: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      setIsTesting(false);
+      if (requestId === testRequestIdRef.current) {
+        setIsTesting(false);
+      }
     }
   };
 
   const handleResolveConflict = (action: 'replace' | 'append' | 'keep') => {
     if (!pendingDiscoveredModels) return;
+    editVersionRef.current += 1;
 
     if (action === 'replace') {
       setModels(pendingDiscoveredModels);
       setRawText(pendingDiscoveredModels.join(', '));
-      setFallbackModels(prev => prev.filter(f => pendingDiscoveredModels.includes(f)));
+      const nextFallback = fallbackModels.filter(f => pendingDiscoveredModels.includes(f));
+      setFallbackModels(nextFallback);
+      setFallbackRawText(nextFallback.join(', '));
       setHasUserModifiedModels(false);
     } else if (action === 'append') {
       const merged = Array.from(new Set([...models, ...pendingDiscoveredModels]));
@@ -322,7 +369,10 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
                 <Input
                   id="provider-name"
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={e => {
+                    editVersionRef.current += 1;
+                    setName(e.target.value);
+                  }}
                   placeholder={i18nService.t('magpieProviderNamePlaceholder')}
                   required
                   disabled={isSaving}
@@ -333,7 +383,13 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
                 <Label htmlFor="provider-api" className="text-sm">
                   {i18nService.t('magpieProviderApi')}
                 </Label>
-                <Select value={api} onValueChange={val => setApi(val as MagpieProviderApi)}>
+                <Select
+                  value={api}
+                  onValueChange={val => {
+                    editVersionRef.current += 1;
+                    setApi(val as MagpieProviderApi);
+                  }}
+                >
                   <SelectTrigger id="provider-api" className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -360,7 +416,10 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
                 id="provider-url"
                 type="url"
                 value={baseUrl}
-                onChange={e => setBaseUrl(e.target.value)}
+                onChange={e => {
+                  editVersionRef.current += 1;
+                  setBaseUrl(e.target.value);
+                }}
                 placeholder="https://api.openai.com/v1"
                 required
                 disabled={isSaving}
@@ -375,7 +434,10 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
                 id="provider-key"
                 type="password"
                 value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
+                onChange={e => {
+                  editVersionRef.current += 1;
+                  setApiKey(e.target.value);
+                }}
                 placeholder={
                   isEditing
                     ? i18nService.t('magpieProviderKeyKeepExisting')
@@ -461,11 +523,6 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
                           {i18nService
                             .t('magpieTestAutoFilled')
                             .replace('{count}', String(testResult.discoveredModels.length))}
-                        </p>
-                      )}
-                      {api === 'anthropic-messages' && (
-                        <p className="text-muted-foreground">
-                          {i18nService.t('magpieAnthropicNoModelsHint')}
                         </p>
                       )}
                     </div>
@@ -671,16 +728,19 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
             )}
           </div>
 
-          {/* 5. 容灾回退模型列表 */}
+          {/* 5. 容灾回退模型列表 (P2: 保留独立文本状态，避免逗号和空格被提前吃掉) */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="provider-fallback" className="text-sm">
               {i18nService.t('magpieProviderFallback')}
             </Label>
             <Input
               id="provider-fallback"
-              value={fallbackModels.join(', ')}
+              value={fallbackRawText}
               onChange={e => {
-                const parsed = e.target.value
+                editVersionRef.current += 1;
+                const text = e.target.value;
+                setFallbackRawText(text);
+                const parsed = text
                   .split(',')
                   .map(f => f.trim())
                   .filter(Boolean);

@@ -154,7 +154,6 @@ export const magpieTranslations = {
     magpieModelSetAsPrimary: '设为主力',
     magpieModelSetAsFallback: '设为回退',
     magpieModelRemove: '移除',
-    magpieAnthropicNoModelsHint: 'Anthropic 官方不支持拉取模型列表，已为您载入推荐模型',
     magpieTesting: '测试中...',
     magpieTestSuccess: '连接成功',
     magpieTestFailed: '连接失败',
@@ -673,8 +672,6 @@ export const magpieTranslations = {
     magpieModelSetAsPrimary: 'Set as primary',
     magpieModelSetAsFallback: 'Set as fallback',
     magpieModelRemove: 'Remove',
-    magpieAnthropicNoModelsHint:
-      'Anthropic does not support public model listing; recommended models loaded',
     magpieTesting: 'Testing...',
     magpieTestSuccess: 'Connected',
     magpieTestFailed: 'Connection failed',
