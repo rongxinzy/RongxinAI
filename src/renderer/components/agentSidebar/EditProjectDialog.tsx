@@ -125,7 +125,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
         </DialogHeader>
         <div className="flex flex-col gap-4 py-2">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-project-name" className="sr-only">
+            <Label htmlFor="edit-project-name" className="text-sm">
               {i18nService.t('projectNameLabel')}
             </Label>
             <Input

@@ -68,10 +68,10 @@
   --zy-border: rgba(16, 24, 40, 0.08);
   --zy-input-border: rgba(16, 24, 40, 0.14);
 
-  --zy-primary: #0f6bf2;          /* 品牌蓝：只表示「可执行的主动作」与焦点 */
+  --zy-primary: #3d70e0;          /* 品牌蓝：只表示「可执行的主动作」与焦点 */
   --zy-primary-foreground: #ffffff;
-  --zy-primary-muted: rgba(15, 107, 242, 0.1);
-  --ring: rgba(15, 107, 242, 0.4);
+  --zy-primary-muted: rgba(61, 112, 224, 0.1);
+  --ring: rgba(61, 112, 224, 0.4);
 
   --zy-success: #079455;
   --zy-warning: #dc6803;
@@ -99,10 +99,10 @@
   --zy-border: rgba(255, 255, 255, 0.07);
   --zy-input-border: rgba(255, 255, 255, 0.13);
 
-  --zy-primary: #4c8dff;
+  --zy-primary: #3d70e0;
   --zy-primary-foreground: #ffffff;
-  --zy-primary-muted: rgba(76, 141, 255, 0.16);
-  --ring: rgba(76, 141, 255, 0.5);
+  --zy-primary-muted: rgba(61, 112, 224, 0.16);
+  --ring: rgba(61, 112, 224, 0.5);
 
   --zy-success: #47cd89;
   --zy-warning: #fdb022;

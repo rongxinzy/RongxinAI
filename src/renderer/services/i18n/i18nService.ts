@@ -76,6 +76,13 @@ class I18nService {
       // 默认使用英文
       this.currentLanguage = 'en';
     }
+    this.applyDocumentLanguage();
+  }
+
+  /** Keep the document language in sync for screen readers, spellcheck and font fallback. */
+  private applyDocumentLanguage(): void {
+    if (typeof document === 'undefined') return;
+    document.documentElement.lang = this.currentLanguage === 'zh' ? 'zh-CN' : 'en';
   }
 
   // 根据系统语言推断应用语言
@@ -92,6 +99,7 @@ class I18nService {
     const { persist = true } = options;
     const hasChanged = this.currentLanguage !== language;
     this.currentLanguage = language;
+    this.applyDocumentLanguage();
 
     if (hasChanged) {
       this.listeners.forEach(listener => listener());

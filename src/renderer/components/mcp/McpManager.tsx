@@ -506,6 +506,7 @@ const McpManager: React.FC<McpManagerProps> = ({
               getRegistryEntryDescription={getRegistryEntryDescription}
               onInstallFromRegistry={handleInstallFromRegistry}
               onCancelOfficialAuthorization={handleCancelOfficialAuthorization}
+              onConfigureLocal={handleOpenCreateForm}
             />
           )}
 

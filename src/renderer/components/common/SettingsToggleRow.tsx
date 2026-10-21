@@ -22,7 +22,7 @@ function SettingsToggleRow({
   return (
     <div className="flex items-center justify-between gap-6">
       <div className="min-w-0 flex-1">
-        <h4 id={labelId} className="text-base font-medium text-foreground">
+        <h4 id={labelId} className="text-sm font-medium text-foreground">
           {label}
         </h4>
         <p id={descriptionId} className="mt-1 text-sm text-muted-foreground">

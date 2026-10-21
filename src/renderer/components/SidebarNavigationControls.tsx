@@ -32,6 +32,8 @@ interface SidebarNavigationControlsProps {
   onShowActivity: () => void;
   onWorkModeChange: (checked: boolean) => void;
   workMode: WorkMode;
+  onSearch?: () => void;
+  searchLabel?: string;
   managedModelsOnly?: boolean;
   inferenceEdition?: import('../../shared/inferenceEdition').InferenceEdition;
   /** Warms the lazily loaded chunk for a view on hover/focus intent. */
@@ -49,6 +51,8 @@ export const SidebarNavigationControls = ({
   onShowActivity,
   onWorkModeChange,
   workMode,
+  onSearch,
+  searchLabel,
   managedModelsOnly = false,
   inferenceEdition,
   onPrefetchView,
@@ -115,6 +119,9 @@ export const SidebarNavigationControls = ({
         testId: 'sidebar-new-conversation',
       }}
       entries={entries}
+      search={
+        onSearch ? { label: searchLabel ?? i18nService.t('search'), onClick: onSearch } : undefined
+      }
     />
   );
 };

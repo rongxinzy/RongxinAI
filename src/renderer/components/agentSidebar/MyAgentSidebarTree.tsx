@@ -259,14 +259,14 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
         onSave={handleSaveWorkspace}
         onRemove={workspace => setWorkspacePendingRemoval(workspace)}
       />
-      <div className="theme-sidebar-section sticky top-0 z-30 flex items-center justify-between">
+      <div className="theme-sidebar-section group sticky top-0 z-30 flex items-center justify-between">
         <h2 className="min-w-0 truncate">{i18nService.t('workspaces')}</h2>
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
           onClick={() => void handleCreateWorkspace()}
-          className="theme-action-muted"
+          className="theme-sidebar-row-action"
           aria-label={i18nService.t('workspaceAdd')}
         >
           <FolderPlus className="size-4" strokeWidth={1.75} />
@@ -321,7 +321,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
         </div>
       )}
 
-      {workMode === 'work' && (
+      {workMode === 'work' && scheduledWorkspaceNodes.length > 0 && (
         <div className="mt-3 flex flex-col gap-0.5">
           <div className="theme-sidebar-section flex items-center">
             <h2 className="min-w-0 truncate">{i18nService.t('scheduledTasks')}</h2>

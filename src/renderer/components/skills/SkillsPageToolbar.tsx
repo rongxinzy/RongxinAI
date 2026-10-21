@@ -71,8 +71,8 @@ export function SkillsPageToolbar({
   return (
     <header className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
-          <PlusMenuSkillsIcon className="size-6 text-primary" />
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+          <PlusMenuSkillsIcon className="size-5 text-muted-foreground" />
         </div>
         <p className="min-w-0 text-sm text-muted-foreground">
           {i18nService.t('skillsDescription')}

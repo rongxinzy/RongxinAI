@@ -7,11 +7,15 @@ import {
   Bot,
   ListTodo,
   MessageCirclePlus,
-  Plus,
+  Search,
+  SquarePen,
   Terminal,
   Users,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+
+import { configService } from '../../services/config';
+import { formatShortcutLabel } from '../../services/shortcutLabel';
 
 const icons = {
   conversation: MessageCirclePlus,
@@ -70,6 +74,7 @@ interface SidebarNavigationViewProps {
   onModeChange: (checked: boolean) => void;
   newConversation: SidebarNavigationEntry;
   entries: SidebarNavigationEntry[];
+  search?: { label: string; onClick: () => void };
 }
 
 export function SidebarNavigationView({
@@ -79,6 +84,7 @@ export function SidebarNavigationView({
   onModeChange,
   newConversation,
   entries,
+  search,
 }: SidebarNavigationViewProps) {
   // The mode flip re-renders the whole app (sidebar tree + main view) in one
   // blocking commit. Reflect the toggle optimistically in this tiny tree and
@@ -104,9 +110,13 @@ export function SidebarNavigationView({
       onModeChange(checked);
     });
   };
+  const shortcutConfig = configService.getConfig().shortcuts;
+  const isMac = window.electron?.platform === 'darwin';
+  const newTaskShortcutLabel = formatShortcutLabel(shortcutConfig?.newChat ?? 'CmdOrCtrl+N', isMac);
+  const searchShortcutLabel = formatShortcutLabel(shortcutConfig?.search ?? 'CmdOrCtrl+K', isMac);
   return (
-    <div className="flex flex-col gap-4 px-2 py-4">
-      <div className="relative h-7 w-full">
+    <div className="flex flex-col gap-4 px-2 pt-3 pb-4">
+      <div className="relative h-8 w-full">
         <Switch
           checked={shownIsChat}
           onCheckedChange={handleModeChange}
@@ -127,23 +137,41 @@ export function SidebarNavigationView({
           </span>
         ))}
       </div>
-      <Button
-        type="button"
-        variant="default"
-        size="lg"
-        className="w-full justify-start gap-2"
-        data-testid={newConversation.testId}
-        data-active={newConversation.active || undefined}
-        aria-current={newConversation.currentPage ? 'page' : undefined}
-        onClick={newConversation.onClick}
-        onMouseEnter={newConversation.onIntent}
-        onFocus={newConversation.onIntent}
-      >
-        <Plus data-icon="inline-start" aria-hidden="true" />
-        <span className="min-w-0 truncate">{newConversation.label}</span>
-      </Button>
+      <div className="flex flex-col gap-0.5">
+        <Button
+          type="button"
+          variant="secondary"
+          size="lg"
+          className="w-full justify-start gap-2.5"
+          data-testid={newConversation.testId}
+          data-active={newConversation.active || undefined}
+          aria-current={newConversation.currentPage ? 'page' : undefined}
+          onClick={newConversation.onClick}
+          onMouseEnter={newConversation.onIntent}
+          onFocus={newConversation.onIntent}
+        >
+          <SquarePen className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate text-left">{newConversation.label}</span>
+          <span className="theme-shell-kbd shrink-0">{newTaskShortcutLabel}</span>
+        </Button>
+        {search && (
+          <Button
+            type="button"
+            variant="navigation"
+            size="navigation"
+            className="w-full justify-start gap-2.5"
+            aria-label={search.label}
+            aria-haspopup="dialog"
+            onClick={search.onClick}
+          >
+            <Search className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate text-left">{search.label}</span>
+            <span className="theme-shell-kbd shrink-0">{searchShortcutLabel}</span>
+          </Button>
+        )}
+      </div>
       {entries.length > 0 && (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5">
           {entries.map(entry => (
             <SidebarNavigationItem key={entry.id} entry={entry} />
           ))}

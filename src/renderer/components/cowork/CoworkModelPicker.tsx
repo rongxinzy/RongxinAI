@@ -7,7 +7,7 @@ import {
   CommandList,
 } from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
-import { Bot, Check, Cpu } from 'lucide-react';
+import { Check, Cpu } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ProviderIcon } from '../../providers/uiRegistry';
@@ -73,19 +73,6 @@ export function CoworkModelPicker({
           <PromptSelectorButton
             compact={compact}
             label={displayedSelectedModel?.name ?? i18nService.t('selectModel')}
-            icon={
-              displayedSelectedModel ? (
-                <ModelProviderIcon
-                  provider={
-                    displayedSelectedModel.providerKey ||
-                    displayedSelectedModel.provider ||
-                    'openai'
-                  }
-                />
-              ) : (
-                <Bot className="size-4" />
-              )
-            }
           />
         }
       />

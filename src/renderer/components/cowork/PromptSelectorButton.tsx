@@ -8,7 +8,7 @@ type PromptSelectorButtonProps = Omit<
   'children' | 'size' | 'variant'
 > & {
   label: string;
-  icon: ReactNode;
+  icon?: ReactNode;
   compact?: boolean;
 };
 
@@ -28,8 +28,10 @@ export function PromptSelectorButton({
       aria-label={label}
       className={cn('min-w-0 max-w-48 gap-1.5', className)}
     >
-      <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
-      {!compact && <span className="min-w-0 truncate">{label}</span>}
+      {icon ? (
+        <span className="flex size-4 shrink-0 items-center justify-center">{icon}</span>
+      ) : null}
+      {(!compact || !icon) && <span className="min-w-0 truncate">{label}</span>}
       <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
     </PromptInputButton>
   );

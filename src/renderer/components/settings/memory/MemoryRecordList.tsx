@@ -6,7 +6,6 @@ import {
   EllipsisVertical,
   Funnel,
   Pencil,
-  Plus,
   RotateCcw,
   Search,
   ShieldAlert,
@@ -36,7 +35,6 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -309,11 +307,9 @@ function MemoryRows(props: {
     records,
     viewTotal,
     view,
-    busy,
     readOnly,
     workspaceName,
     sessionTitles,
-    onCreate,
     onSelect,
     onClearFilters,
     actionProps,
@@ -338,14 +334,6 @@ function MemoryRows(props: {
               : i18nService.t('managedMemoryEmptyDescription')}
           </EmptyDescription>
         </EmptyHeader>
-        {view === ManagedMemoryView.LongTerm && (
-          <EmptyContent>
-            <Button type="button" variant="outline" onClick={onCreate} disabled={busy}>
-              <Plus data-icon="inline-start" />
-              {i18nService.t('managedMemoryCreate')}
-            </Button>
-          </EmptyContent>
-        )}
       </Empty>
     );
   }

@@ -48,7 +48,7 @@ export interface AppConfig {
 
 export const DEFAULT_SHORTCUTS = {
   newChat: 'CmdOrCtrl+N',
-  search: 'CmdOrCtrl+F',
+  search: 'CmdOrCtrl+K',
   settings: 'CmdOrCtrl+,',
   sendMessage: 'Enter',
 } as const;

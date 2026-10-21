@@ -43,6 +43,8 @@ export const zhTodoActivity: Record<string, string> = {
   todoListNamePlaceholder: '列表名称',
   todoSearchPlaceholder: '搜索待办',
   todoEmpty: '还没有待办，输入一件事开始。',
+  todoEmptyTitle: '还没有待办',
+  todoEmptyDescription: '输入一件事，开始你的第一条待办。',
   todoNoSearchResults: '没有找到匹配的待办。',
   todoLoading: '正在加载待办',
   todoLoadError: '待办加载失败。',

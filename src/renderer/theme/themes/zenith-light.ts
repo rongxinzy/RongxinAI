@@ -1,6 +1,7 @@
 import { BackgroundKind, DEFAULT_BACKGROUND } from '../background/background';
 import { classicComponentAppearances } from '../components/classic';
 import type { ThemeDefinition } from './types';
+import { quietStudioAppearances, quietStudioLightTokens } from './quiet-studio-v4';
 
 /**
  * Zenith Light - Premium Futuristic Design
@@ -15,12 +16,12 @@ export const zenithLight: ThemeDefinition = {
     description: 'Premium futuristic light theme with glassmorphism',
     appearance: 'light',
   },
-  components: classicComponentAppearances(),
+  components: { ...classicComponentAppearances(), ...quietStudioAppearances() },
   background: {
     ...DEFAULT_BACKGROUND,
     kind: BackgroundKind.Color,
-    color: '#FAFBFD',
-    opacity: 1,
+    color: '#F4F5F7',
+    opacity: 0,
   },
   tokens: {
     // ── Typography Scale (Desktop-optimized: light and dense) ──
@@ -394,5 +395,8 @@ export const zenithLight: ThemeDefinition = {
     'syntax-shiki-ansi-bright-cyan': '#22D3EE',
     'syntax-shiki-ansi-white': '#E2E8F0',
     'syntax-shiki-ansi-bright-white': '#F8FAFC',
+
+    // ── v4.0 Quiet Studio overrides ──
+    ...quietStudioLightTokens,
   },
 };

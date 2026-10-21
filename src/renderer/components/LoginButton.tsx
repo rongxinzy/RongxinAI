@@ -157,8 +157,16 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings, settingsActiv
         aria-haspopup="menu"
         className="theme-page-login-button-button-1 inline-flex w-full items-center justify-start"
       >
-        <UserRound data-icon="inline-start" />
-        <span className="truncate">{accountLabel}</span>
+        <span className="theme-shell-account-avatar flex shrink-0 items-center justify-center">
+          <UserRound className="size-4" strokeWidth={1.75} aria-hidden="true" />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col text-left">
+          <span className="theme-shell-account-name truncate">{accountLabel}</span>
+          <span className="theme-shell-account-hint truncate">
+            {i18nService.t('accountSignInHint')}
+          </span>
+        </span>
+        <Settings className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </Button>
 
       {showMenu ? (

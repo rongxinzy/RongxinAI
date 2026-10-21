@@ -124,7 +124,10 @@ export const ProviderManagerSection: React.FC<ProviderManagerSectionProps> = ({
                         <span>{i18nService.t('magpieHostManaged')}</span>
                       </Badge>
                     ) : (
-                      <Badge variant={isActive ? 'default' : 'secondary'}>
+                      <Badge variant="secondary" className="gap-1.5">
+                        {isActive ? (
+                          <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
+                        ) : null}
                         {i18nService.t(
                           isActive ? 'magpieProviderEnabled' : 'magpieProviderDisabled',
                         )}

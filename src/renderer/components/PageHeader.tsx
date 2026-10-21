@@ -28,6 +28,8 @@ interface PageHeaderProps {
   actions?: React.ReactNode;
   /** Second row (tabs); takes over the border-b divider from the main row. */
   tabs?: React.ReactNode;
+  /** Whether a divider separates the header from the content below. */
+  divider?: boolean;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
@@ -39,6 +41,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   leftContent,
   actions,
   tabs,
+  divider,
   isSidebarCollapsed,
   onToggleSidebar,
   onNewChat,
@@ -69,12 +72,13 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       content={
         leftContent ??
         (title ? (
-          <h1 className="theme-heading truncate text-lg font-semibold text-foreground">{title}</h1>
+          <h1 className="theme-heading truncate text-sm font-medium text-foreground">{title}</h1>
         ) : null)
       }
       actions={actions}
       windowControls={<WindowTitleBar inline />}
       tabs={tabs}
+      divider={divider}
     />
   );
 };

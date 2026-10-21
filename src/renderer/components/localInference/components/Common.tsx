@@ -4,7 +4,6 @@ import type { ReactNode } from 'react';
 
 import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
-import { localInferenceMutedTextClass } from '../constants';
 import { progressBarPercent } from '../utils/progress';
 
 export function EmptyState({
@@ -18,10 +17,10 @@ export function EmptyState({
 }) {
   return (
     <div
-      className={`flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-surface px-4 py-8 text-center ${className}`.trim()}
+      className={`flex min-h-[260px] flex-col items-center justify-center gap-2 px-4 py-8 text-center ${className}`.trim()}
     >
-      <Server className={`h-7 w-7 ${localInferenceMutedTextClass}`} />
-      <p className={`text-sm font-medium ${localInferenceMutedTextClass}`}>{title}</p>
+      <Server className="h-5 w-5 text-muted-foreground" />
+      <p className="text-lg font-semibold text-foreground">{title}</p>
       {action}
     </div>
   );

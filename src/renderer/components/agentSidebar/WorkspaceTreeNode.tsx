@@ -151,7 +151,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
               variant="ghost"
               size="icon"
               onClick={() => onCreateTask(workspace)}
-              className="theme-action-muted"
+              className="theme-sidebar-row-action pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
               aria-label={i18nService.t('myAgentSidebarNewTask')}
             >
               <MessageCirclePlus className="size-4" strokeWidth={1.75} />
