@@ -73,6 +73,8 @@ export interface MagpieTestProviderResult {
   ok: boolean;
   latencyMs?: number;
   modelCount?: number;
+  discoveredModels?: string[];
+  requiresKey?: boolean;
   error?: string;
 }
 

@@ -498,6 +498,25 @@ describe('Magpie owned lifecycle', () => {
       });
       expect(result.ok).toBe(true);
       expect(result.modelCount).toBe(1);
+      expect(result.discoveredModels).toEqual(['m1']);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('testProvider flags requiresKey when testing without valid key gets 401', async () => {
+    const { manager, root } = await setup();
+    try {
+      await manager.start();
+      const result = await manager.testProvider({
+        name: 'OpenAI Without Key',
+        api: 'openai-completions',
+        baseUrl: 'https://api.openai.com',
+        models: ['gpt-4o'],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.requiresKey).toBe(true);
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });
