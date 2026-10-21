@@ -14,5 +14,4 @@ export const QUIET_STUDIO_SELECTORS = {
   'shell-status-dot': '.theme-shell-status-dot',
   'shell-status-dot-warning': '.theme-shell-status-dot-warning',
   'home-greeting': '.theme-home-greeting',
-  'home-footnote': '.theme-home-footnote',
 } as const;

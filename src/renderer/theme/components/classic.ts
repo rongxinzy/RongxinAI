@@ -196,6 +196,5 @@ export function classicComponentAppearances(): ComponentAppearances {
     'shell-status-dot': recipe({}),
     'shell-status-dot-warning': recipe({}),
     'home-greeting': recipe({}),
-    'home-footnote': recipe({}),
   };
 }

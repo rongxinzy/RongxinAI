@@ -831,7 +831,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           </div>
         </div>
       </div>
-      <div className="theme-home-footnote shrink-0 pb-3">{i18nService.t('coworkHomeFootnote')}</div>
     </div>
   );
 };

@@ -366,13 +366,6 @@ export function quietStudioAppearances(): Partial<ComponentAppearances> {
         color: 'var(--zy-text-primary)',
       },
     }),
-    'home-footnote': recipe({
-      base: {
-        'font-size': 'var(--zy-component-text-xs)',
-        color: 'var(--zy-text-muted)',
-        'text-align': 'center',
-      },
-    }),
 
     'shell-sidebar': recipe({
       base: {

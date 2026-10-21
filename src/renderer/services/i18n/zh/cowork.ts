@@ -43,7 +43,6 @@ export const zhCowork: Record<string, string> = {
   coworkSessionActions: '更多操作',
   coworkPlaceholder: '描述一个任务，或者问任何问题',
   coworkHomeSubtitle: '读取本地文件、执行多步任务，关键操作前会先征得你的同意',
-  coworkHomeFootnote: '知远可能会出错，请核对重要信息',
   homeGreetingMorning: '早上好，今天想完成什么？',
   homeGreetingAfternoon: '下午好，今天想完成什么？',
   homeGreetingEvening: '晚上好，今天想完成什么？',

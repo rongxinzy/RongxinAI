@@ -44,7 +44,6 @@ export const enCowork: Record<string, string> = {
   coworkPlaceholder: 'Describe a task or ask any question',
   coworkHomeSubtitle:
     'Reads local files and runs multi-step tasks, asking before sensitive actions',
-  coworkHomeFootnote: 'ZhiYuan can make mistakes. Check important info.',
   homeGreetingMorning: 'Good morning. What would you like to get done?',
   homeGreetingAfternoon: 'Good afternoon. What would you like to get done?',
   homeGreetingEvening: 'Good evening. What would you like to get done?',

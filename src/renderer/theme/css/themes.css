@@ -5383,12 +5383,6 @@
   font-weight: var(--zy-component-font-weight-semibold);
   color: var(--zy-text-primary);
 }
-:where(:root, [data-theme]) :where(.theme-home-footnote) {
-  font-size: var(--zy-component-text-xs);
-  color: var(--zy-text-muted);
-  text-align: center;
-  line-height: var(--zy-component-text-xs--line-height);
-}
 @media (min-width: 48rem) {
 :where(:root, [data-theme]) :where(.peer[data-variant="inset"] ~ .theme-sidebar-inset) {
   border-radius: var(--zy-style-radius-xl);
@@ -8333,8 +8327,7 @@ to {
 :where(:root, [data-theme]) :where(.theme-shell-account-hint),
 :where(:root, [data-theme]) :where(.theme-shell-status-dot),
 :where(:root, [data-theme]) :where(.theme-shell-status-dot-warning),
-:where(:root, [data-theme]) :where(.theme-home-greeting),
-:where(:root, [data-theme]) :where(.theme-home-footnote) { transition-duration: 0s; animation: none; }
+:where(:root, [data-theme]) :where(.theme-home-greeting) { transition-duration: 0s; animation: none; }
 }
 }
 :where(:root, [data-theme]) [data-sonner-toast].cn-toast {
