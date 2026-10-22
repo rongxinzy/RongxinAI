@@ -24,7 +24,7 @@ import {
 } from './appConfigSettings';
 import { updateTitleBarOverlay } from './windowManagement';
 import { setLanguage } from '../i18n';
-import { ensureWindowsTaskbarBrand } from './windowBranding';
+import { ensureWindowsTaskbarBrand, repairWindowsTaskbarIdentity } from './windowBranding';
 import { createMainWindow } from './mainWindow';
 import { setContentSecurityPolicy } from './windowSecurity';
 import {
@@ -113,7 +113,9 @@ export const initApp = async (): Promise<void> => {
     await ensureEmbeddedPiAgentDir(app.getPath('userData')).catch(error => {
       console.error('[PiRuntime] Failed to prepare embedded Pi agent directory:', error);
     });
-    // 开发态写入带知远 .ico 的开始菜单快捷方式，任务栏按 AUMID 取图标。
+    // 清理同一 AUMID 的旧开发态快捷方式，再写入开发态快捷方式；任务栏按
+    // 开始菜单解析名称与图标，顺序反了会继续落到 Electron 原子图标。
+    repairWindowsTaskbarIdentity();
     ensureWindowsTaskbarBrand();
 
     protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, async request => {

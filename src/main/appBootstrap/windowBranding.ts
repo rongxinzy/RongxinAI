@@ -4,7 +4,9 @@ import path from 'path';
 
 import { app, shell, type BrowserWindow } from 'electron';
 
+import { APP_USER_MODEL_ID } from '../appConstants';
 import { runtimeAppName, WINDOWS_TASKBAR_APP_USER_MODEL_ID } from './appEnv';
+import { findStaleTaskbarShortcuts, type StartMenuShortcut } from './windowsTaskbarShortcut';
 
 export const PRELOAD_PATH = app.isPackaged
   ? path.join(__dirname, 'preload.js')
@@ -39,6 +41,78 @@ export const applyWindowsWindowIcon = (window: BrowserWindow): void => {
   // Prefer path string — Electron updates both window and taskbar icons from it.
   window.setIcon(iconPath);
   console.log('[Main] Applied Windows window icon:', iconPath);
+};
+
+const START_MENU_MAX_DEPTH = 2;
+
+const collectStartMenuShortcuts = (programsDir: string): StartMenuShortcut[] => {
+  const shortcuts: StartMenuShortcut[] = [];
+  const readDirectory = (directory: string, depth: number): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const entryPath = path.join(directory, entry.name);
+      // 旧版本地化目录（如「程序」）是 junction，isDirectory() 对它返回 false。
+      if (entry.isDirectory()) {
+        if (depth < START_MENU_MAX_DEPTH) readDirectory(entryPath, depth + 1);
+        continue;
+      }
+      if (!entry.isFile() || !entry.name.toLowerCase().endsWith('.lnk')) continue;
+      try {
+        const details = shell.readShortcutLink(entryPath);
+        shortcuts.push({
+          shortcutPath: entryPath,
+          appUserModelId: details.appUserModelId,
+          target: details.target,
+        });
+      } catch {
+        // 解析不了的快捷方式不归我们管。
+      }
+    }
+  };
+  readDirectory(programsDir, 1);
+  return shortcuts;
+};
+
+/**
+ * 清理抢走任务栏身份的旧快捷方式：旧开发态写过一条指向 electron.exe、
+ * 却使用产品 AUMID 的快捷方式（Electron.lnk），Windows 会把任务栏名称和
+ * 图标解析到它，导致装好新版本后仍显示 Electron 原子图标。必须在创建窗口
+ * 之前调用，任务栏才会按清理后的结果解析身份。
+ */
+export const repairWindowsTaskbarIdentity = (): void => {
+  if (process.platform !== 'win32') return;
+  try {
+    const programsDir = path.join(
+      app.getPath('appData'),
+      'Microsoft',
+      'Windows',
+      'Start Menu',
+      'Programs',
+    );
+    // 打包态只用产品 AUMID；开发态连 .dev 一起清理，自己的开发快捷方式指向
+    // 当前 electron.exe，不会被判定为残留。
+    const appUserModelIds = app.isPackaged
+      ? [WINDOWS_TASKBAR_APP_USER_MODEL_ID]
+      : [WINDOWS_TASKBAR_APP_USER_MODEL_ID, APP_USER_MODEL_ID];
+    const staleShortcuts = findStaleTaskbarShortcuts(collectStartMenuShortcuts(programsDir), {
+      execPath: process.execPath,
+      appUserModelIds,
+    });
+    for (const shortcut of staleShortcuts) {
+      fs.rmSync(shortcut.shortcutPath, { force: true });
+      console.warn(
+        '[Main] removed stale Start Menu shortcut claiming the taskbar identity:',
+        shortcut.shortcutPath,
+      );
+    }
+  } catch (error) {
+    console.warn('[Main] failed to repair the Windows taskbar identity:', error);
+  }
 };
 
 /**
