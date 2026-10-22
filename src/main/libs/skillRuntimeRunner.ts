@@ -11,7 +11,8 @@ import {
   resolveGitBashPathForPi,
 } from './coworkUtil';
 import { appendPythonRuntimeToEnv, getManagedPythonExecutable } from './pythonRuntime';
-import { findSkillPythonExecutable } from './skillPythonRuntime';
+import { installSkillPythonDependencies } from './skillPythonDependencies';
+import { findSkillPythonExecutable, resolveSkillPython } from './skillPythonRuntime';
 import {
   appendUvRuntimeToEnv,
   configureUvForManagedPython,
@@ -22,9 +23,28 @@ export type SkillScriptErrorCode =
   | 'SKILL_SCRIPT_NOT_FOUND'
   | 'SKILL_SCRIPT_OUTSIDE_ROOT'
   | 'SKILL_RUNTIME_UNAVAILABLE'
+  | 'SKILL_DEPENDENCIES_UNAVAILABLE'
   | 'SKILL_SCRIPT_FAILED'
   | 'SKILL_SCRIPT_TIMEOUT'
   | 'SKILL_SCRIPT_ABORTED';
+
+/**
+ * Packages large enough that installing them must be an explicit user decision.
+ * Anything else installs on first use without interrupting the turn.
+ */
+const CONFIRM_REQUIRED_PACKAGES = new Set([
+  'vtk',
+  'vtkmodules',
+  'cadquery_ocp',
+  'cadquery_ocp_novtk',
+  'ocp',
+  'build123d',
+  'scipy',
+  'statsmodels',
+  'playwright',
+  'sympy',
+  'scikit_learn',
+]);
 
 type SkillScriptRuntime = 'python' | 'node' | 'bash' | 'powershell';
 
@@ -55,6 +75,12 @@ export type RunSkillScriptOptions = {
   timeoutMs?: number;
   signal?: AbortSignal;
   envOverrides?: Record<string, string | undefined>;
+  /**
+   * Set once the user agreed to a large on-demand dependency download. Small
+   * deltas install automatically; large ones (CAD, scipy, playwright) ask first
+   * because they can be hundreds of megabytes.
+   */
+  confirmDependencyInstall?: boolean;
 };
 
 export type ManagedSkillProcess = {
@@ -185,27 +211,78 @@ export function resolveSkillScriptPath(
 async function resolveRuntime(
   scriptPath: string,
   skillDir: string,
+  options: Pick<RunSkillScriptOptions, 'confirmDependencyInstall'> = {},
 ): Promise<
   | {
       runtime: SkillScriptRuntime;
       command: string;
       prefixArgs: string[];
       env: Record<string, string>;
+      sitePackages?: string;
     }
   | { errorCode: SkillScriptErrorCode; error: string }
 > {
   const extension = path.extname(scriptPath).toLowerCase();
 
   if (extension === '.py') {
+    const skillId = path.basename(skillDir);
+    const requirementsPath = path.join(skillDir, 'requirements.txt');
+    const hasRequirements = fs.existsSync(requirementsPath);
+
+    if (hasRequirements) {
+      let resolution = resolveSkillPython(skillId, requirementsPath);
+      if (resolution.kind === 'dependencies-missing') {
+        const deltaPackages = resolution.delta.packages ?? [];
+        const requiresConfirmation = deltaPackages.some(pkg => CONFIRM_REQUIRED_PACKAGES.has(pkg));
+        if (requiresConfirmation && !options.confirmDependencyInstall) {
+          return {
+            errorCode: 'SKILL_DEPENDENCIES_UNAVAILABLE',
+            error:
+              `Skill '${skillId}' needs ${deltaPackages.length} Python packages that are not bundled with the app ` +
+              `(including ${deltaPackages.filter(pkg => CONFIRM_REQUIRED_PACKAGES.has(pkg)).join(', ')}). ` +
+              'Ask the user to confirm this download, then call run_skill_script again with ' +
+              'confirmDependencyInstall=true to install them and run the script.',
+          };
+        }
+        const outcome = await installSkillPythonDependencies(skillId, requirementsPath);
+        if (!outcome.ok) {
+          const reason = outcome.reason ?? 'failed';
+          return {
+            errorCode: 'SKILL_DEPENDENCIES_UNAVAILABLE',
+            error:
+              `Skill '${skillId}' dependencies could not be installed (${reason}): ${outcome.detail ?? 'unknown error'}. ` +
+              (reason === 'offline'
+                ? 'The package index is unreachable and no cached wheels are available.'
+                : 'Check the configured package index in Settings.'),
+          };
+        }
+        resolution = resolveSkillPython(skillId, requirementsPath);
+      }
+      if (resolution.kind === 'ready') {
+        return {
+          runtime: 'python',
+          command: resolution.python,
+          prefixArgs: [],
+          env: { PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+          sitePackages: resolution.sitePackages ?? undefined,
+        };
+      }
+      if (resolution.kind === 'dependencies-missing') {
+        return {
+          errorCode: 'SKILL_DEPENDENCIES_UNAVAILABLE',
+          error: `Skill '${skillId}' dependencies are still missing after installation.`,
+        };
+      }
+    }
+
     let executable: string | null = null;
     try {
       executable = getManagedPythonExecutable();
     } catch {
       executable = null;
     }
-    const requirementsPath = path.join(skillDir, 'requirements.txt');
-    const skillPythonExecutable = fs.existsSync(requirementsPath)
-      ? findSkillPythonExecutable(path.basename(skillDir), requirementsPath)
+    const skillPythonExecutable = hasRequirements
+      ? findSkillPythonExecutable(skillId, requirementsPath)
       : null;
     executable = skillPythonExecutable || executable;
     if (!executable) {
@@ -214,7 +291,10 @@ async function resolveRuntime(
         error: 'The application-managed Python runtime is unavailable for this Skill.',
       };
     }
-    if (fs.existsSync(requirementsPath) && !skillPythonExecutable) {
+    if (hasRequirements && !skillPythonExecutable) {
+      // The Skill's requirements changed without a matching packaged manifest
+      // (local edit or a marketplace update). Keep the previous best-effort
+      // resolver so the Skill still runs instead of failing hard.
       let uvExecutable: string | null = null;
       try {
         uvExecutable = findBundledUvExecutable(process.platform === 'win32' ? 'uv.exe' : 'uv');
@@ -354,7 +434,9 @@ async function prepareSkillScript(
     };
   }
 
-  const runtime = await resolveRuntime(resolved.scriptPath, resolved.skillDir);
+  const runtime = await resolveRuntime(resolved.scriptPath, resolved.skillDir, {
+    confirmDependencyInstall: options.confirmDependencyInstall,
+  });
   if ('errorCode' in runtime) {
     return { result: invalidInputResult(resolved.scriptPath, runtime.errorCode, runtime.error) };
   }
@@ -385,6 +467,14 @@ async function prepareSkillScript(
       '[skill-runtime] Managed uv environment was not appended:',
       error instanceof Error ? error.message : String(error),
     );
+  }
+  if (runtime.sitePackages) {
+    // The overlay shadows the packaged layer (PYTHONPATH precedes site-packages),
+    // which is how one Skill can pin a different version of a shared package.
+    const existing = env.PYTHONPATH?.trim();
+    env.PYTHONPATH = existing
+      ? `${runtime.sitePackages}${path.delimiter}${existing}`
+      : runtime.sitePackages;
   }
   Object.assign(env, runtime.env, options.envOverrides || {});
   env.SKILLS_ROOT = skillsRoot;

@@ -15,6 +15,7 @@ import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
 import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
+import { PiOcrSystemPrompt } from './piOcrTool';
 import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
@@ -85,6 +86,13 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     requiresFileTools: true,
     enabled: context => context.chatMode !== true,
     prompt: PiDocumentReaderSystemPrompt,
+  },
+  {
+    id: 'ocr',
+    requiresFileTools: true,
+    enabled: context =>
+      context.chatMode !== true && (context.platform ?? process.platform) === 'win32',
+    prompt: PiOcrSystemPrompt,
   },
   {
     id: 'builtin-file-tools',

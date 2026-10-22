@@ -37,6 +37,8 @@ import { resolvePiSkillRoots } from './piSkillRoots';
 import { buildPiCadViewerTool } from './piCadViewerTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
+import { buildPiOcrTool } from './piOcrTool';
+import { isOcrSupported } from '../../ocr/ocrEngine';
 import { buildPiPythonTools } from './piPythonTools';
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
@@ -161,6 +163,7 @@ export function buildPiSessionCustomTools(
   }
   if (!resourceState.chatMode && resourceState.fileToolsEnabled) {
     customTools.push(buildPiDocumentReaderTool({ workspaceRoot }));
+    if (isOcrSupported()) customTools.push(buildPiOcrTool({ workspaceRoot }));
     customTools.push(
       ...buildPiPythonTools({
         service: getPythonRuntimeService(),

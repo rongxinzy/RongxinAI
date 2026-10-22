@@ -24,7 +24,7 @@ function createFixture(changeSourceAfterBaseline = false) {
   const archivePath = path.join(componentsRoot, 'skill-python.7z');
   const archive = spawnSync(
     sevenZipPath,
-    ['a', '-t7z', '-mx=9', '-m0=lzma2', '-ms=on', archivePath, 'skill-python'],
+    ['a', '-t7z', '-mx=5', '-m0=lzma2', '-ms=on', archivePath, 'skill-python'],
     { cwd: path.join(root, 'resources'), encoding: 'utf8' },
   );
   expect(archive.status, archive.stderr || archive.stdout).toBe(0);
@@ -35,7 +35,7 @@ function createFixture(changeSourceAfterBaseline = false) {
         {
           key: 'skill-python',
           archive: 'skill-python.7z',
-          archiveCompression: 'lzma2-mx9-solid-v1',
+          archiveCompression: 'lzma2-mx5-solid-v1',
         },
       ],
     }),
