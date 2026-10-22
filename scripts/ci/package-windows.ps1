@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 
 # Windows 发布包构建入口，由 Makefile 的 ci-package-windows 目标调用。
 # GitLab 编排逻辑保留在 .gitlab-ci.yml 中，具体构建行为集中在这里。
