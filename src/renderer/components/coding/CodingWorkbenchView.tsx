@@ -8,7 +8,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@shared/components/ui/empty';
-import { FileDiff, FolderGit2, FolderPlus, PanelRight } from 'lucide-react';
+import { Bot, FileDiff, FolderGit2, FolderPlus, PanelRight } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -383,6 +383,12 @@ export const CodingWorkbenchView = ({
       title={i18nService.t('codingAgent')}
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
+      actions={
+        <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
+          <Bot className="mr-1 size-4" />
+          {i18nService.t('codingAgentManageButton')}
+        </Button>
+      }
     />
   );
 
@@ -461,6 +467,10 @@ export const CodingWorkbenchView = ({
         }
         actions={
           <>
+            <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
+              <Bot className="mr-1 size-4" />
+              {i18nService.t('codingAgentManageButton')}
+            </Button>
             {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
               <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
                 <FileDiff className="mr-1 size-4" />

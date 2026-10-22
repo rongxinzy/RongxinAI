@@ -185,6 +185,13 @@ export const magpieTranslations = {
     magpieActionFailed: '模型管理操作未完成。请检查运行时是否可用，或稍后重试。',
 
     magpieSettingsSections: '模型服务设置',
+    magpieSectionProvidersAndModels: '渠道与模型',
+    magpieSectionAdvanced: '高级设置',
+    magpieModelsCatalogDesc:
+      '当前已启用的渠道提供的所有可用模型。点击模型可查看支持能力，并将其设为全局默认模型。',
+    magpieAgentsRelocatedNotice:
+      '提示：如需连接或管理本机的命令行编程智能体（Claude Code、Codex、OpenCode 等），请前往「编程模式」顶部的智能体管理器。',
+    codingAgentManageButton: '智能体管理',
     magpieSectionService: '服务',
     magpieSectionProviders: '渠道',
     magpieSectionAgents: '接入 Agent',
@@ -442,6 +449,13 @@ export const magpieTranslations = {
     magpieActionFailed:
       'Model management did not complete. Check runtime availability or try again later.',
     magpieSettingsSections: 'Model service settings',
+    magpieSectionProvidersAndModels: 'Providers & Models',
+    magpieSectionAdvanced: 'Advanced Settings',
+    magpieModelsCatalogDesc:
+      'All available models provided by enabled providers. Click a model to inspect its capabilities or set it as default.',
+    magpieAgentsRelocatedNotice:
+      'Tip: To connect or manage local CLI coding agents (Claude Code, Codex, OpenCode, etc.), please open the Agent Manager at the top of Coding mode.',
+    codingAgentManageButton: 'Manage Agents',
     magpieSectionService: 'Service',
     magpieSectionProviders: 'Providers',
     magpieSectionAgents: 'Agents',
