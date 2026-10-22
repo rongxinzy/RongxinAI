@@ -170,8 +170,10 @@ foreach ($version in @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction 
   $completion = Get-Content -LiteralPath $complete -Raw
   if (-not $completion -or ($completion -split '\|', 2)[0] -cne $version.Name) { continue }
   # One locked file must not abort the remaining versions (nor fail the install):
-  # report it and keep reclaiming the rest.
+  # report it and keep reclaiming the rest. The completion marker goes first so an
+  # interrupted deletion can never make the next install trust this version.
   try {
+    [IO.File]::Delete((ConvertTo-LongPath $complete))
     Remove-TreeWithoutFollowingLinks $version.FullName
   } catch {
     [Console]::Error.WriteLine("cleanup: could not reclaim $($version.Name): $($_.Exception.Message)")
