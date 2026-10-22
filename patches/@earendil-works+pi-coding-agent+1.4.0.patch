@@ -2,7 +2,7 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-sessio
 index 0000000..1111111 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -1885,6 +1885,9 @@ export class AgentSession {
+@@ -1914,6 +1914,9 @@ export class AgentSession {
          if (typeof content === "string") {
              text = content;
          }
@@ -12,7 +12,7 @@ index 0000000..1111111 100644
          else {
              const textParts = [];
              images = [];
-@@ -3568,12 +3571,14 @@ export class AgentSession {
+@@ -3597,11 +3600,13 @@ export class AgentSession {
                  return false;
              const msg = m;
              // Skip aborted messages with no content
@@ -22,12 +22,11 @@ index 0000000..1111111 100644
              return true;
          });
          if (!lastAssistant)
-             return undefined;
-+        if (!lastAssistant.content || typeof lastAssistant.content[Symbol.iterator] !== "function")
 +            return undefined;
++        if (!lastAssistant.content || typeof lastAssistant.content[Symbol.iterator] !== "function")
+             return undefined;
          let text = "";
          for (const content of lastAssistant.content) {
-             if (content.type === "text") {
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
 index 0000000..1111111 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
