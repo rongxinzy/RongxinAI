@@ -45,3 +45,6 @@ export function resolveMagpieExternalAgentRowId(upstreamId: string): MagpieExter
   }
   return null;
 }
+
+/** Host provider id under which the running local GPU (llama.cpp) models are registered. */
+export const LOCAL_GPU_MAGPIE_PROVIDER_ID = 'zhiyuan-host-local-gpu';

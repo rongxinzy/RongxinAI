@@ -1,8 +1,6 @@
 import { expect, test, vi } from 'vitest';
-import {
-  ManagedMagpieProviderBindings,
-  LOCAL_GPU_MAGPIE_PROVIDER_ID,
-} from './managedProviderBindings';
+import { ManagedMagpieProviderBindings } from './managedProviderBindings';
+import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
 import { ZhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
 import { buildLlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
 const model = buildLlamaCppRunningModelBinding({
