@@ -73,6 +73,8 @@ export const enArtifactsUpdates: Record<string, string> = {
   updateDownloadingBackground: 'Downloading update in the background...',
   updateDownloadingPill: 'Downloading',
   updateDownloadCancel: 'Cancel Download',
+  updateVerifying: 'Verifying the installer...',
+  updateVerifyingPill: 'Verifying',
   updateSectionTitle: 'Software Update',
   updateReadyTitle: 'New version available',
   updateReadyConfirm: 'Install and Restart',

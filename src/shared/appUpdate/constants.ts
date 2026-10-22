@@ -4,6 +4,8 @@ export const AppUpdateStatus = {
   Available: 'available',
   Downloading: 'downloading',
   Paused: 'paused',
+  /** The installer bytes are on disk; the signed-manifest checksum and freshness checks are running. */
+  Verifying: 'verifying',
   Ready: 'ready',
   Installing: 'installing',
   UpToDate: 'up_to_date',
@@ -49,7 +51,7 @@ export const AppUpdateIpc = {
   StateChanged: 'appUpdate:stateChanged',
 } as const;
 
-interface AppUpdateDownloadProgress {
+export interface AppUpdateDownloadProgress {
   received: number;
   total: number | undefined;
   percent: number | undefined;

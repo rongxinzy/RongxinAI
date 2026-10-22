@@ -54,6 +54,14 @@ const electronMocks = vi.hoisted(() => ({
   getPath: vi.fn(() => os.tmpdir()),
   isPackaged: false,
   openExternal: vi.fn(),
+  window: {
+    isDestroyed: () => false,
+    isVisible: () => true,
+    hide: vi.fn(),
+    show: vi.fn(),
+    focus: vi.fn(),
+    webContents: { send: vi.fn() },
+  },
 }));
 
 vi.mock('electron', () => ({
@@ -65,106 +73,26 @@ vi.mock('electron', () => ({
       return electronMocks.isPackaged;
     },
   },
-  BrowserWindow: { getAllWindows: () => [] },
+  BrowserWindow: { getAllWindows: () => [electronMocks.window] },
   shell: { openExternal: electronMocks.openExternal },
 }));
 
 const installerMocks = vi.hoisted(() => ({ installWindowsNsis: vi.fn() }));
 
 vi.mock('./appUpdateInstaller', () => installerMocks);
-vi.mock('./appUpdateFileHasher', () => ({
-  sha512UpdateFile: async (filePath: string) =>
-    crypto
-      .createHash('sha512')
-      .update(await fs.promises.readFile(filePath))
-      .digest('base64'),
-}));
+const hasherMocks = vi.hoisted(() => ({ sha512UpdateFile: vi.fn() }));
+
+vi.mock('./appUpdateFileHasher', () => hasherMocks);
 vi.mock('./appUpdateInstallReceipt', () => ({ readInstallResult: () => null }));
 
 import { AppUpdateCoordinator } from './appUpdateCoordinator';
-
-class MemoryStore {
-  private readonly values = new Map<string, unknown>();
-
-  get<T>(key: string): T | undefined {
-    return this.values.get(key) as T | undefined;
-  }
-
-  set<T>(key: string, value: T): void {
-    this.values.set(key, value);
-  }
-
-  delete(key: string): void {
-    this.values.delete(key);
-  }
-}
-
-const updaterInfo = (version: string, sha512: string, filename = 'ZhiYuan.zip') => ({
-  version,
-  files: [{ url: filename, sha512 }],
-  path: filename,
-  sha512,
-  releaseDate: '2026-08-06T00:00:00.000Z',
-});
-
-function signedManifest(
-  privateKey: crypto.KeyObject,
-  options: {
-    version?: string;
-    updaterSha512?: string;
-    platform?: string;
-    arch?: string;
-    variant?: string;
-    updaterFilename?: string;
-  } = {},
-) {
-  const version = options.version ?? '2026.7.2';
-  const platform = options.platform ?? 'darwin';
-  const arch = options.arch ?? 'arm64';
-  const variant = options.variant ?? 'default';
-  const updaterFilename = options.updaterFilename ?? 'ZhiYuan.zip';
-  const payload = {
-    channel: 'stable',
-    version,
-    publishedAt: '2026-08-06T00:00:00.000Z',
-    minimumSupportedVersion: '2026.7.1',
-    mandatory: false,
-    artifact: {
-      platform,
-      arch,
-      variant,
-      // The old interface remains a DMG so pre-migration clients still work.
-      url: `https://downloads.rongxzyai.com/releases/${version}/${platform}-${arch}-${variant}/ZhiYuan.dmg`,
-      size: 1024,
-      sha256: 'a'.repeat(64),
-      updater: options.updaterSha512
-        ? {
-            sha512: options.updaterSha512,
-            size: 27,
-            filename: updaterFilename,
-            url: `https://downloads.rongxzyai.com/releases/${version}/${platform}-${arch}-${variant}/${updaterFilename}`,
-          }
-        : undefined,
-    },
-  };
-  const payloadBytes = Buffer.from(JSON.stringify(payload));
-  return {
-    schemaVersion: 1,
-    keyId: 'test-release-key',
-    algorithm: 'Ed25519',
-    payload: payloadBytes.toString('base64url'),
-    signature: crypto.sign(null, payloadBytes, privateKey).toString('base64url'),
-  };
-}
-
-function manifestFetch(...envelopes: unknown[]) {
-  let call = 0;
-  return vi.fn(async () => {
-    const envelope = envelopes[Math.min(call, envelopes.length - 1)];
-    call += 1;
-    return new Response(JSON.stringify(envelope), { status: 200 });
-  });
-}
+import {
+  ageReadyStatePastFreshnessWindow,
+  manifestFetch,
+  MemoryStore,
+  signedManifest,
+  updaterInfo,
+} from './appUpdateCoordinator.testHarness';
 
 describe('AppUpdateCoordinator electron-updater bridge', () => {
   const originalPlatform = process.platform;
@@ -172,6 +100,14 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
   let privateKey: crypto.KeyObject;
   let downloadedFile: string;
   let updaterSha512: string;
+
+  /** Lets the pending electron-updater download complete with the fixture file. */
+  const mockDownloadCompletes = (): void => {
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
+      updaterMocks.emit('update-downloaded', { downloadedFile });
+      return [downloadedFile];
+    });
+  };
 
   beforeEach(async () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
@@ -195,9 +131,19 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockReset();
     vi.mocked(updaterMocks.autoUpdater.quitAndInstall).mockReset();
     installerMocks.installWindowsNsis.mockReset();
+    hasherMocks.sha512UpdateFile.mockReset();
+    hasherMocks.sha512UpdateFile.mockImplementation(async (filePath: string) =>
+      crypto
+        .createHash('sha512')
+        .update(await fs.promises.readFile(filePath))
+        .digest('base64'),
+    );
     electronMocks.getAppPath.mockReturnValue(process.cwd());
     electronMocks.isPackaged = false;
     electronMocks.openExternal.mockReset();
+    electronMocks.window.hide.mockClear();
+    electronMocks.window.show.mockClear();
+    electronMocks.window.focus.mockClear();
   });
 
   afterEach(async () => {
@@ -205,6 +151,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     await fs.promises.rm(path.dirname(downloadedFile), { recursive: true, force: true });
     Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform });
     Object.defineProperty(process, 'arch', { configurable: true, value: originalArch });
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
@@ -257,10 +204,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
       isUpdateAvailable: true,
       updateInfo: updaterInfo('2026.7.2', updaterSha512),
     });
-    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
-      updaterMocks.emit('update-downloaded', { downloadedFile });
-      return [downloadedFile];
-    });
+    mockDownloadCompletes();
 
     const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
     await coordinator.checkNow();
@@ -348,7 +292,59 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
   });
 
-  test('uses the Windows NSIS handoff after the final freshness check', async () => {
+  test('reports verifying while the downloaded installer is hashed', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal('fetch', manifestFetch(envelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    mockDownloadCompletes();
+    let finishHash: ((digest: string) => void) | undefined;
+    hasherMocks.sha512UpdateFile.mockImplementationOnce(
+      () =>
+        new Promise<string>(resolve => {
+          finishHash = resolve;
+        }),
+    );
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Verifying));
+    expect(coordinator.getState().progress).toBeNull();
+    await vi.waitFor(() => expect(hasherMocks.sha512UpdateFile).toHaveBeenCalledTimes(1));
+
+    finishHash?.(updaterSha512);
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+  });
+
+  test('reports a capped fraction and drops it when the transfer counter restarts', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal('fetch', manifestFetch(envelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+
+    updaterMocks.emit('download-progress', { transferred: 60, total: 100, bytesPerSecond: 10 });
+    expect(coordinator.getState().progress).toMatchObject({ received: 60, percent: 0.6 });
+
+    updaterMocks.emit('download-progress', { transferred: 100, total: 100, bytesPerSecond: 10 });
+    expect(coordinator.getState().progress?.percent).toBe(0.99);
+
+    // A differential download restarts its byte counter for the next batch; the
+    // fraction no longer describes the whole transfer.
+    updaterMocks.emit('download-progress', { transferred: 10, total: 100, bytesPerSecond: 10 });
+    expect(coordinator.getState().progress?.percent).toBeUndefined();
+    expect(coordinator.getState().progress?.received).toBe(10);
+  });
+
+  test('rehashes a restored ready update because this session never verified its bytes', async () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
     Object.defineProperty(process, 'arch', { configurable: true, value: 'x64' });
     const installerFile = path.join(path.dirname(downloadedFile), 'ZhiYuan.Setup.exe');
@@ -366,10 +362,41 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
       isUpdateAvailable: true,
       updateInfo: updaterInfo('2026.7.2', updaterSha512, 'ZhiYuan.Setup.exe'),
     });
-    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
-      updaterMocks.emit('update-downloaded', { downloadedFile });
-      return [downloadedFile];
+    const store = new MemoryStore();
+    store.set('app_update_ready_v2', {
+      envelope,
+      filePath: installerFile,
+      sha512: updaterSha512,
     });
+    const coordinator = new AppUpdateCoordinator(store as unknown as SqliteStore);
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    const result = await coordinator.installReadyUpdate();
+
+    expect(result.success).toBe(true);
+    expect(hasherMocks.sha512UpdateFile).toHaveBeenCalledTimes(1);
+    expect(installerMocks.installWindowsNsis).toHaveBeenCalledOnce();
+  });
+
+  test('uses the Windows NSIS handoff for a fresh ready update', async () => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
+    Object.defineProperty(process, 'arch', { configurable: true, value: 'x64' });
+    const installerFile = path.join(path.dirname(downloadedFile), 'ZhiYuan.Setup.exe');
+    await fs.promises.rename(downloadedFile, installerFile);
+    downloadedFile = installerFile;
+    const envelope = signedManifest(privateKey, {
+      updaterSha512,
+      platform: 'win32',
+      arch: 'x64',
+      variant: 'lite',
+      updaterFilename: 'ZhiYuan.Setup.exe',
+    });
+    vi.stubGlobal('fetch', manifestFetch(envelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512, 'ZhiYuan.Setup.exe'),
+    });
+    mockDownloadCompletes();
     const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
     await coordinator.checkNow();
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
@@ -399,10 +426,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
       isUpdateAvailable: true,
       updateInfo: updaterInfo('2026.7.2', updaterSha512, 'ZhiYuan.Setup.exe'),
     });
-    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
-      updaterMocks.emit('update-downloaded', { downloadedFile });
-      return [downloadedFile];
-    });
+    mockDownloadCompletes();
     installerMocks.installWindowsNsis.mockRejectedValueOnce(new Error('Installer handoff failed'));
     const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
     await coordinator.checkNow();
@@ -485,10 +509,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
       isUpdateAvailable: true,
       updateInfo: updaterInfo('2026.7.2', updaterSha512),
     });
-    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
-      updaterMocks.emit('update-downloaded', { downloadedFile });
-      return [downloadedFile];
-    });
+    mockDownloadCompletes();
     const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
     await coordinator.checkNow();
     await vi.waitFor(() => expect(coordinator.getState().failureStage).toBe('verify'));
@@ -618,17 +639,14 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(result.state.errorMessage).toBe('network offline');
   });
 
-  test('rehashes a ready update immediately before installation', async () => {
+  test('rejects a ready update whose file changed after verification instead of installing it', async () => {
     const envelope = signedManifest(privateKey, { updaterSha512 });
     vi.stubGlobal('fetch', manifestFetch(envelope));
     vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
       isUpdateAvailable: true,
       updateInfo: updaterInfo('2026.7.2', updaterSha512),
     });
-    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
-      updaterMocks.emit('update-downloaded', { downloadedFile });
-      return [downloadedFile];
-    });
+    mockDownloadCompletes();
     const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
     await coordinator.checkNow();
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
@@ -638,10 +656,12 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
 
     expect(result.success).toBe(false);
     expect(result.state.status).toBe(AppUpdateStatus.Error);
+    expect(hasherMocks.sha512UpdateFile).toHaveBeenCalledTimes(2);
+    expect(electronMocks.window.hide).not.toHaveBeenCalled();
     expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
   });
 
-  test('installs a ready update only after confirming it is still latest', async () => {
+  test('installs a fresh ready update without another network round trip', async () => {
     const envelope = signedManifest(privateKey, { updaterSha512 });
     const fetchMock = manifestFetch(envelope);
     vi.stubGlobal('fetch', fetchMock);
@@ -649,13 +669,98 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
       isUpdateAvailable: true,
       updateInfo: updaterInfo('2026.7.2', updaterSha512),
     });
-    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
-      updaterMocks.emit('update-downloaded', { downloadedFile });
-      return [downloadedFile];
+    mockDownloadCompletes();
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    const result = await coordinator.installReadyUpdate();
+
+    expect(result.success).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(updaterMocks.autoUpdater.checkForUpdates).toHaveBeenCalledTimes(2);
+    // The digest computed after the download is reused instead of reading the
+    // whole installer again on the click path.
+    expect(hasherMocks.sha512UpdateFile).toHaveBeenCalledTimes(1);
+    expect(electronMocks.window.hide).toHaveBeenCalledOnce();
+    expect(updaterMocks.autoUpdater.quitAndInstall).toHaveBeenCalledOnce();
+  });
+
+  test('marks the install as in progress before the handoff resolves', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal('fetch', manifestFetch(envelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    mockDownloadCompletes();
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    const install = coordinator.installReadyUpdate();
+    expect(coordinator.getState().status).toBe(AppUpdateStatus.Installing);
+    await install;
+  });
+
+  test('coalesces concurrent install clicks into a single handoff', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal('fetch', manifestFetch(envelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    mockDownloadCompletes();
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    const [first, second] = await Promise.all([
+      coordinator.installReadyUpdate(),
+      coordinator.installReadyUpdate(),
+    ]);
+
+    expect(first).toBe(second);
+    expect(updaterMocks.autoUpdater.quitAndInstall).toHaveBeenCalledOnce();
+    expect(electronMocks.window.hide).toHaveBeenCalledOnce();
+  });
+
+  test('restores the window when the handoff fails after the install started', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal('fetch', manifestFetch(envelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    mockDownloadCompletes();
+    vi.mocked(updaterMocks.autoUpdater.quitAndInstall).mockImplementationOnce(() => {
+      throw new Error('Handoff failed');
     });
     const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
     await coordinator.checkNow();
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    const result = await coordinator.installReadyUpdate();
+
+    expect(result.success).toBe(false);
+    expect(electronMocks.window.hide).toHaveBeenCalledOnce();
+    expect(electronMocks.window.show).toHaveBeenCalledOnce();
+    expect(coordinator.getState().status).toBe(AppUpdateStatus.Error);
+  });
+
+  test('rechecks an aged ready update before installing it', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    const fetchMock = manifestFetch(envelope);
+    vi.stubGlobal('fetch', fetchMock);
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    mockDownloadCompletes();
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+    ageReadyStatePastFreshnessWindow();
 
     const result = await coordinator.installReadyUpdate();
 
@@ -664,7 +769,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(updaterMocks.autoUpdater.quitAndInstall).toHaveBeenCalledOnce();
   });
 
-  test('blocks installation and downloads a version published after the ready prompt', async () => {
+  test('blocks installation and downloads a version published after the ready prompt aged', async () => {
     const readyEnvelope = signedManifest(privateKey, { updaterSha512 });
     const newerSha512 = crypto.randomBytes(64).toString('base64');
     const newerEnvelope = signedManifest(privateKey, {
@@ -694,6 +799,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
     await coordinator.checkNow();
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+    ageReadyStatePastFreshnessWindow();
 
     const result = await coordinator.installReadyUpdate();
 
@@ -733,6 +839,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
     await coordinator.checkNow();
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+    ageReadyStatePastFreshnessWindow();
 
     const result = await coordinator.installReadyUpdate();
 
@@ -775,10 +882,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
       isUpdateAvailable: true,
       updateInfo: updaterInfo('2026.7.2', updaterSha512),
     });
-    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
-      updaterMocks.emit('update-downloaded', { downloadedFile });
-      return [downloadedFile];
-    });
+    mockDownloadCompletes();
     const store = new MemoryStore();
     const coordinator = new AppUpdateCoordinator(store as unknown as SqliteStore);
     await coordinator.checkNow();

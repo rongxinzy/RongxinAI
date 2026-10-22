@@ -2,7 +2,6 @@ import { TooltipProvider } from '@shared/components/ui/tooltip';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { AppUpdateStatus } from '../shared/appUpdate/constants';
 import { ManagedProviderAccessMode } from '../shared/managedProviders';
 import { getBranding } from '../shared/branding';
 import { shouldSkipPreviewBoot } from './browserMock/previewQuery';
@@ -11,7 +10,6 @@ import { MainViewCanvas } from './app/MainViewCanvas';
 import { MainView } from './app/constants';
 import { useAppBootstrap } from './app/useAppBootstrap';
 import { useAppKeyboardShortcuts } from './app/useAppKeyboardShortcuts';
-import { useAppUpdateState } from './app/useAppUpdateState';
 import { useNetworkStatusForwarder } from './app/useNetworkStatusForwarder';
 import { useDesktopPetNavigation } from './app/useDesktopPetNavigation';
 import {
@@ -31,7 +29,7 @@ import { prefetchFeatureView } from './components/featureViewPrefetch';
 import { ParticleBootScreen } from './components/boot/ParticleBootScreen';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
-import AppUpdateBadge from './components/update/AppUpdateBadge';
+import AppUpdateSidebarEntry from './components/update/AppUpdateSidebarEntry';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { agentService } from './services/agent';
 import {
@@ -98,7 +96,6 @@ const App: React.FC = () => {
     managedProviderPolicy,
     setManagedProviderPolicy,
   } = useAppBootstrap();
-  const appUpdateState = useAppUpdateState();
   const toastTimerRef = useRef<number | null>(null);
   const toastOnCloseRef = useRef<(() => void) | null>(null);
   const appShellRef = useRef<HTMLDivElement>(null);
@@ -413,9 +410,7 @@ const App: React.FC = () => {
     [dismissToast],
   );
 
-  const updateInfo = appUpdateState.info;
-
-  const handleUpdateAction = useCallback(() => {
+  const handleOpenAbout = useCallback(() => {
     handleShowSettings({ initialTab: 'about' });
   }, [handleShowSettings]);
 
@@ -511,18 +506,9 @@ const App: React.FC = () => {
     return unsubscribe;
   }, [handleNewChat]);
 
-  const shouldShowUpdateBadge =
-    updateInfo &&
-    (appUpdateState.status === AppUpdateStatus.Ready ||
-      appUpdateState.status === AppUpdateStatus.Error ||
-      (appUpdateState.status === AppUpdateStatus.Available && updateInfo.manualDownloadOnly));
-  const updateEntry = shouldShowUpdateBadge ? (
-    <AppUpdateBadge
-      latestVersion={updateInfo.latestVersion}
-      status={appUpdateState.status}
-      onClick={handleUpdateAction}
-    />
-  ) : null;
+  const updateEntry = (
+    <AppUpdateSidebarEntry collapsed={isSidebarCollapsed} onOpenAbout={handleOpenAbout} />
+  );
   const windowsStandaloneTitleBar = isWindows ? (
     <div className="draggable relative h-9 shrink-0 bg-surface-raised">
       <WindowTitleBar isOverlayActive={false} />
@@ -551,7 +537,6 @@ const App: React.FC = () => {
         onCloseSettings={() => setInitErrorSettingsOpen(false)}
         settingsOptions={settingsOptions}
         enterpriseConfig={enterpriseConfig}
-        appUpdateState={appUpdateState}
         managedModelsOnly={managedModelsOnly}
         inferenceEdition={inferenceEdition}
       />
@@ -586,7 +571,7 @@ const App: React.FC = () => {
             onNewChat={handleNewChat}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={handleToggleSidebar}
-            updateEntry={!isSidebarCollapsed ? updateEntry : null}
+            updateEntry={updateEntry}
             hideLogin={Boolean(enterpriseConfig) || !getBranding().features.enableCommunityAuth}
             managedModelsOnly={managedModelsOnly}
             inferenceEdition={inferenceEdition}
@@ -601,7 +586,6 @@ const App: React.FC = () => {
             onLeaveSettings={handleLeaveSettings}
             onRequestAppSettings={handleShowSettings}
             enterpriseConfig={enterpriseConfig}
-            appUpdateState={appUpdateState}
             managedModelsOnly={managedModelsOnly}
             inferenceEdition={inferenceEdition}
             localInferenceEnabled={localInferenceEnabled}

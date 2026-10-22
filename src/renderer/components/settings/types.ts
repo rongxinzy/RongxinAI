@@ -1,4 +1,3 @@
-import type { AppUpdateRuntimeState } from '../../../shared/appUpdate/constants';
 import type { InferenceEdition } from '../../../shared/inferenceEdition';
 
 export type TabType =
@@ -38,7 +37,6 @@ export interface SettingsPageProps extends SettingsOpenOptions {
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
   enterpriseConfig?: SettingsEnterpriseConfig | null;
-  appUpdateState?: AppUpdateRuntimeState;
   managedModelsOnly?: boolean;
   inferenceEdition?: InferenceEdition;
 }
