@@ -23,7 +23,6 @@ import {
 import { i18nService } from '../../../services/i18n';
 import { showAppError } from '../../../services/appToast';
 import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
-import { MagpieAgentsPanel } from '../../coding/MagpieAgentsPanel';
 import { MagpieModelPreferences } from './MagpieModelPreferences';
 import { MagpieNetworkPreferences } from './MagpieNetworkPreferences';
 import { MagpiePrivacyPreferences } from './MagpiePrivacyPreferences';
@@ -34,38 +33,26 @@ import { ProviderManagerSection } from './ProviderManagerSection';
 import { useMagpiePreferences } from './useMagpiePreferences';
 
 const ModelSection = {
-  Service: 'service',
-  Agents: 'agents',
   Providers: 'providers',
   RoutingUsage: 'routingUsage',
-  Models: 'models',
-  Network: 'network',
-  Privacy: 'privacy',
+  Advanced: 'advanced',
 } as const;
 type ModelSection = (typeof ModelSection)[keyof typeof ModelSection];
 
 const MODEL_SECTIONS = [
-  ModelSection.Service,
-  ModelSection.Agents,
   ModelSection.Providers,
   ModelSection.RoutingUsage,
-  ModelSection.Models,
-  ModelSection.Network,
-  ModelSection.Privacy,
+  ModelSection.Advanced,
 ] as const;
 
 const SECTION_LABEL_KEYS: Record<ModelSection, string> = {
-  [ModelSection.Service]: 'magpieSectionService',
-  [ModelSection.Agents]: 'magpieSectionAgents',
-  [ModelSection.Providers]: 'magpieSectionProviders',
+  [ModelSection.Providers]: 'magpieSectionProvidersAndModels',
   [ModelSection.RoutingUsage]: 'magpieSectionRoutingUsage',
-  [ModelSection.Models]: 'magpieSectionModels',
-  [ModelSection.Network]: 'magpieSectionNetwork',
-  [ModelSection.Privacy]: 'magpieSectionPrivacy',
+  [ModelSection.Advanced]: 'magpieSectionAdvanced',
 };
 
 export default function ModelSettingsPanel() {
-  const [section, setSection] = useState<ModelSection>(ModelSection.Service);
+  const [section, setSection] = useState<ModelSection>(ModelSection.Providers);
   const [compactSections, setCompactSections] = useState(
     () => window.matchMedia('(max-width: 1100px)').matches,
   );
@@ -205,11 +192,7 @@ export default function ModelSettingsPanel() {
   const models = running ? catalog.models : [];
   const selected = models.find(model => model.id === selection);
   const saved = models.find(model => model.id === catalog?.defaultModelId);
-  const needsPreferences =
-    running &&
-    section !== ModelSection.Service &&
-    section !== ModelSection.Agents &&
-    section !== ModelSection.Providers;
+  const needsPreferences = running && section === ModelSection.Advanced;
   const {
     preferences,
     saving,
@@ -260,7 +243,7 @@ export default function ModelSettingsPanel() {
         </div>
       )}
 
-      {section === ModelSection.Service && (
+      {section === ModelSection.Providers && (
         <div className="flex flex-col gap-8">
           <section className="flex flex-col gap-4">
             <div className="flex min-w-0 flex-col gap-1">
@@ -358,76 +341,71 @@ export default function ModelSettingsPanel() {
           )}
 
           {running && (
-            <section className="flex flex-col gap-4 border-t border-border pt-6">
-              <div className="flex flex-wrap items-start justify-between gap-4">
+            <>
+              <section className="flex flex-col gap-4 border-t border-border pt-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <h3 className="text-base font-semibold">
+                      {i18nService.t('magpieDefaultModel')}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {i18nService.t('modelBrowseSaved')}:{' '}
+                      {saved?.display_name || saved?.id || i18nService.t('magpieModelUnset')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {i18nService.t('magpieDefaultModelHint')}
+                    </p>
+                  </div>
+                  {selected && selection !== catalog?.defaultModelId && (
+                    <Button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => apply(await selectMagpieDefaultModel(selection), true))
+                      }
+                    >
+                      {i18nService.t('magpieSetDefault')}
+                    </Button>
+                  )}
+                </div>
+              </section>
+
+              <section className="flex flex-col gap-4 border-t border-border pt-6">
+                <ProviderManagerSection
+                  providers={providers}
+                  loading={providersLoading}
+                  disabled={busy}
+                  onRefresh={loadProviders}
+                  onSaveProvider={handleSaveProvider}
+                  onToggleProvider={handleToggleProvider}
+                  onDeleteProvider={handleDeleteProvider}
+                  onTestProvider={handleTestProvider}
+                />
+              </section>
+
+              <section className="flex flex-col gap-4 border-t border-border pt-6">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <h3 className="text-base font-semibold">{i18nService.t('magpieDefaultModel')}</h3>
+                  <h3 className="text-base font-semibold">
+                    {i18nService.t('magpieSectionModels')}
+                  </h3>
                   <p className="text-sm text-muted-foreground">
-                    {i18nService.t('modelBrowseSaved')}:{' '}
-                    {saved?.display_name || saved?.id || i18nService.t('magpieModelUnset')}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {i18nService.t('magpieDefaultModelHint')}
+                    {i18nService.t('magpieModelsCatalogDesc')}
                   </p>
                 </div>
-                {selected && selection !== catalog?.defaultModelId && (
-                  <Button
-                    type="button"
-                    disabled={busy}
-                    onClick={() =>
-                      void run(async () => apply(await selectMagpieDefaultModel(selection), true))
-                    }
-                  >
-                    {i18nService.t('magpieSetDefault')}
-                  </Button>
+                {!models.length && (
+                  <p className="text-sm text-muted-foreground">
+                    {i18nService.t('magpieCatalogEmpty')}
+                  </p>
                 )}
-              </div>
-              {!models.length && (
-                <p className="text-sm text-muted-foreground">
-                  {i18nService.t('magpieCatalogEmpty')}
-                </p>
-              )}
-              <ModelCatalogBrowser
-                models={models}
-                defaultModelId={catalog?.defaultModelId ?? null}
-                selection={selection}
-                disabled={busy}
-                onSelect={setSelection}
-              />
-            </section>
-          )}
-        </div>
-      )}
-
-      {section === ModelSection.Agents && (
-        <section className="flex flex-col gap-4">
-          <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="text-base font-semibold">
-              {i18nService.t('magpieExternalSettingsLink')}
-            </h2>
-            <p className="max-w-prose text-sm text-muted-foreground">
-              {i18nService.t('magpieExternalSettingsLinkHint')}
-            </p>
-          </div>
-          {running ? <MagpieAgentsPanel /> : preferencesUnavailable}
-        </section>
-      )}
-
-      {section === ModelSection.Providers && (
-        <div className="flex flex-col gap-4">
-          {running ? (
-            <ProviderManagerSection
-              providers={providers}
-              loading={providersLoading}
-              disabled={busy}
-              onRefresh={loadProviders}
-              onSaveProvider={handleSaveProvider}
-              onToggleProvider={handleToggleProvider}
-              onDeleteProvider={handleDeleteProvider}
-              onTestProvider={handleTestProvider}
-            />
-          ) : (
-            preferencesUnavailable
+                <ModelCatalogBrowser
+                  models={models}
+                  defaultModelId={catalog?.defaultModelId ?? null}
+                  selection={selection}
+                  disabled={busy}
+                  onSelect={setSelection}
+                />
+              </section>
+            </>
           )}
         </div>
       )}
@@ -436,66 +414,60 @@ export default function ModelSettingsPanel() {
         <ModelRoutingUsagePanel running={running} disabled={busy} />
       )}
 
-      {section === ModelSection.Models && (
-        <div className="flex flex-col gap-4">
-          {preferences ? (
-            <MagpieModelPreferences preferences={preferences} saving={saving} update={update} />
-          ) : (
-            preferencesUnavailable
-          )}
-          {preferencesError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {preferencesError}
-            </p>
-          ) : null}
-        </div>
-      )}
+      {section === ModelSection.Advanced && (
+        <div className="flex flex-col gap-8">
+          <div className="rounded-lg border border-border-subtle bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+            {i18nService.t('magpieAgentsRelocatedNotice')}
+          </div>
 
-      {section === ModelSection.Network && (
-        <div className="flex flex-col gap-4">
           {preferences ? (
-            <MagpieNetworkPreferences preferences={preferences} saving={saving} update={update} />
-          ) : (
-            preferencesUnavailable
-          )}
-          {preferencesError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {preferencesError}
-            </p>
-          ) : null}
-        </div>
-      )}
+            <>
+              <MagpieModelPreferences preferences={preferences} saving={saving} update={update} />
 
-      {section === ModelSection.Privacy && (
-        <div className="flex flex-col gap-6">
-          {preferences ? (
-            <MagpiePrivacyPreferences preferences={preferences} saving={saving} update={update} />
+              {running && catalog ? (
+                <div className="border-t border-border pt-6">
+                  <MagpieSubscriptionControl
+                    status={catalog.status}
+                    disabled={busy || saving}
+                    onBusyChange={value => {
+                      locked.current = value;
+                      actionVersion.current += 1;
+                      setBusy(value);
+                    }}
+                    onStatusChange={async status => {
+                      const next = { status, models: [], defaultModelId: null };
+                      applyMagpieCatalog(next);
+                      apply(next);
+                      if (status.state === 'running') apply(await refreshMagpieModels());
+                    }}
+                  />
+                </div>
+              ) : null}
+
+              <div className="border-t border-border pt-6">
+                <MagpieNetworkPreferences
+                  preferences={preferences}
+                  saving={saving}
+                  update={update}
+                />
+              </div>
+
+              <div className="border-t border-border pt-6">
+                <MagpiePrivacyPreferences
+                  preferences={preferences}
+                  saving={saving}
+                  update={update}
+                />
+              </div>
+            </>
           ) : (
             preferencesUnavailable
           )}
+
           {preferencesError ? (
             <p role="alert" className="text-sm text-destructive">
               {preferencesError}
             </p>
-          ) : null}
-          {running && catalog ? (
-            <div className="border-t border-border pt-6">
-              <MagpieSubscriptionControl
-                status={catalog.status}
-                disabled={busy || saving}
-                onBusyChange={value => {
-                  locked.current = value;
-                  actionVersion.current += 1;
-                  setBusy(value);
-                }}
-                onStatusChange={async status => {
-                  const next = { status, models: [], defaultModelId: null };
-                  applyMagpieCatalog(next);
-                  apply(next);
-                  if (status.state === 'running') apply(await refreshMagpieModels());
-                }}
-              />
-            </div>
           ) : null}
         </div>
       )}
