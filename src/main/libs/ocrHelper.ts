@@ -34,21 +34,28 @@ function resolveBundledOcrScriptCandidates(): string[] {
 }
 
 /**
+ * Absolute path of the bundled OCR helper for the current platform/build.
+ * Shared by the prompt hint and the `ocr` tool so both agree on availability.
+ */
+export function resolveBundledOcrScriptPath(): string | null {
+  if (process.platform !== 'win32') return null;
+  return (
+    resolveBundledOcrScriptCandidates().find(candidate => {
+      try {
+        return fs.existsSync(candidate);
+      } catch {
+        return false;
+      }
+    }) ?? null
+  );
+}
+
+/**
  * Returns the helper when this platform and build can run it, otherwise null
  * (the caller then falls back to asking the user for the text).
  */
 export function resolveBundledOcrHelper(): BundledOcrHelper | null {
-  // The script depends on Windows.Media.Ocr; other platforms have no equivalent
-  // bundled path, so do not advertise one.
-  if (process.platform !== 'win32') return null;
-
-  const scriptPath = resolveBundledOcrScriptCandidates().find(candidate => {
-    try {
-      return fs.existsSync(candidate);
-    } catch {
-      return false;
-    }
-  });
+  const scriptPath = resolveBundledOcrScriptPath();
   if (!scriptPath) return null;
 
   return {

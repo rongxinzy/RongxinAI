@@ -98,5 +98,5 @@ test('does not allow paths outside the workspace', async () => {
 
 test('publishes the harness document-reading policy', () => {
   expect(PiDocumentReaderSystemPrompt).toContain('read_document');
-  expect(PiDocumentReaderSystemPrompt).toContain('scanned or image-only PDFs');
+  expect(PiDocumentReaderSystemPrompt).toContain('local OCR');
 });
