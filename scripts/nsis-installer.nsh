@@ -100,7 +100,8 @@ Var /GLOBAL zyDeleteRealAppData
   System::Call 'kernel32::GetCurrentProcessId()i .r9'
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\manage-install-processes.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -SelfPid $9 -Mode count'
   Pop ${RESULT}
-  Pop $R8
+  ; Discard the captured stdout without clobbering ${RESULT} or caller's error register ($R8)
+  Pop $R6
 !macroend
 
 ; Replace stock CHECK_APP_RUNNING: its raw prefix/inline PowerShell path

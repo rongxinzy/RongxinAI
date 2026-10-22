@@ -244,9 +244,7 @@ export const registerAppLifecycleHandlers = (): void => {
     // turned update installs into an installer racing a live old process.
     // Update installs use a shorter budget so the installer starts promptly.
     const timeoutMs = cleanupTimeoutForOrigin(getAppQuitOrigin());
-    const cleanupDeadline = new Promise<void>(resolve =>
-      setTimeout(resolve, timeoutMs).unref?.(),
-    );
+    const cleanupDeadline = new Promise<void>(resolve => setTimeout(resolve, timeoutMs).unref?.());
 
     void Promise.race([runAppCleanup(), cleanupDeadline])
       .catch(error => {

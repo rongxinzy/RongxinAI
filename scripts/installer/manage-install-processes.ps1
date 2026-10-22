@@ -29,7 +29,7 @@ function Get-InstallProcesses([bool]$IncludeRuntime) {
       return $image.StartsWith($installPrefix, [StringComparison]::OrdinalIgnoreCase) -or
         ($IncludeRuntime -and $image.StartsWith($runtimePrefix, [StringComparison]::OrdinalIgnoreCase))
     }
-    return $IncludeRuntime -and $_.Name -and ($exeNames -contains $_.Name)
+    return [bool]($_.Name -and ($exeNames -contains $_.Name))
   })
 }
 if ($Mode -eq 'count') {
