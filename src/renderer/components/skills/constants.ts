@@ -57,7 +57,6 @@ const skillCategoryIds: Record<Exclude<SkillCategory, 'all'>, ReadonlySet<string
     'ecom-copy-assistant',
     'customer-reply-craft',
     'xindaya-translator',
-    'viral-writer',
     'docx',
     'pdf',
     'presentation-studio',
