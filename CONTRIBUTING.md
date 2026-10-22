@@ -19,7 +19,9 @@ Please read this guide and [`AGENTS.md`](AGENTS.md) before making a code change.
 
 - Git
 - Node.js `>=24 <25`
-- Bun `>=1.4 <1.5`
+- Bun `>=1.4 <1.5` (matches `package.json` `packageManager`)
+- Electron **44.x** (desktop shell; see `devDependencies.electron` in `package.json`)
+- Pi agent stack **`@earendil-works/pi-*` 1.4.0** (execution kernel consumed by `piRuntimeAdapter.ts`)
 - Go: only for packaging. The exact SDK version pinned in `resources/magpie/upstream.json` (currently Go 1.26.8) is required by `bun run magpie:build`
 
 Windows release builds also require PortableGit. Native dependencies such as `better-sqlite3` may require Python and a supported C/C++ build toolchain when a prebuilt binary is unavailable.
@@ -38,7 +40,7 @@ For day-to-day renderer UI iteration, start the browser preview and use its Vite
 bun run web:preview
 ```
 
-The preview uses typed fixture data in place of the Electron preload bridge. Inspect layouts, interactions, themes, responsive states, and console output in the browser. Run `bun run web:preview:check` for a light/dark walkthrough and screenshots in `.github/pr-assets/browser-preview/` (install Playwright Chromium first with `bunx playwright install chromium`). See [README.md](README.md#browser-preview-mode) for its scope.
+The preview uses typed fixture data in place of the Electron preload bridge. Inspect layouts, interactions, themes, responsive states, and console output in the browser. Run `bun run web:preview:check` for a light/dark walkthrough (install Playwright Chromium first with `bunx playwright install chromium`); release preflight runs the same Playwright suite. Regenerate committed documentation screenshots under `docs/theme-previews/` with `bun run preview:doc-screenshots`. See [README.md](README.md#browser-preview-mode) for scope.
 
 Start Electron when verifying real IPC, native-window or system behavior, and affected end-to-end flows:
 
