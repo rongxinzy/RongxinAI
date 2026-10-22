@@ -7,6 +7,7 @@ import {
   type PreviewEdition,
 } from './previewQuery';
 import type { DeepPartial } from './scenarioTypes';
+import { createSiteDemoOverrides } from './siteDemo';
 
 type ElectronApi = Window['electron'];
 
@@ -64,6 +65,8 @@ export function createScenarioOverrides(
           listRunningModels: () => new Promise(() => undefined),
         },
       };
+    case PreviewScenario.Site:
+      return createSiteDemoOverrides();
     default:
       return undefined;
   }

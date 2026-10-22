@@ -11,6 +11,9 @@ bundles never contain this folder) and installs `browserMockElectron` as `window
 - `interactive.ts` — fixture-backed sessions, a streamed mock reply, skills, MCP, scheduled
   tasks, local inference, and dialogs. These replace generated methods and do not warn.
 - `fixtures/` — sessions, messages, workspaces, skills, MCP servers, agents, and config.
+- `siteDemo/` — `?previewScenario=site` (with `previewLocale=zh-CN|en-US`): localized demo data for the
+  official-site screenshots. `bun run site:snapshots --out <rongxinxzyai-pages>` captures them as 2x PNG,
+  webp and static HTML snapshots (`scripts/site-screenshots/`).
 - `installMock.ts` — installs the mock when `window.electron` is missing.
 
 `bun run web:preview:check` walks the main screens in light and dark and fails on console
