@@ -21,6 +21,8 @@ export const PreviewScenario = {
   Error: 'error',
   Loading: 'loading',
   Coding: 'coding',
+  /** Official-site screenshot demo (siteDemo/). */
+  Site: 'site',
 } as const;
 
 export type PreviewScenario = (typeof PreviewScenario)[keyof typeof PreviewScenario];
@@ -44,6 +46,7 @@ export function readPreviewScenario(searchParams = readPreviewSearchParams()): P
   if (raw === PreviewScenario.Error) return PreviewScenario.Error;
   if (raw === PreviewScenario.Loading) return PreviewScenario.Loading;
   if (raw === PreviewScenario.Coding) return PreviewScenario.Coding;
+  if (raw === PreviewScenario.Site) return PreviewScenario.Site;
   return PreviewScenario.Default;
 }
 
