@@ -298,6 +298,7 @@ test.skipIf(!dotnetAvailable)(
         'WindowsShellLink.cs',
         'UninstallerEngine.cs',
         'SetupOperation.cs',
+        'WindowFit.cs',
       ];
       fs.writeFileSync(
         path.join(root, 'Contracts.csproj'),
@@ -579,6 +580,15 @@ try {
     refused = false;
     try { using var stream = new MemoryStream(corrupt); SfxPayload.Locate(stream); } catch (EngineException) { refused = true; }
     Check(refused, "corrupt certificate offset accepted");
+
+    // Laptop panels: the setup window must never exceed the logical work area.
+    Check(WindowFit.Fit(2560, 1440, 1f) == (860, 560), "full desktop should keep the design size");
+    Check(WindowFit.Fit(1920, 1080, 1.5f) == (860, 560), "1920x1080 at 150% should keep the design size");
+    Check(WindowFit.Fit(1280, 720, 1.5f) == (821, 448), "1280x720 at 150% should shrink to the work area");
+    Check(WindowFit.Fit(1366, 768, 2f) == (651, 352), "1366x768 at 200% should shrink below the minimum");
+    Check(WindowFit.Fit(1024, 600, 1f) == (860, 560), "small desktop should keep the design size");
+    var tight = WindowFit.Fit(800, 480, 1f);
+    Check(tight.Width <= 800 - WindowFit.EdgeMargin && tight.Height <= 480 - WindowFit.EdgeMargin, "fitting overflowed the work area");
     Console.WriteLine("PASS: transaction recovery, retention, path guards");
 } finally { Directory.Delete(root, recursive: true); }
 sealed class ContractProgress(Action<EngineEvent> report) : IProgress<EngineEvent> {
