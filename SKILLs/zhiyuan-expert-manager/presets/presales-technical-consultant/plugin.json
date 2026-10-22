@@ -11,7 +11,7 @@
 
   "agents": ["./agents/presales-technical-consultant.md"],
   "skills": ["./skills/presales-technical-consulting"],
-  "skillIds": ["web-search", "docx", "xlsx", "pptx", "pdf"],
+  "skillIds": ["web-search", "docx", "xlsx", "presentation-studio", "pdf"],
 
   "displayName": {
     "en": "Presales Technical Consultant",
