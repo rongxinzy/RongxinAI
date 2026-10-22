@@ -141,3 +141,6 @@ bench-results/
 
 # Local model marketplace cache created by tests/dev runs
 /marketplace-cache/
+SKILLs/docx/runtime/
+SKILLs/docx/scripts/dotnet/**/bin/
+SKILLs/docx/scripts/dotnet/**/obj/

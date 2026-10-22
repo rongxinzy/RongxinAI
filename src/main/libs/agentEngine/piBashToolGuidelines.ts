@@ -53,7 +53,8 @@ export const normalizePiBashTimeoutSeconds = (timeout: unknown): number => {
  * Work-package G re-evaluation (2026-10): KEEP this gate. It is narrow —
  * only a `python`/`python3` invocation referencing the Skills root is
  * blocked — and it protects a real failure mode, not a style rule: bundled
- * Skill scripts depend on the shared dependency layer and the
+ * Skill scripts depend on the shared dependency layer (office/PDF core; heavier
+ * Skill dependencies install on demand into a per-Skill overlay) and the
  * run_skill_script harness (requirements manifest gate, timeouts, output
  * caps); a bare-shell invocation burns a turn on missing-dependency errors
  * after the fact. General shell python stays untouched.

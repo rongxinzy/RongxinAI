@@ -120,7 +120,7 @@
     "build:skill:web-search": "npm install --prefix SKILLs/web-search && node SKILLs/web-search/node_modules/typescript/bin/tsc -p SKILLs/web-search/tsconfig.json && node -e \"const fs=require('fs');['.connection','.server.log','.server.pid'].forEach(f=>{try{fs.unlinkSync('SKILLs/web-search/'+f)}catch(e){}});\"",
     "build:skill:tech-news": "node scripts/build-skill-tech-news.js",
     "build:skill:email": "cd SKILLs/imap-smtp-email && npm install --production",
-    "build:skills": "bun run build:skill:web-search && bun run build:skill:tech-news && bun run build:skill:email",
+    "build:skills": "bun run build:skill:web-search && bun run build:skill:tech-news && bun run build:skill:email && node scripts/build-docx-runtime.cjs",
     "prepare:modelscope-tokens": "node scripts/write-modelscope-token-resource.cjs",
     "prepare:update-release": "node scripts/prepare-update-release.cjs",
     "magpie:build": "node scripts/build-magpie-runtime.cjs",

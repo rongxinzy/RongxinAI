@@ -64,6 +64,12 @@ export function buildPiSkillScriptTool(options: {
           description: 'Arguments passed as an argv array; do not build a shell command string.',
         },
         timeoutMs: { type: 'number', minimum: 1000, maximum: 900000 },
+        confirmDependencyInstall: {
+          type: 'boolean',
+          description:
+            'Set to true only after the user agreed to download a large missing dependency set ' +
+            '(for example the CAD or statistics packages). Small dependency sets install automatically.',
+        },
       },
       required: ['skillId', 'script'],
       additionalProperties: false,
@@ -91,6 +97,7 @@ export function buildPiSkillScriptTool(options: {
         workspaceRoot: options.workspaceRoot,
         skillsRoot: options.skillRoots?.[skillId],
         timeoutMs: typeof params.timeoutMs === 'number' ? params.timeoutMs : undefined,
+        confirmDependencyInstall: params.confirmDependencyInstall === true,
         signal,
       });
       // Pi marks a normally resolved custom tool as successful, even with ok:false.

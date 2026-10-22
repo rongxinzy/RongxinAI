@@ -3,18 +3,23 @@ import * as fs from 'fs';
 import { formatFromPath, toMarkdown } from '@firecrawl/anydoc';
 
 import { resolveWorkspaceFile } from '../../workbenchTask/artifactCollector';
+import { isOcrSupported } from '../../ocr/ocrEngine';
+import { ocrPdf } from '../../ocr/pdfOcr';
 
 export const PiDocumentReaderToolName = 'read_document';
 export const PiDocumentReaderSystemPrompt = [
   '## Local document reading',
   '',
   '- Use `read_document` for Office, PDF, EPUB, RTF, or CSV files in the workspace when their content is needed.',
-  '- It returns local, structured Markdown. For scanned or image-only PDFs, explain that OCR is not available and use an appropriate fallback.',
+  '- It returns local, structured Markdown. A PDF whose pages have no text layer is automatically re-read with local OCR; the result marks the source.',
+  '- OCR text has no layout: do not describe colors, fonts, or chart shapes from it.',
   '- Use the normal read tool for plain text and source-code files.',
 ].join('\n');
 
 const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 const MAX_MARKDOWN_CHARS = 1_000_000;
+/** Below this many non-whitespace characters a PDF is treated as image-only. */
+const SCANNED_PDF_TEXT_THRESHOLD = 80;
 
 type DocumentReaderToolResult = {
   content: Array<{ type: 'text'; text: string }>;
@@ -31,7 +36,7 @@ export function buildPiDocumentReaderTool(options: {
     label: 'Read Document',
     description:
       'Read a workspace Office document, PDF, EPUB, RTF, or CSV file as structured Markdown. ' +
-      'The conversion is local and read-only; scanned or image-only PDFs require OCR and are not supported.',
+      'The conversion is local and read-only. A PDF without a text layer is re-read with local OCR.',
     parameters: {
       type: 'object',
       properties: {
@@ -94,6 +99,45 @@ export function buildPiDocumentReaderTool(options: {
 
       try {
         const markdown = await toMarkdown(filePath);
+        const plainLength = markdown.replace(/\s+/g, '').length;
+        const isPdf = filePath.toLowerCase().endsWith('.pdf');
+        if (isPdf && plainLength < SCANNED_PDF_TEXT_THRESHOLD && isOcrSupported()) {
+          // The PDF has no usable text layer: rasterize and OCR it instead of
+          // handing the model an empty document.
+          try {
+            const ocr = await ocrPdf(filePath, { maxPages: 20 });
+            const body = ocr.pages
+              .map(page => `## Page ${page.page}\n${page.text.trim() || '(no text recognized)'}`)
+              .join('\n\n');
+            if (body.replace(/\s+/g, '').length > 0) {
+              const truncated = body.length > MAX_MARKDOWN_CHARS;
+              const output = truncated ? body.slice(0, MAX_MARKDOWN_CHARS) : body;
+              const header = [
+                `Document: ${requestedPath}`,
+                'Format: PDF (scanned; text extracted with local OCR)',
+                `Pages: ${ocr.renderedCount}/${ocr.pageCount}${ocr.truncated ? ' (page limit reached)' : ''}`,
+                '',
+              ].join('\n');
+              return {
+                content: [{ type: 'text', text: `${header}\n${output}` }],
+                details: {
+                  path: requestedPath,
+                  format: format ?? 'pdf',
+                  bytes: stat.size,
+                  source: 'ocr',
+                  pages: ocr.renderedCount,
+                  pageCount: ocr.pageCount,
+                  truncated,
+                },
+              };
+            }
+          } catch (error) {
+            console.warn(
+              '[document-reader] OCR fallback failed:',
+              error instanceof Error ? error.message : String(error),
+            );
+          }
+        }
         const truncated = markdown.length > MAX_MARKDOWN_CHARS;
         const output = truncated ? markdown.slice(0, MAX_MARKDOWN_CHARS) : markdown;
         const header = [

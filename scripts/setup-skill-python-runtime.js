@@ -17,12 +17,36 @@ const { finalizeWindowsSkillPython } = require('./setup-windows-skill-python.cjs
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const SKILLS_ROOT = path.join(PROJECT_ROOT, 'SKILLs');
 const RUNTIME_ROOT = path.join(PROJECT_ROOT, 'resources', 'skill-python');
-const MANIFEST_VERSION = 2;
+const MANIFEST_VERSION = 3;
 const SHARED_ENVIRONMENT_NAME = 'shared';
+const LAYER_ID = 'shared';
 const LAYERS_DIRECTORY_NAME = 'layers';
 const SKILLS_DIRECTORY_NAME = 'skills';
 const LOCKS_DIRECTORY_NAME = 'locks';
 const SHARED_LOCK_FILE_NAME = 'shared.txt';
+const PRESET_DIRECTORY_NAME = 'presets';
+const DELTA_LOCK_SUFFIX = '.delta';
+
+/**
+ * Skills whose dependencies ship inside the offline layer. Everything else is
+ * installed on demand into a per-Skill overlay directory, because a single
+ * opt-in preset (text-to-cad) otherwise pulls 865 MB into every installer.
+ *
+ * Adding a Skill here means its whole closure is extracted on every install and
+ * every component version retained on disk, so keep this list to the
+ * productivity core: Office + PDF + OCR support and the small audit/teaching
+ * tooling that is cheap to carry.
+ */
+const CORE_SKILL_IDS = new Set([
+  'xlsx',
+  'pdf',
+  'zhiyuan-expert-manager',
+  'code-safety-audit',
+  'programming-tutor',
+  'database-inspector',
+  'sql-tutor',
+  'py-perf-analyzer',
+]);
 
 const IMPORT_NAME_OVERRIDES = {
   pillow: 'PIL',
@@ -110,6 +134,80 @@ function listRequirementFiles(skillsRoot = SKILLS_ROOT) {
     (left, right) =>
       left.skillId.localeCompare(right.skillId) || left.skillDir.localeCompare(right.skillDir),
   );
+}
+
+/** Preset Skills are opt-in: their requirements must never enter the offline layer. */
+function isPresetSkillDir(skillDir) {
+  return skillDir.split(/[\\/]/).includes(PRESET_DIRECTORY_NAME);
+}
+
+/**
+ * The subset of declared requirements that ships offline. Anything not listed in
+ * CORE_SKILL_IDS (or living under a preset) is resolved on demand at runtime.
+ */
+function selectCoreRequirements(requirements) {
+  return requirements.filter(
+    entry => CORE_SKILL_IDS.has(entry.skillId) && !isPresetSkillDir(entry.skillDir),
+  );
+}
+
+/** Parse a uv-compiled lock into `{ name: version }` (lowercase, normalized names). */
+function parseLockedPackages(lockText) {
+  const packages = new Map();
+  let currentName = null;
+  let currentVersion = null;
+  const flush = () => {
+    if (currentName && currentVersion) packages.set(currentName, currentVersion);
+    currentName = null;
+    currentVersion = null;
+  };
+  for (const line of lockText.split(/\r?\n/)) {
+    const match = line.match(/^([A-Za-z0-9_.-]+)==(\S+)/);
+    if (match) {
+      flush();
+      currentName = match[1].toLowerCase().replace(/[-.]+/g, '_');
+      currentVersion = match[2].replace(/\\$/, '').trim();
+      continue;
+    }
+    if (/^[A-Za-z0-9_.-]+\s*(===|@|=)/.test(line)) flush();
+  }
+  flush();
+  return packages;
+}
+
+/**
+ * Rewrite a Skill lock as the delta the overlay must install on top of the
+ * offline layer: packages already present at the same version are dropped;
+ * same-name/different-version entries stay so a Skill can shadow the core.
+ */
+function buildDeltaLock(skillLockText, corePackages) {
+  const blocks = [];
+  let current = null;
+  for (const line of skillLockText.split(/\r?\n/)) {
+    const header = line.match(/^([A-Za-z0-9_.-]+)==(\S+)/);
+    if (header) {
+      if (current) blocks.push(current);
+      current = {
+        name: header[1].toLowerCase().replace(/[-.]+/g, '_'),
+        version: header[2].replace(/\\$/, '').trim(),
+        lines: [line],
+      };
+      continue;
+    }
+    if (!current) continue; // uv command header / standalone comment
+    if (line.trim() === '') {
+      blocks.push(current);
+      current = null;
+      continue;
+    }
+    current.lines.push(line);
+  }
+  if (current) blocks.push(current);
+
+  const kept = blocks
+    .filter(block => corePackages.get(block.name) !== block.version)
+    .map(block => block.lines.join('\n'));
+  return `${kept.join('\n')}\n`;
 }
 
 function listSkillDirectories(skillsRoot) {
@@ -437,16 +535,19 @@ function getUvVersion(uvPath) {
   return `${result.stdout || result.stderr || ''}`.trim();
 }
 
-function expectedManifest(entry, platform, arch, pythonVersion, uvVersion) {
+function expectedManifest(entry, context) {
+  const coreCovered = context.coreSkillIds.has(entry.skillId);
   return {
     version: MANIFEST_VERSION,
     skillId: entry.skillId,
-    platform,
-    arch,
+    platform: context.platform,
+    arch: context.arch,
     requirementsSha256: sha256File(entry.requirementsPath),
-    layerIds: [SHARED_ENVIRONMENT_NAME],
-    pythonVersion,
-    uvVersion,
+    layerIds: [LAYER_ID],
+    coverage: coreCovered ? 'core' : 'overlay',
+    delta: coreCovered ? null : context.deltaMetadata(entry.skillId),
+    pythonVersion: context.pythonVersion,
+    uvVersion: context.uvVersion,
   };
 }
 
@@ -494,10 +595,51 @@ function manifestMatches(manifest, expected) {
   );
 }
 
+function deltaLockPath(runtimeRoot, skillId) {
+  return path.join(runtimeRoot, LOCKS_DIRECTORY_NAME, `${skillId}${DELTA_LOCK_SUFFIX}.txt`);
+}
+
+/**
+ * Rewrite every Skill lock as a delta against the offline layer and describe it
+ * in the manifest, so the runtime knows both what is missing and how much it is.
+ */
+function writeDeltaLocks(runtimeRoot, requirements, corePackages) {
+  const metadata = new Map();
+  for (const entry of requirements) {
+    const fullLockPath = path.join(runtimeRoot, LOCKS_DIRECTORY_NAME, `${entry.skillId}.txt`);
+    if (!fs.existsSync(fullLockPath)) continue;
+    const deltaText = buildDeltaLock(fs.readFileSync(fullLockPath, 'utf8'), corePackages);
+    const deltaPath = deltaLockPath(runtimeRoot, entry.skillId);
+    fs.writeFileSync(deltaPath, deltaText, 'utf8');
+    const packages = [...parseLockedPackages(deltaText).keys()].sort();
+    metadata.set(entry.skillId, {
+      lockFile: path.basename(deltaPath),
+      sha256: sha256File(deltaPath),
+      packageCount: packages.length,
+      packages,
+    });
+  }
+  return metadata;
+}
+
+/** Drop build-only payload (C headers, Tcl/Tk) that no Skill script can import. */
+function pruneLayerForRuntime(sharedRoot) {
+  for (const relative of [
+    path.join('include'),
+    path.join('tcl'),
+    path.join('Scripts', 'include'),
+    path.join('Scripts', 'tcl'),
+  ]) {
+    fs.rmSync(path.join(sharedRoot, relative), { recursive: true, force: true });
+  }
+}
+
 function checkSkillPythonRuntimeHealth(options = {}) {
   const platform = normalizePlatform(options.platform);
   const arch = options.arch || process.arch;
   const requirements = listRequirementFiles(options.skillsRoot || SKILLS_ROOT);
+  const coreRequirements = selectCoreRequirements(requirements);
+  const coreSkillIds = new Set(coreRequirements.map(entry => entry.skillId));
   const environments = [];
   const declarations = validateSkillDependencyDeclarations(options.skillsRoot || SKILLS_ROOT);
   const missing = [...declarations.missing];
@@ -524,17 +666,18 @@ function checkSkillPythonRuntimeHealth(options = {}) {
   if (!fs.existsSync(sharedLock)) missing.push('shared: requirements lock');
   if (!isEnvironmentRelocatable(sharedRoot)) missing.push('shared: relocatable symlinks');
 
-  const allImports = [
-    ...new Set(requirements.flatMap(entry => parseImportNames(entry.requirementsPath))),
+  // Only the offline layer's packages are probed: overlay Skills are installed on
+  // demand, so their imports must not fail the packaged layer's health check.
+  const coreImports = [
+    ...new Set(coreRequirements.flatMap(entry => parseImportNames(entry.requirementsPath))),
   ];
   const combinedProbe =
-    pythonPath && allImports.length > 0
-      ? probePython(pythonPath, allImports)
+    pythonPath && coreImports.length > 0
+      ? probePython(pythonPath, coreImports)
       : { ok: true, detail: '' };
 
   for (const entry of requirements) {
     const environmentRoot = skillManifestRoot(runtimeRoot, entry.skillId);
-    const importNames = parseImportNames(entry.requirementsPath);
     const manifest = readManifest(environmentRoot);
     const requirementsSha256 = sha256File(entry.requirementsPath);
     const entryMissing = [];
@@ -548,9 +691,16 @@ function checkSkillPythonRuntimeHealth(options = {}) {
     ) {
       entryMissing.push('matching runtime.json');
     }
-    if (pythonPath && !combinedProbe.ok) {
-      const probe = probePython(pythonPath, importNames);
-      if (!probe.ok) entryMissing.push(`imports (${probe.detail || 'probe failed'})`);
+    if (coreSkillIds.has(entry.skillId)) {
+      if (manifest?.coverage !== 'core') entryMissing.push('core coverage');
+      if (pythonPath && !combinedProbe.ok) {
+        const probe = probePython(pythonPath, parseImportNames(entry.requirementsPath));
+        if (!probe.ok) entryMissing.push(`imports (${probe.detail || 'probe failed'})`);
+      }
+    } else if (manifest?.coverage !== 'overlay') {
+      entryMissing.push('overlay coverage');
+    } else if (!fs.existsSync(deltaLockPath(runtimeRoot, entry.skillId))) {
+      entryMissing.push('delta lock');
     }
     if (entryMissing.length > 0) {
       missing.push(`${entry.skillId}: ${entryMissing.join(', ')}`);
@@ -558,7 +708,8 @@ function checkSkillPythonRuntimeHealth(options = {}) {
     environments.push({
       skillId: entry.skillId,
       environmentRoot,
-      pythonPath,
+      pythonPath: coreSkillIds.has(entry.skillId) ? pythonPath : null,
+      coverage: coreSkillIds.has(entry.skillId) ? 'core' : 'overlay',
       missing: entryMissing,
     });
   }
@@ -597,6 +748,9 @@ async function ensureSkillPythonRuntimes(options = {}) {
   const runtimeRoot = options.runtimeRoot || RUNTIME_ROOT;
   const sharedLock = sharedLockPath(runtimeRoot);
   const requirements = listRequirementFiles(skillsRoot);
+  const coreRequirements = selectCoreRequirements(requirements);
+  const coreSkillIds = new Set(coreRequirements.map(entry => entry.skillId));
+  const overlayRequirements = requirements.filter(entry => !coreSkillIds.has(entry.skillId));
   const lockPaths = requirements.map(entry =>
     path.join(runtimeRoot, LOCKS_DIRECTORY_NAME, `${entry.skillId}.txt`),
   );
@@ -609,6 +763,9 @@ async function ensureSkillPythonRuntimes(options = {}) {
   if (requirements.length === 0) {
     return { ok: true, skipped: true, environments: [] };
   }
+  if (coreRequirements.length === 0) {
+    throw new Error('No Skill is selected for the offline layer; check CORE_SKILL_IDS.');
+  }
 
   const base = await resolveBaseRuntime(platform, arch);
   if (!base.uvPath || !base.pythonPath) {
@@ -619,7 +776,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
   const uvVersion = getUvVersion(base.uvPath);
   const sharedRoot = sharedEnvironmentRoot(runtimeRoot);
   const sharedExpected = expectedSharedManifest(
-    requirements,
+    coreRequirements,
     platform,
     arch,
     pythonVersion,
@@ -631,8 +788,8 @@ async function ensureSkillPythonRuntimes(options = {}) {
   // runtime roots the copy inside the helper fails softly and the health
   // check below reports the missing alias.
   ensureWindowsPython3Alias(sharedRoot, platform);
-  const allImports = [
-    ...new Set(requirements.flatMap(entry => parseImportNames(entry.requirementsPath))),
+  const coreImports = [
+    ...new Set(coreRequirements.flatMap(entry => parseImportNames(entry.requirementsPath))),
   ];
   const healthyExistingLayer =
     existingPython &&
@@ -640,13 +797,16 @@ async function ensureSkillPythonRuntimes(options = {}) {
     manifestMatches(readManifest(sharedRoot), sharedExpected) &&
     fs.existsSync(sharedLock) &&
     lockPaths.every(lockPath => fs.existsSync(lockPath)) &&
-    probePython(existingPython, allImports).ok;
+    overlayRequirements.every(entry => fs.existsSync(deltaLockPath(runtimeRoot, entry.skillId))) &&
+    probePython(existingPython, coreImports).ok;
 
   if (!healthyExistingLayer) {
     fs.rmSync(runtimeRoot, { recursive: true, force: true });
     fs.mkdirSync(runtimeRoot, { recursive: true });
     fs.mkdirSync(path.join(runtimeRoot, LOCKS_DIRECTORY_NAME), { recursive: true });
-    console.log('[setup-skill-python-runtime] creating shared relocatable dependency layer');
+    console.log(
+      `[setup-skill-python-runtime] creating shared dependency layer for ${coreRequirements.length} offline Skill(s)`,
+    );
     run(
       base.uvPath,
       [
@@ -655,7 +815,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
         '--generate-hashes',
         '--output-file',
         sharedLock,
-        ...requirements.map(entry => entry.requirementsPath),
+        ...coreRequirements.map(entry => entry.requirementsPath),
       ],
       { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } },
     );
@@ -708,6 +868,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
     finalizeWindowsSkillPython(sharedRoot, base.pythonPath, platform);
     rebaseEnvironmentSymlinks(sharedRoot, base.pythonPath);
     ensureWindowsPython3Alias(sharedRoot, platform);
+    pruneLayerForRuntime(sharedRoot);
     fs.writeFileSync(
       path.join(sharedRoot, 'runtime.json'),
       `${JSON.stringify(sharedExpected, null, 2)}\n`,
@@ -715,16 +876,31 @@ async function ensureSkillPythonRuntimes(options = {}) {
     );
   }
 
+  const corePackages = parseLockedPackages(fs.readFileSync(sharedLock, 'utf8'));
+  const deltaMetadata = writeDeltaLocks(runtimeRoot, requirements, corePackages);
+  const context = {
+    platform,
+    arch,
+    pythonVersion,
+    uvVersion,
+    coreSkillIds,
+    deltaMetadata: skillId => deltaMetadata.get(skillId) || null,
+  };
+
   for (const entry of requirements) {
     const environmentRoot = skillManifestRoot(runtimeRoot, entry.skillId);
-    const expected = expectedManifest(entry, platform, arch, pythonVersion, uvVersion);
+    const expected = expectedManifest(entry, context);
     fs.mkdirSync(environmentRoot, { recursive: true });
     fs.writeFileSync(
       path.join(environmentRoot, 'runtime.json'),
       `${JSON.stringify(expected, null, 2)}\n`,
       'utf8',
     );
-    console.log(`[setup-skill-python-runtime] ${entry.skillId}: linked to shared layer`);
+    console.log(
+      expected.coverage === 'core'
+        ? `[setup-skill-python-runtime] ${entry.skillId}: bundled with the shared layer`
+        : `[setup-skill-python-runtime] ${entry.skillId}: on-demand (${expected.delta?.packageCount ?? 0} packages)`,
+    );
   }
 
   if (healthyExistingLayer) {
@@ -734,7 +910,8 @@ async function ensureSkillPythonRuntimes(options = {}) {
       environments: requirements.map(entry => ({
         skillId: entry.skillId,
         environmentRoot: skillManifestRoot(runtimeRoot, entry.skillId),
-        pythonPath: existingPython,
+        pythonPath: coreSkillIds.has(entry.skillId) ? existingPython : null,
+        coverage: coreSkillIds.has(entry.skillId) ? 'core' : 'overlay',
         missing: [],
       })),
     };
@@ -766,18 +943,25 @@ if (require.main === module) {
 }
 
 module.exports = {
+  CORE_SKILL_IDS,
   RUNTIME_ROOT,
+  buildDeltaLock,
   buildProbeCode,
   checkSkillPythonRuntimeHealth,
+  deltaLockPath,
   describeProbeFailure,
   ensureSkillPythonRuntimes,
   ensureWindowsPython3Alias,
+  isPresetSkillDir,
   listRequirementFiles,
   normalizePlatform,
   parseImportNames,
+  parseLockedPackages,
   probePython,
+  pruneLayerForRuntime,
   pythonExecutableForEnvironment,
   rebaseEnvironmentSymlinks,
+  selectCoreRequirements,
   sharedLockPath,
   validateSkillDependencyDeclarations,
 };

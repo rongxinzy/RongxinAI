@@ -273,6 +273,30 @@ describe.skipIf(process.platform !== 'win32')('post-install cleanup on Windows',
     }
   });
 
+  test('reclaims a stale version whose files sit past MAX_PATH', () => {
+    const data = fixture();
+    const component = path.join(data.runtimeRoot, 'skill-python');
+    const oldId = 'd'.repeat(64);
+    const oldVersion = path.join(component, oldId);
+    // Skill layers legitimately contain very deep paths (jedi typeshed stubs,
+    // OCP .libs). The PowerShell provider reports those as missing, which used
+    // to abort cleanup with exit code 1 and leave every old version behind.
+    const deep = path.join(
+      oldVersion,
+      ...Array.from({ length: 5 }, () => 'segment'.padEnd(40, 'x')),
+    );
+    fs.mkdirSync(deep, { recursive: true });
+    const deepFile = path.join(deep, 'deep-artifact.dll');
+    expect(deepFile.length).toBeGreaterThan(260);
+    fs.writeFileSync(deepFile, 'deep');
+    fs.writeFileSync(path.join(oldVersion, '.complete'), `${oldId}|archive|1|10`);
+
+    const result = runCleanup(data);
+
+    expect(result.status, result.stderr || result.stdout).toBe(0);
+    expect(fs.existsSync(oldVersion)).toBe(false);
+  });
+
   test('rejects retired manifest keys before scheduling backup deletion', () => {
     const data = fixture();
     const backup = `${data.installDir}.old.${backupId}`;

@@ -77,7 +77,7 @@ describe('verifyWindowsPackagedComponents', () => {
         contentId: 'a'.repeat(64),
         archive: 'channel-runtime.7z',
         archiveFormat: '7z',
-        archiveCompression: 'lzma2-mx9-nonsolid-v1',
+        archiveCompression: 'lzma2-mx5-nonsolid-v1',
         archiveSha256,
         archiveSizeBytes: fs.statSync(archivePath).size,
         sentinelSha256: checksum,
