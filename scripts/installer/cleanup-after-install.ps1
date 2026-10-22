@@ -83,26 +83,40 @@ if ($backup -and (Test-Path -LiteralPath $OldInstallPathFile)) {
   }
 }
 
-# Every recursive step checks for links before enumerating. This also protects
-# nested junctions (not just the former resources/mingit link) and avoids the
-# PowerShell 5.1 recursive removal behavior on directory junctions.
+# Every recursive step checks for links before enumerating. Component versions
+# routinely contain paths past MAX_PATH (jedi/typeshed stubs, OCP .libs), and the
+# PowerShell provider reports those as missing, so walk and delete through .NET
+# APIs on a \\?\ long path. Both helpers live inside the script block because the
+# slow-disk worker embeds this text verbatim.
 $deleteTree = {
+  function ConvertTo-LongPath([string]$Path) {
+    if ($Path.StartsWith('\\?\')) { return $Path }
+    if ($Path.StartsWith('\\')) { return '\\?\UNC\' + $Path.Substring(2) }
+    return '\\?\' + $Path
+  }
+
   function Remove-TreeWithoutFollowingLinks([string]$Path) {
-    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
-    if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-      if ($item.PSIsContainer) { [IO.Directory]::Delete($item.FullName) }
-      else { [IO.File]::Delete($item.FullName) }
+    $long = ConvertTo-LongPath $Path
+    if ([IO.Directory]::Exists($long)) {
+      if (([IO.File]::GetAttributes($long) -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+        [IO.Directory]::Delete($long)
+        return
+      }
+      foreach ($child in [IO.Directory]::GetFileSystemEntries($long)) {
+        Remove-TreeWithoutFollowingLinks $child
+      }
+      [IO.Directory]::Delete($long)
       return
     }
-    if ($item.PSIsContainer) {
-      foreach ($child in @(Get-ChildItem -LiteralPath $item.FullName -Force -ErrorAction Stop)) {
-        Remove-TreeWithoutFollowingLinks $child.FullName
-      }
-      [IO.Directory]::Delete($item.FullName)
-    } else {
-      if ($item.IsReadOnly) { $item.IsReadOnly = $false }
-      [IO.File]::Delete($item.FullName)
+    if (-not [IO.File]::Exists($long)) { return }
+    if (([IO.File]::GetAttributes($long) -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+      [IO.File]::Delete($long)
+      return
     }
+    if (([IO.File]::GetAttributes($long) -band [IO.FileAttributes]::ReadOnly) -ne 0) {
+      [IO.File]::SetAttributes($long, [IO.FileAttributes]::Normal)
+    }
+    [IO.File]::Delete($long)
   }
 }
 . $deleteTree
@@ -155,7 +169,13 @@ foreach ($version in @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction 
   if (($completeItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
   $completion = Get-Content -LiteralPath $complete -Raw
   if (-not $completion -or ($completion -split '\|', 2)[0] -cne $version.Name) { continue }
-  Remove-TreeWithoutFollowingLinks $version.FullName
+  # One locked file must not abort the remaining versions (nor fail the install):
+  # report it and keep reclaiming the rest.
+  try {
+    Remove-TreeWithoutFollowingLinks $version.FullName
+  } catch {
+    [Console]::Error.WriteLine("cleanup: could not reclaim $($version.Name): $($_.Exception.Message)")
+  }
 }
 
 }
