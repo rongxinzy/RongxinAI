@@ -19,11 +19,11 @@ function fixture() {
   fs.mkdirSync(resources, { recursive: true });
   fs.mkdirSync(path.join(runtimeRoot, 'skill-python', currentId), { recursive: true });
   fs.mkdirSync(path.join(runtimeRoot, 'uv', currentId), { recursive: true });
-  fs.writeFileSync(path.join(runtimeRoot, 'uv', currentId, '.complete'), `${currentId}|archive|1|10`);
   fs.writeFileSync(
-    path.join(runtimeRoot, 'uv', currentId, 'keep.txt'),
-    'component payload',
+    path.join(runtimeRoot, 'uv', currentId, '.complete'),
+    `${currentId}|archive|1|10`,
   );
+  fs.writeFileSync(path.join(runtimeRoot, 'uv', currentId, 'keep.txt'), 'component payload');
   return { root, installDir, runtimeRoot, resources };
 }
 
@@ -56,10 +56,7 @@ describe.skipIf(process.platform !== 'win32')('uninstall component cleanup', () 
   test('reclaims a version whose files sit past MAX_PATH', () => {
     const data = fixture();
     const version = path.join(data.runtimeRoot, 'skill-python', staleId);
-    const deep = path.join(
-      version,
-      ...Array.from({ length: 5 }, () => 'segment'.padEnd(40, 'x')),
-    );
+    const deep = path.join(version, ...Array.from({ length: 5 }, () => 'segment'.padEnd(40, 'x')));
     fs.mkdirSync(deep, { recursive: true });
     const deepFile = path.join(deep, 'deep-artifact.dll');
     expect(deepFile.length).toBeGreaterThan(260);
