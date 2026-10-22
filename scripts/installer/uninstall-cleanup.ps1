@@ -28,22 +28,37 @@ foreach ($prefix in $prefixes) {
   }
 }
 
+# Component versions routinely contain paths past MAX_PATH (jedi typeshed stubs,
+# OCP .libs), and the PowerShell provider reports those as missing, which aborted
+# this script halfway and left a partially deleted cache behind.
+function ConvertTo-LongPath([string]$Path) {
+  if ($Path.StartsWith('\\?\')) { return $Path }
+  if ($Path.StartsWith('\\')) { return '\\?\UNC\' + $Path.Substring(2) }
+  return '\\?\' + $Path
+}
+
 function Remove-TreeWithoutFollowingLinks([string]$Path) {
-  $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
-  if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
-    if ($item.PSIsContainer) { [IO.Directory]::Delete($item.FullName) }
-    else { [IO.File]::Delete($item.FullName) }
+  $long = ConvertTo-LongPath $Path
+  if ([IO.Directory]::Exists($long)) {
+    if (([IO.File]::GetAttributes($long) -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+      [IO.Directory]::Delete($long)
+      return
+    }
+    foreach ($child in [IO.Directory]::GetFileSystemEntries($long)) {
+      Remove-TreeWithoutFollowingLinks $child
+    }
+    [IO.Directory]::Delete($long)
     return
   }
-  if ($item.PSIsContainer) {
-    foreach ($child in @(Get-ChildItem -LiteralPath $item.FullName -Force)) {
-      Remove-TreeWithoutFollowingLinks $child.FullName
-    }
-    [IO.Directory]::Delete($item.FullName)
-  } else {
-    if ($item.IsReadOnly) { $item.IsReadOnly = $false }
-    [IO.File]::Delete($item.FullName)
+  if (-not [IO.File]::Exists($long)) { return }
+  if (([IO.File]::GetAttributes($long) -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    [IO.File]::Delete($long)
+    return
   }
+  if (([IO.File]::GetAttributes($long) -band [IO.FileAttributes]::ReadOnly) -ne 0) {
+    [IO.File]::SetAttributes($long, [IO.FileAttributes]::Normal)
+  }
+  [IO.File]::Delete($long)
 }
 foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv', 'llamacpp-bundled')) {
   $root = Join-Path $RuntimeRoot $key
@@ -63,6 +78,10 @@ foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python'
     if (-not (Test-Path -LiteralPath $complete -PathType Leaf)) { continue }
     if (((Get-Item -LiteralPath $complete -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
     if (((Get-Content -LiteralPath $complete -Raw) -split '\|', 2)[0] -cne $version.Name) { continue }
+    # Drop the completion marker first: if this deletion is interrupted (locked
+    # file, power loss) the next install must treat the version as incomplete and
+    # re-extract it instead of linking a half-deleted tree.
+    [IO.File]::Delete((ConvertTo-LongPath $complete))
     Remove-TreeWithoutFollowingLinks $version.FullName
   }
 }
