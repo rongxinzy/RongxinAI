@@ -28,8 +28,18 @@ case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) OS="windows-shell" ;;
 esac
 
-# --- Full pipeline: .NET SDK ---
-if ! command -v dotnet &>/dev/null; then
+# --- Full pipeline: bundled self-contained CLI, then .NET SDK ---
+BUNDLED_CLI="$PROJECT_DIR/runtime/MiniMaxAIDocx.Cli.exe"
+[ -x "$BUNDLED_CLI" ] || BUNDLED_CLI="$PROJECT_DIR/runtime/MiniMaxAIDocx.exe"
+RUNTIME_AVAILABLE=false
+if [ -x "$BUNDLED_CLI" ]; then
+    RUNTIME_AVAILABLE=true
+    printf "[OK]      %-14s %s\n" "docx cli" "bundled self-contained runtime"
+fi
+
+if $RUNTIME_AVAILABLE; then
+    printf "[SKIP]    %-14s not required with the bundled runtime\n" "dotnet"
+elif ! command -v dotnet &>/dev/null; then
     printf "[WARN]    %-14s not found (bundled Markdown fallback can still create simple DOCX files)\n" "dotnet"
     echo ""
     echo "  .NET SDK is REQUIRED. Install it:"
@@ -62,7 +72,9 @@ else
 fi
 
 # --- Critical: NuGet packages ---
-if [ -d "$DOTNET_DIR" ]; then
+if $RUNTIME_AVAILABLE; then
+    printf "[SKIP]    %-14s not needed with the bundled runtime\n" "OpenXML project"
+elif [ -d "$DOTNET_DIR" ]; then
     if ! $DOTNET_AVAILABLE; then
         printf "[SKIP]    %-14s requires .NET 8+ (bundled Markdown fallback remains available)\n" "OpenXML project"
     elif [ -f "$DOTNET_DIR/MiniMaxAIDocx.Cli/bin/Debug/net10.0/MiniMaxAIDocx.Cli.dll" ] || \

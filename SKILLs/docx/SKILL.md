@@ -83,8 +83,12 @@ mainPart.Document = new Document(new Body());
 
 All CLI commands below use `$CLI` as shorthand for:
 ```bash
-dotnet run --project scripts/dotnet/MiniMaxAIDocx.Cli --
+bash scripts/cli.sh
 ```
+
+`cli.sh` prefers the bundled self-contained runtime (`runtime/MiniMaxAIDocx.Cli.exe`, needs no
+.NET installed) and falls back to `dotnet run` on developer machines. Inside ZhiYuan, run it
+through `run_skill_script` like any other bundled script.
 
 ## Pipeline routing
 
