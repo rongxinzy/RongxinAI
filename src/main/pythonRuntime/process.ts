@@ -76,8 +76,7 @@ export async function runProcess(
         return;
       }
       try {
-        if (process.platform === 'win32')
-          child.kill(); // Closing the helper's handle kills its Job.
+        if (process.platform === 'win32') child.kill(); // Closing the helper's handle kills its Job.
         else process.kill(-child.pid, 'SIGKILL');
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;

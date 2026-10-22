@@ -77,18 +77,19 @@ process.stdin.on('data', chunk => {
     });
 
     if (terminal) {
-      vi.spyOn(AuthTerminalService.prototype, 'start').mockImplementation(
-        function (this: AuthTerminalService, input) {
-          const event = {
-            id: 'test-terminal',
-            profileId: input.profileId,
-            methodId: input.methodId,
-            workspaceRoot: input.cwd,
-          };
-          queueMicrotask(() => this.emit('exit', { ...event, exitCode: 0 }));
-          return event;
-        },
-      );
+      vi.spyOn(AuthTerminalService.prototype, 'start').mockImplementation(function (
+        this: AuthTerminalService,
+        input,
+      ) {
+        const event = {
+          id: 'test-terminal',
+          profileId: input.profileId,
+          methodId: input.methodId,
+          workspaceRoot: input.cwd,
+        };
+        queueMicrotask(() => this.emit('exit', { ...event, exitCode: 0 }));
+        return event;
+      });
       const completed = new Promise<void>(resolve =>
         service!.once('authTerminalExit', () => resolve()),
       );

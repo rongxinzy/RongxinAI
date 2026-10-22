@@ -344,9 +344,8 @@ export function registerLlamaCppIpcHandlers(
   registerImpl('install', async () =>
     runRuntimeInstall(signal => manager.installRuntime({ signal })),
   );
-  registerImpl(
-    'getRuntimeInstallSnapshot',
-    (): LlamaCppRuntimeInstallSnapshot => runtimeInstallState.snapshot(),
+  registerImpl('getRuntimeInstallSnapshot', (): LlamaCppRuntimeInstallSnapshot =>
+    runtimeInstallState.snapshot(),
   );
   registerImpl('cancelRuntimeInstall', async () => {
     const controller = runtimeInstallController;
