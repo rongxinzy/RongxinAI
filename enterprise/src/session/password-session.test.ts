@@ -289,12 +289,10 @@ describe('Zhiyuan password session', () => {
 
   test('retains authentication after a transport failure while SDK tokens remain valid', async () => {
     const client = mockClient({
-      getSessionState: vi.fn(
-        async (): Promise<AepSessionState> => ({
-          status: 'authenticated',
-          passwordChangeRequired: false,
-        }),
-      ),
+      getSessionState: vi.fn(async (): Promise<AepSessionState> => ({
+        status: 'authenticated',
+        passwordChangeRequired: false,
+      })),
       loginWithPassword: vi.fn(async () => ({ ...tokens(), modelAccessExpiresIn: 0 })),
       refreshSession: vi
         .fn()

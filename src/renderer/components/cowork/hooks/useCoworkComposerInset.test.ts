@@ -41,22 +41,22 @@ afterEach(() => {
 
 test('keeps the conversation inset synchronized with the composer height', async () => {
   vi.stubGlobal('ResizeObserver', TestResizeObserver);
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
-    function (this: HTMLElement) {
-      const height = this.dataset.testid === 'composer' ? 128.4 : 0;
-      return {
-        bottom: height,
-        height,
-        left: 0,
-        right: 0,
-        top: 0,
-        width: 0,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      };
-    },
-  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+    this: HTMLElement,
+  ) {
+    const height = this.dataset.testid === 'composer' ? 128.4 : 0;
+    return {
+      bottom: height,
+      height,
+      left: 0,
+      right: 0,
+      top: 0,
+      width: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    };
+  });
 
   const view = render(React.createElement(Fixture));
   const root = view.getByTestId('root');
