@@ -119,7 +119,66 @@
   body.shell .demo-bar { display: none; }
   body.shell .window { width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
   @media (max-width: 700px) { .page { padding-left: 28px; padding-right: 28px; } .opt-row { flex-wrap: wrap; } .opt-path { flex: 1; max-width: 100%; } }
-  @media (max-height: 480px) { .page-progress, .page-complete, .page-uninstall { justify-content: flex-start; } }
+  /* Laptop panels after display scaling expose ~850x480 or less. Compact the
+     layout stage by stage so every page still fits one panel and the installer
+     never grows an inner scrollbar. */
+  @media (max-height: 620px) {
+    .titlebar { height: 54px; padding: 0 12px 0 24px; }
+    .page { padding: 20px 44px; }
+    .hero-title { font-size: 28px; }
+    .hero-tag { margin-top: 8px; }
+    .options { margin-top: 22px; }
+    .opt-row { padding: 12px 0; }
+    .license-row { margin-top: 14px; }
+    .footer { padding-top: 14px; }
+    .loader { width: 54px; height: 54px; margin-bottom: 20px; }
+    .progress-title, .complete-title, .uninstall-title { font-size: 25px; }
+    .track-wrap { margin-top: 20px; }
+    .tips { margin-top: 20px; min-height: 36px; }
+    .check { width: 56px; height: 56px; margin-bottom: 18px; }
+    .uninstall-icon { width: 50px; height: 50px; margin-bottom: 18px; }
+    .uninstall-desc { margin-top: 10px; line-height: 1.6; }
+  }
+  @media (max-height: 520px) {
+    .titlebar { height: 48px; padding-right: 10px; }
+    .page { padding: 14px 36px 16px; }
+    .hero-title { font-size: 24px; }
+    .hero-tag { font-size: 13px; margin-top: 6px; }
+    .options { margin-top: 14px; }
+    .opt-row { padding: 9px 0; gap: 12px; }
+    .opt-icon { width: 20px; height: 24px; }
+    .opt-path { margin-top: 6px; font-size: 13px; }
+    .license-row { margin-top: 12px; }
+    .footer { padding-top: 12px; }
+    .brand-row img { height: 22px; }
+    .loader { width: 46px; height: 46px; margin-bottom: 14px; }
+    .progress-title, .complete-title, .uninstall-title { font-size: 22px; }
+    .phase { font-size: 13px; margin-top: 6px; min-height: 19px; }
+    .track-wrap { margin-top: 16px; }
+    .track-meta { margin-bottom: 8px; }
+    .tips { margin-top: 16px; min-height: 32px; font-size: 13px; }
+    .check { width: 48px; height: 48px; margin-bottom: 14px; }
+    .complete-sub { margin-top: 8px; }
+    .uninstall-icon { width: 44px; height: 44px; margin-bottom: 14px; }
+    .uninstall-desc { font-size: 13px; }
+    dialog { padding: 20px; }
+    dialog pre { max-height: 48vh; margin: 12px 0; }
+  }
+  @media (max-height: 440px) {
+    .titlebar { height: 44px; }
+    .page { padding: 10px 28px 12px; }
+    .hero-title { font-size: 21px; }
+    .opt-row { padding: 7px 0; }
+    .opt-desc { display: none; }
+    .license-row { margin-top: 10px; }
+    .track-wrap { margin-top: 12px; }
+    .tips { margin-top: 12px; min-height: 28px; }
+    .loader { margin-bottom: 10px; }
+    .check { margin-bottom: 10px; }
+  }
+  /* Centre the status pages on laptop sizes; only the smallest supported panel
+     switches to top alignment so nothing can be clipped. */
+  @media (max-height: 420px) { .page-progress, .page-complete, .page-uninstall { justify-content: flex-start; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
   @media (forced-colors: active) { .window { background: Canvas; } .btn, .checkbox { border: 1px solid ButtonText; } .btn-primary, .checkbox.on, .fill { background: Highlight; color: HighlightText; forced-color-adjust: none; } .btn-primary:disabled { background: Canvas; color: GrayText; border-color: GrayText; } .check .circle { fill: CanvasText; } .check .tick { stroke: Canvas; } }
 </style>

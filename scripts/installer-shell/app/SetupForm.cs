@@ -66,8 +66,8 @@ internal static class Program
 /// </summary>
 public sealed class SetupForm : Form
 {
-    private const int WindowWidth = 860;
-    private const int WindowHeight = 560;
+    private const int WindowWidth = WindowFit.DesignWidth;
+    private const int WindowHeight = WindowFit.DesignHeight;
 
     private readonly WebView2 webView = new();
     private readonly string? capturePreviewPath;
@@ -237,6 +237,7 @@ public sealed class SetupForm : Form
 
         Load += async (_, _) =>
         {
+            FitWindowToWorkArea();
             DebugLog("form load; ensuring CoreWebView2");
             try
             {
@@ -576,6 +577,28 @@ public sealed class SetupForm : Form
         if (lifecycleEvents++ >= 64) return;
         AppendEvent(eventsLogPath, new EngineEvent(Type: "lifecycle", Label: stage,
             Detail: $"operationActive={operationActive}; closeRequested={closeRequested}"));
+    }
+
+    /// <summary>
+    /// 14-inch laptops report less than the design size in logical pixels once
+    /// display scaling is applied (1280x720 at 150% leaves ~853x480). A fixed
+    /// 860x560 client area then exceeds the screen, Windows clamps the window and
+    /// the page grows scrollbars. Fit the client area to the work area instead so
+    /// the UI always renders as one panel; the page has height media queries that
+    /// compact the layout down to this minimum.
+    /// </summary>
+    private void FitWindowToWorkArea()
+    {
+        var screen = Screen.FromControl(this) ?? Screen.PrimaryScreen;
+        if (screen is null) return;
+        var size = WindowFit.Fit(
+            screen.WorkingArea.Width,
+            screen.WorkingArea.Height,
+            DeviceDpi / 96f);
+        if (size.Width == ClientSize.Width && size.Height == ClientSize.Height) return;
+        ClientSize = new Size(size.Width, size.Height);
+        CenterToScreen();
+        RecordLifecycle($"window-fitted-{size.Width}x{size.Height}");
     }
 
     internal void CancelInstall()
