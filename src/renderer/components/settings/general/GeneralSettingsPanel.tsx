@@ -18,8 +18,6 @@ interface GeneralSettingsPanelProps {
   onSqliteAutoBackupEnabledChange: (next: boolean) => void;
   codemodeEnabled: boolean;
   onCodemodeEnabledChange: (next: boolean) => void;
-  mcpNativeBridge: boolean;
-  onMcpNativeBridgeChange: (next: boolean) => void;
 }
 
 export default function GeneralSettingsPanel({
@@ -35,8 +33,6 @@ export default function GeneralSettingsPanel({
   onSqliteAutoBackupEnabledChange,
   codemodeEnabled,
   onCodemodeEnabledChange,
-  mcpNativeBridge,
-  onMcpNativeBridgeChange,
 }: GeneralSettingsPanelProps) {
   return (
     <div className="flex flex-col gap-8">
@@ -81,7 +77,7 @@ export default function GeneralSettingsPanel({
 
       <section className="flex flex-col gap-4">
         <h2 className="text-base font-semibold text-foreground">
-          {i18nService.t('settingsGeneralSectionAgentRuntime')}
+          {i18nService.t('settingsGeneralSectionAdvanced')}
         </h2>
         <FieldGroup className="gap-4">
           <SettingsToggleRow
@@ -89,13 +85,6 @@ export default function GeneralSettingsPanel({
             description={i18nService.t('codemodeEnabledDescription')}
             checked={codemodeEnabled}
             onCheckedChange={onCodemodeEnabledChange}
-          />
-
-          <SettingsToggleRow
-            label={i18nService.t('mcpNativeBridge')}
-            description={i18nService.t('mcpNativeBridgeDescription')}
-            checked={mcpNativeBridge}
-            onCheckedChange={onMcpNativeBridgeChange}
           />
         </FieldGroup>
       </section>

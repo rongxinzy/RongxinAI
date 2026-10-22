@@ -440,9 +440,9 @@ export const enCommon: Record<string, string> = {
   useSystemProxy: 'Use System Proxy',
   useSystemProxyDescription:
     'When enabled, network requests follow system proxy settings (applies immediately)',
-  sqliteAutoBackupEnabled: 'Enable Auto Backup and Recovery',
+  sqliteAutoBackupEnabled: 'Automatic Data Backup & Recovery',
   sqliteAutoBackupEnabledDescription:
-    'When enabled, the app automatically backs up data and tries to restore corrupted data on startup',
+    'Automatically backs up task history, configuration, and memories daily, attempting recovery if data is corrupted',
   taskTemplateSectionTitle: 'Quick Setup',
   taskTemplateSectionDesc: 'Choose a preset template to get started, or build from scratch',
   taskTemplateFinanceNewsName: 'Financial News',
