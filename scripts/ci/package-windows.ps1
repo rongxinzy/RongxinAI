@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 
 # Windows 发布包构建入口，由 Makefile 的 ci-package-windows 目标调用。
 # GitLab 编排逻辑保留在 .gitlab-ci.yml 中，具体构建行为集中在这里。
@@ -107,7 +107,7 @@ $pythonDir = 'resources\python-win'
 # 需要手动确保 Windows Electron 二进制文件存在。
 $electronVersion = $env:ELECTRON_VERSION
 if (-not $electronVersion) {
-  $electronVersion = '40.2.1'
+  $electronVersion = '44.9.3'
 }
 $electronDist = 'node_modules\electron\dist'
 if (-not (Test-Path "$electronDist\electron.exe")) {
