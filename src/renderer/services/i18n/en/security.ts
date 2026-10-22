@@ -99,10 +99,10 @@ export const enSecurity: Record<string, string> = {
   securityFindingJsxray_monkey_patch: 'Monkey patching',
   securityFindingJsxray_prototype_pollution: 'Prototype pollution',
   securityFindingJsxray_sql_injection: 'SQL injection',
-  preventSleepUpdateFailed: 'Failed to update prevent sleep setting',
-  preventSleep: 'Prevent Sleep',
+  preventSleepUpdateFailed: 'Failed to update background keep-alive setting',
+  preventSleep: 'Keep Running in Background',
   preventSleepDescription:
-    'Prevent the system from suspending the app process (does not block system sleep or display off)',
+    'Prevents the system from suspending the application process, ensuring background tasks and automations continue running',
   linkSafetyOpenExternalTitle: 'Open external link?',
   linkSafetyOpenExternalWarning:
     "You're about to visit an external website. Make sure you trust this link.",
