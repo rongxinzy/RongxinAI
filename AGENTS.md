@@ -14,6 +14,7 @@
 bun run electron:dev       # Vite + Electron 热重载（端口 5175 起自增）
 bun run web:preview        # 浏览器预览（端口 5176，无需 Electron）
 bun run web:preview:check  # 浅色/深色走查主要界面，console error 即失败
+bun run preview:doc-screenshots  # 1280×800 文档截图到 docs/theme-previews/
 bun run build              # 生产构建（TS + Vite）
 bun run lint               # oxlint，含 theme:check / theme:audit
 bun run format             # oxfmt；提交前 bun run format:check
@@ -35,7 +36,7 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 - 会话、流式回复、设置、Skills、MCP、自动化、本地推理和 IM 的数据在 `browserMock/interactive.ts` 与 `browserMock/fixtures/`。改了 preload 契约后跑 `bun run web:preview:codegen`，并提交 `src/renderer/browserMock/generated/`。`bun run web:preview:codegen:check` 会在生成结果过期时失败。
 - `bun run web:preview:check`（先 `bunx playwright install chromium`）在 headless Chromium 中跑 Playwright 交互测试与 warn-only 的 axe 抽检；mock 仍支持 URL 参数 `previewScenario` / `previewEdition` / `previewSkipBoot` 供本地走查。`console.error` 与 `pageerror` 会让检查失败。Preload 契约：`bun run web:preview:contract`；生成面校验：`bun run web:preview:codegen:check`。这些检查由发布前 `release-preflight.yml` 的 `browser-preview` job 统一执行，日常 PR 不自动启动浏览器。
 
-Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。
+Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致）。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。桌面壳 Electron **44.x**；Agent 执行栈 `@earendil-works/pi-*` **1.4.0**（见 `package.json`）。
 
 ## 产品与品牌
 
@@ -122,7 +123,7 @@ Node >=24 <25，Bun >=1.3。包管理与脚本一律用 Bun（`bun install`、`b
 
 ### 主界面参考标杆（2026-10-20，DESIGN.md v4.0）
 
-用户审阅 v3 主界面后授权废止 Zenith 的毛玻璃、渐变主按钮、外发光、悬停上浮和放大 30% 字阶，确立 v4.0 Quiet Studio 标准。参考实现位于 [docs/design/reference/index.html](docs/design/reference/index.html)（含 `tokens.css`、`shell.css`、`stage.css`、`main.js`）；代码改造完成前，旧基准截图（[浅色](docs/theme-previews/main-interface-2026-10-05-light.png)、[深色](docs/theme-previews/main-interface-2026-10-05-dark.png)）保留供回归参考，待 v4 实现通过用户验收后再替换。
+用户审阅 v3 主界面后授权废止 Zenith 的毛玻璃、渐变主按钮、外发光、悬停上浮和放大 30% 字阶，确立 v4.0 Quiet Studio 标准。参考实现位于 [docs/design/reference/index.html](docs/design/reference/index.html)（含 `tokens.css`、`shell.css`、`stage.css`、`main.js`）。主界面浏览器预览基准（1280×800，2026-10-22）：[浅色](docs/theme-previews/main-interface-2026-10-22-light.png)、[深色](docs/theme-previews/main-interface-2026-10-22-dark.png)。文档截图用 `bun run preview:doc-screenshots` 再生。
 
 | 特征 | v4 做法 | 代码入口 |
 | --- | --- | --- |
