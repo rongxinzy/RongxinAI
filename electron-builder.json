@@ -374,7 +374,7 @@
     "include": "scripts/nsis-installer.nsh",
     "artifactName": "${productName}-Setup-${version}.${ext}"
   },
-  "electronVersion": "40.2.1",
+  "electronVersion": "44.9.3",
   "electronLanguages": ["en-US", "zh-CN", "zh-TW", "ja", "ko", "fr", "es", "es-419"],
   "electronUpdaterCompatibility": ">=6.0.0",
   "detectUpdateChannel": false,

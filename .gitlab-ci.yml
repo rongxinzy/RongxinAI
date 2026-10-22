@@ -276,7 +276,7 @@ build-linux:
     # 手动下载 Electron 二进制（避免 GitHub 不可达）
     # node_modules 缓存命中时此步骤为 no-op
     - |
-      ELECTRON_VER="40.2.1"
+      ELECTRON_VER="44.9.3"
       ELECTRON_DIST="node_modules/electron/dist"
       if [ ! -f "$ELECTRON_DIST/electron" ]; then
         echo "Downloading Electron $ELECTRON_VER from npmmirror..."

@@ -107,7 +107,7 @@ $pythonDir = 'resources\python-win'
 # 需要手动确保 Windows Electron 二进制文件存在。
 $electronVersion = $env:ELECTRON_VERSION
 if (-not $electronVersion) {
-  $electronVersion = '40.2.1'
+  $electronVersion = '44.9.3'
 }
 $electronDist = 'node_modules\electron\dist'
 if (-not (Test-Path "$electronDist\electron.exe")) {
