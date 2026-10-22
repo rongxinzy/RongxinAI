@@ -3,7 +3,6 @@ import {
   type LlamaCppAgentEligibility,
   type LlamaCppRunningModel,
 } from '../../shared/llamacpp';
-import { ProviderName } from '../../shared/providers';
 import type { Model } from '../store/slices/modelSlice';
 
 export function getRunningModelAgentEligibility(
@@ -19,21 +18,9 @@ export function getRunningModelAgentEligibility(
   });
 }
 
-function isLlamaCppModel(model: Pick<Model, 'providerKey'>): boolean {
-  return model.providerKey === ProviderName.LlamaCpp;
-}
-
+/** Only running local models carry an eligibility; every other model is unrestricted. */
 export function getModelAgentEligibility(
-  model: Pick<
-    Model,
-    | 'providerKey'
-    | 'llamaCppAgentEligibility'
-    | 'llamaCppRuntimeContextWindow'
-    | 'llamaCppTrainedContextWindow'
-  >,
+  model: Pick<Model, 'llamaCppAgentEligibility'>,
 ): LlamaCppAgentEligibility | null {
-  if (!isLlamaCppModel(model)) {
-    return null;
-  }
   return model.llamaCppAgentEligibility ?? null;
 }

@@ -2,7 +2,7 @@ import type { OllamaProviderSnapshot } from './ollamaProviderBinding';
 import type { MagpieHostProvider } from './hostProviders';
 import type { ZhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
 import type { LlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
-export const LOCAL_GPU_MAGPIE_PROVIDER_ID = 'zhiyuan-host-local-gpu';
+import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
 const OLLAMA_MAGPIE_PROVIDER_ID = 'zhiyuan-host-ollama';
 export interface LocalGpuSnapshot {
   baseUrl: string | null;

@@ -1,10 +1,13 @@
 import { beforeEach, expect, test, vi } from 'vitest';
 import { refreshMagpieModels, selectMagpieDefaultModel, toCatalogModel } from './availableModels';
 import { store } from '../store';
+import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
 const api = { catalog: vi.fn(), selectDefault: vi.fn(), start: vi.fn() };
+const llamacpp = { listRunningModels: vi.fn() };
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('window', { electron: { magpie: api } });
+  llamacpp.listRunningModels.mockResolvedValue([]);
+  vi.stubGlobal('window', { electron: { magpie: api, llamacpp } });
 });
 const catalog = {
   status: { state: 'running', version: '1' },
@@ -71,4 +74,42 @@ test('a refresh overlapping a default write cannot restore the old default', asy
   resolveRead({ ...catalog, defaultModelId: 'removed/model' });
   await refreshing;
   expect(store.getState().model.defaultSelectedModel.id).toBe('vendor/model');
+});
+
+test('running local models carry their agent eligibility so the picker can offer them', async () => {
+  llamacpp.listRunningModels.mockResolvedValue([
+    { name: 'big-ctx', runtime_context_length: 65536, trained_context_length: 131072 },
+    { name: 'tiny-ctx', runtime_context_length: 2048, trained_context_length: 2048 },
+  ]);
+  const local = (id: string) => ({ id, owned_by: LOCAL_GPU_MAGPIE_PROVIDER_ID });
+  api.catalog.mockResolvedValue({
+    ...catalog,
+    models: [
+      ...catalog.models,
+      local(`${LOCAL_GPU_MAGPIE_PROVIDER_ID}/big-ctx`),
+      local('tiny-ctx'),
+      { id: 'big-ctx', owned_by: 'vendor' },
+    ],
+  });
+  await refreshMagpieModels();
+  const byKey = store
+    .getState()
+    .model.availableModels.map(model => [
+      model.id,
+      model.providerKey,
+      model.llamaCppAgentEligibility?.eligible,
+    ]);
+  expect(byKey).toEqual([
+    ['vendor/model', undefined, undefined],
+    [`${LOCAL_GPU_MAGPIE_PROVIDER_ID}/big-ctx`, LOCAL_GPU_MAGPIE_PROVIDER_ID, true],
+    ['tiny-ctx', LOCAL_GPU_MAGPIE_PROVIDER_ID, false],
+    ['big-ctx', 'vendor', undefined],
+  ]);
+});
+
+test('an unavailable local service leaves the catalog without local eligibility', async () => {
+  llamacpp.listRunningModels.mockRejectedValue(new Error('down'));
+  api.catalog.mockResolvedValue(catalog);
+  await refreshMagpieModels();
+  expect(store.getState().model.availableModels[0]?.llamaCppAgentEligibility).toBeUndefined();
 });
