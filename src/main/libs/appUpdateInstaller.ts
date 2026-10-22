@@ -11,6 +11,11 @@ import {
   writePendingInstallReceipt,
 } from './appUpdateInstallReceipt';
 
+/** How long the app waits for the launcher to confirm it started. */
+const HELPER_HANDOFF_TIMEOUT_MS = 5_000;
+/** The helper writes its marker right after PowerShell starts; poll finely so quit is not delayed. */
+const HELPER_HANDOFF_POLL_MS = 50;
+
 /**
  * Preserve the assisted, visible NSIS handoff. electron-updater owns the
  * verified download, but its default quitAndInstall handoff cannot guarantee
@@ -44,38 +49,48 @@ export async function installWindowsNsis(exePath: string, targetVersion: string)
     '  $record = @{ schemaVersion = 1; attemptId = $attemptId; targetVersion = $targetVersion; status = $status; detail = $detail; recordedAt = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() }',
     '  $tmp = "$receiptPath.tmp"',
     '  [IO.File]::WriteAllText($tmp, ($record | ConvertTo-Json -Compress), [Text.Encoding]::UTF8)',
-    '  [IO.File]::Replace($tmp, $receiptPath, $null)',
+    // [NullString]::Value is the only way to pass a real null backup path to
+    // .NET from PowerShell; a bare $null binds as an empty string and Replace
+    // throws, which used to fail the receipt right after a successful install.
+    '  [IO.File]::Replace($tmp, $receiptPath, [NullString]::Value)',
     '}',
     'function Log($msg) {',
     "  $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'",
     '  Add-Content -Path $logPath -Value "[$ts] $msg" -Encoding UTF8',
     '}',
+    '$installerExitCode = $null',
     'try {',
     '  [IO.File]::WriteAllText($handoffPath, "started")',
     '  Log "Update script started (appPid=$appPid)"',
-    '  $waited = 0',
-    '  while ($waited -lt 120) {',
-    '    try { Get-Process -Id $appPid -ErrorAction Stop | Out-Null; Start-Sleep -Seconds 1; $waited++ }',
-    '    catch { break }',
-    '  }',
+    // Wait-Process blocks until the pid is gone (or the timeout expires) instead
+    // of polling once per second, so the installer can start immediately after
+    // this process exits.
+    '  Wait-Process -Id $appPid -Timeout 120 -ErrorAction SilentlyContinue',
     '  Log "Launching interactive installer: $installerPath"',
     '  $installer = Start-Process -FilePath $installerPath -Wait -PassThru',
-    '  Log "Installer exited with code $($installer.ExitCode)"',
-    '  if ($installer.ExitCode -ne 0) { throw "Installer exited with code $($installer.ExitCode)" }',
+    '  $installerExitCode = $installer.ExitCode',
+    '  Log "Installer exited with code $installerExitCode"',
+    '  if ($installerExitCode -ne 0) { throw "Installer exited with code $installerExitCode" }',
     '  Write-Receipt "succeeded" $null',
     '  Log "Installer completed; NSIS finish page controls app launch"',
     '} catch {',
     '  Log "ERROR: $($_.Exception.Message)"',
     '  try { Write-Receipt "failed" $_.Exception.Message } catch { Log "Unable to save update result: $($_.Exception.Message)" }',
-    '  if (Test-Path $appPath) {',
-    '    Start-Process -FilePath $appPath',
-    '    Log "Existing app relaunched after installer cancellation or failure"',
+    // Relaunch only when the installer never succeeded: a receipt write
+    // failure after a clean install must not start a second app instance.
+    '  if ($installerExitCode -ne 0) {',
+    '    if (Test-Path $appPath) {',
+    '      Start-Process -FilePath $appPath',
+    '      Log "Existing app relaunched after installer cancellation or failure"',
+    '    }',
     '  }',
     '}',
   ].join('\r\n');
 
   await fs.promises.writeFile(scriptPath, `\ufeff${script}`, 'utf8');
-  const vbs = `CreateObject("WScript.Shell").Run "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${scriptPath}""", 0, False`;
+  // -NoProfile keeps user profile scripts out of the update path: they can take
+  // seconds and would run before the handoff marker is written.
+  const vbs = `CreateObject("WScript.Shell").Run "powershell.exe -NoProfile -NonInteractive -NoLogo -ExecutionPolicy Bypass -WindowStyle Hidden -File ""${scriptPath}""", 0, False`;
   await fs.promises.writeFile(vbsPath, vbs, 'utf8');
   const pendingReceipt: AppUpdateInstallReceipt = {
     schemaVersion: 1,
@@ -96,7 +111,8 @@ export async function installWindowsNsis(exePath: string, targetVersion: string)
     launcher.unref();
     launcherPid = launcher.pid;
     let helperStarted = false;
-    for (let attempt = 0; attempt < 25; attempt += 1) {
+    const attempts = Math.ceil(HELPER_HANDOFF_TIMEOUT_MS / HELPER_HANDOFF_POLL_MS);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       if (
         await fs.promises.stat(handoffPath).then(
           () => true,
@@ -106,7 +122,7 @@ export async function installWindowsNsis(exePath: string, targetVersion: string)
         helperStarted = true;
         break;
       }
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise(resolve => setTimeout(resolve, HELPER_HANDOFF_POLL_MS));
     }
     if (!helperStarted) throw new Error('Update installer helper did not start');
   } catch (error) {
