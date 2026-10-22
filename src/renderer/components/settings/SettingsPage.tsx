@@ -57,7 +57,6 @@ export default function SettingsPage({
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [preventSleep, setPreventSleep] = useState(false);
   const [codemodeEnabled, setCodemodeEnabled] = useState(false);
-  const [mcpNativeBridge, setMcpNativeBridge] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(() => {
     if (noticeI18nKey) {
@@ -139,7 +138,6 @@ export default function SettingsPage({
       setAutoLaunch(autoLaunchResult?.enabled === true);
       setPreventSleep(preventSleepResult?.enabled === true);
       setCodemodeEnabled(coworkConfigResult?.config?.codemodeEnabled === true);
-      setMcpNativeBridge(coworkConfigResult?.config?.mcpNativeBridge === true);
     })();
     return () => {
       active = false;
@@ -217,15 +215,6 @@ export default function SettingsPage({
     }
   };
 
-  const handleMcpNativeBridgeChange = async (next: boolean) => {
-    setMcpNativeBridge(next);
-    const updated = await coworkService.updateConfig({ mcpNativeBridge: next });
-    if (!updated) {
-      setMcpNativeBridge(!next);
-      setError(i18nService.t('coworkConfigSaveFailed'));
-    }
-  };
-
   const shortcutLabelMap: Record<string, string> = {
     newChat: 'newChat',
     search: 'search',
@@ -297,8 +286,6 @@ export default function SettingsPage({
             }}
             codemodeEnabled={codemodeEnabled}
             onCodemodeEnabledChange={next => void handleCodemodeChange(next)}
-            mcpNativeBridge={mcpNativeBridge}
-            onMcpNativeBridgeChange={next => void handleMcpNativeBridgeChange(next)}
           />
         );
 

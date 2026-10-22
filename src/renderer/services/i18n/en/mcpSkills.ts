@@ -44,9 +44,9 @@ export const enMcpSkills: Record<string, string> = {
   piRuntimeCompactionKeepRecentTokens: 'Compaction keep-recent tokens',
   piRuntimeCacheControlFormat: 'Cache control format',
   piRuntimeCacheControlAnthropic: 'Anthropic cache_control',
-  codemodeEnabled: 'Tool orchestration (Codemode)',
+  codemodeEnabled: 'Batch tool acceleration (Codemode)',
   codemodeEnabledDescription:
-    'Let the model orchestrate parallel tool calls from a sandbox script — fewer rounds for batch work in long tasks. Off keeps current session behavior unchanged',
+    'Allows the agent to batch tool calls via sandbox scripts, significantly speeding up long tasks and batch file operations. Recommended for high-capability models like Claude 3.5 or GPT-4o (default off)',
   mcpNativeBridge: 'MCP native bridge',
   mcpNativeBridgeDescription:
     'Work sessions connect MCP servers through the builtin extension with per-server progressive tool exposure; off keeps the single gateway tool',

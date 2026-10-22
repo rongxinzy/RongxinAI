@@ -428,8 +428,9 @@ export const zhCommon: Record<string, string> = {
   autoLaunchUpdateFailed: '更新开机自启动设置失败',
   useSystemProxy: '使用系统代理',
   useSystemProxyDescription: '开启后网络请求将跟随系统代理（立即生效）',
-  sqliteAutoBackupEnabled: '启用自动备份与恢复',
-  sqliteAutoBackupEnabledDescription: '开启后将自动备份数据，并在启动时尝试恢复损坏的数据',
+  sqliteAutoBackupEnabled: '数据自动备份与恢复',
+  sqliteAutoBackupEnabledDescription:
+    '每天自动备份任务历史、配置及知识记忆，并在异常时尝试恢复数据',
   taskTemplateSectionTitle: '快速创建定时任务',
   taskTemplateSectionDesc: '选择一个预设模板快速上手，或从零开始自定义配置',
   taskTemplateFinanceNewsName: '财经新闻',
