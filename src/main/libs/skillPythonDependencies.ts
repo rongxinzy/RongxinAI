@@ -267,8 +267,3 @@ export async function installSkillPythonDependencies(
     packageCount: status.packageCount ?? 0,
   };
 }
-
-/** Remove one Skill's overlay directory. The packaged layer is never touched. */
-export function uninstallSkillPythonDependencies(skillId: string): void {
-  fs.rmSync(skillPythonOverlayRoot(skillId), { recursive: true, force: true });
-}

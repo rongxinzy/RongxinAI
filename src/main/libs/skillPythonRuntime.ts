@@ -16,13 +16,13 @@ const LOCKS_DIRECTORY_NAME = 'locks';
  * requirements. `overlay` means the Skill needs a per-Skill overlay directory
  * that the app installs on demand into user data (see skillPythonDependencies).
  */
-export const SkillPythonCoverage = {
+const SkillPythonCoverage = {
   Core: 'core',
   Overlay: 'overlay',
 } as const;
-export type SkillPythonCoverage = (typeof SkillPythonCoverage)[keyof typeof SkillPythonCoverage];
+type SkillPythonCoverage = (typeof SkillPythonCoverage)[keyof typeof SkillPythonCoverage];
 
-export interface SkillPythonDelta {
+interface SkillPythonDelta {
   /** Lock that pins exactly the packages the overlay still needs. */
   lockFile?: string;
   sha256?: string;
@@ -30,7 +30,7 @@ export interface SkillPythonDelta {
   packages?: string[];
 }
 
-export interface SkillPythonSkillManifest {
+interface SkillPythonSkillManifest {
   version?: number;
   skillId?: string;
   coverage?: SkillPythonCoverage;
@@ -38,7 +38,7 @@ export interface SkillPythonSkillManifest {
   delta?: SkillPythonDelta | null;
 }
 
-export interface SkillPythonOverlayManifest {
+interface SkillPythonOverlayManifest {
   version?: number;
   skillId?: string;
   lockSha256?: string;
@@ -222,9 +222,7 @@ function findDeltaLockPath(root: string, lockFile: string | undefined): string |
   return candidates.find(candidate => fs.existsSync(candidate)) || null;
 }
 
-export function readSkillPythonOverlayManifest(
-  sitePackages: string,
-): SkillPythonOverlayManifest | null {
+function readSkillPythonOverlayManifest(sitePackages: string): SkillPythonOverlayManifest | null {
   return readJsonObject(
     path.join(sitePackages, 'runtime.json'),
   ) as SkillPythonOverlayManifest | null;

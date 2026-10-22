@@ -16,7 +16,7 @@ import path from 'path';
 
 import { resolveBundledOcrScriptPath } from '../libs/ocrHelper';
 
-export interface OcrLine {
+interface OcrLine {
   text: string;
   x?: number;
   y?: number;
@@ -161,11 +161,6 @@ export async function getOcrStatus(language: string = DEFAULT_LANGUAGE): Promise
   };
   cachedStatus = { value, at: Date.now() };
   return value;
-}
-
-/** Reset the cached capability probe (tests and settings changes). */
-export function clearOcrStatusCache(): void {
-  cachedStatus = null;
 }
 
 export async function recognizeImages(

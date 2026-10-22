@@ -16,7 +16,7 @@ import path from 'path';
 import { findSharedSkillPythonExecutable } from '../libs/skillPythonRuntime';
 import { recognizeImages, type OcrImageText } from './ocrEngine';
 
-export interface OcrPdfPage {
+interface OcrPdfPage {
   page: number;
   text: string;
   lines: OcrImageText['lines'];

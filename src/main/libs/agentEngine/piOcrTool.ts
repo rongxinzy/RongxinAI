@@ -13,7 +13,7 @@ import { resolveWorkspaceFile } from '../../workbenchTask/artifactCollector';
 import { getOcrStatus, isOcrSupported, readOcrText } from '../../ocr/ocrEngine';
 import { ocrPdf } from '../../ocr/pdfOcr';
 
-export const PiOcrToolName = 'ocr';
+const PiOcrToolName = 'ocr';
 export const PiOcrSystemPrompt = [
   '## Local OCR',
   '',
