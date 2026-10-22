@@ -176,6 +176,16 @@ bun run llamacpp:runtime:download
 
 </details>
 
+## 浏览器预览模式
+
+无需 Electron 即可在浏览器中预览渲染器：
+
+```bash
+bun run web:preview
+```
+
+在端口 5176 启动 Vite，并用类型化的 preload mock 替代真实 IPC。日常改 UI 时优先用它做热更新、主题与布局检查。`bun run web:preview:check` 会在浅色/深色下用 Playwright 走查主要界面，出现控制台错误即失败。`bun run preview:doc-screenshots` 会生成 1280×800 的文档截图到 `docs/theme-previews/`（主界面、外观、平台模型、本地推理）。mock 仅在浏览器开发模式启用；生产构建与 Electron 运行时使用真实 preload。涉及 IPC、系统能力或完整业务流程时，请用 `bun run electron:dev` 复验。详见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
 ## 参与项目
 
 - [报告问题](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml)：附上系统、版本、复现步骤和相关日志。
