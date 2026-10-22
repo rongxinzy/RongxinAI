@@ -39,13 +39,13 @@
 
 ## 开始使用
 
-1. **下载**：从[官网](https://www.rongxzyai.com/#download)获取安装包：Windows x64（轻量版、CPU 版、CUDA 版）、macOS（Apple Silicon 与 Intel）、Linux x64（`.deb` 与 AppImage）。
+1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包：**Windows** x64 轻量版、CPU 版、CUDA 版（`.exe`）；**macOS** Apple Silicon 与 Intel 的 CPU 版（`.dmg` 与 `.zip`）；**Linux** x64 CPU 与 CUDA 版（`.deb` 与 AppImage）。
 2. **打开应用**：直接用内置免费模型对话，无需 API Key。
 3. **派任务**：选择项目目录、描述任务，查看执行过程并处理授权请求。
 
 开发者：`git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent && cd ZhiYuanAgent && bun install && bun run electron:dev`（Node 24.x、Bun 1.4.0）。前置条件与更多命令见[开发者快速开始](#开发者快速开始)。
 
-免费模型需要联网，服务可用性及额度以应用内提示为准。其他平台也可[从源码运行](#开发者快速开始)。
+免费模型需要联网，服务可用性及额度以应用内提示为准。若无对应架构或版本的安装包，可[从源码运行](#开发者快速开始)。
 
 ### 使用本地模型
 
@@ -65,6 +65,7 @@
 | --- | :-: | :-: | :-: | :-: | :-: |
 | 在微信/飞书/钉钉里直接派任务 | ✅（另有企业微信、QQ、邮箱） | ❌（连接器有 Slack、Gmail） | ❌（有 Slack 连接器） | ❌ | ❌ |
 | 开源桌面应用 | ✅ AGPL-3.0 | ❌ 闭源 | ❌ 闭源 | ✅ AGPL-3.0 | ❌ 开源（Apache-2.0）但为终端工具，图形界面是另一个项目 |
+| Windows / macOS / Linux 安装包 | ✅ | ❌ | ✅ | ✅ | ❌ |
 | 内置 GGUF 模型市场（无需 Ollama） | ✅ 基于 llama.cpp | ❌ 仅云端 | ❌ 仅云端 | ❌ 需借助 Ollama / LM Studio | ❌ 需借助 Ollama / LM Studio |
 | 免费模型 + 本地模型 + 完全开源 | ✅ 三者兼具 | ❌ 仅免费额度（每日 300 积分） | ❌ 仅免费版 | ✅ CherryAI 免费（Qwen3-8B）+ Ollama/LM Studio | ❌ 无内置免费模型 |
 | 智能体：文件 + 命令 + 浏览器 | ✅ | ✅ | ✅ 仅付费版（Cowork） | ? | ✅（浏览器经 QA 技能） |
