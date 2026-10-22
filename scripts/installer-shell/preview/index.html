@@ -70,7 +70,7 @@
   .opt-body { flex: 1; min-width: 0; }
   .opt-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
   .opt-desc { font-size: 14px; line-height: 1.5; color: var(--text-2); margin-top: 4px; }
-  .opt-path { display: block; margin-top: 8px; font: 14px/1.5 var(--font); color: var(--text); max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: text; }
+  .opt-path { display: block; margin-top: 8px; font: 14px/1.5 var(--font); color: var(--text); max-width: 100%; min-width: 0; overflow-wrap: anywhere; white-space: normal; user-select: text; }
   .link { background: none; border: 0; padding: 4px 0; color: var(--text); font: 500 14px/1.5 var(--font); cursor: pointer; border-radius: 4px; flex-shrink: 0; text-underline-offset: 3px; }
   .link:hover { text-decoration: underline; }
   .license-row { margin-top: 18px; display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--text-2); }
@@ -336,6 +336,13 @@ function applyI18n() {
     document.querySelector('.app-title').textContent =
       lang === 'zh' ? '卸载程序' : 'Uninstaller';
   }
+  // The shell window is borderless, but the document title still surfaces in
+  // Alt-Tab, the taskbar tooltip and accessibility clients.
+  document.title =
+    lang === 'zh' ? '知远智能体 · 安装程序' : 'ZhiYuan Agent · Setup';
+  if (uninstallMode) {
+    document.title = lang === 'zh' ? '知远智能体 · 卸载程序' : 'ZhiYuan Agent · Uninstall';
+  }
 }
 
 /* ---------- page router ---------- */
@@ -409,29 +416,101 @@ const phaseName = document.getElementById('phaseName');
 const tipsBox = document.getElementById('tips');
 let simToken = 0;
 
+// Engine phases arrive as stable Chinese labels. The engine reports byte
+// progress per archive (app.7z, then one run per component), so each run starts
+// again at 0%: mapping them 1:1 onto a single bar made it jump to 100% and fall
+// back to 0% while work continued. Weight the phases and keep the bar monotonic
+// instead; a new run inside a phase only ever consumes the remaining band.
+const PHASE_META = {
+  '正在准备安装包': { en: 'Preparing the installer', weight: 3 },
+  '正在停止运行中的知远进程': { en: 'Stopping running ZhiYuan processes', weight: 4 },
+  '正在迁移用户创建的 Skills': { en: 'Migrating your Skills', weight: 3 },
+  '正在准备安装目录': { en: 'Preparing the install directory', weight: 3 },
+  '正在解包应用程序': { en: 'Extracting application files', weight: 24 },
+  '正在展开离线组件': { en: 'Expanding offline components', weight: 30 },
+  '正在激活离线组件': { en: 'Activating offline components', weight: 6 },
+  '正在连接本地运行环境': { en: 'Connecting the local runtime', weight: 3 },
+  '正在校验运行环境': { en: 'Verifying the local runtime', weight: 5 },
+  '正在安装 Microsoft Visual C++ 运行时': { en: 'Installing Microsoft Visual C++ Runtime', weight: 8 },
+  '正在清理旧版本': { en: 'Cleaning up the previous version', weight: 5 },
+  '正在写入卸载信息': { en: 'Writing uninstall information', weight: 2 },
+  '正在移除应用程序，个人数据将保留': { en: 'Removing the application (personal data is kept)', weight: 20 },
+  '正在清理本地离线运行环境': { en: 'Removing the local offline runtime', weight: 40 },
+  '已跳过离线运行环境清理': { en: 'Skipped offline runtime cleanup', weight: 10 },
+  '未找到卸载清理脚本，已跳过运行环境清理': { en: 'Uninstall script missing; skipped runtime cleanup', weight: 10 },
+  '正在移除卸载信息': { en: 'Removing uninstall information', weight: 5 },
+  '正在删除安装目录': { en: 'Deleting the install directory', weight: 15 },
+  '安装已完成，旧版本清理将在下次安装时重试': { en: 'Installed; cleanup of the previous version will retry next time', weight: 1 },
+};
+const DEFAULT_PHASE_WEIGHT = 5;
+
+let progressFloor = 0;
+let phaseBase = 0;
+let phaseEnd = DEFAULT_PHASE_WEIGHT;
+let runPercent = -1;
+
+function phaseText(label) {
+  if (!label) return '';
+  if (lang === 'zh') return label;
+  return PHASE_META[label]?.en || label;
+}
+
+function phaseWeight(label) {
+  return PHASE_META[label]?.weight || DEFAULT_PHASE_WEIGHT;
+}
+
+function paintProgress(value) {
+  const shown = Math.max(progressFloor, Math.min(99, Math.round(value)));
+  progressFloor = shown;
+  fill.style.transition = '';
+  fill.style.width = shown + '%';
+  percent.textContent = shown + '%';
+}
+
+function enterPhase(label) {
+  // Bank whatever this phase already reached, then open a band for the next one.
+  phaseBase = Math.min(95, Math.max(progressFloor, phaseBase));
+  phaseEnd = Math.min(97, phaseBase + phaseWeight(label));
+  runPercent = -1;
+}
+
 function resetProgressView() {
   fill.style.transition = 'none';
   fill.style.width = '0%';
   percent.textContent = '0%';
   phaseLabel.textContent = '';
   phaseName.textContent = '';
+  progressFloor = 0;
+  phaseBase = 0;
+  phaseEnd = DEFAULT_PHASE_WEIGHT;
+  runPercent = -1;
 }
 
 function handleEngineEvent(evt) {
   if (evt.type === 'phase') {
+    enterPhase(evt.label || '');
     phaseLabel.classList.add('swap');
     setTimeout(() => {
-      phaseLabel.textContent = (evt.label || '') + '…';
-      phaseName.textContent = evt.label || '';
+      const text = phaseText(evt.label || '');
+      phaseLabel.textContent = text ? text + '…' : '';
+      phaseName.textContent = text;
       phaseLabel.classList.remove('swap');
     }, 120);
   } else if (evt.type === 'progress') {
     const pct = Math.max(0, Math.min(100, evt.percent || 0));
-    fill.style.transition = '';
-    fill.style.width = pct + '%';
-    percent.textContent = pct + '%';
+    if (pct + 5 < runPercent) {
+      // A new archive started inside the same phase: shrink the remaining band
+      // so repeated runs converge instead of replaying the whole phase.
+      phaseBase = Math.min(95, Math.max(progressFloor, phaseBase));
+      const remaining = Math.max(2, phaseEnd - phaseBase);
+      phaseEnd = Math.min(97, phaseBase + remaining / 2);
+    }
+    runPercent = pct;
+    paintProgress(phaseBase + ((phaseEnd - phaseBase) * pct) / 100);
   } else if (evt.type === 'done') {
+    progressFloor = 100;
     percent.textContent = '100%';
+    fill.style.transition = '';
     fill.style.width = '100%';
     if (uninstallMode) {
       document.getElementById('completeTitle').textContent = t('uninstalledTitle');

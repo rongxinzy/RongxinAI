@@ -92,6 +92,16 @@ describe('hosted installer Promise bridge (not Windows acceptance)', () => {
           ? '卸载程序'
           : '安装程序',
     );
+    // Borderless shell: the document title is what Alt-Tab and accessibility see.
+    expect(ui.document.title).toBe(
+      english
+        ? page === 'uninstall'
+          ? 'ZhiYuan Agent · Uninstall'
+          : 'ZhiYuan Agent · Setup'
+        : page === 'uninstall'
+          ? '知远智能体 · 卸载程序'
+          : '知远智能体 · 安装程序',
+    );
     for (const [selector, chinese, translated] of [
       ['#btnInstall', '安装', 'Install'],
       ['#btnBrowse', '更改…', 'Change…'],
@@ -555,5 +565,41 @@ describe('license fallback and repeated opening', () => {
     await vi.waitFor(() => expect(dialog.showModal).toHaveBeenCalledOnce());
     expect(dialog.open).toBe(true);
     expect((ui.document.querySelector('#btnInstall') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('translates engine phase labels for an English session', async () => {
+    const ui = mount('?shell=1&lang=en');
+    ui.event({ type: 'phase', label: '正在解包应用程序' });
+
+    await vi.waitFor(() =>
+      expect(ui.document.querySelector('#phaseName')?.textContent).toBe(
+        'Extracting application files',
+      ),
+    );
+  });
+
+  it('keeps the progress bar monotonic when each archive restarts at zero', () => {
+    const ui = mount('?shell=1&lang=zh');
+    const shown = () =>
+      Number((ui.document.querySelector('#percent')?.textContent || '0').replace('%', ''));
+
+    ui.event({ type: 'phase', label: '正在解包应用程序' });
+    ui.event({ type: 'progress', percent: 100 });
+    const afterAppArchive = shown();
+
+    ui.event({ type: 'phase', label: '正在展开离线组件' });
+    ui.event({ type: 'progress', percent: 100 });
+    const afterComponent = shown();
+    expect(afterComponent).toBeGreaterThan(afterAppArchive);
+
+    // The next component archive reports 0% again; the bar must not fall back.
+    ui.event({ type: 'progress', percent: 0 });
+    expect(shown()).toBeGreaterThanOrEqual(afterComponent);
+
+    ui.event({ type: 'progress', percent: 100 });
+    expect(shown()).toBeLessThanOrEqual(99);
+
+    ui.event({ type: 'done' });
+    expect(shown()).toBe(100);
   });
 });
