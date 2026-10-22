@@ -67,13 +67,13 @@ describe('Windows offline component identity', () => {
     );
 
     expect(compressionByKey).toMatchObject({
-      'channel-runtime': 'lzma2-mx9-nonsolid-v1',
-      skills: 'lzma2-mx9-solid-v1',
-      mcps: 'lzma2-mx9-solid-v1',
+      'channel-runtime': 'lzma2-mx5-nonsolid-v1',
+      skills: 'lzma2-mx5-solid-v1',
+      mcps: 'lzma2-mx5-solid-v1',
       'portable-git': 'lzma-bcj2-d128m-mx9-solid-v1',
-      python: 'lzma2-mx9-solid-v1',
-      'skill-python': 'lzma2-mx9-solid-v1',
-      uv: 'lzma2-mx9-nonsolid-v1',
+      python: 'lzma2-mx5-solid-v1',
+      'skill-python': 'lzma2-mx5-solid-v1',
+      uv: 'lzma2-mx5-nonsolid-v1',
     });
   });
 
@@ -149,7 +149,7 @@ describe('Windows offline component identity', () => {
     );
     expect(manifest.archive).toBe('runtime.7z');
     expect(manifest.archiveFormat).toBe('7z');
-    expect(manifest.archiveCompression).toBe('lzma2-mx9-nonsolid-v1');
+    expect(manifest.archiveCompression).toBe('lzma2-mx5-nonsolid-v1');
   });
 
   test('does not reuse an archive created with a different compression profile', () => {
@@ -167,7 +167,7 @@ describe('Windows offline component identity', () => {
     );
     fs.writeFileSync(
       manifestPath,
-      JSON.stringify({ ...manifest, archiveCompression: 'lzma2-mx9-nonsolid-v1' }),
+      JSON.stringify({ ...manifest, archiveCompression: 'lzma2-mx5-nonsolid-v1' }),
     );
 
     expect(
