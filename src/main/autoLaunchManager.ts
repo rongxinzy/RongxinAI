@@ -16,13 +16,9 @@ export function getAutoLaunchEnabled(): boolean {
 }
 
 export function setAutoLaunchEnabled(enabled: boolean): void {
-  const isMac = process.platform === 'darwin';
-
   try {
     app.setLoginItemSettings({
       openAtLogin: enabled,
-      // macOS: 自启后窗口不显示，M芯片和Intel均兼容
-      openAsHidden: isMac ? enabled : false,
       // Windows: 通过命令行参数标记自启动
       args: enabled ? ['--auto-launched'] : [],
     });
