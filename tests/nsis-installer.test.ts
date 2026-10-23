@@ -256,6 +256,18 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(failureBlock).toContain('SetErrorLevel 1');
   });
 
+  test('does not stop a silent install on the VC runtime notice', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const noticeIndex = installerScript.indexOf(
+      'MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime',
+    );
+
+    expect(noticeIndex).toBeGreaterThan(-1);
+    // Silent updates run through the auto-updater; a blocking dialog there
+    // would leave the installer alive with no window and never finish.
+    expect(installerScript.slice(0, noticeIndex).trimEnd()).toMatch(/IfSilent \+2$/);
+  });
+
   test('seeks to the end before appending installer timing records', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const normalizedInstallerScript = installerScript.replace(/\r\n/g, '\n');

@@ -47,7 +47,9 @@ test('confirms the Windows helper started before quitting and records the target
     fs.readdirSync(mocks.root).find(name => name.endsWith('.ps1'))!,
   );
   const script = await fs.promises.readFile(scriptPath, 'utf8');
-  expect(script).toContain('Start-Process -FilePath $installerPath -Wait -PassThru');
+  expect(script).toContain("$installerStart.Arguments = '/S --updated'");
+  expect(script).toContain('$installerStart.UseShellExecute = $false');
+  expect(script).toContain('[System.Diagnostics.Process]::Start($installerStart)');
   expect(script).toContain('Wait-Process -Id $appPid -Timeout 120');
   expect(script).not.toContain('Start-Sleep');
   // A bare $null binds as an empty path and throws; [NullString]::Value is the
@@ -56,7 +58,15 @@ test('confirms the Windows helper started before quitting and records the target
   expect(script).not.toContain('[IO.File]::Replace($tmp, $receiptPath, $null)');
   expect(script).toContain('if ($installerExitCode -ne 0)');
   expect(script).toContain('Write-Receipt "failed"');
-  expect(script).not.toContain("-ArgumentList '/S'");
+  // The installed NSIS wizard must never appear, in any update scenario.
+  expect(script).not.toContain('Start-Process -FilePath $installerPath');
+  // A silent install has no finish page, so the helper owns the relaunch and
+  // cannot rely on --force-run to start the application.
+  expect(script).not.toContain('--force-run');
+  expect(script).toContain('Start-Process -FilePath $appPath');
+  expect(script.indexOf('Write-Receipt "succeeded" $null')).toBeLessThan(
+    script.indexOf('Start-Process -FilePath $appPath'),
+  );
   const vbsPath = path.join(
     mocks.root,
     fs.readdirSync(mocks.root).find(name => name.endsWith('.vbs'))!,
