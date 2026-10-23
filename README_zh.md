@@ -9,7 +9,7 @@
 
 <p align="center"><strong>开源、本地优先的桌面 AI 智能体：内置免费模型开箱即用，支持本地 GGUF 模型，还能在微信、飞书、钉钉里直接派活。</strong></p>
 
-<p align="center"><sub>仓库：<a href="https://github.com/rongxinzy/RongxinAI">RongxinAI</a> · 产品：知远智能体 · 官网：<a href="https://www.rongxzyai.com">rongxzyai.com</a></sub></p>
+<p align="center"><sub>仓库：<a href="https://github.com/rongxinzy/RongxinAI">rongxinzy/RongxinAI</a> · 产品：知远智能体 · 官网：<a href="https://www.rongxzyai.com">rongxzyai.com</a></sub></p>
 
 <p align="center">
   <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat&logo=github" alt="Stars"></a>
