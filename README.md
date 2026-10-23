@@ -9,7 +9,7 @@
 
 <p align="center"><strong>The open-source, local-first desktop AI agent — start free with a built-in model, run GGUF models locally, and assign tasks from WeChat, Feishu or DingTalk.</strong></p>
 
-<p align="center"><sub>Repo: <a href="https://github.com/rongxinzy/RongxinAI">RongxinAI</a> · Product: ZhiYuan Agent · Site: <a href="https://www.rongxzyai.com">rongxzyai.com</a></sub></p>
+<p align="center"><sub>Repo: <a href="https://github.com/rongxinzy/RongxinAI">rongxinzy/RongxinAI</a> · Product: ZhiYuan Agent · Site: <a href="https://www.rongxzyai.com">rongxzyai.com</a></sub></p>
 
 <p align="center">
   <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat&logo=github" alt="Stars"></a>
