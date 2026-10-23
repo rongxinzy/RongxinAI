@@ -17,15 +17,20 @@ const HELPER_HANDOFF_TIMEOUT_MS = 5_000;
 const HELPER_HANDOFF_POLL_MS = 50;
 
 /**
- * Preserve the assisted, visible NSIS handoff. electron-updater owns the
- * verified download, but its default quitAndInstall handoff cannot guarantee
- * that a cancellation relaunches the running application.
+ * Run the verified NSIS updater exactly the way electron-updater would — silent
+ * (`/S`) and flagged `--updated` — but keep the handoff in this helper so a
+ * failed or cancelled install still brings the application back.
+ *
+ * A silent assisted install never opens a wizard page, so the only visible
+ * installer in the product is the WebView2 shell used for first installs and
+ * manual downloads. electron-updater's own quitAndInstall cannot be used here
+ * because it neither waits for the installer nor relaunches the app.
  */
 export async function installWindowsNsis(exePath: string, targetVersion: string): Promise<void> {
   const stat = await fs.promises.stat(exePath);
   if (stat.size === 0) throw new Error('Update file is empty');
 
-  console.log('[AppUpdate] Windows NSIS install (interactive mode)');
+  console.log('[AppUpdate] Windows NSIS install (silent mode)');
   const timestamp = Date.now();
   const tempDir = app.getPath('temp');
   const logPath = path.join(tempDir, `zhiyuan-update-${timestamp}.log`);
@@ -59,6 +64,7 @@ export async function installWindowsNsis(exePath: string, targetVersion: string)
     '  Add-Content -Path $logPath -Value "[$ts] $msg" -Encoding UTF8',
     '}',
     '$installerExitCode = $null',
+    '$failure = $null',
     'try {',
     '  [IO.File]::WriteAllText($handoffPath, "started")',
     '  Log "Update script started (appPid=$appPid)"',
@@ -66,24 +72,43 @@ export async function installWindowsNsis(exePath: string, targetVersion: string)
     // of polling once per second, so the installer can start immediately after
     // this process exits.
     '  Wait-Process -Id $appPid -Timeout 120 -ErrorAction SilentlyContinue',
-    '  Log "Launching interactive installer: $installerPath"',
-    '  $installer = Start-Process -FilePath $installerPath -Wait -PassThru',
+    '  Log "Launching silent installer: $installerPath"',
+    // /S --updated is the same invocation electron-updater performs for a
+    // background update: no wizard page is shown, and the installer treats the
+    // run as an upgrade. --force-run is deliberately not passed: this helper
+    // owns the relaunch so success and failure both end with a running app.
+    // CreateProcess (UseShellExecute = $false) mirrors electron-updater:
+    // ShellExecute would route the freshly downloaded installer through
+    // SmartScreen and hold the update behind a prompt.
+    '  $installerStart = New-Object System.Diagnostics.ProcessStartInfo',
+    '  $installerStart.FileName = $installerPath',
+    "  $installerStart.Arguments = '/S --updated'",
+    '  $installerStart.WorkingDirectory = (Split-Path -Parent $installerPath)',
+    '  $installerStart.UseShellExecute = $false',
+    '  $installer = [System.Diagnostics.Process]::Start($installerStart)',
+    '  $installer.WaitForExit()',
     '  $installerExitCode = $installer.ExitCode',
     '  Log "Installer exited with code $installerExitCode"',
     '  if ($installerExitCode -ne 0) { throw "Installer exited with code $installerExitCode" }',
-    '  Write-Receipt "succeeded" $null',
-    '  Log "Installer completed; NSIS finish page controls app launch"',
     '} catch {',
-    '  Log "ERROR: $($_.Exception.Message)"',
-    '  try { Write-Receipt "failed" $_.Exception.Message } catch { Log "Unable to save update result: $($_.Exception.Message)" }',
-    // Relaunch only when the installer never succeeded: a receipt write
-    // failure after a clean install must not start a second app instance.
-    '  if ($installerExitCode -ne 0) {',
-    '    if (Test-Path $appPath) {',
-    '      Start-Process -FilePath $appPath',
-    '      Log "Existing app relaunched after installer cancellation or failure"',
-    '    }',
-    '  }',
+    '  $failure = $_.Exception.Message',
+    '  Log "ERROR: $failure"',
+    '}',
+    'if ($installerExitCode -eq 0) {',
+    '  try { Write-Receipt "succeeded" $null } catch { Log "Unable to save update result: $($_.Exception.Message)" }',
+    '} else {',
+    '  try { Write-Receipt "failed" $failure } catch { Log "Unable to save update result: $($_.Exception.Message)" }',
+    '}',
+    // A silent install has no finish page to start the app, so the relaunch
+    // happens here in both outcomes: success starts the new version, failure
+    // brings the still-installed previous version back instead of leaving the
+    // desktop without the app. A receipt write failure after a clean install
+    // must not prevent that relaunch.
+    'if (Test-Path $appPath) {',
+    '  Start-Process -FilePath $appPath',
+    '  Log "Application relaunched after installer exit $installerExitCode"',
+    '} else {',
+    '  Log "Application executable missing after installer exit $installerExitCode"',
     '}',
   ].join('\r\n');
 

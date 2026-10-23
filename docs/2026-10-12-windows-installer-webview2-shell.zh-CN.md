@@ -6,6 +6,7 @@
 
 - **首装/重装**：单文件 `ZhiYuanAgent-Setup-<version>.exe` = WebView2 外壳 + 内嵌载荷（自解包）。本文件定义其引擎。
 - **自动更新**：现有 electron-builder NSIS 安装器（`scripts/nsis-installer.nsh`）**原样保留**，electron-updater 静默路径不变。
+- 更新手交通道（`src/main/libs/appUpdateInstaller.ts`）用 `/S --updated` 启动 NSIS：**任何更新场景都不显示 NSIS 向导**，用户可见的安装器只有本外壳。脚本在安装器退出后自行重启应用——成功启动新版本，失败恢复原版本；不依赖安装器完成页启动。
 - 两条链路必须产出**同一磁盘形态**：`$INSTDIR\resources` 下 junction 布局 + `%LOCALAPPDATA%\ZhiYuanAgent\runtimes` 内容寻址缓存。保证手段：**共享 PowerShell 脚本**，NSIS 与外壳只做编排，不各写一份组件逻辑。
 
 ## 引擎编排（对照 nsis-installer.nsh 逐步复刻）
