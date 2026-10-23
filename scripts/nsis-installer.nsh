@@ -825,7 +825,10 @@ Var /GLOBAL zyDeleteRealAppData
       !insertmacro OpenTimingLogForAppend $2
       FileWrite $2 "phase=vc-runtime-install-failed exit=$0 output=$1$\r$\n"
       FileClose $2
-      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
+      ; Silent updates (/S) must never stop on a dialog: the failure is
+      ; recorded in the timing log and the install still completes.
+      IfSilent +2
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
   VcRuntimeReady:
 
   ; Local inference stays an in-app concern: download, verification,
