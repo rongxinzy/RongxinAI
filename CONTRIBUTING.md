@@ -8,6 +8,7 @@ Please read this guide and [`AGENTS.md`](AGENTS.md) before making a code change.
 
 ## Before You Start
 
+- For how-to questions or sharing workflows, use [GitHub Discussions](https://github.com/rongxinzy/RongxinAI/discussions) instead of issues. All participants are expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 - Search the existing [issues](https://github.com/rongxinzy/RongxinAI/issues) and pull requests before opening a new one.
 - Use the bug report or feature request issue template and include enough context for others to reproduce or evaluate the request.
 - For a large feature, architectural change, or breaking change, open an issue first so the approach can be discussed before implementation.
