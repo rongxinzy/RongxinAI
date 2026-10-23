@@ -196,6 +196,7 @@ bun run web:preview
 - [报告问题](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml)：附上系统、版本、复现步骤和相关日志。
 - [提出功能建议](https://github.com/rongxinzy/RongxinAI/issues/new?template=feature_request.yml)：描述实际场景与预期行为。
 - [贡献代码或文档](CONTRIBUTING.md)：先阅读 [`AGENTS.md`](AGENTS.md)；涉及界面时同时遵守 [`DESIGN.md`](DESIGN.md)。
+- [安全政策](SECURITY.md)：请通过私有渠道报告漏洞，勿在公开 Issue 讨论未修复的安全问题。
 
 欢迎通过 Star 关注项目，也欢迎分享你用知远完成的工作流。
 

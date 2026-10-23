@@ -206,6 +206,7 @@ The mock is only active in browser mode (`import.meta.env.DEV` + no `window.elec
 - [Report a bug](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml) with your system, app version, reproduction steps, and relevant logs.
 - [Suggest a feature](https://github.com/rongxinzy/RongxinAI/issues/new?template=feature_request.yml) by describing the workflow and expected behavior.
 - [Contribute code or documentation](CONTRIBUTING.md). Read [`AGENTS.md`](AGENTS.md) first and follow [`DESIGN.md`](DESIGN.md) for UI changes.
+- [Security policy](SECURITY.md) — report vulnerabilities privately; do not open public issues for unfixed security bugs.
 
 Star the repository to follow the project, or share a workflow you have built with ZhiYuan.
 

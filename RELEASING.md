@@ -19,6 +19,8 @@ Before tagging, run **Release preflight** (`release-preflight.yml`) against the 
    - Publish one complete **beta** update feed (`channels/beta-pointer.json`), preventing platform jobs from overwriting shared metadata or exposing a partial generation
    - Create a GitHub **pre-release** with auto-generated release notes and attached installers
 
+User-facing release text: copy the top section from [`docs/RELEASE_NOTES_TEMPLATE.md`](docs/RELEASE_NOTES_TEMPLATE.md) into the GitHub Release body above the auto-generated PR list. Auto notes are categorized via [`.github/release.yml`](.github/release.yml).
+
 Beta users opt in under **Settings → About → Beta update channel**.
 
 ### Edition matrix

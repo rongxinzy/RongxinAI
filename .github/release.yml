@@ -1,0 +1,28 @@
+# Used when release.yml creates a GitHub pre-release with generate_release_notes: true.
+# User-facing release text: docs/RELEASE_NOTES_TEMPLATE.md (paste above auto-generated appendix).
+
+changelog:
+  exclude:
+    labels:
+      - duplicate
+      - invalid
+      - wontfix
+    authors:
+      - dependabot[bot]
+  categories:
+    - title: Features
+      labels:
+        - enhancement
+    - title: Bug Fixes
+      labels:
+        - bug
+    - title: Documentation
+      labels:
+        - documentation
+        - area: docs
+    - title: Dependencies
+      labels:
+        - dependencies
+    - title: Other Changes
+      labels:
+        - '*'
