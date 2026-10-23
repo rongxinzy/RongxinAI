@@ -15,6 +15,11 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/rongxinzy/RongxinAI" alt="AGPL-3.0"></a>
   <a href="https://github.com/rongxinzy/RongxinAI/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/rongxinzy/RongxinAI/ci.yml?branch=main&label=CI" alt="CI"></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platforms">
+  <a href="https://github.com/rongxinzy/RongxinAI/releases"><img src="https://img.shields.io/github/downloads/rongxinzy/RongxinAI/total?label=downloads" alt="Downloads"></a>
+  <img src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white" alt="Electron 44">
+  <img src="https://img.shields.io/badge/Bun-1.4-fbf0df?logo=bun&logoColor=black" alt="Bun 1.4">
+  <a href="https://www.rongxzyai.com"><img src="https://img.shields.io/badge/Website-rongxzyai.com-0A66C2" alt="Website"></a>
+  <a href="https://github.com/rongxinzy/RongxinAI/discussions"><img src="https://img.shields.io/badge/Discussions-Welcome-brightgreen?logo=github" alt="Discussions"></a>
 </p>
 
 <p align="center">
