@@ -9,6 +9,8 @@
 
 <p align="center"><strong>The open-source, local-first desktop AI agent — start free with a built-in model, run GGUF models locally, and assign tasks from WeChat, Feishu or DingTalk.</strong></p>
 
+<p align="center"><sub>Repo: <a href="https://github.com/rongxinzy/RongxinAI">RongxinAI</a> · Product: ZhiYuan Agent · Site: <a href="https://www.rongxzyai.com">rongxzyai.com</a></sub></p>
+
 <p align="center">
   <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat&logo=github" alt="Stars"></a>
   <a href="https://github.com/rongxinzy/RongxinAI/releases"><img src="https://img.shields.io/github/v/release/rongxinzy/RongxinAI?include_prereleases" alt="Release"></a>
@@ -198,11 +200,13 @@ The mock is only active in browser mode (`import.meta.env.DEV` + no `window.elec
 
 ## Contribute
 
-- [Report a bug](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml) with your system, app version, reproduction steps, and relevant logs.
-- [Suggest a feature](https://github.com/rongxinzy/RongxinAI/issues/new?template=feature_request.yml) by describing the workflow and expected behavior.
-- [Contribute code or documentation](CONTRIBUTING.md). Read [`AGENTS.md`](AGENTS.md) first and follow [`DESIGN.md`](DESIGN.md) for UI changes.
+- [Good first issues](https://github.com/rongxinzy/RongxinAI/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) — best place to start
+- [Discussions](https://github.com/rongxinzy/RongxinAI/discussions) — questions and showcases (not for bugs)
+- [Report a bug](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml)
+- [Suggest a feature](https://github.com/rongxinzy/RongxinAI/issues/new?template=feature_request.yml)
+- [Contributing guide](CONTRIBUTING.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [`AGENTS.md`](AGENTS.md)
 
-Star the repository to follow the project, or share a workflow you have built with ZhiYuan.
+Star the repository to follow the project, or share a workflow in Discussions.
 
 ## Acknowledgments and license
 

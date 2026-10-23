@@ -9,6 +9,8 @@
 
 <p align="center"><strong>开源、本地优先的桌面 AI 智能体：内置免费模型开箱即用，支持本地 GGUF 模型，还能在微信、飞书、钉钉里直接派活。</strong></p>
 
+<p align="center"><sub>仓库：<a href="https://github.com/rongxinzy/RongxinAI">RongxinAI</a> · 产品：知远智能体 · 官网：<a href="https://www.rongxzyai.com">rongxzyai.com</a></sub></p>
+
 <p align="center">
   <a href="https://github.com/rongxinzy/RongxinAI/stargazers"><img src="https://img.shields.io/github/stars/rongxinzy/RongxinAI?style=flat&logo=github" alt="Stars"></a>
   <a href="https://github.com/rongxinzy/RongxinAI/releases"><img src="https://img.shields.io/github/v/release/rongxinzy/RongxinAI?include_prereleases" alt="Release"></a>
@@ -188,11 +190,13 @@ bun run web:preview
 
 ## 参与项目
 
-- [报告问题](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml)：附上系统、版本、复现步骤和相关日志。
-- [提出功能建议](https://github.com/rongxinzy/RongxinAI/issues/new?template=feature_request.yml)：描述实际场景与预期行为。
-- [贡献代码或文档](CONTRIBUTING.md)：先阅读 [`AGENTS.md`](AGENTS.md)；涉及界面时同时遵守 [`DESIGN.md`](DESIGN.md)。
+- [适合新手的 issues](https://github.com/rongxinzy/RongxinAI/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) — 推荐从这里开始
+- [Discussions](https://github.com/rongxinzy/RongxinAI/discussions) — 提问与展示工作流（请勿用于报 bug）
+- [报告问题](https://github.com/rongxinzy/RongxinAI/issues/new?template=bug_report.yml)
+- [提出功能建议](https://github.com/rongxinzy/RongxinAI/issues/new?template=feature_request.yml)
+- [贡献指南](CONTRIBUTING.md) · [行为准则](CODE_OF_CONDUCT.md) · [`AGENTS.md`](AGENTS.md)
 
-欢迎通过 Star 关注项目，也欢迎分享你用知远完成的工作流。
+欢迎 Star 关注项目，或在 Discussions 分享你用知远完成的工作流。
 
 ## 致谢与许可证
 
