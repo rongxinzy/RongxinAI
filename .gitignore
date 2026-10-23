@@ -91,6 +91,8 @@ openspec/
 spec/
 specs/
 docs/*
+!docs/RELEASE_NOTES_TEMPLATE.md
+!docs/github-social-preview.png
 localdocs/
 docker/
 llamacpp-oss-tools/
