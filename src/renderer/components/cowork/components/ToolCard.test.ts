@@ -11,12 +11,21 @@ import { expect, test, vi } from 'vitest';
 
 import { i18nService } from '../../../services/i18n';
 import type { ToolGroupItem } from '../helpers/messageGrouping';
+import { getToolInputSummary, getToolResultDisplay } from '../helpers/toolUtils';
 import { setPersistentToggleNamespace } from '../hooks/usePersistentToggle';
 import { ToolCard } from './ToolCard';
 
 vi.mock('@shared/components/ai-elements/code-block', () => ({
   CodeBlock: ({ code }: { code: string }) => createElement('pre', null, code),
 }));
+vi.mock('../helpers/toolUtils', async importOriginal => {
+  const actual = await importOriginal<typeof import('../helpers/toolUtils')>();
+  return {
+    ...actual,
+    getToolInputSummary: vi.fn(actual.getToolInputSummary),
+    getToolResultDisplay: vi.fn(actual.getToolResultDisplay),
+  };
+});
 i18nService.setLanguage('zh', { persist: false });
 const group = (id: string, output = 'ok', isError = false): ToolGroupItem => ({
   type: CoworkDisplayItemType.ToolGroup,
@@ -34,6 +43,41 @@ const group = (id: string, output = 'ok', isError = false): ToolGroupItem => ({
     timestamp: 2,
     metadata: { isError },
   },
+});
+
+test('memoizes result parsing, redaction, and input summaries by reference', () => {
+  setPersistentToggleNamespace('memoized-display');
+  const fixture = group('memoized', '{"value":1}');
+  const mapDisplayText = vi.fn((value: string) => value.replaceAll('value', 'redacted'));
+  const resultDisplaySpy = vi.mocked(getToolResultDisplay);
+  const inputSummarySpy = vi.mocked(getToolInputSummary);
+  resultDisplaySpy.mockClear();
+  inputSummarySpy.mockClear();
+  const { rerender } = render(createElement(ToolCard, { group: fixture, mapDisplayText }));
+
+  expect(resultDisplaySpy).toHaveBeenCalledTimes(1);
+  expect(inputSummarySpy).toHaveBeenCalledTimes(1);
+  expect(mapDisplayText).toHaveBeenCalledTimes(3);
+
+  rerender(createElement(ToolCard, { group: fixture, mapDisplayText, forceExpand: true }));
+  expect(resultDisplaySpy).toHaveBeenCalledTimes(1);
+  expect(inputSummarySpy).toHaveBeenCalledTimes(1);
+  expect(mapDisplayText).toHaveBeenCalledTimes(3);
+
+  rerender(
+    createElement(ToolCard, {
+      group: {
+        ...fixture,
+        toolResult: { ...fixture.toolResult!, content: '{"value":2}' },
+      },
+      mapDisplayText,
+      forceExpand: true,
+    }),
+  );
+  expect(resultDisplaySpy).toHaveBeenCalledTimes(2);
+  expect(inputSummarySpy).toHaveBeenCalledTimes(1);
+  expect(mapDisplayText).toHaveBeenCalledTimes(4);
+  expect(screen.getByText(/"redacted": 2/)).toBeVisible();
 });
 
 test('caps long output until explicitly expanded and preserves the full result for export', () => {
@@ -172,4 +216,22 @@ test('caps single-line oversized tool output by character limit until expanded',
   expect(screen.queryByText(/TAIL_MARKER/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: i18nService.t('coworkToolResultShowAll') }));
   expect(screen.getByText(/TAIL_MARKER/)).toBeVisible();
+});
+
+test('recomputes todo summaries when the language changes', () => {
+  setPersistentToggleNamespace('localized-todo');
+  const fixture = group('localized-todo');
+  fixture.toolUse.metadata = {
+    toolName: 'todowrite',
+    toolInput: { todos: [{ content: 'Ship performance fix', status: 'in_progress' }] },
+  };
+  const { rerender } = render(createElement(ToolCard, { group: fixture }));
+  try {
+    expect(screen.getByText(new RegExp(i18nService.t('coworkTodoInProgress')))).toBeVisible();
+    i18nService.setLanguage('en', { persist: false });
+    rerender(createElement(ToolCard, { group: fixture }));
+    expect(screen.getByText(new RegExp(i18nService.t('coworkTodoInProgress')))).toBeVisible();
+  } finally {
+    i18nService.setLanguage('zh', { persist: false });
+  }
 });
