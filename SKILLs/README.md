@@ -40,9 +40,9 @@ SKILLs/
 | `zhiyuan/` | 可选的产品展示元数据与图标；参见 [docx 的 metadata.yaml](docx/zhiyuan/metadata.yaml)。Optional product display metadata and icons; see the DOCX example. |
 | `LICENSE` | 适用的许可文本，保留引入资源的授权与署名。Applicable license text; preserve licenses and attribution for imported resources. |
 
-目录名是应用使用的技能 ID。它不一定等于 frontmatter 的 `name`：`docx/SKILL.md` 的 `name` 是 `minimax-docx`，但配置与工具调用使用 `docx`。新技能建议使用清晰的、小写连字符目录名，并让 `name` 与目录名一致。
+目录名是应用使用的技能 ID，frontmatter 的 `name` 应与目录名一致（例如 `docx/SKILL.md` 的 `name` 是 `docx`，配置与工具调用也使用 `docx`）。新技能建议使用清晰的、小写连字符目录名，并让 `name` 与目录名一致。
 
-The directory name is the application's Skill ID. It need not equal the frontmatter `name`: `docx/SKILL.md` uses `minimax-docx`, while configuration and tool calls use `docx`. For new Skills, prefer a clear lowercase hyphenated directory name and a matching `name`.
+The directory name is the application's Skill ID, and the frontmatter `name` should match it (for example, `docx/SKILL.md` uses `docx`, and configuration and tool calls use `docx` too). For new Skills, prefer a clear lowercase hyphenated directory name and a matching `name`.
 
 ## 2. 编写 SKILL.md / Writing SKILL.md
 

@@ -1,174 +1,118 @@
 {
+  "_comment": "Generated from MCPs/registry.json into the renderer McpRegistryEntry shape. Not imported by code; kept in sync so it cannot drift. Guarded by src/main/mcpRegistryIntegrity.test.ts.",
   "categories": [
-    { "id": "all", "name_zh": "全部", "name_en": "All" },
-    { "id": "search", "name_zh": "搜索", "name_en": "Search" },
-    { "id": "developer", "name_zh": "开发工具", "name_en": "Dev Tools" },
-    { "id": "productivity", "name_zh": "效率工具", "name_en": "Productivity" },
-    { "id": "browser", "name_zh": "浏览器", "name_en": "Browser" },
-    { "id": "design", "name_zh": "设计", "name_en": "Design" },
-    { "id": "data-api", "name_zh": "数据 & API", "name_en": "Data & API" }
+    {
+      "id": "productivity",
+      "name_zh": "效率工具",
+      "name_en": "Productivity"
+    },
+    {
+      "id": "developer",
+      "name_zh": "开发工具",
+      "name_en": "Developer tools"
+    },
+    {
+      "id": "data-api",
+      "name_zh": "数据 & API",
+      "name_en": "Data & API"
+    }
   ],
   "servers": [
     {
-      "id": "tavily",
-      "name": "Tavily",
-      "description_zh": "实时网页搜索、智能数据提取和网站爬取",
-      "description_en": "Real-time web search, intelligent data extraction and web crawling",
-      "category": "search",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "tavily-mcp@latest"],
-      "requiredEnvKeys": ["TAVILY_API_KEY"]
-    },
-    {
-      "id": "github",
-      "name": "GitHub",
-      "description_zh": "GitHub 平台集成：仓库、Issues、PR、Actions 管理",
-      "description_en": "GitHub platform integration: repos, issues, PRs, Actions management",
-      "category": "developer",
-      "transportType": "http",
-      "url": "https://api.githubcopilot.com/mcp/",
-      "authType": "token"
-    },
-    {
-      "id": "gitlab",
-      "name": "GitLab",
-      "description_zh": "GitLab API 集成：项目管理、合并请求、流水线",
-      "description_en": "GitLab API integration: project management, merge requests, pipelines",
-      "category": "developer",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-gitlab"],
-      "requiredEnvKeys": ["GITLAB_PERSONAL_ACCESS_TOKEN"],
-      "optionalEnvKeys": ["GITLAB_API_URL"]
-    },
-    {
-      "id": "context7",
-      "name": "Context7",
-      "description_zh": "为 AI 编程提供最新的库文档和代码示例",
-      "description_en": "Up-to-date library documentation and code examples for AI coding",
-      "category": "developer",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@upstash/context7-mcp@latest"]
-    },
-    {
-      "id": "google-drive",
-      "name": "Google Drive",
-      "description_zh": "Google Drive 文件访问和搜索，自动导出 Workspace 文件",
-      "description_en": "Google Drive file access and search with auto-export for Workspace files",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-gdrive"],
-      "optionalEnvKeys": ["GDRIVE_CREDENTIALS_PATH"]
-    },
-    {
-      "id": "gmail",
-      "name": "Gmail",
-      "description_zh": "Gmail 邮件管理：读取、发送、搜索邮件，支持自动认证",
-      "description_en": "Gmail management: read, send, search emails with auto authentication",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-      "requiredEnvKeys": ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REDIRECT_URI"]
-    },
-    {
-      "id": "google-calendar",
-      "name": "Google Calendar",
-      "description_zh": "Google Calendar 日程管理：创建、查询、更新日历事件",
-      "description_en": "Google Calendar management: create, query, update calendar events",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@cocal/google-calendar-mcp"],
-      "requiredEnvKeys": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI"]
-    },
-    {
       "id": "notion",
       "name": "Notion",
-      "description_zh": "Notion API：搜索、创建/更新页面、管理数据库",
-      "description_en": "Notion API: search, create/update pages, manage databases",
+      "descriptionKey": "",
+      "description_zh": "在线协作与知识库管理工作区",
+      "description_en": "A connected workspace for collaboration and knowledge management.",
       "category": "productivity",
+      "categoryKey": "mcpCategoryProductivity",
       "transportType": "http",
       "url": "https://mcp.notion.com/mcp",
       "authType": "oauth"
     },
     {
-      "id": "slack",
-      "name": "Slack",
-      "description_zh": "Slack 工作区：频道管理、消息发送、用户查询",
-      "description_en": "Slack workspace: channel management, messaging, user queries",
+      "id": "supabase",
+      "name": "Supabase",
+      "descriptionKey": "",
+      "description_zh": "Supabase 数据库、表、边缘函数和项目管理",
+      "description_en": "Supabase database, tables, edge functions, and project management.",
+      "category": "developer",
+      "categoryKey": "mcpCategoryDeveloper",
+      "transportType": "http",
+      "url": "https://mcp.supabase.com/mcp",
+      "authType": "oauth"
+    },
+    {
+      "id": "jinshuju",
+      "name": "金数据",
+      "descriptionKey": "",
+      "description_zh": "金数据表单、数据查询和自动化",
+      "description_en": "Jinshuju forms, data queries, and workflow automation.",
       "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-slack"],
-      "requiredEnvKeys": ["SLACK_BOT_TOKEN", "SLACK_TEAM_ID"]
+      "categoryKey": "mcpCategoryProductivity",
+      "transportType": "http",
+      "url": "https://jinshuju.net/mcp",
+      "authType": "oauth"
     },
     {
-      "id": "todoist",
-      "name": "TodoList",
-      "description_zh": "任务管理：创建、更新、完成和组织待办事项",
-      "description_en": "Task management: create, update, complete and organize to-do items",
+      "id": "feishu",
+      "name": "飞书",
+      "descriptionKey": "",
+      "description_zh": "飞书文档、日历、消息、云盘和审批",
+      "description_en": "Feishu documents, calendars, messages, drive, and approvals.",
       "category": "productivity",
+      "categoryKey": "mcpCategoryProductivity",
       "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "todoist-mcp@latest"],
-      "requiredEnvKeys": ["TODOIST_API_TOKEN"]
+      "command": "lark-cli",
+      "authType": "cli"
     },
     {
-      "id": "playwright",
-      "name": "Playwright",
-      "description_zh": "高级浏览器自动化，支持 Chromium/Firefox/WebKit",
-      "description_en": "Advanced browser automation supporting Chromium/Firefox/WebKit",
-      "category": "browser",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@executeautomation/playwright-mcp-server"]
+      "id": "github",
+      "name": "GitHub",
+      "descriptionKey": "",
+      "description_zh": "GitHub 仓库、Issue、Pull Request 和开发工作流",
+      "description_en": "GitHub repositories, issues, pull requests, and developer workflows.",
+      "category": "developer",
+      "categoryKey": "mcpCategoryDeveloper",
+      "transportType": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "authType": "token"
     },
     {
-      "id": "figma",
-      "name": "Figma",
-      "description_zh": "Figma 设计平台集成：读取文件、组件、样式，支持设计稿解析",
-      "description_en": "Figma design platform integration: read files, components, styles, and parse designs",
-      "category": "design",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "figma-developer-mcp@latest"],
-      "requiredEnvKeys": ["FIGMA_API_KEY"]
-    },
-    {
-      "id": "canva",
-      "name": "Canva",
-      "description_zh": "Canva 设计平台：创建和管理设计、模板操作",
-      "description_en": "Canva design platform: create and manage designs, template operations",
-      "category": "design",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@iflow-mcp/mattcoatsworth-canva-mcp-server"],
-      "requiredEnvKeys": ["CANVA_API_KEY"]
-    },
-    {
-      "id": "firecrawl",
-      "name": "Firecrawl",
-      "description_zh": "网页抓取与数据提取：支持批处理、结构化提取和内容分析",
-      "description_en": "Web scraping and data extraction: batch processing, structured extraction and content analysis",
+      "id": "pkulaw",
+      "name": "北大法宝",
+      "descriptionKey": "",
+      "description_zh": "法律法规、案例和司法数据检索",
+      "description_en": "Chinese laws, regulations, and judicial case search.",
       "category": "data-api",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "firecrawl-mcp@latest"],
-      "requiredEnvKeys": ["FIRECRAWL_API_KEY"]
+      "categoryKey": "mcpCategoryDataApi",
+      "transportType": "http",
+      "url": "https://apim-gateway.pkulaw.com/mcp-law-agg/1.0.0/mcp",
+      "authType": "oauth"
     },
     {
-      "id": "fetch",
-      "name": "Fetch",
-      "description_zh": "网页内容抓取和 HTML 转 Markdown，适合 LLM 消费",
-      "description_en": "Web content fetching and HTML-to-markdown conversion for LLM consumption",
+      "id": "baidu-netdisk",
+      "name": "百度网盘",
+      "descriptionKey": "",
+      "description_zh": "百度网盘文件搜索、读取和管理",
+      "description_en": "Baidu Netdisk file search, reading, and management.",
+      "category": "productivity",
+      "categoryKey": "mcpCategoryProductivity",
+      "transportType": "sse",
+      "url": "https://mcp-pan.baidu.com/sse",
+      "authType": "token"
+    },
+    {
+      "id": "patsnap-search",
+      "name": "智慧芽",
+      "descriptionKey": "",
+      "description_zh": "专利、文献和科技情报检索，支持自然语言与语义搜索",
+      "description_en": "Patsnap patent, literature, and technology intelligence search.",
       "category": "data-api",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-fetch"]
+      "categoryKey": "mcpCategoryDataApi",
+      "transportType": "http",
+      "url": "https://connect.zhihuiya.com/2b0355/logic-mcp?apikey=${PATSNAP_API_KEY}",
+      "authType": "token"
     }
   ]
 }

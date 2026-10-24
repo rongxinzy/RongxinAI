@@ -26,9 +26,9 @@ When calling tools, follow the MCP tool schemas exposed by the server. Do not in
 Authentication:
 
 - This connector uses a user-provided Patsnap API key.
-- If authentication fails or the API key expires, ask the user to regenerate or update their Patsnap API key in WorkBuddy.
+- If authentication fails or the API key expires, ask the user to regenerate or update their Patsnap API key in ZhiYuan Agent (知远智能体).
 
 认证说明：
 
 - 此 Connector 使用用户自填的智慧芽 API Key。
-- 如果认证失败或 API Key 失效，请提醒用户在 WorkBuddy 中重新填写或更新智慧芽 API Key。
+- 如果认证失败或 API Key 失效，请提醒用户在知远智能体中重新填写或更新智慧芽 API Key。

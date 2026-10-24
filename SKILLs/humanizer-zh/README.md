@@ -18,55 +18,18 @@ Humanizer-zh 是一个用于去除文本中 AI 生成痕迹的工具，帮助你
 
 ## 安装
 
-### 方法一：通过 npx 一键安装（推荐）
-
-```bash
-npx skills add https://github.com/op7418/Humanizer-zh.git
-```
-
-这是最简单的安装方式，会自动将技能安装到正确的目录。
-
-### 方法二：通过 Git 克隆
-
-```bash
-# 克隆到 Claude Code 的 skills 目录
-git clone https://github.com/op7418/Humanizer-zh.git ~/.claude/skills/humanizer-zh
-```
-
-### 方法三：手动安装
-
-1. 下载本项目的 ZIP 文件或克隆到本地
-2. 将 `Humanizer-zh` 文件夹复制到 Claude Code 的 skills 目录：
-   - **macOS/Linux**: `~/.claude/skills/`
-   - **Windows**: `%USERPROFILE%\.claude\skills\`
-
-3. 确保文件夹结构如下：
-   ```
-   ~/.claude/skills/humanizer-zh/
-   ├── SKILL.md       # 技能定义文件（中文版）
-   └── README.md      # 说明文档
-   ```
-
-### 验证安装
-
-重启 Claude Code 或重新加载 skills 后，在对话中输入：
-
-```
-/humanizer-zh
-```
-
-如果安装成功，该技能将被激活。
+本技能已内置于知远智能体 (ZhiYuan Agent)，在应用的 Skills 中确认 `humanizer-zh` 已启用即可使用，无需单独安装。以下示例均为对话中的自然语言请求，不依赖任何命令行安装步骤。
 
 ## 使用
 
 ### 基础用法
 
-在 Claude Code 中，你可以通过以下方式使用 Humanizer：
+在知远中，你可以通过以下方式使用 Humanizer：
 
-#### 1. 直接调用技能
+#### 1. 直接提出请求
 
 ```
-/humanizer-zh 请帮我人性化以下文本：
+请帮我人性化以下文本：
 
 [粘贴你的 AI 生成文本]
 ```
@@ -82,7 +45,7 @@ git clone https://github.com/op7418/Humanizer-zh.git ~/.claude/skills/humanizer-
 #### 3. 处理文件内容
 
 ```
-/humanizer-zh 请人性化 article.md 文件中的内容
+请人性化 article.md 文件中的内容
 ```
 
 ### 使用场景示例
@@ -91,7 +54,7 @@ git clone https://github.com/op7418/Humanizer-zh.git ~/.claude/skills/humanizer-
 
 **输入：**
 ```
-/humanizer-zh
+请人性化这段营销文案：
 坐落在风景如画的杭州市中心，这家咖啡馆拥有丰富的文化底蕴和令人叹为观止的装饰。它作为城市咖啡文化的焦点，为顾客提供无缝、直观和充满活力的体验。
 ```
 
@@ -102,7 +65,7 @@ git clone https://github.com/op7418/Humanizer-zh.git ~/.claude/skills/humanizer-
 
 **输入：**
 ```
-/humanizer-zh
+请人性化这段学术摘要：
 本研究深入探讨了机器学习在医疗诊断中的关键作用，突出了其在不断演变的医疗格局中的重要性。此外，它为该领域的未来发展奠定了坚实的基础。
 ```
 
@@ -113,7 +76,7 @@ git clone https://github.com/op7418/Humanizer-zh.git ~/.claude/skills/humanizer-
 
 **输入：**
 ```
-/humanizer-zh
+请人性化这段博客开头：
 人工智能不仅仅是一种技术，它是我们思考未来的方式的革命。行业专家认为这将对整个社会产生持久影响。
 ```
 

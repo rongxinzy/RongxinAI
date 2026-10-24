@@ -1,6 +1,6 @@
-# minimax-pdf
+# pdf
 
-A Claude skill for creating and editing visually polished PDFs.  
+A skill for creating and editing visually polished PDFs.  
 Three routes. One design system. Tokens flow from content analysis through every renderer.
 
 ## Quick start
