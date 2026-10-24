@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="websecurityaudit-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8F8F0"/>
+      <stop offset="100%" stop-color="#D0F0E0"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#websecurityaudit-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M24 12 L34 16 V24 C34 30, 30 34, 24 36 C18 34, 14 30, 14 24 V16 Z" fill="#9AD4B8" stroke="#5CB88A" stroke-width="1.4" stroke-linejoin="round"/>
+</svg>

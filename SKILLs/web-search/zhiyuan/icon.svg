@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="websearch-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8F4FC"/>
+      <stop offset="100%" stop-color="#CFE8F8"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#websearch-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <circle cx="22" cy="22" r="7" stroke="#5BA4D9" stroke-width="1.6" fill="white" fill-opacity="0.4"/><line x1="27" y1="27" x2="34" y2="34" stroke="#5D4E63" stroke-width="2" stroke-linecap="round"/>
+</svg>

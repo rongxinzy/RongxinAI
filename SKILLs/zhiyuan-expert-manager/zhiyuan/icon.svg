@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="zhiyuanexpertmanager-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F0EBFF"/>
+      <stop offset="100%" stop-color="#E0D6FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#zhiyuanexpertmanager-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <rect x="16" y="18" width="16" height="14" rx="4" fill="#C4B8F0" stroke="#9B87DE" stroke-width="1.4"/><circle cx="20" cy="25" r="1.6" fill="#5D4E63"/><circle cx="28" cy="25" r="1.6" fill="#5D4E63"/><path d="M21 29 Q24 31 27 29" stroke="#5D4E63" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+</svg>

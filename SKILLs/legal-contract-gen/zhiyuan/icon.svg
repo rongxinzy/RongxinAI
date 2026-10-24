@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="legalcontractgen-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F0EBFF"/>
+      <stop offset="100%" stop-color="#E0D6FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#legalcontractgen-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <line x1="24" y1="14" x2="24" y2="32" stroke="#9B87DE" stroke-width="2" stroke-linecap="round"/><line x1="14" y1="20" x2="34" y2="20" stroke="#9B87DE" stroke-width="1.8" stroke-linecap="round"/><path d="M12 24 Q16 28 20 24 Z" fill="#C4B8F0"/><path d="M28 24 Q32 28 36 24 Z" fill="#C4B8F0"/>
+</svg>

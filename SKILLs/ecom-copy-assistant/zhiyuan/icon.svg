@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="ecomcopyassistant-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFECE8"/>
+      <stop offset="100%" stop-color="#FFD8D0"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#ecomcopyassistant-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <circle cx="20" cy="32" r="2" fill="#5D4E63"/><circle cx="30" cy="32" r="2" fill="#5D4E63"/><path d="M14 18 H18 L22 28 H32 L34 22 H20" stroke="#E87868" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
