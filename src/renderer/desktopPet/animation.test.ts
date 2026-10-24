@@ -1,6 +1,10 @@
 import { test, expect } from 'vitest';
 
-import { DesktopPetState } from '../../shared/desktopPet/constants';
+import {
+  DesktopPetPlayableAction,
+  DesktopPetSprite,
+  DesktopPetState,
+} from '../../shared/desktopPet/constants';
 import { DesktopPetAnimation } from './animation';
 
 test('an interrupted expression transition starts from the visible mixture without a jump', () => {
@@ -29,6 +33,15 @@ test('spring response is independent of refresh rate and preserves shape at rele
     return animation.sample(1000).scaleY;
   };
   expect(simulate(60)).toBeCloseTo(simulate(120), 10);
+});
+
+test('playAction mixes in the action pose and a spring bounce', () => {
+  const animation = new DesktopPetAnimation();
+  animation.sample(0);
+  animation.playAction(DesktopPetPlayableAction.Happy, 0);
+  expect(animation.weights(450)[DesktopPetSprite[DesktopPetState.Greeting]]).toBeGreaterThan(0.5);
+  expect(animation.sample(50).scaleY).toBeLessThan(1);
+  expect(animation.sample(2_000).offsetY).toBe(0);
 });
 
 test('reduced motion settles directly to the latest pose and clears a landing impulse', () => {

@@ -8,7 +8,9 @@ import {
   DESKTOP_PET_TERMINAL_MS,
   DESKTOP_PET_FAILURES_KEY,
   DESKTOP_PET_DEFAULT_SETTINGS,
+  DesktopPetEffectKind,
   DesktopPetIpc,
+  DesktopPetPlayableAction,
   DesktopPetState,
   DesktopPetTaskResult,
 } from '../../shared/desktopPet/constants';
@@ -174,6 +176,11 @@ function greet(): void {
   }, 1800);
 }
 
+function playAction(action: DesktopPetPlayableAction): void {
+  if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
+  pet.webContents.send(DesktopPetIpc.Effect, { kind: DesktopPetEffectKind.Action, action });
+}
+
 function showMenu(): void {
   if (!pet) return;
   Menu.buildFromTemplate([
@@ -181,6 +188,18 @@ function showMenu(): void {
     { type: 'separator' },
     { label: t(status.targetSessionId ? 'desktopPetOpenTask' : 'desktopPetOpen'), click: openTask },
     { label: t('desktopPetGreet'), click: greet },
+    {
+      label: t('desktopPetActionPeek'),
+      click: () => playAction(DesktopPetPlayableAction.Peek),
+    },
+    {
+      label: t('desktopPetActionNod'),
+      click: () => playAction(DesktopPetPlayableAction.Nod),
+    },
+    {
+      label: t('desktopPetActionFlutter'),
+      click: () => playAction(DesktopPetPlayableAction.Flutter),
+    },
     { label: t('desktopPetReset'), click: () => motion?.reset() },
     { type: 'separator' },
     { label: t('desktopPetHide'), click: () => setDesktopPetEnabled(false) },
@@ -385,6 +404,7 @@ export function initializeDesktopPet(
   bind(DesktopPetIpc.DragStart, () => motion?.begin());
   bind(DesktopPetIpc.DragEnd, () => {
     if (motion?.end()) {
+      playAction(DesktopPetPlayableAction.Happy);
       if (status.targetSessionId) openTask();
       else greet();
     }

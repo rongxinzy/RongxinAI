@@ -1,7 +1,10 @@
 import { beforeEach, afterEach, test, expect, vi } from 'vitest';
+import { Menu } from 'electron';
 
 import {
+  DesktopPetEffectKind,
   DesktopPetIpc,
+  DesktopPetPlayableAction,
   DesktopPetTaskResult,
   DESKTOP_PET_STORE_KEY,
   DESKTOP_PET_FAILURES_KEY,
@@ -212,6 +215,49 @@ test('the renderer receives only a localized status snapshot', () => {
   const [channel, snapshot] = contents.send.mock.calls.at(-1)!;
   expect(channel).toBe(DesktopPetIpc.State);
   expect(Object.keys(snapshot).sort()).toEqual(['bubble', 'label', 'reducedMotion', 'state']);
+});
+
+test('the menu offers on-demand actions that reach the pet window as effects', () => {
+  setDesktopPetEnabled(true);
+  const contents = mocks.windows[0].webContents;
+  mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
+  const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
+    label?: string;
+    click?: () => void;
+  }>;
+  const byLabel = (label: string) => template.find(item => item.label === label);
+  contents.send.mockClear();
+  byLabel('侧看一眼')!.click!();
+  byLabel('点点头')!.click!();
+  byLabel('展翅一下')!.click!();
+  const actions = contents.send.mock.calls
+    .filter(([channel]) => channel === DesktopPetIpc.Effect)
+    .map(([, effect]) => (effect as { action: string }).action);
+  expect(actions).toEqual([
+    DesktopPetPlayableAction.Peek,
+    DesktopPetPlayableAction.Nod,
+    DesktopPetPlayableAction.Flutter,
+  ]);
+});
+
+test('a click (drag end without movement) plays the happy feedback before greeting', () => {
+  setDesktopPetEnabled(true);
+  const contents = mocks.windows[0].webContents;
+  mocks.end.mockReturnValueOnce(true);
+  mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
+  expect(contents.send).toHaveBeenCalledWith(DesktopPetIpc.Effect, {
+    kind: DesktopPetEffectKind.Action,
+    action: DesktopPetPlayableAction.Happy,
+  });
+  const effectAt = contents.send.mock.calls.findIndex(
+    ([channel]) => channel === DesktopPetIpc.Effect,
+  );
+  const greetingAt = contents.send.mock.calls.findIndex(
+    ([channel, snapshot]) =>
+      channel === DesktopPetIpc.State && (snapshot as { state: string }).state === 'greeting',
+  );
+  expect(effectAt).toBeGreaterThanOrEqual(0);
+  expect(greetingAt).toBeGreaterThan(effectAt);
 });
 
 test('hiding preserves position and disposal removes IPC and screen listeners', () => {

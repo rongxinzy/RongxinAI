@@ -41,7 +41,17 @@ export const DESKTOP_PET_DEFAULT_SETTINGS = {
   roaming: true,
 } as const;
 
-export const DesktopPetEffectKind = { Drag: 'drag', Impact: 'impact' } as const;
+export const DesktopPetEffectKind = { Drag: 'drag', Impact: 'impact', Action: 'action' } as const;
+
+/** Actions the pet can play on demand (menu playback / click feedback). */
+export const DesktopPetPlayableAction = {
+  Peek: 'peek',
+  Nod: 'nod',
+  Flutter: 'flutter',
+  Happy: 'happy',
+} as const;
+export type DesktopPetPlayableAction =
+  (typeof DesktopPetPlayableAction)[keyof typeof DesktopPetPlayableAction];
 
 export const DESKTOP_PET_SIZE = 192;
 export const DESKTOP_PET_STORE_KEY = 'desktopPet';

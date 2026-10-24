@@ -1,6 +1,7 @@
 import {
   DESKTOP_PET_SIZE,
   DesktopPetEffectKind,
+  DesktopPetPlayableAction,
   DesktopPetSprite,
   DesktopPetState,
 } from '../../shared/desktopPet/constants';
@@ -164,7 +165,10 @@ const unsubscribe = bridge?.onState(update);
 const unsubscribePose = bridge?.onPose(pose => animation.setPose(pose.facing, pose.walking));
 const unsubscribeEffect = bridge?.onEffect(effect => {
   if (effect.kind === DesktopPetEffectKind.Drag) animation.setDragging(effect.active);
-  else if (!reducedMotion) animation.impact(effect.strength);
+  else if (reducedMotion) return;
+  else if (effect.kind === DesktopPetEffectKind.Action)
+    animation.playAction(effect.action, performance.now());
+  else animation.impact(effect.strength);
 });
 const onMotionChange = (): void => {
   reducedMotion = systemReducedMotion || reduced.matches;
@@ -202,6 +206,7 @@ view.addEventListener('click', () => {
   if (!bridge) {
     state = DesktopPetState.Greeting;
     animation.setState(state, performance.now());
+    if (!reducedMotion) animation.playAction(DesktopPetPlayableAction.Happy, performance.now());
     maskDirty = true;
     refresh();
   }
