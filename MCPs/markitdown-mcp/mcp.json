@@ -1,11 +1,8 @@
 {
   "mcpServers": {
     "markitdown-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "markitdown-mcp-npx"
-      ]
+      "command": "uvx",
+      "args": ["markitdown-mcp"]
     }
   }
 }

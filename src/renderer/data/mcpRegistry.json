@@ -133,12 +133,12 @@
     {
       "id": "fetch",
       "name": "Fetch",
-      "description_zh": "网页内容抓取和 HTML 转 Markdown，适合 LLM 消费",
-      "description_en": "Web content fetching and HTML-to-markdown conversion for LLM consumption.",
+      "description_zh": "网页内容抓取和 HTML 转 Markdown（uvx mcp-server-fetch，PyPI 走国内镜像）",
+      "description_en": "Fetch web pages as Markdown via uvx mcp-server-fetch (CN PyPI mirrors).",
       "category": "data-api",
       "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-fetch"],
+      "command": "uvx",
+      "defaultArgs": ["mcp-server-fetch"],
       "authType": "none"
     },
     {
@@ -210,7 +210,7 @@
       "transportType": "stdio",
       "command": "npx",
       "defaultArgs": ["-y", "@larksuiteoapi/lark-mcp", "mcp", "-l", "zh"],
-      "requiredEnvKeys": ["LARK_APP_ID", "LARK_APP_SECRET"],
+      "requiredEnvKeys": ["APP_ID", "APP_SECRET"],
       "authType": "token"
     },
     {
@@ -228,8 +228,8 @@
     {
       "id": "excel-mcp-server",
       "name": "Excel MCP Server",
-      "description_zh": "读写 Excel/透视/图表（uvx 启动，PyPI 走国内镜像）",
-      "description_en": "Excel read/write, pivots, and charts via uvx (CN PyPI mirrors).",
+      "description_zh": "读写 Excel/透视/图表（uvx）。安装时请追加 --allow-dir <工作目录>，不要把 . 当作允许目录。",
+      "description_en": "Excel read/write, pivots, and charts via uvx. Append --allow-dir <folder> at install; do not allow '.'.",
       "category": "productivity",
       "transportType": "stdio",
       "command": "uvx",
@@ -248,25 +248,14 @@
       "authType": "none"
     },
     {
-      "id": "genoffice",
-      "name": "GenOffice",
-      "description_zh": "GenOffice Docs/Sheets/Slides/PDF MCP（npx）",
-      "description_en": "GenOffice MCP for docs, sheets, slides, and PDF.",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "genoffice", "mcp"],
-      "authType": "none"
-    },
-    {
       "id": "markitdown-mcp",
       "name": "MarkItDown MCP",
-      "description_zh": "PDF/Office 转 Markdown 读取（npx）",
-      "description_en": "Convert PDF/Office to Markdown for LLM consumption.",
+      "description_zh": "微软 MarkItDown：PDF/Office 转 Markdown（uvx，PyPI 走国内镜像）",
+      "description_en": "Microsoft MarkItDown: PDF/Office to Markdown via uvx (CN PyPI mirrors).",
       "category": "productivity",
       "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "markitdown-mcp-npx"],
+      "command": "uvx",
+      "defaultArgs": ["markitdown-mcp"],
       "authType": "none"
     },
     {
@@ -310,7 +299,7 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+      "defaultArgs": ["-y", "@modelcontextprotocol/server-filesystem"],
       "authType": "none"
     },
     {
@@ -334,28 +323,6 @@
       "command": "npx",
       "defaultArgs": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
       "authType": "none"
-    },
-    {
-      "id": "slack",
-      "name": "Slack",
-      "description_zh": "Slack 工作区：频道管理、消息发送、用户查询",
-      "description_en": "Slack workspace: channel management, messaging, user queries",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-slack"],
-      "requiredEnvKeys": ["SLACK_BOT_TOKEN", "SLACK_TEAM_ID"]
-    },
-    {
-      "id": "todoist",
-      "name": "TodoList",
-      "description_zh": "任务管理：创建、更新、完成和组织待办事项",
-      "description_en": "Task management: create, update, complete and organize to-do items",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "todoist-mcp@latest"],
-      "requiredEnvKeys": ["TODOIST_API_TOKEN"]
     }
   ]
 }

@@ -174,6 +174,51 @@ test('skillsConfigIntegrity: MCP catalogs exclude abandoned GongRzhe/iflow offic
   }
 });
 
+test('skillsConfigIntegrity: curated MCP launch commands stay installable and closed by default', () => {
+  const catalogs = [
+    path.join(repoRoot, 'MCPs/registry.json'),
+    path.join(repoRoot, 'src/renderer/data/mcpRegistry.json'),
+  ].map(
+    filePath =>
+      JSON.parse(fs.readFileSync(filePath, 'utf-8')) as {
+        servers: Array<{
+          id: string;
+          command?: string;
+          defaultArgs?: string[];
+          requiredEnvKeys?: string[];
+        }>;
+      },
+  );
+
+  for (const catalog of catalogs) {
+    const byId = new Map(catalog.servers.map(server => [server.id, server]));
+    expect(byId.has('genoffice'), 'genoffice npm package is not published').toBe(false);
+    expect(byId.has('slack')).toBe(false);
+    expect(byId.has('todoist')).toBe(false);
+
+    expect(byId.get('fetch')).toMatchObject({
+      command: 'uvx',
+      defaultArgs: ['mcp-server-fetch'],
+    });
+    expect(byId.get('markitdown-mcp')).toMatchObject({
+      command: 'uvx',
+      defaultArgs: ['markitdown-mcp'],
+    });
+    expect(byId.get('filesystem')?.defaultArgs).toEqual([
+      '-y',
+      '@modelcontextprotocol/server-filesystem',
+    ]);
+    expect(byId.get('lark-mcp')?.requiredEnvKeys).toEqual(['APP_ID', 'APP_SECRET']);
+    expect(byId.get('excel-mcp-server')?.defaultArgs ?? []).not.toContain('.');
+
+    const serialized = JSON.stringify(catalog);
+    expect(serialized).not.toContain('@modelcontextprotocol/server-fetch');
+    expect(serialized).not.toContain('markitdown-mcp-npx');
+    expect(serialized).not.toContain('server-slack');
+    expect(serialized.toLowerCase()).not.toContain('gongrzhe');
+  }
+});
+
 test('skillsConfigIntegrity: marketing-campaign-expert uses presentation-studio', () => {
   const presets = loadPresetPlugins();
   const marketing = presets.find(({ preset }) => preset === 'marketing-campaign-expert');

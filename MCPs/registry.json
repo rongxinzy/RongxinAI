@@ -159,14 +159,13 @@
     {
       "id": "fetch",
       "name": "Fetch",
-      "description_zh": "网页内容抓取和 HTML 转 Markdown，适合 LLM 消费",
-      "description_en": "Web content fetching and HTML-to-markdown conversion for LLM consumption.",
+      "description_zh": "网页内容抓取和 HTML 转 Markdown（uvx mcp-server-fetch，PyPI 走国内镜像）",
+      "description_en": "Fetch web pages as Markdown via uvx mcp-server-fetch (CN PyPI mirrors).",
       "category": "data-api",
       "transportType": "stdio",
-      "command": "npx",
+      "command": "uvx",
       "defaultArgs": [
-        "-y",
-        "@modelcontextprotocol/server-fetch"
+        "mcp-server-fetch"
       ],
       "authType": "none",
       "connectorPath": "fetch/mcp.json"
@@ -277,8 +276,8 @@
         "zh"
       ],
       "requiredEnvKeys": [
-        "LARK_APP_ID",
-        "LARK_APP_SECRET"
+        "APP_ID",
+        "APP_SECRET"
       ],
       "authType": "token",
       "connectorPath": "lark-mcp/mcp.json"
@@ -305,8 +304,8 @@
     {
       "id": "excel-mcp-server",
       "name": "Excel MCP Server",
-      "description_zh": "读写 Excel/透视/图表（uvx 启动，PyPI 走国内镜像）",
-      "description_en": "Excel read/write, pivots, and charts via uvx (CN PyPI mirrors).",
+      "description_zh": "读写 Excel/透视/图表（uvx）。安装时请追加 --allow-dir <工作目录>，不要把 . 当作允许目录。",
+      "description_en": "Excel read/write, pivots, and charts via uvx. Append --allow-dir <folder> at install; do not allow '.'.",
       "category": "productivity",
       "transportType": "stdio",
       "command": "uvx",
@@ -334,32 +333,15 @@
       "connectorPath": "officecli/mcp.json"
     },
     {
-      "id": "genoffice",
-      "name": "GenOffice",
-      "description_zh": "GenOffice Docs/Sheets/Slides/PDF MCP（npx）",
-      "description_en": "GenOffice MCP for docs, sheets, slides, and PDF.",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "genoffice",
-        "mcp"
-      ],
-      "authType": "none",
-      "connectorPath": "genoffice/mcp.json"
-    },
-    {
       "id": "markitdown-mcp",
       "name": "MarkItDown MCP",
-      "description_zh": "PDF/Office 转 Markdown 读取（npx）",
-      "description_en": "Convert PDF/Office to Markdown for LLM consumption.",
+      "description_zh": "微软 MarkItDown：PDF/Office 转 Markdown（uvx，PyPI 走国内镜像）",
+      "description_en": "Microsoft MarkItDown: PDF/Office to Markdown via uvx (CN PyPI mirrors).",
       "category": "productivity",
       "transportType": "stdio",
-      "command": "npx",
+      "command": "uvx",
       "defaultArgs": [
-        "-y",
-        "markitdown-mcp-npx"
+        "markitdown-mcp"
       ],
       "authType": "none",
       "connectorPath": "markitdown-mcp/mcp.json"
@@ -418,8 +400,7 @@
       "command": "npx",
       "defaultArgs": [
         "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "."
+        "@modelcontextprotocol/server-filesystem"
       ],
       "authType": "none",
       "connectorPath": "filesystem/mcp.json"
