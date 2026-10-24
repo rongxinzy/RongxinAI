@@ -320,6 +320,7 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 - **hover**：中性表面或文字层级变化（次文字 → 主文字），只在支持悬停的设备上生效。
 - **pressed**：选中填充 + 1px 位移（按钮）或仅表面加深（行）。
 - **focus-visible**：2px `--ring` 外轮廓，偏移 1px；不得无替代地移除。
+- **共享 Select 辨识边界**：使用现有 `--zy-text-muted` 中性描边，hover 不降低其对比度。键盘焦点用不透明 `--primary` 的 2px 外轮廓、偏移 1px，并移除额外透明阴影；它复用品牌蓝，不新增色系。原因是弱透明 `--ring` 再次混色后不能满足 3:1；此处按实际合成对比度落实焦点要求，不把分隔线的低对比边框当作控件边界。
 - **disabled**：recipe 提供外观，组件阻止动作并提供正确禁用语义，指针 `not-allowed`。
 - **selected / checked / open / invalid**：绑定真实状态；验证 selected+hover、invalid+focus、disabled 等组合。
 
