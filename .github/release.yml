@@ -19,7 +19,7 @@ changelog:
     - title: Documentation
       labels:
         - documentation
-        - area: docs
+        - "area: docs"
     - title: Dependencies
       labels:
         - dependencies
