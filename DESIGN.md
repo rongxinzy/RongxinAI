@@ -15,6 +15,7 @@
 | v2.0 Codex & Modern Agent Studio | 2026-10-13 | 确立工程归属、Button 使用纪律、密度与舒展度、全局提示规范。**本版完整继承这些工程约束。** |
 | v3.x Zenith | 2026-10-17 | 引入毛玻璃、蓝紫渐变主按钮、彩色光晕、悬停上浮放大、呼吸动画，并把字阶放大 30%。文档内部数值互相冲突（侧栏 240/280px、导航 32/40px、输入框 32/48px、卡片 20/32px），实现时只能各取一半，导致主界面「像模板、不像大厂」。**本版废止 v3 的视觉语言，保留 token 变量名及 v3 期间的专项修订（第十一至十三节）。** |
 | v4.0 Quiet Studio | 2026-10-20 | 用户审阅主界面截图后授权重定规范。以参考实现为代码标杆。 |
+| v4.0.1 | 2026-10-24 | 用户确认保留三段模型设置；修正元信息对比度与深色字阶，使规范与实现重新对齐。 |
 
 ## 一、诊断：v3 主界面为什么不像大厂作品
 
@@ -77,7 +78,7 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 | 选中填充 | `--sidebar-accent` | `rgba(16,24,40,.06)` | `rgba(255,255,255,.06)` | selected、pressed、分段轨道、禁用发送键底 |
 | 主文字 | `--zy-text-primary` / `--foreground` | `#181D27` | `#DFE1E6` | 标题、正文、选中项 |
 | 次文字 | `--zy-text-muted-foreground` / `--muted-foreground` | `#535862` | `#969DA8` | 控件文字、导航常态、说明 |
-| 元信息 | `--zy-text-muted` | `#717680` | `#6E7480` | 时间、分组标签、占位符、行内图标 |
+| 元信息 | `--zy-text-muted` | `#68707A` | `#89919D` | 时间、分组标签、占位符、行内图标 |
 | 边框 | `--zy-border` / `--border` | `rgba(16,24,40,.06)` | `rgba(255,255,255,.05)` | 面板描边、分隔线、胶囊描边 |
 | 强边框 | `--zy-input-border` / `--input` | `rgba(16,24,40,.08)` | `rgba(255,255,255,.08)` | 输入岛、输入框、浮层 |
 | 品牌蓝 | `--zy-primary` / `--primary` | `#3D70E0` | `#3D70E0` | 可执行的主动作、链接、运行点 |
@@ -478,14 +479,15 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 ### 模型页层级
 
-- 模型页按官方 Magpie 设置的信息架构分为 Service / Agents / Providers / Models / Network & sharing / Privacy / About 七个分段，使用分段控件切换；窄窗口下改为下拉选择，不得横向裁切分段标签。
-- 页面顶部只保留一个 `Model service` 区：状态徽标、简短说明、刷新/启用动作；启用说明只在未运行时出现。不得再出现打开官方管理页面的入口。
-- Provider 使用带分隔线的行式列表，不再为每个 Provider 套 Card；服务商模型标签使用 `text-xs`，不得出现 10px/11px 字号。
-- Default model 显示当前已保存默认模型；`Set as default` 只在用户选择了不同模型时出现，不展示长期禁用的主按钮。
-- Models / Network / Privacy 使用自动保存行：切换即写入，行内显示当前值；不得再引入页面级 Save。Network 的端口、局域网共享、CORS 与允许来源由宿主托管，只读展示并说明原因。
-- Privacy 的脱敏分类使用行式开关，不套嵌套卡片；订阅账号控制放在隐私分段底部。
-- 外部 Agent 是模型页的一级分段 `Agents`，直接展示接入列表与刷新/断开动作；不得收在 Service 底部，也不得再通过“管理接入”弹窗承载。
-- 页面内不得再出现重复的 `Models` 标题；许可证只在 About 分段出现一次。
+2026-10-24 用户确认保留当前三段精简结构，替代此前七段约定。
+
+- 模型页分为 `Providers & Models / Routing & usage / Advanced Settings` 三个一级分段，使用分段控件切换；窄窗口下改为下拉选择，不得横向裁切分段标签。
+- `Providers & Models` 依次承载 Model service、Default model、Provider 行式列表和模型目录。Model service 只保留状态徽标、简短说明、刷新/启用动作；启用说明只在未运行时出现，不提供官方管理页面入口。
+- Provider 使用带分隔线的行式列表，不为每个 Provider 套 Card；服务商模型标签使用 `text-xs`，不得出现 10px/11px 字号。Default model 显示当前已保存默认模型；`Set as default` 只在用户选择了不同模型时出现。
+- `Routing & usage` 集中承载模型回退组、订阅配额、近期调用与估算费用，不再单设 Model Routing 页面。
+- `Advanced Settings` 承载模型偏好、订阅账号、Network 与 Privacy；外部 Agent 管理入口位于编程模式的 Agent Manager，本分段只保留前往该入口的说明，不再设置模型页 Agents 分段或管理接入弹窗。
+- Models / Network / Privacy 使用自动保存行：切换即写入，行内显示当前值；不得引入页面级 Save。Network 的端口、局域网共享、CORS 与允许来源由宿主托管，只读展示并说明原因。
+- Privacy 的脱敏分类使用行式开关，不套嵌套卡片；页面内不得出现重复的 Models 标题。
 
 ### 其他修订
 
@@ -512,5 +514,5 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 **Design Authority**：本文件是知远智能体前端设计的唯一事实来源。偏离本文件须取得用户明确授权并同步更新本文件。
 
-**Version**: 4.0.0
-**Last Updated**: 2026-10-20
+**Version**: 4.0.1
+**Last Updated**: 2026-10-24

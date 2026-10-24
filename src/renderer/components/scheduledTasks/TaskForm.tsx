@@ -748,7 +748,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
     <div className="flex flex-col min-h-0 h-full">
       <div className="flex-1 overflow-y-auto py-3 min-h-0">
         <TaskFormBody
-          mode={mode}
           name={form.name}
           modelId={form.modelId}
           workspaceId={form.workspaceId}

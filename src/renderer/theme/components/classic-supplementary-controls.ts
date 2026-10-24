@@ -98,7 +98,7 @@ export function classicSupplementaryControls() {
     'fluid-tab-small': recipe({ base: { height: '1.75rem' } }),
     'fluid-indicator': recipe({
       base: {
-        'transition-property': 'transform, width, height',
+        'transition-property': 'transform',
         'transition-duration': '200ms',
         'transition-timing-function': 'var(--zy-style-ease-smooth)',
         'border-radius': '9999px',
@@ -187,7 +187,7 @@ export function classicSupplementaryControls() {
     'progress-fill': recipe({
       base: {
         'background-color': 'var(--primary)',
-        'transition-property': 'width, transform',
+        'transition-property': 'transform',
         'transition-duration': '150ms',
       },
     }),

@@ -101,7 +101,7 @@ export function MainViewCanvas({
   onRespondToPermission,
 }: MainViewCanvasProps) {
   return (
-    <div className={`flex-1 min-w-0 p-2 transition-[padding] duration-200 ease-out`}>
+    <div className="flex-1 min-w-0 p-2">
       <div
         data-main-canvas
         className="theme-main-panel relative h-full min-h-0 overflow-hidden contain-[layout_style_paint]"

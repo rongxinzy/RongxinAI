@@ -59,6 +59,10 @@ test('a parked sidebar request opens the real form with the requested folder', a
   render(createElement(ScheduledTasksView));
   const workspace = await screen.findByRole('combobox', { name: /scheduledTasksFormWorkspace/ });
   await waitFor(() => expect(workspace).toHaveTextContent('requested'));
+  const dialog = screen.getByRole('dialog');
+  expect(dialog.querySelectorAll('.overflow-y-auto')).toHaveLength(1);
+  expect(screen.getByRole('heading', { name: 'scheduledTasksNewTask' })).toBeVisible();
+  expect(screen.getByRole('button', { name: 'cancel' })).toBeVisible();
   expect(consumeScheduledTaskCreateRequest()).toBeNull();
 });
 

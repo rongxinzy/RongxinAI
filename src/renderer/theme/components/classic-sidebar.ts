@@ -31,7 +31,7 @@ export function classicSidebar() {
         'padding-inline': '0.5rem',
         'font-size': 'var(--zy-component-text-xs)',
         'font-weight': 'var(--zy-component-font-weight-medium)',
-        'transition-property': 'margin, opacity',
+        'transition-property': 'opacity',
         'transition-duration': '200ms',
         'transition-timing-function': 'linear',
       },
@@ -63,8 +63,8 @@ export function classicSidebar() {
         color: 'var(--sidebar-foreground)',
         padding: '0.5rem',
         'font-size': 'var(--zy-component-text-sm)',
-        'transition-property': 'width, height, padding',
-        'transition-duration': '150ms',
+        'transition-property': 'color, background-color, border-color, opacity, box-shadow',
+        'transition-duration': '120ms',
       },
       hover: {
         'background-color': 'var(--sidebar-accent)',
@@ -168,20 +168,8 @@ export function classicSidebar() {
     'sidebar-sub-md': recipe({ base: { 'font-size': 'var(--zy-component-text-sm)' } }),
     'sidebar-sub-sm': recipe({ base: { 'font-size': 'var(--zy-component-text-xs)' } }),
     'sidebar-sub-icon': recipe({ base: { color: 'var(--sidebar-accent-foreground)' } }),
-    'sidebar-gap': recipe({
-      base: {
-        'transition-property': 'width',
-        'transition-duration': '200ms',
-        'transition-timing-function': 'linear',
-      },
-    }),
-    'sidebar-container-motion': recipe({
-      base: {
-        'transition-property': 'left, right, width',
-        'transition-duration': '200ms',
-        'transition-timing-function': 'linear',
-      },
-    }),
+    'sidebar-gap': recipe({ base: {} }),
+    'sidebar-container-motion': recipe({ base: {} }),
     'sidebar-container-left-border': recipe({
       base: { 'border-right-width': '1px', 'border-style': 'solid' },
     }),

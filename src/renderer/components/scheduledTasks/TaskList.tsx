@@ -124,7 +124,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
               {task.name}
             </span>
             {workspaceName && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground shrink-0 rounded px-1.5 py-0.5 bg-muted/60">
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground shrink-0 rounded px-1.5 py-0.5 bg-muted/60">
                 <Folder className="size-3" />
                 <span className="truncate max-w-[120px]">{workspaceName}</span>
               </span>
@@ -176,7 +176,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
                   variant="ghost"
                   size="icon"
                   className="shrink-0"
-                  aria-label={i18nService.t('scheduledTasksActions')}
+                  aria-label={i18nService.t('scheduledTasksActions').replace('{name}', task.name)}
                 />
               }
               onClick={(e: React.MouseEvent) => e.stopPropagation()}
@@ -223,7 +223,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
       </div>
 
       {displayText && (
-        <p className="text-xs text-muted-foreground/80 line-clamp-1 pl-11 pr-2">{displayText}</p>
+        <p className="text-xs text-muted-foreground line-clamp-1 pl-11 pr-2">{displayText}</p>
       )}
     </Card>
   );
@@ -339,12 +339,12 @@ const TaskList: React.FC<TaskListProps> = ({
                       <div className="text-xs font-medium text-foreground truncate">
                         {i18nService.t(tpl.nameKey as Parameters<typeof i18nService.t>[0])}
                       </div>
-                      <div className="text-[11px] text-muted-foreground line-clamp-1">
+                      <div className="text-xs text-muted-foreground line-clamp-1">
                         {i18nService.t(tpl.descKey as Parameters<typeof i18nService.t>[0])}
                       </div>
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground/80">
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                     <CalendarClock className="size-3" />
                     {i18nService.t(tpl.scheduleLabelKey as Parameters<typeof i18nService.t>[0])}
                   </span>

@@ -100,7 +100,7 @@ export const quietStudioLightTokens: Record<string, string> = {
 
   'text-primary': '#181D27',
   'text-muted-foreground': '#535862',
-  'text-muted': '#717680',
+  'text-muted': '#68707A',
 
   border: 'rgba(16, 24, 40, 0.06)',
   'border-subtle': 'rgba(16, 24, 40, 0.06)',
@@ -180,6 +180,27 @@ export const quietStudioLightTokens: Record<string, string> = {
 };
 
 export const quietStudioDarkTokens: Record<string, string> = {
+  'component-text-xs': '12px',
+  'component-text-xs--line-height': '16px',
+  'component-text-sm': '14px',
+  'component-text-sm--line-height': '20px',
+  'component-text-base': '16px',
+  'component-text-base--line-height': '24px',
+  'component-text-lg': '18px',
+  'component-text-lg--line-height': '28px',
+  'component-text-xl': '20px',
+  'component-text-xl--line-height': '28px',
+  'component-text-2xl': '24px',
+  'component-text-2xl--line-height': '32px',
+  'component-text-3xl': '28px',
+  'component-text-3xl--line-height': '36px',
+  'style-text-xxl': '24px',
+  'style-text-xxl--line-height': '32px',
+  'style-body-leading': '1.5',
+  'style-font-sans': sansFont,
+  'style-font-heading': sansFont,
+  'style-font-mono': monoFont,
+  'text-muted': '#89919D',
   'semantic-background': '#18191D',
   'semantic-foreground': '#DFE1E6',
   'semantic-card': '#1F2126',
@@ -222,7 +243,6 @@ export const quietStudioDarkTokens: Record<string, string> = {
   'chat-bot-foreground': '#DFE1E6',
   'text-primary': '#DFE1E6',
   'text-muted-foreground': '#969DA8',
-  'text-muted': '#6E7480',
   border: 'rgba(255, 255, 255, 0.05)',
   'border-subtle': 'rgba(255, 255, 255, 0.05)',
   'input-border': 'rgba(255, 255, 255, 0.08)',
@@ -869,8 +889,8 @@ export function quietStudioAppearances(): Partial<ComponentAppearances> {
     }),
     'page-quick-action-bar-button-1': recipe({
       base: {
-        gap: '0.375rem',
-        'padding-inline': '0.75rem',
+        gap: '0.25rem',
+        'padding-inline': '0.5rem',
         'padding-block': '0px',
         height: '2rem',
         'border-radius': '9999px',

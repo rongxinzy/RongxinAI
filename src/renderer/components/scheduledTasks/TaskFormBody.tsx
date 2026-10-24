@@ -25,7 +25,6 @@ import {
 import { i18nService } from '../../services/i18n';
 
 interface TaskFormBodyProps {
-  mode: 'create' | 'edit';
   name: string;
   modelId: string;
   workspaceId: string;
@@ -49,7 +48,6 @@ interface TaskFormBodyProps {
 
 const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
   ({
-    mode,
     name,
     modelId,
     workspaceId,
@@ -71,12 +69,6 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
     onPayloadTextChange,
   }) => (
     <div className="max-w-2xl mx-auto flex flex-col gap-4 w-full px-1">
-      <p className="text-sm text-muted-foreground">
-        {mode === 'create'
-          ? i18nService.t('scheduledTasksFormCreate')
-          : i18nService.t('scheduledTasksFormUpdate')}
-      </p>
-
       <FieldGroup className="gap-4">
         <Field data-invalid={Boolean(errors.name) || undefined}>
           <FieldLabel htmlFor="scheduled-task-name">
