@@ -11,6 +11,9 @@ export const enSettings: Record<string, string> = {
   desktopPetRoaming: 'Screen roaming',
   desktopPetRoamingDescription:
     'While idle, Xiaoyuan may take short walks along the screen. You can turn this off anytime.',
+  desktopPetChatter: 'Occasional chatter',
+  desktopPetChatterDescription:
+    'While idle, Xiaoyuan may show a short line now and then. Task status bubbles always win. You can turn this off anytime.',
   desktopPetHideInFullscreenDescription:
     'Hide while ZhiYuan Agent is fullscreen and restore afterward. Also hide while locked or suspended.',
   desktopPetTaskOpenFailed:

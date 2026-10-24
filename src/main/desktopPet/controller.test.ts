@@ -299,6 +299,7 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
     doNotDisturb: false,
     hideInFullscreen: true,
     roaming: true,
+    chatter: true,
   });
   await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   mocks.windows[0].emit('ready-to-show');
@@ -322,6 +323,7 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
     doNotDisturb: false,
     hideInFullscreen: true,
     roaming: true,
+    chatter: true,
   });
 });
 

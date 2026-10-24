@@ -8,6 +8,7 @@ const settings = z.object({
   doNotDisturb: z.boolean(),
   hideInFullscreen: z.boolean(),
   roaming: z.boolean(),
+  chatter: z.boolean(),
 });
 export const desktopPetContract = defineIpcContract({
   getSettings: { channel: DesktopPetIpc.GetSettings, args: z.tuple([]), result: settings },

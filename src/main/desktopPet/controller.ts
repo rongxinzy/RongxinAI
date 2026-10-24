@@ -31,6 +31,7 @@ import { PiUiEventType, type PiUiEvent } from '../../shared/cowork/piUiEvent';
 import type { SqliteStore } from '../sqliteStore';
 import { t } from '../i18n';
 import { desktopPetBubbleKey } from './bubbleText';
+import { DesktopPetChatter } from './chatter';
 import { clampPetPosition, DesktopPetMotion, petBounds } from './motion';
 import { DesktopPetStatus } from './status';
 import { watchDesktopPetVisibility } from './visibility';
@@ -42,7 +43,9 @@ let mainWindow: (() => BrowserWindow | null) | undefined;
 let onEnabledChanged: (() => void) | undefined;
 let terminalTimer: ReturnType<typeof setTimeout> | undefined;
 let greetingTimer: ReturnType<typeof setTimeout> | undefined;
+let chatterTimer: ReturnType<typeof setTimeout> | undefined;
 let greeting = false;
+let chatter = new DesktopPetChatter();
 let reducedMotion = false;
 let status = new DesktopPetStatus();
 let visibility: ReturnType<typeof watchDesktopPetVisibility> | undefined;
@@ -59,10 +62,18 @@ function sendState(): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
   const state = currentState();
   const bubbleKey = desktopPetBubbleKey(state);
+  const allowChatter =
+    !bubbleKey &&
+    state === DesktopPetState.Idle &&
+    !greeting &&
+    !reducedMotion &&
+    getDesktopPetSettings().chatter;
+  if (!allowChatter) chatter.clear();
+  const chatterKey = allowChatter ? chatter.activeKey() : null;
   pet.webContents.send(DesktopPetIpc.State, {
     state,
     label: t(`desktopPet_${state}`),
-    bubble: bubbleKey ? t(bubbleKey) : null,
+    bubble: bubbleKey ? t(bubbleKey) : chatterKey ? t(chatterKey) : null,
     reducedMotion,
   });
   syncRoamAllow(state);
@@ -74,6 +85,30 @@ function syncRoamAllow(state: DesktopPetState): void {
   motion?.setAllowRoam(
     state === DesktopPetState.Idle && !greeting && !reducedMotion && settings.roaming,
   );
+}
+
+function chatterAllowed(state: DesktopPetState): boolean {
+  const settings = getDesktopPetSettings();
+  return (
+    visible && settings.chatter && !reducedMotion && state === DesktopPetState.Idle && !greeting
+  );
+}
+
+function stopChatterLoop(): void {
+  clearTimeout(chatterTimer);
+  chatterTimer = undefined;
+}
+
+function startChatterLoop(): void {
+  if (chatterTimer) return;
+  const step = (): void => {
+    const state = currentState();
+    const changed = chatter.tick(Date.now(), chatterAllowed(state));
+    if (changed) sendState();
+    chatterTimer = setTimeout(step, 1000);
+  };
+  chatter.reset(Date.now());
+  chatterTimer = setTimeout(step, 1000);
 }
 
 function sendPose(facing: number, walking: boolean): void {
@@ -99,6 +134,7 @@ function getDesktopPetSettings(): DesktopPetSettings {
     doNotDisturb: saved?.doNotDisturb === true,
     hideInFullscreen: saved?.hideInFullscreen !== false,
     roaming: saved?.roaming !== false,
+    chatter: saved?.chatter !== false,
   };
 }
 
@@ -125,9 +161,12 @@ function syncVisibility(): void {
   visible = show;
   if (show) {
     motion?.resume();
+    startChatterLoop();
     sendState();
     pet.showInactive();
   } else {
+    stopChatterLoop();
+    chatter.clear();
     motion?.pause();
     pet.hide();
   }
@@ -368,6 +407,7 @@ export function initializeDesktopPet(
       setDesktopPetEnabled(settings.enabled);
       motion?.setRoamingEnabled(settings.roaming);
       syncRoamAllow(currentState());
+      sendState();
       return settings;
     },
     getPendingTask: event => {
@@ -442,6 +482,8 @@ export function observeDesktopPetEvent(event: PiUiEvent): void {
 export function disposeDesktopPet(): void {
   clearTimeout(terminalTimer);
   clearTimeout(greetingTimer);
+  stopChatterLoop();
+  chatter.clear();
   motion?.dispose();
   pet?.destroy();
   pet = null;

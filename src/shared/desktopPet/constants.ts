@@ -39,6 +39,7 @@ export const DESKTOP_PET_DEFAULT_SETTINGS = {
   doNotDisturb: false,
   hideInFullscreen: true,
   roaming: true,
+  chatter: true,
 } as const;
 
 export const DesktopPetEffectKind = { Drag: 'drag', Impact: 'impact', Action: 'action' } as const;

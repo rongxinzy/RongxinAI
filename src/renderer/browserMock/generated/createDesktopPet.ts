@@ -10,6 +10,7 @@ export function createDesktopPet(runtime: BrowserMockRuntime): Window['electron'
         doNotDisturb: false,
         hideInFullscreen: false,
         roaming: false,
+        chatter: false,
       };
     },
     setSettings: async _p0 => {
@@ -20,6 +21,7 @@ export function createDesktopPet(runtime: BrowserMockRuntime): Window['electron'
         doNotDisturb: false,
         hideInFullscreen: false,
         roaming: false,
+        chatter: false,
       };
     },
     onSettingsChanged: _p0 => {
