@@ -16,6 +16,10 @@ const config: KnipConfig = {
   workspaces: {
     '.': {
       entry: [
+        // Executed offline CLI, no exports. Include its helper dependency graph in checks.
+        // Command/provenance: src/renderer/assets/desktop-pet/motion/README.md.
+        // This is an entry root, not an ignoreFiles/ignoreIssues exemption.
+        'scripts/companion/media/render-motion.mjs',
         // vite-plugin-electron bundle entries. Knip's Vite plugin reads HTML and
         // rolldown inputs, not the electron() entry list in vite.config.ts.
         // Run from .husky/pre-commit.
@@ -107,6 +111,9 @@ const config: KnipConfig = {
   },
   ignoreBinaries: [
     // Operating-system commands, not npm packages.
+    // Host-only offline media encoder; render-motion checks its version before use.
+    // Not shipped or resolved from JS dependencies. See the motion asset README.
+    'ffmpeg',
     'openssl',
     'reg',
     // Packaged Linux e2e seeds and reads SQLite through the sqlite3 CLI.

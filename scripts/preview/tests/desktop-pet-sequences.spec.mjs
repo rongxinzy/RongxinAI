@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { DesktopPetBuiltinId } from '../../../src/shared/desktopPet/catalog.ts';
+import { DesktopPetMotion } from '../../../src/shared/desktopPet/motionCatalog.ts';
 
 const characters = ['xiaoyuan', 'youli', 'tuantuan', 'mianmian', 'zhuli', 'yunmo', 'maixiao'];
 const states = ['idle', 'thinking', 'waiting', 'completed', 'error', 'greeting'];
@@ -129,9 +131,22 @@ test('long playback renders multiple beats, stays inside the mask and yields to 
     await expect(page.locator('canvas')).toHaveAttribute('data-character', character);
     await page.evaluate(() => window.petEffect({ kind: 'action', action: 'happy' }));
     const samples = [];
+    let elapsed = 0;
     for (const interval of [500, 500, 900, 1600]) {
-      await page.clock.runFor(interval);
-      await expect(page.locator('canvas')).toHaveAttribute('data-sequence', 'happy');
+      elapsed += interval;
+      if (character === DesktopPetBuiltinId.Xiaoyuan) {
+        // A fake clock cannot advance a browser decoder. Verify actual media time.
+        await expect(page.locator('canvas')).toHaveAttribute(
+          'data-media-clip',
+          DesktopPetMotion.Happy,
+        );
+        await expect
+          .poll(async () => Number(await page.locator('canvas').getAttribute('data-media-time')))
+          .toBeGreaterThan(elapsed / 1000);
+      } else {
+        await page.clock.runFor(interval);
+        await expect(page.locator('canvas')).toHaveAttribute('data-sequence', 'happy');
+      }
       samples.push(
         await page.locator('canvas').evaluate(canvas => {
           const data = canvas.getContext('2d').getImageData(0, 0, 192, 192).data;
@@ -168,6 +183,18 @@ test('hidden and reduced-motion windows discard choreography and never replay ba
   await page.clock.install();
   await page.goto('/desktop-pet.html');
   await expect(page.locator('canvas')).toHaveAttribute('data-character', 'xiaoyuan');
+  await page.evaluate(
+    characterId =>
+      window.petState({
+        characterId,
+        state: 'idle',
+        label: 'Companion',
+        bubble: null,
+        reducedMotion: false,
+      }),
+    DesktopPetBuiltinId.Youli,
+  );
+  await expect(page.locator('canvas')).toHaveAttribute('data-character', DesktopPetBuiltinId.Youli);
   await page.evaluate(() => window.petEffect({ kind: 'action', action: 'peek' }));
   await page.clock.runFor(2000);
   await expect(page.locator('canvas')).toHaveAttribute('data-sequence', 'peek');

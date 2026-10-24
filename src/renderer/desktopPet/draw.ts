@@ -85,3 +85,60 @@ export function petHitMask(
   cache.values.set(key, alpha);
   return alpha;
 }
+
+export function drawPetMedia(
+  target: CanvasRenderingContext2D,
+  source: CanvasImageSource,
+  scaleY = 1,
+  facing = 1,
+  rotate = 0,
+  offsetX = 0,
+  offsetY = 0,
+): void {
+  target.save();
+  target.translate(DESKTOP_PET_SIZE / 2 + offsetX, DESKTOP_PET_SIZE - 12 + offsetY);
+  target.rotate(rotate);
+  target.scale(facing / Math.sqrt(scaleY), scaleY);
+  target.drawImage(
+    source,
+    -DESKTOP_PET_SIZE / 2,
+    -(DESKTOP_PET_SIZE - 12),
+    DESKTOP_PET_SIZE,
+    DESKTOP_PET_SIZE,
+  );
+  target.restore();
+}
+
+const mediaMasks = new WeakMap<HTMLImageElement, { source: string; value: Uint8Array }>();
+/** Each decoded slot owns one mask. Reusing its image for a new clip invalidates the cache. */
+export function petMediaHitMask(images: HTMLImageElement[]): Uint8Array {
+  const combined = new Uint8Array(DESKTOP_PET_SIZE * DESKTOP_PET_SIZE);
+  for (const image of images) {
+    let cached = mediaMasks.get(image);
+    if (cached?.source !== image.src) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = DESKTOP_PET_SIZE;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) continue;
+      for (const facing of [-1, 1])
+        for (const rotate of [-0.16, 0, 0.16])
+          for (const scale of [0.86, 1, 1.13])
+            for (const [x, y] of [
+              [-8, -18],
+              [8, -18],
+              [-8, 6],
+              [8, 6],
+              [0, 0],
+            ])
+              drawPetMedia(context, image, scale, facing, rotate, x, y);
+      const pixels = context.getImageData(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE).data;
+      const value = new Uint8Array(combined.length);
+      for (let index = 0; index < value.length; index++)
+        value[index] = pixels[index * 4 + 3] > 32 ? 255 : 0;
+      cached = { source: image.src, value };
+      mediaMasks.set(image, cached);
+    }
+    for (let index = 0; index < combined.length; index++) combined[index] |= cached.value[index];
+  }
+  return combined;
+}

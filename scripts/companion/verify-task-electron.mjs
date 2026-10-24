@@ -4,6 +4,10 @@ import fs from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { DesktopPetState } from '../../src/shared/desktopPet/constants.ts';
+import { DesktopPetMotion } from '../../src/shared/desktopPet/motionCatalog.ts';
+import { WorkbenchRunStatus } from '../../src/shared/workbenchTask/constants.ts';
+import { stressMedia } from './stress-media.mjs';
 
 // Manual native acceptance only: isolated storage, local model fixture, no real account keys.
 // Prerequisites: verified Magpie resource, build:electron:dev and web:preview.
@@ -48,6 +52,8 @@ const server = createServer(async (request, response) => {
     maxTokens: payload.max_tokens,
   });
   requests++;
+  // Keep the run active long enough to observe its real media state before completion.
+  if (kind === 'task') await new Promise(resolve => setTimeout(resolve, 2000));
   response.writeHead(200, { 'Content-Type': 'text/event-stream' });
   const chunk = (delta, finish_reason = null) => ({
     id: 'fixture-answer',
@@ -125,6 +131,19 @@ try {
     .catch(() => application.windows().find(page => page.url().includes('desktop-pet.html')));
   if (!actor) throw new Error('Native companion actor missing');
   await actor.waitForFunction(() => Boolean(window.desktopPet));
+  await actor.addInitScript(() => {
+    window.acceptanceVideos = [];
+    const create = Document.prototype.createElement;
+    Document.prototype.createElement = function (...args) {
+      const element = create.apply(this, args);
+      if (args[0] === 'video') window.acceptanceVideos.push(element);
+      return element;
+    };
+  });
+  await actor.emulateMedia({ reducedMotion: 'no-preference' });
+  await actor.reload();
+  await expect(actor.locator('canvas')).toHaveAttribute('data-media-state', 'playing');
+  await expect.poll(() => actor.evaluate(() => window.acceptanceVideos.length)).toBe(2);
   await application.evaluate(({ Menu }) => {
     Menu.prototype.popup = function () {
       const item = this.items.find(item => ['聊两句', 'Have a chat'].includes(item.label));
@@ -165,6 +184,15 @@ try {
     tasks: [task],
   } = await chat.evaluate(() => window.companion.tasks());
   const receipt = task.receipt;
+  await expect(actor.locator('canvas')).toHaveAttribute('data-state', DesktopPetState.Thinking);
+  await expect(actor.locator('canvas')).toHaveAttribute('data-media-clip', DesktopPetMotion.Think);
+  await main.evaluate(() => window.electron.desktopPet.setSettings({ doNotDisturb: true }));
+  await expect(actor.locator('canvas')).toHaveAttribute('data-visible', 'false');
+  expect(
+    await actor.evaluate(() =>
+      window.acceptanceVideos.every(video => video.paused && !video.getAttribute('src')),
+    ),
+  ).toBe(true);
   const retry = await chat.evaluate(
     async receipt =>
       window.companion.submitTask({
@@ -182,16 +210,18 @@ try {
   await expect
     .poll(
       async () =>
-        ['succeeded', 'needs_review', 'failed'].includes(
-          (await chat.evaluate(() => window.companion.tasks())).tasks[0]?.status,
-        ),
+        [
+          WorkbenchRunStatus.Succeeded,
+          WorkbenchRunStatus.NeedsReview,
+          WorkbenchRunStatus.Failed,
+        ].includes((await chat.evaluate(() => window.companion.tasks())).tasks[0]?.status),
       { timeout: 90_000 },
     )
     .toBe(true);
   const {
     tasks: [finished],
   } = await chat.evaluate(() => window.companion.tasks());
-  if (finished.status === 'failed') {
+  if (finished.status === WorkbenchRunStatus.Failed) {
     const detail = await main.evaluate(
       taskId => window.electron.workbenchTask.getDetail(taskId),
       receipt.taskId,
@@ -200,6 +230,33 @@ try {
       `Native work run failed: ${JSON.stringify(detail.detail?.runs.map(run => ({ id: run.id, status: run.status, failure: run.failure })))}`,
     );
   }
+  expect(
+    await actor.evaluate(() => window.acceptanceVideos.every(video => !video.getAttribute('src'))),
+  ).toBe(true);
+  await main.evaluate(() => window.electron.desktopPet.setSettings({ doNotDisturb: false }));
+  await expect(actor.locator('canvas')).toHaveAttribute('data-state', DesktopPetState.Completed);
+  await expect(actor.locator('canvas')).toHaveAttribute('data-media-clip', DesktopPetMotion.Happy);
+  const media = await actor.evaluate(() => {
+    const canvas = document.querySelector('canvas');
+    const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    let transparent = 0,
+      opaque = 0;
+    for (let index = 3; index < pixels.length; index += 4) {
+      if (pixels[index] === 0) transparent++;
+      if (pixels[index] > 240) opaque++;
+    }
+    return {
+      decoderSlots: window.acceptanceVideos.length,
+      clip: canvas.dataset.mediaClip,
+      transparent,
+      opaque,
+      devicePixelRatio: window.devicePixelRatio,
+    };
+  });
+  expect(media.transparent).toBeGreaterThan(10_000);
+  expect(media.opaque).toBeGreaterThan(5000);
+  expect(media.decoderSlots).toBe(2);
+  await actor.screenshot({ path: path.join(userData, 'motion-window.png'), omitBackground: true });
   await chat.screenshot({ path: path.join(userData, 'task-window.png') });
   await chat.evaluate(sessionId => window.companion.openWorkbench(sessionId), receipt.sessionId);
   await main
@@ -219,6 +276,14 @@ try {
   await expect
     .poll(() => requestKinds.map(item => item.kind).sort(), { timeout: 10_000 })
     .toEqual(['project-memory', 'session-memory', 'task']);
+  const stress = process.env.COMPANION_MEDIA_STRESS_SECONDS
+    ? await stressMedia(
+        application,
+        main,
+        actor,
+        Number(process.env.COMPANION_MEDIA_STRESS_SECONDS),
+      )
+    : null;
   console.log(
     JSON.stringify({
       passed: true,
@@ -228,6 +293,8 @@ try {
       taskExecutions: requestKinds.filter(item => item.kind === 'task').length,
       maintenanceRequests: requestKinds.filter(item => item.kind !== 'task').length,
       detailAvailable: Boolean(detail),
+      media,
+      stress,
       userData,
       workspace,
     }),

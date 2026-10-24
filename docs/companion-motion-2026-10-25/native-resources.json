@@ -1,0 +1,220 @@
+{
+  "passed": true,
+  "status": "succeeded",
+  "receipt": {
+    "petId": "1df4bf36-b769-4919-b0b5-d46ca5d11b9e",
+    "requestId": "94b28a75-fab8-4216-bc22-15dcc11807f8",
+    "sessionId": "1abae669-a482-4e8d-ba53-18461bef442a",
+    "taskId": "9cb49726-6941-40eb-996a-01814becbaef",
+    "runId": "99b0155f-a86a-46c0-88ef-923f826460d0"
+  },
+  "requests": 3,
+  "taskExecutions": 1,
+  "maintenanceRequests": 2,
+  "detailAvailable": true,
+  "media": {
+    "decoderSlots": 2,
+    "clip": "happy",
+    "transparent": 100388,
+    "opaque": 40734,
+    "devicePixelRatio": 2
+  },
+  "stress": {
+    "seconds": 180.22754979199996,
+    "samples": [
+      {
+        "heapBytes": 3269704,
+        "pid": 68273,
+        "workingSetKiB": 205712,
+        "cpuPercent": 0.8577417863418884,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3255636,
+        "pid": 68273,
+        "workingSetKiB": 214336,
+        "cpuPercent": 1.1232236223672192,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3278692,
+        "pid": 68273,
+        "workingSetKiB": 202944,
+        "cpuPercent": 0.9627276742219628,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3259756,
+        "pid": 68273,
+        "workingSetKiB": 211664,
+        "cpuPercent": 0.9340464526310008,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3281324,
+        "pid": 68273,
+        "workingSetKiB": 218304,
+        "cpuPercent": 1.1087188090109357,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3266148,
+        "pid": 68273,
+        "workingSetKiB": 220240,
+        "cpuPercent": 0.9411215005133042,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3290008,
+        "pid": 68273,
+        "workingSetKiB": 224304,
+        "cpuPercent": 1.0015872651243238,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3266504,
+        "pid": 68273,
+        "workingSetKiB": 226928,
+        "cpuPercent": 0.9777904424106041,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3290148,
+        "pid": 68273,
+        "workingSetKiB": 230608,
+        "cpuPercent": 0.8575784295582937,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3266564,
+        "pid": 68273,
+        "workingSetKiB": 234912,
+        "cpuPercent": 0.8436416788427229,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3289156,
+        "pid": 68273,
+        "workingSetKiB": 240640,
+        "cpuPercent": 0.8816535818608744,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3267720,
+        "pid": 68273,
+        "workingSetKiB": 242320,
+        "cpuPercent": 0.7892912990083993,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3289256,
+        "pid": 68273,
+        "workingSetKiB": 226528,
+        "cpuPercent": 0.786464361259381,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3266728,
+        "pid": 68273,
+        "workingSetKiB": 231712,
+        "cpuPercent": 0.8547195154153776,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3289320,
+        "pid": 68273,
+        "workingSetKiB": 234512,
+        "cpuPercent": 0.7669806685360091,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3266792,
+        "pid": 68273,
+        "workingSetKiB": 186752,
+        "cpuPercent": 1.2114010430091766,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3289384,
+        "pid": 68273,
+        "workingSetKiB": 192384,
+        "cpuPercent": 1.866886401411319,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3267900,
+        "pid": 68273,
+        "workingSetKiB": 195200,
+        "cpuPercent": 1.7012788270748218,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3290536,
+        "pid": 68273,
+        "workingSetKiB": 200176,
+        "cpuPercent": 1.8009991865693213,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3267964,
+        "pid": 68273,
+        "workingSetKiB": 207920,
+        "cpuPercent": 1.7694806743536913,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 3290568,
+        "pid": 68273,
+        "workingSetKiB": 212752,
+        "cpuPercent": 1.7256279894188757,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      }
+    ],
+    "heapGrowthBytes": 20864,
+    "workingSetGrowthKiB": 7040
+  },
+  "userData": "/tmp/companion-task-native-G26ILG",
+  "workspace": "/tmp/companion-task-workspace-gLERz9"
+}
