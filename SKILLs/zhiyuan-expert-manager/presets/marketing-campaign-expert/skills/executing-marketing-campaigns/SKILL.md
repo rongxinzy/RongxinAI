@@ -120,4 +120,4 @@ Report in this order:
 5. actions to scale, fix, stop, or test;
 6. reusable assets, process changes, owners, and dates.
 
-Use `web-search` for current market evidence; `campaign-planner` for an expanded campaign plan; `marketing-writer` for conversion-oriented page copy; `ad-creative` for paid-media variants; and `docx`, `xlsx`, `pptx`, or `pdf` for verified deliverables. Always locate and read the selected skill in `<available_skills>` before using it.
+Use `web-search` for current market evidence; `campaign-planner` for an expanded campaign plan; `marketing-writer` for conversion-oriented page copy; `ad-creative` for paid-media variants; and `docx`, `xlsx`, `presentation-studio`, or `pdf` for verified deliverables. Always locate and read the selected skill in `<available_skills>` before using it.
