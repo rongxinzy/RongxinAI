@@ -1,6 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { DESKTOP_PET_BUILTINS, DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
+import {
+  DESKTOP_PET_BUILTINS,
+  DesktopPetBuiltinId,
+  desktopPetBuiltin,
+} from '../../shared/desktopPet/catalog';
+import { DESKTOP_PET_STORE_KEY } from '../../shared/desktopPet/constants';
 import type { CompanionProfile } from '../../shared/companion/types';
 
 const STORE_KEY = 'companion_profiles';
@@ -39,6 +44,9 @@ export class CompanionProfiles {
       createdAt: Date.now(),
     }));
     const value = { activePetId: profiles[0].petId, profiles };
+    const appearance = this.store.get<{ characterId?: string }>(DESKTOP_PET_STORE_KEY)?.characterId;
+    const selected = appearance ? desktopPetBuiltin(appearance) : undefined;
+    if (selected) profiles[0].characterId = selected.id;
     this.store.set(STORE_KEY, value);
     return value;
   }

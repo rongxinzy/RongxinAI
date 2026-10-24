@@ -3,8 +3,7 @@ export const enSettings: Record<string, string> = {
   desktopPetSettingsTitle: 'Desktop companion',
   desktopPetEnabled: 'Show desktop companion',
   desktopPetCharacter: 'Companion character',
-  desktopPetCharacterDescription:
-    'Saved automatically. Switching characters preserves tasks and failure reminders.',
+  desktopPetCharacterDescription: 'Changes appearance only.',
   desktopPetCharacterXiaoyuan: 'Xiaoyuan · Owl',
   desktopPetCharacterYouli: 'Youli · Red fox',
   desktopPetCharacterTuantuan: 'Tuantuan · Sea otter',
@@ -12,20 +11,16 @@ export const enSettings: Record<string, string> = {
   desktopPetCharacterZhuli: 'Zhuli · Red panda',
   desktopPetCharacterYunmo: 'Yunmo · Baby dragon',
   desktopPetCharacterMaixiao: 'Maixiao · Corgi',
-  desktopPetEnabledDescription:
-    'Show task status on your desktop. Click to open the related task. Off by default.',
+  desktopPetEnabledDescription: 'Click for the current task. Open chat from the companion menu.',
   desktopPetDoNotDisturb: 'Do not disturb',
-  desktopPetDoNotDisturbDescription:
-    'Temporarily hide your companion. Tasks continue and unhandled failure reminders are kept.',
+  desktopPetDoNotDisturbDescription: 'Hide your companion while tasks continue.',
   desktopPetHideInFullscreen: 'Hide when the app is fullscreen',
   desktopPetRoaming: 'Screen roaming',
-  desktopPetRoamingDescription:
-    'While idle, your companion may take short walks along the screen. You can turn this off anytime.',
+  desktopPetRoamingDescription: 'Take short walks while idle.',
   desktopPetChatter: 'Occasional chatter',
-  desktopPetChatterDescription:
-    'While idle, your companion may show a short line now and then. Task status bubbles always win. You can turn this off anytime.',
+  desktopPetChatterDescription: 'Show an occasional line while idle.',
   desktopPetHideInFullscreenDescription:
-    'Hide while ZhiYuan Agent is fullscreen and restore afterward. Also hide while locked or suspended.',
+    'Hide while this app is fullscreen, or the device is locked or asleep.',
   desktopPetTaskOpenFailed:
     'The task could not be opened. Check the conversation list. Unacknowledged failure reminders are kept.',
   // Settings

@@ -10,6 +10,18 @@
  */
 
 // ─── Store ──────────────────────────────────────────────────────────────────
+export const CompanionIpc = {
+  Bootstrap: 'companion:bootstrap',
+  Select: 'companion:select',
+  Submit: 'companion:submit',
+  Answer: 'companion:answer',
+  Stop: 'companion:stop',
+  Hide: 'companion:hide',
+  OpenWorkbench: 'companion:openWorkbench',
+  Context: 'companion:context',
+  Visibility: 'companion:visibility',
+} as const;
+
 export const StoreIpc = {
   Get: 'store:get',
   Set: 'store:set',

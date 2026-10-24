@@ -35,6 +35,7 @@ import { zhSecurity } from './zh/security';
 import { zhSettings } from './zh/settings';
 import { zhTodoActivity } from './zh/todoActivity';
 import { zhWorkbench } from './zh/workbench';
+import { companionMessages } from '../../../shared/companion/messages';
 
 const zhModules = [
   zhLocalInferenceService,
@@ -53,6 +54,7 @@ const zhModules = [
   zhArtifactsUpdates,
   zhSettings,
   zhCommon,
+  companionMessages.zh,
 ];
 
 const enModules = [
@@ -72,6 +74,7 @@ const enModules = [
   enArtifactsUpdates,
   enSettings,
   enCommon,
+  companionMessages.en,
 ];
 
 describe('split translation modules', () => {

@@ -81,6 +81,19 @@ test('an explicit companion request can start a previously enabled service', asy
   expect(f.start).toHaveBeenCalledTimes(1);
 });
 
+test('failed gateway startup degrades to local capability and a later request can recover', async () => {
+  const f = fixture();
+  f.setStatus({ state: 'failed', version: 'test', enabled: true });
+  f.start.mockRejectedValueOnce(new Error('Fixture gateway startup failed'));
+  expect((await f.assignment.resolve('pet')).availability).toMatchObject({
+    capability: CompanionCapability.Local,
+    reason: CompanionUnavailableReason.ServiceUnavailable,
+  });
+  expect((await f.assignment.resolve('pet')).availability.capability).toBe(
+    CompanionCapability.Chat,
+  );
+});
+
 test('stops assigning when service consent is revoked before its process has exited', async () => {
   const f = fixture();
   f.setStatus({

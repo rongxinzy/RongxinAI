@@ -5,6 +5,7 @@ import { APP_NAME } from './appConstants';
 import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { t } from './i18n';
 import { isDesktopPetEnabled, setDesktopPetEnabled } from './desktopPet/controller';
+import { openCompanionWindow } from './companion/window';
 
 let tray: Tray | null = null;
 let contextMenu: Menu | null = null;
@@ -66,6 +67,7 @@ function buildContextMenu(getWindow: () => BrowserWindow | null): Menu {
       },
     },
     { type: 'separator' },
+    { label: t('companionTalk'), click: openCompanionWindow },
     {
       label: t('desktopPetTitle'),
       type: 'checkbox',

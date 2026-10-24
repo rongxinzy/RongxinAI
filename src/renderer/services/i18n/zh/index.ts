@@ -14,6 +14,7 @@ import { zhTodoActivity } from './todoActivity';
 import { zhArtifactsUpdates } from './artifactsUpdates';
 import { zhSettings } from './settings';
 import { zhCommon } from './common';
+import { companionMessages } from '../../../../shared/companion/messages';
 
 export const zhTranslations: Record<string, string> = {
   ...zhLocalInferenceService,
@@ -32,4 +33,5 @@ export const zhTranslations: Record<string, string> = {
   ...zhArtifactsUpdates,
   ...zhSettings,
   ...zhCommon,
+  ...companionMessages.zh,
 };

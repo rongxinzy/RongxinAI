@@ -9,6 +9,7 @@ import {
   GenerationTask,
   Harness,
   hook,
+  UserEntry,
   type Conversation,
   type Submission,
 } from '@earendil-works/pi-durable';
@@ -18,6 +19,7 @@ import { CompanionCapability, CompanionRequestState } from '../../shared/compani
 import type {
   CompanionAnswer,
   CompanionAvailability,
+  CompanionConversation,
   CompanionProfile,
   CompanionReceipt,
 } from '../../shared/companion/types.js';
@@ -254,6 +256,40 @@ export class PiCompanionRuntime {
   stop(profile: CompanionProfile): Promise<void> {
     return this.serialize(async () => {
       await (await this.open(profile)).conversation.abort(context);
+    });
+  }
+
+  history(profile: CompanionProfile): Promise<CompanionConversation> {
+    return this.serialize(async () => {
+      const active = await this.open(profile);
+      const page = await active.conversation.entries({}, 32, undefined, context);
+      const pending = (await active.harness.inspect(context)).submissions.find(
+        item => item.type === 'input' && item.requestId,
+      );
+      return {
+        messages: [...page.items]
+          .reverse()
+          .filter(entry => UserEntry.is(entry) || AssistantEntry.is(entry))
+          .flatMap(entry =>
+            (entry.model ?? []).flatMap(message => {
+              if (message.role !== 'user' && message.role !== 'assistant') return [];
+              const text =
+                typeof message.content === 'string'
+                  ? message.content
+                  : message.content
+                      .flatMap(block => (block.type === 'text' ? [block.text] : []))
+                      .join('\n');
+              return text ? [{ id: entry.id, role: message.role, text }] : [];
+            }),
+          ),
+        pending: pending
+          ? {
+              petId: profile.petId,
+              requestId: pending.requestId!,
+              submissionId: pending.id,
+            }
+          : null,
+      };
     });
   }
 

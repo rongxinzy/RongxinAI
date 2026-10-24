@@ -34,6 +34,8 @@ interface PageHeaderProps {
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
+  /** Standalone windows can supply their own native chrome or use the OS frame. */
+  windowControls?: React.ReactNode;
 }
 
 const PageHeader: React.FC<PageHeaderProps> = ({
@@ -46,8 +48,9 @@ const PageHeader: React.FC<PageHeaderProps> = ({
   onToggleSidebar,
   onNewChat,
   updateBadge,
+  windowControls,
 }) => {
-  const isMac = window.electron.platform === 'darwin';
+  const isMac = window.electron?.platform === 'darwin';
   return (
     <PageHeaderLayout
       navigation={
@@ -76,7 +79,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
         ) : null)
       }
       actions={actions}
-      windowControls={<WindowTitleBar inline />}
+      windowControls={windowControls === undefined ? <WindowTitleBar inline /> : windowControls}
       tabs={tabs}
       divider={divider}
     />

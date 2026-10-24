@@ -14,6 +14,7 @@ import { enTodoActivity } from './todoActivity';
 import { enArtifactsUpdates } from './artifactsUpdates';
 import { enSettings } from './settings';
 import { enCommon } from './common';
+import { companionMessages } from '../../../../shared/companion/messages';
 
 export const enTranslations: Record<string, string> = {
   ...enLocalInferenceService,
@@ -32,4 +33,5 @@ export const enTranslations: Record<string, string> = {
   ...enArtifactsUpdates,
   ...enSettings,
   ...enCommon,
+  ...companionMessages.en,
 };

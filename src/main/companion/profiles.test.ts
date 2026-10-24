@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
+import { DESKTOP_PET_STORE_KEY } from '../../shared/desktopPet/constants';
 import { CompanionProfiles, type CompanionProfileStore } from './profiles';
 import { companionInstructions } from './personas';
 
@@ -21,6 +22,15 @@ test('creates seven persistent identities, with only one active companion', () =
   expect(new Set(first.profiles.map(profile => profile.petId)).size).toBe(7);
   expect(new CompanionProfiles(f.store).snapshot()).toEqual(first);
   expect(f.profiles.active().petId).toBe(first.activePetId);
+});
+
+test('preserves the current appearance when creating the first companion identity', () => {
+  const f = fixture();
+  f.values.set(DESKTOP_PET_STORE_KEY, { characterId: DesktopPetBuiltinId.Yunmo });
+  expect(f.profiles.active()).toMatchObject({
+    personaId: DesktopPetBuiltinId.Xiaoyuan,
+    characterId: DesktopPetBuiltinId.Yunmo,
+  });
 });
 
 test('changing appearance keeps identity and personality; selecting another companion is separate', () => {

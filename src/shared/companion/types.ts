@@ -32,3 +32,44 @@ export interface CompanionAnswer extends CompanionReceipt {
   state: CompanionRequestState;
   text: string;
 }
+
+export interface CompanionMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export interface CompanionConversation {
+  messages: CompanionMessage[];
+  pending: CompanionReceipt | null;
+}
+
+export interface CompanionWindowContext {
+  language: 'zh' | 'en';
+  theme: 'light' | 'dark' | 'system';
+  themeStyle: string;
+}
+
+export interface CompanionWindowState {
+  context: CompanionWindowContext;
+  activePetId: string;
+  profiles: CompanionProfile[];
+  conversation: CompanionConversation;
+  availability: CompanionAvailability;
+  shortcutAvailable: boolean;
+}
+
+export interface CompanionWindowApi {
+  bootstrap(): Promise<CompanionWindowState>;
+  select(petId: string): Promise<CompanionWindowState>;
+  submit(request: { requestId: string; text: string }): Promise<{
+    availability: CompanionAvailability;
+    receipt: CompanionReceipt | null;
+  }>;
+  answer(receipt: CompanionReceipt): Promise<CompanionAnswer>;
+  stop(): Promise<void>;
+  hide(): Promise<void>;
+  openWorkbench(): Promise<void>;
+  onContext(listener: (context: CompanionWindowContext) => void): () => void;
+  onVisibility(listener: (visible: boolean) => void): () => void;
+}

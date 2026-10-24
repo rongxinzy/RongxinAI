@@ -36,6 +36,7 @@ import { DesktopPetChatter } from './chatter';
 import { clampPetPosition, DesktopPetMotion, petBounds } from './motion';
 import { DesktopPetStatus } from './status';
 import { watchDesktopPetVisibility } from './visibility';
+import { openCompanionWindow, updateActiveCompanionAppearance } from '../companion/window';
 
 let pet: BrowserWindow | null = null;
 let motion: DesktopPetMotion | undefined;
@@ -236,6 +237,7 @@ function showMenu(): void {
     { label: t(`desktopPet_${currentState()}`), enabled: false },
     { type: 'separator' },
     { label: t(status.targetSessionId ? 'desktopPetOpenTask' : 'desktopPetOpen'), click: openTask },
+    { label: t('companionTalk'), click: openCompanionWindow },
     { label: t('desktopPetGreet'), click: greet },
     {
       label: t('desktopPetActionPeek'),
@@ -261,6 +263,16 @@ export function isDesktopPetWindow(window: BrowserWindow): boolean {
 
 export function isDesktopPetEnabled(): boolean {
   return getDesktopPetSettings().enabled;
+}
+
+export function setDesktopPetAppearance(characterId: DesktopPetSettings['characterId']): void {
+  if (!store) return;
+  store.set(DESKTOP_PET_STORE_KEY, {
+    ...store.get<DesktopPetPreferences>(DESKTOP_PET_STORE_KEY),
+    characterId,
+  });
+  publishSettings();
+  sendState();
 }
 
 export function setDesktopPetEnabled(enabled: boolean): void {
@@ -414,6 +426,7 @@ export function initializeDesktopPet(
         ...patch,
       });
       const settings = getDesktopPetSettings();
+      if (patch.characterId) updateActiveCompanionAppearance(settings.characterId);
       setDesktopPetEnabled(settings.enabled);
       motion?.setRoamingEnabled(settings.roaming);
       syncRoamAllow(currentState());

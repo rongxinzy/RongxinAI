@@ -32,6 +32,22 @@ export class CompanionModelAssignment {
   }
 
   async resolve(conversationId: string) {
+    try {
+      return await this.resolveAvailable(conversationId);
+    } catch {
+      // A stopped gateway or a failed catalog read must not disable local drafts and identity.
+      const availability: CompanionAvailability = {
+        capability: CompanionCapability.Local,
+        modelId: null,
+        imageInput: false,
+        toolUse: false,
+        reason: CompanionUnavailableReason.ServiceUnavailable,
+      };
+      return { models: createModels(), model: null, availability };
+    }
+  }
+
+  private async resolveAvailable(conversationId: string) {
     for (const [id, until] of this.failures) if (until <= this.now()) this.failures.delete(id);
     const selected = await this.service.resolveAutomatic(new Set(this.failures.keys()));
     const models = createModels();

@@ -48,6 +48,7 @@ function scan(dir: string): void {
   }
 }
 scan(resolve(root, 'src/renderer/components'));
+scan(resolve(root, 'src/renderer/companion'));
 scan(resolve(root, 'src/shared/components'));
 
 // Migrated primitives must not reintroduce state appearance utilities. Keep

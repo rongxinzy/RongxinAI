@@ -10,6 +10,7 @@ import { getStore } from './runtimeServices';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { destroyTray } from '../trayManager';
 import { disposeDesktopPet } from '../desktopPet/controller';
+import { disposeCompanionWindow } from '../companion/window';
 import { disposeZhiyuanEnterpriseExtension } from '../enterpriseExtension/host';
 import { shutdownPythonRuntime } from '../pythonRuntime/host';
 import { getSkillServiceManager } from '../skillServices';
@@ -62,6 +63,7 @@ const runAppCleanup = async (): Promise<void> => {
   // are taken down. These calls are synchronous and cheap.
   destroyTray();
   disposeDesktopPet();
+  disposeCompanionWindow();
   agentRuntime.skillManager?.stopWatching();
 
   inferenceRuntime.disposeMagpieModels?.();

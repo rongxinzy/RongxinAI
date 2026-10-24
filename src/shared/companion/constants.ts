@@ -1,3 +1,15 @@
+import { DesktopPetBuiltinId } from '../desktopPet/catalog';
+
+export const COMPANION_NAME_KEYS = {
+  [DesktopPetBuiltinId.Xiaoyuan]: 'companionXiaoyuan',
+  [DesktopPetBuiltinId.Youli]: 'companionYouli',
+  [DesktopPetBuiltinId.Tuantuan]: 'companionTuantuan',
+  [DesktopPetBuiltinId.Mianmian]: 'companionMianmian',
+  [DesktopPetBuiltinId.Zhuli]: 'companionZhuli',
+  [DesktopPetBuiltinId.Yunmo]: 'companionYunmo',
+  [DesktopPetBuiltinId.Maixiao]: 'companionMaixiao',
+} as const;
+
 export const CompanionCapability = {
   Local: 'local',
   Chat: 'chat',
@@ -15,6 +27,10 @@ export type CompanionRequestState =
 export const CompanionUnavailableReason = {
   NoModel: 'no_model',
   ModelFailed: 'model_failed',
+  ServiceUnavailable: 'service_unavailable',
 } as const;
 export type CompanionUnavailableReason =
   (typeof CompanionUnavailableReason)[keyof typeof CompanionUnavailableReason];
+
+export const COMPANION_PAGE = 'companion.html';
+export const COMPANION_SHORTCUT = 'CommandOrControl+Shift+Space';
