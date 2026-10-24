@@ -6,7 +6,6 @@ import {
   PromptInputProvider,
   PromptInputSubmit,
   PromptInputTools,
-  usePromptInputController,
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
 import {
@@ -105,7 +104,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       onCancelTaskResume,
     } = props;
     const dispatch = useDispatch();
-    const controller = usePromptInputController();
 
     const draftKey = sessionId || '__home__';
     const draftPrompt = useSelector(
@@ -196,7 +194,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       attachments,
       modelSupportsImage,
       setImageVisionHint,
-      controller,
     });
 
     // Load skills on mount

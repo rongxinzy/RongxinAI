@@ -1,5 +1,5 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CoworkMessage } from '../../types/cowork';
 import { i18nService } from '../../services/i18n';
 import {
@@ -14,7 +14,7 @@ interface SessionStatsLineProps {
 }
 
 export function SessionStatsLine({ messages }: SessionStatsLineProps) {
-  const stats = getSessionStats(messages);
+  const stats = useMemo(() => getSessionStats(messages), [messages]);
   const groups: string[] = [];
   if (stats.turns > 0 || stats.steps > 0) {
     groups.push(

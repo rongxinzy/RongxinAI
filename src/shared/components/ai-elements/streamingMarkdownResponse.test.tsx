@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { clearResolvedLocalPathCache } from '../../../renderer/services/useResolvedLocalPath';
@@ -129,5 +130,42 @@ describe('StreamingMarkdownResponse local paths', () => {
     const button = await screen.findByTitle(RESOLVED_PATH);
     fireEvent.click(button);
     await waitFor(() => expect(openPath).toHaveBeenCalledWith(RESOLVED_PATH));
+  });
+});
+
+describe('StreamingMarkdownResponse rendering stability', () => {
+  test('keeps reference-style text consistent between streaming and final rendering', () => {
+    const padding = 'context paragraph\n\n'.repeat(600);
+    const content = `[label][ref]\n\n${padding}[ref]: https://example.com\n\n${padding}`;
+    const { container, rerender } = render(
+      <StreamingMarkdownResponse content={content} isStreaming />,
+    );
+    const streamed = container.textContent;
+
+    rerender(<StreamingMarkdownResponse content={content} isStreaming={false} />);
+    expect(container.textContent).toBe(streamed);
+  });
+
+  test('coalesces large tail layout updates but applies rewrites immediately', () => {
+    vi.useFakeTimers();
+    try {
+      const initial = 'word 🚀 '.repeat(6_000);
+      const { container, rerender } = render(
+        <StreamingMarkdownResponse content={initial} isStreaming />,
+        { wrapper: StrictMode },
+      );
+      const tail = container.querySelector('.whitespace-pre-wrap');
+      const appended = `${initial}next`;
+      rerender(<StreamingMarkdownResponse content={appended} isStreaming />);
+      expect(tail?.textContent).toBe(initial);
+      act(() => vi.advanceTimersByTime(48));
+      expect(tail?.textContent).toBe(appended);
+
+      const rewritten = 'rewritten '.repeat(4_000);
+      rerender(<StreamingMarkdownResponse content={rewritten} isStreaming />);
+      expect(tail?.textContent).toBe(rewritten);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

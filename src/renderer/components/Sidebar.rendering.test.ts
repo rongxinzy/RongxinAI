@@ -28,14 +28,19 @@ import Sidebar from './Sidebar';
 type WorkspaceRowProps = ComponentProps<typeof WorkspaceTreeNode>;
 const mocks = vi.hoisted(() => ({
   renderWorkspace: vi.fn<(props: WorkspaceRowProps) => void>(),
+  renderTask: vi.fn<(props: ComponentProps<typeof AgentTaskRow>) => void>(),
   previews: [] as CoworkSessionSummary[],
   languageListeners: new Set<() => void>(),
   language: 'en' as 'zh' | 'en',
   listPreviews: vi.fn(),
+  loadSession: vi.fn(),
 }));
 
 vi.mock('../services/cowork', () => ({
-  coworkService: { listSessionsForWorkspacePreview: mocks.listPreviews },
+  coworkService: {
+    listSessionsForWorkspacePreview: mocks.listPreviews,
+    loadSession: mocks.loadSession,
+  },
 }));
 vi.mock('../services/agent', () => ({ agentService: {} }));
 vi.mock('../services/workspace', () => ({ workspaceService: {} }));
@@ -64,17 +69,26 @@ vi.mock('./SidebarNavigationControls', () => ({
     ),
 }));
 vi.mock('./agentSidebar/AgentTaskRow', () => ({
-  default: (props: ComponentProps<typeof AgentTaskRow>) =>
-    createElement(
+  default: (props: ComponentProps<typeof AgentTaskRow>) => {
+    mocks.renderTask(props);
+    return createElement(
       'div',
       { 'data-testid': props.task.id },
       createElement(
         'output',
         null,
-        JSON.stringify({ batch: props.isBatchMode, selected: props.isSelected }),
+        JSON.stringify({
+          batch: props.isBatchMode,
+          selected: props.isSelected,
+          title: props.task.title,
+          indicator: props.task.indicator,
+        }),
       ),
+      createElement('button', { onClick: props.onSelect }, 'chat select'),
+      createElement('button', { onClick: props.onShare }, 'chat share'),
       createElement('button', { onClick: props.onEnterBatchMode }, 'chat batch'),
-    ),
+    );
+  },
 }));
 vi.mock('./LoginButton', () => ({ default: () => null }));
 vi.mock('./chat/ChatSkillShortcuts', () => ({ default: () => null }));
@@ -169,6 +183,7 @@ async function mountSidebar() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.loadSession.mockResolvedValue(null);
   mocks.language = 'en';
   mocks.previews = [
     session,
@@ -219,6 +234,73 @@ test('navigation skips history renders and preserves expanded state and cached p
   fireEvent.click(screen.getAllByRole('button', { name: 'expand' })[0]);
   expect(mocks.renderWorkspace.mock.calls.length).toBeGreaterThan(renders);
   expect(initialRow).toHaveTextContent('"isExpanded":false');
+});
+
+test('navigation skips unchanged chat task row renders', async () => {
+  const view = await mountSidebar();
+  fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  await waitFor(() => expect(mocks.renderTask).toHaveBeenCalledTimes(2));
+  const initialRow = screen.getByTestId('chat-one');
+  const routes: ComponentProps<typeof Sidebar>['activeView'][] = [
+    'todo',
+    'scheduledTasks',
+    'activity',
+    'expert',
+    'coding',
+    'settings',
+    'cowork',
+  ];
+
+  for (const activeView of routes) view.rerender(view.element({ activeView }));
+
+  expect(mocks.renderTask).toHaveBeenCalledTimes(2);
+  expect(screen.getByTestId('chat-one')).toBe(initialRow);
+
+  mocks.language = 'zh';
+  act(() => mocks.languageListeners.forEach(listener => listener()));
+  expect(mocks.renderTask.mock.calls.length).toBeGreaterThan(2);
+});
+
+test('memoized chat tasks still react to selection, titles, streams, unread and batch state', async () => {
+  await mountSidebar();
+  fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  await waitFor(() => expect(mocks.renderTask).toHaveBeenCalledTimes(2));
+
+  act(() => store.dispatch(setCurrentSessionId('chat-one')));
+  expect(mocks.renderTask.mock.calls.length).toBeGreaterThan(2);
+  expect(screen.getByTestId('chat-one')).toHaveTextContent('"selected":true');
+  act(() => store.dispatch(updateSessionTitle({ sessionId: 'chat-one', title: 'Chat renamed' })));
+  expect(screen.getByTestId('chat-one')).toHaveTextContent('"title":"Chat renamed"');
+  act(() =>
+    store.dispatch(
+      updateSessionStatus({ sessionId: 'chat-one', status: CoworkSessionStatusValue.Running }),
+    ),
+  );
+  expect(screen.getByTestId('chat-one')).toHaveTextContent(AgentSidebarIndicator.Running);
+  act(() => store.dispatch(setCurrentSessionId(null)));
+  act(() =>
+    store.dispatch(
+      updateSessionStatus({ sessionId: 'chat-one', status: CoworkSessionStatusValue.Completed }),
+    ),
+  );
+  expect(screen.getByTestId('chat-one')).toHaveTextContent(AgentSidebarIndicator.CompletedUnread);
+  fireEvent.click(screen.getAllByRole('button', { name: 'chat batch' })[0]);
+  expect(screen.getByTestId('chat-one')).toHaveTextContent('"batch":true');
+  expect(screen.getByTestId('chat-one')).toHaveTextContent('"selected":true');
+});
+
+test('chat share still selects the session before scheduling share options', async () => {
+  await mountSidebar();
+  fireEvent.click(screen.getByRole('button', { name: 'switch mode' }));
+  const listener = vi.fn();
+  window.addEventListener('cowork:open-share-options', listener);
+
+  fireEvent.click(screen.getAllByRole('button', { name: 'chat share' })[0]);
+
+  await waitFor(() => expect(listener).toHaveBeenCalledOnce());
+  expect(mocks.loadSession).toHaveBeenCalledWith('chat-one');
+  expect(listener.mock.calls[0][0].detail).toEqual({ sessionId: 'chat-one' });
+  window.removeEventListener('cowork:open-share-options', listener);
 });
 
 test('memoized history still reacts to selection, streaming, unread, titles and language', async () => {

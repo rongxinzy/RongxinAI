@@ -71,7 +71,7 @@ Wired from `coworkService.setupStreamListeners`: `PiUiEventSequenceTracker` → 
 
 - `LiveTextStore` keeps per message a `base` (last authoritative snapshot) plus `parts` in insertion order; cached text is capped at 2M, entries are capped (256), and `awaitingBase` drops increments until a resync base lands. Streaming text never lives in Redux.
 - `AssistantBubble` and `TurnBlock`'s `ThinkingItem` subscribe via `useLiveMessageText`; a streaming answer with an empty body still renders (fully blank → `AssistantBubble` returns `null`).
-- `StreamingMarkdownResponse` is the **only** renderer throttle: stable committed Markdown blocks plus a plain-text tail, fully re-parsed once on finalize.
+- `StreamingMarkdownResponse` is the **only** renderer throttle: the segmenter scans only appended input and commits stable Markdown prefixes in 8192-character batches to one Streamdown context; the growing tail stays plain text, with 48 ms trailing DOM updates once it exceeds 32768 characters (short text and rewrites remain immediate). The full response is re-parsed once on finalize.
 
 ## Invariants
 

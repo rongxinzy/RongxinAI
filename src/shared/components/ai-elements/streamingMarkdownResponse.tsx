@@ -15,7 +15,7 @@ import { useStreamingTextSegments } from '@shared/components/ai-elements/streami
 
 import type { StreamingTextSegments } from '@shared/components/ai-elements/streamingText';
 import type { ComponentProps, MouseEvent, ReactNode } from 'react';
-import { useContext, useMemo, useState } from 'react';
+import { memo, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { StreamdownContext } from 'streamdown';
 
 import {
@@ -158,7 +158,7 @@ const LocalAwareAnchor = ({
   );
 };
 
-const StaticMarkdownBlock = ({
+const StaticMarkdownBlock = memo(function StaticMarkdownBlock({
   content,
   cwd,
   enabled,
@@ -166,7 +166,7 @@ const StaticMarkdownBlock = ({
   content: string;
   cwd: string | undefined;
   enabled: boolean;
-}) => {
+}) {
   const components = useMemo(
     () => ({
       a: (props: AnchorProps) => <LocalAwareAnchor {...props} cwd={cwd} enabled={enabled} />,
@@ -177,12 +177,53 @@ const StaticMarkdownBlock = ({
     [cwd, enabled],
   );
   return <MessageResponse components={components}>{content}</MessageResponse>;
+});
+
+const LARGE_STREAMING_TAIL_CHARACTERS = 32_768;
+const LARGE_STREAMING_TAIL_UPDATE_MS = 48;
+
+const useStreamingTailContent = (content: string, sourceContent: string): string => {
+  const [visibleContent, setVisibleContent] = useState(content);
+  const previousContentRef = useRef({ tail: content, source: sourceContent });
+  const lastUpdateAtRef = useRef(0);
+  const previous = previousContentRef.current;
+  const isRewrite =
+    !sourceContent.startsWith(previous.source) || !content.startsWith(previous.tail);
+
+  useEffect(() => {
+    previousContentRef.current = { tail: content, source: sourceContent };
+    if (isRewrite || content.length < LARGE_STREAMING_TAIL_CHARACTERS) {
+      lastUpdateAtRef.current = 0;
+      setVisibleContent(content);
+      return;
+    }
+    const elapsed = performance.now() - lastUpdateAtRef.current;
+    const timer = window.setTimeout(
+      () => {
+        lastUpdateAtRef.current = performance.now();
+        setVisibleContent(content);
+      },
+      Math.max(0, LARGE_STREAMING_TAIL_UPDATE_MS - elapsed),
+    );
+    return () => window.clearTimeout(timer);
+  }, [content, sourceContent, isRewrite]);
+
+  return isRewrite || content.length < LARGE_STREAMING_TAIL_CHARACTERS ? content : visibleContent;
 };
 
 /** 流式尾段：纯文本，不做 Markdown/Shiki 重解析。 */
-const StreamingPlainTail = ({ content }: { content: string }) => (
-  <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{content}</div>
-);
+const StreamingPlainTail = ({
+  content,
+  sourceContent,
+}: {
+  content: string;
+  sourceContent: string;
+}) => {
+  const visibleContent = useStreamingTailContent(content, sourceContent);
+  return (
+    <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{visibleContent}</div>
+  );
+};
 
 export const StreamingMarkdownResponse = ({
   content,
@@ -212,7 +253,7 @@ export const StreamingMarkdownResponse = ({
         // 流式中的已提交块不发本地路径 IPC，流结束后统一解析。
         <StaticMarkdownBlock content={committed} cwd={cwd} enabled={false} />
       ) : null}
-      {tail ? <StreamingPlainTail content={tail} /> : null}
+      {tail ? <StreamingPlainTail content={tail} sourceContent={content} /> : null}
     </div>
   );
 };

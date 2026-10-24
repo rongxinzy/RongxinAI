@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
-import type { usePromptInputController } from '@shared/components/ai-elements/prompt-input';
 
 import { setDraftPrompt } from '../../../store/slices/coworkSlice';
 import { isImagePath } from './promptInputUtils';
@@ -14,13 +13,12 @@ interface UsePromptDraftSyncParams {
   attachments: CoworkAttachment[];
   modelSupportsImage: boolean;
   setImageVisionHint: (hint: boolean) => void;
-  controller: ReturnType<typeof usePromptInputController>;
 }
 
 /**
- * Draft persistence for the composer: mirrors the local value into the
- * PromptInput controller, syncs from the Redux draft on session switches,
- * debounces writes while typing, and flushes the pending draft on unmount.
+ * Draft persistence for the composer: syncs from the Redux draft on session
+ * switches, debounces writes while typing, and flushes the pending draft on
+ * unmount.
  */
 export function usePromptDraftSync({
   draftKey,
@@ -30,24 +28,8 @@ export function usePromptDraftSync({
   attachments,
   modelSupportsImage,
   setImageVisionHint,
-  controller,
 }: UsePromptDraftSyncParams) {
   const dispatch = useDispatch();
-
-  // Keep a stable ref to the controller to avoid [controller] dep in the sync effect.
-  // Without this, every controller reference change triggers a re-render cascade
-  // which can cause OOM when switching to sessions with large message histories.
-  const controllerRef = useRef(controller);
-  controllerRef.current = controller;
-
-  // Sync local value to PromptInput's controller on all changes
-  // (clear on submit, external setValue, session switch, etc.)
-  useEffect(() => {
-    const ctrl = controllerRef.current;
-    if (ctrl.textInput.value !== value) {
-      ctrl.textInput.setInput(value);
-    }
-  }, [value]);
 
   const previousDraftKeyRef = useRef(draftKey);
   // Sync value from draft when sessionId changes

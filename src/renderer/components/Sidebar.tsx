@@ -41,7 +41,7 @@ import {
 import { WorkMode } from '../store/workMode/constants';
 import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
-import AgentTaskRow from './agentSidebar/AgentTaskRow';
+import ChatSessionList from './ChatSessionList';
 import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
 import {
   CodingWorkspaceSidebar,
@@ -194,36 +194,39 @@ const Sidebar: React.FC<SidebarProps> = ({
     setShowBatchDeleteConfirm(false);
   }, [isCollapsed]);
 
-  const handleSelectSession = async (session: CoworkSessionSummary) => {
-    const agentId = session.agentId?.trim() || AgentId.Main;
-    flushSync(() => {
-      dispatch(setLoadingSessionId(session.id));
-    });
+  const handleSelectSession = useCallback(
+    async (session: CoworkSessionSummary) => {
+      const agentId = session.agentId?.trim() || AgentId.Main;
+      flushSync(() => {
+        dispatch(setLoadingSessionId(session.id));
+      });
 
-    // If the target session is actively streaming in the background, restore its
-    // event-derived live snapshot immediately so the user sees the active stream
-    // without waiting for the DB round-trip.
-    const streamingSnapshot = store.getState().cowork.streamingSessions[session.id];
-    if (streamingSnapshot) {
-      dispatch(setCurrentSession(streamingSnapshot));
-    }
-
-    // Chat sessions are not scoped to agents — skip loadSessions
-    // to avoid replacing the full sessions list with a filtered subset.
-    try {
-      if (session.mode !== 'chat') {
-        if (agentId !== currentAgentId) {
-          agentService.switchAgent(agentId);
-          await coworkService.loadSessions(agentId);
-        }
+      // If the target session is actively streaming in the background, restore its
+      // event-derived live snapshot immediately so the user sees the active stream
+      // without waiting for the DB round-trip.
+      const streamingSnapshot = store.getState().cowork.streamingSessions[session.id];
+      if (streamingSnapshot) {
+        dispatch(setCurrentSession(streamingSnapshot));
       }
-      onShowCowork();
-      const loadedSession = await coworkService.loadSession(session.id);
-      return loadedSession !== null;
-    } finally {
-      dispatch(clearLoadingSessionId(session.id));
-    }
-  };
+
+      // Chat sessions are not scoped to agents — skip loadSessions
+      // to avoid replacing the full sessions list with a filtered subset.
+      try {
+        if (session.mode !== 'chat') {
+          if (agentId !== currentAgentId) {
+            agentService.switchAgent(agentId);
+            await coworkService.loadSessions(agentId);
+          }
+        }
+        onShowCowork();
+        const loadedSession = await coworkService.loadSession(session.id);
+        return loadedSession !== null;
+      } finally {
+        dispatch(clearLoadingSessionId(session.id));
+      }
+    },
+    [currentAgentId, dispatch, onShowCowork],
+  );
 
   const handleDeleteSession = useCallback(async (sessionId: string) => {
     await coworkService.deleteSession(sessionId);
@@ -523,44 +526,19 @@ const Sidebar: React.FC<SidebarProps> = ({
                       </EmptyHeader>
                     </Empty>
                   ) : (
-                    <div className="space-y-0.5">
-                      {chatTaskNodes.map(task => (
-                        <AgentTaskRow
-                          key={task.id}
-                          task={task}
-                          isBatchMode={isBatchMode}
-                          isSelected={isBatchMode ? selectedIds.has(task.id) : task.isSelected}
-                          isNested={false}
-                          showBatchOption
-                          onSelect={() => {
-                            const session = sessions.find(s => s.id === task.id);
-                            if (session) {
-                              setSearchActive(false);
-                              void handleSelectSession(session);
-                            }
-                          }}
-                          onDelete={() => handleDeleteSession(task.id)}
-                          onShare={async () => {
-                            const session = sessions.find(s => s.id === task.id);
-                            if (session) {
-                              setSearchActive(false);
-                              await handleSelectSession(session);
-                              window.setTimeout(() => {
-                                window.dispatchEvent(
-                                  new CustomEvent('cowork:open-share-options', {
-                                    detail: { sessionId: task.id },
-                                  }),
-                                );
-                              }, 0);
-                            }
-                          }}
-                          onTogglePin={pinned => handleToggleSessionPin(task.id, pinned)}
-                          onRename={title => handleRenameSession(task.id, title)}
-                          onToggleSelection={() => handleToggleSelection(task.id)}
-                          onEnterBatchMode={() => handleEnterBatchMode(task.id)}
-                        />
-                      ))}
-                    </div>
+                    <ChatSessionList
+                      tasks={chatTaskNodes}
+                      sessions={sessions}
+                      isBatchMode={isBatchMode}
+                      selectedIds={selectedIds}
+                      onSelectSession={handleSelectSession}
+                      onDeleteSession={handleDeleteSession}
+                      onToggleSessionPin={handleToggleSessionPin}
+                      onRenameSession={handleRenameSession}
+                      onToggleSelection={handleToggleSelection}
+                      onEnterBatchMode={handleEnterBatchMode}
+                      onDismissSearch={handleDismissSearch}
+                    />
                   )}
                 </>
               )}
