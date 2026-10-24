@@ -26,6 +26,7 @@ import type {
   DesktopPetTaskOpen,
 } from '../../shared/desktopPet/types';
 import { desktopPetContract } from '../../shared/desktopPet/contract';
+import { desktopPetBuiltin } from '../../shared/desktopPet/catalog';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { PiUiEventType, type PiUiEvent } from '../../shared/cowork/piUiEvent';
 import type { SqliteStore } from '../sqliteStore';
@@ -66,6 +67,7 @@ function sendState(): void {
   if (!chatterEnabled) chatter.clear();
   const chatterKey = chatterEnabled ? chatter.activeKey() : null;
   pet.webContents.send(DesktopPetIpc.State, {
+    characterId: getDesktopPetSettings().characterId,
     state,
     label: t(`desktopPet_${state}`),
     bubble: bubbleKey ? t(bubbleKey) : chatterKey ? t(chatterKey) : null,
@@ -125,6 +127,8 @@ function getDesktopPetSettings(): DesktopPetSettings {
   const saved = store?.get<DesktopPetPreferences>(DESKTOP_PET_STORE_KEY);
   return {
     ...DESKTOP_PET_DEFAULT_SETTINGS,
+    characterId:
+      desktopPetBuiltin(saved?.characterId ?? '')?.id ?? DESKTOP_PET_DEFAULT_SETTINGS.characterId,
     enabled: saved?.enabled === true,
     doNotDisturb: saved?.doNotDisturb === true,
     hideInFullscreen: saved?.hideInFullscreen !== false,
@@ -147,6 +151,10 @@ function publishSettings(): void {
   onEnabledChanged?.();
 }
 
+function sendVisibility(): void {
+  pet?.webContents.send(DesktopPetIpc.Effect, { kind: DesktopPetEffectKind.Visibility, visible });
+}
+
 function syncVisibility(): void {
   if (!pet || pet.isDestroyed()) return;
   const settings = getDesktopPetSettings();
@@ -154,6 +162,8 @@ function syncVisibility(): void {
   const show = ready && settings.enabled && !visibility?.suppressed(settings);
   if (show === visible) return;
   visible = show;
+  // Electron can keep document.visibilityState visible after hide(); explicitly pause media.
+  sendVisibility();
   if (show) {
     motion?.resume();
     startChatterLoop();
@@ -207,11 +217,12 @@ function greet(): void {
   greetingTimer = setTimeout(() => {
     greeting = false;
     sendState();
-  }, 1800);
+  }, DESKTOP_PET_TERMINAL_MS);
 }
 
 function playAction(action: DesktopPetPlayableAction): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
+  motion?.rest();
   pet.webContents.send(DesktopPetIpc.Effect, { kind: DesktopPetEffectKind.Action, action });
   if (visible && !reducedMotion && getDesktopPetSettings().chatter) {
     chatter.showAction(action, Date.now());
@@ -439,7 +450,10 @@ export function initializeDesktopPet(
     listeners.set(channel, listener);
     ipcMain.on(channel, listener);
   };
-  bind(DesktopPetIpc.Ready, sendState);
+  bind(DesktopPetIpc.Ready, () => {
+    sendVisibility();
+    sendState();
+  });
   bind(DesktopPetIpc.DragStart, () => motion?.begin());
   bind(DesktopPetIpc.DragEnd, () => {
     if (motion?.end()) {

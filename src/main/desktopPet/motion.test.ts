@@ -158,3 +158,19 @@ test('quiet mode stops native polling and motion until explicitly resumed', () =
   expect(vi.getTimerCount()).toBe(1);
   expect(position).toEqual(paused);
 });
+
+test('an explicit action rests a walking pet and publishes the stopped pose before playback', () => {
+  motion.dispose();
+  const pose = vi.fn();
+  motion = new DesktopPetMotion(window, settled, effect, pose);
+  motion.setAllowRoam(true);
+  vi.advanceTimersByTime(100);
+  expect(pose).toHaveBeenLastCalledWith(expect.objectContaining({ walking: true }));
+  motion.rest();
+  expect(pose).toHaveBeenLastCalledWith(expect.objectContaining({ walking: false }));
+  const stopped = { ...position };
+  vi.advanceTimersByTime(15_000);
+  expect(position).toEqual(stopped);
+  motion.setAllowRoam(false);
+  expect(pose).toHaveBeenLastCalledWith(expect.objectContaining({ walking: false }));
+});

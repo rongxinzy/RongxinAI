@@ -2,6 +2,7 @@ import { beforeEach, afterEach, test, expect, vi } from 'vitest';
 import { Menu } from 'electron';
 
 import { setLanguage } from '../i18n';
+import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 
 import {
   DesktopPetEffectKind,
@@ -128,6 +129,7 @@ vi.mock('./motion', () => ({
     pause = mocks.pause;
     resume = mocks.resume;
     reset() {}
+    rest() {}
     ensureVisible() {}
   },
 }));
@@ -217,7 +219,13 @@ test('the renderer receives only a localized status snapshot', () => {
   mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: contents, senderFrame: contents.mainFrame });
   const [channel, snapshot] = contents.send.mock.calls.at(-1)!;
   expect(channel).toBe(DesktopPetIpc.State);
-  expect(Object.keys(snapshot).sort()).toEqual(['bubble', 'label', 'reducedMotion', 'state']);
+  expect(Object.keys(snapshot).sort()).toEqual([
+    'bubble',
+    'characterId',
+    'label',
+    'reducedMotion',
+    'state',
+  ]);
 });
 
 test('the menu offers on-demand actions that reach the pet window as effects', () => {
@@ -324,7 +332,7 @@ test('English action chatter is localized and expires after the show window', as
   );
 });
 
-test('click happy chatter survives greeting', () => {
+test('click happy chatter appears during greeting and expires independently', () => {
   setDesktopPetEnabled(true);
   mocks.windows[0].emit('ready-to-show');
   const contents = mocks.windows[0].webContents;
@@ -334,10 +342,10 @@ test('click happy chatter survives greeting', () => {
     DesktopPetIpc.State,
     expect.objectContaining({ state: 'greeting', bubble: '嘿嘿！' }),
   );
-  vi.advanceTimersByTime(1_800);
+  vi.advanceTimersByTime(8_000);
   expect(contents.send).toHaveBeenLastCalledWith(
     DesktopPetIpc.State,
-    expect.objectContaining({ state: 'idle', bubble: '嘿嘿！' }),
+    expect.objectContaining({ state: 'idle', bubble: null }),
   );
   vi.advanceTimersByTime(2_200);
   expect(contents.send).toHaveBeenLastCalledWith(
@@ -419,6 +427,7 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
     'invalid arguments',
   );
   expect(await invoke(DesktopPetIpc.GetSettings)).toEqual({
+    characterId: DesktopPetBuiltinId.Xiaoyuan,
     enabled: false,
     doNotDisturb: false,
     hideInFullscreen: true,
@@ -430,9 +439,17 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
   expect(mocks.show).toHaveBeenCalledOnce();
   await invoke(DesktopPetIpc.SetSettings, { doNotDisturb: true });
   expect(mocks.hide).toHaveBeenCalledOnce();
+  expect(mocks.windows[0].webContents.send).toHaveBeenCalledWith(DesktopPetIpc.Effect, {
+    kind: DesktopPetEffectKind.Visibility,
+    visible: false,
+  });
   expect(isDesktopPetEnabled()).toBe(true);
   await invoke(DesktopPetIpc.SetSettings, { doNotDisturb: false });
   expect(mocks.show).toHaveBeenCalledTimes(2);
+  expect(mocks.windows[0].webContents.send).toHaveBeenCalledWith(DesktopPetIpc.Effect, {
+    kind: DesktopPetEffectKind.Visibility,
+    visible: true,
+  });
   mocks.fullscreen = true;
   mocks.mainEvents.get('enter-full-screen')!();
   expect(mocks.hide).toHaveBeenCalledTimes(2);
@@ -443,12 +460,44 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
   mocks.power.get('unlock-screen')!();
   expect(mocks.show).toHaveBeenCalledTimes(3);
   expect(await invoke(DesktopPetIpc.GetSettings)).toEqual({
+    characterId: DesktopPetBuiltinId.Xiaoyuan,
     enabled: true,
     doNotDisturb: false,
     hideInFullscreen: true,
     roaming: true,
     chatter: true,
   });
+});
+
+test('character settings validate IDs, survive restart, and preserve task failures', async () => {
+  await expect(invoke(DesktopPetIpc.SetSettings, { characterId: '../unknown' })).rejects.toThrow(
+    'invalid arguments',
+  );
+  await invoke(DesktopPetIpc.SetSettings, {
+    enabled: true,
+    characterId: DesktopPetBuiltinId.Youli,
+  });
+  const events = new PiUiEventSequencer(() => 'character-failure');
+  observeDesktopPetEvent(
+    events.next({
+      type: PiUiEventType.Error,
+      sessionId: 'failed',
+      error: { kind: CoworkErrorKind.Unknown, message: 'failed' },
+    }),
+  );
+  await invoke(DesktopPetIpc.SetSettings, { characterId: DesktopPetBuiltinId.Yunmo });
+  expect(mocks.values.get(DESKTOP_PET_FAILURES_KEY)).toHaveLength(1);
+  disposeDesktopPet();
+  initializeDesktopPet(preferences, getMainWindow, mocks.changed);
+  expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
+    characterId: DesktopPetBuiltinId.Yunmo,
+  });
+  const contents = mocks.windows.at(-1)!.webContents;
+  mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: contents, senderFrame: contents.mainFrame });
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ characterId: DesktopPetBuiltinId.Yunmo, state: 'error' }),
+  );
 });
 
 test('task navigation keeps failures until a matching successful acknowledgement, including across restart', async () => {

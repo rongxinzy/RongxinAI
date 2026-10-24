@@ -2,8 +2,10 @@ import { z } from 'zod';
 
 import { defineIpcContract } from '../ipc/contract';
 import { DesktopPetIpc, DesktopPetTaskResult } from './constants';
+import { DesktopPetBuiltinId } from './catalog';
 
 const settings = z.object({
+  characterId: z.enum(Object.values(DesktopPetBuiltinId)),
   enabled: z.boolean(),
   doNotDisturb: z.boolean(),
   hideInFullscreen: z.boolean(),

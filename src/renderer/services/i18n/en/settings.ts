@@ -1,19 +1,29 @@
 // Settings and appearance
 export const enSettings: Record<string, string> = {
   desktopPetSettingsTitle: 'Desktop companion',
-  desktopPetEnabled: 'Show Xiaoyuan',
+  desktopPetEnabled: 'Show desktop companion',
+  desktopPetCharacter: 'Companion character',
+  desktopPetCharacterDescription:
+    'Saved automatically. Switching characters preserves tasks and failure reminders.',
+  desktopPetCharacterXiaoyuan: 'Xiaoyuan · Owl',
+  desktopPetCharacterYouli: 'Youli · Red fox',
+  desktopPetCharacterTuantuan: 'Tuantuan · Sea otter',
+  desktopPetCharacterMianmian: 'Mianmian · Lop rabbit',
+  desktopPetCharacterZhuli: 'Zhuli · Red panda',
+  desktopPetCharacterYunmo: 'Yunmo · Baby dragon',
+  desktopPetCharacterMaixiao: 'Maixiao · Corgi',
   desktopPetEnabledDescription:
     'Show task status on your desktop. Click to open the related task. Off by default.',
   desktopPetDoNotDisturb: 'Do not disturb',
   desktopPetDoNotDisturbDescription:
-    'Temporarily hide Xiaoyuan. Tasks continue and unhandled failure reminders are kept.',
+    'Temporarily hide your companion. Tasks continue and unhandled failure reminders are kept.',
   desktopPetHideInFullscreen: 'Hide when the app is fullscreen',
   desktopPetRoaming: 'Screen roaming',
   desktopPetRoamingDescription:
-    'While idle, Xiaoyuan may take short walks along the screen. You can turn this off anytime.',
+    'While idle, your companion may take short walks along the screen. You can turn this off anytime.',
   desktopPetChatter: 'Occasional chatter',
   desktopPetChatterDescription:
-    'While idle, Xiaoyuan may show a short line now and then. Task status bubbles always win. You can turn this off anytime.',
+    'While idle, your companion may show a short line now and then. Task status bubbles always win. You can turn this off anytime.',
   desktopPetHideInFullscreenDescription:
     'Hide while ZhiYuan Agent is fullscreen and restore afterward. Also hide while locked or suspended.',
   desktopPetTaskOpenFailed:

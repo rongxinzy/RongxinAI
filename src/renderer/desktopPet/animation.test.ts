@@ -35,13 +35,17 @@ test('spring response is independent of refresh rate and preserves shape at rele
   expect(simulate(60)).toBeCloseTo(simulate(120), 10);
 });
 
-test('playAction mixes in the action pose and a spring bounce', () => {
+test('happy performance runs through anticipation, leap and recovery over seven seconds', () => {
   const animation = new DesktopPetAnimation();
+  animation.configure(12);
   animation.sample(0);
   animation.playAction(DesktopPetPlayableAction.Happy, 0);
-  expect(animation.weights(450)[DesktopPetSprite[DesktopPetState.Greeting]]).toBeGreaterThan(0.5);
-  expect(animation.sample(50).scaleY).toBeLessThan(1);
-  expect(animation.sample(2_000).offsetY).toBe(0);
+  expect(animation.sample(500).scaleY).toBeLessThan(1);
+  expect(animation.sample(1000).offsetY).toBe(-16);
+  expect(animation.weights(1000)[11]).toBe(1);
+  expect(animation.sample(3500).sequence).toBe(DesktopPetPlayableAction.Happy);
+  expect(animation.sample(7000).offsetY).toBe(0);
+  expect(animation.weights(7000)[DesktopPetSprite[DesktopPetState.Idle]]).toBe(1);
 });
 
 test('reduced motion settles directly to the latest pose and clears a landing impulse', () => {
@@ -49,9 +53,49 @@ test('reduced motion settles directly to the latest pose and clears a landing im
   animation.sample(0);
   animation.setState(DesktopPetState.Greeting, 20);
   animation.impact(1);
-  animation.settle(40);
+  animation.setReducedMotion(true, 40);
   expect(animation.weights(40)).toEqual([0, 0, 0, 0, 0, 1]);
   expect(animation.sample(40).transitioning).toBe(false);
-  expect(animation.sample(40).scaleY).toBeCloseTo(1 + Math.sin(40 / 1400) * 0.012);
+  expect(animation.sample(40).scaleY).toBe(1);
   expect(Number.isFinite(animation.sample(60_000).scaleY)).toBe(true);
+});
+
+test('task state preempts a performance without a position jump and cannot be overwritten', () => {
+  for (const state of [DesktopPetState.Error, DesktopPetState.Waiting, DesktopPetState.Thinking]) {
+    const animation = new DesktopPetAnimation();
+    animation.configure(12);
+    animation.playAction(DesktopPetPlayableAction.Happy, 0);
+    const before = animation.sample(1000);
+    animation.setState(state, 1000);
+    expect(animation.sample(1000).offsetY).toBe(before.offsetY);
+    animation.playAction(DesktopPetPlayableAction.Happy, 1001);
+    const after = animation.sample(1160);
+    expect(after.sequence).toBeNull();
+    expect(after.offsetY).toBe(0);
+    expect(after.weights[DesktopPetSprite[state]]).toBe(1);
+  }
+});
+
+test('drag, walking, hidden window and reduced motion cancel playback without catch-up', () => {
+  const animation = new DesktopPetAnimation();
+  animation.configure(12);
+  animation.playAction(DesktopPetPlayableAction.Peek, 0);
+  animation.sample(1000);
+  animation.setDragging(true);
+  expect(animation.sample(1200).sequence).toBeNull();
+  animation.setDragging(false);
+  animation.playAction(DesktopPetPlayableAction.Peek, 1300);
+  animation.setPose(-1, true);
+  expect(animation.sample(1500).sequence).toBeNull();
+  animation.setPose(1, false);
+  animation.playAction(DesktopPetPlayableAction.Happy, 2000);
+  animation.setPaused(true, 3000);
+  animation.setPaused(false, 60_000);
+  expect(animation.sample(60_000).sequence).toBeNull();
+  animation.setReducedMotion(true, 60_001);
+  animation.playAction(DesktopPetPlayableAction.Happy, 60_002);
+  const a = animation.sample(60_003);
+  const b = animation.sample(70_000);
+  expect([a.scaleY, a.offsetY, a.rotate]).toEqual([1, 0, 0]);
+  expect(b.weights).toEqual(a.weights);
 });

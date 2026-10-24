@@ -64,17 +64,22 @@ export class DesktopPetMotion {
       this.flying = undefined;
       this.settled();
     }
-    if (value) this.roam.reset(performance.now());
+    if (value) this.rest();
   }
 
   setRoamingEnabled(value: boolean): void {
     this.roamingEnabled = value;
-    if (!value) this.roam.reset(performance.now());
+    if (!value) this.rest();
   }
 
   setAllowRoam(value: boolean): void {
     this.allowRoam = value;
-    if (!value) this.roam.reset(performance.now());
+    if (!value) this.rest();
+  }
+
+  rest(): void {
+    this.roam.reset(performance.now());
+    this.publishPose({ facing: this.lastPose.facing, walking: false });
   }
 
   private publishPose(next: { facing: number; walking: boolean }): void {

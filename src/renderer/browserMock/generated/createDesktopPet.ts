@@ -6,6 +6,7 @@ export function createDesktopPet(runtime: BrowserMockRuntime): Window['electron'
     getSettings: async () => {
       runtime.warnOnce('desktopPet.getSettings');
       return {
+        characterId: 'maixiao',
         enabled: false,
         doNotDisturb: false,
         hideInFullscreen: false,
@@ -17,6 +18,7 @@ export function createDesktopPet(runtime: BrowserMockRuntime): Window['electron'
       void _p0;
       runtime.warnOnce('desktopPet.setSettings');
       return {
+        characterId: 'maixiao',
         enabled: false,
         doNotDisturb: false,
         hideInFullscreen: false,
