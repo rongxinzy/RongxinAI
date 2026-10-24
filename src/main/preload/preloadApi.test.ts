@@ -184,6 +184,7 @@ describe('preload entry', () => {
       'shell',
       'skills',
       'store',
+      'strata',
       'todo',
       'window',
       'workbenchTask',

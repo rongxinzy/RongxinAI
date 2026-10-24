@@ -13,9 +13,11 @@ import {
 } from '../../shared/appUpdate/constants';
 import { getLlamaCppServiceConfig } from '../ipcHandlers/llamacpp';
 import { getOllamaServiceConfig } from '../ipcHandlers/ollama';
+import { getStrataServiceConfig } from '../ipcHandlers/strata';
 import { AppUpdateCoordinator } from '../libs/appUpdateCoordinator';
 import { LlamaCppManager } from '../libs/llamacppManager';
 import { OllamaManager } from '../libs/ollamaManager';
+import { StrataManager } from '../libs/strata/strataManager';
 import { McpCredentialVault } from '../libs/mcpCredentialVault';
 import { McpStore } from '../mcpStore';
 import { AgentManager } from '../agentManager';
@@ -91,6 +93,16 @@ export const getOllamaManager = (): OllamaManager => {
     inferenceRuntime.ollamaManager = new OllamaManager(() => getOllamaServiceConfig(getStore()));
   }
   return inferenceRuntime.ollamaManager;
+};
+
+export const getStrataManager = (): StrataManager => {
+  if (!inferenceRuntime.strataManager) {
+    inferenceRuntime.strataManager = new StrataManager(
+      () => getStrataServiceConfig(getStore()),
+      () => inferenceRuntime.llamaCppModelOrchestrator,
+    );
+  }
+  return inferenceRuntime.strataManager;
 };
 
 export const getAppUpdateCoordinator = (): AppUpdateCoordinator => {

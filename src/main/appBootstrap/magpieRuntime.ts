@@ -12,6 +12,8 @@ import { isLlamaCppLanAccessEnabled } from '../magpie/lanAccess';
 import { ManagedMagpieProviderBindings } from '../magpie/managedProviderBindings';
 import { LlamaCppGatewayCredentialVault } from '../libs/llamacppGatewayCredentialVault';
 import { readOllamaProviderSnapshot } from '../magpie/ollamaProviderBinding';
+import { readStrataProviderSnapshot } from '../magpie/strataProviderBinding';
+import { getStrataManager } from './runtimeServices';
 import { buildLlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
 import { getLlamaCppServiceConfig } from '../ipcHandlers/llamacpp';
 import { registerMagpieIpc } from '../magpie/registerIpc';
@@ -71,6 +73,11 @@ export const setupMagpieRuntime = (): void => {
   inferenceRuntime.managedMagpieBindings.setOllamaReader(() =>
     readOllamaProviderSnapshot(getOllamaManager()),
   );
+  inferenceRuntime.managedMagpieBindings.setStrataReader(async () => {
+    const manager = getStrataManager();
+    inferenceRuntime.managedMagpieBindings?.setExpectedStrataPort(manager.resolvePort());
+    return readStrataProviderSnapshot(manager);
+  });
   inferenceRuntime.managedMagpieBindings.setGpuReader(async () => {
     const orchestrator = inferenceRuntime.llamaCppModelOrchestrator;
     if (!orchestrator) return { baseUrl: null, models: [] };
