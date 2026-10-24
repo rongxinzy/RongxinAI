@@ -136,8 +136,11 @@ export class MagpieModelService {
     if (catalog.status.state !== 'running' || !catalog.status.gatewayUrl) return null;
     const candidates = catalog.models.filter(model => {
       if (excludedIds.has(model.id)) return false;
-      if (model.modalities && !model.modalities.input.includes('text')) return false;
-      if (model.modalities && !model.modalities.output.includes('text')) return false;
+      // The gateway projects absent capability metadata as empty arrays.
+      // Only an explicit non-text declaration excludes a text attempt.
+      if (model.modalities?.input.length && !model.modalities.input.includes('text')) return false;
+      if (model.modalities?.output.length && !model.modalities.output.includes('text'))
+        return false;
       return (
         !model.native_endpoints?.length ||
         model.native_endpoints.some(endpoint =>

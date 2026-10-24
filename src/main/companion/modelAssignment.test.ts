@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import type { MagpieModel, MagpieStatus } from '../../shared/magpie/types';
 import { CompanionCapability, CompanionUnavailableReason } from '../../shared/companion/constants';
 import { MagpieModelService } from '../magpie/modelService';
+import { projectMagpieCatalog } from '../magpie/catalog';
 import { CompanionModelAssignment } from './modelAssignment.mjs';
 
 function fixture() {
@@ -145,4 +146,29 @@ test('does not infer tools from catalog presence; visual support requires a decl
     toolUse: false,
     imageInput: true,
   });
+});
+
+test('gateway metadata with unknown modalities permits a text attempt without asserting other capabilities', async () => {
+  const f = fixture();
+  f.setModels(
+    projectMagpieCatalog({
+      data: [{ id: 'fixture/model', native_endpoints: ['/v1/chat/completions'] }],
+    }),
+  );
+  expect((await f.assignment.resolve('pet')).availability).toMatchObject({
+    capability: CompanionCapability.Chat,
+    modelId: 'fixture/model',
+    imageInput: false,
+    toolUse: false,
+  });
+  f.setModels(
+    projectMagpieCatalog({ data: [{ id: 'embedding', native_endpoints: ['/v1/embeddings'] }] }),
+  );
+  expect((await f.assignment.resolve('pet')).availability.capability).toBe(
+    CompanionCapability.Local,
+  );
+  f.setModels([{ id: 'image-input', modalities: { input: ['image'], output: [] } }]);
+  expect((await f.assignment.resolve('pet')).availability.capability).toBe(
+    CompanionCapability.Local,
+  );
 });

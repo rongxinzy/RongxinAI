@@ -63,6 +63,8 @@ const config: KnipConfig = {
         // Invoked from tests/e2e/packaged-linux/run-with-headless-deps.sh.
         'tests/e2e/packaged-linux/run-packaged-smoke.mjs',
         // Manual installer and preview harnesses. Workflows do not call them.
+        // Manual native companion check documented in companion-task-acceptance.md.
+        'scripts/companion/verify-task-electron.mjs',
         'scripts/installer-shell/assert-e2e.cjs',
         'scripts/installer-shell/e2e-sfx.cjs',
         'scripts/installer-shell/e2e-uninstall.cjs',
