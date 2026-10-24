@@ -51,6 +51,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
     desktopPet_bubble_waiting: '需要确认',
     desktopPet_bubble_completed: '已完成',
     desktopPet_bubble_error: '出错了',
+    desktopPet_chatter_1: '今天也一起加油呀',
+    desktopPet_chatter_2: '我在这儿陪着你',
+    desktopPet_chatter_3: '伸个懒腰……',
+    desktopPet_chatter_4: '需要帮忙随时叫我',
+    desktopPet_chatter_5: '休息一下也没关系',
+    desktopPet_chatter_6: '想到什么了吗？',
+    desktopPet_chatter_7: '天气真好呢',
+    desktopPet_chatter_8: '慢慢来，不着急',
+    desktopPet_chatter_9: '我守着呢',
+    desktopPet_chatter_10: '有我在就好',
 
     // Session titles (created by ChannelSessionSync)
     coworkDefaultSessionTitle: '新对话',
@@ -468,6 +478,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
     desktopPet_bubble_waiting: 'Needs approval',
     desktopPet_bubble_completed: 'Done',
     desktopPet_bubble_error: 'Issue',
+    desktopPet_chatter_1: "Let's keep going today",
+    desktopPet_chatter_2: "I'm right here with you",
+    desktopPet_chatter_3: 'Just a little stretch...',
+    desktopPet_chatter_4: 'Call me if you need a hand',
+    desktopPet_chatter_5: 'A short break is fine too',
+    desktopPet_chatter_6: 'Got something on your mind?',
+    desktopPet_chatter_7: 'Nice day for it',
+    desktopPet_chatter_8: 'Take it one step at a time',
+    desktopPet_chatter_9: "I've got your back",
+    desktopPet_chatter_10: "You're not alone here",
 
     // Session titles
     coworkDefaultSessionTitle: 'New Chat',

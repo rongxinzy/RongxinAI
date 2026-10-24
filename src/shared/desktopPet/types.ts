@@ -5,6 +5,7 @@ export interface DesktopPetSettings {
   doNotDisturb: boolean;
   hideInFullscreen: boolean;
   roaming: boolean;
+  chatter: boolean;
 }
 
 export interface DesktopPetTaskOpen {

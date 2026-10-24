@@ -8,6 +8,8 @@ export const zhSettings: Record<string, string> = {
   desktopPetHideInFullscreen: '应用全屏时隐藏',
   desktopPetRoaming: '屏幕漫游',
   desktopPetRoamingDescription: '待机时小远会偶尔沿屏幕轻轻走动，可随时关闭。',
+  desktopPetChatter: '偶尔碎碎念',
+  desktopPetChatterDescription: '待机时小远会偶尔冒出短句，任务状态气泡始终优先；可随时关闭。',
   desktopPetHideInFullscreenDescription:
     '知远智能体全屏时自动隐藏，退出全屏后恢复；锁屏和休眠时也会隐藏。',
   desktopPetTaskOpenFailed: '暂时无法打开任务，请从会话列表查看。未确认的失败提醒会保留。',

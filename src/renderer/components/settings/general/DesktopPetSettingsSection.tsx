@@ -80,6 +80,13 @@ export function DesktopPetSettingsSection() {
           disabled={!settings || saving}
           onCheckedChange={roaming => update({ roaming })}
         />
+        <SettingsToggleRow
+          label={i18nService.t('desktopPetChatter')}
+          description={i18nService.t('desktopPetChatterDescription')}
+          checked={settings?.chatter ?? true}
+          disabled={!settings || saving}
+          onCheckedChange={chatter => update({ chatter })}
+        />
       </FieldGroup>
     </section>
   );
