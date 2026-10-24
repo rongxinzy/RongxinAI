@@ -8,11 +8,14 @@ import { DesktopPetIdleActions } from './idleActions';
 const TRANSITION_MS = 160;
 const SPRING_DAMPING = 16;
 const SPRING_FREQUENCY = 22;
-const GREETING_INDEX = DesktopPetSprite[DesktopPetState.Greeting];
+const smooth = (value: number) => {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+};
 
 export class DesktopPetAnimation {
   private state: DesktopPetState = DesktopPetState.Idle;
-  private from: number[] = [1, 0, 0, 0, 0, 0];
+  private from = [1, 0, 0, 0, 0, 0];
   private changedAt = -Infinity;
   private lastTime: number | undefined;
   private displacement = 0;
@@ -20,85 +23,109 @@ export class DesktopPetAnimation {
   private dragging = false;
   private facing = 1;
   private walking = false;
+  private reduced = false;
+  private paused = false;
+  private tempo = 1;
+  private energy = 1;
   private readonly idle = new DesktopPetIdleActions();
+  private recovery:
+    | { at: number; rotate: number; offsetX: number; offsetY: number; stretch: number }
+    | undefined;
 
+  configure(count: number, tempo = 1, energy = 1): void {
+    this.from = Array<number>(count).fill(0);
+    this.from[DesktopPetSprite[this.state]] = 1;
+    this.tempo = tempo;
+    this.energy = energy;
+    this.settle(this.lastTime ?? 0);
+  }
+  private motion(now: number) {
+    return this.idle.sample(
+      now,
+      !this.reduced &&
+        !this.paused &&
+        !this.dragging &&
+        !this.walking &&
+        (this.state === DesktopPetState.Idle ||
+          this.state === DesktopPetState.Greeting ||
+          this.state === DesktopPetState.Completed),
+      this.from.length,
+      this.tempo,
+      this.energy,
+    );
+  }
+  private interrupt(now: number): void {
+    this.recovery = { at: now, ...this.motion(now) };
+    this.idle.clear();
+  }
   setState(state: DesktopPetState, now: number): void {
     if (state === this.state) return;
-    this.from = this.applyIdleBoost(this.blendWeights(now), this.idleMotion(now));
+    this.from = this.weights(now);
+    this.interrupt(now);
     this.state = state;
     this.changedAt = now;
-    if (state === DesktopPetState.Greeting) this.impact(0.65);
+    if (state === DesktopPetState.Completed || state === DesktopPetState.Greeting)
+      this.playAction(DesktopPetPlayableAction.Happy, now);
   }
-
   setDragging(active: boolean): void {
+    if (active && !this.dragging) this.interrupt(this.lastTime ?? 0);
     this.dragging = active;
   }
-
   setPose(facing: number, walking: boolean): void {
+    if (walking && !this.walking) this.interrupt(this.lastTime ?? 0);
     this.facing = facing >= 0 ? 1 : -1;
     this.walking = walking;
     this.idle.setFacing(this.facing);
   }
-
+  setReducedMotion(active: boolean, now: number): void {
+    this.reduced = active;
+    if (active) this.settle(now);
+  }
+  setPaused(active: boolean, now: number): void {
+    this.paused = active;
+    this.settle(now);
+  }
   impact(strength: number): void {
     this.velocity -= Math.max(0, Math.min(1, strength)) * 2;
   }
-
-  /** On-demand action (menu playback / click feedback); happy adds a stronger bounce. */
   playAction(action: DesktopPetPlayableAction, now: number): void {
+    if (
+      this.reduced ||
+      this.paused ||
+      this.dragging ||
+      this.walking ||
+      this.state === DesktopPetState.Error ||
+      this.state === DesktopPetState.Waiting ||
+      this.state === DesktopPetState.Thinking
+    )
+      return;
     this.idle.play(action, now);
-    this.impact(action === DesktopPetPlayableAction.Happy ? 0.85 : 0.3);
   }
-
   settle(now: number): void {
     this.changedAt = -Infinity;
     this.displacement = 0;
     this.velocity = 0;
     this.lastTime = now;
+    this.idle.clear();
+    this.recovery = undefined;
   }
-
-  weights(now: number): number[] {
-    return this.applyIdleBoost(this.blendWeights(now), this.idleMotion(now));
-  }
-
-  private blendWeights(now: number): number[] {
-    const progress = Math.max(0, Math.min(1, (now - this.changedAt) / TRANSITION_MS));
-    const eased = progress * progress * (3 - 2 * progress);
+  private baseWeights(now: number): number[] {
+    const eased = this.reduced ? 1 : smooth((now - this.changedAt) / TRANSITION_MS);
     const target = DesktopPetSprite[this.state];
     return this.from.map(
       (weight, index) => weight * (1 - eased) + Number(index === target) * eased,
     );
   }
-
-  private idleMotion(now: number): ReturnType<DesktopPetIdleActions['sample']> {
-    const idleActive = this.state === DesktopPetState.Idle && !this.dragging && !this.walking;
-    return this.idle.sample(now, idleActive);
-  }
-
-  private applyIdleBoost(
-    base: number[],
-    idle: ReturnType<DesktopPetIdleActions['sample']>,
-  ): number[] {
-    if (idle.greetingBoost <= 0) return base;
-    const keep = 1 - idle.greetingBoost;
-    return base.map((weight, index) =>
-      index === GREETING_INDEX ? weight * keep + idle.greetingBoost : weight * keep,
+  weights(now: number): number[] {
+    const motion = this.motion(now);
+    return this.baseWeights(now).map(
+      (weight, index) => weight * (1 - motion.influence) + motion.weights[index] * motion.influence,
     );
   }
-
-  sample(now: number): {
-    weights: number[];
-    scaleY: number;
-    transitioning: boolean;
-    facing: number;
-    rotate: number;
-    offsetX: number;
-    offsetY: number;
-  } {
+  sample(now: number) {
     const dt = this.lastTime === undefined ? 0 : Math.max(0, (now - this.lastTime) / 1000);
     this.lastTime = now;
     const target = this.dragging ? 0.025 : 0;
-    // Closed-form damped spring preserves velocity across interruptions and refresh rates.
     const offset = this.displacement - target;
     const coefficient = (this.velocity + SPRING_DAMPING * offset) / SPRING_FREQUENCY;
     const angle = SPRING_FREQUENCY * dt;
@@ -109,16 +136,33 @@ export class DesktopPetAnimation {
       decay *
       (-SPRING_DAMPING * wave +
         SPRING_FREQUENCY * (-offset * Math.sin(angle) + coefficient * Math.cos(angle)));
-    const idle = this.idleMotion(now);
-    const walkBob = this.walking ? Math.sin(now / 110) * 4 : 0;
+    const motion = this.motion(now);
+    const recovery = this.recovery;
+    const residual = recovery ? 1 - smooth((now - recovery.at) / TRANSITION_MS) : 0;
+    if (!residual) this.recovery = undefined;
+    const stretch = motion.stretch + (recovery ? (recovery.stretch - 1) * residual : 0);
     return {
-      weights: this.applyIdleBoost(this.blendWeights(now), idle),
-      scaleY: Math.max(0.92, Math.min(1.07, 1 + this.displacement + Math.sin(now / 1400) * 0.012)),
-      transitioning: now - this.changedAt < TRANSITION_MS,
+      weights: this.baseWeights(now).map(
+        (weight, index) =>
+          weight * (1 - motion.influence) + motion.weights[index] * motion.influence,
+      ),
+      scaleY: this.reduced
+        ? 1
+        : Math.max(
+            0.86,
+            Math.min(1.13, (1 + this.displacement + Math.sin(now / 1400) * 0.008) * stretch),
+          ),
+      transitioning: !this.reduced && now - this.changedAt < TRANSITION_MS,
       facing: this.facing,
-      rotate: idle.rotate,
-      offsetX: idle.offsetX,
-      offsetY: idle.offsetY + walkBob,
+      rotate: this.reduced ? 0 : motion.rotate + (recovery?.rotate ?? 0) * residual,
+      offsetX: this.reduced ? 0 : motion.offsetX + (recovery?.offsetX ?? 0) * residual,
+      offsetY: this.reduced
+        ? 0
+        : motion.offsetY +
+          (recovery?.offsetY ?? 0) * residual +
+          (this.walking ? Math.sin(now / 110) * 3 : 0),
+      sequence: motion.kind,
+      progress: motion.progress,
     };
   }
 }

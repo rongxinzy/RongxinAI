@@ -2,13 +2,14 @@ import {
   DESKTOP_PET_SIZE,
   DesktopPetEffectKind,
   DesktopPetPlayableAction,
-  DesktopPetSprite,
   DesktopPetState,
 } from '../../shared/desktopPet/constants';
 import type { DesktopPetBridge, DesktopPetSnapshot } from '../../shared/desktopPet/types';
-import atlasUrl from '../assets/desktop-pet/xiaoyuan-atlas.png';
+import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 import stylesheetUrl from './desktop-pet.css?url';
 import { DesktopPetAnimation } from './animation';
+import { DesktopPetAtlas } from './atlas';
+import { drawPetPose, petHitMask } from './draw';
 
 declare global {
   interface Window {
@@ -28,69 +29,20 @@ const view = canvas;
 const ctx = context;
 const bridge = window.desktopPet;
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-const image = new Image();
+const atlas = new DesktopPetAtlas();
 const animation = new DesktopPetAnimation();
-// Readback stays off the visible canvas so Chromium can keep rendering on the GPU.
-const maskCanvas = document.createElement('canvas');
-maskCanvas.width = maskCanvas.height = DESKTOP_PET_SIZE;
-const maskContext = maskCanvas.getContext('2d', { willReadFrequently: true });
 let state: DesktopPetState = DesktopPetState.Idle;
 let reducedMotion = reduced.matches;
 let systemReducedMotion = false;
 let frameId: number | undefined;
 let maskDirty = true;
-let transitionMask = false;
+let maskKey = '';
 let pointerActive = false;
 let disposed = false;
-
-function drawPose(
-  target: CanvasRenderingContext2D,
-  index: number,
-  scaleY: number,
-  facing: number,
-  rotate: number,
-  offsetX: number,
-  offsetY: number,
-): void {
-  const cellWidth = image.naturalWidth / 3;
-  const cellHeight = image.naturalHeight / 2;
-  target.save();
-  target.translate(DESKTOP_PET_SIZE / 2 + offsetX, DESKTOP_PET_SIZE + offsetY);
-  target.rotate(rotate);
-  target.scale(facing / Math.sqrt(scaleY), scaleY);
-  target.drawImage(
-    image,
-    (index % 3) * cellWidth,
-    Math.floor(index / 3) * cellHeight,
-    cellWidth,
-    cellHeight,
-    -DESKTOP_PET_SIZE / 2,
-    -DESKTOP_PET_SIZE,
-    DESKTOP_PET_SIZE,
-    DESKTOP_PET_SIZE,
-  );
-  target.restore();
-}
-
-function publishMask(weights: number[]): void {
-  if (!bridge || !maskContext) return;
-  maskContext.clearRect(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE);
-  // Cover the small deformation envelope and both transition endpoints, once per change.
-  weights.forEach((weight, index) => {
-    if (weight === 0 && index !== DesktopPetSprite[state]) return;
-    if (reducedMotion) drawPose(maskContext, index, 1, 1, 0, 0, 0);
-    else
-      for (let step = 0; step <= 15; step++)
-        drawPose(maskContext, index, 0.92 + step * 0.01, 1, 0, 0, 0);
-  });
-  const pixels = maskContext.getImageData(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE).data;
-  const alpha = new Uint8Array(DESKTOP_PET_SIZE * DESKTOP_PET_SIZE);
-  for (let i = 0; i < alpha.length; i++) alpha[i] = pixels[i * 4 + 3];
-  bridge.hitMask(alpha);
-}
+let nativeVisible = true;
 
 function draw(now: number): void {
-  if (!image.complete || image.naturalWidth === 0) return;
+  if (!atlas.image) return;
   const ratio = Math.min(2, window.devicePixelRatio || 1);
   const size = Math.round(DESKTOP_PET_SIZE * ratio);
   if (view.width !== size || view.height !== size) view.width = view.height = size;
@@ -102,8 +54,9 @@ function draw(now: number): void {
   pose.weights.forEach((weight, index) => {
     if (weight <= 0) return;
     ctx.globalAlpha = weight;
-    drawPose(
+    drawPetPose(
       ctx,
+      atlas,
       index,
       reducedMotion ? 1 : pose.scaleY,
       pose.facing,
@@ -115,16 +68,22 @@ function draw(now: number): void {
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   view.dataset.state = state;
-  if (maskDirty || (transitionMask && !pose.transitioning)) {
-    publishMask(pose.weights);
+  view.dataset.reducedMotion = String(reducedMotion);
+  view.dataset.character = atlas.character.id;
+  view.dataset.sequence = pose.sequence ?? '';
+  view.dataset.progress = String(pose.progress);
+  const indices = pose.weights.flatMap((weight, index) => (weight > 0 ? [index] : []));
+  const nextMaskKey = `${reducedMotion}:${indices.join(',')}`;
+  if (maskDirty || nextMaskKey !== maskKey) {
+    bridge?.hitMask(petHitMask(atlas, reducedMotion, indices));
     maskDirty = false;
-    transitionMask = pose.transitioning;
+    maskKey = nextMaskKey;
   }
 }
 
 function frame(now: number): void {
   frameId = undefined;
-  if (disposed || document.hidden) return;
+  if (disposed || document.hidden || !nativeVisible) return;
   draw(now);
   if (!reducedMotion) frameId = requestAnimationFrame(frame);
 }
@@ -132,7 +91,7 @@ function frame(now: number): void {
 function refresh(): void {
   if (frameId !== undefined) cancelAnimationFrame(frameId);
   frameId = undefined;
-  if (reducedMotion) animation.settle(performance.now());
+  animation.setReducedMotion(reducedMotion, performance.now());
   frame(performance.now());
 }
 
@@ -157,14 +116,32 @@ function update(snapshot: DesktopPetSnapshot): void {
   view.setAttribute('aria-label', snapshot.label);
   view.title = snapshot.label;
   updateBubble(snapshot.bubble);
-  maskDirty = true;
+  if (reducedMotion) maskDirty = true;
+  void selectCharacter(snapshot.characterId);
   refresh();
+}
+
+async function selectCharacter(id: string): Promise<void> {
+  try {
+    if (!(await atlas.select(id))) return;
+    const { columns, rows, tempo, energy } = atlas.character;
+    animation.configure(columns * rows, tempo, energy);
+    maskDirty = true;
+    refresh();
+  } catch (error) {
+    console.error('[DesktopPet] Character atlas failed to load:', error);
+  }
 }
 
 const unsubscribe = bridge?.onState(update);
 const unsubscribePose = bridge?.onPose(pose => animation.setPose(pose.facing, pose.walking));
 const unsubscribeEffect = bridge?.onEffect(effect => {
-  if (effect.kind === DesktopPetEffectKind.Drag) animation.setDragging(effect.active);
+  if (effect.kind === DesktopPetEffectKind.Visibility) {
+    nativeVisible = effect.visible;
+    view.dataset.visible = String(nativeVisible);
+    animation.setPaused(!nativeVisible || document.hidden, performance.now());
+    refresh();
+  } else if (effect.kind === DesktopPetEffectKind.Drag) animation.setDragging(effect.active);
   else if (reducedMotion) return;
   else if (effect.kind === DesktopPetEffectKind.Action)
     animation.playAction(effect.action, performance.now());
@@ -177,7 +154,11 @@ const onMotionChange = (): void => {
   refresh();
 };
 reduced.addEventListener('change', onMotionChange);
-document.addEventListener('visibilitychange', refresh);
+const onVisibilityChange = (): void => {
+  animation.setPaused(document.hidden || !nativeVisible, performance.now());
+  refresh();
+};
+document.addEventListener('visibilitychange', onVisibilityChange);
 window.addEventListener('resize', refresh);
 
 view.addEventListener('pointerdown', event => {
@@ -212,23 +193,31 @@ view.addEventListener('click', () => {
   }
 });
 
-image.onload = () => {
+async function initialize(): Promise<void> {
+  const parameters = new URLSearchParams(location.search);
   if (import.meta.env.DEV && !bridge) {
-    const requested = new URLSearchParams(location.search).get('state');
+    const requested = parameters.get('state');
     if (Object.values(DesktopPetState).includes(requested as DesktopPetState))
       state = requested as DesktopPetState;
   }
+  await selectCharacter(
+    import.meta.env.DEV && !bridge
+      ? (parameters.get('character') ?? DesktopPetBuiltinId.Xiaoyuan)
+      : DesktopPetBuiltinId.Xiaoyuan,
+  );
   animation.setState(state, performance.now());
-  animation.settle(performance.now());
+  animation.setReducedMotion(reducedMotion, performance.now());
+  if (import.meta.env.DEV && !bridge) {
+    const action = parameters.get('action') as DesktopPetPlayableAction;
+    if (Object.values(DesktopPetPlayableAction).includes(action))
+      animation.playAction(action, performance.now());
+  }
   view.setAttribute('aria-label', document.title);
   refresh();
   bridge?.motion(reduced.matches);
   bridge?.ready();
-};
-image.onerror = () => {
-  console.error('[DesktopPet] Character atlas failed to load');
-};
-image.src = atlasUrl;
+}
+void initialize();
 
 window.addEventListener('pagehide', () => {
   disposed = true;
@@ -237,6 +226,6 @@ window.addEventListener('pagehide', () => {
   unsubscribePose?.();
   unsubscribeEffect?.();
   reduced.removeEventListener('change', onMotionChange);
-  document.removeEventListener('visibilitychange', refresh);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
   window.removeEventListener('resize', refresh);
 });

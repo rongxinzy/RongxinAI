@@ -1,0 +1,44 @@
+{
+  "generator": "Built-in image_gen.imagegen, six independent calls, transparent_background=true",
+  "date": "2026-10-24",
+  "revisionPrompt": "Edit this sprite atlas, preserving the exact plush character identity, colors and all 12 poses. FIX THE PRODUCTION GRID LAYOUT: 4 columns by 3 rows of exactly equal square cells, overall 4:3. Every character must be fully contained in its OWN cell. Shrink ALL 12 characters to the SAME much smaller scale: each figure including every ear, tail, wing and paw fits inside the CENTRAL 58% of its square cell. Leave at least 21% completely empty transparent margin on ALL FOUR SIDES of EVERY cell. This wide empty gutter is mandatory so no ear/tail from one cell ever appears in its neighbor. Center each character horizontally and vertically in its cell, same baseline for standing poses. Do not fill the canvas with oversized figures. Do not draw grid lines or labels. Preserve row-major poses: idle, thoughtful, waiting, joyful arms raised, worried, wave; blink, stretch; curled sleep, startled, crouch, leap. Exactly twelve whole isolated characters, no fragments, no cropped limbs, no duplicates, no shadows, no background, no glow, no text. Transparent alpha everywhere outside the figures.",
+  "sharedPrompt": "Production sprite atlas, stylized-concept. Exactly 12 equal cells in 4 columns and 3 rows on a 4:3 canvas. Same character identity, camera, scale and accessory throughout. Full body, feet at a consistent baseline, 14 percent transparent padding per cell. Premium polished 3D plush toy style, tactile fur or matte skin, expressive glossy eyes. Row-major poses: neutral idle; thoughtful paw at chin; waiting with paws together; joyful completion with arms up; worried error with slumped posture; greeting wave; blink with eyes closed; stretch with arms up; curled sleeping; startled alert; crouched anticipation; leap. No text, numbers, borders, grid lines, logo, environment, floor, cast shadow, glow or other characters. Genuinely transparent alpha background, no checkerboard or painted background.",
+  "characters": [
+    {
+      "id": "youli",
+      "name": "游栗 / Youli",
+      "output": "youli-atlas.png",
+      "subjectPrompt": "Baby red fox, russet fur, cream muzzle and belly, dark-tipped large ears, a large ivory-tipped fluffy tail, indigo bandana. Curious, quick and bright."
+    },
+    {
+      "id": "tuantuan",
+      "name": "团团 / Tuantuan",
+      "output": "tuantuan-atlas.png",
+      "subjectPrompt": "Baby sea otter, cocoa-brown fur and cream face and belly, small round ears, muted turquoise bandana. Gentle and cuddly."
+    },
+    {
+      "id": "mianmian",
+      "name": "绵绵 / Mianmian",
+      "output": "mianmian-atlas.png",
+      "subjectPrompt": "Ivory lop-eared baby rabbit, long soft ears with dusty pink interiors, sage-green bandana. Soft, shy and springy."
+    },
+    {
+      "id": "zhuli",
+      "name": "竹栗 / Zhuli",
+      "output": "zhuli-atlas.png",
+      "subjectPrompt": "Baby red panda, terracotta fur, ivory face mask, dark paws, large ringed fluffy tail, ochre bandana. Relaxed and warm."
+    },
+    {
+      "id": "yunmo",
+      "name": "云墨 / Yunmo",
+      "output": "yunmo-atlas.png",
+      "subjectPrompt": "Mist-blue baby dragon, pale jade belly, rounded ivory horns, small wings, amber bandana. Friendly, rounded and magical without glow or effects."
+    },
+    {
+      "id": "maixiao",
+      "name": "麦小 / Maixiao",
+      "output": "maixiao-atlas.png",
+      "subjectPrompt": "Honey-colored baby corgi, white forehead blaze, cream belly, short legs, teal bandana. Playful, eager and energetic."
+    }
+  ]
+}

@@ -75,6 +75,9 @@ test('desktop companion refreshes with animation frames and freezes immediately 
         window.petState = listener;
         return () => {};
       },
+      onPose() {
+        return () => {};
+      },
       onEffect(listener) {
         window.petEffect = listener;
         return () => {};

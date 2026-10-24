@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { attachConsoleGuards, home } from '../shared/harness.mjs';
 
 async function captureTaskBridge(page) {
@@ -46,7 +47,7 @@ for (const colorScheme of ['light', 'dark']) {
     await page.getByText('Login', { exact: true }).first().click();
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
     const group = page.getByRole('region', { name: 'Desktop companion', exact: true });
-    const enabled = group.getByRole('switch', { name: 'Show Xiaoyuan', exact: true });
+    const enabled = group.getByRole('switch', { name: 'Show desktop companion', exact: true });
     await expect(enabled).not.toBeChecked();
     await page.evaluate(() => {
       window.petDelaySave = true;
@@ -61,11 +62,22 @@ for (const colorScheme of ['light', 'dark']) {
     });
     await expect(enabled).toBeEnabled();
     await expect(enabled).toBeChecked();
+    const character = group.getByRole('combobox', { name: 'Companion character', exact: true });
+    await character.click();
+    await page.getByRole('option', { name: 'Yunmo · Baby dragon', exact: true }).click();
+    await expect(character).toContainText('Yunmo');
+    const accessibility = await new AxeBuilder({ page })
+      .include('section[aria-label="Desktop companion"]')
+      .analyze();
+    expect(accessibility.violations.map(violation => violation.id)).toEqual([]);
     await group.getByRole('switch', { name: 'Do not disturb', exact: true }).click();
     expect(await page.evaluate(() => window.electron.desktopPet.getSettings())).toEqual({
       enabled: true,
       doNotDisturb: true,
       hideInFullscreen: true,
+      roaming: true,
+      chatter: true,
+      characterId: 'yunmo',
     });
     // Simulate a tray change through the same API and push subscription used by native settings.
     await page.evaluate(() => window.electron.desktopPet.setSettings({ doNotDisturb: false }));
@@ -76,12 +88,37 @@ for (const colorScheme of ['light', 'dark']) {
     await page.getByText('Login', { exact: true }).first().click();
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
     await expect(enabled).toBeChecked();
+    await expect(character).toContainText('Yunmo');
+    await character.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(
+      page.getByRole('option', { name: 'Yunmo · Baby dragon', exact: true }),
+    ).toBeVisible();
+    await page.emulateMedia({ colorScheme: colorScheme === 'light' ? 'dark' : 'light' });
+    await expect(
+      page.getByRole('option', { name: 'Yunmo · Baby dragon', exact: true }),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(character).toBeFocused();
+    await page.emulateMedia({ colorScheme });
     await page.setViewportSize({ width: 1280, height: 800 });
     await group.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `/tmp/desktop-pet-settings-${colorScheme}-1280.png` });
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.screenshot({ path: `/tmp/desktop-pet-settings-${colorScheme}-1920.png` });
     await page.setViewportSize({ width: 760, height: 700 });
+    for (const [width, height] of [
+      [1280, 800],
+      [1440, 900],
+      [1024, 768],
+      [940, 700],
+      [760, 700],
+    ]) {
+      await page.setViewportSize({ width, height });
+      await character.scrollIntoViewIfNeeded();
+      await expect(character).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
+    }
     await group.scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(760);
     await expect(enabled).toBeVisible();
@@ -101,7 +138,7 @@ for (const colorScheme of ['light', 'dark']) {
     await expect(
       page
         .getByRole('region', { name: '桌面伙伴', exact: true })
-        .getByRole('switch', { name: '显示小远', exact: true }),
+        .getByRole('switch', { name: '显示桌面伙伴', exact: true }),
     ).toBeChecked();
     await page.screenshot({ path: `/tmp/desktop-pet-settings-${colorScheme}-zh.png` });
     await page.waitForFunction(() => typeof window.openPetTask === 'function');
