@@ -233,7 +233,7 @@ ZhiYuan Agent 的 pi 内核没有 `TeamCreate` / `SendMessage`，Team 型专家�
 生成并注册完毕后告知用户：
 
 1. ✅ 专家已注册到 ZhiYuan Agent，可在 Agent 列表中找到
-2. 📦 如需分享，可打包目录：`node scripts/package_expert.js <expert-dir>`
+2. 📦 如需分享，可手动打包专家目录（将整个专家目录压缩为 zip，无需额外脚本）
 3. 📋 请核对内容是否准确
 
 ## References

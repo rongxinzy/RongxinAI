@@ -1,6 +1,8 @@
 import { beforeEach, afterEach, test, expect, vi } from 'vitest';
 import { Menu } from 'electron';
 
+import { setLanguage } from '../i18n';
+
 import {
   DesktopPetEffectKind,
   DesktopPetIpc,
@@ -167,6 +169,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   disposeDesktopPet();
+  setLanguage('zh');
   vi.useRealTimers();
 });
 
@@ -258,6 +261,127 @@ test('a click (drag end without movement) plays the happy feedback before greeti
   );
   expect(effectAt).toBeGreaterThanOrEqual(0);
   expect(greetingAt).toBeGreaterThan(effectAt);
+});
+
+test('menu actions emit matching localized chatter and task bubbles take precedence', async () => {
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
+  const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
+    label?: string;
+    click?: () => void;
+  }>;
+  const byLabel = (label: string) => template.find(item => item.label === label)!;
+  contents.send.mockClear();
+  for (const [label, bubble] of [
+    ['侧看一眼', '我看一眼～'],
+    ['点点头', '嗯嗯'],
+    ['展翅一下', '扑棱一下'],
+  ]) {
+    byLabel(label).click!();
+    expect(contents.send).toHaveBeenLastCalledWith(
+      DesktopPetIpc.State,
+      expect.objectContaining({ bubble }),
+    );
+  }
+  observeDesktopPetEvent(
+    new PiUiEventSequencer(() => 'action-chatter-task').next({
+      type: PiUiEventType.Started,
+      sessionId: 'action-chatter-task',
+    }),
+  );
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'thinking', bubble: '处理中' }),
+  );
+  byLabel('点点头').click!();
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'thinking', bubble: '处理中' }),
+  );
+});
+
+test('English action chatter is localized and expires after the show window', async () => {
+  setLanguage('en');
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
+  const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
+    label?: string;
+    click?: () => void;
+  }>;
+  template.find(item => item.label === 'Peek sideways')!.click!();
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ bubble: 'Just a peek~' }),
+  );
+  vi.advanceTimersByTime(4_000);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ bubble: null }),
+  );
+});
+
+test('click happy chatter survives greeting', () => {
+  setDesktopPetEnabled(true);
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  mocks.end.mockReturnValueOnce(true);
+  mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'greeting', bubble: '嘿嘿！' }),
+  );
+  vi.advanceTimersByTime(1_800);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'idle', bubble: '嘿嘿！' }),
+  );
+  vi.advanceTimersByTime(2_200);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ bubble: null }),
+  );
+});
+
+test('action chatter respects settings, visibility, and reduced motion', async () => {
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  const menu = () => {
+    mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
+    const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
+      label?: string;
+      click?: () => void;
+    }>;
+    template.find(item => item.label === '点点头')!.click!();
+  };
+  const happy = () => {
+    mocks.end.mockReturnValueOnce(true);
+    mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
+  };
+  const lastBubble = () =>
+    (contents.send.mock.calls.at(-1)![1] as { bubble: string | null }).bubble;
+
+  await invoke(DesktopPetIpc.SetSettings, { chatter: false });
+  menu();
+  happy();
+  expect(lastBubble()).toBeNull();
+  await invoke(DesktopPetIpc.SetSettings, { chatter: true });
+  menu();
+  await invoke(DesktopPetIpc.SetSettings, { chatter: false });
+  expect(lastBubble()).toBeNull();
+
+  await invoke(DesktopPetIpc.SetSettings, { chatter: true, doNotDisturb: true });
+  happy();
+  expect(lastBubble()).toBeNull();
+  await invoke(DesktopPetIpc.SetSettings, { doNotDisturb: false });
+  mocks.ipc.get(DesktopPetIpc.Motion)!({ sender: contents, senderFrame: contents.mainFrame }, true);
+  menu();
+  happy();
+  expect(lastBubble()).toBeNull();
 });
 
 test('hiding preserves position and disposal removes IPC and screen listeners', () => {

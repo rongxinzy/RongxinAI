@@ -4,10 +4,10 @@ This directory contains the official product website for **知远智能体 (ZhiY
 
 ## Tech
 
-- Single `index.html` with embedded CSS + JS — zero dependencies, zero build step
+- Static HTML with embedded or linked CSS — zero dependencies, zero build step
 - Dark theme matching the Electron app's brand identity
 - Fully responsive (mobile, tablet, desktop)
-- Scroll-triggered fade-in animations via IntersectionObserver
+- Scroll-triggered fade-in animations via IntersectionObserver (homepage)
 
 ## Preview Locally
 
@@ -18,7 +18,7 @@ npx serve website/
 python -m http.server 8080 -d website/
 ```
 
-Open `http://localhost:8080` (or whichever port the server uses).
+Open `http://localhost:8080` (or whichever port the server uses). Blog pages live under `/blog/`.
 
 ## Deploy
 
@@ -26,12 +26,18 @@ The website is fully static and can be deployed to any static host:
 
 - **GitHub Pages**: push the `website/` directory or set it as the Pages root
 - **Vercel / Netlify**: point to the `website/` folder
-- **Any CDN / S3**: upload `website/index.html`
+- **Any CDN / S3**: upload the `website/` tree
 
 ## Structure
 
 ```
 website/
-├── index.html     # Single-page website (all-in-one)
-└── README.md      # This file
+├── index.html          # Landing page (embedded CSS + JS)
+├── css/
+│   └── common.css      # Shared styles for blog pages
+├── blog/
+│   ├── index.html      # Blog list
+│   ├── xiaoyuan.html   # Desktop companion 「小远」 introduction
+│   └── images/         # Blog assets (optimized previews)
+└── README.md           # This file
 ```

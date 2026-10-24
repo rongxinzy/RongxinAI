@@ -46,7 +46,7 @@ export const enMcpSkills: Record<string, string> = {
   piRuntimeCacheControlAnthropic: 'Anthropic cache_control',
   codemodeEnabled: 'Batch tool acceleration (Codemode)',
   codemodeEnabledDescription:
-    'Allows the agent to batch tool calls via sandbox scripts, significantly speeding up long tasks and batch file operations. Recommended for high-capability models like Claude 3.5 or GPT-4o (default off)',
+    'Lets the agent combine multiple tool calls in a sandboxed script, reducing waiting on long tasks and batch file operations. Default off.',
   mcpNativeBridge: 'MCP native bridge',
   mcpNativeBridgeDescription:
     'Work sessions connect MCP servers through the builtin extension with per-server progressive tool exposure; off keeps the single gateway tool',

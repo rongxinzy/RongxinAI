@@ -46,7 +46,7 @@ export interface CoworkPromptInputProps {
   showModelSelector?: boolean;
   onManageSkills?: () => void;
   onManageConnectors?: () => void;
-  /** Work mode: show the 请求权限/全部允许 selector in the toolbar */
+  /** Work mode: show the permission mode selector (敏感操作需确认 / 全部允许) in the toolbar */
   showPermissionModeSelector?: boolean;
   permissionMode?: CoworkPermissionMode;
   onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
