@@ -29,6 +29,7 @@ import type {
   LlamaCppApi,
   MarketplaceApi,
   OllamaApi,
+  StrataApi,
 } from './electron/localInferenceApi';
 import type { AgentsApi, TodoApi, WorkbenchTaskApi } from './electron/agentsApi';
 import type { CoworkApi } from './electron/coworkApi';
@@ -62,6 +63,7 @@ export interface IElectronAPI {
   llamacpp: LlamaCppApi;
   marketplace: MarketplaceApi;
   hardware: HardwareApi;
+  strata: StrataApi;
   agents: AgentsApi;
   checkApiConfig: AppSystemContractApi['checkApiConfig'];
   generateSessionTitle: AppSystemContractApi['generateSessionTitle'];

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "strataReleaseTag": "v0.2.4",
+  "attribution": "Strata inference engine (MIT) by Niko1221 — https://github.com/Niko1221/Strata",
+  "defaultPort": 8096,
+  "control": {
+    "assetName": "strata-control-0.1.49.1-windows-x86_64.zip",
+    "sha256": "2bb7e1406a91f2fb92cf0379099fe9e3d267086e6619106a5947d80bd29dc30d"
+  },
+  "engineQwen": {
+    "assetName": "strata-engine-0.1.48-windows-x86_64-cuda-cuda13.tar.gz",
+    "sha256": "1e1611b0977d984bd7d8e79591a1ba1a7e550a2f4a66bfa45744a77308a71b95",
+    "installFolder": "0.1.48-windows-x86_64-cuda-cuda13"
+  },
+  "engineDsv41": {
+    "assetName": "strata-dsv41-0.1.49-windows-x86_64-cuda-cuda13.tar.gz",
+    "sha256": "2de85e1c93abcc43127cb8a313ff837157a35b3069d0c5d29655333d53d924c6",
+    "installFolder": "0.1.49-windows-x86_64-cuda-cuda13"
+  }
+}

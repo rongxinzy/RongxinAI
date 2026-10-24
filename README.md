@@ -154,7 +154,7 @@ The edition is selected with `ZHIYUAN_UPDATE_VARIANT` and decides which bundled 
 | --- | --- | --- |
 | `lite` | Windows x64 only | None (no llama.cpp) |
 | `cpu` | Windows x64, Linux x64, macOS arm64 and x64 | llama.cpp CPU + Vulkan on Windows/Linux; Metal on macOS |
-| `cuda` | Windows x64, Linux x64 | llama.cpp built for RTX 40 (sm_89) with CUDA 12.4, the CUDA runtime libraries it needs, and a CPU fallback |
+| `cuda` | Windows x64, Linux x64 | llama.cpp built for RTX 40 (sm_89) with CUDA 12.4, the CUDA runtime libraries it needs, and a CPU fallback. **Windows x64 cuda** also bundles the Strata dual-engine (Qwen + DeepSeek CUDA13 engines + control runtime); see [STRATA-DUAL-ENGINE.md](STRATA-DUAL-ENGINE.md). |
 
 | Command | Output |
 | --- | --- |

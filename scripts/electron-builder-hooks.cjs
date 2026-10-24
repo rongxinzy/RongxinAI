@@ -468,7 +468,7 @@ function configureInferenceEditionResources(context) {
 
   const withoutBundled = withoutLegacyBackends.filter(entry => {
     const target = typeof entry === 'string' ? entry : entry?.to;
-    return target !== 'llamacpp-bundled';
+    return target !== 'llamacpp-bundled' && target !== 'strata-bundled';
   });
 
   if (edition === 'lite') {
@@ -486,6 +486,19 @@ function configureInferenceEditionResources(context) {
     throw new Error(
       `[electron-builder-hooks] Failed to stage bundled llama.cpp runtime for edition ${edition}.`,
     );
+  }
+
+  if (edition === 'cuda' && context.electronPlatformName === 'win32') {
+    const prepareStrata = spawnSync(process.execPath, ['scripts/prepare-strata-runtime.cjs'], {
+      cwd: path.join(__dirname, '..'),
+      env: process.env,
+      stdio: 'inherit',
+    });
+    if (prepareStrata.status !== 0) {
+      throw new Error(
+        `[electron-builder-hooks] Failed to stage bundled Strata runtime for edition ${edition}.`,
+      );
+    }
   }
 
   const windowsComponentBundled =

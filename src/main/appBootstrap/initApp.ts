@@ -33,6 +33,7 @@ import {
   initStore,
   getLlamaCppManager,
   getOllamaManager,
+  getStrataManager,
   checkForAppUpdate,
   startAppUpdatePolling,
   setPreventSleepBlockerEnabled,
@@ -78,6 +79,7 @@ import { registerMemoryIpcHandlers } from '../memory/ipc';
 import { resolveMemorySessionTitles } from '../memory/sessionTitleResolver';
 import { registerLlamaCppIpcHandlers } from '../ipcHandlers/llamacpp';
 import { registerOllamaIpcHandlers } from '../ipcHandlers/ollama';
+import { registerStrataIpcHandlers } from '../ipcHandlers/strata';
 import { registerMarketplaceIpcHandlers } from '../ipcHandlers/marketplace';
 import { cleanupLegacyCopilotStoredToken } from '../legacyCredentialCleanup';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from '../libs/enterpriseConfigSync';
@@ -401,6 +403,17 @@ export const initApp = async (): Promise<void> => {
       getStore,
       onModelBindingsChanged: async snapshot => {
         inferenceRuntime.managedMagpieBindings?.setOllamaSnapshot(snapshot);
+        if (inferenceRuntime.magpieManager?.status().state === 'running')
+          await inferenceRuntime.managedMagpieBindings?.synchronize();
+      },
+    });
+    registerStrataIpcHandlers(getStrataManager(), {
+      getStore,
+      onModelBindingsChanged: async snapshot => {
+        inferenceRuntime.managedMagpieBindings?.setExpectedStrataPort(
+          getStrataManager().resolvePort(),
+        );
+        inferenceRuntime.managedMagpieBindings?.setStrataSnapshot(snapshot);
         if (inferenceRuntime.magpieManager?.status().state === 'running')
           await inferenceRuntime.managedMagpieBindings?.synchronize();
       },

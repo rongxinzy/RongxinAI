@@ -8,6 +8,7 @@ import { createOllama } from './createOllama';
 import { createLlamacpp } from './createLlamacpp';
 import { createMarketplace } from './createMarketplace';
 import { createHardware } from './createHardware';
+import { createStrata } from './createStrata';
 import { createAgents } from './createAgents';
 import { createCheckApiConfig } from './createCheckApiConfig';
 import { createGenerateSessionTitle } from './createGenerateSessionTitle';
@@ -56,6 +57,7 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     llamacpp: createLlamacpp(runtime),
     marketplace: createMarketplace(runtime),
     hardware: createHardware(runtime),
+    strata: createStrata(runtime),
     agents: createAgents(runtime),
     checkApiConfig: createCheckApiConfig(runtime),
     generateSessionTitle: createGenerateSessionTitle(runtime),
