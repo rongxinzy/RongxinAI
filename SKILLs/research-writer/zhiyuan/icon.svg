@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="researchwriter-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF8E8"/>
+      <stop offset="100%" stop-color="#FFEFD0"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#researchwriter-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M30 12 L34 14 L22 36 L16 38 L18 32 Z" fill="#D9A84A" stroke="#5D4E63" stroke-width="1.2" stroke-linejoin="round"/><path d="M10 32 C14 34, 18 33, 22 30" stroke="#F0D090" stroke-width="2" stroke-linecap="round" fill="none"/>
+</svg>

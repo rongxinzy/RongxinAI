@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="campaignplanner-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF0E8"/>
+      <stop offset="100%" stop-color="#FFE2D4"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#campaignplanner-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M14 22 L22 18 L22 30 L14 26 Z" fill="#E8956A"/><path d="M32 18 C36 20, 38 24, 36 28" stroke="#F5C4A8" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+</svg>

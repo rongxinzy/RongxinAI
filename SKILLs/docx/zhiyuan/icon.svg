@@ -1,6 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <rect width="48" height="48" rx="10" fill="#2B579A"/>
-  <path d="M17 10h9l7 7v19a2 2 0 0 1-2 2H17a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2z" fill="none" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>
-  <path d="M26 10v7h7" fill="none" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>
-  <path d="M20 24h9M20 29h9M20 34h6" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="docx-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8F4FC"/>
+      <stop offset="100%" stop-color="#CFE8F8"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#docx-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M16 12 H28 L34 18 V36 H16 Z" fill="white" fill-opacity="0.6" stroke="#5BA4D9" stroke-width="1.4" stroke-linejoin="round"/><line x1="20" y1="22" x2="30" y2="22" stroke="#9CCCEB" stroke-width="1.4" stroke-linecap="round"/><line x1="20" y1="28" x2="28" y2="28" stroke="#9CCCEB" stroke-width="1.4" stroke-linecap="round"/>
 </svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="legalriskanalyzer-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F0EBFF"/>
+      <stop offset="100%" stop-color="#E0D6FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#legalriskanalyzer-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M24 12 L34 16 V24 C34 30, 30 34, 24 36 C18 34, 14 30, 14 24 V16 Z" fill="#C4B8F0" stroke="#9B87DE" stroke-width="1.4" stroke-linejoin="round"/>
+</svg>

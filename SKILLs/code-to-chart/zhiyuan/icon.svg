@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="codetochart-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8F4FC"/>
+      <stop offset="100%" stop-color="#CFE8F8"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#codetochart-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <rect x="14" y="24" width="4" height="10" rx="1.5" fill="#5BA4D9"/><rect x="22" y="18" width="4" height="16" rx="1.5" fill="#5BA4D9"/><rect x="30" y="22" width="4" height="12" rx="1.5" fill="#9CCCEB"/>
+</svg>

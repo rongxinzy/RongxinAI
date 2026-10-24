@@ -89,6 +89,7 @@ export function McpMarketplaceTab({
               <McpIcon
                 iconSrc={officialIcons[entry.id] || MCP_ICON_BY_ID[entry.id]}
                 fallbackLabel={entry.name}
+                category={entry.category}
                 imageClassName={getRegistryIconImageClassName(entry.id)}
               />
               <div className="min-w-0 flex-1">
