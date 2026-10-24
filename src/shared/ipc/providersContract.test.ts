@@ -120,7 +120,7 @@ test('agentsGetPresetExperts result accepts the localized catalog shape', () => 
       path: '/SKILLs/experts/data-analyst',
       mcpIds: ['context7'],
       pythonRequirements: { requirementsPath: './requirements.txt' },
-      pypiMirrors: ['https://pypi.tuna.tsinghua.edu.cn/simple'],
+      pypiMirrors: ['https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple'],
       skillCatalog: [
         {
           id: 'anthropic-document-skills',

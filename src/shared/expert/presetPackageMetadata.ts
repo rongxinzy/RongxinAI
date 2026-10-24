@@ -8,9 +8,12 @@ export const ExpertPypiMirrorId = {
   TsinghuaTuna: 'tsinghua-tuna',
   Ustc: 'ustc',
   Tencent: 'tencent',
-  ByteDance: 'bytedance',
   Aliyun: 'aliyun',
 } as const;
+
+/** Matches managed runtime default in `pythonPackageIndexes.ts` (uv/pip). */
+export const DEFAULT_CN_PYPI_PRIMARY_MIRROR_URL =
+  'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
 
 export type ExpertPypiMirrorId = (typeof ExpertPypiMirrorId)[keyof typeof ExpertPypiMirrorId];
 
@@ -19,10 +22,9 @@ export type ExpertPypiMirrorId = (typeof ExpertPypiMirrorId)[keyof typeof Expert
 export const DEFAULT_CN_NPM_REGISTRY_URL = 'https://registry.npmmirror.com';
 
 export const DEFAULT_CN_PYPI_MIRROR_URLS: readonly string[] = [
-  'https://pypi.tuna.tsinghua.edu.cn/simple',
+  DEFAULT_CN_PYPI_PRIMARY_MIRROR_URL,
   'https://pypi.mirrors.ustc.edu.cn/simple',
   'https://mirrors.cloud.tencent.com/pypi/simple',
-  'https://mirrors.byted.org/pypi/simple',
   'https://mirrors.aliyun.com/pypi/simple',
 ];
 
@@ -112,15 +114,23 @@ export const readPresetExpertPackageMetadata = (
 
 export const buildSkillCatalogPromptBlock = (skillCatalog: ExpertSkillCatalogEntry[]): string => {
   if (skillCatalog.length === 0) return '';
-  const lines = skillCatalog.map(
+  const linesZh = skillCatalog.map(
     entry =>
       `- \`${entry.id}\`（${entry.category}）：\`${entry.install}\`（npm 镜像 \`${DEFAULT_CN_NPM_REGISTRY_URL}\`）`,
   );
+  const linesEn = skillCatalog.map(
+    entry =>
+      `- \`${entry.id}\` (${entry.category}): \`${entry.install}\` (npm registry \`${DEFAULT_CN_NPM_REGISTRY_URL}\`)`,
+  );
   return [
-    '## 推荐外部 Skill（运行时安装）',
+    '## 推荐外部 Skill（运行时安装） / Recommended external skills (runtime install)',
     '',
-    '以下 Skill 不在安装包内；需要时用 `npx skills add` 或文档中的 install 命令拉取，禁止 vendor 仓库。',
-    ...lines,
+    '以下 Skill 不在安装包内；需要时用 `npx skills add` 或 install 命令拉取，禁止 vendor 仓库。',
+    'Skills are not bundled; install with `npx skills add` or the install command below. Do not vendor repos.',
+    ...linesZh,
+    '',
+    'English:',
+    ...linesEn,
   ].join('\n');
 };
 
@@ -138,17 +148,28 @@ export const buildPythonDependencyPromptBlock = (
         ? `内联依赖：${pythonRequirements.dependencies.join('、')}。`
         : '';
 
+  const depHintEn =
+    pythonRequirements.requirementsPath != null
+      ? `Requirements file: \`${pythonRequirements.requirementsPath}\` (relative to expert package root).`
+      : pythonRequirements.dependencies != null && pythonRequirements.dependencies.length > 0
+        ? `Inline deps: ${pythonRequirements.dependencies.join(', ')}.`
+        : '';
+
   return [
-    '## Python 依赖（运行时安装）',
+    '## Python 依赖（运行时安装） / Python dependencies (runtime install)',
     '',
-    '当任务需要额外 Python 包时，使用 `python_install` 或托管 `python-runtime` 工具安装；禁止把 wheel 打进安装包或仓库。',
+    '当任务需要额外 Python 包时，使用 `python_install` 或托管 `python-runtime` 安装；禁止把 wheel 打进安装包或仓库。',
+    'Use `python_install` or managed `python-runtime` for extra packages; never vendor wheels in the app or repo.',
     depHint,
-    '按以下 PyPI 镜像顺序尝试（失败再换下一个）：',
+    depHintEn,
+    '按以下 PyPI 镜像顺序尝试（与托管运行时 UV_INDEX 首选一致，失败再换下一个）：',
+    'Try these PyPI mirrors in order (primary matches managed UV_INDEX):',
     mirrorList,
     '',
-    `Node/npx 拉取 MCP 或前端工具包时，应用运行时会优先使用 npm 镜像 \`${DEFAULT_CN_NPM_REGISTRY_URL}\`（勿在仓库内 vendor 完整 npm 包）。`,
+    `Node/npx MCP 与工具包默认 npm 镜像 \`${DEFAULT_CN_NPM_REGISTRY_URL}\`（勿 vendor 完整 npm 包）。`,
+    `Default npm registry for npx/MCP: \`${DEFAULT_CN_NPM_REGISTRY_URL}\` (do not vendor full npm packages).`,
     '',
-    '安装完成后用 `python_execute` 验证 import，再继续交付。',
+    '安装后用 `python_execute` 验证 import / Verify imports with `python_execute` before delivery.',
   ]
     .filter(Boolean)
     .join('\n');

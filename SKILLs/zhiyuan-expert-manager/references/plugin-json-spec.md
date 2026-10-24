@@ -32,7 +32,7 @@
 | `skillIds` | string[] | 复用应用内已有 Skill 的 ID（不复制文件）               |
 | `mcpIds`   | string[] | 可选。安装后写入 Agent 的 MCP 连接器 ID（如 `context7`） |
 | `pythonRequirements` | object | 可选。`requirementsPath`（相对专家包根目录）或 `dependencies` 字符串数组；仅声明依赖，运行时经 uv/pip 安装 |
-| `pypiMirrors` | string[] | 可选。覆盖默认中国 PyPI 镜像顺序（清华 → 中科大 → 腾讯 → 字节 → 阿里云） |
+| `pypiMirrors` | string[] | 可选。覆盖默认中国 PyPI 镜像顺序（清华 TUNA web → 中科大 → 腾讯 → 阿里云，与托管 `UV_INDEX` 首选一致） |
 | `skillCatalog` | object[] | 可选。外部 Skill 安装提示（不入安装包）：每项含 `id`、`category`（如 `office`/`design`）、`install`（如 `npx skills add …`）、可选 `license` |
 
 运行时约定（不入安装包）：

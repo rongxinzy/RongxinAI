@@ -60,5 +60,18 @@
     "lark-mcp",
     "dingtalk-mcp",
     "feishu"
+  ],
+  "skillCatalog": [
+    {
+      "id": "mcp-notify",
+      "category": "office",
+      "install": "npx -y mcp-notify",
+      "license": "MIT"
+    },
+    {
+      "id": "workbuddy-office-skills",
+      "category": "office",
+      "install": "npx skills add bitcjm/workbuddy-skills"
+    }
   ]
 }

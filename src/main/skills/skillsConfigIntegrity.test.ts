@@ -210,11 +210,20 @@ test('skillsConfigIntegrity: curated MCP launch commands stay installable and cl
     ]);
     expect(byId.get('lark-mcp')?.requiredEnvKeys).toEqual(['APP_ID', 'APP_SECRET']);
     expect(byId.get('excel-mcp-server')?.defaultArgs ?? []).not.toContain('.');
+    expect(byId.get('excel-mcp-server')?.argPlaceholders).toEqual([
+      '--allow-dir',
+      '<YOUR_WORK_DIR>',
+    ]);
+    expect(byId.get('gitlab')).toMatchObject({
+      transportType: 'http',
+      url: 'https://gitlab.com/api/v4/mcp',
+    });
 
     const serialized = JSON.stringify(catalog);
     expect(serialized).not.toContain('@modelcontextprotocol/server-fetch');
     expect(serialized).not.toContain('markitdown-mcp-npx');
     expect(serialized).not.toContain('server-slack');
+    expect(serialized).not.toContain('server-gitlab');
     expect(serialized.toLowerCase()).not.toContain('gongrzhe');
   }
 });

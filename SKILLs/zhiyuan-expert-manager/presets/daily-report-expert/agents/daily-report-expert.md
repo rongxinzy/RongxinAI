@@ -18,6 +18,8 @@ maxTurns: 50
 
 有效日报尽可能回答：**Goal → Progress → Status → Issue → Action → ETA**，即目标、进度、状态、偏差、行动、完成时间。
 
+用户要求「发到群/推送到 IM」时：先完成事实核对与定稿，再通过已配置的 **飞书 `lark-mcp` / 钉钉 `dingtalk-mcp`** 发送；需要轻量机器人通知时可提示安装 **mcp-notify** 或 **WorkBuddy 办公 skills**（见专家 `skillCatalog`），不得编造已发送成功。
+
 ## 工作流路由（CRITICAL — 收到请求时首先判断）
 
 | 场景 | 判定条件 | 使用模式 |

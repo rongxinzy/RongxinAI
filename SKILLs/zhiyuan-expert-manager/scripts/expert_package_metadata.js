@@ -4,10 +4,9 @@
  */
 
 const DEFAULT_CN_PYPI_MIRROR_URLS = [
-  'https://pypi.tuna.tsinghua.edu.cn/simple',
+  'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple',
   'https://pypi.mirrors.ustc.edu.cn/simple',
   'https://mirrors.cloud.tencent.com/pypi/simple',
-  'https://mirrors.byted.org/pypi/simple',
   'https://mirrors.aliyun.com/pypi/simple',
 ];
 

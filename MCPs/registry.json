@@ -224,22 +224,12 @@
     {
       "id": "gitlab",
       "name": "GitLab",
-      "description_zh": "GitLab API 集成：项目管理、合并请求、流水线",
-      "description_en": "GitLab API integration: project management, merge requests, pipelines.",
+      "description_zh": "GitLab 官方 MCP（OAuth）：项目、合并请求、流水线与工作项（自托管请改实例 URL）",
+      "description_en": "Official GitLab MCP (OAuth): projects, merge requests, pipelines, and work items.",
       "category": "developer",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@modelcontextprotocol/server-gitlab"
-      ],
-      "requiredEnvKeys": [
-        "GITLAB_PERSONAL_ACCESS_TOKEN"
-      ],
-      "optionalEnvKeys": [
-        "GITLAB_API_URL"
-      ],
-      "authType": "token",
+      "transportType": "http",
+      "url": "https://gitlab.com/api/v4/mcp",
+      "authType": "oauth",
       "connectorPath": "gitlab/mcp.json"
     },
     {
@@ -312,6 +302,10 @@
       "defaultArgs": [
         "excel-mcp-server",
         "stdio"
+      ],
+      "argPlaceholders": [
+        "--allow-dir",
+        "<YOUR_WORK_DIR>"
       ],
       "authType": "none",
       "connectorPath": "excel-mcp-server/mcp.json"
@@ -401,6 +395,9 @@
       "defaultArgs": [
         "-y",
         "@modelcontextprotocol/server-filesystem"
+      ],
+      "argPlaceholders": [
+        "<ALLOWED_DIR>"
       ],
       "authType": "none",
       "connectorPath": "filesystem/mcp.json"

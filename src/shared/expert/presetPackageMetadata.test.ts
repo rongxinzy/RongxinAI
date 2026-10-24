@@ -15,7 +15,7 @@ import {
 
 test('resolvePresetPypiMirrors uses documented default order when plugin omits overrides', () => {
   expect(resolvePresetPypiMirrors({})).toEqual([...DEFAULT_CN_PYPI_MIRROR_URLS]);
-  expect(DEFAULT_CN_PYPI_MIRROR_URLS[0]).toContain('tuna.tsinghua');
+  expect(DEFAULT_CN_PYPI_MIRROR_URLS[0]).toContain('mirrors.tuna.tsinghua.edu.cn');
   expect(DEFAULT_CN_NPM_REGISTRY_URL).toBe('https://registry.npmmirror.com');
   expect(ExpertPypiMirrorId.TsinghuaTuna).toBe('tsinghua-tuna');
 });

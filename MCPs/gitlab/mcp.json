@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "gitlab": {
-      "command": "npx",
-      "args": ["-y","@modelcontextprotocol/server-gitlab"]
+      "url": "https://gitlab.com/api/v4/mcp"
     }
   }
 }

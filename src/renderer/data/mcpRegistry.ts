@@ -1,91 +1,68 @@
-import { McpRegistryEntry } from '../types/mcp';
+import type { McpCategory, McpRegistryEntry } from '../types/mcp';
+
+import registryBundle from './mcpRegistry.json';
+
+const CATEGORY_ID_TO_I18N_KEY: Record<string, string> = {
+  all: 'mcpCategoryAll',
+  search: 'mcpCategorySearch',
+  developer: 'mcpCategoryDeveloper',
+  productivity: 'mcpCategoryProductivity',
+  browser: 'mcpCategoryBrowser',
+  design: 'mcpCategoryDesign',
+  'data-api': 'mcpCategoryDataApi',
+};
+
+type BundledRegistry = {
+  categories: Array<{ id: string; name_zh: string; name_en: string }>;
+  servers: Array<{
+    id: string;
+    name: string;
+    description_zh?: string;
+    description_en?: string;
+    category: string;
+    transportType: 'stdio' | 'sse' | 'http';
+    command?: string;
+    defaultArgs?: string[];
+    url?: string;
+    headers?: Record<string, string>;
+    authType?: McpRegistryEntry['authType'];
+    requiredEnvKeys?: string[];
+    optionalEnvKeys?: string[];
+    argPlaceholders?: string[];
+    connectorPath?: string;
+    iconPath?: string;
+    metadataPath?: string;
+  }>;
+};
+
+const bundle = registryBundle as BundledRegistry;
+
+const toRegistryEntry = (server: BundledRegistry['servers'][number]): McpRegistryEntry => ({
+  id: server.id,
+  name: server.name,
+  descriptionKey: '',
+  description_zh: server.description_zh,
+  description_en: server.description_en,
+  category: server.category as McpCategory,
+  categoryKey: CATEGORY_ID_TO_I18N_KEY[server.category] ?? 'mcpCategoryDeveloper',
+  transportType: server.transportType,
+  command: server.command,
+  defaultArgs: server.defaultArgs,
+  url: server.url,
+  headers: server.headers,
+  authType: server.authType,
+  requiredEnvKeys: server.requiredEnvKeys,
+  optionalEnvKeys: server.optionalEnvKeys,
+  argPlaceholders: server.argPlaceholders,
+  connectorPath: server.connectorPath,
+  iconPath: server.iconPath,
+  metadataPath: server.metadataPath,
+});
 
 /** Fallback entries used only when the bundled marketplace cannot be loaded. */
-export const mcpRegistry: McpRegistryEntry[] = [
-  {
-    id: 'notion',
-    name: 'Notion',
-    descriptionKey: '',
-    description_zh:
-      '\u5728\u7ebf\u534f\u4f5c\u4e0e\u77e5\u8bc6\u5e93\u7ba1\u7406\u5de5\u4f5c\u533a',
-    description_en: 'A connected workspace for collaboration and knowledge management.',
-    category: 'productivity',
-    categoryKey: 'mcpCategoryProductivity',
-    transportType: 'http',
-    url: 'https://mcp.notion.com/mcp',
-    authType: 'oauth',
-  },
-  {
-    id: 'supabase',
-    name: 'Supabase',
-    descriptionKey: '',
-    description_zh:
-      'Supabase \u6570\u636e\u5e93\u3001\u8868\u3001\u8fb9\u7f18\u51fd\u6570\u548c\u9879\u76ee\u7ba1\u7406',
-    description_en: 'Supabase database, tables, edge functions, and project management.',
-    category: 'developer',
-    categoryKey: 'mcpCategoryDeveloper',
-    transportType: 'http',
-    url: 'https://mcp.supabase.com/mcp',
-    authType: 'oauth',
-  },
-  {
-    id: 'jinshuju',
-    name: '\u91d1\u6570\u636e',
-    descriptionKey: '',
-    description_zh:
-      '\u91d1\u6570\u636e\u8868\u5355\u3001\u6570\u636e\u67e5\u8be2\u548c\u81ea\u52a8\u5316',
-    description_en: 'Jinshuju forms, data queries, and workflow automation.',
-    category: 'productivity',
-    categoryKey: 'mcpCategoryProductivity',
-    transportType: 'http',
-    url: 'https://jinshuju.net/mcp',
-    authType: 'oauth',
-  },
-  {
-    id: 'amap-maps',
-    name: '高德地图',
-    descriptionKey: '',
-    description_zh: '高德地图路线、POI、地理编码与出行能力（国内常用）',
-    description_en: 'AMap routing, POI, geocoding, and mobility tools for China.',
-    category: 'data-api',
-    categoryKey: 'mcpCategoryDataApi',
-    transportType: 'stdio',
-    command: 'npx',
-    defaultArgs: ['-y', '@amap/amap-maps-mcp-server'],
-    requiredEnvKeys: ['AMAP_MAPS_API_KEY'],
-    authType: 'token',
-  },
-  {
-    id: 'feishu',
-    name: '\u98de\u4e66',
-    descriptionKey: '',
-    description_zh:
-      '\u98de\u4e66\u6587\u6863\u3001\u65e5\u5386\u3001\u6d88\u606f\u3001\u4e91\u76d8\u548c\u5ba1\u6279\u534f\u4f5c',
-    description_en: 'Feishu documents, calendars, messages, drive, and approvals.',
-    category: 'productivity',
-    categoryKey: 'mcpCategoryProductivity',
-    transportType: 'stdio',
-    command: 'lark-cli',
-    authType: 'cli',
-  },
-  {
-    id: 'pkulaw',
-    name: '\u5317\u5927\u6cd5\u5b9d',
-    descriptionKey: '',
-    description_zh:
-      '\u4e2d\u56fd\u6cd5\u5f8b\u6cd5\u89c4\u3001\u6848\u4f8b\u548c\u53f8\u6cd5\u6570\u636e\u68c0\u7d22',
-    description_en: 'Chinese laws, regulations, and judicial case search.',
-    category: 'data-api',
-    categoryKey: 'mcpCategoryDataApi',
-    transportType: 'http',
-    url: 'https://apim-gateway.pkulaw.com/mcp-law-agg/1.0.0/mcp',
-    authType: 'oauth',
-  },
-];
+export const mcpRegistry: McpRegistryEntry[] = bundle.servers.map(toRegistryEntry);
 
-export const mcpCategories = [
-  { id: 'all', key: 'mcpCategoryAll' },
-  { id: 'developer', key: 'mcpCategoryDeveloper' },
-  { id: 'productivity', key: 'mcpCategoryProductivity' },
-  { id: 'data-api', key: 'mcpCategoryDataApi' },
-] as const;
+export const mcpCategories = bundle.categories.map(category => ({
+  id: category.id,
+  key: CATEGORY_ID_TO_I18N_KEY[category.id] ?? 'mcpCategoryDeveloper',
+}));
