@@ -126,10 +126,7 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@upstash/context7-mcp@latest"
-      ],
+      "defaultArgs": ["-y", "@upstash/context7-mcp@latest"],
       "authType": "none"
     },
     {
@@ -140,13 +137,8 @@
       "category": "search",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "tavily-mcp@latest"
-      ],
-      "requiredEnvKeys": [
-        "TAVILY_API_KEY"
-      ],
+      "defaultArgs": ["-y", "tavily-mcp@latest"],
+      "requiredEnvKeys": ["TAVILY_API_KEY"],
       "authType": "token"
     },
     {
@@ -157,9 +149,7 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "uvx",
-      "defaultArgs": [
-        "mcp-server-fetch"
-      ],
+      "defaultArgs": ["mcp-server-fetch"],
       "authType": "none"
     },
     {
@@ -170,10 +160,7 @@
       "category": "browser",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@playwright/mcp@latest"
-      ],
+      "defaultArgs": ["-y", "@playwright/mcp@latest"],
       "authType": "none"
     },
     {
@@ -184,13 +171,8 @@
       "category": "design",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "figma-developer-mcp@latest"
-      ],
-      "requiredEnvKeys": [
-        "FIGMA_API_KEY"
-      ],
+      "defaultArgs": ["-y", "figma-developer-mcp@latest"],
+      "requiredEnvKeys": ["FIGMA_API_KEY"],
       "authType": "token"
     },
     {
@@ -201,13 +183,8 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "firecrawl-mcp@latest"
-      ],
-      "requiredEnvKeys": [
-        "FIRECRAWL_API_KEY"
-      ],
+      "defaultArgs": ["-y", "firecrawl-mcp@latest"],
+      "requiredEnvKeys": ["FIRECRAWL_API_KEY"],
       "authType": "token"
     },
     {
@@ -228,13 +205,8 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@amap/amap-maps-mcp-server"
-      ],
-      "requiredEnvKeys": [
-        "AMAP_MAPS_API_KEY"
-      ],
+      "defaultArgs": ["-y", "@amap/amap-maps-mcp-server"],
+      "requiredEnvKeys": ["AMAP_MAPS_API_KEY"],
       "authType": "token"
     },
     {
@@ -245,17 +217,8 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@larksuiteoapi/lark-mcp",
-        "mcp",
-        "-l",
-        "zh"
-      ],
-      "requiredEnvKeys": [
-        "APP_ID",
-        "APP_SECRET"
-      ],
+      "defaultArgs": ["-y", "@larksuiteoapi/lark-mcp", "mcp", "-l", "zh"],
+      "requiredEnvKeys": ["APP_ID", "APP_SECRET"],
       "authType": "token"
     },
     {
@@ -266,14 +229,8 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "dingtalk-mcp@latest"
-      ],
-      "requiredEnvKeys": [
-        "DINGTALK_Client_ID",
-        "DINGTALK_Client_Secret"
-      ],
+      "defaultArgs": ["-y", "dingtalk-mcp@latest"],
+      "requiredEnvKeys": ["DINGTALK_Client_ID", "DINGTALK_Client_Secret"],
       "authType": "token"
     },
     {
@@ -284,14 +241,8 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "uvx",
-      "defaultArgs": [
-        "excel-mcp-server",
-        "stdio"
-      ],
-      "argPlaceholders": [
-        "--allow-dir",
-        "<YOUR_WORK_DIR>"
-      ],
+      "defaultArgs": ["excel-mcp-server", "stdio"],
+      "argPlaceholders": ["--allow-dir", "<YOUR_WORK_DIR>"],
       "authType": "none"
     },
     {
@@ -302,11 +253,7 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@officecli/officecli",
-        "mcp"
-      ],
+      "defaultArgs": ["-y", "@officecli/officecli", "mcp"],
       "authType": "none"
     },
     {
@@ -317,9 +264,7 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "uvx",
-      "defaultArgs": [
-        "markitdown-mcp"
-      ],
+      "defaultArgs": ["markitdown-mcp"],
       "authType": "none"
     },
     {
@@ -340,13 +285,8 @@
       "category": "design",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@figwright/mcp@latest"
-      ],
-      "requiredEnvKeys": [
-        "FIGMA_API_KEY"
-      ],
+      "defaultArgs": ["-y", "@figwright/mcp@latest"],
+      "requiredEnvKeys": ["FIGMA_API_KEY"],
       "authType": "token"
     },
     {
@@ -357,10 +297,7 @@
       "category": "browser",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "chrome-devtools-mcp@latest"
-      ],
+      "defaultArgs": ["-y", "chrome-devtools-mcp@latest"],
       "authType": "none"
     },
     {
@@ -371,13 +308,8 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem"
-      ],
-      "argPlaceholders": [
-        "<ALLOWED_DIR>"
-      ],
+      "defaultArgs": ["-y", "@modelcontextprotocol/server-filesystem"],
+      "argPlaceholders": ["<ALLOWED_DIR>"],
       "authType": "none"
     },
     {
@@ -388,10 +320,7 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@modelcontextprotocol/server-memory"
-      ],
+      "defaultArgs": ["-y", "@modelcontextprotocol/server-memory"],
       "authType": "none"
     },
     {
@@ -402,10 +331,7 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": [
-        "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
-      ],
+      "defaultArgs": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
       "authType": "none"
     }
   ]
