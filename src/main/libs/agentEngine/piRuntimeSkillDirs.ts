@@ -22,15 +22,28 @@ import { getFeishuConnectorSkillsRoot } from '../feishuConnectorPaths';
  * fallback so a default skill deleted from (or not yet synced to) userData
  * stays loadable.
  */
+/** Packaged-only fallback roots; tolerate incomplete Electron test doubles. */
+function resolveBundledSkillsRoots(): string[] {
+  const roots: string[] = [];
+  if (typeof process.resourcesPath === 'string' && process.resourcesPath.length > 0) {
+    roots.push(path.join(process.resourcesPath, 'SKILLs'));
+  }
+  try {
+    if (typeof app.getAppPath === 'function') {
+      roots.push(path.join(app.getAppPath(), 'SKILLs'));
+    }
+  } catch {
+    // Unit tests often mock electron.app without getAppPath.
+  }
+  return roots;
+}
+
 export function resolveZhiyuanSkillDirs(): string[] {
   return collectZhiyuanSkillRoots({
     isPackaged: app.isPackaged,
     userSkillsRoot: getSkillsRoot(),
     userDataSkillsRoot: path.join(app.getPath('userData'), 'SKILLs'),
-    bundledSkillsRoots: [
-      path.join(process.resourcesPath, 'SKILLs'),
-      path.join(app.getAppPath(), 'SKILLs'),
-    ],
+    bundledSkillsRoots: resolveBundledSkillsRoots(),
     feishuRoot: getFeishuConnectorSkillsRoot(app.getPath('userData')),
     exists: dir => fs.existsSync(dir),
   });
