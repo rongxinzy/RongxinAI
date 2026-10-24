@@ -5259,6 +5259,25 @@
   font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-text-primary);
 }
+:where(:root, [data-theme]) :where(.theme-welcome-screen) {
+  background-color: var(--background);
+  color: var(--foreground);
+  transition-property: opacity;
+  transition-duration: 200ms;
+}
+:where(:root, [data-theme]) :where(.theme-welcome-title) {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+}
+:where(:root, [data-theme]) :where(.theme-welcome-art) {
+  width: min(52rem, 88vw);
+  height: min(24rem, 44vh);
+  animation-name: zy-component-welcome-art-1su47v9;
+  animation-duration: 240ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
 :where(:root, [data-theme]) :where(.theme-home-brand) {
   height: 3rem;
 }
@@ -7246,6 +7265,9 @@
 :where(:root, [data-theme]) :where(.theme-sheet-content[data-side="right"]):where([data-ending-style]) {
   translate: 2.5rem 0;
 }
+:where(:root, [data-theme]) :where(.theme-welcome-screen):where([data-ending-style]) {
+  opacity: 0;
+}
 :where(:root, [data-theme]) :where(.theme-select-trigger):where([data-placeholder]) {
   color: var(--muted-foreground);
 }
@@ -7382,6 +7404,16 @@ from {
 to {
   opacity: 1;
   scale: 1;
+}
+}
+@keyframes zy-component-welcome-art-1su47v9 {
+from {
+  opacity: 0;
+  translate: 0 0.5rem;
+}
+to {
+  opacity: 1;
+  translate: 0 0;
 }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -8297,6 +8329,9 @@ to {
 :where(:root, [data-theme]) :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]),
 :where(:root, [data-theme]) :where(.theme-sidebar-mode-label),
 :where(:root, [data-theme]) :where(.theme-sidebar-mode-label[data-mode-selected="true"]),
+:where(:root, [data-theme]) :where(.theme-welcome-screen),
+:where(:root, [data-theme]) :where(.theme-welcome-title),
+:where(:root, [data-theme]) :where(.theme-welcome-art),
 :where(:root, [data-theme]) :where(.theme-home-brand),
 :where(:root, [data-theme]) :where(.theme-home-caption),
 :where(:root, [data-theme]) :where(.theme-home-sticky),

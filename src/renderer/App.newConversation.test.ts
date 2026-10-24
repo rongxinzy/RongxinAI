@@ -29,7 +29,7 @@ test('resets active skills for every blank conversation entry point', () => {
 
 test('new chat clears the prompt expert chip while expert-page entry does not', () => {
   const openNewConversation = callbackBody(appSource, 'openNewConversation', 'handleNewChat');
-  const handleChatWithExpert = callbackBody(appSource, 'handleChatWithExpert', 'dismissToast');
+  const handleChatWithExpert = callbackBody(appSource, 'handleChatWithExpert', 'handleOpenAbout');
 
   expect(openNewConversation).toContain('clearExperts: options?.clearExperts === true');
   expect(handleChatWithExpert).toContain('openNewConversation();');
@@ -37,7 +37,7 @@ test('new chat clears the prompt expert chip while expert-page entry does not', 
 });
 
 test('preserves the selected skill when starting from use-this-skill', () => {
-  const handleTrySkill = callbackBody(appSource, 'handleTrySkill', 'dismissToast');
+  const handleTrySkill = callbackBody(appSource, 'handleTrySkill', 'handleChatWithExpert');
 
   expect(handleTrySkill).toContain('if (!skill?.enabled)');
   expect(handleTrySkill).toContain('dispatch(setActiveSkillIds([skillId]));');

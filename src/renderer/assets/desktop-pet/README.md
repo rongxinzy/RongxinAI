@@ -1,5 +1,7 @@
 # 桌面伙伴素材
 
+启动欢迎群像见 [companions-welcome.png](companions-welcome.png)，七位伙伴共同入画，透明背景；生成方式与提示词见 [welcome-prompt.md](welcome-prompt.md)。这是独立的启动插画，不影响动作图集或角色选择。
+
 六个新角色通过内置 `image_gen.imagegen` 分别生成并修整留白，保留工具返回的透明 PNG；没有程序化修改或重新编码图片。生成规格、角色提示词及修整提示词见 [prompts.json](prompts.json)。
 
 | 角色 | 素材 | 动作性格 |

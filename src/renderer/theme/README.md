@@ -35,7 +35,7 @@ const paper: ThemePlugin = {
 - `css/tailwind.css`: utility-to-token adapter, no per-theme values. `css/components.css`: shared control, typography, motion and layout rules. Layout dimensions and state selectors remain structural CSS; they are not separate runtime component implementations.
 - `syntax/`: static CodeMirror and Prism scope adapters; Shiki emits semantic variables. Switching style does not require re-highlighting to update colors.
 - `ThemeManager`: replaces one generated stylesheet and updates the root appearance class in place. Settings cancel restores both style and appearance; saving writes only changed configuration fields.
-- Brand/provider/file-type logos, avatar artwork, sampled boot-logo particles, user-authored artifacts and portable document exports retain content colors. Theme plugins do not rewrite user documents or execute code inside artifact sandboxes.
+- Brand/provider/file-type logos, avatar and welcome artwork, user-authored artifacts and portable document exports retain content colors. Theme plugins do not rewrite user documents or execute code inside artifact sandboxes.
 
 ## Verification boundaries
 

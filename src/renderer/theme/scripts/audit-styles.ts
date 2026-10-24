@@ -10,8 +10,6 @@ const exceptions: Record<string, string> = {
     'Portable conversation exports use print-oriented document styling.',
   'src/renderer/components/artifacts/ArtifactPanel.tsx':
     'Standalone exported documents preserve portable content styling.',
-  'src/renderer/components/boot/ParticleBootScreen.tsx':
-    'Particle colors are sampled from the product logo image.',
   'src/renderer/components/expert/expertAvatars.tsx':
     'Authored avatar artwork preserves its own colors.',
 };
