@@ -62,14 +62,9 @@ function sendState(): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
   const state = currentState();
   const bubbleKey = desktopPetBubbleKey(state);
-  const allowChatter =
-    !bubbleKey &&
-    state === DesktopPetState.Idle &&
-    !greeting &&
-    !reducedMotion &&
-    getDesktopPetSettings().chatter;
-  if (!allowChatter) chatter.clear();
-  const chatterKey = allowChatter ? chatter.activeKey() : null;
+  const chatterEnabled = !bubbleKey && !reducedMotion && getDesktopPetSettings().chatter;
+  if (!chatterEnabled) chatter.clear();
+  const chatterKey = chatterEnabled ? chatter.activeKey() : null;
   pet.webContents.send(DesktopPetIpc.State, {
     state,
     label: t(`desktopPet_${state}`),
@@ -218,6 +213,10 @@ function greet(): void {
 function playAction(action: DesktopPetPlayableAction): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
   pet.webContents.send(DesktopPetIpc.Effect, { kind: DesktopPetEffectKind.Action, action });
+  if (visible && !reducedMotion && getDesktopPetSettings().chatter) {
+    chatter.showAction(action, Date.now());
+    sendState();
+  }
 }
 
 function showMenu(): void {

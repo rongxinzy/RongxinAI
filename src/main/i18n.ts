@@ -61,6 +61,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     desktopPet_chatter_8: '慢慢来，不着急',
     desktopPet_chatter_9: '我守着呢',
     desktopPet_chatter_10: '有我在就好',
+    desktopPet_chatter_action_happy: '嘿嘿！',
+    desktopPet_chatter_action_peek: '我看一眼～',
+    desktopPet_chatter_action_nod: '嗯嗯',
+    desktopPet_chatter_action_flutter: '扑棱一下',
 
     // Session titles (created by ChannelSessionSync)
     coworkDefaultSessionTitle: '新对话',
@@ -488,6 +492,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     desktopPet_chatter_8: 'Take it one step at a time',
     desktopPet_chatter_9: "I've got your back",
     desktopPet_chatter_10: "You're not alone here",
+    desktopPet_chatter_action_happy: 'Hehe!',
+    desktopPet_chatter_action_peek: 'Just a peek~',
+    desktopPet_chatter_action_nod: 'Mhm',
+    desktopPet_chatter_action_flutter: 'Flutter!',
 
     // Session titles
     coworkDefaultSessionTitle: 'New Chat',
