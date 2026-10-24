@@ -123,6 +123,33 @@ export class MagpieModelService {
       );
     return { model, catalog, gatewayUrl: catalog.status.gatewayUrl };
   }
+
+  /** Companion requests use existing consent and policy, without changing the global default. */
+  async resolveAutomatic(excludedIds: ReadonlySet<string> = new Set()): Promise<{
+    model: MagpieModel;
+    gatewayUrl: string;
+  } | null> {
+    const status = this.backend.status();
+    if (status.enabled === false) return null;
+    if (status.state !== 'running' && status.enabled === true) await this.backend.ensureRunning?.();
+    const catalog = await this.catalog();
+    if (catalog.status.state !== 'running' || !catalog.status.gatewayUrl) return null;
+    const candidates = catalog.models.filter(model => {
+      if (excludedIds.has(model.id)) return false;
+      if (model.modalities && !model.modalities.input.includes('text')) return false;
+      if (model.modalities && !model.modalities.output.includes('text')) return false;
+      return (
+        !model.native_endpoints?.length ||
+        model.native_endpoints.some(endpoint =>
+          ['/v1/messages', '/v1/responses', '/v1/chat/completions'].includes(endpoint),
+        )
+      );
+    });
+    candidates.sort((a, b) => a.id.localeCompare(b.id, 'en'));
+    const model =
+      candidates.find(candidate => candidate.id === catalog.defaultModelId) ?? candidates[0];
+    return model ? { model, gatewayUrl: catalog.status.gatewayUrl } : null;
+  }
 }
 let installed: MagpieModelService | undefined;
 export function installMagpieModelService(service: MagpieModelService): () => void {

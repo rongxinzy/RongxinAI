@@ -90,6 +90,10 @@ const runAppCleanup = async (): Promise<void> => {
   // the slowest service instead of the sum of every service.
   const steps: CleanupStep[] = [
     {
+      name: 'companions',
+      run: async () => agentRuntime.piRuntimeAdapter?.closeCompanions(),
+    },
+    {
       name: 'magpie',
       run: async () => {
         if (disconnectExternalAgents) {

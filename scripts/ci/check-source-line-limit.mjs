@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const BASELINE_RELATIVE = 'scripts/ci/source-line-baseline.json';
-const sourcePattern = /\.(ts|tsx|js|jsx|mjs|cjs|py)$/i;
+const sourcePattern = /\.(ts|mts|cts|tsx|js|jsx|mjs|cjs|py)$/i;
 const skipPattern =
   /(?:^|\/)(vendor|generated)(?:\/|$)|\.lock$|^tests\/replay\/tapes\/|MCPs\/feishu\/skills\/lark-apps\/creative-design\/starter-components\//;
 

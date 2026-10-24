@@ -84,6 +84,7 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     // File-backed Pi sessions live beside the SQLite transcript under
     // userData; one directory per Cowork session id.
     agentRuntime.piRuntimeAdapter.setPiSessionStoreRoot(app.getPath('userData'));
+    agentRuntime.piRuntimeAdapter.setCompanionStore(getStore());
     agentRuntime.piRuntimeAdapter.setCoworkStore(getCoworkStore());
     agentRuntime.piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     agentRuntime.piRuntimeAdapter.setArtifactLedger(getArtifactLedger());

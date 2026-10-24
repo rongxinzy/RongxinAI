@@ -5,6 +5,7 @@
  * catalog modalities, then the learned rejection verdict.
  */
 
+import type { Model } from '@earendil-works/pi-ai';
 import {
   ZhiyuanModelPoolHeader,
   type ZhiyuanModelPoolWorkload as ZhiyuanModelPoolWorkloadValue,
@@ -20,6 +21,7 @@ import { ImageInputVerdict, imageInputVerdict } from './piImageInputFallback';
 import type { PiModelRuntime, PiModules, PiResolvedModel } from './piRuntimeSessionState';
 
 export const DEFAULT_PI_LOCAL_MAX_TOKENS = 4096;
+type MagpieNativeApi = 'openai-responses' | 'anthropic-messages' | 'openai-completions';
 
 export interface ModelPoolRequestContext {
   conversationId: string;
@@ -40,9 +42,9 @@ export function buildMagpiePiModel(
   gatewayUrl: string,
   modelPoolRequestContext?: ModelPoolRequestContext,
 ): {
-  model: Record<string, unknown>;
+  model: Model<MagpieNativeApi> & Record<string, unknown>;
   baseUrl: string;
-  api: string;
+  api: MagpieNativeApi;
   supportsImage: boolean;
   maxTokens: number;
 } {
@@ -60,7 +62,7 @@ export function buildMagpiePiModel(
     throw new Error('Invalid owned model gateway URL');
   }
   const endpoints = selected.native_endpoints ?? [];
-  const api = endpoints.includes('/v1/responses')
+  const api: MagpieNativeApi = endpoints.includes('/v1/responses')
     ? 'openai-responses'
     : endpoints.includes('/v1/messages')
       ? 'anthropic-messages'
@@ -80,7 +82,7 @@ export function buildMagpiePiModel(
   const imageInput = magpieImageInput(selected);
   const supportsImage = imageInput === ModelCapabilityStatus.Supported;
 
-  const model: Record<string, unknown> = {
+  const model: Model<MagpieNativeApi> & Record<string, unknown> = {
     id: selected.id,
     name: selected.display_name || selected.id,
     provider: 'magpie',

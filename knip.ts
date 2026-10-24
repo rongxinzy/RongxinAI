@@ -78,7 +78,7 @@ const config: KnipConfig = {
         'electron-builder.xiaoruan.cjs',
       ],
       project: [
-        'src/**/*.{js,mjs,cjs,jsx,ts,tsx,css}',
+        'src/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,css}',
         'scripts/**/*.{js,mjs,cjs,jsx,ts,tsx}',
         'tests/**/*.{js,mjs,cjs,jsx,ts,tsx}',
         'electron-builder*.cjs',

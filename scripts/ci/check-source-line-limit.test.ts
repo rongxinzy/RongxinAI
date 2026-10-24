@@ -15,6 +15,15 @@ describe('checkSourceLineLimit', () => {
     expect(errors[0]).toContain('src/new.ts');
   });
 
+  test('checks native ESM and CommonJS TypeScript sources under the same limit', () => {
+    for (const extension of ['mts', 'cts']) {
+      const file = `src/new.${extension}`;
+      const errors = checkSourceLineLimit(base, { 'src/big.ts': 1500, [file]: 1001 }, base);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain(file);
+    }
+  });
+
   test('fails a capped file that grows past its cap', () => {
     expect(checkSourceLineLimit(base, { 'src/big.ts': 1501 }, base)[0]).toContain(
       'exceeds baseline cap',
