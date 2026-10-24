@@ -1,6 +1,8 @@
 import { BrowserWindow, screen } from 'electron';
 
 import { DESKTOP_PET_SIZE, DesktopPetEffectKind } from '../../shared/desktopPet/constants';
+import { DESKTOP_PET_CANVAS_TOP, DESKTOP_PET_WINDOW_HEIGHT } from '../../shared/desktopPet/layout';
+import { DesktopPetRoam } from './roam';
 import type { DesktopPetEffect } from '../../shared/desktopPet/types';
 import {
   estimateReleaseVelocity,
@@ -16,7 +18,7 @@ export function petBounds(area: Electron.Rectangle): ThrowBounds {
     minX: area.x,
     minY: area.y,
     maxX: Math.max(area.x, area.x + area.width - DESKTOP_PET_SIZE),
-    maxY: Math.max(area.y, area.y + area.height - DESKTOP_PET_SIZE),
+    maxY: Math.max(area.y, area.y + area.height - DESKTOP_PET_WINDOW_HEIGHT),
   };
 }
 
@@ -37,11 +39,16 @@ export class DesktopPetMotion {
   private mask = new Uint8Array(DESKTOP_PET_SIZE * DESKTOP_PET_SIZE);
   private ignoring = true;
   private reducedMotion = false;
+  private roamingEnabled = true;
+  private allowRoam = false;
+  private readonly roam = new DesktopPetRoam();
+  private lastPose: { facing: number; walking: boolean } = { facing: 1, walking: false };
 
   constructor(
     private readonly window: BrowserWindow,
     private readonly settled: () => void,
     private readonly effect: (effect: DesktopPetEffect) => void = () => {},
+    private readonly pose: (pose: { facing: number; walking: boolean }) => void = () => {},
   ) {
     window.setIgnoreMouseEvents(true);
     this.tick();
@@ -57,10 +64,29 @@ export class DesktopPetMotion {
       this.flying = undefined;
       this.settled();
     }
+    if (value) this.roam.reset(performance.now());
+  }
+
+  setRoamingEnabled(value: boolean): void {
+    this.roamingEnabled = value;
+    if (!value) this.roam.reset(performance.now());
+  }
+
+  setAllowRoam(value: boolean): void {
+    this.allowRoam = value;
+    if (!value) this.roam.reset(performance.now());
+  }
+
+  private publishPose(next: { facing: number; walking: boolean }): void {
+    if (next.facing === this.lastPose.facing && next.walking === this.lastPose.walking) return;
+    this.lastPose = next;
+    this.pose(next);
   }
 
   begin(): void {
     this.flying = undefined;
+    this.roam.reset(performance.now());
+    this.publishPose({ facing: this.roam.facingDirection, walking: false });
     const cursor = screen.getCursorScreenPoint();
     const [x, y] = this.window.getPosition();
     this.dragging = {
@@ -152,6 +178,7 @@ export class DesktopPetMotion {
     if (this.window.isDestroyed()) return;
     const now = performance.now();
     const cursor = screen.getCursorScreenPoint();
+    const [x, y] = this.window.getPosition();
     if (this.dragging) {
       this.sample(cursor, now);
       const area = screen.getDisplayNearestPoint(cursor).workArea;
@@ -185,11 +212,21 @@ export class DesktopPetMotion {
       this.window.setPosition(Math.round(next.x), Math.round(next.y));
       this.flying = next.atRest ? undefined : next;
       if (next.atRest) this.settled();
+    } else if (!this.reducedMotion && this.roamingEnabled && this.allowRoam) {
+      const area = screen.getDisplayMatching(this.window.getBounds()).workArea;
+      const bounds = petBounds(area);
+      const moved = this.roam.tick(now, { x, y }, bounds, true);
+      if (moved) {
+        this.window.setPosition(moved.x, moved.y);
+        this.publishPose({ facing: moved.facing, walking: moved.walking });
+      } else {
+        this.publishPose({ facing: this.roam.facingDirection, walking: false });
+      }
     }
     this.lastTime = now;
-    const [x, y] = this.window.getPosition();
-    const localX = Math.floor(cursor.x - x);
-    const localY = Math.floor(cursor.y - y);
+    const [hitX, hitY] = this.window.getPosition();
+    const localX = Math.floor(cursor.x - hitX);
+    const localY = Math.floor(cursor.y - hitY - DESKTOP_PET_CANVAS_TOP);
     const hit =
       localX >= 0 &&
       localX < DESKTOP_PET_SIZE &&
@@ -201,7 +238,7 @@ export class DesktopPetMotion {
       this.window.setIgnoreMouseEvents(ignore);
       this.ignoring = ignore;
     }
-    const interval = this.dragging || this.flying ? 1000 / 60 : 80;
+    const interval = this.dragging || this.flying || this.roam.isWalking() ? 1000 / 60 : 80;
     this.timer = setTimeout(this.tick, Math.max(1, interval - (performance.now() - now)));
   };
 }

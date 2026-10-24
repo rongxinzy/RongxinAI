@@ -118,6 +118,8 @@ vi.mock('./motion', () => ({
     dispose = mocks.dispose;
     setMask = mocks.setMask;
     setReducedMotion() {}
+    setRoamingEnabled() {}
+    setAllowRoam() {}
     pause = mocks.pause;
     resume = mocks.resume;
     reset() {}
@@ -182,7 +184,7 @@ test('the companion is opt-in and uses a dedicated sandboxed preload', () => {
   expect(mocks.windows[0].loadURL).toHaveBeenCalledWith(
     expect.stringContaining('desktop-pet.html'),
   );
-  expect(saved).toEqual({ enabled: true, x: 300, y: 400 });
+  expect(saved).toEqual({ enabled: true, layoutVersion: 1, x: 300, y: 400 });
 });
 
 test('IPC rejects other windows and subframes and bounds the alpha mask', () => {
@@ -209,13 +211,18 @@ test('the renderer receives only a localized status snapshot', () => {
   mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: contents, senderFrame: contents.mainFrame });
   const [channel, snapshot] = contents.send.mock.calls.at(-1)!;
   expect(channel).toBe(DesktopPetIpc.State);
-  expect(Object.keys(snapshot).sort()).toEqual(['label', 'reducedMotion', 'state']);
+  expect(Object.keys(snapshot).sort()).toEqual(['bubble', 'label', 'reducedMotion', 'state']);
 });
 
 test('hiding preserves position and disposal removes IPC and screen listeners', () => {
   setDesktopPetEnabled(true);
   setDesktopPetEnabled(false);
-  expect(preferences.get(DESKTOP_PET_STORE_KEY)).toEqual({ enabled: false, x: 300, y: 400 });
+  expect(preferences.get(DESKTOP_PET_STORE_KEY)).toEqual({
+    enabled: false,
+    layoutVersion: 1,
+    x: 300,
+    y: 400,
+  });
   expect(isDesktopPetEnabled()).toBe(false);
   expect(mocks.dispose).toHaveBeenCalled();
   disposeDesktopPet();
@@ -245,6 +252,7 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
     enabled: false,
     doNotDisturb: false,
     hideInFullscreen: true,
+    roaming: true,
   });
   await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   mocks.windows[0].emit('ready-to-show');
@@ -267,6 +275,7 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
     enabled: true,
     doNotDisturb: false,
     hideInFullscreen: true,
+    roaming: true,
   });
 });
 

@@ -73,6 +73,13 @@ export function DesktopPetSettingsSection() {
           disabled={!settings || saving}
           onCheckedChange={hideInFullscreen => update({ hideInFullscreen })}
         />
+        <SettingsToggleRow
+          label={i18nService.t('desktopPetRoaming')}
+          description={i18nService.t('desktopPetRoamingDescription')}
+          checked={settings?.roaming ?? true}
+          disabled={!settings || saving}
+          onCheckedChange={roaming => update({ roaming })}
+        />
       </FieldGroup>
     </section>
   );

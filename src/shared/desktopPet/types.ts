@@ -4,6 +4,7 @@ export interface DesktopPetSettings {
   enabled: boolean;
   doNotDisturb: boolean;
   hideInFullscreen: boolean;
+  roaming: boolean;
 }
 
 export interface DesktopPetTaskOpen {
@@ -32,7 +33,13 @@ export type DesktopPetEffect =
 export interface DesktopPetSnapshot {
   state: DesktopPetState;
   label: string;
+  bubble: string | null;
   reducedMotion: boolean;
+}
+
+export interface DesktopPetPose {
+  facing: number;
+  walking: boolean;
 }
 
 export interface DesktopPetBridge {
@@ -44,6 +51,7 @@ export interface DesktopPetBridge {
   hitMask(mask: Uint8Array): void;
   motion(reduced: boolean): void;
   onState(listener: (state: DesktopPetSnapshot) => void): () => void;
+  onPose(listener: (pose: DesktopPetPose) => void): () => void;
   onEffect(listener: (effect: DesktopPetEffect) => void): () => void;
 }
 
@@ -51,4 +59,5 @@ export interface DesktopPetPreferences extends Partial<DesktopPetSettings> {
   enabled: boolean;
   x?: number;
   y?: number;
+  layoutVersion?: number;
 }

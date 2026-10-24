@@ -11,6 +11,7 @@ export type DesktopPetState = (typeof DesktopPetState)[keyof typeof DesktopPetSt
 export const DesktopPetIpc = {
   Ready: 'desktop-pet:ready',
   State: 'desktop-pet:state',
+  Pose: 'desktop-pet:pose',
   DragStart: 'desktop-pet:drag-start',
   DragEnd: 'desktop-pet:drag-end',
   Menu: 'desktop-pet:menu',
@@ -37,6 +38,7 @@ export const DESKTOP_PET_DEFAULT_SETTINGS = {
   enabled: false,
   doNotDisturb: false,
   hideInFullscreen: true,
+  roaming: true,
 } as const;
 
 export const DesktopPetEffectKind = { Drag: 'drag', Impact: 'impact' } as const;

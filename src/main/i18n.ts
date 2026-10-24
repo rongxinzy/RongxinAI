@@ -44,6 +44,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     desktopPet_completed: '小远 · 任务已完成',
     desktopPet_error: '小远 · 任务遇到问题',
     desktopPet_greeting: '小远 · 你好呀',
+    desktopPet_bubble_thinking: '处理中',
+    desktopPet_bubble_waiting: '需要确认',
+    desktopPet_bubble_completed: '已完成',
+    desktopPet_bubble_error: '出错了',
 
     // Session titles (created by ChannelSessionSync)
     coworkDefaultSessionTitle: '新对话',
@@ -454,6 +458,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     desktopPet_completed: 'Xiaoyuan · Task completed',
     desktopPet_error: 'Xiaoyuan · Task needs attention',
     desktopPet_greeting: 'Xiaoyuan · Hello there',
+    desktopPet_bubble_thinking: 'Working',
+    desktopPet_bubble_waiting: 'Needs approval',
+    desktopPet_bubble_completed: 'Done',
+    desktopPet_bubble_error: 'Issue',
 
     // Session titles
     coworkDefaultSessionTitle: 'New Chat',

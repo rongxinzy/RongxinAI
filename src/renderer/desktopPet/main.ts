@@ -15,6 +15,7 @@ declare global {
   }
 }
 
+const bubble = document.querySelector<HTMLDivElement>('#desktop-pet-bubble');
 const canvas = document.querySelector<HTMLCanvasElement>('#desktop-pet');
 const stylesheet = document.createElement('link');
 stylesheet.rel = 'stylesheet';
@@ -41,12 +42,21 @@ let transitionMask = false;
 let pointerActive = false;
 let disposed = false;
 
-function drawPose(target: CanvasRenderingContext2D, index: number, scaleY: number): void {
+function drawPose(
+  target: CanvasRenderingContext2D,
+  index: number,
+  scaleY: number,
+  facing: number,
+  rotate: number,
+  offsetX: number,
+  offsetY: number,
+): void {
   const cellWidth = image.naturalWidth / 3;
   const cellHeight = image.naturalHeight / 2;
   target.save();
-  target.translate(DESKTOP_PET_SIZE / 2, DESKTOP_PET_SIZE);
-  target.scale(1 / Math.sqrt(scaleY), scaleY);
+  target.translate(DESKTOP_PET_SIZE / 2 + offsetX, DESKTOP_PET_SIZE + offsetY);
+  target.rotate(rotate);
+  target.scale(facing / Math.sqrt(scaleY), scaleY);
   target.drawImage(
     image,
     (index % 3) * cellWidth,
@@ -67,8 +77,10 @@ function publishMask(weights: number[]): void {
   // Cover the small deformation envelope and both transition endpoints, once per change.
   weights.forEach((weight, index) => {
     if (weight === 0 && index !== DesktopPetSprite[state]) return;
-    if (reducedMotion) drawPose(maskContext, index, 1);
-    else for (let step = 0; step <= 15; step++) drawPose(maskContext, index, 0.92 + step * 0.01);
+    if (reducedMotion) drawPose(maskContext, index, 1, 1, 0, 0, 0);
+    else
+      for (let step = 0; step <= 15; step++)
+        drawPose(maskContext, index, 0.92 + step * 0.01, 1, 0, 0, 0);
   });
   const pixels = maskContext.getImageData(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE).data;
   const alpha = new Uint8Array(DESKTOP_PET_SIZE * DESKTOP_PET_SIZE);
@@ -89,7 +101,15 @@ function draw(now: number): void {
   pose.weights.forEach((weight, index) => {
     if (weight <= 0) return;
     ctx.globalAlpha = weight;
-    drawPose(ctx, index, reducedMotion ? 1 : pose.scaleY);
+    drawPose(
+      ctx,
+      index,
+      reducedMotion ? 1 : pose.scaleY,
+      pose.facing,
+      reducedMotion ? 0 : pose.rotate,
+      reducedMotion ? 0 : pose.offsetX,
+      reducedMotion ? 0 : pose.offsetY,
+    );
   });
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
@@ -115,6 +135,19 @@ function refresh(): void {
   frame(performance.now());
 }
 
+function updateBubble(text: string | null): void {
+  if (!bubble) return;
+  if (!text) {
+    bubble.hidden = true;
+    bubble.dataset.visible = 'false';
+    bubble.textContent = '';
+    return;
+  }
+  bubble.hidden = false;
+  bubble.textContent = text;
+  bubble.dataset.visible = 'true';
+}
+
 function update(snapshot: DesktopPetSnapshot): void {
   animation.setState(snapshot.state, performance.now());
   state = snapshot.state;
@@ -122,11 +155,13 @@ function update(snapshot: DesktopPetSnapshot): void {
   reducedMotion = systemReducedMotion || reduced.matches;
   view.setAttribute('aria-label', snapshot.label);
   view.title = snapshot.label;
+  updateBubble(snapshot.bubble);
   maskDirty = true;
   refresh();
 }
 
 const unsubscribe = bridge?.onState(update);
+const unsubscribePose = bridge?.onPose(pose => animation.setPose(pose.facing, pose.walking));
 const unsubscribeEffect = bridge?.onEffect(effect => {
   if (effect.kind === DesktopPetEffectKind.Drag) animation.setDragging(effect.active);
   else if (!reducedMotion) animation.impact(effect.strength);
@@ -194,6 +229,7 @@ window.addEventListener('pagehide', () => {
   disposed = true;
   if (frameId !== undefined) cancelAnimationFrame(frameId);
   unsubscribe?.();
+  unsubscribePose?.();
   unsubscribeEffect?.();
   reduced.removeEventListener('change', onMotionChange);
   document.removeEventListener('visibilitychange', refresh);

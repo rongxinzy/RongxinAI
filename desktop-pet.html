@@ -7,7 +7,10 @@
     <title>知远智能体 (ZhiYuan Agent)</title>
   </head>
   <body>
-    <canvas id="desktop-pet" width="192" height="192" role="img"></canvas>
+    <div id="desktop-pet-root">
+      <div id="desktop-pet-bubble" hidden></div>
+      <canvas id="desktop-pet" width="192" height="192" role="img"></canvas>
+    </div>
     <script type="module" src="/src/renderer/desktopPet/main.ts"></script>
   </body>
 </html>

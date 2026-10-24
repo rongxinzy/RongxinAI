@@ -12,6 +12,11 @@ import {
   DesktopPetState,
   DesktopPetTaskResult,
 } from '../../shared/desktopPet/constants';
+import {
+  DESKTOP_PET_CANVAS_TOP,
+  DESKTOP_PET_LAYOUT_VERSION,
+  DESKTOP_PET_WINDOW_HEIGHT,
+} from '../../shared/desktopPet/layout';
 import type {
   DesktopPetFailure,
   DesktopPetPreferences,
@@ -23,6 +28,7 @@ import { handleIpcContract } from '../ipc/handleIpcContract';
 import { PiUiEventType, type PiUiEvent } from '../../shared/cowork/piUiEvent';
 import type { SqliteStore } from '../sqliteStore';
 import { t } from '../i18n';
+import { desktopPetBubbleKey } from './bubbleText';
 import { clampPetPosition, DesktopPetMotion, petBounds } from './motion';
 import { DesktopPetStatus } from './status';
 import { watchDesktopPetVisibility } from './visibility';
@@ -50,11 +56,27 @@ const currentState = (): DesktopPetState =>
 function sendState(): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
   const state = currentState();
+  const bubbleKey = desktopPetBubbleKey(state);
   pet.webContents.send(DesktopPetIpc.State, {
     state,
     label: t(`desktopPet_${state}`),
+    bubble: bubbleKey ? t(bubbleKey) : null,
     reducedMotion,
   });
+  syncRoamAllow(state);
+}
+
+function syncRoamAllow(state: DesktopPetState): void {
+  const settings = getDesktopPetSettings();
+  motion?.setRoamingEnabled(settings.roaming);
+  motion?.setAllowRoam(
+    state === DesktopPetState.Idle && !greeting && !reducedMotion && settings.roaming,
+  );
+}
+
+function sendPose(facing: number, walking: boolean): void {
+  if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
+  pet.webContents.send(DesktopPetIpc.Pose, { facing, walking });
 }
 
 function persistPosition(): void {
@@ -74,7 +96,15 @@ function getDesktopPetSettings(): DesktopPetSettings {
     enabled: saved?.enabled === true,
     doNotDisturb: saved?.doNotDisturb === true,
     hideInFullscreen: saved?.hideInFullscreen !== false,
+    roaming: saved?.roaming !== false,
   };
+}
+
+function migratePetLayout(preferences: DesktopPetPreferences): DesktopPetPreferences {
+  if (preferences.layoutVersion === DESKTOP_PET_LAYOUT_VERSION) return preferences;
+  const next = { ...preferences, layoutVersion: DESKTOP_PET_LAYOUT_VERSION };
+  if (Number.isFinite(preferences.y)) next.y = preferences.y! - DESKTOP_PET_CANVAS_TOP;
+  return next;
 }
 
 function publishSettings(): void {
@@ -179,11 +209,15 @@ export function setDesktopPetEnabled(enabled: boolean): void {
     publishSettings();
     return;
   }
-  const saved = store.get<DesktopPetPreferences>(DESKTOP_PET_STORE_KEY);
+  const savedRaw = store.get<DesktopPetPreferences>(DESKTOP_PET_STORE_KEY);
+  const saved = migratePetLayout(savedRaw ?? { enabled: true });
+  if (saved !== savedRaw) store.set(DESKTOP_PET_STORE_KEY, saved);
   const area = screen.getPrimaryDisplay().workArea;
   const candidate = {
     x: Number.isFinite(saved?.x) ? saved!.x! : area.x + area.width - DESKTOP_PET_SIZE - 24,
-    y: Number.isFinite(saved?.y) ? saved!.y! : area.y + area.height - DESKTOP_PET_SIZE - 24,
+    y: Number.isFinite(saved?.y)
+      ? saved!.y!
+      : area.y + area.height - DESKTOP_PET_WINDOW_HEIGHT - 24,
   };
   const position = clampPetPosition(
     candidate,
@@ -192,7 +226,7 @@ export function setDesktopPetEnabled(enabled: boolean): void {
   const window = new BrowserWindow({
     ...position,
     width: DESKTOP_PET_SIZE,
-    height: DESKTOP_PET_SIZE,
+    height: DESKTOP_PET_WINDOW_HEIGHT,
     transparent: true,
     frame: false,
     resizable: false,
@@ -216,10 +250,15 @@ export function setDesktopPetEnabled(enabled: boolean): void {
   pet = window;
   ready = false;
   visible = false;
-  motion = new DesktopPetMotion(window, persistPosition, effect => {
-    if (!window.isDestroyed() && !window.webContents.isDestroyed())
-      window.webContents.send(DesktopPetIpc.Effect, effect);
-  });
+  motion = new DesktopPetMotion(
+    window,
+    persistPosition,
+    effect => {
+      if (!window.isDestroyed() && !window.webContents.isDestroyed())
+        window.webContents.send(DesktopPetIpc.Effect, effect);
+    },
+    pose => sendPose(pose.facing, pose.walking),
+  );
   motion.setReducedMotion(reducedMotion);
   motion.pause();
   syncVisibility();
@@ -306,8 +345,11 @@ export function initializeDesktopPet(
         ...store!.get<DesktopPetPreferences>(DESKTOP_PET_STORE_KEY),
         ...patch,
       });
-      setDesktopPetEnabled(getDesktopPetSettings().enabled);
-      return getDesktopPetSettings();
+      const settings = getDesktopPetSettings();
+      setDesktopPetEnabled(settings.enabled);
+      motion?.setRoamingEnabled(settings.roaming);
+      syncRoamAllow(currentState());
+      return settings;
     },
     getPendingTask: event => {
       assertMain(event);

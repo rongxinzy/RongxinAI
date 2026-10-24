@@ -6,7 +6,55 @@ body {
   overflow: hidden;
 }
 
+#desktop-pet-root {
+  position: relative;
+  width: 192px;
+  height: 232px;
+}
+
+#desktop-pet-bubble {
+  position: absolute;
+  top: 2px;
+  left: 50%;
+  z-index: 1;
+  box-sizing: border-box;
+  max-width: 176px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgb(18 18 22 / 82%);
+  color: #f5f5f7;
+  font:
+    600 12px/1.35 system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+#desktop-pet-bubble[data-visible='true'] {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #desktop-pet-bubble {
+    transition: none;
+  }
+}
+
 canvas {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   display: block;
   width: 192px;
   height: 192px;

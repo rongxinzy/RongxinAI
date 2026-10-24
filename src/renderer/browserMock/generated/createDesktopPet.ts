@@ -9,6 +9,7 @@ export function createDesktopPet(runtime: BrowserMockRuntime): Window['electron'
         enabled: false,
         doNotDisturb: false,
         hideInFullscreen: false,
+        roaming: false,
       };
     },
     setSettings: async _p0 => {
@@ -18,6 +19,7 @@ export function createDesktopPet(runtime: BrowserMockRuntime): Window['electron'
         enabled: false,
         doNotDisturb: false,
         hideInFullscreen: false,
+        roaming: false,
       };
     },
     onSettingsChanged: _p0 => {

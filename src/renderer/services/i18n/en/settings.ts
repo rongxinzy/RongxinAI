@@ -8,6 +8,9 @@ export const enSettings: Record<string, string> = {
   desktopPetDoNotDisturbDescription:
     'Temporarily hide Xiaoyuan. Tasks continue and unhandled failure reminders are kept.',
   desktopPetHideInFullscreen: 'Hide when the app is fullscreen',
+  desktopPetRoaming: 'Screen roaming',
+  desktopPetRoamingDescription:
+    'While idle, Xiaoyuan may take short walks along the screen. You can turn this off anytime.',
   desktopPetHideInFullscreenDescription:
     'Hide while ZhiYuan Agent is fullscreen and restore afterward. Also hide while locked or suspended.',
   desktopPetTaskOpenFailed:

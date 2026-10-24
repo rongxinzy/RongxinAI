@@ -15,6 +15,7 @@ vi.mock('electron', () => ({
 
 import { DesktopPetMotion } from './motion';
 import { DesktopPetEffectKind } from '../../shared/desktopPet/constants';
+import { DESKTOP_PET_CANVAS_TOP, DESKTOP_PET_WINDOW_HEIGHT } from '../../shared/desktopPet/layout';
 
 let position = { x: 400, y: 300 };
 const ignore = vi.fn();
@@ -22,7 +23,7 @@ const settled = vi.fn();
 const effect = vi.fn();
 const window = {
   getPosition: () => [position.x, position.y],
-  getBounds: () => ({ ...position, width: 192, height: 192 }),
+  getBounds: () => ({ ...position, width: 192, height: DESKTOP_PET_WINDOW_HEIGHT }),
   setPosition: (x: number, y: number) => {
     position = { x, y };
   },
@@ -34,7 +35,7 @@ let motion: DesktopPetMotion;
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] });
   vi.clearAllMocks();
-  desktop.cursor = { x: 496, y: 396 };
+  desktop.cursor = { x: 496, y: 396 + DESKTOP_PET_CANVAS_TOP };
   desktop.area = { x: 0, y: 24, width: 1440, height: 876 };
   position = { x: 400, y: 300 };
   motion = new DesktopPetMotion(window, settled, effect);
@@ -128,8 +129,8 @@ test('native drag and meaningful collisions emit bounded visual effects, without
 });
 
 test('sliding along the ground does not repeatedly trigger landing impulses', () => {
-  position = { x: 400, y: 708 };
-  desktop.cursor = { x: 496, y: 804 };
+  position = { x: 400, y: 708 - DESKTOP_PET_CANVAS_TOP };
+  desktop.cursor = { x: 496, y: 804 - DESKTOP_PET_CANVAS_TOP };
   motion.begin();
   for (let i = 0; i < 5; i++) {
     desktop.cursor.x += 20;
@@ -140,7 +141,7 @@ test('sliding along the ground does not repeatedly trigger landing impulses', ()
   const released = position.x;
   vi.advanceTimersByTime(300);
   expect(position.x).toBeGreaterThan(released);
-  expect(position.y).toBe(708);
+  expect(position.y).toBe(708 - DESKTOP_PET_CANVAS_TOP);
   expect(effect).not.toHaveBeenCalled();
 });
 
