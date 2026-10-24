@@ -1,4 +1,4 @@
-import React, { type Dispatch, type SetStateAction } from 'react';
+import React, { Activity, type Dispatch, type SetStateAction } from 'react';
 
 import type { CodingSidebarSelection } from '../components/coding/CodingWorkspaceSidebar';
 import type { ExpertTab } from '../components/expert/ExpertView';
@@ -12,6 +12,7 @@ import {
   ActivityView,
   CodingWorkbenchView,
   CoworkView,
+  CompanionHomeView,
   ExpertView,
   LocalInferenceView,
   McpView,
@@ -106,6 +107,42 @@ export function MainViewCanvas({
         data-main-canvas
         className="theme-main-panel relative h-full min-h-0 overflow-hidden contain-[layout_style_paint]"
       >
+        <LazyChunkErrorBoundary resetKey={mainView}>
+          <React.Suspense fallback={mainView === MainView.Companion ? lazyViewFallback : null}>
+            <Activity mode={mainView === MainView.Companion ? 'visible' : 'hidden'}>
+              <CompanionHomeView
+                isSidebarCollapsed={isSidebarCollapsed}
+                onToggleSidebar={onToggleSidebar}
+              />
+            </Activity>
+          </React.Suspense>
+        </LazyChunkErrorBoundary>
+        <LazyChunkErrorBoundary resetKey={mainView}>
+          <React.Suspense fallback={mainView === MainView.Cowork ? lazyViewFallback : null}>
+            <Activity mode={mainView === MainView.Cowork ? 'visible' : 'hidden'}>
+              <CoworkView
+                onRequestAppSettings={onRequestAppSettings}
+                onShowSkills={onShowSkills}
+                onShowConnectors={onShowConnectors}
+                isSidebarCollapsed={isSidebarCollapsed}
+                onToggleSidebar={onToggleSidebar}
+                onNewChat={onNewChat}
+                updateBadge={null}
+                inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
+                onRespondToInlineQuestion={onRespondToPermission}
+                inlinePermission={
+                  pendingPermission &&
+                  mainView === MainView.Cowork &&
+                  pendingPermission.sessionId === currentSessionId &&
+                  !isInlineAskUserQuestion
+                    ? pendingPermission
+                    : null
+                }
+                onRespondToInlinePermission={onRespondToPermission}
+              />
+            </Activity>
+          </React.Suspense>
+        </LazyChunkErrorBoundary>
         {hasMountedLocalInference &&
           !isLocalInferenceDormant &&
           localInferenceEnabled &&
@@ -216,28 +253,7 @@ export function MainViewCanvas({
                 onNewChat={onNewChat}
                 updateBadge={null}
               />
-            ) : mainView === MainView.LocalInference ? null : (
-              <CoworkView
-                onRequestAppSettings={onRequestAppSettings}
-                onShowSkills={onShowSkills}
-                onShowConnectors={onShowConnectors}
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={onToggleSidebar}
-                onNewChat={onNewChat}
-                updateBadge={null}
-                inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
-                onRespondToInlineQuestion={onRespondToPermission}
-                inlinePermission={
-                  pendingPermission &&
-                  mainView === MainView.Cowork &&
-                  pendingPermission.sessionId === currentSessionId &&
-                  !isInlineAskUserQuestion
-                    ? pendingPermission
-                    : null
-                }
-                onRespondToInlinePermission={onRespondToPermission}
-              />
-            )}
+            ) : null}
           </React.Suspense>
         </LazyChunkErrorBoundary>
       </div>

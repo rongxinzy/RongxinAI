@@ -162,7 +162,7 @@
   --destructive: #D92D20;
   --border: rgba(16, 24, 40, 0.06);
   --input: rgba(16, 24, 40, 0.08);
-  --ring: rgba(61, 112, 224, 0.40);
+  --ring: var(--zy-primary);
   --chart-1: #3B82F6;
   --chart-2: #8B5CF6;
   --chart-3: #10B981;
@@ -176,7 +176,7 @@
   --sidebar-accent: rgba(16, 24, 40, 0.06);
   --sidebar-accent-foreground: #181D27;
   --sidebar-border: rgba(16, 24, 40, 0.06);
-  --sidebar-ring: rgba(61, 112, 224, 0.40);
+  --sidebar-ring: var(--zy-primary);
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
@@ -278,7 +278,7 @@
   --zy-gray-9: #334155;
   --zy-gray-10: #1E293B;
   --zy-gray-11: #0F172A;
-  --zy-ring: rgba(61, 112, 224, 0.40);
+  --zy-ring: var(--zy-primary);
   --zy-radius: 8px;
   --zy-state-destructive-tint-percent: 10%;
   --zy-state-destructive-border: #D92D20;
@@ -470,7 +470,7 @@
   --destructive: #F97066;
   --border: rgba(255, 255, 255, 0.05);
   --input: rgba(255, 255, 255, 0.08);
-  --ring: rgba(61, 112, 224, 0.50);
+  --ring: var(--zy-primary);
   --chart-1: #60A5FA;
   --chart-2: #A78BFA;
   --chart-3: #34D399;
@@ -484,7 +484,7 @@
   --sidebar-accent: rgba(255, 255, 255, 0.06);
   --sidebar-accent-foreground: #DFE1E6;
   --sidebar-border: rgba(255, 255, 255, 0.05);
-  --sidebar-ring: rgba(61, 112, 224, 0.50);
+  --sidebar-ring: var(--zy-primary);
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -586,7 +586,7 @@
   --zy-gray-9: #F1F5F9;
   --zy-gray-10: #F8FAFC;
   --zy-gray-11: #FFFFFF;
-  --zy-ring: rgba(61, 112, 224, 0.50);
+  --zy-ring: var(--zy-primary);
   --zy-radius: 12px;
   --zy-state-destructive-tint-percent: 20%;
   --zy-state-destructive-border: #F97066;
@@ -1590,8 +1590,8 @@
 }
 :where(:root, [data-theme]) :where(.theme-fluid-tab) {
   transition-property: color, background-color, border-color, opacity, box-shadow;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   border-radius: var(--zy-style-radius-md);
   padding-inline: 0.75rem;
   font-size: var(--zy-component-text-sm);
@@ -2043,12 +2043,12 @@
   border-radius: var(--zy-style-radius-lg);
   border-width: 1px;
   border-style: solid;
-  border-color: var(--input);
+  border-color: var(--zy-text-muted);
   background-color: var(--zy-state-input-field);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   height: 2rem;
 }
 :where(:root, [data-theme]) :where(.theme-input-group-addon) {
@@ -4897,7 +4897,7 @@
   background-color: var(--card);
   border-width: 1px;
   border-style: solid;
-  border-color: var(--zy-input-border);
+  border-color: var(--zy-text-muted);
   box-shadow: var(--zy-style-shadow-sm);
 }
 :where(:root, [data-theme]) :where(.group.is-user .theme-message-body) {
@@ -5631,7 +5631,7 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-input-group):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  border-color: var(--zy-text-muted);
 }
 }
 @media (hover: hover) {
@@ -6417,6 +6417,11 @@
 }
 }
 @media (hover: hover) {
+:where(:root, [data-theme]) :where(.theme-composer-surface .theme-input-group):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  border-color: var(--zy-text-muted);
+}
+}
+@media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-tabs-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
   color: var(--foreground);
 }
@@ -6819,7 +6824,12 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
 }
 :where(:root, [data-theme]) :where(.theme-fluid-tab):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  box-shadow: 0 0 0 1px var(--muted), 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--ring);
+  outline-offset: 1px;
+  box-shadow: none;
+  opacity: 1;
 }
 :where(:root, [data-theme]) :where(.theme-check):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   border-color: var(--ring);
@@ -7279,12 +7289,20 @@
   box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-composer-surface .theme-input-group):where(:has(:is([data-slot="input-group-control"], [contenteditable]):focus-visible)) {
-  border-color: color-mix(in oklab, var(--zy-input-border) 60%, var(--zy-primary));
+  border-color: var(--zy-text-muted);
   box-shadow: var(--zy-style-shadow-md);
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--primary);
+  outline-offset: 1px;
 }
 :where(:root, [data-theme]) :where(.theme-input-group):where(:has([data-slot="input-group-control"]:focus-visible)) {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ring) 40%, transparent);
+  border-color: var(--zy-text-muted);
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--primary);
+  outline-offset: 1px;
+  box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-command-input-group):where(:has([data-slot="input-group-control"]:focus-visible)) {
   box-shadow: none;
@@ -7296,8 +7314,12 @@
   box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-composer-surface .theme-input-group):where(:has([data-slot="input-group-control"]:focus-visible)) {
-  border-color: color-mix(in oklab, var(--zy-input-border) 60%, var(--zy-primary));
+  border-color: var(--zy-text-muted);
   box-shadow: var(--zy-style-shadow-md);
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--primary);
+  outline-offset: 1px;
 }
 :where(:root, [data-theme]) :where(.theme-input-group):where(:has([data-slot][aria-invalid="true"])) {
   border-color: var(--zy-state-destructive-border);

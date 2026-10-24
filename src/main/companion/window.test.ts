@@ -67,6 +67,7 @@ import {
   initializeCompanionWindow,
   isCompanionWindow,
   openCompanionWindow,
+  updateActiveCompanionAppearance,
 } from './window';
 
 function fixture() {
@@ -94,6 +95,7 @@ function fixture() {
     active: () => profile,
     snapshot: () => ({ activePetId: profile.petId, profiles: [profile] }),
     select: vi.fn(() => profile),
+    changeAppearance: vi.fn(),
   };
   const onProfileChanged = vi.fn();
   const tasks = {
@@ -157,7 +159,7 @@ test('creates a focusable sandboxed window and reuses it without admitting a mod
 test('rejects foreign senders, subframes and malformed input before runtime execution', async () => {
   const f = fixture();
   const submit = mocks.handlers.get(IpcChannel.Submit)!;
-  const request = { requestId: 'one', text: 'hello' };
+  const request = { petId: f.profile.petId, requestId: 'one', text: 'hello' };
   await expect(submit({ sender: {}, senderFrame: {} }, request)).rejects.toThrow(
     'owned main frame',
   );
@@ -179,7 +181,7 @@ test('hide and close preserve the conversation, while stop is explicit', async (
   expect(f.window.hide).toHaveBeenCalledTimes(2);
   expect(f.runtime.stop).not.toHaveBeenCalled();
   expect(f.runtime.close).not.toHaveBeenCalled();
-  await f.invoke(IpcChannel.Stop);
+  await f.invoke(IpcChannel.Stop, f.profile.petId);
   expect(f.runtime.stop).toHaveBeenCalledWith(f.profile);
 });
 
@@ -227,4 +229,53 @@ test('task navigation checks active companion ownership and does not run the tas
   await f.invoke(IpcChannel.OpenWorkbench, sessionId);
   expect(f.openTask).toHaveBeenCalledWith(sessionId);
   expect(f.tasks.submit).not.toHaveBeenCalled();
+});
+
+test('admits only the registered app main frame and keeps quick-window hide scoped', async () => {
+  const f = fixture();
+  const mainEvent = { sender: f.main.webContents, senderFrame: f.main.webContents.mainFrame };
+  expect(await mocks.handlers.get(IpcChannel.Bootstrap)!(mainEvent)).toMatchObject({
+    activePetId: f.profile.petId,
+  });
+  await expect(
+    mocks.handlers.get(IpcChannel.Bootstrap)!({ ...mainEvent, senderFrame: {} }),
+  ).rejects.toThrow('owned main frame');
+  await expect(mocks.handlers.get(IpcChannel.Hide)!(mainEvent)).rejects.toThrow('quick window');
+  expect(f.main.hide).not.toHaveBeenCalled();
+  await f.invoke(IpcChannel.Select, f.profile.petId);
+  expect(f.main.webContents.send).toHaveBeenCalledWith(IpcChannel.Changed);
+  expect(f.window.webContents.send).toHaveBeenCalledWith(IpcChannel.Changed);
+  await f.invoke(IpcChannel.OpenWorkbench);
+  expect(f.main.webContents.send).toHaveBeenCalledWith(IpcChannel.Workbench);
+});
+
+test('a stale or queued cross-window request cannot submit or stop a different companion', async () => {
+  const f = fixture();
+  const oldId = f.profile.petId;
+  const submit = f.invoke(IpcChannel.Submit, {
+    petId: oldId,
+    requestId: 'before-switch',
+    text: 'Private input',
+  });
+  f.profile.petId = '00000000-0000-4000-8000-000000000099';
+  await expect(submit).rejects.toThrow('selection changed');
+  await expect(f.invoke(IpcChannel.Stop, oldId)).rejects.toThrow('selection changed');
+  expect(f.runtime.submit).not.toHaveBeenCalled();
+  expect(f.runtime.stop).not.toHaveBeenCalled();
+});
+
+test('appearance changes notify both surfaces without changing personality or starting a request', () => {
+  const f = fixture();
+  updateActiveCompanionAppearance(DesktopPetBuiltinId.Youli);
+  expect(f.profiles.changeAppearance).toHaveBeenCalledWith(
+    f.profile.petId,
+    DesktopPetBuiltinId.Youli,
+  );
+  expect(f.profile.personaId).toBe(DesktopPetBuiltinId.Xiaoyuan);
+  expect(f.main.webContents.send).toHaveBeenCalledWith(IpcChannel.Changed);
+  expect(f.window.webContents.send).toHaveBeenCalledWith(IpcChannel.Changed);
+  expect(f.runtime.submit).not.toHaveBeenCalled();
+  f.profiles.changeAppearance.mockClear();
+  updateActiveCompanionAppearance(f.profile.characterId);
+  expect(f.profiles.changeAppearance).not.toHaveBeenCalled();
 });

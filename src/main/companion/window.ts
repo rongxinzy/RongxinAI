@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen } from 'electron';
-import { COMPANION_PAGE, COMPANION_SHORTCUT } from '../../shared/companion/constants';
+import {
+  COMPANION_PAGE,
+  COMPANION_SHORTCUT,
+  CompanionRequestState,
+} from '../../shared/companion/constants';
 import { companionContract } from '../../shared/companion/contract';
 import { CompanionIpc as IpcChannel } from '../../shared/ipc/channels';
 import type {
@@ -40,7 +44,10 @@ export function updateActiveCompanionAppearance(
 ): void {
   if (!options) return;
   const { profiles } = options.getCompanions();
-  profiles.changeAppearance(profiles.active().petId, characterId);
+  const active = profiles.active();
+  if (active.characterId === characterId) return;
+  profiles.changeAppearance(active.petId, characterId);
+  changed();
 }
 
 function preferences(): CompanionWindowContext {
@@ -74,14 +81,30 @@ async function snapshot(): Promise<CompanionWindowState> {
   };
 }
 
-function assertWindow(event: Electron.IpcMainInvokeEvent): void {
-  if (
-    !window ||
-    window.isDestroyed() ||
-    event.sender !== window.webContents ||
-    event.senderFrame !== window.webContents.mainFrame
-  )
-    throw new Error('Companion IPC requires its owned main frame');
+function surfaces(): BrowserWindow[] {
+  return [window, options?.getMainWindow()].filter((candidate): candidate is BrowserWindow =>
+    Boolean(candidate && !candidate.isDestroyed()),
+  );
+}
+
+function assertWindow(event: Electron.IpcMainInvokeEvent): BrowserWindow {
+  const owner = surfaces().find(
+    candidate =>
+      event.sender === candidate.webContents &&
+      event.senderFrame === candidate.webContents.mainFrame,
+  );
+  if (!owner) throw new Error('Companion IPC requires an owned main frame');
+  return owner;
+}
+
+function changed(): void {
+  for (const surface of surfaces()) surface.webContents.send(IpcChannel.Changed);
+}
+
+function activeProfile(petId: string): CompanionProfile {
+  const profile = options!.getCompanions().profiles.active();
+  if (profile.petId !== petId) throw new Error('Companion selection changed before this request');
+  return profile;
 }
 
 export function initializeCompanionWindow(next: Options): void {
@@ -109,11 +132,11 @@ export function initializeCompanionWindow(next: Options): void {
   };
   handleIpcContract(companionContract, {
     chooseWorkspace: async event => {
-      assertWindow(event);
+      const owner = assertWindow(event);
       if (choosingWorkspace) throw new Error('A workspace dialog is already open');
       choosingWorkspace = true;
       try {
-        const selection = await dialog.showOpenDialog(window!, {
+        const selection = await dialog.showOpenDialog(owner, {
           title: t('companionPickFolder'),
           properties: ['openDirectory', 'createDirectory'],
         });
@@ -126,25 +149,34 @@ export function initializeCompanionWindow(next: Options): void {
     },
     bootstrap: event => serialized(event, snapshot),
     select: (event, petId) =>
-      serialized(event, () => {
+      serialized(event, async () => {
         const selected = next.getCompanions().profiles.select(petId);
         next.onProfileChanged(selected);
-        return snapshot();
+        const state = await snapshot();
+        changed();
+        return state;
       }),
     submit: (event, request) =>
-      serialized(event, () => {
-        const { profiles, runtime } = next.getCompanions();
-        return runtime.submit(profiles.active(), request.requestId, request.text);
+      serialized(event, async () => {
+        const profile = activeProfile(request.petId);
+        const result = await next
+          .getCompanions()
+          .runtime.submit(profile, request.requestId, request.text);
+        if (result.receipt) changed();
+        return result;
       }),
     answer: (event, receipt) =>
-      serialized(event, () => {
-        const { profiles, runtime } = next.getCompanions();
-        return runtime.answer(profiles.active(), receipt);
+      serialized(event, async () => {
+        const result = await next
+          .getCompanions()
+          .runtime.answer(activeProfile(receipt.petId), receipt);
+        if (result.state === CompanionRequestState.Answered) changed();
+        return result;
       }),
-    stop: event =>
-      serialized(event, () => {
-        const { profiles, runtime } = next.getCompanions();
-        return runtime.stop(profiles.active());
+    stop: (event, petId) =>
+      serialized(event, async () => {
+        await next.getCompanions().runtime.stop(activeProfile(petId));
+        changed();
       }),
     submitTask: (event, request) =>
       serialized(event, () =>
@@ -159,7 +191,7 @@ export function initializeCompanionWindow(next: Options): void {
         next.getTasks().stop(next.getCompanions().profiles.active().petId, sessionId),
       ),
     hide: event => {
-      assertWindow(event);
+      if (assertWindow(event) !== window) throw new Error('Only the quick window can hide itself');
       window?.hide();
     },
     openWorkbench: (event, sessionId) => {
@@ -172,6 +204,7 @@ export function initializeCompanionWindow(next: Options): void {
       }
       const main = next.getMainWindow();
       if (main && !main.isDestroyed()) {
+        main.webContents.send(IpcChannel.Workbench);
         if (main.isMinimized()) main.restore();
         main.show();
         main.focus();
@@ -188,11 +221,11 @@ export function initializeCompanionWindow(next: Options): void {
     }
   });
   unsubscribeTasks = next.getTasks().onChanged(sessionId => {
-    if (!window || window.isDestroyed()) return;
     try {
       const petId = next.getCompanions().profiles.active().petId;
       if (next.getTasks().owned(petId, sessionId))
-        window.webContents.send(IpcChannel.TasksChanged, next.getTasks().snapshot(petId));
+        for (const surface of surfaces())
+          surface.webContents.send(IpcChannel.TasksChanged, next.getTasks().snapshot(petId));
     } catch (error) {
       console.warn(`[Companion] Failed to project task for session ${sessionId}:`, error);
     }

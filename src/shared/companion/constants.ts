@@ -33,6 +33,8 @@ export type CompanionUnavailableReason =
   (typeof CompanionUnavailableReason)[keyof typeof CompanionUnavailableReason];
 
 export const COMPANION_PAGE = 'companion.html';
+export const CompanionSurface = { Quick: 'quick', Home: 'home' } as const;
+export type CompanionSurface = (typeof CompanionSurface)[keyof typeof CompanionSurface];
 export const COMPANION_SHORTCUT = 'CommandOrControl+Shift+Space';
 
 export const CompanionComposerMode = { Chat: 'chat', Task: 'task' } as const;

@@ -108,7 +108,11 @@ test('keeps managed-only and chat navigation policies and chat workspace selecti
   expect(screen.queryByRole('button', { name: 'localInferenceTitle' })).toBeNull();
   expect(screen.getByRole('button', { name: 'todoTitle' })).toBeTruthy();
   view.rerender(createElement(SidebarNavigationControls, { ...handlers, workMode: WorkMode.Chat }));
-  expect(screen.getAllByRole('button')).toHaveLength(1);
+  expect(screen.getAllByRole('button')).toHaveLength(3);
+  expect(screen.getByTestId('sidebar-view-companion')).toHaveAccessibleName('companionNav');
+  expect(screen.getByTestId('sidebar-view-workbench')).toHaveAccessibleName(
+    'companionWorkbenchNav',
+  );
   await user.click(screen.getByRole('button', { name: 'newChat' }));
   expect(handlers.onNewChat).toHaveBeenCalledTimes(1);
   expect(mocks.clearWorkspaceSelection).not.toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { CompanionComposerMode } from '../../shared/companion/constants';
+import { CompanionComposerMode, CompanionSurface } from '../../shared/companion/constants';
 interface Draft {
   text: string;
   requestId: string;
@@ -8,9 +8,15 @@ interface Draft {
 const PREFIX = 'zhiyuan-companion-draft:';
 
 /** The same draft keeps its request key until its durable admission is acknowledged. */
-export function readCompanionDraft(petId: string): Draft {
+const draftKey = (petId: string, surface: CompanionSurface) =>
+  PREFIX + (surface === CompanionSurface.Home ? 'home:' : '') + petId;
+
+export function readCompanionDraft(
+  petId: string,
+  surface: CompanionSurface = CompanionSurface.Quick,
+): Draft {
   try {
-    const value: unknown = JSON.parse(localStorage.getItem(PREFIX + petId) ?? 'null');
+    const value: unknown = JSON.parse(localStorage.getItem(draftKey(petId, surface)) ?? 'null');
     if (
       value &&
       typeof value === 'object' &&
@@ -42,9 +48,13 @@ export function readCompanionDraft(petId: string): Draft {
   return { text: '', requestId: crypto.randomUUID() };
 }
 
-export function writeCompanionDraft(petId: string, draft: Draft): void {
+export function writeCompanionDraft(
+  petId: string,
+  draft: Draft,
+  surface: CompanionSurface = CompanionSurface.Quick,
+): void {
   try {
-    localStorage.setItem(PREFIX + petId, JSON.stringify(draft));
+    localStorage.setItem(draftKey(petId, surface), JSON.stringify(draft));
   } catch {
     /* The mounted window still owns the draft; hiding does not unmount it. */
   }

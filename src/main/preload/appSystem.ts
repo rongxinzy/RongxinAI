@@ -10,6 +10,8 @@ import type { appSystemContract } from '../../shared/ipc/appSystemContract';
 import type { IpcContractApi } from '../../shared/ipc/contract';
 import { onPush, onPushVoid } from './pushChannel';
 import { createIpcInvokers } from './createIpcInvokers';
+import { companionApi } from './companion';
+import type { CompanionWindowApi } from '../../shared/companion/types';
 
 type AppSystemContractApi = IpcContractApi<typeof appSystemContract>;
 const invokers = createIpcInvokers(appSystemContractChannels);
@@ -32,6 +34,25 @@ type WithExtra<E, M extends Record<string, keyof AppSystemContractApi>> = Rename
 // fire-and-forget sends (contextMenu.execute, window controls, network status)
 // and push subscriptions stay hand-wired below.
 export const appSystemApi = {
+  // Explicit member projection keeps the existing preload contract walker authoritative.
+  companion: {
+    bootstrap: companionApi.bootstrap,
+    select: companionApi.select,
+    submit: companionApi.submit,
+    answer: companionApi.answer,
+    stop: companionApi.stop,
+    submitTask: companionApi.submitTask,
+    tasks: companionApi.tasks,
+    stopTask: companionApi.stopTask,
+    chooseWorkspace: companionApi.chooseWorkspace,
+    hide: companionApi.hide,
+    openWorkbench: companionApi.openWorkbench,
+    onContext: companionApi.onContext,
+    onVisibility: companionApi.onVisibility,
+    onTasks: companionApi.onTasks,
+    onChanged: companionApi.onChanged,
+    onWorkbench: companionApi.onWorkbench,
+  },
   desktopPet: {
     getSettings: () => ipcRenderer.invoke(DesktopPetIpc.GetSettings),
     setSettings: patch => ipcRenderer.invoke(DesktopPetIpc.SetSettings, patch),
@@ -166,6 +187,7 @@ export const appSystemApi = {
   },
 } satisfies {
   desktopPet: DesktopPetApi;
+  companion: CompanionWindowApi;
   appEvents: {
     onOpenSettings: (callback: () => void) => () => void;
     onNewTask: (callback: () => void) => () => void;

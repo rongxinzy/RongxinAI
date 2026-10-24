@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "status": "succeeded",
+  "receipt": {
+    "petId": "561aeb07-6f8c-481b-950c-05eb4cbf9a4e",
+    "requestId": "f30a03e3-7186-4aef-a00e-e217ff810b97",
+    "sessionId": "5ec272db-9de8-4bce-8562-7aacfc9739bb",
+    "taskId": "446e19df-77e0-4351-97d3-49d2ea05dd80",
+    "runId": "f7305ad0-230a-4b59-b28f-9347bb224526"
+  },
+  "requests": 4,
+  "taskExecutions": 1,
+  "chatExecutions": 1,
+  "maintenanceRequests": 2,
+  "detailAvailable": true,
+  "media": {
+    "decoderSlots": 2,
+    "clip": "happy",
+    "transparent": 100388,
+    "opaque": 40734,
+    "devicePixelRatio": 2
+  },
+  "home": {
+    "profileCount": 7,
+    "sharedIdentity": true,
+    "sharedConversation": true,
+    "staleRequestsRejected": {
+      "submit": true,
+      "stop": true
+    },
+    "independentDrafts": true,
+    "appearancePreservesIdentity": true
+  },
+  "stress": null,
+  "userData": "/tmp/companion-task-native-sNrmyV",
+  "workspace": "/tmp/companion-task-workspace-HwR3ke"
+}

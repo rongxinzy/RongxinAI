@@ -2,6 +2,7 @@
 import type { BrowserMockRuntime } from '../runtime';
 import { createStore } from './createStore';
 import { createDesktopPet } from './createDesktopPet';
+import { createCompanion } from './createCompanion';
 import { createSkills } from './createSkills';
 import { createMcp } from './createMcp';
 import { createOllama } from './createOllama';
@@ -50,6 +51,7 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     arch: 'arm64',
     store: createStore(runtime),
     desktopPet: createDesktopPet(runtime),
+    companion: createCompanion(runtime),
     skills: createSkills(runtime),
     mcp: createMcp(runtime),
     ollama: createOllama(runtime),

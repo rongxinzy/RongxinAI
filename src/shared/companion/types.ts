@@ -72,12 +72,12 @@ export interface CompanionWindowState {
 export interface CompanionWindowApi {
   bootstrap(): Promise<CompanionWindowState>;
   select(petId: string): Promise<CompanionWindowState>;
-  submit(request: { requestId: string; text: string }): Promise<{
+  submit(request: { petId: string; requestId: string; text: string }): Promise<{
     availability: CompanionAvailability;
     receipt: CompanionReceipt | null;
   }>;
   answer(receipt: CompanionReceipt): Promise<CompanionAnswer>;
-  stop(): Promise<void>;
+  stop(petId: string): Promise<void>;
   submitTask(request: CompanionTaskRequest): Promise<CompanionTaskResult>;
   tasks(): Promise<CompanionTaskSnapshot>;
   stopTask(sessionId: string): Promise<void>;
@@ -87,4 +87,6 @@ export interface CompanionWindowApi {
   onContext(listener: (context: CompanionWindowContext) => void): () => void;
   onVisibility(listener: (visible: boolean) => void): () => void;
   onTasks(listener: (snapshot: CompanionTaskSnapshot) => void): () => void;
+  onChanged(listener: () => void): () => void;
+  onWorkbench(listener: () => void): () => void;
 }

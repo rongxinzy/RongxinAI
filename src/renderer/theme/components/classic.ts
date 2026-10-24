@@ -99,11 +99,21 @@ export function classicComponentAppearances(): ComponentAppearances {
     'input-group': recipe({
       base: {
         ...field.base,
+        'border-color': 'var(--zy-text-muted)',
         'background-color': 'var(--zy-state-input-field)',
         height: '2rem',
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
       },
-      hover: field.hover,
-      groupFocus: field.focus,
+      hover: { 'border-color': 'var(--zy-text-muted)' },
+      groupFocus: {
+        'border-color': 'var(--zy-text-muted)',
+        'outline-style': 'solid',
+        'outline-width': '2px',
+        'outline-color': 'var(--primary)',
+        'outline-offset': '1px',
+        'box-shadow': 'none',
+      },
       groupInvalid: field.invalid,
       groupDisabled: { ...field.disabled, 'border-color': 'var(--input)' },
     }),

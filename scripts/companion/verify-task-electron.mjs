@@ -8,6 +8,7 @@ import { DesktopPetState } from '../../src/shared/desktopPet/constants.ts';
 import { DesktopPetMotion } from '../../src/shared/desktopPet/motionCatalog.ts';
 import { WorkbenchRunStatus } from '../../src/shared/workbenchTask/constants.ts';
 import { stressMedia } from './stress-media.mjs';
+import { verifyHomeSurfaces } from './verify-home-surfaces.mjs';
 
 // Manual native acceptance only: isolated storage, local model fixture, no real account keys.
 // Prerequisites: verified Magpie resource, build:electron:dev and web:preview.
@@ -43,7 +44,11 @@ const server = createServer(async (request, response) => {
     ? 'project-memory'
     : system.startsWith('You extract compact, evidence-grounded session memory.')
       ? 'session-memory'
-      : 'task';
+      : content(payload.messages?.findLast(message => message.role === 'user')).includes(
+            'Native shared conversation',
+          )
+        ? 'companion-chat'
+        : 'task';
   requestKinds.push({
     kind,
     system: system.slice(0, 180),
@@ -75,7 +80,9 @@ const server = createServer(async (request, response) => {
             unresolved: [],
             nextSteps: [],
           })
-        : '项目资料已整理，接下来可以查看工作台里的这条任务。';
+        : kind === 'companion-chat'
+          ? 'Native companion reply is shared'
+          : '项目资料已整理，接下来可以查看工作台里的这条任务。';
   response.write(`data: ${JSON.stringify(chunk({ role: 'assistant', content: answer }))}\n\n`);
   response.write(`data: ${JSON.stringify(chunk({}, 'stop'))}\n\n`);
   response.end('data: [DONE]\n\n');
@@ -91,6 +98,16 @@ delete env.ELECTRON_RUN_AS_NODE;
 let application;
 try {
   application = await electron.launch({ args: ['.'], cwd: root, env, timeout: 60_000 });
+  // Retain only this module's window diagnostics; never dump general app/model logs.
+  for (const output of [application.process().stdout, application.process().stderr]) {
+    let buffer = '';
+    output?.on('data', chunk => {
+      buffer = (buffer + chunk.toString()).slice(-8192);
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) if (line.includes('[DesktopPet]')) console.log(line);
+    });
+  }
   const main = await application.firstWindow();
   await main.getByTestId('sidebar-new-conversation').waitFor({ timeout: 60_000 });
   const configured = await main.evaluate(
@@ -129,7 +146,21 @@ try {
       timeout: 15_000,
     })
     .catch(() => application.windows().find(page => page.url().includes('desktop-pet.html')));
-  if (!actor) throw new Error('Native companion actor missing');
+  if (!actor) {
+    console.log(
+      JSON.stringify({
+        userData,
+        windows: await application.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows().map(window => ({
+            id: window.id,
+            url: window.webContents.getURL(),
+          })),
+        ),
+        settings: await main.evaluate(() => window.electron.desktopPet.getSettings()),
+      }),
+    );
+    throw new Error('Native companion actor missing');
+  }
   await actor.waitForFunction(() => Boolean(window.desktopPet));
   await actor.addInitScript(() => {
     window.acceptanceVideos = [];
@@ -154,6 +185,10 @@ try {
   const opened = application.waitForEvent('window', { timeout: 15_000 });
   await actor.evaluate(() => window.desktopPet.menu());
   const chat = await opened;
+  const home =
+    process.env.COMPANION_VERIFY_HOME === '1'
+      ? await verifyHomeSurfaces(main, chat, userData)
+      : null;
   await chat.getByRole('tab', { name: '交代任务', exact: true }).waitFor();
   await chat.getByRole('tab', { name: '交代任务', exact: true }).click();
   await chat.getByRole('combobox', { name: '工作区', exact: true }).click();
@@ -259,6 +294,7 @@ try {
   await actor.screenshot({ path: path.join(userData, 'motion-window.png'), omitBackground: true });
   await chat.screenshot({ path: path.join(userData, 'task-window.png') });
   await chat.evaluate(sessionId => window.companion.openWorkbench(sessionId), receipt.sessionId);
+  await expect(main.getByTestId('sidebar-view-workbench')).toHaveAttribute('aria-current', 'page');
   await main
     .getByText('整理项目资料，并告诉我接下来该做什么。', { exact: true })
     .first()
@@ -275,7 +311,11 @@ try {
     throw new Error('Workbench task identity changed');
   await expect
     .poll(() => requestKinds.map(item => item.kind).sort(), { timeout: 10_000 })
-    .toEqual(['project-memory', 'session-memory', 'task']);
+    .toEqual(
+      home
+        ? ['companion-chat', 'project-memory', 'session-memory', 'task']
+        : ['project-memory', 'session-memory', 'task'],
+    );
   const stress = process.env.COMPANION_MEDIA_STRESS_SECONDS
     ? await stressMedia(
         application,
@@ -291,9 +331,13 @@ try {
       receipt,
       requests,
       taskExecutions: requestKinds.filter(item => item.kind === 'task').length,
-      maintenanceRequests: requestKinds.filter(item => item.kind !== 'task').length,
+      chatExecutions: requestKinds.filter(item => item.kind === 'companion-chat').length,
+      maintenanceRequests: requestKinds.filter(
+        item => item.kind === 'project-memory' || item.kind === 'session-memory',
+      ).length,
       detailAvailable: Boolean(detail),
       media,
+      home,
       stress,
       userData,
       workspace,

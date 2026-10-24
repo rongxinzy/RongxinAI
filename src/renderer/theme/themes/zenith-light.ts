@@ -1,5 +1,6 @@
 import { BackgroundKind, DEFAULT_BACKGROUND } from '../background/background';
 import { classicComponentAppearances } from '../components/classic';
+import { withAccessibleComposer } from '../components/accessible-composer';
 import type { ThemeDefinition } from './types';
 import { quietStudioAppearances, quietStudioLightTokens } from './quiet-studio-v4';
 
@@ -16,7 +17,10 @@ export const zenithLight: ThemeDefinition = {
     description: 'Premium futuristic light theme with glassmorphism',
     appearance: 'light',
   },
-  components: { ...classicComponentAppearances(), ...quietStudioAppearances() },
+  components: withAccessibleComposer({
+    ...classicComponentAppearances(),
+    ...quietStudioAppearances(),
+  }),
   background: {
     ...DEFAULT_BACKGROUND,
     kind: BackgroundKind.Color,
@@ -232,7 +236,6 @@ export const zenithLight: ThemeDefinition = {
     'gray-11': '#0F172A',
 
     // ── Focus Ring ──
-    ring: '#3B82F6',
 
     // ── Semantic Aliases ──
     'semantic-background': '#FAFBFD',
@@ -252,7 +255,6 @@ export const zenithLight: ThemeDefinition = {
     'semantic-destructive': '#EF4444',
     'semantic-border': 'rgba(0, 0, 0, 0.06)',
     'semantic-input': 'rgba(0, 0, 0, 0.08)',
-    'semantic-ring': '#3B82F6',
 
     // ── Charts ──
     'semantic-chart-1': '#3B82F6',
@@ -269,7 +271,6 @@ export const zenithLight: ThemeDefinition = {
     'semantic-sidebar-accent': 'rgba(59, 130, 246, 0.08)',
     'semantic-sidebar-accent-foreground': '#3B82F6',
     'semantic-sidebar-border': 'rgba(0, 0, 0, 0.06)',
-    'semantic-sidebar-ring': '#3B82F6',
 
     // ── Component Palettes ──
     'component-palette-white': '#FFFFFF',
@@ -398,5 +399,8 @@ export const zenithLight: ThemeDefinition = {
 
     // ── v4.0 Quiet Studio overrides ──
     ...quietStudioLightTokens,
+    ring: 'var(--zy-primary)',
+    'semantic-ring': 'var(--zy-primary)',
+    'semantic-sidebar-ring': 'var(--zy-primary)',
   },
 };

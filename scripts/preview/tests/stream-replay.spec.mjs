@@ -27,6 +27,7 @@ const GLM_FIXTURES = ['glm-tool-text-jsonl', 'glm-fresh-pr1127-jsonl-gz'];
 async function startReplayPage(page, baseURL, fixtureId, { scrollMutation = null } = {}) {
   const search = previewStreamReplaySearch(fixtureId, { scrollMutation });
   await page.goto(`${baseURL}${search}`, { waitUntil: 'domcontentloaded' });
+  await page.getByTestId('sidebar-view-workbench').click();
   await page.getByRole('log').waitFor({ timeout: 60_000 });
   await page.waitForFunction(() => window.__previewCoworkStreamReady === true, undefined, {
     timeout: 120_000,
@@ -36,6 +37,7 @@ async function startReplayPage(page, baseURL, fixtureId, { scrollMutation = null
 async function readFullParseBaseline(page, baseURL, fixtureId) {
   const search = previewStreamReplayInstantSearch(fixtureId);
   await page.goto(`${baseURL}${search}`, { waitUntil: 'domcontentloaded' });
+  await page.getByTestId('sidebar-view-workbench').click();
   await page.getByRole('log').waitFor({ timeout: 60_000 });
   await page.waitForFunction(() => window.__previewCoworkStreamReady === true, undefined, {
     timeout: 120_000,

@@ -7,6 +7,8 @@ import {
   Bot,
   ListTodo,
   MessageCirclePlus,
+  MessageCircle,
+  PanelsTopLeft,
   Search,
   SquarePen,
   Terminal,
@@ -18,6 +20,8 @@ import { configService } from '../../services/config';
 import { formatShortcutLabel } from '../../services/shortcutLabel';
 
 const icons = {
+  companion: MessageCircle,
+  cowork: PanelsTopLeft,
   conversation: MessageCirclePlus,
   localInference: Bot,
   coding: Terminal,
@@ -72,6 +76,8 @@ interface SidebarNavigationViewProps {
   newConversation: SidebarNavigationEntry;
   entries: SidebarNavigationEntry[];
   search?: { label: string; onClick: () => void };
+  primaryEntries?: SidebarNavigationEntry[];
+  showModeSwitch?: boolean;
 }
 
 export function SidebarNavigationView({
@@ -82,6 +88,8 @@ export function SidebarNavigationView({
   newConversation,
   entries,
   search,
+  primaryEntries = [],
+  showModeSwitch = true,
 }: SidebarNavigationViewProps) {
   // The mode flip re-renders the whole app (sidebar tree + main view) in one
   // blocking commit. Reflect the toggle optimistically in this tiny tree and
@@ -113,27 +121,36 @@ export function SidebarNavigationView({
   const searchShortcutLabel = formatShortcutLabel(shortcutConfig?.search ?? 'CmdOrCtrl+K', isMac);
   return (
     <div className="flex flex-col gap-4 px-2 pt-3 pb-4">
-      <div className="relative h-8 w-full">
-        <Switch
-          checked={shownIsChat}
-          onCheckedChange={handleModeChange}
-          data-mode="work-chat"
-          aria-label={`${workLabel} / ${chatLabel}`}
-        />
-        {[workLabel, chatLabel].map((label, index) => (
-          <span
-            key={index}
-            data-mode-selected={shownIsChat === (index === 1)}
-            aria-hidden="true"
-            className={cn(
-              'theme-sidebar-mode-label pointer-events-none absolute inset-y-0 flex w-1/2 items-center justify-center',
-              index === 0 ? 'left-0' : 'left-1/2',
-            )}
-          >
-            {label}
-          </span>
-        ))}
-      </div>
+      {primaryEntries.length ? (
+        <div className="flex flex-col gap-0.5">
+          {primaryEntries.map(entry => (
+            <SidebarNavigationItem key={entry.id} entry={entry} />
+          ))}
+        </div>
+      ) : null}
+      {showModeSwitch ? (
+        <div className="relative h-8 w-full">
+          <Switch
+            checked={shownIsChat}
+            onCheckedChange={handleModeChange}
+            data-mode="work-chat"
+            aria-label={`${workLabel} / ${chatLabel}`}
+          />
+          {[workLabel, chatLabel].map((label, index) => (
+            <span
+              key={index}
+              data-mode-selected={shownIsChat === (index === 1)}
+              aria-hidden="true"
+              className={cn(
+                'theme-sidebar-mode-label pointer-events-none absolute inset-y-0 flex w-1/2 items-center justify-center',
+                index === 0 ? 'left-0' : 'left-1/2',
+              )}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="flex flex-col gap-0.5">
         <Button
           type="button"

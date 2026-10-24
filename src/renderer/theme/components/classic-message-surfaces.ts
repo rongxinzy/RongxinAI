@@ -62,10 +62,10 @@ export function classicMessageSurfaces() {
       base: {
         'border-radius': 'var(--zy-style-radius-3xl)',
         'background-color': 'var(--zy-surface-overlay)',
-        'border-color': 'var(--border)',
+        'border-color': 'var(--zy-text-muted)',
       },
-      groupFocus: { 'border-color': 'var(--ring)', 'box-shadow': 'none' },
-      composerFocus: { 'border-color': 'var(--ring)', 'box-shadow': 'none' },
+      groupFocus: { 'border-color': 'var(--zy-text-muted)', 'box-shadow': 'none' },
+      composerFocus: { 'border-color': 'var(--zy-text-muted)', 'box-shadow': 'none' },
     }),
     'composer-drop-active': recipe({
       base: { 'box-shadow': '0 0 0 2px var(--primary), var(--zy-style-shadow-elevated)' },

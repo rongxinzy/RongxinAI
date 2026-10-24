@@ -64,6 +64,7 @@ export const companionContract = defineIpcContract({
     args: z.tuple([
       z
         .object({
+          petId: z.uuid(),
           requestId: z.string().trim().min(1).max(128),
           text: z.string().trim().min(1).max(32_000),
         })
@@ -79,7 +80,7 @@ export const companionContract = defineIpcContract({
       text: z.string(),
     }),
   },
-  stop: { channel: IpcChannel.Stop, args: z.tuple([]), result: z.void() },
+  stop: { channel: IpcChannel.Stop, args: z.tuple([z.uuid()]), result: z.void() },
   submitTask: {
     channel: IpcChannel.SubmitTask,
     args: z.tuple([companionTaskRequest]),

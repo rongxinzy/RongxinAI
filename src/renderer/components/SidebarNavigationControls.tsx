@@ -8,8 +8,11 @@ import { selectHasActiveActivityRun } from '../store/selectors/activitySelectors
 import { WorkMode } from '../store/workMode/constants';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import { SidebarNavigationView, type SidebarNavigationEntry } from './shell/SidebarNavigationView';
+import { requestCompanionNavigation } from '../app/companionNavigation';
+import { MainView } from '../app/constants';
 
 export type SidebarActiveView =
+  | 'companion'
   | 'cowork'
   | 'settings'
   | 'skills'
@@ -106,6 +109,27 @@ export const SidebarNavigationControls = ({
   }
   return (
     <SidebarNavigationView
+      primaryEntries={[
+        {
+          id: MainView.Companion,
+          icon: MainView.Companion,
+          label: i18nService.t('companionNav'),
+          active: activeView === MainView.Companion,
+          currentPage: activeView === MainView.Companion,
+          testId: 'sidebar-view-companion',
+          onClick: () => requestCompanionNavigation(MainView.Companion),
+        },
+        {
+          id: MainView.Cowork,
+          icon: MainView.Cowork,
+          label: i18nService.t('companionWorkbenchNav'),
+          active: activeView === MainView.Cowork,
+          currentPage: activeView === MainView.Cowork,
+          testId: 'sidebar-view-workbench',
+          onClick: () => requestCompanionNavigation(MainView.Cowork),
+        },
+      ]}
+      showModeSwitch={activeView !== MainView.Companion}
       isChat={isChat}
       workLabel={i18nService.t('workMode')}
       chatLabel={i18nService.t('chatMode')}

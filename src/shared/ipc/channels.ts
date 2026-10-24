@@ -25,6 +25,8 @@ export const CompanionIpc = {
   OpenWorkbench: 'companion:openWorkbench',
   Context: 'companion:context',
   Visibility: 'companion:visibility',
+  Changed: 'companion:changed',
+  Workbench: 'companion:workbench',
 } as const;
 
 export const StoreIpc = {

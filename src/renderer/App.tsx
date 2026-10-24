@@ -12,6 +12,8 @@ import { useAppBootstrap } from './app/useAppBootstrap';
 import { useAppKeyboardShortcuts } from './app/useAppKeyboardShortcuts';
 import { useNetworkStatusForwarder } from './app/useNetworkStatusForwarder';
 import { useDesktopPetNavigation } from './app/useDesktopPetNavigation';
+import { useCompanionNavigation } from './app/companionNavigation';
+import { useAvailableModelsRefresh } from './app/useAvailableModelsRefresh';
 import {
   InferenceEdition,
   isLocalInferenceEnabledForEdition,
@@ -33,13 +35,6 @@ import Sidebar from './components/Sidebar';
 import AppUpdateSidebarEntry from './components/update/AppUpdateSidebarEntry';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { agentService } from './services/agent';
-import {
-  refreshMagpieModels,
-  LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
-  notifyLlamaCppRunningModelsChanged,
-} from './services/availableModels';
-import { ZhiyuanModelPoolEvent } from '../shared/modelPool/constants';
-import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
 import { showAppToast } from './services/toastNotification';
@@ -59,7 +54,8 @@ import type { CoworkPermissionResult } from './types/cowork';
 const App: React.FC = () => {
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
   const [initErrorSettingsOpen, setInitErrorSettingsOpen] = useState(false);
-  const [mainView, setMainView] = useState<MainView>(MainView.Cowork);
+  const [mainView, setMainView] = useState<MainView>(MainView.Companion);
+  useCompanionNavigation(setMainView);
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
   const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);
@@ -119,77 +115,11 @@ const App: React.FC = () => {
     return () => window.cancelAnimationFrame(frame);
   }, [initError, isInitialized]);
 
-  const availableModelsRefreshRequestIdRef = useRef(0);
-
-  const refreshAvailableModels = useCallback(async () => {
-    const requestId = ++availableModelsRefreshRequestIdRef.current;
-    try {
-      const [, policy] = await Promise.all([
-        refreshMagpieModels(),
-        window.electron.managedProviders.policy(),
-      ]);
-      if (requestId !== availableModelsRefreshRequestIdRef.current) return;
-      setManagedProviderPolicy(policy);
-      if (policy.mode === ManagedProviderAccessMode.Exclusive) {
-        setMainView(currentView =>
-          currentView === MainView.LocalInference ? MainView.Cowork : currentView,
-        );
-      }
-    } catch (error) {
-      console.error('[App] failed to refresh available models:', error);
-    }
-  }, [setManagedProviderPolicy]);
-
-  useEffect(() => {
-    if (!isInitialized) {
-      return;
-    }
-
-    const handleConfigUpdated = () => {
-      void refreshAvailableModels();
-    };
-    const handleLlamaCppRunningModelsChanged = () => {
-      void refreshAvailableModels();
-    };
-    const handleLlamaCppModelBindingsChanged = () => {
-      // Reload first so existing settings listeners receive the authoritative model configuration.
-      void configService
-        .reload()
-        .then(() => notifyLlamaCppRunningModelsChanged())
-        .catch(error => {
-          console.error('[App] failed to reload config after model bindings changed:', error);
-        });
-    };
-    const handleManagedProvidersChanged = () => {
-      void refreshAvailableModels();
-    };
-
-    window.addEventListener('config-updated', handleConfigUpdated);
-    window.addEventListener(
-      LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
-      handleLlamaCppRunningModelsChanged,
-    );
-    window.addEventListener(ZhiyuanModelPoolEvent.AuthChanged, handleLlamaCppRunningModelsChanged);
-    const unsubscribeModelBindings = window.electron.llamacpp.onModelBindingsChanged(
-      handleLlamaCppModelBindingsChanged,
-    );
-    const unsubscribeManagedProviders = window.electron.managedProviders.onChanged(
-      handleManagedProvidersChanged,
-    );
-    return () => {
-      window.removeEventListener('config-updated', handleConfigUpdated);
-      window.removeEventListener(
-        LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
-        handleLlamaCppRunningModelsChanged,
-      );
-      window.removeEventListener(
-        ZhiyuanModelPoolEvent.AuthChanged,
-        handleLlamaCppRunningModelsChanged,
-      );
-      unsubscribeModelBindings();
-      unsubscribeManagedProviders();
-    };
-  }, [isInitialized, refreshAvailableModels]);
+  const refreshAvailableModels = useAvailableModelsRefresh(
+    isInitialized,
+    setManagedProviderPolicy,
+    setMainView,
+  );
 
   useEffect(() => {
     const unsubscribe = i18nService.subscribe(() => {

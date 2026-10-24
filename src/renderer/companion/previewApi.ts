@@ -11,7 +11,7 @@ import { WorkbenchRunStatus } from '../../shared/workbenchTask';
 
 /** DEV browser fixture only. It exercises the window UI, never models or production storage. */
 export function createCompanionPreviewApi(): CompanionWindowApi {
-  const params = new URLSearchParams(location.search);
+  const params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
   const profiles = Object.values(DesktopPetBuiltinId).map((id, index) => ({
     petId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
     personaId: id,
@@ -22,6 +22,11 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
   const messages = new Map<string, CompanionMessage[]>();
   const requests = new Map<string, { receipt: CompanionReceipt; text: string; at: number }>();
   let sequence = 0;
+  const changedListeners = new Set<() => void>();
+  const workbenchListeners = new Set<() => void>();
+  const changed = () => {
+    for (const listener of changedListeners) listener();
+  };
   const tasks = new Map<string, CompanionTaskProjection[]>();
   let taskRevision = 0;
   const taskSnapshot = () => ({
@@ -61,9 +66,11 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
     bootstrap: snapshot,
     select: async id => {
       active = id;
+      changed();
       return snapshot();
     },
     submit: async request => {
+      if (request.petId !== active) throw new Error('Companion selection changed');
       if (availability.capability === CompanionCapability.Local)
         return { availability, receipt: null };
       const receipt = { petId: active, requestId: request.requestId, submissionId: ++sequence };
@@ -72,6 +79,7 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
         { id: ++sequence, role: 'user', text: request.text },
       ]);
       requests.set(active, { receipt, text: request.text, at: Date.now() });
+      changed();
       return { availability, receipt };
     },
     answer: async receipt => {
@@ -94,8 +102,10 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
       }
       return { ...receipt, text: '', state: CompanionRequestState.Answered };
     },
-    stop: async () => {
+    stop: async petId => {
+      if (petId !== active) throw new Error('Companion selection changed');
       requests.delete(active);
+      changed();
     },
     submitTask: async request => {
       if (availability.capability === CompanionCapability.Local) return { receipt: null };
@@ -138,9 +148,22 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
     openWorkbench: async sessionId => {
       document.documentElement.dataset.companionWorkbench = 'true';
       if (sessionId) document.documentElement.dataset.companionTask = sessionId;
+      for (const listener of workbenchListeners) listener();
     },
     onContext: () => () => {},
     onVisibility: () => () => {},
     onTasks: () => () => {},
+    onChanged: listener => {
+      changedListeners.add(listener);
+      return () => {
+        changedListeners.delete(listener);
+      };
+    },
+    onWorkbench: listener => {
+      workbenchListeners.add(listener);
+      return () => {
+        workbenchListeners.delete(listener);
+      };
+    },
   };
 }

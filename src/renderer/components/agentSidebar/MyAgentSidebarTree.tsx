@@ -280,8 +280,9 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
           </p>
           <Button
             type="button"
+            variant="secondary"
             onClick={() => void handleCreateWorkspace()}
-            className="theme-page-my-agent-sidebar-tree-button-1 mt-3"
+            className="mt-3"
           >
             {i18nService.t('workspaceAdd')}
           </Button>

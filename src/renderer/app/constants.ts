@@ -3,6 +3,7 @@
  * `SidebarActiveView` in components/SidebarNavigationControls.tsx.
  */
 export const MainView = {
+  Companion: 'companion',
   Cowork: 'cowork',
   Settings: 'settings',
   Skills: 'skills',

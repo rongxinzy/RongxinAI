@@ -57,9 +57,11 @@ export async function home(page, baseUrl, search = '') {
     return;
   }
   if (search.includes('previewScenario=empty')) {
+    await page.getByTestId('sidebar-view-workbench').click();
     await page.getByRole('button', { name: 'New Task', exact: true }).waitFor({ timeout: 60_000 });
     return;
   }
+  await page.getByTestId('sidebar-view-workbench').click();
   await page.getByText('Calculator', { exact: true }).first().waitFor({ timeout: 60_000 });
 }
 
