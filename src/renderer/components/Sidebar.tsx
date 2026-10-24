@@ -405,9 +405,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <MotionConfig reducedMotion="user">
       <aside
-        className={`theme-shell-sidebar relative shrink-0 overflow-hidden ${
-          isResizing ? '' : 'sidebar-transition'
-        }`}
+        className="theme-shell-sidebar relative shrink-0 overflow-hidden"
         data-active-view={activeView}
         style={{ width: isCollapsed ? 0 : sidebarWidth }}
       >

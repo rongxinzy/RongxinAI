@@ -264,11 +264,13 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         }}
       >
         <DialogContent className="theme-control-sizing-4 flex max-h-[85vh] flex-col gap-0 overflow-hidden sm:max-w-2xl">
-          <DialogHeader className="sr-only">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-2 pr-12">
             <DialogTitle>{i18nService.t('scheduledTasksNewTask')}</DialogTitle>
-            <DialogDescription>{i18nService.t('scheduledTasksNewTask')}</DialogDescription>
+            <DialogDescription className="sr-only">
+              {i18nService.t('scheduledTasksNewTask')}
+            </DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-b-xl px-4 pt-9">
+          <div className="flex min-h-0 flex-1 flex-col px-6 pb-4">
             <TaskForm
               key={createFormKey}
               mode="create"
@@ -292,11 +294,11 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         }}
       >
         <DialogContent className="theme-control-sizing-4 flex max-h-[85vh] flex-col gap-0 overflow-hidden sm:max-w-2xl">
-          <DialogHeader className="sr-only">
+          <DialogHeader className="shrink-0 px-6 pt-6 pb-2 pr-12">
             <DialogTitle>{editingTask?.name ?? i18nService.t('scheduledTasksTitle')}</DialogTitle>
-            <DialogDescription>{editingTask?.name ?? ''}</DialogDescription>
+            <DialogDescription className="sr-only">{editingTask?.name ?? ''}</DialogDescription>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-y-auto rounded-b-xl px-4 pt-9">
+          <div className="flex min-h-0 flex-1 flex-col px-6 pb-4">
             {editingTask && (
               <TaskForm
                 mode="edit"

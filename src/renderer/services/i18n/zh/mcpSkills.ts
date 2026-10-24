@@ -45,7 +45,7 @@ export const zhMcpSkills: Record<string, string> = {
   piRuntimeCacheControlAnthropic: 'Anthropic cache_control',
   codemodeEnabled: '复杂任务批处理加速 (Codemode)',
   codemodeEnabledDescription:
-    '允许智能体编写脚本批量并发调用工具，显著加速长任务与批量文件处理。建议搭配 Claude 3.5、GPT-4o 等高算力模型使用（默认关闭）',
+    '允许智能体在沙箱脚本中组合多次工具调用，减少长任务和批量文件操作的等待时间。默认关闭。',
   mcpNativeBridge: 'MCP 原生桥接',
   mcpNativeBridgeDescription:
     '工作会话改用内置 MCP 扩展连接服务器，按服务器暴露级别渐进展示工具；关闭时沿用单网关工具',

@@ -12,7 +12,6 @@ afterEach(cleanup);
 test('shows the selected session title instead of its internal id', () => {
   render(
     createElement(TaskFormBody, {
-      mode: 'create',
       name: '',
       modelId: '',
       workspaceId: 'workspace-1',

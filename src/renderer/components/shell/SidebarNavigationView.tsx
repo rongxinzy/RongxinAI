@@ -58,10 +58,7 @@ function SidebarNavigationItem({ entry }: { entry: SidebarNavigationEntry }) {
       </div>
       <span className="min-w-0 truncate">{entry.label}</span>
       {entry.running && (
-        <span
-          className="ml-auto size-1.5 shrink-0 rounded-full bg-primary motion-safe:animate-pulse"
-          aria-hidden="true"
-        />
+        <span className="ml-auto size-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
       )}
     </Button>
   );

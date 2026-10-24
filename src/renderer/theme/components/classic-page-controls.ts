@@ -555,8 +555,8 @@ export function classicPageControls() {
     }),
     'page-quick-action-bar-button-1': recipe({
       base: {
-        gap: '0.5rem',
-        'padding-inline': '0.75rem',
+        gap: '0.25rem',
+        'padding-inline': '0.5rem',
         'padding-block': '0.5rem',
         'border-radius': '9999px',
         'font-size': 'var(--zy-component-text-sm)',
@@ -597,23 +597,21 @@ export function classicPageControls() {
     'page-task-template-gallery-card-1': recipe({
       hover: {
         'background-color': 'color-mix(in oklab, var(--muted) 50%, transparent)',
-        'box-shadow': 'var(--zy-style-shadow-md)',
       },
       base: {
-        'transition-property': 'background-color,box-shadow',
-        'transition-duration': '150ms',
-        'box-shadow': 'var(--zy-style-shadow-sm)',
+        'transition-property': 'background-color',
+        'transition-duration': '120ms',
+        'box-shadow': 'none',
       },
     }),
     'page-task-template-gallery-card-2': recipe({
       base: {
         'border-style': 'dashed',
-        'transition-property': 'background-color,box-shadow',
-        'transition-duration': '150ms',
+        'transition-property': 'background-color',
+        'transition-duration': '120ms',
       },
       hover: {
         'background-color': 'color-mix(in oklab, var(--muted) 50%, transparent)',
-        'box-shadow': 'var(--zy-style-shadow-md)',
       },
     }),
     'page-pi-runtime-model-config-select-trigger-1': recipe({

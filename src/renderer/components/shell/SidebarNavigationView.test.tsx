@@ -66,6 +66,29 @@ test('flips the thumb optimistically and defers the mode change to the next fram
   expect(toggle).toHaveAttribute('aria-checked', 'true');
 });
 
+test('keeps the running indicator static', () => {
+  const props = baseProps();
+  const { container } = render(
+    createElement(SidebarNavigationView, {
+      ...props,
+      entries: [
+        {
+          id: 'coding',
+          icon: 'coding',
+          label: 'Coding',
+          active: true,
+          running: true,
+          onClick: vi.fn(),
+        },
+      ],
+    }),
+  );
+
+  const indicator = container.querySelector('[aria-hidden="true"].bg-primary');
+  expect(indicator).not.toHaveClass('animate-pulse');
+  expect(indicator).not.toHaveClass('motion-safe:animate-pulse');
+});
+
 test('a rapid second toggle cancels the stale deferred change', () => {
   const raf = stubAnimationFrame();
   const props = baseProps();
