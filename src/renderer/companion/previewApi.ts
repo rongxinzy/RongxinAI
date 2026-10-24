@@ -6,6 +6,8 @@ import type {
   CompanionWindowContext,
   CompanionReceipt,
 } from '../../shared/companion/types';
+import type { CompanionTaskProjection } from '../../shared/companion/tasks';
+import { WorkbenchRunStatus } from '../../shared/workbenchTask';
 
 /** DEV browser fixture only. It exercises the window UI, never models or production storage. */
 export function createCompanionPreviewApi(): CompanionWindowApi {
@@ -20,6 +22,7 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
   const messages = new Map<string, CompanionMessage[]>();
   const requests = new Map<string, { receipt: CompanionReceipt; text: string; at: number }>();
   let sequence = 0;
+  const tasks = new Map<string, CompanionTaskProjection[]>();
   const context: CompanionWindowContext = {
     language: params.get('language') === 'en' ? 'en' : 'zh',
     theme: params.get('theme') === 'dark' ? 'dark' : 'light',
@@ -38,6 +41,8 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
     profiles,
     availability,
     shortcutAvailable: true,
+    workspaces: [{ id: 'preview-workspace', name: 'Preview project' }],
+    tasks: tasks.get(active) ?? [],
     conversation: {
       messages: messages.get(active) ?? [],
       pending: requests.get(active)?.receipt ?? null,
@@ -83,13 +88,45 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
     stop: async () => {
       requests.delete(active);
     },
+    submitTask: async request => {
+      if (availability.capability === CompanionCapability.Local) return { receipt: null };
+      const existing = tasks
+        .get(request.petId)
+        ?.find(task => task.receipt.requestId === request.requestId);
+      if (existing) return { receipt: existing.receipt };
+      const receipt = {
+        petId: request.petId,
+        requestId: request.requestId,
+        sessionId: crypto.randomUUID(),
+        taskId: crypto.randomUUID(),
+        runId: crypto.randomUUID(),
+      };
+      tasks.set(request.petId, [
+        { receipt, title: request.text, status: WorkbenchRunStatus.Queued, missing: false },
+        ...(tasks.get(request.petId) ?? []),
+      ]);
+      return { receipt };
+    },
+    tasks: async () => tasks.get(active) ?? [],
+    stopTask: async sessionId => {
+      tasks.set(
+        active,
+        (tasks.get(active) ?? []).map(task =>
+          task.receipt.sessionId === sessionId
+            ? { ...task, status: WorkbenchRunStatus.Cancelled }
+            : task,
+        ),
+      );
+    },
     hide: async () => {
       document.documentElement.dataset.companionHidden = 'true';
     },
-    openWorkbench: async () => {
+    openWorkbench: async sessionId => {
       document.documentElement.dataset.companionWorkbench = 'true';
+      if (sessionId) document.documentElement.dataset.companionTask = sessionId;
     },
     onContext: () => () => {},
     onVisibility: () => () => {},
+    onTasks: () => () => {},
   };
 }

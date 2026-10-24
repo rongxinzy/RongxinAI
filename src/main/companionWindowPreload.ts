@@ -8,8 +8,11 @@ const api: CompanionWindowApi = {
   submit: request => ipcRenderer.invoke(IpcChannel.Submit, request),
   answer: receipt => ipcRenderer.invoke(IpcChannel.Answer, receipt),
   stop: () => ipcRenderer.invoke(IpcChannel.Stop),
+  submitTask: request => ipcRenderer.invoke(IpcChannel.SubmitTask, request),
+  tasks: () => ipcRenderer.invoke(IpcChannel.Tasks),
+  stopTask: sessionId => ipcRenderer.invoke(IpcChannel.StopTask, sessionId),
   hide: () => ipcRenderer.invoke(IpcChannel.Hide),
-  openWorkbench: () => ipcRenderer.invoke(IpcChannel.OpenWorkbench),
+  openWorkbench: sessionId => ipcRenderer.invoke(IpcChannel.OpenWorkbench, sessionId),
   onContext: listener => {
     const handle = (_event: Electron.IpcRendererEvent, context: Parameters<typeof listener>[0]) =>
       listener(context);
@@ -20,6 +23,14 @@ const api: CompanionWindowApi = {
     const handle = (_event: Electron.IpcRendererEvent, visible: boolean) => listener(visible);
     ipcRenderer.on(IpcChannel.Visibility, handle);
     return () => ipcRenderer.removeListener(IpcChannel.Visibility, handle);
+  },
+  onTasks: listener => {
+    const handle = (
+      _event: Electron.IpcRendererEvent,
+      payload: { petId: string; tasks: Parameters<typeof listener>[1] },
+    ) => listener(payload.petId, payload.tasks);
+    ipcRenderer.on(IpcChannel.TasksChanged, handle);
+    return () => ipcRenderer.removeListener(IpcChannel.TasksChanged, handle);
   },
 };
 contextBridge.exposeInMainWorld('companion', api);

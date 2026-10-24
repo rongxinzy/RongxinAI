@@ -1,5 +1,11 @@
 import type { DesktopPetBuiltinId } from '../desktopPet/catalog';
 import type {
+  CompanionTaskRequest,
+  CompanionTaskResult,
+  CompanionTaskProjection,
+  CompanionWorkspace,
+} from './tasks';
+import type {
   CompanionCapability,
   CompanionRequestState,
   CompanionUnavailableReason,
@@ -57,6 +63,8 @@ export interface CompanionWindowState {
   conversation: CompanionConversation;
   availability: CompanionAvailability;
   shortcutAvailable: boolean;
+  workspaces: CompanionWorkspace[];
+  tasks: CompanionTaskProjection[];
 }
 
 export interface CompanionWindowApi {
@@ -68,8 +76,12 @@ export interface CompanionWindowApi {
   }>;
   answer(receipt: CompanionReceipt): Promise<CompanionAnswer>;
   stop(): Promise<void>;
+  submitTask(request: CompanionTaskRequest): Promise<CompanionTaskResult>;
+  tasks(): Promise<CompanionTaskProjection[]>;
+  stopTask(sessionId: string): Promise<void>;
   hide(): Promise<void>;
-  openWorkbench(): Promise<void>;
+  openWorkbench(sessionId?: string): Promise<void>;
   onContext(listener: (context: CompanionWindowContext) => void): () => void;
   onVisibility(listener: (visible: boolean) => void): () => void;
+  onTasks(listener: (petId: string, tasks: CompanionTaskProjection[]) => void): () => void;
 }

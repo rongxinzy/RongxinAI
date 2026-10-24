@@ -1,6 +1,9 @@
+import { CompanionComposerMode } from '../../shared/companion/constants';
 interface Draft {
   text: string;
   requestId: string;
+  mode?: CompanionComposerMode;
+  workspaceId?: string;
 }
 const PREFIX = 'zhiyuan-companion-draft:';
 
@@ -19,7 +22,20 @@ export function readCompanionDraft(petId: string): Draft {
       value.requestId.length <= 128 &&
       value.requestId.length > 0
     )
-      return { text: value.text, requestId: value.requestId };
+      return {
+        text: value.text,
+        requestId: value.requestId,
+        mode:
+          'mode' in value && value.mode === CompanionComposerMode.Task
+            ? CompanionComposerMode.Task
+            : CompanionComposerMode.Chat,
+        workspaceId:
+          'workspaceId' in value &&
+          typeof value.workspaceId === 'string' &&
+          value.workspaceId.length <= 128
+            ? value.workspaceId
+            : undefined,
+      };
   } catch {
     /* Keep the window usable when browser storage is unavailable. */
   }

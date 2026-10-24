@@ -191,8 +191,13 @@ function persistFailures(): void {
 }
 
 function openTask(): void {
+  if (status.targetSessionId) openDesktopPetSession(status.targetSessionId);
+  else openMainWindow();
+}
+
+/** Shared native navigation keeps its existing queued-load and failure acknowledgement. */
+export function openDesktopPetSession(sessionId: string): void {
   openMainWindow();
-  const sessionId = status.targetSessionId;
   const window = mainWindow?.();
   if (!sessionId || !window || window.isDestroyed() || window.webContents.isDestroyed()) return;
   pendingTask = {

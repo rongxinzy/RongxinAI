@@ -13,11 +13,14 @@ import type { SqliteStore } from '../sqliteStore';
 import { t } from '../i18n';
 import type { CompanionProfiles } from './profiles';
 import type { PiCompanionRuntime } from './durableRuntime.mjs';
+import type { CompanionTasks } from './tasks';
 
 interface Options {
   store: Pick<SqliteStore, 'get' | 'onDidChange'>;
   getMainWindow(): BrowserWindow | null;
   getCompanions(): { profiles: CompanionProfiles; runtime: PiCompanionRuntime };
+  getTasks(): CompanionTasks;
+  openTask(sessionId: string): void;
   onProfileChanged(profile: CompanionProfile): void;
 }
 
@@ -25,6 +28,7 @@ let options: Options | null = null;
 let window: BrowserWindow | null = null;
 let shortcutAvailable = false;
 let unsubscribe: (() => void) | undefined;
+let unsubscribeTasks: (() => void) | undefined;
 
 export function isCompanionWindow(candidate: BrowserWindow): boolean {
   return candidate === window;
@@ -61,6 +65,8 @@ async function snapshot(): Promise<CompanionWindowState> {
     availability,
     shortcutAvailable,
     conversation: await runtime.history(active),
+    workspaces: options.getTasks().workspaces(),
+    tasks: options.getTasks().recent(active.petId),
   };
 }
 
@@ -120,12 +126,28 @@ export function initializeCompanionWindow(next: Options): void {
         const { profiles, runtime } = next.getCompanions();
         return runtime.stop(profiles.active());
       }),
+    submitTask: (event, request) =>
+      serialized(event, () =>
+        next.getTasks().submit(next.getCompanions().profiles.active(), request),
+      ),
+    tasks: event =>
+      serialized(event, () => next.getTasks().recent(next.getCompanions().profiles.active().petId)),
+    stopTask: (event, sessionId) =>
+      serialized(event, () =>
+        next.getTasks().stop(next.getCompanions().profiles.active().petId, sessionId),
+      ),
     hide: event => {
       assertWindow(event);
       window?.hide();
     },
-    openWorkbench: event => {
+    openWorkbench: (event, sessionId) => {
       assertWindow(event);
+      if (sessionId) {
+        if (!next.getTasks().owned(next.getCompanions().profiles.active().petId, sessionId))
+          throw new Error('Task belongs to another companion');
+        next.openTask(sessionId);
+        return;
+      }
       const main = next.getMainWindow();
       if (main && !main.isDestroyed()) {
         if (main.isMinimized()) main.restore();
@@ -141,6 +163,19 @@ export function initializeCompanionWindow(next: Options): void {
     if (window && !window.isDestroyed()) {
       window.setTitle(t('companionTitle'));
       window.webContents.send(IpcChannel.Context, preferences());
+    }
+  });
+  unsubscribeTasks = next.getTasks().onChanged(sessionId => {
+    if (!window || window.isDestroyed()) return;
+    try {
+      const petId = next.getCompanions().profiles.active().petId;
+      if (next.getTasks().owned(petId, sessionId))
+        window.webContents.send(IpcChannel.TasksChanged, {
+          petId,
+          tasks: next.getTasks().recent(petId),
+        });
+    } catch (error) {
+      console.warn(`[Companion] Failed to project task for session ${sessionId}:`, error);
     }
   });
 }
@@ -216,6 +251,8 @@ export function disposeCompanionWindow(): void {
   options = null;
   unsubscribe?.();
   unsubscribe = undefined;
+  unsubscribeTasks?.();
+  unsubscribeTasks = undefined;
   if (shortcutAvailable) globalShortcut.unregister(COMPANION_SHORTCUT);
   shortcutAvailable = false;
   window?.destroy();

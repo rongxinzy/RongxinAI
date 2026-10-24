@@ -94,18 +94,39 @@ function fixture() {
     select: vi.fn(() => profile),
   };
   const onProfileChanged = vi.fn();
+  const tasks = {
+    recent: vi.fn(() => []),
+    workspaces: vi.fn(() => []),
+    owned: vi.fn(() => false),
+    onChanged: vi.fn(() => vi.fn()),
+    submit: vi.fn(),
+  };
+  const openTask = vi.fn();
   initializeCompanionWindow({
     store: { get: () => undefined, onDidChange: () => () => {} },
     getMainWindow: () => main,
     getCompanions: () => ({ profiles, runtime }) as never,
     onProfileChanged,
+    getTasks: () => tasks as never,
+    openTask,
   });
   openCompanionWindow();
   const window = mocks.windows.at(-1)!;
   const event = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
   const invoke = (channel: string, ...args: unknown[]) =>
     mocks.handlers.get(channel)!(event, ...args);
-  return { window, main, runtime, profile, profiles, event, invoke, onProfileChanged };
+  return {
+    window,
+    main,
+    runtime,
+    profile,
+    profiles,
+    event,
+    invoke,
+    onProfileChanged,
+    tasks,
+    openTask,
+  };
 }
 
 afterEach(() => {
@@ -169,8 +190,19 @@ test('the bridge exposes profile state and the workbench without general applica
   expect(f.onProfileChanged).toHaveBeenCalledWith(f.profile);
   await f.invoke(IpcChannel.OpenWorkbench);
   expect(f.main.focus).toHaveBeenCalledOnce();
-  expect(mocks.handlers.size).toBe(7);
+  expect(mocks.handlers.size).toBe(10);
   disposeCompanionWindow();
   expect(mocks.handlers.size).toBe(0);
   expect(mocks.unregister).toHaveBeenCalledWith(COMPANION_SHORTCUT);
+});
+
+test('task navigation checks active companion ownership and does not run the task again', async () => {
+  const f = fixture();
+  const sessionId = '00000000-0000-4000-8000-000000000002';
+  await expect(f.invoke(IpcChannel.OpenWorkbench, sessionId)).rejects.toThrow('another companion');
+  expect(f.openTask).not.toHaveBeenCalled();
+  f.tasks.owned.mockReturnValue(true);
+  await f.invoke(IpcChannel.OpenWorkbench, sessionId);
+  expect(f.openTask).toHaveBeenCalledWith(sessionId);
+  expect(f.tasks.submit).not.toHaveBeenCalled();
 });

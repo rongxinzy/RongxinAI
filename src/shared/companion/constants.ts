@@ -34,3 +34,7 @@ export type CompanionUnavailableReason =
 
 export const COMPANION_PAGE = 'companion.html';
 export const COMPANION_SHORTCUT = 'CommandOrControl+Shift+Space';
+
+export const CompanionComposerMode = { Chat: 'chat', Task: 'task' } as const;
+export type CompanionComposerMode =
+  (typeof CompanionComposerMode)[keyof typeof CompanionComposerMode];

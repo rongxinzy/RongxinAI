@@ -3,6 +3,12 @@ import { CompanionIpc as IpcChannel } from '../ipc/channels';
 import { defineIpcContract } from '../ipc/contract';
 import { DesktopPetBuiltinId } from '../desktopPet/catalog';
 import {
+  companionTaskRequest,
+  companionTaskProjection,
+  companionTaskResult,
+  companionWorkspace,
+} from './tasks';
+import {
   CompanionCapability,
   CompanionRequestState,
   CompanionUnavailableReason,
@@ -39,6 +45,8 @@ const state = z.object({
   profiles: z.array(profile),
   availability,
   shortcutAvailable: z.boolean(),
+  workspaces: z.array(companionWorkspace),
+  tasks: z.array(companionTaskProjection),
   conversation: z.object({
     messages: z.array(
       z.object({ id: z.number(), role: z.enum(['user', 'assistant']), text: z.string() }),
@@ -70,6 +78,17 @@ export const companionContract = defineIpcContract({
     }),
   },
   stop: { channel: IpcChannel.Stop, args: z.tuple([]), result: z.void() },
+  submitTask: {
+    channel: IpcChannel.SubmitTask,
+    args: z.tuple([companionTaskRequest]),
+    result: companionTaskResult,
+  },
+  tasks: { channel: IpcChannel.Tasks, args: z.tuple([]), result: z.array(companionTaskProjection) },
+  stopTask: { channel: IpcChannel.StopTask, args: z.tuple([z.uuid()]), result: z.void() },
   hide: { channel: IpcChannel.Hide, args: z.tuple([]), result: z.void() },
-  openWorkbench: { channel: IpcChannel.OpenWorkbench, args: z.tuple([]), result: z.void() },
+  openWorkbench: {
+    channel: IpcChannel.OpenWorkbench,
+    args: z.tuple([z.uuid().optional()]),
+    result: z.void(),
+  },
 });

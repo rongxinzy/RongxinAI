@@ -27,6 +27,8 @@ import { setLanguage } from '../i18n';
 import { createTray, updateTrayMenu } from '../trayManager';
 import { initializeDesktopPet, setDesktopPetAppearance } from '../desktopPet/controller';
 import { initializeCompanionWindow } from '../companion/window';
+import { getCompanionTasks } from './companionTasks';
+import { openDesktopPetSession } from '../desktopPet/controller';
 import { getPiRuntimeAdapter } from './sessionServices';
 import {
   getDisplayWorkAreas,
@@ -325,6 +327,8 @@ export const createMainWindow = (): void => {
         store: getStore(),
         getMainWindow: () => lifecycleRuntime.mainWindow,
         getCompanions: () => getPiRuntimeAdapter().getCompanions(),
+        getTasks: getCompanionTasks,
+        openTask: openDesktopPetSession,
         onProfileChanged: profile => setDesktopPetAppearance(profile.characterId),
       });
 

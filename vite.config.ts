@@ -340,10 +340,8 @@ export default defineConfig(async ({ command }) => {
                     outDir: 'dist-electron',
                     minify: false,
                     rolldownOptions: {
-                      external:
-                        command === 'serve'
-                          ? isElectronDevelopmentExternal
-                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                      // Keep native ESM-only dependencies bundled in the CJS main, as in production.
+                      external: id => ELECTRON_MAIN_EXTERNALS.includes(id),
                       output: {
                         // Keep CJS format (default), but load via ESM loader.mjs
                         codeSplitting: false,

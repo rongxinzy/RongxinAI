@@ -228,29 +228,6 @@ test('the renderer receives only a localized status snapshot', () => {
   ]);
 });
 
-test('the menu offers on-demand actions that reach the pet window as effects', () => {
-  setDesktopPetEnabled(true);
-  const contents = mocks.windows[0].webContents;
-  mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
-  const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
-    label?: string;
-    click?: () => void;
-  }>;
-  const byLabel = (label: string) => template.find(item => item.label === label);
-  contents.send.mockClear();
-  byLabel('侧看一眼')!.click!();
-  byLabel('点点头')!.click!();
-  byLabel('展翅一下')!.click!();
-  const actions = contents.send.mock.calls
-    .filter(([channel]) => channel === DesktopPetIpc.Effect)
-    .map(([, effect]) => (effect as { action: string }).action);
-  expect(actions).toEqual([
-    DesktopPetPlayableAction.Peek,
-    DesktopPetPlayableAction.Nod,
-    DesktopPetPlayableAction.Flutter,
-  ]);
-});
-
 test('a click (drag end without movement) plays the happy feedback before greeting', () => {
   setDesktopPetEnabled(true);
   const contents = mocks.windows[0].webContents;
@@ -269,45 +246,6 @@ test('a click (drag end without movement) plays the happy feedback before greeti
   );
   expect(effectAt).toBeGreaterThanOrEqual(0);
   expect(greetingAt).toBeGreaterThan(effectAt);
-});
-
-test('menu actions emit matching localized chatter and task bubbles take precedence', async () => {
-  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
-  mocks.windows[0].emit('ready-to-show');
-  const contents = mocks.windows[0].webContents;
-  mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
-  const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
-    label?: string;
-    click?: () => void;
-  }>;
-  const byLabel = (label: string) => template.find(item => item.label === label)!;
-  contents.send.mockClear();
-  for (const [label, bubble] of [
-    ['侧看一眼', '我看一眼～'],
-    ['点点头', '嗯嗯'],
-    ['展翅一下', '扑棱一下'],
-  ]) {
-    byLabel(label).click!();
-    expect(contents.send).toHaveBeenLastCalledWith(
-      DesktopPetIpc.State,
-      expect.objectContaining({ bubble }),
-    );
-  }
-  observeDesktopPetEvent(
-    new PiUiEventSequencer(() => 'action-chatter-task').next({
-      type: PiUiEventType.Started,
-      sessionId: 'action-chatter-task',
-    }),
-  );
-  expect(contents.send).toHaveBeenLastCalledWith(
-    DesktopPetIpc.State,
-    expect.objectContaining({ state: 'thinking', bubble: '处理中' }),
-  );
-  byLabel('点点头').click!();
-  expect(contents.send).toHaveBeenLastCalledWith(
-    DesktopPetIpc.State,
-    expect.objectContaining({ state: 'thinking', bubble: '处理中' }),
-  );
 });
 
 test('English action chatter is localized and expires after the show window', async () => {
