@@ -23,6 +23,7 @@ interface SkillsConfig {
 interface ExpertPlugin {
   name: string;
   skillIds: string[];
+  mcpIds?: string[];
 }
 
 function loadSkillsConfig(): SkillsConfig {
@@ -119,6 +120,112 @@ test('skillsConfigIntegrity: expert presets do not reference retired pptx', () =
 
   const offenders = presets.filter(({ plugin }) => (plugin.skillIds ?? []).includes('pptx'));
   expect(offenders.map(({ preset }) => preset)).toEqual([]);
+});
+
+test('skillsConfigIntegrity: bundled preset experts count at least eighteen', () => {
+  const presets = loadPresetPlugins();
+  expect(presets.length).toBeGreaterThanOrEqual(18);
+});
+
+test('skillsConfigIntegrity: expert preset mcpIds are non-empty strings when declared', () => {
+  const presets = loadPresetPlugins();
+  for (const { preset, plugin } of presets) {
+    for (const mcpId of plugin.mcpIds ?? []) {
+      expect(typeof mcpId, `${preset}: invalid mcpId`).toBe('string');
+      expect(mcpId.trim().length, `${preset}: empty mcpId`).toBeGreaterThan(0);
+    }
+  }
+});
+
+function loadCuratedMcpCatalogIds(): Set<string> {
+  const ids = new Set<string>();
+  const bundled = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, 'MCPs/registry.json'), 'utf-8'),
+  ) as { servers?: Array<{ id: string }> };
+  const fallback = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, 'src/renderer/data/mcpRegistry.json'), 'utf-8'),
+  ) as { servers?: Array<{ id: string }> };
+  for (const server of bundled.servers ?? []) ids.add(server.id);
+  for (const server of fallback.servers ?? []) ids.add(server.id);
+  return ids;
+}
+
+test('skillsConfigIntegrity: expert preset mcpIds reference curated local MCP catalog ids', () => {
+  const allowed = loadCuratedMcpCatalogIds();
+  const presets = loadPresetPlugins();
+  const unresolved: string[] = [];
+  for (const { preset, plugin } of presets) {
+    for (const mcpId of plugin.mcpIds ?? []) {
+      if (!allowed.has(mcpId)) unresolved.push(`${preset}:${mcpId}`);
+    }
+  }
+  expect(unresolved).toEqual([]);
+});
+
+test('skillsConfigIntegrity: MCP catalogs exclude abandoned GongRzhe/iflow office packages', () => {
+  const paths = [
+    path.join(repoRoot, 'MCPs/registry.json'),
+    path.join(repoRoot, 'src/renderer/data/mcpRegistry.json'),
+  ];
+  for (const filePath of paths) {
+    const text = fs.readFileSync(filePath, 'utf-8');
+    expect(text.toLowerCase()).not.toContain('gongrzhe');
+    expect(text.toLowerCase()).not.toContain('iflow-mcp');
+  }
+});
+
+test('skillsConfigIntegrity: curated MCP launch commands stay installable and closed by default', () => {
+  const catalogs = [
+    path.join(repoRoot, 'MCPs/registry.json'),
+    path.join(repoRoot, 'src/renderer/data/mcpRegistry.json'),
+  ].map(
+    filePath =>
+      JSON.parse(fs.readFileSync(filePath, 'utf-8')) as {
+        servers: Array<{
+          id: string;
+          command?: string;
+          defaultArgs?: string[];
+          requiredEnvKeys?: string[];
+        }>;
+      },
+  );
+
+  for (const catalog of catalogs) {
+    const byId = new Map(catalog.servers.map(server => [server.id, server]));
+    expect(byId.has('genoffice'), 'genoffice npm package is not published').toBe(false);
+    expect(byId.has('slack')).toBe(false);
+    expect(byId.has('todoist')).toBe(false);
+
+    expect(byId.get('fetch')).toMatchObject({
+      command: 'uvx',
+      defaultArgs: ['mcp-server-fetch'],
+    });
+    expect(byId.get('markitdown-mcp')).toMatchObject({
+      command: 'uvx',
+      defaultArgs: ['markitdown-mcp'],
+    });
+    expect(byId.get('filesystem')?.defaultArgs).toEqual([
+      '-y',
+      '@modelcontextprotocol/server-filesystem',
+    ]);
+    expect(byId.get('lark-mcp')?.requiredEnvKeys).toEqual(['APP_ID', 'APP_SECRET']);
+    expect(byId.get('excel-mcp-server')?.defaultArgs ?? []).not.toContain('.');
+    expect(byId.get('excel-mcp-server')?.argPlaceholders).toEqual([
+      '--allow-dir',
+      '<YOUR_WORK_DIR>',
+    ]);
+    expect(byId.get('gitlab')).toMatchObject({
+      transportType: 'http',
+      url: 'https://gitlab.com/api/v4/mcp',
+    });
+
+    const serialized = JSON.stringify(catalog);
+    expect(serialized).not.toContain('@modelcontextprotocol/server-fetch');
+    expect(serialized).not.toContain('markitdown-mcp-npx');
+    expect(serialized).not.toContain('server-slack');
+    expect(serialized).not.toContain('server-gitlab');
+    expect(serialized.toLowerCase()).not.toContain('gongrzhe');
+  }
 });
 
 test('skillsConfigIntegrity: marketing-campaign-expert uses presentation-studio', () => {

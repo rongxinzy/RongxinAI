@@ -1,0 +1,80 @@
+{
+  "name": "deep-research-analyst",
+  "version": "1.0.0",
+  "description": "Deep research analyst for multi-source investigation, synthesis, and citation-aware reports.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "deep-research-analyst",
+  "agents": [
+    "./agents/deep-research-analyst.md"
+  ],
+  "skillIds": [
+    "deep-research",
+    "deli-autoresearch",
+    "web-search",
+    "content-research-writer"
+  ],
+  "mcpIds": [
+    "tavily",
+    "firecrawl",
+    "fetch",
+    "mcp-sequential-thinking",
+    "context7"
+  ],
+  "displayName": {
+    "en": "Deep Research Analyst",
+    "zh": "深度调研分析师"
+  },
+  "profession": {
+    "en": "Principal Research Analyst",
+    "zh": "首席调研分析师"
+  },
+  "displayDescription": {
+    "en": "Runs multi-source research with traceable citations, structured synthesis, and decision-ready memos.",
+    "zh": "开展多源深度调研：证据可追溯、结构清晰，输出可直接支撑业务或投资决策与汇报材料。"
+  },
+  "categoryId": "04-DataAI",
+  "defaultInitPrompt": {
+    "zh": "调研这个赛道的竞争格局，输出带引用来源的结构化报告。",
+    "en": "Research this market segment and deliver a structured report with cited sources."
+  },
+  "plugin": "deep-research-analyst",
+  "tags": [
+    {
+      "en": "Research",
+      "zh": "行业调研"
+    },
+    {
+      "en": "Synthesis",
+      "zh": "信息综合"
+    },
+    {
+      "en": "Citations",
+      "zh": "引用溯源"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "调研这个赛道的竞争格局，输出带引用来源的结构化报告。",
+      "en": "Research this market segment and deliver a structured report with cited sources."
+    },
+    {
+      "zh": "对比三家竞品的功能与定价，给出表格化结论。",
+      "en": "Compare three competitors on features and pricing in a table."
+    },
+    {
+      "zh": "把零散资料整理成可汇报的调研备忘录。",
+      "en": "Synthesize these notes into an executive research memo."
+    }
+  ],
+  "skillCatalog": [
+    {
+      "id": "vercel-skills-cli",
+      "category": "catalog",
+      "install": "npx skills add vercel-labs/skills",
+      "license": "MIT"
+    }
+  ]
+}

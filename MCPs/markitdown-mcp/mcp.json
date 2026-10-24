@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "markitdown-mcp": {
+      "command": "uvx",
+      "args": ["markitdown-mcp"]
+    }
+  }
+}

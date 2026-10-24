@@ -77,5 +77,10 @@
     "meeting-recap",
     "process-doc",
     "xindaya-translator"
+  ],
+  "mcpIds": [
+    "fetch",
+    "tavily",
+    "markitdown-mcp"
   ]
 }

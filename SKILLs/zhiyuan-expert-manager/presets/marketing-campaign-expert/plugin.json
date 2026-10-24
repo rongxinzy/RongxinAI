@@ -5,12 +5,14 @@
   "author": {
     "name": "ZhiYuan Agent"
   },
-
   "expertType": "agent",
   "agentName": "marketing-campaign-expert",
-
-  "agents": ["./agents/marketing-campaign-expert.md"],
-  "skills": ["./skills/executing-marketing-campaigns"],
+  "agents": [
+    "./agents/marketing-campaign-expert.md"
+  ],
+  "skills": [
+    "./skills/executing-marketing-campaigns"
+  ],
   "skillIds": [
     "web-search",
     "campaign-planner",
@@ -21,7 +23,6 @@
     "presentation-studio",
     "pdf"
   ],
-
   "displayName": {
     "en": "Marketing Campaign Expert",
     "zh": "营销战役专家"
@@ -41,9 +42,18 @@
   },
   "plugin": "marketing-campaign-expert",
   "tags": [
-    { "en": "Campaign Strategy", "zh": "战役策略" },
-    { "en": "Content and Channels", "zh": "内容与渠道" },
-    { "en": "Measurement and ROI", "zh": "衡量与回报" }
+    {
+      "en": "Campaign Strategy",
+      "zh": "战役策略"
+    },
+    {
+      "en": "Content and Channels",
+      "zh": "内容与渠道"
+    },
+    {
+      "en": "Measurement and ROI",
+      "zh": "衡量与回报"
+    }
   ],
   "quickPrompts": [
     {
@@ -57,6 +67,25 @@
     {
       "zh": "分析这份战役数据，计算关键指标，定位问题并给出下一轮优化实验。",
       "en": "Analyze this campaign data, calculate key metrics, identify issues, and propose the next optimization experiments."
+    }
+  ],
+  "mcpIds": [
+    "figma",
+    "figma-remote",
+    "figwright",
+    "fetch"
+  ],
+  "skillCatalog": [
+    {
+      "id": "design-buddy",
+      "category": "design",
+      "install": "npx skills add SpaceZephyr/design-buddy"
+    },
+    {
+      "id": "guizang-ppt-skill",
+      "category": "office",
+      "install": "npx skills add op7418/guizang-ppt-skill",
+      "license": "AGPL-3.0"
     }
   ]
 }

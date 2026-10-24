@@ -1,6 +1,12 @@
 import fs from 'fs';
 import path from 'node:path';
 
+import {
+  buildPythonDependencyPromptBlock,
+  buildSkillCatalogPromptBlock,
+  readPresetExpertPackageMetadata,
+} from '../shared/expert/presetPackageMetadata';
+
 /**
  * Live snapshot of a bundled expert preset read from disk. Bundled presets
  * are file-sourced like regular skills: editing the preset markdown takes
@@ -10,6 +16,8 @@ import path from 'node:path';
 export interface BundledPresetExpertSnapshot {
   promptSnapshot: string;
   skillIds: string[];
+  mcpIds: string[];
+  capabilityPolicy: Record<string, unknown>;
 }
 
 export interface BundledPresetMember {
@@ -145,7 +153,34 @@ export function resolveBundledPresetExpertSnapshot(
     const isMember = leadAgentId !== null && selectedAgentId !== leadAgentId;
     const skillIds = isMember ? [] : resolveSkillIdsFromRegistry(pluginJson, presetDir, skillsRoot);
 
-    return { promptSnapshot, skillIds };
+    const packageMetadata = readPresetExpertPackageMetadata(pluginJson);
+    const pythonBlock = buildPythonDependencyPromptBlock(packageMetadata);
+    if (pythonBlock) {
+      promptSnapshot = `${promptSnapshot}\n\n${pythonBlock}`;
+    }
+    const skillBlock = buildSkillCatalogPromptBlock(packageMetadata.skillCatalog);
+    if (skillBlock) {
+      promptSnapshot = `${promptSnapshot}\n\n${skillBlock}`;
+    }
+
+    const capabilityPolicy: Record<string, unknown> = {};
+    if (packageMetadata.mcpIds.length > 0) capabilityPolicy.mcpIds = packageMetadata.mcpIds;
+    if (packageMetadata.pythonRequirements) {
+      capabilityPolicy.pythonRequirements = packageMetadata.pythonRequirements;
+    }
+    if (packageMetadata.pypiMirrors.length > 0) {
+      capabilityPolicy.pypiMirrors = packageMetadata.pypiMirrors;
+    }
+    if (packageMetadata.skillCatalog.length > 0) {
+      capabilityPolicy.skillCatalog = packageMetadata.skillCatalog;
+    }
+
+    return {
+      promptSnapshot,
+      skillIds,
+      mcpIds: packageMetadata.mcpIds,
+      capabilityPolicy,
+    };
   } catch (error) {
     console.warn(`[PresetExpert] failed to read bundled preset '${presetId}':`, error);
     return null;

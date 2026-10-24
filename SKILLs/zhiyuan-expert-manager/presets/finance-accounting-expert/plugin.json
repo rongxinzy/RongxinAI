@@ -5,11 +5,11 @@
   "author": {
     "name": "ZhiYuan Agent"
   },
-
   "expertType": "agent",
   "agentName": "finance-accounting-expert",
-
-  "agents": ["./agents/finance-accounting-expert.md"],
+  "agents": [
+    "./agents/finance-accounting-expert.md"
+  ],
   "skills": [
     "./skills/finance-workflows",
     "./skills/financial-statements",
@@ -19,8 +19,12 @@
     "./skills/audit-support",
     "./skills/variance-analysis"
   ],
-  "skillIds": ["web-search", "xlsx", "docx", "pdf"],
-
+  "skillIds": [
+    "web-search",
+    "xlsx",
+    "docx",
+    "pdf"
+  ],
   "displayName": {
     "en": "Finance and Accounting Expert",
     "zh": "财务会计专家"
@@ -40,9 +44,18 @@
   },
   "plugin": "finance-accounting-expert",
   "tags": [
-    { "en": "Financial Reporting", "zh": "财务报告" },
-    { "en": "Close and Reconciliation", "zh": "关账与对账" },
-    { "en": "Audit and Variance", "zh": "审计与差异" }
+    {
+      "en": "Financial Reporting",
+      "zh": "财务报告"
+    },
+    {
+      "en": "Close and Reconciliation",
+      "zh": "关账与对账"
+    },
+    {
+      "en": "Audit and Variance",
+      "zh": "审计与差异"
+    }
   ],
   "quickPrompts": [
     {
@@ -56,6 +69,25 @@
     {
       "zh": "请分析实际与预算差异，拆解主要驱动并生成管理层可用的差异说明。",
       "en": "Analyze actual versus budget, decompose the main drivers, and prepare management-ready variance commentary."
+    }
+  ],
+  "mcpIds": [
+    "excel-mcp-server",
+    "fetch",
+    "lark-mcp"
+  ],
+  "pythonRequirements": {
+    "dependencies": [
+      "pandas>=2.2.0",
+      "openpyxl>=3.1.0"
+    ]
+  },
+  "skillCatalog": [
+    {
+      "id": "anthropic-document-skills",
+      "category": "office",
+      "install": "npx skills add anthropics/skills",
+      "license": "see-repo"
     }
   ]
 }

@@ -1,0 +1,77 @@
+{
+  "name": "python-fullstack-dev",
+  "version": "1.0.0",
+  "description": "Python backend and API development expert for services, data layers, and production readiness.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "python-fullstack-dev",
+  "agents": [
+    "./agents/python-fullstack-dev.md"
+  ],
+  "skillIds": [
+    "code-safety-audit",
+    "code-arch-optimizer",
+    "smart-commit-gen",
+    "log-diagnostic",
+    "web-search"
+  ],
+  "mcpIds": [
+    "filesystem",
+    "memory",
+    "mcp-sequential-thinking",
+    "context7",
+    "github",
+    "chrome-devtools-mcp"
+  ],
+  "pythonRequirements": {
+    "requirementsPath": "./requirements.txt"
+  },
+  "displayName": {
+    "en": "Python Full-Stack Dev",
+    "zh": "Python 全栈开发专家"
+  },
+  "profession": {
+    "en": "Senior Python Engineer",
+    "zh": "高级 Python 工程师"
+  },
+  "displayDescription": {
+    "en": "Designs and ships Python APIs and services with tests, observability, and secure dependency practices.",
+    "zh": "负责 Python 服务与 API 的设计实现，强调测试、可观测性与安全的依赖安装策略。"
+  },
+  "categoryId": "02-Engineering",
+  "defaultInitPrompt": {
+    "zh": "帮我设计并实现一个 FastAPI 服务骨架，并说明如何安装 Python 依赖。",
+    "en": "Design a FastAPI service skeleton and explain how to install Python dependencies."
+  },
+  "plugin": "python-fullstack-dev",
+  "tags": [
+    {
+      "en": "Python",
+      "zh": "Python"
+    },
+    {
+      "en": "API Design",
+      "zh": "API 设计"
+    },
+    {
+      "en": "Backend",
+      "zh": "后端开发"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "帮我设计并实现一个 FastAPI 服务骨架，并说明如何安装 Python 依赖。",
+      "en": "Design a FastAPI service skeleton and explain how to install Python dependencies."
+    },
+    {
+      "zh": "审查这段 Python 代码的安全与架构问题，给出可执行的修改建议。",
+      "en": "Review this Python code for security and architecture issues with actionable fixes."
+    },
+    {
+      "zh": "根据错误日志定位线上异常根因，并给出修复步骤。",
+      "en": "Use these logs to find the root cause and outline fix steps."
+    }
+  ]
+}

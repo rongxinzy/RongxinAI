@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "lark-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@larksuiteoapi/lark-mcp",
+        "mcp",
+        "-l",
+        "zh"
+      ]
+    }
+  }
+}

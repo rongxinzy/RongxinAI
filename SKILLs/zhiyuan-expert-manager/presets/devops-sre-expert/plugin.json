@@ -1,0 +1,73 @@
+{
+  "name": "devops-sre-expert",
+  "version": "1.0.0",
+  "description": "DevOps/SRE expert for CI/CD, observability, incident response, and infrastructure hygiene.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "devops-sre-expert",
+  "agents": [
+    "./agents/devops-sre-expert.md"
+  ],
+  "skillIds": [
+    "git-repo-audit",
+    "log-diagnostic",
+    "code-safety-audit",
+    "smart-commit-gen"
+  ],
+  "mcpIds": [
+    "github",
+    "gitlab",
+    "context7",
+    "playwright",
+    "chrome-devtools-mcp",
+    "filesystem"
+  ],
+  "displayName": {
+    "en": "DevOps SRE Expert",
+    "zh": "DevOps 运维专家"
+  },
+  "profession": {
+    "en": "Site Reliability Engineer",
+    "zh": "站点可靠性工程师"
+  },
+  "displayDescription": {
+    "en": "Improves delivery pipelines, observability, and incident runbooks with security-aware operations.",
+    "zh": "优化 CI/CD、可观测性与故障应急手册，兼顾安全合规、发布稳定性与快速回滚能力。"
+  },
+  "categoryId": "02-Engineering",
+  "defaultInitPrompt": {
+    "zh": "审查这份 GitHub Actions 流水线并提出可靠性改进建议。",
+    "en": "Review this GitHub Actions pipeline and suggest reliability improvements."
+  },
+  "plugin": "devops-sre-expert",
+  "tags": [
+    {
+      "en": "CI/CD",
+      "zh": "持续交付"
+    },
+    {
+      "en": "SRE",
+      "zh": "可靠性"
+    },
+    {
+      "en": "Incidents",
+      "zh": "故障响应"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "审查这份 GitHub Actions 流水线并提出可靠性改进建议。",
+      "en": "Review this GitHub Actions pipeline and suggest reliability improvements."
+    },
+    {
+      "zh": "根据告警日志写一份事故时间线与缓解步骤。",
+      "en": "Draft an incident timeline and mitigation steps from these alert logs."
+    },
+    {
+      "zh": "给出生产环境配置漂移的检查清单。",
+      "en": "Provide a checklist for detecting production configuration drift."
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "figwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@figwright/mcp@latest"
+      ]
+    }
+  }
+}

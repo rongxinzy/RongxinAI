@@ -730,6 +730,42 @@ export const PRESET_EXPERT_AVATARS: Record<string, PresetExpertAvatarStyle> = {
     iconColor: 'oklch(0.88 0.11 210)',
     Artwork: ReactDevArt,
   },
+  'python-fullstack-dev': {
+    icon: Terminal,
+    background: tile('linear-gradient(135deg, oklch(0.4 0.1 155), oklch(0.28 0.08 165))'),
+  },
+  'presentation-designer': {
+    icon: Presentation,
+    background: tile('linear-gradient(135deg, oklch(0.46 0.14 35), oklch(0.34 0.12 25))'),
+  },
+  'deep-research-analyst': {
+    icon: Microscope,
+    background: tile('linear-gradient(135deg, oklch(0.42 0.11 250), oklch(0.3 0.09 260))'),
+  },
+  'process-automation-expert': {
+    icon: Zap,
+    background: tile('linear-gradient(135deg, oklch(0.45 0.13 85), oklch(0.32 0.1 75))'),
+  },
+  'document-engineering-expert': {
+    icon: FileCode2,
+    background: tile('linear-gradient(135deg, oklch(0.44 0.08 210), oklch(0.32 0.07 220))'),
+  },
+  'local-inference-guide': {
+    icon: Cpu,
+    background: tile('linear-gradient(135deg, oklch(0.4 0.09 290), oklch(0.28 0.08 300))'),
+  },
+  'product-requirements-expert': {
+    icon: Compass,
+    background: tile('linear-gradient(135deg, oklch(0.46 0.12 55), oklch(0.34 0.1 45))'),
+  },
+  'devops-sre-expert': {
+    icon: Cloud,
+    background: tile('linear-gradient(135deg, oklch(0.42 0.1 230), oklch(0.3 0.08 240))'),
+  },
+  'academic-writing-expert': {
+    icon: BookOpen,
+    background: tile('linear-gradient(135deg, oklch(0.44 0.09 25), oklch(0.32 0.08 15))'),
+  },
 };
 
 // ============================================================================
