@@ -11,6 +11,7 @@ const api: CompanionWindowApi = {
   submitTask: request => ipcRenderer.invoke(IpcChannel.SubmitTask, request),
   tasks: () => ipcRenderer.invoke(IpcChannel.Tasks),
   stopTask: sessionId => ipcRenderer.invoke(IpcChannel.StopTask, sessionId),
+  chooseWorkspace: () => ipcRenderer.invoke(IpcChannel.ChooseWorkspace),
   hide: () => ipcRenderer.invoke(IpcChannel.Hide),
   openWorkbench: sessionId => ipcRenderer.invoke(IpcChannel.OpenWorkbench, sessionId),
   onContext: listener => {
@@ -25,10 +26,8 @@ const api: CompanionWindowApi = {
     return () => ipcRenderer.removeListener(IpcChannel.Visibility, handle);
   },
   onTasks: listener => {
-    const handle = (
-      _event: Electron.IpcRendererEvent,
-      payload: { petId: string; tasks: Parameters<typeof listener>[1] },
-    ) => listener(payload.petId, payload.tasks);
+    const handle = (_event: Electron.IpcRendererEvent, payload: Parameters<typeof listener>[0]) =>
+      listener(payload);
     ipcRenderer.on(IpcChannel.TasksChanged, handle);
     return () => ipcRenderer.removeListener(IpcChannel.TasksChanged, handle);
   },

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   register: vi.fn(() => true),
   unregister: vi.fn(),
+  choose: vi.fn(async () => ({ canceled: true, filePaths: [] as string[] })),
   windows: [] as FakeWindow[],
 }));
 
@@ -49,6 +50,7 @@ vi.mock('electron', () => ({
     return new FakeWindow(options);
   }),
   globalShortcut: { register: mocks.register, unregister: mocks.unregister },
+  dialog: { showOpenDialog: mocks.choose },
   ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => unknown) =>
       mocks.handlers.set(channel, handler),
@@ -95,11 +97,12 @@ function fixture() {
   };
   const onProfileChanged = vi.fn();
   const tasks = {
-    recent: vi.fn(() => []),
+    snapshot: vi.fn((petId: string) => ({ petId, revision: 1, tasks: [] })),
     workspaces: vi.fn(() => []),
     owned: vi.fn(() => false),
     onChanged: vi.fn(() => vi.fn()),
     submit: vi.fn(),
+    chooseWorkspace: vi.fn(async () => ({ id: 'workspace', name: 'Chosen folder' })),
   };
   const openTask = vi.fn();
   initializeCompanionWindow({
@@ -190,10 +193,29 @@ test('the bridge exposes profile state and the workbench without general applica
   expect(f.onProfileChanged).toHaveBeenCalledWith(f.profile);
   await f.invoke(IpcChannel.OpenWorkbench);
   expect(f.main.focus).toHaveBeenCalledOnce();
-  expect(mocks.handlers.size).toBe(10);
+  expect(mocks.handlers.size).toBe(11);
   disposeCompanionWindow();
   expect(mocks.handlers.size).toBe(0);
   expect(mocks.unregister).toHaveBeenCalledWith(COMPANION_SHORTCUT);
+});
+
+test('workspace picking accepts paths only from its native dialog and cancellation is inert', async () => {
+  const f = fixture();
+  await expect(
+    mocks.handlers.get(IpcChannel.ChooseWorkspace)!({ sender: {}, senderFrame: {} }),
+  ).rejects.toThrow('owned main frame');
+  expect(mocks.choose).not.toHaveBeenCalled();
+  expect(await f.invoke(IpcChannel.ChooseWorkspace)).toBeNull();
+  expect(f.tasks.chooseWorkspace).not.toHaveBeenCalled();
+  mocks.choose.mockResolvedValueOnce({ canceled: false, filePaths: ['/chosen/folder'] });
+  expect(await f.invoke(IpcChannel.ChooseWorkspace)).toEqual({
+    id: 'workspace',
+    name: 'Chosen folder',
+  });
+  expect(f.tasks.chooseWorkspace).toHaveBeenCalledWith('/chosen/folder');
+  await expect(f.invoke(IpcChannel.ChooseWorkspace, '/renderer/path')).rejects.toThrow(
+    'invalid arguments',
+  );
 });
 
 test('task navigation checks active companion ownership and does not run the task again', async () => {

@@ -32,7 +32,9 @@ for (const theme of ['light', 'dark']) {
     await expect(input).toHaveValue('');
     const task = page.getByRole('button', { name: new RegExp(original) });
     await expect(task).toContainText('已受理');
-    const [accepted] = await page.evaluate(() => window.companion.tasks());
+    const {
+      tasks: [accepted],
+    } = await page.evaluate(() => window.companion.tasks());
     await task.click();
     await expect(page.locator('html')).toHaveAttribute(
       'data-companion-task',
@@ -68,7 +70,7 @@ test('unavailable task execution preserves draft, workspace and request key', as
     ),
   ).toBe(draft);
   await expect(input).toHaveValue('下次有模型时，再处理这份项目。');
-  expect(await page.evaluate(() => window.companion.tasks())).toEqual([]);
+  expect((await page.evaluate(() => window.companion.tasks())).tasks).toEqual([]);
 });
 
 test('task state events are scoped to their companion and late admission never clears a newer draft', async ({
@@ -107,13 +109,17 @@ test('task state events are scoped to their companion and late admission never c
   await expect(task).toContainText('已受理');
   await expect(input).toHaveValue('Keep this next task');
   await page.evaluate(async status => {
-    const [task] = await window.companion.tasks();
-    window.tasksChanged('another-pet', [{ ...task, status }]);
+    const snapshot = await window.companion.tasks();
+    window.tasksChanged({
+      ...snapshot,
+      petId: '00000000-0000-4000-8000-000000000002',
+      tasks: snapshot.tasks.map(task => ({ ...task, status })),
+    });
   }, WorkbenchRunStatus.WaitingApproval);
   await expect(task).toContainText('已受理');
   await page.evaluate(async status => {
-    const [task] = await window.companion.tasks();
-    window.tasksChanged(task.receipt.petId, [{ ...task, status }]);
+    const snapshot = await window.companion.tasks();
+    window.tasksChanged({ ...snapshot, tasks: snapshot.tasks.map(task => ({ ...task, status })) });
   }, WorkbenchRunStatus.WaitingApproval);
   await expect(task).toContainText('需要确认');
   await expect(input).toHaveValue('Keep this next task');
@@ -175,4 +181,36 @@ test('task workspace, draft and open selector survive hot appearance changes at 
   );
   await page.keyboard.press('Escape');
   await expect(input).toHaveValue('Keep this task draft and workspace while appearance changes');
+});
+
+test('a first-time task can choose its folder without losing text edited while the picker is pending', async ({
+  page,
+}) => {
+  await page.goto('/companion.html?noWorkspace=1');
+  await page.getByRole('tab', { name: '交代任务', exact: true }).click();
+  const input = page.getByRole('textbox');
+  await input.fill('Original draft');
+  await page.evaluate(() => {
+    const choose = window.companion.chooseWorkspace;
+    window.companion.chooseWorkspace = async () => {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return choose();
+    };
+  });
+  await page.getByRole('button', { name: '选择文件夹', exact: true }).click();
+  await expect(page.getByRole('button', { name: '开始任务', exact: true })).toBeDisabled();
+  await input.fill('Keep this newer task');
+  await expect(page.getByRole('combobox', { name: '工作区', exact: true })).toContainText(
+    'Preview project',
+  );
+  await expect(input).toHaveValue('Keep this newer task');
+  await input.press('Enter');
+  await expect(page.getByRole('button', { name: /Keep this newer task/ })).toContainText('已受理');
+  await input.fill('This stays after cancellation');
+  await page.evaluate(() => (window.companion.chooseWorkspace = async () => null));
+  await page.getByRole('button', { name: '选择文件夹', exact: true }).click();
+  await expect(input).toHaveValue('This stays after cancellation');
+  await expect(page.getByRole('combobox', { name: '工作区', exact: true })).toContainText(
+    'Preview project',
+  );
 });

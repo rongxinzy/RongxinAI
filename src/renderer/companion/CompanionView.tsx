@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { X, PanelLeft, Square } from 'lucide-react';
+import { X, PanelLeft, Square, FolderOpen } from 'lucide-react';
 import { WorkbenchRunStatus } from '../../shared/workbenchTask';
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
@@ -29,6 +29,7 @@ import PageHeader from '../components/PageHeader';
 import { i18nService } from '../services/i18n';
 import { themeService } from '../services/theme';
 import { readCompanionDraft, writeCompanionDraft } from './draft';
+import { useTaskSnapshots } from './useTaskSnapshots';
 
 function applyContext(context: CompanionWindowContext): void {
   i18nService.setLanguage(context.language, { persist: false });
@@ -38,44 +39,63 @@ function applyContext(context: CompanionWindowContext): void {
 
 export function CompanionView() {
   const [state, setState] = useState<CompanionWindowState | null>(null);
-  const [draft, setDraft] = useState<ReturnType<typeof readCompanionDraft>>({
+  const { remember: rememberTasks, update: updateTasks } = useTaskSnapshots(setState);
+  const [draft, setDraft] = useState<ReturnType<typeof readCompanionDraft>>(() => ({
     text: '',
     requestId: crypto.randomUUID(),
-  });
+  }));
   const [sending, setSending] = useState(false);
+  const [choosingWorkspace, setChoosingWorkspace] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [visible, setVisible] = useState(true);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const [, languageChanged] = useState(0);
   const revision = useRef(0);
   const activeId = useRef<string | null>(null);
+  const draftRef = useRef(draft);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const t = (key: string) => i18nService.t(key);
   const taskMode = draft.mode === CompanionComposerMode.Task;
   const cancelPendingLoad = useCallback(() => {
     revision.current++;
   }, []);
-  const load = useCallback(async (petId?: string) => {
-    const current = ++revision.current;
-    const api = window.companion;
-    if (!api) {
-      setError('companionLoadFailed');
-      return;
-    }
-    try {
-      const next = petId ? await api.select(petId) : await api.bootstrap();
-      if (revision.current !== current) return;
-      applyContext(next.context);
-      if (activeId.current !== next.activePetId) {
-        activeId.current = next.activePetId;
-        setDraft(readCompanionDraft(next.activePetId));
+  const replaceDraft = useCallback(
+    (next: ReturnType<typeof readCompanionDraft>, petId?: string) => {
+      draftRef.current = next;
+      if (petId) writeCompanionDraft(petId, next);
+      setDraft(next);
+    },
+    [],
+  );
+  const load = useCallback(
+    async (petId?: string) => {
+      const current = ++revision.current;
+      const api = window.companion;
+      if (!api) {
+        setError('companionLoadFailed');
+        return;
       }
-      setState(next);
-      setError(null);
-    } catch {
-      if (revision.current === current) setError('companionLoadFailed');
-    }
-  }, []);
+      try {
+        const next = petId ? await api.select(petId) : await api.bootstrap();
+        if (revision.current !== current) return;
+        applyContext(next.context);
+        if (activeId.current !== next.activePetId) {
+          activeId.current = next.activePetId;
+          replaceDraft(readCompanionDraft(next.activePetId));
+        }
+        const snapshot = rememberTasks({
+          petId: next.activePetId,
+          revision: next.taskRevision,
+          tasks: next.tasks,
+        });
+        setState({ ...next, tasks: snapshot.tasks, taskRevision: snapshot.revision });
+        setError(null);
+      } catch {
+        if (revision.current === current) setError('companionLoadFailed');
+      }
+    },
+    [replaceDraft, rememberTasks],
+  );
 
   useEffect(() => {
     void load();
@@ -85,11 +105,7 @@ export function CompanionView() {
       setVisible(next);
       if (next) textarea.current?.focus();
     });
-    const unsubscribeTasks = window.companion?.onTasks((petId, tasks) => {
-      setState(current =>
-        current && current.activePetId === petId ? { ...current, tasks } : current,
-      );
-    });
+    const unsubscribeTasks = window.companion?.onTasks(updateTasks);
     const keydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented) {
         event.preventDefault();
@@ -105,7 +121,7 @@ export function CompanionView() {
       unsubscribeTasks?.();
       document.removeEventListener('keydown', keydown);
     };
-  }, [load, cancelPendingLoad]);
+  }, [load, cancelPendingLoad, updateTasks]);
 
   const pending = state?.conversation.pending;
   useEffect(() => {
@@ -141,15 +157,15 @@ export function CompanionView() {
   }, [pending, visible, load]);
 
   const updateDraft = (text: string, patch: Partial<typeof draft> = {}) => {
-    const next = { ...draft, ...patch, text, requestId: crypto.randomUUID() };
-    setDraft(next);
-    if (activeId.current) writeCompanionDraft(activeId.current, next);
+    const next = { ...draftRef.current, ...patch, text, requestId: crypto.randomUUID() };
+    replaceDraft(next, activeId.current ?? undefined);
   };
 
   const submit = async () => {
+    if (taskMode && choosingWorkspace) return;
     if (!state || !draft.text.trim() || sending || (!taskMode && pending) || !window.companion)
       return;
-    const sent = draft;
+    const sent = draftRef.current;
     const petId = state.activePetId;
     setSending(true);
     setError(null);
@@ -169,16 +185,9 @@ export function CompanionView() {
           setError('companionNoModel');
           return;
         }
-        setDraft(current => {
-          if (current.requestId !== sent.requestId) return current;
-          const next = { ...current, text: '', requestId: crypto.randomUUID() };
-          writeCompanionDraft(petId, next);
-          return next;
-        });
-        const tasks = await window.companion.tasks();
-        setState(current =>
-          current && current.activePetId === petId ? { ...current, tasks } : current,
-        );
+        if (activeId.current === petId && draftRef.current.requestId === sent.requestId)
+          replaceDraft({ ...draftRef.current, text: '', requestId: crypto.randomUUID() }, petId);
+        updateTasks(await window.companion.tasks());
         return;
       }
       const result = await window.companion.submit({ requestId: sent.requestId, text: sent.text });
@@ -187,12 +196,8 @@ export function CompanionView() {
         setError('companionNoModel');
         return;
       }
-      setDraft(current => {
-        if (current.requestId !== sent.requestId) return current;
-        const next = { ...current, text: '', requestId: crypto.randomUUID() };
-        writeCompanionDraft(petId, next);
-        return next;
-      });
+      if (activeId.current === petId && draftRef.current.requestId === sent.requestId)
+        replaceDraft({ ...draftRef.current, text: '', requestId: crypto.randomUUID() }, petId);
       setState(
         current =>
           current && {
@@ -221,6 +226,34 @@ export function CompanionView() {
       await load();
     } catch {
       setError('companionFailed');
+    }
+  };
+
+  const chooseWorkspace = async () => {
+    if (!state || sending || choosingWorkspace || !window.companion) return;
+    const petId = state.activePetId;
+    setChoosingWorkspace(true);
+    try {
+      const workspace = await window.companion.chooseWorkspace();
+      if (!workspace) return;
+      setState(
+        current =>
+          current && {
+            ...current,
+            workspaces: [...current.workspaces.filter(item => item.id !== workspace.id), workspace],
+          },
+      );
+      if (activeId.current !== petId) return;
+      replaceDraft(
+        { ...draftRef.current, workspaceId: workspace.id, requestId: crypto.randomUUID() },
+        petId,
+      );
+      setError(null);
+      textarea.current?.focus();
+    } catch {
+      if (activeId.current === petId) setError('companionPickFolderFailed');
+    } finally {
+      setChoosingWorkspace(false);
     }
   };
 
@@ -253,7 +286,7 @@ export function CompanionView() {
       <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
         <Select
           value={state?.activePetId ?? ''}
-          disabled={!state || sending || Boolean(pending)}
+          disabled={!state || sending || choosingWorkspace || Boolean(pending)}
           onValueChange={id => {
             if (id) void load(id);
           }}
@@ -328,12 +361,7 @@ export function CompanionView() {
                       onClick={async () => {
                         try {
                           await window.companion!.stopTask(task.receipt.sessionId);
-                          const tasks = await window.companion!.tasks();
-                          setState(current =>
-                            current?.activePetId === task.receipt.petId
-                              ? { ...current, tasks }
-                              : current,
-                          );
+                          updateTasks(await window.companion!.tasks());
                         } catch {
                           setError('companionTaskStopFailed');
                         }
@@ -372,37 +400,51 @@ export function CompanionView() {
       <div className="flex shrink-0 flex-col gap-3 px-4 pb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <FluidTabs
-            disabled={sending}
+            disabled={!state || sending || choosingWorkspace}
             aria-label={t('companionInputMode')}
             value={taskMode ? CompanionComposerMode.Task : CompanionComposerMode.Chat}
-            onValueChange={mode => updateDraft(draft.text, { mode })}
+            onValueChange={mode => updateDraft(draftRef.current.text, { mode })}
             items={[
               { value: CompanionComposerMode.Chat, label: t('companionModeChat') },
               { value: CompanionComposerMode.Task, label: t('companionModeTask') },
             ]}
           />
           {taskMode ? (
-            <Select
-              value={draft.workspaceId ?? ''}
-              disabled={!state || sending}
-              onValueChange={id => {
-                if (id) updateDraft(draft.text, { workspaceId: id });
-              }}
-            >
-              <SelectTrigger className="w-44" aria-label={t('companionWorkspace')}>
-                <SelectValue>
-                  {state?.workspaces.find(workspace => workspace.id === draft.workspaceId)?.name ??
-                    t('companionChooseWorkspace')}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent listLabel={t('companionWorkspace')} portalContainer={portalContainer}>
-                {state?.workspaces.map(workspace => (
-                  <SelectItem key={workspace.id} value={workspace.id}>
-                    {workspace.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select
+                value={draft.workspaceId ?? ''}
+                disabled={!state || sending || choosingWorkspace}
+                onValueChange={id => {
+                  if (id) updateDraft(draftRef.current.text, { workspaceId: id });
+                }}
+              >
+                <SelectTrigger className="w-44" aria-label={t('companionWorkspace')}>
+                  <SelectValue>
+                    {state?.workspaces.find(workspace => workspace.id === draft.workspaceId)
+                      ?.name ?? t('companionChooseWorkspace')}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  listLabel={t('companionWorkspace')}
+                  portalContainer={portalContainer}
+                >
+                  {state?.workspaces.map(workspace => (
+                    <SelectItem key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('companionPickFolder')}
+                disabled={!state || sending || choosingWorkspace}
+                onClick={() => void chooseWorkspace()}
+              >
+                <FolderOpen />
+              </Button>
+            </div>
           ) : null}
         </div>
         {error ? (
@@ -435,7 +477,12 @@ export function CompanionView() {
             <span />
             <PromptInputSubmit
               status={pending && !taskMode ? 'streaming' : 'ready'}
-              disabled={!state || sending || ((!pending || taskMode) && !draft.text.trim())}
+              disabled={
+                !state ||
+                sending ||
+                (taskMode && choosingWorkspace) ||
+                ((!pending || taskMode) && !draft.text.trim())
+              }
               onStop={() => void stop()}
               aria-label={t(
                 pending && !taskMode

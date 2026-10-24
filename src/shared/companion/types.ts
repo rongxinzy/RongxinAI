@@ -4,6 +4,7 @@ import type {
   CompanionTaskResult,
   CompanionTaskProjection,
   CompanionWorkspace,
+  CompanionTaskSnapshot,
 } from './tasks';
 import type {
   CompanionCapability,
@@ -65,6 +66,7 @@ export interface CompanionWindowState {
   shortcutAvailable: boolean;
   workspaces: CompanionWorkspace[];
   tasks: CompanionTaskProjection[];
+  taskRevision: number;
 }
 
 export interface CompanionWindowApi {
@@ -77,11 +79,12 @@ export interface CompanionWindowApi {
   answer(receipt: CompanionReceipt): Promise<CompanionAnswer>;
   stop(): Promise<void>;
   submitTask(request: CompanionTaskRequest): Promise<CompanionTaskResult>;
-  tasks(): Promise<CompanionTaskProjection[]>;
+  tasks(): Promise<CompanionTaskSnapshot>;
   stopTask(sessionId: string): Promise<void>;
+  chooseWorkspace(): Promise<CompanionWorkspace | null>;
   hide(): Promise<void>;
   openWorkbench(sessionId?: string): Promise<void>;
   onContext(listener: (context: CompanionWindowContext) => void): () => void;
   onVisibility(listener: (visible: boolean) => void): () => void;
-  onTasks(listener: (petId: string, tasks: CompanionTaskProjection[]) => void): () => void;
+  onTasks(listener: (snapshot: CompanionTaskSnapshot) => void): () => void;
 }

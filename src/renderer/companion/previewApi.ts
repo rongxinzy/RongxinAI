@@ -23,6 +23,14 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
   const requests = new Map<string, { receipt: CompanionReceipt; text: string; at: number }>();
   let sequence = 0;
   const tasks = new Map<string, CompanionTaskProjection[]>();
+  let taskRevision = 0;
+  const taskSnapshot = () => ({
+    petId: active,
+    revision: ++taskRevision,
+    tasks: tasks.get(active) ?? [],
+  });
+  const workspaces =
+    params.get('noWorkspace') === '1' ? [] : [{ id: 'preview-workspace', name: 'Preview project' }];
   const context: CompanionWindowContext = {
     language: params.get('language') === 'en' ? 'en' : 'zh',
     theme: params.get('theme') === 'dark' ? 'dark' : 'light',
@@ -41,8 +49,9 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
     profiles,
     availability,
     shortcutAvailable: true,
-    workspaces: [{ id: 'preview-workspace', name: 'Preview project' }],
+    workspaces,
     tasks: tasks.get(active) ?? [],
+    taskRevision: ++taskRevision,
     conversation: {
       messages: messages.get(active) ?? [],
       pending: requests.get(active)?.receipt ?? null,
@@ -107,7 +116,12 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
       ]);
       return { receipt };
     },
-    tasks: async () => tasks.get(active) ?? [],
+    tasks: async () => taskSnapshot(),
+    chooseWorkspace: async () => {
+      const selected = { id: 'preview-workspace', name: 'Preview project' };
+      if (!workspaces.length) workspaces.push(selected);
+      return selected;
+    },
     stopTask: async sessionId => {
       tasks.set(
         active,

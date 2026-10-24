@@ -7,6 +7,7 @@ import {
   companionTaskProjection,
   companionTaskResult,
   companionWorkspace,
+  companionTaskSnapshot,
 } from './tasks';
 import {
   CompanionCapability,
@@ -47,6 +48,7 @@ const state = z.object({
   shortcutAvailable: z.boolean(),
   workspaces: z.array(companionWorkspace),
   tasks: z.array(companionTaskProjection),
+  taskRevision: z.number().int().nonnegative(),
   conversation: z.object({
     messages: z.array(
       z.object({ id: z.number(), role: z.enum(['user', 'assistant']), text: z.string() }),
@@ -83,7 +85,12 @@ export const companionContract = defineIpcContract({
     args: z.tuple([companionTaskRequest]),
     result: companionTaskResult,
   },
-  tasks: { channel: IpcChannel.Tasks, args: z.tuple([]), result: z.array(companionTaskProjection) },
+  tasks: { channel: IpcChannel.Tasks, args: z.tuple([]), result: companionTaskSnapshot },
+  chooseWorkspace: {
+    channel: IpcChannel.ChooseWorkspace,
+    args: z.tuple([]),
+    result: companionWorkspace.nullable(),
+  },
   stopTask: { channel: IpcChannel.StopTask, args: z.tuple([z.uuid()]), result: z.void() },
   hide: { channel: IpcChannel.Hide, args: z.tuple([]), result: z.void() },
   openWorkbench: {

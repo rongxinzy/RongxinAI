@@ -1,4 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
+import { mkdtemp, writeFile, rm, realpath } from 'node:fs/promises';
 import { CompanionTasks } from './tasks';
 import { createCoworkStoreHarness } from '../coworkStore/coworkStore.testHarness';
 import { initializeWorkbenchTaskSchema } from '../workbenchTask/schema';
@@ -175,6 +176,18 @@ test('stop uses the owned native session while foreign ownership cannot stop it'
   expect(f.start).toHaveBeenCalledOnce();
 });
 
+test('metadata reads preserve order across native status changes', async () => {
+  const f = fixture();
+  const { receipt } = await f.service.submit(f.profile, f.request);
+  const before = f.service.snapshot(f.profile.petId);
+  f.service.stop(f.profile.petId, receipt!.sessionId);
+  const after = f.service.snapshot(f.profile.petId);
+  expect(after.revision).toBeGreaterThan(before.revision);
+  expect(before.tasks[0].status).toBe(WorkbenchRunStatus.Queued);
+  expect(after.tasks[0].status).toBe(WorkbenchRunStatus.Cancelled);
+  expect(f.service.snapshot('another-pet').tasks).toEqual([]);
+});
+
 test('a workbench retry remains the same task and projects the latest run after completion', async () => {
   const f = fixture();
   const { receipt } = await f.service.submit(f.profile, f.request);
@@ -200,4 +213,22 @@ test('a workbench retry remains the same task and projects the latest run after 
   expect(projection.receipt.taskId).toBe(first.id);
   expect(projection.status).toBe(WorkbenchRunStatus.Succeeded);
   expect(f.db.prepare('SELECT count(*) AS n FROM workbench_tasks').get()).toEqual({ n: 1 });
+});
+
+test('a native folder choice becomes visible without exposing filesystem paths in its result', async () => {
+  const f = fixture();
+  const directory = await realpath(await mkdtemp('/tmp/companion-folder-choice-'));
+  try {
+    const hidden = f.store.ensureWorkspace(directory, 'Chosen project', true);
+    expect(f.service.workspaces().find(item => item.id === hidden.id)).toBeUndefined();
+    const selected = await f.service.chooseWorkspace(directory);
+    expect(selected).toEqual({ id: hidden.id, name: 'Chosen project' });
+    expect(f.service.workspaces()).toContainEqual(selected);
+    await writeFile(directory + '/file.txt', 'fixture');
+    await expect(f.service.chooseWorkspace(directory + '/file.txt')).rejects.toThrow(
+      'must be a directory',
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

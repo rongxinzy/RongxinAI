@@ -30,8 +30,14 @@ export const companionTaskResult = z.object({
   reason: z.enum(Object.values(CompanionUnavailableReason)).optional(),
 });
 export const companionWorkspace = z.object({ id: z.string(), name: z.string() });
+export const companionTaskSnapshot = z.object({
+  petId: z.uuid(),
+  revision: z.number().int().nonnegative(),
+  tasks: z.array(companionTaskProjection),
+});
 export type CompanionTaskRequest = z.infer<typeof companionTaskRequest>;
 export type CompanionTaskReceipt = z.infer<typeof companionTaskReceipt>;
 export type CompanionTaskProjection = z.infer<typeof companionTaskProjection>;
 export type CompanionTaskResult = z.infer<typeof companionTaskResult>;
 export type CompanionWorkspace = z.infer<typeof companionWorkspace>;
+export type CompanionTaskSnapshot = z.infer<typeof companionTaskSnapshot>;

@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { app, BrowserWindow, globalShortcut, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen } from 'electron';
 import { COMPANION_PAGE, COMPANION_SHORTCUT } from '../../shared/companion/constants';
 import { companionContract } from '../../shared/companion/contract';
 import { CompanionIpc as IpcChannel } from '../../shared/ipc/channels';
@@ -29,6 +29,7 @@ let window: BrowserWindow | null = null;
 let shortcutAvailable = false;
 let unsubscribe: (() => void) | undefined;
 let unsubscribeTasks: (() => void) | undefined;
+let choosingWorkspace = false;
 
 export function isCompanionWindow(candidate: BrowserWindow): boolean {
   return candidate === window;
@@ -59,14 +60,17 @@ async function snapshot(): Promise<CompanionWindowState> {
   const identities = profiles.snapshot();
   const active = identities.profiles.find(profile => profile.petId === identities.activePetId)!;
   const availability = await runtime.resume(active);
+  const conversation = await runtime.history(active);
+  const taskSnapshot = options.getTasks().snapshot(active.petId);
   return {
     ...identities,
     context: preferences(),
     availability,
     shortcutAvailable,
-    conversation: await runtime.history(active),
+    conversation,
     workspaces: options.getTasks().workspaces(),
-    tasks: options.getTasks().recent(active.petId),
+    tasks: taskSnapshot.tasks,
+    taskRevision: taskSnapshot.revision,
   };
 }
 
@@ -104,6 +108,22 @@ export function initializeCompanionWindow(next: Options): void {
     return result;
   };
   handleIpcContract(companionContract, {
+    chooseWorkspace: async event => {
+      assertWindow(event);
+      if (choosingWorkspace) throw new Error('A workspace dialog is already open');
+      choosingWorkspace = true;
+      try {
+        const selection = await dialog.showOpenDialog(window!, {
+          title: t('companionPickFolder'),
+          properties: ['openDirectory', 'createDirectory'],
+        });
+        assertWindow(event);
+        if (selection.canceled || !selection.filePaths[0]) return null;
+        return await next.getTasks().chooseWorkspace(selection.filePaths[0]);
+      } finally {
+        choosingWorkspace = false;
+      }
+    },
     bootstrap: event => serialized(event, snapshot),
     select: (event, petId) =>
       serialized(event, () => {
@@ -131,7 +151,9 @@ export function initializeCompanionWindow(next: Options): void {
         next.getTasks().submit(next.getCompanions().profiles.active(), request),
       ),
     tasks: event =>
-      serialized(event, () => next.getTasks().recent(next.getCompanions().profiles.active().petId)),
+      serialized(event, () =>
+        next.getTasks().snapshot(next.getCompanions().profiles.active().petId),
+      ),
     stopTask: (event, sessionId) =>
       serialized(event, () =>
         next.getTasks().stop(next.getCompanions().profiles.active().petId, sessionId),
@@ -170,10 +192,7 @@ export function initializeCompanionWindow(next: Options): void {
     try {
       const petId = next.getCompanions().profiles.active().petId;
       if (next.getTasks().owned(petId, sessionId))
-        window.webContents.send(IpcChannel.TasksChanged, {
-          petId,
-          tasks: next.getTasks().recent(petId),
-        });
+        window.webContents.send(IpcChannel.TasksChanged, next.getTasks().snapshot(petId));
     } catch (error) {
       console.warn(`[Companion] Failed to project task for session ${sessionId}:`, error);
     }

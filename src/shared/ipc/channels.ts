@@ -20,6 +20,7 @@ export const CompanionIpc = {
   Tasks: 'companion:tasks',
   TasksChanged: 'companion:tasks:changed',
   StopTask: 'companion:task:stop',
+  ChooseWorkspace: 'companion:workspace:choose',
   Hide: 'companion:hide',
   OpenWorkbench: 'companion:openWorkbench',
   Context: 'companion:context',

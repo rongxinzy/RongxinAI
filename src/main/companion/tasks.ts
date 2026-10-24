@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { realpath, stat } from 'node:fs/promises';
 import type Database from 'better-sqlite3';
 import { CoworkSessionMode, CoworkPermissionMode } from '../../shared/cowork/constants';
 import { CompanionUnavailableReason } from '../../shared/companion/constants';
@@ -33,6 +34,7 @@ interface Options {
 
 /** Ownership links only; canonical Cowork/Workbench tables remain the task and run authority. */
 export class CompanionTasks {
+  private revision = 0;
   constructor(private readonly options: Options) {
     options.db.exec(`CREATE TABLE IF NOT EXISTS companion_task_admissions (
       pet_id TEXT NOT NULL, request_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
@@ -56,7 +58,18 @@ export class CompanionTasks {
     return this.options.sessions
       .getCoworkStore()
       .listWorkspaces()
+      .filter(workspace => !workspace.isHidden)
       .map(({ id, name }) => ({ id, name }));
+  }
+
+  /** Only the owned native directory dialog supplies this path. No renderer path argument. */
+  async chooseWorkspace(selectedPath: string) {
+    const directory = await realpath(selectedPath);
+    if (!(await stat(directory)).isDirectory()) throw new Error('Workspace must be a directory');
+    const store = this.options.sessions.getCoworkStore();
+    const workspace = store.ensureWorkspace(directory);
+    if (workspace.isHidden) store.setWorkspaceHidden(workspace.id, false);
+    return { id: workspace.id, name: workspace.name };
   }
 
   onChanged(listener: (sessionId: string) => void): () => void {
@@ -91,7 +104,7 @@ export class CompanionTasks {
     if (previous) return this.existing(previous, fingerprint);
     const store = this.options.sessions.getCoworkStore();
     const workspace = store.getWorkspace(request.workspaceId);
-    if (!workspace) throw new Error('Unknown task workspace');
+    if (!workspace || workspace.isHidden) throw new Error('Unknown task workspace');
     let model;
     try {
       model = await this.options.models.resolveAutomatic();
@@ -186,6 +199,10 @@ export class CompanionTasks {
     this.options.sessions.getPiRuntimeAdapter().stopSession(sessionId);
     const task = this.options.tasks.getCurrent(sessionId)?.task;
     if (task?.activeRunId) this.options.tasks.cancelRun(sessionId, task.activeRunId);
+  }
+
+  snapshot(petId: string) {
+    return { petId, revision: ++this.revision, tasks: this.recent(petId) };
   }
 
   recent(petId: string): CompanionTaskProjection[] {
