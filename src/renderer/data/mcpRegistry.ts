@@ -59,7 +59,11 @@ const toRegistryEntry = (server: BundledRegistry['servers'][number]): McpRegistr
   metadataPath: server.metadataPath,
 });
 
-/** Fallback entries used only when the bundled marketplace cannot be loaded. */
+/**
+ * Fallback entries used only when the bundled marketplace cannot be loaded.
+ * Derived from mcpRegistry.json (kept in sync with MCPs/registry.json; guarded by
+ * src/main/mcpRegistryIntegrity.test.ts and src/renderer/data/mcpRegistry.test.ts).
+ */
 export const mcpRegistry: McpRegistryEntry[] = bundle.servers.map(toRegistryEntry);
 
 export const mcpCategories = bundle.categories.map(category => ({

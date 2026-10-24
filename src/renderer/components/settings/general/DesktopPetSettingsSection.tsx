@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react';
-import { FieldGroup } from '@shared/components/ui/field';
+import { Field, FieldLabel, FieldDescription, FieldGroup } from '@shared/components/ui/field';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@shared/components/ui/select';
+import { DESKTOP_PET_BUILTINS, desktopPetBuiltin } from '../../../../shared/desktopPet/catalog';
 
 import type { DesktopPetSettings } from '../../../../shared/desktopPet/types';
 import { i18nService } from '../../../services/i18n';
@@ -52,7 +60,38 @@ export function DesktopPetSettingsSection() {
         </p>
       ) : null}
       <FieldGroup className="gap-4">
+        <Field>
+          <FieldLabel htmlFor="desktop-pet-character">
+            {i18nService.t('desktopPetCharacter')}
+          </FieldLabel>
+          <FieldDescription>{i18nService.t('desktopPetCharacterDescription')}</FieldDescription>
+          <Select
+            value={settings?.characterId ?? ''}
+            disabled={!settings || saving}
+            onValueChange={value => {
+              const character = desktopPetBuiltin(value ?? '');
+              if (character) void update({ characterId: character.id });
+            }}
+          >
+            <SelectTrigger id="desktop-pet-character" className="w-full">
+              <SelectValue>
+                {i18nService.t(
+                  desktopPetBuiltin(settings?.characterId ?? '')?.nameKey ??
+                    'desktopPetCharacterXiaoyuan',
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {DESKTOP_PET_BUILTINS.map(character => (
+                <SelectItem key={character.id} value={character.id}>
+                  {i18nService.t(character.nameKey)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
         <SettingsToggleRow
+          labelHeadingLevel={3}
           label={i18nService.t('desktopPetEnabled')}
           description={i18nService.t('desktopPetEnabledDescription')}
           checked={settings?.enabled ?? false}
@@ -60,6 +99,7 @@ export function DesktopPetSettingsSection() {
           onCheckedChange={enabled => update({ enabled })}
         />
         <SettingsToggleRow
+          labelHeadingLevel={3}
           label={i18nService.t('desktopPetDoNotDisturb')}
           description={i18nService.t('desktopPetDoNotDisturbDescription')}
           checked={settings?.doNotDisturb ?? false}
@@ -67,6 +107,7 @@ export function DesktopPetSettingsSection() {
           onCheckedChange={doNotDisturb => update({ doNotDisturb })}
         />
         <SettingsToggleRow
+          labelHeadingLevel={3}
           label={i18nService.t('desktopPetHideInFullscreen')}
           description={i18nService.t('desktopPetHideInFullscreenDescription')}
           checked={settings?.hideInFullscreen ?? true}
@@ -74,6 +115,7 @@ export function DesktopPetSettingsSection() {
           onCheckedChange={hideInFullscreen => update({ hideInFullscreen })}
         />
         <SettingsToggleRow
+          labelHeadingLevel={3}
           label={i18nService.t('desktopPetRoaming')}
           description={i18nService.t('desktopPetRoamingDescription')}
           checked={settings?.roaming ?? true}
@@ -81,6 +123,7 @@ export function DesktopPetSettingsSection() {
           onCheckedChange={roaming => update({ roaming })}
         />
         <SettingsToggleRow
+          labelHeadingLevel={3}
           label={i18nService.t('desktopPetChatter')}
           description={i18nService.t('desktopPetChatterDescription')}
           checked={settings?.chatter ?? true}

@@ -1,3 +1,5 @@
+import { DesktopPetBuiltinId } from './catalog';
+
 export const DesktopPetState = {
   Idle: 'idle',
   Thinking: 'thinking',
@@ -35,6 +37,7 @@ export const DesktopPetTaskResult = {
 export type DesktopPetTaskResult = (typeof DesktopPetTaskResult)[keyof typeof DesktopPetTaskResult];
 export const DESKTOP_PET_FAILURES_KEY = 'desktopPetFailures';
 export const DESKTOP_PET_DEFAULT_SETTINGS = {
+  characterId: DesktopPetBuiltinId.Xiaoyuan,
   enabled: false,
   doNotDisturb: false,
   hideInFullscreen: true,
@@ -42,7 +45,12 @@ export const DESKTOP_PET_DEFAULT_SETTINGS = {
   chatter: true,
 } as const;
 
-export const DesktopPetEffectKind = { Drag: 'drag', Impact: 'impact', Action: 'action' } as const;
+export const DesktopPetEffectKind = {
+  Drag: 'drag',
+  Impact: 'impact',
+  Action: 'action',
+  Visibility: 'visibility',
+} as const;
 
 /** Actions the pet can play on demand (menu playback / click feedback). */
 export const DesktopPetPlayableAction = {

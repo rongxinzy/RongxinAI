@@ -108,6 +108,17 @@
       "authType": "token"
     },
     {
+      "id": "patsnap-search",
+      "name": "智慧芽",
+      "description_zh": "专利、文献和科技情报检索，支持自然语言与语义搜索",
+      "description_en": "Patsnap patent, literature, and technology intelligence search.",
+      "category": "data-api",
+      "categoryKey": "mcpCategoryDataApi",
+      "transportType": "http",
+      "url": "https://connect.zhihuiya.com/2b0355/logic-mcp?apikey=${PATSNAP_API_KEY}",
+      "authType": "token"
+    },
+    {
       "id": "context7",
       "name": "Context7",
       "description_zh": "为 AI 编程提供最新的库文档和代码示例（npx 启动，npm 走 npmmirror）",
@@ -115,7 +126,10 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@upstash/context7-mcp@latest"],
+      "defaultArgs": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
       "authType": "none"
     },
     {
@@ -126,8 +140,13 @@
       "category": "search",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "tavily-mcp@latest"],
-      "requiredEnvKeys": ["TAVILY_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "tavily-mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "TAVILY_API_KEY"
+      ],
       "authType": "token"
     },
     {
@@ -138,7 +157,9 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "uvx",
-      "defaultArgs": ["mcp-server-fetch"],
+      "defaultArgs": [
+        "mcp-server-fetch"
+      ],
       "authType": "none"
     },
     {
@@ -149,7 +170,10 @@
       "category": "browser",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@playwright/mcp@latest"],
+      "defaultArgs": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
       "authType": "none"
     },
     {
@@ -160,8 +184,13 @@
       "category": "design",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "figma-developer-mcp@latest"],
-      "requiredEnvKeys": ["FIGMA_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "figma-developer-mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "FIGMA_API_KEY"
+      ],
       "authType": "token"
     },
     {
@@ -172,8 +201,13 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "firecrawl-mcp@latest"],
-      "requiredEnvKeys": ["FIRECRAWL_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "firecrawl-mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "FIRECRAWL_API_KEY"
+      ],
       "authType": "token"
     },
     {
@@ -194,8 +228,13 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@amap/amap-maps-mcp-server"],
-      "requiredEnvKeys": ["AMAP_MAPS_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "@amap/amap-maps-mcp-server"
+      ],
+      "requiredEnvKeys": [
+        "AMAP_MAPS_API_KEY"
+      ],
       "authType": "token"
     },
     {
@@ -206,8 +245,17 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@larksuiteoapi/lark-mcp", "mcp", "-l", "zh"],
-      "requiredEnvKeys": ["APP_ID", "APP_SECRET"],
+      "defaultArgs": [
+        "-y",
+        "@larksuiteoapi/lark-mcp",
+        "mcp",
+        "-l",
+        "zh"
+      ],
+      "requiredEnvKeys": [
+        "APP_ID",
+        "APP_SECRET"
+      ],
       "authType": "token"
     },
     {
@@ -218,8 +266,14 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "dingtalk-mcp@latest"],
-      "requiredEnvKeys": ["DINGTALK_Client_ID", "DINGTALK_Client_Secret"],
+      "defaultArgs": [
+        "-y",
+        "dingtalk-mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "DINGTALK_Client_ID",
+        "DINGTALK_Client_Secret"
+      ],
       "authType": "token"
     },
     {
@@ -230,8 +284,14 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "uvx",
-      "defaultArgs": ["excel-mcp-server", "stdio"],
-      "argPlaceholders": ["--allow-dir", "<YOUR_WORK_DIR>"],
+      "defaultArgs": [
+        "excel-mcp-server",
+        "stdio"
+      ],
+      "argPlaceholders": [
+        "--allow-dir",
+        "<YOUR_WORK_DIR>"
+      ],
       "authType": "none"
     },
     {
@@ -242,7 +302,11 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@officecli/officecli", "mcp"],
+      "defaultArgs": [
+        "-y",
+        "@officecli/officecli",
+        "mcp"
+      ],
       "authType": "none"
     },
     {
@@ -253,7 +317,9 @@
       "category": "productivity",
       "transportType": "stdio",
       "command": "uvx",
-      "defaultArgs": ["markitdown-mcp"],
+      "defaultArgs": [
+        "markitdown-mcp"
+      ],
       "authType": "none"
     },
     {
@@ -274,8 +340,13 @@
       "category": "design",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@figwright/mcp@latest"],
-      "requiredEnvKeys": ["FIGMA_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "@figwright/mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "FIGMA_API_KEY"
+      ],
       "authType": "token"
     },
     {
@@ -286,7 +357,10 @@
       "category": "browser",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "chrome-devtools-mcp@latest"],
+      "defaultArgs": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ],
       "authType": "none"
     },
     {
@@ -297,8 +371,13 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-filesystem"],
-      "argPlaceholders": ["<ALLOWED_DIR>"],
+      "defaultArgs": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem"
+      ],
+      "argPlaceholders": [
+        "<ALLOWED_DIR>"
+      ],
       "authType": "none"
     },
     {
@@ -309,7 +388,10 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-memory"],
+      "defaultArgs": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
       "authType": "none"
     },
     {
@@ -320,7 +402,10 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "defaultArgs": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
       "authType": "none"
     }
   ]

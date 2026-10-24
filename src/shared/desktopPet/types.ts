@@ -1,6 +1,8 @@
 import type { DesktopPetPlayableAction, DesktopPetState, DesktopPetTaskResult } from './constants';
+import type { DesktopPetBuiltinId } from './catalog';
 
 export interface DesktopPetSettings {
+  characterId: DesktopPetBuiltinId;
   enabled: boolean;
   doNotDisturb: boolean;
   hideInFullscreen: boolean;
@@ -28,11 +30,13 @@ export interface DesktopPetApi {
 }
 
 export type DesktopPetEffect =
+  | { kind: 'visibility'; visible: boolean }
   | { kind: 'drag'; active: boolean }
   | { kind: 'impact'; strength: number }
   | { kind: 'action'; action: DesktopPetPlayableAction };
 
 export interface DesktopPetSnapshot {
+  characterId: DesktopPetBuiltinId;
   state: DesktopPetState;
   label: string;
   bubble: string | null;

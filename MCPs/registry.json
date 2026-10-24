@@ -124,6 +124,19 @@
       "metadataPath": "baidu-netdisk/zhiyuan/connector.yaml"
     },
     {
+      "id": "patsnap-search",
+      "name": "智慧芽",
+      "description_zh": "专利、文献和科技情报检索，支持自然语言与语义搜索",
+      "description_en": "Patsnap patent, literature, and technology intelligence search.",
+      "category": "data-api",
+      "transportType": "http",
+      "url": "https://connect.zhihuiya.com/2b0355/logic-mcp?apikey=${PATSNAP_API_KEY}",
+      "authType": "token",
+      "connectorPath": "patsnap-search/mcp.json",
+      "iconPath": "patsnap-search/zhiyuan/icon.png",
+      "metadataPath": "patsnap-search/zhiyuan/connector.yaml"
+    },
+    {
       "id": "context7",
       "name": "Context7",
       "description_zh": "为 AI 编程提供最新的库文档和代码示例（npx 启动，npm 走 npmmirror）",

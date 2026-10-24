@@ -105,7 +105,7 @@ New deletion: w:id="49"
 
 ## Author and Date
 
-- **Author**: Free text. Use consistent strings (e.g., `"MiniMaxAI"` for all automated edits)
+- **Author**: Free text. Use consistent strings (e.g., `"ZhiYuan"` for all automated edits)
 - **Date**: ISO 8601 with UTC timezone marker: `2026-03-21T10:30:00Z`
   - Must include the `T` separator and `Z` suffix (or `+HH:MM` offset)
   - Omitting the date is allowed but not recommended
@@ -121,7 +121,7 @@ Add `<w:ins>` wrapper around new content at the target location:
 ```xml
 <w:p>
   <w:r><w:t>Existing text. </w:t></w:r>
-  <w:ins w:id="5" w:author="MiniMaxAI" w:date="2026-03-21T12:00:00Z">
+  <w:ins w:id="5" w:author="ZhiYuan" w:date="2026-03-21T12:00:00Z">
     <w:r><w:t>Proposed new text. </w:t></w:r>
   </w:ins>
   <w:r><w:t>More existing text.</w:t></w:r>
@@ -135,7 +135,7 @@ Wrap existing content in `<w:del>` and change `<w:t>` to `<w:delText>`:
 ```xml
 <w:p>
   <w:r><w:t>Keep this. </w:t></w:r>
-  <w:del w:id="6" w:author="MiniMaxAI" w:date="2026-03-21T12:01:00Z">
+  <w:del w:id="6" w:author="ZhiYuan" w:date="2026-03-21T12:01:00Z">
     <w:r>
       <w:rPr><w:b /></w:rPr>
       <w:delText>Remove this.</w:delText>
@@ -166,14 +166,14 @@ When tracked deletion spans a paragraph boundary, use `<w:pPrChange>` on the mer
 ```xml
 <w:p>
   <w:pPr>
-    <w:pPrChange w:id="7" w:author="MiniMaxAI" w:date="2026-03-21T12:05:00Z">
+    <w:pPrChange w:id="7" w:author="ZhiYuan" w:date="2026-03-21T12:05:00Z">
       <w:pPr>
         <w:pStyle w:val="Normal" />
       </w:pPr>
     </w:pPrChange>
   </w:pPr>
   <w:r><w:t>First paragraph text. </w:t></w:r>
-  <w:del w:id="8" w:author="MiniMaxAI" w:date="2026-03-21T12:05:00Z">
+  <w:del w:id="8" w:author="ZhiYuan" w:date="2026-03-21T12:05:00Z">
     <w:r><w:delText> </w:delText></w:r>
   </w:del>
   <w:r><w:t>Second paragraph text (now merged).</w:t></w:r>
@@ -188,10 +188,10 @@ The entire new paragraph is wrapped in `<w:ins>`:
 <w:p>
   <w:pPr>
     <w:rPr>
-      <w:ins w:id="9" w:author="MiniMaxAI" w:date="2026-03-21T12:10:00Z" />
+      <w:ins w:id="9" w:author="ZhiYuan" w:date="2026-03-21T12:10:00Z" />
     </w:rPr>
   </w:pPr>
-  <w:ins w:id="10" w:author="MiniMaxAI" w:date="2026-03-21T12:10:00Z">
+  <w:ins w:id="10" w:author="ZhiYuan" w:date="2026-03-21T12:10:00Z">
     <w:r><w:t>Entirely new paragraph.</w:t></w:r>
   </w:ins>
 </w:p>

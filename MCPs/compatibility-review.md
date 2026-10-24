@@ -12,9 +12,5 @@ This repository contains connector metadata, remote MCP URLs, and skills. It doe
 | Patsnap | HTTP + API token | No browser OAuth; requires `PATSNAP_API_KEY` | Token/API subscription and provider terms required |
 | Feishu CLI | Official CLI + Skills, not MCP transport | CLI opens official browser login | CLI/Skills terms apply; do not present as a stdio MCP server |
 | PKULaw | HTTP + MCP OAuth 2.1/PKCE | Skill explicitly documents browser callback authorization | No local MIT proof; subscription/official account required |
-| WPS | HTTP + bearer token | Browser is used to sign in and manually obtain a connector token; not public OAuth | Token and WPS connector terms required; current endpoint metadata is WorkBuddy-oriented |
-| Qixinhuiyan | HTTP | No verifiable public OAuth flow in bundled files | Official account/contract required; do not auto-open OAuth |
-| Huayu Yuandian | HTTP | No verifiable public OAuth flow in bundled files | Official account/contract required; do not auto-open OAuth |
-| Gildata | HTTP + URL token | No browser OAuth; skill uses `GILDATA_TOKEN`/JY API key | Provider token/subscription and terms required |
 
-The UI therefore exposes browser authorization only for entries classified as `oauth`, the Feishu official CLI flow for `cli`, and token fields for `token`. `external` entries show the provider-access explanation without pretending that a public OAuth flow exists.
+The UI therefore exposes browser authorization only for entries classified as `oauth`, the Feishu official CLI flow for `cli`, and token fields for `token`.

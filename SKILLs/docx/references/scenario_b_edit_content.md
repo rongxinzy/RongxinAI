@@ -192,7 +192,7 @@ See `references/track_changes_guide.md` for full XML examples.
 
 Quick reference — inserting text with tracking:
 ```xml
-<w:ins w:id="1" w:author="MiniMaxAI" w:date="2026-03-21T10:00:00Z">
+<w:ins w:id="1" w:author="ZhiYuan" w:date="2026-03-21T10:00:00Z">
   <w:r>
     <w:t>New text here</w:t>
   </w:r>
@@ -201,7 +201,7 @@ Quick reference — inserting text with tracking:
 
 Deleting text with tracking:
 ```xml
-<w:del w:id="2" w:author="MiniMaxAI" w:date="2026-03-21T10:00:00Z">
+<w:del w:id="2" w:author="ZhiYuan" w:date="2026-03-21T10:00:00Z">
   <w:r>
     <w:delText>Removed text</w:delText>  <!-- MUST use delText, not t -->
   </w:r>
