@@ -255,6 +255,7 @@ export const APP_SELECTORS = {
   'sidebar-common-inactive':
     '[data-active-view]:not([data-active-view="cowork"]) .sidebar-session-row.sidebar-interactive-surface-active',
   'composer-surface': '.theme-composer-surface',
+  'composer-backdrop': '.theme-composer-backdrop',
   'composer-drop-active': '.theme-composer-drop-active',
   'message-code-user': '.theme-message-code-user',
   'message-cowork-user': '.theme-message-cowork-user',

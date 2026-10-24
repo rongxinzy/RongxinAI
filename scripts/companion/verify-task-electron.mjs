@@ -10,6 +10,7 @@ import { WorkbenchRunStatus } from '../../src/shared/workbenchTask/constants.ts'
 import { stressMedia } from './stress-media.mjs';
 import { verifyHomeSurfaces } from './verify-home-surfaces.mjs';
 import { createTaskFileFixture, chooseTaskFile } from './verify-task-files.mjs';
+import { verifyWorkbenchCopy } from './verify-workbench-copy.mjs';
 
 // Manual native acceptance only: isolated storage, local model fixture, no real account keys.
 // Prerequisites: verified Magpie resource, build:electron:dev and web:preview.
@@ -396,6 +397,8 @@ try {
         Number(process.env.COMPANION_MEDIA_STRESS_SECONDS),
       )
     : null;
+  const copy =
+    process.env.COMPANION_VERIFY_COPY === '1' ? await verifyWorkbenchCopy(main, userData) : null;
   console.log(
     JSON.stringify({
       passed: true,
@@ -419,6 +422,7 @@ try {
           }
         : null,
       stress,
+      copy,
       userData,
       workspace,
     }),
