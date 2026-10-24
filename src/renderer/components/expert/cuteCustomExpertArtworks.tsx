@@ -34,6 +34,8 @@ const ICON_THEME: Record<string, CutePastelThemeKey> = {
   bot: 'periwinkle',
   zap: 'lemon',
   cloud: 'sky',
+  python: 'mint',
+  presentation: 'peach',
 };
 
 function Motif({ name }: { name: string }) {
@@ -371,6 +373,50 @@ function Motif({ name }: { name: string }) {
           stroke={T.sky.accent}
           strokeWidth="1.4"
         />
+      );
+    case 'python':
+      return (
+        <>
+          <path
+            d="M18 16 C14 18, 14 22, 16 24 C14 26, 14 30, 18 32 C20 33, 24 33, 26 31 C28 33, 32 33, 34 30 C36 27, 36 24, 34 22 C36 20, 36 16, 32 14 C30 13, 26 13, 24 15 C22 13, 20 14, 18 16 Z"
+            fill={T.mint.accentSoft}
+            stroke={T.mint.accent}
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <CuteFace cx={24} cy={23} eyeOffset={3} blush={false} />
+          <path
+            d="M14 20 L12 20 M34 26 L36 26"
+            stroke={T.mint.accent}
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </>
+      );
+    case 'presentation':
+      return (
+        <>
+          <rect
+            x="13"
+            y="14"
+            width="22"
+            height="16"
+            rx="3"
+            fill="white"
+            fillOpacity="0.65"
+            stroke={T.peach.accent}
+            strokeWidth="1.4"
+          />
+          <rect x="16" y="17" width="8" height="5" rx="1" fill={T.peach.accentSoft} />
+          <rect x="26" y="17" width="6" height="10" rx="1" fill={T.coral.accentSoft} />
+          <path
+            d="M22 34 L24 38 L26 34"
+            stroke={T.peach.accent}
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+          <circle cx="30" cy="19" r="1.5" fill={T.lemon.accent} />
+        </>
       );
     default:
       return (

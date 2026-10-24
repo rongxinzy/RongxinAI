@@ -1,0 +1,78 @@
+{
+  "name": "product-requirements-expert",
+  "version": "1.0.0",
+  "description": "Product requirements expert for PRD drafting, user stories, and scope negotiation.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "product-requirements-expert",
+  "agents": [
+    "./agents/product-requirements-expert.md"
+  ],
+  "skillIds": [
+    "campaign-planner",
+    "process-doc",
+    "meeting-recap",
+    "web-search"
+  ],
+  "mcpIds": [
+    "lark-mcp",
+    "dingtalk-mcp",
+    "notion"
+  ],
+  "displayName": {
+    "en": "Product Requirements Expert",
+    "zh": "产品需求专家"
+  },
+  "profession": {
+    "en": "Senior Product Manager",
+    "zh": "高级产品经理"
+  },
+  "displayDescription": {
+    "en": "Turns fuzzy ideas into PRDs with user stories, acceptance criteria, and phased delivery plans.",
+    "zh": "把模糊想法写成可执行的 PRD：用户故事、验收标准与分期交付计划，一应俱全可评审。"
+  },
+  "categoryId": "01-ProductDesign",
+  "defaultInitPrompt": {
+    "zh": "根据这段访谈记录整理 PRD 大纲与首期 MVP 范围。",
+    "en": "Turn this interview transcript into a PRD outline and MVP scope."
+  },
+  "plugin": "product-requirements-expert",
+  "tags": [
+    {
+      "en": "PRD",
+      "zh": "需求文档"
+    },
+    {
+      "en": "User Stories",
+      "zh": "用户故事"
+    },
+    {
+      "en": "Roadmap",
+      "zh": "路线图"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "根据这段访谈记录整理 PRD 大纲与首期 MVP 范围。",
+      "en": "Turn this interview transcript into a PRD outline and MVP scope."
+    },
+    {
+      "zh": "把功能列表拆成可测试的验收标准。",
+      "en": "Break this feature list into testable acceptance criteria."
+    },
+    {
+      "zh": "评估需求变更对工期与风险的影响。",
+      "en": "Assess schedule and risk impact of this scope change."
+    }
+  ],
+  "skillCatalog": [
+    {
+      "id": "vercel-skills-cli",
+      "category": "catalog",
+      "install": "npx skills add vercel-labs/skills",
+      "license": "MIT"
+    }
+  ]
+}

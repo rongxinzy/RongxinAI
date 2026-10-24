@@ -1,15 +1,34 @@
 {
-  "_comment": "Generated from MCPs/registry.json into the renderer McpRegistryEntry shape. Not imported by code; kept in sync so it cannot drift. Guarded by src/main/mcpRegistryIntegrity.test.ts.",
   "categories": [
+    {
+      "id": "all",
+      "name_zh": "全部",
+      "name_en": "All"
+    },
+    {
+      "id": "search",
+      "name_zh": "搜索",
+      "name_en": "Search"
+    },
+    {
+      "id": "developer",
+      "name_zh": "开发工具",
+      "name_en": "Dev Tools"
+    },
     {
       "id": "productivity",
       "name_zh": "效率工具",
       "name_en": "Productivity"
     },
     {
-      "id": "developer",
-      "name_zh": "开发工具",
-      "name_en": "Developer tools"
+      "id": "browser",
+      "name_zh": "浏览器",
+      "name_en": "Browser"
+    },
+    {
+      "id": "design",
+      "name_zh": "设计",
+      "name_en": "Design"
     },
     {
       "id": "data-api",
@@ -21,11 +40,9 @@
     {
       "id": "notion",
       "name": "Notion",
-      "descriptionKey": "",
       "description_zh": "在线协作与知识库管理工作区",
       "description_en": "A connected workspace for collaboration and knowledge management.",
       "category": "productivity",
-      "categoryKey": "mcpCategoryProductivity",
       "transportType": "http",
       "url": "https://mcp.notion.com/mcp",
       "authType": "oauth"
@@ -33,11 +50,9 @@
     {
       "id": "supabase",
       "name": "Supabase",
-      "descriptionKey": "",
       "description_zh": "Supabase 数据库、表、边缘函数和项目管理",
       "description_en": "Supabase database, tables, edge functions, and project management.",
       "category": "developer",
-      "categoryKey": "mcpCategoryDeveloper",
       "transportType": "http",
       "url": "https://mcp.supabase.com/mcp",
       "authType": "oauth"
@@ -45,11 +60,9 @@
     {
       "id": "jinshuju",
       "name": "金数据",
-      "descriptionKey": "",
       "description_zh": "金数据表单、数据查询和自动化",
       "description_en": "Jinshuju forms, data queries, and workflow automation.",
       "category": "productivity",
-      "categoryKey": "mcpCategoryProductivity",
       "transportType": "http",
       "url": "https://jinshuju.net/mcp",
       "authType": "oauth"
@@ -57,11 +70,9 @@
     {
       "id": "feishu",
       "name": "飞书",
-      "descriptionKey": "",
       "description_zh": "飞书文档、日历、消息、云盘和审批",
       "description_en": "Feishu documents, calendars, messages, drive, and approvals.",
       "category": "productivity",
-      "categoryKey": "mcpCategoryProductivity",
       "transportType": "stdio",
       "command": "lark-cli",
       "authType": "cli"
@@ -69,11 +80,9 @@
     {
       "id": "github",
       "name": "GitHub",
-      "descriptionKey": "",
       "description_zh": "GitHub 仓库、Issue、Pull Request 和开发工作流",
       "description_en": "GitHub repositories, issues, pull requests, and developer workflows.",
       "category": "developer",
-      "categoryKey": "mcpCategoryDeveloper",
       "transportType": "http",
       "url": "https://api.githubcopilot.com/mcp/",
       "authType": "token"
@@ -81,11 +90,9 @@
     {
       "id": "pkulaw",
       "name": "北大法宝",
-      "descriptionKey": "",
       "description_zh": "法律法规、案例和司法数据检索",
       "description_en": "Chinese laws, regulations, and judicial case search.",
       "category": "data-api",
-      "categoryKey": "mcpCategoryDataApi",
       "transportType": "http",
       "url": "https://apim-gateway.pkulaw.com/mcp-law-agg/1.0.0/mcp",
       "authType": "oauth"
@@ -93,11 +100,9 @@
     {
       "id": "baidu-netdisk",
       "name": "百度网盘",
-      "descriptionKey": "",
       "description_zh": "百度网盘文件搜索、读取和管理",
       "description_en": "Baidu Netdisk file search, reading, and management.",
       "category": "productivity",
-      "categoryKey": "mcpCategoryProductivity",
       "transportType": "sse",
       "url": "https://mcp-pan.baidu.com/sse",
       "authType": "token"
@@ -105,7 +110,6 @@
     {
       "id": "patsnap-search",
       "name": "智慧芽",
-      "descriptionKey": "",
       "description_zh": "专利、文献和科技情报检索，支持自然语言与语义搜索",
       "description_en": "Patsnap patent, literature, and technology intelligence search.",
       "category": "data-api",
@@ -113,6 +117,222 @@
       "transportType": "http",
       "url": "https://connect.zhihuiya.com/2b0355/logic-mcp?apikey=${PATSNAP_API_KEY}",
       "authType": "token"
+    },
+    {
+      "id": "context7",
+      "name": "Context7",
+      "description_zh": "为 AI 编程提供最新的库文档和代码示例（npx 启动，npm 走 npmmirror）",
+      "description_en": "Up-to-date library docs and code examples for AI coding (npx, npmmirror-friendly).",
+      "category": "developer",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@upstash/context7-mcp@latest"],
+      "authType": "none"
+    },
+    {
+      "id": "tavily",
+      "name": "Tavily",
+      "description_zh": "实时网页搜索、智能数据提取和网站爬取",
+      "description_en": "Real-time web search, intelligent data extraction and web crawling.",
+      "category": "search",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "tavily-mcp@latest"],
+      "requiredEnvKeys": ["TAVILY_API_KEY"],
+      "authType": "token"
+    },
+    {
+      "id": "fetch",
+      "name": "Fetch",
+      "description_zh": "网页内容抓取和 HTML 转 Markdown（uvx mcp-server-fetch，PyPI 走国内镜像）",
+      "description_en": "Fetch web pages as Markdown via uvx mcp-server-fetch (CN PyPI mirrors).",
+      "category": "data-api",
+      "transportType": "stdio",
+      "command": "uvx",
+      "defaultArgs": ["mcp-server-fetch"],
+      "authType": "none"
+    },
+    {
+      "id": "playwright",
+      "name": "Playwright",
+      "description_zh": "高级浏览器自动化，支持 Chromium/Firefox/WebKit",
+      "description_en": "Advanced browser automation supporting Chromium/Firefox/WebKit.",
+      "category": "browser",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@playwright/mcp@latest"],
+      "authType": "none"
+    },
+    {
+      "id": "figma",
+      "name": "Figma",
+      "description_zh": "Figma 设计平台集成：读取文件、组件、样式，支持设计稿解析",
+      "description_en": "Figma design platform integration: read files, components, styles, and parse designs.",
+      "category": "design",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "figma-developer-mcp@latest"],
+      "requiredEnvKeys": ["FIGMA_API_KEY"],
+      "authType": "token"
+    },
+    {
+      "id": "firecrawl",
+      "name": "Firecrawl",
+      "description_zh": "网页抓取与数据提取：支持批处理、结构化提取和内容分析",
+      "description_en": "Web scraping and data extraction: batch processing, structured extraction and content analysis.",
+      "category": "data-api",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "firecrawl-mcp@latest"],
+      "requiredEnvKeys": ["FIRECRAWL_API_KEY"],
+      "authType": "token"
+    },
+    {
+      "id": "gitlab",
+      "name": "GitLab",
+      "description_zh": "GitLab 官方 MCP（OAuth）：项目、合并请求、流水线与工作项（自托管请改实例 URL）",
+      "description_en": "Official GitLab MCP (OAuth): projects, merge requests, pipelines, and work items.",
+      "category": "developer",
+      "transportType": "http",
+      "url": "https://gitlab.com/api/v4/mcp",
+      "authType": "oauth"
+    },
+    {
+      "id": "amap-maps",
+      "name": "高德地图",
+      "description_zh": "高德地图路线、POI、地理编码与出行能力（国内常用）",
+      "description_en": "AMap routing, POI, geocoding, and mobility tools for China.",
+      "category": "data-api",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@amap/amap-maps-mcp-server"],
+      "requiredEnvKeys": ["AMAP_MAPS_API_KEY"],
+      "authType": "token"
+    },
+    {
+      "id": "lark-mcp",
+      "name": "飞书 OpenAPI MCP",
+      "description_zh": "飞书官方 MCP：文档、日历、多维表、消息（npx + npmmirror）",
+      "description_en": "Official Feishu/Lark OpenAPI MCP for docs, calendar, bitable, and IM.",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@larksuiteoapi/lark-mcp", "mcp", "-l", "zh"],
+      "requiredEnvKeys": ["APP_ID", "APP_SECRET"],
+      "authType": "token"
+    },
+    {
+      "id": "dingtalk-mcp",
+      "name": "钉钉 MCP",
+      "description_zh": "钉钉官方 MCP：通讯录、日程、待办与机器人（npx）",
+      "description_en": "Official DingTalk MCP for contacts, calendar, todos, and bots.",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "dingtalk-mcp@latest"],
+      "requiredEnvKeys": ["DINGTALK_Client_ID", "DINGTALK_Client_Secret"],
+      "authType": "token"
+    },
+    {
+      "id": "excel-mcp-server",
+      "name": "Excel MCP Server",
+      "description_zh": "读写 Excel/透视/图表（uvx）。安装时请追加 --allow-dir <工作目录>，不要把 . 当作允许目录。",
+      "description_en": "Excel read/write, pivots, and charts via uvx. Append --allow-dir <folder> at install; do not allow '.'.",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "uvx",
+      "defaultArgs": ["excel-mcp-server", "stdio"],
+      "argPlaceholders": ["--allow-dir", "<YOUR_WORK_DIR>"],
+      "authType": "none"
+    },
+    {
+      "id": "officecli",
+      "name": "OfficeCLI",
+      "description_zh": "Word/Excel/PPT 一体化 Office CLI MCP（npx）",
+      "description_en": "Word/Excel/PPT OfficeCLI MCP server (npx).",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@officecli/officecli", "mcp"],
+      "authType": "none"
+    },
+    {
+      "id": "markitdown-mcp",
+      "name": "MarkItDown MCP",
+      "description_zh": "微软 MarkItDown：PDF/Office 转 Markdown（uvx，PyPI 走国内镜像）",
+      "description_en": "Microsoft MarkItDown: PDF/Office to Markdown via uvx (CN PyPI mirrors).",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "uvx",
+      "defaultArgs": ["markitdown-mcp"],
+      "authType": "none"
+    },
+    {
+      "id": "figma-remote",
+      "name": "Figma Remote MCP",
+      "description_zh": "Figma 官方远程 MCP（OAuth，无需本地 npm 包）",
+      "description_en": "Official Figma remote MCP (OAuth, no local npm bundle).",
+      "category": "design",
+      "transportType": "http",
+      "url": "https://mcp.figma.com/mcp",
+      "authType": "oauth"
+    },
+    {
+      "id": "figwright",
+      "name": "Figwright",
+      "description_zh": "Figma 双向读写 MCP（npx + 桌面插件）",
+      "description_en": "Bidirectional Figma MCP (npx + desktop plugin).",
+      "category": "design",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@figwright/mcp@latest"],
+      "requiredEnvKeys": ["FIGMA_API_KEY"],
+      "authType": "token"
+    },
+    {
+      "id": "chrome-devtools-mcp",
+      "name": "Chrome DevTools MCP",
+      "description_zh": "Chrome 官方 DevTools：调试、性能、DOM（npx）",
+      "description_en": "Official Chrome DevTools MCP for debugging, performance, and DOM.",
+      "category": "browser",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "chrome-devtools-mcp@latest"],
+      "authType": "none"
+    },
+    {
+      "id": "filesystem",
+      "name": "MCP Filesystem",
+      "description_zh": "官方受限文件系统读写（npx，需配置允许目录）",
+      "description_en": "Official constrained filesystem MCP (configure allowed directories).",
+      "category": "developer",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@modelcontextprotocol/server-filesystem"],
+      "argPlaceholders": ["<ALLOWED_DIR>"],
+      "authType": "none"
+    },
+    {
+      "id": "memory",
+      "name": "MCP Memory",
+      "description_zh": "官方知识图谱记忆 MCP（npx）",
+      "description_en": "Official knowledge-graph memory MCP.",
+      "category": "developer",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@modelcontextprotocol/server-memory"],
+      "authType": "none"
+    },
+    {
+      "id": "mcp-sequential-thinking",
+      "name": "Sequential Thinking",
+      "description_zh": "官方分步推理 MCP（npx）",
+      "description_en": "Official sequential thinking MCP for complex tasks.",
+      "category": "developer",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "authType": "none"
     }
   ]
 }

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "officecli": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@officecli/officecli",
+        "mcp"
+      ]
+    }
+  }
+}

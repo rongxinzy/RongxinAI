@@ -1,0 +1,96 @@
+{
+  "name": "presentation-designer",
+  "version": "1.0.0",
+  "description": "Presentation and slide design expert for business decks, narrative flow, and visual consistency.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "presentation-designer",
+  "agents": [
+    "./agents/presentation-designer.md"
+  ],
+  "skillIds": [
+    "presentation-studio",
+    "frontend-design",
+    "copywriting",
+    "web-search"
+  ],
+  "mcpIds": [
+    "figma",
+    "figma-remote",
+    "figwright",
+    "fetch"
+  ],
+  "displayName": {
+    "en": "Presentation Designer",
+    "zh": "演示文稿设计专家"
+  },
+  "profession": {
+    "en": "Presentation Design Lead",
+    "zh": "演示设计负责人"
+  },
+  "displayDescription": {
+    "en": "Structures story-driven slide decks with clear visuals, speaker notes, and brand-safe layouts.",
+    "zh": "打造故事驱动的演示文稿：结构清晰、视觉统一、备注完整，适配商务汇报与融资路演场景。"
+  },
+  "categoryId": "06-ContentCreative",
+  "defaultInitPrompt": {
+    "zh": "根据这份大纲生成一套 10 页路演 PPT 的结构与每页要点。",
+    "en": "Turn this outline into a 10-slide pitch structure with key points per slide."
+  },
+  "plugin": "presentation-designer",
+  "tags": [
+    {
+      "en": "Slides",
+      "zh": "幻灯片"
+    },
+    {
+      "en": "Storytelling",
+      "zh": "叙事结构"
+    },
+    {
+      "en": "Visual Design",
+      "zh": "视觉设计"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "根据这份大纲生成一套 10 页路演 PPT 的结构与每页要点。",
+      "en": "Turn this outline into a 10-slide pitch structure with key points per slide."
+    },
+    {
+      "zh": "优化这份汇报 PPT 的信息层级，让结论更前置。",
+      "en": "Improve this deck hierarchy so conclusions appear earlier."
+    },
+    {
+      "zh": "为技术方案评审准备演讲者备注与过渡话术。",
+      "en": "Prepare speaker notes and transitions for a technical review deck."
+    }
+  ],
+  "skillCatalog": [
+    {
+      "id": "guizang-ppt-skill",
+      "category": "office",
+      "install": "npx skills add op7418/guizang-ppt-skill",
+      "license": "AGPL-3.0"
+    },
+    {
+      "id": "dashi-ppt-skill",
+      "category": "office",
+      "install": "npx skills add chuspeeism/dashi-ppt-skill",
+      "license": "AGPL-3.0"
+    },
+    {
+      "id": "skywork-skills",
+      "category": "office",
+      "install": "npx skills add SkyworkAI/Skywork-Skills",
+      "license": "MIT"
+    },
+    {
+      "id": "design-buddy",
+      "category": "design",
+      "install": "npx skills add SpaceZephyr/design-buddy"
+    }
+  ]
+}

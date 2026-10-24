@@ -72,13 +72,22 @@ test('mcpRegistryIntegrity: registry paths (connector/icon/metadata) exist on di
   const missing: string[] = [];
 
   for (const server of registry.servers) {
+    const packageDir = path.join(mcpsRoot, server.id);
+    const hasPackageDir = fs.existsSync(packageDir);
+    // Full marketplace connectors ship MCPs/<id>/zhiyuan/{icon,connector.yaml}.
+    // Curated npx/uvx/http launch recipes may only ship mcp.json + connectorPath.
+    const isFullConnector = hasPackageDir && fs.existsSync(path.join(packageDir, 'zhiyuan'));
+
     for (const [label, relative] of [
       ['connectorPath', server.connectorPath],
       ['iconPath', server.iconPath],
       ['metadataPath', server.metadataPath],
     ] as const) {
+      const required = label === 'connectorPath' ? hasPackageDir : isFullConnector;
       if (!relative) {
-        missing.push(`${server.id}: missing ${label}`);
+        if (required) {
+          missing.push(`${server.id}: missing ${label}`);
+        }
       } else if (!fs.existsSync(path.join(mcpsRoot, relative))) {
         missing.push(`${server.id}: ${label} ${relative} not found`);
       }

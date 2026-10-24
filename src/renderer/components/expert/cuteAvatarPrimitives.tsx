@@ -3,9 +3,9 @@ import React from 'react';
 
 /** Shared ink for cute mascot strokes — soft plum-gray, not harsh black. */
 export const CUTE_INK = '#5D4E63';
-export const CUTE_INK_SOFT = '#8A7B8F';
+const CUTE_INK_SOFT = '#8A7B8F';
 export const CUTE_STROKE = 2;
-export const CUTE_TILE_RX = 14;
+const CUTE_TILE_RX = 14;
 
 export interface CutePastelTheme {
   bgFrom: string;
@@ -83,7 +83,7 @@ export function CuteFace({
       {smile && (
         <path
           d={`M${cx - 3.5} ${cy + 3} Q ${cx} ${cy + 6.5} ${cx + 3.5} ${cy + 3}`}
-          stroke={CUTE_INK}
+          stroke={CUTE_INK_SOFT}
           strokeWidth="1.4"
           strokeLinecap="round"
           fill="none"

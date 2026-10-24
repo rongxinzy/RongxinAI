@@ -118,6 +118,16 @@ test('agentsGetPresetExperts result accepts the localized catalog shape', () => 
       quickPrompts: [{ en: 'clean this csv', zh: '清洗这份 csv' }],
       workflow: ['load', 'clean', 'report'],
       path: '/SKILLs/experts/data-analyst',
+      mcpIds: ['context7'],
+      pythonRequirements: { requirementsPath: './requirements.txt' },
+      pypiMirrors: ['https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple'],
+      skillCatalog: [
+        {
+          id: 'anthropic-document-skills',
+          category: 'office',
+          install: 'npx skills add anthropics/skills',
+        },
+      ],
     },
   ];
   expect(providersContract.agentsGetPresetExperts.result.safeParse({ experts }).success).toBe(true);

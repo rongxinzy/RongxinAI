@@ -23,7 +23,7 @@ test('all bundled expert presets pass strict validation', () => {
   const presetIds = fs
     .readdirSync(presetsRoot)
     .filter(entry => fs.statSync(path.join(presetsRoot, entry)).isDirectory());
-  expect(presetIds.length).toBeGreaterThanOrEqual(8);
+  expect(presetIds.length).toBeGreaterThanOrEqual(18);
 
   const failures: string[] = [];
   for (const presetId of presetIds) {

@@ -115,6 +115,62 @@ export const PRESET_EXPERT_AVATARS: Record<string, PresetExpertAvatarStyle> = {
     iconColor: 'oklch(0.45 0.09 255)',
     Artwork: ReactDevArt,
   },
+  'python-fullstack-dev': {
+    icon: Terminal,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.45 0.1 155)',
+    Artwork: ({ className }) => <CuteCustomExpertArt iconKey="python" className={className} />,
+  },
+  'presentation-designer': {
+    icon: Presentation,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.5 0.12 35)',
+    Artwork: ({ className }) => (
+      <CuteCustomExpertArt iconKey="presentation" className={className} />
+    ),
+  },
+  'deep-research-analyst': {
+    icon: Microscope,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.45 0.1 250)',
+    Artwork: ({ className }) => <CuteCustomExpertArt iconKey="microscope" className={className} />,
+  },
+  'process-automation-expert': {
+    icon: Zap,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.48 0.12 85)',
+    Artwork: ({ className }) => <CuteCustomExpertArt iconKey="zap" className={className} />,
+  },
+  'document-engineering-expert': {
+    icon: FileCode2,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.45 0.08 210)',
+    Artwork: ({ className }) => <CuteCustomExpertArt iconKey="fileCode" className={className} />,
+  },
+  'local-inference-guide': {
+    icon: Cpu,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.45 0.09 290)',
+    Artwork: ({ className }) => <CuteCustomExpertArt iconKey="cpu" className={className} />,
+  },
+  'product-requirements-expert': {
+    icon: Compass,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.48 0.11 55)',
+    Artwork: ({ className }) => <CuteCustomExpertArt iconKey="compass" className={className} />,
+  },
+  'devops-sre-expert': {
+    icon: Cloud,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.45 0.1 230)',
+    Artwork: ({ className }) => <CuteCustomExpertArt iconKey="cloud" className={className} />,
+  },
+  'academic-writing-expert': {
+    icon: BookOpen,
+    background: PASTEL_TILE,
+    iconColor: 'oklch(0.45 0.09 25)',
+    Artwork: ({ className }) => <CuteCustomExpertArt iconKey="bookOpen" className={className} />,
+  },
 };
 
 export const CUSTOM_EXPERT_ICONS: Record<string, LucideIcon> = {

@@ -11,6 +11,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { validatePackageMetadata } = require('./expert_package_metadata');
+
 const VALID_CATEGORY_IDS = new Set([
   '01-ProductDesign',
   '02-Engineering',
@@ -304,6 +306,8 @@ function validatePluginJson(pluginJson, expertDir, result) {
       }
     }
   }
+
+  validatePackageMetadata(pluginJson, expertDir, result);
 
   if (expertType === 'team') {
     const teamInfo = pluginJson.teamInfo;
