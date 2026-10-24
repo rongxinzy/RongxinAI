@@ -72,12 +72,22 @@
     }
   ],
   "mcpIds": [
-    "fetch"
+    "excel-mcp-server",
+    "fetch",
+    "lark-mcp"
   ],
   "pythonRequirements": {
     "dependencies": [
       "pandas>=2.2.0",
       "openpyxl>=3.1.0"
     ]
-  }
+  },
+  "skillCatalog": [
+    {
+      "id": "anthropic-document-skills",
+      "category": "office",
+      "install": "npx skills add anthropics/skills",
+      "license": "see-repo"
+    }
+  ]
 }

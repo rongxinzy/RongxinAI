@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "genoffice": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "genoffice",
+        "mcp"
+      ]
+    }
+  }
+}

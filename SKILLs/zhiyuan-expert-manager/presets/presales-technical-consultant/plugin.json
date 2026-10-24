@@ -69,6 +69,7 @@
   "mcpIds": [
     "context7",
     "github",
-    "fetch"
+    "fetch",
+    "lark-mcp"
   ]
 }

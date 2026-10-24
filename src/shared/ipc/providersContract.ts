@@ -129,6 +129,13 @@ const ExpertPythonRequirementsSchema = z.object({
   dependencies: z.array(z.string()).optional(),
 });
 
+const ExpertSkillCatalogEntrySchema = z.object({
+  id: z.string(),
+  category: z.string(),
+  install: z.string(),
+  license: z.string().optional(),
+});
+
 const PresetExpertsResultSchema = z.object({
   experts: z.array(
     z.object({
@@ -144,6 +151,7 @@ const PresetExpertsResultSchema = z.object({
       mcpIds: z.array(z.string()),
       pythonRequirements: ExpertPythonRequirementsSchema.optional(),
       pypiMirrors: z.array(z.string()),
+      skillCatalog: z.array(ExpertSkillCatalogEntrySchema),
     }),
   ),
   error: z.string().optional(),

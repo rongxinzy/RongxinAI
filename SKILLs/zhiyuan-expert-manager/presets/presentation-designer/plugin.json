@@ -18,6 +18,8 @@
   ],
   "mcpIds": [
     "figma",
+    "figma-remote",
+    "figwright",
     "fetch"
   ],
   "displayName": {
@@ -64,6 +66,31 @@
     {
       "zh": "为技术方案评审准备演讲者备注与过渡话术。",
       "en": "Prepare speaker notes and transitions for a technical review deck."
+    }
+  ],
+  "skillCatalog": [
+    {
+      "id": "guizang-ppt-skill",
+      "category": "office",
+      "install": "npx skills add op7418/guizang-ppt-skill",
+      "license": "AGPL-3.0"
+    },
+    {
+      "id": "dashi-ppt-skill",
+      "category": "office",
+      "install": "npx skills add chuspeeism/dashi-ppt-skill",
+      "license": "AGPL-3.0"
+    },
+    {
+      "id": "skywork-skills",
+      "category": "office",
+      "install": "npx skills add SkyworkAI/Skywork-Skills",
+      "license": "MIT"
+    },
+    {
+      "id": "design-buddy",
+      "category": "design",
+      "install": "npx skills add SpaceZephyr/design-buddy"
     }
   ]
 }

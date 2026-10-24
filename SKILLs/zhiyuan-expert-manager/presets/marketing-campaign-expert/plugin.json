@@ -71,6 +71,21 @@
   ],
   "mcpIds": [
     "figma",
+    "figma-remote",
+    "figwright",
     "fetch"
+  ],
+  "skillCatalog": [
+    {
+      "id": "design-buddy",
+      "category": "design",
+      "install": "npx skills add SpaceZephyr/design-buddy"
+    },
+    {
+      "id": "guizang-ppt-skill",
+      "category": "office",
+      "install": "npx skills add op7418/guizang-ppt-skill",
+      "license": "AGPL-3.0"
+    }
   ]
 }

@@ -18,9 +18,12 @@
     "web-search"
   ],
   "mcpIds": [
+    "filesystem",
+    "memory",
+    "mcp-sequential-thinking",
     "context7",
     "github",
-    "fetch"
+    "chrome-devtools-mcp"
   ],
   "pythonRequirements": {
     "requirementsPath": "./requirements.txt"

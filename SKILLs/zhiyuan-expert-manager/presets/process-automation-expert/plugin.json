@@ -17,9 +17,11 @@
     "database-inspector"
   ],
   "mcpIds": [
-    "github",
     "playwright",
-    "fetch"
+    "chrome-devtools-mcp",
+    "lark-mcp",
+    "fetch",
+    "filesystem"
   ],
   "pythonRequirements": {
     "requirementsPath": "./requirements.txt"

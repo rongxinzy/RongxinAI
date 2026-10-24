@@ -121,6 +121,13 @@ test('agentsGetPresetExperts result accepts the localized catalog shape', () => 
       mcpIds: ['context7'],
       pythonRequirements: { requirementsPath: './requirements.txt' },
       pypiMirrors: ['https://pypi.tuna.tsinghua.edu.cn/simple'],
+      skillCatalog: [
+        {
+          id: 'anthropic-document-skills',
+          category: 'office',
+          install: 'npx skills add anthropics/skills',
+        },
+      ],
     },
   ];
   expect(providersContract.agentsGetPresetExperts.result.safeParse({ experts }).success).toBe(true);

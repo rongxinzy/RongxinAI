@@ -57,6 +57,8 @@
     }
   ],
   "mcpIds": [
+    "lark-mcp",
+    "dingtalk-mcp",
     "feishu"
   ]
 }

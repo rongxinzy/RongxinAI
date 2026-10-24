@@ -3,6 +3,7 @@ import path from 'path';
 
 import {
   type ExpertPythonRequirements,
+  type ExpertSkillCatalogEntry,
   readPresetExpertPackageMetadata,
 } from '../shared/expert/presetPackageMetadata';
 
@@ -24,6 +25,7 @@ export interface PresetExpertCatalogEntry {
   mcpIds: string[];
   pythonRequirements?: ExpertPythonRequirements;
   pypiMirrors: string[];
+  skillCatalog: ExpertSkillCatalogEntry[];
 }
 
 const WORKFLOW_HEADING_PATTERN = /(?:标准.*(?:流程|SOP)|全流程|组件开发.*SOP)/i;
@@ -92,6 +94,7 @@ export function listPresetExperts(bundledSkillsRoot: string): PresetExpertCatalo
             mcpIds: packageMetadata.mcpIds,
             pythonRequirements: packageMetadata.pythonRequirements,
             pypiMirrors: packageMetadata.pypiMirrors,
+            skillCatalog: packageMetadata.skillCatalog,
           },
         ];
       } catch (error) {

@@ -72,7 +72,9 @@
   ],
   "mcpIds": [
     "fetch",
-    "tavily"
+    "tavily",
+    "excel-mcp-server",
+    "context7"
   ],
   "pythonRequirements": {
     "dependencies": [
@@ -80,5 +82,13 @@
       "numpy>=1.26.0",
       "matplotlib>=3.8.0"
     ]
-  }
+  },
+  "skillCatalog": [
+    {
+      "id": "anthropic-document-skills",
+      "category": "office",
+      "install": "npx skills add anthropics/skills",
+      "license": "see-repo"
+    }
+  ]
 }

@@ -18,7 +18,9 @@
   ],
   "mcpIds": [
     "context7",
-    "fetch"
+    "fetch",
+    "filesystem",
+    "memory"
   ],
   "displayName": {
     "en": "Local Inference Guide",

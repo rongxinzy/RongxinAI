@@ -17,8 +17,9 @@
     "web-search"
   ],
   "mcpIds": [
-    "notion",
-    "feishu"
+    "lark-mcp",
+    "dingtalk-mcp",
+    "notion"
   ],
   "displayName": {
     "en": "Product Requirements Expert",
@@ -64,6 +65,14 @@
     {
       "zh": "评估需求变更对工期与风险的影响。",
       "en": "Assess schedule and risk impact of this scope change."
+    }
+  ],
+  "skillCatalog": [
+    {
+      "id": "vercel-skills-cli",
+      "category": "catalog",
+      "install": "npx skills add vercel-labs/skills",
+      "license": "MIT"
     }
   ]
 }

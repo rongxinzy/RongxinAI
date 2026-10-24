@@ -73,6 +73,10 @@
   "mcpIds": [
     "context7",
     "github",
-    "playwright"
+    "playwright",
+    "chrome-devtools-mcp",
+    "filesystem",
+    "figma",
+    "figwright"
   ]
 }

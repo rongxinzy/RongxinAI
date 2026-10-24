@@ -61,7 +61,9 @@
     "./skills/text-to-cad"
   ],
   "mcpIds": [
-    "fetch"
+    "fetch",
+    "filesystem",
+    "context7"
   ],
   "pythonRequirements": {
     "requirementsPath": "./skills/text-to-cad/requirements.txt"

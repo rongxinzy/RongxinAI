@@ -19,7 +19,10 @@
   "mcpIds": [
     "github",
     "gitlab",
-    "context7"
+    "context7",
+    "playwright",
+    "chrome-devtools-mcp",
+    "filesystem"
   ],
   "displayName": {
     "en": "DevOps SRE Expert",

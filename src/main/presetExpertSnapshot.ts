@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import {
   buildPythonDependencyPromptBlock,
+  buildSkillCatalogPromptBlock,
   readPresetExpertPackageMetadata,
 } from '../shared/expert/presetPackageMetadata';
 
@@ -157,6 +158,10 @@ export function resolveBundledPresetExpertSnapshot(
     if (pythonBlock) {
       promptSnapshot = `${promptSnapshot}\n\n${pythonBlock}`;
     }
+    const skillBlock = buildSkillCatalogPromptBlock(packageMetadata.skillCatalog);
+    if (skillBlock) {
+      promptSnapshot = `${promptSnapshot}\n\n${skillBlock}`;
+    }
 
     const capabilityPolicy: Record<string, unknown> = {};
     if (packageMetadata.mcpIds.length > 0) capabilityPolicy.mcpIds = packageMetadata.mcpIds;
@@ -165,6 +170,9 @@ export function resolveBundledPresetExpertSnapshot(
     }
     if (packageMetadata.pypiMirrors.length > 0) {
       capabilityPolicy.pypiMirrors = packageMetadata.pypiMirrors;
+    }
+    if (packageMetadata.skillCatalog.length > 0) {
+      capabilityPolicy.skillCatalog = packageMetadata.skillCatalog;
     }
 
     return {

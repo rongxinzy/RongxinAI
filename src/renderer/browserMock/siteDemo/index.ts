@@ -37,9 +37,7 @@ function presetExperts(): PresetExperts {
   return Object.entries(presetFiles)
     .filter(([, preset]) => preset.name !== 'presales-technical-consultant')
     .map(([file, preset]) => {
-      const packageMetadata = readPresetExpertPackageMetadata(
-        preset as Record<string, unknown>,
-      );
+      const packageMetadata = readPresetExpertPackageMetadata(preset as Record<string, unknown>);
       return {
         name: preset.name,
         displayName: preset.displayName,
@@ -53,6 +51,7 @@ function presetExperts(): PresetExperts {
         mcpIds: packageMetadata.mcpIds,
         pythonRequirements: packageMetadata.pythonRequirements,
         pypiMirrors: packageMetadata.pypiMirrors,
+        skillCatalog: packageMetadata.skillCatalog,
       };
     });
 }

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dingtalk-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "dingtalk-mcp@latest"
+      ]
+    }
+  }
+}

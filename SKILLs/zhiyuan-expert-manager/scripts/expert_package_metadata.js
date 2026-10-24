@@ -29,6 +29,26 @@ function resolveMcpIds(pluginJson) {
   return normalizeStringList(pluginJson.mcpIds);
 }
 
+function parseSkillCatalog(pluginJson) {
+  const raw = pluginJson.skillCatalog;
+  if (!Array.isArray(raw)) return [];
+  const entries = [];
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) continue;
+    const id = isNonEmptyString(item.id) ? item.id.trim() : '';
+    const category = isNonEmptyString(item.category) ? item.category.trim() : '';
+    const install = isNonEmptyString(item.install) ? item.install.trim() : '';
+    if (!id || !category || !install) continue;
+    entries.push({
+      id,
+      category,
+      install,
+      license: isNonEmptyString(item.license) ? item.license.trim() : undefined,
+    });
+  }
+  return entries;
+}
+
 function parsePythonRequirements(pluginJson) {
   const raw = pluginJson.pythonRequirements;
   if (raw === undefined || raw === null) return undefined;
@@ -86,12 +106,40 @@ function validatePackageMetadata(pluginJson, expertDir, result) {
       result.error("plugin.json: 'pypiMirrors' must be an array of non-empty URL strings when provided");
     }
   }
+
+  const skillCatalog = pluginJson.skillCatalog;
+  if (skillCatalog !== undefined) {
+    if (!Array.isArray(skillCatalog)) {
+      result.error("plugin.json: 'skillCatalog' must be an array when provided");
+    } else {
+      for (let i = 0; i < skillCatalog.length; i += 1) {
+        const item = skillCatalog[i];
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+          result.error(`plugin.json: 'skillCatalog[${i}]' must be an object`);
+          continue;
+        }
+        if (!isNonEmptyString(item.id)) {
+          result.error(`plugin.json: 'skillCatalog[${i}].id' must be a non-empty string`);
+        }
+        if (!isNonEmptyString(item.category)) {
+          result.error(`plugin.json: 'skillCatalog[${i}].category' must be a non-empty string`);
+        }
+        if (!isNonEmptyString(item.install)) {
+          result.error(`plugin.json: 'skillCatalog[${i}].install' must be a non-empty string`);
+        }
+        if (item.license !== undefined && !isNonEmptyString(item.license)) {
+          result.error(`plugin.json: 'skillCatalog[${i}].license' must be a non-empty string when provided`);
+        }
+      }
+    }
+  }
 }
 
 module.exports = {
   DEFAULT_CN_PYPI_MIRROR_URLS,
   resolvePypiMirrors,
   resolveMcpIds,
+  parseSkillCatalog,
   parsePythonRequirements,
   validatePackageMetadata,
 };

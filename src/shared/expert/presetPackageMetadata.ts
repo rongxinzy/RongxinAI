@@ -33,10 +33,19 @@ export interface ExpertPythonRequirements {
   dependencies?: string[];
 }
 
+/** External skill install hint (runtime `npx skills add`, not vendored). */
+export interface ExpertSkillCatalogEntry {
+  id: string;
+  category: string;
+  install: string;
+  license?: string;
+}
+
 export interface PresetExpertPackageMetadata {
   mcpIds: string[];
   pythonRequirements?: ExpertPythonRequirements;
   pypiMirrors: string[];
+  skillCatalog: ExpertSkillCatalogEntry[];
 }
 
 const isNonEmptyString = (value: unknown): value is string =>
@@ -69,13 +78,51 @@ export const parsePresetPythonRequirements = (
   return { requirementsPath, dependencies };
 };
 
+export const parseSkillCatalog = (
+  pluginJson: Record<string, unknown>,
+): ExpertSkillCatalogEntry[] => {
+  const raw = pluginJson.skillCatalog;
+  if (!Array.isArray(raw)) return [];
+  const entries: ExpertSkillCatalogEntry[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null || Array.isArray(item)) continue;
+    const record = item as Record<string, unknown>;
+    const id = isNonEmptyString(record.id) ? record.id.trim() : '';
+    const category = isNonEmptyString(record.category) ? record.category.trim() : '';
+    const install = isNonEmptyString(record.install) ? record.install.trim() : '';
+    if (!id || !category || !install) continue;
+    entries.push({
+      id,
+      category,
+      install,
+      license: isNonEmptyString(record.license) ? record.license.trim() : undefined,
+    });
+  }
+  return entries;
+};
+
 export const readPresetExpertPackageMetadata = (
   pluginJson: Record<string, unknown>,
 ): PresetExpertPackageMetadata => ({
   mcpIds: normalizeStringList(pluginJson.mcpIds),
   pythonRequirements: parsePresetPythonRequirements(pluginJson),
   pypiMirrors: resolvePresetPypiMirrors(pluginJson),
+  skillCatalog: parseSkillCatalog(pluginJson),
 });
+
+export const buildSkillCatalogPromptBlock = (skillCatalog: ExpertSkillCatalogEntry[]): string => {
+  if (skillCatalog.length === 0) return '';
+  const lines = skillCatalog.map(
+    entry =>
+      `- \`${entry.id}\`（${entry.category}）：\`${entry.install}\`（npm 镜像 \`${DEFAULT_CN_NPM_REGISTRY_URL}\`）`,
+  );
+  return [
+    '## 推荐外部 Skill（运行时安装）',
+    '',
+    '以下 Skill 不在安装包内；需要时用 `npx skills add` 或文档中的 install 命令拉取，禁止 vendor 仓库。',
+    ...lines,
+  ].join('\n');
+};
 
 export const buildPythonDependencyPromptBlock = (
   metadata: Pick<PresetExpertPackageMetadata, 'pythonRequirements' | 'pypiMirrors'>,
@@ -111,10 +158,12 @@ export const mergeExpertCapabilityPolicy = (input: {
   mcpIds: string[];
   pythonRequirements?: ExpertPythonRequirements;
   pypiMirrors: string[];
+  skillCatalog?: ExpertSkillCatalogEntry[];
 }): Record<string, unknown> => {
   const policy: Record<string, unknown> = {};
   if (input.mcpIds.length > 0) policy.mcpIds = input.mcpIds;
   if (input.pythonRequirements) policy.pythonRequirements = input.pythonRequirements;
   if (input.pypiMirrors.length > 0) policy.pypiMirrors = input.pypiMirrors;
+  if (input.skillCatalog && input.skillCatalog.length > 0) policy.skillCatalog = input.skillCatalog;
   return policy;
 };

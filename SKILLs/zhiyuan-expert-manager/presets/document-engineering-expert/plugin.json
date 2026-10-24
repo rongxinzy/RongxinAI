@@ -18,9 +18,12 @@
     "xlsx"
   ],
   "mcpIds": [
-    "fetch",
-    "jinshuju",
-    "baidu-netdisk"
+    "lark-mcp",
+    "dingtalk-mcp",
+    "excel-mcp-server",
+    "officecli",
+    "markitdown-mcp",
+    "fetch"
   ],
   "displayName": {
     "en": "Document Engineering Expert",
@@ -66,6 +69,20 @@
     {
       "zh": "生成合同附件的技术附录大纲。",
       "en": "Draft a technical appendix outline for this contract exhibit."
+    }
+  ],
+  "skillCatalog": [
+    {
+      "id": "anthropic-document-skills",
+      "category": "office",
+      "install": "npx skills add anthropics/skills",
+      "license": "see-repo"
+    },
+    {
+      "id": "vercel-skills-cli",
+      "category": "catalog",
+      "install": "npx skills add vercel-labs/skills",
+      "license": "MIT"
     }
   ]
 }

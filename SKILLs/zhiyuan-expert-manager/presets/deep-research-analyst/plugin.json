@@ -19,7 +19,9 @@
   "mcpIds": [
     "tavily",
     "firecrawl",
-    "fetch"
+    "fetch",
+    "mcp-sequential-thinking",
+    "context7"
   ],
   "displayName": {
     "en": "Deep Research Analyst",
@@ -65,6 +67,14 @@
     {
       "zh": "把零散资料整理成可汇报的调研备忘录。",
       "en": "Synthesize these notes into an executive research memo."
+    }
+  ],
+  "skillCatalog": [
+    {
+      "id": "vercel-skills-cli",
+      "category": "catalog",
+      "install": "npx skills add vercel-labs/skills",
+      "license": "MIT"
     }
   ]
 }

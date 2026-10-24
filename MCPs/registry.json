@@ -1,11 +1,35 @@
 {
   "categories": [
-    { "id": "productivity", "name_zh": "效率工具", "name_en": "Productivity" },
-    { "id": "developer", "name_zh": "开发工具", "name_en": "Developer tools" },
-    { "id": "data-api", "name_zh": "数据 & API", "name_en": "Data & API" },
-    { "id": "search", "name_zh": "搜索", "name_en": "Search" },
-    { "id": "browser", "name_zh": "浏览器", "name_en": "Browser" },
-    { "id": "design", "name_zh": "设计", "name_en": "Design" }
+    {
+      "id": "productivity",
+      "name_zh": "效率工具",
+      "name_en": "Productivity"
+    },
+    {
+      "id": "developer",
+      "name_zh": "开发工具",
+      "name_en": "Developer tools"
+    },
+    {
+      "id": "data-api",
+      "name_zh": "数据 & API",
+      "name_en": "Data & API"
+    },
+    {
+      "id": "search",
+      "name_zh": "搜索",
+      "name_en": "Search"
+    },
+    {
+      "id": "browser",
+      "name_zh": "浏览器",
+      "name_en": "Browser"
+    },
+    {
+      "id": "design",
+      "name_zh": "设计",
+      "name_en": "Design"
+    }
   ],
   "servers": [
     {
@@ -107,7 +131,10 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@upstash/context7-mcp@latest"],
+      "defaultArgs": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
       "authType": "none",
       "connectorPath": "context7/mcp.json"
     },
@@ -119,8 +146,13 @@
       "category": "search",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "tavily-mcp@latest"],
-      "requiredEnvKeys": ["TAVILY_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "tavily-mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "TAVILY_API_KEY"
+      ],
       "authType": "token",
       "connectorPath": "tavily/mcp.json"
     },
@@ -132,7 +164,10 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-fetch"],
+      "defaultArgs": [
+        "-y",
+        "@modelcontextprotocol/server-fetch"
+      ],
       "authType": "none",
       "connectorPath": "fetch/mcp.json"
     },
@@ -144,7 +179,10 @@
       "category": "browser",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@executeautomation/playwright-mcp-server"],
+      "defaultArgs": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
       "authType": "none",
       "connectorPath": "playwright/mcp.json"
     },
@@ -156,8 +194,13 @@
       "category": "design",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "figma-developer-mcp@latest"],
-      "requiredEnvKeys": ["FIGMA_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "figma-developer-mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "FIGMA_API_KEY"
+      ],
       "authType": "token",
       "connectorPath": "figma/mcp.json"
     },
@@ -169,8 +212,13 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "firecrawl-mcp@latest"],
-      "requiredEnvKeys": ["FIRECRAWL_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "firecrawl-mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "FIRECRAWL_API_KEY"
+      ],
       "authType": "token",
       "connectorPath": "firecrawl/mcp.json"
     },
@@ -182,9 +230,16 @@
       "category": "developer",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-gitlab"],
-      "requiredEnvKeys": ["GITLAB_PERSONAL_ACCESS_TOKEN"],
-      "optionalEnvKeys": ["GITLAB_API_URL"],
+      "defaultArgs": [
+        "-y",
+        "@modelcontextprotocol/server-gitlab"
+      ],
+      "requiredEnvKeys": [
+        "GITLAB_PERSONAL_ACCESS_TOKEN"
+      ],
+      "optionalEnvKeys": [
+        "GITLAB_API_URL"
+      ],
       "authType": "token",
       "connectorPath": "gitlab/mcp.json"
     },
@@ -196,10 +251,208 @@
       "category": "data-api",
       "transportType": "stdio",
       "command": "npx",
-      "defaultArgs": ["-y", "@amap/amap-maps-mcp-server"],
-      "requiredEnvKeys": ["AMAP_MAPS_API_KEY"],
+      "defaultArgs": [
+        "-y",
+        "@amap/amap-maps-mcp-server"
+      ],
+      "requiredEnvKeys": [
+        "AMAP_MAPS_API_KEY"
+      ],
       "authType": "token",
       "connectorPath": "amap-maps/mcp.json"
+    },
+    {
+      "id": "lark-mcp",
+      "name": "飞书 OpenAPI MCP",
+      "description_zh": "飞书官方 MCP：文档、日历、多维表、消息（npx + npmmirror）",
+      "description_en": "Official Feishu/Lark OpenAPI MCP for docs, calendar, bitable, and IM.",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "@larksuiteoapi/lark-mcp",
+        "mcp",
+        "-l",
+        "zh"
+      ],
+      "requiredEnvKeys": [
+        "LARK_APP_ID",
+        "LARK_APP_SECRET"
+      ],
+      "authType": "token",
+      "connectorPath": "lark-mcp/mcp.json"
+    },
+    {
+      "id": "dingtalk-mcp",
+      "name": "钉钉 MCP",
+      "description_zh": "钉钉官方 MCP：通讯录、日程、待办与机器人（npx）",
+      "description_en": "Official DingTalk MCP for contacts, calendar, todos, and bots.",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "dingtalk-mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "DINGTALK_Client_ID",
+        "DINGTALK_Client_Secret"
+      ],
+      "authType": "token",
+      "connectorPath": "dingtalk-mcp/mcp.json"
+    },
+    {
+      "id": "excel-mcp-server",
+      "name": "Excel MCP Server",
+      "description_zh": "读写 Excel/透视/图表（uvx 启动，PyPI 走国内镜像）",
+      "description_en": "Excel read/write, pivots, and charts via uvx (CN PyPI mirrors).",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "uvx",
+      "defaultArgs": [
+        "excel-mcp-server",
+        "stdio"
+      ],
+      "authType": "none",
+      "connectorPath": "excel-mcp-server/mcp.json"
+    },
+    {
+      "id": "officecli",
+      "name": "OfficeCLI",
+      "description_zh": "Word/Excel/PPT 一体化 Office CLI MCP（npx）",
+      "description_en": "Word/Excel/PPT OfficeCLI MCP server (npx).",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "@officecli/officecli",
+        "mcp"
+      ],
+      "authType": "none",
+      "connectorPath": "officecli/mcp.json"
+    },
+    {
+      "id": "genoffice",
+      "name": "GenOffice",
+      "description_zh": "GenOffice Docs/Sheets/Slides/PDF MCP（npx）",
+      "description_en": "GenOffice MCP for docs, sheets, slides, and PDF.",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "genoffice",
+        "mcp"
+      ],
+      "authType": "none",
+      "connectorPath": "genoffice/mcp.json"
+    },
+    {
+      "id": "markitdown-mcp",
+      "name": "MarkItDown MCP",
+      "description_zh": "PDF/Office 转 Markdown 读取（npx）",
+      "description_en": "Convert PDF/Office to Markdown for LLM consumption.",
+      "category": "productivity",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "markitdown-mcp-npx"
+      ],
+      "authType": "none",
+      "connectorPath": "markitdown-mcp/mcp.json"
+    },
+    {
+      "id": "figma-remote",
+      "name": "Figma Remote MCP",
+      "description_zh": "Figma 官方远程 MCP（OAuth，无需本地 npm 包）",
+      "description_en": "Official Figma remote MCP (OAuth, no local npm bundle).",
+      "category": "design",
+      "transportType": "http",
+      "url": "https://mcp.figma.com/mcp",
+      "authType": "oauth",
+      "connectorPath": "figma-remote/mcp.json"
+    },
+    {
+      "id": "figwright",
+      "name": "Figwright",
+      "description_zh": "Figma 双向读写 MCP（npx + 桌面插件）",
+      "description_en": "Bidirectional Figma MCP (npx + desktop plugin).",
+      "category": "design",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "@figwright/mcp@latest"
+      ],
+      "requiredEnvKeys": [
+        "FIGMA_API_KEY"
+      ],
+      "authType": "token",
+      "connectorPath": "figwright/mcp.json"
+    },
+    {
+      "id": "chrome-devtools-mcp",
+      "name": "Chrome DevTools MCP",
+      "description_zh": "Chrome 官方 DevTools：调试、性能、DOM（npx）",
+      "description_en": "Official Chrome DevTools MCP for debugging, performance, and DOM.",
+      "category": "browser",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "chrome-devtools-mcp@latest"
+      ],
+      "authType": "none",
+      "connectorPath": "chrome-devtools-mcp/mcp.json"
+    },
+    {
+      "id": "filesystem",
+      "name": "MCP Filesystem",
+      "description_zh": "官方受限文件系统读写（npx，需配置允许目录）",
+      "description_en": "Official constrained filesystem MCP (configure allowed directories).",
+      "category": "developer",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
+      "authType": "none",
+      "connectorPath": "filesystem/mcp.json"
+    },
+    {
+      "id": "memory",
+      "name": "MCP Memory",
+      "description_zh": "官方知识图谱记忆 MCP（npx）",
+      "description_en": "Official knowledge-graph memory MCP.",
+      "category": "developer",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "authType": "none",
+      "connectorPath": "memory/mcp.json"
+    },
+    {
+      "id": "mcp-sequential-thinking",
+      "name": "Sequential Thinking",
+      "description_zh": "官方分步推理 MCP（npx）",
+      "description_en": "Official sequential thinking MCP for complex tasks.",
+      "category": "developer",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "authType": "none",
+      "connectorPath": "mcp-sequential-thinking/mcp.json"
     }
   ]
 }

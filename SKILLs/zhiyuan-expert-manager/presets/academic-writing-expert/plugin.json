@@ -18,7 +18,9 @@
   ],
   "mcpIds": [
     "tavily",
-    "fetch"
+    "fetch",
+    "mcp-sequential-thinking",
+    "context7"
   ],
   "pythonRequirements": {
     "dependencies": [
