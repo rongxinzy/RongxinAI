@@ -9,7 +9,6 @@
   "type": "mcp",
   "auth_mode": "token",
   "version": "1.0.0",
-  "minWorkbuddyVersion": "4.23.0",
   "examples_zh": [
     "帮我检索固态电池电解质相关的专利和论文",
     "查找近五年 CRISPR 递送系统相关的核心专利和文献",

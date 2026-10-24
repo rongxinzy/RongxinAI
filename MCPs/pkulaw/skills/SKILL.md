@@ -163,11 +163,11 @@ author: "北京北大英华科技有限公司（北大法宝）"
 
 ## 六、认证说明（OAuth 2.1 + PKCE）
 
-本 Connector 通过 **MCP OAuth 2.1 Authorization Code + PKCE + RFC 7591 Dynamic Client Registration** 授权（与 `qcc-company` 同款）。WorkBuddy 首次连接时自动打开浏览器跳转 `cas.pkulaw.com`，用户用 [mcp.pkulaw.com](https://mcp.pkulaw.com) 账号登录授权后自动回拉，**用户无需手动填写 Token**；过期会用 refresh token 自动续期。
+本 Connector 通过 **MCP OAuth 2.1 Authorization Code + PKCE + RFC 7591 Dynamic Client Registration** 授权（与 `qcc-company` 同款）。知远智能体 (ZhiYuan Agent) 首次连接时自动打开浏览器跳转 `cas.pkulaw.com`，用户用 [mcp.pkulaw.com](https://mcp.pkulaw.com) 账号登录授权后自动回拉，**用户无需手动填写 Token**；过期会用 refresh token 自动续期。
 
 若用户报 `401` / `403`：
 - 在 [mcp.pkulaw.com](https://mcp.pkulaw.com) → 我的应用 → **订阅** 5 个底层 MCP 服务（法规-关键词 / 法规-语义 / 案例-关键词 / 案例-语义 / 精准法条-关键词）
-- 或在 WorkBuddy 连接器页面点 **"重新连接"** 触发授权流程
+- 或在知远的连接器页面点 **"重新连接"** 触发授权流程
 
 ## 七、数据来源与免责声明
 

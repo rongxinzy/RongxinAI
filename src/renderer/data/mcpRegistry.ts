@@ -1,13 +1,16 @@
 import { McpRegistryEntry } from '../types/mcp';
 
-/** Fallback entries used only when the bundled marketplace cannot be loaded. */
+/**
+ * Fallback entries used only when the bundled marketplace cannot be loaded.
+ * Mirrors MCPs/registry.json — keep both in sync (guarded by
+ * src/main/mcpRegistryIntegrity.test.ts).
+ */
 export const mcpRegistry: McpRegistryEntry[] = [
   {
     id: 'notion',
     name: 'Notion',
     descriptionKey: '',
-    description_zh:
-      '\u5728\u7ebf\u534f\u4f5c\u4e0e\u77e5\u8bc6\u5e93\u7ba1\u7406\u5de5\u4f5c\u533a',
+    description_zh: '在线协作与知识库管理工作区',
     description_en: 'A connected workspace for collaboration and knowledge management.',
     category: 'productivity',
     categoryKey: 'mcpCategoryProductivity',
@@ -19,8 +22,7 @@ export const mcpRegistry: McpRegistryEntry[] = [
     id: 'supabase',
     name: 'Supabase',
     descriptionKey: '',
-    description_zh:
-      'Supabase \u6570\u636e\u5e93\u3001\u8868\u3001\u8fb9\u7f18\u51fd\u6570\u548c\u9879\u76ee\u7ba1\u7406',
+    description_zh: 'Supabase 数据库、表、边缘函数和项目管理',
     description_en: 'Supabase database, tables, edge functions, and project management.',
     category: 'developer',
     categoryKey: 'mcpCategoryDeveloper',
@@ -30,10 +32,9 @@ export const mcpRegistry: McpRegistryEntry[] = [
   },
   {
     id: 'jinshuju',
-    name: '\u91d1\u6570\u636e',
+    name: '金数据',
     descriptionKey: '',
-    description_zh:
-      '\u91d1\u6570\u636e\u8868\u5355\u3001\u6570\u636e\u67e5\u8be2\u548c\u81ea\u52a8\u5316',
+    description_zh: '金数据表单、数据查询和自动化',
     description_en: 'Jinshuju forms, data queries, and workflow automation.',
     category: 'productivity',
     categoryKey: 'mcpCategoryProductivity',
@@ -43,10 +44,9 @@ export const mcpRegistry: McpRegistryEntry[] = [
   },
   {
     id: 'feishu',
-    name: '\u98de\u4e66',
+    name: '飞书',
     descriptionKey: '',
-    description_zh:
-      '\u98de\u4e66\u6587\u6863\u3001\u65e5\u5386\u3001\u6d88\u606f\u3001\u4e91\u76d8\u548c\u5ba1\u6279\u534f\u4f5c',
+    description_zh: '飞书文档、日历、消息、云盘和审批',
     description_en: 'Feishu documents, calendars, messages, drive, and approvals.',
     category: 'productivity',
     categoryKey: 'mcpCategoryProductivity',
@@ -55,17 +55,52 @@ export const mcpRegistry: McpRegistryEntry[] = [
     authType: 'cli',
   },
   {
-    id: 'pkulaw',
-    name: '\u5317\u5927\u6cd5\u5b9d',
+    id: 'github',
+    name: 'GitHub',
     descriptionKey: '',
-    description_zh:
-      '\u4e2d\u56fd\u6cd5\u5f8b\u6cd5\u89c4\u3001\u6848\u4f8b\u548c\u53f8\u6cd5\u6570\u636e\u68c0\u7d22',
+    description_zh: 'GitHub 仓库、Issue、Pull Request 和开发工作流',
+    description_en: 'GitHub repositories, issues, pull requests, and developer workflows.',
+    category: 'developer',
+    categoryKey: 'mcpCategoryDeveloper',
+    transportType: 'http',
+    url: 'https://api.githubcopilot.com/mcp/',
+    authType: 'token',
+  },
+  {
+    id: 'pkulaw',
+    name: '北大法宝',
+    descriptionKey: '',
+    description_zh: '法律法规、案例和司法数据检索',
     description_en: 'Chinese laws, regulations, and judicial case search.',
     category: 'data-api',
     categoryKey: 'mcpCategoryDataApi',
     transportType: 'http',
     url: 'https://apim-gateway.pkulaw.com/mcp-law-agg/1.0.0/mcp',
     authType: 'oauth',
+  },
+  {
+    id: 'baidu-netdisk',
+    name: '百度网盘',
+    descriptionKey: '',
+    description_zh: '百度网盘文件搜索、读取和管理',
+    description_en: 'Baidu Netdisk file search, reading, and management.',
+    category: 'productivity',
+    categoryKey: 'mcpCategoryProductivity',
+    transportType: 'sse',
+    url: 'https://mcp-pan.baidu.com/sse',
+    authType: 'token',
+  },
+  {
+    id: 'patsnap-search',
+    name: '智慧芽',
+    descriptionKey: '',
+    description_zh: '专利、文献和科技情报检索，支持自然语言与语义搜索',
+    description_en: 'Patsnap patent, literature, and technology intelligence search.',
+    category: 'data-api',
+    categoryKey: 'mcpCategoryDataApi',
+    transportType: 'http',
+    url: 'https://connect.zhihuiya.com/2b0355/logic-mcp?apikey=${PATSNAP_API_KEY}',
+    authType: 'token',
   },
 ];
 

@@ -277,6 +277,64 @@ function copySkillsToUserData(pluginJson, expertDir, userDataSkillsDir, overwrit
   }
 }
 
+/**
+ * Candidate roots for materializing top-level skillIds (e.g. "docx"): the
+ * SKILLs top-level directory this script ships in (SKILLs/<expert>/scripts →
+ * two levels up), plus any caller-provided roots (tests, custom layouts).
+ */
+function getTopLevelSkillSourceRoots(extraRoots) {
+  const roots = [];
+  if (Array.isArray(extraRoots)) {
+    for (const root of extraRoots) {
+      if (typeof root === 'string' && root.trim()) roots.push(path.resolve(root));
+    }
+  }
+  roots.push(path.resolve(__dirname, '..', '..'));
+  return [...new Set(roots)];
+}
+
+/**
+ * Materialize plugin.json skillIds that reference top-level bundled skills
+ * instead of nested package skills: copy <root>/<id>/ into userData/SKILLs/<id>
+ * so Pi sessions can load them. Nested package skills are already copied by
+ * copySkillsToUserData; missing ids are logged and skipped (the expert may
+ * legitimately rely on nested skills only).
+ */
+function copyTopLevelSkillIdsToUserData(
+  skillIds,
+  userDataSkillsDir,
+  sourceRoots,
+  overwrite = false,
+  logger = console,
+) {
+  const ids = [...new Set(Array.isArray(skillIds) ? skillIds : [])];
+  for (const id of ids) {
+    if (typeof id !== 'string' || !id.trim()) continue;
+    // Directory ids only — a forged path id must never escape the roots.
+    if (path.basename(id) !== id) continue;
+
+    const dest = path.join(userDataSkillsDir, id);
+    if (fs.existsSync(path.join(dest, 'SKILL.md')) && !overwrite) continue;
+
+    let src = null;
+    for (const root of sourceRoots) {
+      const candidate = path.join(root, id);
+      if (fs.existsSync(path.join(candidate, 'SKILL.md'))) {
+        src = candidate;
+        break;
+      }
+    }
+    if (!src) {
+      logger.warn(`[ExpertRegister] skill "${id}" not found in bundled SKILLs roots; skipping`);
+      continue;
+    }
+
+    fs.mkdirSync(userDataSkillsDir, { recursive: true });
+    if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
+    copyDirRecursive(src, dest);
+  }
+}
+
 function getPiAgentsDir() {
   // pi-coding-agent's getAgentDir() resolves to ~/.pi/agent.
   // The subagent extension discovers agents from <agentDir>/agents/*.md.
@@ -602,6 +660,15 @@ function parseExpertPackage(expertDir, options = {}) {
   const userDataDir = path.dirname(options.dbPath || getDefaultDbPath());
   const userDataSkillsDir = path.join(userDataDir, 'SKILLs');
   copySkillsToUserData(pluginJson, expertPath, userDataSkillsDir, Boolean(options.update));
+  // Top-level skillIds reference bundled SKILLs (e.g. "docx") that ship in the
+  // app, not in the package; materialize them into userData so sessions that
+  // only scan userData can still load them.
+  copyTopLevelSkillIdsToUserData(
+    skillIds,
+    userDataSkillsDir,
+    getTopLevelSkillSourceRoots(options.skillSourceRoots),
+    Boolean(options.update),
+  );
 
   // Sync agent MDs to pi agents directory for subagent discovery
   // (Team members and single agents alike — any expert agent can be a subagent target)
@@ -843,6 +910,8 @@ module.exports = {
   syncAgentsToPiDir,
   upsertExpertRegistry,
   getBundledSkillRoots,
+  getTopLevelSkillSourceRoots,
+  copyTopLevelSkillIdsToUserData,
   AGENT_SOURCE_EXPERT_PACKAGE,
   AGENT_SOURCE_EXPERT_PACKAGE_MEMBER,
 };

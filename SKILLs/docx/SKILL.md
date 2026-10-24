@@ -1,10 +1,9 @@
 ---
-name: minimax-docx
+name: docx
 license: MIT
 metadata:
   version: "1.0.1"
   category: document-processing
-  author: MiniMaxAI
   sources:
     - "ECMA-376 Office Open XML File Formats"
     - "GB/T 9704-2012 Layout Standard for Official Documents"
@@ -21,7 +20,7 @@ description: >
   implies a printable/formal document, use this skill.
 ---
 
-# minimax-docx
+# docx
 
 Create, edit, and format DOCX documents via CLI tools or direct C# scripts built on OpenXML SDK (.NET).
 

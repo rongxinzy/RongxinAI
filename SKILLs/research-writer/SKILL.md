@@ -46,7 +46,7 @@ cd my-article-title
 touch article-draft.md
 ```
 
-从这个目录打开 Claude Code，即可开始写作。
+在知远 (ZhiYuan Agent) 中启用该 Skill 后，即可在此目录中开始写作。
 
 ### 基本工作流
 

@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 import {
+  copyTopLevelSkillIdsToUserData,
   getPiAgentsDir,
   parseExpertPackage,
 } from '../SKILLs/zhiyuan-expert-manager/scripts/register_expert';
@@ -190,6 +191,140 @@ describe('parseExpertPackage', () => {
       expect(dir).toBe(path.join(os.homedir(), '.pi', 'agent', 'agents'));
     } finally {
       process.env.PI_CODING_AGENT_DIR = originalEnv;
+    }
+  });
+});
+
+describe('copyTopLevelSkillIdsToUserData (via parseExpertPackage)', () => {
+  function createSkillIdsOnlyExpertPackage(dir, skillIds) {
+    const agentDir = path.join(dir, 'agents');
+    fs.mkdirSync(agentDir, { recursive: true });
+    const plugin = {
+      name: 'test-skillids-expert',
+      version: '1.0.0',
+      description: 'A skillIds-only test expert.',
+      author: { name: 'Test', email: 'test@example.com' },
+      expertType: 'agent',
+      agentName: 'test-skillids-assistant',
+      agents: ['./agents/test-skillids-assistant.md'],
+      skillIds,
+      displayName: { en: 'Test SkillIds Assistant', zh: '测试技能引用助手' },
+      profession: { en: 'Assistant', zh: '助手' },
+      displayDescription: {
+        en: 'A skillIds-only expert for integration testing.',
+        zh: '一个仅引用内置技能、不携带任何嵌套技能目录的轻量集成测试专家，专注验证注册流程。',
+      },
+      categoryId: '02-Engineering',
+      defaultInitPrompt: {
+        zh: '你好，请帮我完成一次内置技能调用。',
+        en: 'Hello, please run a bundled skill for me.',
+      },
+      plugin: 'test-skillids-expert',
+      tags: [
+        { en: 'Testing', zh: '测试' },
+        { en: 'Coding', zh: '编程' },
+        { en: 'Q&A', zh: '问答' },
+      ],
+      quickPrompts: [
+        {
+          en: 'Hello, please run a bundled skill for me.',
+          zh: '你好，请帮我完成一次内置技能调用。',
+        },
+        { en: 'Explain what a skill is.', zh: '解释什么是技能。' },
+        { en: 'List the bundled skills you can use.', zh: '列出你可以使用的内置技能。' },
+      ],
+    };
+    fs.writeFileSync(path.join(dir, 'plugin.json'), JSON.stringify(plugin, null, 2), 'utf-8');
+    fs.writeFileSync(
+      path.join(agentDir, 'test-skillids-assistant.md'),
+      `---\nname: test-skillids-assistant\ndescription: "A skillIds-only test assistant."\ndisplayName:\n  en: "Test SkillIds Assistant"\n  zh: "测试技能引用助手"\nprofession:\n  en: "Assistant"\n  zh: "助手"\n---\n\n# 测试技能引用助手\n\n## Skill 使用协议（CRITICAL）\n\n1. 从系统提示的 \`<available_skills>\` 中选择与请求最匹配的一个 Skill。\n2. 使用 \`read\` 完整读取该 Skill 的 \`<location>\`。\n3. 严格按 \`SKILL.md\` 执行；禁止一次性加载全部技能，按依赖顺序加载后续技能。\n`,
+      'utf-8',
+    );
+  }
+
+  function createBundledSkill(root, id) {
+    const skillDir = path.join(root, id);
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillDir, 'SKILL.md'),
+      `---\nname: ${id}\ndescription: Bundled skill for tests.\n---\n\n# ${id}\n`,
+      'utf-8',
+    );
+    return skillDir;
+  }
+
+  test('materializes top-level skillIds from a bundled SKILLs root into userData', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-test-'));
+    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-userdata-'));
+    const bundledRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-skills-root-'));
+    const piAgentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-pi-agents-'));
+    const originalEnv = process.env.PI_CODING_AGENT_DIR;
+    try {
+      process.env.PI_CODING_AGENT_DIR = piAgentsDir;
+      createBundledSkill(bundledRoot, 'fake-bundled-skill');
+      createSkillIdsOnlyExpertPackage(tmpDir, ['fake-bundled-skill']);
+
+      parseExpertPackage(tmpDir, {
+        dbPath: path.join(userDataDir, 'zhiyuan.sqlite'),
+        skillSourceRoots: [bundledRoot],
+      });
+
+      const copiedSkillMd = path.join(userDataDir, 'SKILLs', 'fake-bundled-skill', 'SKILL.md');
+      expect(fs.existsSync(copiedSkillMd)).toBe(true);
+      expect(fs.readFileSync(copiedSkillMd, 'utf-8')).toContain('# fake-bundled-skill');
+    } finally {
+      process.env.PI_CODING_AGENT_DIR = originalEnv;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+      fs.rmSync(bundledRoot, { recursive: true, force: true });
+      fs.rmSync(piAgentsDir, { recursive: true, force: true });
+    }
+  });
+
+  test('warns and continues when a skillId is missing from all source roots', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-test-'));
+    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-userdata-'));
+    const bundledRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-skills-root-'));
+    const piAgentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-pi-agents-'));
+    const originalEnv = process.env.PI_CODING_AGENT_DIR;
+    const warnings = [];
+    const originalWarn = console.warn;
+    try {
+      process.env.PI_CODING_AGENT_DIR = piAgentsDir;
+      console.warn = message => warnings.push(String(message));
+      createSkillIdsOnlyExpertPackage(tmpDir, ['no-such-bundled-skill']);
+
+      expect(() =>
+        parseExpertPackage(tmpDir, {
+          dbPath: path.join(userDataDir, 'zhiyuan.sqlite'),
+          skillSourceRoots: [bundledRoot],
+        }),
+      ).not.toThrow();
+
+      expect(warnings.some(w => w.includes('no-such-bundled-skill'))).toBe(true);
+      expect(fs.existsSync(path.join(userDataDir, 'SKILLs', 'no-such-bundled-skill'))).toBe(false);
+    } finally {
+      console.warn = originalWarn;
+      process.env.PI_CODING_AGENT_DIR = originalEnv;
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+      fs.rmSync(bundledRoot, { recursive: true, force: true });
+      fs.rmSync(piAgentsDir, { recursive: true, force: true });
+    }
+  });
+
+  test('never materializes path-shaped skillIds outside the source roots', () => {
+    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-userdata-'));
+    const bundledRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-skills-root-'));
+    try {
+      // A traversal-shaped id must be skipped before any existence check.
+      copyTopLevelSkillIdsToUserData(['../escape'], path.join(userDataDir, 'SKILLs'), [
+        bundledRoot,
+      ]);
+      expect(fs.readdirSync(userDataDir)).toEqual([]);
+    } finally {
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+      fs.rmSync(bundledRoot, { recursive: true, force: true });
     }
   });
 });
