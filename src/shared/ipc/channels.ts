@@ -21,6 +21,7 @@ export const CompanionIpc = {
   TasksChanged: 'companion:tasks:changed',
   StopTask: 'companion:task:stop',
   ChooseWorkspace: 'companion:workspace:choose',
+  ChooseFiles: 'companion:files:choose',
   Hide: 'companion:hide',
   OpenWorkbench: 'companion:openWorkbench',
   Context: 'companion:context',

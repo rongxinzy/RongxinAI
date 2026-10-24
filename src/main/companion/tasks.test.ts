@@ -88,6 +88,7 @@ test('commits session, message, task, run and receipt before the single native l
   expect(first.receipt).toBeTruthy();
   const retry = await f.service.submit(f.profile, f.request);
   expect(retry).toEqual(first);
+  expect(await f.service.submit(f.profile, { ...f.request, attachmentIds: [] })).toEqual(first);
   expect(f.start).toHaveBeenCalledOnce();
   expect(f.models.resolveAutomatic).toHaveBeenCalledOnce();
   expect(f.service.recent(f.profile.petId)[0]).toMatchObject({
@@ -228,6 +229,60 @@ test('a native folder choice becomes visible without exposing filesystem paths i
     await expect(f.service.chooseWorkspace(directory + '/file.txt')).rejects.toThrow(
       'must be a directory',
     );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('selected files reach the same native task and lost-reply retries survive file removal', async () => {
+  const f = fixture();
+  const directory = await mkdtemp('/tmp/companion-task-files-');
+  const file = directory + '/selected-notes.md';
+  try {
+    await writeFile(file, 'Explicitly selected file.');
+    const selected = await f.service.attachments.choose(f.profile.petId, [file]);
+    const request = { ...f.request, attachmentIds: selected.map(item => item.id) };
+    const result = await f.service.submit(f.profile, request);
+    const message = f.store.getSession(result.receipt!.sessionId)!.messages[0];
+    expect(message.metadata?.fileAttachments).toEqual([
+      expect.objectContaining({ name: 'selected-notes.md', extension: 'MD' }),
+    ]);
+    expect(f.start).toHaveBeenCalledWith(
+      result.receipt!.sessionId,
+      f.request.text,
+      expect.objectContaining({
+        fileAttachments: [expect.objectContaining({ name: 'selected-notes.md' })],
+        modelOverride: 'available/model',
+        systemPrompt: expect.stringContaining('selected-notes.md'),
+      }),
+    );
+    await rm(file);
+    expect(await f.service.submit(f.profile, request)).toEqual(result);
+    await expect(f.service.submit(f.profile, { ...request, attachmentIds: [] })).rejects.toThrow(
+      'different input',
+    );
+    await expect(f.service.submit(f.profile, { ...request, requestId: 'new' })).rejects.toThrow();
+    expect(f.start).toHaveBeenCalledOnce();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('foreign or forged attachment grants cannot admit a task', async () => {
+  const f = fixture();
+  const directory = await mkdtemp('/tmp/companion-task-foreign-');
+  try {
+    const file = directory + '/private.txt';
+    await writeFile(file, 'Private');
+    const selected = await f.service.attachments.choose('another-pet', [file]);
+    await expect(
+      f.service.submit(f.profile, {
+        ...f.request,
+        attachmentIds: selected.map(item => item.id),
+      }),
+    ).rejects.toThrow('unavailable');
+    expect(f.start).not.toHaveBeenCalled();
+    expect(f.db.prepare('SELECT count(*) AS n FROM workbench_tasks').get()).toEqual({ n: 0 });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

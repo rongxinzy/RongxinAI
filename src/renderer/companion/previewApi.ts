@@ -132,6 +132,10 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
       if (!workspaces.length) workspaces.push(selected);
       return selected;
     },
+    chooseFiles: async petId => {
+      if (petId !== active) throw new Error('Companion selection changed');
+      return [{ id: crypto.randomUUID(), name: 'project-notes.md', bytes: 128 }];
+    },
     stopTask: async sessionId => {
       tasks.set(
         active,

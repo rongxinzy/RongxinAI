@@ -9,6 +9,7 @@ import { DesktopPetMotion } from '../../src/shared/desktopPet/motionCatalog.ts';
 import { WorkbenchRunStatus } from '../../src/shared/workbenchTask/constants.ts';
 import { stressMedia } from './stress-media.mjs';
 import { verifyHomeSurfaces } from './verify-home-surfaces.mjs';
+import { createTaskFileFixture, chooseTaskFile } from './verify-task-files.mjs';
 
 // Manual native acceptance only: isolated storage, local model fixture, no real account keys.
 // Prerequisites: verified Magpie resource, build:electron:dev and web:preview.
@@ -17,6 +18,8 @@ const port = Number(process.env.PREVIEW_PORT ?? 5176);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid preview port');
 const userData = await fs.mkdtemp('/tmp/companion-task-native-');
 const workspace = await fs.mkdtemp('/tmp/companion-task-workspace-');
+const fileFixture =
+  process.env.COMPANION_VERIFY_FILES === '1' ? await createTaskFileFixture(userData) : null;
 let requests = 0;
 const requestKinds = [];
 const server = createServer(async (request, response) => {
@@ -67,6 +70,60 @@ const server = createServer(async (request, response) => {
     model: 'fixture-model',
     choices: [{ index: 0, delta, finish_reason }],
   });
+  if (kind === 'task' && fileFixture) {
+    const toolResults = JSON.stringify(
+      payload.messages?.filter(message => message.role === 'tool'),
+    );
+    if (fileFixture.requested) {
+      fileFixture.observed = toolResults.includes(fileFixture.marker);
+      if (!fileFixture.observed) {
+        response.end(
+          `data: ${JSON.stringify(chunk({ role: 'assistant', content: 'Selected file contents were not returned.' }))}\n\ndata: [DONE]\n\n`,
+        );
+        return;
+      }
+    } else {
+      if (!JSON.stringify(payload.messages).includes(fileFixture.file)) {
+        response.write(
+          `data: ${JSON.stringify(chunk({ role: 'assistant', content: 'Selected file reference is missing.' }))}\n\n`,
+        );
+        response.write(`data: ${JSON.stringify(chunk({}, 'stop'))}\n\n`);
+        response.end('data: [DONE]\n\n');
+        return;
+      }
+      const read = payload.tools?.find(tool => tool.function?.name === 'read');
+      if (!read) {
+        response.write(
+          `data: ${JSON.stringify(chunk({ role: 'assistant', content: 'Native file read tool is missing.' }))}\n\n`,
+        );
+        response.write(`data: ${JSON.stringify(chunk({}, 'stop'))}\n\n`);
+        response.end('data: [DONE]\n\n');
+        return;
+      }
+      fileFixture.requested = true;
+      response.write(
+        `data: ${JSON.stringify(
+          chunk({
+            role: 'assistant',
+            tool_calls: [
+              {
+                index: 0,
+                id: 'read-selected-file',
+                type: 'function',
+                function: {
+                  name: 'read',
+                  arguments: JSON.stringify({ path: fileFixture.file }),
+                },
+              },
+            ],
+          }),
+        )}\n\n`,
+      );
+      response.write(`data: ${JSON.stringify(chunk({}, 'tool_calls'))}\n\n`);
+      response.end('data: [DONE]\n\n');
+      return;
+    }
+  }
   const answer =
     kind === 'project-memory'
       ? JSON.stringify({ shouldSave: false, memories: [] })
@@ -193,6 +250,9 @@ try {
   await chat.getByRole('tab', { name: '交代任务', exact: true }).click();
   await chat.getByRole('combobox', { name: '工作区', exact: true }).click();
   await chat.getByRole('option', { name: 'Isolated task project', exact: true }).click();
+  const attachmentIds = fileFixture
+    ? await chooseTaskFile(application, chat, fileFixture, userData)
+    : undefined;
   await chat.getByRole('textbox').fill('整理项目资料，并告诉我接下来该做什么。');
   await chat.getByRole('textbox').press('Enter');
   await chat.getByRole('textbox').evaluate(async element => {
@@ -228,18 +288,19 @@ try {
       window.acceptanceVideos.every(video => video.paused && !video.getAttribute('src')),
     ),
   ).toBe(true);
-  const retry = await chat.evaluate(
-    async receipt =>
-      window.companion.submitTask({
-        petId: receipt.petId,
-        requestId: receipt.requestId,
-        text: '整理项目资料，并告诉我接下来该做什么。',
-        workspaceId: (await window.companion.bootstrap()).workspaces.find(
-          workspace => workspace.name === 'Isolated task project',
-        ).id,
-      }),
-    receipt,
+  const taskRequest = await chat.evaluate(
+    async ({ receipt, attachmentIds }) => ({
+      petId: receipt.petId,
+      requestId: receipt.requestId,
+      text: '整理项目资料，并告诉我接下来该做什么。',
+      workspaceId: (await window.companion.bootstrap()).workspaces.find(
+        workspace => workspace.name === 'Isolated task project',
+      ).id,
+      ...(attachmentIds ? { attachmentIds } : {}),
+    }),
+    { receipt, attachmentIds },
   );
+  const retry = await chat.evaluate(request => window.companion.submitTask(request), taskRequest);
   if (JSON.stringify(retry.receipt) !== JSON.stringify(receipt))
     throw new Error('Receipt changed on retry');
   await expect
@@ -256,6 +317,13 @@ try {
   const {
     tasks: [finished],
   } = await chat.evaluate(() => window.companion.tasks());
+  if (fileFixture) {
+    expect(fileFixture.observed).toBe(true);
+    await fs.rm(fileFixture.file);
+    expect(
+      (await chat.evaluate(request => window.companion.submitTask(request), taskRequest)).receipt,
+    ).toEqual(receipt);
+  }
   if (finished.status === WorkbenchRunStatus.Failed) {
     const detail = await main.evaluate(
       taskId => window.electron.workbenchTask.getDetail(taskId),
@@ -295,10 +363,9 @@ try {
   await chat.screenshot({ path: path.join(userData, 'task-window.png') });
   await chat.evaluate(sessionId => window.companion.openWorkbench(sessionId), receipt.sessionId);
   await expect(main.getByTestId('sidebar-view-workbench')).toHaveAttribute('aria-current', 'page');
-  await main
-    .getByText('整理项目资料，并告诉我接下来该做什么。', { exact: true })
-    .first()
-    .waitFor({ timeout: 30_000 });
+  await expect(main.getByRole('log')).toContainText('整理项目资料，并告诉我接下来该做什么。', {
+    timeout: 30_000,
+  });
   const detail = await main.evaluate(
     taskId => window.electron.workbenchTask.getDetail(taskId),
     receipt.taskId,
@@ -309,13 +376,18 @@ try {
     detail.detail.runs[0]?.id !== receipt.runId
   )
     throw new Error('Workbench task identity changed');
+  const expectedKinds = home
+    ? ['companion-chat', 'project-memory', 'session-memory', 'task']
+    : ['project-memory', 'session-memory', 'task'];
+  if (fileFixture) expectedKinds.push('task');
   await expect
     .poll(() => requestKinds.map(item => item.kind).sort(), { timeout: 10_000 })
-    .toEqual(
-      home
-        ? ['companion-chat', 'project-memory', 'session-memory', 'task']
-        : ['project-memory', 'session-memory', 'task'],
-    );
+    .toEqual(expectedKinds.sort());
+  if (fileFixture) {
+    await expect(main.getByText('attachment-notes.md', { exact: true }).first()).toBeVisible();
+    await main.mouse.move(10, 10);
+    await main.screenshot({ path: path.join(userData, 'task-file-workbench.png') });
+  }
   const stress = process.env.COMPANION_MEDIA_STRESS_SECONDS
     ? await stressMedia(
         application,
@@ -330,7 +402,8 @@ try {
       status: finished.status,
       receipt,
       requests,
-      taskExecutions: requestKinds.filter(item => item.kind === 'task').length,
+      taskExecutions: detail.detail.runs.length,
+      taskModelRequests: requestKinds.filter(item => item.kind === 'task').length,
       chatExecutions: requestKinds.filter(item => item.kind === 'companion-chat').length,
       maintenanceRequests: requestKinds.filter(
         item => item.kind === 'project-memory' || item.kind === 'session-memory',
@@ -338,6 +411,13 @@ try {
       detailAvailable: Boolean(detail),
       media,
       home,
+      files: fileFixture
+        ? {
+            readThroughNativeTool: fileFixture.observed,
+            opaqueDraft: true,
+            lostReplyAfterRemoval: true,
+          }
+        : null,
       stress,
       userData,
       workspace,

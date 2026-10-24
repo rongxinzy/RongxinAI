@@ -105,6 +105,15 @@ function fixture() {
     onChanged: vi.fn(() => vi.fn()),
     submit: vi.fn(),
     chooseWorkspace: vi.fn(async () => ({ id: 'workspace', name: 'Chosen folder' })),
+    attachments: {
+      choose: vi.fn(async () => [
+        {
+          id: '00000000-0000-4000-8000-000000000009',
+          name: 'report.pdf',
+          bytes: 20,
+        },
+      ]),
+    },
   };
   const openTask = vi.fn();
   initializeCompanionWindow({
@@ -195,7 +204,7 @@ test('the bridge exposes profile state and the workbench without general applica
   expect(f.onProfileChanged).toHaveBeenCalledWith(f.profile);
   await f.invoke(IpcChannel.OpenWorkbench);
   expect(f.main.focus).toHaveBeenCalledOnce();
-  expect(mocks.handlers.size).toBe(11);
+  expect(mocks.handlers.size).toBe(12);
   disposeCompanionWindow();
   expect(mocks.handlers.size).toBe(0);
   expect(mocks.unregister).toHaveBeenCalledWith(COMPANION_SHORTCUT);
@@ -278,4 +287,29 @@ test('appearance changes notify both surfaces without changing personality or st
   f.profiles.changeAppearance.mockClear();
   updateActiveCompanionAppearance(f.profile.characterId);
   expect(f.profiles.changeAppearance).not.toHaveBeenCalled();
+});
+
+test('file picking admits only native paths for the still-active owned profile', async () => {
+  const f = fixture();
+  await expect(
+    mocks.handlers.get(IpcChannel.ChooseFiles)!({ sender: {}, senderFrame: {} }, f.profile.petId),
+  ).rejects.toThrow('owned main frame');
+  expect(await f.invoke(IpcChannel.ChooseFiles, f.profile.petId)).toEqual([]);
+  expect(f.tasks.attachments.choose).not.toHaveBeenCalled();
+  mocks.choose.mockResolvedValueOnce({ canceled: false, filePaths: ['/chosen/report.pdf'] });
+  expect(await f.invoke(IpcChannel.ChooseFiles, f.profile.petId)).toEqual([
+    { id: '00000000-0000-4000-8000-000000000009', name: 'report.pdf', bytes: 20 },
+  ]);
+  expect(f.tasks.attachments.choose).toHaveBeenCalledWith(f.profile.petId, ['/chosen/report.pdf']);
+  await expect(
+    f.invoke(IpcChannel.ChooseFiles, f.profile.petId, ['/renderer/path']),
+  ).rejects.toThrow('invalid arguments');
+  f.tasks.attachments.choose.mockClear();
+  const oldId = f.profile.petId;
+  mocks.choose.mockImplementationOnce(async () => {
+    f.profile.petId = '00000000-0000-4000-8000-000000000099';
+    return { canceled: false, filePaths: ['/chosen/report.pdf'] };
+  });
+  await expect(f.invoke(IpcChannel.ChooseFiles, oldId)).rejects.toThrow('selection changed');
+  expect(f.tasks.attachments.choose).not.toHaveBeenCalled();
 });

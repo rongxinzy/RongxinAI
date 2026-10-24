@@ -21,6 +21,7 @@ import type { MagpieModelService } from '../magpie/modelService';
 import type { WorkbenchTaskService } from '../workbenchTask/taskService';
 import { createPiWorkbenchContract } from '../libs/agentEngine/piRuntimeWorkbenchContract';
 import { companionInstructions } from './personas';
+import { CompanionAttachments } from './attachments';
 
 interface Row extends CompanionTaskReceipt {
   fingerprint: string;
@@ -35,7 +36,9 @@ interface Options {
 /** Ownership links only; canonical Cowork/Workbench tables remain the task and run authority. */
 export class CompanionTasks {
   private revision = 0;
+  readonly attachments: CompanionAttachments;
   constructor(private readonly options: Options) {
+    this.attachments = new CompanionAttachments(options.db);
     options.db.exec(`CREATE TABLE IF NOT EXISTS companion_task_admissions (
       pet_id TEXT NOT NULL, request_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
       session_id TEXT NOT NULL, task_id TEXT NOT NULL, run_id TEXT NOT NULL,
@@ -97,7 +100,12 @@ export class CompanionTasks {
     profile: CompanionProfile,
     input: CompanionTaskRequest,
   ): Promise<CompanionTaskResult> {
-    const request = companionTaskRequest.parse(input);
+    const parsed = companionTaskRequest.parse(input);
+    // Reloaded drafts represent no selection as []; the same request must keep its receipt.
+    const request = {
+      ...parsed,
+      attachmentIds: parsed.attachmentIds?.length ? parsed.attachmentIds : undefined,
+    };
     if (request.petId !== profile.petId) throw new Error('Task belongs to another companion');
     const fingerprint = createHash('sha256').update(JSON.stringify(request)).digest('hex');
     const previous = this.find(profile.petId, request.requestId);
@@ -112,6 +120,7 @@ export class CompanionTasks {
       return { receipt: null, reason: CompanionUnavailableReason.ServiceUnavailable };
     }
     if (!model) return { receipt: null, reason: CompanionUnavailableReason.NoModel };
+    const attachments = await this.attachments.resolve(profile.petId, request.attachmentIds);
 
     const launch: { current?: () => void } = {};
     const modelId = model.model.id;
@@ -137,9 +146,21 @@ export class CompanionTasks {
           cwd: workspace.path,
           mode: CoworkSessionMode.Work,
           modelOverride: modelId,
+          ...attachments,
           // Keep the existing user permission choice. Personality never grants authority.
           permissionMode: store.getConfig().permissionMode ?? CoworkPermissionMode.Ask,
-          systemPrompt: [store.getConfig().systemPrompt, companionInstructions(profile.personaId)]
+          systemPrompt: [
+            store.getConfig().systemPrompt,
+            companionInstructions(profile.personaId),
+            attachments.fileAttachments.length
+              ? [
+                  'Files explicitly attached to this task (references only):',
+                  ...attachments.fileAttachments.map(({ name, path }) =>
+                    JSON.stringify({ name, path }),
+                  ),
+                ].join('\n')
+              : undefined,
+          ]
             .filter(Boolean)
             .join('\n\n'),
         },

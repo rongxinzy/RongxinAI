@@ -1,4 +1,5 @@
 import type { DesktopPetBuiltinId } from '../desktopPet/catalog';
+import type { CompanionAttachment } from './attachments';
 import type {
   CompanionTaskRequest,
   CompanionTaskResult,
@@ -82,6 +83,7 @@ export interface CompanionWindowApi {
   tasks(): Promise<CompanionTaskSnapshot>;
   stopTask(sessionId: string): Promise<void>;
   chooseWorkspace(): Promise<CompanionWorkspace | null>;
+  chooseFiles(petId: string): Promise<CompanionAttachment[]>;
   hide(): Promise<void>;
   openWorkbench(sessionId?: string): Promise<void>;
   onContext(listener: (context: CompanionWindowContext) => void): () => void;

@@ -1,9 +1,11 @@
 import { CompanionComposerMode, CompanionSurface } from '../../shared/companion/constants';
+import { companionAttachments, type CompanionAttachment } from '../../shared/companion/attachments';
 interface Draft {
   text: string;
   requestId: string;
   mode?: CompanionComposerMode;
   workspaceId?: string;
+  attachments?: CompanionAttachment[];
 }
 const PREFIX = 'zhiyuan-companion-draft:';
 
@@ -41,6 +43,10 @@ export function readCompanionDraft(
           value.workspaceId.length <= 128
             ? value.workspaceId
             : undefined,
+        attachments:
+          'attachments' in value
+            ? (companionAttachments.safeParse(value.attachments).data ?? [])
+            : [],
       };
   } catch {
     /* Keep the window usable when browser storage is unavailable. */

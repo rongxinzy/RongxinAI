@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { WorkbenchRunStatus } from '../workbenchTask/constants';
 import { CompanionUnavailableReason } from './constants';
+import { COMPANION_MAX_ATTACHMENTS } from './attachments';
 
 export const companionTaskRequest = z
   .object({
@@ -8,6 +9,7 @@ export const companionTaskRequest = z
     requestId: z.string().trim().min(1).max(128),
     text: z.string().trim().min(1).max(32_000),
     workspaceId: z.string().min(1).max(128),
+    attachmentIds: z.array(z.uuid()).max(COMPANION_MAX_ATTACHMENTS).optional(),
   })
   .strict();
 const companionTaskReceipt = z

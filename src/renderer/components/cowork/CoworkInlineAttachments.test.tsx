@@ -51,6 +51,7 @@ describe('CoworkInlineAttachments', () => {
     expect(attachment).toHaveClass('h-8');
 
     const removeButton = screen.getByLabelText(i18nService.t('coworkAttachmentRemove'));
+    expect(removeButton).toHaveAccessibleDescription('brief.pdf');
     expect(removeButton).toHaveClass('theme-page-attachments-button-variant-6');
     expect(zenithLight.components['page-attachments-button-variant-6'].parentHover.opacity).toBe(
       '1',
@@ -64,7 +65,7 @@ describe('CoworkInlineAttachments', () => {
     });
   });
 
-  test('uses a fixed-width muted label with the filename tail and full hover name', async () => {
+  test('preserves the compact filename tail and the complete hover name', async () => {
     const filename = 'very-long-financial-report-2026-final.csv';
 
     render(
@@ -87,9 +88,7 @@ describe('CoworkInlineAttachments', () => {
     fireEvent.focus(trigger!);
 
     const fullName = await screen.findByRole('heading', { name: filename });
-    expect(fullName).toHaveClass('whitespace-nowrap');
-    expect(fullName.parentElement?.parentElement).toHaveClass('w-max');
-    expect(fullName.parentElement?.parentElement).not.toHaveClass('max-w-80');
+    expect(fullName).toHaveTextContent(filename);
   });
 
   test('shows an unknown extension instead of the generic binary media type', async () => {

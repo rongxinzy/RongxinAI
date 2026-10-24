@@ -1,0 +1,48 @@
+{
+  "passed": true,
+  "status": "succeeded",
+  "receipt": {
+    "petId": "120509ca-46da-4e07-b5cd-367f44e2ecfb",
+    "requestId": "5d436c60-b363-4d43-b28d-000e0e149ff2",
+    "sessionId": "b017d047-5a2d-49ca-8062-027a04c79247",
+    "taskId": "a8c3d3bc-b7ae-4a50-962b-3055757ed8b5",
+    "runId": "f27a7bef-5b73-4d97-b953-909842a6d9e5"
+  },
+  "requests": 5,
+  "taskExecutions": 1,
+  "taskModelRequests": 2,
+  "chatExecutions": 1,
+  "maintenanceRequests": 2,
+  "detailAvailable": true,
+  "media": {
+    "decoderSlots": 2,
+    "clip": "happy",
+    "transparent": 100388,
+    "opaque": 40734,
+    "devicePixelRatio": 2
+  },
+  "home": {
+    "profileCount": 7,
+    "sharedIdentity": true,
+    "sharedConversation": true,
+    "systemAppearanceSync": true,
+    "staleRequestsRejected": {
+      "submit": true,
+      "stop": true
+    },
+    "independentDrafts": true,
+    "appearancePreservesIdentity": true
+  },
+  "files": {
+    "readThroughNativeTool": true,
+    "opaqueDraft": true,
+    "lostReplyAfterRemoval": true
+  },
+  "stress": null,
+  "userData": "/tmp/companion-task-native-ZZEgrW",
+  "workspace": "/tmp/companion-task-workspace-kRjgVh",
+  "postClosePersistence": {
+    "catalogRows": 1,
+    "admissionMatchesReceipt": true
+  }
+}

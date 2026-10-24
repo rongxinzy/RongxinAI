@@ -33,6 +33,12 @@ export type CompanionUnavailableReason =
   (typeof CompanionUnavailableReason)[keyof typeof CompanionUnavailableReason];
 
 export const COMPANION_PAGE = 'companion.html';
+export const CompanionAttachmentIssue = {
+  TooLarge: 'companion_attachment_too_large',
+  TooMany: 'companion_attachment_too_many',
+  Invalid: 'companion_attachment_invalid',
+  Unavailable: 'companion_attachment_unavailable',
+} as const;
 export const CompanionSurface = { Quick: 'quick', Home: 'home' } as const;
 export type CompanionSurface = (typeof CompanionSurface)[keyof typeof CompanionSurface];
 export const COMPANION_SHORTCUT = 'CommandOrControl+Shift+Space';

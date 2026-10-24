@@ -128,6 +128,11 @@ export function createCompanion(runtime: BrowserMockRuntime): Window['electron']
         name: 'Preview',
       };
     },
+    chooseFiles: async _p0 => {
+      void _p0;
+      runtime.warnOnce('companion.chooseFiles');
+      return [];
+    },
     hide: async () => {
       runtime.warnOnce('companion.hide');
     },

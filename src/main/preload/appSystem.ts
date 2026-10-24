@@ -45,6 +45,7 @@ export const appSystemApi = {
     tasks: companionApi.tasks,
     stopTask: companionApi.stopTask,
     chooseWorkspace: companionApi.chooseWorkspace,
+    chooseFiles: companionApi.chooseFiles,
     hide: companionApi.hide,
     openWorkbench: companionApi.openWorkbench,
     onContext: companionApi.onContext,

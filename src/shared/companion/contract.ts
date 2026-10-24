@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { CompanionIpc as IpcChannel } from '../ipc/channels';
 import { defineIpcContract } from '../ipc/contract';
 import { DesktopPetBuiltinId } from '../desktopPet/catalog';
+import { companionAttachments } from './attachments';
 import {
   companionTaskRequest,
   companionTaskProjection,
@@ -91,6 +92,11 @@ export const companionContract = defineIpcContract({
     channel: IpcChannel.ChooseWorkspace,
     args: z.tuple([]),
     result: companionWorkspace.nullable(),
+  },
+  chooseFiles: {
+    channel: IpcChannel.ChooseFiles,
+    args: z.tuple([z.uuid()]),
+    result: companionAttachments,
   },
   stopTask: { channel: IpcChannel.StopTask, args: z.tuple([z.uuid()]), result: z.void() },
   hide: { channel: IpcChannel.Hide, args: z.tuple([]), result: z.void() },

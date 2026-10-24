@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { X, PanelsTopLeft, FolderOpen } from 'lucide-react';
+import { X, PanelsTopLeft, FolderOpen, Paperclip } from 'lucide-react';
 import { cn } from '@shared/lib/utils';
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
@@ -15,6 +15,7 @@ import {
   PromptInputFooter,
   PromptInputTextarea,
   PromptInputSubmit,
+  PromptInputButton,
 } from '@shared/components/ai-elements/prompt-input';
 import type {
   CompanionWindowApi,
@@ -27,6 +28,7 @@ import {
   CompanionRequestState,
   CompanionComposerMode,
   CompanionSurface,
+  CompanionAttachmentIssue,
 } from '../../shared/companion/constants';
 import PageHeader from '../components/PageHeader';
 import { i18nService } from '../services/i18n';
@@ -35,8 +37,11 @@ import { readCompanionDraft, writeCompanionDraft } from './draft';
 import { useTaskSnapshots } from './useTaskSnapshots';
 import { CompanionConversation } from './CompanionConversation';
 import { CompanionPortrait } from './CompanionPortrait';
+import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttachments';
+import { useCompanionFiles } from './useCompanionFiles';
 
 function applyContext(context: CompanionWindowContext): void {
+  themeService.initialize();
   i18nService.setLanguage(context.language, { persist: false });
   themeService.setStyle(context.themeStyle);
   themeService.setTheme(context.theme);
@@ -191,9 +196,18 @@ export function CompanionView({
     const next = { ...draftRef.current, ...patch, text, requestId: crypto.randomUUID() };
     replaceDraft(next, activeId.current ?? undefined);
   };
+  const { choosingFiles, chooseFiles } = useCompanionFiles({
+    api,
+    disabled: !state || sending || choosingWorkspace,
+    activePetId: () => activeId.current,
+    attachments: () => draftRef.current.attachments ?? [],
+    onChange: attachments => updateDraft(draftRef.current.text, { attachments }),
+    onError: setError,
+    onFocus: () => textarea.current?.focus(),
+  });
 
   const submit = async () => {
-    if (taskMode && choosingWorkspace) return;
+    if (taskMode && (choosingWorkspace || choosingFiles)) return;
     if (!state || !draft.text.trim() || sending || (!taskMode && pending) || !api) return;
     const sent = draftRef.current;
     const petId = state.activePetId;
@@ -203,7 +217,12 @@ export function CompanionView({
       const current =
         activeId.current === petId ? draftRef.current : readCompanionDraft(petId, surface);
       if (current.requestId !== sent.requestId) return;
-      const next = { ...current, text: '', requestId: crypto.randomUUID() };
+      const next = {
+        ...current,
+        text: '',
+        requestId: crypto.randomUUID(),
+        attachments: taskMode ? [] : current.attachments,
+      };
       if (activeId.current === petId) replaceDraft(next, petId);
       else writeCompanionDraft(petId, next, surface);
     };
@@ -218,6 +237,7 @@ export function CompanionView({
           requestId: sent.requestId,
           text: sent.text,
           workspaceId: sent.workspaceId,
+          attachmentIds: sent.attachments?.map(file => file.id),
         });
         if (!result.receipt) {
           if (activeId.current === petId) setError('companionNoModel');
@@ -236,10 +256,18 @@ export function CompanionView({
       }
       acknowledgeDraft();
       await load();
-    } catch {
+    } catch (failure) {
+      await load();
       if (activeId.current === petId)
-        setError(taskMode ? 'companionTaskSubmitFailed' : 'companionFailed');
-      void load();
+        setError(
+          taskMode &&
+            failure instanceof Error &&
+            failure.message.includes(CompanionAttachmentIssue.Unavailable)
+            ? 'companionFileUnavailable'
+            : taskMode
+              ? 'companionTaskSubmitFailed'
+              : 'companionFailed',
+        );
     } finally {
       setSending(false);
     }
@@ -335,7 +363,7 @@ export function CompanionView({
             ) : null}
             <Select
               value={state?.activePetId ?? ''}
-              disabled={!state || sending || choosingWorkspace || Boolean(pending)}
+              disabled={!state || sending || choosingWorkspace || choosingFiles || Boolean(pending)}
               onValueChange={id => {
                 if (id) void load(id);
               }}
@@ -384,10 +412,10 @@ export function CompanionView({
             }
           }}
         />
-        <div className="flex shrink-0 flex-col gap-3 px-4 pb-4">
+        <div className="flex min-h-0 shrink flex-col gap-3 overflow-y-auto px-4 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <FluidTabs
-              disabled={!state || sending || choosingWorkspace}
+              disabled={!state || sending || choosingWorkspace || choosingFiles}
               aria-label={t('companionInputMode')}
               value={taskMode ? CompanionComposerMode.Task : CompanionComposerMode.Chat}
               onValueChange={mode => updateDraft(draftRef.current.text, { mode })}
@@ -400,7 +428,7 @@ export function CompanionView({
               <div className="flex items-center gap-2">
                 <Select
                   value={draft.workspaceId ?? ''}
-                  disabled={!state || sending || choosingWorkspace}
+                  disabled={!state || sending || choosingWorkspace || choosingFiles}
                   onValueChange={id => {
                     if (id) updateDraft(draftRef.current.text, { workspaceId: id });
                   }}
@@ -426,7 +454,7 @@ export function CompanionView({
                   variant="ghost"
                   size="icon-sm"
                   aria-label={t('companionPickFolder')}
-                  disabled={!state || sending || choosingWorkspace}
+                  disabled={!state || sending || choosingWorkspace || choosingFiles}
                   onClick={() => void chooseWorkspace()}
                 >
                   <FolderOpen />
@@ -437,18 +465,33 @@ export function CompanionView({
           {error ? (
             <div role="alert" className="flex items-center justify-between gap-3">
               <span className="theme-home-caption">{t(error)}</span>
-              <Button variant="ghost" size="sm" onClick={() => void load()}>
-                {t('companionRefresh')}
-              </Button>
+              {!error.startsWith('companionFile') ? (
+                <Button variant="ghost" size="sm" onClick={() => void load()}>
+                  {t('companionRefresh')}
+                </Button>
+              ) : null}
             </div>
           ) : null}
           {state && !state.shortcutAvailable ? (
             <p className="theme-home-caption">{t('companionShortcutUnavailable')}</p>
           ) : null}
+          {taskMode && draft.attachments?.length ? (
+            <CoworkInlineAttachments
+              className="max-h-16 flex-wrap overflow-y-auto"
+              attachments={draft.attachments.map(file => ({ path: file.id, name: file.name }))}
+              onRemove={id =>
+                updateDraft(draftRef.current.text, {
+                  attachments: draftRef.current.attachments?.filter(file => file.id !== id),
+                })
+              }
+            />
+          ) : null}
           <PromptInput
             onSubmit={submit}
             maxFiles={0}
-            onError={() => setError('companionAttachmentsWorkbench')}
+            onError={() =>
+              setError(taskMode ? 'companionFilesUsePicker' : 'companionAttachmentsWorkbench')
+            }
           >
             <PromptInputTextarea
               ref={textarea}
@@ -461,13 +504,24 @@ export function CompanionView({
               autoFocus
             />
             <PromptInputFooter>
-              <span />
+              {taskMode ? (
+                <PromptInputButton
+                  aria-label={t('companionAddFiles')}
+                  tooltip={t('companionAddFiles')}
+                  disabled={!state || sending || choosingWorkspace || choosingFiles}
+                  onClick={() => void chooseFiles()}
+                >
+                  <Paperclip />
+                </PromptInputButton>
+              ) : (
+                <span />
+              )}
               <PromptInputSubmit
                 status={pending && !taskMode ? 'streaming' : 'ready'}
                 disabled={
                   !state ||
                   sending ||
-                  (taskMode && choosingWorkspace) ||
+                  (taskMode && (choosingWorkspace || choosingFiles)) ||
                   ((!pending || taskMode) && !draft.text.trim())
                 }
                 onStop={() => void stop()}

@@ -147,11 +147,14 @@ test('task workspace, draft and open selector survive hot appearance changes at 
   await page.getByRole('combobox', { name: '工作区', exact: true }).click();
   await page.getByRole('option', { name: 'Preview project', exact: true }).click();
   const input = page.getByRole('textbox');
+  await page.getByRole('button', { name: '添加附件', exact: true }).click();
+  await expect(page.getByText('project-notes.md', { exact: true })).toBeVisible();
   await input.fill('Keep this task draft and workspace while appearance changes');
   await input.evaluate(element => element.setSelectionRange(2, 10));
   await page.evaluate(() => window.taskContext({ language: 'en', theme: 'dark', themeStyle: '' }));
   await expect(input).toHaveValue('Keep this task draft and workspace while appearance changes');
   await expect(input).toBeFocused();
+  await expect(page.getByText('project-notes.md', { exact: true })).toBeVisible();
   expect(await input.evaluate(element => [element.selectionStart, element.selectionEnd])).toEqual([
     2, 10,
   ]);
@@ -181,6 +184,7 @@ test('task workspace, draft and open selector survive hot appearance changes at 
   );
   await page.keyboard.press('Escape');
   await expect(input).toHaveValue('Keep this task draft and workspace while appearance changes');
+  await expect(page.getByText('project-notes.md', { exact: true })).toBeVisible();
 });
 
 test('a first-time task can choose its folder without losing text edited while the picker is pending', async ({

@@ -9,6 +9,12 @@ export async function verifyHomeSurfaces(main, quick, output) {
   await expect(homeInput).toBeEnabled();
   await homeInput.fill('A draft kept in the main companion page');
   await quickInput.fill('A draft kept in the quick window');
+  for (const page of [main, quick]) await page.emulateMedia({ colorScheme: 'light' });
+  await expect(main.locator('html')).toHaveClass(/light/);
+  await expect(quick.locator('html')).toHaveClass(/light/);
+  for (const page of [main, quick]) await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(main.locator('html')).toHaveClass(/dark/);
+  await expect(quick.locator('html')).toHaveClass(/dark/);
   const initial = await main.evaluate(() => window.electron.companion.bootstrap());
   const original = initial.profiles.find(profile => profile.petId === initial.activePetId);
   const other = initial.profiles.find(profile => profile.petId !== initial.activePetId);
@@ -94,12 +100,14 @@ export async function verifyHomeSurfaces(main, quick, output) {
   await expect(main.getByTestId('sidebar-view-companion')).toHaveAttribute('aria-current', 'page');
   await expect(homeInput).toBeVisible();
   await expect(homeInput).toHaveValue('A draft kept in the main companion page');
+  await main.mouse.move(10, 10);
   await main.screenshot({ path: path.join(output, 'companion-home.png') });
   await quickInput.fill('');
   return {
     profileCount: initial.profiles.length,
     sharedIdentity: true,
     sharedConversation: true,
+    systemAppearanceSync: true,
     staleRequestsRejected: rejected,
     independentDrafts: true,
     appearancePreservesIdentity: true,

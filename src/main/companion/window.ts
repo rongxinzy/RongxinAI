@@ -33,7 +33,7 @@ let window: BrowserWindow | null = null;
 let shortcutAvailable = false;
 let unsubscribe: (() => void) | undefined;
 let unsubscribeTasks: (() => void) | undefined;
-let choosingWorkspace = false;
+let choosingDialog = false;
 
 export function isCompanionWindow(candidate: BrowserWindow): boolean {
   return candidate === window;
@@ -133,8 +133,8 @@ export function initializeCompanionWindow(next: Options): void {
   handleIpcContract(companionContract, {
     chooseWorkspace: async event => {
       const owner = assertWindow(event);
-      if (choosingWorkspace) throw new Error('A workspace dialog is already open');
-      choosingWorkspace = true;
+      if (choosingDialog) throw new Error('A companion dialog is already open');
+      choosingDialog = true;
       try {
         const selection = await dialog.showOpenDialog(owner, {
           title: t('companionPickFolder'),
@@ -144,7 +144,26 @@ export function initializeCompanionWindow(next: Options): void {
         if (selection.canceled || !selection.filePaths[0]) return null;
         return await next.getTasks().chooseWorkspace(selection.filePaths[0]);
       } finally {
-        choosingWorkspace = false;
+        choosingDialog = false;
+      }
+    },
+    chooseFiles: async (event, petId) => {
+      const owner = assertWindow(event);
+      activeProfile(petId);
+      if (choosingDialog) throw new Error('A companion dialog is already open');
+      choosingDialog = true;
+      try {
+        const selection = await dialog.showOpenDialog(owner, {
+          title: t('companionAddFiles'),
+          properties: ['openFile', 'multiSelections'],
+        });
+        if (selection.canceled) return [];
+        return await serialized(event, () => {
+          activeProfile(petId);
+          return next.getTasks().attachments.choose(petId, selection.filePaths);
+        });
+      } finally {
+        choosingDialog = false;
       }
     },
     bootstrap: event => serialized(event, snapshot),
@@ -301,6 +320,7 @@ export function openCompanionWindow(): void {
 
 export function disposeCompanionWindow(): void {
   options = null;
+  choosingDialog = false;
   unsubscribe?.();
   unsubscribe = undefined;
   unsubscribeTasks?.();
