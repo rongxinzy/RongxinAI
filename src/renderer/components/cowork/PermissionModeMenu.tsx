@@ -26,8 +26,8 @@ const PERMISSION_MODE_LABEL_KEYS = {
 } as const;
 
 /**
- * Work-mode permission selector: 请求权限 (ask before acting) vs 全部允许
- * (execute without authorization). Persisted via cowork config.
+ * Work-mode permission selector: 敏感操作需确认 vs 全部允许 (i18n permissionMode*).
+ * Persisted via cowork config.
  */
 const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
   value,

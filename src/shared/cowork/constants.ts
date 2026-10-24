@@ -94,7 +94,7 @@ export const CoworkPermissionMode = {
 
 export type CoworkPermissionMode = (typeof CoworkPermissionMode)[keyof typeof CoworkPermissionMode];
 
-export const DEFAULT_COWORK_PERMISSION_MODE = CoworkPermissionMode.AllowAll;
+export const DEFAULT_COWORK_PERMISSION_MODE = CoworkPermissionMode.Ask;
 
 export const CoworkPermissionBehavior = {
   Allow: 'allow',
