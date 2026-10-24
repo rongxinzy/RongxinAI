@@ -17,6 +17,7 @@ const os = require('os');
 const path = require('path');
 
 const { validateExpert } = require('./validate_expert');
+const { resolveMcpIds } = require('./expert_package_metadata');
 
 const DEFAULT_DB_FILENAME = 'zhiyuan.sqlite';
 
@@ -114,6 +115,7 @@ function ensureAgentsTable(db) {
       working_directory TEXT NOT NULL DEFAULT '',
       icon TEXT NOT NULL DEFAULT '',
       skill_ids TEXT NOT NULL DEFAULT '[]',
+      mcp_ids TEXT NOT NULL DEFAULT '[]',
       enabled INTEGER NOT NULL DEFAULT 1,
       pinned INTEGER NOT NULL DEFAULT 0,
       pin_order INTEGER,
@@ -125,6 +127,10 @@ function ensureAgentsTable(db) {
       updated_at INTEGER NOT NULL
     );
   `);
+  const columns = db.prepare('PRAGMA table_info(agents)').all().map(row => row.name);
+  if (!columns.includes('mcp_ids')) {
+    db.exec("ALTER TABLE agents ADD COLUMN mcp_ids TEXT NOT NULL DEFAULT '[]'");
+  }
 }
 
 function agentIdExists(db, id) {
@@ -156,6 +162,7 @@ function updateAgentFromRequest(db, existingId, request) {
       identity = ?,
       icon = ?,
       skill_ids = ?,
+      mcp_ids = ?,
       source = ?,
       preset_id = ?,
       updated_at = ?
@@ -166,6 +173,7 @@ function updateAgentFromRequest(db, existingId, request) {
     request.identity,
     request.icon,
     JSON.stringify(request.skillIds || []),
+    JSON.stringify(request.mcpIds || []),
     request.source,
     request.presetId,
     now,
@@ -597,6 +605,7 @@ function parseExpertPackage(expertDir, options = {}) {
 
   // Resolve skill IDs
   const skillIds = resolveSkillIds(pluginJson, expertPath);
+  const packageMcpIds = resolveMcpIds(pluginJson);
 
   // Copy skills to userData/SKILLs
   const userDataDir = path.dirname(options.dbPath || getDefaultDbPath());
@@ -651,6 +660,7 @@ function parseExpertPackage(expertDir, options = {}) {
         workingDirectory: options.workingDirectory || '',
         icon,
         skillIds: [],
+        mcpIds: [],
         source: AGENT_SOURCE_EXPERT_PACKAGE_MEMBER,
         presetId: pluginJson.name,
       });
@@ -686,6 +696,7 @@ function parseExpertPackage(expertDir, options = {}) {
       workingDirectory: options.workingDirectory || '',
       icon,
       skillIds,
+      mcpIds: packageMcpIds,
       source: AGENT_SOURCE_EXPERT_PACKAGE,
       presetId: pluginJson.name,
     });
@@ -705,6 +716,7 @@ function parseExpertPackage(expertDir, options = {}) {
       workingDirectory: options.workingDirectory || '',
       icon,
       skillIds,
+      mcpIds: packageMcpIds,
       source: AGENT_SOURCE_EXPERT_PACKAGE,
       presetId: pluginJson.name,
     });
@@ -745,9 +757,9 @@ function registerExpert(expertDir, options = {}) {
       db.prepare(`
         INSERT INTO agents (
           id, name, description, system_prompt, identity, model, working_directory,
-          icon, skill_ids, enabled, pinned, is_default, source, preset_id,
+          icon, skill_ids, mcp_ids, enabled, pinned, is_default, source, preset_id,
           triage_override, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 0, ?, ?, NULL, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, 0, ?, ?, NULL, ?, ?)
       `).run(
         agentId,
         request.name,
@@ -758,6 +770,7 @@ function registerExpert(expertDir, options = {}) {
         request.workingDirectory,
         request.icon,
         JSON.stringify(request.skillIds || []),
+        JSON.stringify(request.mcpIds || []),
         request.source,
         request.presetId,
         now,

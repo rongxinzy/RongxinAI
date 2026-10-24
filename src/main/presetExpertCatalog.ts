@@ -1,6 +1,11 @@
 import fs from 'fs';
 import path from 'path';
 
+import {
+  type ExpertPythonRequirements,
+  readPresetExpertPackageMetadata,
+} from '../shared/expert/presetPackageMetadata';
+
 interface LocalizedText {
   en: string;
   zh: string;
@@ -16,6 +21,9 @@ export interface PresetExpertCatalogEntry {
   quickPrompts: LocalizedText[];
   workflow: string[];
   path: string;
+  mcpIds: string[];
+  pythonRequirements?: ExpertPythonRequirements;
+  pypiMirrors: string[];
 }
 
 const WORKFLOW_HEADING_PATTERN = /(?:标准.*(?:流程|SOP)|全流程|组件开发.*SOP)/i;
@@ -68,18 +76,22 @@ export function listPresetExperts(bundledSkillsRoot: string): PresetExpertCatalo
       if (!fs.existsSync(pluginPath)) return [];
 
       try {
-        const plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf-8'));
+        const plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf-8')) as Record<string, unknown>;
+        const packageMetadata = readPresetExpertPackageMetadata(plugin);
         return [
           {
-            name: plugin.name,
-            displayName: plugin.displayName,
-            profession: plugin.profession,
-            displayDescription: plugin.displayDescription,
-            categoryId: plugin.categoryId,
-            tags: plugin.tags,
-            quickPrompts: plugin.quickPrompts,
+            name: plugin.name as string,
+            displayName: plugin.displayName as LocalizedText,
+            profession: plugin.profession as LocalizedText,
+            displayDescription: plugin.displayDescription as LocalizedText,
+            categoryId: plugin.categoryId as string,
+            tags: plugin.tags as LocalizedText[],
+            quickPrompts: plugin.quickPrompts as LocalizedText[],
             workflow: readWorkflow(presetDir, plugin.agents),
             path: presetDir,
+            mcpIds: packageMetadata.mcpIds,
+            pythonRequirements: packageMetadata.pythonRequirements,
+            pypiMirrors: packageMetadata.pypiMirrors,
           },
         ];
       } catch (error) {

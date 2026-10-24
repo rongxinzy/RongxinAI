@@ -53,39 +53,6 @@
       "defaultArgs": ["-y", "@upstash/context7-mcp@latest"]
     },
     {
-      "id": "google-drive",
-      "name": "Google Drive",
-      "description_zh": "Google Drive 文件访问和搜索，自动导出 Workspace 文件",
-      "description_en": "Google Drive file access and search with auto-export for Workspace files",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@modelcontextprotocol/server-gdrive"],
-      "optionalEnvKeys": ["GDRIVE_CREDENTIALS_PATH"]
-    },
-    {
-      "id": "gmail",
-      "name": "Gmail",
-      "description_zh": "Gmail 邮件管理：读取、发送、搜索邮件，支持自动认证",
-      "description_en": "Gmail management: read, send, search emails with auto authentication",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@gongrzhe/server-gmail-autoauth-mcp"],
-      "requiredEnvKeys": ["GMAIL_CLIENT_ID", "GMAIL_CLIENT_SECRET", "GMAIL_REDIRECT_URI"]
-    },
-    {
-      "id": "google-calendar",
-      "name": "Google Calendar",
-      "description_zh": "Google Calendar 日程管理：创建、查询、更新日历事件",
-      "description_en": "Google Calendar management: create, query, update calendar events",
-      "category": "productivity",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@cocal/google-calendar-mcp"],
-      "requiredEnvKeys": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI"]
-    },
-    {
       "id": "notion",
       "name": "Notion",
       "description_zh": "Notion API：搜索、创建/更新页面、管理数据库",
@@ -139,17 +106,6 @@
       "requiredEnvKeys": ["FIGMA_API_KEY"]
     },
     {
-      "id": "canva",
-      "name": "Canva",
-      "description_zh": "Canva 设计平台：创建和管理设计、模板操作",
-      "description_en": "Canva design platform: create and manage designs, template operations",
-      "category": "design",
-      "transportType": "stdio",
-      "command": "npx",
-      "defaultArgs": ["-y", "@iflow-mcp/mattcoatsworth-canva-mcp-server"],
-      "requiredEnvKeys": ["CANVA_API_KEY"]
-    },
-    {
       "id": "firecrawl",
       "name": "Firecrawl",
       "description_zh": "网页抓取与数据提取：支持批处理、结构化提取和内容分析",
@@ -159,6 +115,17 @@
       "command": "npx",
       "defaultArgs": ["-y", "firecrawl-mcp@latest"],
       "requiredEnvKeys": ["FIRECRAWL_API_KEY"]
+    },
+    {
+      "id": "amap-maps",
+      "name": "高德地图",
+      "description_zh": "高德地图路线、POI、地理编码与出行能力（国内常用）",
+      "description_en": "AMap routing, POI, geocoding, and mobility tools for China.",
+      "category": "data-api",
+      "transportType": "stdio",
+      "command": "npx",
+      "defaultArgs": ["-y", "@amap/amap-maps-mcp-server"],
+      "requiredEnvKeys": ["AMAP_MAPS_API_KEY"]
     },
     {
       "id": "fetch",

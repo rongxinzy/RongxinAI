@@ -1,0 +1,71 @@
+{
+  "name": "document-engineering-expert",
+  "version": "1.0.0",
+  "description": "Document engineering expert for DOCX/PDF workflows, templates, and publication-quality output.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "document-engineering-expert",
+  "agents": [
+    "./agents/document-engineering-expert.md"
+  ],
+  "skillIds": [
+    "docx",
+    "pdf",
+    "process-doc",
+    "copy-editor",
+    "xlsx"
+  ],
+  "mcpIds": [
+    "fetch",
+    "jinshuju",
+    "baidu-netdisk"
+  ],
+  "displayName": {
+    "en": "Document Engineering Expert",
+    "zh": "文档工程专家"
+  },
+  "profession": {
+    "en": "Senior Document Engineer",
+    "zh": "高级文档工程师"
+  },
+  "displayDescription": {
+    "en": "Produces publication-ready DOCX/PDF deliverables with templates, styles, and review checklists.",
+    "zh": "交付可发布的 Word/PDF 文档：模板规范、样式统一、附审阅清单与修改说明。"
+  },
+  "categoryId": "06-ContentCreative",
+  "defaultInitPrompt": {
+    "zh": "把这份草稿整理成符合企业模板规范的 Word 文档结构。",
+    "en": "Restructure this draft to match our corporate Word template."
+  },
+  "plugin": "document-engineering-expert",
+  "tags": [
+    {
+      "en": "DOCX",
+      "zh": "Word 文档"
+    },
+    {
+      "en": "PDF",
+      "zh": "PDF"
+    },
+    {
+      "en": "Templates",
+      "zh": "模板规范"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "把这份草稿整理成符合企业模板规范的 Word 文档结构。",
+      "en": "Restructure this draft to match our corporate Word template."
+    },
+    {
+      "zh": "检查这份 PDF 的目录、编号与交叉引用是否一致。",
+      "en": "Check this PDF for consistent headings, numbering, and cross-references."
+    },
+    {
+      "zh": "生成合同附件的技术附录大纲。",
+      "en": "Draft a technical appendix outline for this contract exhibit."
+    }
+  ]
+}

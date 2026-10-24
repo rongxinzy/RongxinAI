@@ -15,6 +15,7 @@ import {
   siteWorkspaces,
   type SiteDemoLang,
 } from './content';
+import { readPresetExpertPackageMetadata } from '../../../shared/expert/presetPackageMetadata';
 import { siteLocalModels, siteMarketplace } from './models';
 
 type ElectronApi = Window['electron'];
@@ -35,17 +36,25 @@ const presetFiles = import.meta.glob<PresetPlugin>(
 function presetExperts(): PresetExperts {
   return Object.entries(presetFiles)
     .filter(([, preset]) => preset.name !== 'presales-technical-consultant')
-    .map(([file, preset]) => ({
-      name: preset.name,
-      displayName: preset.displayName,
-      profession: preset.profession,
-      displayDescription: preset.displayDescription,
-      categoryId: preset.categoryId ?? '',
-      tags: preset.tags ?? [],
-      quickPrompts: preset.quickPrompts ?? [],
-      workflow: [],
-      path: file,
-    }));
+    .map(([file, preset]) => {
+      const packageMetadata = readPresetExpertPackageMetadata(
+        preset as Record<string, unknown>,
+      );
+      return {
+        name: preset.name,
+        displayName: preset.displayName,
+        profession: preset.profession,
+        displayDescription: preset.displayDescription,
+        categoryId: preset.categoryId ?? '',
+        tags: preset.tags ?? [],
+        quickPrompts: preset.quickPrompts ?? [],
+        workflow: [],
+        path: file,
+        mcpIds: packageMetadata.mcpIds,
+        pythonRequirements: packageMetadata.pythonRequirements,
+        pypiMirrors: packageMetadata.pypiMirrors,
+      };
+    });
 }
 
 const catalog: MagpieModelCatalog = {

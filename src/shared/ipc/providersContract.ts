@@ -124,6 +124,11 @@ const UpdateAgentRequestSchema = z.object({
 /** Localized preset-expert catalog row (presetExpertCatalog.ts). */
 const LocalizedTextSchema = z.object({ en: z.string(), zh: z.string() });
 
+const ExpertPythonRequirementsSchema = z.object({
+  requirementsPath: z.string().optional(),
+  dependencies: z.array(z.string()).optional(),
+});
+
 const PresetExpertsResultSchema = z.object({
   experts: z.array(
     z.object({
@@ -136,6 +141,9 @@ const PresetExpertsResultSchema = z.object({
       quickPrompts: z.array(LocalizedTextSchema),
       workflow: z.array(z.string()),
       path: z.string(),
+      mcpIds: z.array(z.string()),
+      pythonRequirements: ExpertPythonRequirementsSchema.optional(),
+      pypiMirrors: z.array(z.string()),
     }),
   ),
   error: z.string().optional(),

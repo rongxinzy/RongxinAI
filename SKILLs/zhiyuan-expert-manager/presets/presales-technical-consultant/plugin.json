@@ -5,14 +5,21 @@
   "author": {
     "name": "ZhiYuan Agent"
   },
-
   "expertType": "agent",
   "agentName": "presales-technical-consultant",
-
-  "agents": ["./agents/presales-technical-consultant.md"],
-  "skills": ["./skills/presales-technical-consulting"],
-  "skillIds": ["web-search", "docx", "xlsx", "presentation-studio", "pdf"],
-
+  "agents": [
+    "./agents/presales-technical-consultant.md"
+  ],
+  "skills": [
+    "./skills/presales-technical-consulting"
+  ],
+  "skillIds": [
+    "web-search",
+    "docx",
+    "xlsx",
+    "presentation-studio",
+    "pdf"
+  ],
   "displayName": {
     "en": "Presales Technical Consultant",
     "zh": "售前技术顾问"
@@ -32,9 +39,18 @@
   },
   "plugin": "presales-technical-consultant",
   "tags": [
-    { "en": "Technical Discovery", "zh": "技术需求发现" },
-    { "en": "Demo and POC", "zh": "演示与验证" },
-    { "en": "Solution Architecture", "zh": "解决方案架构" }
+    {
+      "en": "Technical Discovery",
+      "zh": "技术需求发现"
+    },
+    {
+      "en": "Demo and POC",
+      "zh": "演示与验证"
+    },
+    {
+      "en": "Solution Architecture",
+      "zh": "解决方案架构"
+    }
   ],
   "quickPrompts": [
     {
@@ -49,5 +65,10 @@
       "zh": "为这个项目定义POC范围、成功标准、时间线、责任人和决策门。",
       "en": "Define the POC scope, success criteria, timeline, owners, and decision gates for this opportunity."
     }
+  ],
+  "mcpIds": [
+    "context7",
+    "github",
+    "fetch"
   ]
 }

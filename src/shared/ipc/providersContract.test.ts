@@ -118,6 +118,9 @@ test('agentsGetPresetExperts result accepts the localized catalog shape', () => 
       quickPrompts: [{ en: 'clean this csv', zh: '清洗这份 csv' }],
       workflow: ['load', 'clean', 'report'],
       path: '/SKILLs/experts/data-analyst',
+      mcpIds: ['context7'],
+      pythonRequirements: { requirementsPath: './requirements.txt' },
+      pypiMirrors: ['https://pypi.tuna.tsinghua.edu.cn/simple'],
     },
   ];
   expect(providersContract.agentsGetPresetExperts.result.safeParse({ experts }).success).toBe(true);

@@ -1,0 +1,74 @@
+{
+  "name": "academic-writing-expert",
+  "version": "1.0.0",
+  "description": "Academic writing expert for literature reviews, methodology sections, and citation discipline.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "academic-writing-expert",
+  "agents": [
+    "./agents/academic-writing-expert.md"
+  ],
+  "skillIds": [
+    "deep-research",
+    "humanizer-zh",
+    "copy-editor",
+    "content-research-writer"
+  ],
+  "mcpIds": [
+    "tavily",
+    "fetch"
+  ],
+  "pythonRequirements": {
+    "dependencies": [
+      "matplotlib>=3.8.0"
+    ]
+  },
+  "displayName": {
+    "en": "Academic Writing Expert",
+    "zh": "学术写作专家"
+  },
+  "profession": {
+    "en": "Academic Writing Coach",
+    "zh": "学术写作教练"
+  },
+  "displayDescription": {
+    "en": "Structures papers and theses with rigorous citations, methodology clarity, and reviewer-ready language.",
+    "zh": "辅导论文与课题写作：文献综述、方法章节、引用规范与审稿友好表达，适合研究生答辩准备。"
+  },
+  "categoryId": "12-IndustryConsultant",
+  "defaultInitPrompt": {
+    "zh": "帮我梳理论文引言的研究空白与贡献点表述。",
+    "en": "Help articulate the research gap and contributions for my paper introduction."
+  },
+  "plugin": "academic-writing-expert",
+  "tags": [
+    {
+      "en": "Academic",
+      "zh": "学术写作"
+    },
+    {
+      "en": "Citations",
+      "zh": "引用规范"
+    },
+    {
+      "en": "Methodology",
+      "zh": "研究方法"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "帮我梳理论文引言的研究空白与贡献点表述。",
+      "en": "Help articulate the research gap and contributions for my paper introduction."
+    },
+    {
+      "zh": "根据摘要生成结构化的文献综述提纲。",
+      "en": "Build a structured literature review outline from this abstract set."
+    },
+    {
+      "zh": "润色这段方法章节，保持术语一致。",
+      "en": "Polish this methods section while keeping terminology consistent."
+    }
+  ]
+}

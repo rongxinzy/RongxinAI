@@ -18,6 +18,8 @@ test('reads a bundled expert preset live from disk', () => {
   expect(snapshot?.skillIds).toEqual(
     expect.arrayContaining(['data-quality-review', 'metric-diagnosis', 'analytics-report']),
   );
+  expect(snapshot?.mcpIds).toEqual(expect.arrayContaining(['fetch', 'tavily']));
+  expect(snapshot?.capabilityPolicy.mcpIds).toEqual(expect.arrayContaining(['fetch', 'tavily']));
 });
 
 test('loads the complete text-to-cad skill set for the CAD engineering expert', () => {
@@ -66,6 +68,10 @@ const buildTeamPreset = (): string => {
   fs.copyFileSync(
     path.resolve('SKILLs/zhiyuan-expert-manager/scripts/validate_expert.js'),
     path.join(scriptsDir, 'validate_expert.js'),
+  );
+  fs.copyFileSync(
+    path.resolve('SKILLs/zhiyuan-expert-manager/scripts/expert_package_metadata.js'),
+    path.join(scriptsDir, 'expert_package_metadata.js'),
   );
   fs.writeFileSync(
     path.join(presetDir, 'plugin.json'),

@@ -49,7 +49,8 @@ export const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessio
     let promptSnapshot = expert.systemPrompt.trim();
     const packageId = expert.presetId.trim() || expert.id;
     let skillIds = [...expert.skillIds];
-    const mcpIds = Array.isArray(expert.mcpIds) ? expert.mcpIds : [];
+    let mcpIds = Array.isArray(expert.mcpIds) ? expert.mcpIds : [];
+    let capabilityPolicy: Record<string, unknown> = {};
 
     // Bundled presets are file-sourced like regular skills: the preset
     // markdown is read live on every session so editing the preset takes
@@ -67,15 +68,33 @@ export const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessio
       if (liveSnapshot) {
         promptSnapshot = liveSnapshot.promptSnapshot;
         skillIds = liveSnapshot.skillIds;
+        if (liveSnapshot.mcpIds.length > 0) {
+          mcpIds = liveSnapshot.mcpIds;
+        }
+        capabilityPolicy = { ...liveSnapshot.capabilityPolicy };
       }
     }
 
     if (!promptSnapshot) {
       throw new Error(`Expert '${expertId}' has an empty system prompt`);
     }
+    const resolvedCapabilityPolicy =
+      Object.keys(capabilityPolicy).length > 0
+        ? capabilityPolicy
+        : mcpIds.length > 0
+          ? { mcpIds }
+          : {};
     const contentHash = crypto
       .createHash('sha256')
-      .update(JSON.stringify({ packageId, expertId: expert.id, promptSnapshot, skillIds, mcpIds }))
+      .update(
+        JSON.stringify({
+          packageId,
+          expertId: expert.id,
+          promptSnapshot,
+          skillIds,
+          capabilityPolicy: resolvedCapabilityPolicy,
+        }),
+      )
       .digest('hex');
     const source: CoworkSessionExpertSource =
       expert.source === 'expert-package-member'
@@ -90,7 +109,7 @@ export const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessio
       source,
       promptSnapshot,
       skillIds,
-      capabilityPolicy: mcpIds.length > 0 ? { mcpIds } : {},
+      capabilityPolicy: resolvedCapabilityPolicy,
       contentHash,
     });
   }

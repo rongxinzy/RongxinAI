@@ -30,6 +30,14 @@
 | `agents`   | string[] | Agent 定义文件路径列表                                 |
 | `skills`   | string[] | Skill 目录路径列表（会被复制到 ZhiYuan Agent SKILLs/） |
 | `skillIds` | string[] | 复用应用内已有 Skill 的 ID（不复制文件）               |
+| `mcpIds`   | string[] | 可选。安装后写入 Agent 的 MCP 连接器 ID（如 `context7`） |
+| `pythonRequirements` | object | 可选。`requirementsPath`（相对专家包根目录）或 `dependencies` 字符串数组；仅声明依赖，运行时经 uv/pip 安装 |
+| `pypiMirrors` | string[] | 可选。覆盖默认中国 PyPI 镜像顺序（清华 → 中科大 → 腾讯 → 字节 → 阿里云） |
+
+运行时约定（不入安装包）：
+
+- **Python**：仅提交 `requirements.txt` 或 `pythonRequirements.dependencies`；由 `python_install` / 托管运行时按镜像安装。
+- **Node/MCP**：MCP 与 npx 工具通过 `command: npx` + `defaultArgs` 启动；应用在为 MCP 子进程注入环境时会默认设置 `npm_config_registry` / `NPM_CONFIG_REGISTRY` 为 `https://registry.npmmirror.com`（淘宝 npmmirror），不在仓库内 vendor npm 包。
 
 ## 展示字段（必填）
 

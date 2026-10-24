@@ -69,5 +69,16 @@
       "zh": "帮我写一份管理层周报，结论先行。",
       "en": "Write an executive weekly report, answer-first."
     }
-  ]
+  ],
+  "mcpIds": [
+    "fetch",
+    "tavily"
+  ],
+  "pythonRequirements": {
+    "dependencies": [
+      "pandas>=2.2.0",
+      "numpy>=1.26.0",
+      "matplotlib>=3.8.0"
+    ]
+  }
 }

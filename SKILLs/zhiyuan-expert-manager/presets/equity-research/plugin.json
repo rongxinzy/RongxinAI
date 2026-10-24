@@ -7,7 +7,9 @@
   },
   "expertType": "agent",
   "agentName": "equity-research-expert",
-  "agents": ["./agents/equity-research-expert.md"],
+  "agents": [
+    "./agents/equity-research-expert.md"
+  ],
   "skills": [
     "./skills/catalyst-calendar",
     "./skills/earnings-analysis",
@@ -45,9 +47,18 @@
   },
   "plugin": "equity-research",
   "tags": [
-    { "en": "Fundamental Research", "zh": "基本面研究" },
-    { "en": "Valuation Modeling", "zh": "估值建模" },
-    { "en": "Portfolio Risk", "zh": "组合风险" }
+    {
+      "en": "Fundamental Research",
+      "zh": "基本面研究"
+    },
+    {
+      "en": "Valuation Modeling",
+      "zh": "估值建模"
+    },
+    {
+      "en": "Portfolio Risk",
+      "zh": "组合风险"
+    }
   ],
   "quickPrompts": [
     {
@@ -62,5 +73,16 @@
       "zh": "请用DCF与可比公司法评估这家公司，并给出关键假设和敏感性分析。",
       "en": "Value this company with DCF and trading comps, including key assumptions and sensitivity analysis."
     }
-  ]
+  ],
+  "mcpIds": [
+    "tavily",
+    "firecrawl",
+    "fetch"
+  ],
+  "pythonRequirements": {
+    "dependencies": [
+      "pandas>=2.2.0",
+      "numpy>=1.26.0"
+    ]
+  }
 }
