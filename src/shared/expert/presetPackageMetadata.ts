@@ -12,7 +12,7 @@ export const ExpertPypiMirrorId = {
 } as const;
 
 /** Matches managed runtime default in `pythonPackageIndexes.ts` (uv/pip). */
-export const DEFAULT_CN_PYPI_PRIMARY_MIRROR_URL =
+const DEFAULT_CN_PYPI_PRIMARY_MIRROR_URL =
   'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
 
 export type ExpertPypiMirrorId = (typeof ExpertPypiMirrorId)[keyof typeof ExpertPypiMirrorId];
