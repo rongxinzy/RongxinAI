@@ -1,4 +1,8 @@
-import { DesktopPetSprite, DesktopPetState } from '../../shared/desktopPet/constants';
+import {
+  DesktopPetPlayableAction,
+  DesktopPetSprite,
+  DesktopPetState,
+} from '../../shared/desktopPet/constants';
 import { DesktopPetIdleActions } from './idleActions';
 
 const TRANSITION_MS = 160;
@@ -38,6 +42,12 @@ export class DesktopPetAnimation {
 
   impact(strength: number): void {
     this.velocity -= Math.max(0, Math.min(1, strength)) * 2;
+  }
+
+  /** On-demand action (menu playback / click feedback); happy adds a stronger bounce. */
+  playAction(action: DesktopPetPlayableAction, now: number): void {
+    this.idle.play(action, now);
+    this.impact(action === DesktopPetPlayableAction.Happy ? 0.85 : 0.3);
   }
 
   settle(now: number): void {

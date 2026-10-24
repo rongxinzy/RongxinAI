@@ -1,4 +1,4 @@
-import type { DesktopPetState, DesktopPetTaskResult } from './constants';
+import type { DesktopPetPlayableAction, DesktopPetState, DesktopPetTaskResult } from './constants';
 
 export interface DesktopPetSettings {
   enabled: boolean;
@@ -28,7 +28,8 @@ export interface DesktopPetApi {
 
 export type DesktopPetEffect =
   | { kind: 'drag'; active: boolean }
-  | { kind: 'impact'; strength: number };
+  | { kind: 'impact'; strength: number }
+  | { kind: 'action'; action: DesktopPetPlayableAction };
 
 export interface DesktopPetSnapshot {
   state: DesktopPetState;
