@@ -13,7 +13,7 @@ export const StrataServiceStatus = {
 
 export type StrataServiceStatus = (typeof StrataServiceStatus)[keyof typeof StrataServiceStatus];
 
-export interface StrataHardwareGate {
+interface StrataHardwareGate {
   /** Minimum system RAM (GB). Values from Strata official docs only. */
   minSystemRamGb: number;
   /** Minimum GPU VRAM (GB). */

@@ -1,6 +1,5 @@
 import type { StrataManager } from '../libs/strata/strataManager';
 import type { MagpieHostProvider } from './hostProviders';
-import { STRATA_MAGPIE_PROVIDER_ID } from '../../shared/strata/constants';
 import { StrataClient } from '../libs/strata/strataClient';
 import { StrataServiceStatus } from '../../shared/strata/types';
 
