@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>认识桌面伙伴「小远」 · 知远智能体博客</title>
+    <meta
+      name="description"
+      content="小远是知远智能体的可选桌面伙伴：原创白色雪鸮，透明置顶小窗，只读投影任务状态，默认关闭。了解如何开启与它能做什么。"
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%2334D399' /%3E%3Ctext x='16' y='22' text-anchor='middle' font-size='18' font-weight='700' fill='%23000'%3EL%3C/text%3E%3C/svg%3E"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../css/common.css" />
+  </head>
+  <body>
+    <nav>
+      <div class="container">
+        <a href="../index.html" class="nav-logo">
+          <span class="nav-logo-icon">L</span>
+          <span>ZhiYuan Agent</span>
+        </a>
+        <div class="nav-links">
+          <a href="../index.html#features">Features</a>
+          <a href="../index.html#architecture">Architecture</a>
+          <a href="index.html">Blog</a>
+          <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" rel="noopener">GitHub</a>
+        </div>
+        <a href="../index.html#cta" class="btn btn-primary btn-sm nav-cta">Get Started</a>
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Menu">
+          <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+    </nav>
+    <div class="mobile-menu" id="mobileMenu">
+      <a href="../index.html#features" onclick="closeMobileMenu()">Features</a>
+      <a href="../index.html#architecture" onclick="closeMobileMenu()">Architecture</a>
+      <a href="index.html" onclick="closeMobileMenu()">Blog</a>
+      <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" rel="noopener">GitHub</a>
+      <a href="../index.html#cta" class="btn btn-primary" onclick="closeMobileMenu()">Get Started</a>
+    </div>
+
+    <main class="page-main">
+      <div class="container article-wrap">
+        <span class="section-label">Desktop companion</span>
+        <h1 class="page-title">认识桌面伙伴「小远」</h1>
+        <p class="article-subtitle">
+          Xiaoyuan — an optional snowy-owl companion on your desktop, built for ZhiYuan Agent.
+        </p>
+        <p class="article-meta">
+          2026年10月19日 · 北京容芯致远 ·
+          <a
+            href="https://github.com/rongxinzy/RongxinAI/issues/1168"
+            target="_blank"
+            rel="noopener"
+            style="color: #34d399"
+            >社区 Issue #1168</a
+          >
+        </p>
+
+        <div class="article-body">
+          <p>
+            在知远智能体里，任务可以在后台安静运行，Cowork 会话里也能看见完整进度。但有时你只想确认「它还在跑吗」「是不是在等我点确认」——而不必把整个窗口拉到最前。
+          </p>
+          <p>
+            所以我们做了<strong>小远</strong>：一只原创的<strong>白色雪鸮</strong>，系着蓝紫色围巾，住在桌面一角的小窗里。它是陪伴，不是第二个 Agent：<strong>只读投影</strong>当前任务状态，<strong>不会</strong>替你发起模型请求，也<strong>不会</strong>改动执行内核。动画与交互借鉴了开源社区
+            <code>dsh-pet</code>（MIT）里成熟的做法，形象与素材则是知远自己的透明媒体资产。
+          </p>
+
+          <figure class="figure">
+            <img
+              src="images/xiaoyuan-on-desktop-light.png"
+              alt="浅色主题下，小远停留在桌面角落的知远智能体窗口旁"
+              width="1280"
+              height="800"
+              loading="lazy"
+            />
+            <figcaption>小远使用独立透明窗口，始终置顶；透明区域可穿透鼠标，不挡你操作其他应用。</figcaption>
+          </figure>
+
+          <h2>默认尊重你的专注</h2>
+          <p>
+            小远<strong>默认关闭</strong>——我们不想用桌宠绑架任何人的工作流。想见面时，打开<strong>设置 → 通用 → 桌面伙伴</strong>，开启「显示小远」；也可以从系统托盘一键显示或收起，设置会与托盘<strong>双向同步</strong>并自动保存。
+          </p>
+          <p>同一分组里还有几个贴心开关（均可随时改）：</p>
+          <ul>
+            <li><strong>免打扰</strong>：暂时隐藏小远，任务照常运行；未处理的失败提醒会保留。</li>
+            <li><strong>应用全屏时隐藏</strong>：默认开启，全屏沉浸时不抢视线（macOS 不跨到其他应用的全屏空间）。</li>
+            <li><strong>屏幕漫游</strong>：待机时沿屏幕轻轻走动，可关。</li>
+            <li><strong>偶尔冒泡</strong>：待机短句陪伴；任务状态气泡始终优先，可关。</li>
+          </ul>
+
+          <figure class="figure">
+            <img
+              src="images/xiaoyuan-settings-light.png"
+              alt="知远智能体设置页中的桌面伙伴分组"
+              width="1280"
+              height="800"
+              loading="lazy"
+            />
+            <figcaption>设置 → 通用里的「桌面伙伴」分组，与托盘状态保持一致。</figcaption>
+          </figure>
+
+          <h2>它怎么陪你</h2>
+          <p>
+            小远住在约 192×192 的逻辑像素窗口里，角色画布铺满窗口，<strong>透明像素区域穿透鼠标</strong>。你可以拖动、甩抛，它会带着一点弹簧感落在屏幕边缘；待机时还可以慢慢「散步」。右键（或等效操作）打开<strong>系统原生菜单</strong>：打开知远、查看待处理任务、打个招呼、侧看一眼、点点头、展翅一下、回到角落、收起小远——没有另造一套 App 内导航。
+          </p>
+          <p>窗口会<strong>记住位置</strong>；锁屏或休眠时隐藏，醒来后按最新设置决定是否出现。</p>
+
+          <div class="figure-grid">
+            <figure class="figure">
+              <img
+                src="images/xiaoyuan-on-desktop-dark.png"
+                alt="深色主题桌面上的小远"
+                width="1280"
+                height="800"
+                loading="lazy"
+              />
+              <figcaption>深色主题下同样使用同一套角色素材。</figcaption>
+            </figure>
+            <figure class="figure">
+              <img
+                src="images/xiaoyuan-on-desktop-light.png"
+                alt="浅色主题桌面上的小远"
+                width="1280"
+                height="800"
+                loading="lazy"
+              />
+              <figcaption>角色形象不参与 UI 主题取色，保持独立媒体风格。</figcaption>
+            </figure>
+          </div>
+
+          <h2>任务状态：看一眼就懂</h2>
+          <p>
+            小远表情与托盘文案跟随<strong>现有 Cowork 任务状态</strong>，六种姿态对应待机、思考、等待确认、完成、出错与招呼。任务进行中，角色上方会出现紧凑的<strong>状态气泡</strong>（短文案、圆角胶囊）；点击小远会带你去看当前优先任务，权限审批仍在熟悉的会话界面完成。
+          </p>
+
+          <table class="status-table">
+            <thead>
+              <tr>
+                <th>状态</th>
+                <th>小远在说什么（托盘 / 标签）</th>
+                <th>气泡（进行中时）</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>待机</td>
+                <td>小远 · 随时待命</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>思考 / 运行中</td>
+                <td>小远 · 正在处理任务</td>
+                <td>处理中</td>
+              </tr>
+              <tr>
+                <td>等待确认</td>
+                <td>小远 · 等待你确认</td>
+                <td>需要确认</td>
+              </tr>
+              <tr>
+                <td>完成</td>
+                <td>小远 · 任务已完成</td>
+                <td>已完成</td>
+              </tr>
+              <tr>
+                <td>出错</td>
+                <td>小远 · 任务遇到问题</td>
+                <td>出错了</td>
+              </tr>
+              <tr>
+                <td>招呼</td>
+                <td>小远 · 你好呀</td>
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <blockquote>
+            重要原则：小远是<strong>只读投影</strong>。它消费任务状态事件来换表情和文案，不触发新的推理请求，也不替代你在 Cowork 里的任何一次确认。
+          </blockquote>
+
+          <h2>偶尔的一句闲聊</h2>
+          <p>
+            如果你开启了「偶尔冒泡」，待机时小远会像朋友一样冒出短句——永远排在任务气泡之后。产品里内置的文案包括：
+          </p>
+          <ul class="chatter-list">
+            <li>今天也一起加油呀</li>
+            <li>我在这儿陪着你</li>
+            <li>伸个懒腰……</li>
+            <li>需要帮忙随时叫我</li>
+            <li>休息一下也没关系</li>
+            <li>想到什么了吗？</li>
+            <li>天气真好呢</li>
+            <li>慢慢来，不着急</li>
+            <li>我守着呢</li>
+            <li>有我在就好</li>
+          </ul>
+          <p>在菜单里点「打个招呼」「侧看一眼」等动作时，也会有「嘿嘿！」「嗯嗯」「扑棱一下」之类的小回应——纯本地动画与文案，同样不占用模型算力。</p>
+
+          <h2>给开源社区的话</h2>
+          <p>
+            小远来自社区里「想要一点温度」的声音（<a
+              href="https://github.com/rongxinzy/RongxinAI/issues/1168"
+              target="_blank"
+              rel="noopener"
+              style="color: #34d399"
+              >#1168</a
+            >），也在设计规范里写清了边界：它是桌面上的伙伴，不是新的配色来源。角色精灵图位于仓库
+            <code>src/renderer/assets/desktop-pet/xiaoyuan-atlas.png</code>；应用内更多截图见
+            <code>docs/theme-previews/desktop-pet-*.png</code>。
+          </p>
+          <p>
+            无论你把它当作专注模式下的静音图标，还是长时间 Cowork 时的桌边守望者——<strong>开关在你手里</strong>。欢迎下载最新版知远智能体，在设置里轻轻打开「显示小远」，看雪鸮是否合你的桌面脾气。
+          </p>
+          <p>
+            <a
+              href="https://github.com/rongxinzy/RongxinAI/releases"
+              target="_blank"
+              rel="noopener"
+              class="btn btn-primary"
+              style="margin-top: 8px"
+              >获取最新版本</a
+            >
+          </p>
+        </div>
+
+        <nav class="article-nav" aria-label="文章导航">
+          <a href="index.html">← 返回博客列表</a>
+        </nav>
+      </div>
+    </main>
+
+    <footer>
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <a href="../index.html" class="nav-logo">
+              <span class="nav-logo-icon">L</span>
+              <span>ZhiYuan Agent</span>
+            </a>
+            <p>
+              An all-in-one local AI Agent workspace with a fully self-developed stack. Built by
+              北京容芯致远.
+            </p>
+          </div>
+          <div class="footer-col">
+            <h4>Product</h4>
+            <a href="../index.html#features">Features</a>
+            <a href="../index.html#architecture">Architecture</a>
+            <a href="../index.html#skills">Skills</a>
+            <a href="../index.html#security">Security</a>
+          </div>
+          <div class="footer-col">
+            <h4>Resources</h4>
+            <a href="index.html">Blog</a>
+            <a href="https://github.com/rongxinzy/RongxinAI/blob/main/README.md" target="_blank" rel="noopener"
+              >Documentation</a
+            >
+            <a href="https://github.com/rongxinzy/RongxinAI/releases" target="_blank" rel="noopener">Releases</a>
+            <a href="https://github.com/rongxinzy/RongxinAI/issues" target="_blank" rel="noopener">Issues</a>
+          </div>
+          <div class="footer-col">
+            <h4>Company</h4>
+            <a href="#">北京容芯致远</a>
+            <a href="mailto:dev@zhiyuan.com">Contact</a>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>&copy; 2026 北京容芯致远. GNU AGPL v3.0.</span>
+          <div class="footer-socials">
+            <a href="https://github.com/rongxinzy/RongxinAI" target="_blank" rel="noopener" title="GitHub">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path
+                  d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      function toggleMobileMenu() {
+        document.getElementById('mobileMenu').classList.toggle('open');
+      }
+      function closeMobileMenu() {
+        document.getElementById('mobileMenu').classList.remove('open');
+      }
+    </script>
+  </body>
+</html>
