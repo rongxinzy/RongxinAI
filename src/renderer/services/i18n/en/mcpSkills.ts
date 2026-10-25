@@ -60,23 +60,36 @@ export const enMcpSkills: Record<string, string> = {
   skills: 'Skills',
   remoteImport: 'Remote Import',
   remoteImportTitle: 'Remote Import',
-  createCustomSkill: 'New Custom Skill',
-  createCustomSkillDesc:
-    'Draft or paste your skill specifications and SOP following standard Markdown',
-  skillIdentifier: 'Skill Identifier (ID)',
-  skillIdentifierPlaceholder:
-    'e.g. contract-reviewer, market-researcher (lowercase letters, numbers, hyphens)',
-  skillNameLabel: 'Skill Display Name',
+  createCustomSkill: 'New skill',
+  createCustomSkillDesc: 'Write down the steps for a task you repeat.',
+  skillIdentifier: 'Identifier',
+  skillIdentifierPlaceholder: 'e.g. contract-reviewer',
+  skillNameLabel: 'Name',
   skillNamePlaceholder: 'e.g. Contract Reviewer, Market Research Assistant',
-  skillDescriptionLabel: 'Skill Trigger Description',
-  skillDescriptionPlaceholder: 'Clearly describe when the agent should trigger this skill',
-  skillContentLabel: 'Skill Specification (SKILL.md content)',
-  skillCreateSuccess: 'Custom skill created successfully',
-  skillCreateError: 'Failed to create custom skill',
+  skillDescriptionLabel: 'Purpose and when to use',
+  skillDescriptionPlaceholder: 'e.g. Check payment terms when reviewing contracts',
+  skillContentLabel: 'Instructions (Markdown)',
+  skillUseTemplate: 'Use template',
+  skillIdentifierRequired: 'Enter an identifier.',
+  skillIdentifierExists: 'This identifier is already in use. Choose another.',
+  skillIdentifierReserved: 'This identifier belongs to a built-in skill. Choose another.',
+  skillCreateSuccess: 'Skill created',
+  skillCreateError: 'Couldn’t create the skill. Try again.',
   skillIdInvalid:
-    'Invalid skill ID format. Only lowercase letters, numbers, and hyphens are allowed.',
-  skillNameRequired: 'Skill name is required',
-  skillContentRequired: 'Skill specification content is required',
+    'Use lowercase letters, numbers and hyphens. Start and end with a letter or number.',
+  skillNameRequired: 'Enter a name.',
+  skillContentRequired: 'Enter the instructions.',
+  skillBodyTemplate: `## When to use
+- Describe the task and the materials it needs.
+
+## Steps
+1. Check the materials and delivery requirements. Ask for missing key information.
+2. Write the steps that can be repeated for this task.
+3. Check the result and describe anything left unfinished.
+
+## Output
+- Describe the files or content to deliver and their format.
+`,
   skillCreatorPrompt:
     'You are a senior Skill Architect. Please guide me through designing a brand new ZhiYuan Agent skill. First, inquire about the intended purpose, triggering scenarios, and input/output expectations. Then plan the skill directory layout and draft the SKILL.md file with valid YAML frontmatter.',
   skillCreatorNotInstalled: 'Please install the skill-creator skill first',
@@ -96,9 +109,9 @@ export const enMcpSkills: Record<string, string> = {
   skillFilterClear: 'Clear filters',
   skillMarketplaceSearchEmptyDescription:
     'No match in the loaded skills. Clear the search to browse all pages.',
-  skillsDescription: 'Pre-packaged best practices and tools for your AI agent',
+  skillsDescription: 'Save task steps and tool instructions for later tasks.',
   skillInstalled: 'Installed',
-  skillInstalledDescription: 'Enabled skills that the agent can read and use in conversations.',
+  skillInstalledDescription: 'Manage installed skills. Enable them for use in tasks.',
   skillMarketplace: 'Marketplace',
   skillCategoryAll: 'All',
   skillCategoryWriting: 'Writing',
@@ -196,6 +209,7 @@ export const enMcpSkills: Record<string, string> = {
   mcpTransportHttp: 'Streamable HTTP',
   // MCP Marketplace & Registry
   mcpInstalled: 'Installed',
+  mcpAdded: 'Added',
   mcpInUse: 'In use',
   mcpMarketplace: 'Marketplace',
   mcpCustom: 'Custom',
@@ -259,15 +273,14 @@ export const enMcpSkills: Record<string, string> = {
   mcpConnectSubtitle:
     'After authorization, ZhiYuan Agent will use this service within the scope you allow.',
   mcpConnectUsageTitle: 'How it works',
-  mcpConnectUsageBody:
-    "When you explicitly ask, the agent uses this service's tools to complete the task.",
+  mcpConnectUsageBody: 'Use this service’s tools in tasks after connecting.',
   mcpConnectDataTitle: 'Data and permissions',
   mcpConnectDataBody:
-    'Only content and actions you explicitly approve on the authorization page are accessed.',
-  mcpConnectControlTitle: 'You stay in control',
+    'The service’s permissions determine which data and actions are available. Task content needed for a tool call is sent to the service.',
+  mcpConnectControlTitle: 'Disconnect',
   mcpConnectControlBody:
-    'You can disconnect or re-authorize the service at any time from installed services.',
-  mcpConnectAuthTitle: 'Secure authorization',
+    'Remove the connection in this app. Manage the authorization in the service’s settings.',
+  mcpConnectAuthTitle: 'Authorization method',
   mcpConnectAuthBody:
     "Your system browser opens the provider's official sign-in and authorization page.",
   mcpExternalUnavailable: 'Official provider access is required before connecting',

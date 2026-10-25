@@ -5,6 +5,7 @@
  * references were lifted into props.
  */
 import { Button } from '@shared/components/ui/button';
+import { Badge } from '@shared/components/ui/badge';
 import {
   Empty,
   EmptyContent,
@@ -127,9 +128,7 @@ export function McpMarketplaceTab({
                   )}
                 </div>
               </div>
-              <div
-                className={`flex shrink-0 items-center gap-1.5 transition-opacity ${installingRegistryId === entry.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100'}`}
-              >
+              <div className="flex shrink-0 items-center gap-1.5">
                 {pendingOfficialAuthorizationRegistryId === entry.id ? (
                   <div className="flex items-center gap-1">
                     <div
@@ -153,21 +152,19 @@ export function McpMarketplaceTab({
                 ) : installingRegistryId === entry.id ? (
                   <div
                     className="flex size-7 items-center justify-center"
-                    aria-label={i18nService.t('mcpInstall')}
+                    aria-label={i18nService.t(entry.authType ? 'mcpConnect' : 'mcpInstall')}
                   >
                     <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
                   </div>
                 ) : installedRegistryIds.has(entry.id) ? (
-                  <span className="px-2.5 py-1 text-xs rounded-lg bg-surface text-muted-foreground">
-                    {i18nService.t('mcpInstalled')}
-                  </span>
+                  <Badge variant="secondary">{i18nService.t('mcpAdded')}</Badge>
                 ) : (
                   <Button
                     type="button"
+                    variant="outline"
                     onClick={() => onInstallFromRegistry(entry)}
-                    className="theme-page-mcp-manager-button-2"
                   >
-                    {i18nService.t('mcpInstall')}
+                    {i18nService.t(entry.authType ? 'mcpConnect' : 'mcpInstall')}
                   </Button>
                 )}
               </div>

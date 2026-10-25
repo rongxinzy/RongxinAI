@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "userData": "/tmp/companion-skill-create-9rVqQH",
+  "boundedId": "native-ui-c7da3a84-e86a-4110-b603-5f588d",
+  "ownedIpc": true,
+  "enabledAfterCreate": true,
+  "singleFrontmatter": true,
+  "bodyPreserved": true,
+  "modelCallsRequested": false
+}

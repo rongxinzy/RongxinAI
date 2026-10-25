@@ -3,7 +3,7 @@ export const zhChannels: Record<string, string> = {
   connectors: '连接器',
   connectorFeishu: '飞书',
   connectorGitHub: 'GitHub',
-  connectorsDescription: '连接常用服务，让智能体在需要时查询信息、处理文件和完成更多任务。',
+  connectorsDescription: '连接任务需要的服务，按授权范围使用工具。',
   // 邮箱技能配置
   emailTab: '邮箱',
   emailConfig: '邮箱配置',

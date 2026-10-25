@@ -59,21 +59,35 @@ export const zhMcpSkills: Record<string, string> = {
   skills: '技能',
   remoteImport: '远程导入',
   remoteImportTitle: '远程导入',
-  createCustomSkill: '新建自定义技能',
-  createCustomSkillDesc: '基于标准 Markdown 规范编写或粘贴你的技能规约与 SOP',
-  skillIdentifier: '技能标识 (ID)',
-  skillIdentifierPlaceholder:
-    '例如：contract-reviewer, market-researcher (仅支持小写字母、数字、短横线)',
-  skillNameLabel: '技能显示名称',
+  createCustomSkill: '新建技能',
+  createCustomSkillDesc: '写下需要反复使用的任务步骤。',
+  skillIdentifier: '标识',
+  skillIdentifierPlaceholder: '例如：contract-reviewer',
+  skillNameLabel: '名称',
   skillNamePlaceholder: '例如：合同合规审查、市场调研助手',
-  skillDescriptionLabel: '技能触发描述 (Description)',
-  skillDescriptionPlaceholder: '清晰描述该技能的用途与触发时机，供智能体在恰当时机自主调用',
-  skillContentLabel: '技能规约 (SKILL.md 内容)',
-  skillCreateSuccess: '自定义技能创建成功',
-  skillCreateError: '创建自定义技能失败',
-  skillIdInvalid: '技能标识格式不正确，仅允许小写字母、数字和短横线',
-  skillNameRequired: '技能名称不能为空',
-  skillContentRequired: '技能规约内容不能为空',
+  skillDescriptionLabel: '用途与使用时机',
+  skillDescriptionPlaceholder: '例如：审阅合同时检查付款条款',
+  skillContentLabel: '执行说明（Markdown）',
+  skillUseTemplate: '使用模板',
+  skillIdentifierRequired: '请填写标识。',
+  skillIdentifierExists: '这个标识已被使用，请换一个。',
+  skillIdentifierReserved: '这个标识属于内置技能，请换一个。',
+  skillCreateSuccess: '技能已创建',
+  skillCreateError: '没能创建技能，请重试。',
+  skillIdInvalid: '标识只能包含小写字母、数字和短横线，并以字母或数字开头和结尾。',
+  skillNameRequired: '请填写名称。',
+  skillContentRequired: '请填写执行说明。',
+  skillBodyTemplate: `## 适用场景
+- 说明要处理的任务和所需材料。
+
+## 步骤
+1. 确认材料和交付要求，缺少关键信息时先询问。
+2. 写出可重复执行的处理步骤。
+3. 检查结果，说明尚未完成的事项。
+
+## 输出
+- 说明需要交付的文件或内容格式。
+`,
   skillCreatorPrompt:
     '你是一位资深的技能设计架构师。请协助我创建一个全新的知远智能体技能。首先，请询问我这个技能的目标用途、触发场景和输入输出规范。随后为我规划技能结构，并编写包含标准 YAML frontmatter 的 SKILL.md。',
   skillCreatorNotInstalled: '请先安装 skill-creator 技能',
@@ -92,9 +106,9 @@ export const zhMcpSkills: Record<string, string> = {
   skillFilterClear: '清除筛选',
   skillMarketplaceSearchEmptyDescription:
     '已加载的技能中没有匹配项，清除搜索后可翻页浏览全部技能。',
-  skillsDescription: '为您的智能体提供预封装且可重复的最佳实践与工具',
+  skillsDescription: '保存任务步骤和工具用法，供后续任务使用。',
   skillInstalled: '已安装',
-  skillInstalledDescription: '已启用，智能体可以在对话中读取和调用这些技能。',
+  skillInstalledDescription: '管理已安装技能；启用后可在任务中使用。',
   skillMarketplace: '技能市场',
   skillCategoryAll: '全部',
   skillCategoryWriting: '写作创作',
@@ -191,6 +205,7 @@ export const zhMcpSkills: Record<string, string> = {
   mcpTransportHttp: 'HTTP 流式传输',
   // MCP 市场 & 注册表
   mcpInstalled: '已安装',
+  mcpAdded: '已添加',
   mcpInUse: '使用中',
   mcpMarketplace: '市场',
   mcpCustom: '自定义',
@@ -247,12 +262,12 @@ export const zhMcpSkills: Record<string, string> = {
   mcpConnectTitle: '连接 {name}',
   mcpConnectSubtitle: '授权后，知远智能体将在你允许的范围内使用此服务。',
   mcpConnectUsageTitle: '如何使用',
-  mcpConnectUsageBody: '当你明确要求时，智能体会调用该服务提供的工具来完成任务。',
+  mcpConnectUsageBody: '连接后，可在任务中使用此服务提供的工具。',
   mcpConnectDataTitle: '数据与权限',
-  mcpConnectDataBody: '仅访问你在授权页中明确允许的内容和操作范围。',
-  mcpConnectControlTitle: '你始终可控',
-  mcpConnectControlBody: '你可以随时在已安装服务中断开连接或重新授权。',
-  mcpConnectAuthTitle: '安全授权',
+  mcpConnectDataBody: '可访问的数据和操作取决于服务授权范围。执行任务时会向服务发送所需内容。',
+  mcpConnectControlTitle: '断开连接',
+  mcpConnectControlBody: '可在本应用中移除连接；授权管理请前往服务方设置。',
+  mcpConnectAuthTitle: '授权方式',
   mcpConnectAuthBody: '将使用系统默认浏览器完成服务方的官方登录与授权。',
   mcpExternalUnavailable: '需要服务方开通后才能连接',
   mcpInstallFromUrl: '通过 URL 安装',

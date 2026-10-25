@@ -82,6 +82,8 @@ const config: KnipConfig = {
         // Executed manual CLI; inspect its imports, not an ignore or issue exemption.
         // Command and evidence: docs/architecture/companion-input-acceptance.md.
         'scripts/companion/verify-bubble-input.mjs',
+        // Manual native skill-create check; command/evidence in companion-tools-copy-acceptance.md.
+        'scripts/companion/verify-skill-create.mjs',
         // Manual closed synthetic-store upgrade check, documented in companion-managed-memory-acceptance.md.
         'scripts/companion/verify-memory-runtime-upgrade.mjs',
         'scripts/installer-shell/assert-e2e.cjs',
