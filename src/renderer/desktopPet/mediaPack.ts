@@ -1,4 +1,5 @@
 import { DesktopPetBuiltinId, desktopPetBuiltin } from '../../shared/desktopPet/catalog';
+import { desktopPetMediaSources } from '@/desktopPet/mediaSources';
 import {
   DESKTOP_PET_MOTIONS,
   XIAOYUAN_ORIGINAL_MOTIONS,
@@ -14,11 +15,6 @@ export interface DesktopPetMediaClip {
 }
 
 // Only bundled, authored media. No external URLs or model-supplied media paths.
-const sources = import.meta.glob<string>('../assets/desktop-pet/motion/*/*.{webm,png}', {
-  eager: true,
-  query: '?url',
-  import: 'default',
-});
 export function desktopPetMediaPack(characterId: string): DesktopPetMediaClip[] | null {
   if (!desktopPetBuiltin(characterId)) return null;
   // Xiaoyuan's first-release artwork is the canonical source. Keep the old authoring
@@ -27,9 +23,9 @@ export function desktopPetMediaPack(characterId: string): DesktopPetMediaClip[] 
   const root = `../assets/desktop-pet/motion/${canonical ? 'xiaoyuan-original' : characterId}/`;
   const repertoire = canonical ? XIAOYUAN_ORIGINAL_MOTIONS : DESKTOP_PET_MOTIONS;
   const pack = repertoire.flatMap(clip => {
-    const url = sources[`${root}${clip.id}.webm`];
-    const maskUrl = sources[`${root}${clip.id}-mask.png`];
-    const posterUrl = sources[`${root}${clip.id}-poster.png`];
+    const url = desktopPetMediaSources[`${root}${clip.id}.webm`];
+    const maskUrl = desktopPetMediaSources[`${root}${clip.id}-mask.png`];
+    const posterUrl = desktopPetMediaSources[`${root}${clip.id}-poster.png`];
     return url && maskUrl && posterUrl ? [{ ...clip, url, maskUrl, posterUrl }] : [];
   });
   // A missing file invalidates the declared repertoire rather than silently accepting damage.

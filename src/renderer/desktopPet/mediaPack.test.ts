@@ -5,6 +5,7 @@ import {
   XIAOYUAN_ORIGINAL_MOTIONS,
 } from '../../shared/desktopPet/motionCatalog';
 import { desktopPetMediaPack } from './mediaPack';
+import { desktopPetMediaSources as releasedSources } from './mediaSources';
 
 test('every bundled companion has its complete declared repertoire without mixing Xiaoyuan artwork', () => {
   for (const character of DESKTOP_PET_BUILTINS) {
@@ -24,4 +25,13 @@ test('every bundled companion has its complete declared repertoire without mixin
     }
   }
   expect(desktopPetMediaPack('unknown')).toBeNull();
+});
+
+test('the release entry contains all original Xiaoyuan clips and no dormant or rejected media', () => {
+  const expected = XIAOYUAN_ORIGINAL_MOTIONS.flatMap(clip =>
+    ['.webm', '-mask.png', '-poster.png'].map(
+      suffix => `../assets/desktop-pet/motion/xiaoyuan-original/${clip.id}${suffix}`,
+    ),
+  );
+  expect(Object.keys(releasedSources).sort()).toEqual(expected.sort());
 });

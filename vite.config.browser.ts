@@ -11,7 +11,7 @@ const devPort = Number(process.env.VITE_DEV_PORT ?? 5176);
  * Browser preview configuration.
  * Skips Electron plugins and runs a plain Vite dev server.
  */
-export default defineConfig(async () => ({
+export default defineConfig(async ({ command }) => ({
   define: {
     __VERSION__: JSON.stringify('0.16.0'),
   },
@@ -25,6 +25,12 @@ export default defineConfig(async () => ({
   base: '/',
   resolve: {
     alias: {
+      '@/desktopPet/mediaSources': path.resolve(
+        projectRoot,
+        command === 'serve'
+          ? 'scripts/preview/desktop-pet-media.ts'
+          : 'src/renderer/desktopPet/mediaSources.ts',
+      ),
       '@shared': path.resolve(projectRoot, './src/shared'),
       '@': path.resolve(projectRoot, './src/renderer'),
     },

@@ -385,6 +385,12 @@ export default defineConfig(async ({ command }) => {
     base: process.env.NODE_ENV === 'development' ? '/' : './',
     resolve: {
       alias: {
+        '@/desktopPet/mediaSources': path.resolve(
+          projectRoot,
+          command === 'serve'
+            ? 'scripts/preview/desktop-pet-media.ts'
+            : 'src/renderer/desktopPet/mediaSources.ts',
+        ),
         '@shared': path.resolve(projectRoot, './src/shared'),
         '@': path.resolve(projectRoot, './src/renderer'),
       },

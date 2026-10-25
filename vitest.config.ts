@@ -5,6 +5,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   resolve: {
     alias: {
+      '@/desktopPet/mediaSources': path.resolve(
+        __dirname,
+        './scripts/preview/desktop-pet-media.ts',
+      ),
       '@shared': path.resolve(__dirname, './src/shared'),
       '@': path.resolve(__dirname, './src/renderer'),
       electron: path.resolve(__dirname, './tests/__mocks__/electron.ts'),

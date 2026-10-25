@@ -1,0 +1,153 @@
+{
+  "passed": true,
+  "totalAssetBytes": 59221183,
+  "videoCount": 24,
+  "videoBytes": 15868336,
+  "canonicalClips": 24,
+  "videos": [
+    {
+      "file": "blink-fCeUODBN.webm",
+      "bytes": 213526,
+      "sha256": "414364c7fd93d07a684293df60f78abf71a36b63af079ad64b0b31515b1f2a54",
+      "canonical": "blink.webm"
+    },
+    {
+      "file": "bow-CT8vkwy9.webm",
+      "bytes": 583894,
+      "sha256": "ccd5ae6fe36e7968c4eb597601ed4ffb130184a75d5092c502e1d2a99fed5de9",
+      "canonical": "bow.webm"
+    },
+    {
+      "file": "concern-DRYcuh0Z.webm",
+      "bytes": 335903,
+      "sha256": "58f686610bbe9192eb474edd49c56b0fd903ef1da551190105ad1e669a25b59d",
+      "canonical": "concern.webm"
+    },
+    {
+      "file": "dance-uWf1PLPf.webm",
+      "bytes": 1342508,
+      "sha256": "8de17a2bc83b50d1eff6f264871002f425e7477e862b79441d6a41e3ee53efbd",
+      "canonical": "dance.webm"
+    },
+    {
+      "file": "doze-aXST-PhV.webm",
+      "bytes": 630979,
+      "sha256": "22476dc88eee598831f5f79c9f5fd22f003f64fd40b9e02de77776eee3950be6",
+      "canonical": "doze.webm"
+    },
+    {
+      "file": "flutter-C7YrCet4.webm",
+      "bytes": 1173239,
+      "sha256": "bb75c695c710af355105e9f9378570379dbcddb54637827826cd86df4f11e1cf",
+      "canonical": "flutter.webm"
+    },
+    {
+      "file": "happy-W7B4pFaH.webm",
+      "bytes": 1282827,
+      "sha256": "fb81d45a334dfe1d87e226bf7c3e577f6408619b9bd5499a293cc953065770cd",
+      "canonical": "happy.webm"
+    },
+    {
+      "file": "hop-WCA49btE.webm",
+      "bytes": 685939,
+      "sha256": "c3ffc9f2930ac537ba708718211b1394c951e7d6ac760acb218054feeb90e1a6",
+      "canonical": "hop.webm"
+    },
+    {
+      "file": "idle-E8PZi7EO.webm",
+      "bytes": 304906,
+      "sha256": "f4c06e3c6674bcd43c0b21293d860c3ae566e2907937c4e5d8bac00eb640e380",
+      "canonical": "idle.webm"
+    },
+    {
+      "file": "land-C-n27vcZ.webm",
+      "bytes": 383662,
+      "sha256": "9c0036fa05be665b59e606176626632a0242ac2fdbf42ba5820addc01ce33d2f",
+      "canonical": "land.webm"
+    },
+    {
+      "file": "lift-BV6AKAOY.webm",
+      "bytes": 345704,
+      "sha256": "e09164eefa1372ddbe3ceb025db64cf4ad2fbcff57993ef410edcef0463e9bc6",
+      "canonical": "lift.webm"
+    },
+    {
+      "file": "listen-XV9QGmM5.webm",
+      "bytes": 709386,
+      "sha256": "afbdf6694bfc1b526ebb122b6cd87043fa032da9faf87d617e84b7366eea07ab",
+      "canonical": "listen.webm"
+    },
+    {
+      "file": "look-left-CNGgJdpS.webm",
+      "bytes": 493411,
+      "sha256": "9695f44f64e9317b4169e48ad9b091f2a70b7348ba16cfe6ea4d8bdcb115589c",
+      "canonical": "look-left.webm"
+    },
+    {
+      "file": "look-right-BxlzNUEZ.webm",
+      "bytes": 486779,
+      "sha256": "704ca1b13d86f24475ae5c032ca211a0eae0d9682e5a9a4c460c493b734cbc3d",
+      "canonical": "look-right.webm"
+    },
+    {
+      "file": "nod-CQvQWd8m.webm",
+      "bytes": 497870,
+      "sha256": "61a64864de689e58583c77706a57a61dfd767e8bdaeeacd0944e5d3e96034a7f",
+      "canonical": "nod.webm"
+    },
+    {
+      "file": "peek-CxV33BBJ.webm",
+      "bytes": 769205,
+      "sha256": "ea58a03bef816794849b874f45650141c061b1993e0a3a2bba97d969698cf895",
+      "canonical": "peek.webm"
+    },
+    {
+      "file": "preen-B1hYl4El.webm",
+      "bytes": 1102926,
+      "sha256": "127eb258c90c4924d31666c69748eb16954382ca3e355fddc5c4c444ff6d1318",
+      "canonical": "preen.webm"
+    },
+    {
+      "file": "stretch-s64bdTvF.webm",
+      "bytes": 1006162,
+      "sha256": "b6bc100fad8465779dce5abda5e5159651d36163cf2f3e46fb42c1b00ec50b5d",
+      "canonical": "stretch.webm"
+    },
+    {
+      "file": "think-BkXxFlg8.webm",
+      "bytes": 348146,
+      "sha256": "37c71765218055431bf0d08dde366c528cefd5b7f2da6dc66675e5f802245464",
+      "canonical": "think.webm"
+    },
+    {
+      "file": "tilt-BrAg58zs.webm",
+      "bytes": 523846,
+      "sha256": "dbfb213047d1f9146a2fc2ed4412e1b468d3128f78e3824c680729c0cdf10b94",
+      "canonical": "tilt.webm"
+    },
+    {
+      "file": "wait-D24Y10lM.webm",
+      "bytes": 265191,
+      "sha256": "a8466a44f1eaa52673748bfac4484704c74539f0f45e719dfacf706c9bceabfc",
+      "canonical": "wait.webm"
+    },
+    {
+      "file": "wake-BTC3tvTe.webm",
+      "bytes": 917105,
+      "sha256": "3e3cabb5404ff235fe4cf03bc29db703c63a8194cec7d5633d64477f6ccbf04c",
+      "canonical": "wake.webm"
+    },
+    {
+      "file": "walk-CNFgZZ4D.webm",
+      "bytes": 547043,
+      "sha256": "9f19b643ba6a666852ba7fa02ba5cc20ba6ac378cdb243dc22dc1c73aa6f1f09",
+      "canonical": "walk.webm"
+    },
+    {
+      "file": "wave-C54PvS9N.webm",
+      "bytes": 918179,
+      "sha256": "a41ef3f7b98168f05274a925942d7a1c1a3adaffd8afb8ac96c4f194e8110fbb",
+      "canonical": "wave.webm"
+    }
+  ]
+}

@@ -22,6 +22,9 @@ const config: KnipConfig = {
         'scripts/companion/media/render-motion.mjs',
         'scripts/companion/media/review-owl-study.mjs',
         'scripts/companion/media/review-original-gestures.mjs',
+        // Real Vite serve/vitest alias entry; the config's path.resolve is not a static import.
+        // This source supplies retained character media to authoring previews only.
+        'scripts/preview/desktop-pet-media.ts',
         // Invoked by the retained Windows packaging pipelines in package-commands.mjs.
         'scripts/installer-shell/build-distribution.cjs',
         // vite-plugin-electron bundle entries. Knip's Vite plugin reads HTML and
