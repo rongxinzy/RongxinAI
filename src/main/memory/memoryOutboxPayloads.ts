@@ -14,7 +14,7 @@ export interface ConfirmPayload {
   content: string;
   topicKey?: string;
   sourceKind: MemorySourceKindValue;
-  scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
+  scope: MemoryScope;
   linkId: string;
   taskId?: string;
   runId?: string;

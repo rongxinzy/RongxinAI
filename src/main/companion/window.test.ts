@@ -116,10 +116,16 @@ function fixture() {
     },
   };
   const openTask = vi.fn();
+  const memory = {
+    list: vi.fn(() => []),
+    save: vi.fn(),
+    forget: vi.fn(async () => true),
+    shareConfirmed: vi.fn(async () => ({ id: 'shared', available: true })),
+  };
   initializeCompanionWindow({
     store: { get: () => undefined, onDidChange: () => () => {} },
     getMainWindow: () => main,
-    getCompanions: () => ({ profiles, runtime }) as never,
+    getCompanions: () => ({ profiles, runtime, memory }) as never,
     onProfileChanged,
     getTasks: () => tasks as never,
     openTask,
@@ -140,6 +146,7 @@ function fixture() {
     onProfileChanged,
     tasks,
     openTask,
+    memory,
   };
 }
 
@@ -204,10 +211,36 @@ test('the bridge exposes profile state and the workbench without general applica
   expect(f.onProfileChanged).toHaveBeenCalledWith(f.profile);
   await f.invoke(IpcChannel.OpenWorkbench);
   expect(f.main.focus).toHaveBeenCalledOnce();
-  expect(mocks.handlers.size).toBe(12);
+  expect(mocks.handlers.size).toBe(16);
   disposeCompanionWindow();
   expect(mocks.handlers.size).toBe(0);
   expect(mocks.unregister).toHaveBeenCalledWith(COMPANION_SHORTCUT);
+});
+
+test('memory IPC admits only owned frames and the active companion with explicit sharing confirmation', async () => {
+  const f = fixture();
+  const petId = f.profile.petId;
+  await expect(
+    mocks.handlers.get(IpcChannel.ListMemories)!({ sender: {}, senderFrame: {} }, petId),
+  ).rejects.toThrow('owned main frame');
+  await expect(
+    f.invoke(IpcChannel.ListMemories, '00000000-0000-4000-8000-000000000099'),
+  ).rejects.toThrow('selection changed');
+  expect(f.memory.list).not.toHaveBeenCalled();
+  expect(await f.invoke(IpcChannel.ListMemories, petId)).toEqual([]);
+  const request = { petId, id: 'memory', requestId: 'share' };
+  await expect(f.invoke(IpcChannel.ShareMemory, request)).rejects.toThrow('invalid arguments');
+  await expect(f.invoke(IpcChannel.ShareMemory, { ...request, confirmed: false })).rejects.toThrow(
+    'invalid arguments',
+  );
+  expect(f.memory.shareConfirmed).not.toHaveBeenCalled();
+  expect(await f.invoke(IpcChannel.ShareMemory, { ...request, confirmed: true })).toEqual({
+    id: 'shared',
+    available: true,
+  });
+  expect(f.memory.shareConfirmed).toHaveBeenCalledWith(petId, 'memory', 'share');
+  await f.invoke(IpcChannel.ForgetMemory, petId, 'memory');
+  expect(f.memory.forget).toHaveBeenCalledWith(petId, 'memory');
 });
 
 test('workspace picking accepts paths only from its native dialog and cancellation is inert', async () => {

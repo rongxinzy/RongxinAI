@@ -1,0 +1,50 @@
+[
+  {
+    "surface": "companion-memory",
+    "theme": "light",
+    "name": "标题",
+    "text": 16.882648911678455,
+    "border": 5.015155844645165,
+    "focus": 4.5727208137972175,
+    "focusVisible": true,
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "outlineOffset": "1px"
+  },
+  {
+    "surface": "companion-memory",
+    "theme": "light",
+    "name": "内容",
+    "text": 16.882648911678455,
+    "border": 5.015155844645165,
+    "focus": 4.5727208137972175,
+    "focusVisible": true,
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "outlineOffset": "1px"
+  },
+  {
+    "surface": "companion-memory",
+    "theme": "dark",
+    "name": "标题",
+    "text": 12.310487439889068,
+    "border": 4.681618415484225,
+    "focus": 3.257248047020745,
+    "focusVisible": true,
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "outlineOffset": "1px"
+  },
+  {
+    "surface": "companion-memory",
+    "theme": "dark",
+    "name": "内容",
+    "text": 12.310487439889068,
+    "border": 4.681618415484225,
+    "focus": 3.257248047020745,
+    "focusVisible": true,
+    "outlineWidth": "2px",
+    "outlineStyle": "solid",
+    "outlineOffset": "1px"
+  }
+]

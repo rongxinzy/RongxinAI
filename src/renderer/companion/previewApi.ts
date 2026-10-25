@@ -8,6 +8,7 @@ import type {
 } from '../../shared/companion/types';
 import type { CompanionTaskProjection } from '../../shared/companion/tasks';
 import { WorkbenchRunStatus } from '../../shared/workbenchTask';
+import { createCompanionMemoryPreview } from './memoryPreviewApi';
 
 /** DEV browser fixture only. It exercises the window UI, never models or production storage. */
 export function createCompanionPreviewApi(): CompanionWindowApi {
@@ -63,6 +64,7 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
     },
   });
   return {
+    ...createCompanionMemoryPreview(() => active),
     bootstrap: snapshot,
     select: async id => {
       active = id;

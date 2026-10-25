@@ -22,10 +22,16 @@ import { PiCompanionRuntime } from '../../companion/durableRuntime.mjs';
 import { CompanionModelAssignment } from '../../companion/modelAssignment.mjs';
 import { CompanionProfiles, type CompanionProfileStore } from '../../companion/profiles';
 import { getMagpieModelService } from '../../magpie/modelService';
+import type { CompanionMemoryService } from '../../companion/memory';
 
 export class PiRuntimeServiceBindings extends EventEmitter {
   private companionStore: CompanionProfileStore | null = null;
   private companions: { profiles: CompanionProfiles; runtime: PiCompanionRuntime } | null = null;
+  private companionMemory: CompanionMemoryService | null = null;
+
+  setCompanionMemoryService(service: CompanionMemoryService): void {
+    this.companionMemory = service;
+  }
 
   setCompanionStore(store: CompanionProfileStore): void {
     this.companionStore = store;
@@ -41,10 +47,11 @@ export class PiRuntimeServiceBindings extends EventEmitter {
         runtime: new PiCompanionRuntime(
           path.join(this.piSessionStoreRoot, 'companions'),
           new CompanionModelAssignment(getMagpieModelService()),
+          this.companionMemory ?? undefined,
         ),
       };
     }
-    return this.companions;
+    return { ...this.companions, memory: this.companionMemory };
   }
 
   async closeCompanions(): Promise<void> {

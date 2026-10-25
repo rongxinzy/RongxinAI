@@ -9,7 +9,7 @@ const MAX_ENGRAM_RECALL_LIMIT = 20;
 export interface MemoryRecallScopeInput {
   query: string;
   projectId: string;
-  scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
+  scope: MemoryScope;
   sessionId?: string;
   limit?: number;
 }

@@ -476,7 +476,7 @@
   --chart-3: #34D399;
   --chart-4: #FBBF24;
   --chart-5: #F87171;
-  --radius: 12px;
+  --radius: 8px;
   --sidebar: #121316;
   --sidebar-foreground: #DFE1E6;
   --sidebar-primary: #3D70E0;
@@ -485,10 +485,10 @@
   --sidebar-accent-foreground: #DFE1E6;
   --sidebar-border: rgba(255, 255, 255, 0.05);
   --sidebar-ring: var(--zy-primary);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --zy-style-text-xxl: 24px;
   --zy-style-text-xxl--line-height: 32px;
   --zy-style-shadow-subtle: none;
@@ -516,17 +516,17 @@
   --zy-style-switch-press-shrink: 1px;
   --zy-style-switch-motion-ms: 150;
   --zy-style-switch-thumb: #18191D;
-  --zy-style-work-chat-thumb-radius: 8px;
+  --zy-style-work-chat-thumb-radius: 6px;
   --zy-style-work-chat-thumb: #1F2126;
   --zy-style-font-heading: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
   --zy-style-font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
   --zy-style-font-mono: 'SF Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
-  --zy-style-radius-sm: 8px;
-  --zy-style-radius-md: 12px;
-  --zy-style-radius-lg: 16px;
-  --zy-style-radius-xl: 20px;
-  --zy-style-radius-2xl: 24px;
-  --zy-style-radius-3xl: 32px;
+  --zy-style-radius-sm: 4px;
+  --zy-style-radius-md: 6px;
+  --zy-style-radius-lg: 8px;
+  --zy-style-radius-xl: 12px;
+  --zy-style-radius-2xl: 16px;
+  --zy-style-radius-3xl: 20px;
   --zy-style-destructive-confirm: #F97066;
   --zy-style-work-chat-track: rgba(255, 255, 255, 0.06);
   --zy-primary: #3D70E0;
@@ -587,7 +587,7 @@
   --zy-gray-10: #F8FAFC;
   --zy-gray-11: #FFFFFF;
   --zy-ring: var(--zy-primary);
-  --zy-radius: 12px;
+  --zy-radius: 8px;
   --zy-state-destructive-tint-percent: 20%;
   --zy-state-destructive-border: #F97066;
   --zy-state-destructive-focus-ring: 40%;
@@ -992,7 +992,7 @@
 :where(:root, [data-theme]) :where(.theme-scroll-viewport) {
   border-radius: inherit;
   transition-property: color, box-shadow;
-  transition-duration: 150ms;
+  transition-duration: 120ms;
   outline-style: none;
 }
 :where(:root, [data-theme]) :where(.theme-scroll-bar) {
@@ -1958,22 +1958,22 @@
   opacity: 1;
   scale: 1;
   transition-property: opacity, scale;
-  transition-duration: 100ms;
+  transition-duration: 200ms;
   transition-timing-function: ease-out;
   border-radius: var(--zy-style-radius-xl);
   background-color: var(--zy-surface-overlay);
   color: var(--zy-surface-foreground);
   box-shadow: var(--zy-style-shadow-modal);
-  padding: 1rem;
+  padding: 1.5rem;
   gap: 1rem;
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-dialog-overlay) {
   background-color: color-mix(in oklab, var(--zy-component-palette-black) 20%, transparent);
-  backdrop-filter: blur(6px);
+  backdrop-filter: none;
   opacity: 1;
   transition-property: opacity;
-  transition-duration: 100ms;
+  transition-duration: 200ms;
 }
 :where(:root, [data-theme]) :where(.theme-dialog-title) {
   font-size: var(--zy-component-text-base);
@@ -1992,7 +1992,8 @@
   border-style: solid;
   border-top-color: var(--zy-border);
   background-color: var(--zy-surface);
-  padding: 1rem;
+  padding-inline: 1.5rem;
+  padding-block: 1rem;
 }
 :where(:root, [data-theme]) :where(.theme-dialog-footer-seamless) {
   background-color: transparent;
@@ -2008,7 +2009,7 @@
   opacity: 1;
   scale: 1;
   transition-property: opacity, scale;
-  transition-duration: 100ms;
+  transition-duration: 200ms;
   transition-timing-function: ease-out;
   border-radius: var(--zy-style-radius-lg);
   background-color: var(--popover);
@@ -2266,7 +2267,7 @@
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-confirm-dialog) {
-  border-radius: var(--zy-style-radius-2xl);
+  border-radius: var(--zy-style-radius-xl);
   padding: 0px;
   box-shadow: var(--zy-style-shadow-2xl);
 }
@@ -2469,12 +2470,12 @@
   border-radius: var(--zy-style-radius-lg);
   border-width: 1px;
   border-style: solid;
-  border-color: var(--input);
+  border-color: var(--zy-text-muted);
   background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   height: 2rem;
   padding-inline: 0.625rem;
   padding-block: 0.25rem;
@@ -2485,12 +2486,12 @@
   border-radius: var(--zy-style-radius-lg);
   border-width: 1px;
   border-style: solid;
-  border-color: var(--input);
+  border-color: var(--zy-text-muted);
   background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
-  transition-duration: 150ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   min-height: 4rem;
   padding-inline: 0.625rem;
   padding-block: 0.5rem;
@@ -5699,12 +5700,12 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-input):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  border-color: var(--zy-text-muted);
 }
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-textarea):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  border-color: var(--zy-text-muted);
 }
 }
 @media (hover: hover) {
@@ -6809,9 +6810,11 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
 }
 :where(:root, [data-theme]) :where(.theme-scroll-viewport):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  box-shadow: none;
   outline-style: solid;
-  outline-width: 1px;
+  outline-width: 2px;
+  outline-color: var(--primary);
+  outline-offset: 1px;
 }
 :where(:root, [data-theme]) :where(.theme-sidebar-label):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   box-shadow: 0 0 0 2px var(--sidebar-ring);
@@ -6901,12 +6904,20 @@
   color: var(--primary);
 }
 :where(:root, [data-theme]) :where(.theme-input):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ring) 40%, transparent);
+  border-color: var(--zy-text-muted);
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--primary);
+  outline-offset: 1px;
+  box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-textarea):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ring) 40%, transparent);
+  border-color: var(--zy-text-muted);
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--primary);
+  outline-offset: 1px;
+  box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-input-embedded):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   border-width: 0px;

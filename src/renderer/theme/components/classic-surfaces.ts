@@ -28,7 +28,7 @@ export function classicSurfaces(): SurfaceAppearances {
     opacity: '1',
     scale: '1',
     'transition-property': 'opacity, scale',
-    'transition-duration': '100ms',
+    'transition-duration': '200ms',
     'transition-timing-function': 'ease-out',
   };
   const hidden = { opacity: '0', scale: '0.95' };
@@ -85,7 +85,7 @@ export function classicSurfaces(): SurfaceAppearances {
         'background-color': 'var(--zy-surface-overlay)',
         color: 'var(--zy-surface-foreground)',
         'box-shadow': 'var(--zy-style-shadow-modal)',
-        padding: '1rem',
+        padding: '1.5rem',
         gap: '1rem',
       },
       entering: hidden,
@@ -95,10 +95,10 @@ export function classicSurfaces(): SurfaceAppearances {
       base: {
         'background-color':
           'color-mix(in oklab, var(--zy-component-palette-black) 20%, transparent)',
-        'backdrop-filter': 'blur(6px)',
+        'backdrop-filter': 'none',
         opacity: '1',
         'transition-property': 'opacity',
-        'transition-duration': '100ms',
+        'transition-duration': '200ms',
       },
       entering: { opacity: '0' },
       exiting: { opacity: '0' },
@@ -113,7 +113,8 @@ export function classicSurfaces(): SurfaceAppearances {
         'border-style': 'solid',
         'border-top-color': 'var(--zy-border)',
         'background-color': 'var(--zy-surface)',
-        padding: '1rem',
+        'padding-inline': '1.5rem',
+        'padding-block': '1rem',
       },
     }),
     'dialog-footer-seamless': recipe({

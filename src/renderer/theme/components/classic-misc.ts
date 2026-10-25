@@ -26,13 +26,15 @@ export function classicMisc() {
       base: {
         'border-radius': 'inherit',
         'transition-property': 'color, box-shadow',
-        'transition-duration': '150ms',
+        'transition-duration': '120ms',
         'outline-style': 'none',
       },
       focus: {
-        'box-shadow': '0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
+        'box-shadow': 'none',
         'outline-style': 'solid',
-        'outline-width': '1px',
+        'outline-width': '2px',
+        'outline-color': 'var(--primary)',
+        'outline-offset': '1px',
       },
     }),
     'scroll-bar': recipe({

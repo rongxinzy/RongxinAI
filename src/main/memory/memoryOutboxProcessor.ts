@@ -23,6 +23,10 @@ export async function processMemoryOutboxItem(
   }
   const payload = parseConfirmPayload(item.payload);
   if (!payload) return retryInvalidOutboxItem(repository, item);
+  if (payload.candidateBacked && !repository.getCandidate(payload.linkId)) {
+    repository.markCompleted(item.id);
+    return null;
+  }
   try {
     const { superseded } = validateMemoryOutboxRelationships(repository, payload);
     const candidate = adapter.saveCandidate({
@@ -45,6 +49,31 @@ export async function processMemoryOutboxItem(
     if (memoryId === null) {
       adapter.discardCandidate(candidate.id);
       repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
+      return null;
+    }
+    // A user can withdraw a candidate or its promotion source while Engram is writing.
+    // Revalidate after the asynchronous boundary before making it recallable locally.
+    let stillApplicable =
+      !payload.candidateBacked ||
+      repository.getCandidate(payload.linkId)?.status === MemoryLifecycleStatus.NeedsReview;
+    try {
+      validateMemoryOutboxRelationships(repository, payload);
+    } catch {
+      stillApplicable = false;
+    }
+    if (!stillApplicable) {
+      const cleanupId = repository.enqueue(
+        MemoryOutboxOperation.Forget,
+        {
+          linkId: payload.linkId,
+          observationId: memoryId,
+          hardDelete: false,
+        },
+        payload.linkId,
+      );
+      repository.markCompleted(item.id);
+      const cleanup = repository.findPendingByLinkId(payload.linkId, MemoryOutboxOperation.Forget);
+      if (cleanup?.id === cleanupId) await processMemoryForget(repository, adapter, cleanup);
       return null;
     }
     repository.createLink({

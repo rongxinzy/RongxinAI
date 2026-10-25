@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { X, PanelsTopLeft, FolderOpen, Paperclip } from 'lucide-react';
+import { FolderOpen, Paperclip } from 'lucide-react';
 import { cn } from '@shared/lib/utils';
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
@@ -39,6 +39,7 @@ import { CompanionConversation } from './CompanionConversation';
 import { CompanionPortrait } from './CompanionPortrait';
 import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttachments';
 import { useCompanionFiles } from './useCompanionFiles';
+import { CompanionHeaderActions } from './CompanionHeaderActions';
 
 function applyContext(context: CompanionWindowContext): void {
   themeService.initialize();
@@ -324,26 +325,12 @@ export function CompanionView({
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
         actions={
-          <>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t('companionWorkbench')}
-              onClick={() => void api?.openWorkbench()}
-            >
-              <PanelsTopLeft />
-            </Button>
-            {surface === CompanionSurface.Quick ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t('companionHide')}
-                onClick={() => void api?.hide()}
-              >
-                <X />
-              </Button>
-            ) : null}
-          </>
+          <CompanionHeaderActions
+            api={api}
+            surface={surface}
+            visible={visible}
+            profile={state?.profiles.find(profile => profile.petId === state.activePetId)}
+          />
         }
       />
       <div className="mx-auto flex w-full min-h-0 max-w-3xl flex-1 flex-col">

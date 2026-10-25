@@ -21,7 +21,7 @@ import {
   MemorySummaryFormat,
 } from '../memory/constants';
 
-const MemoryScopeSchema = z.enum([MemoryScope.Project, MemoryScope.Personal, MemoryScope.Session]);
+const MemoryScopeSchema = z.enum(Object.values(MemoryScope));
 
 const MemoryKindSchema = z.enum([
   MemoryKind.Decision,
@@ -58,7 +58,7 @@ const MemorySourceKindSchema = z.enum([
 ]);
 
 /** `ManagedMemoryRecord` projection the memory settings view renders. */
-const ManagedMemoryRecordSchema = z.object({
+export const ManagedMemoryRecordSchema = z.object({
   id: z.string(),
   memoryId: z.number().nullable(),
   projectId: z.string(),

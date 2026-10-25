@@ -123,7 +123,7 @@ export function classicExtraOverlays(): ExtraAppearances {
     }),
     'confirm-dialog': recipe({
       base: {
-        'border-radius': 'var(--zy-style-radius-2xl)',
+        'border-radius': 'var(--zy-style-radius-xl)',
         padding: '0px',
         'box-shadow': 'var(--zy-style-shadow-2xl)',
       },

@@ -4,6 +4,10 @@ import type { CompanionWindowApi } from '../../shared/companion/types';
 
 /** Both owned surfaces share the same validated IPC and durable conversation. */
 export const companionApi: CompanionWindowApi = {
+  listMemories: petId => ipcRenderer.invoke(IpcChannel.ListMemories, petId),
+  saveMemory: input => ipcRenderer.invoke(IpcChannel.SaveMemory, input),
+  forgetMemory: (petId, id) => ipcRenderer.invoke(IpcChannel.ForgetMemory, petId, id),
+  shareMemory: input => ipcRenderer.invoke(IpcChannel.ShareMemory, input),
   bootstrap: () => ipcRenderer.invoke(IpcChannel.Bootstrap),
   select: petId => ipcRenderer.invoke(IpcChannel.Select, petId),
   submit: request => ipcRenderer.invoke(IpcChannel.Submit, request),

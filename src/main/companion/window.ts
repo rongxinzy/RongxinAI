@@ -18,11 +18,16 @@ import { t } from '../i18n';
 import type { CompanionProfiles } from './profiles';
 import type { PiCompanionRuntime } from './durableRuntime.mjs';
 import type { CompanionTasks } from './tasks';
+import type { CompanionMemoryService } from './memory';
 
 interface Options {
   store: Pick<SqliteStore, 'get' | 'onDidChange'>;
   getMainWindow(): BrowserWindow | null;
-  getCompanions(): { profiles: CompanionProfiles; runtime: PiCompanionRuntime };
+  getCompanions(): {
+    profiles: CompanionProfiles;
+    runtime: PiCompanionRuntime;
+    memory?: CompanionMemoryService | null;
+  };
   getTasks(): CompanionTasks;
   openTask(sessionId: string): void;
   onProfileChanged(profile: CompanionProfile): void;
@@ -107,6 +112,12 @@ function activeProfile(petId: string): CompanionProfile {
   return profile;
 }
 
+function memoryService(): CompanionMemoryService {
+  const service = options?.getCompanions().memory;
+  if (!service) throw new Error(t('companionMemoryUnavailable'));
+  return service;
+}
+
 export function initializeCompanionWindow(next: Options): void {
   if (options) return;
   options = next;
@@ -131,6 +142,32 @@ export function initializeCompanionWindow(next: Options): void {
     return result;
   };
   handleIpcContract(companionContract, {
+    listMemories: (event, petId) =>
+      serialized(event, () => {
+        activeProfile(petId);
+        return memoryService().list(petId);
+      }),
+    saveMemory: (event, input) =>
+      serialized(event, async () => {
+        activeProfile(input.petId);
+        const saved = await memoryService().save(input);
+        changed();
+        return saved;
+      }),
+    forgetMemory: (event, petId, id) =>
+      serialized(event, async () => {
+        activeProfile(petId);
+        const forgotten = await memoryService().forget(petId, id);
+        changed();
+        return forgotten;
+      }),
+    shareMemory: (event, input) =>
+      serialized(event, async () => {
+        activeProfile(input.petId);
+        const id = await memoryService().shareConfirmed(input.petId, input.id, input.requestId);
+        changed();
+        return id;
+      }),
     chooseWorkspace: async event => {
       const owner = assertWindow(event);
       if (choosingDialog) throw new Error('A companion dialog is already open');

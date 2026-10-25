@@ -65,8 +65,8 @@ async function fixture() {
     },
   );
   const runtimes: PiCompanionRuntime[] = [];
-  const create = () => {
-    const runtime = new PiCompanionRuntime(root, new CompanionModelAssignment(service));
+  const create = (memory?: { context(petId: string, query: string): Promise<string> }) => {
+    const runtime = new PiCompanionRuntime(root, new CompanionModelAssignment(service), memory);
     runtimes.push(runtime);
     return runtime;
   };
@@ -258,6 +258,38 @@ test('actual provider failure cools down that model without replaying the user r
     expect(f.requests.map(request => request.model)).toEqual(['local', 'backup']);
     expect((await runtime.answer(f.profile, failed)).state).toBe(CompanionRequestState.Unanswered);
     expect((await runtime.resume(f.profile)).modelId).toBe('backup');
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test('native prompt sections follow private owner memory, appearance changes and forgetting', async () => {
+  const f = await fixture();
+  let remembered = 'Private memory: the paper kite is blue.';
+  const seen: Array<{ petId: string; query: string }> = [];
+  const memory = {
+    context: async (petId: string, query: string) => {
+      seen.push({ petId, query });
+      return petId === f.profile.petId ? remembered : '';
+    },
+  };
+  try {
+    const runtime = f.create(memory);
+    const first = await receiptFor(runtime, f.profile);
+    await answered(runtime, f.profile, first);
+    expect(JSON.stringify(f.requests[0].messages)).toContain('paper kite is blue');
+    const other = { ...f.profile, petId: randomUUID() };
+    await answered(runtime, other, await receiptFor(runtime, other));
+    expect(JSON.stringify(f.requests[1].messages)).not.toContain('paper kite is blue');
+    await runtime.close();
+    const reopened = f.create(memory);
+    const dressed = { ...f.profile, characterId: DesktopPetBuiltinId.Maixiao };
+    await answered(reopened, dressed, await receiptFor(reopened, dressed, 'two'));
+    expect(JSON.stringify(f.requests[2].messages)).toContain('paper kite is blue');
+    remembered = '';
+    await answered(reopened, dressed, await receiptFor(reopened, dressed, 'three'));
+    expect(JSON.stringify(f.requests[3].messages)).not.toContain('paper kite is blue');
+    expect(seen.every(item => item.query === 'Help me think through this.')).toBe(true);
   } finally {
     await f.cleanup();
   }

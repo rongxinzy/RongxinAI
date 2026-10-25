@@ -73,8 +73,8 @@ export const zenithDark: ThemeDefinition = {
     'style-font-heading':
       "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif",
 
-    // ── Border Radius (Larger, modern) ──
-    radius: '12px',
+    // Quiet Studio geometry is shared with the light appearance.
+    radius: '8px',
     // Appearance-conditioned component values (work package N) — dark
     'state-destructive-tint-percent': '20%',
     'state-destructive-border': 'color-mix(in oklab, var(--destructive) 50%, transparent)',
@@ -98,23 +98,23 @@ export const zenithDark: ThemeDefinition = {
     'state-banner-warning-bg': 'color-mix(in oklab, var(--zy-warning) 14%, transparent)',
     'state-banner-warning-border': 'color-mix(in oklab, var(--zy-warning) 35%, transparent)',
     'state-banner-warning-text': 'var(--zy-warning)',
-    'style-radius-sm': '8px',
+    'style-radius-sm': '4px',
     'state-login-hover-tint':
       'color-mix(in oklab, var(--zy-component-palette-white) 4%, transparent)',
     'state-muted-tab-text': 'var(--muted-foreground)',
     'state-page-pill-bg': 'var(--zy-background)',
     'state-page-pill-hover': 'var(--muted)',
     'state-session-tint': 'color-mix(in oklab, var(--zy-component-palette-white) 5%, transparent)',
-    'style-radius-md': '12px',
-    'style-radius-lg': '16px',
-    'style-radius-xl': '20px',
-    'style-radius-2xl': '24px',
-    'style-radius-3xl': '32px',
-    'semantic-radius': '12px',
-    'semantic-radius-sm': '8px',
-    'semantic-radius-md': '12px',
-    'semantic-radius-lg': '16px',
-    'semantic-radius-xl': '20px',
+    'style-radius-md': '6px',
+    'style-radius-lg': '8px',
+    'style-radius-xl': '12px',
+    'style-radius-2xl': '16px',
+    'style-radius-3xl': '20px',
+    'semantic-radius': '8px',
+    'semantic-radius-sm': '4px',
+    'semantic-radius-md': '6px',
+    'semantic-radius-lg': '8px',
+    'semantic-radius-xl': '12px',
 
     // ── Shadows (Multi-layer with colored glow) ──
     'style-shadow-xs': '0 1px 2px rgba(0, 0, 0, 0.4)',
@@ -147,7 +147,7 @@ export const zenithDark: ThemeDefinition = {
     'style-switch-press-shrink': '1px',
     'style-switch-motion-ms': '150',
     'style-switch-thumb': '#FFFFFF',
-    'style-work-chat-thumb-radius': '8px',
+    'style-work-chat-thumb-radius': '6px',
     'style-work-chat-thumb': 'color-mix(in oklab, var(--zy-foreground) 20%, var(--zy-background))',
     'style-work-chat-track': 'rgba(96, 165, 250, 0.12)',
 

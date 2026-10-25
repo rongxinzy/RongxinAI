@@ -3,6 +3,8 @@ import { CompanionIpc as IpcChannel } from '../ipc/channels';
 import { defineIpcContract } from '../ipc/contract';
 import { DesktopPetBuiltinId } from '../desktopPet/catalog';
 import { companionAttachments } from './attachments';
+import { companionMemorySave, companionMemoryShare } from './memory';
+import { ManagedMemoryRecordSchema } from '../ipc/memoryContract';
 import {
   companionTaskRequest,
   companionTaskProjection,
@@ -58,6 +60,26 @@ const state = z.object({
   }),
 });
 export const companionContract = defineIpcContract({
+  listMemories: {
+    channel: IpcChannel.ListMemories,
+    args: z.tuple([z.uuid()]),
+    result: z.array(ManagedMemoryRecordSchema),
+  },
+  saveMemory: {
+    channel: IpcChannel.SaveMemory,
+    args: z.tuple([companionMemorySave]),
+    result: ManagedMemoryRecordSchema,
+  },
+  forgetMemory: {
+    channel: IpcChannel.ForgetMemory,
+    args: z.tuple([z.uuid(), z.string().min(1).max(128)]),
+    result: z.boolean(),
+  },
+  shareMemory: {
+    channel: IpcChannel.ShareMemory,
+    args: z.tuple([companionMemoryShare]),
+    result: z.object({ id: z.string(), available: z.boolean() }),
+  },
   bootstrap: { channel: IpcChannel.Bootstrap, args: z.tuple([]), result: state },
   select: { channel: IpcChannel.Select, args: z.tuple([z.uuid()]), result: state },
   submit: {

@@ -9,6 +9,7 @@ import {
   GenerationTask,
   Harness,
   hook,
+  section,
   UserEntry,
   type Conversation,
   type Submission,
@@ -25,6 +26,7 @@ import type {
 } from '../../shared/companion/types.js';
 import { CompanionModelAssignment } from './modelAssignment.mjs';
 import { companionInstructions } from './personas.js';
+import type { CompanionMemoryService } from './memory.js';
 
 const owners = new Set<string>();
 const requestIdSchema = z.string().trim().min(1).max(128);
@@ -38,6 +40,7 @@ interface ActiveCompanion {
   models: Models;
   modelId: string | null;
   availability: CompanionAvailability;
+  memoryQuery: string;
 }
 
 export interface CompanionAdmission {
@@ -55,6 +58,7 @@ export class PiCompanionRuntime {
   constructor(
     private readonly root: string,
     private readonly assignment: CompanionModelAssignment,
+    private readonly memory?: Pick<CompanionMemoryService, 'context'>,
   ) {}
 
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
@@ -78,10 +82,27 @@ export class PiCompanionRuntime {
     owners.add(file);
     try {
       let models: Models = createModels();
+      let memoryQuery = '';
       const registry = createRegistry();
       registry.install(
         defineExtension({
           name: 'zhiyuan.companion',
+          sections: this.memory
+            ? [
+                section('companion-memory', async () => {
+                  if (!memoryQuery) return undefined;
+                  try {
+                    return (await this.memory!.context(profile.petId, memoryQuery)) || undefined;
+                  } catch (error) {
+                    console.warn(
+                      `[CompanionMemory] Recall failed for companion ${profile.petId}:`,
+                      error,
+                    );
+                    return undefined;
+                  }
+                }),
+              ]
+            : [],
           hooks: [
             hook(GenerationTask, {
               afterResponse: message => {
@@ -116,6 +137,18 @@ export class PiCompanionRuntime {
         const conversation = await harness.root(context, {
           agent: { instructions: companionInstructions(profile.personaId), tools: [] },
         });
+        const restored = await conversation.entries({}, 32, undefined, context);
+        const latestUser = restored.items.find(entry => UserEntry.is(entry));
+        memoryQuery =
+          latestUser?.model
+            ?.flatMap(message =>
+              message.role === 'user'
+                ? typeof message.content === 'string'
+                  ? [message.content]
+                  : message.content.flatMap(block => (block.type === 'text' ? [block.text] : []))
+                : [],
+            )
+            .join('\n') ?? '';
         const active: ActiveCompanion = {
           petId: profile.petId,
           file,
@@ -128,6 +161,12 @@ export class PiCompanionRuntime {
             models = value;
           },
           modelId: null,
+          get memoryQuery() {
+            return memoryQuery;
+          },
+          set memoryQuery(value) {
+            memoryQuery = value;
+          },
           availability: {
             capability: CompanionCapability.Local,
             modelId: null,
@@ -180,6 +219,7 @@ export class PiCompanionRuntime {
         throw new Error('Companion has an unfinished request');
       const availability = await this.configure(active);
       if (!active.modelId) return { availability, receipt: null };
+      active.memoryQuery = text;
       const submission = await active.conversation.submit(
         { type: 'input', content: text, requestId: key, whenBusy: 'reject' },
         context,

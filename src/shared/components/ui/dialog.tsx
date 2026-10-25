@@ -47,10 +47,12 @@ function DialogContent({
   overlayClassName,
   children,
   showCloseButton = true,
+  closeLabel = 'Close',
   disableCloseAnimation = false,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
+  closeLabel?: string;
   overlayClassName?: string;
   disableCloseAnimation?: boolean;
 }) {
@@ -74,7 +76,7 @@ function DialogContent({
             render={<Button variant="ghost" className="absolute top-2 right-2" size="icon-sm" />}
           >
             <XIcon />
-            <span className="sr-only">Close</span>
+            <span className="sr-only">{closeLabel}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>
@@ -104,7 +106,7 @@ function DialogFooter({
       className={cn(
         surface === DialogFooterSurface.Seamless
           ? 'theme-dialog-footer-seamless'
-          : 'theme-dialog-footer -mx-4 -mb-4',
+          : 'theme-dialog-footer -mx-6 -mb-6',
         'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
         className,
       )}

@@ -22,6 +22,8 @@ import {
 import { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { WorkbenchTaskService } from '../workbenchTask/taskService';
 import { promoteVerifiedWorkbenchRun } from '../memory/taskMemoryPromotion';
+import { CompanionMemoryService } from '../companion/memory';
+import { CompanionMemoryRetractions } from '../companion/memoryRetractions';
 
 export const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!agentRuntime.workbenchTaskService) {
@@ -73,6 +75,20 @@ export const getProjectMemoryService = (): ProjectMemoryService => {
   return memoryRuntime.projectMemoryService;
 };
 
+const getCompanionMemoryService = (): CompanionMemoryService => {
+  const shared = getProjectMemoryService();
+  if (!memoryRuntime.companionMemoryService) {
+    memoryRuntime.companionMemoryService = new CompanionMemoryService(
+      memoryRuntime.memoryRepository!,
+      memoryRuntime.engramAdapter!,
+      shared,
+      path.join(app.getPath('userData'), 'companions'),
+      new CompanionMemoryRetractions(getStore().getDatabase()),
+    );
+  }
+  return memoryRuntime.companionMemoryService;
+};
+
 export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
   if (!agentRuntime.piRuntimeAdapter) {
     // Pi shell tools inherit the main-process environment. Keep the gateway
@@ -89,6 +105,7 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     agentRuntime.piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     agentRuntime.piRuntimeAdapter.setArtifactLedger(getArtifactLedger());
     agentRuntime.piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
+    agentRuntime.piRuntimeAdapter.setCompanionMemoryService(getCompanionMemoryService());
     agentRuntime.piRuntimeAdapter.setSessionSummaryService(
       new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),
     );

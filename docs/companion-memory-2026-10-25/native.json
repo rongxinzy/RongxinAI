@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "status": "succeeded",
+  "receipt": {
+    "petId": "5fe43209-0077-47fa-ba6a-53c37f01df70",
+    "requestId": "4d9132cf-8122-4270-8ca2-5b8433f11755",
+    "sessionId": "cf864738-260f-490c-89d3-ff1409d842f1",
+    "taskId": "e16aed0d-7c42-4b92-8bff-814272dbcd18",
+    "runId": "fda12f99-91ce-4847-a2ed-252aee22a2f4"
+  },
+  "requests": 7,
+  "taskExecutions": 1,
+  "taskModelRequests": 1,
+  "chatExecutions": 4,
+  "maintenanceRequests": 2,
+  "detailAvailable": true,
+  "media": {
+    "decoderSlots": 2,
+    "clip": "happy",
+    "transparent": 100388,
+    "opaque": 40734,
+    "devicePixelRatio": 2
+  },
+  "allMedia": null,
+  "home": null,
+  "files": null,
+  "stress": null,
+  "copy": null,
+  "memory": {
+    "privateRecall": true,
+    "otherCompanionIsolated": true,
+    "forgottenContextRemoved": true,
+    "confirmedPersonalRecall": true,
+    "savedViaNativeUi": true,
+    "requests": 4
+  },
+  "userData": "/tmp/companion-task-native-LcJEyZ",
+  "workspace": "/tmp/companion-task-workspace-LnVIRl"
+}

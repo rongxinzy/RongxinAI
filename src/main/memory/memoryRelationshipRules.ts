@@ -10,7 +10,7 @@ import {
 } from '../../shared/memory';
 
 export interface MemoryRelationshipIdentity {
-  scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
+  scope: MemoryScope;
   projectId: string;
   sessionId: string;
 }
@@ -45,7 +45,11 @@ export function assertCanPromote(
   if (source.status !== MemoryLifecycleStatus.Active) {
     throw new Error('Promotion source must be active.');
   }
-  if (source.scope !== MemoryScope.Project && source.scope !== MemoryScope.Session) {
+  if (
+    source.scope !== MemoryScope.Project &&
+    source.scope !== MemoryScope.Session &&
+    source.scope !== MemoryScope.Companion
+  ) {
     throw new Error('Only Project or Session memory can be promoted to Personal memory.');
   }
   if (source.projectId !== sourceProjectId) {

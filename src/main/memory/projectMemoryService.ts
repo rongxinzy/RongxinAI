@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { createManualMemory, updateManualMemory } from './manualMemoryOperations';
 
 import {
   MemoryKind,
@@ -16,7 +17,6 @@ import {
   type MemorySourceKind as MemorySourceKindValue,
 } from '../../shared/memory';
 import {
-  MANUAL_MEMORY_SESSION_ID,
   MemoryOutboxOperation,
   PERSONAL_MEMORY_SESSION_PREFIX,
   SESSION_SUMMARY_TTL_DAYS,
@@ -24,7 +24,6 @@ import {
 import {
   assertCanPromote,
   assertCanSupersede,
-  normalizeManualMemoryInput,
   type MemoryRelationshipIdentity,
 } from './memoryRelationshipRules';
 import {
@@ -60,58 +59,21 @@ export class ProjectMemoryService {
     return this.resolveIdentity(workingDirectory);
   }
 
-  async createManualMemory(input: ManualMemoryCreateInput): Promise<ManagedMemoryRecord> {
-    const normalized = normalizeManualMemoryInput(input);
-    const project = this.resolveIdentity(input.workingDirectory);
-    const candidateId = this.repository.createPersonalCandidate({
-      projectId:
-        normalized.scope === MemoryScope.Personal ? PERSONAL_MEMORY_PROJECT_ID : project.id,
-      projectRoot:
-        normalized.scope === MemoryScope.Personal ? this.personalDirectory : project.root,
-      scope: normalized.scope,
-      sessionId: MANUAL_MEMORY_SESSION_ID,
-      sourceKind: MemorySourceKind.Explicit,
-      title: normalized.title,
-      content: normalized.content,
-      kind: normalized.kind,
-      sensitivity: normalized.sensitivity,
-      metadata: { manual: true },
-    });
-    await this.confirmMemoryCandidate(candidateId);
-    return this.requireCandidateOrLink(candidateId);
+  createManualMemory(input: ManualMemoryCreateInput): Promise<ManagedMemoryRecord> {
+    return createManualMemory(this.manualOperations(), input);
   }
 
-  async updateManualMemory(input: ManualMemoryUpdateInput): Promise<ManagedMemoryRecord> {
-    const normalized = normalizeManualMemoryInput(input);
-    const candidate = this.repository.getCandidate(input.id);
-    if (candidate) {
-      this.assertManualMemoryBoundary(candidate, input.workingDirectory);
-      const updated = this.repository.updateCandidate(input.id, normalized);
-      if (!updated) throw new Error('Memory candidate is not editable.');
-      return updated;
-    }
+  updateManualMemory(input: ManualMemoryUpdateInput): Promise<ManagedMemoryRecord> {
+    return updateManualMemory(this.manualOperations(), input);
+  }
 
-    const current = this.repository.getLink(input.id);
-    if (!current || current.status !== MemoryLifecycleStatus.Active) {
-      throw new Error('Active memory not found.');
-    }
-    this.assertManualMemoryBoundary(current, input.workingDirectory);
-    const project = this.resolveIdentity(input.workingDirectory);
-    const replacementId = this.repository.createPersonalCandidate({
-      projectId: current.scope === MemoryScope.Personal ? PERSONAL_MEMORY_PROJECT_ID : project.id,
-      projectRoot: current.scope === MemoryScope.Personal ? this.personalDirectory : project.root,
-      scope: current.scope,
-      sessionId: MANUAL_MEMORY_SESSION_ID,
-      sourceKind: MemorySourceKind.Explicit,
-      title: normalized.title,
-      content: normalized.content,
-      kind: normalized.kind,
-      sensitivity: normalized.sensitivity,
-      supersedesLinkId: current.id,
-      metadata: { manual: true, editedFrom: current.id },
-    });
-    await this.confirmMemoryCandidate(replacementId);
-    return this.requireCandidateOrLink(replacementId);
+  private manualOperations() {
+    return {
+      repository: this.repository,
+      resolveIdentity: this.resolveIdentity,
+      personalDirectory: this.personalDirectory,
+      confirm: (id: string) => this.confirmMemoryCandidate(id),
+    };
   }
 
   async recallProject(input: { workingDirectory: string; query: string; limit?: number }) {
@@ -392,7 +354,8 @@ export class ProjectMemoryService {
     }
     const rawCandidate = this.repository.getCandidateDetails(id);
     if (!rawCandidate) throw new Error('Memory candidate details are unavailable.');
-    const { superseded, promotedFrom } = this.validateCandidateRelationships(
+    const { superseded, promotedFrom } = validateMemoryCandidateRelationships(
+      this.repository,
       candidate,
       rawCandidate,
     );
@@ -504,7 +467,10 @@ export class ProjectMemoryService {
 
   listManagedMemories(input: ManagedMemoryListInput = {}): ManagedMemoryRecord[] {
     const workingDirectory = input.workingDirectory?.trim();
-    if (!workingDirectory) return this.repository.listManaged(input);
+    if (!workingDirectory)
+      return this.repository
+        .listManaged(input)
+        .filter(memory => memory.scope !== MemoryScope.Companion);
 
     const projectId = this.resolveIdentity(workingDirectory).id;
     const records = this.repository.listManaged({
@@ -573,24 +539,6 @@ export class ProjectMemoryService {
     return await this.drainOutbox(limit);
   }
 
-  private requireCandidateOrLink(id: string): ManagedMemoryRecord {
-    const memory = this.repository.getLink(id) ?? this.repository.getCandidate(id);
-    if (!memory) throw new Error('Memory projection was not created.');
-    return memory;
-  }
-
-  private assertManualMemoryBoundary(memory: ManagedMemoryRecord, workingDirectory: string): void {
-    if (memory.scope === MemoryScope.Session) {
-      throw new Error('Session summaries cannot be edited manually.');
-    }
-    if (
-      memory.scope === MemoryScope.Project &&
-      memory.projectId !== this.resolveIdentity(workingDirectory).id
-    ) {
-      throw new Error('Workspace memory belongs to a different workspace.');
-    }
-  }
-
   private async recallScope(input: {
     query: string;
     projectId: string;
@@ -613,34 +561,9 @@ export class ProjectMemoryService {
     return resolveReferencedMemoryLink(this.repository, label, linkId, memoryId);
   }
 
-  private validateCandidateRelationships(
-    candidate: ManagedMemoryRecord,
-    details: {
-      supersedesLinkId: string | null;
-      promotedFromLinkId: string | null;
-      promotionSourceProjectId: string | null;
-      promotionSourceSessionId: string | null;
-    },
-  ): { superseded: ManagedMemoryRecord | null; promotedFrom: ManagedMemoryRecord | null } {
-    return validateMemoryCandidateRelationships(this.repository, candidate, details);
-  }
-
   private async processOutboxItem(item: MemoryOutboxItem | null): Promise<number | null> {
     return await processMemoryOutboxItem(this.repository, this.adapter, item);
   }
 }
 
-export async function buildProjectMemoryContextSafe(
-  service: ProjectMemoryService | null,
-  workingDirectory: string,
-  sessionId: string,
-  query: string,
-): Promise<string> {
-  if (!service) return '';
-  try {
-    return await service.buildProjectContext({ workingDirectory, sessionId, query });
-  } catch (error) {
-    console.warn('[ProjectMemory] Failed to recall project context:', error);
-    return '';
-  }
-}
+export { buildProjectMemoryContextSafe } from './memoryContext';

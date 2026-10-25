@@ -3,6 +3,58 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createCompanion(runtime: BrowserMockRuntime): Window['electron']['companion'] {
   return {
+    listMemories: async _p0 => {
+      void _p0;
+      runtime.warnOnce('companion.listMemories');
+      return [];
+    },
+    saveMemory: async _p0 => {
+      void _p0;
+      runtime.warnOnce('companion.saveMemory');
+      return {
+        id: 'preview',
+        memoryId: 0,
+        projectId: '',
+        scope: 'companion',
+        sessionId: '',
+        sourceKind: 'explicit',
+        taskId: '',
+        runId: '',
+        artifactId: '',
+        approvalId: '',
+        status: 'active',
+        title: 'Preview',
+        content: '',
+        kind: 'decision',
+        topicKey: '',
+        importance: 0,
+        confidence: 0,
+        sensitivity: 'normal',
+        expiresAt: '',
+        supersededBy: '',
+        promotedFromLinkId: '',
+        promotionSourceProjectId: '',
+        promotionSourceSessionId: '',
+        createdAt: '',
+        updatedAt: '',
+        deliveryStatus: 'completed',
+        deliveryError: '',
+      };
+    },
+    forgetMemory: async (_p0, _p1) => {
+      void _p0;
+      void _p1;
+      runtime.warnOnce('companion.forgetMemory');
+      return false;
+    },
+    shareMemory: async _p0 => {
+      void _p0;
+      runtime.warnOnce('companion.shareMemory');
+      return {
+        id: 'preview',
+        available: false,
+      };
+    },
     bootstrap: async () => {
       runtime.warnOnce('companion.bootstrap');
       return {

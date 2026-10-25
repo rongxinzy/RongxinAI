@@ -38,7 +38,7 @@ export class ZhiYuanEngramAdapter {
     const params = new URLSearchParams({
       q: input.query,
       project: input.project,
-      scope: input.scope ?? EngramMemoryScope.Project,
+      scope: engramScope(input.scope),
       limit: String(Math.min(Math.max(input.limit ?? 8, 1), 20)),
     });
     if (input.matchMode) params.set('match_mode', input.matchMode);
@@ -58,7 +58,7 @@ export class ZhiYuanEngramAdapter {
     if (!connection) return [];
     const params = new URLSearchParams({
       project: input.project,
-      scope: input.scope ?? EngramMemoryScope.Project,
+      scope: engramScope(input.scope),
       limit: String(Math.min(Math.max(input.limit ?? 8, 1), 20)),
     });
     const observations = await this.request<EngramObservation[] | null>(
@@ -95,7 +95,7 @@ export class ZhiYuanEngramAdapter {
       body: JSON.stringify({
         session_id: candidate.sessionId,
         project: candidate.project,
-        scope: candidate.scope,
+        scope: engramScope(candidate.scope),
         type: candidate.type,
         title: candidate.title,
         content: candidate.content,
@@ -191,4 +191,11 @@ export class ZhiYuanEngramAdapter {
 
 export function redactPrivateBlocks(value: string): string {
   return value.replace(/<private>[\s\S]*?<\/private>/gi, '[REDACTED]');
+}
+
+/** Engram's transport has three scopes; companion ownership is an isolated project namespace. */
+function engramScope(scope?: EngramMemoryScopeValue): string {
+  return scope === EngramMemoryScope.Companion
+    ? EngramMemoryScope.Project
+    : (scope ?? EngramMemoryScope.Project);
 }

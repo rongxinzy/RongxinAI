@@ -2,6 +2,7 @@ export const MemoryScope = {
   Project: 'project',
   Personal: 'personal',
   Session: 'session',
+  Companion: 'companion',
 } as const;
 
 export type MemoryScope = (typeof MemoryScope)[keyof typeof MemoryScope];
@@ -82,3 +83,4 @@ export const MemoryIpcChannel = {
 } as const;
 
 export const PERSONAL_MEMORY_PROJECT_ID = 'personal://zhiyuan-agent/user';
+export const COMPANION_MEMORY_PROJECT_PREFIX = 'companion://zhiyuan-agent/';

@@ -12,6 +12,7 @@ import { verifyHomeSurfaces } from './verify-home-surfaces.mjs';
 import { createTaskFileFixture, chooseTaskFile } from './verify-task-files.mjs';
 import { verifyWorkbenchCopy } from './verify-workbench-copy.mjs';
 import { verifyAllMedia } from './verify-all-media.mjs';
+import { verifyCompanionMemory, COMPANION_MEMORY_NATIVE_MARKER } from './verify-memory.mjs';
 
 // Manual native acceptance only: isolated storage, local model fixture, no real account keys.
 // Prerequisites: verified Magpie resource, build:electron:dev and web:preview.
@@ -56,6 +57,7 @@ const server = createServer(async (request, response) => {
         : 'task';
   requestKinds.push({
     kind,
+    companionMemory: system.includes(COMPANION_MEMORY_NATIVE_MARKER),
     system: system.slice(0, 180),
     lastUser: content(payload.messages?.findLast(message => message.role === 'user')).slice(0, 180),
     messageCount: payload.messages?.length,
@@ -221,6 +223,9 @@ try {
     throw new Error('Native companion actor missing');
   }
   await actor.waitForFunction(() => Boolean(window.desktopPet));
+  // The preload exists before loadURL completes. Reloading then aborts the app's own load.
+  await actor.waitForLoadState('load');
+  await actor.locator('canvas').waitFor();
   await actor.addInitScript(() => {
     window.acceptanceVideos = [];
     const create = Document.prototype.createElement;
@@ -404,6 +409,10 @@ try {
     : null;
   const copy =
     process.env.COMPANION_VERIFY_COPY === '1' ? await verifyWorkbenchCopy(main, userData) : null;
+  const memory =
+    process.env.COMPANION_VERIFY_MEMORY === '1'
+      ? await verifyCompanionMemory(application, main, chat, userData, requestKinds)
+      : null;
   console.log(
     JSON.stringify({
       passed: true,
@@ -429,6 +438,7 @@ try {
         : null,
       stress,
       copy,
+      memory,
       userData,
       workspace,
     }),

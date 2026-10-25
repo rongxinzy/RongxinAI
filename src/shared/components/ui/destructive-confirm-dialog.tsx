@@ -57,7 +57,7 @@ function DestructiveConfirmDialog({
           <div className="flex min-w-0 flex-col gap-2">
             <DialogTitle className="theme-confirm-title">{title}</DialogTitle>
             <DialogDescription
-              className="theme-confirm-description min-w-0 truncate"
+              className="theme-confirm-description min-w-0 break-words"
               title={description}
             >
               {description}
