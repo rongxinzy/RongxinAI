@@ -62,6 +62,8 @@
 
 ## 已完成的基础验证（2026-10-24）
 
+2026-10-26 按用户优先级暂停进一步记忆依赖工作，回到小远媒体交互。已在双视频槽内提前解码后继动作，保留真实结束、原随机闲置节奏、任务抢占与隐藏释放；浏览器和 macOS Electron 衔接复验见[小远质量记录](companion-xiaoyuan-quality.md#提前解码后继动作2026-10-26)。这不改变上表的完整范围，也不代表 Windows、最终美术或安装发布通过。
+
 - `src/main/companion/`：身份仓库、独立 persona、Magpie 自动分配与 Pi Durable 原生存储。`PiRuntimeAdapter` 通过服务绑定持有该后端，不安装独立执行工具；退出走 `close` 保存待恢复输入，用户停止才撤回。
 - 存储路径为 `userData/companions/<petId>.sqlite`。路径使用 UUID 与解析后的真实目录，进程内拒绝重复所有者；切换形象不会改变路径、身份或 persona。
 - 适配器原文件超过 5000 token，原有注入服务机械提取至 `piRuntimeServiceBindings.ts`，方法与调用契约保留；现有工作台流程保持。原生 ESM `.mts` 用于 Pi 的 import-only 导出，Knip 与源码行数检查同步扩展覆盖该格式，无新增忽略或基线豁免。

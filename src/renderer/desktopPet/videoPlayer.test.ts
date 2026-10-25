@@ -1,99 +1,17 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { DesktopPetMotion } from '../../shared/desktopPet/motionCatalog';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 import { DesktopPetPlayableAction, DesktopPetState } from '../../shared/desktopPet/constants';
 import { DesktopPetMediaController } from './mediaController';
-import { PetVideoPlayer, PetVideoState } from './videoPlayer';
-import { desktopPetMediaPack, type DesktopPetMediaClip } from './mediaPack';
-
-class FakeVideo extends EventTarget {
-  src = '';
-  loop = false;
-  muted = false;
-  playsInline = false;
-  preload = '';
-  currentTime = 0;
-  onended: (() => void) | null = null;
-  callbacks = new Map<number, () => void>();
-  nextId = 0;
-  auto = false;
-  pause = vi.fn();
-  play = vi.fn(async () => {});
-  load() {
-    if (this.auto && this.src) queueMicrotask(() => this.dispatchEvent(new Event('loadeddata')));
-  }
-  removeAttribute() {
-    this.src = '';
-  }
-  requestVideoFrameCallback(callback: () => void) {
-    const id = ++this.nextId;
-    this.callbacks.set(id, callback);
-    if (this.auto) queueMicrotask(() => this.frame());
-    return id;
-  }
-  cancelVideoFrameCallback(id: number) {
-    this.callbacks.delete(id);
-  }
-  frame() {
-    for (const [id, callback] of this.callbacks) {
-      this.callbacks.delete(id);
-      callback();
-    }
-  }
-}
-class FakeImage {
-  src = '';
-  decode = vi.fn(async () => {});
-  removeAttribute() {
-    this.src = '';
-  }
-}
-const cleanup: (() => void)[] = [];
-afterEach(() => {
-  cleanup.splice(0).forEach(dispose => dispose());
-  vi.unstubAllGlobals();
-  vi.useRealTimers();
-  vi.restoreAllMocks();
-});
-
-const clip = (id: DesktopPetMotion): DesktopPetMediaClip => ({
-  id,
-  url: `/${id}.webm`,
-  maskUrl: `/${id}-mask.png`,
-  posterUrl: `/${id}-poster.png`,
-  loop: false,
-});
-function fixture() {
-  const videos: FakeVideo[] = [];
-  const images: FakeImage[] = [];
-  const changed = vi.fn(),
-    ended = vi.fn(),
-    failed = vi.fn();
-  const player = new PetVideoPlayer({
-    changed,
-    ended,
-    failed,
-    now: () => 0,
-    video: () => {
-      const video = new FakeVideo();
-      videos.push(video);
-      return video as never;
-    },
-    image: () => {
-      const image = new FakeImage();
-      images.push(image);
-      return image as never;
-    },
-  });
-  cleanup.push(() => player.dispose());
-  const ready = async (slot: number) => {
-    videos[slot].dispatchEvent(new Event('loadeddata'));
-    await vi.waitFor(() => expect(videos[slot].callbacks.size).toBe(1));
-    videos[slot].frame();
-    await vi.waitFor(() => expect(player.state).toBe(PetVideoState.Playing));
-  };
-  return { player, videos, images, changed, ended, failed, ready };
-}
+import { PetVideoState } from './videoPlayer';
+import { desktopPetMediaPack } from './mediaPack';
+import {
+  cleanup,
+  clip,
+  FakeImage,
+  FakeVideo,
+  fixture,
+} from '../../../tests/fixtures/desktopPetVideo';
 
 test('does not promote metadata-ready media until play and its first decoded frame succeed', async () => {
   const f = fixture();
@@ -330,6 +248,23 @@ test('dozing hands off to wake through actual end events and impacts do not eras
   await f.wait(DesktopPetMotion.Wait);
   f.controller.impact(1);
   expect(f.current()).toBe(DesktopPetMotion.Wait);
+});
+
+test('preparation keeps the existing quiet idle beat between randomly chosen actions', async () => {
+  const f = controllerFixture();
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.7);
+  f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan });
+  await f.wait(DesktopPetMotion.Idle);
+  expect(random).toHaveBeenCalledTimes(1);
+  f.videos[0].onended?.();
+  await vi.waitFor(() => expect(f.videos[1].onended).not.toBeNull());
+  // Selecting idle is itself a complete beat. It still returns to the quiet
+  // base before another draw, rather than doubling the rate of idle gestures.
+  expect(random).toHaveBeenCalledTimes(1);
+  f.controller.sample(performance.now() + 120);
+  f.videos[1].onended?.();
+  await vi.waitFor(() => expect(f.videos[0].onended).not.toBeNull());
+  expect(random).toHaveBeenCalledTimes(2);
 });
 
 test('an idle-only authoring fixture yields to missing pose actions and resumes only at their end', async () => {

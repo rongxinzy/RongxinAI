@@ -50,6 +50,7 @@ export class DesktopPetMediaController {
   };
   private pack: DesktopPetMediaClip[] | null = null;
   private transient: DesktopPetMotion | undefined;
+  private successor: DesktopPetMotion | undefined;
   private terminalPlayed = false;
   private failed = new Set<DesktopPetMotion>();
   private wanted: DesktopPetMotion | undefined;
@@ -67,6 +68,12 @@ export class DesktopPetMediaController {
     this.player = new PetVideoPlayer({
       changed,
       ended: () => this.ended(),
+      started: clip => {
+        if (clip.loop) return;
+        this.successor = this.following();
+        const next = this.clip(this.successor);
+        if (next && !this.failed.has(next.id)) this.player.prepare(next);
+      },
       failed: clip => {
         this.failed.add(clip.id);
       },
@@ -107,6 +114,7 @@ export class DesktopPetMediaController {
     )
       return;
     this.transient = undefined;
+    this.successor = undefined;
     this.fallbackAction = false;
     this.wanted = undefined;
     // Attention must replace old celebrations immediately. Ordinary motion
@@ -116,15 +124,15 @@ export class DesktopPetMediaController {
     this.synchronize();
   }
 
-  private base(): DesktopPetMotion {
+  private base(terminalPlayed = this.terminalPlayed): DesktopPetMotion {
     const { state, dragging, walking } = this.context;
     if (state === DesktopPetState.Error) return DesktopPetMotion.Concern;
     if (state === DesktopPetState.Waiting) return DesktopPetMotion.Wait;
     if (state === DesktopPetState.Thinking) return DesktopPetMotion.Think;
     if (dragging) return DesktopPetMotion.Lift;
     if (walking) return DesktopPetMotion.Walk;
-    if (!this.terminalPlayed && state === DesktopPetState.Completed) return DesktopPetMotion.Happy;
-    if (!this.terminalPlayed && state === DesktopPetState.Greeting) return DesktopPetMotion.Wave;
+    if (!terminalPlayed && state === DesktopPetState.Completed) return DesktopPetMotion.Happy;
+    if (!terminalPlayed && state === DesktopPetState.Greeting) return DesktopPetMotion.Wave;
     return DesktopPetMotion.Idle;
   }
 
@@ -155,19 +163,30 @@ export class DesktopPetMediaController {
     if (this.disposed || !this.context.visible || this.context.reduced) return;
     if (this.wanted === DesktopPetMotion.Happy || this.wanted === DesktopPetMotion.Wave)
       this.terminalPlayed = true;
+    const next = this.successor ?? this.following();
+    this.successor = undefined;
     if (this.wanted === DesktopPetMotion.Doze) this.transient = DesktopPetMotion.Wake;
     else if (this.transient) this.transient = undefined;
-    else if (this.base() === DesktopPetMotion.Idle) {
+    else if (this.base() === DesktopPetMotion.Idle) this.transient = next;
+    this.synchronize(true);
+  }
+
+  private following(): DesktopPetMotion {
+    if (this.wanted === DesktopPetMotion.Doze) return DesktopPetMotion.Wake;
+    if (this.transient) return this.base(true);
+    if (this.base(true) === DesktopPetMotion.Idle) {
       const candidates = idle.filter(
         clip => !this.failed.has(clip.id) && this.pack?.some(available => available.id === clip.id),
       );
       let pick = Math.random() * candidates.reduce((sum, clip) => sum + clip.weight, 0);
-      this.transient = candidates.find(clip => {
-        pick -= clip.weight;
-        return pick <= 0;
-      })?.id;
+      return (
+        candidates.find(clip => {
+          pick -= clip.weight;
+          return pick <= 0;
+        })?.id ?? DesktopPetMotion.Idle
+      );
     }
-    this.synchronize(true);
+    return this.base(true);
   }
 
   impact(strength: number): void {
@@ -223,7 +242,7 @@ export class DesktopPetMediaController {
 
   private synchronize(restart = false): void {
     const id = this.transient ?? this.base();
-    const clip = this.pack?.find(clip => clip.id === id);
+    const clip = this.clip(id);
     if (!this.context.visible || this.context.reduced || this.fallbackAction || !clip) {
       this.wanted = undefined;
       this.player.stop();
@@ -233,12 +252,14 @@ export class DesktopPetMediaController {
     this.wanted = id;
     this.loadPoster(clip);
     if (!this.context.reduced && !this.failed.has(id)) {
-      // Idle is authored as a seamless cycle but ends once to choose another idle beat.
-      this.player.play(
-        { ...clip, loop: id === DesktopPetMotion.Idle ? false : clip.loop },
-        restart,
-      );
+      this.player.play(clip, restart);
     }
+  }
+
+  private clip(id: DesktopPetMotion): DesktopPetMediaClip | undefined {
+    const clip = this.pack?.find(clip => clip.id === id);
+    // Idle ends once to choose another beat; its successor is decoded in the spare slot.
+    return clip && { ...clip, loop: id === DesktopPetMotion.Idle ? false : clip.loop };
   }
 
   sample(now: number) {
