@@ -144,6 +144,7 @@ vi.mock('../desktopPet/controller', () => ({
   openDesktopPetSession: vi.fn(),
   getDesktopPetWindow: vi.fn(() => null),
   setDesktopPetBubbleVisible: vi.fn(),
+  observeDesktopPetCompanionActivity: vi.fn(),
 }));
 vi.mock('../companion/window', () => ({ initializeCompanionWindow: vi.fn() }));
 vi.mock('./appConfigSettings', () => ({ getInitialTheme: () => 'light' }));

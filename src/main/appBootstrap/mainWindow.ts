@@ -30,6 +30,7 @@ import {
   setDesktopPetAppearance,
   getDesktopPetWindow,
   setDesktopPetBubbleVisible,
+  observeDesktopPetCompanionActivity,
 } from '../desktopPet/controller';
 import { initializeCompanionWindow } from '../companion/window';
 import { getCompanionTasks } from './companionTasks';
@@ -333,6 +334,7 @@ export const createMainWindow = (): void => {
         getMainWindow: () => lifecycleRuntime.mainWindow,
         getPetWindow: getDesktopPetWindow,
         onBubbleVisibility: setDesktopPetBubbleVisible,
+        onActivity: observeDesktopPetCompanionActivity,
         getCompanions: () => getPiRuntimeAdapter().getCompanions(),
         getTasks: getCompanionTasks,
         openTask: openDesktopPetSession,

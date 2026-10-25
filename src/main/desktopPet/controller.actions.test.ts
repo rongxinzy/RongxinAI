@@ -2,6 +2,8 @@ import { beforeEach, afterEach, test, expect, vi } from 'vitest';
 import { Menu } from 'electron';
 
 import { setLanguage } from '../i18n';
+import { CoworkErrorKind } from '../../common/coworkError';
+import { CompanionActivityState } from '../companion/activity';
 
 import {
   DesktopPetIpc,
@@ -134,6 +136,8 @@ import {
   disposeDesktopPet,
   setDesktopPetEnabled,
   observeDesktopPetEvent,
+  observeDesktopPetCompanionActivity,
+  setDesktopPetBubbleVisible,
 } from './controller';
 
 let saved: unknown;
@@ -234,5 +238,95 @@ test('menu actions emit matching localized chatter and task bubbles take precede
   expect(contents.send).toHaveBeenLastCalledWith(
     DesktopPetIpc.State,
     expect.objectContaining({ state: 'thinking', bubble: '处理中' }),
+  );
+});
+
+test('real controller follows chat activity and suppresses duplicate chat labels while the input bubble is open', async () => {
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  observeDesktopPetCompanionActivity({
+    petId: 'pet',
+    submissionId: 1,
+    state: CompanionActivityState.Replying,
+  });
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'thinking', label: '正在回复', bubble: '正在回复' }),
+  );
+  setDesktopPetBubbleVisible(true);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'thinking', bubble: null }),
+  );
+  observeDesktopPetCompanionActivity({
+    petId: 'pet',
+    submissionId: 1,
+    state: CompanionActivityState.Answered,
+  });
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'completed', bubble: null }),
+  );
+  setDesktopPetBubbleVisible(false);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'completed', bubble: '回复好了' }),
+  );
+  vi.advanceTimersByTime(8000);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'idle' }),
+  );
+});
+
+test('chat outcomes do not erase task failures or approvals, and disabled pets do not replay them', async () => {
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  const seq = new PiUiEventSequencer(() => 'priority-task');
+  observeDesktopPetEvent(
+    seq.next({
+      type: PiUiEventType.Error,
+      sessionId: 'task',
+      error: { kind: CoworkErrorKind.Unknown, message: 'failed' },
+    }),
+  );
+  observeDesktopPetCompanionActivity({
+    petId: 'pet',
+    submissionId: 1,
+    state: CompanionActivityState.Answered,
+  });
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'error', bubble: '出错了' }),
+  );
+  observeDesktopPetEvent(
+    seq.next({
+      type: PiUiEventType.PermissionRequest,
+      sessionId: 'approval',
+      request: { requestId: 'approval-1', toolName: 'bash', toolInput: {} },
+    }),
+  );
+  observeDesktopPetCompanionActivity({
+    petId: 'pet',
+    submissionId: 1,
+    state: CompanionActivityState.Failed,
+  });
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'waiting' }),
+  );
+  setDesktopPetEnabled(false);
+  observeDesktopPetCompanionActivity({
+    petId: 'pet',
+    submissionId: 2,
+    state: CompanionActivityState.Answered,
+  });
+  setDesktopPetEnabled(true);
+  mocks.windows.at(-1)!.emit('ready-to-show');
+  expect(mocks.windows.at(-1)!.webContents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'waiting' }),
   );
 });

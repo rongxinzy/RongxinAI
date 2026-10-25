@@ -38,6 +38,9 @@ import {
   type CompanionChatMemory,
 } from './memoryTools.mjs';
 
+import { CompanionSubmissionActivity } from './submissionActivity.mjs';
+import type { CompanionActivity } from './activity.js';
+
 const owners = new Set<string>();
 const requestIdSchema = z.string().trim().min(1).max(128);
 const promptSchema = z.string().trim().max(32_000);
@@ -70,6 +73,11 @@ export class PiCompanionRuntime {
   private active: ActiveCompanion | null = null;
   private line: Promise<unknown> = Promise.resolve();
   private closing = false;
+  private readonly activity = new CompanionSubmissionActivity();
+
+  onActivity(listener: (activity: CompanionActivity) => void): () => void {
+    return this.activity.subscribe(listener);
+  }
 
   constructor(
     private readonly root: string,
@@ -88,6 +96,7 @@ export class PiCompanionRuntime {
     z.uuid().parse(profile.petId);
     if (this.active?.petId === profile.petId) return this.active;
     if (this.active) {
+      this.activity.clear();
       await this.active.harness.close(context);
       owners.delete(this.active.file);
       this.active = null;
@@ -296,6 +305,7 @@ export class PiCompanionRuntime {
         },
         context,
       );
+      this.activity.track(active.petId, submission);
       return {
         availability,
         receipt: { petId: profile.petId, requestId: key, submissionId: submission.id },
@@ -360,7 +370,14 @@ export class PiCompanionRuntime {
       if (active.modelId && inspection.scheduling === 'running' && inspection.submissions.length)
         return active.availability;
       const availability = await this.configure(active);
-      if (active.modelId) active.harness.resume();
+      if (active.modelId) {
+        const pending = inspection.submissions.find(item => item.type === 'input');
+        if (pending) {
+          const submission = await active.harness.submission(pending.id, context);
+          if (submission) this.activity.track(active.petId, submission);
+        }
+        active.harness.resume();
+      }
       return availability;
     });
   }
@@ -419,6 +436,7 @@ export class PiCompanionRuntime {
   async close(): Promise<void> {
     this.closing = true;
     await this.line;
+    this.activity.clear();
     if (this.active) {
       await this.active.harness.close(context);
       owners.delete(this.active.file);

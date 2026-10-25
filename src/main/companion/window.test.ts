@@ -94,6 +94,7 @@ function fixture(open = true) {
     answer: vi.fn(),
     stop: vi.fn(async () => {}),
     close: vi.fn(),
+    onActivity: vi.fn(() => vi.fn()),
   };
   const main = new FakeWindow({});
   const profiles = {
@@ -104,6 +105,7 @@ function fixture(open = true) {
     changeAppearance: vi.fn(),
   };
   const onProfileChanged = vi.fn();
+  const onActivity = vi.fn();
   const tasks = {
     snapshot: vi.fn((petId: string) => ({ petId, revision: 1, tasks: [] })),
     workspaces: vi.fn(() => []),
@@ -139,6 +141,7 @@ function fixture(open = true) {
     getMainWindow: () => main,
     getCompanions: () => ({ profiles, runtime, memory }) as never,
     onProfileChanged,
+    onActivity,
     getTasks: () => tasks as never,
     openTask,
   });
@@ -157,6 +160,7 @@ function fixture(open = true) {
     event,
     invoke,
     onProfileChanged,
+    onActivity,
     tasks,
     openTask,
     memory,
@@ -185,6 +189,17 @@ test('creates a focusable sandboxed window and reuses it without admitting a mod
   expect(f.window.focus).toHaveBeenCalledOnce();
   expect(f.runtime.submit).not.toHaveBeenCalled();
   expect(mocks.register).toHaveBeenCalledWith(COMPANION_SHORTCUT, expect.any(Function));
+});
+
+test('activity projection subscribes once without loading the hidden conversation and unsubscribes on disposal', () => {
+  const f = fixture(false);
+  prepareCompanionWindow();
+  expect(f.runtime.onActivity).toHaveBeenCalledExactlyOnceWith(f.onActivity);
+  expect(f.runtime.resume).not.toHaveBeenCalled();
+  expect(f.runtime.history).not.toHaveBeenCalled();
+  const unsubscribe = f.runtime.onActivity.mock.results[0].value;
+  disposeCompanionWindow();
+  expect(unsubscribe).toHaveBeenCalledOnce();
 });
 
 test('preparing stays hidden without a runtime resume, and opening reuses that ready shell', async () => {

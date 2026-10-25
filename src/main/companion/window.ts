@@ -16,6 +16,7 @@ import { handleIpcContract } from '../ipc/handleIpcContract';
 import type { SqliteStore } from '../sqliteStore';
 import { t } from '../i18n';
 import type { CompanionProfiles } from './profiles';
+import type { CompanionActivity } from './activity';
 import type { PiCompanionRuntime } from './durableRuntime.mjs';
 import type { CompanionTasks } from './tasks';
 import type { CompanionMemoryService } from './memory';
@@ -35,6 +36,7 @@ interface Options {
   onProfileChanged(profile: CompanionProfile): void;
   getPetWindow?(): BrowserWindow | null;
   onBubbleVisibility?(visible: boolean): void;
+  onActivity?(activity: CompanionActivity): void;
 }
 
 let options: Options | null = null;
@@ -42,6 +44,7 @@ let window: BrowserWindow | null = null;
 let shortcutAvailable = false;
 let unsubscribe: (() => void) | undefined;
 let unsubscribeTasks: (() => void) | undefined;
+let unsubscribeActivity: (() => void) | undefined;
 let choosingDialog = false;
 let bubblePlacement: CompanionBubblePlacement | undefined;
 let bubbleAnchor: ReturnType<typeof anchorCompanionBubble> | undefined;
@@ -148,6 +151,8 @@ function memoryService(): CompanionMemoryService {
 export function initializeCompanionWindow(next: Options): void {
   if (options) return;
   options = next;
+  if (next.onActivity)
+    unsubscribeActivity = next.getCompanions().runtime.onActivity(next.onActivity);
   let line: Promise<unknown> = Promise.resolve();
   let queued = 0;
   const publishedReplies = new Set<string>();
@@ -459,6 +464,8 @@ export function disposeCompanionWindow(): void {
   unsubscribe = undefined;
   unsubscribeTasks?.();
   unsubscribeTasks = undefined;
+  unsubscribeActivity?.();
+  unsubscribeActivity = undefined;
   if (shortcutAvailable) globalShortcut.unregister(COMPANION_SHORTCUT);
   shortcutAvailable = false;
   window?.destroy();

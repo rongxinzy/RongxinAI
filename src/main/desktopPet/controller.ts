@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'path';
 
 import {
@@ -37,6 +37,9 @@ import { desktopPetBubbleKey } from './bubbleText';
 import { DesktopPetChatter } from './chatter';
 import { clampPetPosition, DesktopPetMotion, petBounds } from './motion';
 import { DesktopPetStatus } from './status';
+import { DesktopPetCompanionStatus } from './companionStatus';
+import { showDesktopPetMenu } from './menu';
+import type { CompanionActivity } from '../companion/activity';
 import { watchDesktopPetVisibility } from './visibility';
 import { DesktopWindowObserver } from './windows/observer';
 import {
@@ -59,6 +62,7 @@ let greeting = false;
 let chatter = new DesktopPetChatter();
 let reducedMotion = false;
 let status = new DesktopPetStatus();
+const companionStatus = new DesktopPetCompanionStatus(sendState);
 let visibility: ReturnType<typeof watchDesktopPetVisibility> | undefined;
 let ready = false;
 let visible = false;
@@ -67,20 +71,29 @@ let requestSequence = 0;
 let pendingTask: (DesktopPetTaskOpen & { failureId?: string }) | null = null;
 const listeners = new Map<string, (event: Electron.IpcMainEvent, payload?: unknown) => void>();
 
-const currentState = (): DesktopPetState =>
-  greeting && status.state === DesktopPetState.Idle ? DesktopPetState.Greeting : status.state;
+const currentState = (): DesktopPetState => {
+  const state = companionStatus.project(status.state);
+  return greeting && state === DesktopPetState.Idle ? DesktopPetState.Greeting : state;
+};
+
+export function observeDesktopPetCompanionActivity(activity: CompanionActivity): void {
+  greeting = false;
+  companionStatus.observe(activity);
+}
 
 function sendState(): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
   const state = currentState();
-  const bubbleKey = desktopPetBubbleKey(state);
-  const chatterEnabled = !bubbleKey && !reducedMotion && getDesktopPetSettings().chatter;
+  const chatLabel = companionStatus.labelKey(status.state);
+  const bubbleKey = chatLabel ? (bubbleOpen ? null : chatLabel) : desktopPetBubbleKey(state);
+  const chatterEnabled =
+    !chatLabel && !bubbleKey && !reducedMotion && getDesktopPetSettings().chatter;
   if (!chatterEnabled) chatter.clear();
   const chatterKey = chatterEnabled ? chatter.activeKey() : null;
   pet.webContents.send(DesktopPetIpc.State, {
     characterId: getDesktopPetSettings().characterId,
     state,
-    label: t(`desktopPet_${state}`),
+    label: t(chatLabel ?? `desktopPet_${state}`),
     bubble: bubbleKey ? t(bubbleKey) : chatterKey ? t(chatterKey) : null,
     reducedMotion,
   });
@@ -190,6 +203,7 @@ function syncVisibility(): void {
     ready && settings.enabled && !visibility?.suppressed(settings) && !externalFullscreen;
   if (show === visible) return;
   visible = show;
+  companionStatus.setVisible(show);
   // Electron can keep document.visibilityState visible after hide(); explicitly pause media.
   sendVisibility();
   if (show) {
@@ -266,29 +280,17 @@ function playAction(action: DesktopPetPlayableAction): void {
 }
 
 function showMenu(): void {
-  if (!pet) return;
-  Menu.buildFromTemplate([
-    { label: t(`desktopPet_${currentState()}`), enabled: false },
-    { type: 'separator' },
-    { label: t(status.targetSessionId ? 'desktopPetOpenTask' : 'desktopPetOpen'), click: openTask },
-    { label: t('companionTalk'), click: openCompanionWindow },
-    { label: t('desktopPetGreet'), click: greet },
-    {
-      label: t('desktopPetActionPeek'),
-      click: () => playAction(DesktopPetPlayableAction.Peek),
-    },
-    {
-      label: t('desktopPetActionNod'),
-      click: () => playAction(DesktopPetPlayableAction.Nod),
-    },
-    {
-      label: t('desktopPetActionFlutter'),
-      click: () => playAction(DesktopPetPlayableAction.Flutter),
-    },
-    { label: t('desktopPetReset'), click: () => motion?.reset() },
-    { type: 'separator' },
-    { label: t('desktopPetHide'), click: () => setDesktopPetEnabled(false) },
-  ]).popup({ window: pet });
+  if (pet)
+    showDesktopPetMenu({
+      pet,
+      label: t(companionStatus.labelKey(status.state) ?? `desktopPet_${currentState()}`),
+      hasTask: Boolean(status.targetSessionId),
+      openTask,
+      greet,
+      playAction,
+      reset: () => motion?.reset(),
+      hide: () => setDesktopPetEnabled(false),
+    });
 }
 
 export function isDesktopPetWindow(window: BrowserWindow): boolean {
@@ -301,7 +303,7 @@ export function getDesktopPetWindow(): BrowserWindow | null {
 
 export function setDesktopPetBubbleVisible(value: boolean): void {
   bubbleOpen = value;
-  syncRoamAllow(currentState());
+  sendState();
 }
 
 export function isDesktopPetEnabled(): boolean {
@@ -418,6 +420,7 @@ export function setDesktopPetEnabled(enabled: boolean): void {
     motion = undefined;
     pet = null;
     visible = false;
+    companionStatus.setVisible(false);
     ready = false;
     publishSettings();
   });
@@ -583,5 +586,7 @@ export function disposeDesktopPet(): void {
     ipcMain.removeHandler(definition.channel);
   pendingTask = null;
   status = new DesktopPetStatus();
+  companionStatus.reset();
+  companionStatus.setVisible(false);
   store = undefined;
 }
