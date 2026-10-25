@@ -244,17 +244,32 @@ test('hide releases all media and show starts the latest state without replaying
   expect(f.videos).toHaveLength(2);
 });
 
-test('reduced motion never assigns video sources and switching to an unmigrated character releases media', async () => {
+test('reduced motion never assigns video sources and unknown characters release media', async () => {
   const f = controllerFixture();
   f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan, reduced: true });
   await Promise.resolve();
   expect(f.videos.every(video => video.src === '')).toBe(true);
   f.controller.update({ reduced: false });
   await f.wait(DesktopPetMotion.Idle);
-  f.controller.update({ characterId: DesktopPetBuiltinId.Youli });
+  f.controller.update({ characterId: 'unknown' });
   expect(f.controller.supported).toBe(false);
   expect(f.videos.every(video => video.src === '')).toBe(true);
   expect(f.controller.playAction(DesktopPetPlayableAction.Happy)).toBe(false);
+});
+
+test('switching every migrated character cancels old media while retaining two owned slots', async () => {
+  const f = controllerFixture();
+  for (const characterId of Object.values(DesktopPetBuiltinId)) {
+    f.controller.update({ characterId });
+    await f.wait(DesktopPetMotion.Idle);
+    expect(f.controller.supported).toBe(true);
+    expect(f.videos).toHaveLength(2);
+    expect(
+      f.videos
+        .filter(video => video.src)
+        .every(video => video.src.includes(`/motion/${characterId}/`)),
+    ).toBe(true);
+  }
 });
 
 test('dozing hands off to wake through actual end events and impacts do not erase task attention', async () => {

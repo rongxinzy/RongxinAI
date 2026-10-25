@@ -3,6 +3,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { verifyMotionMask } from './verify-motion-mask.mjs';
 import {
   DESKTOP_PET_MOTIONS,
   DESKTOP_PET_MEDIA_FPS,
@@ -51,12 +52,19 @@ export async function verifyMotion(output, sourceSha256, choreographySha256) {
         throw new Error(`Motion asset digest mismatch: ${clip.id}${suffix}`);
       bytes += file.length;
     }
+    await verifyMotionMask(
+      path.join(output, `${clip.id}-mask.png`),
+      DESKTOP_PET_MEDIA_SIZE,
+      entry.bounds,
+    );
     const { stdout, stderr } = await execute(
       'ffmpeg',
       [
         '-hide_banner',
         '-loglevel',
         'info',
+        '-threads',
+        '2',
         '-c:v',
         'libvpx-vp9',
         '-i',

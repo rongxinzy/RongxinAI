@@ -1,0 +1,152 @@
+{
+  "packs": [
+    {
+      "id": "xiaoyuan",
+      "files": 73,
+      "clips": 24,
+      "frames": 4410,
+      "seconds": 147,
+      "bytes": 33452814,
+      "largest": {
+        "file": "dance.webm",
+        "bytes": 2031956
+      },
+      "sourceSha256": "cd6208e7f2cc204a4c0c59a0c03fdf49cc68a662bd2d273c71fb7fa0b4cc5da5",
+      "crf": 25,
+      "verification": {
+        "clips": 24,
+        "frames": 4410,
+        "bytes": 33452814,
+        "fps": 30,
+        "alpha": true
+      }
+    },
+    {
+      "id": "youli",
+      "files": 73,
+      "clips": 24,
+      "frames": 4410,
+      "seconds": 147,
+      "bytes": 22911985,
+      "largest": {
+        "file": "dance.webm",
+        "bytes": 1415707
+      },
+      "sourceSha256": "480eb42f45bbd5f15ec1a7fb98f5054bacbf3f80dc73b5826f004559fff9ae82",
+      "crf": 25,
+      "verification": {
+        "clips": 24,
+        "frames": 4410,
+        "bytes": 22911985,
+        "fps": 30,
+        "alpha": true
+      }
+    },
+    {
+      "id": "tuantuan",
+      "files": 73,
+      "clips": 24,
+      "frames": 4410,
+      "seconds": 147,
+      "bytes": 18802511,
+      "largest": {
+        "file": "dance.webm",
+        "bytes": 1117259
+      },
+      "sourceSha256": "5e157ce21f831a59d85236a1de069e595eba2d9c1b83abf8bf3f4b4f5e4d40ac",
+      "crf": 25,
+      "verification": {
+        "clips": 24,
+        "frames": 4410,
+        "bytes": 18802511,
+        "fps": 30,
+        "alpha": true
+      }
+    },
+    {
+      "id": "mianmian",
+      "files": 73,
+      "clips": 24,
+      "frames": 4410,
+      "seconds": 147,
+      "bytes": 27145013,
+      "largest": {
+        "file": "dance.webm",
+        "bytes": 1844177
+      },
+      "sourceSha256": "86e5c7e5c6fef89242459be21fbf5d8a010df94729736c7f01155eaa688ee3f5",
+      "crf": 25,
+      "verification": {
+        "clips": 24,
+        "frames": 4410,
+        "bytes": 27145013,
+        "fps": 30,
+        "alpha": true
+      }
+    },
+    {
+      "id": "zhuli",
+      "files": 73,
+      "clips": 24,
+      "frames": 4410,
+      "seconds": 147,
+      "bytes": 25073889,
+      "largest": {
+        "file": "preen.webm",
+        "bytes": 1289627
+      },
+      "sourceSha256": "3e65e9ac22f405c83b8286b04ad3237413c0ba99996a2b5c38465ea2a5701514",
+      "crf": 25,
+      "verification": {
+        "clips": 24,
+        "frames": 4410,
+        "bytes": 25073889,
+        "fps": 30,
+        "alpha": true
+      }
+    },
+    {
+      "id": "yunmo",
+      "files": 73,
+      "clips": 24,
+      "frames": 4410,
+      "seconds": 147,
+      "bytes": 27905772,
+      "largest": {
+        "file": "dance.webm",
+        "bytes": 1826134
+      },
+      "sourceSha256": "a7bac74b215b433e3d26680e6ea60ead7c37e41a4d71e412494509dccae9593e",
+      "crf": 28,
+      "verification": {
+        "clips": 24,
+        "frames": 4410,
+        "bytes": 27905772,
+        "fps": 30,
+        "alpha": true
+      }
+    },
+    {
+      "id": "maixiao",
+      "files": 73,
+      "clips": 24,
+      "frames": 4410,
+      "seconds": 147,
+      "bytes": 26676537,
+      "largest": {
+        "file": "dance.webm",
+        "bytes": 1827542
+      },
+      "sourceSha256": "da41134296556ba9b44ea0056b37b2b126aee4139fe1e2a8f51ce833b08461da",
+      "crf": 25,
+      "verification": {
+        "clips": 24,
+        "frames": 4410,
+        "bytes": 26676537,
+        "fps": 30,
+        "alpha": true
+      }
+    }
+  ],
+  "totalBytes": 181968521
+}

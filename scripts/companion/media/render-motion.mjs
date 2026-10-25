@@ -15,6 +15,10 @@ import {
 import { OWL_RIG_FRAMES, drawOwlRig } from './owl-rig.mjs';
 import { sampleOwlMotion } from './owl-motion.mjs';
 import { verifyMotion } from './verify-motion.mjs';
+import { DesktopPetBuiltinId } from '../../../src/shared/desktopPet/catalog.ts';
+import { COMPANION_RIGS, companionRigFrames } from './companion-rigs.mjs';
+import { drawCompanionRig } from './companion-rig-draw.mjs';
+import { sampleCompanionMotion } from './companion-motion.mjs';
 
 // Offline artwork build only. No application process, model or user workspace is involved.
 const root = fileURLToPath(new URL('../../..', import.meta.url));
@@ -24,24 +28,40 @@ const { values } = parseArgs({
     verify: { type: 'boolean' },
     clip: { type: 'string' },
     out: { type: 'string' },
+    character: { type: 'string' },
+    crf: { type: 'string' },
   },
 });
+const crf = values.crf === undefined ? 25 : Number(values.crf);
+if (!Number.isInteger(crf) || crf < 18 || crf > 40)
+  throw new Error('Motion encoder CRF must be an integer between 18 and 40');
+const character = values.character ?? DesktopPetBuiltinId.Xiaoyuan;
+const rigConfig = COMPANION_RIGS[character];
+if (character !== DesktopPetBuiltinId.Xiaoyuan && !rigConfig)
+  throw new Error('Unknown companion character');
 const output = path.resolve(
-  values.out ?? path.join(root, 'src/renderer/assets/desktop-pet/motion/xiaoyuan'),
+  values.out ?? path.join(root, 'src/renderer/assets/desktop-pet/motion', character),
 );
 const selected = values.clip
   ? DESKTOP_PET_MOTIONS.filter(clip => clip.id === values.clip)
   : DESKTOP_PET_MOTIONS;
 if (!selected.length) throw new Error('Unknown motion clip');
-const source = await fs.readFile(
-  path.join(root, 'src/renderer/assets/desktop-pet/rigs/xiaoyuan-rig-v1.png'),
+const sourcePath = path.join(
+  root,
+  'src/renderer/assets/desktop-pet/rigs',
+  `${character}-rig-v1.png`,
 );
+const source = await fs.readFile(sourcePath);
+const drawRig = rigConfig ? drawCompanionRig : drawOwlRig;
+const sampleMotion = rigConfig ? sampleCompanionMotion : sampleOwlMotion;
+const rigFrames = rigConfig ? await companionRigFrames(sourcePath, rigConfig) : OWL_RIG_FRAMES;
 const hash = buffer => createHash('sha256').update(buffer).digest('hex');
 const choreographySha256 = hash(
   JSON.stringify({
-    draw: drawOwlRig.toString(),
-    motion: sampleOwlMotion.toString(),
-    frames: OWL_RIG_FRAMES,
+    draw: drawRig.toString(),
+    motion: sampleMotion.toString(),
+    frames: rigFrames,
+    rigConfig,
   }),
 );
 if (values.verify) {
@@ -61,32 +81,43 @@ try {
   const page = await browser.newPage();
   await page.setContent('<canvas width="512" height="512"></canvas>');
   await page.addScriptTag({
-    content: `window.drawRig = ${drawOwlRig.toString()}; window.sampleMotion = ${sampleOwlMotion.toString()};`,
+    content: `window.drawRig = ${drawRig.toString()}; window.sampleMotion = ${sampleMotion.toString()};`,
   });
   await page.evaluate(
-    async ({ data, frames, ids, size }) => {
+    async ({ data, frames, ids, size, config, characters }) => {
       const image = new Image();
       image.src = data;
       await image.decode();
       window.rig = image;
       window.parts = frames;
       window.clips = ids;
+      window.rigConfig = config;
+      window.characters = characters;
       window.canvas = document.querySelector('canvas');
       window.context = window.canvas.getContext('2d', { willReadFrequently: true });
       window.union = new Uint8Array(size * size);
     },
     {
       data: `data:image/png;base64,${source.toString('base64')}`,
-      frames: OWL_RIG_FRAMES,
+      frames: rigFrames,
       ids: DesktopPetMotion,
       size: DESKTOP_PET_MEDIA_SIZE,
+      config: rigConfig,
+      characters: DesktopPetBuiltinId,
     },
   );
   const frame = async (clip, index) =>
     page.evaluate(
       ({ clip, index, fps, size }) => {
-        const pose = window.sampleMotion(clip.id, index / fps, clip.seconds, window.clips);
-        window.drawRig(window.context, window.rig, window.parts, pose);
+        const pose = window.sampleMotion(
+          clip.id,
+          index / fps,
+          clip.seconds,
+          window.clips,
+          window.rigConfig,
+          window.characters,
+        );
+        window.drawRig(window.context, window.rig, window.parts, pose, window.rigConfig);
         const pixels = window.context.getImageData(0, 0, size, size).data;
         for (let i = 0; i < window.union.length; i++)
           if (pixels[i * 4 + 3] > 32) window.union[i] = 255;
@@ -96,20 +127,9 @@ try {
     );
 
   if (values.preview) {
-    const examples = [
-      DesktopPetMotion.Idle,
-      DesktopPetMotion.Think,
-      DesktopPetMotion.Wave,
-      DesktopPetMotion.Flutter,
-      DesktopPetMotion.Concern,
-      DesktopPetMotion.Stretch,
-      DesktopPetMotion.Preen,
-      DesktopPetMotion.Walk,
-    ];
-    for (const id of examples) {
-      const clip = DESKTOP_PET_MOTIONS.find(clip => clip.id === id);
-      const png = await frame(clip, Math.floor((clip.seconds * DESKTOP_PET_MEDIA_FPS) / 2));
-      await fs.writeFile(path.join(output, `${id}.png`), Buffer.from(png, 'base64'));
+    for (const clip of selected) {
+      const png = await frame(clip, Math.floor(clip.seconds * DESKTOP_PET_MEDIA_FPS * 0.37));
+      await fs.writeFile(path.join(output, `${clip.id}.png`), Buffer.from(png, 'base64'));
     }
     console.log(JSON.stringify({ preview: true, output, sourceSha256: hash(source) }));
   } else {
@@ -118,6 +138,7 @@ try {
       choreographySha256,
       chromium: browser.version(),
       encoder: encoderVersion,
+      crf,
       size: DESKTOP_PET_MEDIA_SIZE,
       fps: DESKTOP_PET_MEDIA_FPS,
       clips: [],
@@ -148,11 +169,13 @@ try {
           '-b:v',
           '0',
           '-crf',
-          '25',
+          String(crf),
           '-deadline',
           'good',
           '-cpu-used',
           '5',
+          '-threads',
+          '2',
           '-auto-alt-ref',
           '0',
           filename,
@@ -187,14 +210,25 @@ try {
       }
       const mask = await page.evaluate(size => {
         const pixels = new ImageData(size, size);
+        const bounds = [size, size, -1, -1];
         for (let index = 0; index < window.union.length; index++) {
           pixels.data[index * 4] = pixels.data[index * 4 + 1] = pixels.data[index * 4 + 2] = 255;
           pixels.data[index * 4 + 3] = window.union[index];
+          if (window.union[index]) {
+            const x = index % size,
+              y = Math.floor(index / size);
+            bounds[0] = Math.min(bounds[0], x);
+            bounds[1] = Math.min(bounds[1], y);
+            bounds[2] = Math.max(bounds[2], x);
+            bounds[3] = Math.max(bounds[3], y);
+          }
         }
+        if (bounds[0] < 4 || bounds[1] < 4 || bounds[2] >= size - 4 || bounds[3] >= size - 4)
+          throw new Error('Authored motion touches the canvas edge');
         window.context.putImageData(pixels, 0, 0);
-        return window.canvas.toDataURL('image/png').split(',')[1];
+        return { png: window.canvas.toDataURL('image/png').split(',')[1], bounds };
       }, DESKTOP_PET_MEDIA_SIZE);
-      await fs.writeFile(path.join(output, `${clip.id}-mask.png`), Buffer.from(mask, 'base64'));
+      await fs.writeFile(path.join(output, `${clip.id}-mask.png`), Buffer.from(mask.png, 'base64'));
       const bytes = await fs.readFile(filename);
       const entry = {
         id: clip.id,
@@ -202,6 +236,7 @@ try {
         seconds: clip.seconds,
         bytes: bytes.length,
         sha256: hash(bytes),
+        bounds: mask.bounds,
         posterSha256: hash(await fs.readFile(path.join(output, `${clip.id}-poster.png`))),
         maskSha256: hash(await fs.readFile(path.join(output, `${clip.id}-mask.png`))),
       };

@@ -49,7 +49,7 @@ export const enMain1: Record<string, string> = {
   desktopPet_chatter_action_happy: 'Hehe!',
   desktopPet_chatter_action_peek: 'Just a peek~',
   desktopPet_chatter_action_nod: 'Mhm',
-  desktopPet_chatter_action_flutter: 'Flutter!',
+  desktopPet_chatter_action_flutter: 'A little stretch.',
   // Session titles
   coworkDefaultSessionTitle: 'New Chat',
   codingAgentDefaultMissionTitle: 'New coding task',

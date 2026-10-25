@@ -47,7 +47,7 @@ export const zhMain1: Record<string, string> = {
   desktopPet_chatter_action_happy: '嘿嘿！',
   desktopPet_chatter_action_peek: '我看一眼～',
   desktopPet_chatter_action_nod: '嗯嗯',
-  desktopPet_chatter_action_flutter: '扑棱一下',
+  desktopPet_chatter_action_flutter: '伸个懒腰。',
   // Session titles (created by ChannelSessionSync)
   coworkDefaultSessionTitle: '新对话',
   codingAgentDefaultMissionTitle: '新建编程任务',

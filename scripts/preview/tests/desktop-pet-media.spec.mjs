@@ -4,7 +4,10 @@ import {
   DesktopPetEffectKind,
   DesktopPetPlayableAction,
 } from '../../../src/shared/desktopPet/constants.ts';
-import { DesktopPetBuiltinId } from '../../../src/shared/desktopPet/catalog.ts';
+import {
+  DESKTOP_PET_BUILTINS,
+  DesktopPetBuiltinId,
+} from '../../../src/shared/desktopPet/catalog.ts';
 import {
   DesktopPetMotion,
   DESKTOP_PET_MOTIONS,
@@ -44,9 +47,9 @@ async function bridge(page) {
     };
   });
 }
-const snapshot = state => ({
+const snapshot = (state, characterId = DesktopPetBuiltinId.Xiaoyuan) => ({
   state,
-  characterId: DesktopPetBuiltinId.Xiaoyuan,
+  characterId,
   label: state,
   reducedMotion: false,
   bubble: null,
@@ -89,76 +92,152 @@ test('continuous owl media decodes real frames with alpha and two owned slots', 
   expect(errors).toEqual([]);
 });
 
-test('all authored clips decode transparent content at their real middle frame', async ({
+for (const character of DESKTOP_PET_BUILTINS) {
+  test(`${character.id}: all authored clips decode transparent content at their real middle frame`, async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/desktop-pet.html');
+    const clips = DESKTOP_PET_MOTIONS.map(clip => ({
+      id: clip.id,
+      url: new URL(
+        `/src/renderer/assets/desktop-pet/motion/${character.id}/${clip.id}.webm`,
+        page.url(),
+      ).href,
+    }));
+    const results = await page.evaluate(async clips => {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 192;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      const video = document.createElement('video');
+      video.muted = true;
+      const results = [];
+      for (const clip of clips) {
+        try {
+          const loaded = new Promise((resolve, reject) => {
+            video.onloadeddata = resolve;
+            video.onerror = reject;
+          });
+          video.src = clip.url;
+          video.load();
+          await loaded;
+          const seeked = new Promise(resolve =>
+            video.addEventListener('seeked', resolve, { once: true }),
+          );
+          video.currentTime = video.duration / 2;
+          await seeked;
+          context.clearRect(0, 0, 192, 192);
+          context.drawImage(video, 0, 0, 192, 192);
+          const rgba = context.getImageData(0, 0, 192, 192).data;
+          let edge = 0,
+            transparent = 0,
+            opaque = 0;
+          for (let y = 0; y < 192; y++)
+            for (let x = 0; x < 192; x++) {
+              const alpha = rgba[(y * 192 + x) * 4 + 3];
+              if (alpha === 0) transparent++;
+              if (alpha > 240) opaque++;
+              if (x === 0 || y === 0 || x === 191 || y === 191) edge = Math.max(edge, alpha);
+            }
+          results.push({
+            id: clip.id,
+            width: video.videoWidth,
+            height: video.videoHeight,
+            duration: video.duration,
+            edge,
+            transparent,
+            opaque,
+          });
+        } finally {
+          video.pause();
+          video.removeAttribute('src');
+          video.load();
+        }
+      }
+      return results;
+    }, clips);
+    expect(results).toHaveLength(24);
+    for (const result of results) {
+      expect(result.width, result.id).toBe(512);
+      expect(result.height, result.id).toBe(512);
+      expect(result.duration, result.id).toBeGreaterThanOrEqual(3);
+      expect(result.edge, result.id).toBe(0);
+      expect(result.transparent, result.id).toBeGreaterThan(10_000);
+      expect(result.opaque, result.id).toBeGreaterThan(4000);
+    }
+  });
+}
+
+test('switching all six companions preserves task priority and reuses two video slots', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await bridge(page);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/desktop-pet.html');
-  const clips = DESKTOP_PET_MOTIONS.map(clip => ({
-    id: clip.id,
-    url: new URL(`/src/renderer/assets/desktop-pet/motion/xiaoyuan/${clip.id}.webm`, page.url())
-      .href,
-  }));
-  const results = await page.evaluate(async clips => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 192;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    const video = document.createElement('video');
-    video.muted = true;
-    const results = [];
-    for (const clip of clips) {
-      try {
-        const loaded = new Promise((resolve, reject) => {
-          video.onloadeddata = resolve;
-          video.onerror = reject;
-        });
-        video.src = clip.url;
-        video.load();
-        await loaded;
-        const seeked = new Promise(resolve =>
-          video.addEventListener('seeked', resolve, { once: true }),
-        );
-        video.currentTime = video.duration / 2;
-        await seeked;
-        context.clearRect(0, 0, 192, 192);
-        context.drawImage(video, 0, 0, 192, 192);
-        const rgba = context.getImageData(0, 0, 192, 192).data;
-        let edge = 0,
-          transparent = 0,
-          opaque = 0;
-        for (let y = 0; y < 192; y++)
-          for (let x = 0; x < 192; x++) {
-            const alpha = rgba[(y * 192 + x) * 4 + 3];
-            if (alpha === 0) transparent++;
-            if (alpha > 240) opaque++;
-            if (x === 0 || y === 0 || x === 191 || y === 191) edge = Math.max(edge, alpha);
-          }
-        results.push({
-          id: clip.id,
-          width: video.videoWidth,
-          height: video.videoHeight,
-          duration: video.duration,
-          edge,
-          transparent,
-          opaque,
-        });
-      } finally {
-        video.pause();
-        video.removeAttribute('src');
-        video.load();
-      }
+  const canvas = page.locator('canvas');
+  for (const character of DESKTOP_PET_BUILTINS.slice(1)) {
+    await page.evaluate(
+      value => window.mediaState(value),
+      snapshot(DesktopPetState.Idle, character.id),
+    );
+    await expect(canvas).toHaveAttribute('data-character', character.id);
+    await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
+    await page.evaluate(
+      action => window.mediaEffect({ kind: 'action', action }),
+      DesktopPetPlayableAction.Happy,
+    );
+    await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Happy);
+    for (const [state, clip] of [
+      [DesktopPetState.Error, DesktopPetMotion.Concern],
+      [DesktopPetState.Waiting, DesktopPetMotion.Wait],
+      [DesktopPetState.Thinking, DesktopPetMotion.Think],
+    ]) {
+      await page.evaluate(value => window.mediaState(value), snapshot(state, character.id));
+      await expect(canvas).toHaveAttribute('data-media-clip', clip);
+      await page.evaluate(
+        action => window.mediaEffect({ kind: 'action', action }),
+        DesktopPetPlayableAction.Flutter,
+      );
+      await expect(canvas).toHaveAttribute('data-media-clip', clip);
     }
-    return results;
-  }, clips);
-  expect(results).toHaveLength(24);
-  for (const result of results) {
-    expect(result.width, result.id).toBe(512);
-    expect(result.height, result.id).toBe(512);
-    expect(result.duration, result.id).toBeGreaterThanOrEqual(3);
-    expect(result.edge, result.id).toBe(0);
-    expect(result.transparent, result.id).toBeGreaterThan(10_000);
-    expect(result.opaque, result.id).toBeGreaterThan(4000);
+    await page.evaluate(
+      kind => window.mediaEffect({ kind, visible: false }),
+      DesktopPetEffectKind.Visibility,
+    );
+    expect(
+      await page.evaluate(() =>
+        window.mediaVideos.every(video => video.paused && !video.getAttribute('src')),
+      ),
+    ).toBe(true);
+    await page.evaluate(
+      value => window.mediaState(value),
+      snapshot(DesktopPetState.Completed, character.id),
+    );
+    await page.evaluate(
+      kind => window.mediaEffect({ kind, visible: true }),
+      DesktopPetEffectKind.Visibility,
+    );
+    await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Happy);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(canvas).toHaveAttribute('data-reduced-motion', 'true');
+    expect(
+      await page.evaluate(() =>
+        window.mediaVideos.every(video => video.paused && !video.getAttribute('src')),
+      ),
+    ).toBe(true);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Happy);
+    expect(await page.evaluate(() => window.mediaVideos.length)).toBe(2);
+    expect(
+      await page.evaluate(
+        id =>
+          window.mediaVideos
+            .filter(video => video.getAttribute('src'))
+            .every(video => video.src.includes(`/motion/${id}/`)),
+        character.id,
+      ),
+    ).toBe(true);
   }
 });
 

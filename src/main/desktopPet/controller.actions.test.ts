@@ -212,7 +212,7 @@ test('menu actions emit matching localized chatter and task bubbles take precede
   for (const [label, bubble] of [
     ['侧看一眼', '我看一眼～'],
     ['点点头', '嗯嗯'],
-    ['舒展一下', '扑棱一下'],
+    ['舒展一下', '伸个懒腰。'],
   ]) {
     byLabel(label).click!();
     expect(contents.send).toHaveBeenLastCalledWith(

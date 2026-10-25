@@ -1,0 +1,54 @@
+{
+  "generator": "Built-in image_gen.imagegen; transparent_background=true; six independent identity references",
+  "date": "2026-10-25",
+  "sharedPrompt": "Use case: identity-preserve. Asset type: decomposed cutout puppet parts atlas for authored 2D skeletal animation, NOT full-character poses. The attached reference supplies exact identity and materials. Create a square 1536 by 1536 atlas in EXACTLY 4 equal columns and 4 equal rows. Every specified piece centered entirely inside the CENTRAL 70 percent of its cell; leave wide transparent gutters on all sides. Row 1, left to right: complete headless armless legless torso without bandana; blank furry head WITHOUT ears and WITHOUT eyebrows/eyes/nose/mouth, preserving fur patterns (dragon keeps its two ivory horns on head); separate left arm with paw; separate right arm with paw. Row 2: separate left short leg and foot; separate right short leg and foot; whole detached tail (attachment end at bottom center); separate triangular bandana. Row 3: four TRANSPARENT facial overlays without surrounding head, all same scale and alignment: neutral two open eyes plus brows, centered nose and SMALL CLOSED SMILING MOUTH (NO tongue, NO open mouth); gentle closed eyelids with same nose and closed mouth; joyful smiling eyes plus open laughing mouth and same nose; worried open eyes and raised inner brows plus nose and a tiny concerned mouth. All facial features front-facing and symmetrically spaced. Row 4: separate left ear; separate right ear; separate left wing ONLY for the dragon; separate right wing ONLY for the dragon. For all mammals leave last two cells fully empty transparent. Rabbit ears are long drooping lop ears, whole and uncropped. Arm/leg tops rounded for overlap beneath torso, no detached white joint caps. Consistent frontal camera, material and neutral studio light. Exactly one specified part per cell, no assembled animals, no extra props. No labels, text, numbers, grid lines, floor, cast shadows, background, checkerboard, glow or watermark. Genuine clean alpha outside the pieces, no stray fragments, speckles or white halo. Preserve the reference identity and accessory; this output rearranges it into puppet parts, not a new character.",
+  "characters": [
+    {
+      "id": "tuantuan",
+      "reference": "../tuantuan-atlas.png",
+      "output": "tuantuan-rig-v1.png",
+      "subject": "Tuantuan, the SAME cocoa-brown baby sea otter with cream face and belly, tiny round ears, small dark paws, long tapered brown otter tail, muted turquoise bandana. Gentle plush 3D toy with brown glossy eyes."
+    },
+    {
+      "id": "mianmian",
+      "reference": "../mianmian-atlas.png",
+      "output": "mianmian-rig-v1.png",
+      "subject": "Mianmian, the SAME ivory lop-eared baby rabbit with long soft drooping ears and dusty-pink ear interiors, tiny pink nose, fluffy round pompom tail, sage-green triangular bandana. Soft ivory plush 3D toy with brown glossy eyes."
+    },
+    {
+      "id": "zhuli",
+      "reference": "../zhuli-atlas.png",
+      "output": "zhuli-rig-v1.png",
+      "subject": "Zhuli, the SAME terracotta baby red panda with ivory face mask, dark chocolate arms and paws, round ears, thick fluffy striped tail, ochre triangular bandana. Warm plush 3D toy with brown glossy eyes."
+    },
+    {
+      "id": "yunmo",
+      "reference": "../yunmo-atlas.png",
+      "output": "yunmo-rig-v1.png",
+      "subject": "Yunmo, the SAME mist-blue baby dragon with pale jade belly and inner wings, rounded ivory horns on the head, amber triangular bandana, small separate left and right wings, small blue tail with jade fin. Friendly rounded plush 3D toy with amber glossy eyes."
+    },
+    {
+      "id": "maixiao",
+      "reference": "../maixiao-atlas.png",
+      "output": "maixiao-rig-v1.png",
+      "subject": "Maixiao, the SAME honey-colored baby corgi with white forehead blaze, cream muzzle and belly, very short legs, tiny curled tail, teal triangular bandana. Eager plush 3D toy with brown glossy eyes."
+    }
+  ],
+  "fox": {
+    "id": "youli",
+    "reference": "../youli-atlas.png",
+    "output": "youli-rig-v1.png",
+    "initialPrompt": "Use case: identity-preserve. Asset type: production cutout puppet parts atlas for a desktop companion, NOT a sequence of full characters. Reference image 1 supplies the exact character identity: Youli, a baby russet red fox, cream muzzle and belly, amber-brown glossy eyes, dark paws and dark ear tips, large cream-tipped fluffy tail, indigo blue bandana. Preserve this plush 3D toy style and proportions, no new accessories. Create a 1536 by 1536 square atlas arranged in EXACTLY 4 equal columns by 4 equal rows, sixteen square cells. Every piece fully inside the central 70 percent of its cell with truly transparent gutters, no pieces touching or overlapping. Row 1: a complete headless armless legless furry torso with cream belly (no bandana); a blank furry head WITHOUT ears and WITHOUT eyes/brows/nose/mouth, retaining its cream cheek/muzzle fur pattern; separate left arm with dark paw; separate right arm with dark paw. Row 2: separate left short leg with dark foot; separate right short leg with dark foot; complete large fluffy curled fox tail with cream tip, attached end at bottom center; separate indigo triangular bandana. Row 3: FOUR facial feature overlays on transparent alpha, no surrounding head: neutral open eyes plus eyebrows and small dark nose and smiling mouth; matching gently closed eyelids with same nose/mouth; joyful closed smiling eyes plus open laughing mouth and same nose; worried open eyes with lifted inner brows plus small concerned mouth and nose. Align all four facial feature clusters to the same coordinates and scale, front view, two eyes symmetrically spaced, nose centered below. Row 4: separate left triangular fox ear; separate right triangular fox ear; leave the final TWO cells COMPLETELY EMPTY TRANSPARENT. Rounded upper joint ends on limbs for overlap under the torso, no detached white joint caps. Keep consistent frontal camera and soft neutral studio light. Constraints: each cell contains exactly its specified part, no assembled animals anywhere, no duplicate faces on the head, no letters, numbers, grid lines, floor, shadows, checkerboard, glow or watermark. Real clean alpha background; absolutely no white halos, stray fur fragments, colored noise or floating specks outside parts. The supplied full-character atlas is identity reference only; output the decomposed puppet atlas.",
+    "corrections": [
+      "Use case: precise-object-edit. This is a 4 by 4 cutout puppet atlas, preserve EXACTLY the atlas size, all part locations, cells, plush fox identity, colors, alpha and all existing body/limb/tail/ear/bandana pieces. Make ONLY this facial correction: in row 3 column 1 (neutral open-eye face overlay), replace its currently open laughing mouth with a SMALL CLOSED, calm smiling mouth, same as the gentle closed-eye overlay in row 3 column 2. Preserve its two open amber eyes, eyebrows and nose. The neutral face must have no open mouth and no tongue. Also keep all pixels outside the specified pieces genuinely transparent, clean alpha without halos. No labels, no background, no grid, no new pieces. The other three expressions remain unchanged.",
+      "Use case: precise-object-edit. Preserve this exact square 4 by 4 fox puppet parts atlas, all cell coordinates, all pieces, colors, material and expressions. ONLY fix the exposed flat peach-colored cut ends on the detached arms in row 1 columns 3 and 4 and the detached legs in row 2 columns 1 and 2. Cover those exposed flat peach cuts with rounded continuous russet fox fur so every limb has a naturally furry rounded proximal end, with NO flesh, NO pale exposed cross section, NO seam and NO flat cap. Keep dark paws unchanged and preserve each limb silhouette, orientation, size and location. Do not change the torso, head, bandana, tail, ears, neutral closed smiling mouth or any other face. No text, grid or background. Genuine clean alpha."
+    ]
+  },
+  "corrections": {
+    "shared": "Use case: precise-object-edit. Production 4 by 4 puppet parts atlas. Preserve the exact square canvas size and the positions of all sixteen cells. This is a small local correction, not a redesign.",
+    "mianmian": "In row 1 column 1, remove the TWO attached forearms/paws currently on the front of the torso. Replace those attached arms with uninterrupted matching ivory belly fur, leaving one complete headless, armless, legless rounded torso. The separate arm pieces in row 1 columns 3 and 4 stay exactly unchanged. Every other part, all 4 expressions, all source cell positions, color, texture, accessory and transparency stay unchanged.",
+    "yunmo": "In row 1 column 1, remove BOTH wings attached to the torso. Keep ONLY one complete headless armless legless blue furry torso with its pale jade belly, no wing fragments at all on either side. The detached wing pieces in row 4 columns 3 and 4 stay exactly unchanged. Every other piece, all four expressions, horned blank head, cheek frills, limbs, tail, amber bandana, all source cell positions, color, material and transparency stay unchanged.",
+    "maixiao": "Change ONLY the two ear pieces in row 4 columns 1 and 2. Make them the corgi's characteristic UPRIGHT triangular ears from the original character: tall softly triangular ears, honey outer fur and dusty-pink inner ear, tips erect, NO drooping folds. Mirror left and right. Keep each whole ear inside its existing cell with generous transparent gutter. All 14 other cell positions, parts, face expressions, head blaze, color, materials, tail, bandana and transparency remain unchanged.",
+    "suffix": "No labels, background, grid, cast shadow or watermark. Preserve genuine clean alpha and avoid stray fragments or halos."
+  }
+}

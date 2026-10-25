@@ -1,0 +1,86 @@
+{
+  "passed": true,
+  "status": "succeeded",
+  "receipt": {
+    "petId": "44ab2a38-ee43-4c7b-b5bc-66448cc4bc53",
+    "requestId": "0d513dc6-1c9a-4ae7-bbcf-be644ecbc61e",
+    "sessionId": "9623680f-77bd-4040-a00b-7c345a241ddd",
+    "taskId": "9c8890bc-4598-4728-8860-0ab2a1db4979",
+    "runId": "be583bff-4f24-463a-be96-b12c20715f9e"
+  },
+  "requests": 3,
+  "taskExecutions": 1,
+  "taskModelRequests": 1,
+  "chatExecutions": 0,
+  "maintenanceRequests": 2,
+  "detailAvailable": true,
+  "media": {
+    "decoderSlots": 2,
+    "clip": "happy",
+    "transparent": 100388,
+    "opaque": 40734,
+    "devicePixelRatio": 2
+  },
+  "allMedia": [
+    {
+      "character": "youli",
+      "slots": 2,
+      "sources": 1,
+      "onlyCurrentCharacter": true,
+      "opaque": 39232,
+      "transparent": 104286,
+      "hiddenReleased": true
+    },
+    {
+      "character": "tuantuan",
+      "slots": 2,
+      "sources": 1,
+      "onlyCurrentCharacter": true,
+      "opaque": 32086,
+      "transparent": 111332,
+      "hiddenReleased": true
+    },
+    {
+      "character": "mianmian",
+      "slots": 2,
+      "sources": 1,
+      "onlyCurrentCharacter": true,
+      "opaque": 32062,
+      "transparent": 112433,
+      "hiddenReleased": true
+    },
+    {
+      "character": "zhuli",
+      "slots": 2,
+      "sources": 1,
+      "onlyCurrentCharacter": true,
+      "opaque": 37214,
+      "transparent": 105383,
+      "hiddenReleased": true
+    },
+    {
+      "character": "yunmo",
+      "slots": 2,
+      "sources": 1,
+      "onlyCurrentCharacter": true,
+      "opaque": 42521,
+      "transparent": 100716,
+      "hiddenReleased": true
+    },
+    {
+      "character": "maixiao",
+      "slots": 2,
+      "sources": 1,
+      "onlyCurrentCharacter": true,
+      "opaque": 35245,
+      "transparent": 108771,
+      "hiddenReleased": true
+    }
+  ],
+  "home": null,
+  "files": null,
+  "stress": null,
+  "copy": null,
+  "userData": "/tmp/companion-task-native-wCU1eA",
+  "workspace": "/tmp/companion-task-workspace-o72clh"
+}

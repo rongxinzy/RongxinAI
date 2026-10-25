@@ -81,10 +81,23 @@ for (const colorScheme of ['light', 'dark']) {
   }) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
+    await bridge(page);
     await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await page.goto('/desktop-pet.html');
     for (const character of characters) {
       for (const state of states) {
-        await page.goto(`/desktop-pet.html?character=${character}&state=${state}`);
+        // The native window receives state changes in place; do not churn 42 HMR connections.
+        await page.evaluate(
+          ({ characterId, state }) =>
+            window.petState({
+              characterId,
+              state,
+              label: 'Companion',
+              bubble: null,
+              reducedMotion: true,
+            }),
+          { characterId: character, state },
+        );
         const canvas = page.locator('canvas');
         await expect(canvas).toHaveAttribute('data-character', character);
         await expect(canvas).toHaveAttribute('data-state', state);
@@ -134,19 +147,14 @@ test('long playback renders multiple beats, stays inside the mask and yields to 
     let elapsed = 0;
     for (const interval of [500, 500, 900, 1600]) {
       elapsed += interval;
-      if (character === DesktopPetBuiltinId.Xiaoyuan) {
-        // A fake clock cannot advance a browser decoder. Verify actual media time.
-        await expect(page.locator('canvas')).toHaveAttribute(
-          'data-media-clip',
-          DesktopPetMotion.Happy,
-        );
-        await expect
-          .poll(async () => Number(await page.locator('canvas').getAttribute('data-media-time')))
-          .toBeGreaterThan(elapsed / 1000);
-      } else {
-        await page.clock.runFor(interval);
-        await expect(page.locator('canvas')).toHaveAttribute('data-sequence', 'happy');
-      }
+      // A fake clock cannot advance a browser decoder. All seven now use real media.
+      await expect(page.locator('canvas')).toHaveAttribute(
+        'data-media-clip',
+        DesktopPetMotion.Happy,
+      );
+      await expect
+        .poll(async () => Number(await page.locator('canvas').getAttribute('data-media-time')))
+        .toBeGreaterThan(elapsed / 1000);
       samples.push(
         await page.locator('canvas').evaluate(canvas => {
           const data = canvas.getContext('2d').getImageData(0, 0, 192, 192).data;
@@ -172,6 +180,10 @@ test('long playback renders multiple beats, stays inside the mask and yields to 
     await page.clock.runFor(200);
     await expect(page.locator('canvas')).toHaveAttribute('data-state', 'error');
     await expect(page.locator('canvas')).toHaveAttribute('data-sequence', '');
+    await expect(page.locator('canvas')).toHaveAttribute(
+      'data-media-clip',
+      DesktopPetMotion.Concern,
+    );
     await expect(page.locator('#desktop-pet-bubble')).toHaveText('Failed');
   }
 });
@@ -196,8 +208,10 @@ test('hidden and reduced-motion windows discard choreography and never replay ba
   );
   await expect(page.locator('canvas')).toHaveAttribute('data-character', DesktopPetBuiltinId.Youli);
   await page.evaluate(() => window.petEffect({ kind: 'action', action: 'peek' }));
-  await page.clock.runFor(2000);
-  await expect(page.locator('canvas')).toHaveAttribute('data-sequence', 'peek');
+  await expect(page.locator('canvas')).toHaveAttribute('data-media-clip', DesktopPetMotion.Peek);
+  await expect
+    .poll(async () => Number(await page.locator('canvas').getAttribute('data-media-time')))
+    .toBeGreaterThan(0.15);
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     document.dispatchEvent(new Event('visibilitychange'));
@@ -210,6 +224,7 @@ test('hidden and reduced-motion windows discard choreography and never replay ba
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await expect(page.locator('canvas')).toHaveAttribute('data-sequence', '');
+  await expect(page.locator('canvas')).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(page.locator('canvas')).toHaveAttribute('data-reduced-motion', 'true');
   await page.evaluate(() => window.petEffect({ kind: 'action', action: 'happy' }));

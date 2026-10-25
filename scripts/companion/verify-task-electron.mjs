@@ -11,6 +11,7 @@ import { stressMedia } from './stress-media.mjs';
 import { verifyHomeSurfaces } from './verify-home-surfaces.mjs';
 import { createTaskFileFixture, chooseTaskFile } from './verify-task-files.mjs';
 import { verifyWorkbenchCopy } from './verify-workbench-copy.mjs';
+import { verifyAllMedia } from './verify-all-media.mjs';
 
 // Manual native acceptance only: isolated storage, local model fixture, no real account keys.
 // Prerequisites: verified Magpie resource, build:electron:dev and web:preview.
@@ -389,6 +390,10 @@ try {
     await main.mouse.move(10, 10);
     await main.screenshot({ path: path.join(userData, 'task-file-workbench.png') });
   }
+  const allMedia =
+    process.env.COMPANION_VERIFY_ALL_MEDIA === '1'
+      ? await verifyAllMedia(application, main, actor, userData)
+      : null;
   const stress = process.env.COMPANION_MEDIA_STRESS_SECONDS
     ? await stressMedia(
         application,
@@ -413,6 +418,7 @@ try {
       ).length,
       detailAvailable: Boolean(detail),
       media,
+      allMedia,
       home,
       files: fileFixture
         ? {
