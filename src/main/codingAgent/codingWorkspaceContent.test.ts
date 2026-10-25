@@ -25,6 +25,8 @@ vi.mock('../workbenchTask/artifactWorkerPool', async importOriginal => {
     fs.mkdtempSync(path.join(tmpdir(), 'coding-content-worker-build-')),
   );
   workerFixture.compiledRoot = compiledRoot;
+  // The independently compiled worker resolves bundled package imports from this fixture.
+  fs.symlinkSync(path.resolve('node_modules'), path.join(compiledRoot, 'node_modules'), 'junction');
   const compiled = path.join(compiledRoot, 'compiled');
   execFileSync(
     process.execPath,
