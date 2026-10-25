@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="churnprevention-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8F8F0"/>
+      <stop offset="100%" stop-color="#D0F0E0"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#churnprevention-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M24 34 C16 28, 14 22, 18 18 C21 15, 24 17, 24 17 C24 17, 27 15, 30 18 C34 22, 32 28, 24 34 Z" fill="#5CB88A" fill-opacity="0.85"/>
+</svg>

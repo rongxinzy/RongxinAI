@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="logdiagnostic-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8EEFF"/>
+      <stop offset="100%" stop-color="#D4DEFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#logdiagnostic-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M14 16 L22 24 L14 32 M26 32 H34" stroke="#5D4E63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

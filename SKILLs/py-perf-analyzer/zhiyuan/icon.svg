@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="pyperfanalyzer-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8F8F0"/>
+      <stop offset="100%" stop-color="#D0F0E0"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#pyperfanalyzer-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <rect x="14" y="24" width="4" height="10" rx="1.5" fill="#5CB88A"/><rect x="22" y="18" width="4" height="16" rx="1.5" fill="#5CB88A"/><rect x="30" y="22" width="4" height="12" rx="1.5" fill="#9AD4B8"/>
+</svg>

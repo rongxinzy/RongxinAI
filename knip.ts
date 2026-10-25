@@ -20,6 +20,7 @@ const config: KnipConfig = {
         // rolldown inputs, not the electron() entry list in vite.config.ts.
         // Run from .husky/pre-commit.
         'scripts/check-new-file-tokens.mjs',
+        'scripts/generate-cute-skill-icons.mjs',
         'src/main/main.ts',
         'src/main/preload.ts',
         'src/main/desktopPetPreload.ts',

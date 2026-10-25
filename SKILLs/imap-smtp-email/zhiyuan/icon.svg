@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="imapsmtpemail-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8F4FC"/>
+      <stop offset="100%" stop-color="#CFE8F8"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#imapsmtpemail-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <rect x="12" y="16" width="24" height="16" rx="3" fill="white" fill-opacity="0.55" stroke="#5BA4D9" stroke-width="1.4"/><path d="M12 18 L24 26 L36 18" stroke="#5BA4D9" stroke-width="1.4" fill="none"/>
+</svg>

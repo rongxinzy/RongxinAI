@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="xindayatranslator-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF0E8"/>
+      <stop offset="100%" stop-color="#FFE2D4"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#xindayatranslator-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <circle cx="24" cy="24" r="10" stroke="#E8956A" stroke-width="1.4" fill="white" fill-opacity="0.4"/><path d="M14 24 H34 M24 14 C20 18, 20 30, 24 34 M24 14 C28 18, 28 30, 24 34" stroke="#F5C4A8" stroke-width="1.2" fill="none"/>
+</svg>

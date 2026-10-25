@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="codearchoptimizer-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8EEFF"/>
+      <stop offset="100%" stop-color="#D4DEFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#codearchoptimizer-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M24 14 L36 20 L24 26 L12 20 Z" fill="#A8B8F0" stroke="#7B8FDE" stroke-width="1.2"/><path d="M24 20 L36 26 L24 32 L12 26 Z" fill="#7B8FDE" fill-opacity="0.35" stroke="#7B8FDE" stroke-width="1.2"/>
+</svg>
