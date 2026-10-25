@@ -8,6 +8,7 @@ import { normalizeError, readErrorMessage } from './errorNormalization';
 import { i18nService } from './i18n';
 
 const DEFAULT_FALLBACK_KEY = 'codingAgentActionFailed';
+export type AppErrorLogLevel = 'error' | 'warn';
 
 /**
  * Resolve the text a surface should show for an error produced by the app.
@@ -43,14 +44,15 @@ export function reportAppError(
   error: unknown,
   fallbackKey = DEFAULT_FALLBACK_KEY,
   tag = 'Coding',
+  level: AppErrorLogLevel = 'error',
 ): string {
   const message = readErrorMessage(error).trim();
   if (message) {
-    console.error(`[${tag}] ${message}`);
+    console[level](`[${tag}] ${message}`);
     // The bridge only exists in the Electron renderer; unit tests and any
     // non-window context must still be able to format the error.
     if (typeof window !== 'undefined') {
-      window.electron?.log?.fromRenderer?.('error', tag, message);
+      window.electron?.log?.fromRenderer?.(level, tag, message);
     }
   }
   return appErrorText(error, fallbackKey);

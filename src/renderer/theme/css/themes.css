@@ -887,7 +887,7 @@
   color: var(--destructive);
 }
 :where(:root, [data-theme]) :where(.theme-alert-destructive > [data-slot="alert-description"]) {
-  color: color-mix(in oklab, var(--destructive) 90%, transparent);
+  color: var(--destructive);
 }
 :where(:root, [data-theme]) :where(.theme-alert > svg) {
   color: currentColor;

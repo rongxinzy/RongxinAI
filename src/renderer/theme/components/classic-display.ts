@@ -58,7 +58,7 @@ export function classicDisplay() {
     }),
     'alert-destructive': recipe({ base: { color: 'var(--destructive)' } }),
     'alert-destructive-description': recipe({
-      base: { color: 'color-mix(in oklab, var(--destructive) 90%, transparent)' },
+      base: { color: 'var(--destructive)' },
     }),
     'alert-icon': recipe({ base: { color: 'currentColor' } }),
     'alert-icon-size': recipe({ base: { width: '1rem', height: '1rem' } }),

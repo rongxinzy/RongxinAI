@@ -46,6 +46,7 @@
 ## 优先复用的现成能力（2026-10-25）
 
 - 执行、持久会话和业务任务继续复用现有 Pi、Durable 与 Task/Run，不另建执行框架。真实目录的未知能力数组是本地适配语义错误，已修复；不是缺少新的选模库。
+- 模型服务商编辑继续复用已有共享控件，完整状态及请求竞争整改见[服务商编辑阶段](companion-provider-editor-acceptance.md)。该阶段不替代 Windows、主动跟进、最终美术及其他页面的完整交付。
 - 动画播放先复用已获授权的 dsh-pet MIT 机制；连续骨骼动作可评估 [Rive Web runtime](https://rive.app/docs/runtimes/web/web-js) 和 [数据绑定](https://rive.app/docs/runtimes/web/data-binding)。运行库消费已经制作的 `.riv` 素材，不会自动生成七位伙伴的动作。2026-10-25 核对官方 [运行素材导出](https://rive.app/docs/editor/exporting/exporting-for-runtime)：导出需要付费方案，编辑器制作与开源运行库须分开评估。当前没有自有角色 `.riv`、未购买方案、未增加依赖或迁移；不能将通用示例能播放当作伙伴原型已完成。继续保留已可重建的离线媒体，并以自有角色的绑定/衔接效果、常驻资源、包体和制作成本决定迁移。
 - Windows 窗口接口可评估 [Koffi 的 Win32 回调绑定](https://koffi.dev/callbacks)，减少手写原生绑定；窗口遮挡、支点、攀爬和动作协调仍需实现。优先在隔离 helper 验证枚举及事件回调，主进程保留 Electron 窗口所有权；Windows x64/arm64 打包、回调生命周期、DPI 和实机行为通过前不认定可用。
 

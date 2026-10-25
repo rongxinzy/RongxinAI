@@ -258,6 +258,9 @@ export const zhCowork: Record<string, string> = {
   coworkErrorServerError: '模型服务出错，请稍后重试。',
   coworkErrorStreamInterrupted: '与模型的连接中断，本次任务已停止。请重试。',
   coworkErrorTurnTimeout: '模型长时间没有响应，本次任务已中断。请重试，或减少同时运行的任务数。',
+  coworkErrorToolTimeout: '工具执行超时，请重试。',
+  coworkErrorToolPermissionDenied: '工具操作未获授权，请检查权限后重试。',
+  coworkErrorMaxIterations: '本轮已达到执行步数上限。请继续任务或缩小范围。',
   coworkErrorFileWriteTruncated:
     '文件内容被截断，未能完整写入。请让模型分块写入或减少单次写入长度。',
   coworkErrorSessionStartFailed: '会话启动失败：{error}',

@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 import path from 'node:path';
 import { magpieTranslations } from '../../src/renderer/services/magpieTranslations.ts';
+import { verifyProviderEditor } from './verify-provider-editor.mjs';
 
 async function verifyNativeModelCopy(main, output) {
   const language = (await main.locator('html').getAttribute('lang')).startsWith('zh') ? 'zh' : 'en';
@@ -40,6 +41,7 @@ async function verifyNativeModelCopy(main, output) {
     await expect(search).toBeFocused();
     await main.screenshot({ path: path.join(output, `model-copy-${theme}.png`) });
   }
+  const providerEditor = await verifyProviderEditor(main, region, copy, language, output);
   const sections = region.getByRole('combobox', { name: copy.magpieSettingsSections, exact: true });
   if (await sections.count()) {
     await sections.click();
@@ -54,6 +56,7 @@ async function verifyNativeModelCopy(main, output) {
     realCatalog: true,
     retainedSearchAndFocus: true,
     copyFromCurrentSettings: true,
+    providerEditor,
   };
 }
 

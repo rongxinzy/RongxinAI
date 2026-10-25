@@ -326,6 +326,11 @@ export const enCowork: Record<string, string> = {
   coworkErrorStreamInterrupted:
     'The model connection was interrupted. This task has stopped. Please retry.',
   coworkErrorTurnTimeout: 'The model stopped responding. Please retry or reduce concurrent tasks.',
+  coworkErrorToolTimeout: 'The tool timed out. Please retry.',
+  coworkErrorToolPermissionDenied:
+    'This tool action was not authorized. Check permissions and retry.',
+  coworkErrorMaxIterations:
+    'This run reached its step limit. Continue the task or narrow its scope.',
   coworkErrorFileWriteTruncated:
     'The file content was truncated. Ask the model to write smaller chunks.',
   coworkErrorSessionStartFailed: 'Failed to start session: {error}',

@@ -155,7 +155,7 @@ export default function ModelSettingsPanel() {
       apply(await refreshMagpieModels());
       return true;
     } catch (err: unknown) {
-      showAppError(err instanceof Error ? err.message : 'Save provider failed');
+      showAppError(err, 'magpieProviderSaveFailed', 'ModelSettings', 'warn');
       return false;
     }
   };
@@ -167,7 +167,7 @@ export default function ModelSettingsPanel() {
       apply(await refreshMagpieModels());
       return true;
     } catch (err: unknown) {
-      showAppError(err instanceof Error ? err.message : 'Toggle provider failed');
+      showAppError(err, 'magpieActionFailed', 'ModelSettings', 'warn');
       return false;
     }
   };
@@ -179,7 +179,7 @@ export default function ModelSettingsPanel() {
       apply(await refreshMagpieModels());
       return true;
     } catch (err: unknown) {
-      showAppError(err instanceof Error ? err.message : 'Delete provider failed');
+      showAppError(err, 'magpieActionFailed', 'ModelSettings', 'warn');
       return false;
     }
   };
