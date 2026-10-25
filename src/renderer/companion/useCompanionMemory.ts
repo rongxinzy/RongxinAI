@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CompanionWindowApi } from '../../shared/companion/types';
 import { MemoryLifecycleStatus, type ManagedMemoryRecord } from '../../shared/memory';
+import { createCompanionRefreshQueue } from './refreshQueue';
 
 export function useCompanionMemory(
   api: CompanionWindowApi | undefined,
@@ -14,6 +15,9 @@ export function useCompanionMemory(
   const [notice, setNotice] = useState<string | null>(null);
   const generation = useRef(0);
   const writing = useRef(false);
+  const invalidate = useCallback(() => {
+    generation.current++;
+  }, []);
   const load = useCallback(async () => {
     const current = ++generation.current;
     setLoading(true);
@@ -37,11 +41,18 @@ export function useCompanionMemory(
   }, [api, petId]);
   useEffect(() => {
     if (!open) return;
-    void load();
+    const refresh = createCompanionRefreshQueue(load);
+    void refresh.request();
+    const unsubscribe = api?.onChanged(() => {
+      // This writer reloads after its receipt; an earlier push must not erase a write error.
+      if (!writing.current) void refresh.request();
+    });
     return () => {
-      generation.current++;
+      unsubscribe?.();
+      refresh.dispose();
+      invalidate();
     };
-  }, [open, load]);
+  }, [api, open, load, invalidate]);
   const run = async (operation: () => Promise<void>): Promise<boolean> => {
     if (writing.current || !api) return false;
     writing.current = true;

@@ -3,7 +3,7 @@ import { CompanionIpc as IpcChannel } from '../ipc/channels';
 import { defineIpcContract } from '../ipc/contract';
 import { DesktopPetBuiltinId } from '../desktopPet/catalog';
 import { companionAttachments } from './attachments';
-import { companionMemorySave, companionMemoryShare } from './memory';
+import { companionMemorySave, companionMemoryShare, companionMemoryConfirm } from './memory';
 import { ManagedMemoryRecordSchema } from '../ipc/memoryContract';
 import {
   companionTaskRequest,
@@ -68,6 +68,11 @@ export const companionContract = defineIpcContract({
   saveMemory: {
     channel: IpcChannel.SaveMemory,
     args: z.tuple([companionMemorySave]),
+    result: ManagedMemoryRecordSchema,
+  },
+  confirmMemory: {
+    channel: IpcChannel.ConfirmMemory,
+    args: z.tuple([companionMemoryConfirm]),
     result: ManagedMemoryRecordSchema,
   },
   forgetMemory: {

@@ -123,6 +123,7 @@ export function initializeCompanionWindow(next: Options): void {
   options = next;
   let line: Promise<unknown> = Promise.resolve();
   let queued = 0;
+  const publishedReplies = new Set<string>();
   const serialized = <T>(
     event: Electron.IpcMainInvokeEvent,
     operation: () => Promise<T> | T,
@@ -160,6 +161,13 @@ export function initializeCompanionWindow(next: Options): void {
         const forgotten = await memoryService().forget(petId, id);
         changed();
         return forgotten;
+      }),
+    confirmMemory: (event, input) =>
+      serialized(event, async () => {
+        activeProfile(input.petId);
+        const saved = await memoryService().confirm(input);
+        changed();
+        return saved;
       }),
     shareMemory: (event, input) =>
       serialized(event, async () => {
@@ -226,7 +234,15 @@ export function initializeCompanionWindow(next: Options): void {
         const result = await next
           .getCompanions()
           .runtime.answer(activeProfile(receipt.petId), receipt);
-        if (result.state === CompanionRequestState.Answered) changed();
+        if (result.state !== CompanionRequestState.Accepted) {
+          const key = `${receipt.petId}:${receipt.submissionId}`;
+          if (!publishedReplies.has(key)) {
+            publishedReplies.add(key);
+            if (publishedReplies.size > 128)
+              publishedReplies.delete(publishedReplies.values().next().value!);
+            changed();
+          }
+        }
         return result;
       }),
     stop: (event, petId) =>

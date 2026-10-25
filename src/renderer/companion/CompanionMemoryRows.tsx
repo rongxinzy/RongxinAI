@@ -4,6 +4,7 @@ import { Button } from '@shared/components/ui/button';
 import { Field, FieldContent, FieldDescription, FieldTitle } from '@shared/components/ui/field';
 import { Separator } from '@shared/components/ui/separator';
 import type { ManagedMemoryRecord } from '../../shared/memory';
+import { companionMemoryNeedsReview } from '../../shared/companion/memoryStatus';
 import { i18nService } from '../services/i18n';
 
 export function CompanionMemoryRows({
@@ -11,12 +12,14 @@ export function CompanionMemoryRows({
   busy,
   edit,
   share,
+  review,
   forget,
 }: {
   records: ManagedMemoryRecord[];
   busy: boolean;
   edit: (record: ManagedMemoryRecord) => void;
   share: (record: ManagedMemoryRecord) => void;
+  review: (record: ManagedMemoryRecord) => void;
   forget: (record: ManagedMemoryRecord) => void;
 }) {
   const t = (key: string) => i18nService.t(key);
@@ -32,28 +35,48 @@ export function CompanionMemoryRows({
                 {record.content}
               </FieldDescription>
               {record.memoryId === null ? (
-                <FieldDescription>{t('companionMemoryPending')}</FieldDescription>
+                <FieldDescription>
+                  {t(
+                    companionMemoryNeedsReview(record)
+                      ? 'companionMemoryNeedsReview'
+                      : 'companionMemoryPending',
+                  )}
+                </FieldDescription>
               ) : null}
             </FieldContent>
             <div className="flex shrink-0 items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`${t('companionMemoryEdit')}: ${record.title}`}
-                disabled={busy || record.memoryId === null}
-                onClick={() => edit(record)}
-              >
-                <Pencil strokeWidth={1.75} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`${t('companionMemoryShare')}: ${record.title}`}
-                disabled={busy || record.memoryId === null}
-                onClick={() => share(record)}
-              >
-                <Share2 strokeWidth={1.75} />
-              </Button>
+              {companionMemoryNeedsReview(record) ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`${t('companionMemoryReview')}: ${record.title}`}
+                  disabled={busy}
+                  onClick={() => review(record)}
+                >
+                  {t('companionMemoryReview')}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`${t('companionMemoryEdit')}: ${record.title}`}
+                    disabled={busy || record.memoryId === null}
+                    onClick={() => edit(record)}
+                  >
+                    <Pencil strokeWidth={1.75} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`${t('companionMemoryShare')}: ${record.title}`}
+                    disabled={busy || record.memoryId === null}
+                    onClick={() => share(record)}
+                  >
+                    <Share2 strokeWidth={1.75} />
+                  </Button>
+                </>
+              )}
               <Button
                 variant="ghost"
                 size="icon-sm"

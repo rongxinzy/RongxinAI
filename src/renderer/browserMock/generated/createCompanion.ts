@@ -41,6 +41,39 @@ export function createCompanion(runtime: BrowserMockRuntime): Window['electron']
         deliveryError: '',
       };
     },
+    confirmMemory: async _p0 => {
+      void _p0;
+      runtime.warnOnce('companion.confirmMemory');
+      return {
+        id: 'preview',
+        memoryId: 0,
+        projectId: '',
+        scope: 'companion',
+        sessionId: '',
+        sourceKind: 'explicit',
+        taskId: '',
+        runId: '',
+        artifactId: '',
+        approvalId: '',
+        status: 'active',
+        title: 'Preview',
+        content: '',
+        kind: 'decision',
+        topicKey: '',
+        importance: 0,
+        confidence: 0,
+        sensitivity: 'normal',
+        expiresAt: '',
+        supersededBy: '',
+        promotedFromLinkId: '',
+        promotionSourceProjectId: '',
+        promotionSourceSessionId: '',
+        createdAt: '',
+        updatedAt: '',
+        deliveryStatus: 'completed',
+        deliveryError: '',
+      };
+    },
     forgetMemory: async (_p0, _p1) => {
       void _p0;
       void _p1;

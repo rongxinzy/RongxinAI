@@ -24,6 +24,7 @@ export const CompanionIpc = {
   ChooseFiles: 'companion:files:choose',
   ListMemories: 'companion:memory:list',
   SaveMemory: 'companion:memory:save',
+  ConfirmMemory: 'companion:memory:confirm',
   ForgetMemory: 'companion:memory:forget',
   ShareMemory: 'companion:memory:share',
   Hide: 'companion:hide',

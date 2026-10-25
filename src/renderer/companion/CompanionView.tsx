@@ -25,7 +25,6 @@ import type {
 import {
   COMPANION_NAME_KEYS,
   CompanionCapability,
-  CompanionRequestState,
   CompanionComposerMode,
   CompanionSurface,
   CompanionAttachmentIssue,
@@ -40,6 +39,8 @@ import { CompanionPortrait } from './CompanionPortrait';
 import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttachments';
 import { useCompanionFiles } from './useCompanionFiles';
 import { CompanionHeaderActions } from './CompanionHeaderActions';
+import { createCompanionRefreshQueue } from './refreshQueue';
+import { useCompanionAnswer } from './useCompanionAnswer';
 
 function applyContext(context: CompanionWindowContext): void {
   themeService.initialize();
@@ -121,18 +122,19 @@ export function CompanionView({
   );
 
   useEffect(() => {
-    void load();
+    const refresh = createCompanionRefreshQueue(() => load());
+    void refresh.request();
     const unsubscribeLanguage = i18nService.subscribe(() => languageChanged(value => value + 1));
     const unsubscribeContext =
       surface === CompanionSurface.Quick ? api?.onContext(applyContext) : undefined;
     const unsubscribeChanged = api?.onChanged(() => {
-      if (visibleRef.current) void load();
+      if (visibleRef.current) void refresh.request();
     });
     const unsubscribeVisibility = api?.onVisibility(next => {
       visibleRef.current = next;
       setVisible(next);
       if (next) {
-        void load();
+        void refresh.request();
         textarea.current?.focus();
       }
     });
@@ -150,6 +152,7 @@ export function CompanionView({
     };
     document.addEventListener('keydown', keydown);
     return () => {
+      refresh.dispose();
       cancelPendingLoad();
       unsubscribeLanguage();
       unsubscribeContext?.();
@@ -164,34 +167,7 @@ export function CompanionView({
   useEffect(() => {
     if (state?.activePetId && visible) textarea.current?.focus();
   }, [state?.activePetId, visible]);
-  useEffect(() => {
-    if (!pending || !visible) return;
-    let active = true;
-    let timer: ReturnType<typeof setTimeout>;
-    const check = async () => {
-      try {
-        const answer = await api!.answer(pending);
-        if (!active) return;
-        if (answer.state !== CompanionRequestState.Accepted) {
-          await load();
-          if (active && answer.state === CompanionRequestState.Unanswered)
-            setError('companionFailed');
-          return;
-        }
-      } catch {
-        if (active) {
-          setError('companionLoadFailed');
-          return;
-        }
-      }
-      if (active) timer = setTimeout(check, 500);
-    };
-    void check();
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [api, pending, visible, load]);
+  useCompanionAnswer({ api, pending, visible, reload: load, onError: setError });
 
   const updateDraft = (text: string, patch: Partial<typeof draft> = {}) => {
     const next = { ...draftRef.current, ...patch, text, requestId: crypto.randomUUID() };

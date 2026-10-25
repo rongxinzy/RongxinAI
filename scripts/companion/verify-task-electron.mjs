@@ -1,7 +1,6 @@
 import { _electron as electron } from 'playwright';
 import { expect } from '@playwright/test';
 import fs from 'node:fs/promises';
-import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { DesktopPetState } from '../../src/shared/desktopPet/constants.ts';
@@ -12,13 +11,16 @@ import { verifyHomeSurfaces } from './verify-home-surfaces.mjs';
 import { createTaskFileFixture, chooseTaskFile } from './verify-task-files.mjs';
 import { verifyWorkbenchCopy } from './verify-workbench-copy.mjs';
 import { verifyAllMedia } from './verify-all-media.mjs';
-import { verifyCompanionMemory, COMPANION_MEMORY_NATIVE_MARKER } from './verify-memory.mjs';
+import { verifyCompanionMemory } from './verify-memory.mjs';
 import {
   createTaskMemoryFixture,
   approveTaskMemory,
   prepareTaskMemory,
   verifyTaskMemory,
 } from './verify-task-memory.mjs';
+
+import { startCompanionModelFixture } from './task-model-fixture.mjs';
+import { createMemoryReviewFixture, verifyMemoryReview } from './verify-memory-review.mjs';
 
 // Manual native acceptance only: isolated storage, local model fixture, no real account keys.
 // Prerequisites: verified Magpie resource, build:electron:dev and web:preview.
@@ -29,144 +31,16 @@ const userData = await fs.mkdtemp('/tmp/companion-task-native-');
 const workspace = await fs.mkdtemp('/tmp/companion-task-workspace-');
 const fileFixture =
   process.env.COMPANION_VERIFY_FILES === '1' ? await createTaskFileFixture(userData) : null;
-let requests = 0;
 const taskMemoryFixture =
   process.env.COMPANION_VERIFY_TASK_MEMORY === '1' ? createTaskMemoryFixture() : null;
-const requestKinds = [];
-const server = createServer(async (request, response) => {
-  if (request.url.endsWith('/models')) {
-    response.setHeader('Content-Type', 'application/json');
-    response.end(
-      JSON.stringify({
-        object: 'list',
-        data: [{ id: 'fixture-model', object: 'model', owned_by: 'fixture' }],
-      }),
-    );
-    return;
-  }
-  if (!request.url.includes('/chat/completions')) {
-    response.writeHead(404).end();
-    return;
-  }
-  const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
-  const payload = JSON.parse(Buffer.concat(chunks).toString());
-  const content = message =>
-    typeof message?.content === 'string' ? message.content : JSON.stringify(message?.content ?? '');
-  const system = content(payload.messages?.find(message => message.role === 'system'));
-  const kind = system.startsWith('You extract durable, atomic memory from evidence.')
-    ? 'project-memory'
-    : system.startsWith('You extract compact, evidence-grounded session memory.')
-      ? 'session-memory'
-      : content(payload.messages?.findLast(message => message.role === 'user')).includes(
-            'Native shared conversation',
-          )
-        ? 'companion-chat'
-        : 'task';
-  requestKinds.push({
-    kind,
-    companionMemory: system.includes(COMPANION_MEMORY_NATIVE_MARKER),
-    taskMemory: taskMemoryFixture?.inspect(payload),
-    system: system.slice(0, 180),
-    lastUser: content(payload.messages?.findLast(message => message.role === 'user')).slice(0, 180),
-    messageCount: payload.messages?.length,
-    maxTokens: payload.max_tokens,
-  });
-  requests++;
-  // Keep the run active long enough to observe its real media state before completion.
-  if (kind === 'task') await new Promise(resolve => setTimeout(resolve, 2000));
-  response.writeHead(200, { 'Content-Type': 'text/event-stream' });
-  const chunk = (delta, finish_reason = null) => ({
-    id: 'fixture-answer',
-    object: 'chat.completion.chunk',
-    created: 1,
-    model: 'fixture-model',
-    choices: [{ index: 0, delta, finish_reason }],
-  });
-  if (kind === 'task' && fileFixture) {
-    const toolResults = JSON.stringify(
-      payload.messages?.filter(message => message.role === 'tool'),
-    );
-    if (fileFixture.requested) {
-      fileFixture.observed = toolResults.includes(fileFixture.marker);
-      if (!fileFixture.observed) {
-        response.end(
-          `data: ${JSON.stringify(chunk({ role: 'assistant', content: 'Selected file contents were not returned.' }))}\n\ndata: [DONE]\n\n`,
-        );
-        return;
-      }
-    } else {
-      if (!JSON.stringify(payload.messages).includes(fileFixture.file)) {
-        response.write(
-          `data: ${JSON.stringify(chunk({ role: 'assistant', content: 'Selected file reference is missing.' }))}\n\n`,
-        );
-        response.write(`data: ${JSON.stringify(chunk({}, 'stop'))}\n\n`);
-        response.end('data: [DONE]\n\n');
-        return;
-      }
-      const read = payload.tools?.find(tool => tool.function?.name === 'read');
-      if (!read) {
-        response.write(
-          `data: ${JSON.stringify(chunk({ role: 'assistant', content: 'Native file read tool is missing.' }))}\n\n`,
-        );
-        response.write(`data: ${JSON.stringify(chunk({}, 'stop'))}\n\n`);
-        response.end('data: [DONE]\n\n');
-        return;
-      }
-      fileFixture.requested = true;
-      response.write(
-        `data: ${JSON.stringify(
-          chunk({
-            role: 'assistant',
-            tool_calls: [
-              {
-                index: 0,
-                id: 'read-selected-file',
-                type: 'function',
-                function: {
-                  name: 'read',
-                  arguments: JSON.stringify({ path: fileFixture.file }),
-                },
-              },
-            ],
-          }),
-        )}\n\n`,
-      );
-      response.write(`data: ${JSON.stringify(chunk({}, 'tool_calls'))}\n\n`);
-      response.end('data: [DONE]\n\n');
-      return;
-    }
-  }
-  const memoryCall = kind === 'task' ? taskMemoryFixture?.nextCall(payload) : null;
-  if (memoryCall) {
-    response.write(
-      `data: ${JSON.stringify(chunk({ role: 'assistant', tool_calls: [memoryCall] }))}\n\n`,
-    );
-    response.write(`data: ${JSON.stringify(chunk({}, 'tool_calls'))}\n\n`);
-    response.end('data: [DONE]\n\n');
-    return;
-  }
-  const answer =
-    kind === 'project-memory'
-      ? JSON.stringify({ shouldSave: false, memories: [] })
-      : kind === 'session-memory'
-        ? JSON.stringify({
-            shouldSave: false,
-            goal: null,
-            currentState: null,
-            decisions: [],
-            artifacts: [],
-            unresolved: [],
-            nextSteps: [],
-          })
-        : kind === 'companion-chat'
-          ? 'Native companion reply is shared'
-          : '项目资料已整理，接下来可以查看工作台里的这条任务。';
-  response.write(`data: ${JSON.stringify(chunk({ role: 'assistant', content: answer }))}\n\n`);
-  response.write(`data: ${JSON.stringify(chunk({}, 'stop'))}\n\n`);
-  response.end('data: [DONE]\n\n');
-});
-await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+const reviewFixture =
+  process.env.COMPANION_VERIFY_MEMORY_REVIEW === '1' ? createMemoryReviewFixture() : null;
+const modelFixture = await startCompanionModelFixture(
+  fileFixture,
+  taskMemoryFixture,
+  reviewFixture,
+);
+const { server, requestKinds } = modelFixture;
 const env = {
   ...process.env,
   NODE_ENV: 'development',
@@ -296,7 +170,7 @@ try {
       JSON.stringify({
         alerts: await chat.getByRole('alert').allTextContents(),
         state: await chat.evaluate(() => window.companion.bootstrap()),
-        requests,
+        requests: modelFixture.requestCount(),
       }),
     );
     throw error;
@@ -437,12 +311,15 @@ try {
   const taskMemory = taskMemoryAdmission
     ? await verifyTaskMemory(main, chat, taskMemoryAdmission, receipt, requestKinds)
     : null;
+  const memoryReview = reviewFixture
+    ? await verifyMemoryReview(application, main, chat, userData, requestKinds)
+    : null;
   console.log(
     JSON.stringify({
       passed: true,
       status: finished.status,
       receipt,
-      requests,
+      requests: modelFixture.requestCount(),
       taskExecutions: detail.detail.runs.length,
       taskModelRequests: requestKinds.filter(item => item.kind === 'task').length,
       chatExecutions: requestKinds.filter(item => item.kind === 'companion-chat').length,
@@ -464,6 +341,7 @@ try {
       copy,
       memory,
       taskMemory,
+      memoryReview,
       userData,
       workspace,
     }),

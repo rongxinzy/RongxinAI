@@ -48,6 +48,7 @@ export const appSystemApi = {
     chooseFiles: companionApi.chooseFiles,
     listMemories: companionApi.listMemories,
     saveMemory: companionApi.saveMemory,
+    confirmMemory: companionApi.confirmMemory,
     forgetMemory: companionApi.forgetMemory,
     shareMemory: companionApi.shareMemory,
     hide: companionApi.hide,

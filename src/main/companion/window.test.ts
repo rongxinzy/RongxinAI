@@ -1,8 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, expect, test, vi } from 'vitest';
 import { CompanionIpc as IpcChannel } from '../../shared/ipc/channels';
-import { COMPANION_SHORTCUT } from '../../shared/companion/constants';
+import { COMPANION_SHORTCUT, CompanionRequestState } from '../../shared/companion/constants';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
+import { MemoryKind } from '../../shared/memory/constants';
 
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
@@ -119,6 +120,7 @@ function fixture() {
   const memory = {
     list: vi.fn(() => []),
     save: vi.fn(),
+    confirm: vi.fn(),
     forget: vi.fn(async () => true),
     shareConfirmed: vi.fn(async () => ({ id: 'shared', available: true })),
   };
@@ -211,7 +213,7 @@ test('the bridge exposes profile state and the workbench without general applica
   expect(f.onProfileChanged).toHaveBeenCalledWith(f.profile);
   await f.invoke(IpcChannel.OpenWorkbench);
   expect(f.main.focus).toHaveBeenCalledOnce();
-  expect(mocks.handlers.size).toBe(16);
+  expect(mocks.handlers.size).toBe(17);
   disposeCompanionWindow();
   expect(mocks.handlers.size).toBe(0);
   expect(mocks.unregister).toHaveBeenCalledWith(COMPANION_SHORTCUT);
@@ -241,6 +243,65 @@ test('memory IPC admits only owned frames and the active companion with explicit
   expect(f.memory.shareConfirmed).toHaveBeenCalledWith(petId, 'memory', 'share');
   await f.invoke(IpcChannel.ForgetMemory, petId, 'memory');
   expect(f.memory.forget).toHaveBeenCalledWith(petId, 'memory');
+});
+
+test('memory review admits only an explicitly confirmed snapshot for the still-active owner', async () => {
+  const f = fixture();
+  const request = {
+    petId: f.profile.petId,
+    id: 'candidate',
+    title: 'Decision',
+    content: 'Reviewed facts.',
+    kind: MemoryKind.Decision,
+    confirmed: true,
+  };
+  const handler = mocks.handlers.get(IpcChannel.ConfirmMemory)!;
+  await expect(handler({ sender: {}, senderFrame: {} }, request)).rejects.toThrow(
+    'owned main frame',
+  );
+  await expect(handler({ ...f.event, senderFrame: {} }, request)).rejects.toThrow(
+    'owned main frame',
+  );
+  await expect(
+    f.invoke(IpcChannel.ConfirmMemory, { ...request, confirmed: false }),
+  ).rejects.toThrow('invalid arguments');
+  expect(f.memory.confirm).not.toHaveBeenCalled();
+  f.memory.confirm.mockRejectedValueOnce(new Error('Fixture delivery'));
+  await expect(f.invoke(IpcChannel.ConfirmMemory, request)).rejects.toThrow('Fixture delivery');
+  expect(f.memory.confirm).toHaveBeenCalledWith(request);
+  f.memory.confirm.mockClear();
+  const queued = f.invoke(IpcChannel.ConfirmMemory, request);
+  f.profile.petId = '00000000-0000-4000-8000-000000000099';
+  await expect(queued).rejects.toThrow('selection changed');
+  expect(f.memory.confirm).not.toHaveBeenCalled();
+});
+
+test('both surfaces can read a terminal reply without broadcasting it repeatedly', async () => {
+  const f = fixture();
+  const receipt = { petId: f.profile.petId, requestId: 'same-request', submissionId: 1 };
+  f.runtime.answer.mockResolvedValue({
+    ...receipt,
+    state: CompanionRequestState.Answered,
+    text: 'Done',
+  });
+  f.main.webContents.send.mockClear();
+  f.window.webContents.send.mockClear();
+  await f.invoke(IpcChannel.Answer, receipt);
+  await mocks.handlers.get(IpcChannel.Answer)!(
+    { sender: f.main.webContents, senderFrame: f.main.webContents.mainFrame },
+    receipt,
+  );
+  await f.invoke(IpcChannel.Answer, receipt);
+  expect(f.main.webContents.send).toHaveBeenCalledExactlyOnceWith(IpcChannel.Changed);
+  expect(f.window.webContents.send).toHaveBeenCalledExactlyOnceWith(IpcChannel.Changed);
+  f.runtime.answer.mockResolvedValue({
+    ...receipt,
+    submissionId: 2,
+    state: CompanionRequestState.Unanswered,
+    text: '',
+  });
+  await f.invoke(IpcChannel.Answer, { ...receipt, submissionId: 2 });
+  expect(f.main.webContents.send).toHaveBeenCalledTimes(2);
 });
 
 test('workspace picking accepts paths only from its native dialog and cancellation is inert', async () => {

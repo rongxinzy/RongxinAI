@@ -4,7 +4,14 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { expect, test, vi } from 'vitest';
-import { MemoryKind, MemoryScope, MemoryLifecycleStatus } from '../../shared/memory';
+import {
+  MemoryKind,
+  MemoryScope,
+  MemoryLifecycleStatus,
+  MemorySourceKind,
+} from '../../shared/memory';
+import { ATOMIC_MEMORY_EXTRACTOR_VERSION, MemoryExtractorKind } from '../memory/constants';
+import { companionMemoryNeedsReview } from '../../shared/companion/memoryStatus';
 import { EngramManager } from '../memory/engramManager';
 import { MemoryRepository } from '../memory/repository';
 import { ProjectMemoryService } from '../memory/projectMemoryService';
@@ -64,6 +71,107 @@ async function fixture() {
     },
   };
 }
+
+function taskCandidate(f: Awaited<ReturnType<typeof fixture>>) {
+  const owner = companionMemoryIdentity(f.a);
+  const id = f.repository.createPersonalCandidate({
+    projectId: owner.projectId,
+    projectRoot: path.join(f.root, 'companions', f.a),
+    scope: MemoryScope.Companion,
+    sessionId: 'owned-task',
+    sourceKind: MemorySourceKind.TaskVerifier,
+    title: 'Paper kite',
+    content: 'The paper kite uses a bamboo frame.',
+    kind: MemoryKind.Decision,
+    taskId: 'task-1',
+    runId: 'run-1',
+    metadata: {
+      extraction: {
+        extractorKind: MemoryExtractorKind.Atomic,
+        extractorVersion: ATOMIC_MEMORY_EXTRACTOR_VERSION,
+      },
+    },
+  });
+  return {
+    petId: f.a,
+    id,
+    title: 'Paper kite',
+    content: 'The paper kite uses a bamboo frame.',
+    kind: MemoryKind.Decision,
+    confirmed: true as const,
+  };
+}
+
+test('task candidates require exact reviewed text and remain private after idempotent confirmation', async () => {
+  const f = await fixture();
+  try {
+    const input = taskCandidate(f);
+    expect(companionMemoryNeedsReview(f.service.list(f.a)[0])).toBe(true);
+    expect(await f.service.context(f.a, 'paper kite')).toBe('');
+    await expect(f.service.confirm({ ...input, confirmed: false } as never)).rejects.toThrow();
+    await expect(f.service.confirm({ ...input, content: 'Different paper kite.' })).rejects.toThrow(
+      'changed',
+    );
+    await expect(f.service.confirm({ ...input, petId: f.b })).rejects.toThrow('Memory not found');
+    const confirm = vi.spyOn(f.adapter, 'confirmMemory');
+    const saved = await f.service.confirm(input);
+    expect(saved.memoryId).not.toBeNull();
+    expect(saved.status).toBe(MemoryLifecycleStatus.Active);
+    expect(companionMemoryNeedsReview(saved)).toBe(false);
+    expect(await f.service.context(f.a, 'paper kite')).toContain('bamboo');
+    expect(await f.service.context(f.b, 'paper kite')).toBe('');
+    expect(f.shared.listManagedMemories()).toEqual([]);
+    expect((await f.service.confirm(input)).memoryId).toBe(saved.memoryId);
+    expect(confirm).toHaveBeenCalledOnce();
+    await f.service.forget(f.a, input.id);
+    await expect(f.service.confirm(input)).rejects.toThrow('not available');
+    expect(await f.service.context(f.a, 'paper kite')).toBe('');
+  } finally {
+    vi.restoreAllMocks();
+    await f.cleanup();
+  }
+}, 60_000);
+
+test('offline approved candidates are pending sync, and retries never duplicate delivery or resurrect deletion', async () => {
+  const f = await fixture();
+  try {
+    const input = taskCandidate(f);
+    const confirm = vi.spyOn(f.adapter, 'confirmMemory').mockResolvedValueOnce(null);
+    const queued = await f.service.confirm(input);
+    expect(queued.memoryId).toBeNull();
+    expect(companionMemoryNeedsReview(queued)).toBe(false);
+    expect((await f.service.confirm(input)).id).toBe(queued.id);
+    expect(confirm).toHaveBeenCalledOnce();
+    await f.service.forget(f.a, queued.id);
+    await f.shared.retryPendingOutbox();
+    await expect(f.service.confirm(input)).rejects.toThrow('Memory not found');
+    expect(f.service.list(f.a)).toEqual([]);
+    expect(await f.service.context(f.a, 'paper kite')).toBe('');
+  } finally {
+    vi.restoreAllMocks();
+    await f.cleanup();
+  }
+}, 60_000);
+
+test('withdrawing an in-flight task confirmation prevents a successful review receipt', async () => {
+  const f = await fixture();
+  try {
+    const input = taskCandidate(f);
+    const confirm = f.adapter.confirmMemory.bind(f.adapter);
+    vi.spyOn(f.adapter, 'confirmMemory').mockImplementationOnce(async (...args) => {
+      const result = await confirm(...args);
+      await f.service.forget(f.a, input.id);
+      return result;
+    });
+    await expect(f.service.confirm(input)).rejects.toThrow('Memory not found');
+    await f.shared.retryPendingOutbox();
+    expect(f.service.list(f.a)).toEqual([]);
+    expect(await f.service.context(f.a, 'paper kite')).toBe('');
+  } finally {
+    vi.restoreAllMocks();
+    await f.cleanup();
+  }
+}, 60_000);
 
 test('real memory runtime isolates companions and shares only after existing personal confirmation', async () => {
   const f = await fixture();

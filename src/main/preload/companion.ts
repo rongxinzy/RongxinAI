@@ -6,6 +6,7 @@ import type { CompanionWindowApi } from '../../shared/companion/types';
 export const companionApi: CompanionWindowApi = {
   listMemories: petId => ipcRenderer.invoke(IpcChannel.ListMemories, petId),
   saveMemory: input => ipcRenderer.invoke(IpcChannel.SaveMemory, input),
+  confirmMemory: input => ipcRenderer.invoke(IpcChannel.ConfirmMemory, input),
   forgetMemory: (petId, id) => ipcRenderer.invoke(IpcChannel.ForgetMemory, petId, id),
   shareMemory: input => ipcRenderer.invoke(IpcChannel.ShareMemory, input),
   bootstrap: () => ipcRenderer.invoke(IpcChannel.Bootstrap),

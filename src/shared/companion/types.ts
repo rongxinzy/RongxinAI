@@ -1,7 +1,7 @@
 import type { DesktopPetBuiltinId } from '../desktopPet/catalog';
 import type { CompanionAttachment } from './attachments';
 import type { ManagedMemoryRecord } from '../memory/types';
-import type { CompanionMemorySave, CompanionMemoryShare } from './memory';
+import type { CompanionMemorySave, CompanionMemoryShare, CompanionMemoryConfirm } from './memory';
 import type {
   CompanionTaskRequest,
   CompanionTaskResult,
@@ -75,6 +75,7 @@ export interface CompanionWindowState {
 export interface CompanionWindowApi {
   listMemories(petId: string): Promise<ManagedMemoryRecord[]>;
   saveMemory(input: CompanionMemorySave): Promise<ManagedMemoryRecord>;
+  confirmMemory(input: CompanionMemoryConfirm): Promise<ManagedMemoryRecord>;
   forgetMemory(petId: string, id: string): Promise<boolean>;
   shareMemory(input: CompanionMemoryShare): Promise<{ id: string; available: boolean }>;
   bootstrap(): Promise<CompanionWindowState>;

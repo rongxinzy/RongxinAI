@@ -11,7 +11,10 @@ import type { CompanionWindowApi } from '../../shared/companion/types';
 /** Browser fixture only; private memory persistence is verified against the main-process service. */
 export function createCompanionMemoryPreview(
   active: () => string,
-): Pick<CompanionWindowApi, 'listMemories' | 'saveMemory' | 'forgetMemory' | 'shareMemory'> {
+): Pick<
+  CompanionWindowApi,
+  'listMemories' | 'saveMemory' | 'forgetMemory' | 'shareMemory' | 'confirmMemory'
+> {
   const records = new Map<string, Map<string, ManagedMemoryRecord>>();
   const owned = (petId: string) => {
     if (petId !== active()) throw new Error('Companion selection changed.');
@@ -25,6 +28,21 @@ export function createCompanionMemoryPreview(
   let sequence = 0;
   return {
     listMemories: async petId => [...owned(petId).values()],
+    confirmMemory: async input => {
+      const record = owned(input.petId).get(input.id);
+      if (
+        !input.confirmed ||
+        !record ||
+        record.title !== input.title ||
+        record.content !== input.content ||
+        record.kind !== input.kind
+      )
+        throw new Error('Memory changed after review.');
+      record.memoryId ??= ++sequence;
+      record.status = MemoryLifecycleStatus.Active;
+      record.deliveryStatus = MemoryDeliveryStatus.Completed;
+      return record;
+    },
     saveMemory: async input => {
       const list = owned(input.petId);
       const previous = list.get(input.requestId);

@@ -11,13 +11,15 @@ import {
   DialogTitle,
 } from '@shared/components/ui/dialog';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
-import { FieldDescription, FieldError, FieldTitle } from '@shared/components/ui/field';
+import { FieldDescription, FieldError } from '@shared/components/ui/field';
 import type { CompanionWindowApi } from '../../shared/companion/types';
 import type { ManagedMemoryRecord } from '../../shared/memory';
 import { i18nService } from '../services/i18n';
 import { CompanionMemoryEditor } from './CompanionMemoryEditor';
 import { CompanionMemoryRows } from './CompanionMemoryRows';
 import { useCompanionMemory } from './useCompanionMemory';
+import { CompanionMemoryReview } from './CompanionMemoryReview';
+import { MemoryKind } from '../../shared/memory';
 
 export function CompanionMemoryDialog({
   api,
@@ -34,19 +36,27 @@ export function CompanionMemoryDialog({
     null,
   );
   const [deleting, setDeleting] = useState<ManagedMemoryRecord | null>(null);
+  const [reviewing, setReviewing] = useState<ManagedMemoryRecord | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  // Hand focus to a stable node before removing a focused view's controls.
+  // Otherwise the popup's deferred restoration can steal focus from the new view.
+  const focusPanel = () => panel.current?.focus({ preventScroll: true });
   const memory = useCompanionMemory(api, petId, open);
   const t = (key: string) => i18nService.t(key);
   const title = editing
     ? t(editing.record ? 'companionMemoryEdit' : 'companionMemoryAdd')
-    : sharing
-      ? t('companionMemoryShare')
-      : t('companionMemoryOwner').replace('{name}', name);
+    : reviewing
+      ? t('companionMemoryReviewTitle')
+      : sharing
+        ? t('companionMemoryShare')
+        : t('companionMemoryOwner').replace('{name}', name);
   const close = () => {
     if (!memory.busy) {
       setOpen(false);
       setEditing(null);
       setSharing(null);
+      setReviewing(null);
     }
   };
   return (
@@ -71,6 +81,7 @@ export function CompanionMemoryDialog({
         }}
       >
         <DialogContent
+          ref={panel}
           className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] sm:max-w-lg"
           finalFocus={deleting ? false : trigger}
           showCloseButton={!memory.busy}
@@ -79,7 +90,13 @@ export function CompanionMemoryDialog({
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
-              {t(sharing ? 'companionMemoryShareDescription' : 'companionMemoryPrivate')}
+              {t(
+                sharing
+                  ? 'companionMemoryShareDescription'
+                  : reviewing
+                    ? 'companionMemoryReviewDescription'
+                    : 'companionMemoryPrivate',
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className="flex min-h-0 flex-col gap-4">
@@ -91,56 +108,74 @@ export function CompanionMemoryDialog({
               <CompanionMemoryEditor
                 record={editing.record}
                 busy={memory.busy}
-                onCancel={() => setEditing(null)}
+                onCancel={() => {
+                  focusPanel();
+                  setEditing(null);
+                }}
                 onSave={async input => {
                   const saved = await memory.run(async () => {
                     const record = await api!.saveMemory({ ...input, petId });
                     if (record.memoryId === null) memory.setNotice('companionMemoryPending');
                   });
-                  if (saved) setEditing(null);
+                  if (saved) {
+                    focusPanel();
+                    setEditing(null);
+                  }
                 }}
               />
-            ) : sharing ? (
-              <>
-                <div
-                  role="region"
-                  aria-label={t('companionMemoryContent')}
-                  tabIndex={0}
-                  className="theme-scroll-viewport flex min-h-0 min-w-0 flex-col gap-2 overflow-y-auto"
-                >
-                  <FieldTitle className="break-words">{sharing.record.title}</FieldTitle>
-                  <FieldDescription className="whitespace-pre-wrap break-words">
-                    {sharing.record.content}
-                  </FieldDescription>
-                </div>
-                <DialogFooter surface={DialogFooterSurface.Seamless} className="shrink-0">
-                  <Button variant="ghost" disabled={memory.busy} onClick={() => setSharing(null)}>
-                    {t('cancel')}
-                  </Button>
-                  <Button
-                    disabled={memory.busy}
-                    onClick={() =>
-                      void memory
-                        .run(async () => {
-                          const result = await api!.shareMemory({
-                            petId,
-                            id: sharing.record.id,
-                            requestId: sharing.requestId,
-                            confirmed: true,
-                          });
-                          memory.setNotice(
-                            result.available ? 'companionMemoryShared' : 'companionMemoryPending',
-                          );
-                        })
-                        .then(saved => {
-                          if (saved) setSharing(null);
-                        })
-                    }
-                  >
-                    {t('companionMemoryShareConfirm')}
-                  </Button>
-                </DialogFooter>
-              </>
+            ) : sharing || reviewing ? (
+              <CompanionMemoryReview
+                record={reviewing ?? sharing!.record}
+                busy={memory.busy}
+                confirmLabel={t(
+                  reviewing ? 'companionMemoryRemember' : 'companionMemoryShareConfirm',
+                )}
+                onCancel={() => {
+                  focusPanel();
+                  setSharing(null);
+                  setReviewing(null);
+                }}
+                onConfirm={() =>
+                  void memory
+                    .run(async () => {
+                      if (reviewing) {
+                        const saved = await api!.confirmMemory({
+                          petId,
+                          id: reviewing.id,
+                          title: reviewing.title,
+                          content: reviewing.content,
+                          kind:
+                            reviewing.kind === MemoryKind.Preference
+                              ? MemoryKind.Preference
+                              : MemoryKind.Decision,
+                          confirmed: true,
+                        });
+                        memory.setNotice(
+                          saved.memoryId === null
+                            ? 'companionMemoryPending'
+                            : 'companionMemoryRemembered',
+                        );
+                      } else if (sharing) {
+                        const result = await api!.shareMemory({
+                          petId,
+                          id: sharing.record.id,
+                          requestId: sharing.requestId,
+                          confirmed: true,
+                        });
+                        memory.setNotice(
+                          result.available ? 'companionMemoryShared' : 'companionMemoryPending',
+                        );
+                      }
+                    })
+                    .then(saved => {
+                      if (saved) {
+                        focusPanel();
+                        setSharing(null);
+                        setReviewing(null);
+                      }
+                    })
+                }
+              />
             ) : (
               <>
                 <div className="min-h-0 overflow-y-auto">
@@ -150,11 +185,18 @@ export function CompanionMemoryDialog({
                     <CompanionMemoryRows
                       records={memory.records}
                       busy={memory.busy}
+                      review={record => {
+                        focusPanel();
+                        memory.setNotice(null);
+                        setReviewing(record);
+                      }}
                       edit={record => {
+                        focusPanel();
                         memory.setNotice(null);
                         setEditing({ record });
                       }}
                       share={record => {
+                        focusPanel();
                         memory.setNotice(null);
                         setSharing({ record, requestId: crypto.randomUUID() });
                       }}
@@ -175,6 +217,7 @@ export function CompanionMemoryDialog({
                   <Button
                     disabled={memory.busy}
                     onClick={() => {
+                      focusPanel();
                       memory.setNotice(null);
                       setEditing({ record: null });
                     }}

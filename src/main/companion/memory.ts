@@ -17,6 +17,8 @@ import type { ProjectMemoryService } from '../memory/projectMemoryService';
 import type { MemoryRepository } from '../memory/repository';
 import type { ZhiYuanEngramAdapter } from '../memory/zhiyuanEngramAdapter';
 import type { CompanionMemoryRetractions } from './memoryRetractions';
+import { companionMemoryConfirm, type CompanionMemoryConfirm } from '../../shared/companion/memory';
+import { companionMemoryNeedsReview } from '../../shared/companion/memoryStatus';
 
 const requestSchema = z.string().trim().min(1).max(128);
 const MAX_CONTEXT_QUERY = 4000;
@@ -101,6 +103,28 @@ export class CompanionMemoryService {
     this.owned(petId, id);
     this.retractions.add(id);
     return this.shared.forgetMemory(id, false);
+  }
+
+  async confirm(request: CompanionMemoryConfirm): Promise<ManagedMemoryRecord> {
+    const input = companionMemoryConfirm.parse(request);
+    const memory = this.owned(input.petId, input.id);
+    if (
+      memory.title !== input.title ||
+      memory.content !== input.content ||
+      memory.kind !== input.kind
+    )
+      throw new Error('Memory changed after it was reviewed.');
+    if (memory.status === MemoryLifecycleStatus.Active && memory.memoryId !== null) return memory;
+    if (memory.sourceKind !== MemorySourceKind.TaskVerifier)
+      throw new Error('Memory is not available for review.');
+    const pending = this.repository.findPendingByLinkId(input.id, MemoryOutboxOperation.Confirm);
+    if (!pending) {
+      if (!companionMemoryNeedsReview(memory))
+        throw new Error('Memory is not available for review.');
+      await this.shared.confirmMemoryCandidate(input.id);
+    }
+    // Re-check after Engram acknowledges: a user may have withdrawn the candidate meanwhile.
+    return this.owned(input.petId, input.id);
   }
 
   proposePersonal(petId: string, id: string, requestId: string): string {

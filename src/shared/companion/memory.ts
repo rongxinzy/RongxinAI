@@ -22,3 +22,15 @@ export const companionMemoryShare = z
   .strict();
 export type CompanionMemorySave = z.infer<typeof companionMemorySave>;
 export type CompanionMemoryShare = z.infer<typeof companionMemoryShare>;
+
+export const companionMemoryConfirm = z
+  .object({
+    petId: z.uuid(),
+    id: z.string().min(1).max(128),
+    title: z.string().min(1).max(120),
+    content: z.string().min(1).max(3000),
+    kind: z.enum([MemoryKind.Preference, MemoryKind.Decision]),
+    confirmed: z.literal(true),
+  })
+  .strict();
+export type CompanionMemoryConfirm = z.infer<typeof companionMemoryConfirm>;
