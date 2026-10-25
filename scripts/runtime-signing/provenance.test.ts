@@ -25,7 +25,7 @@ const build = {
   sourceRepository: source.repo,
   sourceRunId: '123',
   sourceSha: sha,
-  sourceTag: 'v1.20.0-zhiyuan.4',
+  sourceTag: 'v3.6.0-zhiyuan.1',
 };
 const run = {
   id: 123,
@@ -71,6 +71,17 @@ test('validates trusted completed runs and rejects every mismatched boundary', (
     expect(() =>
       validateRun({ ...run, ...override }, source.repo, source.workflow, '123', 'push'),
     ).toThrow();
+});
+
+test('memory signing trusts the maintained upstream fork and rejects the previous source', async () => {
+  expect(source.repo).toBe('rongxinzy/engram');
+  const previousSource = { full_name: 'z189yis/engram-cjk' };
+  await expect(
+    readBuildRun('engram', '123', async (repo: string) => {
+      expect(repo).toBe(source.repo);
+      return { ...run, repository: previousSource, head_repository: previousSource };
+    }),
+  ).rejects.toThrow('trusted workflow execution');
 });
 
 test('rejects malformed IDs, missing signer configuration and non-main ancestry', () => {

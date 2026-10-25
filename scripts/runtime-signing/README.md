@@ -16,17 +16,17 @@ Configure the repository secret `RUNTIME_ARTIFACT_READ_TOKEN` in each
 participating repository (the central prepare job has no release environment):
 
 - ZhiYuan Agent needs Actions/read and Contents/read for `rongxinzy/pi-connect`
-  and `z189yis/engram-cjk`.
+  and `rongxinzy/engram`.
 - Each runtime needs Actions/read and Contents/read for ZhiYuan Agent, plus
   Contents/read for its own source provenance.
 - No cross-repository write permission is required. The runtime's own
   `GITHUB_TOKEN` publishes its release.
 
-Use appropriately scoped GitHub App tokens or personal access tokens. A
-fine-grained PAT is limited to one resource owner; these repositories span
-two owners, so one multi-owner fine-grained PAT is not sufficient. Provision
-an appropriate credential and ensure it can read every repository required
-by that workflow. Do not grant signing-key access with this token.
+Use appropriately scoped GitHub App tokens or personal access tokens. These
+repositories share the `rongxinzy` resource owner, so a fine-grained PAT can be
+limited to the listed repositories and read permissions. Ensure the existing
+credential can read the new memory-runtime repository before dispatching.
+Do not grant signing-key access with this token.
 
 No public `RUNTIME_SIGNER_THUMBPRINT` variable is required. The central signing
 job still uses its existing private `CERTUM_CERT_THUMBPRINT` secret to select
@@ -53,7 +53,7 @@ signing environment; confirm its protection rules in repository settings.
 
 This is a three-stage manual protected sequence, not automatic cross-repo
 dispatch. Signed files travel through Actions artifacts; final release assets
-remain in pi-connect and engram-cjk, not ZhiYuan Agent releases.
+remain in pi-connect and rongxinzy/engram, not ZhiYuan Agent releases.
 
 Source and signed artifacts expire after 14 days. If expired, rebuild the
 same unchanged unpublished tag, sign the new successful run, and publish

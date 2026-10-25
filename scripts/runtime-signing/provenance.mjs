@@ -15,7 +15,7 @@ export const RuntimeSources = Object.freeze({
     files: ['cc-connect-sidecar-windows-amd64.exe'],
   },
   engram: {
-    repo: 'z189yis/engram-cjk',
+    repo: 'rongxinzy/engram',
     workflow: '.github/workflows/fork-release.yml',
     artifact: 'unsigned-engram-binaries',
     tag: /^v\d+\.\d+\.\d+-zhiyuan\.\d+$/,
