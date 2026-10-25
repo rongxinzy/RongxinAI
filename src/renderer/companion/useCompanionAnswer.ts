@@ -6,12 +6,14 @@ export function useCompanionAnswer({
   api,
   pending,
   visible,
+  waitingForModel = false,
   reload,
   onError,
 }: {
   api?: CompanionWindowApi;
   pending: CompanionReceipt | null | undefined;
   visible: boolean;
+  waitingForModel?: boolean;
   reload: () => Promise<void>;
   onError: (key: string) => void;
 }) {
@@ -19,7 +21,8 @@ export function useCompanionAnswer({
   const requestId = pending?.requestId;
   const submissionId = pending?.submissionId;
   useEffect(() => {
-    if (!petId || !requestId || submissionId === undefined || !visible || !api) return;
+    if (!petId || !requestId || submissionId === undefined || !visible || waitingForModel || !api)
+      return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     const check = async () => {
@@ -42,5 +45,5 @@ export function useCompanionAnswer({
       clearTimeout(timer);
     };
     // Receipt fields, rather than bootstrap object identity, define a polling lifetime.
-  }, [api, petId, requestId, submissionId, visible, reload, onError]);
+  }, [api, petId, requestId, submissionId, visible, waitingForModel, reload, onError]);
 }

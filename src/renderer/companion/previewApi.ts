@@ -203,6 +203,10 @@ export function createCompanionPreviewApi(
       if (sessionId) document.documentElement.dataset.companionTask = sessionId;
       for (const listener of workbenchListeners) listener();
     },
+    onFocus: listener => {
+      window.addEventListener('focus', listener);
+      return () => window.removeEventListener('focus', listener);
+    },
     onContext: () => () => {},
     onVisibility: () => () => {},
     onTasks: () => () => {},

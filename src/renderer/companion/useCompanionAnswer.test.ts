@@ -78,3 +78,45 @@ test('terminal feedback comes from the refreshed native snapshot, not a late tra
     hook.unmount();
   }
 });
+
+test('waiting for a model suspends receipt polling and recovery starts the same receipt once', async () => {
+  vi.useFakeTimers();
+  const answer = vi.fn(async () => ({
+    ...receipt,
+    state: CompanionRequestState.Accepted,
+    text: '',
+  }));
+  const api = { answer } as unknown as CompanionWindowApi;
+  const reload = vi.fn(async () => {}),
+    onError = vi.fn();
+  const view = renderHook(
+    ({ waitingForModel }) =>
+      useCompanionAnswer({
+        api,
+        pending: receipt,
+        visible: true,
+        waitingForModel,
+        reload,
+        onError,
+      }),
+    { initialProps: { waitingForModel: true } },
+  );
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(answer).not.toHaveBeenCalled();
+  expect(reload).not.toHaveBeenCalled();
+  view.rerender({ waitingForModel: false });
+  await act(async () => {});
+  expect(answer).toHaveBeenCalledExactlyOnceWith(receipt);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(500);
+  });
+  expect(answer).toHaveBeenCalledTimes(2);
+  view.rerender({ waitingForModel: true });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(5000);
+  });
+  expect(answer).toHaveBeenCalledTimes(2);
+  expect(onError).not.toHaveBeenCalled();
+});

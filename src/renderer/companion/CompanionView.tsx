@@ -24,6 +24,7 @@ import type {
 import {
   COMPANION_NAME_KEYS,
   CompanionComposerMode,
+  CompanionCapability,
   CompanionUnavailableReason,
 } from '../../shared/companion/constants';
 import { companionSubmissionError } from '../services/companionSubmissionError';
@@ -77,6 +78,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
   const activeId = useRef<string | null>(null);
   const draftRef = useRef(draft);
   const visibleRef = useRef(false);
+  const modelRecovery = useRef(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const t = (key: string) => i18nService.t(key);
   const taskMode = draft.mode === CompanionComposerMode.Task;
@@ -154,6 +156,10 @@ export function CompanionView({ api = window.companion }: Props = {}) {
         void api?.hide();
       }
     };
+    const focus = () => {
+      if (visibleRef.current && modelRecovery.current) void refresh.request();
+    };
+    const unsubscribeFocus = api?.onFocus(focus);
     document.addEventListener('keydown', keydown);
     return () => {
       refresh.dispose();
@@ -163,15 +169,26 @@ export function CompanionView({ api = window.companion }: Props = {}) {
       unsubscribeChanged?.();
       unsubscribeVisibility?.();
       unsubscribeTasks?.();
+      unsubscribeFocus?.();
       document.removeEventListener('keydown', keydown);
     };
   }, [api, load, cancelPendingLoad, updateTasks]);
 
   const pending = state?.conversation.pending;
+  const waitingForModel = Boolean(
+    pending && state?.availability.capability === CompanionCapability.Local,
+  );
   useEffect(() => {
     if (state?.activePetId && visible) textarea.current?.focus();
   }, [state?.activePetId, visible]);
-  useCompanionAnswer({ api, pending, visible, reload: load, onError: setError });
+  useCompanionAnswer({
+    api,
+    pending,
+    visible,
+    waitingForModel,
+    reload: load,
+    onError: setError,
+  });
 
   const updateDraft = (text: string, patch: Partial<typeof draft> = {}) => {
     const next = { ...draftRef.current, ...patch, text, requestId: crypto.randomUUID() };
@@ -192,6 +209,11 @@ export function CompanionView({ api = window.companion }: Props = {}) {
     isStreaming: false,
     handleIncomingFiles: addFiles,
   });
+
+  useEffect(() => {
+    modelRecovery.current =
+      waitingForModel && !choosingFiles && !choosingWorkspace && !sending && !error;
+  }, [waitingForModel, choosingFiles, choosingWorkspace, sending, error]);
 
   const submit = async () => {
     if (choosingWorkspace || choosingFiles) return;
@@ -432,6 +454,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
           </div>
           <CompanionFeedback
             conversation={state?.conversation}
+            availability={state?.availability}
             taskMode={taskMode}
             error={error}
             reload={load}

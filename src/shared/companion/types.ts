@@ -105,6 +105,7 @@ export interface CompanionWindowApi {
   stageFile(petId: string, file: CompanionIncomingFile): Promise<CompanionAttachment>;
   hide(): Promise<void>;
   openWorkbench(sessionId?: string): Promise<void>;
+  onFocus(listener: () => void): () => void;
   onContext(listener: (context: CompanionWindowContext) => void): () => void;
   onVisibility(listener: (visible: boolean) => void): () => void;
   onTasks(listener: (snapshot: CompanionTaskSnapshot) => void): () => void;

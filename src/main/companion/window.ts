@@ -420,6 +420,10 @@ export function prepareCompanionWindow(): void {
       showReadyWindow();
     }
   });
+  created.on('focus', () => {
+    if (window === created && windowVisible && !created.webContents.isDestroyed())
+      created.webContents.send(IpcChannel.Focus);
+  });
   created.on('show', () => window === created && syncCompanionVisibility(true));
   created.on('hide', () => window === created && syncCompanionVisibility(false));
   created.on('close', event => {

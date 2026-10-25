@@ -55,6 +55,7 @@ export const appSystemApi = {
     shareMemory: companionApi.shareMemory,
     hide: companionApi.hide,
     openWorkbench: companionApi.openWorkbench,
+    onFocus: companionApi.onFocus,
     onContext: companionApi.onContext,
     onVisibility: companionApi.onVisibility,
     onTasks: companionApi.onTasks,

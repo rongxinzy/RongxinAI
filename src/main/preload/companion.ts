@@ -23,6 +23,11 @@ export const companionApi: CompanionWindowApi = {
   stageFile: (petId, file) => ipcRenderer.invoke(IpcChannel.StageFile, petId, file),
   hide: () => ipcRenderer.invoke(IpcChannel.Hide),
   openWorkbench: sessionId => ipcRenderer.invoke(IpcChannel.OpenWorkbench, sessionId),
+  onFocus: listener => {
+    const handle = () => listener();
+    ipcRenderer.on(IpcChannel.Focus, handle);
+    return () => ipcRenderer.removeListener(IpcChannel.Focus, handle);
+  },
   onContext: listener => {
     const handle = (_event: Electron.IpcRendererEvent, context: Parameters<typeof listener>[0]) =>
       listener(context);

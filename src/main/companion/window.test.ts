@@ -18,6 +18,7 @@ class FakeWindow extends EventEmitter {
   destroyed = false;
   webContents = {
     mainFrame: {},
+    isDestroyed: () => false,
     send: vi.fn(),
     setWindowOpenHandler: vi.fn(),
     on: vi.fn(),
@@ -209,6 +210,8 @@ test('preparing stays hidden without a runtime resume, and opening reuses that r
   expect(mocks.windows).toHaveLength(2);
   expect(f.window.show).not.toHaveBeenCalled();
   expect(f.window.focus).not.toHaveBeenCalled();
+  f.window.emit('focus');
+  expect(f.window.webContents.send).not.toHaveBeenCalledWith(IpcChannel.Focus);
   expect(await f.invoke(IpcChannel.GetVisibility)).toBe(false);
   expect(f.runtime.resume).not.toHaveBeenCalled();
   expect(f.runtime.history).not.toHaveBeenCalled();
@@ -216,6 +219,8 @@ test('preparing stays hidden without a runtime resume, and opening reuses that r
   expect(f.window.show).toHaveBeenCalledOnce();
   expect(f.window.focus).toHaveBeenCalledOnce();
   expect(await f.invoke(IpcChannel.GetVisibility)).toBe(true);
+  f.window.emit('focus');
+  expect(f.window.webContents.send).toHaveBeenCalledWith(IpcChannel.Focus);
   await expect(f.invoke(IpcChannel.GetVisibility, true)).rejects.toThrow('invalid arguments');
   await expect(
     mocks.handlers.get(IpcChannel.GetVisibility)!({ sender: {}, senderFrame: {} }),

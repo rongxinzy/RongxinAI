@@ -55,6 +55,16 @@ describe('pushChannel helpers', () => {
 });
 
 describe('split api fragments', () => {
+  test('companion focus is a payload-free subscription with full cleanup', () => {
+    const listener = vi.fn();
+    const off = appSystemApi.companion.onFocus(listener);
+    ipcRenderer.emit(CompanionIpc.Focus, { sender: {} });
+    expect(listener).toHaveBeenCalledExactlyOnceWith();
+    off();
+    ipcRenderer.emit(CompanionIpc.Focus, { sender: {} });
+    expect(listener).toHaveBeenCalledOnce();
+    expect(ipcRenderer.listenerCount(CompanionIpc.Focus)).toBe(0);
+  });
   test('companion visibility reads only the dedicated window state channel', async () => {
     const invoke = vi.spyOn(ipcRenderer, 'invoke').mockResolvedValueOnce(false);
     await expect(appSystemApi.companion.visibility()).resolves.toBe(false);

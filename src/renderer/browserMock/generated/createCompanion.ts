@@ -239,6 +239,9 @@ export function createCompanion(runtime: BrowserMockRuntime): Window['electron']
       void _p0;
       runtime.warnOnce('companion.openWorkbench');
     },
+    onFocus: _p0 => {
+      return runtime.subscribe('companion.onFocus', _p0);
+    },
     onContext: _p0 => {
       return runtime.subscribe('companion.onContext', _p0);
     },

@@ -2,6 +2,7 @@ import { Square } from 'lucide-react';
 import { Button } from '@shared/components/ui/button';
 import { Conversation, ConversationContent } from '@shared/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@shared/components/ai-elements/message';
+import { CompanionCapability } from '../../shared/companion/constants';
 import { WorkbenchRunStatus } from '../../shared/workbenchTask';
 import type { CompanionWindowState } from '../../shared/companion/types';
 import { i18nService } from '../services/i18n';
@@ -103,7 +104,9 @@ export function CompanionConversation({
             <p className="theme-home-caption">{t('companionEmpty')}</p>
           </div>
         )}
-        {state?.conversation.pending && !taskMode ? (
+        {state?.conversation.pending &&
+        state.availability.capability === CompanionCapability.Chat &&
+        !taskMode ? (
           <p role="status" className="theme-home-caption">
             {t('companionWorking')}
           </p>
