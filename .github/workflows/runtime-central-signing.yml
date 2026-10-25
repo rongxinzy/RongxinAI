@@ -7,7 +7,7 @@ on:
         type: string
         required: false
       engram_run_id:
-        description: Successful tagged engram-cjk build run ID (optional)
+        description: Successful tagged rongxinzy/engram build run ID (optional)
         type: string
         required: false
 permissions:
