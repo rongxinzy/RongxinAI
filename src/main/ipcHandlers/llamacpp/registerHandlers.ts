@@ -31,6 +31,9 @@ import {
 import { LlamaCppModelResidencyMode } from '../../../shared/llamacpp';
 import { t } from '../../i18n';
 import { LlamaCppManager } from '../../libs/llamacppManager';
+import { inferenceRuntime } from '../../appBootstrap/inferenceRuntimeState';
+import { isStrataFeatureEnabled } from '../../libs/strata/strataEditionPolicy';
+import { releaseGpuForLlamaCpp } from '../../libs/strata/gpuExclusiveInferenceCoordinator';
 import { llamacppContract } from '../../../shared/ipc/llamacppContract';
 import { handleIpcContract, handleIpcContractSubset } from '../../ipc/handleIpcContract';
 import { createLlamaCppModelLaunchLogger } from '../../libs/llamacppModelLaunchLog';
@@ -630,6 +633,9 @@ export function registerLlamaCppIpcHandlers(
         'Service transition is active',
       );
       throw new Error(t('llamacppLoadModelServiceUnavailable'));
+    }
+    if (isStrataFeatureEnabled()) {
+      await releaseGpuForLlamaCpp(inferenceRuntime.strataManager);
     }
     return await loadModelLock.runExclusive(
       modelName,

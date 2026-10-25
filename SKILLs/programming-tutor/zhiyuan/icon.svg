@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="programmingtutor-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8EEFF"/>
+      <stop offset="100%" stop-color="#D4DEFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#programmingtutor-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <path d="M16 18 L12 24 L16 30 M32 18 L36 24 L32 30" stroke="#5D4E63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

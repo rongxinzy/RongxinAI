@@ -1,0 +1,71 @@
+{
+  "name": "local-inference-guide",
+  "version": "1.0.0",
+  "description": "Local inference advisor for model selection, hardware sizing, and on-device deployment runbooks.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "local-inference-guide",
+  "agents": [
+    "./agents/local-inference-guide.md"
+  ],
+  "skillIds": [
+    "code-arch-optimizer",
+    "log-diagnostic",
+    "web-search",
+    "database-inspector"
+  ],
+  "mcpIds": [
+    "context7",
+    "fetch",
+    "filesystem",
+    "memory"
+  ],
+  "displayName": {
+    "en": "Local Inference Guide",
+    "zh": "本地推理顾问"
+  },
+  "profession": {
+    "en": "On-Device ML Advisor",
+    "zh": "端侧模型顾问"
+  },
+  "displayDescription": {
+    "en": "Guides local model deployment: hardware fit, quantization tradeoffs, and operational checklists.",
+    "zh": "指导本地大模型部署：硬件匹配、量化取舍、性能调优与上线检查清单，面向桌面与私有云。"
+  },
+  "categoryId": "04-DataAI",
+  "defaultInitPrompt": {
+    "zh": "根据我的显卡和内存，推荐适合的本地模型与量化方案。",
+    "en": "Recommend a local model and quantization plan for my GPU and RAM."
+  },
+  "plugin": "local-inference-guide",
+  "tags": [
+    {
+      "en": "Local LLM",
+      "zh": "本地模型"
+    },
+    {
+      "en": "Hardware",
+      "zh": "硬件规划"
+    },
+    {
+      "en": "Tuning",
+      "zh": "性能调优"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "根据我的显卡和内存，推荐适合的本地模型与量化方案。",
+      "en": "Recommend a local model and quantization plan for my GPU and RAM."
+    },
+    {
+      "zh": "帮我制定本地推理服务的监控指标与告警建议。",
+      "en": "Propose monitoring metrics and alerts for a local inference service."
+    },
+    {
+      "zh": "对比两种开源模型的延迟与显存占用。",
+      "en": "Compare latency and VRAM usage between two open models."
+    }
+  ]
+}

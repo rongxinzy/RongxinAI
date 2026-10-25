@@ -135,19 +135,22 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
     [records],
   );
 
-  const runAction = async (id: string, action: () => Promise<unknown>, successKey: string) => {
-    setBusyId(id);
-    try {
-      await action();
-      showAppSuccessToast(i18nService.t(successKey));
-      await load();
-    } catch (error) {
-      showAppErrorToast(i18nService.t('managedMemoryActionFailed'));
-      console.error('[ManagedMemory] Memory action failed:', error);
-    } finally {
-      setBusyId(null);
-    }
-  };
+  const runAction = useCallback(
+    async (id: string, action: () => Promise<unknown>, successKey: string) => {
+      setBusyId(id);
+      try {
+        await action();
+        showAppSuccessToast(i18nService.t(successKey));
+        await load();
+      } catch (error) {
+        showAppErrorToast(i18nService.t('managedMemoryActionFailed'));
+        console.error('[ManagedMemory] Memory action failed:', error);
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [load],
+  );
 
   const handleRetry = async () => {
     setBusyId(OUTBOX_BUSY_ID);
@@ -173,9 +176,9 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
     );
   };
 
-  const openCreateEditor = () => setEditor({ record: null, draft: emptyDraft() });
+  const openCreateEditor = useCallback(() => setEditor({ record: null, draft: emptyDraft() }), []);
 
-  const openEditEditor = (record: ManagedMemoryRecord) => {
+  const openEditEditor = useCallback((record: ManagedMemoryRecord) => {
     if (record.scope !== MemoryScope.Project && record.scope !== MemoryScope.Personal) return;
     setEditor({
       record,
@@ -187,7 +190,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
         sensitivity: record.sensitivity,
       },
     });
-  };
+  }, []);
 
   const updateDraft = (patch: Partial<MemoryDraft>) => {
     setEditor(current =>
@@ -233,6 +236,32 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
     }
   };
 
+  const handleConfirm = useCallback(
+    (record: ManagedMemoryRecord) => {
+      void runAction(
+        record.id,
+        () => memoryService.confirmCandidate(record.id),
+        'managedMemoryConfirmed',
+      );
+    },
+    [runAction],
+  );
+  const handleArchive = useCallback(
+    (record: ManagedMemoryRecord) => {
+      void runAction(record.id, () => memoryService.archive(record.id), 'managedMemoryArchived');
+    },
+    [runAction],
+  );
+  const handleRestore = useCallback(
+    (record: ManagedMemoryRecord) => {
+      void runAction(record.id, () => memoryService.restore(record.id), 'managedMemoryRestored');
+    },
+    [runAction],
+  );
+  const handleRequestForget = useCallback((record: ManagedMemoryRecord) => {
+    setForgetTarget({ record });
+  }, []);
+
   const memoryRecordListProps = {
     workspaceName: selectedWorkspace?.name ?? selectedWorkspacePath,
     records,
@@ -241,17 +270,10 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
     busy: busyId !== null,
     onCreate: openCreateEditor,
     onEdit: openEditEditor,
-    onConfirm: (record: ManagedMemoryRecord) =>
-      void runAction(
-        record.id,
-        () => memoryService.confirmCandidate(record.id),
-        'managedMemoryConfirmed',
-      ),
-    onArchive: (record: ManagedMemoryRecord) =>
-      void runAction(record.id, () => memoryService.archive(record.id), 'managedMemoryArchived'),
-    onRestore: (record: ManagedMemoryRecord) =>
-      void runAction(record.id, () => memoryService.restore(record.id), 'managedMemoryRestored'),
-    onForget: (record: ManagedMemoryRecord) => setForgetTarget({ record }),
+    onConfirm: handleConfirm,
+    onArchive: handleArchive,
+    onRestore: handleRestore,
+    onForget: handleRequestForget,
   };
 
   return (

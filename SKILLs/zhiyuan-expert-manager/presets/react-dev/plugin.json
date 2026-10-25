@@ -69,5 +69,14 @@
     "web-security-audit",
     "log-diagnostic",
     "smart-commit-gen"
+  ],
+  "mcpIds": [
+    "context7",
+    "github",
+    "playwright",
+    "chrome-devtools-mcp",
+    "filesystem",
+    "figma",
+    "figwright"
   ]
 }

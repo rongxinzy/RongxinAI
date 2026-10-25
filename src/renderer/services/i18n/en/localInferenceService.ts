@@ -391,4 +391,11 @@ export const enLocalInferenceService: Record<string, string> = {
   localInferenceLaunchBooleanDisabled: 'Disabled',
   localInferenceLaunchLoadOnly: 'Preload',
   localInferenceLaunchLoadAndDebug: 'Start Debugging',
+  strataCatalogTitle: 'Strata models (Windows CUDA)',
+  strataCatalogSubtitle:
+    'Large MoE families that require the bundled Strata engine. GPU is exclusive with llama.cpp.',
+  strataCatalogHardwareGate: 'Strata docs: ≥{ram} GB RAM, ≥{vram} GB VRAM, ≥{disk} GB disk',
+  strataCatalogStart: 'Start Strata',
+  strataCatalogStop: 'Stop Strata',
+  strataStartRequested: 'Strata start requested. Large models may take several minutes.',
 };

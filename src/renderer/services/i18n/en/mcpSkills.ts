@@ -292,7 +292,8 @@ export const enMcpSkills: Record<string, string> = {
   mcpCategoryDataApi: 'Data & API',
   mcpDesc_tavily: 'Real-time web search, intelligent data extraction and web crawling',
   mcpDesc_github: 'GitHub platform integration: repos, issues, PRs, Actions management',
-  mcpDesc_gitlab: 'GitLab API integration: project management, merge requests, pipelines',
+  mcpDesc_gitlab:
+    'Official GitLab MCP (OAuth): projects, merge requests, pipelines, and work items',
   mcpDesc_context7: 'Up-to-date library documentation and code examples for AI coding',
   mcpDesc_google_drive: 'Google Drive file access and search with auto-export for Workspace files',
   mcpDesc_gmail: 'Gmail management: read, send, search emails with auto authentication',

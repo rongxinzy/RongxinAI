@@ -47,8 +47,14 @@ export const ToolCard: React.FC<{
         ? ToolState.OutputError
         : ToolState.OutputAvailable
       : ToolState.InputAvailable;
-  const rawResult = toolResult ? getToolResultDisplay(toolResult) : '';
-  const result = mapDisplayText ? mapDisplayText(rawResult) : rawResult;
+  const rawResult = useMemo(
+    () => (toolResult ? getToolResultDisplay(toolResult) : ''),
+    [toolResult],
+  );
+  const result = useMemo(
+    () => (mapDisplayText ? mapDisplayText(rawResult) : rawResult),
+    [rawResult, mapDisplayText],
+  );
   const [open, setOpen] = usePersistentToggle(`tool-${toolUse.id}`, false);
   const [expanded, setExpanded] = usePersistentToggle(`toolresult-${toolUse.id}`, false);
   const resultCollapse = useMemo(() => collapseToolText(result), [result]);
@@ -73,8 +79,15 @@ export const ToolCard: React.FC<{
       : inputCollapse.collapsible && !showFull
         ? inputCollapse.preview
         : serializedInput;
-  const rawSummary = getToolInputSummary(name, input);
-  const summary = rawSummary && mapDisplayText ? mapDisplayText(rawSummary) : rawSummary;
+  const language = i18nService.getLanguage();
+  const rawSummary = useMemo(() => {
+    void language;
+    return getToolInputSummary(name, input);
+  }, [name, input, language]);
+  const summary = useMemo(
+    () => (rawSummary && mapDisplayText ? mapDisplayText(rawSummary) : rawSummary),
+    [rawSummary, mapDisplayText],
+  );
 
   return (
     <Tool

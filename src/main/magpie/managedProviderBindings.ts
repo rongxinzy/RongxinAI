@@ -1,8 +1,10 @@
 import type { OllamaProviderSnapshot } from './ollamaProviderBinding';
+import type { StrataProviderSnapshot } from './strataProviderBinding';
 import type { MagpieHostProvider } from './hostProviders';
 import type { ZhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
 import type { LlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
 import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
+import { STRATA_MAGPIE_PROVIDER_ID } from '../../shared/strata/constants';
 const OLLAMA_MAGPIE_PROVIDER_ID = 'zhiyuan-host-ollama';
 export interface LocalGpuSnapshot {
   baseUrl: string | null;
@@ -12,10 +14,14 @@ export interface LocalGpuSnapshot {
 export class ManagedMagpieProviderBindings {
   private gpu: MagpieHostProvider | null = null;
   private ollama: MagpieHostProvider | null = null;
+  private strata: MagpieHostProvider | null = null;
   private refreshOllama?: () => Promise<OllamaProviderSnapshot>;
+  private refreshStrata?: () => Promise<StrataProviderSnapshot>;
   private gpuRevision = 0;
   private ollamaRevision = 0;
+  private strataRevision = 0;
   private refreshGpu?: () => Promise<LocalGpuSnapshot>;
+  private expectedStrataPort: number | null = null;
   constructor(
     private readonly enterprise: ZhiyuanManagedProviderBridge,
     private readonly sink: {
@@ -71,6 +77,39 @@ export class ManagedMagpieProviderBindings {
       models: snapshot.models,
     };
   }
+  setStrataReader(reader: () => Promise<StrataProviderSnapshot>): void {
+    this.refreshStrata = reader;
+  }
+  setExpectedStrataPort(port: number): void {
+    this.expectedStrataPort = port;
+  }
+  setStrataSnapshot(snapshot: StrataProviderSnapshot): void {
+    this.strataRevision++;
+    this.strata = null;
+    if (!snapshot.baseUrl || snapshot.models.length === 0) return;
+    const url = new URL(snapshot.baseUrl);
+    if (
+      url.protocol !== 'http:' ||
+      !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ||
+      !url.port ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash
+    ) {
+      throw new Error('Strata host endpoint must be loopback');
+    }
+    if (this.expectedStrataPort !== null && url.port !== String(this.expectedStrataPort)) {
+      throw new Error('Strata host endpoint must match the configured serve port');
+    }
+    this.strata = {
+      id: STRATA_MAGPIE_PROVIDER_ID,
+      name: 'Strata',
+      api: 'openai-completions',
+      baseUrl: snapshot.baseUrl,
+      models: snapshot.models,
+    };
+  }
   async beforeCatalog(): Promise<void> {
     if (this.refreshGpu) {
       const revision = this.gpuRevision;
@@ -90,6 +129,15 @@ export class ManagedMagpieProviderBindings {
         if (revision === this.ollamaRevision) this.ollama = null;
       }
     }
+    if (this.refreshStrata) {
+      const revision = this.strataRevision;
+      try {
+        const snapshot = await this.refreshStrata();
+        if (revision === this.strataRevision) this.setStrataSnapshot(snapshot);
+      } catch {
+        if (revision === this.strataRevision) this.strata = null;
+      }
+    }
     await this.synchronize();
   }
   async synchronize(): Promise<void> {
@@ -97,6 +145,7 @@ export class ManagedMagpieProviderBindings {
       ...this.enterprise.hostProviders(),
       ...(this.gpu ? [this.gpu] : []),
       ...(this.ollama ? [this.ollama] : []),
+      ...(this.strata ? [this.strata] : []),
     ]);
   }
   allowedModel(modelRef: string): boolean {

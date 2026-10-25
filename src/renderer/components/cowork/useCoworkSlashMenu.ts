@@ -54,25 +54,38 @@ export const useCoworkSlashMenu = ({
 
   const skills = useSelector((state: RootState) => state.skill.skills);
   const enabledSkills = useMemo(() => skills.filter(skill => skill.enabled), [skills]);
+  const language = i18nService.getLanguage();
+  const hasEnabledSkills = enabledSkills.length > 0;
+  const canCompact = Boolean(sessionId);
 
-  const commands = buildCoworkSlashCommands(
-    { skills: enabledSkills.length > 0, compact: !!sessionId },
-    {
-      skillDescription: i18nService.t('coworkSlashCommandSkillDescription'),
-      skillHint: i18nService.t('coworkSlashCommandSkillHint'),
-      compactDescription: i18nService.t('coworkSlashCommandCompactDescription'),
-    },
+  const commands = useMemo(
+    () =>
+      buildCoworkSlashCommands(
+        { skills: hasEnabledSkills, compact: canCompact },
+        {
+          skillDescription: i18nService.t('coworkSlashCommandSkillDescription'),
+          skillHint: i18nService.t('coworkSlashCommandSkillHint'),
+          compactDescription: i18nService.t('coworkSlashCommandCompactDescription'),
+        },
+      ),
+    // Language invalidates translations read from the external i18n service.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasEnabledSkills, canCompact, language],
   );
   const query = coworkSlashCommandQuery(value);
   const matchingCommands = query === null ? [] : filterCoworkSlashCommands(commands, query);
   const argument = coworkSlashCommandArgument(value);
-  const skillOptions = enabledSkills.map(skill => ({
-    value: skill.id,
-    label: skill.displayName || skill.name,
-    description:
-      (i18nService.getLanguage() === 'zh' && skill.displayDescription) ||
-      skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description),
-  }));
+  const skillOptions = useMemo(
+    () =>
+      enabledSkills.map(skill => ({
+        value: skill.id,
+        label: skill.displayName || skill.name,
+        description:
+          (language === 'zh' && skill.displayDescription) ||
+          skillService.getLocalizedSkillDescription(skill.id, skill.name, skill.description),
+      })),
+    [enabledSkills, language],
+  );
   const matchingOptions =
     argument?.name === CoworkSlashCommand.Skill
       ? filterCoworkSlashOptions(skillOptions, argument.query)

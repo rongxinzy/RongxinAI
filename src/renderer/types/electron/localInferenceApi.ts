@@ -15,6 +15,8 @@ import type { IpcContractApi } from '../../../shared/ipc/contract';
 import type { marketplaceContract } from '../../../shared/marketplace/contract';
 import type { ollamaContract } from '../../../shared/ipc/ollamaContract';
 import type { llamacppContract } from '../../../shared/ipc/llamacppContract';
+import type { strataContract } from '../../../shared/ipc/strataContract';
+import type { StrataStatusSnapshot } from '../../../shared/strata/types';
 import type {
   OllamaChatChunk,
   OllamaInstallProgress,
@@ -73,4 +75,8 @@ export interface MarketplaceApi extends IpcContractApi<typeof marketplaceContrac
 export interface HardwareApi {
   nvidiaSmi: () => Promise<NvidiaSmiSnapshot>;
   systemMemory: () => Promise<SystemMemorySnapshot>;
+}
+
+export interface StrataApi extends Omit<IpcContractApi<typeof strataContract>, 'onStatusChanged'> {
+  onStatusChanged: (callback: (snapshot: StrataStatusSnapshot) => void) => () => void;
 }

@@ -344,4 +344,11 @@ export const zhLocalInferenceService: Record<string, string> = {
   localInferenceLaunchBooleanDisabled: '禁用',
   localInferenceLaunchLoadOnly: '预加载',
   localInferenceLaunchLoadAndDebug: '开始调试',
+  strataCatalogTitle: 'Strata 模型（Windows CUDA）',
+  strataCatalogSubtitle:
+    '需使用内置 Strata 引擎的大型 MoE 模型；GPU 与 llama.cpp 互斥，不可同时占用。',
+  strataCatalogHardwareGate: 'Strata 文档门槛：内存 ≥{ram} GB、显存 ≥{vram} GB、磁盘 ≥{disk} GB',
+  strataCatalogStart: '启动 Strata',
+  strataCatalogStop: '停止 Strata',
+  strataStartRequested: '已请求启动 Strata；大模型可能需要数分钟准备。',
 };

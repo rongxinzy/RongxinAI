@@ -1,0 +1,75 @@
+{
+  "name": "process-automation-expert",
+  "version": "1.0.0",
+  "description": "Workflow automation expert for SOP design, scripting glue, and repeatable office automation.",
+  "author": {
+    "name": "ZhiYuanAgent"
+  },
+  "expertType": "agent",
+  "agentName": "process-automation-expert",
+  "agents": [
+    "./agents/process-automation-expert.md"
+  ],
+  "skillIds": [
+    "process-doc",
+    "smart-commit-gen",
+    "log-diagnostic",
+    "database-inspector"
+  ],
+  "mcpIds": [
+    "playwright",
+    "chrome-devtools-mcp",
+    "lark-mcp",
+    "fetch",
+    "filesystem"
+  ],
+  "pythonRequirements": {
+    "requirementsPath": "./requirements.txt"
+  },
+  "displayName": {
+    "en": "Process Automation Expert",
+    "zh": "流程自动化专家"
+  },
+  "profession": {
+    "en": "Automation Engineer",
+    "zh": "自动化工程师"
+  },
+  "displayDescription": {
+    "en": "Designs repeatable automations across scripts, APIs, and browser flows with clear runbooks.",
+    "zh": "设计可复用的办公与研发自动化流程，覆盖脚本、接口与浏览器操作，并附运行手册与验收。"
+  },
+  "categoryId": "09-OperationsHR",
+  "defaultInitPrompt": {
+    "zh": "帮我把这份重复性周报整理流程设计成可自动执行的步骤。",
+    "en": "Turn this weekly reporting chore into an automatable step-by-step workflow."
+  },
+  "plugin": "process-automation-expert",
+  "tags": [
+    {
+      "en": "Automation",
+      "zh": "自动化"
+    },
+    {
+      "en": "SOP",
+      "zh": "标准流程"
+    },
+    {
+      "en": "Integration",
+      "zh": "系统集成"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "帮我把这份重复性周报整理流程设计成可自动执行的步骤。",
+      "en": "Turn this weekly reporting chore into an automatable step-by-step workflow."
+    },
+    {
+      "zh": "评估用 Playwright 自动抓取后台报表的可行性与风险。",
+      "en": "Assess feasibility and risks of automating this admin report with Playwright."
+    },
+    {
+      "zh": "为数据同步任务编写幂等的 Python 脚本骨架。",
+      "en": "Draft an idempotent Python script skeleton for this data sync job."
+    }
+  ]
+}

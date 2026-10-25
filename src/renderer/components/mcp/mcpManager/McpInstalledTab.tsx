@@ -94,6 +94,7 @@ export function McpInstalledTab({
                 <McpIcon
                   iconSrc={getIconForServer(server)}
                   fallbackLabel={server.name}
+                  category={registryEntry?.category}
                   imageClassName={getRegistryIconImageClassName(registryEntry?.id)}
                 />
                 <div className="min-w-0 flex-1">

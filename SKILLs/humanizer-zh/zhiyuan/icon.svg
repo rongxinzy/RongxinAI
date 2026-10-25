@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="humanizerzh-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF0E8"/>
+      <stop offset="100%" stop-color="#FFE2D4"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#humanizerzh-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <ellipse cx="24" cy="24" rx="12" ry="10" fill="white" fill-opacity="0.55" stroke="#E8956A" stroke-width="1.4"/><circle cx="19" cy="23" r="1.5" fill="#5D4E63"/><circle cx="24" cy="23" r="1.5" fill="#5D4E63"/><circle cx="29" cy="23" r="1.5" fill="#5D4E63"/>
+</svg>

@@ -276,7 +276,7 @@ export const zhMcpSkills: Record<string, string> = {
   mcpCategoryDataApi: '数据 & API',
   mcpDesc_tavily: '实时网页搜索、智能数据提取和网站爬取',
   mcpDesc_github: 'GitHub 平台集成：仓库、Issues、PR、Actions 管理',
-  mcpDesc_gitlab: 'GitLab API 集成：项目管理、合并请求、流水线',
+  mcpDesc_gitlab: 'GitLab 官方 MCP（OAuth）：项目、合并请求、流水线与工作项',
   mcpDesc_context7: '为 AI 编程提供最新的库文档和代码示例',
   mcpDesc_google_drive: 'Google Drive 文件访问和搜索，自动导出 Workspace 文件',
   mcpDesc_gmail: 'Gmail 邮件管理：读取、发送、搜索邮件，支持自动认证',

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="databaseinspector-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#E8F4FC"/>
+      <stop offset="100%" stop-color="#CFE8F8"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#databaseinspector-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <ellipse cx="24" cy="18" rx="10" ry="4" fill="#9CCCEB" stroke="#5BA4D9" stroke-width="1.4"/><path d="M14 18 V30 C14 33, 18 35, 24 35 C30 35, 34 33, 34 30 V18" fill="#9CCCEB" stroke="#5BA4D9" stroke-width="1.4"/>
+</svg>

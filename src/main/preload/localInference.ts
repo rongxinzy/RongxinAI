@@ -4,7 +4,9 @@ import { HardwareIpc } from '../../shared/ipc/channels';
 import { LlamaCppIpcChannel } from '../../shared/llamacpp/constants';
 import { ollamaContractChannels } from '../../shared/ipc/ollamaContract.channels';
 import { llamacppContractChannels } from '../../shared/ipc/llamacppContract.channels';
+import { strataContractChannels } from '../../shared/ipc/strataContract.channels';
 import { OllamaIpcChannel } from '../../shared/ollama/constants';
+import { StrataIpcChannel } from '../../shared/strata/constants';
 import { createIpcInvokers } from './createIpcInvokers';
 import { onPush, onPushVoid } from './pushChannel';
 
@@ -54,5 +56,11 @@ export const localInferenceApi = {
   hardware: {
     nvidiaSmi: () => ipcRenderer.invoke(HardwareIpc.NvidiaSmi),
     systemMemory: () => ipcRenderer.invoke(HardwareIpc.SystemMemory),
+  },
+
+  strata: {
+    ...createIpcInvokers(strataContractChannels),
+    onStatusChanged: (callback: (snapshot: unknown) => void) =>
+      onPush(StrataIpcChannel.StatusChanged, callback),
   },
 };

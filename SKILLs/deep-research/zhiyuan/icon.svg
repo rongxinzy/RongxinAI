@@ -1,6 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-  <rect width="48" height="48" rx="10" fill="#7048E8"/>
-  <circle cx="22" cy="22" r="8.5" fill="none" stroke="#fff" stroke-width="2.5"/>
-  <path d="M28.5 28.5L36 36" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M22 17.5v9M17.5 22h9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <defs>
+    <linearGradient id="deepresearch-bg" x1="4" y1="4" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#F0EBFF"/>
+      <stop offset="100%" stop-color="#E0D6FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="14" fill="url(#deepresearch-bg)"/>
+  <ellipse cx="18" cy="12" rx="14" ry="8" fill="white" fill-opacity="0.35"/>
+  <circle cx="22" cy="22" r="7" stroke="#9B87DE" stroke-width="1.6" fill="white" fill-opacity="0.4"/><line x1="27" y1="27" x2="34" y2="34" stroke="#5D4E63" stroke-width="2" stroke-linecap="round"/>
 </svg>

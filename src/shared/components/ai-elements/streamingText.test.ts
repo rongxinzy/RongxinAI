@@ -26,3 +26,32 @@ test('source rewrites and finalization still invalidate the cached segments', ()
     tail: 'rewritten tail',
   });
 });
+
+test('batches stable prefixes without splitting the Markdown context', () => {
+  const segmenter = new StreamingTextSegmenter();
+  const firstBlock = `${'First paragraph\n'.repeat(600)}\n`;
+  const first = segmenter.update(`${firstBlock}tail`, true);
+  expect(first).toEqual({ committed: firstBlock, tail: 'tail' });
+  const growingTail = segmenter.update(`${firstBlock}tail grows`, true);
+  expect(growingTail.committed).toBe(first.committed);
+
+  const withCode = segmenter.update(`${firstBlock}tail grows\n\n\`\`\`ts\nconst n = 1;\n`, true);
+  expect(withCode.committed).toBe(firstBlock);
+  expect(withCode.tail).toBe('tail grows\n\n```ts\nconst n = 1;\n');
+  const closed = segmenter.update(
+    `${firstBlock}tail grows\n\n\`\`\`ts\nconst n = 1;\n\`\`\`\nnext`,
+    true,
+  );
+  expect(closed.committed).toBe(firstBlock);
+  expect(closed.tail).toBe('tail grows\n\n```ts\nconst n = 1;\n```\nnext');
+});
+
+test('commits a large closing fence even when the response has no trailing newline', () => {
+  const segmenter = new StreamingTextSegmenter();
+  const content = '```ts\n' + 'const answer = 42;\n'.repeat(600);
+  segmenter.update(content, true);
+  expect(segmenter.update(`${content}\`\`\``, true)).toEqual({
+    committed: `${content}\`\`\``,
+    tail: '',
+  });
+});

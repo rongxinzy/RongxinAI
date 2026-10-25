@@ -12,6 +12,14 @@ const exceptions: Record<string, string> = {
     'Standalone exported documents preserve portable content styling.',
   'src/renderer/components/expert/expertAvatars.tsx':
     'Authored avatar artwork preserves its own colors.',
+  'src/renderer/components/expert/cuteAvatarPrimitives.tsx':
+    'Authored avatar artwork preserves its own colors.',
+  'src/renderer/components/expert/cuteExpertArtworks.tsx':
+    'Authored avatar artwork preserves its own colors.',
+  'src/renderer/components/expert/cuteCustomExpertArtworks.tsx':
+    'Authored avatar artwork preserves its own colors.',
+  'src/renderer/components/mcp/mcpManager/cuteMcpCategoryIcons.tsx':
+    'Authored MCP category avatar artwork preserves its own colors.',
 };
 const violations: string[] = [];
 let scanned = 0;

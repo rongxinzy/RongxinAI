@@ -29,32 +29,9 @@ export type StreamingTextSegments = {
   tail: string;
 };
 
-const getLastStableBoundary = (content: string): number => {
-  let boundary = 0;
-  let fence: { character: string; length: number } | null = null;
-  let offset = 0;
+const STABLE_COMMIT_BATCH_CHARACTERS = 8_192;
 
-  for (const line of content.split(/(?<=\n)/)) {
-    offset += line.length;
-    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
-    if (fenceMatch) {
-      const marker = fenceMatch[1];
-      if (!fence) {
-        fence = { character: marker[0], length: marker.length };
-      } else if (marker[0] === fence.character && marker.length >= fence.length) {
-        fence = null;
-        boundary = offset;
-      }
-      continue;
-    }
-
-    if (!fence && line.trim().length === 0) {
-      boundary = offset;
-    }
-  }
-
-  return boundary;
-};
+type Fence = { character: string; length: number };
 
 /** Commits complete Markdown blocks while streaming; only the tail remains mutable. */
 export class StreamingTextSegmenter {
@@ -62,6 +39,8 @@ export class StreamingTextSegmenter {
   private tail = '';
   private previousContent = '';
   private wasStreaming = false;
+  private pendingLine = '';
+  private fence: Fence | null = null;
   private segments: StreamingTextSegments = { committed: '', tail: '' };
 
   update(content: string, isStreaming: boolean): StreamingTextSegments {
@@ -70,28 +49,70 @@ export class StreamingTextSegmenter {
     if (!isStreaming) {
       this.committed = content;
       this.tail = '';
+      this.pendingLine = '';
+      this.fence = null;
       this.previousContent = content;
       this.wasStreaming = false;
       return this.snapshot();
     }
 
     const isAppend = this.wasStreaming && content.startsWith(this.previousContent);
-    if (isAppend) {
-      this.tail += content.slice(this.previousContent.length);
-    } else {
+    const appended = isAppend ? content.slice(this.previousContent.length) : content;
+    if (!isAppend) {
       this.committed = '';
       this.tail = content;
+      this.pendingLine = '';
+      this.fence = null;
+    } else {
+      this.tail += appended;
     }
 
     this.previousContent = content;
     this.wasStreaming = true;
-    const boundary = getLastStableBoundary(this.tail);
-    if (boundary > 0) {
-      this.committed += this.tail.slice(0, boundary);
-      this.tail = this.tail.slice(boundary);
-    }
-
+    this.consumeCompleteLines(appended);
     return this.snapshot();
+  }
+
+  private consumeCompleteLines(appended: string): void {
+    const completedTailLength = this.tail.length - appended.length - this.pendingLine.length;
+    this.pendingLine += appended;
+    let processedLength = 0;
+    let stableBoundary = 0;
+    let newlineIndex = this.pendingLine.indexOf('\n');
+    while (newlineIndex >= 0) {
+      const line = this.pendingLine.slice(0, newlineIndex + 1);
+      this.pendingLine = this.pendingLine.slice(newlineIndex + 1);
+      processedLength += line.length;
+      if (this.consumeLine(line)) stableBoundary = completedTailLength + processedLength;
+      newlineIndex = this.pendingLine.indexOf('\n');
+    }
+    if (
+      this.pendingLine &&
+      (this.fence || this.pendingLine.trim().length === 0) &&
+      this.consumeLine(this.pendingLine)
+    ) {
+      this.pendingLine = '';
+      stableBoundary = this.tail.length;
+    }
+    if (stableBoundary >= STABLE_COMMIT_BATCH_CHARACTERS) {
+      this.committed += this.tail.slice(0, stableBoundary);
+      this.tail = this.tail.slice(stableBoundary);
+    }
+  }
+
+  private consumeLine(line: string): boolean {
+    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch) {
+      const marker = fenceMatch[1];
+      if (!this.fence) {
+        this.fence = { character: marker[0], length: marker.length };
+      } else if (marker[0] === this.fence.character && marker.length >= this.fence.length) {
+        this.fence = null;
+        return true;
+      }
+      return false;
+    }
+    return !this.fence && line.trim().length === 0;
   }
 
   private snapshot(): StreamingTextSegments {

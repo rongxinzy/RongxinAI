@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   Archive,
   Brain,
@@ -97,7 +97,12 @@ interface MemoryRecordActionProps {
   onForget: () => void;
 }
 
-export function MemoryRecordList(props: MemoryRecordListProps) {
+const subscribeLanguage = (listener: () => void) => i18nService.subscribe(listener);
+const getLanguage = () => i18nService.getLanguage();
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+
+export const MemoryRecordList = memo(function MemoryRecordList(props: MemoryRecordListProps) {
+  useSyncExternalStore(subscribeLanguage, getLanguage, getLanguage);
   const {
     view,
     workspaceName,
@@ -288,7 +293,7 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
       />
     </>
   );
-}
+});
 
 function MemoryRows(props: {
   records: ManagedMemoryRecord[];
@@ -752,8 +757,14 @@ function sourceLabel(
 function formatDate(value: string): string {
   const timestamp = parseMemoryTimestamp(value);
   if (Number.isNaN(timestamp)) return value;
-  return new Intl.DateTimeFormat(i18nService.getLanguage() === 'zh' ? 'zh-CN' : 'en-US', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(timestamp));
+  const locale = i18nService.getLanguage() === 'zh' ? 'zh-CN' : 'en-US';
+  let formatter = dateTimeFormatters.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+    dateTimeFormatters.set(locale, formatter);
+  }
+  return formatter.format(new Date(timestamp));
 }

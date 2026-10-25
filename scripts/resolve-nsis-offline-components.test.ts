@@ -6,6 +6,7 @@ import path from 'node:path';
 import {
   resolveNsisOfflineComponentTargets,
   shouldIncludeLlamaCppBundledComponent,
+  shouldIncludeStrataBundledComponent,
   writeNsisOfflineComponentRouting,
 } from './resolve-nsis-offline-components.cjs';
 
@@ -80,6 +81,8 @@ test('lite targets exclude llamacpp-bundled component', () => {
 test('cpu and cuda targets include llamacpp-bundled component', () => {
   process.env.ZHIYUAN_UPDATE_VARIANT = 'cpu';
   expect(resolveNsisOfflineComponentTargets()).toHaveLength(8);
+  expect(shouldIncludeStrataBundledComponent()).toBe(false);
   process.env.ZHIYUAN_UPDATE_VARIANT = 'cuda';
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(8);
+  expect(resolveNsisOfflineComponentTargets()).toHaveLength(9);
+  expect(shouldIncludeStrataBundledComponent()).toBe(true);
 });

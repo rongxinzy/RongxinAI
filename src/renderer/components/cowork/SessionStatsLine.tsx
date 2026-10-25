@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Button } from '@shared/components/ui/button';
 import {
   Popover,
@@ -19,7 +20,7 @@ interface SessionStatsLineProps {
 }
 
 export function SessionStatsLine({ messages }: SessionStatsLineProps) {
-  const stats = getSessionStats(messages);
+  const stats = useMemo(() => getSessionStats(messages), [messages]);
   const hasCounts = stats.turns > 0 || stats.steps > 0;
   const metrics = [
     ['coworkStatsTurns', hasCounts ? String(stats.turns) : null],

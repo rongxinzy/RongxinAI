@@ -7,7 +7,9 @@
   },
   "expertType": "agent",
   "agentName": "daily-report-expert",
-  "agents": ["./agents/daily-report-expert.md"],
+  "agents": [
+    "./agents/daily-report-expert.md"
+  ],
   "displayName": {
     "en": "Daily Report Expert",
     "zh": "日报专家"
@@ -27,9 +29,18 @@
   },
   "plugin": "daily-report-expert",
   "tags": [
-    { "en": "Status Reporting", "zh": "状态汇报" },
-    { "en": "Project Quality", "zh": "项目质量" },
-    { "en": "Risk Management", "zh": "风险管理" }
+    {
+      "en": "Status Reporting",
+      "zh": "状态汇报"
+    },
+    {
+      "en": "Project Quality",
+      "zh": "项目质量"
+    },
+    {
+      "en": "Risk Management",
+      "zh": "风险管理"
+    }
   ],
   "quickPrompts": [
     {
@@ -43,6 +54,24 @@
     {
       "en": "Score this daily report out of 100 and explain the key issues affecting the score.",
       "zh": "请按100分制评估这份日报，并说明影响分数的关键问题。"
+    }
+  ],
+  "mcpIds": [
+    "lark-mcp",
+    "dingtalk-mcp",
+    "feishu"
+  ],
+  "skillCatalog": [
+    {
+      "id": "mcp-notify",
+      "category": "office",
+      "install": "npx -y mcp-notify",
+      "license": "MIT"
+    },
+    {
+      "id": "workbuddy-office-skills",
+      "category": "office",
+      "install": "npx skills add bitcjm/workbuddy-skills"
     }
   ]
 }
