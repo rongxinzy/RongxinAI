@@ -167,7 +167,8 @@ test('opens a modal, filters once-loaded results, and restores focus without cha
   await user.click(trigger);
   const modal = screen.getByRole('dialog');
   const input = within(modal).getByRole('combobox', { name: 'searchConversations' });
-  expect(input).toHaveFocus();
+  // The shared dialog schedules initial focus on the next animation frame.
+  await waitFor(() => expect(input).toHaveFocus());
   await screen.findByRole('option', { name: /Same title Project/ });
   await user.type(input, 'specialist');
   expect(within(modal).getAllByRole('option')).toHaveLength(2);

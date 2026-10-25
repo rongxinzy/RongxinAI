@@ -511,11 +511,11 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 2026-10-24 用户确认保留当前三段精简结构，替代此前七段约定。
 
-- 模型页分为 `Providers & Models / Routing & usage / Advanced Settings` 三个一级分段，使用分段控件切换；窄窗口下改为下拉选择，不得横向裁切分段标签。
-- `Providers & Models` 依次承载 Model service、Default model、Provider 行式列表和模型目录。Model service 只保留状态徽标、简短说明、刷新/启用动作；启用说明只在未运行时出现，不提供官方管理页面入口。
+- 模型页分为 `Providers & models / Routing & usage / Advanced settings` 三个一级分段，使用分段控件切换；窄窗口下改为下拉选择，不得横向裁切分段标签。中文使用「服务商与模型 / 路由与用量 / 高级设置」；模型来源称「服务商」，通信接入继续称「渠道」，不混用。
+- `Providers & models` 依次承载 Model service、Default model、Provider 行式列表和模型目录。Model service 只保留状态徽标、简短说明、刷新/启用动作；启用说明只在未运行时出现，不提供官方管理页面入口。
 - Provider 使用带分隔线的行式列表，不为每个 Provider 套 Card；服务商模型标签使用 `text-xs`，不得出现 10px/11px 字号。Default model 显示当前已保存默认模型；`Set as default` 只在用户选择了不同模型时出现。
 - `Routing & usage` 集中承载模型回退组、订阅配额、近期调用与估算费用，不再单设 Model Routing 页面。
-- `Advanced Settings` 承载模型偏好、订阅账号、Network 与 Privacy；外部 Agent 管理入口位于编程模式的 Agent Manager，本分段只保留前往该入口的说明，不再设置模型页 Agents 分段或管理接入弹窗。
+- `Advanced settings` 承载模型偏好、订阅账号、Network 与 Privacy；外部 Agent 管理入口位于编程模式的 Agent Manager，本分段只保留前往该入口的说明，不再设置模型页 Agents 分段或管理接入弹窗。
 - Models / Network / Privacy 使用自动保存行：切换即写入，行内显示当前值；不得引入页面级 Save。Network 的端口、局域网共享、CORS 与允许来源由宿主托管，只读展示并说明原因。
 - Privacy 的脱敏分类使用行式开关，不套嵌套卡片；页面内不得出现重复的 Models 标题。
 

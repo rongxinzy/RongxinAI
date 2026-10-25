@@ -56,6 +56,32 @@ export class CompanionMemoryService {
       );
   }
 
+  async search(petId: string, query = ''): Promise<ManagedMemoryRecord[]> {
+    const owner = companionMemoryIdentity(petId);
+    const text = z.string().max(MAX_CONTEXT_QUERY).parse(query).trim();
+    if (!text)
+      return this.list(petId)
+        .filter(
+          record =>
+            record.status === MemoryLifecycleStatus.Active &&
+            this.repository.isCurrentSemanticMemoryLink(record.id, MemoryScope.Companion),
+        )
+        .slice(0, 8);
+    const observations = await recallMemoryScope(this.repository, this.adapter, {
+      query: text,
+      projectId: owner.projectId,
+      scope: MemoryScope.Companion,
+    });
+    return observations.flatMap(observation => {
+      const record = this.repository.findLinkByMemoryId(observation.id);
+      return record?.scope === MemoryScope.Companion &&
+        record.projectId === owner.projectId &&
+        record.status === MemoryLifecycleStatus.Active
+        ? [record]
+        : [];
+    });
+  }
+
   async save(input: {
     petId: string;
     requestId: string;
@@ -100,8 +126,19 @@ export class CompanionMemoryService {
   }
 
   async forget(petId: string, id: string): Promise<boolean> {
+    const owner = companionMemoryIdentity(petId);
+    const receipt = createHash('sha256').update(`${owner.petId}:forget:${id}`).digest('hex');
+    const record = this.repository.getLink(id) ?? this.repository.getCandidate(id);
+    if (
+      this.retractions.has(receipt) &&
+      (!record || record.status === MemoryLifecycleStatus.Deleted)
+    )
+      return true;
     this.owned(petId, id);
     this.retractions.add(id);
+    // Record the owner-bound intent before a pending candidate can be physically deleted.
+    // Recovery retries any still-present record; missing/deleted projections are acknowledged.
+    this.retractions.add(receipt);
     return this.shared.forgetMemory(id, false);
   }
 

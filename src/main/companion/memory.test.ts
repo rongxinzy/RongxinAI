@@ -108,6 +108,8 @@ test('task candidates require exact reviewed text and remain private after idemp
     const input = taskCandidate(f);
     expect(companionMemoryNeedsReview(f.service.list(f.a)[0])).toBe(true);
     expect(await f.service.context(f.a, 'paper kite')).toBe('');
+    expect(await f.service.search(f.a)).toEqual([]);
+    expect(await f.service.search(f.a, 'paper kite')).toEqual([]);
     await expect(f.service.confirm({ ...input, confirmed: false } as never)).rejects.toThrow();
     await expect(f.service.confirm({ ...input, content: 'Different paper kite.' })).rejects.toThrow(
       'changed',
@@ -119,6 +121,10 @@ test('task candidates require exact reviewed text and remain private after idemp
     expect(saved.status).toBe(MemoryLifecycleStatus.Active);
     expect(companionMemoryNeedsReview(saved)).toBe(false);
     expect(await f.service.context(f.a, 'paper kite')).toContain('bamboo');
+    expect((await f.service.search(f.a, 'paper kite')).map(record => record.id)).toEqual([
+      saved.id,
+    ]);
+    expect(await f.service.search(f.b, 'paper kite')).toEqual([]);
     expect(await f.service.context(f.b, 'paper kite')).toBe('');
     expect(f.shared.listManagedMemories()).toEqual([]);
     expect((await f.service.confirm(input)).memoryId).toBe(saved.memoryId);
@@ -126,6 +132,7 @@ test('task candidates require exact reviewed text and remain private after idemp
     await f.service.forget(f.a, input.id);
     await expect(f.service.confirm(input)).rejects.toThrow('not available');
     expect(await f.service.context(f.a, 'paper kite')).toBe('');
+    expect(await f.service.search(f.a)).toEqual([]);
   } finally {
     vi.restoreAllMocks();
     await f.cleanup();
@@ -203,6 +210,9 @@ test('real memory runtime isolates companions and shares only after existing per
     expect(f.repository.getLink(saved.id)?.status).toBe(MemoryLifecycleStatus.Active);
     expect(f.repository.getLink(candidate)?.scope).toBe(MemoryScope.Personal);
     expect(f.repository.getLink(candidate)?.promotedFromLinkId).toBe(saved.id);
+    expect((await f.service.search(f.a)).map(record => record.id)).toEqual([saved.id]);
+    expect(await f.service.search(f.b)).toEqual([]);
+    expect(await f.service.search(f.b, 'paper kite')).toEqual([]);
   } finally {
     await f.cleanup();
   }
@@ -226,6 +236,7 @@ test('idempotent saves, updates and forgetting cannot cross companion ownership'
     const current = await f.service.context(f.a, 'paper kite');
     expect(current).toContain('now green');
     expect(current).not.toContain('is blue');
+    expect((await f.service.search(f.a)).map(record => record.id)).toEqual([replacement.id]);
     expect(await f.service.forget(f.a, replacement.id)).toBe(true);
     expect(f.service.list(f.a)).toEqual([]);
     expect(f.repository.getLink(replacement.id)?.status).toBe(MemoryLifecycleStatus.Deleted);
@@ -276,7 +287,10 @@ test('forgetting an offline write survives request replay and a new database con
   try {
     vi.spyOn(f.adapter, 'confirmMemory').mockResolvedValueOnce(null);
     const pending = await f.save(f.a, 'withdrawn');
+    expect(await f.service.search(f.a)).toEqual([]);
     await f.service.forget(f.a, pending.id);
+    expect(await f.service.forget(f.a, pending.id)).toBe(true);
+    await expect(f.service.forget(f.b, pending.id)).rejects.toThrow('Memory not found');
     await f.shared.retryPendingOutbox();
     await expect(f.save(f.a, 'withdrawn')).rejects.toThrow('withdrawn');
     expect(f.service.list(f.a)).toEqual([]);
@@ -310,6 +324,27 @@ test('forgetting during an in-flight private write does not resurrect it after a
     expect(await f.service.context(f.a, 'paper kite')).toBe('');
     await f.shared.retryPendingOutbox();
     expect(f.service.list(f.a)).toEqual([]);
+  } finally {
+    vi.restoreAllMocks();
+    await f.cleanup();
+  }
+}, 60_000);
+
+test('a recorded forget intent retries an unwithdrawn projection and cannot acknowledge another owner', async () => {
+  const f = await fixture();
+  try {
+    const saved = await f.save(f.a, 'forget-intent');
+    const withdraw = vi
+      .spyOn(f.shared, 'forgetMemory')
+      .mockRejectedValueOnce(new Error('Fixture failure before projection withdrawal'));
+    await expect(f.service.forget(f.a, saved.id)).rejects.toThrow('before projection');
+    expect(f.repository.getLink(saved.id)?.status).toBe(MemoryLifecycleStatus.Active);
+    expect(await f.service.forget(f.a, saved.id)).toBe(true);
+    expect(f.repository.getLink(saved.id)?.status).toBe(MemoryLifecycleStatus.Deleted);
+    expect(await f.service.forget(f.a, saved.id)).toBe(true);
+    expect(withdraw).toHaveBeenCalledTimes(2);
+    await expect(f.service.forget(f.b, saved.id)).rejects.toThrow('Memory not found');
+    expect(await f.service.search(f.a)).toEqual([]);
   } finally {
     vi.restoreAllMocks();
     await f.cleanup();
