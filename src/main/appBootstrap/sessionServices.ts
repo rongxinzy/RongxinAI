@@ -24,6 +24,7 @@ import { WorkbenchTaskService } from '../workbenchTask/taskService';
 import { promoteVerifiedWorkbenchRun } from '../memory/taskMemoryPromotion';
 import { CompanionMemoryService } from '../companion/memory';
 import { CompanionMemoryRetractions } from '../companion/memoryRetractions';
+import { companionTaskMemoryResolver } from '../companion/taskMemoryIdentity';
 
 export const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!agentRuntime.workbenchTaskService) {
@@ -70,6 +71,10 @@ export const getProjectMemoryService = (): ProjectMemoryService => {
       memoryRuntime.engramAdapter,
       resolveProjectIdentity,
       path.join(app.getPath('userData'), 'memory'),
+      companionTaskMemoryResolver(
+        getStore().getDatabase(),
+        path.join(app.getPath('userData'), 'companions'),
+      ),
     );
   }
   return memoryRuntime.projectMemoryService;

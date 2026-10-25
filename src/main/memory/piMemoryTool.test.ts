@@ -60,6 +60,7 @@ test('exposes only controlled project memory actions', async () => {
   expect(result).toMatchObject({ details: { count: 1 } });
   expect(service.recallProject).toHaveBeenCalledWith({
     workingDirectory: '/workspace/project',
+    sessionId: 'session-1',
     query: 'database',
   });
 });

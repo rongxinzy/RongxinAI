@@ -117,6 +117,9 @@ export function planRecallQuery(query: string): RecallQueryPlan {
   const broadQuery =
     keywordQuery &&
     (normalizeForComparison(keywordQuery) !== normalizeForComparison(exactQuery) ||
+      // CJK word boundaries carry search semantics even when concatenating the
+      // segments yields the same letters. Dropping them loses the OR fallback.
+      (CJK_PATTERN.test(exactQuery) && keywordQuery !== exactQuery.toLocaleLowerCase()) ||
       countWordLikeTokens(exactQuery) >= 5)
       ? keywordQuery
       : null;

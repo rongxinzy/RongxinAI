@@ -15,14 +15,19 @@ export function buildPiProjectMemoryTool(input: {
   extractor?: AtomicMemoryExtractor;
 }): Record<string, unknown> {
   void input.extractor;
+  const privateScope =
+    input.service.getSessionMemoryScope?.(input.sessionId) === MemoryScope.Companion;
+  const scopeLabel = privateScope ? 'private' : 'workspace';
   return {
     name: 'memory',
     label: 'Memory',
-    description:
-      'Recall workspace, current-session, and confirmed personal memory; explicitly save durable workspace memory; ' +
-      'list controlled active memory; or propose personal memory for user review.',
-    promptSnippet:
-      'Use memory to recall prior workspace decisions or save durable facts only when they are useful later.',
+    description: privateScope
+      ? 'Recall private memory for this companion, current-task memory, and confirmed personal memory; save private facts or propose personal memory for user review.'
+      : 'Recall workspace, current-session, and confirmed personal memory; explicitly save durable workspace memory; ' +
+        'list controlled active memory; or propose personal memory for user review.',
+    promptSnippet: privateScope
+      ? 'Use memory to recall prior decisions for this companion or save durable private facts useful later. Personal proposals require user confirmation.'
+      : 'Use memory to recall prior workspace decisions or save durable facts only when they are useful later.',
     parameters: {
       type: 'object',
       properties: {
@@ -33,9 +38,12 @@ export function buildPiProjectMemoryTool(input: {
         },
         query: { type: 'string', description: 'Search query for recall.' },
         limit: { type: 'number', description: 'Maximum number of memories to list.' },
-        title: { type: 'string', description: 'Short title for a saved workspace memory.' },
+        title: { type: 'string', description: `Short title for a saved ${scopeLabel} memory.` },
         content: { type: 'string', description: 'Proposed atomic memory content.' },
-        topicKey: { type: 'string', description: 'Stable topic key for workspace memory upsert.' },
+        topicKey: {
+          type: 'string',
+          description: `Stable topic key for ${scopeLabel} memory upsert.`,
+        },
         supersedesMemoryId: {
           type: 'number',
           description: 'Active Personal observation ID replaced by the proposed Personal memory.',
@@ -60,7 +68,11 @@ export function buildPiProjectMemoryTool(input: {
         if (action === PiMemoryAction.Recall) {
           const query = requiredString(params.query, 'query');
           const [workspace, personal, session] = await Promise.all([
-            input.service.recallProject({ workingDirectory: input.workingDirectory, query }),
+            input.service.recallProject({
+              workingDirectory: input.workingDirectory,
+              sessionId: input.sessionId,
+              query,
+            }),
             input.service.recallPersonal({ query }),
             input.service.recallSession({
               workingDirectory: input.workingDirectory,
@@ -155,11 +167,16 @@ export function buildPiProjectMemoryTool(input: {
             metadata: memory.metadata,
           });
           return memoryId === null
-            ? toolResult('Project memory was queued and will retry when memory is available.', {
-                queued: true,
-                reason: 'memory_unavailable',
-              })
-            : toolResult(`Saved workspace memory ${memoryId}.`, { memoryId });
+            ? toolResult(
+                privateScope
+                  ? 'Private memory was queued and will retry when memory is available.'
+                  : 'Project memory was queued and will retry when memory is available.',
+                {
+                  queued: true,
+                  reason: 'memory_unavailable',
+                },
+              )
+            : toolResult(`Saved ${scopeLabel} memory ${memoryId}.`, { memoryId });
         }
         return toolResult('Unsupported memory action.', {
           isError: true,

@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "status": "succeeded",
+  "receipt": {
+    "petId": "55b751b9-d20d-4e54-8411-82a4f767e200",
+    "requestId": "6a0a3ece-bb21-4e46-ab3d-66ec371eab54",
+    "sessionId": "12c493d2-3bb1-4e1a-89b5-361708df85bf",
+    "taskId": "074a50b4-d595-43ca-b609-74cb681a78b6",
+    "runId": "4e76a5c3-ea57-4a7a-bed2-2d110622ee18"
+  },
+  "requests": 10,
+  "taskExecutions": 1,
+  "taskModelRequests": 4,
+  "chatExecutions": 0,
+  "maintenanceRequests": 6,
+  "detailAvailable": true,
+  "media": {
+    "decoderSlots": 2,
+    "clip": "happy",
+    "transparent": 100218,
+    "opaque": 40731,
+    "devicePixelRatio": 2
+  },
+  "allMedia": null,
+  "home": null,
+  "files": null,
+  "stress": null,
+  "copy": null,
+  "memory": null,
+  "taskMemory": {
+    "initialPrivateRecall": true,
+    "nativeToolPrivateSave": true,
+    "continuedWithOriginalOwnerAfterSwitch": true,
+    "secondCompanionIsolated": true,
+    "sharedWorkbenchMemoryExcluded": true
+  },
+  "userData": "/tmp/companion-task-native-h8XYBa",
+  "workspace": "/tmp/companion-task-workspace-th8uhz"
+}

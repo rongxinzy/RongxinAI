@@ -145,6 +145,7 @@ export function buildPiSessionCustomTools(
       buildPiConversationHistoryTool({
         service: conversationHistoryService,
         workingDirectory: workspaceRoot,
+        sessionId,
       }),
     );
   }

@@ -37,6 +37,12 @@ test('does not broaden short non-CJK queries', () => {
   });
 });
 
+test('keeps CJK word boundaries when segmentation changes no letters', () => {
+  const plan = planRecallQuery('整理项目资料，继续完成。');
+  expect(plan.broadQuery?.split(' ')).toEqual(expect.arrayContaining(['整理', '项目', '资料']));
+  expect(plan.allowRecentFallback).toBe(false);
+});
+
 test('extracts keyword broad query for natural-language english recall questions', () => {
   const plan = planRecallQuery(
     'What persistence technology did the team decide to standardize on for this workspace?',

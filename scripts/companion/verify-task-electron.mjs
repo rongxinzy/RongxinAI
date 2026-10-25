@@ -13,6 +13,12 @@ import { createTaskFileFixture, chooseTaskFile } from './verify-task-files.mjs';
 import { verifyWorkbenchCopy } from './verify-workbench-copy.mjs';
 import { verifyAllMedia } from './verify-all-media.mjs';
 import { verifyCompanionMemory, COMPANION_MEMORY_NATIVE_MARKER } from './verify-memory.mjs';
+import {
+  createTaskMemoryFixture,
+  approveTaskMemory,
+  prepareTaskMemory,
+  verifyTaskMemory,
+} from './verify-task-memory.mjs';
 
 // Manual native acceptance only: isolated storage, local model fixture, no real account keys.
 // Prerequisites: verified Magpie resource, build:electron:dev and web:preview.
@@ -24,6 +30,8 @@ const workspace = await fs.mkdtemp('/tmp/companion-task-workspace-');
 const fileFixture =
   process.env.COMPANION_VERIFY_FILES === '1' ? await createTaskFileFixture(userData) : null;
 let requests = 0;
+const taskMemoryFixture =
+  process.env.COMPANION_VERIFY_TASK_MEMORY === '1' ? createTaskMemoryFixture() : null;
 const requestKinds = [];
 const server = createServer(async (request, response) => {
   if (request.url.endsWith('/models')) {
@@ -58,6 +66,7 @@ const server = createServer(async (request, response) => {
   requestKinds.push({
     kind,
     companionMemory: system.includes(COMPANION_MEMORY_NATIVE_MARKER),
+    taskMemory: taskMemoryFixture?.inspect(payload),
     system: system.slice(0, 180),
     lastUser: content(payload.messages?.findLast(message => message.role === 'user')).slice(0, 180),
     messageCount: payload.messages?.length,
@@ -127,6 +136,15 @@ const server = createServer(async (request, response) => {
       response.end('data: [DONE]\n\n');
       return;
     }
+  }
+  const memoryCall = kind === 'task' ? taskMemoryFixture?.nextCall(payload) : null;
+  if (memoryCall) {
+    response.write(
+      `data: ${JSON.stringify(chunk({ role: 'assistant', tool_calls: [memoryCall] }))}\n\n`,
+    );
+    response.write(`data: ${JSON.stringify(chunk({}, 'tool_calls'))}\n\n`);
+    response.end('data: [DONE]\n\n');
+    return;
   }
   const answer =
     kind === 'project-memory'
@@ -249,6 +267,7 @@ try {
   const opened = application.waitForEvent('window', { timeout: 15_000 });
   await actor.evaluate(() => window.desktopPet.menu());
   const chat = await opened;
+  const taskMemoryAdmission = taskMemoryFixture ? await prepareTaskMemory(chat) : null;
   const home =
     process.env.COMPANION_VERIFY_HOME === '1'
       ? await verifyHomeSurfaces(main, chat, userData)
@@ -310,6 +329,7 @@ try {
   const retry = await chat.evaluate(request => window.companion.submitTask(request), taskRequest);
   if (JSON.stringify(retry.receipt) !== JSON.stringify(receipt))
     throw new Error('Receipt changed on retry');
+  if (taskMemoryAdmission) await approveTaskMemory(main, chat, receipt);
   await expect
     .poll(
       async () =>
@@ -387,6 +407,7 @@ try {
     ? ['companion-chat', 'project-memory', 'session-memory', 'task']
     : ['project-memory', 'session-memory', 'task'];
   if (fileFixture) expectedKinds.push('task');
+  if (taskMemoryFixture) expectedKinds.push('task');
   await expect
     .poll(() => requestKinds.map(item => item.kind).sort(), { timeout: 10_000 })
     .toEqual(expectedKinds.sort());
@@ -413,6 +434,9 @@ try {
     process.env.COMPANION_VERIFY_MEMORY === '1'
       ? await verifyCompanionMemory(application, main, chat, userData, requestKinds)
       : null;
+  const taskMemory = taskMemoryAdmission
+    ? await verifyTaskMemory(main, chat, taskMemoryAdmission, receipt, requestKinds)
+    : null;
   console.log(
     JSON.stringify({
       passed: true,
@@ -439,6 +463,7 @@ try {
       stress,
       copy,
       memory,
+      taskMemory,
       userData,
       workspace,
     }),

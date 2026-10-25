@@ -22,6 +22,7 @@ import type { WorkbenchTaskService } from '../workbenchTask/taskService';
 import { createPiWorkbenchContract } from '../libs/agentEngine/piRuntimeWorkbenchContract';
 import { companionInstructions } from './personas';
 import { CompanionAttachments } from './attachments';
+import { initializeCompanionTaskAdmissions } from './taskOwnership';
 
 interface Row extends CompanionTaskReceipt {
   fingerprint: string;
@@ -39,12 +40,7 @@ export class CompanionTasks {
   readonly attachments: CompanionAttachments;
   constructor(private readonly options: Options) {
     this.attachments = new CompanionAttachments(options.db);
-    options.db.exec(`CREATE TABLE IF NOT EXISTS companion_task_admissions (
-      pet_id TEXT NOT NULL, request_id TEXT NOT NULL, fingerprint TEXT NOT NULL,
-      session_id TEXT NOT NULL, task_id TEXT NOT NULL, run_id TEXT NOT NULL,
-      created_at INTEGER NOT NULL, PRIMARY KEY (pet_id, request_id)
-    ); CREATE INDEX IF NOT EXISTS companion_task_admissions_recent
-      ON companion_task_admissions(pet_id, created_at DESC);`);
+    initializeCompanionTaskAdmissions(options.db);
     // Queued work left by a previous process never silently replays external effects.
     const queued = options.db
       .prepare(`SELECT a.session_id AS sessionId FROM companion_task_admissions a
