@@ -18,9 +18,11 @@ function resolveHostTargetId() {
 }
 
 function readRuntimeConfig(rootDir) {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(rootDir, 'config/runtime-pins.json'), 'utf8'),
+  );
   if (!packageJson.engram?.version || !packageJson.engram?.repo) {
-    throw new Error('package.json is missing the pinned memory runtime configuration.');
+    throw new Error('config/runtime-pins.json is missing the pinned memory runtime configuration.');
   }
   // Fork 运行时校验：ZhiYuan 使用带 -zhiyuan 后缀的 fork 标签。
   // 防呆——若配置回退到上游裸版本号（v1.20.0 无后缀），说明配置被
@@ -29,7 +31,7 @@ function readRuntimeConfig(rootDir) {
   if (!/^v\d+\.\d+\.\d+-zhiyuan\.\d+$/.test(version)) {
     throw new Error(
       `Unsupported memory runtime version "${version}": expected a fork tag like v1.20.0-zhiyuan.1. ` +
-        'Publish the fork release first, then update package.json engram.version and runtimeChecksums.',
+        'Publish the fork release first, then update config/runtime-pins.json engram.version and runtimeChecksums.',
     );
   }
   return packageJson.engram;

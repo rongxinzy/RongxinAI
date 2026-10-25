@@ -12,7 +12,6 @@ import {
   ActivityView,
   CodingWorkbenchView,
   CoworkView,
-  CompanionHomeView,
   ExpertView,
   LocalInferenceView,
   McpView,
@@ -107,16 +106,6 @@ export function MainViewCanvas({
         data-main-canvas
         className="theme-main-panel relative h-full min-h-0 overflow-hidden contain-[layout_style_paint]"
       >
-        <LazyChunkErrorBoundary resetKey={mainView}>
-          <React.Suspense fallback={mainView === MainView.Companion ? lazyViewFallback : null}>
-            <Activity mode={mainView === MainView.Companion ? 'visible' : 'hidden'}>
-              <CompanionHomeView
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={onToggleSidebar}
-              />
-            </Activity>
-          </React.Suspense>
-        </LazyChunkErrorBoundary>
         <LazyChunkErrorBoundary resetKey={mainView}>
           <React.Suspense fallback={mainView === MainView.Cowork ? lazyViewFallback : null}>
             <Activity mode={mainView === MainView.Cowork ? 'visible' : 'hidden'}>

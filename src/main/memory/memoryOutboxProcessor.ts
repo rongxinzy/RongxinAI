@@ -42,6 +42,7 @@ export async function processMemoryOutboxItem(
       item.operation === MemoryOutboxOperation.Supersede && payload.supersededObservationId
         ? await adapter.supersede({
             observationId: payload.supersededObservationId,
+            expectedProject: payload.projectId,
             replacementCandidateId: candidate.id,
             workingDirectory: payload.projectRoot,
           })
@@ -66,6 +67,7 @@ export async function processMemoryOutboxItem(
         MemoryOutboxOperation.Forget,
         {
           linkId: payload.linkId,
+          projectId: payload.projectId,
           observationId: memoryId,
           hardDelete: false,
         },
@@ -132,7 +134,11 @@ async function processMemoryForget(
   const payload = parseForgetPayload(item.payload);
   if (!payload) return retryInvalidOutboxItem(repository, item);
   try {
-    const forgotten = await adapter.forget(payload.observationId, payload.hardDelete);
+    const forgotten = await adapter.forget(
+      payload.observationId,
+      payload.hardDelete,
+      payload.projectId,
+    );
     if (!forgotten) {
       repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
       return null;

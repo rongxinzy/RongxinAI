@@ -5,6 +5,7 @@ import { DesktopPetBuiltinId } from '../desktopPet/catalog';
 import { companionAttachments } from './attachments';
 import { companionMemorySave, companionMemoryShare, companionMemoryConfirm } from './memory';
 import { ManagedMemoryRecordSchema } from '../ipc/memoryContract';
+import { CompanionBubbleSide } from './bubble';
 import {
   companionTaskRequest,
   companionTaskProjection,
@@ -35,13 +36,19 @@ const availability = z.object({
   capability: z.enum(Object.values(CompanionCapability)),
   modelId: z.string().nullable(),
   imageInput: z.boolean(),
-  toolUse: z.literal(false),
+  toolUse: z.boolean(),
   reason: z.enum(Object.values(CompanionUnavailableReason)).optional(),
 });
 const context = z.object({
   language: z.enum(['zh', 'en']),
   theme: z.enum(['light', 'dark', 'system']),
   themeStyle: z.string(),
+  bubble: z
+    .object({
+      side: z.enum(Object.values(CompanionBubbleSide)),
+      anchorX: z.number().finite().nonnegative(),
+    })
+    .optional(),
 });
 const state = z.object({
   context,
@@ -60,6 +67,7 @@ const state = z.object({
   }),
 });
 export const companionContract = defineIpcContract({
+  visibility: { channel: IpcChannel.GetVisibility, args: z.tuple([]), result: z.boolean() },
   listMemories: {
     channel: IpcChannel.ListMemories,
     args: z.tuple([z.uuid()]),

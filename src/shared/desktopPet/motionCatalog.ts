@@ -56,3 +56,6 @@ export const DESKTOP_PET_MOTIONS = [
 
 export const DESKTOP_PET_MEDIA_FPS = 30;
 export const DESKTOP_PET_MEDIA_SIZE = 512;
+
+// The restored head/feet and repaired wing anatomy now have a complete authored repertoire.
+export const XIAOYUAN_ORIGINAL_MOTIONS = DESKTOP_PET_MOTIONS;

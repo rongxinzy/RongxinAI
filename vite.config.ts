@@ -229,6 +229,20 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
+                // Native hooks and window geometry must be isolated from the browser process.
+                entry: 'src/main/desktopPetWindowsEntry.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                    rolldownOptions: { external: id => ELECTRON_MAIN_EXTERNALS.includes(id) },
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // Parse model catalogs without blocking Electron's main process.
                 entry: 'src/main/magpie/catalogWorker.ts',
                 vite: {

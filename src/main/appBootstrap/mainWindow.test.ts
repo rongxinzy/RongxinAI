@@ -142,6 +142,8 @@ vi.mock('../trayManager', () => ({ createTray: mocks.createTray, updateTrayMenu:
 vi.mock('../desktopPet/controller', () => ({
   initializeDesktopPet: vi.fn(),
   openDesktopPetSession: vi.fn(),
+  getDesktopPetWindow: vi.fn(() => null),
+  setDesktopPetBubbleVisible: vi.fn(),
 }));
 vi.mock('../companion/window', () => ({ initializeCompanionWindow: vi.fn() }));
 vi.mock('./appConfigSettings', () => ({ getInitialTheme: () => 'light' }));

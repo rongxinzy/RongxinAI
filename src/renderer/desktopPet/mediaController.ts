@@ -53,12 +53,17 @@ export class DesktopPetMediaController {
   private terminalPlayed = false;
   private failed = new Set<DesktopPetMotion>();
   private wanted: DesktopPetMotion | undefined;
+  private fallbackAction = false;
   private poster: { id: DesktopPetMotion; image: HTMLImageElement } | undefined;
   private posterPending: HTMLImageElement | undefined;
+  private readonly posterImages: HTMLImageElement[] = [];
   private posterRevision = 0;
   private disposed = false;
   readonly player: PetVideoPlayer;
-  constructor(private readonly changed: () => void) {
+  constructor(
+    private readonly changed: () => void,
+    private readonly loadPack = desktopPetMediaPack,
+  ) {
     this.player = new PetVideoPlayer({
       changed,
       ended: () => this.ended(),
@@ -69,7 +74,7 @@ export class DesktopPetMediaController {
   }
 
   get supported(): boolean {
-    return Boolean(this.pack?.length);
+    return !this.fallbackAction && Boolean(this.pack?.some(clip => clip.id === this.base()));
   }
 
   update(next: Partial<MediaContext>): void {
@@ -82,16 +87,32 @@ export class DesktopPetMediaController {
     const characterChanged =
       next.characterId !== undefined && next.characterId !== this.context.characterId;
     const stateChanged = next.state !== undefined && next.state !== this.context.state;
+    const previous = this.context;
+    const previousBase = this.base();
     this.context = { ...this.context, ...next };
     if (characterChanged) {
-      this.pack = desktopPetMediaPack(this.context.characterId || DesktopPetBuiltinId.Xiaoyuan);
+      this.pack = this.loadPack(this.context.characterId || DesktopPetBuiltinId.Xiaoyuan);
       this.failed.clear();
       this.clearPoster();
     }
     if (stateChanged || characterChanged) this.terminalPlayed = false;
+    // A pose update can leave the chosen task expression unchanged. Keep its
+    // playback phase instead of reloading the same clip on every drag or step.
+    if (
+      !characterChanged &&
+      !stateChanged &&
+      previousBase === this.base() &&
+      previous.visible === this.context.visible &&
+      previous.reduced === this.context.reduced
+    )
+      return;
     this.transient = undefined;
+    this.fallbackAction = false;
     this.wanted = undefined;
-    this.player.stop();
+    // Attention must replace old celebrations immediately. Ordinary motion
+    // changes retain the outgoing frame for the player's decoded-frame handoff.
+    if (characterChanged || (stateChanged && attention.includes(this.context.state)))
+      this.player.stop();
     this.synchronize();
   }
 
@@ -108,13 +129,26 @@ export class DesktopPetMediaController {
   }
 
   playAction(action: DesktopPetPlayableAction): boolean {
-    if (!this.supported) return false;
     const { reduced, visible, dragging, walking, state } = this.context;
     if (reduced || !visible || dragging || walking || attention.includes(state)) return true;
+    if (!this.pack?.some(clip => clip.id === actions[action])) {
+      this.fallbackAction = true;
+      this.clearPoster();
+      this.player.stop();
+      return false;
+    }
+    this.fallbackAction = false;
     this.transient = actions[action];
     this.failed.delete(this.transient);
     this.synchronize(true);
     return true;
+  }
+
+  /** The original pose sequence owns unsupported actions until its real sampled end. */
+  finishFallback(sequenceActive: boolean): void {
+    if (!this.fallbackAction || sequenceActive) return;
+    this.fallbackAction = false;
+    this.synchronize();
   }
 
   private ended(): void {
@@ -124,7 +158,9 @@ export class DesktopPetMediaController {
     if (this.wanted === DesktopPetMotion.Doze) this.transient = DesktopPetMotion.Wake;
     else if (this.transient) this.transient = undefined;
     else if (this.base() === DesktopPetMotion.Idle) {
-      const candidates = idle.filter(clip => !this.failed.has(clip.id));
+      const candidates = idle.filter(
+        clip => !this.failed.has(clip.id) && this.pack?.some(available => available.id === clip.id),
+      );
       let pick = Math.random() * candidates.reduce((sum, clip) => sum + clip.weight, 0);
       this.transient = candidates.find(clip => {
         pick -= clip.weight;
@@ -147,14 +183,14 @@ export class DesktopPetMediaController {
       this.transient === DesktopPetMotion.Land
     )
       return;
+    if (!this.pack?.some(clip => clip.id === DesktopPetMotion.Land)) return;
     this.transient = DesktopPetMotion.Land;
     this.synchronize();
   }
 
   private clearPoster(): void {
     this.posterRevision++;
-    this.posterPending?.removeAttribute('src');
-    this.poster?.image.removeAttribute('src');
+    for (const image of this.posterImages) image.removeAttribute('src');
     this.poster = this.posterPending = undefined;
   }
 
@@ -162,7 +198,13 @@ export class DesktopPetMediaController {
     if (this.poster?.id === clip.id && !this.posterPending) return;
     this.posterPending?.removeAttribute('src');
     const revision = ++this.posterRevision;
-    const image = new Image();
+    // Keep the decoded poster until its successor is ready, reusing the other
+    // slot even when an earlier decode was interrupted. Revisions own completion.
+    let image = this.posterImages.find(candidate => candidate !== this.poster?.image);
+    if (!image) {
+      image = new Image();
+      this.posterImages.push(image);
+    }
     this.posterPending = image;
     image.src = clip.posterUrl;
     void image
@@ -180,17 +222,14 @@ export class DesktopPetMediaController {
   }
 
   private synchronize(restart = false): void {
-    if (!this.context.visible || !this.supported) {
-      this.clearPoster();
-      return;
-    }
-    if (this.context.reduced) {
-      this.clearPoster();
-      return;
-    }
     const id = this.transient ?? this.base();
     const clip = this.pack?.find(clip => clip.id === id);
-    if (!clip) return;
+    if (!this.context.visible || this.context.reduced || this.fallbackAction || !clip) {
+      this.wanted = undefined;
+      this.player.stop();
+      this.clearPoster();
+      return;
+    }
     this.wanted = id;
     this.loadPoster(clip);
     if (!this.context.reduced && !this.failed.has(id)) {
@@ -215,5 +254,6 @@ export class DesktopPetMediaController {
     this.disposed = true;
     this.player.dispose();
     this.clearPoster();
+    this.posterImages.length = 0;
   }
 }

@@ -235,10 +235,10 @@ blockquote {
 
 /* Theme colors are driven by CSS variables from themes.css.
  * color-scheme is set by the [data-theme] selectors. */
-body,
-#root,
+body:not([data-companion-window]),
+body:not([data-companion-window]) > #root,
 .App,
-main {
+main:not([data-companion-bubble]) {
   background-color: var(--zy-background);
   color: var(--zy-foreground);
 }

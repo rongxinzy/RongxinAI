@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { expect, test } from 'vitest';
+import { packageCommands } from '../packaging/package-commands.mjs';
 
 const root = path.resolve(import.meta.dirname, '../..');
 const read = (file: string) => readFileSync(path.join(root, file), 'utf8');
@@ -9,10 +10,13 @@ const read = (file: string) => readFileSync(path.join(root, file), 'utf8');
 test('community builds keep the full NSIS updater and then assemble the WebView2 installer', () => {
   const { scripts } = JSON.parse(read('package.json'));
   for (const name of ['dist:win:offline', 'dist:win:signed']) {
-    expect(scripts[name]).toContain('electron-builder --win nsis --x64');
-    expect(scripts[name]).toContain('&& node scripts/installer-shell/build-distribution.cjs');
+    expect(scripts[name]).toBe(`bun scripts/packaging/run-package.mjs ${name}`);
+    expect(packageCommands[name]).toContain('electron-builder --win nsis --x64');
+    expect(packageCommands[name]).toContain(
+      '&& node scripts/installer-shell/build-distribution.cjs',
+    );
   }
-  expect(scripts['dist:win:signed']).toMatch(/build-distribution\.cjs --signed$/);
+  expect(packageCommands['dist:win:signed']).toMatch(/build-distribution\.cjs --signed$/);
   const build = read('scripts/installer-shell/build-distribution.cjs');
   expect(build).not.toContain('sign(uninstall)');
   expect(build.indexOf('verifyRetainedHost(root, uninstall)')).toBeLessThan(

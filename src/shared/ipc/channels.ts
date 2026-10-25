@@ -11,6 +11,7 @@
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 export const CompanionIpc = {
+  GetVisibility: 'companion:visibility:get',
   Bootstrap: 'companion:bootstrap',
   Select: 'companion:select',
   Submit: 'companion:submit',

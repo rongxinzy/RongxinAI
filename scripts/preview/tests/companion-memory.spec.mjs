@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { contrast } from '../shared/contrast.mjs';
+import { useDormantCompanionRoster } from '../shared/companion-roster.mjs';
+
+test.beforeEach(async ({ page }) => useDormantCompanionRoster(page));
 
 async function settleDialog(page) {
   await expect(page.locator('[data-slot="dialog-content"]')).toHaveCount(1);

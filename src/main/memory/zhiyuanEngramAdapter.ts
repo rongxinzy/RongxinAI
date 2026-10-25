@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import {
   EngramMemoryScope,
   EngramObservationType,
+  EngramResponseCode,
   type EngramSearchMatchMode as EngramSearchMatchModeValue,
   type EngramMemoryScope as EngramMemoryScopeValue,
   type EngramObservationType as EngramObservationTypeValue,
@@ -45,6 +46,8 @@ export class ZhiYuanEngramAdapter {
     const observations = await this.request<EngramObservation[] | null>(
       connection,
       `/search?${params.toString()}`,
+      {},
+      [],
     );
     return Array.isArray(observations) ? observations : [];
   }
@@ -64,6 +67,8 @@ export class ZhiYuanEngramAdapter {
     const observations = await this.request<EngramObservation[] | null>(
       connection,
       `/observations/recent?${params.toString()}`,
+      {},
+      [],
     );
     return Array.isArray(observations) ? observations : [];
   }
@@ -108,6 +113,7 @@ export class ZhiYuanEngramAdapter {
 
   async supersede(input: {
     observationId: number;
+    expectedProject: string;
     replacementCandidateId: string;
     workingDirectory: string;
   }): Promise<number | null> {
@@ -116,14 +122,22 @@ export class ZhiYuanEngramAdapter {
       input.workingDirectory,
     );
     if (replacementId === null) return null;
-    await this.forget(input.observationId, false);
+    await this.forget(input.observationId, false, input.expectedProject);
     return replacementId;
   }
 
-  async forget(observationId: number, hardDelete: boolean): Promise<boolean> {
+  async forget(
+    observationId: number,
+    hardDelete: boolean,
+    expectedProject: string,
+  ): Promise<boolean> {
     const connection = await this.getConnection();
     if (!connection) return false;
-    await this.request(connection, `/observations/${observationId}?hard=${hardDelete}`, {
+    const params = new URLSearchParams({
+      hard: String(hardDelete),
+      expected_project: expectedProject,
+    });
+    await this.request(connection, `/observations/${observationId}?${params.toString()}`, {
       method: 'DELETE',
     });
     return true;
@@ -169,6 +183,7 @@ export class ZhiYuanEngramAdapter {
     connection: EngramConnection,
     pathname: string,
     init: RequestInit = {},
+    unknownProjectResult?: T,
   ): Promise<T> {
     const response = await fetch(`${connection.url}${pathname}`, {
       ...init,
@@ -180,6 +195,18 @@ export class ZhiYuanEngramAdapter {
       signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) {
+      // New owners have no backend project until their first write. Only reads
+      // opt into the server's exact unknown-project result, never generic 404s.
+      if (unknownProjectResult !== undefined && response.status === 404) {
+        const body: unknown = await response.json().catch((): null => null);
+        if (
+          body !== null &&
+          typeof body === 'object' &&
+          'code' in body &&
+          body.code === EngramResponseCode.UnknownProject
+        )
+          return unknownProjectResult;
+      }
       const method = init.method ?? 'GET';
       throw new Error(
         `Memory service request failed with HTTP ${response.status} for ${method} ${pathname}.`,

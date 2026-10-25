@@ -16,10 +16,12 @@ function sha256File(filePath) {
 }
 
 function readPinnedManifest() {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.join(ROOT, 'config/runtime-pins.json'), 'utf8'),
+  );
   const strata = packageJson.strata;
   if (!strata?.releaseTag || !strata.control || !strata.engineQwen || !strata.engineDsv41) {
-    throw new Error('package.json is missing the pinned Strata runtime configuration.');
+    throw new Error('config/runtime-pins.json is missing the pinned Strata runtime configuration.');
   }
   return strata;
 }

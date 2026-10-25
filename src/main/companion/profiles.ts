@@ -6,6 +6,7 @@ import {
   desktopPetBuiltin,
 } from '../../shared/desktopPet/catalog';
 import { DESKTOP_PET_STORE_KEY } from '../../shared/desktopPet/constants';
+import { isDesktopPetReleased } from '../../shared/desktopPet/availability';
 import type { CompanionProfile } from '../../shared/companion/types';
 
 const STORE_KEY = 'companion_profiles';
@@ -25,7 +26,10 @@ export interface CompanionProfileStore {
 
 /** One host-owned identity collection; appearances never serve as storage keys. */
 export class CompanionProfiles {
-  constructor(private readonly store: CompanionProfileStore) {}
+  constructor(
+    private readonly store: CompanionProfileStore,
+    private readonly available: (id: string) => boolean = isDesktopPetReleased,
+  ) {}
 
   snapshot(): { activePetId: string; profiles: CompanionProfile[] } {
     const result = saved.safeParse(this.store.get(STORE_KEY));
@@ -51,21 +55,38 @@ export class CompanionProfiles {
     return value;
   }
 
-  active(): CompanionProfile {
+  visibleSnapshot(): { activePetId: string; profiles: CompanionProfile[] } {
     const state = this.snapshot();
+    const profiles = state.profiles
+      .filter(item => this.available(item.personaId))
+      .map(item =>
+        this.available(item.characterId) ? item : { ...item, characterId: item.personaId },
+      );
+    const active = profiles.find(item => item.petId === state.activePetId) ?? profiles[0];
+    if (!active) throw new Error('No released companion identity is available');
+    return { activePetId: active.petId, profiles };
+  }
+
+  active(): CompanionProfile {
+    const state = this.visibleSnapshot();
     return state.profiles.find(item => item.petId === state.activePetId)!;
   }
 
   select(petId: string): CompanionProfile {
     const state = this.snapshot();
-    const selected = state.profiles.find(item => item.petId === petId);
+    const selected = state.profiles.find(
+      item => item.petId === petId && this.available(item.personaId),
+    );
     if (!selected) throw new Error('Unknown companion');
     this.store.set(STORE_KEY, { ...state, activePetId: petId });
-    return selected;
+    return this.available(selected.characterId)
+      ? selected
+      : { ...selected, characterId: selected.personaId };
   }
 
   changeAppearance(petId: string, characterId: DesktopPetBuiltinId): CompanionProfile {
     character.parse(characterId);
+    if (!this.available(characterId)) throw new Error('Companion appearance is not released');
     const state = this.snapshot();
     const selected = state.profiles.find(item => item.petId === petId);
     if (!selected) throw new Error('Unknown companion');

@@ -4,6 +4,7 @@ import type { CompanionWindowApi } from '../../shared/companion/types';
 
 /** Both owned surfaces share the same validated IPC and durable conversation. */
 export const companionApi: CompanionWindowApi = {
+  visibility: () => ipcRenderer.invoke(IpcChannel.GetVisibility),
   listMemories: petId => ipcRenderer.invoke(IpcChannel.ListMemories, petId),
   saveMemory: input => ipcRenderer.invoke(IpcChannel.SaveMemory, input),
   confirmMemory: input => ipcRenderer.invoke(IpcChannel.ConfirmMemory, input),

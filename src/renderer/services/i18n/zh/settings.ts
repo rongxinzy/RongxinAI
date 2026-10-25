@@ -11,7 +11,7 @@ export const zhSettings: Record<string, string> = {
   desktopPetCharacterZhuli: '竹栗 · 小熊猫',
   desktopPetCharacterYunmo: '云墨 · 幼龙',
   desktopPetCharacterMaixiao: '麦小 · 柯基',
-  desktopPetEnabledDescription: '点击查看任务，右键打开对话。',
+  desktopPetEnabledDescription: '点击打开对话，右键查看更多操作。',
   desktopPetDoNotDisturb: '免打扰',
   desktopPetDoNotDisturbDescription: '隐藏伙伴，任务继续。',
   desktopPetHideInFullscreen: '应用全屏时隐藏',
@@ -19,7 +19,7 @@ export const zhSettings: Record<string, string> = {
   desktopPetRoamingDescription: '空闲时沿屏幕走动。',
   desktopPetChatter: '偶尔碎碎念',
   desktopPetChatterDescription: '空闲时显示短句。',
-  desktopPetHideInFullscreenDescription: '应用全屏、锁屏或休眠时收起。',
+  desktopPetHideInFullscreenDescription: '应用全屏时，暂时收起伙伴。',
   desktopPetTaskOpenFailed: '暂时无法打开任务，请从会话列表查看。未确认的失败提醒会保留。',
   // 设置
   settings: '设置',
@@ -64,6 +64,8 @@ export const zhSettings: Record<string, string> = {
   english: 'English',
   // 快捷键
   keyboardShortcuts: '键盘快捷键',
+  companionShortcutLabel: '打开伙伴对话',
+  shortcutGlobal: '全局快捷键',
   shortcutNotSet: '未设置',
   shortcutRecorderHint: '点击快捷键后按下新的组合键；Esc 取消，Backspace 清除。',
   shortcutConflict: '快捷键 "{0}" 已被 "{1}" 使用',

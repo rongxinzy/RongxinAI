@@ -83,7 +83,6 @@ test('refreshes available models when the managed provider projection changes', 
   expect(f.policy).toHaveBeenCalledOnce();
   const restrictView = f.setView.mock.calls[0][0];
   expect(restrictView(MainView.LocalInference)).toBe(MainView.Cowork);
-  expect(restrictView(MainView.Companion)).toBe(MainView.Companion);
   f.hook.unmount();
   expect(f.unsubscribe).toHaveBeenCalledOnce();
   expect(f.unsubscribeBindings).toHaveBeenCalledOnce();

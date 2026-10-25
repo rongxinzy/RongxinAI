@@ -11,7 +11,7 @@ export const enSettings: Record<string, string> = {
   desktopPetCharacterZhuli: 'Zhuli · Red panda',
   desktopPetCharacterYunmo: 'Yunmo · Baby dragon',
   desktopPetCharacterMaixiao: 'Maixiao · Corgi',
-  desktopPetEnabledDescription: 'Click for the current task. Open chat from the companion menu.',
+  desktopPetEnabledDescription: 'Click to chat. Right-click for more actions.',
   desktopPetDoNotDisturb: 'Do not disturb',
   desktopPetDoNotDisturbDescription: 'Hide your companion while tasks continue.',
   desktopPetHideInFullscreen: 'Hide when the app is fullscreen',
@@ -19,8 +19,7 @@ export const enSettings: Record<string, string> = {
   desktopPetRoamingDescription: 'Take short walks while idle.',
   desktopPetChatter: 'Occasional chatter',
   desktopPetChatterDescription: 'Show an occasional line while idle.',
-  desktopPetHideInFullscreenDescription:
-    'Hide while this app is fullscreen, or the device is locked or asleep.',
+  desktopPetHideInFullscreenDescription: 'Hide your companion while this app is fullscreen.',
   desktopPetTaskOpenFailed:
     'The task could not be opened. Check the conversation list. Unacknowledged failure reminders are kept.',
   // Settings
@@ -67,6 +66,8 @@ export const enSettings: Record<string, string> = {
   english: 'English',
   // Shortcuts
   keyboardShortcuts: 'Keyboard Shortcuts',
+  companionShortcutLabel: 'Open companion chat',
+  shortcutGlobal: 'Global shortcut',
   shortcutNotSet: 'Not set',
   shortcutRecorderHint: 'Click a shortcut and press the new keys; Esc cancels, Backspace clears.',
   shortcutConflict: 'Shortcut "{0}" is already used by "{1}"',

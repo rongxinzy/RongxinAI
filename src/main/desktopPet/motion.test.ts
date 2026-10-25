@@ -8,19 +8,23 @@ const desktop = vi.hoisted(() => ({
 vi.mock('electron', () => ({
   screen: {
     getCursorScreenPoint: () => ({ ...desktop.cursor }),
-    getDisplayNearestPoint: () => ({ workArea: desktop.area }),
-    getDisplayMatching: () => ({ workArea: desktop.area }),
+    getDisplayNearestPoint: () => ({ id: 'main', workArea: desktop.area }),
+    getDisplayMatching: () => ({ id: 'main', workArea: desktop.area }),
   },
 }));
 
 import { DesktopPetMotion } from './motion';
 import { DesktopPetEffectKind } from '../../shared/desktopPet/constants';
 import { DESKTOP_PET_CANVAS_TOP, DESKTOP_PET_WINDOW_HEIGHT } from '../../shared/desktopPet/layout';
+import { PetOrientation, WindowSurfaceSide } from '../../shared/desktopPet/surfaces/constants';
+import { surfaceWindowPosition } from '../../shared/desktopPet/surfaces/placement';
+import type { WindowSurfaceSnapshot } from '../../shared/desktopPet/surfaces/types';
 
 let position = { x: 400, y: 300 };
 const ignore = vi.fn();
 const settled = vi.fn();
 const effect = vi.fn();
+const publishedPose = vi.fn();
 const window = {
   getPosition: () => [position.x, position.y],
   getBounds: () => ({ ...position, width: 192, height: DESKTOP_PET_WINDOW_HEIGHT }),
@@ -38,7 +42,7 @@ beforeEach(() => {
   desktop.cursor = { x: 496, y: 396 + DESKTOP_PET_CANVAS_TOP };
   desktop.area = { x: 0, y: 24, width: 1440, height: 876 };
   position = { x: 400, y: 300 };
-  motion = new DesktopPetMotion(window, settled, effect);
+  motion = new DesktopPetMotion(window, settled, effect, publishedPose);
 });
 afterEach(() => {
   motion.dispose();
@@ -108,12 +112,13 @@ test('a removed display clamps an ongoing drag to the remaining work area', () =
 
 test('native drag and meaningful collisions emit bounded visual effects, without per-tick messages', () => {
   motion.begin();
-  expect(effect).toHaveBeenLastCalledWith({ kind: DesktopPetEffectKind.Drag, active: true });
+  expect(effect).not.toHaveBeenCalled();
   for (let i = 0; i < 5; i++) {
     desktop.cursor.y += 40;
     vi.advanceTimersByTime(32);
   }
   expect(effect).toHaveBeenCalledOnce();
+  expect(effect).toHaveBeenLastCalledWith({ kind: DesktopPetEffectKind.Drag, active: true });
   motion.end();
   expect(effect).toHaveBeenLastCalledWith({ kind: DesktopPetEffectKind.Drag, active: false });
   vi.advanceTimersByTime(1000);
@@ -173,4 +178,70 @@ test('an explicit action rests a walking pet and publishes the stopped pose befo
   expect(position).toEqual(stopped);
   motion.setAllowRoam(false);
   expect(pose).toHaveBeenLastCalledWith(expect.objectContaining({ walking: false }));
+});
+
+function wall(x = 450): WindowSurfaceSnapshot {
+  return {
+    revision: 1,
+    sequence: 1,
+    capturedAt: performance.now(),
+    timing: { queueMs: 0, runMs: 0 },
+    fullscreenDisplays: [],
+    surfaces: [
+      {
+        owner: 'window',
+        display: 'main',
+        side: WindowSurfaceSide.Left,
+        start: { x, y: 200 },
+        end: { x, y: 700 },
+        from: 0,
+        to: 1,
+      },
+    ],
+  };
+}
+function perchOnWall(): void {
+  position = surfaceWindowPosition({ x: 450, y: 500 }, PetOrientation.Upright);
+  motion.setAllowRoam(true);
+  motion.setWindowSnapshot(wall());
+  vi.advanceTimersByTime(80);
+  expect(publishedPose).toHaveBeenLastCalledWith(
+    expect.objectContaining({ orientation: PetOrientation.Left }),
+  );
+  desktop.cursor = { x: position.x + 96, y: position.y + DESKTOP_PET_CANVAS_TOP + 96 };
+}
+
+test('clicking a perched companion keeps its support and follows the same window afterward', () => {
+  perchOnWall();
+  const before = { ...position };
+  effect.mockClear();
+  motion.begin();
+  desktop.cursor.x += 3;
+  vi.advanceTimersByTime(32);
+  expect(position).toEqual(before);
+  expect(effect).not.toHaveBeenCalled();
+  expect(motion.end()).toBe(true);
+  motion.setAllowRoam(false);
+  motion.setWindowSnapshot(wall(510));
+  expect(position).toEqual({ x: before.x + 60, y: before.y });
+  expect(publishedPose).toHaveBeenLastCalledWith(
+    expect.objectContaining({ orientation: PetOrientation.Left }),
+  );
+});
+
+test('crossing the drag threshold detaches support even if released back at the starting point', () => {
+  perchOnWall();
+  const start = { ...desktop.cursor };
+  const before = { ...position };
+  motion.begin();
+  desktop.cursor.x += 20;
+  vi.advanceTimersByTime(32);
+  expect(publishedPose).toHaveBeenLastCalledWith(
+    expect.objectContaining({ orientation: PetOrientation.Upright }),
+  );
+  desktop.cursor = start;
+  expect(motion.end()).toBe(false);
+  motion.setAllowRoam(false);
+  motion.setWindowSnapshot(wall(510));
+  expect(position).toEqual(before);
 });

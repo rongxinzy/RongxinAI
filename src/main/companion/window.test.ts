@@ -29,6 +29,7 @@ class FakeWindow extends EventEmitter {
   loadURL = vi.fn(async () => {});
   loadFile = vi.fn(async () => {});
   setTitle = vi.fn();
+  setBounds = vi.fn();
   constructor(readonly options: Record<string, unknown>) {
     super();
     mocks.windows.push(this);
@@ -58,6 +59,8 @@ vi.mock('electron', () => ({
     removeHandler: (channel: string) => mocks.handlers.delete(channel),
   },
   screen: {
+    on: vi.fn(),
+    removeListener: vi.fn(),
     getCursorScreenPoint: () => ({ x: -500, y: 50 }),
     getDisplayNearestPoint: () => ({ workArea: { x: -1440, y: 0, width: 1440, height: 900 } }),
   },
@@ -68,10 +71,11 @@ import {
   initializeCompanionWindow,
   isCompanionWindow,
   openCompanionWindow,
+  prepareCompanionWindow,
   updateActiveCompanionAppearance,
 } from './window';
 
-function fixture() {
+function fixture(open = true) {
   const profile = {
     petId: '00000000-0000-4000-8000-000000000001',
     personaId: DesktopPetBuiltinId.Xiaoyuan,
@@ -95,6 +99,7 @@ function fixture() {
   const profiles = {
     active: () => profile,
     snapshot: () => ({ activePetId: profile.petId, profiles: [profile] }),
+    visibleSnapshot: () => ({ activePetId: profile.petId, profiles: [profile] }),
     select: vi.fn(() => profile),
     changeAppearance: vi.fn(),
   };
@@ -132,7 +137,8 @@ function fixture() {
     getTasks: () => tasks as never,
     openTask,
   });
-  openCompanionWindow();
+  if (open) openCompanionWindow();
+  else prepareCompanionWindow();
   const window = mocks.windows.at(-1)!;
   const event = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
   const invoke = (channel: string, ...args: unknown[]) =>
@@ -169,9 +175,31 @@ test('creates a focusable sandboxed window and reuses it without admitting a mod
   expect(isCompanionWindow(f.window as never)).toBe(true);
   openCompanionWindow();
   expect(mocks.windows).toHaveLength(2);
+  expect(f.window.focus).not.toHaveBeenCalled();
+  f.window.emit('ready-to-show');
   expect(f.window.focus).toHaveBeenCalledOnce();
   expect(f.runtime.submit).not.toHaveBeenCalled();
   expect(mocks.register).toHaveBeenCalledWith(COMPANION_SHORTCUT, expect.any(Function));
+});
+
+test('preparing stays hidden without a runtime resume, and opening reuses that ready shell', async () => {
+  const f = fixture(false);
+  prepareCompanionWindow();
+  f.window.emit('ready-to-show');
+  expect(mocks.windows).toHaveLength(2);
+  expect(f.window.show).not.toHaveBeenCalled();
+  expect(f.window.focus).not.toHaveBeenCalled();
+  expect(await f.invoke(IpcChannel.GetVisibility)).toBe(false);
+  expect(f.runtime.resume).not.toHaveBeenCalled();
+  expect(f.runtime.history).not.toHaveBeenCalled();
+  openCompanionWindow();
+  expect(f.window.show).toHaveBeenCalledOnce();
+  expect(f.window.focus).toHaveBeenCalledOnce();
+  expect(await f.invoke(IpcChannel.GetVisibility)).toBe(true);
+  await expect(f.invoke(IpcChannel.GetVisibility, true)).rejects.toThrow('invalid arguments');
+  await expect(
+    mocks.handlers.get(IpcChannel.GetVisibility)!({ sender: {}, senderFrame: {} }),
+  ).rejects.toThrow('owned main frame');
 });
 
 test('rejects foreign senders, subframes and malformed input before runtime execution', async () => {
@@ -203,6 +231,14 @@ test('hide and close preserve the conversation, while stop is explicit', async (
   expect(f.runtime.stop).toHaveBeenCalledWith(f.profile);
 });
 
+test('hiding a loading bubble cancels its pending first show', async () => {
+  const f = fixture();
+  await f.invoke(IpcChannel.Hide);
+  f.window.emit('ready-to-show');
+  expect(f.window.show).not.toHaveBeenCalled();
+  expect(f.window.focus).not.toHaveBeenCalled();
+});
+
 test('the bridge exposes profile state and the workbench without general application IPC', async () => {
   const f = fixture();
   expect(await f.invoke(IpcChannel.Bootstrap)).toMatchObject({
@@ -213,7 +249,7 @@ test('the bridge exposes profile state and the workbench without general applica
   expect(f.onProfileChanged).toHaveBeenCalledWith(f.profile);
   await f.invoke(IpcChannel.OpenWorkbench);
   expect(f.main.focus).toHaveBeenCalledOnce();
-  expect(mocks.handlers.size).toBe(17);
+  expect(mocks.handlers.size).toBe(18);
   disposeCompanionWindow();
   expect(mocks.handlers.size).toBe(0);
   expect(mocks.unregister).toHaveBeenCalledWith(COMPANION_SHORTCUT);

@@ -7,10 +7,17 @@ import { cn } from '@shared/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
-function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
+function InputGroup({
+  className,
+  variant = 'default',
+  ...props
+}: React.ComponentProps<'div'> & {
+  variant?: 'default' | 'paper';
+}) {
   return (
     <div
       data-slot="input-group"
+      data-variant={variant}
       role="group"
       className={cn(
         'theme-input-group group/input-group relative flex w-full min-w-0 items-center has-[>[data-align=block-end]]:h-auto has-[>[data-align=block-end]]:flex-col has-[>[data-align=block-start]]:h-auto has-[>[data-align=block-start]]:flex-col has-[>textarea]:h-auto',

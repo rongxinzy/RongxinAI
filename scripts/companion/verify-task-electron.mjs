@@ -138,7 +138,10 @@ try {
       item.click();
     };
   });
-  const opened = application.waitForEvent('window', { timeout: 15_000 });
+  const prepared = application.windows().find(page => page.url().includes('companion.html'));
+  const opened = prepared
+    ? Promise.resolve(prepared)
+    : application.waitForEvent('window', { timeout: 15_000 });
   await actor.evaluate(() => window.desktopPet.menu());
   const chat = await opened;
   const taskMemoryAdmission = taskMemoryFixture ? await prepareTaskMemory(chat) : null;
@@ -165,7 +168,10 @@ try {
       })
       .toBe(1);
   } catch (error) {
-    await chat.screenshot({ path: path.join(userData, 'task-rejected.png') });
+    console.error(error);
+    await chat
+      .screenshot({ path: path.join(userData, 'task-rejected.png'), timeout: 3000 })
+      .catch(failure => console.warn('Task rejection screenshot unavailable:', failure.message));
     console.log(
       JSON.stringify({
         alerts: await chat.getByRole('alert').allTextContents(),
@@ -261,6 +267,16 @@ try {
   expect(media.opaque).toBeGreaterThan(5000);
   expect(media.decoderSlots).toBe(2);
   await actor.screenshot({ path: path.join(userData, 'motion-window.png'), omitBackground: true });
+  // DND hides the bubble too; lifting DND must not reopen it without user intent.
+  expect(
+    await application.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows()
+        .find(window => window.webContents.getURL().includes('companion.html'))
+        .isVisible(),
+    ),
+  ).toBe(false);
+  await actor.evaluate(() => window.desktopPet.menu());
+  await expect(chat.getByRole('textbox')).toBeFocused();
   await chat.screenshot({ path: path.join(userData, 'task-window.png') });
   await chat.evaluate(sessionId => window.companion.openWorkbench(sessionId), receipt.sessionId);
   await expect(main.getByTestId('sidebar-view-workbench')).toHaveAttribute('aria-current', 'page');

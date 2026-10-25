@@ -1,0 +1,26 @@
+{
+  "sourceSha256": "2883fbb9a6f09a493769294fc8993cf96e6992ad5dc4a74c0968c56a3a586465",
+  "choreographySha256": "23c5726c7078eef6f7224b6faf5e3c21990a64e4c8b9efea3f6ce75f94eb8230",
+  "chromium": "151.0.7922.34",
+  "encoder": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "crf": 25,
+  "size": 512,
+  "fps": 30,
+  "clips": [
+    {
+      "id": "idle",
+      "frames": 120,
+      "seconds": 4,
+      "bytes": 325304,
+      "sha256": "b4c1842eeb5aae940a2640e2da2ebc117d77ba75daa052e1a47a2f27cb54440a",
+      "bounds": [
+        99,
+        38,
+        417,
+        487
+      ],
+      "posterSha256": "df6450f02aa996a20681004decde49956d3194ae6d1fee969da5d6a01d29a4b7",
+      "maskSha256": "8934307dca4d7eb1f30108578aedbef8108bfa8f56b0a7b9acdd1fcaaec79aff"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import type { DesktopPetBuiltinId } from '../desktopPet/catalog';
 import type { CompanionAttachment } from './attachments';
+import type { CompanionBubblePlacement } from './bubble';
 import type { ManagedMemoryRecord } from '../memory/types';
 import type { CompanionMemorySave, CompanionMemoryShare, CompanionMemoryConfirm } from './memory';
 import type {
@@ -28,7 +29,7 @@ export interface CompanionAvailability {
   modelId: string | null;
   imageInput: boolean;
   /** Catalog presence alone never establishes tool support. */
-  toolUse: false;
+  toolUse: boolean;
   reason?: CompanionUnavailableReason;
 }
 
@@ -58,6 +59,7 @@ export interface CompanionWindowContext {
   language: 'zh' | 'en';
   theme: 'light' | 'dark' | 'system';
   themeStyle: string;
+  bubble?: CompanionBubblePlacement;
 }
 
 export interface CompanionWindowState {
@@ -73,6 +75,7 @@ export interface CompanionWindowState {
 }
 
 export interface CompanionWindowApi {
+  visibility(): Promise<boolean>;
   listMemories(petId: string): Promise<ManagedMemoryRecord[]>;
   saveMemory(input: CompanionMemorySave): Promise<ManagedMemoryRecord>;
   confirmMemory(input: CompanionMemoryConfirm): Promise<ManagedMemoryRecord>;

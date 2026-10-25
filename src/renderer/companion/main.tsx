@@ -12,6 +12,7 @@ declare global {
 }
 
 const root = document.getElementById('root');
+document.body.dataset.companionWindow = '';
 if (import.meta.env.DEV && !window.companion) {
   window.companion = createCompanionPreviewApi();
   document.documentElement.dataset.companionPreview = 'true';

@@ -26,7 +26,11 @@ import type {
 } from '../../shared/companion/types.js';
 import { CompanionModelAssignment } from './modelAssignment.mjs';
 import { companionInstructions } from './personas.js';
-import type { CompanionMemoryService } from './memory.js';
+import {
+  companionMemoryTools,
+  companionToolsRejected,
+  type CompanionChatMemory,
+} from './memoryTools.mjs';
 
 const owners = new Set<string>();
 const requestIdSchema = z.string().trim().min(1).max(128);
@@ -41,6 +45,7 @@ interface ActiveCompanion {
   modelId: string | null;
   availability: CompanionAvailability;
   memoryQuery: string;
+  memoryTools: ReturnType<typeof companionMemoryTools>;
 }
 
 export interface CompanionAdmission {
@@ -58,7 +63,7 @@ export class PiCompanionRuntime {
   constructor(
     private readonly root: string,
     private readonly assignment: CompanionModelAssignment,
-    private readonly memory?: Pick<CompanionMemoryService, 'context'>,
+    private readonly memory?: Pick<CompanionChatMemory, 'context'> & Partial<CompanionChatMemory>,
   ) {}
 
   private serialize<T>(operation: () => Promise<T>): Promise<T> {
@@ -83,10 +88,20 @@ export class PiCompanionRuntime {
     try {
       let models: Models = createModels();
       let memoryQuery = '';
+      const memoryTools =
+        this.memory?.search && this.memory.save && this.memory.forget
+          ? companionMemoryTools(profile.petId, {
+              context: this.memory.context.bind(this.memory),
+              search: this.memory.search.bind(this.memory),
+              save: this.memory.save.bind(this.memory),
+              forget: this.memory.forget.bind(this.memory),
+            })
+          : [];
       const registry = createRegistry();
       registry.install(
         defineExtension({
           name: 'zhiyuan.companion',
+          tools: memoryTools,
           sections: this.memory
             ? [
                 section('companion-memory', async () => {
@@ -106,7 +121,13 @@ export class PiCompanionRuntime {
           hooks: [
             hook(GenerationTask, {
               afterResponse: message => {
-                if (message.stopReason === 'error') this.assignment.failed(message.model);
+                if (message.stopReason === 'error') {
+                  if (companionToolsRejected(message.errorMessage ?? ''))
+                    this.assignment.observeTools(message.model, false);
+                  else this.assignment.failed(message.model);
+                } else if (message.content.some(block => block.type === 'toolCall')) {
+                  this.assignment.observeTools(message.model, true);
+                }
               },
             }),
           ],
@@ -135,7 +156,10 @@ export class PiCompanionRuntime {
       }
       try {
         const conversation = await harness.root(context, {
-          agent: { instructions: companionInstructions(profile.personaId), tools: [] },
+          agent: {
+            instructions: companionInstructions(profile.personaId),
+            tools: memoryTools,
+          },
         });
         const restored = await conversation.entries({}, 32, undefined, context);
         const latestUser = restored.items.find(entry => UserEntry.is(entry));
@@ -161,6 +185,7 @@ export class PiCompanionRuntime {
             models = value;
           },
           modelId: null,
+          memoryTools,
           get memoryQuery() {
             return memoryQuery;
           },
@@ -191,7 +216,9 @@ export class PiCompanionRuntime {
     active.models = resolved.models;
     active.modelId = resolved.availability.modelId;
     active.availability = resolved.availability;
-    await active.conversation.configure({ model: resolved.model }, context);
+    const tools =
+      active.modelId && this.assignment.permitsTools(active.modelId) ? active.memoryTools : [];
+    await active.conversation.configure({ model: resolved.model, tools }, context);
     return resolved.availability;
   }
 

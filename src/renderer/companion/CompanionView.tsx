@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FolderOpen, Paperclip } from 'lucide-react';
-import { cn } from '@shared/lib/utils';
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import {
@@ -24,44 +23,41 @@ import type {
 } from '../../shared/companion/types';
 import {
   COMPANION_NAME_KEYS,
-  CompanionCapability,
   CompanionComposerMode,
-  CompanionSurface,
   CompanionAttachmentIssue,
 } from '../../shared/companion/constants';
-import PageHeader from '../components/PageHeader';
 import { i18nService } from '../services/i18n';
 import { themeService } from '../services/theme';
+import { resolveThemePlugin } from '../theme/themes/plugins';
 import { readCompanionDraft, writeCompanionDraft } from './draft';
 import { useTaskSnapshots } from './useTaskSnapshots';
 import { CompanionConversation } from './CompanionConversation';
-import { CompanionPortrait } from './CompanionPortrait';
 import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttachments';
 import { useCompanionFiles } from './useCompanionFiles';
 import { CompanionHeaderActions } from './CompanionHeaderActions';
 import { createCompanionRefreshQueue } from './refreshQueue';
 import { useCompanionAnswer } from './useCompanionAnswer';
+import { CompanionBubbleFrame } from './CompanionBubbleFrame';
+import { watchCompanionVisibility } from './visibility';
+import { CompanionBubbleSide, type CompanionBubblePlacement } from '../../shared/companion/bubble';
 
 function applyContext(context: CompanionWindowContext): void {
   themeService.initialize();
   i18nService.setLanguage(context.language, { persist: false });
-  themeService.setStyle(context.themeStyle);
-  themeService.setTheme(context.theme);
+  const style = resolveThemePlugin(context.themeStyle).id;
+  if (themeService.getStyle() !== style) themeService.setStyle(style);
+  if (themeService.getTheme() !== context.theme) themeService.setTheme(context.theme);
 }
 
 interface Props {
   api?: CompanionWindowApi;
-  surface?: CompanionSurface;
-  isSidebarCollapsed?: boolean;
-  onToggleSidebar?: () => void;
 }
 
-export function CompanionView({
-  api = window.companion,
-  surface = CompanionSurface.Quick,
-  isSidebarCollapsed,
-  onToggleSidebar,
-}: Props = {}) {
+export function CompanionView({ api = window.companion }: Props = {}) {
+  const [placement, setPlacement] = useState<CompanionBubblePlacement>({
+    side: CompanionBubbleSide.Above,
+    anchorX: 240,
+  });
   const [state, setState] = useState<CompanionWindowState | null>(null);
   const { remember: rememberTasks, update: updateTasks } = useTaskSnapshots(setState);
   const [draft, setDraft] = useState<ReturnType<typeof readCompanionDraft>>(() => ({
@@ -71,13 +67,13 @@ export function CompanionView({
   const [sending, setSending] = useState(false);
   const [choosingWorkspace, setChoosingWorkspace] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(false);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const [, languageChanged] = useState(0);
   const revision = useRef(0);
   const activeId = useRef<string | null>(null);
   const draftRef = useRef(draft);
-  const visibleRef = useRef(true);
+  const visibleRef = useRef(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
   const t = (key: string) => i18nService.t(key);
   const taskMode = draft.mode === CompanionComposerMode.Task;
@@ -87,10 +83,10 @@ export function CompanionView({
   const replaceDraft = useCallback(
     (next: ReturnType<typeof readCompanionDraft>, petId?: string) => {
       draftRef.current = next;
-      if (petId) writeCompanionDraft(petId, next, surface);
+      if (petId) writeCompanionDraft(petId, next);
       setDraft(next);
     },
-    [surface],
+    [],
   );
   const load = useCallback(
     async (petId?: string) => {
@@ -102,10 +98,11 @@ export function CompanionView({
       try {
         const next = petId ? await api.select(petId) : await api.bootstrap();
         if (revision.current !== current) return;
-        if (surface === CompanionSurface.Quick) applyContext(next.context);
+        applyContext(next.context);
+        if (next.context.bubble) setPlacement(next.context.bubble);
         if (activeId.current !== next.activePetId) {
           activeId.current = next.activePetId;
-          replaceDraft(readCompanionDraft(next.activePetId, surface));
+          replaceDraft(readCompanionDraft(next.activePetId));
         }
         const snapshot = rememberTasks({
           petId: next.activePetId,
@@ -118,34 +115,37 @@ export function CompanionView({
         if (revision.current === current) setError('companionLoadFailed');
       }
     },
-    [api, surface, replaceDraft, rememberTasks],
+    [api, replaceDraft, rememberTasks],
   );
 
   useEffect(() => {
     const refresh = createCompanionRefreshQueue(() => load());
-    void refresh.request();
+    if (!api) void refresh.request();
     const unsubscribeLanguage = i18nService.subscribe(() => languageChanged(value => value + 1));
-    const unsubscribeContext =
-      surface === CompanionSurface.Quick ? api?.onContext(applyContext) : undefined;
+    const unsubscribeContext = api?.onContext(context => {
+      applyContext(context);
+      if (context.bubble) setPlacement(context.bubble);
+    });
     const unsubscribeChanged = api?.onChanged(() => {
       if (visibleRef.current) void refresh.request();
     });
-    const unsubscribeVisibility = api?.onVisibility(next => {
-      visibleRef.current = next;
-      setVisible(next);
-      if (next) {
-        void refresh.request();
-        textarea.current?.focus();
-      }
-    });
+    const unsubscribeVisibility = api
+      ? watchCompanionVisibility(
+          api,
+          next => {
+            visibleRef.current = next;
+            setVisible(next);
+            if (next) {
+              void refresh.request();
+              textarea.current?.focus();
+            }
+          },
+          () => setError('companionLoadFailed'),
+        )
+      : undefined;
     const unsubscribeTasks = api?.onTasks(updateTasks);
     const keydown = (event: KeyboardEvent) => {
-      if (
-        surface === CompanionSurface.Quick &&
-        event.key === 'Escape' &&
-        !event.isComposing &&
-        !event.defaultPrevented
-      ) {
+      if (event.key === 'Escape' && !event.isComposing && !event.defaultPrevented) {
         event.preventDefault();
         void api?.hide();
       }
@@ -161,7 +161,7 @@ export function CompanionView({
       unsubscribeTasks?.();
       document.removeEventListener('keydown', keydown);
     };
-  }, [api, surface, load, cancelPendingLoad, updateTasks]);
+  }, [api, load, cancelPendingLoad, updateTasks]);
 
   const pending = state?.conversation.pending;
   useEffect(() => {
@@ -191,8 +191,7 @@ export function CompanionView({
     setSending(true);
     setError(null);
     const acknowledgeDraft = () => {
-      const current =
-        activeId.current === petId ? draftRef.current : readCompanionDraft(petId, surface);
+      const current = activeId.current === petId ? draftRef.current : readCompanionDraft(petId);
       if (current.requestId !== sent.requestId) return;
       const next = {
         ...current,
@@ -201,7 +200,7 @@ export function CompanionView({
         attachments: taskMode ? [] : current.attachments,
       };
       if (activeId.current === petId) replaceDraft(next, petId);
-      else writeCompanionDraft(petId, next, surface);
+      else writeCompanionDraft(petId, next);
     };
     try {
       if (taskMode) {
@@ -290,40 +289,19 @@ export function CompanionView({
   return (
     <main
       ref={setPortalContainer}
-      className={cn(
-        'flex min-h-0 flex-col',
-        surface === CompanionSurface.Home ? 'h-full' : 'h-dvh',
-      )}
+      data-companion-bubble
+      aria-label={t('companionTitle')}
+      className="theme-companion-bubble relative flex h-dvh min-h-0 flex-col p-4"
     >
-      <PageHeader
-        title={t('companionTitle')}
-        windowControls={surface === CompanionSurface.Home ? undefined : null}
-        isSidebarCollapsed={isSidebarCollapsed}
-        onToggleSidebar={onToggleSidebar}
-        actions={
-          <CompanionHeaderActions
-            api={api}
-            surface={surface}
-            visible={visible}
-            profile={state?.profiles.find(profile => profile.petId === state.activePetId)}
-          />
-        }
-      />
-      <div className="mx-auto flex w-full min-h-0 max-w-3xl flex-1 flex-col">
-        <div className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
-            {state ? (
-              <CompanionPortrait
-                characterId={
-                  state.profiles.find(profile => profile.petId === state.activePetId)!.characterId
-                }
-                label={t(
-                  COMPANION_NAME_KEYS[
-                    state.profiles.find(profile => profile.petId === state.activePetId)!.personaId
-                  ],
-                )}
-              />
-            ) : null}
+      <CompanionBubbleFrame placement={placement} />
+      <h1 className="sr-only">{t('companionTitle')}</h1>
+      <div className="theme-companion-paper-content relative flex min-h-0 w-full flex-1 flex-col py-3">
+        <header className="flex shrink-0 items-center justify-between gap-2 px-3 pb-3">
+          {state?.profiles.length === 1 ? (
+            <span className="theme-companion-name">
+              {t(COMPANION_NAME_KEYS[state.profiles[0].personaId])}
+            </span>
+          ) : (
             <Select
               value={state?.activePetId ?? ''}
               disabled={!state || sending || choosingWorkspace || choosingFiles || Boolean(pending)}
@@ -331,7 +309,10 @@ export function CompanionView({
                 if (id) void load(id);
               }}
             >
-              <SelectTrigger className="w-44" aria-label={t('companionChoose')}>
+              <SelectTrigger
+                className="theme-companion-selector w-36"
+                aria-label={t('companionChoose')}
+              >
                 <SelectValue>
                   {state
                     ? t(
@@ -351,15 +332,15 @@ export function CompanionView({
                 ))}
               </SelectContent>
             </Select>
+          )}
+          <div className="flex items-center gap-1">
+            <CompanionHeaderActions
+              api={api}
+              visible={visible}
+              profile={state?.profiles.find(profile => profile.petId === state.activePetId)}
+            />
           </div>
-          <span className="theme-home-caption">
-            {t(
-              state?.availability.capability === CompanionCapability.Chat
-                ? 'companionChatReady'
-                : 'companionLocalOnly',
-            )}
-          </span>
-        </div>
+        </header>
         <CompanionConversation
           state={state}
           taskMode={taskMode}
@@ -450,6 +431,7 @@ export function CompanionView({
             />
           ) : null}
           <PromptInput
+            inputVariant="paper"
             onSubmit={submit}
             maxFiles={0}
             onError={() =>

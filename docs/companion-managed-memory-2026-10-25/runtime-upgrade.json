@@ -1,0 +1,13 @@
+{
+  "userData": "/tmp/companion-memory-upgrade-PeeTg5",
+  "previousVersion": "engram 1.20.0-zhiyuan.4",
+  "nextVersion": "engram 3.6.0-zhiyuan.1",
+  "owners": 4,
+  "sameObservationIds": true,
+  "sameContent": true,
+  "isolation": true,
+  "deletedHidden": true,
+  "hardDeleteAfterUpgrade": true,
+  "wrongOwnerRejected": true,
+  "actualUserDataTouched": false
+}

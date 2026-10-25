@@ -148,6 +148,24 @@ test('does not infer tools from catalog presence; visual support requires a decl
   });
 });
 
+test('explicit tool rejection preserves text assignment and expires without changing defaults', async () => {
+  const f = fixture();
+  f.assignment.observeTools('a', false);
+  expect(f.assignment.permitsTools('a')).toBe(false);
+  expect((await f.assignment.resolve('pet')).availability).toMatchObject({
+    modelId: 'a',
+    toolUse: false,
+    capability: CompanionCapability.Chat,
+  });
+  f.advance();
+  expect(f.assignment.permitsTools('a')).toBe(true);
+  f.assignment.observeTools('a', true);
+  expect((await f.assignment.resolve('pet')).availability.toolUse).toBe(true);
+  f.setDefault('b');
+  expect((await f.assignment.resolve('pet')).availability.toolUse).toBe(false);
+  expect(f.write).not.toHaveBeenCalled();
+});
+
 test('gateway metadata with unknown modalities permits a text attempt without asserting other capabilities', async () => {
   const f = fixture();
   f.setModels(

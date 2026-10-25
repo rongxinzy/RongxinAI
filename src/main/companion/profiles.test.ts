@@ -12,7 +12,8 @@ function fixture() {
       values.set(key, structuredClone(value));
     },
   };
-  return { values, store, profiles: new CompanionProfiles(store) };
+  // Exercise retained multi-companion behavior separately from the single-character release.
+  return { values, store, profiles: new CompanionProfiles(store, () => true) };
 }
 
 test('creates seven persistent identities, with only one active companion', () => {
@@ -66,4 +67,23 @@ test('all seven personalities have distinct concise native instructions and shar
     expect(prompt).toContain('not accuracy or permissions');
     expect(prompt).toContain('Do not claim actions');
   }
+});
+
+test('the release hides dormant identities without rewriting their saved appearance or active owner', () => {
+  const f = fixture();
+  const all = f.profiles.snapshot();
+  f.profiles.changeAppearance(all.profiles[0].petId, DesktopPetBuiltinId.Youli);
+  f.profiles.select(all.profiles[1].petId);
+  const preserved = structuredClone(f.values.get('companion_profiles'));
+  const released = new CompanionProfiles(f.store);
+  expect(released.visibleSnapshot().profiles).toEqual([
+    { ...all.profiles[0], characterId: DesktopPetBuiltinId.Xiaoyuan },
+  ]);
+  expect(released.active().petId).toBe(all.profiles[0].petId);
+  expect(() => released.select(all.profiles[1].petId)).toThrow('Unknown');
+  expect(() => released.changeAppearance(all.profiles[0].petId, DesktopPetBuiltinId.Youli)).toThrow(
+    'not released',
+  );
+  expect(f.values.get('companion_profiles')).toEqual(preserved);
+  expect(new CompanionProfiles(f.store, () => true).active().petId).toBe(all.profiles[1].petId);
 });

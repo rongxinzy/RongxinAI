@@ -20,6 +20,7 @@ const MAX_FAILURES = 64;
 /** Failure observations are bounded and expire; a catalog entry is not a health check. */
 export class CompanionModelAssignment {
   private readonly failures = new Map<string, number>();
+  private readonly toolSupport = new Map<string, { supported: boolean; until: number }>();
   constructor(
     private readonly service: MagpieModelService,
     private readonly now: () => number = Date.now,
@@ -29,6 +30,18 @@ export class CompanionModelAssignment {
     this.failures.delete(modelId);
     this.failures.set(modelId, this.now() + COOLDOWN_MS);
     if (this.failures.size > MAX_FAILURES) this.failures.delete(this.failures.keys().next().value!);
+  }
+
+  observeTools(modelId: string, supported: boolean): void {
+    this.toolSupport.delete(modelId);
+    this.toolSupport.set(modelId, { supported, until: this.now() + COOLDOWN_MS });
+    if (this.toolSupport.size > MAX_FAILURES)
+      this.toolSupport.delete(this.toolSupport.keys().next().value!);
+  }
+
+  permitsTools(modelId: string): boolean {
+    const observed = this.toolSupport.get(modelId);
+    return !observed || observed.until <= this.now() || observed.supported;
   }
 
   async resolve(conversationId: string) {
@@ -91,7 +104,9 @@ export class CompanionModelAssignment {
       capability: CompanionCapability.Chat,
       modelId: selected.model.id,
       imageInput: projection.supportsImage,
-      toolUse: false,
+      toolUse:
+        this.toolSupport.get(selected.model.id)?.supported === true &&
+        this.toolSupport.get(selected.model.id)!.until > this.now(),
     };
     return { models, model, availability };
   }

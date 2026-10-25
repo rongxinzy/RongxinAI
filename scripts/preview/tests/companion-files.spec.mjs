@@ -2,38 +2,23 @@ import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { attachConsoleGuards } from '../shared/harness.mjs';
 import { CompanionAttachmentIssue } from '../../../src/shared/companion/constants.ts';
+import { useDormantCompanionRoster } from '../shared/companion-roster.mjs';
 
-async function open(page, surface = 'quick', theme = 'light', offline = false) {
-  if (surface === 'home')
-    await page.addInitScript(theme => {
-      let api;
-      Object.defineProperty(window, 'electron', {
-        configurable: true,
-        get: () => api,
-        set(value) {
-          value.appInfo.getSystemLocale = async () => 'zh-CN';
-          const get = value.store.get;
-          value.store.get = async key =>
-            key === 'app_config'
-              ? { ...(await get(key)), language: 'zh', theme, language_initialized: true }
-              : get(key);
-          api = value;
-        },
-      });
-    }, theme);
+test.beforeEach(async ({ page }) => useDormantCompanionRoster(page));
+
+async function open(page, surface = 'compact', theme = 'light', offline = false) {
+  await page.setViewportSize({ width: 480, height: surface === 'tall' ? 800 : 400 });
   await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
-  await page.goto(
-    `${surface === 'home' ? '/' : '/companion.html'}?previewSkipBoot=1&previewScenario=empty&theme=${theme}&offline=${offline ? '1' : '0'}`,
-  );
+  await page.goto(`/companion.html?theme=${theme}&offline=${offline ? '1' : '0'}`);
   await page.getByRole('tab', { name: '交代任务', exact: true }).click();
   await page.getByRole('combobox', { name: '工作区', exact: true }).click();
   await page.getByRole('option', { name: 'Preview project', exact: true }).click();
-  await page.evaluate(surface => {
-    window.filesApi = surface === 'home' ? window.electron.companion : window.companion;
-  }, surface);
+  await page.evaluate(() => {
+    window.filesApi = window.companion;
+  });
 }
 
-for (const surface of ['home', 'quick'])
+for (const surface of ['tall', 'compact'])
   for (const theme of ['light', 'dark'])
     test(`${surface} task files preserve draft identity, reload and narrow layout in ${theme}`, async ({
       page,
@@ -51,19 +36,19 @@ for (const surface of ['home', 'quick'])
       await expect(page.getByRole('alert')).toContainText('暂时没有可用模型');
       await expect(page.getByText('project-notes.md', { exact: true })).toBeVisible();
       await expect(page.getByRole('textbox')).toHaveValue('根据附件整理一份摘要。');
-      for (const width of surface === 'home' ? [1440, 1280, 1024, 940, 760] : [560, 448]) {
-        await page.setViewportSize({ width, height: 800 });
+      for (const width of surface === 'tall' ? [1440, 1280, 1024, 940, 760] : [560, 480, 448]) {
+        await page.setViewportSize({ width, height: surface === 'tall' ? 800 : 400 });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true,
         );
         await expect(page.getByRole('button', { name: '添加附件', exact: true })).toBeVisible();
         await expect(page.getByRole('button', { name: '移除', exact: true })).toBeVisible();
       }
-      const canvas = surface === 'home' ? '[data-main-canvas]' : 'main';
+      const canvas = 'main';
       expect(
         (await new AxeBuilder({ page }).include(canvas).analyze()).violations.map(item => item.id),
       ).toEqual([]);
-      await page.setViewportSize({ width: surface === 'home' ? 1280 : 560, height: 800 });
+      await page.setViewportSize({ width: 480, height: surface === 'tall' ? 800 : 400 });
       await page.screenshot({ path: `/tmp/companion-files-${surface}-${theme}.png` });
       await page.getByRole('button', { name: '移除', exact: true }).click();
       await expect(page.getByText('project-notes.md', { exact: true })).toHaveCount(0);

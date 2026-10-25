@@ -1,0 +1,90 @@
+{
+  "userData": "/tmp/companion-bubble-native-hFHbYi",
+  "platform": "darwin",
+  "pointerOpensBubble": true,
+  "animatedGreeting": true,
+  "reducedMotionFreezes": true,
+  "anchoredAbove": true,
+  "flipsBelow": true,
+  "movementRetainsFocus": true,
+  "dndHidesBoth": true,
+  "hidingRetainsDraft": true,
+  "workbenchSeparate": true,
+  "privateMemoryTools": true,
+  "singleReleasedProfile": true,
+  "rejectsUnavailableProfile": true,
+  "chatToolsLeaveSharedMemoryUnchanged": true,
+  "modelRequests": 8,
+  "managedMemory": null,
+  "mediaStress": {
+    "seconds": 604.1160354589999,
+    "heapGrowthBytes": 34012,
+    "workingSetGrowthKiB": -34240,
+    "domDiagnostics": {
+      "connectedElements": 14,
+      "detachedRoots": 7,
+      "retainedNodes": 7,
+      "roots": [
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "VIDEO",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "VIDEO",
+          "retained": 1,
+          "children": []
+        }
+      ]
+    },
+    "sampleFiles": [
+      {
+        "file": "native-poster-pool-ten-minute.samples-01.json",
+        "firstSampleIndex": 0,
+        "count": 24,
+        "sha256": "ef91cd75ea146357a3093f0116b40bda210e22f57da98f24390d6cf85cbcf0dc"
+      },
+      {
+        "file": "native-poster-pool-ten-minute.samples-02.json",
+        "firstSampleIndex": 24,
+        "count": 24,
+        "sha256": "f9f78673adfc37188f1f36b05e3e437d77e0a72c22a268e7a12bb825f53a3f41"
+      },
+      {
+        "file": "native-poster-pool-ten-minute.samples-03.json",
+        "firstSampleIndex": 48,
+        "count": 20,
+        "sha256": "3bdd732428e016911df3e5ea64886ce1cb7ed7d6fb1729e1b9a66b6e59ada411"
+      }
+    ],
+    "sampleCount": 68,
+    "originalReportSha256": "9661640bedabbc61794b6f11b4b95f2dc31e2f347f04c02beb33cb2fcfc6731b"
+  },
+  "actualExternalModelQuality": "not verified",
+  "windowsNativeSurfaces": "not verified"
+}

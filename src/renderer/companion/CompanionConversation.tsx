@@ -13,7 +13,7 @@ interface Props {
   stopTask(sessionId: string): void;
 }
 
-/** The same conversation and task projection is used in the home and quick window. */
+/** Durable conversation and task projection inside the companion's bubble. */
 export function CompanionConversation({ state, taskMode, openTask, stopTask }: Props) {
   const t = (key: string) => i18nService.t(key);
   return (

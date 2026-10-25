@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { useDormantCompanionRoster } from '../shared/companion-roster.mjs';
+
+test.beforeEach(async ({ page }) => useDormantCompanionRoster(page));
 
 for (const language of ['zh', 'en']) {
   for (const theme of ['light', 'dark']) {
@@ -11,11 +14,13 @@ for (const language of ['zh', 'en']) {
       page.on('console', message => {
         if (message.type() === 'error') errors.push(message.text());
       });
-      await page.setViewportSize({ width: language === 'en' ? 448 : 560, height: 640 });
+      await page.setViewportSize({ width: language === 'en' ? 448 : 480, height: 400 });
       await page.goto(`/companion.html?language=${language}&theme=${theme}`);
       await expect(page).toHaveTitle('知远智能体 (ZhiYuan Agent)');
       const heading = language === 'zh' ? '你的智能伙伴' : 'Your intelligent companion';
-      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+      await expect(page.getByRole('main', { name: heading })).toBeVisible();
+      await expect(page.getByRole('heading', { name: heading })).toHaveClass('sr-only');
+      await expect(page.locator('.theme-companion-sketch')).toBeVisible();
       const input = page.getByRole('textbox');
       await expect(input).toBeFocused();
       const text =
@@ -55,7 +60,12 @@ for (const language of ['zh', 'en']) {
       await expect(input).toHaveValue('A private draft for the first companion');
       await expect(page.locator('[data-slot="select-content"]')).toBeHidden();
       const accessibility = await new AxeBuilder({ page }).analyze();
-      expect(accessibility.violations.map(item => item.id)).toEqual([]);
+      expect(
+        accessibility.violations.map(item => ({
+          id: item.id,
+          nodes: item.nodes.map(node => ({ html: node.html, summary: node.failureSummary })),
+        })),
+      ).toEqual([]);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );
@@ -129,7 +139,7 @@ test('hot theme and language changes preserve input, focus, selection and open p
   expect(await input.evaluate(element => [element.selectionStart, element.selectionEnd])).toEqual([
     2, 10,
   ]);
-  await expect(page.getByRole('heading', { name: 'Your intelligent companion' })).toBeVisible();
+  await expect(page.getByRole('main', { name: 'Your intelligent companion' })).toBeVisible();
   await page.getByRole('combobox').click();
   await page.evaluate(() =>
     window.companionTestContext({ language: 'zh', theme: 'light', themeStyle: '' }),

@@ -19,6 +19,8 @@ import type { CompanionProfiles } from './profiles';
 import type { PiCompanionRuntime } from './durableRuntime.mjs';
 import type { CompanionTasks } from './tasks';
 import type { CompanionMemoryService } from './memory';
+import type { CompanionBubblePlacement } from '../../shared/companion/bubble';
+import { anchorCompanionBubble } from './bubbleAnchor';
 
 interface Options {
   store: Pick<SqliteStore, 'get' | 'onDidChange'>;
@@ -31,6 +33,8 @@ interface Options {
   getTasks(): CompanionTasks;
   openTask(sessionId: string): void;
   onProfileChanged(profile: CompanionProfile): void;
+  getPetWindow?(): BrowserWindow | null;
+  onBubbleVisibility?(visible: boolean): void;
 }
 
 let options: Options | null = null;
@@ -39,9 +43,31 @@ let shortcutAvailable = false;
 let unsubscribe: (() => void) | undefined;
 let unsubscribeTasks: (() => void) | undefined;
 let choosingDialog = false;
+let bubblePlacement: CompanionBubblePlacement | undefined;
+let bubbleAnchor: ReturnType<typeof anchorCompanionBubble> | undefined;
+let windowVisible = false;
+let windowReady = false;
+let showRequested = false;
 
 export function isCompanionWindow(candidate: BrowserWindow): boolean {
   return candidate === window;
+}
+
+function syncCompanionVisibility(visible: boolean): void {
+  if (!window || window.isDestroyed()) return;
+  if (visible) bubbleAnchor?.activate();
+  else bubbleAnchor?.deactivate();
+  if (windowVisible === visible) return;
+  windowVisible = visible;
+  window.webContents.send(IpcChannel.Visibility, visible);
+}
+
+/** Host suppression also updates draft/dialog visibility when native hide events are absent. */
+export function hideCompanionWindow(): void {
+  showRequested = false;
+  if (!window || window.isDestroyed()) return;
+  window.hide();
+  syncCompanionVisibility(false);
 }
 
 export function updateActiveCompanionAppearance(
@@ -63,13 +89,14 @@ function preferences(): CompanionWindowContext {
     language: config?.language === 'en' ? 'en' : 'zh',
     theme: config?.theme === 'light' || config?.theme === 'dark' ? config.theme : 'system',
     themeStyle: typeof config?.themeStyle === 'string' ? config.themeStyle : '',
+    ...(bubblePlacement ? { bubble: bubblePlacement } : {}),
   };
 }
 
 async function snapshot(): Promise<CompanionWindowState> {
   if (!options) throw new Error('Companion window is not initialized');
   const { profiles, runtime } = options.getCompanions();
-  const identities = profiles.snapshot();
+  const identities = profiles.visibleSnapshot();
   const active = identities.profiles.find(profile => profile.petId === identities.activePetId)!;
   const availability = await runtime.resume(active);
   const conversation = await runtime.history(active);
@@ -192,6 +219,10 @@ export function initializeCompanionWindow(next: Options): void {
         choosingDialog = false;
       }
     },
+    visibility: event => {
+      assertWindow(event);
+      return windowVisible;
+    },
     chooseFiles: async (event, petId) => {
       const owner = assertWindow(event);
       activeProfile(petId);
@@ -264,7 +295,7 @@ export function initializeCompanionWindow(next: Options): void {
       ),
     hide: event => {
       if (assertWindow(event) !== window) throw new Error('Only the quick window can hide itself');
-      window?.hide();
+      hideCompanionWindow();
     },
     openWorkbench: (event, sessionId) => {
       assertWindow(event);
@@ -304,24 +335,33 @@ export function initializeCompanionWindow(next: Options): void {
   });
 }
 
-export function openCompanionWindow(): void {
-  if (!options) return;
-  if (window && !window.isDestroyed()) {
-    if (window.isMinimized()) window.restore();
-    window.show();
-    window.focus();
-    return;
-  }
+function showReadyWindow(): void {
+  if (!showRequested || !windowReady || !window || window.isDestroyed()) return;
+  bubbleAnchor?.place();
+  if (window.isMinimized()) window.restore();
+  window.show();
+  syncCompanionVisibility(true);
+  window.focus();
+}
+
+/** Prepare only the window shell. The hidden renderer does not load a conversation. */
+export function prepareCompanionWindow(): void {
+  if (!options || (window && !window.isDestroyed())) return;
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const width = Math.min(560, area.width);
-  const height = Math.min(640, area.height);
+  const width = Math.min(480, area.width - 16);
+  const height = Math.min(400, area.height - 16);
   const created = new BrowserWindow({
     x: Math.round(area.x + (area.width - width) / 2),
     y: Math.round(area.y + (area.height - height) / 3),
     width,
     height,
     minWidth: 448,
-    minHeight: 400,
+    minHeight: 240,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    alwaysOnTop: true,
+    resizable: false,
     show: false,
     title: t('companionTitle'),
     skipTaskbar: true,
@@ -337,24 +377,38 @@ export function openCompanionWindow(): void {
     },
   });
   window = created;
+  windowVisible = false;
+  windowReady = false;
+  bubbleAnchor = anchorCompanionBubble(
+    created,
+    { ...options, hideWindow: hideCompanionWindow },
+    placement => {
+      bubblePlacement = placement;
+      created.webContents.send(IpcChannel.Context, preferences());
+    },
+  );
   created.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   created.webContents.on('will-navigate', event => event.preventDefault());
   created.once('ready-to-show', () => {
     if (!created.isDestroyed()) {
-      created.show();
-      created.focus();
+      windowReady = true;
+      showReadyWindow();
     }
   });
-  created.on('show', () => created.webContents.send(IpcChannel.Visibility, true));
-  created.on('hide', () => created.webContents.send(IpcChannel.Visibility, false));
+  created.on('show', () => window === created && syncCompanionVisibility(true));
+  created.on('hide', () => window === created && syncCompanionVisibility(false));
   created.on('close', event => {
-    if (options) {
+    if (options && window === created) {
       event.preventDefault();
-      created.hide();
+      hideCompanionWindow();
     }
   });
   created.once('closed', () => {
-    if (window === created) window = null;
+    if (window === created) {
+      window = null;
+      windowReady = false;
+      showRequested = false;
+    }
   });
   created.webContents.on('render-process-gone', (_event, details) => {
     console.warn(`[Companion] Renderer exited for window ${created.id}:`, details.reason);
@@ -371,6 +425,13 @@ export function openCompanionWindow(): void {
   });
 }
 
+export function openCompanionWindow(): void {
+  if (!options) return;
+  showRequested = true;
+  prepareCompanionWindow();
+  showReadyWindow();
+}
+
 export function disposeCompanionWindow(): void {
   options = null;
   choosingDialog = false;
@@ -382,6 +443,11 @@ export function disposeCompanionWindow(): void {
   shortcutAvailable = false;
   window?.destroy();
   window = null;
+  bubblePlacement = undefined;
+  bubbleAnchor = undefined;
+  windowVisible = false;
+  windowReady = false;
+  showRequested = false;
   for (const definition of Object.values(companionContract))
     ipcMain.removeHandler(definition.channel);
 }

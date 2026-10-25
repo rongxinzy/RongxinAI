@@ -380,6 +380,8 @@
   "detectUpdateChannel": false,
   "generateUpdatesFilesForAllChannels": false,
   "asarUnpack": [
+    "node_modules/koffi/**",
+    "node_modules/@koromix/koffi-*/**",
     "node_modules/@agentclientprotocol/codex-acp/**",
     "node_modules/@agentclientprotocol/claude-agent-acp/**",
     "node_modules/@anthropic-ai/claude-agent-sdk/**",

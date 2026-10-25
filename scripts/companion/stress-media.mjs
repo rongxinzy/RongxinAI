@@ -31,7 +31,22 @@ export async function stressMedia(application, main, actor, seconds) {
   const cdp = await actor.context().newCDPSession(actor);
   const sample = async () => {
     await cdp.send('HeapProfiler.collectGarbage');
+    // GC may advance a clip handoff. Observe an actual decoded successor after
+    // GC with the existing bounded expect timeout; failed playback still fails.
+    let media;
+    await expect
+      .poll(async () => {
+        media = await actor.evaluate(() => ({
+          slots: window.acceptanceVideos.length,
+          rasterCanvases: window.acceptanceCanvases ?? null,
+          sources: window.acceptanceVideos.filter(video => video.getAttribute('src')).length,
+          state: document.querySelector('canvas').dataset.mediaState,
+        }));
+        return media.state;
+      })
+      .toBe('playing');
     const heap = await cdp.send('Runtime.getHeapUsage');
+    const dom = await cdp.send('Memory.getDOMCounters');
     const process = await application.evaluate(({ app, BrowserWindow }) => {
       const pet = BrowserWindow.getAllWindows().find(window =>
         window.webContents.getURL().includes('desktop-pet.html'),
@@ -45,15 +60,17 @@ export async function stressMedia(application, main, actor, seconds) {
         cpuPercent: metrics.cpu.percentCPUUsage,
       };
     });
-    const media = await actor.evaluate(() => ({
-      slots: window.acceptanceVideos.length,
-      sources: window.acceptanceVideos.filter(video => video.getAttribute('src')).length,
-      state: document.querySelector('canvas').dataset.mediaState,
-    }));
     expect(media.slots).toBe(2);
     expect(media.sources).toBeLessThanOrEqual(2);
     expect(media.state).toBe('playing');
-    return { heapBytes: heap.usedSize, ...process, ...media };
+    return {
+      heapBytes: heap.usedSize,
+      embedderHeapBytes: heap.embedderHeapUsedSize ?? null,
+      backingStorageBytes: heap.backingStorageSize ?? null,
+      ...dom,
+      ...process,
+      ...media,
+    };
   };
   const samples = [await sample()];
   const started = performance.now();
@@ -69,10 +86,47 @@ export async function stressMedia(application, main, actor, seconds) {
     heapGrowthBytes: last.heapBytes - first.heapBytes,
     workingSetGrowthKiB: last.workingSetKiB - first.workingSetKiB,
   };
+  // Optional inspection runs after all measured samples: enabling DOM inspection
+  // can itself retain nodes and must not alter the resource-growth evidence.
+  if (process.env.COMPANION_MEDIA_DOM_DIAGNOSTICS === '1') {
+    await cdp.send('DOM.enable');
+    const { detachedNodes } = await cdp.send('DOM.getDetachedDomNodes');
+    result.domDiagnostics = {
+      connectedElements: await actor.evaluate(() => document.querySelectorAll('*').length),
+      detachedRoots: detachedNodes.length,
+      retainedNodes: detachedNodes.reduce((sum, root) => sum + root.retainedNodeIds.length, 0),
+      roots: detachedNodes.slice(0, 24).map(({ treeNode, retainedNodeIds }) => ({
+        name: treeNode.nodeName,
+        retained: retainedNodeIds.length,
+        children: treeNode.children?.slice(0, 16).map(child => child.nodeName),
+      })),
+    };
+    await cdp.send('DOM.disable');
+  }
+  // Preserve the measurements even when a growth assertion fails.
+  console.log(JSON.stringify({ nativeMediaResources: result }));
   expect(new Set(samples.map(sample => sample.pid)).size).toBe(1);
   expect(result.heapGrowthBytes).toBeLessThan(16 * 1024 * 1024);
   expect(result.workingSetGrowthKiB).toBeLessThan(64 * 1024);
   await main.evaluate(() => window.electron.desktopPet.setSettings({ doNotDisturb: true }));
+  console.log(
+    JSON.stringify({
+      hiddenPet: await application.evaluate(({ BrowserWindow }) => {
+        const pet = BrowserWindow.getAllWindows().find(window =>
+          window.webContents.getURL().includes('desktop-pet.html'),
+        );
+        return {
+          visible: pet.isVisible(),
+          loading: pet.webContents.isLoading(),
+          destroyed: pet.webContents.isDestroyed(),
+        };
+      }),
+      renderer: await actor.evaluate(() => ({
+        visible: document.querySelector('canvas')?.dataset.visible,
+        sources: window.acceptanceVideos.filter(video => video.getAttribute('src')).length,
+      })),
+    }),
+  );
   await expect(actor.locator('canvas')).toHaveAttribute('data-visible', 'false');
   expect(
     await actor.evaluate(() =>

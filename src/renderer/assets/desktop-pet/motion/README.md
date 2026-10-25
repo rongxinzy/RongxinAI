@@ -1,6 +1,8 @@
 # 连续动作素材
 
-当前阶段：七位伙伴各有 24 条 512×512 / 30fps VP9 alpha 连续素材，共 168 条、30,870 帧。播放已经使用连续视频；原姿态图集保留为减少动效与解码失败时的静态回退。小远羽毛边缘与嘴型修订、长期资源及跨平台验收仍未完成。
+当前发布仅开放小远，欢迎七位群像保持原样。小远实际播放 `xiaoyuan-original/` 的 24 条 512×512 / 30fps VP9 alpha 素材，共 4,410 帧、22,308,203 字节。头脸、尖喙、脚趾与围巾保留第一版像素，翅膀和被遮挡的躯干采用[局部补齐稿](../rigs/xiaoyuan-occlusion-v1-prompt.md)，眨眼遮挡原虹膜而不缩放虹膜。最终美术、长时资源与跨平台验收未完成。
+
+旧七包共 168 条、30,870 帧保留为历史素材；其他六位日常隐藏，小远旧包 `xiaoyuan/` 也不再参与实际播放。以下旧部件和七包体积记录属于这批历史素材，不代表当前发布包。原姿态图集继续用于减少动效与解码失败时的静态回退。
 
 素材来源为内置 imagegen 生成的原创分层部件：[源 PNG](../rigs/xiaoyuan-rig-v1.png)、[生成提示词](../rigs/xiaoyuan-rig-prompt.md)。源 PNG 保留生成字节，脚本只定义取景框、关节、层次和轨迹，按实际时间离线合成全身帧；头部、翅膀、脚、表情和围巾独立运动，不做整张立绘变形来替代关节动作。部分羽毛边缘仍有白边和散点，嘴型也需对齐原形象的尖喙，不能以自动解码测试替代美术验收。
 
@@ -11,6 +13,8 @@
 需要仓库依赖与宿主 `ffmpeg`（当前使用 libvpx-vp9）。没有新增产品运行时依赖或模型调用。
 
 ```bash
+bun scripts/companion/media/render-motion.mjs --owl-original --out=src/renderer/assets/desktop-pet/motion/xiaoyuan-original
+bun scripts/companion/media/render-motion.mjs --owl-original --out=src/renderer/assets/desktop-pet/motion/xiaoyuan-original --verify
 bun scripts/companion/media/render-motion.mjs --preview --out=/tmp/companion-owl-rig-preview
 bun scripts/companion/media/render-motion.mjs
 bun scripts/companion/media/render-motion.mjs --verify

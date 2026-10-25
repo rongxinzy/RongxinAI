@@ -73,7 +73,7 @@ jobs:
             vendor/engram-runtime
             vendor/channel-runtime
             build-tar/windows-components
-          key: packaging-Windows-win-x64-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js', 'scripts/windows-resource-pack.cjs') }}
+          key: packaging-Windows-win-x64-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'config/runtime-pins.json', 'scripts/packaging/package-commands.mjs', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js', 'scripts/windows-resource-pack.cjs') }}
           restore-keys: |
             packaging-Windows-win-x64-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts

@@ -36,6 +36,7 @@ type WithExtra<E, M extends Record<string, keyof AppSystemContractApi>> = Rename
 export const appSystemApi = {
   // Explicit member projection keeps the existing preload contract walker authoritative.
   companion: {
+    visibility: companionApi.visibility,
     bootstrap: companionApi.bootstrap,
     select: companionApi.select,
     submit: companionApi.submit,

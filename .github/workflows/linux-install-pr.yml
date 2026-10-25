@@ -47,7 +47,7 @@ jobs:
             ~/.cache/electron-builder
             vendor/engram-runtime
             vendor/channel-runtime
-          key: linux-install-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: linux-install-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'config/runtime-pins.json', 'scripts/**') }}
           restore-keys: |
             linux-install-node24-bun1.4.0-
       - name: Install Electron and virtual desktop dependencies

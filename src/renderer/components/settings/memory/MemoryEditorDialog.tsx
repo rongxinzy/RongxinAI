@@ -60,8 +60,11 @@ export function MemoryEditorDialog(props: {
   const valid = Boolean(draft.title.trim() && draft.content.trim());
   return (
     <Dialog open={editor !== null} onOpenChange={open => !open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
+      <DialogContent
+        closeLabel={i18nService.t('close')}
+        className="flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col overflow-hidden sm:max-w-lg"
+      >
+        <DialogHeader className="shrink-0">
           <DialogTitle>
             {editor?.record
               ? i18nService.t('managedMemoryEditTitle')
@@ -69,7 +72,7 @@ export function MemoryEditorDialog(props: {
           </DialogTitle>
           <DialogDescription>{i18nService.t('managedMemoryEditorDescription')}</DialogDescription>
         </DialogHeader>
-        <FieldGroup className="gap-4">
+        <FieldGroup className="min-h-0 flex-1 gap-4 overflow-y-auto">
           <Field data-disabled={Boolean(editor?.record) || undefined}>
             <FieldLabel htmlFor="managed-memory-scope">
               {i18nService.t('managedMemoryFieldScope')}
@@ -112,6 +115,8 @@ export function MemoryEditorDialog(props: {
             </FieldLabel>
             <Textarea
               id="managed-memory-content"
+              autoGrow={false}
+              rows={5}
               value={draft.content}
               onChange={event => onChange({ content: event.target.value })}
               placeholder={i18nService.t('managedMemoryContentPlaceholder')}
@@ -186,7 +191,7 @@ export function MemoryEditorDialog(props: {
             </Field>
           </div>
         </FieldGroup>
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
             {i18nService.t('cancel')}
           </Button>

@@ -31,7 +31,11 @@ import {
 } from '../../../../shared/memory';
 import { i18nService } from '../../../services/i18n';
 import { memoryService } from '../../../services/memory';
-import { showAppErrorToast, showAppSuccessToast } from '../../../services/toastNotification';
+import {
+  showAppErrorToast,
+  showAppInfoToast,
+  showAppSuccessToast,
+} from '../../../services/toastNotification';
 import type { RootState } from '../../../store';
 import { getWorkspaceDisplayName } from '../../../utils/path';
 import { ManagedMemoryView } from './constants';
@@ -139,8 +143,10 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
     async (id: string, action: () => Promise<unknown>, successKey: string) => {
       setBusyId(id);
       try {
-        await action();
-        showAppSuccessToast(i18nService.t(successKey));
+        const result = await action();
+        if (result === false || result === null)
+          showAppInfoToast(i18nService.t('managedMemorySyncPending'));
+        else showAppSuccessToast(i18nService.t(successKey));
         await load();
       } catch (error) {
         showAppErrorToast(i18nService.t('managedMemoryActionFailed'));
@@ -384,7 +390,11 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
 
       <DestructiveConfirmDialog
         open={forgetTarget !== null}
-        title={i18nService.t('managedMemoryForgetTitle')}
+        title={i18nService.t(
+          forgetTarget?.record.memoryId === null
+            ? 'managedMemoryRejectTitle'
+            : 'managedMemoryForgetTitle',
+        )}
         description={
           forgetTarget?.record.memoryId === null
             ? i18nService.t('managedMemoryRejectDescription')

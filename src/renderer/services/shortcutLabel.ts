@@ -1,9 +1,9 @@
 export function formatShortcutLabel(shortcut: string, isMacPlatform: boolean): string {
-  if (!isMacPlatform) return shortcut.replace(/CmdOrCtrl/g, 'Ctrl');
+  const portable = shortcut.replace(
+    /(^|\+)(CmdOrCtrl|CommandOrControl)(?=\+|$)/gi,
+    `$1${isMacPlatform ? '⌘' : 'Ctrl'}`,
+  );
+  if (!isMacPlatform) return portable;
 
-  return shortcut
-    .replace(/CmdOrCtrl/g, '⌘')
-    .replace('Cmd', '⌘')
-    .replace('Option', '⌥')
-    .replace('Alt', '⌥');
+  return portable.replace('Cmd', '⌘').replace('Option', '⌥').replace('Alt', '⌥');
 }

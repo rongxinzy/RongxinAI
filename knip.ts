@@ -20,6 +20,10 @@ const config: KnipConfig = {
         // Command/provenance: src/renderer/assets/desktop-pet/motion/README.md.
         // This is an entry root, not an ignoreFiles/ignoreIssues exemption.
         'scripts/companion/media/render-motion.mjs',
+        'scripts/companion/media/review-owl-study.mjs',
+        'scripts/companion/media/review-original-gestures.mjs',
+        // Invoked by the retained Windows packaging pipelines in package-commands.mjs.
+        'scripts/installer-shell/build-distribution.cjs',
         // vite-plugin-electron bundle entries. Knip's Vite plugin reads HTML and
         // rolldown inputs, not the electron() entry list in vite.config.ts.
         // Run from .husky/pre-commit.
@@ -28,6 +32,7 @@ const config: KnipConfig = {
         'src/main/main.ts',
         'src/main/preload.ts',
         'src/main/desktopPetPreload.ts',
+        'src/main/desktopPetWindowsEntry.ts',
         'src/main/companionWindowPreload.ts',
         'src/main/llamacppModelDaemonEntry.ts',
         'src/main/workbenchTask/artifactWorker.ts',
@@ -70,6 +75,12 @@ const config: KnipConfig = {
         // Manual installer and preview harnesses. Workflows do not call them.
         // Manual native companion check documented in companion-task-acceptance.md.
         'scripts/companion/verify-task-electron.mjs',
+        'scripts/companion/verify-bubble-electron.mjs',
+        // Executed manual CLI; inspect its imports, not an ignore or issue exemption.
+        // Command and evidence: docs/architecture/companion-input-acceptance.md.
+        'scripts/companion/verify-bubble-input.mjs',
+        // Manual closed synthetic-store upgrade check, documented in companion-managed-memory-acceptance.md.
+        'scripts/companion/verify-memory-runtime-upgrade.mjs',
         'scripts/installer-shell/assert-e2e.cjs',
         'scripts/installer-shell/e2e-sfx.cjs',
         'scripts/installer-shell/e2e-uninstall.cjs',

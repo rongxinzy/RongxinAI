@@ -64,7 +64,7 @@ export function CompanionMemoryDialog({
       <Button
         ref={trigger}
         variant="ghost"
-        size="default"
+        size="icon-sm"
         aria-label={t('companionMemory')}
         onClick={() => {
           memory.setNotice(null);
@@ -72,7 +72,6 @@ export function CompanionMemoryDialog({
         }}
       >
         <Brain strokeWidth={1.75} />
-        {t('companionMemory')}
       </Button>
       <Dialog
         open={open && !deleting}

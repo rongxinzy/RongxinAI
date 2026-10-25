@@ -1,0 +1,155 @@
+{
+  "userData": "/tmp/companion-input-native-i4tcW3",
+  "platform": "darwin",
+  "environment": "production renderer over loopback, isolated development shell, automation round trip included",
+  "bundledRenderer": true,
+  "preparedBeforeFirstClick": true,
+  "firstOpenMs": 253.59862500000008,
+  "firstInputTargetMet": false,
+  "warmOpenMs": [
+    40.66274999999996,
+    45.63516699999991,
+    48.269582999999784,
+    46.31583300000011,
+    39.82229099999995,
+    40.05670800000007,
+    41.60691699999961,
+    39.63274999999976,
+    40.16641600000003,
+    42.220584000000144,
+    35.724583000000166,
+    30.816417,
+    46.31337499999972,
+    39.5202919999997,
+    45.849874999999884,
+    39.621458000000075,
+    39.64837499999976,
+    40.215291000000434,
+    41.91612499999974,
+    39.12116699999979,
+    39.94212500000003,
+    38.2318750000004,
+    47.60699999999997,
+    38.99266699999998,
+    39.72641599999997,
+    39.075832999999875,
+    40.21062499999971,
+    38.40625,
+    39.78670899999952,
+    38.84045799999967
+  ],
+  "warmP95Ms": 47.60699999999997,
+  "warmTargetMs": 200,
+  "warmTargetMet": true,
+  "modeResults": [
+    {
+      "mode": "chat",
+      "events": [
+        {
+          "type": "compositionstart",
+          "data": ""
+        },
+        {
+          "type": "compositionupdate",
+          "data": "小远"
+        },
+        {
+          "type": "keydown",
+          "key": "Enter",
+          "keyCode": 13,
+          "isComposing": true
+        },
+        {
+          "type": "compositionupdate",
+          "data": ""
+        },
+        {
+          "type": "compositionend",
+          "data": ""
+        },
+        {
+          "type": "compositionstart",
+          "data": ""
+        },
+        {
+          "type": "compositionupdate",
+          "data": "候选词"
+        },
+        {
+          "type": "keydown",
+          "key": "Escape",
+          "keyCode": 27,
+          "isComposing": true
+        },
+        {
+          "type": "compositionupdate",
+          "data": "确认输入"
+        },
+        {
+          "type": "compositionend",
+          "data": "确认输入"
+        }
+      ],
+      "committedDraftSurvivesHide": true,
+      "shiftEnterAddsLine": true
+    },
+    {
+      "mode": "task",
+      "events": [
+        {
+          "type": "compositionstart",
+          "data": ""
+        },
+        {
+          "type": "compositionupdate",
+          "data": "小远"
+        },
+        {
+          "type": "keydown",
+          "key": "Enter",
+          "keyCode": 13,
+          "isComposing": true
+        },
+        {
+          "type": "compositionupdate",
+          "data": ""
+        },
+        {
+          "type": "compositionend",
+          "data": ""
+        },
+        {
+          "type": "compositionstart",
+          "data": ""
+        },
+        {
+          "type": "compositionupdate",
+          "data": "候选词"
+        },
+        {
+          "type": "keydown",
+          "key": "Escape",
+          "keyCode": 27,
+          "isComposing": true
+        },
+        {
+          "type": "compositionupdate",
+          "data": "确认输入"
+        },
+        {
+          "type": "compositionend",
+          "data": "确认输入"
+        }
+      ],
+      "committedDraftSurvivesHide": true,
+      "shiftEnterAddsLine": true
+    }
+  ],
+  "singleCommittedChatRoundTrip": true,
+  "localModelRequests": 1,
+  "unavailableModelKeepsDraft": true,
+  "noDurableMessageAdmittedWhenUnavailable": true,
+  "workbenchDraftSeparate": true,
+  "operatingSystemCandidateWindow": "not verified",
+  "productionStartupLatency": "not verified"
+}

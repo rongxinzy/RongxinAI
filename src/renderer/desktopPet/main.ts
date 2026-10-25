@@ -6,11 +6,14 @@ import {
 } from '../../shared/desktopPet/constants';
 import type { DesktopPetBridge, DesktopPetSnapshot } from '../../shared/desktopPet/types';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
+import { isDesktopPetReleased } from '../../shared/desktopPet/availability';
 import stylesheetUrl from './desktop-pet.css?url';
 import { DesktopPetAnimation } from './animation';
 import { DesktopPetAtlas } from './atlas';
 import { drawPetPose, petHitMask, drawPetMedia, petMediaHitMask } from './draw';
 import { DesktopPetMediaController } from './mediaController';
+import { PetOrientation } from '../../shared/desktopPet/surfaces/constants';
+import { applyPetOrientation, orientPetMask } from './orientation';
 
 declare global {
   interface Window {
@@ -33,6 +36,7 @@ const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 const atlas = new DesktopPetAtlas();
 const animation = new DesktopPetAnimation();
 let state: DesktopPetState = DesktopPetState.Idle;
+let nativeOrientation: PetOrientation = PetOrientation.Upright;
 let reducedMotion = reduced.matches;
 let systemReducedMotion = false;
 let frameId: number | undefined;
@@ -54,11 +58,19 @@ function draw(now: number): void {
   ctx.setTransform(size / DESKTOP_PET_SIZE, 0, 0, size / DESKTOP_PET_SIZE, 0, 0);
   ctx.clearRect(0, 0, DESKTOP_PET_SIZE, DESKTOP_PET_SIZE);
   const pose = animation.sample(now);
+  media.finishFallback(Boolean(pose.sequence));
+  animation.setContinuousMedia(media.supported, now);
   const clip = media.sample(now);
   const drawable = !reducedMotion ? clip.playing : null;
   const poster = !reducedMotion ? clip.poster : undefined;
-  // Add premultiplied layers to preserve opaque body pixels through the crossfade.
-  ctx.globalCompositeOperation = 'lighter';
+  const orientation = reducedMotion ? PetOrientation.Upright : nativeOrientation;
+  ctx.save();
+  applyPetOrientation(ctx, orientation);
+  // Add only during a crossfade; a single layer keeps the original canvas pixel rounding.
+  const crossfading =
+    drawable?.previous ||
+    (!drawable && !poster && pose.weights.filter(weight => weight > 0).length > 1);
+  ctx.globalCompositeOperation = crossfading ? 'lighter' : 'source-over';
   if (drawable || poster) {
     const draw = (image: CanvasImageSource, weight: number) => {
       ctx.globalAlpha = weight;
@@ -85,6 +97,8 @@ function draw(now: number): void {
     });
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
+  ctx.restore();
+  view.dataset.orientation = orientation;
   view.dataset.state = state;
   view.dataset.reducedMotion = String(reducedMotion);
   view.dataset.character = atlas.character.id;
@@ -100,12 +114,18 @@ function draw(now: number): void {
       ? [poster]
       : [];
   const indices = pose.weights.flatMap((weight, index) => (weight > 0 ? [index] : []));
-  const nextMaskKey = mediaImages.length
+  const contentMaskKey = mediaImages.length
     ? mediaImages.map(image => image.src).join('|')
     : `${reducedMotion}:${indices.join(',')}`;
+  const nextMaskKey = `${orientation}:${contentMaskKey}`;
   if (maskDirty || nextMaskKey !== maskKey) {
     bridge?.hitMask(
-      mediaImages.length ? petMediaHitMask(mediaImages) : petHitMask(atlas, reducedMotion, indices),
+      orientPetMask(
+        mediaImages.length
+          ? petMediaHitMask(mediaImages)
+          : petHitMask(atlas, reducedMotion, indices),
+        orientation,
+      ),
     );
     maskDirty = false;
     maskKey = nextMaskKey;
@@ -155,6 +175,7 @@ function update(snapshot: DesktopPetSnapshot): void {
 }
 
 async function selectCharacter(id: string): Promise<void> {
+  if (!isDesktopPetReleased(id)) id = DesktopPetBuiltinId.Xiaoyuan;
   try {
     if (!(await atlas.select(id))) return;
     const { columns, rows, tempo, energy } = atlas.character;
@@ -174,8 +195,11 @@ async function selectCharacter(id: string): Promise<void> {
 
 const unsubscribe = bridge?.onState(update);
 const unsubscribePose = bridge?.onPose(pose => {
+  nativeOrientation = pose.orientation;
   animation.setPose(pose.facing, pose.walking);
   media.update({ walking: pose.walking });
+  maskDirty = true;
+  refresh();
 });
 const unsubscribeEffect = bridge?.onEffect(effect => {
   if (effect.kind === DesktopPetEffectKind.Visibility) {
@@ -187,9 +211,13 @@ const unsubscribeEffect = bridge?.onEffect(effect => {
   } else if (effect.kind === DesktopPetEffectKind.Drag) {
     animation.setDragging(effect.active);
     media.update({ dragging: effect.active });
+    refresh();
   } else if (reducedMotion) return;
   else if (effect.kind === DesktopPetEffectKind.Action) {
-    if (!media.playAction(effect.action)) animation.playAction(effect.action, performance.now());
+    if (!media.playAction(effect.action)) {
+      animation.setContinuousMedia(false, performance.now());
+      animation.playAction(effect.action, performance.now());
+    }
   } else {
     animation.impact(effect.strength);
     media.impact(effect.strength);

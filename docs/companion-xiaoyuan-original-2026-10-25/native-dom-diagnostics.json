@@ -1,0 +1,320 @@
+{
+  "userData": "/tmp/companion-bubble-native-Rvswjk",
+  "platform": "darwin",
+  "pointerOpensBubble": true,
+  "animatedGreeting": true,
+  "reducedMotionFreezes": true,
+  "anchoredAbove": true,
+  "flipsBelow": true,
+  "movementRetainsFocus": true,
+  "dndHidesBoth": true,
+  "hidingRetainsDraft": true,
+  "workbenchSeparate": true,
+  "privateMemoryTools": true,
+  "singleReleasedProfile": true,
+  "rejectsUnavailableProfile": true,
+  "chatToolsLeaveSharedMemoryUnchanged": true,
+  "modelRequests": 8,
+  "managedMemory": null,
+  "mediaStress": {
+    "seconds": 90.16622325,
+    "samples": [
+      {
+        "heapBytes": 4724932,
+        "embedderHeapBytes": 1899344,
+        "backingStorageBytes": 1640255,
+        "documents": 1,
+        "nodes": 147,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 229120,
+        "cpuPercent": 0,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4725092,
+        "embedderHeapBytes": 1612200,
+        "backingStorageBytes": 1640252,
+        "documents": 1,
+        "nodes": 159,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 236672,
+        "cpuPercent": 1.4728055678994267,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4711408,
+        "embedderHeapBytes": 1582992,
+        "backingStorageBytes": 1714380,
+        "documents": 1,
+        "nodes": 177,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 184624,
+        "cpuPercent": 1.3299263495153055,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4736456,
+        "embedderHeapBytes": 1562344,
+        "backingStorageBytes": 1714381,
+        "documents": 1,
+        "nodes": 189,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 195056,
+        "cpuPercent": 1.4310926493210565,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4739892,
+        "embedderHeapBytes": 1562056,
+        "backingStorageBytes": 1714381,
+        "documents": 1,
+        "nodes": 201,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 199280,
+        "cpuPercent": 1.3704489257236987,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4744056,
+        "embedderHeapBytes": 1533576,
+        "backingStorageBytes": 1714380,
+        "documents": 1,
+        "nodes": 213,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 201664,
+        "cpuPercent": 1.92722943167377,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4735732,
+        "embedderHeapBytes": 1316064,
+        "backingStorageBytes": 1714373,
+        "documents": 1,
+        "nodes": 225,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 206784,
+        "cpuPercent": 2.1076395233975735,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4736708,
+        "embedderHeapBytes": 1331936,
+        "backingStorageBytes": 1714373,
+        "documents": 1,
+        "nodes": 255,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 214368,
+        "cpuPercent": 1.7603963732456271,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4738508,
+        "embedderHeapBytes": 1493776,
+        "backingStorageBytes": 1714381,
+        "documents": 1,
+        "nodes": 267,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 216352,
+        "cpuPercent": 1.5138231615903668,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4742748,
+        "embedderHeapBytes": 1488152,
+        "backingStorageBytes": 1714381,
+        "documents": 1,
+        "nodes": 279,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 182560,
+        "cpuPercent": 1.5392698905908144,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4742816,
+        "embedderHeapBytes": 1490672,
+        "backingStorageBytes": 1714380,
+        "documents": 1,
+        "nodes": 291,
+        "jsEventListeners": 50,
+        "pid": 22026,
+        "workingSetKiB": 171872,
+        "cpuPercent": 1.6310149191938443,
+        "slots": 2,
+        "rasterCanvases": 5,
+        "sources": 1,
+        "state": "playing"
+      }
+    ],
+    "heapGrowthBytes": 17884,
+    "workingSetGrowthKiB": -57248,
+    "domDiagnostics": {
+      "connectedElements": 14,
+      "detachedRoots": 37,
+      "retainedNodes": 37,
+      "roots": [
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "VIDEO",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "VIDEO",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        },
+        {
+          "name": "IMG",
+          "retained": 1,
+          "children": []
+        }
+      ]
+    }
+  },
+  "actualExternalModelQuality": "not verified",
+  "windowsNativeSurfaces": "not verified"
+}

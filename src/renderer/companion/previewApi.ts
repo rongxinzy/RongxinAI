@@ -1,4 +1,5 @@
-import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
+import { RELEASED_DESKTOP_PETS } from '../../shared/desktopPet/availability';
+import type { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 import { CompanionCapability, CompanionRequestState } from '../../shared/companion/constants';
 import type {
   CompanionMessage,
@@ -11,9 +12,11 @@ import { WorkbenchRunStatus } from '../../shared/workbenchTask';
 import { createCompanionMemoryPreview } from './memoryPreviewApi';
 
 /** DEV browser fixture only. It exercises the window UI, never models or production storage. */
-export function createCompanionPreviewApi(): CompanionWindowApi {
+export function createCompanionPreviewApi(
+  characters: readonly DesktopPetBuiltinId[] = RELEASED_DESKTOP_PETS.map(pet => pet.id),
+): CompanionWindowApi {
   const params = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
-  const profiles = Object.values(DesktopPetBuiltinId).map((id, index) => ({
+  const profiles = characters.map((id, index) => ({
     petId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
     personaId: id,
     characterId: id,
@@ -64,9 +67,11 @@ export function createCompanionPreviewApi(): CompanionWindowApi {
     },
   });
   return {
+    visibility: async () => true,
     ...createCompanionMemoryPreview(() => active),
     bootstrap: snapshot,
     select: async id => {
+      if (!profiles.some(profile => profile.petId === id)) throw new Error('Unknown companion');
       active = id;
       changed();
       return snapshot();

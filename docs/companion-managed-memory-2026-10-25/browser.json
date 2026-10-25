@@ -1,0 +1,30 @@
+[
+  {
+    "language": "zh",
+    "theme": "light",
+    "viewportCount": 5,
+    "mockSave": true,
+    "themeDraftFocus": true
+  },
+  {
+    "language": "zh",
+    "theme": "dark",
+    "viewportCount": 5,
+    "mockSave": true,
+    "themeDraftFocus": true
+  },
+  {
+    "language": "en",
+    "theme": "light",
+    "viewportCount": 5,
+    "mockSave": true,
+    "themeDraftFocus": true
+  },
+  {
+    "language": "en",
+    "theme": "dark",
+    "viewportCount": 5,
+    "mockSave": true,
+    "themeDraftFocus": true
+  }
+]

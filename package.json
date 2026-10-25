@@ -30,44 +30,6 @@
       "win-x64-cuda-12": []
     }
   },
-  "engram": {
-    "version": "v1.20.0-zhiyuan.4",
-    "repo": "z189yis/engram-cjk",
-    "runtimeAssets": {
-      "mac-x64": "engram_v1.20.0-zhiyuan.4_darwin_amd64.tar.gz",
-      "mac-arm64": "engram_v1.20.0-zhiyuan.4_darwin_arm64.tar.gz",
-      "win-x64": "engram_v1.20.0-zhiyuan.4_windows_amd64.zip",
-      "win-arm64": "engram_v1.20.0-zhiyuan.4_windows_arm64.zip",
-      "linux-x64": "engram_v1.20.0-zhiyuan.4_linux_amd64.tar.gz",
-      "linux-arm64": "engram_v1.20.0-zhiyuan.4_linux_arm64.tar.gz"
-    },
-    "runtimeChecksums": {
-      "mac-x64": "5b85ce91f4ec7f16ce24ef413001988283e5d8e8ff11747cb140bf83e30ec679",
-      "mac-arm64": "7181a883def28f74363bad441b2fba777634225fb56e99e9b56f7b47f37f29e5",
-      "win-x64": "d64879f73d290caf176046802f7d434f45d7e6c6f81adf7f11365bebffa220f2",
-      "win-arm64": "1692029c3123a32bdf7bdec781213b11fd368645518f2291abfab059ace4963f",
-      "linux-x64": "94d567fda8e105c05aaac8fef44bd27d626a5a8c28f3af0edafdaaec41d53d62",
-      "linux-arm64": "cb7f7af2e5bbf49333273f3e8db8435c2b2acb9ba5642f2ad3513d3063a4fbd6"
-    }
-  },
-  "strata": {
-    "releaseTag": "v0.2.4",
-    "defaultPort": 8096,
-    "control": {
-      "assetName": "strata-control-0.1.49.1-windows-x86_64.zip",
-      "sha256": "2bb7e1406a91f2fb92cf0379099fe9e3d267086e6619106a5947d80bd29dc30d"
-    },
-    "engineQwen": {
-      "assetName": "strata-engine-0.1.48-windows-x86_64-cuda-cuda13.tar.gz",
-      "sha256": "1e1611b0977d984bd7d8e79591a1ba1a7e550a2f4a66bfa45744a77308a71b95",
-      "installFolder": "0.1.48-windows-x86_64-cuda-cuda13"
-    },
-    "engineDsv41": {
-      "assetName": "strata-dsv41-0.1.49-windows-x86_64-cuda-cuda13.tar.gz",
-      "sha256": "2de85e1c93abcc43127cb8a313ff837157a35b3069d0c5d29655333d53d924c6",
-      "installFolder": "0.1.49-windows-x86_64-cuda-cuda13"
-    }
-  },
   "channelRuntime": {
     "version": "zhiyuan-sidecar-v4",
     "repo": "rongxinzy/pi-connect",
@@ -152,31 +114,31 @@
     "electron:dev:enterprise": "bun run build:enterprise && node scripts/electron-dev-enterprise.mjs",
     "apply:patches": "node ./node_modules/patch-package/index.js --error-on-fail",
     "postinstall": "bun run apply:patches && electron-builder install-app-deps",
-    "pack": "bun run setup:uv-runtime && bun run setup:python-runtime && bun run setup:posix-uv-runtime && bun run setup:posix-python-runtime && bun run build && bun run build:skills && bun run channel:runtime:download && bun run engram:runtime:host && electron-builder --dir",
-    "dist": "bun run setup:uv-runtime && bun run setup:python-runtime && bun run setup:posix-uv-runtime && bun run setup:posix-python-runtime && bun run build && bun run build:skills && bun run channel:runtime:download && bun run engram:runtime:host && electron-builder",
-    "dist:mac": "bun run channel:runtime:mac-arm64 && bun run engram:runtime:mac-arm64 && electron-builder --mac --config electron-builder.json --publish never",
+    "pack": "bun scripts/packaging/run-package.mjs pack",
+    "dist": "bun scripts/packaging/run-package.mjs dist",
+    "dist:mac": "bun scripts/packaging/run-package.mjs dist:mac",
     "predist:mac": "bun run prepare:update-release && bun run build && bun run build:skills && bun run channel:runtime:mac-arm64 && bun run engram:runtime:mac-arm64",
-    "dist:mac:x64": "bun run prepare:update-release && bun run build && bun run build:skills && bun run channel:runtime:mac-x64 && bun run engram:runtime:mac-x64 && electron-builder --mac --x64 --publish never",
-    "dist:mac:arm64": "bun run prepare:update-release && bun run build && bun run build:skills && bun run channel:runtime:mac-arm64 && bun run engram:runtime:mac-arm64 && electron-builder --mac --arm64 --publish never",
-    "dist:mac:universal": "bun run prepare:update-release && bun run build && bun run build:skills && bun run channel:runtime:mac-universal && bun run engram:runtime:mac-arm64 && electron-builder --mac --universal --publish never",
+    "dist:mac:x64": "bun scripts/packaging/run-package.mjs dist:mac:x64",
+    "dist:mac:arm64": "bun scripts/packaging/run-package.mjs dist:mac:arm64",
+    "dist:mac:universal": "bun scripts/packaging/run-package.mjs dist:mac:universal",
     "dist:win": "bun run dist:win:offline",
-    "dist:win:offline": "cross-env ZHIYUAN_ALLOW_HOST_CHANNEL_RUNTIME=1 bun run channel:runtime:win-x64 && bun run engram:runtime:win-x64 && bun run prepare:update-release && node scripts/ensure-build-version.js && bun run build && bun run build:skills && electron-builder --win nsis --x64 --config electron-builder.json --publish never && node scripts/installer-shell/build-distribution.cjs",
-    "dist:win:signed": "cross-env ZHIYUAN_ALLOW_HOST_CHANNEL_RUNTIME=1 bun run channel:runtime:win-x64 && bun run engram:runtime:win-x64 && bun run prepare:update-release && node scripts/ensure-build-version.js && bun run build && bun run build:skills && electron-builder --win nsis --x64 --config electron-builder.windows-signed.cjs --publish never && node scripts/installer-shell/build-distribution.cjs --signed",
-    "dist:win:enterprise": "cross-env ZHIYUAN_ALLOW_HOST_CHANNEL_RUNTIME=1 bun run channel:runtime:win-x64 && bun run engram:runtime:win-x64 && bun run prepare:update-release && cross-env ZHIYUAN_UPDATE_VARIANT=lite node scripts/ensure-build-version.js && bun run build && bun run build:enterprise && bun run build:skills && electron-builder --win nsis --x64 --config electron-builder.enterprise.cjs --publish never",
-    "dist:win:xiaoruan": "cross-env APP_EDITION=xiaoruan ZHIYUAN_ALLOW_HOST_CHANNEL_RUNTIME=1 bun run channel:runtime:win-x64 && bun run engram:runtime:win-x64 && bun run prepare:update-release && cross-env ZHIYUAN_UPDATE_VARIANT=lite node scripts/ensure-build-version.js && bun run build && bun run build:skills && electron-builder --win nsis --x64 --config electron-builder.xiaoruan.cjs --publish never",
+    "dist:win:offline": "bun scripts/packaging/run-package.mjs dist:win:offline",
+    "dist:win:signed": "bun scripts/packaging/run-package.mjs dist:win:signed",
+    "dist:win:enterprise": "bun scripts/packaging/run-package.mjs dist:win:enterprise",
+    "dist:win:xiaoruan": "bun scripts/packaging/run-package.mjs dist:win:xiaoruan",
     "build:xiaoruan": "cross-env APP_EDITION=xiaoruan bun run build",
     "dist:win:lite": "bun run dist:win:offline",
     "prepare:inference-edition-runtime": "node scripts/prepare-inference-edition-runtime.cjs",
-    "dist:win:cpu": "cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run dist:win:offline",
-    "dist:win:cuda": "cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run dist:win:offline",
-    "dist:win:signed:cpu": "cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run dist:win:signed",
-    "dist:win:signed:cuda": "cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run dist:win:signed",
+    "dist:win:cpu": "bun scripts/packaging/run-package.mjs dist:win:cpu",
+    "dist:win:cuda": "bun scripts/packaging/run-package.mjs dist:win:cuda",
+    "dist:win:signed:cpu": "bun scripts/packaging/run-package.mjs dist:win:signed:cpu",
+    "dist:win:signed:cuda": "bun scripts/packaging/run-package.mjs dist:win:signed:cuda",
     "sync:vendor-llamacpp-cpu": "node scripts/sync-vendor-llamacpp-cpu-edition.cjs",
     "finalize:vendor-llamacpp-cuda": "node scripts/finalize-llamacpp-cuda-edition.cjs",
     "predist:linux": "bun run channel:runtime:linux-x64 && bun run engram:runtime:linux-x64 && node scripts/ensure-build-version.js && bun run prepare:update-release",
-    "dist:linux": "bun run build && bun run build:skills && bun run engram:runtime:linux-x64 && electron-builder --linux --publish never",
-    "dist:linux:cpu": "cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run sync:vendor-llamacpp-cpu && cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run dist:linux",
-    "dist:linux:cuda": "cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run sync:vendor-llamacpp-cpu && bash scripts/build-llamacpp-cuda-rtx40.sh linux && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run finalize:vendor-llamacpp-cuda && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run dist:linux",
+    "dist:linux": "bun scripts/packaging/run-package.mjs dist:linux",
+    "dist:linux:cpu": "bun scripts/packaging/run-package.mjs dist:linux:cpu",
+    "dist:linux:cuda": "bun scripts/packaging/run-package.mjs dist:linux:cuda",
     "clean:release": "rimraf release",
     "generate:tray-icons": "node scripts/generate-tray-icons.js",
     "generate:app-icons": "python3 scripts/generate-app-icons.py",
@@ -243,6 +205,7 @@
     "better-sqlite3": "13.0.3",
     "bufferutil": "^4.1.0",
     "electron-updater": "6.8.9",
+    "koffi": "3.3.4",
     "node-pty": "1.1.0",
     "npm": "^11.11.0",
     "utf-8-validate": "^6.0.6"

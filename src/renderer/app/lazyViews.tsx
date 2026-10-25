@@ -7,7 +7,6 @@ const loadCoworkView = () =>
 // Start the default view chunk during the boot animation so first paint isn't waiting on it.
 const coworkViewPromise = loadCoworkView();
 export const CoworkView = React.lazy(() => coworkViewPromise);
-export const CompanionHomeView = React.lazy(() => import('../companion/CompanionHomeView'));
 export const SettingsPage = React.lazy(() => import('../components/settings/SettingsPage'));
 export const SkillsView = React.lazy(() =>
   import('../components/skills').then(module => ({ default: module.SkillsView })),

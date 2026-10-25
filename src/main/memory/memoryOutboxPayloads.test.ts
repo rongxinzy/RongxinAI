@@ -28,9 +28,12 @@ test('parseConfirmPayload rejects payloads with missing, empty, or non-string re
 });
 
 test('parseForgetPayload validates field types', () => {
-  const valid = { linkId: 'link-1', observationId: 7, hardDelete: true };
+  const valid = { linkId: 'link-1', projectId: 'project-a', observationId: 7, hardDelete: true };
   expect(parseForgetPayload(valid)).toEqual(valid);
   expect(parseForgetPayload({ ...valid, linkId: 7 })).toBeNull();
+  expect(parseForgetPayload({ ...valid, projectId: undefined })).toBeNull();
+  expect(parseForgetPayload({ ...valid, projectId: '' })).toBeNull();
+  expect(parseForgetPayload({ ...valid, projectId: ' ' })).toBeNull();
   expect(parseForgetPayload({ ...valid, observationId: '7' })).toBeNull();
   expect(parseForgetPayload({ ...valid, hardDelete: 'true' })).toBeNull();
   expect(parseForgetPayload({ linkId: 'link-1' })).toBeNull();

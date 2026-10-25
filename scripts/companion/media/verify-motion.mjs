@@ -8,6 +8,7 @@ import {
   DESKTOP_PET_MOTIONS,
   DESKTOP_PET_MEDIA_FPS,
   DESKTOP_PET_MEDIA_SIZE,
+  DesktopPetMotion,
 } from '../../../src/shared/desktopPet/motionCatalog.ts';
 
 const execute = promisify(execFile);
@@ -16,8 +17,13 @@ const MAX_PACK_BYTES = 40 * 1024 * 1024;
 const sha = data => createHash('sha256').update(data).digest('hex');
 
 /** Offline full-frame verification; no test skips, threshold edits or source-file ignores. */
-export async function verifyMotion(output, sourceSha256, choreographySha256) {
-  const manifestBytes = await fs.readFile(path.join(output, 'manifest.json'));
+export async function verifyMotion(output, sourceSha256, choreographySha256, study = false) {
+  const catalog = study
+    ? DESKTOP_PET_MOTIONS.filter(clip => clip.id === DesktopPetMotion.Idle)
+    : DESKTOP_PET_MOTIONS;
+  const manifestBytes = await fs.readFile(
+    path.join(output, study ? 'idle-manifest.json' : 'manifest.json'),
+  );
   if (manifestBytes.length > 100_000) throw new Error('Motion manifest exceeds its bound');
   const manifest = JSON.parse(manifestBytes);
   if (manifest.sourceSha256 !== sourceSha256 || manifest.choreographySha256 !== choreographySha256)
@@ -25,14 +31,13 @@ export async function verifyMotion(output, sourceSha256, choreographySha256) {
   if (
     manifest.size !== DESKTOP_PET_MEDIA_SIZE ||
     manifest.fps !== DESKTOP_PET_MEDIA_FPS ||
-    manifest.clips.length !== DESKTOP_PET_MOTIONS.length
+    manifest.clips.length !== catalog.length
   )
     throw new Error('Motion manifest does not match the authored catalog');
   const ids = new Set(manifest.clips.map(clip => clip.id));
-  if (ids.size !== DESKTOP_PET_MOTIONS.length)
-    throw new Error('Motion manifest contains duplicate clips');
+  if (ids.size !== catalog.length) throw new Error('Motion manifest contains duplicate clips');
   let bytes = manifestBytes.length;
-  for (const clip of DESKTOP_PET_MOTIONS) {
+  for (const clip of catalog) {
     const entry = manifest.clips.find(entry => entry.id === clip.id);
     if (
       !entry ||

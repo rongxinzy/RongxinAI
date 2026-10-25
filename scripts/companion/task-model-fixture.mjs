@@ -1,7 +1,12 @@
 import { createServer } from 'node:http';
 import { COMPANION_MEMORY_NATIVE_MARKER } from './verify-memory.mjs';
 
-export async function startCompanionModelFixture(fileFixture, taskMemoryFixture, reviewFixture) {
+export async function startCompanionModelFixture(
+  fileFixture,
+  taskMemoryFixture,
+  reviewFixture,
+  chatMemoryFixture,
+) {
   let requests = 0;
   const requestKinds = [];
   const server = createServer(async (request, response) => {
@@ -114,7 +119,12 @@ export async function startCompanionModelFixture(fileFixture, taskMemoryFixture,
         return;
       }
     }
-    const memoryCall = kind === 'task' ? taskMemoryFixture?.nextCall(payload) : null;
+    const memoryCall =
+      kind === 'task'
+        ? taskMemoryFixture?.nextCall(payload)
+        : kind === 'companion-chat'
+          ? chatMemoryFixture?.nextCall(payload)
+          : null;
     if (memoryCall) {
       response.write(
         `data: ${JSON.stringify(chunk({ role: 'assistant', tool_calls: [memoryCall] }))}\n\n`,

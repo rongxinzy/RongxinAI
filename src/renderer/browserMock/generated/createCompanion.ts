@@ -3,6 +3,10 @@ import type { BrowserMockRuntime } from '../runtime';
 
 export function createCompanion(runtime: BrowserMockRuntime): Window['electron']['companion'] {
   return {
+    visibility: async () => {
+      runtime.warnOnce('companion.visibility');
+      return false;
+    },
     listMemories: async _p0 => {
       void _p0;
       runtime.warnOnce('companion.listMemories');

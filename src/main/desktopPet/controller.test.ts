@@ -46,6 +46,8 @@ const mocks = vi.hoisted(() => ({
   screenOn: vi.fn(),
   screenOff: vi.fn(),
   changed: vi.fn(),
+  hideBubble: vi.fn(),
+  prepareBubble: vi.fn(),
 }));
 
 vi.mock('electron', () => {
@@ -134,6 +136,13 @@ vi.mock('./motion', () => ({
   },
 }));
 
+vi.mock('../companion/window', () => ({
+  hideCompanionWindow: mocks.hideBubble,
+  openCompanionWindow: vi.fn(),
+  prepareCompanionWindow: mocks.prepareBubble,
+  updateActiveCompanionAppearance: vi.fn(),
+}));
+
 import {
   initializeDesktopPet,
   disposeDesktopPet,
@@ -177,6 +186,7 @@ afterEach(() => {
 
 test('the companion is opt-in and uses a dedicated sandboxed preload', () => {
   expect(isDesktopPetEnabled()).toBe(false);
+  expect(mocks.prepareBubble).not.toHaveBeenCalled();
   setDesktopPetEnabled(true);
   expect(mocks.options[0]).toMatchObject({
     transparent: true,
@@ -193,6 +203,24 @@ test('the companion is opt-in and uses a dedicated sandboxed preload', () => {
     expect.stringContaining('desktop-pet.html'),
   );
   expect(saved).toEqual({ enabled: true, layoutVersion: 1, x: 300, y: 400 });
+  expect(mocks.prepareBubble).not.toHaveBeenCalled();
+  mocks.windows[0].emit('ready-to-show');
+  expect(mocks.prepareBubble).toHaveBeenCalledOnce();
+});
+
+test('suppression hides the bubble even when the native pet emits no hide event', async () => {
+  setDesktopPetEnabled(true);
+  mocks.windows[0].emit('ready-to-show');
+  mocks.hideBubble.mockClear();
+  await invoke(DesktopPetIpc.SetSettings, { doNotDisturb: true });
+  expect(mocks.hideBubble).toHaveBeenCalled();
+  await invoke(DesktopPetIpc.SetSettings, { doNotDisturb: false });
+  mocks.hideBubble.mockClear();
+  mocks.power.get('lock-screen')!();
+  expect(mocks.hideBubble).toHaveBeenCalled();
+  mocks.hideBubble.mockClear();
+  setDesktopPetEnabled(false);
+  expect(mocks.hideBubble).toHaveBeenCalled();
 });
 
 test('IPC rejects other windows and subframes and bounds the alpha mask', () => {
@@ -407,14 +435,22 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
   });
 });
 
-test('character settings validate IDs, survive restart, and preserve task failures', async () => {
+test('released character settings reject hidden pets without rewriting saved data or failures', async () => {
+  saved = { characterId: DesktopPetBuiltinId.Youli, enabled: false };
+  expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
+    characterId: DesktopPetBuiltinId.Xiaoyuan,
+  });
+  expect(saved).toEqual({ characterId: DesktopPetBuiltinId.Youli, enabled: false });
   await expect(invoke(DesktopPetIpc.SetSettings, { characterId: '../unknown' })).rejects.toThrow(
     'invalid arguments',
   );
-  await invoke(DesktopPetIpc.SetSettings, {
-    enabled: true,
-    characterId: DesktopPetBuiltinId.Youli,
-  });
+  await expect(
+    invoke(DesktopPetIpc.SetSettings, {
+      enabled: true,
+      characterId: DesktopPetBuiltinId.Youli,
+    }),
+  ).rejects.toThrow();
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   const events = new PiUiEventSequencer(() => 'character-failure');
   observeDesktopPetEvent(
     events.next({
@@ -423,18 +459,20 @@ test('character settings validate IDs, survive restart, and preserve task failur
       error: { kind: CoworkErrorKind.Unknown, message: 'failed' },
     }),
   );
-  await invoke(DesktopPetIpc.SetSettings, { characterId: DesktopPetBuiltinId.Yunmo });
+  await expect(
+    invoke(DesktopPetIpc.SetSettings, { characterId: DesktopPetBuiltinId.Yunmo }),
+  ).rejects.toThrow();
   expect(mocks.values.get(DESKTOP_PET_FAILURES_KEY)).toHaveLength(1);
   disposeDesktopPet();
   initializeDesktopPet(preferences, getMainWindow, mocks.changed);
   expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
-    characterId: DesktopPetBuiltinId.Yunmo,
+    characterId: DesktopPetBuiltinId.Xiaoyuan,
   });
   const contents = mocks.windows.at(-1)!.webContents;
   mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: contents, senderFrame: contents.mainFrame });
   expect(contents.send).toHaveBeenLastCalledWith(
     DesktopPetIpc.State,
-    expect.objectContaining({ characterId: DesktopPetBuiltinId.Yunmo, state: 'error' }),
+    expect.objectContaining({ characterId: DesktopPetBuiltinId.Xiaoyuan, state: 'error' }),
   );
 });
 

@@ -82,7 +82,7 @@ export function classicSupplementaryControls() {
         'line-height': '1.25rem',
         'font-weight': 'var(--zy-component-font-weight-normal)',
         color: 'var(--muted-foreground)',
-        opacity: '0.85',
+        opacity: '1',
         'outline-style': 'none',
       },
       hover: { color: 'var(--foreground)', opacity: '1' },

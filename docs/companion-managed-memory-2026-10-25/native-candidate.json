@@ -1,0 +1,28 @@
+{
+  "userData": "/tmp/companion-bubble-native-ncGDg6",
+  "platform": "darwin",
+  "pointerOpensBubble": true,
+  "animatedGreeting": true,
+  "reducedMotionFreezes": true,
+  "anchoredAbove": true,
+  "flipsBelow": true,
+  "movementRetainsFocus": true,
+  "dndHidesBoth": true,
+  "hidingRetainsDraft": true,
+  "workbenchSeparate": true,
+  "privateMemoryTools": true,
+  "singleReleasedProfile": true,
+  "rejectsUnavailableProfile": true,
+  "chatToolsLeaveSharedMemoryUnchanged": true,
+  "modelRequests": 8,
+  "managedMemory": {
+    "created": true,
+    "edited": true,
+    "deleted": true,
+    "permanentlyDeleted": true,
+    "themes": 2
+  },
+  "mediaStress": null,
+  "actualExternalModelQuality": "not verified",
+  "windowsNativeSurfaces": "not verified"
+}

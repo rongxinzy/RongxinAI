@@ -29,6 +29,8 @@ export function watchDesktopPetVisibility(window: BrowserWindow | null, changed:
   window?.on('enter-full-screen', changed);
   window?.on('leave-full-screen', changed);
   return {
+    canObserve: (settings: DesktopPetSettings): boolean =>
+      !settings.doNotDisturb && !locked && !suspended,
     suppressed: (settings: DesktopPetSettings): boolean =>
       settings.doNotDisturb ||
       locked ||

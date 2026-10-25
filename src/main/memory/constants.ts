@@ -97,6 +97,10 @@ export const EngramSearchMatchMode = {
 export type EngramSearchMatchMode =
   (typeof EngramSearchMatchMode)[keyof typeof EngramSearchMatchMode];
 
+export const EngramResponseCode = {
+  UnknownProject: 'unknown_project',
+} as const;
+
 export const EngramEnvironment = {
   BinaryPath: 'ZHIYUAN_ENGRAM_BIN',
   DataDirectory: 'ENGRAM_DATA_DIR',

@@ -1,0 +1,216 @@
+{
+  "userData": "/tmp/companion-bubble-native-ZCyofj",
+  "platform": "darwin",
+  "pointerOpensBubble": true,
+  "animatedGreeting": true,
+  "reducedMotionFreezes": true,
+  "anchoredAbove": true,
+  "flipsBelow": true,
+  "movementRetainsFocus": true,
+  "dndHidesBoth": true,
+  "hidingRetainsDraft": true,
+  "workbenchSeparate": true,
+  "privateMemoryTools": true,
+  "singleReleasedProfile": true,
+  "rejectsUnavailableProfile": true,
+  "sharedMemoryUnchanged": true,
+  "modelRequests": 8,
+  "mediaStress": {
+    "seconds": 180.324358041,
+    "samples": [
+      {
+        "heapBytes": 4708352,
+        "pid": 28379,
+        "workingSetKiB": 226496,
+        "cpuPercent": 0,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4688900,
+        "pid": 28379,
+        "workingSetKiB": 233248,
+        "cpuPercent": 1.9541237660827995,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4711936,
+        "pid": 28379,
+        "workingSetKiB": 237216,
+        "cpuPercent": 1.9159391696289831,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4690504,
+        "pid": 28379,
+        "workingSetKiB": 234432,
+        "cpuPercent": 2.122032544452549,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4717768,
+        "pid": 28379,
+        "workingSetKiB": 236928,
+        "cpuPercent": 1.922925898606266,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4701516,
+        "pid": 28379,
+        "workingSetKiB": 239840,
+        "cpuPercent": 1.9026162471607484,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4725468,
+        "pid": 28379,
+        "workingSetKiB": 242528,
+        "cpuPercent": 1.989385731948703,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4702068,
+        "pid": 28379,
+        "workingSetKiB": 245232,
+        "cpuPercent": 1.7508390482035854,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4723448,
+        "pid": 28379,
+        "workingSetKiB": 245664,
+        "cpuPercent": 1.9097635510885396,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4700876,
+        "pid": 28379,
+        "workingSetKiB": 249696,
+        "cpuPercent": 2.059086788115029,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4723480,
+        "pid": 28379,
+        "workingSetKiB": 251904,
+        "cpuPercent": 2.025382922945213,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4700988,
+        "pid": 28379,
+        "workingSetKiB": 253248,
+        "cpuPercent": 1.865969043498465,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4724252,
+        "pid": 28379,
+        "workingSetKiB": 258640,
+        "cpuPercent": 2.065593714009659,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4701724,
+        "pid": 28379,
+        "workingSetKiB": 264160,
+        "cpuPercent": 1.933493274316924,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4723104,
+        "pid": 28379,
+        "workingSetKiB": 264496,
+        "cpuPercent": 1.8314178108828858,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4701800,
+        "pid": 28379,
+        "workingSetKiB": 267568,
+        "cpuPercent": 1.9538614564405212,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4724412,
+        "pid": 28379,
+        "workingSetKiB": 272832,
+        "cpuPercent": 1.8823552376762076,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4701864,
+        "pid": 28379,
+        "workingSetKiB": 272176,
+        "cpuPercent": 1.6768906042375935,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4724456,
+        "pid": 28379,
+        "workingSetKiB": 274576,
+        "cpuPercent": 1.9848628029360333,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4701916,
+        "pid": 28379,
+        "workingSetKiB": 278848,
+        "cpuPercent": 1.9895389377515567,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      },
+      {
+        "heapBytes": 4724520,
+        "pid": 28379,
+        "workingSetKiB": 279216,
+        "cpuPercent": 1.9817115598177697,
+        "slots": 2,
+        "sources": 1,
+        "state": "playing"
+      }
+    ],
+    "heapGrowthBytes": 16168,
+    "workingSetGrowthKiB": 52720
+  },
+  "actualExternalModelQuality": "not verified",
+  "windowsNativeSurfaces": "not verified"
+}

@@ -1,0 +1,54 @@
+{
+  "userData": "/tmp/companion-bubble-native-ufATY6",
+  "platform": "darwin",
+  "pointerOpensBubble": true,
+  "animatedGreeting": true,
+  "reducedMotionFreezes": true,
+  "anchoredAbove": true,
+  "flipsBelow": true,
+  "movementRetainsFocus": true,
+  "dndHidesBoth": true,
+  "hidingRetainsDraft": true,
+  "workbenchSeparate": true,
+  "privateMemoryTools": true,
+  "singleReleasedProfile": true,
+  "rejectsUnavailableProfile": true,
+  "chatToolsLeaveSharedMemoryUnchanged": true,
+  "modelRequests": 8,
+  "managedMemory": {
+    "created": true,
+    "edited": true,
+    "deleted": true,
+    "permanentlyDeleted": true,
+    "themes": 2
+  },
+  "mediaStress": {
+    "seconds": 604.0521007919999,
+    "heapGrowthBytes": 30052,
+    "workingSetGrowthKiB": 8464,
+    "sampleFiles": [
+      {
+        "file": "native-resources-cache-ten-minute.samples-01.json",
+        "firstSampleIndex": 0,
+        "count": 24,
+        "sha256": "414b934113052f488837144bbd41a74f424b64a5a1307b6838c17c1db99ed810"
+      },
+      {
+        "file": "native-resources-cache-ten-minute.samples-02.json",
+        "firstSampleIndex": 24,
+        "count": 24,
+        "sha256": "e64e8cf858e9df133d936fad2304688844f8062d0d9423d3fb15d703d0337196"
+      },
+      {
+        "file": "native-resources-cache-ten-minute.samples-03.json",
+        "firstSampleIndex": 48,
+        "count": 20,
+        "sha256": "bd4c95d11b9bb07a0f076705f28bec360541fc40b65693c6b56af87272bcf7cc"
+      }
+    ],
+    "sampleCount": 68,
+    "originalReportSha256": "518f214ed4f2c82617816e7f729b6d5d97b5e1849b6a9d9d71151f67b56e09ca"
+  },
+  "actualExternalModelQuality": "not verified",
+  "windowsNativeSurfaces": "not verified"
+}

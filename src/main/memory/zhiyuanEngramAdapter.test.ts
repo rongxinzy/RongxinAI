@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { EngramMemoryScope, EngramObservationType } from './constants';
+import { EngramMemoryScope, EngramObservationType, EngramResponseCode } from './constants';
 import { redactPrivateBlocks, ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
 
 afterEach(() => {
@@ -122,4 +122,66 @@ test('redacts explicit private blocks before a candidate can be persisted', () =
   expect(redactPrivateBlocks('keep <private>secret-token</private> this')).toBe(
     'keep [REDACTED] this',
   );
+});
+
+test('a known empty-project response is empty only for read operations', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify({ code: EngramResponseCode.UnknownProject }), { status: 404 }),
+    ),
+  );
+  const adapter = new ZhiYuanEngramAdapter({
+    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+    start: vi.fn(),
+  } as never);
+  await expect(adapter.recall({ project: 'empty-owner', query: 'kite' })).resolves.toEqual([]);
+  await expect(adapter.recent({ project: 'empty-owner' })).resolves.toEqual([]);
+  await expect(adapter.forget(17, true, 'empty-owner')).rejects.toThrow('HTTP 404 for DELETE');
+});
+
+test('other failed reads never become empty memory results', async () => {
+  const adapter = new ZhiYuanEngramAdapter({
+    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+    start: vi.fn(),
+  } as never);
+  for (const [status, body] of [
+    [404, '{"code":"invalid_project"}'],
+    [404, 'not JSON'],
+    [401, JSON.stringify({ code: EngramResponseCode.UnknownProject })],
+    [500, JSON.stringify({ code: EngramResponseCode.UnknownProject })],
+  ] as const) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(body, { status })),
+    );
+    await expect(adapter.recall({ project: 'owner', query: 'kite' })).rejects.toThrow(
+      `HTTP ${status} for GET /search?`,
+    );
+    await expect(adapter.recent({ project: 'owner' })).rejects.toThrow(
+      `HTTP ${status} for GET /observations/recent?`,
+    );
+  }
+});
+
+test('deletion carries the caller owner assertion without fetching a target to invent it', async () => {
+  const requests: URL[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL) => {
+      requests.push(new URL(url));
+      return new Response('{}', { status: 200 });
+    }),
+  );
+  const adapter = new ZhiYuanEngramAdapter({
+    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+    start: vi.fn(),
+  } as never);
+  const project = 'companion://zhiyuan-agent/pet-a';
+  await adapter.forget(17, true, project);
+  expect(requests).toHaveLength(1);
+  expect(requests[0].pathname).toBe('/observations/17');
+  expect(requests[0].searchParams.get('hard')).toBe('true');
+  expect(requests[0].searchParams.get('expected_project')).toBe(project);
 });

@@ -76,7 +76,7 @@ async function bridge(page) {
 }
 
 for (const colorScheme of ['light', 'dark']) {
-  test(`all seven characters render every task pose with transparent edges in ${colorScheme}`, async ({
+  test(`all hidden selections project to Xiaoyuan task poses with transparent edges in ${colorScheme}`, async ({
     page,
   }) => {
     const errors = [];
@@ -99,7 +99,7 @@ for (const colorScheme of ['light', 'dark']) {
           { characterId: character, state },
         );
         const canvas = page.locator('canvas');
-        await expect(canvas).toHaveAttribute('data-character', character);
+        await expect(canvas).toHaveAttribute('data-character', DesktopPetBuiltinId.Xiaoyuan);
         await expect(canvas).toHaveAttribute('data-state', state);
         const pixels = await canvas.evaluate(element => {
           const data = element.getContext('2d').getImageData(0, 0, 192, 192).data;
@@ -129,7 +129,7 @@ test('long playback renders multiple beats, stays inside the mask and yields to 
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/desktop-pet.html');
   await expect(page.locator('canvas')).toHaveAttribute('data-character', 'xiaoyuan');
-  for (const character of characters) {
+  for (const character of [DesktopPetBuiltinId.Xiaoyuan]) {
     await page.evaluate(
       characterId =>
         window.petState({
@@ -147,11 +147,11 @@ test('long playback renders multiple beats, stays inside the mask and yields to 
     let elapsed = 0;
     for (const interval of [500, 500, 900, 1600]) {
       elapsed += interval;
-      // A fake clock cannot advance a browser decoder. All seven now use real media.
       await expect(page.locator('canvas')).toHaveAttribute(
         'data-media-clip',
         DesktopPetMotion.Happy,
       );
+      // Browser video time comes from the actual decoder, not an advanced JS test clock.
       await expect
         .poll(async () => Number(await page.locator('canvas').getAttribute('data-media-time')))
         .toBeGreaterThan(elapsed / 1000);
@@ -166,7 +166,7 @@ test('long playback renders multiple beats, stays inside the mask and yields to 
       );
     }
     expect(new Set(samples.map(sample => sample.image)).size).toBe(4);
-    expect(samples.every(sample => sample.missing === 0)).toBe(true);
+    expect(samples.map(sample => sample.missing)).toEqual([0, 0, 0, 0]);
     await page.evaluate(characterId => {
       window.petState({
         characterId,
@@ -206,7 +206,10 @@ test('hidden and reduced-motion windows discard choreography and never replay ba
       }),
     DesktopPetBuiltinId.Youli,
   );
-  await expect(page.locator('canvas')).toHaveAttribute('data-character', DesktopPetBuiltinId.Youli);
+  await expect(page.locator('canvas')).toHaveAttribute(
+    'data-character',
+    DesktopPetBuiltinId.Xiaoyuan,
+  );
   await page.evaluate(() => window.petEffect({ kind: 'action', action: 'peek' }));
   await expect(page.locator('canvas')).toHaveAttribute('data-media-clip', DesktopPetMotion.Peek);
   await expect
@@ -224,7 +227,7 @@ test('hidden and reduced-motion windows discard choreography and never replay ba
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await expect(page.locator('canvas')).toHaveAttribute('data-sequence', '');
-  await expect(page.locator('canvas')).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
+  await expect.poll(() => page.locator('canvas').getAttribute('data-media-clip')).toBe('idle');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect(page.locator('canvas')).toHaveAttribute('data-reduced-motion', 'true');
   await page.evaluate(() => window.petEffect({ kind: 'action', action: 'happy' }));

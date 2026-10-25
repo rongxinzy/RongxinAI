@@ -24,7 +24,26 @@ export async function chooseTaskFile(application, chat, fixture, output) {
         document.getAnimations().map(animation => animation.finished.catch(() => {})),
       );
     });
-    await chat.screenshot({ path: path.join(output, 'task-file-draft.png') });
+    console.log(
+      JSON.stringify({
+        fileDraftWindow: await application.evaluate(({ BrowserWindow }) => {
+          const window = BrowserWindow.getAllWindows().find(window =>
+            window.webContents.getURL().includes('companion.html'),
+          );
+          return {
+            visible: window.isVisible(),
+            focused: window.isFocused(),
+            bounds: window.getBounds(),
+          };
+        }),
+        fileDraftDocument: await chat.evaluate(() => ({
+          visibility: document.visibilityState,
+          focused: document.hasFocus(),
+          readyState: document.readyState,
+        })),
+      }),
+    );
+    await chat.screenshot({ path: path.join(output, 'task-file-draft.png'), timeout: 5000 });
     const attachments = await chat.evaluate(async () => {
       const { activePetId } = await window.companion.bootstrap();
       return JSON.parse(localStorage.getItem(`zhiyuan-companion-draft:${activePetId}`)).attachments;

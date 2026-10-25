@@ -1,22 +1,24 @@
 import { expect, test } from '@playwright/test';
 
 import { contrast } from '../shared/contrast.mjs';
+import { useDormantCompanionRoster } from '../shared/companion-roster.mjs';
+
+test.beforeEach(async ({ page }) => useDormantCompanionRoster(page));
 
 for (const theme of ['light', 'dark']) {
   test(`home navigation and mode controls retain visible keyboard focus in ${theme}`, async ({
     page,
   }) => {
     await page.goto('/?previewScenario=empty&previewSkipBoot=1');
-    await expect(page.getByRole('combobox')).toBeEnabled();
+    await expect(page.getByTestId('sidebar-view-workbench')).toBeVisible();
     await page.evaluate(async theme => {
       const source = new URL('/src/renderer/services/theme.ts', location.origin).href;
       const { themeService } = await import(source);
       themeService.setTheme(theme);
     }, theme);
     for (const control of [
-      page.getByTestId('sidebar-view-companion'),
       page.getByTestId('sidebar-view-workbench'),
-      page.getByRole('tab').first(),
+      page.getByRole('switch').first(),
     ]) {
       await control.focus();
       await page.keyboard.press('Tab');
@@ -51,10 +53,12 @@ for (const theme of ['light', 'dark']) {
       await Promise.all(element.getAnimations().map(animation => animation.finished));
     });
     const focused = await contrast(group);
-    expect(focused.outlineWidth).toBe('2px');
-    expect(focused.outlineStyle).toBe('solid');
-    expect(focused.outlineOffset).toBe('1px');
-    expect(focused.focus).toBeGreaterThanOrEqual(3);
+    // The paper variant uses a persistent 2px underline, recolored on keyboard focus.
+    expect(await group.evaluate(element => getComputedStyle(element).borderBottomWidth)).toBe(
+      '2px',
+    );
+    expect(await group.evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
+    expect(focused.border).toBeGreaterThanOrEqual(3);
     expect((await contrast(input)).text).toBeGreaterThanOrEqual(4.5);
     console.log(
       JSON.stringify({
@@ -115,13 +119,15 @@ for (const theme of ['light', 'dark']) {
     await page.getByRole('tab', { name: '交代任务', exact: true }).click();
     for (const name of ['切换伙伴', '工作区']) {
       const selector = page.getByRole('combobox', { name, exact: true });
-      expect((await contrast(selector)).border).toBeGreaterThanOrEqual(3);
+      if (name === '工作区') expect((await contrast(selector)).border).toBeGreaterThanOrEqual(3);
+      else expect((await contrast(selector.locator('svg'))).text).toBeGreaterThanOrEqual(3);
       expect((await contrast(selector)).text).toBeGreaterThanOrEqual(4.5);
       await selector.hover();
       await selector.evaluate(async element => {
         await Promise.all(element.getAnimations().map(animation => animation.finished));
       });
-      expect((await contrast(selector)).border).toBeGreaterThanOrEqual(3);
+      if (name === '工作区') expect((await contrast(selector)).border).toBeGreaterThanOrEqual(3);
+      else expect((await contrast(selector.locator('svg'))).text).toBeGreaterThanOrEqual(3);
       await selector.focus();
       await page.keyboard.press('Tab');
       await page.keyboard.press('Shift+Tab');

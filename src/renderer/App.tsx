@@ -54,7 +54,7 @@ import type { CoworkPermissionResult } from './types/cowork';
 const App: React.FC = () => {
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
   const [initErrorSettingsOpen, setInitErrorSettingsOpen] = useState(false);
-  const [mainView, setMainView] = useState<MainView>(MainView.Companion);
+  const [mainView, setMainView] = useState<MainView>(MainView.Cowork);
   useCompanionNavigation(setMainView);
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();

@@ -2,6 +2,8 @@
 
 启动欢迎群像见 [companions-welcome.png](companions-welcome.png)，七位伙伴共同入画，透明背景；生成方式与提示词见 [welcome-prompt.md](welcome-prompt.md)。这是独立的启动插画，不影响动作图集或角色选择。
 
+2026-10-25 发布范围：日常仅开放小远，七位欢迎群像保持原样。其余六位的素材、代码和身份数据保留，暂不开放选择。小远改用 `motion/xiaoyuan-original/` 的 24 段透明连续视频，头脸、脚趾与围巾沿用第一版像素；翅膀和原图遮住的躯干使用[遮挡补齐稿](rigs/xiaoyuan-occlusion-v1-prompt.md)。`motion/xiaoyuan/` 的旧分层稿仍保留，但不再由小远播放器选取。通过 `render-motion.mjs --owl-original --out=src/renderer/assets/desktop-pet/motion/xiaoyuan-original` 重建，追加 `--verify` 校验全部 24 段的来源、帧、透明与命中蒙版。最终美术、真实 Windows、长时资源与发布仍须分别验收。
+
 六个新角色通过内置 `image_gen.imagegen` 分别生成并修整留白，保留工具返回的透明 PNG；没有程序化修改或重新编码图片。生成规格、角色提示词及修整提示词见 [prompts.json](prompts.json)。
 
 | 角色 | 素材 | 动作性格 |
@@ -17,6 +19,6 @@
 
 动作定义在 `desktopPet/sequenceClips.ts`，播放器使用经过时间采样；5 套动作按角色节奏约 6–15 秒。姿态切换只在节拍边界短暂融合，避免持续重影；几何运动用平滑插值。任务错误/待确认/运行中、拖动、漫游、隐藏和减少动效优先于表演。不产生模型请求，不写任务状态，不改变失败提醒。
 
-设置路径：设置 → 通用 → 桌面伙伴 → 伙伴形象。选择自动保存，与桌宠窗口同步；默认仍关闭。
+设置路径：设置 → 通用 → 桌面伙伴。默认仍关闭；本版单伙伴隐藏形象选择，显示与免打扰等开关保留。
 
-开发预览（仅 DEV 生效）：`/desktop-pet.html?character=youli&action=happy`；`state` 可指定六种任务状态。生产版不通过 URL 改写任务状态或设置。
+开发预览（仅 DEV 生效）：`/desktop-pet.html?action=happy`；`state` 可指定六种任务状态。隐藏角色 ID 也投影到小远，不通过 URL 开放其他六位。生产版不通过 URL 改写任务状态或设置。

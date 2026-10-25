@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest';
 import { readPinnedManifest, sha256File } from './download-strata-runtime.cjs';
 
 describe('download-strata-runtime pins', () => {
-  test('package.json strata checksums match release-manifest template', () => {
+  test('runtime pins match the release-manifest template', () => {
     const pinned = readPinnedManifest();
     const template = JSON.parse(
       readFileSync(

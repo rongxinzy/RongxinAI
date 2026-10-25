@@ -1,16 +1,5 @@
 import { memo, useMemo, useState, useSyncExternalStore } from 'react';
-import {
-  Archive,
-  Brain,
-  Check,
-  EllipsisVertical,
-  Funnel,
-  Pencil,
-  RotateCcw,
-  Search,
-  ShieldAlert,
-  Trash2,
-} from 'lucide-react';
+import { Brain, Funnel, Search, ShieldAlert } from 'lucide-react';
 
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
@@ -26,7 +15,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -44,19 +32,24 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@shared/components
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Separator } from '@shared/components/ui/separator';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
 import {
   MemoryDeliveryStatus,
-  MemoryKind,
-  MemoryLifecycleStatus,
-  MemoryScope,
   MemorySensitivity,
-  MemorySourceKind,
   type ManagedMemoryRecord,
-  parseMemoryTimestamp,
 } from '../../../../shared/memory';
 import { i18nService } from '../../../services/i18n';
 import OverflowingSessionTitle from '../../agentSidebar/OverflowingSessionTitle';
+import { MemoryRecordActions, type MemoryRecordActionProps } from './MemoryRecordActions';
+import {
+  displayTitle,
+  scopeLabel,
+  kindLabel,
+  statusLabel,
+  statusVariant,
+  deliveryLabel,
+  sourceLabel,
+  formatDate,
+} from './memoryRecordPresentation';
 import {
   ManagedMemoryScopeFilter,
   ManagedMemoryStatusFilter,
@@ -86,20 +79,8 @@ interface MemoryRecordListProps {
   onForget: (record: ManagedMemoryRecord) => void;
 }
 
-interface MemoryRecordActionProps {
-  record: ManagedMemoryRecord;
-  busy: boolean;
-  inlineLifecycleActions?: boolean;
-  onEdit: () => void;
-  onConfirm: () => void;
-  onArchive: () => void;
-  onRestore: () => void;
-  onForget: () => void;
-}
-
 const subscribeLanguage = (listener: () => void) => i18nService.subscribe(listener);
 const getLanguage = () => i18nService.getLanguage();
-const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
 
 export const MemoryRecordList = memo(function MemoryRecordList(props: MemoryRecordListProps) {
   useSyncExternalStore(subscribeLanguage, getLanguage, getLanguage);
@@ -412,121 +393,6 @@ function MemoryRows(props: {
   );
 }
 
-function MemoryRecordActions(props: MemoryRecordActionProps) {
-  const {
-    record,
-    busy,
-    inlineLifecycleActions = false,
-    onEdit,
-    onConfirm,
-    onArchive,
-    onRestore,
-    onForget,
-  } = props;
-  const editable = canEdit(record);
-  const active = record.status === MemoryLifecycleStatus.Active;
-  const restorable =
-    record.status === MemoryLifecycleStatus.Archived ||
-    record.status === MemoryLifecycleStatus.Expired;
-  const hasPrimaryMenuActions = !inlineLifecycleActions && (editable || active || restorable);
-  const confirmDisabled = busy || record.deliveryStatus === MemoryDeliveryStatus.Pending;
-  return (
-    <div className="flex shrink-0 items-center gap-1">
-      {record.status === MemoryLifecycleStatus.NeedsReview && inlineLifecycleActions && (
-        <Button type="button" size="sm" onClick={onConfirm} disabled={confirmDisabled}>
-          <Check data-icon="inline-start" />
-          {i18nService.t('managedMemoryConfirm')}
-        </Button>
-      )}
-      {record.status === MemoryLifecycleStatus.NeedsReview && !inlineLifecycleActions && (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                onClick={onConfirm}
-                aria-label={i18nService.t('managedMemoryConfirm')}
-                disabled={confirmDisabled}
-              />
-            }
-          >
-            <Check />
-          </TooltipTrigger>
-          <TooltipContent>{i18nService.t('managedMemoryConfirm')}</TooltipContent>
-        </Tooltip>
-      )}
-      {inlineLifecycleActions && editable && (
-        <Button type="button" variant="outline" size="sm" onClick={onEdit} disabled={busy}>
-          <Pencil data-icon="inline-start" />
-          {i18nService.t('edit')}
-        </Button>
-      )}
-      {inlineLifecycleActions && active && (
-        <Button type="button" variant="outline" size="sm" onClick={onArchive} disabled={busy}>
-          <Archive data-icon="inline-start" />
-          {i18nService.t('managedMemoryStopUsing')}
-        </Button>
-      )}
-      {inlineLifecycleActions && restorable && (
-        <Button type="button" variant="outline" size="sm" onClick={onRestore} disabled={busy}>
-          <RotateCcw data-icon="inline-start" />
-          {i18nService.t('managedMemoryRestore')}
-        </Button>
-      )}
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={i18nService.t('managedMemoryMoreActions')}
-              disabled={busy}
-            />
-          }
-        >
-          <EllipsisVertical />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {hasPrimaryMenuActions && (
-            <DropdownMenuGroup>
-              {editable && (
-                <DropdownMenuItem onClick={onEdit}>
-                  <Pencil />
-                  {i18nService.t('edit')}
-                </DropdownMenuItem>
-              )}
-              {active && (
-                <DropdownMenuItem onClick={onArchive}>
-                  <Archive />
-                  {i18nService.t('managedMemoryStopUsing')}
-                </DropdownMenuItem>
-              )}
-              {restorable && (
-                <DropdownMenuItem onClick={onRestore}>
-                  <RotateCcw />
-                  {i18nService.t('managedMemoryRestore')}
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuGroup>
-          )}
-          {hasPrimaryMenuActions && <DropdownMenuSeparator />}
-          <DropdownMenuGroup>
-            <DropdownMenuItem variant="destructive" onClick={onForget}>
-              <Trash2 />
-              {record.memoryId === null
-                ? i18nService.t('managedMemoryRejectCandidate')
-                : i18nService.t('delete')}
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-
 function MemoryDetailsDialog(props: {
   record: ManagedMemoryRecord | null;
   sessionTitles: ReadonlyMap<string, string>;
@@ -555,7 +421,10 @@ function MemoryDetailsDialog(props: {
   } = props;
   return (
     <Dialog open={record !== null} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden sm:max-w-xl">
+      <DialogContent
+        closeLabel={i18nService.t('close')}
+        className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden sm:max-w-xl"
+      >
         <DialogHeader className="theme-control-sizing-19 shrink-0">
           <DialogTitle>
             {record
@@ -606,7 +475,7 @@ function MemoryDetailsDialog(props: {
                 )}
                 {record.deliveryError && (
                   <MemoryDetail label={i18nService.t('managedMemoryPropagationFailed')}>
-                    {record.deliveryError}
+                    {i18nService.t('managedMemorySyncErrorDescription')}
                   </MemoryDetail>
                 )}
               </dl>
@@ -662,109 +531,4 @@ function StatusBadge({ record }: { record: ManagedMemoryRecord }) {
     return <Badge variant="secondary">{i18nService.t('managedMemoryPropagationPending')}</Badge>;
   }
   return <Badge variant={statusVariant(record.status)}>{statusLabel(record.status)}</Badge>;
-}
-
-function canEdit(record: ManagedMemoryRecord): boolean {
-  return (
-    record.scope !== MemoryScope.Session &&
-    (record.status === MemoryLifecycleStatus.Active ||
-      record.status === MemoryLifecycleStatus.NeedsReview) &&
-    record.deliveryStatus !== MemoryDeliveryStatus.Pending
-  );
-}
-
-function displayTitle(
-  record: ManagedMemoryRecord,
-  sessionTitles: ReadonlyMap<string, string>,
-  workspaceName: string,
-): string {
-  if (record.scope !== MemoryScope.Session) return record.title;
-  const sessionTitle =
-    sessionTitles.get(record.sessionId)?.trim() ||
-    record.title.trim() ||
-    i18nService.t('managedMemorySessionSummaryTitle');
-  return workspaceName ? `${workspaceName} - ${sessionTitle}` : sessionTitle;
-}
-
-function scopeLabel(scope: ManagedMemoryRecord['scope']): string {
-  if (scope === MemoryScope.Personal) return i18nService.t('managedMemoryScopePersonal');
-  if (scope === MemoryScope.Session) return i18nService.t('managedMemoryScopeSession');
-  return i18nService.t('managedMemoryScopeProject');
-}
-
-function kindLabel(kind: ManagedMemoryRecord['kind']): string {
-  if (kind === MemoryKind.Preference) return i18nService.t('managedMemoryKindPreference');
-  if (kind === MemoryKind.SessionSummary) {
-    return i18nService.t('managedMemoryKindSessionSummary');
-  }
-  return i18nService.t('managedMemoryKindDecision');
-}
-
-function statusLabel(status: ManagedMemoryRecord['status']): string {
-  const keys: Record<ManagedMemoryRecord['status'], string> = {
-    [MemoryLifecycleStatus.Active]: 'managedMemoryStatusActive',
-    [MemoryLifecycleStatus.NeedsReview]: 'managedMemoryStatusNeedsReview',
-    [MemoryLifecycleStatus.Superseded]: 'managedMemoryStatusSuperseded',
-    [MemoryLifecycleStatus.Expired]: 'managedMemoryStatusExpired',
-    [MemoryLifecycleStatus.Archived]: 'managedMemoryStatusArchived',
-    [MemoryLifecycleStatus.Deleted]: 'managedMemoryStatusDeleted',
-  };
-  return i18nService.t(keys[status]);
-}
-
-function statusVariant(status: ManagedMemoryRecord['status']): 'secondary' | 'outline' {
-  return status === MemoryLifecycleStatus.NeedsReview ? 'secondary' : 'outline';
-}
-
-function deliveryLabel(status: NonNullable<ManagedMemoryRecord['deliveryStatus']>): string {
-  if (status === MemoryDeliveryStatus.Pending) {
-    return i18nService.t('managedMemoryPropagationPending');
-  }
-  if (status === MemoryDeliveryStatus.Failed) {
-    return i18nService.t('managedMemoryPropagationFailed');
-  }
-  return i18nService.t('managedMemoryPropagationCompleted');
-}
-
-function sourceLabel(
-  record: ManagedMemoryRecord,
-  sessionTitles: ReadonlyMap<string, string>,
-): string {
-  if (record.sourceKind === MemorySourceKind.LegacyFileImport) {
-    return i18nService.t('managedMemorySourceLegacyFile');
-  }
-  if (record.sourceKind === MemorySourceKind.LegacySqliteImport) {
-    return i18nService.t('managedMemorySourceLegacySqlite');
-  }
-  if (record.sourceKind === MemorySourceKind.Explicit) {
-    return i18nService.t('managedMemorySourceManual');
-  }
-  if (record.promotedFromLinkId) {
-    if (record.promotionSourceSessionId) {
-      const sessionTitle = sessionTitles.get(record.promotionSourceSessionId)?.trim();
-      return i18nService
-        .t('managedMemoryPromotedFromSession')
-        .replace('{name}', sessionTitle || i18nService.t('managedMemorySourceUnavailable'));
-    }
-    return i18nService.t('managedMemoryPromotedFromWorkspace');
-  }
-  const sourceSessionId = record.sessionId;
-  const sessionTitle = sessionTitles.get(sourceSessionId)?.trim();
-  if (sessionTitle) return sessionTitle;
-  return i18nService.t('managedMemorySourceUnavailable');
-}
-
-function formatDate(value: string): string {
-  const timestamp = parseMemoryTimestamp(value);
-  if (Number.isNaN(timestamp)) return value;
-  const locale = i18nService.getLanguage() === 'zh' ? 'zh-CN' : 'en-US';
-  let formatter = dateTimeFormatters.get(locale);
-  if (!formatter) {
-    formatter = new Intl.DateTimeFormat(locale, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    });
-    dateTimeFormatters.set(locale, formatter);
-  }
-  return formatter.format(new Date(timestamp));
 }

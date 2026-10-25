@@ -55,6 +55,38 @@ const snapshot = (state, characterId = DesktopPetBuiltinId.Xiaoyuan) => ({
   bubble: null,
 });
 
+test('released Xiaoyuan keeps the first-release neutral pixels and never requests the rejected rig', async ({
+  page,
+}) => {
+  const videos = [];
+  page.on('request', request => {
+    if (request.resourceType() === 'media' && new URL(request.url()).pathname.endsWith('.webm'))
+      videos.push(request.url());
+  });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/desktop-pet.html');
+  await expect(page.locator('canvas')).toHaveAttribute('data-state', DesktopPetState.Idle);
+  const difference = await page.evaluate(async atlasUrl => {
+    const { DesktopPetAtlas } = await import(atlasUrl);
+    const atlas = new DesktopPetAtlas();
+    await atlas.select('xiaoyuan');
+    const expected = document.createElement('canvas');
+    expected.width = expected.height = 192;
+    expected.getContext('2d').drawImage(atlas.image, 0, 0, 512, 512, 0, 0, 192, 192);
+    const pixels = expected.getContext('2d').getImageData(0, 0, 192, 192).data;
+    const actual = document
+      .querySelector('canvas')
+      .getContext('2d')
+      .getImageData(0, 0, 192, 192).data;
+    return actual.reduce((count, value, index) => count + Number(value !== pixels[index]), 0);
+  }, new URL('/src/renderer/desktopPet/atlas.ts', page.url()).href);
+  expect(difference).toBe(0);
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await expect(page.locator('canvas')).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
+  expect(videos.length).toBeGreaterThan(0);
+  expect(videos.every(url => url.includes('/motion/xiaoyuan-original/'))).toBe(true);
+});
+
 test('continuous owl media decodes real frames with alpha and two owned slots', async ({
   page,
 }) => {
@@ -92,7 +124,13 @@ test('continuous owl media decodes real frames with alpha and two owned slots', 
   expect(errors).toEqual([]);
 });
 
-for (const character of DESKTOP_PET_BUILTINS) {
+for (const character of [
+  ...DESKTOP_PET_BUILTINS.map(character => ({
+    id: character.id,
+    directory: character.id === DesktopPetBuiltinId.Xiaoyuan ? 'xiaoyuan-original' : character.id,
+  })),
+  { id: 'xiaoyuan-archive', directory: 'xiaoyuan' },
+]) {
   test(`${character.id}: all authored clips decode transparent content at their real middle frame`, async ({
     page,
   }) => {
@@ -102,7 +140,7 @@ for (const character of DESKTOP_PET_BUILTINS) {
     const clips = DESKTOP_PET_MOTIONS.map(clip => ({
       id: clip.id,
       url: new URL(
-        `/src/renderer/assets/desktop-pet/motion/${character.id}/${clip.id}.webm`,
+        `/src/renderer/assets/desktop-pet/motion/${character.directory}/${clip.id}.webm`,
         page.url(),
       ).href,
     }));
@@ -169,7 +207,7 @@ for (const character of DESKTOP_PET_BUILTINS) {
   });
 }
 
-test('switching all six companions preserves task priority and reuses two video slots', async ({
+test('hidden character selections keep original Xiaoyuan and reuse two video slots', async ({
   page,
 }) => {
   await bridge(page);
@@ -181,7 +219,7 @@ test('switching all six companions preserves task priority and reuses two video 
       value => window.mediaState(value),
       snapshot(DesktopPetState.Idle, character.id),
     );
-    await expect(canvas).toHaveAttribute('data-character', character.id);
+    await expect(canvas).toHaveAttribute('data-character', DesktopPetBuiltinId.Xiaoyuan);
     await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
     await page.evaluate(
       action => window.mediaEffect({ kind: 'action', action }),
@@ -194,12 +232,14 @@ test('switching all six companions preserves task priority and reuses two video 
       [DesktopPetState.Thinking, DesktopPetMotion.Think],
     ]) {
       await page.evaluate(value => window.mediaState(value), snapshot(state, character.id));
+      await expect(canvas).toHaveAttribute('data-state', state);
       await expect(canvas).toHaveAttribute('data-media-clip', clip);
       await page.evaluate(
         action => window.mediaEffect({ kind: 'action', action }),
         DesktopPetPlayableAction.Flutter,
       );
       await expect(canvas).toHaveAttribute('data-media-clip', clip);
+      await expect(canvas).toHaveAttribute('data-sequence', '');
     }
     await page.evaluate(
       kind => window.mediaEffect({ kind, visible: false }),
@@ -218,6 +258,7 @@ test('switching all six companions preserves task priority and reuses two video 
       kind => window.mediaEffect({ kind, visible: true }),
       DesktopPetEffectKind.Visibility,
     );
+    await expect(canvas).toHaveAttribute('data-state', DesktopPetState.Completed);
     await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Happy);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(canvas).toHaveAttribute('data-reduced-motion', 'true');
@@ -235,7 +276,7 @@ test('switching all six companions preserves task priority and reuses two video 
           window.mediaVideos
             .filter(video => video.getAttribute('src'))
             .every(video => video.src.includes(`/motion/${id}/`)),
-        character.id,
+        'xiaoyuan-original',
       ),
     ).toBe(true);
   }
@@ -257,6 +298,7 @@ test('task failure interrupts celebration and hiding releases media without repl
   await page.evaluate(value => window.mediaState(value), snapshot(DesktopPetState.Error));
   await expect(canvas).toHaveAttribute('data-state', DesktopPetState.Error);
   await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Concern);
+  await expect(canvas).toHaveAttribute('data-sequence', '');
   await page.evaluate(
     action => window.mediaEffect({ kind: 'action', action }),
     DesktopPetPlayableAction.Flutter,
@@ -279,6 +321,7 @@ test('task failure interrupts celebration and hiding releases media without repl
     kind => window.mediaEffect({ kind, visible: true }),
     DesktopPetEffectKind.Visibility,
   );
+  await expect(canvas).toHaveAttribute('data-state', DesktopPetState.Thinking);
   await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Think);
   expect(await page.evaluate(() => window.mediaVideos.length)).toBe(2);
   await page.emulateMedia({ reducedMotion: 'reduce' });

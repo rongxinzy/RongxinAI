@@ -4,7 +4,7 @@ import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 import { DesktopPetPlayableAction, DesktopPetState } from '../../shared/desktopPet/constants';
 import { DesktopPetMediaController } from './mediaController';
 import { PetVideoPlayer, PetVideoState } from './videoPlayer';
-import type { DesktopPetMediaClip } from './mediaPack';
+import { desktopPetMediaPack, type DesktopPetMediaClip } from './mediaPack';
 
 class FakeVideo extends EventTarget {
   src = '';
@@ -199,7 +199,7 @@ test('starved active playback fails after a bounded wait, while recovery clears 
   expect(f.player.sample(0)).toBeNull();
 });
 
-function controllerFixture() {
+function controllerFixture(idleOnly = false) {
   const videos: FakeVideo[] = [];
   vi.stubGlobal('document', {
     createElement: () => {
@@ -210,7 +210,12 @@ function controllerFixture() {
     },
   });
   vi.stubGlobal('Image', FakeImage);
-  const controller = new DesktopPetMediaController(vi.fn());
+  const controller = new DesktopPetMediaController(
+    vi.fn(),
+    idleOnly
+      ? id => desktopPetMediaPack(id)?.filter(clip => clip.id === DesktopPetMotion.Idle) ?? null
+      : undefined,
+  );
   cleanup.push(() => controller.dispose());
   const current = () => controller.sample(performance.now()).playing?.clip.id;
   const wait = async (id: DesktopPetMotion) => vi.waitFor(() => expect(current()).toBe(id));
@@ -219,7 +224,7 @@ function controllerFixture() {
 
 test('task attention interrupts an idle action, remains visible through drag and ignores playback requests', async () => {
   const f = controllerFixture();
-  f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan });
+  f.controller.update({ characterId: DesktopPetBuiltinId.Youli });
   await f.wait(DesktopPetMotion.Idle);
   f.controller.playAction(DesktopPetPlayableAction.Happy);
   await f.wait(DesktopPetMotion.Happy);
@@ -229,9 +234,43 @@ test('task attention interrupts an idle action, remains visible through drag and
   expect(f.current()).toBe(DesktopPetMotion.Concern);
 });
 
-test('hide releases all media and show starts the latest state without replaying its old action', async () => {
+test('walking keeps the decoded outgoing frame until its successor can crossfade', async () => {
   const f = controllerFixture();
   f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan });
+  await f.wait(DesktopPetMotion.Idle);
+  const outgoing = f.controller.sample(performance.now()).playing!.current.video;
+  f.videos.forEach(video => (video.auto = false));
+  f.controller.update({ walking: true });
+  expect(f.controller.sample(performance.now()).playing?.current.video).toBe(outgoing);
+  const pending = f.videos.find(video => video.src.endsWith('/walk.webm'))!;
+  pending.dispatchEvent(new Event('loadeddata'));
+  await vi.waitFor(() => expect(pending.callbacks.size).toBe(1));
+  expect(f.controller.sample(performance.now()).playing?.current.video).toBe(outgoing);
+  pending.frame();
+  await f.wait(DesktopPetMotion.Walk);
+  const handoff = f.controller.sample(performance.now()).playing!;
+  expect(handoff.previous?.video).toBe(outgoing);
+  expect(handoff.mix).toBeLessThan(1);
+  expect(handoff.current.video).toBe(pending);
+});
+
+test('unrelated walking and drag changes do not restart a task attention loop', async () => {
+  const f = controllerFixture();
+  f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan, state: DesktopPetState.Error });
+  await f.wait(DesktopPetMotion.Concern);
+  const playing = f.controller.sample(performance.now()).playing!.current.video;
+  playing.currentTime = 2;
+  f.controller.update({ walking: true });
+  f.controller.update({ dragging: true });
+  const continued = f.controller.sample(performance.now()).playing!;
+  expect(continued?.current.video).toBe(playing);
+  expect(continued.current.video.currentTime).toBe(2);
+  expect(continued.clip.id).toBe(DesktopPetMotion.Concern);
+});
+
+test('hide releases all media and show starts the latest state without replaying its old action', async () => {
+  const f = controllerFixture();
+  f.controller.update({ characterId: DesktopPetBuiltinId.Youli });
   await f.wait(DesktopPetMotion.Idle);
   f.controller.playAction(DesktopPetPlayableAction.Peek);
   await f.wait(DesktopPetMotion.Peek);
@@ -267,7 +306,11 @@ test('switching every migrated character cancels old media while retaining two o
     expect(
       f.videos
         .filter(video => video.src)
-        .every(video => video.src.includes(`/motion/${characterId}/`)),
+        .every(video =>
+          video.src.includes(
+            `/motion/${characterId === DesktopPetBuiltinId.Xiaoyuan ? 'xiaoyuan-original' : characterId}/`,
+          ),
+        ),
     ).toBe(true);
   }
 });
@@ -275,7 +318,7 @@ test('switching every migrated character cancels old media while retaining two o
 test('dozing hands off to wake through actual end events and impacts do not erase task attention', async () => {
   const f = controllerFixture();
   vi.spyOn(Math, 'random').mockReturnValue(0.98);
-  f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan });
+  f.controller.update({ characterId: DesktopPetBuiltinId.Youli });
   await f.wait(DesktopPetMotion.Idle);
   f.videos.find(video => video.onended)?.onended?.();
   await f.wait(DesktopPetMotion.Doze);
@@ -287,4 +330,37 @@ test('dozing hands off to wake through actual end events and impacts do not eras
   await f.wait(DesktopPetMotion.Wait);
   f.controller.impact(1);
   expect(f.current()).toBe(DesktopPetMotion.Wait);
+});
+
+test('an idle-only authoring fixture yields to missing pose actions and resumes only at their end', async () => {
+  const f = controllerFixture(true);
+  f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan });
+  await f.wait(DesktopPetMotion.Idle);
+  expect(f.controller.playAction(DesktopPetPlayableAction.Happy)).toBe(false);
+  expect(f.controller.supported).toBe(false);
+  expect(f.videos.every(video => video.src === '')).toBe(true);
+  f.controller.finishFallback(true);
+  expect(f.current()).toBeUndefined();
+  f.controller.finishFallback(false);
+  await f.wait(DesktopPetMotion.Idle);
+  expect(f.controller.supported).toBe(true);
+});
+
+test('an idle-only authoring fixture never lets stale media cover missing task expressions', async () => {
+  const f = controllerFixture(true);
+  f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan });
+  await f.wait(DesktopPetMotion.Idle);
+  for (const state of [DesktopPetState.Thinking, DesktopPetState.Waiting, DesktopPetState.Error]) {
+    f.controller.update({ state });
+    await Promise.resolve();
+    expect(f.controller.supported).toBe(false);
+    expect(f.controller.playAction(DesktopPetPlayableAction.Happy)).toBe(true);
+    expect(f.controller.sample(performance.now())).toMatchObject({
+      playing: null,
+      poster: undefined,
+    });
+    expect(f.videos.every(video => video.src === '')).toBe(true);
+  }
+  f.controller.update({ state: DesktopPetState.Idle });
+  await f.wait(DesktopPetMotion.Idle);
 });

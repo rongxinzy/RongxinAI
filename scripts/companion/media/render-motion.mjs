@@ -14,6 +14,10 @@ import {
 } from '../../../src/shared/desktopPet/motionCatalog.ts';
 import { OWL_RIG_FRAMES, drawOwlRig } from './owl-rig.mjs';
 import { sampleOwlMotion } from './owl-motion.mjs';
+import { OWL_RIG_V2_FRAMES, drawOwlRigV2 } from './owl-rig-v2.mjs';
+import { sampleOwlMotionV2 } from './owl-motion-v2.mjs';
+import { ORIGINAL_OWL_RIG, drawOriginalOwl } from './owl-original-rig.mjs';
+import { sampleOriginalOwl } from './owl-original-motion.mjs';
 import { verifyMotion } from './verify-motion.mjs';
 import { DesktopPetBuiltinId } from '../../../src/shared/desktopPet/catalog.ts';
 import { COMPANION_RIGS, companionRigFrames } from './companion-rigs.mjs';
@@ -30,6 +34,8 @@ const { values } = parseArgs({
     out: { type: 'string' },
     character: { type: 'string' },
     crf: { type: 'string' },
+    'owl-study': { type: 'boolean' },
+    'owl-original': { type: 'boolean' },
   },
 });
 const crf = values.crf === undefined ? 25 : Number(values.crf);
@@ -39,6 +45,20 @@ const character = values.character ?? DesktopPetBuiltinId.Xiaoyuan;
 const rigConfig = COMPANION_RIGS[character];
 if (character !== DesktopPetBuiltinId.Xiaoyuan && !rigConfig)
   throw new Error('Unknown companion character');
+if (
+  values['owl-original'] &&
+  (values['owl-study'] || character !== DesktopPetBuiltinId.Xiaoyuan || !values.out)
+)
+  throw new Error('Original owl authoring requires Xiaoyuan and an explicit output directory');
+if (
+  values['owl-study'] &&
+  (character !== DesktopPetBuiltinId.Xiaoyuan ||
+    !values.out ||
+    values.clip !== DesktopPetMotion.Idle)
+)
+  throw new Error(
+    'The owl quality study only renders idle to an explicit separate output directory',
+  );
 const output = path.resolve(
   values.out ?? path.join(root, 'src/renderer/assets/desktop-pet/motion', character),
 );
@@ -46,26 +66,55 @@ const selected = values.clip
   ? DESKTOP_PET_MOTIONS.filter(clip => clip.id === values.clip)
   : DESKTOP_PET_MOTIONS;
 if (!selected.length) throw new Error('Unknown motion clip');
-const sourcePath = path.join(
-  root,
-  'src/renderer/assets/desktop-pet/rigs',
-  `${character}-rig-v1.png`,
-);
+const sourcePath =
+  values['owl-study'] || values['owl-original']
+    ? path.join(root, 'src/renderer/assets/desktop-pet/xiaoyuan-atlas.png')
+    : path.join(root, 'src/renderer/assets/desktop-pet/rigs', `${character}-rig-v1.png`);
 const source = await fs.readFile(sourcePath);
-const drawRig = rigConfig ? drawCompanionRig : drawOwlRig;
-const sampleMotion = rigConfig ? sampleCompanionMotion : sampleOwlMotion;
-const rigFrames = rigConfig ? await companionRigFrames(sourcePath, rigConfig) : OWL_RIG_FRAMES;
+const repair = values['owl-original']
+  ? await fs.readFile(
+      path.join(root, 'src/renderer/assets/desktop-pet/rigs/xiaoyuan-occlusion-v1.png'),
+    )
+  : null;
+const drawRig = values['owl-original']
+  ? drawOriginalOwl
+  : values['owl-study']
+    ? drawOwlRigV2
+    : rigConfig
+      ? drawCompanionRig
+      : drawOwlRig;
+const sampleMotion = values['owl-original']
+  ? sampleOriginalOwl
+  : values['owl-study']
+    ? sampleOwlMotionV2
+    : rigConfig
+      ? sampleCompanionMotion
+      : sampleOwlMotion;
+const rigFrames = values['owl-original']
+  ? ORIGINAL_OWL_RIG
+  : values['owl-study']
+    ? OWL_RIG_V2_FRAMES
+    : rigConfig
+      ? await companionRigFrames(sourcePath, rigConfig)
+      : OWL_RIG_FRAMES;
 const hash = buffer => createHash('sha256').update(buffer).digest('hex');
+const matteFloor = values['owl-original'] ? 2 : 0;
 const choreographySha256 = hash(
   JSON.stringify({
     draw: drawRig.toString(),
     motion: sampleMotion.toString(),
     frames: rigFrames,
     rigConfig,
+    repairSha256: repair ? hash(repair) : undefined,
+    ...(matteFloor ? { matteFloor } : {}),
   }),
 );
 if (values.verify) {
-  console.log(JSON.stringify(await verifyMotion(output, hash(source), choreographySha256)));
+  console.log(
+    JSON.stringify(
+      await verifyMotion(output, hash(source), choreographySha256, values['owl-study']),
+    ),
+  );
   process.exit(0);
 }
 const encoderVersion = values.preview
@@ -84,11 +133,23 @@ try {
     content: `window.drawRig = ${drawRig.toString()}; window.sampleMotion = ${sampleMotion.toString()};`,
   });
   await page.evaluate(
-    async ({ data, frames, ids, size, config, characters }) => {
+    async ({ data, repairData, frames, ids, size, config, characters }) => {
       const image = new Image();
       image.src = data;
       await image.decode();
       window.rig = image;
+      if (repairData) {
+        const extra = new Image();
+        extra.src = repairData;
+        await extra.decode();
+        const sheet = document.createElement('canvas');
+        sheet.width = 1536;
+        sheet.height = 2048;
+        const drawing = sheet.getContext('2d');
+        drawing.drawImage(image, 0, 0);
+        drawing.drawImage(extra, 0, 1024);
+        window.rig = sheet;
+      }
       window.parts = frames;
       window.clips = ids;
       window.rigConfig = config;
@@ -99,6 +160,7 @@ try {
     },
     {
       data: `data:image/png;base64,${source.toString('base64')}`,
+      repairData: repair ? `data:image/png;base64,${repair.toString('base64')}` : null,
       frames: rigFrames,
       ids: DesktopPetMotion,
       size: DESKTOP_PET_MEDIA_SIZE,
@@ -108,7 +170,7 @@ try {
   );
   const frame = async (clip, index) =>
     page.evaluate(
-      ({ clip, index, fps, size }) => {
+      ({ clip, index, fps, size, matteFloor }) => {
         const pose = window.sampleMotion(
           clip.id,
           index / fps,
@@ -118,12 +180,22 @@ try {
           window.characters,
         );
         window.drawRig(window.context, window.rig, window.parts, pose, window.rigConfig);
-        const pixels = window.context.getImageData(0, 0, size, size).data;
-        for (let i = 0; i < window.union.length; i++)
+        const rgba = window.context.getImageData(0, 0, size, size);
+        const pixels = rgba.data;
+        let cleaned = false;
+        for (let i = 0; i < window.union.length; i++) {
           if (pixels[i * 4 + 3] > 32) window.union[i] = 255;
+          else if (matteFloor && pixels[i * 4 + 3] > 0 && pixels[i * 4 + 3] <= matteFloor) {
+            // The original alpha matte has 1/255 background dust. Drop only that
+            // invisible residue; genuine feathers and the >32 bounds guard remain intact.
+            pixels.fill(0, i * 4, i * 4 + 4);
+            cleaned = true;
+          }
+        }
+        if (cleaned) window.context.putImageData(rgba, 0, 0);
         return window.canvas.toDataURL('image/png').split(',')[1];
       },
-      { clip, index, fps: DESKTOP_PET_MEDIA_FPS, size: DESKTOP_PET_MEDIA_SIZE },
+      { clip, index, fps: DESKTOP_PET_MEDIA_FPS, size: DESKTOP_PET_MEDIA_SIZE, matteFloor },
     );
 
   if (values.preview) {
@@ -135,6 +207,8 @@ try {
   } else {
     const manifest = {
       sourceSha256: hash(source),
+      repairSha256: repair ? hash(repair) : undefined,
+      ...(matteFloor ? { matteFloor } : {}),
       choreographySha256,
       chromium: browser.version(),
       encoder: encoderVersion,

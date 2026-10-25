@@ -48,7 +48,7 @@ jobs:
             ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
             vendor/channel-runtime
-          key: windows-installer-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: windows-installer-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'config/runtime-pins.json', 'scripts/**') }}
           restore-keys: |
             windows-installer-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts

@@ -1,5 +1,9 @@
-import { desktopPetBuiltin } from '../../shared/desktopPet/catalog';
-import { DESKTOP_PET_MOTIONS, type DesktopPetMotion } from '../../shared/desktopPet/motionCatalog';
+import { DesktopPetBuiltinId, desktopPetBuiltin } from '../../shared/desktopPet/catalog';
+import {
+  DESKTOP_PET_MOTIONS,
+  XIAOYUAN_ORIGINAL_MOTIONS,
+  type DesktopPetMotion,
+} from '../../shared/desktopPet/motionCatalog';
 
 export interface DesktopPetMediaClip {
   id: DesktopPetMotion;
@@ -17,13 +21,17 @@ const sources = import.meta.glob<string>('../assets/desktop-pet/motion/*/*.{webm
 });
 export function desktopPetMediaPack(characterId: string): DesktopPetMediaClip[] | null {
   if (!desktopPetBuiltin(characterId)) return null;
-  const root = `../assets/desktop-pet/motion/${characterId}/`;
-  const pack = DESKTOP_PET_MOTIONS.flatMap(clip => {
+  // Xiaoyuan's first-release artwork is the canonical source. Keep the old authoring
+  // output on disk, but never mix its different face into the released character.
+  const canonical = characterId === DesktopPetBuiltinId.Xiaoyuan;
+  const root = `../assets/desktop-pet/motion/${canonical ? 'xiaoyuan-original' : characterId}/`;
+  const repertoire = canonical ? XIAOYUAN_ORIGINAL_MOTIONS : DESKTOP_PET_MOTIONS;
+  const pack = repertoire.flatMap(clip => {
     const url = sources[`${root}${clip.id}.webm`];
     const maskUrl = sources[`${root}${clip.id}-mask.png`];
     const posterUrl = sources[`${root}${clip.id}-poster.png`];
     return url && maskUrl && posterUrl ? [{ ...clip, url, maskUrl, posterUrl }] : [];
   });
-  // Incomplete authoring output must keep the static-state fallback, never a partial repertoire.
-  return pack.length === DESKTOP_PET_MOTIONS.length ? pack : null;
+  // A missing file invalidates the declared repertoire rather than silently accepting damage.
+  return pack.length === repertoire.length ? pack : null;
 }

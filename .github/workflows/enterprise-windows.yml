@@ -90,7 +90,7 @@ jobs:
             resources/skill-python
             vendor/engram-runtime
             vendor/channel-runtime
-          key: enterprise-packaging-windows-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: enterprise-packaging-windows-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'config/runtime-pins.json', 'scripts/**') }}
           restore-keys: |
             enterprise-packaging-windows-node24-bun1.4.0-
 

@@ -36,6 +36,7 @@ export interface ConfirmPayload {
 
 export interface ForgetPayload {
   linkId: string;
+  projectId: string;
   observationId: number;
   hardDelete: boolean;
 }
@@ -59,6 +60,8 @@ export function parseConfirmPayload(payload: Record<string, unknown>): ConfirmPa
 export function parseForgetPayload(payload: Record<string, unknown>): ForgetPayload | null {
   if (
     typeof payload.linkId !== 'string' ||
+    typeof payload.projectId !== 'string' ||
+    !payload.projectId.trim() ||
     typeof payload.observationId !== 'number' ||
     typeof payload.hardDelete !== 'boolean'
   ) {
