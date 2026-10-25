@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, test, expect, vi } from 'vitest';
-import { Menu } from 'electron';
+import { petMenuItem } from '../../../tests/fixtures/desktopPetMenu';
 
 import { setLanguage } from '../i18n';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
@@ -231,12 +231,7 @@ test('the renderer receives only a localized status snapshot', () => {
 test('the menu offers on-demand actions that reach the pet window as effects', () => {
   setDesktopPetEnabled(true);
   const contents = mocks.windows[0].webContents;
-  mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
-  const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
-    label?: string;
-    click?: () => void;
-  }>;
-  const byLabel = (label: string) => template.find(item => item.label === label);
+  const byLabel = petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents);
   contents.send.mockClear();
   byLabel('侧看一眼')!.click!();
   byLabel('点点头')!.click!();
@@ -275,12 +270,7 @@ test('menu actions emit matching localized chatter and task bubbles take precede
   await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   mocks.windows[0].emit('ready-to-show');
   const contents = mocks.windows[0].webContents;
-  mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
-  const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
-    label?: string;
-    click?: () => void;
-  }>;
-  const byLabel = (label: string) => template.find(item => item.label === label)!;
+  const byLabel = petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents);
   contents.send.mockClear();
   for (const [label, bubble] of [
     ['侧看一眼', '我看一眼～'],
@@ -315,12 +305,8 @@ test('English action chatter is localized and expires after the show window', as
   await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   mocks.windows[0].emit('ready-to-show');
   const contents = mocks.windows[0].webContents;
-  mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
-  const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
-    label?: string;
-    click?: () => void;
-  }>;
-  template.find(item => item.label === 'Peek sideways')!.click!();
+  const byLabel = petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents);
+  byLabel('Peek sideways').click!();
   expect(contents.send).toHaveBeenLastCalledWith(
     DesktopPetIpc.State,
     expect.objectContaining({ bubble: 'Just a peek~' }),
@@ -358,14 +344,7 @@ test('action chatter respects settings, visibility, and reduced motion', async (
   await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   mocks.windows[0].emit('ready-to-show');
   const contents = mocks.windows[0].webContents;
-  const menu = () => {
-    mocks.ipc.get(DesktopPetIpc.Menu)!({ sender: contents, senderFrame: contents.mainFrame });
-    const template = vi.mocked(Menu.buildFromTemplate).mock.calls.at(-1)![0] as Array<{
-      label?: string;
-      click?: () => void;
-    }>;
-    template.find(item => item.label === '点点头')!.click!();
-  };
+  const menu = () => petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents)('点点头').click!();
   const happy = () => {
     mocks.end.mockReturnValueOnce(true);
     mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
@@ -469,14 +448,22 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
   });
 });
 
-test('character settings validate IDs, survive restart, and preserve task failures', async () => {
+test('released character settings reject hidden pets without rewriting saved data or failures', async () => {
+  saved = { characterId: DesktopPetBuiltinId.Youli, enabled: false };
+  expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
+    characterId: DesktopPetBuiltinId.Xiaoyuan,
+  });
+  expect(saved).toEqual({ characterId: DesktopPetBuiltinId.Youli, enabled: false });
   await expect(invoke(DesktopPetIpc.SetSettings, { characterId: '../unknown' })).rejects.toThrow(
     'invalid arguments',
   );
-  await invoke(DesktopPetIpc.SetSettings, {
-    enabled: true,
-    characterId: DesktopPetBuiltinId.Youli,
-  });
+  await expect(
+    invoke(DesktopPetIpc.SetSettings, {
+      enabled: true,
+      characterId: DesktopPetBuiltinId.Youli,
+    }),
+  ).rejects.toThrow();
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   const events = new PiUiEventSequencer(() => 'character-failure');
   observeDesktopPetEvent(
     events.next({
@@ -485,18 +472,20 @@ test('character settings validate IDs, survive restart, and preserve task failur
       error: { kind: CoworkErrorKind.Unknown, message: 'failed' },
     }),
   );
-  await invoke(DesktopPetIpc.SetSettings, { characterId: DesktopPetBuiltinId.Yunmo });
+  await expect(
+    invoke(DesktopPetIpc.SetSettings, { characterId: DesktopPetBuiltinId.Yunmo }),
+  ).rejects.toThrow();
   expect(mocks.values.get(DESKTOP_PET_FAILURES_KEY)).toHaveLength(1);
   disposeDesktopPet();
   initializeDesktopPet(preferences, getMainWindow, mocks.changed);
   expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
-    characterId: DesktopPetBuiltinId.Yunmo,
+    characterId: DesktopPetBuiltinId.Xiaoyuan,
   });
   const contents = mocks.windows.at(-1)!.webContents;
   mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: contents, senderFrame: contents.mainFrame });
   expect(contents.send).toHaveBeenLastCalledWith(
     DesktopPetIpc.State,
-    expect.objectContaining({ characterId: DesktopPetBuiltinId.Yunmo, state: 'error' }),
+    expect.objectContaining({ characterId: DesktopPetBuiltinId.Xiaoyuan, state: 'error' }),
   );
 });
 

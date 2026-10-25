@@ -27,6 +27,7 @@ import type {
 } from '../../shared/desktopPet/types';
 import { desktopPetContract } from '../../shared/desktopPet/contract';
 import { desktopPetBuiltin } from '../../shared/desktopPet/catalog';
+import { isDesktopPetReleased } from '../../shared/desktopPet/availability';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { PiUiEventType, type PiUiEvent } from '../../shared/cowork/piUiEvent';
 import type { SqliteStore } from '../sqliteStore';
@@ -128,7 +129,9 @@ function getDesktopPetSettings(): DesktopPetSettings {
   return {
     ...DESKTOP_PET_DEFAULT_SETTINGS,
     characterId:
-      desktopPetBuiltin(saved?.characterId ?? '')?.id ?? DESKTOP_PET_DEFAULT_SETTINGS.characterId,
+      (isDesktopPetReleased(saved?.characterId ?? '') &&
+        desktopPetBuiltin(saved?.characterId ?? '')?.id) ||
+      DESKTOP_PET_DEFAULT_SETTINGS.characterId,
     enabled: saved?.enabled === true,
     doNotDisturb: saved?.doNotDisturb === true,
     hideInFullscreen: saved?.hideInFullscreen !== false,
@@ -409,6 +412,8 @@ export function initializeDesktopPet(
     },
     setSettings: (event, patch) => {
       assertMain(event);
+      if (patch.characterId && !isDesktopPetReleased(patch.characterId))
+        throw new Error('Desktop companion appearance is not released');
       store!.set(DESKTOP_PET_STORE_KEY, {
         ...store!.get<DesktopPetPreferences>(DESKTOP_PET_STORE_KEY),
         ...patch,

@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Field, FieldLabel, FieldDescription, FieldGroup } from '@shared/components/ui/field';
+import {
+  Field,
+  FieldLabel,
+  FieldDescription,
+  FieldGroup,
+  FieldError,
+} from '@shared/components/ui/field';
 import {
   Select,
   SelectTrigger,
@@ -7,7 +13,8 @@ import {
   SelectContent,
   SelectItem,
 } from '@shared/components/ui/select';
-import { DESKTOP_PET_BUILTINS, desktopPetBuiltin } from '../../../../shared/desktopPet/catalog';
+import { desktopPetBuiltin } from '../../../../shared/desktopPet/catalog';
+import { RELEASED_DESKTOP_PETS } from '../../../../shared/desktopPet/availability';
 
 import type { DesktopPetSettings } from '../../../../shared/desktopPet/types';
 import { i18nService } from '../../../services/i18n';
@@ -51,45 +58,43 @@ export function DesktopPetSettingsSection() {
   };
   return (
     <section className="flex flex-col gap-4" aria-label={i18nService.t('desktopPetSettingsTitle')}>
-      <h2 className="text-base font-semibold text-foreground">
+      <h2 className="theme-field-legend" data-variant="legend">
         {i18nService.t('desktopPetSettingsTitle')}
       </h2>
-      {failed ? (
-        <p role="alert" className="text-sm text-muted-foreground">
-          {i18nService.t('settingsLoadFailed')}
-        </p>
-      ) : null}
+      {failed ? <FieldError>{i18nService.t('settingsLoadFailed')}</FieldError> : null}
       <FieldGroup className="gap-4">
-        <Field>
-          <FieldLabel htmlFor="desktop-pet-character">
-            {i18nService.t('desktopPetCharacter')}
-          </FieldLabel>
-          <FieldDescription>{i18nService.t('desktopPetCharacterDescription')}</FieldDescription>
-          <Select
-            value={settings?.characterId ?? ''}
-            disabled={!settings || saving}
-            onValueChange={value => {
-              const character = desktopPetBuiltin(value ?? '');
-              if (character) void update({ characterId: character.id });
-            }}
-          >
-            <SelectTrigger id="desktop-pet-character" className="w-full">
-              <SelectValue>
-                {i18nService.t(
-                  desktopPetBuiltin(settings?.characterId ?? '')?.nameKey ??
-                    'desktopPetCharacterXiaoyuan',
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {DESKTOP_PET_BUILTINS.map(character => (
-                <SelectItem key={character.id} value={character.id}>
-                  {i18nService.t(character.nameKey)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+        {RELEASED_DESKTOP_PETS.length > 1 ? (
+          <Field>
+            <FieldLabel htmlFor="desktop-pet-character">
+              {i18nService.t('desktopPetCharacter')}
+            </FieldLabel>
+            <FieldDescription>{i18nService.t('desktopPetCharacterDescription')}</FieldDescription>
+            <Select
+              value={settings?.characterId ?? ''}
+              disabled={!settings || saving}
+              onValueChange={value => {
+                const character = desktopPetBuiltin(value ?? '');
+                if (character) void update({ characterId: character.id });
+              }}
+            >
+              <SelectTrigger id="desktop-pet-character" className="w-full">
+                <SelectValue>
+                  {i18nService.t(
+                    desktopPetBuiltin(settings?.characterId ?? '')?.nameKey ??
+                      'desktopPetCharacterXiaoyuan',
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {RELEASED_DESKTOP_PETS.map(character => (
+                  <SelectItem key={character.id} value={character.id}>
+                    {i18nService.t(character.nameKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        ) : null}
         <SettingsToggleRow
           labelHeadingLevel={3}
           label={i18nService.t('desktopPetEnabled')}

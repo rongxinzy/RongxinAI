@@ -25,6 +25,7 @@ export class DesktopPetAnimation {
   private walking = false;
   private reduced = false;
   private paused = false;
+  private continuousMedia = false;
   private tempo = 1;
   private energy = 1;
   private readonly idle = new DesktopPetIdleActions();
@@ -43,6 +44,7 @@ export class DesktopPetAnimation {
     return this.idle.sample(
       now,
       !this.reduced &&
+        !this.continuousMedia &&
         !this.paused &&
         !this.dragging &&
         !this.walking &&
@@ -80,6 +82,11 @@ export class DesktopPetAnimation {
   setReducedMotion(active: boolean, now: number): void {
     this.reduced = active;
     if (active) this.settle(now);
+  }
+  setContinuousMedia(active: boolean, now: number): void {
+    if (active === this.continuousMedia) return;
+    this.continuousMedia = active;
+    this.settle(now);
   }
   setPaused(active: boolean, now: number): void {
     this.paused = active;
@@ -150,7 +157,11 @@ export class DesktopPetAnimation {
         ? 1
         : Math.max(
             0.86,
-            Math.min(1.13, (1 + this.displacement + Math.sin(now / 1400) * 0.008) * stretch),
+            Math.min(
+              1.13,
+              (1 + this.displacement + (this.continuousMedia ? 0 : Math.sin(now / 1400) * 0.008)) *
+                stretch,
+            ),
           ),
       transitioning: !this.reduced && now - this.changedAt < TRANSITION_MS,
       facing: this.facing,
@@ -160,7 +171,7 @@ export class DesktopPetAnimation {
         ? 0
         : motion.offsetY +
           (recovery?.offsetY ?? 0) * residual +
-          (this.walking ? Math.sin(now / 110) * 3 : 0),
+          (this.walking && !this.continuousMedia ? Math.sin(now / 110) * 3 : 0),
       sequence: motion.kind,
       progress: motion.progress,
     };
