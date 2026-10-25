@@ -143,6 +143,10 @@ export function createCompanionPreviewApi(
       if (petId !== active) throw new Error('Companion selection changed');
       return [{ id: crypto.randomUUID(), name: 'project-notes.md', bytes: 128 }];
     },
+    stageFile: async (petId, file) => {
+      if (petId !== active) throw new Error('Companion selection changed');
+      return { id: crypto.randomUUID(), name: file.name, bytes: file.data.byteLength };
+    },
     stopTask: async sessionId => {
       tasks.set(
         active,

@@ -1,5 +1,5 @@
 import type { DesktopPetBuiltinId } from '../desktopPet/catalog';
-import type { CompanionAttachment } from './attachments';
+import type { CompanionAttachment, CompanionIncomingFile } from './attachments';
 import type { CompanionBubblePlacement } from './bubble';
 import type { ManagedMemoryRecord } from '../memory/types';
 import type { CompanionMemorySave, CompanionMemoryShare, CompanionMemoryConfirm } from './memory';
@@ -94,6 +94,7 @@ export interface CompanionWindowApi {
   stopTask(sessionId: string): Promise<void>;
   chooseWorkspace(): Promise<CompanionWorkspace | null>;
   chooseFiles(petId: string): Promise<CompanionAttachment[]>;
+  stageFile(petId: string, file: CompanionIncomingFile): Promise<CompanionAttachment>;
   hide(): Promise<void>;
   openWorkbench(sessionId?: string): Promise<void>;
   onContext(listener: (context: CompanionWindowContext) => void): () => void;

@@ -47,6 +47,7 @@ export const appSystemApi = {
     stopTask: companionApi.stopTask,
     chooseWorkspace: companionApi.chooseWorkspace,
     chooseFiles: companionApi.chooseFiles,
+    stageFile: companionApi.stageFile,
     listMemories: companionApi.listMemories,
     saveMemory: companionApi.saveMemory,
     confirmMemory: companionApi.confirmMemory,

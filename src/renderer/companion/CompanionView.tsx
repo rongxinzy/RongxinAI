@@ -39,6 +39,7 @@ import { createCompanionRefreshQueue } from './refreshQueue';
 import { useCompanionAnswer } from './useCompanionAnswer';
 import { CompanionBubbleFrame } from './CompanionBubbleFrame';
 import { watchCompanionVisibility } from './visibility';
+import { usePromptFileDrop } from '../components/cowork/promptInput/usePromptFileDrop';
 import { CompanionBubbleSide, type CompanionBubblePlacement } from '../../shared/companion/bubble';
 
 function applyContext(context: CompanionWindowContext): void {
@@ -173,7 +174,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
     const next = { ...draftRef.current, ...patch, text, requestId: crypto.randomUUID() };
     replaceDraft(next, activeId.current ?? undefined);
   };
-  const { choosingFiles, chooseFiles } = useCompanionFiles({
+  const { choosingFiles, chooseFiles, addFiles } = useCompanionFiles({
     api,
     disabled: !state || sending || choosingWorkspace,
     activePetId: () => activeId.current,
@@ -181,6 +182,14 @@ export function CompanionView({ api = window.companion }: Props = {}) {
     onChange: attachments => updateDraft(draftRef.current.text, { attachments }),
     onError: setError,
     onFocus: () => textarea.current?.focus(),
+  });
+  const transfers = usePromptFileDrop({
+    disabled: !state || sending || choosingWorkspace || choosingFiles,
+    isStreaming: false,
+    handleIncomingFiles: async files => {
+      if (taskMode) await addFiles(files);
+      else setError('companionAttachmentsWorkbench');
+    },
   });
 
   const submit = async () => {
@@ -356,7 +365,17 @@ export function CompanionView({ api = window.companion }: Props = {}) {
             }
           }}
         />
-        <div className="flex min-h-0 shrink flex-col gap-3 overflow-y-auto px-4 pb-4">
+        <div
+          className="flex min-h-0 shrink flex-col gap-3 overflow-y-auto px-4 pb-4"
+          onDragEnterCapture={transfers.handleDragEnter}
+          onDragOverCapture={transfers.handleDragOver}
+          onDragLeaveCapture={transfers.handleDragLeave}
+          onDropCapture={transfers.handleDrop}
+          onPasteCapture={event => {
+            if (event.clipboardData.files.length) event.stopPropagation();
+            transfers.handlePaste(event);
+          }}
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <FluidTabs
               disabled={!state || sending || choosingWorkspace || choosingFiles}
@@ -421,7 +440,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
           ) : null}
           {taskMode && draft.attachments?.length ? (
             <CoworkInlineAttachments
-              className="max-h-16 flex-wrap overflow-y-auto"
+              className="max-h-20 flex-wrap overflow-y-auto"
               attachments={draft.attachments.map(file => ({ path: file.id, name: file.name }))}
               onRemove={id =>
                 updateDraft(draftRef.current.text, {

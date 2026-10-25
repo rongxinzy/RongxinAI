@@ -16,9 +16,16 @@ interface Props {
 /** Durable conversation and task projection inside the companion's bubble. */
 export function CompanionConversation({ state, taskMode, openTask, stopTask }: Props) {
   const t = (key: string) => i18nService.t(key);
+  // The composer already asks what to do. An empty task list adds no second prompt or scroll stop.
+  if (taskMode && state && !state.tasks.length)
+    return <div aria-hidden="true" className="min-h-0 flex-1" />;
   return (
-    <Conversation className="flex min-h-0 flex-1 flex-col">
-      <ConversationContent className="flex flex-col gap-4 px-4">
+    <Conversation className="flex min-h-16 flex-1 flex-col">
+      <ConversationContent
+        className="flex flex-col gap-4 px-4"
+        scrollClassName="theme-scroll-viewport"
+        scrollTabIndex={0}
+      >
         {taskMode ? (
           state?.tasks.length ? (
             state.tasks.map(task => (

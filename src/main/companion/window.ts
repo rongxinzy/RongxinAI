@@ -242,6 +242,17 @@ export function initializeCompanionWindow(next: Options): void {
         choosingDialog = false;
       }
     },
+    stageFile: (event, petId, file) =>
+      serialized(event, () => {
+        activeProfile(petId);
+        return next
+          .getTasks()
+          .attachments.stage(
+            petId,
+            file,
+            path.join(app.getPath('temp'), 'zhiyuan', 'attachments', 'companion'),
+          );
+      }),
     bootstrap: event => serialized(event, snapshot),
     select: (event, petId) =>
       serialized(event, async () => {

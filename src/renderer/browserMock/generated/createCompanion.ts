@@ -222,6 +222,16 @@ export function createCompanion(runtime: BrowserMockRuntime): Window['electron']
       runtime.warnOnce('companion.chooseFiles');
       return [];
     },
+    stageFile: async (_p0, _p1) => {
+      void _p0;
+      void _p1;
+      runtime.warnOnce('companion.stageFile');
+      return {
+        id: 'preview',
+        name: 'Preview',
+        bytes: 0,
+      };
+    },
     hide: async () => {
       runtime.warnOnce('companion.hide');
     },

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { CompanionIpc as IpcChannel } from '../ipc/channels';
 import { defineIpcContract } from '../ipc/contract';
 import { DesktopPetBuiltinId } from '../desktopPet/catalog';
-import { companionAttachments } from './attachments';
+import { companionAttachments, companionIncomingFile } from './attachments';
 import { companionMemorySave, companionMemoryShare, companionMemoryConfirm } from './memory';
 import { ManagedMemoryRecordSchema } from '../ipc/memoryContract';
 import { CompanionBubbleSide } from './bubble';
@@ -132,6 +132,11 @@ export const companionContract = defineIpcContract({
     channel: IpcChannel.ChooseFiles,
     args: z.tuple([z.uuid()]),
     result: companionAttachments,
+  },
+  stageFile: {
+    channel: IpcChannel.StageFile,
+    args: z.tuple([z.uuid(), companionIncomingFile]),
+    result: companionAttachments.element,
   },
   stopTask: { channel: IpcChannel.StopTask, args: z.tuple([z.uuid()]), result: z.void() },
   hide: { channel: IpcChannel.Hide, args: z.tuple([]), result: z.void() },

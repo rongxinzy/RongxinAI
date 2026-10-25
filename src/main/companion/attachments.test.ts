@@ -1,10 +1,23 @@
-import { afterEach, expect, test } from 'vitest';
-import { mkdtemp, writeFile, rm, symlink, truncate } from 'node:fs/promises';
+import { afterEach, expect, test, vi } from 'vitest';
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  writeFile,
+  rm,
+  symlink,
+  truncate,
+} from 'node:fs/promises';
 import path from 'node:path';
 import { createCoworkStoreHarness } from '../coworkStore/coworkStore.testHarness';
 import { CompanionAttachments } from './attachments';
 import { CompanionAttachmentIssue } from '../../shared/companion/constants';
-import { COMPANION_MAX_ATTACHMENT_BYTES } from '../../shared/companion/attachments';
+import {
+  COMPANION_MAX_ATTACHMENT_BYTES,
+  COMPANION_MAX_ATTACHMENT_NAME_LENGTH,
+  companionAttachments,
+} from '../../shared/companion/attachments';
 
 const close: (() => void)[] = [];
 const directories: string[] = [];
@@ -78,4 +91,51 @@ test('image references use the existing task image and file metadata formats', a
       selected.map(file => file.id),
     ),
   ).rejects.toThrow('unavailable');
+});
+
+test('pasted bytes become an opaque private file with the original display name', async () => {
+  const f = await fixture();
+  const directory = path.join(f.directory, 'staging');
+  const data = new TextEncoder().encode('Clipboard evidence with 中文.');
+  const selected = await f.service.stage(
+    'pet',
+    { name: '../../notes.md', mimeType: 'text/markdown', data },
+    directory,
+  );
+  expect(selected).toMatchObject({ name: 'notes.md', bytes: data.byteLength });
+  expect(Object.keys(selected).sort()).toEqual(['bytes', 'id', 'name']);
+  const {
+    fileAttachments: [resolved],
+  } = await new CompanionAttachments(f.db).resolve('pet', [selected.id]);
+  expect(path.dirname(resolved.path)).toBe(await realpath(directory));
+  expect(await readFile(resolved.path)).toEqual(Buffer.from(data));
+  await expect(f.service.resolve('another-pet', [selected.id])).rejects.toThrow('unavailable');
+  expect(await readFile(f.file, 'utf8')).toBe('User selected evidence.');
+});
+
+test('invalid transfers never write and a rejected grant removes only its staged file', async () => {
+  const f = await fixture();
+  const directory = path.join(f.directory, 'staging');
+  const input = { name: 'pasted', mimeType: 'image/png', data: new Uint8Array([1, 2, 3]) };
+  await expect(
+    f.service.stage(
+      'pet',
+      { ...input, data: new Uint8Array(COMPANION_MAX_ATTACHMENT_BYTES + 1) },
+      directory,
+    ),
+  ).rejects.toThrow();
+  await expect(readdir(directory)).rejects.toThrow();
+  vi.spyOn(f.service, 'choose').mockRejectedValueOnce(new Error('Grant was rejected'));
+  await expect(f.service.stage('pet', input, directory)).rejects.toThrow('Grant was rejected');
+  expect(await readdir(directory)).toEqual([]);
+  const selected = await f.service.stage('pet', input, directory);
+  expect(selected.name).toBe('pasted.png');
+  const longName = await f.service.stage(
+    'pet',
+    { ...input, name: 'a'.repeat(COMPANION_MAX_ATTACHMENT_NAME_LENGTH) },
+    directory,
+  );
+  expect(longName.name).toHaveLength(COMPANION_MAX_ATTACHMENT_NAME_LENGTH);
+  expect(longName.name.endsWith('.png')).toBe(true);
+  expect(companionAttachments.safeParse([longName]).success).toBe(true);
 });

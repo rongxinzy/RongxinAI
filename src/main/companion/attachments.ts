@@ -1,13 +1,20 @@
 import { randomUUID } from 'node:crypto';
-import { realpath, stat } from 'node:fs/promises';
+import { mkdir, open, realpath, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import type Database from 'better-sqlite3';
 import { CompanionAttachmentIssue } from '../../shared/companion/constants';
 import {
   COMPANION_MAX_ATTACHMENTS,
   COMPANION_MAX_ATTACHMENT_BYTES,
+  COMPANION_MAX_ATTACHMENT_NAME_LENGTH,
+  companionIncomingFile,
   type CompanionAttachment,
+  type CompanionIncomingFile,
 } from '../../shared/companion/attachments';
+import {
+  inferAttachmentExtension,
+  sanitizeAttachmentFileName,
+} from '../coworkIpc/fileExportHelpers';
 
 const LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const IMAGE_MIME: Record<string, string> = {
@@ -44,7 +51,7 @@ export class CompanionAttachments {
     return { path: canonical, name: path.basename(canonical), bytes: info.size };
   }
 
-  /** Called only with paths supplied by the owned native file dialog. No file bytes are read. */
+  /** Only the owned native dialog or internal staging supplies these paths. */
   async choose(petId: string, paths: readonly string[]): Promise<CompanionAttachment[]> {
     if (paths.length > COMPANION_MAX_ATTACHMENTS) throw new Error(CompanionAttachmentIssue.TooMany);
     const selected: Row[] = [];
@@ -61,6 +68,33 @@ export class CompanionAttachments {
         insert.run(item.id, petId, item.path, item.name, item.bytes, Date.now() + LIFETIME_MS);
     })();
     return selected.map(({ id, name, bytes }) => ({ id, name, bytes }));
+  }
+
+  /** Async binary write only: no base64 decoding, image parsing, scanning or hashing on main. */
+  async stage(petId: string, input: CompanionIncomingFile, directory: string) {
+    const file = companionIncomingFile.parse(input);
+    const name = sanitizeAttachmentFileName(file.name);
+    const inferred = inferAttachmentExtension(name, file.mimeType);
+    const extension = /^\.[a-z0-9]{1,16}$/i.test(inferred) ? inferred : '';
+    const displayName = path.extname(name)
+      ? name
+      : name.slice(0, COMPANION_MAX_ATTACHMENT_NAME_LENGTH - extension.length) + extension;
+    await mkdir(directory, { recursive: true });
+    const location = path.join(directory, randomUUID() + extension);
+    const handle = await open(location, 'wx', 0o600);
+    try {
+      await handle.writeFile(file.data);
+      await handle.close();
+      const [selected] = await this.choose(petId, [location]);
+      this.db
+        .prepare('UPDATE companion_attachments SET name = ? WHERE id = ?')
+        .run(displayName, selected.id);
+      return { ...selected, name: displayName };
+    } catch (error) {
+      await handle.close().catch(() => {});
+      await unlink(location).catch(() => {});
+      throw error;
+    }
   }
 
   async resolve(petId: string, ids: readonly string[] = []) {

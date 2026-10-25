@@ -20,6 +20,7 @@ export const companionApi: CompanionWindowApi = {
   stopTask: sessionId => ipcRenderer.invoke(IpcChannel.StopTask, sessionId),
   chooseWorkspace: () => ipcRenderer.invoke(IpcChannel.ChooseWorkspace),
   chooseFiles: petId => ipcRenderer.invoke(IpcChannel.ChooseFiles, petId),
+  stageFile: (petId, file) => ipcRenderer.invoke(IpcChannel.StageFile, petId, file),
   hide: () => ipcRenderer.invoke(IpcChannel.Hide),
   openWorkbench: sessionId => ipcRenderer.invoke(IpcChannel.OpenWorkbench, sessionId),
   onContext: listener => {

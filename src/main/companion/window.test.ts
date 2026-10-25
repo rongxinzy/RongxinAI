@@ -47,7 +47,7 @@ class FakeWindow extends EventEmitter {
 }
 
 vi.mock('electron', () => ({
-  app: { isPackaged: false, getAppPath: () => '/app' },
+  app: { isPackaged: false, getAppPath: () => '/app', getPath: () => '/owned-temp' },
   BrowserWindow: vi.fn(function (options: Record<string, unknown>) {
     return new FakeWindow(options);
   }),
@@ -112,6 +112,11 @@ function fixture(open = true) {
     submit: vi.fn(),
     chooseWorkspace: vi.fn(async () => ({ id: 'workspace', name: 'Chosen folder' })),
     attachments: {
+      stage: vi.fn(async () => ({
+        id: '00000000-0000-4000-8000-000000000009',
+        name: 'pasted.txt',
+        bytes: 5,
+      })),
       choose: vi.fn(async () => [
         {
           id: '00000000-0000-4000-8000-000000000009',
@@ -249,7 +254,7 @@ test('the bridge exposes profile state and the workbench without general applica
   expect(f.onProfileChanged).toHaveBeenCalledWith(f.profile);
   await f.invoke(IpcChannel.OpenWorkbench);
   expect(f.main.focus).toHaveBeenCalledOnce();
-  expect(mocks.handlers.size).toBe(18);
+  expect(mocks.handlers.size).toBe(19);
   disposeCompanionWindow();
   expect(mocks.handlers.size).toBe(0);
   expect(mocks.unregister).toHaveBeenCalledWith(COMPANION_SHORTCUT);
@@ -442,4 +447,37 @@ test('file picking admits only native paths for the still-active owned profile',
   });
   await expect(f.invoke(IpcChannel.ChooseFiles, oldId)).rejects.toThrow('selection changed');
   expect(f.tasks.attachments.choose).not.toHaveBeenCalled();
+});
+
+test('binary staging rejects foreign frames, paths, oversized bytes and stale owners', async () => {
+  const f = fixture();
+  const file = { name: 'pasted.txt', mimeType: 'text/plain', data: new Uint8Array([1, 2, 3]) };
+  await expect(
+    mocks.handlers.get(IpcChannel.StageFile)!(
+      { sender: {}, senderFrame: {} },
+      f.profile.petId,
+      file,
+    ),
+  ).rejects.toThrow('owned main frame');
+  await expect(
+    f.invoke(IpcChannel.StageFile, f.profile.petId, { ...file, path: '/private/file' }),
+  ).rejects.toThrow('invalid arguments');
+  await expect(
+    f.invoke(IpcChannel.StageFile, f.profile.petId, {
+      ...file,
+      data: new Uint8Array(25 * 1024 * 1024 + 1),
+    }),
+  ).rejects.toThrow('invalid arguments');
+  const oldId = f.profile.petId;
+  f.profile.petId = '00000000-0000-4000-8000-000000000099';
+  await expect(f.invoke(IpcChannel.StageFile, oldId, file)).rejects.toThrow('selection changed');
+  expect(f.tasks.attachments.stage).not.toHaveBeenCalled();
+  expect(await f.invoke(IpcChannel.StageFile, f.profile.petId, file)).toMatchObject({
+    name: 'pasted.txt',
+  });
+  expect(f.tasks.attachments.stage).toHaveBeenCalledWith(
+    f.profile.petId,
+    file,
+    '/owned-temp/zhiyuan/attachments/companion',
+  );
 });

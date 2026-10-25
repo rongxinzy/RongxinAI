@@ -348,6 +348,8 @@ try {
       home,
       files: fileFixture
         ? {
+            intake: fileFixture.intake,
+            binaryMatchesSource: fileFixture.binaryMatchesSource ?? null,
             readThroughNativeTool: fileFixture.observed,
             opaqueDraft: true,
             lostReplyAfterRemoval: true,

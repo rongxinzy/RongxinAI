@@ -23,6 +23,7 @@ export const CompanionIpc = {
   StopTask: 'companion:task:stop',
   ChooseWorkspace: 'companion:workspace:choose',
   ChooseFiles: 'companion:files:choose',
+  StageFile: 'companion:files:stage',
   ListMemories: 'companion:memory:list',
   SaveMemory: 'companion:memory:save',
   ConfirmMemory: 'companion:memory:confirm',
