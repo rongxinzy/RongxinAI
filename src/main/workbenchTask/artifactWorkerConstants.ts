@@ -12,5 +12,6 @@ export const ArtifactWorkerTask = {
   Collect: 'collect',
   TransformText: 'transform-text',
   InspectWorkspaceContent: 'inspect-workspace-content',
+  PrepareCompanionImages: 'prepare-companion-images',
 } as const;
 export type ArtifactWorkerTask = (typeof ArtifactWorkerTask)[keyof typeof ArtifactWorkerTask];

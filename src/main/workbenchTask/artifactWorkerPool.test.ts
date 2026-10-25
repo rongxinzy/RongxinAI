@@ -9,6 +9,9 @@ import { collectWorkbenchArtifacts } from './artifactCollector';
 import { WorkbenchArtifactWorkerPool } from './artifactWorkerPool';
 import { ArtifactWorkerLimit } from './artifactWorkerConstants';
 import { TextWorkerKind } from './textWorkerOperations';
+import { randomUUID } from 'node:crypto';
+import { CompanionImageIssue } from '../../shared/companion/images';
+import { imageSize } from 'image-size';
 
 const fixture = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-worker-test-')));
 const compiled = path.join(fixture, 'compiled');
@@ -21,6 +24,7 @@ const input = {
   artifactCandidates: [{ path: 'result.txt', source: WorkbenchArtifactCandidateSource.ToolEffect }],
 };
 beforeAll(() => {
+  fs.symlinkSync(path.resolve('node_modules'), path.join(fixture, 'node_modules'), 'junction');
   execFileSync(
     process.execPath,
     [
@@ -46,6 +50,10 @@ beforeAll(() => {
   );
   pool = new WorkbenchArtifactWorkerPool(
     path.join(compiled, 'main/workbenchTask/artifactWorker.js'),
+  );
+  fs.copyFileSync(
+    path.resolve('node_modules/@silvia-odwyer/photon/photon_rs_bg.wasm'),
+    path.join(compiled, 'main/workbenchTask/companion-photon.wasm'),
   );
   fs.writeFileSync(path.join(fixture, 'result.txt'), 'final output');
 });
@@ -184,4 +192,79 @@ test('tool display transforms share the bounded worker pool and support cancella
   expect(await pool.transform({ kind: TextWorkerKind.Tool, result: 'recovered' })).toMatchObject({
     content: 'recovered',
   });
+});
+
+test('image preparation uses actual bytes, bounds pixels before decoding and stays off the event loop', async () => {
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const imagePath = path.join(fixture, 'looks-like-a-text-file.txt');
+  fs.writeFileSync(imagePath, png);
+  const source = { id: randomUUID(), name: 'selected.png', path: imagePath };
+  let ticks = 0;
+  const interval = setInterval(() => {
+    ticks++;
+  }, 1);
+  try {
+    const prepared = await pool.prepareImages([source]);
+    expect(prepared).toEqual([
+      { id: source.id, name: source.name, mimeType: 'image/png', data: png.toString('base64') },
+    ]);
+    expect(ticks).toBeGreaterThan(0);
+    console.log(`[CompanionImagesTest] image preparation yielded ${ticks} main-thread timer ticks`);
+  } finally {
+    clearInterval(interval);
+  }
+  const huge = Buffer.from(png);
+  huge.writeUInt32BE(100_000, 16);
+  huge.writeUInt32BE(100_000, 20);
+  fs.writeFileSync(imagePath, huge);
+  await expect(pool.prepareImages([source])).rejects.toThrow(CompanionImageIssue.TooLarge);
+  fs.writeFileSync(imagePath, 'not an image');
+  await expect(pool.prepareImages([source])).rejects.toThrow();
+  fs.writeFileSync(imagePath, png);
+  const cancellation = new AbortController();
+  const pending = pool.prepareImages([source], cancellation.signal);
+  cancellation.abort();
+  await expect(pending).rejects.toThrow('cancelled');
+  expect((await pool.prepareImages([source]))[0].mimeType).toBe('image/png');
+  await expect(pool.prepareImages(Array(11).fill(source))).rejects.toThrow('selection');
+});
+
+test('a real large bitmap is resized and converted by Photon without blocking the main thread', async () => {
+  const width = 4096,
+    height = 2048;
+  const bmp = Buffer.alloc(54 + width * height * 3, 187);
+  bmp.fill(0, 0, 54);
+  bmp.write('BM');
+  bmp.writeUInt32LE(bmp.length, 2);
+  bmp.writeUInt32LE(54, 10);
+  bmp.writeUInt32LE(40, 14);
+  bmp.writeInt32LE(width, 18);
+  bmp.writeInt32LE(height, 22);
+  bmp.writeUInt16LE(1, 26);
+  bmp.writeUInt16LE(24, 28);
+  const file = path.join(fixture, 'large.bmp');
+  fs.writeFileSync(file, bmp);
+  let ticks = 0;
+  const interval = setInterval(() => {
+    ticks++;
+  }, 1);
+  const started = performance.now();
+  try {
+    const [image] = await pool.prepareImages([{ id: randomUUID(), name: 'large.bmp', path: file }]);
+    expect(image.mimeType).toBe('image/png');
+    expect(imageSize(Buffer.from(image.data, 'base64'))).toMatchObject({
+      width: 2000,
+      height: 1000,
+    });
+    expect(ticks).toBeGreaterThan(0);
+    console.log(
+      `[CompanionImagesTest] large bitmap prepared in ${Math.round(performance.now() - started)} ms with ${ticks} main-thread timer ticks`,
+    );
+  } finally {
+    clearInterval(interval);
+  }
+  expect(await pool.collect(input)).toHaveLength(1);
 });

@@ -9,6 +9,7 @@ import { extractExternalDeps } from 'vite-plugin-electron/plugin';
 import renderer from 'vite-plugin-electron-renderer';
 
 import { ELECTRON_MAIN_EXTERNALS } from './scripts/electron-runtime-dependencies.mjs';
+import { copyCompanionPhoton } from './scripts/copy-companion-photon.mjs';
 
 // https://vitejs.dev/config/
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -99,6 +100,7 @@ const rejectDuplicateHighlighterModules = () => ({
 const copyPhotonWasmPlugin = () => ({
   name: 'copy-photon-wasm',
   closeBundle() {
+    copyCompanionPhoton(projectRoot, path.join(projectRoot, 'dist-electron'));
     const sourceCandidates = [
       path.resolve(
         projectRoot,

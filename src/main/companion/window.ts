@@ -265,9 +265,18 @@ export function initializeCompanionWindow(next: Options): void {
     submit: (event, request) =>
       serialized(event, async () => {
         const profile = activeProfile(request.petId);
-        const result = await next
-          .getCompanions()
-          .runtime.submit(profile, request.requestId, request.text);
+        const result = await next.getCompanions().runtime.submit(
+          profile,
+          request.requestId,
+          request.text,
+          request.attachmentIds?.length
+            ? {
+                ids: request.attachmentIds,
+                resolve: () =>
+                  next.getTasks().attachments.images(profile.petId, request.attachmentIds!),
+              }
+            : undefined,
+        );
         if (result.receipt) changed();
         return result;
       }),

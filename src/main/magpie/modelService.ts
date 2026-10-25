@@ -125,7 +125,10 @@ export class MagpieModelService {
   }
 
   /** Companion requests use existing consent and policy, without changing the global default. */
-  async resolveAutomatic(excludedIds: ReadonlySet<string> = new Set()): Promise<{
+  async resolveAutomatic(
+    excludedIds: ReadonlySet<string> = new Set(),
+    requirements: { imageInput?: boolean } = {},
+  ): Promise<{
     model: MagpieModel;
     gatewayUrl: string;
   } | null> {
@@ -136,6 +139,7 @@ export class MagpieModelService {
     if (catalog.status.state !== 'running' || !catalog.status.gatewayUrl) return null;
     const candidates = catalog.models.filter(model => {
       if (excludedIds.has(model.id)) return false;
+      if (requirements.imageInput && !model.modalities?.input.includes('image')) return false;
       // The gateway projects absent capability metadata as empty arrays.
       // Only an explicit non-text declaration excludes a text attempt.
       if (model.modalities?.input.length && !model.modalities.input.includes('text')) return false;

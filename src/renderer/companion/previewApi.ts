@@ -1,6 +1,11 @@
 import { RELEASED_DESKTOP_PETS } from '../../shared/desktopPet/availability';
 import type { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
-import { CompanionCapability, CompanionRequestState } from '../../shared/companion/constants';
+import {
+  CompanionCapability,
+  CompanionRequestState,
+  CompanionUnavailableReason,
+} from '../../shared/companion/constants';
+import type { CompanionAttachment } from '../../shared/companion/attachments';
 import type {
   CompanionMessage,
   CompanionWindowApi,
@@ -24,6 +29,7 @@ export function createCompanionPreviewApi(
   }));
   let active = profiles[0].petId;
   const messages = new Map<string, CompanionMessage[]>();
+  const files = new Map<string, CompanionAttachment & { petId: string }>();
   const requests = new Map<string, { receipt: CompanionReceipt; text: string; at: number }>();
   let sequence = 0;
   const changedListeners = new Set<() => void>();
@@ -80,10 +86,30 @@ export function createCompanionPreviewApi(
       if (request.petId !== active) throw new Error('Companion selection changed');
       if (availability.capability === CompanionCapability.Local)
         return { availability, receipt: null };
+      if (request.attachmentIds?.length && params.get('noVision') === '1')
+        return {
+          availability: {
+            ...availability,
+            capability: CompanionCapability.Local,
+            modelId: null,
+            reason: CompanionUnavailableReason.ImageUnavailable,
+          },
+          receipt: null,
+        };
+      const attachments = request.attachmentIds?.map(id => {
+        const file = files.get(id);
+        if (!file || file.petId !== active) throw new Error('Attachment is unavailable');
+        return { id, name: file.name };
+      });
       const receipt = { petId: active, requestId: request.requestId, submissionId: ++sequence };
       messages.set(active, [
         ...(messages.get(active) ?? []),
-        { id: ++sequence, role: 'user', text: request.text },
+        {
+          id: ++sequence,
+          role: 'user',
+          text: request.text,
+          ...(attachments?.length ? { attachments } : {}),
+        },
       ]);
       requests.set(active, { receipt, text: request.text, at: Date.now() });
       changed();
@@ -145,7 +171,9 @@ export function createCompanionPreviewApi(
     },
     stageFile: async (petId, file) => {
       if (petId !== active) throw new Error('Companion selection changed');
-      return { id: crypto.randomUUID(), name: file.name, bytes: file.data.byteLength };
+      const selected = { id: crypto.randomUUID(), name: file.name, bytes: file.data.byteLength };
+      files.set(selected.id, { ...selected, petId });
+      return selected;
     },
     stopTask: async sessionId => {
       tasks.set(

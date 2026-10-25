@@ -148,6 +148,42 @@ test('does not infer tools from catalog presence; visual support requires a decl
   });
 });
 
+test('image requests automatically choose a permitted visual model without changing the text default', async () => {
+  const f = fixture();
+  f.setDefault('text');
+  f.setModels([
+    { id: 'text', modalities: { input: ['text'], output: ['text'] } },
+    { id: 'private', modalities: { input: ['text', 'image'], output: ['text'] } },
+    { id: 'vision', modalities: { input: ['text', 'image'], output: ['text'] } },
+    { id: 'unknown', modalities: { input: [], output: [] } },
+  ]);
+  expect((await f.assignment.resolve('pet', true)).availability).toMatchObject({
+    modelId: 'vision',
+    imageInput: true,
+  });
+  expect((await f.assignment.resolve('pet')).availability.modelId).toBe('text');
+  expect(f.write).not.toHaveBeenCalled();
+  f.assignment.failed('vision');
+  expect((await f.assignment.resolve('pet', true)).availability.capability).toBe(
+    CompanionCapability.Local,
+  );
+  f.advance();
+  expect((await f.assignment.resolve('pet', true)).availability.modelId).toBe('vision');
+});
+
+test('vision selection never enables a disabled service or accepts unknown image capabilities', async () => {
+  const f = fixture();
+  expect((await f.assignment.resolve('pet', true)).availability.capability).toBe(
+    CompanionCapability.Local,
+  );
+  f.setModels([{ id: 'vision', modalities: { input: ['text', 'image'], output: ['text'] } }]);
+  f.setStatus({ state: 'stopped', enabled: false, version: 'test' });
+  expect((await f.assignment.resolve('pet', true)).availability.capability).toBe(
+    CompanionCapability.Local,
+  );
+  expect(f.start).not.toHaveBeenCalled();
+});
+
 test('explicit tool rejection preserves text assignment and expires without changing defaults', async () => {
   const f = fixture();
   f.assignment.observeTools('a', false);

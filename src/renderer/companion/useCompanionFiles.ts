@@ -2,6 +2,11 @@ import { useRef, useState } from 'react';
 import type { CompanionWindowApi } from '../../shared/companion/types';
 import { CompanionAttachmentIssue } from '../../shared/companion/constants';
 import {
+  CompanionImageIssue,
+  isCompanionImageFile,
+  isCompanionImageName,
+} from '../../shared/companion/images';
+import {
   COMPANION_MAX_ATTACHMENTS,
   COMPANION_MAX_ATTACHMENT_BYTES,
   type CompanionAttachment,
@@ -10,6 +15,7 @@ import {
 interface Options {
   api?: CompanionWindowApi;
   disabled: boolean;
+  imagesOnly?: boolean;
   activePetId(): string | null;
   attachments(): readonly CompanionAttachment[];
   onChange(files: CompanionAttachment[]): void;
@@ -43,11 +49,13 @@ export function useCompanionFiles(options: Options) {
       if (options.activePetId() !== petId) return;
       const message = failure instanceof Error ? failure.message : '';
       options.onError(
-        message.includes(CompanionAttachmentIssue.TooLarge)
-          ? 'companionFileTooLarge'
-          : message.includes(CompanionAttachmentIssue.TooMany)
-            ? 'companionFilesLimit'
-            : 'companionFilesFailed',
+        message.includes(CompanionImageIssue.Unsupported)
+          ? 'companionAttachmentsWorkbench'
+          : message.includes(CompanionAttachmentIssue.TooLarge)
+            ? 'companionFileTooLarge'
+            : message.includes(CompanionAttachmentIssue.TooMany)
+              ? 'companionFilesLimit'
+              : 'companionFilesFailed',
       );
     } finally {
       locked.current = false;
@@ -64,11 +72,16 @@ export function useCompanionFiles(options: Options) {
   };
   const chooseFiles = () =>
     run(async (petId, api) => {
-      merge(petId, await api.chooseFiles(petId));
+      const selected = await api.chooseFiles(petId);
+      if (options.imagesOnly && selected.some(file => !isCompanionImageName(file.name)))
+        throw new Error(CompanionImageIssue.Unsupported);
+      merge(petId, selected);
     });
   const addFiles = (incoming: FileList | File[]) =>
     run(async (petId, api) => {
       const files = Array.from(incoming);
+      if (options.imagesOnly && files.some(file => !isCompanionImageFile(file)))
+        throw new Error(CompanionImageIssue.Unsupported);
       if (options.attachments().length + files.length > COMPANION_MAX_ATTACHMENTS)
         throw new Error(CompanionAttachmentIssue.TooMany);
       if (files.some(file => file.size > COMPANION_MAX_ATTACHMENT_BYTES))

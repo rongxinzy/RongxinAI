@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite-plugin-electron';
 import { extractExternalDeps } from 'vite-plugin-electron/plugin';
 import { ELECTRON_MAIN_EXTERNALS } from './electron-runtime-dependencies.mjs';
+import { copyCompanionPhoton } from './copy-companion-photon.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
@@ -93,5 +94,6 @@ await build(
 );
 
 copyPhotonWasm();
+copyCompanionPhoton(projectRoot, outputDirectory);
 fs.writeFileSync(readyPath, '');
 console.log('[ElectronDevBuild] Main and preload bundles are ready.');

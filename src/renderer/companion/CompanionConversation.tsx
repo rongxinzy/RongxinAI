@@ -5,19 +5,31 @@ import { Message, MessageContent, MessageResponse } from '@shared/components/ai-
 import { WorkbenchRunStatus } from '../../shared/workbenchTask';
 import type { CompanionWindowState } from '../../shared/companion/types';
 import { i18nService } from '../services/i18n';
+import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttachments';
 
 interface Props {
   state: CompanionWindowState | null;
   taskMode: boolean;
+  hasAttachments?: boolean;
   openTask(sessionId: string): void;
   stopTask(sessionId: string): void;
 }
 
 /** Durable conversation and task projection inside the companion's bubble. */
-export function CompanionConversation({ state, taskMode, openTask, stopTask }: Props) {
+export function CompanionConversation({
+  state,
+  taskMode,
+  hasAttachments,
+  openTask,
+  stopTask,
+}: Props) {
   const t = (key: string) => i18nService.t(key);
   // The composer already asks what to do. An empty task list adds no second prompt or scroll stop.
-  if (taskMode && state && !state.tasks.length)
+  if (
+    state &&
+    ((taskMode && !state.tasks.length) ||
+      (!taskMode && hasAttachments && !state.conversation.messages.length))
+  )
     return <div aria-hidden="true" className="min-h-0 flex-1" />;
   return (
     <Conversation className="flex min-h-16 flex-1 flex-col">
@@ -74,7 +86,15 @@ export function CompanionConversation({ state, taskMode, openTask, stopTask }: P
           state.conversation.messages.map(message => (
             <Message key={`${message.id}-${message.role}`} from={message.role}>
               <MessageContent>
-                <MessageResponse>{message.text}</MessageResponse>
+                {message.attachments?.length ? (
+                  <CoworkInlineAttachments
+                    attachments={message.attachments.map(file => ({
+                      path: file.id,
+                      name: file.name,
+                    }))}
+                  />
+                ) : null}
+                {message.text ? <MessageResponse>{message.text}</MessageResponse> : null}
               </MessageContent>
             </Message>
           ))

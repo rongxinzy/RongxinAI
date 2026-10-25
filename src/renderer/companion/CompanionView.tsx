@@ -24,8 +24,9 @@ import type {
 import {
   COMPANION_NAME_KEYS,
   CompanionComposerMode,
-  CompanionAttachmentIssue,
+  CompanionUnavailableReason,
 } from '../../shared/companion/constants';
+import { companionSubmissionError } from '../services/companionSubmissionError';
 import { i18nService } from '../services/i18n';
 import { themeService } from '../services/theme';
 import { resolveThemePlugin } from '../theme/themes/plugins';
@@ -78,6 +79,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const t = (key: string) => i18nService.t(key);
   const taskMode = draft.mode === CompanionComposerMode.Task;
+  const hasInput = Boolean(draft.text.trim() || (!taskMode && draft.attachments?.length));
   const cancelPendingLoad = useCallback(() => {
     revision.current++;
   }, []);
@@ -177,6 +179,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
   const { choosingFiles, chooseFiles, addFiles } = useCompanionFiles({
     api,
     disabled: !state || sending || choosingWorkspace,
+    imagesOnly: !taskMode,
     activePetId: () => activeId.current,
     attachments: () => draftRef.current.attachments ?? [],
     onChange: attachments => updateDraft(draftRef.current.text, { attachments }),
@@ -186,15 +189,12 @@ export function CompanionView({ api = window.companion }: Props = {}) {
   const transfers = usePromptFileDrop({
     disabled: !state || sending || choosingWorkspace || choosingFiles,
     isStreaming: false,
-    handleIncomingFiles: async files => {
-      if (taskMode) await addFiles(files);
-      else setError('companionAttachmentsWorkbench');
-    },
+    handleIncomingFiles: addFiles,
   });
 
   const submit = async () => {
-    if (taskMode && (choosingWorkspace || choosingFiles)) return;
-    if (!state || !draft.text.trim() || sending || (!taskMode && pending) || !api) return;
+    if (choosingWorkspace || choosingFiles) return;
+    if (!state || !hasInput || sending || (!taskMode && pending) || !api) return;
     const sent = draftRef.current;
     const petId = state.activePetId;
     setSending(true);
@@ -206,7 +206,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
         ...current,
         text: '',
         requestId: crypto.randomUUID(),
-        attachments: taskMode ? [] : current.attachments,
+        attachments: [],
       };
       if (activeId.current === petId) replaceDraft(next, petId);
       else writeCompanionDraft(petId, next);
@@ -232,27 +232,30 @@ export function CompanionView({ api = window.companion }: Props = {}) {
         updateTasks(await api.tasks());
         return;
       }
-      const result = await api.submit({ petId, requestId: sent.requestId, text: sent.text });
+      const result = await api.submit({
+        petId,
+        requestId: sent.requestId,
+        text: sent.text,
+        ...(sent.attachments?.length
+          ? { attachmentIds: sent.attachments.map(file => file.id) }
+          : {}),
+      });
       if (activeId.current === petId)
         setState(current => current && { ...current, availability: result.availability });
       if (!result.receipt) {
-        if (activeId.current === petId) setError('companionNoModel');
+        if (activeId.current === petId)
+          setError(
+            result.availability.reason === CompanionUnavailableReason.ImageUnavailable
+              ? 'companionNoImageModel'
+              : 'companionNoModel',
+          );
         return;
       }
       acknowledgeDraft();
       await load();
     } catch (failure) {
       await load();
-      if (activeId.current === petId)
-        setError(
-          taskMode &&
-            failure instanceof Error &&
-            failure.message.includes(CompanionAttachmentIssue.Unavailable)
-            ? 'companionFileUnavailable'
-            : taskMode
-              ? 'companionTaskSubmitFailed'
-              : 'companionFailed',
-        );
+      if (activeId.current === petId) setError(companionSubmissionError(failure, taskMode));
     } finally {
       setSending(false);
     }
@@ -353,6 +356,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
         <CompanionConversation
           state={state}
           taskMode={taskMode}
+          hasAttachments={Boolean(draft.attachments?.length)}
           openTask={sessionId =>
             void api?.openWorkbench(sessionId).catch(() => setError('companionTaskOpenFailed'))
           }
@@ -438,9 +442,9 @@ export function CompanionView({ api = window.companion }: Props = {}) {
           {state && !state.shortcutAvailable ? (
             <p className="theme-home-caption">{t('companionShortcutUnavailable')}</p>
           ) : null}
-          {taskMode && draft.attachments?.length ? (
+          {draft.attachments?.length ? (
             <CoworkInlineAttachments
-              className="max-h-20 flex-wrap overflow-y-auto"
+              className="max-h-20 shrink-0 flex-wrap overflow-y-auto"
               attachments={draft.attachments.map(file => ({ path: file.id, name: file.name }))}
               onRemove={id =>
                 updateDraft(draftRef.current.text, {
@@ -468,25 +472,22 @@ export function CompanionView({ api = window.companion }: Props = {}) {
               autoFocus
             />
             <PromptInputFooter>
-              {taskMode ? (
-                <PromptInputButton
-                  aria-label={t('companionAddFiles')}
-                  tooltip={t('companionAddFiles')}
-                  disabled={!state || sending || choosingWorkspace || choosingFiles}
-                  onClick={() => void chooseFiles()}
-                >
-                  <Paperclip />
-                </PromptInputButton>
-              ) : (
-                <span />
-              )}
+              <PromptInputButton
+                aria-label={t('companionAddFiles')}
+                tooltip={t('companionAddFiles')}
+                disabled={!state || sending || choosingWorkspace || choosingFiles}
+                onClick={() => void chooseFiles()}
+              >
+                <Paperclip />
+              </PromptInputButton>
               <PromptInputSubmit
                 status={pending && !taskMode ? 'streaming' : 'ready'}
                 disabled={
                   !state ||
                   sending ||
-                  (taskMode && (choosingWorkspace || choosingFiles)) ||
-                  ((!pending || taskMode) && !draft.text.trim())
+                  choosingWorkspace ||
+                  choosingFiles ||
+                  ((!pending || taskMode) && !hasInput)
                 }
                 onStop={() => void stop()}
                 aria-label={t(

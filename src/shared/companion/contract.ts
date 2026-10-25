@@ -2,7 +2,12 @@ import { z } from 'zod';
 import { CompanionIpc as IpcChannel } from '../ipc/channels';
 import { defineIpcContract } from '../ipc/contract';
 import { DesktopPetBuiltinId } from '../desktopPet/catalog';
-import { companionAttachments, companionIncomingFile } from './attachments';
+import {
+  companionAttachments,
+  companionIncomingFile,
+  COMPANION_MAX_ATTACHMENTS,
+  COMPANION_MAX_ATTACHMENT_NAME_LENGTH,
+} from './attachments';
 import { companionMemorySave, companionMemoryShare, companionMemoryConfirm } from './memory';
 import { ManagedMemoryRecordSchema } from '../ipc/memoryContract';
 import { CompanionBubbleSide } from './bubble';
@@ -61,7 +66,20 @@ const state = z.object({
   taskRevision: z.number().int().nonnegative(),
   conversation: z.object({
     messages: z.array(
-      z.object({ id: z.number(), role: z.enum(['user', 'assistant']), text: z.string() }),
+      z.object({
+        id: z.number(),
+        role: z.enum(['user', 'assistant']),
+        text: z.string(),
+        attachments: z
+          .array(
+            z.object({
+              id: z.uuid(),
+              name: z.string().min(1).max(COMPANION_MAX_ATTACHMENT_NAME_LENGTH),
+            }),
+          )
+          .max(COMPANION_MAX_ATTACHMENTS)
+          .optional(),
+      }),
     ),
     pending: receipt.nullable(),
   }),
@@ -102,9 +120,11 @@ export const companionContract = defineIpcContract({
         .object({
           petId: z.uuid(),
           requestId: z.string().trim().min(1).max(128),
-          text: z.string().trim().min(1).max(32_000),
+          text: z.string().trim().max(32_000),
+          attachmentIds: z.array(z.uuid()).max(COMPANION_MAX_ATTACHMENTS).optional(),
         })
-        .strict(),
+        .strict()
+        .refine(input => input.text.length > 0 || Boolean(input.attachmentIds?.length)),
     ]),
     result: z.object({ availability, receipt: receipt.nullable() }),
   },

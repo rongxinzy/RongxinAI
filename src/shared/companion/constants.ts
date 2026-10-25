@@ -28,6 +28,7 @@ export const CompanionUnavailableReason = {
   NoModel: 'no_model',
   ModelFailed: 'model_failed',
   ServiceUnavailable: 'service_unavailable',
+  ImageUnavailable: 'image_unavailable',
 } as const;
 export type CompanionUnavailableReason =
   (typeof CompanionUnavailableReason)[keyof typeof CompanionUnavailableReason];

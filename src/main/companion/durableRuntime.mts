@@ -10,12 +10,18 @@ import {
   Harness,
   hook,
   section,
-  UserEntry,
   type Conversation,
   type Submission,
 } from '@earendil-works/pi-durable';
 import { openNodeSqliteStorage } from '@earendil-works/pi-durable/storage/sqlite/node';
 import { z } from 'zod';
+import type { CompanionPreparedImage } from '../../shared/companion/images.js';
+import { CompanionImageEntry } from '../../shared/companion/images.js';
+import {
+  companionImageMetadata,
+  companionNeedsImages,
+  isCompanionUserEntry,
+} from './imageConversation.mjs';
 import { CompanionCapability, CompanionRequestState } from '../../shared/companion/constants.js';
 import type {
   CompanionAnswer,
@@ -34,7 +40,12 @@ import {
 
 const owners = new Set<string>();
 const requestIdSchema = z.string().trim().min(1).max(128);
-const promptSchema = z.string().trim().min(1).max(32_000);
+const promptSchema = z.string().trim().max(32_000);
+
+interface ImageInput {
+  ids: readonly string[];
+  resolve(): Promise<CompanionPreparedImage[]>;
+}
 
 interface ActiveCompanion {
   petId: string;
@@ -162,7 +173,7 @@ export class PiCompanionRuntime {
           },
         });
         const restored = await conversation.entries({}, 32, undefined, context);
-        const latestUser = restored.items.find(entry => UserEntry.is(entry));
+        const latestUser = restored.items.find(isCompanionUserEntry);
         memoryQuery =
           latestUser?.model
             ?.flatMap(message =>
@@ -211,8 +222,11 @@ export class PiCompanionRuntime {
     }
   }
 
-  private async configure(active: ActiveCompanion): Promise<CompanionAvailability> {
-    const resolved = await this.assignment.resolve(active.petId);
+  private async configure(active: ActiveCompanion, images = false): Promise<CompanionAvailability> {
+    const resolved = await this.assignment.resolve(
+      active.petId,
+      images || (await companionNeedsImages(active.conversation)),
+    );
     active.models = resolved.models;
     active.modelId = resolved.availability.modelId;
     active.availability = resolved.availability;
@@ -226,10 +240,12 @@ export class PiCompanionRuntime {
     profile: CompanionProfile,
     requestId: string,
     prompt: string,
+    imageInput?: ImageInput,
   ): Promise<CompanionAdmission> {
     return this.serialize(async () => {
       const key = requestIdSchema.parse(requestId);
       const text = promptSchema.parse(prompt);
+      if (!text && !imageInput?.ids.length) throw new Error('Companion input is empty');
       const active = await this.open(profile);
       const existing = await active.conversation.commit(
         tx => tx.submissionByRequest(active.conversation.id, key),
@@ -244,11 +260,40 @@ export class PiCompanionRuntime {
       }
       if ((await active.harness.inspect(context)).submissions.length)
         throw new Error('Companion has an unfinished request');
-      const availability = await this.configure(active);
+      const availability = await this.configure(active, Boolean(imageInput?.ids.length));
       if (!active.modelId) return { availability, receipt: null };
+      const images = imageInput?.ids.length ? await imageInput.resolve() : [];
+      if (
+        imageInput?.ids.length &&
+        (images.length !== new Set(imageInput.ids).size ||
+          images.some(image => !imageInput.ids.includes(image.id)))
+      )
+        throw new Error('Companion image selection changed');
       active.memoryQuery = text;
       const submission = await active.conversation.submit(
-        { type: 'input', content: text, requestId: key, whenBusy: 'reject' },
+        {
+          type: 'input',
+          content: images.length
+            ? [
+                ...(text ? [{ type: 'text' as const, text }] : []),
+                ...images.map(image => ({
+                  type: 'image' as const,
+                  data: image.data,
+                  mimeType: image.mimeType,
+                })),
+              ]
+            : text,
+          ...(images.length
+            ? {
+                entry: {
+                  kind: CompanionImageEntry.User,
+                  data: { attachments: images.map(({ id, name }) => ({ id, name })) },
+                },
+              }
+            : {}),
+          requestId: key,
+          whenBusy: 'reject',
+        },
         context,
       );
       return {
@@ -336,7 +381,7 @@ export class PiCompanionRuntime {
       return {
         messages: [...page.items]
           .reverse()
-          .filter(entry => UserEntry.is(entry) || AssistantEntry.is(entry))
+          .filter(entry => isCompanionUserEntry(entry) || AssistantEntry.is(entry))
           .flatMap(entry =>
             (entry.model ?? []).flatMap(message => {
               if (message.role !== 'user' && message.role !== 'assistant') return [];
@@ -346,7 +391,17 @@ export class PiCompanionRuntime {
                   : message.content
                       .flatMap(block => (block.type === 'text' ? [block.text] : []))
                       .join('\n');
-              return text ? [{ id: entry.id, role: message.role, text }] : [];
+              const attachments = companionImageMetadata(entry);
+              return text || attachments?.length
+                ? [
+                    {
+                      id: entry.id,
+                      role: message.role,
+                      text,
+                      ...(attachments?.length ? { attachments } : {}),
+                    },
+                  ]
+                : [];
             }),
           ),
         pending: pending

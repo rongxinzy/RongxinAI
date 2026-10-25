@@ -15,6 +15,7 @@ import {
   inferAttachmentExtension,
   sanitizeAttachmentFileName,
 } from '../coworkIpc/fileExportHelpers';
+import { prepareCompanionImagesAsync } from '../workbenchTask/artifactWorkerPool';
 
 const LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const IMAGE_MIME: Record<string, string> = {
@@ -121,5 +122,20 @@ export class CompanionAttachments {
       });
     }
     return { fileAttachments };
+  }
+
+  /** Reuse the same owner/expiry/path checks before any model image processing. */
+  async images(petId: string, ids: readonly string[], signal?: AbortSignal) {
+    const unique = [...new Set(ids)];
+    if (!unique.length) return [];
+    const { fileAttachments } = await this.resolve(petId, unique);
+    return prepareCompanionImagesAsync(
+      fileAttachments.map((file, index) => ({
+        id: unique[index],
+        name: file.name,
+        path: file.path,
+      })),
+      signal,
+    );
   }
 }

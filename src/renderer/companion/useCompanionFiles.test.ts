@@ -10,7 +10,7 @@ import { COMPANION_MAX_ATTACHMENT_BYTES } from '../../shared/companion/attachmen
 import { useCompanionFiles } from './useCompanionFiles';
 
 afterEach(cleanup);
-function fixture() {
+function fixture(imagesOnly = false) {
   let active = 'pet';
   let attachments: CompanionAttachment[] = [];
   const stageFile = vi.fn(
@@ -26,6 +26,7 @@ function fixture() {
     useCompanionFiles({
       api: { stageFile, chooseFiles } as unknown as CompanionWindowApi,
       disabled: false,
+      imagesOnly,
       activePetId: () => active,
       attachments: () => attachments,
       onChange: next => {
@@ -115,4 +116,23 @@ test('an acknowledged first file survives a later failure', async () => {
   });
   expect(f.attachments()).toMatchObject([{ name: 'kept.txt' }]);
   expect(f.onError).toHaveBeenLastCalledWith('companionFilesFailed');
+});
+
+test('chat admits typed images and rejects other files before staging or altering the draft', async () => {
+  const f = fixture(true);
+  await act(async () => {
+    await f.result.current.addFiles([new File(['image'], 'pasted.png', { type: 'image/png' })]);
+  });
+  expect(f.attachments()).toMatchObject([{ name: 'pasted.png' }]);
+  await act(async () => {
+    await f.result.current.addFiles([new File(['pdf'], 'report.pdf', { type: 'application/pdf' })]);
+  });
+  expect(f.stageFile).toHaveBeenCalledOnce();
+  expect(f.onError).toHaveBeenLastCalledWith('companionAttachmentsWorkbench');
+  expect(f.attachments()).toHaveLength(1);
+  await act(async () => {
+    await f.result.current.chooseFiles();
+  });
+  expect(f.attachments()).toHaveLength(1);
+  expect(f.onError).toHaveBeenLastCalledWith('companionAttachmentsWorkbench');
 });

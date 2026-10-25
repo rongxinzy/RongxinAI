@@ -44,9 +44,9 @@ export class CompanionModelAssignment {
     return !observed || observed.until <= this.now() || observed.supported;
   }
 
-  async resolve(conversationId: string) {
+  async resolve(conversationId: string, imageInput = false) {
     try {
-      return await this.resolveAvailable(conversationId);
+      return await this.resolveAvailable(conversationId, imageInput);
     } catch {
       // A stopped gateway or a failed catalog read must not disable local drafts and identity.
       const availability: CompanionAvailability = {
@@ -60,9 +60,11 @@ export class CompanionModelAssignment {
     }
   }
 
-  private async resolveAvailable(conversationId: string) {
+  private async resolveAvailable(conversationId: string, imageInput: boolean) {
     for (const [id, until] of this.failures) if (until <= this.now()) this.failures.delete(id);
-    const selected = await this.service.resolveAutomatic(new Set(this.failures.keys()));
+    const selected = await this.service.resolveAutomatic(new Set(this.failures.keys()), {
+      imageInput,
+    });
     const models = createModels();
     if (!selected) {
       const availability: CompanionAvailability = {
@@ -70,9 +72,11 @@ export class CompanionModelAssignment {
         modelId: null,
         imageInput: false,
         toolUse: false,
-        reason: this.failures.size
-          ? CompanionUnavailableReason.ModelFailed
-          : CompanionUnavailableReason.NoModel,
+        reason: imageInput
+          ? CompanionUnavailableReason.ImageUnavailable
+          : this.failures.size
+            ? CompanionUnavailableReason.ModelFailed
+            : CompanionUnavailableReason.NoModel,
       };
       return { models, model: null, availability };
     }

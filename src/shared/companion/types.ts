@@ -48,6 +48,7 @@ export interface CompanionMessage {
   id: number;
   role: 'user' | 'assistant';
   text: string;
+  attachments?: Array<{ id: string; name: string }>;
 }
 
 export interface CompanionConversation {
@@ -83,7 +84,12 @@ export interface CompanionWindowApi {
   shareMemory(input: CompanionMemoryShare): Promise<{ id: string; available: boolean }>;
   bootstrap(): Promise<CompanionWindowState>;
   select(petId: string): Promise<CompanionWindowState>;
-  submit(request: { petId: string; requestId: string; text: string }): Promise<{
+  submit(request: {
+    petId: string;
+    requestId: string;
+    text: string;
+    attachmentIds?: string[];
+  }): Promise<{
     availability: CompanionAvailability;
     receipt: CompanionReceipt | null;
   }>;

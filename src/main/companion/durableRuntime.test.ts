@@ -17,6 +17,7 @@ async function fixture() {
   let hold = false;
   let available = true;
   let failLocal = false;
+  let vision = false;
   const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk.toString();
@@ -54,6 +55,15 @@ async function fixture() {
           ? [
               { id: 'local', native_endpoints: ['/v1/chat/completions'] },
               { id: 'backup', native_endpoints: ['/v1/chat/completions'] },
+              ...(vision
+                ? [
+                    {
+                      id: 'vision',
+                      native_endpoints: ['/v1/chat/completions'],
+                      modalities: { input: ['text', 'image'], output: ['text'] },
+                    },
+                  ]
+                : []),
             ]
           : [],
     },
@@ -80,6 +90,9 @@ async function fixture() {
     root,
     profile,
     requests,
+    vision: (value = true) => {
+      vision = value;
+    },
     create,
     hold: (value: boolean) => {
       hold = value;
@@ -202,6 +215,95 @@ test('no model does not acknowledge or persist an unaccepted user draft', async 
     f.available(true);
     const receipt = await receiptFor(runtime, f.profile, 'draft');
     await answered(runtime, f.profile, receipt);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test('image input selects vision, persists original pixels once and projects only safe names', async () => {
+  const f = await fixture();
+  const imageId = randomUUID();
+  const data =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+  let loads = 0;
+  const imageInput = {
+    ids: [imageId],
+    resolve: async () => {
+      loads++;
+      return [{ id: imageId, name: '画面.png', data, mimeType: 'image/png' as const }];
+    },
+  };
+  try {
+    const runtime = f.create();
+    const unavailable = await runtime.submit(f.profile, 'picture', '', imageInput);
+    expect(unavailable.receipt).toBeNull();
+    expect(loads).toBe(0);
+    expect((await runtime.history(f.profile)).messages).toEqual([]);
+    f.vision();
+    const admitted = await runtime.submit(f.profile, 'picture', '', imageInput);
+    await answered(runtime, f.profile, admitted.receipt!);
+    expect(f.requests[0].model).toBe('vision');
+    expect(JSON.stringify(f.requests[0].messages)).toContain(`data:image/png;base64,${data}`);
+    const history = await runtime.history(f.profile);
+    expect(history.messages[0]).toMatchObject({
+      text: '',
+      attachments: [{ id: imageId, name: '画面.png' }],
+    });
+    expect(JSON.stringify(history)).not.toContain(data);
+    await runtime.close();
+    const reopened = f.create();
+    expect(
+      (
+        await reopened.submit(f.profile, 'picture', '', {
+          ...imageInput,
+          resolve: async () => {
+            throw new Error('Original file is gone');
+          },
+        })
+      ).receipt,
+    ).toEqual(admitted.receipt);
+    const next = await receiptFor(reopened, f.profile, 'follow-up');
+    await answered(reopened, f.profile, next);
+    expect(f.requests.map(request => request.model)).toEqual(['vision', 'vision']);
+    expect(loads).toBe(1);
+  } finally {
+    await f.cleanup();
+  }
+});
+
+test('an unfinished image turn waits for a visual model after restart instead of resuming as text', async () => {
+  const f = await fixture();
+  const id = randomUUID();
+  try {
+    f.vision();
+    f.hold(true);
+    const runtime = f.create();
+    const admitted = await runtime.submit(f.profile, 'paused-image', 'What is in this image?', {
+      ids: [id],
+      resolve: async () => [
+        {
+          id,
+          name: 'paused.png',
+          mimeType: 'image/png',
+          data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        },
+      ],
+    });
+    await expect.poll(() => f.requests.length).toBe(1);
+    await runtime.close();
+    f.vision(false);
+    f.hold(false);
+    const reopened = f.create();
+    expect((await reopened.resume(f.profile)).capability).toBe(CompanionCapability.Local);
+    expect((await reopened.answer(f.profile, admitted.receipt!)).state).toBe(
+      CompanionRequestState.Accepted,
+    );
+    expect(f.requests).toHaveLength(1);
+    f.vision();
+    await reopened.resume(f.profile);
+    await answered(reopened, f.profile, admitted.receipt!);
+    expect(f.requests.map(request => request.model)).toEqual(['vision', 'vision']);
+    expect(JSON.stringify(f.requests[1].messages)).toContain('data:image/png;base64,');
   } finally {
     await f.cleanup();
   }

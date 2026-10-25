@@ -47,6 +47,7 @@ test('native selections persist opaque metadata and resolve only for their compa
     fileAttachments: [{ name: 'notes.md', extension: 'MD' }],
   });
   await expect(reopened.resolve('pet-two', [attachment.id])).rejects.toThrow('unavailable');
+  await expect(reopened.images('pet-two', [attachment.id])).rejects.toThrow('unavailable');
   await expect(reopened.resolve('pet-one', ['forged'])).rejects.toThrow('unavailable');
 });
 
@@ -85,6 +86,12 @@ test('image references use the existing task image and file metadata formats', a
     fileAttachments: [{ name: 'reference.png', extension: 'PNG', isImage: true }],
   });
   f.db.prepare('UPDATE companion_attachments SET expires_at = 0').run();
+  await expect(
+    f.service.images(
+      'pet',
+      selected.map(file => file.id),
+    ),
+  ).rejects.toThrow('unavailable');
   await expect(
     f.service.resolve(
       'pet',
