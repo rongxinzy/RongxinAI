@@ -17,5 +17,6 @@ export interface CompanionActivity {
 
 export const CompanionNativeSettlement = {
   Done: 'done',
+  Unanswered: 'unanswered',
   Aborted: 'aborted',
 } as const;

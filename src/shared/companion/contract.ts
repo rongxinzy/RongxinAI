@@ -82,6 +82,7 @@ const state = z.object({
       }),
     ),
     pending: receipt.nullable(),
+    lastReply: receipt.extend({ state: z.enum(Object.values(CompanionRequestState)) }).optional(),
   }),
 });
 export const companionContract = defineIpcContract({

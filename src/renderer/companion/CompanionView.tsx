@@ -33,6 +33,7 @@ import { resolveThemePlugin } from '../theme/themes/plugins';
 import { readCompanionDraft, writeCompanionDraft } from './draft';
 import { useTaskSnapshots } from './useTaskSnapshots';
 import { CompanionConversation } from './CompanionConversation';
+import { CompanionFeedback } from './CompanionFeedback';
 import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttachments';
 import { useCompanionFiles } from './useCompanionFiles';
 import { CompanionHeaderActions } from './CompanionHeaderActions';
@@ -266,7 +267,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
       if (state) await api?.stop(state.activePetId);
       await load();
     } catch {
-      setError('companionFailed');
+      setError('companionStopFailed');
     }
   };
 
@@ -429,16 +430,12 @@ export function CompanionView({ api = window.companion }: Props = {}) {
               </div>
             ) : null}
           </div>
-          {error ? (
-            <div role="alert" className="flex items-center justify-between gap-3">
-              <span className="theme-home-caption">{t(error)}</span>
-              {!error.startsWith('companionFile') ? (
-                <Button variant="ghost" size="sm" onClick={() => void load()}>
-                  {t('companionRefresh')}
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
+          <CompanionFeedback
+            conversation={state?.conversation}
+            taskMode={taskMode}
+            error={error}
+            reload={load}
+          />
           {state && !state.shortcutAvailable ? (
             <p className="theme-home-caption">{t('companionShortcutUnavailable')}</p>
           ) : null}

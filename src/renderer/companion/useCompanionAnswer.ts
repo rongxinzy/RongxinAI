@@ -28,8 +28,6 @@ export function useCompanionAnswer({
         if (!active) return;
         if (answer.state !== CompanionRequestState.Accepted) {
           await reload();
-          if (active && answer.state === CompanionRequestState.Unanswered)
-            onError('companionFailed');
           return;
         }
       } catch {

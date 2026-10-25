@@ -62,3 +62,19 @@ test('a hidden or switched surface cannot apply a late answer from the previous 
   expect(reload).not.toHaveBeenCalled();
   expect(onError).not.toHaveBeenCalled();
 });
+
+test('terminal feedback comes from the refreshed native snapshot, not a late transient failure', async () => {
+  for (const state of [CompanionRequestState.Stopped, CompanionRequestState.Unanswered]) {
+    const answer = vi.fn(async () => ({ ...receipt, state, text: '' }));
+    const api = { answer } as unknown as CompanionWindowApi;
+    const reload = vi.fn(async () => {}),
+      onError = vi.fn();
+    const hook = renderHook(() =>
+      useCompanionAnswer({ api, pending: receipt, visible: true, reload, onError }),
+    );
+    await act(async () => {});
+    expect(reload).toHaveBeenCalledOnce();
+    expect(onError).not.toHaveBeenCalled();
+    hook.unmount();
+  }
+});

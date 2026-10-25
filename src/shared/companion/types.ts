@@ -54,6 +54,8 @@ export interface CompanionMessage {
 export interface CompanionConversation {
   messages: CompanionMessage[];
   pending: CompanionReceipt | null;
+  /** Latest admitted input, read from native Durable storage, including after reopening. */
+  lastReply?: CompanionReceipt & { state: CompanionRequestState };
 }
 
 export interface CompanionWindowContext {

@@ -20,6 +20,7 @@ export const CompanionRequestState = {
   Accepted: 'accepted',
   Answered: 'answered',
   Unanswered: 'unanswered',
+  Stopped: 'stopped',
 } as const;
 export type CompanionRequestState =
   (typeof CompanionRequestState)[keyof typeof CompanionRequestState];

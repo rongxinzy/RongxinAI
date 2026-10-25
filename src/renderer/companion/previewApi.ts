@@ -31,6 +31,7 @@ export function createCompanionPreviewApi(
   const messages = new Map<string, CompanionMessage[]>();
   const files = new Map<string, CompanionAttachment & { petId: string }>();
   const requests = new Map<string, { receipt: CompanionReceipt; text: string; at: number }>();
+  const lastReplies = new Map<string, CompanionReceipt & { state: CompanionRequestState }>();
   let sequence = 0;
   const changedListeners = new Set<() => void>();
   const workbenchListeners = new Set<() => void>();
@@ -70,6 +71,7 @@ export function createCompanionPreviewApi(
     conversation: {
       messages: messages.get(active) ?? [],
       pending: requests.get(active)?.receipt ?? null,
+      lastReply: lastReplies.get(active),
     },
   });
   return {
@@ -112,11 +114,15 @@ export function createCompanionPreviewApi(
         },
       ]);
       requests.set(active, { receipt, text: request.text, at: Date.now() });
+      lastReplies.set(active, { ...receipt, state: CompanionRequestState.Accepted });
       changed();
       return { availability, receipt };
     },
     answer: async receipt => {
       const request = requests.get(receipt.petId);
+      const settled = lastReplies.get(receipt.petId);
+      if (!request && settled?.submissionId === receipt.submissionId)
+        return { ...settled, text: '' };
       if (request && Date.now() - request.at < 800)
         return { ...receipt, text: '', state: CompanionRequestState.Accepted };
       if (request) {
@@ -132,11 +138,15 @@ export function createCompanionPreviewApi(
           },
         ]);
         requests.delete(receipt.petId);
+        lastReplies.set(receipt.petId, { ...receipt, state: CompanionRequestState.Answered });
       }
       return { ...receipt, text: '', state: CompanionRequestState.Answered };
     },
     stop: async petId => {
       if (petId !== active) throw new Error('Companion selection changed');
+      const pending = requests.get(active);
+      if (pending)
+        lastReplies.set(active, { ...pending.receipt, state: CompanionRequestState.Stopped });
       requests.delete(active);
       changed();
     },

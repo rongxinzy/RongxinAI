@@ -98,8 +98,8 @@ export async function companionRuntimeFixture() {
     available: (value: boolean) => {
       available = value;
     },
-    failLocal: () => {
-      failLocal = true;
+    failLocal: (value = true) => {
+      failLocal = value;
     },
     cleanup: async () => {
       await Promise.all(runtimes.map(runtime => runtime.close()));

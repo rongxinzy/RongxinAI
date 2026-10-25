@@ -12,6 +12,7 @@ import {
   section,
   type Conversation,
   type Submission,
+  type Storage,
 } from '@earendil-works/pi-durable';
 import { openNodeSqliteStorage } from '@earendil-works/pi-durable/storage/sqlite/node';
 import { z } from 'zod';
@@ -22,7 +23,7 @@ import {
   companionNeedsImages,
   isCompanionUserEntry,
 } from './imageConversation.mjs';
-import { CompanionCapability, CompanionRequestState } from '../../shared/companion/constants.js';
+import { CompanionCapability } from '../../shared/companion/constants.js';
 import type {
   CompanionAnswer,
   CompanionAvailability,
@@ -40,6 +41,7 @@ import {
 
 import { CompanionSubmissionActivity } from './submissionActivity.mjs';
 import type { CompanionActivity } from './activity.js';
+import { companionReplyState, latestCompanionReply } from './replyOutcome.mjs';
 
 const owners = new Set<string>();
 const requestIdSchema = z.string().trim().min(1).max(128);
@@ -54,6 +56,7 @@ interface ActiveCompanion {
   petId: string;
   file: string;
   harness: Harness;
+  storage: Storage;
   conversation: Conversation;
   models: Models;
   modelId: string | null;
@@ -197,6 +200,7 @@ export class PiCompanionRuntime {
           petId: profile.petId,
           file,
           harness,
+          storage,
           conversation,
           get models() {
             return models;
@@ -336,12 +340,7 @@ export class PiCompanionRuntime {
       }
       return {
         ...receipt,
-        state:
-          record.status === 'done'
-            ? CompanionRequestState.Answered
-            : record.status === 'unanswered'
-              ? CompanionRequestState.Unanswered
-              : CompanionRequestState.Accepted,
+        state: companionReplyState(record),
         text,
       };
     });
@@ -395,7 +394,13 @@ export class PiCompanionRuntime {
       const pending = (await active.harness.inspect(context)).submissions.find(
         item => item.type === 'input' && item.requestId,
       );
+      const lastReply = await latestCompanionReply(
+        active.storage,
+        active.conversation.id,
+        active.petId,
+      );
       return {
+        ...(lastReply ? { lastReply } : {}),
         messages: [...page.items]
           .reverse()
           .filter(entry => isCompanionUserEntry(entry) || AssistantEntry.is(entry))

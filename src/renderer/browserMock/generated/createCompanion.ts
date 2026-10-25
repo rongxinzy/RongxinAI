@@ -174,7 +174,7 @@ export function createCompanion(runtime: BrowserMockRuntime): Window['electron']
       void _p0;
       runtime.warnOnce('companion.answer');
       return {
-        state: 'accepted',
+        state: 'stopped',
         text: '',
         petId: '',
         requestId: '',

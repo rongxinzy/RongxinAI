@@ -85,13 +85,11 @@ test('explicit stop withdraws work and a later reopen cannot restart it', async 
     const receipt = await receiptFor(runtime, f.profile);
     await expect.poll(() => f.requests.length).toBe(1);
     await runtime.stop(f.profile);
-    expect((await runtime.answer(f.profile, receipt)).state).toBe(CompanionRequestState.Unanswered);
+    expect((await runtime.answer(f.profile, receipt)).state).toBe(CompanionRequestState.Stopped);
     await runtime.close();
     const reopened = f.create();
     await reopened.resume(f.profile);
-    expect((await reopened.answer(f.profile, receipt)).state).toBe(
-      CompanionRequestState.Unanswered,
-    );
+    expect((await reopened.answer(f.profile, receipt)).state).toBe(CompanionRequestState.Stopped);
     expect(f.requests).toHaveLength(1);
   } finally {
     await f.cleanup();
