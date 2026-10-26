@@ -3,6 +3,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)][string]$InstallDir,
+  [Parameter(Mandatory = $true)][ValidatePattern('^[^\\/:*?"<>|\r\n]+\.exe$')][string]$ExecutableName,
   [Parameter(Mandatory = $true)][string]$RuntimeRoot,
   [Parameter(Mandatory = $true)][string]$AppDataRoot,
   [ValidateSet('install', 'uninstall')][string]$Mode = 'install'
@@ -75,9 +76,9 @@ foreach ($checked in @($install, $runtime, $appData)) {
 $exists = [IO.Directory]::Exists($install)
 $nonempty = $exists -and @([IO.Directory]::EnumerateFileSystemEntries($install)).Count -gt 0
 if ($Mode -eq 'uninstall' -or $nonempty) {
-  # Use Unicode codepoints so Windows PowerShell 5.1 does not depend on the
-  # source file's encoding to identify the shipping executable.
-  $executable = Join-Path $install (([char]0x77e5).ToString() + [char]0x8fdc + '.exe')
+  # The current build supplies its product identity as a literal argument.
+  # Both editions must prove ownership with their own executable, not another product's.
+  $executable = Join-Path $install $ExecutableName
   $resources = Join-Path $install 'resources'
   $asar = Join-Path $resources 'app.asar'
   Assert-PhysicalPath $resources
