@@ -57,8 +57,14 @@ describe('Zhiyuan extension runtime', () => {
 
     expect(createBackend).toHaveBeenCalledOnce();
     const client = clientFactory.mock.results[0]?.value;
+    if (!client) throw new Error('Expected an enterprise client.');
+    const heartbeat = vi
+      .spyOn(client, 'heartbeat')
+      .mockResolvedValue({ nextHeartbeatAfterSeconds: 30 });
     const backendOptions = createBackend.mock.calls[0]?.[0];
-    expect(backendOptions?.client).toBe(client);
+    // The stable facade delegates to the active client, including after a server change.
+    await backendOptions?.client.heartbeat({});
+    expect(heartbeat).toHaveBeenCalledWith({});
     expect(backendOptions?.skillRoot).toBe(managedRoot);
     expect(backendOptions?.databasePath).toBe(
       path.join(context.paths.userData, 'zhiyuan-enterprise', 'agent-control.sqlite'),
@@ -66,7 +72,10 @@ describe('Zhiyuan extension runtime', () => {
     backendOptions?.onSkillsChanged?.();
     expect(notifyChanged).toHaveBeenCalledOnce();
 
-    await expect(runtime.session.initialize()).resolves.toEqual({ status: 'signed-out' });
+    await expect(runtime.session.initialize()).resolves.toEqual({
+      status: 'signed-out',
+      aepBaseUrl: 'http://127.0.0.1:8080',
+    });
     expect(backend.stop).toHaveBeenCalledOnce();
     await runtime.dispose();
     await runtime.dispose();

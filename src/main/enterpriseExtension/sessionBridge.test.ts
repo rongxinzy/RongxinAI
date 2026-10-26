@@ -5,6 +5,28 @@ import type { ZhiyuanEnterpriseSessionProvider } from './contract';
 import { ZhiyuanEnterpriseSessionBridge } from './sessionBridge';
 
 describe('Zhiyuan enterprise session bridge', () => {
+  test('projects a normalized saved server address while stripping unsafe URLs and secrets', async () => {
+    const bridge = new ZhiyuanEnterpriseSessionBridge(vi.fn());
+    const snapshot = vi.fn(async () => ({
+      status: 'signed-out' as const,
+      aepBaseUrl: 'https://saved.customer.test/',
+      password: 'secret',
+    }));
+    bridge.registerProvider(fixtureProvider({ snapshot }));
+    await expect(bridge.snapshot()).resolves.toEqual({
+      ok: true,
+      snapshot: { status: 'signed-out', aepBaseUrl: 'https://saved.customer.test' },
+    });
+    snapshot.mockResolvedValue({
+      status: 'signed-out',
+      aepBaseUrl: 'https://user:secret@unsafe.test',
+      password: 'secret',
+    });
+    await expect(bridge.snapshot()).resolves.toEqual({
+      ok: true,
+      snapshot: { status: 'signed-out' },
+    });
+  });
   test('returns unavailable without exposing a generic extension channel', async () => {
     const bridge = new ZhiyuanEnterpriseSessionBridge(vi.fn());
 

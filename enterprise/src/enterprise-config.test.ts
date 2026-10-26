@@ -15,6 +15,11 @@ afterEach(() => {
 });
 
 describe('Zhiyuan enterprise configuration', () => {
+  test('accepts a generic installer with no deployment address', async () => {
+    await expect(
+      parseConfigFor({ schemaVersion: 1, aepBaseUrl: '', allowInsecureHttp: true }),
+    ).resolves.toEqual({ schemaVersion: 1, aepBaseUrl: '', allowInsecureHttp: true });
+  });
   test('allows an absolute development config only in an unpackaged host', async () => {
     const packagedResources = writeConfig({
       schemaVersion: 1,

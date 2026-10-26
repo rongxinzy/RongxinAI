@@ -1,6 +1,5 @@
 {
   "schemaVersion": 1,
-  "aepBaseUrl": "https://aep.example.invalid",
-  "allowInsecureHttp": false,
-  "agentControlBaseUrl": "https://agents.example.invalid"
+  "aepBaseUrl": "",
+  "allowInsecureHttp": true
 }

@@ -7,17 +7,20 @@ name: Build Zhiyuan Enterprise Windows package (manual)
 # enterprise overlay config.
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      source_ref:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       version:
         description: Enterprise version (must be vX.Y.Z, for example v1.0.0)
         required: true
         type: string
-      aep_base_url:
-        description: AEP base URL baked into resources/zhiyuan-enterprise/config.json of the package
-        required: true
-        type: string
-        default: 'http://172.18.5.188:30196'
       source_ref:
         description: 'Commit, tag, or branch reachable from main'
         required: true
@@ -97,6 +100,28 @@ jobs:
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
 
+      - name: Read pinned Magpie Go toolchain
+        id: magpie-toolchain
+        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
+          cache: false
+      - name: Cache Magpie module and build scratch
+        uses: actions/cache@v5
+        with:
+          path: |
+            .cache/magpie
+            resources/magpie
+          key: magpie-Windows-win-x64-go${{ steps.magpie-toolchain.outputs.go-version }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
+      - name: Build and verify pinned Magpie gateway
+        run: |
+          bun run magpie:build -- --target win32-x64
+          bun run magpie:verify -- --target win32-x64
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
       - name: Run enterprise quality gates
         run: |
           bun run lint
@@ -104,21 +129,6 @@ jobs:
           bun run test:enterprise
           bun run build:enterprise
           bun run verify:enterprise:bundle
-
-      - name: Render enterprise AEP config
-        shell: pwsh
-        env:
-          INPUT_AEP_BASE_URL: ${{ inputs.aep_base_url }}
-        run: |
-          $baseUrl = "$env:INPUT_AEP_BASE_URL".Trim()
-          if ($baseUrl.Length -eq 0) {
-            throw 'aep_base_url is required for an enterprise package.'
-          }
-          node enterprise/scripts/render-enterprise-config.mjs --base-url $baseUrl --output build/.enterprise-config.generated.json
-          if ($LASTEXITCODE -ne 0) {
-            throw "render-enterprise-config.mjs failed with exit code $LASTEXITCODE."
-          }
-          'ZHIYUAN_ENTERPRISE_CONFIG_FILE=build/.enterprise-config.generated.json' >> $env:GITHUB_ENV
 
       - name: Set up Windows runtimes
         run: |
@@ -242,14 +252,12 @@ jobs:
         env:
           PACKAGE_VERSION: ${{ steps.identity.outputs.version }}
           SOURCE_COMMIT: ${{ steps.identity.outputs.commit }}
-          AEP_BASE_URL: ${{ inputs.aep_base_url }}
         run: |
-          aep_host="$(node -e "console.log(new URL(process.argv[1]).host)" "$AEP_BASE_URL")"
           {
             echo '### Enterprise package'
             echo
             echo "- version: \`$PACKAGE_VERSION\`"
             echo "- source commit: \`$SOURCE_COMMIT\`"
-            echo "- AEP base URL host: \`$aep_host\`"
+            echo '- AEP server: configured and persisted by the client at login'
             echo "- run: \`$GITHUB_RUN_ID\`"
           } >> "$GITHUB_STEP_SUMMARY"

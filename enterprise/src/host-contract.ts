@@ -112,14 +112,15 @@ export type EnterpriseSessionIdentity = {
   readonly passwordChangeRequired: boolean;
 };
 
-export type EnterpriseSessionSnapshot =
+export type EnterpriseSessionSnapshot = { readonly aepBaseUrl?: string } & (
   | { readonly status: typeof EnterpriseSessionStatus.Unavailable }
   | { readonly status: typeof EnterpriseSessionStatus.SignedOut }
   | { readonly status: typeof EnterpriseSessionStatus.Recoverable }
   | {
       readonly status: typeof EnterpriseSessionStatus.Authenticated;
       readonly identity: EnterpriseSessionIdentity;
-    };
+    }
+);
 
 type EnterpriseSessionErrorCode = 'UNAVAILABLE' | 'INVALID_INPUT' | 'OPERATION_FAILED';
 

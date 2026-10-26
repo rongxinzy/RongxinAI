@@ -32,7 +32,7 @@ export function createZhiyuanPasswordSession(
 export function createZhiyuanAepClient(options: ZhiyuanPasswordSessionOptions): AepClient {
   const tokenStore = new ProtectedRefreshTokenStore(
     options.protectedStorage,
-    refreshTokenStorageKey(options.agentId),
+    refreshTokenStorageKey(options.agentId, options.baseUrl),
   );
   return new ZhiyuanSessionAepClient(
     {
@@ -48,7 +48,9 @@ export function createZhiyuanAepClient(options: ZhiyuanPasswordSessionOptions): 
   );
 }
 
-function refreshTokenStorageKey(agentId: string): string {
-  const digest = createHash('sha256').update(agentId, 'utf8').digest('hex');
+function refreshTokenStorageKey(agentId: string, baseUrl: string): string {
+  const digest = createHash('sha256')
+    .update(JSON.stringify([agentId, baseUrl]), 'utf8')
+    .digest('hex');
   return `aep.refresh-token.${digest}`;
 }

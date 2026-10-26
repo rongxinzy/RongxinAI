@@ -27,10 +27,11 @@ export interface PasswordSessionClient {
   logout(): Promise<void>;
 }
 
-export type ZhiyuanSessionSnapshot =
+export type ZhiyuanSessionSnapshot = { readonly aepBaseUrl?: string } & (
   | { readonly status: 'signed-out' }
   | { readonly status: 'recoverable' }
-  | { readonly status: 'authenticated'; readonly identity: CurrentIdentity };
+  | { readonly status: 'authenticated'; readonly identity: CurrentIdentity }
+);
 
 export interface PasswordLoginInput {
   readonly aepBaseUrl: string;
@@ -54,7 +55,7 @@ export class AepMetadataError extends Error {
 export type PasswordSessionClientFactory = (
   baseUrl: string,
   agentControlBaseUrl?: string,
-) => PasswordSessionClient;
+) => PasswordSessionClient | Promise<PasswordSessionClient>;
 
 export class ZhiyuanPasswordSession {
   static readonly MODEL_TOKEN_REFRESH_WINDOW_MS = 30_000;
@@ -68,14 +69,23 @@ export class ZhiyuanPasswordSession {
   #modelAccessExpiresAt = 0;
   #modelCatalogScopes: string | null = null;
   #discoveredAgentControlBaseUrl: string | null = null;
+  #aepBaseUrl: string | undefined;
 
-  constructor(client: PasswordSessionClient, clientFactory?: PasswordSessionClientFactory) {
+  constructor(
+    client: PasswordSessionClient,
+    clientFactory?: PasswordSessionClientFactory,
+    aepBaseUrl?: string,
+  ) {
     this.#client = client;
     this.#clientFactory = clientFactory ?? null;
+    this.#aepBaseUrl = aepBaseUrl;
   }
 
   snapshot(): ZhiyuanSessionSnapshot {
-    return cloneSnapshot(this.#snapshot);
+    const snapshot = cloneSnapshot(this.#snapshot);
+    return this.#aepBaseUrl === undefined
+      ? snapshot
+      : Object.freeze({ ...snapshot, aepBaseUrl: this.#aepBaseUrl });
   }
 
   onDidChange(listener: () => void | Promise<void>): () => void {
@@ -89,6 +99,10 @@ export class ZhiyuanPasswordSession {
 
     this.#initialization = this.#enqueue(async () => {
       try {
+        if (this.#aepBaseUrl === '') {
+          this.#initialized = true;
+          return this.snapshot();
+        }
         const sessionState = await this.#client.getSessionState();
         if (sessionState.status === 'signed-out') {
           this.#snapshot = Object.freeze({ status: 'signed-out' });
@@ -127,14 +141,19 @@ export class ZhiyuanPasswordSession {
     return this.#enqueue(async () => {
       // Re-target the entered server before discovery: metadata must come
       // from the deployment the user typed, not the previously configured
-      // one. `undefined` keeps the current agent-control target until
-      // discovery re-confirms it for this base URL.
+      // one. Clear the old agent-control target until this deployment
+      // advertises its own endpoint.
       if (this.#clientFactory) {
-        this.#client = this.#clientFactory(aepBaseUrl, undefined);
+        this.#snapshot = Object.freeze({ status: 'signed-out' });
+        this.#modelAccessExpiresAt = 0;
+        this.#modelCatalogScopes = null;
+        await this.#publishChanged();
+        this.#client = await this.#clientFactory(aepBaseUrl, '');
+        if (this.#aepBaseUrl !== undefined) this.#aepBaseUrl = aepBaseUrl;
       }
       const deploymentId = await this.#resolveDeploymentId();
       if (this.#clientFactory && this.#discoveredAgentControlBaseUrl) {
-        this.#client = this.#clientFactory(aepBaseUrl, this.#discoveredAgentControlBaseUrl);
+        this.#client = await this.#clientFactory(aepBaseUrl, this.#discoveredAgentControlBaseUrl);
       }
       const tokens = await this.#client.loginWithPassword({
         deploymentId,

@@ -167,6 +167,7 @@ export function App() {
       description={translate(runtime.language, 'loginDescription')}
     >
       <LoginForm
+        initialAepBaseUrl={snapshot?.aepBaseUrl ?? ''}
         language={runtime.language}
         recoverable={snapshot?.status === EnterpriseSessionStatus.Recoverable}
         pending={pending}

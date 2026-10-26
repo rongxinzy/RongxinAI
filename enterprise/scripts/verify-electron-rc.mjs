@@ -11,7 +11,11 @@ const requirePackage = process.env.ZHIYUAN_REQUIRE_ELECTRON_PACKAGE === '1';
 const checks = [];
 
 await assertBuildOutputs();
-await run('npm', ['exec', 'vitest', '--', 'run', 'src/release/electron-rc.test.ts'], root);
+await run(
+  'bun',
+  ['run', 'test:enterprise', 'src/release/electron-rc.test.ts'],
+  path.resolve(root, '..'),
+);
 checks.push(
   'enterprise extension host registration and disposal',
   'enterprise session login projection',
@@ -58,11 +62,9 @@ async function assertBuildOutputs() {
 }
 
 function run(command, args, cwd, extraEnv = {}) {
-  const executable = process.platform === 'win32' && command === 'npm' ? 'npm.cmd' : command;
-  const spawnCommand =
-    process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : executable;
+  const spawnCommand = process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : command;
   const spawnArgs =
-    process.platform === 'win32' ? ['/d', '/s', '/c', [executable, ...args].join(' ')] : args;
+    process.platform === 'win32' ? ['/d', '/s', '/c', [command, ...args].join(' ')] : args;
   return new Promise((resolve, reject) => {
     const child = spawn(spawnCommand, spawnArgs, {
       cwd,
@@ -73,7 +75,7 @@ function run(command, args, cwd, extraEnv = {}) {
     child.once('error', reject);
     child.once('exit', code => {
       if (code === 0) resolve();
-      else reject(new Error(`${executable} ${args.join(' ')} exited with ${code ?? 'unknown'}.`));
+      else reject(new Error(`${command} ${args.join(' ')} exited with ${code ?? 'unknown'}.`));
     });
   });
 }

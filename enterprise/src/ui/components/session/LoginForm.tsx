@@ -10,6 +10,7 @@ import { Input } from '../ui/input.js';
 import { Spinner } from '../ui/spinner.js';
 
 interface LoginFormProps {
+  readonly initialAepBaseUrl: string;
   readonly language: EnterpriseRendererLanguage;
   readonly recoverable: boolean;
   readonly pending: boolean;
@@ -21,8 +22,15 @@ interface LoginFormProps {
   }) => Promise<void>;
 }
 
-export function LoginForm({ language, recoverable, pending, error, onSubmit }: LoginFormProps) {
-  const [aepBaseUrl, setAepBaseUrl] = useState('');
+export function LoginForm({
+  initialAepBaseUrl,
+  language,
+  recoverable,
+  pending,
+  error,
+  onSubmit,
+}: LoginFormProps) {
+  const [aepBaseUrl, setAepBaseUrl] = useState(initialAepBaseUrl);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [validationError, setValidationError] = useState<TranslationKey | null>(null);
