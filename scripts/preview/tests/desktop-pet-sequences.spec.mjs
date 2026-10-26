@@ -76,7 +76,7 @@ async function bridge(page) {
 }
 
 for (const colorScheme of ['light', 'dark']) {
-  test(`all hidden selections project to Xiaoyuan task poses with transparent edges in ${colorScheme}`, async ({
+  test(`all seven original characters retain task poses with transparent edges in ${colorScheme}`, async ({
     page,
   }) => {
     const errors = [];
@@ -99,7 +99,7 @@ for (const colorScheme of ['light', 'dark']) {
           { characterId: character, state },
         );
         const canvas = page.locator('canvas');
-        await expect(canvas).toHaveAttribute('data-character', DesktopPetBuiltinId.Xiaoyuan);
+        await expect(canvas).toHaveAttribute('data-character', character);
         await expect(canvas).toHaveAttribute('data-state', state);
         const pixels = await canvas.evaluate(element => {
           const data = element.getContext('2d').getImageData(0, 0, 192, 192).data;
@@ -204,7 +204,7 @@ test('hidden and reduced-motion windows discard choreography and never replay ba
         bubble: null,
         reducedMotion: false,
       }),
-    DesktopPetBuiltinId.Youli,
+    DesktopPetBuiltinId.Xiaoyuan,
   );
   await expect(page.locator('canvas')).toHaveAttribute(
     'data-character',

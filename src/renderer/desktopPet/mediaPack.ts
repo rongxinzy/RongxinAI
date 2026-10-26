@@ -17,10 +17,9 @@ export interface DesktopPetMediaClip {
 // Only bundled, authored media. No external URLs or model-supplied media paths.
 export function desktopPetMediaPack(characterId: string): DesktopPetMediaClip[] | null {
   if (!desktopPetBuiltin(characterId)) return null;
-  // Xiaoyuan's first-release artwork is the canonical source. Keep the old authoring
-  // output on disk, but never mix its different face into the released character.
+  // Every released pack preserves its original atlas identity, including Xiaoyuan.
   const canonical = characterId === DesktopPetBuiltinId.Xiaoyuan;
-  const root = `../assets/desktop-pet/motion/${canonical ? 'xiaoyuan-original' : characterId}/`;
+  const root = `../assets/desktop-pet/motion/${characterId}-original/`;
   const repertoire = canonical ? XIAOYUAN_ORIGINAL_MOTIONS : DESKTOP_PET_MOTIONS;
   const pack = repertoire.flatMap(clip => {
     const url = desktopPetMediaSources[`${root}${clip.id}.webm`];

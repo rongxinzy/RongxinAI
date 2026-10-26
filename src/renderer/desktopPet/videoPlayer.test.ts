@@ -214,16 +214,21 @@ test('reduced motion never assigns video sources and unknown characters release 
   expect(f.controller.playAction(DesktopPetPlayableAction.Happy)).toBe(false);
 });
 
-test('an unbundled character releases media and returning to Xiaoyuan reuses two slots', async () => {
+test('switching every original character and returning to Xiaoyuan reuses two slots', async () => {
   const f = controllerFixture();
   f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan });
   await f.wait(DesktopPetMotion.Idle);
   for (const characterId of Object.values(DesktopPetBuiltinId)) {
     if (characterId === DesktopPetBuiltinId.Xiaoyuan) continue;
     f.controller.update({ characterId });
-    expect(f.controller.supported).toBe(false);
-    expect(f.current()).toBeUndefined();
-    expect(f.videos.every(video => !video.src)).toBe(true);
+    await f.wait(DesktopPetMotion.Idle);
+    expect(f.controller.supported).toBe(true);
+    expect(f.current()).toBe(DesktopPetMotion.Idle);
+    expect(
+      f.videos
+        .filter(video => video.src)
+        .every(video => video.src.includes(`/motion/${characterId}-original/`)),
+    ).toBe(true);
   }
   f.controller.update({ characterId: DesktopPetBuiltinId.Xiaoyuan });
   await f.wait(DesktopPetMotion.Idle);

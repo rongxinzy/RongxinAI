@@ -1,0 +1,272 @@
+{
+  "sourceSha256": "703372c1e9be2f638bd0559cea245a1ee930d170eb17fe92dec29f11ae5b5265",
+  "choreographySha256": "6c550a6e8b3b2f2f4a6ed1ad8d47dc93b3d2b47352e470fe274a29579ecfafa7",
+  "size": 512,
+  "fps": 30,
+  "clips": [
+    {
+      "id": "idle",
+      "sourcePose": 0,
+      "seconds": 4,
+      "frames": 120,
+      "bytes": 157981,
+      "bounds": [97, 77, 415, 468],
+      "sha256": "614e4830d827c0dfe23cab0f60ed4628729dd26f568f25280b6b78e736bef7fe",
+      "posterSha256": "b185226d5845ddb7847678b2eacbe506c53ef3c81272e11b85036c73a08f7912",
+      "maskSha256": "54bcd9e05a50af70728c52c1197270ac3ab2403569f5d6d5a64075018c51e3d7"
+    },
+    {
+      "id": "blink",
+      "sourcePose": 6,
+      "seconds": 3,
+      "frames": 90,
+      "bytes": 130347,
+      "bounds": [98, 97, 413, 468],
+      "sha256": "4133e9628c5bd91a5b6827f17baae4d09325f5e597323c23c52d56cde37f1516",
+      "posterSha256": "a900f9c5da103194cf1a369f3ad735615981f78af759906e5e0fd52830495a6f",
+      "maskSha256": "ffb37c201ee3740e1595753bb979d064b01fa6ad2ee47c97440f9ff8e234b015"
+    },
+    {
+      "id": "look-left",
+      "sourcePose": 0,
+      "seconds": 5,
+      "frames": 150,
+      "bytes": 320029,
+      "bounds": [97, 66, 413, 468],
+      "sha256": "ca34f504fdda3268326334b109db2c72c65e828f19ba5df898934732721f74cc",
+      "posterSha256": "755b4a46958e7243ec9e12341ebe3e525ca3f8a981d90ed9d7f6e3e2ae282ea0",
+      "maskSha256": "80045133c0190610773305657e1a8d1c377e99b4312bdebce7fbd68c6af2b6fd"
+    },
+    {
+      "id": "look-right",
+      "sourcePose": 0,
+      "seconds": 5,
+      "frames": 150,
+      "bytes": 317020,
+      "bounds": [97, 78, 429, 468],
+      "sha256": "dd538b0d3b12c601d30aaa9584f1ed7b8347d5f90e9dcf924476bd0067a4d0f8",
+      "posterSha256": "21114bafea257143a4ebebdf1b6c4bd8cf085568f0624aacdb0c81522cf8acb5",
+      "maskSha256": "e8184cbcef996183b076b95773c40e2b59d0d26c09c02c7e9e900a087ffd3119"
+    },
+    {
+      "id": "tilt",
+      "sourcePose": 0,
+      "seconds": 5,
+      "frames": 150,
+      "bytes": 290957,
+      "bounds": [97, 67, 426, 468],
+      "sha256": "c8a0dc2477f0332f519709c8b883525725bbde54a51fdc9ad5e6a5da49af9822",
+      "posterSha256": "b185226d5845ddb7847678b2eacbe506c53ef3c81272e11b85036c73a08f7912",
+      "maskSha256": "e087cac273d66cddf6059ead874c8dcbba2a2116aa05a6d402b241fce38165a1"
+    },
+    {
+      "id": "nod",
+      "sourcePose": 0,
+      "seconds": 5,
+      "frames": 150,
+      "bytes": 291229,
+      "bounds": [97, 77, 419, 468],
+      "sha256": "6b511c9a5dbeeb2bf581782a3b985b52e1d0f4476324d79e4e466e4b3546b5b1",
+      "posterSha256": "c4f46b839df2615b6cf1030cfd09c35eb46507d0012f9f191e7f5b07d2a9b4fa",
+      "maskSha256": "39142f756bb8e6fd958d51cf7df1263639992d7059d3bf21153a8e10a44d28ca"
+    },
+    {
+      "id": "peek",
+      "sourcePose": 0,
+      "seconds": 8,
+      "frames": 240,
+      "bytes": 411382,
+      "bounds": [98, 66, 413, 468],
+      "sha256": "08465cf084e33d2285c5873619a816db916af36e71dc6268229eaae0c9deab2b",
+      "posterSha256": "3f5d2fbbe2ac028afafc4f57c7825526efce72c1bc50f5d75caaec089dcd655e",
+      "maskSha256": "c6679c9de14572de3785aacd6bef8b4333d0bc4059e4d70f8457e714a7d62f7a"
+    },
+    {
+      "id": "flutter",
+      "sourcePose": 7,
+      "seconds": 8,
+      "frames": 240,
+      "bytes": 277467,
+      "bounds": [86, 73, 425, 468],
+      "sha256": "f44a40b97961c67f74f6d90363cf5bd9de28b68839f0e2aa330856c02e7f8e23",
+      "posterSha256": "575582e4461d8b22e8d2dbbc423efd7d4a38fceb86a9f1b2e9520a3b79310799",
+      "maskSha256": "c39efcbc437b1abb8c3e6108dcc9a028425cd56e576d50c04a930a4f3f81add8"
+    },
+    {
+      "id": "happy",
+      "sourcePose": 3,
+      "seconds": 7,
+      "frames": 210,
+      "bytes": 399358,
+      "bounds": [83, 63, 427, 467],
+      "sha256": "3a465e24795ffb729f2f701d70f5c8480e88c351b11b46fd37200fefc83dcf9e",
+      "posterSha256": "f8be3bd999fc37366d8168e21fc4f6c44921c3651070b18c7acbcbe1bef7533b",
+      "maskSha256": "531c55c9aee66c25cf40c6e6ba7022608d9ae5eec3465f9726ce6e84588391a4"
+    },
+    {
+      "id": "stretch",
+      "sourcePose": 7,
+      "seconds": 8,
+      "frames": 240,
+      "bytes": 313750,
+      "bounds": [86, 71, 425, 468],
+      "sha256": "d5afb88e003e32f813450067c02b53c37008c1bac0e6e74b00a57fce5c038c3e",
+      "posterSha256": "875ead50bf22bdefa35ee1eb7788766208df51f0656be880ff281bab145d3cb3",
+      "maskSha256": "d90173a3e40e9f63c4e0efa3b9f8ac98aea145064c6c76feb41e88f20edc5c05"
+    },
+    {
+      "id": "doze",
+      "sourcePose": 6,
+      "seconds": 10,
+      "frames": 300,
+      "bytes": 315604,
+      "bounds": [98, 97, 427, 471],
+      "sha256": "64f9ae4c71aa7d7d71501b0ba36e139ef6de41b60ba7658d44585867a6be0b6f",
+      "posterSha256": "dc2070d6f85fc1fd9ef93f62c91ddbd8978522957eb176d0c9461e1ce33bcbbb",
+      "maskSha256": "1524fd7da532454341ee2c9af657ffac684d48be21564fcfd92fdd1ae899bc3e"
+    },
+    {
+      "id": "wake",
+      "sourcePose": 6,
+      "seconds": 6,
+      "frames": 180,
+      "bytes": 278030,
+      "bounds": [98, 94, 427, 470],
+      "sha256": "4cbedd0cb0f1098d48c5b1f29850b36ab4dd24e6034393be6c902f50839873fe",
+      "posterSha256": "06640b802b25d9906a41e3a3434e48d9dd3bfa3f20a407ae3b894d42adf05e5a",
+      "maskSha256": "2789566475bafa791ca4c70cfd8908d2dedcb87b954706e1733578f4364b95ef"
+    },
+    {
+      "id": "think",
+      "sourcePose": 1,
+      "seconds": 6,
+      "frames": 180,
+      "bytes": 188664,
+      "bounds": [115, 85, 407, 468],
+      "sha256": "af94b9c5b85ef62da7b5acc8ef6d9e59228437e014bb8c962e7bc2a8f1c249c2",
+      "posterSha256": "dd82e56a2583407207793b1d3f1775e0c106c7b6a97908197fb12a6a4991ddd0",
+      "maskSha256": "4cc07eab80c652fc757ef69d22274f32df56622a8c8100ab6021d8a198c42875"
+    },
+    {
+      "id": "wait",
+      "sourcePose": 2,
+      "seconds": 6,
+      "frames": 180,
+      "bytes": 201636,
+      "bounds": [102, 91, 415, 468],
+      "sha256": "433e954c37995145de3f8b09eb442ec8610acbc0d982ccd10374c407ac5c20f4",
+      "posterSha256": "45777665ff53bafe283380042ead17c63947509e207a16f4436cefef343fe4ef",
+      "maskSha256": "c2734877097bc221da53a7e905e54ac6f21cce9b200521e0ef6b9038503f9b05"
+    },
+    {
+      "id": "concern",
+      "sourcePose": 4,
+      "seconds": 6,
+      "frames": 180,
+      "bytes": 182400,
+      "bounds": [84, 109, 410, 468],
+      "sha256": "8b0718974349fb9c8f89f873b46d20172ecab2144fb9f6dd61e65bed83d89dfa",
+      "posterSha256": "f5299bd10b553815796fe91044773cc2ec6066a30f56387dd7f1d98ff4b93493",
+      "maskSha256": "681ed12e5fd07c134ed41ef809af7afaf2d83ea25e206e69d02920df1f93d04f"
+    },
+    {
+      "id": "wave",
+      "sourcePose": 5,
+      "seconds": 7,
+      "frames": 210,
+      "bytes": 360207,
+      "bounds": [75, 75, 430, 468],
+      "sha256": "d8630a39c9cf35886e8c294cbdd7b4370f5f53728be9292e2344a2fce8a5a5b2",
+      "posterSha256": "44d3af92443ac0986470c63722511763faac1b6a222d58b04eb101d6ee4d27ed",
+      "maskSha256": "ef0ced246366e8de8bb2823c2f2eb396d94d238c0efc1dd292b1dd2e6e869ef1"
+    },
+    {
+      "id": "walk",
+      "sourcePose": 0,
+      "seconds": 4,
+      "frames": 120,
+      "bytes": 262166,
+      "bounds": [97, 74, 416, 468],
+      "sha256": "59e2927f9b304fe43f4c42867c7ebf62a69d46caf87a9265cef2f24235a5801d",
+      "posterSha256": "b185226d5845ddb7847678b2eacbe506c53ef3c81272e11b85036c73a08f7912",
+      "maskSha256": "69e87c105434425ec2fa33fdb76c56a16235853054b8bfff1e867daedb4e1c28"
+    },
+    {
+      "id": "lift",
+      "sourcePose": 0,
+      "seconds": 4,
+      "frames": 120,
+      "bytes": 228113,
+      "bounds": [97, 73, 420, 470],
+      "sha256": "341c0a873981a86b667a4660948fcf6dff6877f41aa9c62190110d1009d5de96",
+      "posterSha256": "5b5d3789eba0ffcbb0c4541d573f76df64e03958b26d310548fb96bbd37d3e25",
+      "maskSha256": "b1add1215427ef6b9fac3ae3a13fb7d2832c5f63d28344fd9719db636562ed1f"
+    },
+    {
+      "id": "land",
+      "sourcePose": 0,
+      "seconds": 3,
+      "frames": 90,
+      "bytes": 165791,
+      "bounds": [97, 78, 415, 468],
+      "sha256": "03ea9f7a6bed6aa5d27200d7f67989b7846c381bf802a078e6cab804e36ee0e5",
+      "posterSha256": "ea3247fa67853b3d5e2722c13ffaf49ac4a8c1558b9d88f0001a2727238a7859",
+      "maskSha256": "cf3b786ecae774be587be0bf61d61782ea035b1928f24434cf268d7572c5c0af"
+    },
+    {
+      "id": "listen",
+      "sourcePose": 0,
+      "seconds": 8,
+      "frames": 240,
+      "bytes": 363571,
+      "bounds": [97, 78, 426, 468],
+      "sha256": "b287bfeafaba2dceaba6e233acdc2b5647696b431e283a4313e79b04ed856efe",
+      "posterSha256": "44269c262eb9156b5fb62b8cdaf3969210eeb02e123949cc386fabfb8a8e4529",
+      "maskSha256": "7f2eefab655e5d9c1fe7ea494b6973530744604f1579806e32381e690b1f1b87"
+    },
+    {
+      "id": "bow",
+      "sourcePose": 0,
+      "seconds": 6,
+      "frames": 180,
+      "bytes": 340178,
+      "bounds": [97, 78, 426, 469],
+      "sha256": "625478e05a8b7b33dd79e64f979c1d8ae18b8063c93090ffbdc356c49655071f",
+      "posterSha256": "43b7ed615c4b543d94e73f66f9fa35483d5c668232ef95be323f089b346ad285",
+      "maskSha256": "9a2b6bd8bfd44378e7b3f1812a3576c08bdb3e25a0d18540d491306717f0665d"
+    },
+    {
+      "id": "preen",
+      "sourcePose": 1,
+      "seconds": 9,
+      "frames": 270,
+      "bytes": 410876,
+      "bounds": [97, 68, 400, 468],
+      "sha256": "445a0b522bd70fc7e1d38f7f6ea8b3bd9aeadc1ded83d44b11f8e0f91163d19b",
+      "posterSha256": "62030ff19afe37469910aa509c6b5916e47f62d195fc1548e7538a1ba27f44b4",
+      "maskSha256": "671f63264c7a488a1457c9dc8f646b92c198467f97815461dc1979c2c88cdf02"
+    },
+    {
+      "id": "hop",
+      "sourcePose": 11,
+      "seconds": 5,
+      "frames": 150,
+      "bytes": 313071,
+      "bounds": [68, 81, 444, 466],
+      "sha256": "c2c9ad225645dd475e7edfdf3ddd7857be5504c4493ef8005e8c11c8c7c8ad72",
+      "posterSha256": "d96124c21d3511c912d92d5f5ed4a401bb4fe1ebe80050064a670103fa95abc6",
+      "maskSha256": "4afb4de1ac5fb790124be974a7f248298e3ed0d85e62387f1311cb42b91a1704"
+    },
+    {
+      "id": "dance",
+      "sourcePose": 3,
+      "seconds": 9,
+      "frames": 270,
+      "bytes": 532362,
+      "bounds": [85, 68, 427, 467],
+      "sha256": "2f5014a05c02b3ec7eb84d58edfa78407562985ddd7cd54b4ef2e9f67fa29f92",
+      "posterSha256": "6bf5d7c6835cee7338f6368c2ea8fb470b3e252ad3c8f21094bb0a6dc40aea40",
+      "maskSha256": "e3a020d2ecd5ef7dd6f4f648e67d1e84169925520433229aff566da0c7b8ea66"
+    }
+  ]
+}

@@ -75,7 +75,7 @@ test('the release hides dormant identities without rewriting their saved appeara
   f.profiles.changeAppearance(all.profiles[0].petId, DesktopPetBuiltinId.Youli);
   f.profiles.select(all.profiles[1].petId);
   const preserved = structuredClone(f.values.get('companion_profiles'));
-  const released = new CompanionProfiles(f.store);
+  const released = new CompanionProfiles(f.store, id => id === DesktopPetBuiltinId.Xiaoyuan);
   expect(released.visibleSnapshot().profiles).toEqual([
     { ...all.profiles[0], characterId: DesktopPetBuiltinId.Xiaoyuan },
   ]);
@@ -86,4 +86,19 @@ test('the release hides dormant identities without rewriting their saved appeara
   );
   expect(f.values.get('companion_profiles')).toEqual(preserved);
   expect(new CompanionProfiles(f.store, () => true).active().petId).toBe(all.profiles[1].petId);
+});
+
+test('all seven released identities restore their saved owner and appearance without replacing history keys', () => {
+  const f = fixture();
+  const state = f.profiles.snapshot();
+  f.profiles.select(state.profiles[3].petId);
+  const preserved = structuredClone(f.values.get('companion_profiles'));
+  const released = new CompanionProfiles(f.store);
+  expect(released.visibleSnapshot().profiles).toEqual(state.profiles);
+  expect(released.active().petId).toBe(state.profiles[3].petId);
+  expect(f.values.get('companion_profiles')).toEqual(preserved);
+  for (const item of state.profiles) {
+    expect(released.select(item.petId)).toEqual(item);
+    expect(released.changeAppearance(item.petId, item.characterId)).toEqual(item);
+  }
 });
