@@ -1,6 +1,10 @@
 import { BrowserWindow, screen } from 'electron';
 
-import { DESKTOP_PET_SIZE, DesktopPetEffectKind } from '../../shared/desktopPet/constants';
+import {
+  DESKTOP_PET_DRAG_THRESHOLD,
+  DESKTOP_PET_SIZE,
+  DesktopPetEffectKind,
+} from '../../shared/desktopPet/constants';
 import { DESKTOP_PET_CANVAS_TOP, DESKTOP_PET_WINDOW_HEIGHT } from '../../shared/desktopPet/layout';
 import { DesktopPetRoam } from './roam';
 import type { DesktopPetEffect } from '../../shared/desktopPet/types';
@@ -32,7 +36,9 @@ export function clampPetPosition(point: Electron.Point, bounds: ThrowBounds): El
 /** Native pointer coordinates stay in DIP, including on mixed-DPI displays. */
 export class DesktopPetMotion {
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private dragging: { start: Electron.Point; offset: Electron.Point; at: number } | undefined;
+  private dragging:
+    | { start: Electron.Point; offset: Electron.Point; at: number; moved: boolean }
+    | undefined;
   private trail: DragSample[] = [];
   private flying: ThrowState | undefined;
   private lastTime = performance.now();
@@ -98,22 +104,24 @@ export class DesktopPetMotion {
       start: cursor,
       offset: { x: cursor.x - x, y: cursor.y - y },
       at: performance.now(),
+      moved: false,
     };
     this.trail = [{ ...cursor, t: performance.now() }];
-    this.effect({ kind: DesktopPetEffectKind.Drag, active: true });
     this.restart();
   }
 
-  end(): boolean {
+  end(cancelled = false): boolean {
     if (!this.dragging) return false;
     const cursor = screen.getCursorScreenPoint();
-    const clicked =
-      Math.hypot(cursor.x - this.dragging.start.x, cursor.y - this.dragging.start.y) < 5;
+    if (!cancelled) this.moveDrag(cursor);
+    const clicked = !cancelled && !this.dragging.moved;
     this.sample(cursor, performance.now());
     this.dragging = undefined;
     this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
     const velocity =
-      this.reducedMotion || clicked ? null : estimateReleaseVelocity(this.trail, performance.now());
+      this.reducedMotion || clicked || cancelled
+        ? null
+        : estimateReleaseVelocity(this.trail, performance.now());
     if (velocity) {
       const [x, y] = this.window.getPosition();
       this.flying = { x, y, ...velocity };
@@ -179,6 +187,23 @@ export class DesktopPetMotion {
     }
   }
 
+  private moveDrag(cursor: Electron.Point): void {
+    const drag = this.dragging;
+    if (!drag) return;
+    if (!drag.moved) {
+      if (Math.hypot(cursor.x - drag.start.x, cursor.y - drag.start.y) < DESKTOP_PET_DRAG_THRESHOLD)
+        return;
+      drag.moved = true;
+      this.effect({ kind: DesktopPetEffectKind.Drag, active: true });
+    }
+    const area = screen.getDisplayNearestPoint(cursor).workArea;
+    const point = clampPetPosition(
+      { x: cursor.x - drag.offset.x, y: cursor.y - drag.offset.y },
+      petBounds(area),
+    );
+    this.window.setPosition(point.x, point.y);
+  }
+
   private tick = (): void => {
     if (this.window.isDestroyed()) return;
     const now = performance.now();
@@ -186,15 +211,7 @@ export class DesktopPetMotion {
     const [x, y] = this.window.getPosition();
     if (this.dragging) {
       this.sample(cursor, now);
-      const area = screen.getDisplayNearestPoint(cursor).workArea;
-      const point = clampPetPosition(
-        {
-          x: cursor.x - this.dragging.offset.x,
-          y: cursor.y - this.dragging.offset.y,
-        },
-        petBounds(area),
-      );
-      this.window.setPosition(point.x, point.y);
+      this.moveDrag(cursor);
       if (now - this.dragging.at > 60_000) {
         this.dragging = undefined;
         this.effect({ kind: DesktopPetEffectKind.Drag, active: false });

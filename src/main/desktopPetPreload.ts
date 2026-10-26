@@ -11,7 +11,7 @@ import type {
 const bridge: DesktopPetBridge = {
   ready: () => ipcRenderer.send(DesktopPetIpc.Ready),
   dragStart: () => ipcRenderer.send(DesktopPetIpc.DragStart),
-  dragEnd: () => ipcRenderer.send(DesktopPetIpc.DragEnd),
+  dragEnd: cancelled => ipcRenderer.send(DesktopPetIpc.DragEnd, cancelled === true),
   menu: () => ipcRenderer.send(DesktopPetIpc.Menu),
   open: () => ipcRenderer.send(DesktopPetIpc.Open),
   hitMask: mask => ipcRenderer.send(DesktopPetIpc.HitMask, mask),

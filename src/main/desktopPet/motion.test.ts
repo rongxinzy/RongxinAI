@@ -89,6 +89,10 @@ test('a flick moves after release, and reduced motion stops it immediately', () 
 
 test('a click stays in place and disposal cancels the native polling timer', () => {
   motion.begin();
+  desktop.cursor.x += 3;
+  vi.advanceTimersByTime(32);
+  expect(position).toEqual({ x: 400, y: 300 });
+  expect(effect).not.toHaveBeenCalled();
   expect(motion.end()).toBe(true);
   expect(position).toEqual({ x: 400, y: 300 });
   motion.dispose();
@@ -108,6 +112,8 @@ test('a removed display clamps an ongoing drag to the remaining work area', () =
 
 test('native drag and meaningful collisions emit bounded visual effects, without per-tick messages', () => {
   motion.begin();
+  desktop.cursor.y += 6;
+  vi.advanceTimersByTime(16);
   expect(effect).toHaveBeenLastCalledWith({ kind: DesktopPetEffectKind.Drag, active: true });
   for (let i = 0; i < 5; i++) {
     desktop.cursor.y += 40;
@@ -126,6 +132,27 @@ test('native drag and meaningful collisions emit bounded visual effects, without
   effect.mockClear();
   vi.advanceTimersByTime(1000);
   expect(effect).not.toHaveBeenCalled();
+});
+
+test('a drag returning to its starting point remains a drag rather than a click', () => {
+  const start = { ...desktop.cursor };
+  motion.begin();
+  desktop.cursor.x += 100;
+  vi.advanceTimersByTime(32);
+  desktop.cursor = start;
+  vi.advanceTimersByTime(32);
+  expect(motion.end()).toBe(false);
+});
+
+test('a cancelled flick stays placed without throwing or click feedback', () => {
+  motion.begin();
+  desktop.cursor.x += 100;
+  vi.advanceTimersByTime(32);
+  expect(motion.end(true)).toBe(false);
+  const placed = { ...position };
+  vi.advanceTimersByTime(1000);
+  expect(position).toEqual(placed);
+  expect(settled).toHaveBeenCalledOnce();
 });
 
 test('sliding along the ground does not repeatedly trigger landing impulses', () => {

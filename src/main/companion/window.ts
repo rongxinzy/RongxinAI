@@ -385,7 +385,7 @@ export function prepareCompanionWindow(): void {
     frame: false,
     transparent: true,
     hasShadow: false,
-    alwaysOnTop: true,
+    alwaysOnTop: false,
     resizable: false,
     show: false,
     title: t('companionTitle'),

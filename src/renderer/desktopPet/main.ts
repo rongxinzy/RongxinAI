@@ -1,5 +1,6 @@
 import {
   DESKTOP_PET_SIZE,
+  DESKTOP_PET_DRAG_THRESHOLD,
   DesktopPetEffectKind,
   DesktopPetPlayableAction,
   DesktopPetState,
@@ -40,6 +41,10 @@ let frameId: number | undefined;
 let maskDirty = true;
 let maskKey = '';
 let pointerActive = false;
+let pointerId: number | undefined;
+let pointerStart = { x: 0, y: 0 };
+let pointerMoved = false;
+let canOpen = false;
 let disposed = false;
 let nativeVisible = true;
 const media = new DesktopPetMediaController(() => {
@@ -228,31 +233,52 @@ document.addEventListener('visibilitychange', onVisibilityChange);
 window.addEventListener('resize', refresh);
 
 view.addEventListener('pointerdown', event => {
-  if (event.button !== 0) return;
+  if (event.button !== 0 || pointerActive) return;
   pointerActive = true;
+  pointerId = event.pointerId;
+  pointerStart = { x: event.screenX, y: event.screenY };
+  pointerMoved = false;
+  canOpen = false;
   view.setPointerCapture(event.pointerId);
   bridge?.dragStart();
-  if (!bridge) animation.setDragging(true);
-  if (!bridge) media.update({ dragging: true });
 });
-const endDrag = (): void => {
-  if (!pointerActive) return;
+const trackPointer = (event: PointerEvent): void => {
+  if (!pointerActive || event.pointerId !== pointerId) return;
+  if (
+    Math.hypot(event.screenX - pointerStart.x, event.screenY - pointerStart.y) >=
+    DESKTOP_PET_DRAG_THRESHOLD
+  )
+    pointerMoved = true;
+  if (!bridge && pointerMoved) {
+    animation.setDragging(true);
+    media.update({ dragging: true });
+  }
+};
+view.addEventListener('pointermove', trackPointer);
+const endDrag = (event: PointerEvent): void => {
+  if (!pointerActive || event.pointerId !== pointerId) return;
+  trackPointer(event);
+  const cancelled = event.type !== 'pointerup';
+  canOpen = !cancelled && !pointerMoved;
   pointerActive = false;
-  bridge?.dragEnd();
+  pointerId = undefined;
+  bridge?.dragEnd(cancelled);
   if (!bridge) animation.setDragging(false);
   if (!bridge) media.update({ dragging: false });
 };
 view.addEventListener('pointerup', endDrag);
 view.addEventListener('pointercancel', endDrag);
 view.addEventListener('lostpointercapture', endDrag);
-view.addEventListener('dblclick', () => bridge?.open());
+view.addEventListener('dblclick', () => {
+  if (canOpen) bridge?.open();
+});
 view.addEventListener('contextmenu', event => {
   event.preventDefault();
   bridge?.menu();
 });
 // Browser preview exercises the same renderer without an Electron bridge.
 view.addEventListener('click', () => {
-  if (!bridge) {
+  if (!bridge && canOpen) {
     state = DesktopPetState.Greeting;
     animation.setState(state, performance.now());
     media.update({ state });
