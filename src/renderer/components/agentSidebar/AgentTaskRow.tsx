@@ -149,32 +149,50 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         </Button>
       )}
 
+      {!isBatchMode && !isRenaming && hasPendingPermission && (
+        <span
+          className={cn(
+            'theme-sidebar-approval inline-flex size-6 shrink-0 items-center justify-center transition-opacity group-hover:pointer-events-none group-hover:opacity-0',
+            menuOpen && 'pointer-events-none opacity-0',
+          )}
+          title={i18nService.t('workbenchTaskStatusWaitingApproval')}
+        >
+          <Loader className="size-3 animate-spin" />
+        </span>
+      )}
+      {!isBatchMode && !isRenaming && !hasPendingPermission && isRunning && (
+        <span
+          className={cn(
+            'inline-flex size-6 shrink-0 items-center justify-center transition-opacity group-hover:pointer-events-none group-hover:opacity-0',
+            menuOpen && 'pointer-events-none opacity-0',
+          )}
+          title={indicatorLabel}
+        >
+          <Loader className="size-3 animate-spin text-muted-foreground" />
+        </span>
+      )}
+      {!isBatchMode && !isRenaming && showRelativeTime && (
+        <span
+          className={cn(
+            'theme-sidebar-caption theme-sidebar-time pointer-events-none shrink-0 items-center whitespace-nowrap',
+            menuOpen ? 'flex opacity-100' : 'hidden group-hover:flex group-focus-within:flex',
+          )}
+          title={relativeTime.full}
+        >
+          {relativeTime.compact}
+        </span>
+      )}
+      {!isBatchMode && !isRenaming && (
+        <span
+          aria-hidden
+          className={cn(
+            'w-14 shrink-0',
+            menuOpen ? 'block' : 'hidden group-hover:block group-focus-within:block',
+          )}
+        />
+      )}
       {!isBatchMode && !isRenaming && (
         <div className="absolute right-1 top-1/2 flex h-6 w-[52px] -translate-y-1/2 items-center justify-end">
-          {showRelativeTime && (
-            <span
-              className="theme-sidebar-caption theme-sidebar-time pointer-events-none absolute inset-y-0 right-[52px] flex items-center whitespace-nowrap"
-              title={relativeTime.full}
-            >
-              {relativeTime.compact}
-            </span>
-          )}
-          {hasPendingPermission && (
-            <span
-              className="theme-sidebar-approval absolute inset-y-0 right-0 inline-flex size-6 items-center justify-center transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
-              title={i18nService.t('workbenchTaskStatusWaitingApproval')}
-            >
-              <Loader className="size-3 animate-spin" />
-            </span>
-          )}
-          {!hasPendingPermission && isRunning && (
-            <span
-              className="absolute inset-y-0 right-0 inline-flex size-6 items-center justify-center transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
-              title={indicatorLabel}
-            >
-              <Loader className="size-3 animate-spin text-muted-foreground" />
-            </span>
-          )}
           <div className="absolute right-0 flex items-center gap-0.5">
             <Button
               variant="ghost"
@@ -201,7 +219,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                     size="icon-xs"
                     className={cn(
                       'theme-sidebar-row-action pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto',
-                      menuOpen && 'pointer-events-auto',
+                      menuOpen && 'pointer-events-auto opacity-100',
                     )}
                     aria-label={i18nService.t('coworkSessionActions')}
                   >
