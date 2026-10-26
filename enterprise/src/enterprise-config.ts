@@ -45,7 +45,7 @@ export async function loadZhiyuanEnterpriseConfig(
   return parseConfig(parsed);
 }
 
-function parseConfig(value: unknown): ZhiyuanEnterpriseConfig {
+export function parseConfig(value: unknown): ZhiyuanEnterpriseConfig {
   const config = asRecord(value);
   if (
     config?.schemaVersion !== 1 ||
@@ -53,6 +53,15 @@ function parseConfig(value: unknown): ZhiyuanEnterpriseConfig {
     typeof config.allowInsecureHttp !== 'boolean'
   ) {
     throw new Error('Zhiyuan enterprise configuration schema is invalid.');
+  }
+
+  // A generic installer has no deployment address; login supplies it at runtime.
+  if (config.aepBaseUrl === '' && config.agentControlBaseUrl === undefined) {
+    return Object.freeze({
+      schemaVersion: 1,
+      aepBaseUrl: '',
+      allowInsecureHttp: config.allowInsecureHttp,
+    });
   }
 
   let url: URL;

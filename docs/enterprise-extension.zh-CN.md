@@ -36,10 +36,12 @@ Preload 桥只允许 `snapshot`、`login`、`changePassword` 和 `logout`。主�
 
 `capabilities.managedProvider` 只接受一个受管配置源。配置源必须使用现有 `custom_` 供应商命名空间，并返回公开应用标准的 `ProviderConfig`。宿主把该配置同步到 `app_config.providers`，模型选择、OpenAI 兼容传输、能力判断、reasoning 兼容和 Pi runtime 均复用用户自建自定义供应商的同一条代码路径。独占配置源会隐藏可编辑供应商和本地推理入口，但不会建立第二套模型运行时。
 
-## Windows 安装包中央签名
+## 企业版 Windows 通用安装包
 
-未签名的企业安装包由私有仓库的 `Build Windows enterprise package` 工作流构建。本仓库的 `Sign Zhiyuan Enterprise Windows package` 工作流把一次成功的未签名构建转成签名安装包：在 main 上手动触发，输入未签名构建的 run ID、可选且必须与未签名构建一致的 `release_version`，以及要写入 `resources/zhiyuan-enterprise/config.json` 的 AEP base URL。prepare 作业会先校验来源仓库、工作流、run 结论、必需构建步骤和未过期的未签名 artifact，再确定来源 commit 与包版本。
+本仓库的 `Build Zhiyuan Enterprise Windows package (manual)` 工作流直接构建 `enterprise/`，输入 `version`（例如 `v1.0.0`）和可从 main 到达的 `source_ref`，无需填写 AEP 地址。工作流安装锁定的 Go 工具链、构建并校验 Magpie、安装 .NET 8 SDK、验证企业模块，再用 `electron-builder.enterprise.cjs` 完成应用和安装包的一次性 Certum 签名。本地入口是 `bun run dist:win:enterprise`；首次构建需先按 `resources/magpie/upstream.json` 的版本准备 Go，执行 `bun run magpie:build -- --target win32-x64`，并安装 .NET 8 SDK。
 
-sign 作业按精确来源 commit 重建：按来源 commit 检出私有仓库、按 `build/build-manifest.json` 锁定的 `zhiyuanCore.commit` 检出本仓库，重新构建并验证扩展、渲染 AEP 配置，然后用 `build/electron-builder.overlay-signed.cjs` 打包，使应用可执行文件和 NSIS 安装包在一次构建中完成 Authenticode 签名。上传前会校验打包版本、证书指纹、注入的企业资源和干净 PATH 下的运行时，签名安装包与 `SHA256SUMS.txt` 作为 Actions artifact 保留 14 天。
+AEP 服务端地址在企业版客户端登录页填写，可在退出登录后随时修改。地址通过主进程校验后原子保存到企业版 `userData/zhiyuan-enterprise/connection.json`，退出、重启和升级后保留，并在登录页自动回填；即使服务器暂时离线也会保存合法地址。密码不写入该配置，刷新令牌通过系统加密存储并按服务端地址隔离。分离部署的 Agent 控制地址由服务元数据发现并保存，切换服务端时重新发现，不沿用上一个部署的地址。安装包内的配置没有默认服务端地址。
 
-签名完全复用本仓库 `release` 环境既有的 Certum 凭据，私有仓库和调用方都不需要配置任何 secret。
+旧 `Sign Zhiyuan Enterprise Windows package` 入口仍校验私有仓库未签名构建的 run ID 与版本，随后复用上述通用安装包流程。该来源 commit 仅作为交接溯源；客户端源码使用触发签名时本仓库的精确 main commit，不再重建私有仓库中的旧客户端，也不再接受打包时注入地址。
+
+上传前会校验版本、证书、企业资源、运行时、冷安装、升级与卸载。安装包、`SHA256SUMS.txt` 和校验记录作为 Actions artifact 保留 14 天。签名使用本仓库 `release` 环境既有的 Certum 凭据。

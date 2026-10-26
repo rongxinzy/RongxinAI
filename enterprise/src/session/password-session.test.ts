@@ -450,7 +450,7 @@ describe('agent control endpoint discovery', () => {
     expect(initialClient.getMetadata).not.toHaveBeenCalled();
     expect(loginClient.getMetadata).toHaveBeenCalledOnce();
     expect(factoryCalls).toEqual([
-      { baseUrl: 'https://aep.customer.example', agentControlBaseUrl: undefined },
+      { baseUrl: 'https://aep.customer.example', agentControlBaseUrl: '' },
     ]);
   });
 
@@ -476,7 +476,7 @@ describe('agent control endpoint discovery', () => {
       }),
     ).resolves.toMatchObject({ status: 'authenticated' });
     expect(factoryCalls).toEqual([
-      { baseUrl: 'https://aep.customer.example', agentControlBaseUrl: undefined },
+      { baseUrl: 'https://aep.customer.example', agentControlBaseUrl: '' },
       {
         baseUrl: 'https://aep.customer.example',
         agentControlBaseUrl: 'https://agents.customer.example',
@@ -501,7 +501,7 @@ describe('agent control endpoint discovery', () => {
       }),
     ).resolves.toMatchObject({ status: 'authenticated' });
     expect(factoryCalls).toEqual([
-      { baseUrl: 'https://aep.customer.example', agentControlBaseUrl: undefined },
+      { baseUrl: 'https://aep.customer.example', agentControlBaseUrl: '' },
     ]);
   });
 });

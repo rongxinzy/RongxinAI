@@ -30,7 +30,10 @@ export class ZhiyuanPasswordSessionProvider implements ZhiyuanEnterpriseSessionP
         // metadata failure is surfaced as a signed-out snapshot; the renderer
         // reads a non-authenticated login response as a metadata failure.
         if (error instanceof AepMetadataError) {
-          return Object.freeze({ status: EnterpriseSessionStatus.SignedOut });
+          return Object.freeze({
+            ...this.#session.snapshot(),
+            status: EnterpriseSessionStatus.SignedOut,
+          });
         }
         throw error;
       });

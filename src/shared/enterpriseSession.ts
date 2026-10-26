@@ -20,11 +20,12 @@ export type EnterpriseSessionIdentity = {
   readonly passwordChangeRequired: boolean;
 };
 
-export type EnterpriseSessionSnapshot =
+export type EnterpriseSessionSnapshot = { readonly aepBaseUrl?: string } & (
   | { readonly status: 'unavailable' }
   | { readonly status: 'signed-out' }
   | { readonly status: 'recoverable' }
-  | { readonly status: 'authenticated'; readonly identity: EnterpriseSessionIdentity };
+  | { readonly status: 'authenticated'; readonly identity: EnterpriseSessionIdentity }
+);
 
 type EnterpriseSessionErrorCode = 'UNAVAILABLE' | 'INVALID_INPUT' | 'OPERATION_FAILED';
 

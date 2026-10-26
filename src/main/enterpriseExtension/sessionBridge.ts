@@ -140,12 +140,14 @@ function normalizedIdentifier(value: unknown, maxLength: number): string | null 
 
 function normalizeSnapshot(value: unknown): EnterpriseSessionSnapshot {
   const snapshot = asRecord(value);
+  const aepBaseUrl = normalizedAepBaseUrl(snapshot?.aepBaseUrl);
+  const connection = aepBaseUrl ? { aepBaseUrl } : {};
   if (
     snapshot?.status === 'unavailable' ||
     snapshot?.status === 'signed-out' ||
     snapshot?.status === 'recoverable'
   ) {
-    return Object.freeze({ status: snapshot.status });
+    return Object.freeze({ status: snapshot.status, ...connection });
   }
   if (snapshot?.status !== 'authenticated') {
     throw new Error('Zhiyuan enterprise session provider returned an invalid snapshot.');
@@ -153,6 +155,7 @@ function normalizeSnapshot(value: unknown): EnterpriseSessionSnapshot {
   return Object.freeze({
     status: 'authenticated',
     identity: normalizeIdentity(snapshot.identity),
+    ...connection,
   });
 }
 

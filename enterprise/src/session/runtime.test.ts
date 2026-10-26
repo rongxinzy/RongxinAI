@@ -47,7 +47,10 @@ describe('Zhiyuan session runtime', () => {
       createProtectedStorage,
     });
 
-    await expect(session.initialize()).resolves.toEqual({ status: 'signed-out' });
+    await expect(session.initialize()).resolves.toEqual({
+      status: 'signed-out',
+      aepBaseUrl: 'http://127.0.0.1:8080',
+    });
     expect(createProtectedStorage).toHaveBeenCalledWith(
       path.join(context.paths.userData, 'zhiyuan-enterprise', 'secrets'),
       expect.any(Object),
@@ -117,7 +120,7 @@ function createTemporaryDirectory(): string {
 }
 
 describe('agent control endpoint composition', () => {
-  test('threads a configured agent control base into every built client', async () => {
+  test('discards the previous agent control endpoint when changing servers', async () => {
     const root = createTemporaryDirectory();
     const context = hostContext(root);
     const configDirectory = path.join(context.paths.resources, 'zhiyuan-enterprise');
@@ -151,11 +154,10 @@ describe('agent control endpoint composition', () => {
       baseUrl: 'http://127.0.0.1:8080',
       agentControlBaseUrl: 'http://127.0.0.1:8081',
     });
-    // The login rebuild keeps the configured agent endpoint while switching
-    // the API base to the user-supplied address.
+    // The new deployment must discover its own agent-control endpoint.
     expect(options.at(-1)).toEqual({
       baseUrl: 'http://127.0.0.1:9090',
-      agentControlBaseUrl: 'http://127.0.0.1:8081',
+      agentControlBaseUrl: undefined,
     });
   });
 

@@ -6,6 +6,7 @@ import { resolveZhiyuanAgentId } from '../agent-id.js';
 import { loadZhiyuanEnterpriseConfig } from '../enterprise-config.js';
 import type { ZhiyuanEnterpriseHostContext } from '../host-contract.js';
 import { ZhiyuanLicenseActivation } from '../license/activation.js';
+import { EnterpriseConnectionConfigStore } from './connection-config.js';
 import { createZhiyuanAepClient, type ZhiyuanPasswordSessionOptions } from './factory.js';
 import { ZhiyuanPasswordSession } from './password-session.js';
 import {
@@ -43,11 +44,16 @@ export async function createZhiyuanSessionRuntimeComponents(
   dependencies: SessionRuntimeDependencies = {},
 ): Promise<ZhiyuanSessionRuntimeComponents> {
   const platform = mapPlatform(context.platform);
+  const connectionStore = new EnterpriseConnectionConfigStore(context.paths.userData);
   const [config, agentId, safeStorage] = await Promise.all([
-    loadZhiyuanEnterpriseConfig(context.paths.resources, {
-      isPackaged: context.isPackaged,
-      developmentConfigPath: process.env.ZHIYUAN_ENTERPRISE_CONFIG_DEV_PATH,
-    }),
+    connectionStore.load().then(
+      saved =>
+        saved ??
+        loadZhiyuanEnterpriseConfig(context.paths.resources, {
+          isPackaged: context.isPackaged,
+          developmentConfigPath: process.env.ZHIYUAN_ENTERPRISE_CONFIG_DEV_PATH,
+        }),
+    ),
     resolveZhiyuanAgentId(context.paths.userData),
     (dependencies.loadSafeStorage ?? loadElectronSafeStorage)(),
   ]);
@@ -71,16 +77,24 @@ export async function createZhiyuanSessionRuntimeComponents(
       platform,
       protectedStorage,
     });
-  let activeClient = buildClient(currentBase);
-  const client = dependencies.createClient ? activeClient : routeClient(() => activeClient);
-  const session = new ZhiyuanPasswordSession(client, (baseUrl, agentControlBaseUrl) => {
-    currentBase = baseUrl;
-    // `undefined` keeps whatever is already targeted (the packaged config or
-    // an earlier discovery); an explicit value re-targets.
-    if (agentControlBaseUrl !== undefined) currentAgentControl = agentControlBaseUrl;
-    activeClient = buildClient(currentBase);
-    return activeClient;
-  });
+  let activeClient = currentBase ? buildClient(currentBase) : null;
+  const client = routeClient(() => activeClient);
+  const session = new ZhiyuanPasswordSession(
+    client,
+    async (baseUrl, agentControlBaseUrl) => {
+      const changedServer = baseUrl !== currentBase;
+      const nextAgentControl = changedServer ? undefined : currentAgentControl;
+      const resolvedAgentControl =
+        agentControlBaseUrl === undefined ? nextAgentControl : agentControlBaseUrl;
+      // Save before discovery so even an offline deployment is remembered. No credentials enter this file.
+      await connectionStore.save(baseUrl, resolvedAgentControl);
+      currentBase = baseUrl;
+      currentAgentControl = resolvedAgentControl;
+      activeClient = buildClient(currentBase);
+      return activeClient;
+    },
+    config.aepBaseUrl,
+  );
   const licenseActivation = ZhiyuanLicenseActivation.create({ session, client: session });
   return Object.freeze({
     session,
@@ -91,11 +105,13 @@ export async function createZhiyuanSessionRuntimeComponents(
   });
 }
 
-function routeClient<T extends object>(getClient: () => T): T {
-  return new Proxy(getClient(), {
+function routeClient<T extends object>(getClient: () => T | null): T {
+  return new Proxy({} as T, {
     get(_target, property) {
-      const value = Reflect.get(getClient(), property, getClient());
-      return typeof value === 'function' ? value.bind(getClient()) : value;
+      const client = getClient();
+      if (!client) throw new Error('Zhiyuan enterprise server is not configured.');
+      const value = Reflect.get(client, property, client);
+      return typeof value === 'function' ? value.bind(client) : value;
     },
   });
 }
