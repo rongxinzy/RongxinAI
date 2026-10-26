@@ -13,6 +13,10 @@ on:
       app-build-version:
         required: true
         type: string
+      enterprise-extension:
+        description: Add the enterprise extension and product identity to the shared installer
+        type: boolean
+        default: false
     secrets:
       CERTUM_USER_ID:
         required: true
@@ -37,7 +41,9 @@ jobs:
   windows-release:
     runs-on: windows-2022
     environment: release
-    timeout-minutes: 120
+    timeout-minutes: 180
+    env:
+      ZHIYUAN_ENTERPRISE_BUILD: ${{ inputs.enterprise-extension && '1' || '0' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -78,6 +84,13 @@ jobs:
             packaging-Windows-win-x64-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - name: Verify optional enterprise extension
+        if: ${{ inputs.enterprise-extension }}
+        run: |
+          bun run typecheck:enterprise
+          bun run test:enterprise
+          bun run build:enterprise
+          bun run verify:enterprise:bundle
       - name: Read pinned Magpie Go toolchain
         id: magpie-toolchain
         run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
@@ -106,9 +119,11 @@ jobs:
           bun run setup:python-runtime
           bun run engram:runtime:win-x64
       - run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
+        if: ${{ !inputs.enterprise-extension }}
         env:
           LLAMACPP_CPU_TARGET_ID: win-x64
       - uses: ./.github/actions/prepare-windows-cuda
+        if: ${{ !inputs.enterprise-extension }}
       - name: Connect Certum SimplySign
         id: certum-signing
         uses: ./.github/actions/setup-certum-signing
@@ -117,7 +132,7 @@ jobs:
           otp-uri: ${{ secrets.CERTUM_OTP_URI }}
           certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
       - name: Build signed Windows core (lite)
-        run: bun run dist:win:signed
+        run: node scripts/build-windows.cjs --signed ${{ inputs.enterprise-extension && '--enterprise' || '' }}
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
@@ -125,7 +140,35 @@ jobs:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify shared Windows installer
+        uses: ./.github/actions/verify-windows-package
+        with:
+          certificate-thumbprint: ${{ steps.certum-signing.outputs.thumbprint }}
+      - name: Verify optional packaged enterprise extension
+        if: ${{ inputs.enterprise-extension }}
+        env:
+          ZHIYUAN_ELECTRON_PACKAGE_DIR: release/win-unpacked
+          ZHIYUAN_REQUIRE_ELECTRON_PACKAGE: '1'
+          ZHIYUAN_ELECTRON_RC_EVIDENCE_FILE: release/electron-rc-evidence.json
+        run: |
+          node enterprise/scripts/verify-electron-package.mjs
+          node enterprise/scripts/verify-electron-rc.mjs
+          node enterprise/scripts/verify-release-artifacts.mjs
+      - name: Upload enterprise Windows installer
+        if: ${{ inputs.enterprise-extension }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: zhiyuan-enterprise-windows-${{ inputs.app-build-version }}-${{ github.run_number }}
+          path: |
+            release/*.exe
+            release/SHA256SUMS.txt
+            release/*.exe.manifest.json
+            release/electron-rc-evidence.json
+            acceptance-diagnostics/
+          if-no-files-found: error
+          retention-days: 14
       - name: Assemble Windows release payloads (lite, cpu, cuda)
+        if: ${{ !inputs.enterprise-extension }}
         shell: bash
         run: |
           set -euo pipefail
@@ -167,6 +210,7 @@ jobs:
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Upload Windows lite release candidate
+        if: ${{ !inputs.enterprise-extension }}
         uses: actions/upload-artifact@v6
         with:
           name: release-candidate-${{ inputs.app-build-version }}-win32-x64-lite
@@ -174,6 +218,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Upload Windows cpu release candidate
+        if: ${{ !inputs.enterprise-extension }}
         uses: actions/upload-artifact@v6
         with:
           name: release-candidate-${{ inputs.app-build-version }}-win32-x64-cpu
@@ -181,9 +226,23 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Upload Windows cuda release candidate
+        if: ${{ !inputs.enterprise-extension }}
         uses: actions/upload-artifact@v6
         with:
           name: release-candidate-${{ inputs.app-build-version }}-win32-x64-cuda
           path: bundle-win32-x64-cuda/
           if-no-files-found: error
           retention-days: 14
+      - name: Preserve Windows packaging diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-package-diagnostics-${{ inputs.enterprise-extension && 'enterprise' || 'community' }}-${{ github.run_number }}
+          path: |
+            acceptance-diagnostics/
+            release/*.exe
+            scripts/installer-shell/out/*.manifest.json
+            scripts/installer-shell/out/setup-size.json
+            ${{ runner.temp }}/zhiyuan-build-logs
+          if-no-files-found: ignore
+          retention-days: 7

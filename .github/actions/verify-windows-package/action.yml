@@ -1,0 +1,60 @@
+name: Verify Windows package
+description: Shared signed installer acceptance for community and enterprise builds
+inputs:
+  certificate-thumbprint:
+    required: true
+    description: Expected Certum signer
+runs:
+  using: composite
+  steps:
+    - name: Verify signatures, size, and bundled runtimes
+      shell: pwsh
+      env:
+        EXPECTED_THUMBPRINT: ${{ inputs.certificate-thumbprint }}
+      run: |
+        $product = (node scripts/packaging/windows-product.cjs) | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve installer product' }
+        node scripts/ci/verify-packaged-app-version.mjs $product.version
+        if ($LASTEXITCODE -ne 0) { throw 'Packaged version verification failed' }
+        $env:ZHIYUAN_ELECTRON_EXECUTABLE_NAME = [IO.Path]::GetFileNameWithoutExtension($product.executableName)
+        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/verify-windows-authenticode.ps1 -ProjectRoot $pwd -ExpectedThumbprint $env:EXPECTED_THUMBPRINT -ExecutableName $env:ZHIYUAN_ELECTRON_EXECUTABLE_NAME
+        if ($LASTEXITCODE -ne 0) { throw 'Signature verification failed' }
+        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot $pwd
+        if ($LASTEXITCODE -ne 0) { throw 'Installer size measurement failed' }
+        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot $pwd
+        if ($LASTEXITCODE -ne 0) { throw 'Bundled runtime verification failed' }
+    - uses: ./.github/actions/verify-windows-compression
+    - name: Prepare native uninstall acceptance
+      shell: powershell
+      run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
+    - name: Verify NSIS cold install and cache-hit upgrade
+      shell: pwsh
+      run: |
+        $product = (node scripts/packaging/windows-product.cjs) | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve installer product' }
+        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-smoke.ps1 -InstallDirName $product.installDirectoryName
+        if ($LASTEXITCODE -ne 0) { throw 'NSIS install acceptance failed' }
+    - name: Verify final WebView2 installer interactively
+      shell: pwsh
+      run: |
+        node scripts/ci/windows-shell-interactive.mjs
+        if ($LASTEXITCODE -ne 0) { throw 'WebView2 interactive acceptance failed' }
+        $product = (node scripts/packaging/windows-product.cjs) | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve installer product' }
+        $setup = Join-Path release $product.setupFileName
+        $app = Join-Path $env:RUNNER_TEMP "zhiyuan-shell-acceptance/安装路径/$($product.executableName)"
+        node scripts/ci/windows-shell-evidence.mjs acceptance-diagnostics/shell-interactive $setup $app
+        if ($LASTEXITCODE -ne 0) { throw 'Final installer evidence does not match this build' }
+    - name: Verify native uninstall preserves user data
+      shell: powershell
+      env:
+        EXPECTED_THUMBPRINT: ${{ inputs.certificate-thumbprint }}
+      run: ./scripts/ci/windows-shell-uninstall.ps1 -Action verify -ExpectedThumbprint $env:EXPECTED_THUMBPRINT
+    - name: Write final installer checksums
+      shell: pwsh
+      run: |
+        $lines = Get-ChildItem release -Filter '*.exe' -File | ForEach-Object {
+          $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($_.Name)"
+        }
+        $lines | Set-Content release/SHA256SUMS.txt -Encoding utf8NoBOM

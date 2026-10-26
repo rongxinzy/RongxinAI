@@ -54,19 +54,24 @@ test('a failed edition package cannot continue to assemble an installer from sta
 });
 
 test('windows-release assembles and directly uploads all three edition release candidates', () => {
-  type Step = { name?: string; run?: string; uses?: string; with?: Record<string, unknown> };
+  type Step = { name?: string; run?: string; uses?: string; if?: string; with?: Record<string, unknown> };
   const workflow = load(readFileSync('.github/workflows/build-windows-release.yml', 'utf8')) as {
     jobs: Record<string, { needs?: string; steps: Step[] }>;
   };
   expect(workflow.jobs['windows-release'].needs).toBeUndefined();
   expect(workflow.jobs.acceptance).toBeUndefined();
   const steps = workflow.jobs['windows-release'].steps;
-  const uploads = steps
-    .filter(step => step.uses === 'actions/upload-artifact@v6')
-    .map(step => step.with?.name);
-  expect(uploads).toEqual([
+  const uploads = steps.filter(step => step.uses === 'actions/upload-artifact@v6');
+  const candidates = uploads.filter(step => String(step.with?.name).startsWith('release-candidate-'));
+  expect(candidates.map(step => step.with?.name)).toEqual([
     'release-candidate-${{ inputs.app-build-version }}-win32-x64-lite',
     'release-candidate-${{ inputs.app-build-version }}-win32-x64-cpu',
     'release-candidate-${{ inputs.app-build-version }}-win32-x64-cuda',
   ]);
+  expect(candidates.every(step => step.if === '${{ !inputs.enterprise-extension }}')).toBe(true);
+  const enterprise = uploads.find(step => String(step.with?.name).startsWith('zhiyuan-enterprise-windows-'));
+  expect(enterprise?.if).toBe('${{ inputs.enterprise-extension }}');
+  const diagnostics = uploads.find(step => String(step.with?.name).startsWith('windows-package-diagnostics-'));
+  expect(diagnostics?.if).toBe('${{ failure() }}');
+  expect(uploads).toHaveLength(candidates.length + 2);
 });

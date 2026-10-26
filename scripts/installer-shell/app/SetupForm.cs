@@ -312,7 +312,7 @@ public sealed class SetupForm : Form
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
         // Must match the NSIS APP_FILENAME (package.json `name`): both
         // installers default to the same directory.
-        return Path.Combine(localPrograms, "zhiyuan-agent");
+        return Path.Combine(localPrograms, InstallerProduct.InstallDirectoryName);
     }
 
     /// <summary>Uninstall mode comes from --uninstall or from being the copied

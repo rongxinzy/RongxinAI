@@ -288,8 +288,8 @@ test('protected Windows releases authenticate with Certum and require valid sign
   const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
     scripts: Record<string, string>;
   };
-  assert.match(packageJson.scripts['dist:win:signed'], /electron-builder\.windows-signed\.cjs/);
-  assert.match(packageJson.scripts['dist:win:offline'], /electron-builder\.json/);
+  assert.equal(packageJson.scripts['dist:win:signed'], 'node scripts/build-windows.cjs --signed');
+  assert.equal(packageJson.scripts['dist:win:offline'], 'node scripts/build-windows.cjs');
 
   const releaseWorkflow = readFileSync(
     path.join(root, '.github', 'workflows', 'release.yml'),

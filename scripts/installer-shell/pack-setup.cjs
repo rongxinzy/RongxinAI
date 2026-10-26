@@ -38,6 +38,7 @@ const {
 } = require('./distribution-budget.cjs');
 const { sha256File } = require('../windows-resource-pack.cjs');
 const { resolveInferenceEdition } = require('../resolve-nsis-offline-components.cjs');
+const { resolveWindowsProduct } = require('../packaging/windows-product.cjs');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
 const shellExe = path.join(
@@ -206,13 +207,10 @@ try {
   const payloadBytes = fs.statSync(payloadZip).size;
   const alignmentBytes = (8 - ((shellBytes + payloadBytes + FOOTER_BYTES) % 8)) % 8;
   const unsignedSetupBytes = shellBytes + payloadBytes + alignmentBytes + FOOTER_BYTES;
-  const config = JSON.parse(
-    fs.readFileSync(path.join(projectRoot, 'electron-builder.json'), 'utf8'),
-  );
   const updater = path.join(
     projectRoot,
     'release',
-    `${config.productName}-Setup-${packageVersion}.exe`,
+    resolveWindowsProduct(projectRoot).updaterFileName,
   );
   const nsisUpdaterBytes = fs.existsSync(updater) ? fs.statSync(updater).size : null;
   const setupBudgetEdition = resolveInferenceEdition();

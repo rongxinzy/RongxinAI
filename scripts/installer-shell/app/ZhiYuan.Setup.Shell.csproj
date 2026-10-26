@@ -27,4 +27,11 @@
     <EmbeddedResource Include="..\..\..\build\icons\png\256x256.png" LogicalName="ui.assets.icon" />
   </ItemGroup>
 
+  <Target Name="GenerateInstallerProduct" BeforeTargets="CoreCompile">
+    <Exec Command="node &quot;$(MSBuildProjectDirectory)\..\generate-product.cjs&quot; &quot;$(MSBuildProjectDirectory)\$(IntermediateOutputPath)InstallerProduct.g.cs&quot;" />
+    <ItemGroup>
+      <Compile Include="$(IntermediateOutputPath)InstallerProduct.g.cs" />
+    </ItemGroup>
+  </Target>
+
 </Project>

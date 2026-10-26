@@ -38,6 +38,9 @@ const config: KnipConfig = {
         // Spawned by path.join(__dirname, '...js'), not a static import.
         'src/main/extensions/aisphere/requestWorker.ts',
         'scripts/installer-shell/build-shell.cjs',
+        'scripts/installer-shell/build-distribution.cjs',
+        // Invoked by the installer .csproj before compilation.
+        'scripts/installer-shell/generate-product.cjs',
         'scripts/installer-shell/pack-setup.cjs',
         'scripts/installer-shell/make-test-payload.cjs',
         'scripts/patch-windows-electron-icon.mjs',
@@ -45,6 +48,8 @@ const config: KnipConfig = {
         'scripts/prepare-visual-blind-review.mjs',
         'scripts/ci/validate-docx-smoke.mjs',
         'scripts/ci/verify-packaged-acp-resources.mjs',
+        // Invoked by the shared composite Windows acceptance action.
+        'scripts/ci/verify-packaged-app-version.mjs',
         'scripts/ci/measure-llamacpp-bundled.cjs',
         'scripts/ci/build-checkpoint.mjs',
         // Invoked from release.yml and publish workflows, not static imports.

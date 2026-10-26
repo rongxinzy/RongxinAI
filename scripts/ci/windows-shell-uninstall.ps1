@@ -48,7 +48,9 @@ New-Item -ItemType Directory -Path $evidence -Force | Out-Null
 $sandbox = Join-Path $runnerRoot 'zhiyuan-shell-acceptance'
 $unicodeInstallName = ([char]0x5b89).ToString() + [char]0x88c5 + [char]0x8def + [char]0x5f84
 $installRoot = Join-Path $sandbox $unicodeInstallName
-$appName = ([char]0x77e5).ToString() + [char]0x8fdc + '.exe'
+$product = (& node (Join-Path $ProjectRoot 'scripts/packaging/windows-product.cjs')) | ConvertFrom-Json
+if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the installer product identity' }
+$appName = $product.executableName
 $app = Join-Path $installRoot $appName
 $customData = Join-Path $sandbox 'app-data'
 $customRuntime = Join-Path $sandbox 'runtimes'
@@ -88,7 +90,7 @@ if ($setupManifest.signed -eq $true -or $ExpectedThumbprint) {
 } elseif ($setupManifest.signed -ne $false -or $signature.Status -ne 'NotSigned') {
   throw 'Unsigned PR acceptance must explicitly have unsigned setup and uninstall host'
 }
-$guid = '331369f7-5ab3-5702-935d-f3cff6ba8163'
+$guid = $product.appGuid
 $registrationKeys = @("HKCU:/Software/$guid", "HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/$guid")
 $registration = Get-ItemProperty -LiteralPath $registrationKeys[1]
 Assert-NativeUninstallCommands $registration $installedHost $installRoot

@@ -2,9 +2,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { test, expect } from 'vitest';
 
 const sourceRoot = __dirname;
+const require = createRequire(import.meta.url);
+const { productSource } = require('../generate-product.cjs');
+const { resolveWindowsProduct } = require('../../packaging/windows-product.cjs');
 const read = (name: string) => fs.readFileSync(path.join(sourceRoot, name), 'utf8');
 const installer = read('InstallerEngine.cs');
 const uninstaller = read('UninstallerEngine.cs');
@@ -283,12 +287,16 @@ test('license is embedded and acceptance debugging is opt-in, loopback-only and 
 const dotnet = process.env.ZHIYUAN_DOTNET || 'dotnet';
 const dotnetAvailable = spawnSync(dotnet, ['--version'], { encoding: 'utf8' }).status === 0;
 
-test.skipIf(!dotnetAvailable)(
-  'actual C# transaction recovery preserve old files and bound deletion',
-  () => {
+test.skipIf(!dotnetAvailable).each([false, true])(
+  'actual C# transaction recovery preserves files for enterprise=%s',
+  enterprise => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zy-engine-contracts-'));
     const xml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('"', '&quot;');
     try {
+      fs.writeFileSync(
+        path.join(root, 'InstallerProduct.g.cs'),
+        productSource(resolveWindowsProduct(path.resolve(sourceRoot, '../../..'), enterprise)),
+      );
       const sources = [
         'InstallerEngine.cs',
         'SfxPayload.cs',

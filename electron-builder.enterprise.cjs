@@ -15,6 +15,7 @@ const path = require('node:path');
 
 const { packagingExcludePatterns } = require('./scripts/packaging/assert-package-contents.cjs');
 const baseConfig = require('./electron-builder.json');
+const { enterpriseProduct } = require('./scripts/packaging/windows-product.cjs');
 
 // electron-builder resolves extraResources "from" against the project
 // directory, so inputs stay repo-root-relative (the same convention the
@@ -71,10 +72,10 @@ const config = {
   // %LocalAppData%\Programs\zhiyuan-agent and overwrite each other's files.
   // extraMetadata.name gives this build its own sanitizedName and therefore
   // its own default directory (Programs\zhiyuan-agent-enterprise).
-  productName: '知远企业版',
-  executableName: '知远企业版',
-  appId: 'com.zhiyuanagent.enterprise',
-  extraMetadata: { ...(baseConfig.extraMetadata || {}), name: 'zhiyuan-agent-enterprise' },
+  productName: enterpriseProduct.productName,
+  executableName: enterpriseProduct.executableName,
+  appId: enterpriseProduct.appId,
+  extraMetadata: { ...(baseConfig.extraMetadata || {}), name: enterpriseProduct.packageName },
   // The community browser-login deep link belongs to the community build. The
   // enterprise build uses in-app password login and must not claim the scheme.
   protocols: [],
@@ -94,6 +95,7 @@ if (certificateThumbprint) {
         'setup-certum-signing action connects SimplySign.',
     );
   }
+  config.forceCodeSigning = true;
   config.win.signtoolOptions = {
     certificateSha1: certificateThumbprint,
     signingHashAlgorithms: ['sha256'],
