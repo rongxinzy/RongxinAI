@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { DesktopPetTaskResult } from '../../shared/desktopPet/constants';
 import type { DesktopPetTaskOpen } from '../../shared/desktopPet/types';
 import { coworkService } from '../services/cowork';
+import { workspaceService } from '../services/workspace';
 import { i18nService } from '../services/i18n';
 import { showAppError } from '../services/appToast';
 import { store } from '../store';
@@ -27,6 +28,9 @@ export function useDesktopPetNavigation(
       if (!active || request.requestId <= latest.current) return;
       latest.current = request.requestId;
       try {
+        // A task created in the bubble may belong to a newly selected folder.
+        await workspaceService.refreshWorkspaces();
+        if (!active || latest.current !== request.requestId) return;
         const session = await coworkService.loadSession(request.sessionId);
         if (!active || latest.current !== request.requestId) return;
         if (!session) {

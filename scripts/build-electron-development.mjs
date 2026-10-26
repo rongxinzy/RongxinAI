@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 import { build } from 'vite-plugin-electron';
 import { extractExternalDeps } from 'vite-plugin-electron/plugin';
+import { ELECTRON_MAIN_EXTERNALS } from './electron-runtime-dependencies.mjs';
+import { copyCompanionPhoton } from './copy-companion-photon.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
@@ -64,6 +66,7 @@ fs.rmSync(readyPath, { force: true });
 
 await build(createBuildOptions('src/main/preload.ts'));
 await build(createBuildOptions('src/main/desktopPetPreload.ts'));
+await build(createBuildOptions('src/main/companionWindowPreload.ts'));
 await build(createBuildOptions('src/main/llamacppModelDaemonEntry.ts'));
 await build(createBuildOptions('src/main/workbenchTask/artifactWorker.ts'));
 await build(createBuildOptions('src/main/magpie/catalogWorker.ts'));
@@ -81,6 +84,7 @@ await build(
 );
 await build(
   createBuildOptions('src/main/main.ts', {
+    external: id => ELECTRON_MAIN_EXTERNALS.includes(id),
     output: {
       codeSplitting: false,
     },
@@ -88,5 +92,6 @@ await build(
 );
 
 copyPhotonWasm();
+copyCompanionPhoton(projectRoot, outputDirectory);
 fs.writeFileSync(readyPath, '');
 console.log('[ElectronDevBuild] Main and preload bundles are ready.');

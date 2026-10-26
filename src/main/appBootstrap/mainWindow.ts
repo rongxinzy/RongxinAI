@@ -25,7 +25,17 @@ import {
 import { registerContextMenu } from '../contextMenu';
 import { setLanguage } from '../i18n';
 import { createTray, updateTrayMenu } from '../trayManager';
-import { initializeDesktopPet } from '../desktopPet/controller';
+import {
+  initializeDesktopPet,
+  setDesktopPetAppearance,
+  getDesktopPetWindow,
+  setDesktopPetBubbleVisible,
+  observeDesktopPetCompanionActivity,
+} from '../desktopPet/controller';
+import { initializeCompanionWindow } from '../companion/window';
+import { getCompanionTasks } from './companionTasks';
+import { openDesktopPetSession } from '../desktopPet/controller';
+import { getPiRuntimeAdapter } from './sessionServices';
 import {
   getDisplayWorkAreas,
   getTitleBarOverlayOptions,
@@ -319,6 +329,17 @@ export const createMainWindow = (): void => {
         () => lifecycleRuntime.mainWindow,
         () => updateTrayMenu(() => lifecycleRuntime.mainWindow),
       );
+      initializeCompanionWindow({
+        store: getStore(),
+        getMainWindow: () => lifecycleRuntime.mainWindow,
+        getPetWindow: getDesktopPetWindow,
+        onBubbleVisibility: setDesktopPetBubbleVisible,
+        onActivity: observeDesktopPetCompanionActivity,
+        getCompanions: () => getPiRuntimeAdapter().getCompanions(),
+        getTasks: getCompanionTasks,
+        openTask: openDesktopPetSession,
+        onProfileChanged: profile => setDesktopPetAppearance(profile.characterId),
+      });
 
       (async () => {
         // One-time migration: import legacy SQLite task records into the

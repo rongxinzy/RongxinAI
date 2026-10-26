@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
-import { StrataIpcChannel } from '../strata/constants';
+import { StrataEngineKind, StrataFamilyId, StrataIpcChannel } from '../strata/constants';
+import { StrataServiceStatus } from '../strata/types';
 
 const StatusSnapshotSchema = z.object({
-  status: z.string(),
+  status: z.enum(Object.values(StrataServiceStatus)),
   checkedAt: z.string(),
   port: z.number().optional(),
   baseUrl: z.string().optional(),
@@ -15,8 +16,8 @@ const StatusSnapshotSchema = z.object({
 
 const CatalogEntrySchema = z.object({
   id: z.string(),
-  family: z.string(),
-  engine: z.string(),
+  family: z.enum(Object.values(StrataFamilyId)),
+  engine: z.enum(Object.values(StrataEngineKind)),
   displayName: z.string(),
   modelLaunchId: z.string(),
   hardware: z.object({

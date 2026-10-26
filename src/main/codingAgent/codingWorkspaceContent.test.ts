@@ -19,12 +19,12 @@ const workerFixture = vi.hoisted(() => ({
 
 vi.mock('../workbenchTask/artifactWorkerPool', async importOriginal => {
   const actual = await importOriginal<typeof import('../workbenchTask/artifactWorkerPool')>();
-  // Compile the worker in-process. A clean checkout has no dist-electron bundle,
-  // and CI only supplies that bundle by downloading a previous compile job.
+  // Compile the real worker in isolation; unit-test CI does not build the application.
   const compiledRoot = fs.realpathSync(
     fs.mkdtempSync(path.join(tmpdir(), 'coding-content-worker-build-')),
   );
   workerFixture.compiledRoot = compiledRoot;
+  fs.symlinkSync(path.resolve('node_modules'), path.join(compiledRoot, 'node_modules'), 'junction');
   const compiled = path.join(compiledRoot, 'compiled');
   execFileSync(
     process.execPath,

@@ -58,6 +58,7 @@ interface PromptInputMessage {
 }
 
 export type PromptInputProps = Omit<HTMLAttributes<HTMLFormElement>, 'onSubmit' | 'onError'> & {
+  inputVariant?: 'default' | 'paper';
   // e.g., "image/*" or leave undefined for any
   accept?: string;
   multiple?: boolean;
@@ -78,6 +79,7 @@ export type PromptInputProps = Omit<HTMLAttributes<HTMLFormElement>, 'onSubmit' 
 
 export const PromptInput = ({
   className,
+  inputVariant,
   accept,
   multiple,
   globalDrop,
@@ -467,7 +469,9 @@ export const PromptInput = ({
         type="file"
       />
       <form className={cn('w-full', className)} onSubmit={handleSubmit} ref={formRef} {...props}>
-        <InputGroup className="overflow-hidden">{children}</InputGroup>
+        <InputGroup variant={inputVariant} className="overflow-hidden">
+          {children}
+        </InputGroup>
       </form>
     </>
   );

@@ -1590,15 +1590,15 @@
 }
 :where(:root, [data-theme]) :where(.theme-fluid-tab) {
   transition-property: color, background-color, border-color, opacity, box-shadow;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
+  transition-duration: 120ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   border-radius: var(--zy-style-radius-md);
   padding-inline: 0.75rem;
   font-size: var(--zy-component-text-sm);
   line-height: 1.25rem;
   font-weight: var(--zy-component-font-weight-normal);
   color: var(--muted-foreground);
-  opacity: 0.85;
+  opacity: 1;
   outline-style: none;
 }
 :where(:root, [data-theme]) :where(.theme-fluid-list[data-size="default"] .theme-fluid-tab) {
@@ -1826,7 +1826,7 @@
   border-radius: var(--zy-style-radius-lg);
   border-width: 1px;
   border-style: solid;
-  border-color: var(--input);
+  border-color: var(--zy-text-muted);
   background-color: var(--zy-state-input-solid);
   outline-style: none;
   transition-property: color, background-color, border-color, box-shadow;
@@ -5259,6 +5259,66 @@
   font-weight: var(--zy-component-font-weight-medium);
   color: var(--zy-text-primary);
 }
+:where(:root, [data-theme]) :where(body[data-companion-window]) {
+  background-color: transparent;
+}
+:where(:root, [data-theme]) :where(.theme-companion-bubble) {
+  background-color: transparent;
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch) {
+  color: var(--foreground);
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch-paper) {
+  fill: var(--popover);
+}
+:where(:root, [data-theme]) :where(.theme-companion-pencil-warm) {
+  color: #b98267;
+}
+:where(:root, [data-theme]) :where(.theme-companion-pencil-cool) {
+  color: #6e998b;
+}
+:where(:root, [data-theme]) :where(.theme-companion-paper-content) {
+  background-color: transparent;
+}
+:where(:root, [data-theme]) :where(.theme-input-group[data-variant="paper"]) {
+  border-color: var(--zy-text-muted);
+  background-color: transparent;
+  border-radius: 0;
+  border-top-width: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+  border-bottom-width: 2px;
+  box-shadow: none;
+}
+:where(:root, [data-theme]) :where(.theme-companion-selector) {
+  border-color: transparent;
+  background-color: transparent;
+  box-shadow: none;
+}
+:where(:root, [data-theme]) :where(.theme-companion-name) {
+  font-size: var(--zy-component-text-sm);
+  font-weight: 500;
+  line-height: var(--zy-component-text-sm--line-height);
+}
+:where(:root, [data-theme]) :where(.theme-welcome-screen) {
+  background-color: var(--background);
+  color: var(--foreground);
+  transition-property: opacity;
+  transition-duration: 200ms;
+}
+:where(:root, [data-theme]) :where(.theme-welcome-title) {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+}
+:where(:root, [data-theme]) :where(.theme-welcome-art) {
+  width: min(52rem, 88vw);
+  height: min(24rem, 44vh);
+  animation-name: zy-component-welcome-art-1su47v9;
+  animation-duration: 240ms;
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
 :where(:root, [data-theme]) :where(.theme-home-brand) {
   height: 3rem;
 }
@@ -5563,7 +5623,7 @@
 }
 @media (hover: hover) {
 :where(:root, [data-theme]) :where(.theme-select-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
-  border-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  border-color: var(--zy-text-muted);
   background-color: var(--zy-state-input-hover);
 }
 }
@@ -6458,6 +6518,11 @@
   background-color: color-mix(in oklab, var(--sidebar-foreground) 5%, transparent);
 }
 }
+@media (hover: hover) {
+:where(:root, [data-theme]) :where(.theme-companion-selector):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):hover) {
+  background-color: var(--accent);
+}
+}
 :where(:root, [data-theme]) :where(.theme-sidebar-menu-button):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):active:not([aria-haspopup])) {
   background-color: var(--sidebar-accent);
   color: var(--sidebar-accent-foreground);
@@ -6800,7 +6865,12 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
 }
 :where(:root, [data-theme]) :where(.theme-fluid-tab):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  box-shadow: 0 0 0 1px var(--muted), 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+  outline-style: solid;
+  outline-width: 2px;
+  outline-color: var(--primary);
+  outline-offset: 1px;
+  box-shadow: none;
+  opacity: 1;
 }
 :where(:root, [data-theme]) :where(.theme-check):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   border-color: var(--ring);
@@ -6821,8 +6891,12 @@
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
 }
 :where(:root, [data-theme]) :where(.theme-select-trigger):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
-  border-color: var(--ring);
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ring) 40%, transparent);
+  border-color: var(--primary);
+  outline-color: var(--primary);
+  outline-width: 2px;
+  outline-style: solid;
+  outline-offset: 1px;
+  box-shadow: none;
 }
 :where(:root, [data-theme]) :where(.theme-select-item):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
   background-color: var(--accent);
@@ -7246,6 +7320,9 @@
 :where(:root, [data-theme]) :where(.theme-sheet-content[data-side="right"]):where([data-ending-style]) {
   translate: 2.5rem 0;
 }
+:where(:root, [data-theme]) :where(.theme-welcome-screen):where([data-ending-style]) {
+  opacity: 0;
+}
 :where(:root, [data-theme]) :where(.theme-select-trigger):where([data-placeholder]) {
   color: var(--muted-foreground);
 }
@@ -7272,6 +7349,12 @@
 :where(:root, [data-theme]) :where(.theme-composer-surface .theme-input-group):where(:has([data-slot="input-group-control"]:focus-visible)) {
   border-color: color-mix(in oklab, var(--zy-input-border) 60%, var(--zy-primary));
   box-shadow: var(--zy-style-shadow-md);
+}
+:where(:root, [data-theme]) :where(.theme-input-group[data-variant="paper"]):where(:has([data-slot="input-group-control"]:focus-visible)) {
+  outline-style: none;
+  outline-width: 0;
+  box-shadow: none;
+  border-color: var(--primary);
 }
 :where(:root, [data-theme]) :where(.theme-input-group):where(:has([data-slot][aria-invalid="true"])) {
   border-color: var(--zy-state-destructive-border);
@@ -7382,6 +7465,16 @@ from {
 to {
   opacity: 1;
   scale: 1;
+}
+}
+@keyframes zy-component-welcome-art-1su47v9 {
+from {
+  opacity: 0;
+  translate: 0 0.5rem;
+}
+to {
+  opacity: 1;
+  translate: 0 0;
 }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -8297,6 +8390,19 @@ to {
 :where(:root, [data-theme]) :where(.theme-switch[data-mode="work-chat"] [data-slot="switch-thumb"]),
 :where(:root, [data-theme]) :where(.theme-sidebar-mode-label),
 :where(:root, [data-theme]) :where(.theme-sidebar-mode-label[data-mode-selected="true"]),
+:where(:root, [data-theme]) :where(body[data-companion-window]),
+:where(:root, [data-theme]) :where(.theme-companion-bubble),
+:where(:root, [data-theme]) :where(.theme-companion-sketch),
+:where(:root, [data-theme]) :where(.theme-companion-sketch-paper),
+:where(:root, [data-theme]) :where(.theme-companion-pencil-warm),
+:where(:root, [data-theme]) :where(.theme-companion-pencil-cool),
+:where(:root, [data-theme]) :where(.theme-companion-paper-content),
+:where(:root, [data-theme]) :where(.theme-input-group[data-variant="paper"]),
+:where(:root, [data-theme]) :where(.theme-companion-selector),
+:where(:root, [data-theme]) :where(.theme-companion-name),
+:where(:root, [data-theme]) :where(.theme-welcome-screen),
+:where(:root, [data-theme]) :where(.theme-welcome-title),
+:where(:root, [data-theme]) :where(.theme-welcome-art),
 :where(:root, [data-theme]) :where(.theme-home-brand),
 :where(:root, [data-theme]) :where(.theme-home-caption),
 :where(:root, [data-theme]) :where(.theme-home-sticky),

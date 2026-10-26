@@ -57,6 +57,7 @@ export interface IElectronAPI {
   arch: string;
   store: StoreApi;
   desktopPet: import('../../shared/desktopPet/types').DesktopPetApi;
+  companion: import('../../shared/companion/types').CompanionWindowApi;
   skills: SkillsApi;
   mcp: McpApi;
   ollama: OllamaApi;

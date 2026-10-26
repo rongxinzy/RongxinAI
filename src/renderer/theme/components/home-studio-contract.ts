@@ -1,5 +1,18 @@
 /** Home compositions keep stable hooks across editor and menu wrappers. */
 export const HOME_STUDIO_SELECTORS = {
+  'companion-window': 'body[data-companion-window]',
+  'companion-bubble': '.theme-companion-bubble',
+  'companion-sketch': '.theme-companion-sketch',
+  'companion-sketch-paper': '.theme-companion-sketch-paper',
+  'companion-pencil-warm': '.theme-companion-pencil-warm',
+  'companion-pencil-cool': '.theme-companion-pencil-cool',
+  'companion-paper-content': '.theme-companion-paper-content',
+  'companion-paper-input': '.theme-input-group[data-variant="paper"]',
+  'companion-selector': '.theme-companion-selector',
+  'companion-name': '.theme-companion-name',
+  'welcome-screen': '.theme-welcome-screen',
+  'welcome-title': '.theme-welcome-title',
+  'welcome-art': '.theme-welcome-art',
   'home-brand': '.theme-home-brand',
   'home-caption': '.theme-home-caption',
   'home-sticky': '.theme-home-sticky',

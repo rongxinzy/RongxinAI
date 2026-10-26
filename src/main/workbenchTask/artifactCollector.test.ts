@@ -71,7 +71,9 @@ test('collects successful tool files using actual content hashes', () => {
 });
 
 test('marks declared files as pending until a workflow verifies them', () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-declared-artifact-'));
+  const workspace = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-declared-artifact-')),
+  );
   const filePath = path.join(workspace, 'result.md');
   fs.writeFileSync(filePath, '# result');
   try {

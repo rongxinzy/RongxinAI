@@ -105,6 +105,31 @@ const parseShortcut = (shortcut?: string): ParsedShortcut | null => {
   return parsed;
 };
 
+export const shortcutsConflict = (
+  left: string | undefined,
+  right: string | undefined,
+  isMacPlatform: boolean,
+): boolean => {
+  const first = parseShortcut(left);
+  const second = parseShortcut(right);
+  if (!first || !second) return false;
+
+  const resolveModifiers = (shortcut: ParsedShortcut) => ({
+    ...shortcut,
+    ctrl: shortcut.ctrl || (shortcut.commandOrControl && !isMacPlatform),
+    meta: shortcut.meta || (shortcut.commandOrControl && isMacPlatform),
+  });
+  const a = resolveModifiers(first);
+  const b = resolveModifiers(second);
+  return (
+    a.key === b.key &&
+    a.alt === b.alt &&
+    a.ctrl === b.ctrl &&
+    a.shift === b.shift &&
+    a.meta === b.meta
+  );
+};
+
 export const matchesShortcut = (event: KeyboardEvent, shortcut?: string): boolean => {
   const parsed = parseShortcut(shortcut);
   if (!parsed) return false;

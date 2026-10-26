@@ -10,6 +10,34 @@
  */
 
 // ─── Store ──────────────────────────────────────────────────────────────────
+export const CompanionIpc = {
+  GetVisibility: 'companion:visibility:get',
+  Focus: 'companion:focus',
+  Bootstrap: 'companion:bootstrap',
+  Select: 'companion:select',
+  Submit: 'companion:submit',
+  Answer: 'companion:answer',
+  Stop: 'companion:stop',
+  SubmitTask: 'companion:task:submit',
+  Tasks: 'companion:tasks',
+  TasksChanged: 'companion:tasks:changed',
+  StopTask: 'companion:task:stop',
+  ChooseWorkspace: 'companion:workspace:choose',
+  ChooseFiles: 'companion:files:choose',
+  StageFile: 'companion:files:stage',
+  ListMemories: 'companion:memory:list',
+  SaveMemory: 'companion:memory:save',
+  ConfirmMemory: 'companion:memory:confirm',
+  ForgetMemory: 'companion:memory:forget',
+  ShareMemory: 'companion:memory:share',
+  Hide: 'companion:hide',
+  OpenWorkbench: 'companion:openWorkbench',
+  Context: 'companion:context',
+  Visibility: 'companion:visibility',
+  Changed: 'companion:changed',
+  Workbench: 'companion:workbench',
+} as const;
+
 export const StoreIpc = {
   Get: 'store:get',
   Set: 'store:set',

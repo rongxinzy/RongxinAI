@@ -37,6 +37,7 @@ export default defineConfig(async () => ({
       input: {
         main: path.resolve(projectRoot, 'index.html'),
         desktopPet: path.resolve(projectRoot, 'desktop-pet.html'),
+        companion: path.resolve(projectRoot, 'companion.html'),
       },
     },
   },

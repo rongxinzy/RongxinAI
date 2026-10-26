@@ -87,9 +87,9 @@ describe('CoworkInlineAttachments', () => {
     fireEvent.focus(trigger!);
 
     const fullName = await screen.findByRole('heading', { name: filename });
-    expect(fullName).toHaveClass('whitespace-nowrap');
-    expect(fullName.parentElement?.parentElement).toHaveClass('w-max');
-    expect(fullName.parentElement?.parentElement).not.toHaveClass('max-w-80');
+    expect(fullName).toHaveClass('wrap-anywhere', 'whitespace-normal');
+    expect(fullName.parentElement?.parentElement).toHaveClass('w-80', 'max-w-full');
+    expect(fullName.parentElement?.parentElement).not.toHaveClass('w-max');
   });
 
   test('shows an unknown extension instead of the generic binary media type', async () => {

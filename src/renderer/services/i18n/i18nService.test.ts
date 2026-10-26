@@ -1,12 +1,30 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { i18nService } from './i18nService';
+import { configService } from '../config';
 
 afterEach(() => {
+  vi.restoreAllMocks();
   i18nService.setLanguage('zh', { persist: false });
 });
 
 describe('i18nService', () => {
+  test('notifies mounted startup surfaces when initialization resolves a different language', async () => {
+    vi.spyOn(configService, 'getConfig').mockReturnValue({
+      ...configService.getConfig(),
+      language: 'en',
+      language_initialized: true,
+    });
+    const listener = vi.fn();
+    const unsubscribe = i18nService.subscribe(listener);
+    await i18nService.initialize();
+    expect(listener).toHaveBeenCalledOnce();
+    expect(i18nService.getLanguage()).toBe('en');
+    await i18nService.initialize();
+    expect(listener).toHaveBeenCalledOnce();
+    unsubscribe();
+  });
+
   test('translates keys in the current language', () => {
     i18nService.setLanguage('zh', { persist: false });
     expect(i18nService.t('save')).toBe('保存');

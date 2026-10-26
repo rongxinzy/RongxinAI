@@ -4,11 +4,19 @@ import { createHash } from 'node:crypto';
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import { ArtifactWorkerLimit, ArtifactWorkerTask } from './artifactWorkerConstants';
 import type { ArtifactWorkerInput } from './artifactWorkerTypes';
+import path from 'node:path';
+import { prepareCompanionImages } from '../companion/prepareImages.mjs';
 
-parentPort?.on('message', (job: ArtifactWorkerInput) => {
+parentPort?.on('message', async (job: ArtifactWorkerInput) => {
   const startedAt = performance.now();
   try {
-    if (job.kind === ArtifactWorkerTask.TransformText) {
+    if (job.kind === ArtifactWorkerTask.PrepareCompanionImages) {
+      const images = await prepareCompanionImages(
+        job.input.sources,
+        path.join(__dirname, 'companion-photon.wasm'),
+      );
+      parentPort?.postMessage({ images, runMs: performance.now() - startedAt });
+    } else if (job.kind === ArtifactWorkerTask.TransformText) {
       parentPort?.postMessage({
         text: runTextWorkerOperation(job.input),
         runMs: performance.now() - startedAt,

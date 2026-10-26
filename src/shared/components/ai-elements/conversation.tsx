@@ -37,6 +37,7 @@ export type ConversationContentProps = ComponentProps<'div'> & {
   observeContentResize?: boolean;
   reverse?: boolean;
   scrollClassName?: string;
+  scrollTabIndex?: number;
 };
 
 export const ConversationContent = ({
@@ -45,6 +46,7 @@ export const ConversationContent = ({
   observeContentResize = true,
   reverse = true,
   scrollClassName,
+  scrollTabIndex,
   ...props
 }: ConversationContentProps) => {
   const viewport = useConversationViewportContext();
@@ -72,6 +74,7 @@ export const ConversationContent = ({
   return (
     <div
       ref={viewport.attachScrollElement}
+      tabIndex={scrollTabIndex}
       className={resolvedScrollClassName}
       style={{ height: '100%', width: '100%', scrollbarGutter: 'stable both-edges' }}
     >

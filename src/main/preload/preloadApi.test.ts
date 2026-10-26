@@ -5,7 +5,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { contextBridge, ipcRenderer } from 'electron';
 
 import { AgentIpcChannel } from '../../shared/agent/constants';
-import { CoworkSessionIpc, ModelPoolIpc, StoreIpc } from '../../shared/ipc/channels';
+import { CompanionIpc, CoworkSessionIpc, ModelPoolIpc, StoreIpc } from '../../shared/ipc/channels';
 import { LlamaCppIpcChannel } from '../../shared/llamacpp/constants';
 import { appSystemApi } from './appSystem';
 import { artifactsApi } from './artifacts';
@@ -55,6 +55,21 @@ describe('pushChannel helpers', () => {
 });
 
 describe('split api fragments', () => {
+  test('companion focus is a payload-free subscription with full cleanup', () => {
+    const listener = vi.fn();
+    const off = appSystemApi.companion.onFocus(listener);
+    ipcRenderer.emit(CompanionIpc.Focus, { sender: {} });
+    expect(listener).toHaveBeenCalledExactlyOnceWith();
+    off();
+    ipcRenderer.emit(CompanionIpc.Focus, { sender: {} });
+    expect(listener).toHaveBeenCalledOnce();
+    expect(ipcRenderer.listenerCount(CompanionIpc.Focus)).toBe(0);
+  });
+  test('companion visibility reads only the dedicated window state channel', async () => {
+    const invoke = vi.spyOn(ipcRenderer, 'invoke').mockResolvedValueOnce(false);
+    await expect(appSystemApi.companion.visibility()).resolves.toBe(false);
+    expect(invoke).toHaveBeenCalledExactlyOnceWith(CompanionIpc.GetVisibility);
+  });
   test('appSystem store forwards to StoreIpc channels', async () => {
     const invoke = vi.spyOn(ipcRenderer, 'invoke');
     await appSystemApi.store.get('theme');
@@ -154,6 +169,7 @@ describe('preload entry', () => {
       'autoLaunch',
       'checkApiConfig',
       'codingAgent',
+      'companion',
       'contextMenu',
       'cowork',
       'desktopPet',

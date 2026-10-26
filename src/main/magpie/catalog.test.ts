@@ -44,6 +44,7 @@ describe('public gateway catalog', () => {
           {},
           { id: 'image', kind: 'image' },
           { id: 'audio', modalities: { output: ['audio'] } },
+          { id: 'embedding', native_endpoints: ['/v1/embeddings'] },
         ],
       }),
     ).toEqual([]);

@@ -10,14 +10,22 @@ import { Worker } from 'node:worker_threads';
 import type { collectWorkbenchArtifacts } from './artifactCollector';
 import { ArtifactWorkerLimit, ArtifactWorkerTask } from './artifactWorkerConstants';
 import type { ArtifactWorkerInput, WorkspaceContentInspection } from './artifactWorkerTypes';
+import { COMPANION_MAX_ATTACHMENTS } from '../../shared/companion/attachments';
+import {
+  CompanionImageLimit,
+  COMPANION_IMAGE_MIME_TYPES,
+  type CompanionImageSource,
+  type CompanionPreparedImage,
+} from '../../shared/companion/images';
 
 type Input = Parameters<typeof collectWorkbenchArtifacts>[0];
 type Artifacts = ReturnType<typeof collectWorkbenchArtifacts>;
-type Result = Artifacts | WorkspaceContentInspection | TextWorkerOutput;
+type Result = Artifacts | WorkspaceContentInspection | TextWorkerOutput | CompanionPreparedImage[];
 type Response = {
   artifacts?: Artifacts;
   text?: TextWorkerOutput;
   content?: WorkspaceContentInspection;
+  images?: CompanionPreparedImage[];
   error?: string;
   runMs: number;
 };
@@ -85,6 +93,31 @@ export class WorkbenchArtifactWorkerPool {
     ).then(result => result as WorkspaceContentInspection);
   }
 
+  prepareImages(
+    sources: CompanionImageSource[],
+    signal?: AbortSignal,
+  ): Promise<CompanionPreparedImage[]> {
+    if (
+      !sources.length ||
+      sources.length > COMPANION_MAX_ATTACHMENTS ||
+      sources.some(source => !path.isAbsolute(source.path))
+    )
+      return Promise.reject(new Error('Invalid companion image selection.'));
+    try {
+      const bounded = boundWorkerInput(sources, {
+        nodes: 128,
+        depth: 4,
+        characters: 128 * 1024,
+      }) as CompanionImageSource[];
+      return this.enqueue(
+        { kind: ArtifactWorkerTask.PrepareCompanionImages, input: { sources: bounded } },
+        signal,
+      ) as Promise<CompanionPreparedImage[]>;
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  }
+
   private enqueue(task: ArtifactWorkerInput, signal?: AbortSignal): Promise<Result> {
     if (signal?.aborted) return Promise.reject(new Error('Artifact collection cancelled.'));
     if (this.queue.length >= ArtifactWorkerLimit.Queue) {
@@ -149,6 +182,33 @@ export class WorkbenchArtifactWorkerPool {
             )
               this.finish(created, new Error(response.error || 'Invalid text worker result.'));
             else this.finish(created, undefined, false, text);
+          } else if (job.task.kind === ArtifactWorkerTask.PrepareCompanionImages) {
+            const images = response.images;
+            const sources = job.task.input.sources;
+            if (
+              response.error ||
+              !Array.isArray(images) ||
+              images.length !== sources.length ||
+              images.some(
+                (image, index) =>
+                  image.id !== sources[index].id ||
+                  image.name !== sources[index].name ||
+                  typeof image.data !== 'string' ||
+                  image.data.length > CompanionImageLimit.EncodedBytes ||
+                  !COMPANION_IMAGE_MIME_TYPES.includes(image.mimeType),
+              ) ||
+              images.reduce((sum, image) => sum + image.data.length, 0) >
+                CompanionImageLimit.BatchEncodedBytes
+            ) {
+              this.finish(
+                created,
+                new Error(response.error || 'Invalid companion image worker result.'),
+              );
+            } else {
+              // Photon retains peak WASM memory. Recycle this slot after each
+              // image batch instead of retaining a photo-sized heap while idle.
+              this.finish(created, undefined, true, images);
+            }
           } else if (job.task.kind === ArtifactWorkerTask.InspectWorkspaceContent) {
             const content = response.content;
             if (
@@ -230,6 +290,10 @@ export class WorkbenchArtifactWorkerPool {
 }
 
 const pool = new WorkbenchArtifactWorkerPool();
+export const prepareCompanionImagesAsync = (
+  sources: CompanionImageSource[],
+  signal?: AbortSignal,
+): Promise<CompanionPreparedImage[]> => pool.prepareImages(sources, signal);
 export const collectWorkbenchArtifactsAsync = (
   input: Input,
   signal?: AbortSignal,

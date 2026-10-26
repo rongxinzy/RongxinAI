@@ -62,10 +62,9 @@ for (const colorScheme of ['light', 'dark']) {
     });
     await expect(enabled).toBeEnabled();
     await expect(enabled).toBeChecked();
-    const character = group.getByRole('combobox', { name: 'Companion character', exact: true });
-    await character.click();
-    await page.getByRole('option', { name: 'Yunmo · Baby dragon', exact: true }).click();
-    await expect(character).toContainText('Yunmo');
+    // Daily settings expose only the released character; dormant roster tests retain six-owner coverage.
+    await expect(group.getByRole('combobox')).toHaveCount(0);
+    await expect(group.getByText(/Youli|Tuantuan|Mianmian|Zhuli|Yunmo|Maixiao/)).toHaveCount(0);
     const accessibility = await new AxeBuilder({ page })
       .include('section[aria-label="Desktop companion"]')
       .analyze();
@@ -77,7 +76,7 @@ for (const colorScheme of ['light', 'dark']) {
       hideInFullscreen: true,
       roaming: true,
       chatter: true,
-      characterId: 'yunmo',
+      characterId: 'xiaoyuan',
     });
     // Simulate a tray change through the same API and push subscription used by native settings.
     await page.evaluate(() => window.electron.desktopPet.setSettings({ doNotDisturb: false }));
@@ -88,19 +87,7 @@ for (const colorScheme of ['light', 'dark']) {
     await page.getByText('Login', { exact: true }).first().click();
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
     await expect(enabled).toBeChecked();
-    await expect(character).toContainText('Yunmo');
-    await character.focus();
-    await page.keyboard.press('ArrowDown');
-    await expect(
-      page.getByRole('option', { name: 'Yunmo · Baby dragon', exact: true }),
-    ).toBeVisible();
-    await page.emulateMedia({ colorScheme: colorScheme === 'light' ? 'dark' : 'light' });
-    await expect(
-      page.getByRole('option', { name: 'Yunmo · Baby dragon', exact: true }),
-    ).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(character).toBeFocused();
-    await page.emulateMedia({ colorScheme });
+    await expect(group.getByRole('combobox')).toHaveCount(0);
     await page.setViewportSize({ width: 1280, height: 800 });
     await group.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `/tmp/desktop-pet-settings-${colorScheme}-1280.png` });
@@ -115,8 +102,9 @@ for (const colorScheme of ['light', 'dark']) {
       [760, 700],
     ]) {
       await page.setViewportSize({ width, height });
-      await character.scrollIntoViewIfNeeded();
-      await expect(character).toBeVisible();
+      await enabled.scrollIntoViewIfNeeded();
+      await expect(enabled).toBeVisible();
+      await expect(group.getByRole('combobox')).toHaveCount(0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     }
     await group.scrollIntoViewIfNeeded();

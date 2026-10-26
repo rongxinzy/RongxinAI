@@ -9,6 +9,7 @@ import { extractExternalDeps } from 'vite-plugin-electron/plugin';
 import renderer from 'vite-plugin-electron-renderer';
 
 import { ELECTRON_MAIN_EXTERNALS } from './scripts/electron-runtime-dependencies.mjs';
+import { copyCompanionPhoton } from './scripts/copy-companion-photon.mjs';
 
 // https://vitejs.dev/config/
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
@@ -99,6 +100,7 @@ const rejectDuplicateHighlighterModules = () => ({
 const copyPhotonWasmPlugin = () => ({
   name: 'copy-photon-wasm',
   closeBundle() {
+    copyCompanionPhoton(projectRoot, path.join(projectRoot, 'dist-electron'));
     const sourceCandidates = [
       path.resolve(
         projectRoot,
@@ -174,6 +176,18 @@ export default defineConfig(async ({ command }) => {
               },
               {
                 entry: 'src/main/desktopPetPreload.ts',
+                vite: {
+                  build: {
+                    watch: null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
+                entry: 'src/main/companionWindowPreload.ts',
                 vite: {
                   build: {
                     watch: null,
@@ -328,10 +342,7 @@ export default defineConfig(async ({ command }) => {
                     outDir: 'dist-electron',
                     minify: false,
                     rolldownOptions: {
-                      external:
-                        command === 'serve'
-                          ? isElectronDevelopmentExternal
-                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                      external: id => ELECTRON_MAIN_EXTERNALS.includes(id),
                       output: {
                         // Keep CJS format (default), but load via ESM loader.mjs
                         codeSplitting: false,
@@ -379,6 +390,7 @@ export default defineConfig(async ({ command }) => {
           main: path.resolve(projectRoot, 'index.html'),
           officePreview: path.resolve(projectRoot, 'office-preview.html'),
           desktopPet: path.resolve(projectRoot, 'desktop-pet.html'),
+          companion: path.resolve(projectRoot, 'companion.html'),
         },
       },
       // CI 中指定 chrome130（Electron 40 运行时）跳过降级转译省内存
