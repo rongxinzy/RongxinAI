@@ -101,28 +101,7 @@ function Assert-TreesEqual {
 
 function Invoke-PythonProbe {
   param([Parameter(Mandatory = $true)][string]$PythonPath, [Parameter(Mandatory = $true)][string]$Label)
-  $modules = @(
-    'PIL',
-    'cnlunar',
-    'colorama',
-    'line_profiler',
-    'lunardate',
-    'matplotlib',
-    'numpy',
-    'openpyxl',
-    'pandas',
-    'pip_audit',
-    'psycopg2',
-    'pylint',
-    'pypdf',
-    'pypdfium2',
-    'pytest',
-    'reportlab',
-    'scipy',
-    'statsmodels'
-  )
-  $probe = 'import ' + ($modules -join ',') + '; print(1)'
-  & $PythonPath -c $probe
+  & $PythonPath $pythonProbePath
   if ($LASTEXITCODE -ne 0) {
     throw "$Label failed with exit code $LASTEXITCODE"
   }
@@ -209,6 +188,11 @@ try {
 
   Assert-TreesEqual $baselineExtractedRoot $solidExtractedRoot
   if (-not $SkipPythonProbe) {
+    # Use the same offline Skill selection and import mapping as runtime setup.
+    # A script file also preserves Python quoting under Windows PowerShell 5.1.
+    $pythonProbePath = Join-Path $benchmarkRoot 'probe.py'
+    & node (Join-Path $PSScriptRoot 'skill-python-probe.cjs') $ProjectRoot $pythonProbePath
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve offline Skill Python dependency probe' }
     $relativePython = 'skill-python\layers\shared\Scripts\python.exe'
     $baselinePython = Join-Path $baselineExtractedRoot $relativePython
     $solidPython = Join-Path $solidExtractedRoot $relativePython

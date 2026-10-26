@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { sha256File } = require('../windows-resource-pack.cjs');
+const { createSkillPythonProbe } = require('./skill-python-probe.cjs');
 
 const directory = 'build-tar/windows-components';
 const reportPath = `${directory}/skill-python-compression-benchmark.json`;
@@ -20,6 +21,9 @@ const fingerprint = crypto
       archiveHash,
       sha256File('node_modules/7zip-bin/win/x64/7za.exe'),
       sha256File('scripts/ci/benchmark-skill-python-compression.ps1'),
+      sha256File('scripts/ci/skill-python-probe.cjs'),
+      sha256File('scripts/setup-skill-python-runtime.js'),
+      createSkillPythonProbe(process.cwd()),
       sha256File(__filename),
     ]),
   )
