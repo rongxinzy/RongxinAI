@@ -17,7 +17,7 @@ export function createStrata(runtime: BrowserMockRuntime): Window['electron']['s
     status: async () => {
       runtime.warnOnce('strata.status');
       return {
-        status: '',
+        status: 'stopped',
         checkedAt: '',
         managedByApp: true,
       };
@@ -26,7 +26,7 @@ export function createStrata(runtime: BrowserMockRuntime): Window['electron']['s
       void _p0;
       runtime.warnOnce('strata.start');
       return {
-        status: '',
+        status: 'stopped',
         checkedAt: '',
         managedByApp: true,
       };
@@ -34,7 +34,7 @@ export function createStrata(runtime: BrowserMockRuntime): Window['electron']['s
     stop: async () => {
       runtime.warnOnce('strata.stop');
       return {
-        status: '',
+        status: 'stopped',
         checkedAt: '',
         managedByApp: true,
       };
