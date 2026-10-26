@@ -48,6 +48,14 @@ export function classicMessageSurfaces() {
         'text-decoration': 'line-through',
       },
     }),
+    'composer-backdrop': recipe({
+      base: {
+        'background-color': 'var(--background)',
+        'border-top-left-radius': 'var(--zy-style-radius-3xl)',
+        'border-top-right-radius': 'var(--zy-style-radius-3xl)',
+        'padding-bottom': '1rem',
+      },
+    }),
     'composer-surface': recipe({
       base: {
         'border-radius': 'var(--zy-style-radius-3xl)',

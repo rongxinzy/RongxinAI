@@ -7,6 +7,14 @@ const source = readFileSync(
   fileURLToPath(new URL('./CoworkSessionDetail.tsx', import.meta.url)),
   'utf8',
 );
+const composerSource = readFileSync(
+  fileURLToPath(new URL('./sessionDetail/SessionComposerOverlay.tsx', import.meta.url)),
+  'utf8',
+);
+const composerRecipes = readFileSync(
+  fileURLToPath(new URL('../../theme/components/classic-message-surfaces.ts', import.meta.url)),
+  'utf8',
+);
 const turnBlockSource = readFileSync(
   fileURLToPath(new URL('./components/TurnBlock.tsx', import.meta.url)),
   'utf8',
@@ -18,8 +26,8 @@ const userBubbleSource = readFileSync(
 
 test('reserves conversation viewport above the absolutely positioned composer', () => {
   const inputArea = source.indexOf('{/* Input Area */}');
-  const overlay = source.indexOf('ref={composerOverlayRef}', inputArea);
-  const promptInput = source.indexOf('<CoworkPromptInput', inputArea);
+  const overlay = source.indexOf('<SessionComposerOverlay', inputArea);
+  const promptInput = composerSource.indexOf('<CoworkPromptInput\n');
   const permission = source.indexOf('<CoworkPermissionModal');
   const askUserQuestion = source.indexOf('<AskUserQuestionCard');
 
@@ -34,7 +42,10 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   // system (inside detailRoot, outside the scroll container and before the
   // artifact panel frame) so flex sizing — window and panel alike — reaches
   // it automatically.
-  expect(source.slice(overlay, promptInput)).toContain(
+  expect(source.slice(overlay)).toContain('overlayRef={composerOverlayRef}');
+  expect(source.slice(overlay)).toContain('promptInputRef={promptInputRef}');
+  expect(composerSource.slice(0, promptInput)).toContain('ref={overlayRef}');
+  expect(composerSource.slice(0, promptInput)).toContain(
     'className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"',
   );
   const detailRootOpen = source.indexOf('ref={detailRootRef}');
@@ -51,10 +62,16 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   expect(askUserQuestion).toBeLessThan(inputArea);
   expect(permission).toBeGreaterThan(scrollContainer);
   expect(permission).toBeLessThan(inputArea);
-  expect(source.indexOf('<CoworkPermissionModal', promptInput)).toBe(-1);
-  expect(source.slice(overlay, promptInput)).toContain(
-    'className="pointer-events-auto relative min-w-0 rounded-t-3xl bg-background pb-4"',
+  expect(source.indexOf('<CoworkPermissionModal', overlay)).toBe(-1);
+  expect(composerSource).not.toContain('<CoworkPermissionModal');
+  expect(composerSource.slice(0, promptInput)).toContain(
+    'className="theme-composer-backdrop pointer-events-auto relative min-w-0"',
   );
+  expect(composerRecipes).toContain("'composer-backdrop': recipe({");
+  expect(composerRecipes).toContain("'background-color': 'var(--background)'");
+  expect(composerRecipes).toContain("'border-top-left-radius': 'var(--zy-style-radius-3xl)'");
+  expect(composerRecipes).toContain("'border-top-right-radius': 'var(--zy-style-radius-3xl)'");
+  expect(composerSource).toContain('ref={promptInputRef}');
   expect(turnBlockSource).toContain('className="mx-auto w-full max-w-6xl min-w-[320px] pl-4"');
   expect(turnBlockSource).toContain('className="flex min-w-0 flex-col gap-3 py-3"');
   expect(userBubbleSource).toContain(
@@ -67,5 +84,5 @@ test('reserves conversation viewport above the absolutely positioned composer', 
     /\{sessionId && \(\s*<div className="px-3 pt-3">\s*<WorkbenchTaskAcceptanceCard/,
   );
   expect(source).toMatch(/<ConversationContent\r?\n\s+className="pt-3"/);
-  expect(promptInput).toBeGreaterThan(overlay);
+  expect(promptInput).toBeGreaterThan(composerSource.indexOf('ref={overlayRef}'));
 });
