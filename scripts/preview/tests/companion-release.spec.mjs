@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { attachConsoleGuards } from '../shared/harness.mjs';
 
 for (const theme of ['light', 'dark']) {
-  test(`the release exposes only Xiaoyuan in the bubble and appearance settings in ${theme}`, async ({
+  test(`the release exposes all seven original companions in the bubble and appearance settings in ${theme}`, async ({
     page,
   }) => {
     const failures = [];
@@ -12,10 +12,10 @@ for (const theme of ['light', 'dark']) {
     await page.setViewportSize({ width: 480, height: 400 });
     await page.goto(`/companion.html?language=en&theme=${theme}`);
     await expect(page.getByRole('textbox')).toBeEnabled();
-    await expect(page.locator('.theme-companion-name')).toHaveText('Xiaoyuan');
+    const chooser = page.getByRole('combobox', { name: 'Switch companion', exact: true });
     await expect(
-      page.getByRole('combobox', { name: 'Choose a companion', exact: true }),
-    ).toHaveCount(0);
+      page.getByRole('combobox', { name: 'Switch companion', exact: true }),
+    ).toBeVisible();
     const release = await page.evaluate(async () => {
       const state = await window.companion.bootstrap();
       let refused = false;
@@ -26,7 +26,13 @@ for (const theme of ['light', 'dark']) {
       }
       return { identities: state.profiles.map(profile => profile.personaId), refused };
     });
-    expect(release).toEqual({ identities: ['xiaoyuan'], refused: true });
+    expect(release).toEqual({
+      identities: ['xiaoyuan', 'youli', 'tuantuan', 'mianmian', 'zhuli', 'yunmo', 'maixiao'],
+      refused: false,
+    });
+    await chooser.click();
+    await expect(page.getByRole('option')).toHaveCount(7);
+    await page.getByRole('option', { name: 'Xiaoyuan', exact: true }).click();
     await page.getByRole('textbox').fill('A small thought for Xiaoyuan');
     await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
     const foreground = await page.locator('[data-companion-bubble]').evaluate(element => {
@@ -51,8 +57,10 @@ for (const theme of ['light', 'dark']) {
     await expect(
       settings.getByRole('switch', { name: 'Show desktop companion', exact: true }),
     ).toBeVisible();
-    await expect(settings.getByRole('combobox')).toHaveCount(0);
-    await expect(settings.getByText(/Youli|Tuantuan|Mianmian|Zhuli|Yunmo|Maixiao/)).toHaveCount(0);
+    await settings.getByRole('combobox').click();
+    await expect(page.getByRole('option')).toHaveCount(7);
+    await page.getByRole('option', { name: /Maixiao/ }).click();
+    await expect(settings.getByRole('combobox')).toContainText('Maixiao');
     await page.screenshot({ path: `/tmp/companion-solo-settings-${theme}.png` });
     expect(failures).toEqual([]);
   });
