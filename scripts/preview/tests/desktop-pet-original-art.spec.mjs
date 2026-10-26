@@ -10,9 +10,9 @@ test('six original-art idle videos preserve the atlas face, silhouette and propo
   await page.goto('/desktop-pet.html');
   await expect(page.locator('canvas')).toHaveAttribute('data-character', 'xiaoyuan');
   const results = await page.evaluate(
-    async ids => {
-      const { DesktopPetAtlas } = await import('/src/renderer/desktopPet/atlas.ts');
-      const { drawPetPose } = await import('/src/renderer/desktopPet/draw.ts');
+    async ({ ids, atlasModule, drawModule }) => {
+      const { DesktopPetAtlas } = await import(atlasModule);
+      const { drawPetPose } = await import(drawModule);
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 192;
       const context = canvas.getContext('2d', { willReadFrequently: true });
@@ -58,7 +58,12 @@ test('six original-art idle videos preserve the atlas face, silhouette and propo
       }
       return results;
     },
-    DESKTOP_PET_BUILTINS.slice(1).map(pet => pet.id),
+    {
+      ids: DESKTOP_PET_BUILTINS.slice(1).map(pet => pet.id),
+      // Browser-served Vite URLs, not filesystem imports in the Node test runner.
+      atlasModule: new URL('/src/renderer/desktopPet/atlas.ts', page.url()).href,
+      drawModule: new URL('/src/renderer/desktopPet/draw.ts', page.url()).href,
+    },
   );
   for (const result of results) {
     await page.evaluate(({ referenceImage, decodedImage }) => {
