@@ -118,7 +118,7 @@ export function shellSidebarAppearances() {
         ...feedback,
         height: '2rem',
         'padding-left': '0.625rem',
-        'padding-right': '3.625rem',
+        'padding-right': '0.625rem',
         'background-color': 'transparent',
         'border-width': '0px',
         'box-shadow': 'none',
