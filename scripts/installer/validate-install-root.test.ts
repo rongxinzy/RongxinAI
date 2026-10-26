@@ -2,8 +2,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { expect, test } from 'vitest';
 
+const require = createRequire(import.meta.url);
+const { resolveWindowsProduct } = require('../packaging/windows-product.cjs') as {
+  resolveWindowsProduct: (root: string, enterprise: boolean) => { executableName: string };
+};
+const communityExecutable = resolveWindowsProduct(process.cwd(), false).executableName;
+const enterpriseExecutable = resolveWindowsProduct(process.cwd(), true).executableName;
 const script = path.join(__dirname, 'validate-install-root.ps1');
 const installer = fs.readFileSync(path.resolve('scripts/nsis-installer.nsh'), 'utf8');
 const macro = (name: string) => installer.split(`!macro ${name}\n`)[1]?.split('!macroend')[0] || '';
@@ -11,6 +18,7 @@ const macro = (name: string) => installer.split(`!macro ${name}\n`)[1]?.split('!
 test('native prepare, stock process hook and uninstall validate ownership before destructive actions', () => {
   const validate = macro('ValidateInstallRoot MODE');
   expect(validate).toContain('-File "$PLUGINSDIR\\validate-install-root.ps1"');
+  expect(validate).toContain('-ExecutableName "${PRODUCT_FILENAME}.exe"');
   expect(validate).toContain('SetErrorLevel 1');
   expect(validate).toContain('Quit');
   for (const name of [
@@ -54,6 +62,8 @@ test.skipIf(process.platform !== 'win32')(
           script,
           '-InstallDir',
           installDir,
+          '-ExecutableName',
+          communityExecutable,
           '-RuntimeRoot',
           runtimeRoot,
           '-AppDataRoot',
@@ -86,7 +96,7 @@ test.skipIf(process.platform !== 'win32')(
       reject(fresh, 'uninstall');
       fs.writeFileSync(path.join(fresh, 'personal.txt'), 'keep');
       reject(fresh);
-      fs.writeFileSync(path.join(fresh, '知远.exe'), 'owned executable fixture');
+      fs.writeFileSync(path.join(fresh, communityExecutable), 'owned executable fixture');
       reject(fresh);
       fs.mkdirSync(path.join(fresh, 'resources'));
       fs.writeFileSync(path.join(fresh, 'resources', 'app.asar'), 'owned archive fixture');
@@ -128,4 +138,59 @@ test.skipIf(process.platform !== 'win32')(
     }
   },
   90_000,
+);
+
+test.skipIf(process.platform !== 'win32')(
+  'upgrade and uninstall accept only the executable belonging to the current product',
+  () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'install-product-guard-'));
+    const install = path.join(root, '安装目录');
+    fs.mkdirSync(path.join(install, 'resources'), { recursive: true });
+    fs.writeFileSync(path.join(install, 'resources', 'app.asar'), 'owned archive fixture');
+    const run = (executableName: string, mode: string) =>
+      spawnSync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          script,
+          '-InstallDir',
+          install,
+          '-RuntimeRoot',
+          path.join(root, 'runtimes'),
+          '-AppDataRoot',
+          path.join(root, 'data'),
+          '-Mode',
+          mode,
+          '-ExecutableName',
+          executableName,
+        ],
+        { encoding: 'utf8', timeout: 20_000 },
+      );
+    try {
+      for (const [executable, other] of [
+        [communityExecutable, enterpriseExecutable],
+        [enterpriseExecutable, communityExecutable],
+      ]) {
+        const binary = path.join(install, executable);
+        fs.writeFileSync(binary, 'owned executable fixture');
+        for (const mode of ['install', 'uninstall']) {
+          const accepted = run(executable, mode);
+          expect(accepted.error, accepted.stderr).toBeUndefined();
+          expect(accepted.status, accepted.stderr + accepted.stdout).toBe(0);
+          expect(run(other, mode).status).toBe(1);
+        }
+        fs.unlinkSync(binary);
+      }
+      const external = path.join(root, enterpriseExecutable);
+      fs.writeFileSync(external, 'external executable fixture');
+      expect(run(`..\\${enterpriseExecutable}`, 'install').status).toBe(1);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  },
+  30_000,
 );

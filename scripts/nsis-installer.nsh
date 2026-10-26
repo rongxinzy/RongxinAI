@@ -59,7 +59,7 @@ Var /GLOBAL zyDeleteRealAppData
 !macroend
 
 !macro ValidateInstallRoot MODE
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-install-root.ps1" -InstallDir "$INSTDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -AppDataRoot "$APPDATA\ZhiYuanAgent" -Mode ${MODE}'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-install-root.ps1" -InstallDir "$INSTDIR" -ExecutableName "${PRODUCT_FILENAME}.exe" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -AppDataRoot "$APPDATA\ZhiYuanAgent" -Mode ${MODE}'
   Pop $0
   Pop $1
   ${If} $0 != "0"
