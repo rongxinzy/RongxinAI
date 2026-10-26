@@ -104,6 +104,7 @@ foreach ($file in @(${quote(scriptPath)}, ${quote(helperPath)})) {
 . ${quote(helperPath)}
 $root = ${quote(fixture)}
 $sandbox = Join-Path $root 'zhiyuan-shell-acceptance'
+$ProjectRoot = ${quote(path.resolve(__dirname, '../..'))}
 ${installedPathDefinition}
 [IO.File]::WriteAllText((Join-Path $root 'installed-path.txt'), $app, [Text.UTF8Encoding]::new($false))
 $env:PSModulePath = [IO.Path]::Combine($root, 'no-module-search-path')

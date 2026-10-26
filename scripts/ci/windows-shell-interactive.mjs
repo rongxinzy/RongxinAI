@@ -20,6 +20,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import windowsProduct from '../packaging/windows-product.cjs';
 import { shellScreenshots, observeDetachedUpgrade } from './windows-shell-evidence.mjs';
 import { Cdp, snapshotExpression } from './windows-shell-browser-evidence.mjs';
 
@@ -139,7 +140,8 @@ export async function runShellAcceptance() {
   const installRoot = path.join(sandbox, '安装路径');
   const appData = path.join(sandbox, 'app-data');
   const runtime = path.join(sandbox, 'runtimes');
-  const app = path.join(installRoot, '知远.exe');
+  const product = windowsProduct.resolveWindowsProduct(root);
+  const app = path.join(installRoot, product.executableName);
   const asar = path.join(installRoot, 'resources/app.asar');
   const heldApp = `${app}.acceptance-held`;
   assert(!(await exists(sandbox)), 'Shell acceptance requires a fresh CI-owned directory');
@@ -406,7 +408,10 @@ export async function runShellAcceptance() {
     const log = await events(session);
     const done = log.findLast(item => item.type === 'done');
     assert.equal(path.resolve(done.launchPath).toLowerCase(), app.toLowerCase());
-    assert.equal(await sha256(app), await sha256(path.join(root, 'release/win-unpacked/知远.exe')));
+    assert.equal(
+      await sha256(app),
+      await sha256(path.join(root, 'release/win-unpacked', product.executableName)),
+    );
     assert.equal(
       await sha256(asar),
       await sha256(path.join(root, 'release/win-unpacked/resources/app.asar')),

@@ -38,10 +38,10 @@ Preload 桥只允许 `snapshot`、`login`、`changePassword` 和 `logout`。主�
 
 ## 企业版 Windows 通用安装包
 
-本仓库的 `Build Zhiyuan Enterprise Windows package (manual)` 工作流直接构建 `enterprise/`，输入 `version`（例如 `v1.0.0`）和可从 main 到达的 `source_ref`，无需填写 AEP 地址。工作流安装锁定的 Go 工具链、构建并校验 Magpie、安装 .NET 8 SDK、验证企业模块，再用 `electron-builder.enterprise.cjs` 完成应用和安装包的一次性 Certum 签名。本地入口是 `bun run dist:win:enterprise`；首次构建需先按 `resources/magpie/upstream.json` 的版本准备 Go，执行 `bun run magpie:build -- --target win32-x64`，并安装 .NET 8 SDK。
+本仓库的 `Build Zhiyuan Enterprise Windows package (manual)` 入口校验 `version`（例如 `v1.0.0`）和可从 main 到达的 `source_ref` 后，以 `enterprise-extension: true` 调用普通版 `build-windows-release.yml`，无需填写 AEP 地址。两版共用运行时准备、签名、WebView2 安装器和安装验收；企业选项只额外构建 `enterprise/`，通过 `electron-builder.enterprise.cjs` 加入扩展并选择独立产品标识。本地 `bun run dist:win:enterprise` 与普通版离线/签名构建共用 `scripts/build-windows.cjs`。首次构建需先准备锁定的 Go 工具链、执行 `bun run magpie:build -- --target win32-x64`，并安装 .NET 8 SDK。
 
 AEP 服务端地址在企业版客户端登录页填写，可在退出登录后随时修改。地址通过主进程校验后原子保存到企业版 `userData/zhiyuan-enterprise/connection.json`，退出、重启和升级后保留，并在登录页自动回填；即使服务器暂时离线也会保存合法地址。密码不写入该配置，刷新令牌通过系统加密存储并按服务端地址隔离。分离部署的 Agent 控制地址由服务元数据发现并保存，切换服务端时重新发现，不沿用上一个部署的地址。安装包内的配置没有默认服务端地址。
 
 旧 `Sign Zhiyuan Enterprise Windows package` 入口仍校验私有仓库未签名构建的 run ID 与版本，随后复用上述通用安装包流程。该来源 commit 仅作为交接溯源；客户端源码使用触发签名时本仓库的精确 main commit，不再重建私有仓库中的旧客户端，也不再接受打包时注入地址。
 
-上传前会校验版本、证书、企业资源、运行时、冷安装、升级与卸载。安装包、`SHA256SUMS.txt` 和校验记录作为 Actions artifact 保留 14 天。签名使用本仓库 `release` 环境既有的 Certum 凭据。
+共用验收 action 在上传前校验证书、运行时、NSIS 冷安装/升级、实际 WebView2 安装器和原生卸载，企业版另加企业资源与版本校验。WebView2 安装器（`ZhiYuanAgent-Setup-<version>.exe`）、独立命名的 NSIS 更新包、`SHA256SUMS.txt` 和验收记录作为 Actions artifact 保留 14 天。签名使用本仓库 `release` 环境既有的 Certum 凭据。两种安装引擎的程序名、安装目录和注册表标识从同一份产品配置生成。

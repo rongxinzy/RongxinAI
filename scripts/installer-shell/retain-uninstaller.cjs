@@ -4,28 +4,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { sha256File } = require('../windows-resource-pack.cjs');
+const { resolveWindowsProduct } = require('../packaging/windows-product.cjs');
 
 function retainedHostPath(root) {
   return path.join(root, 'scripts', 'installer-shell', 'out', 'ZhiYuanUninstall.exe');
 }
 
 function context(root) {
-  const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
-  const config = JSON.parse(fs.readFileSync(path.join(root, 'electron-builder.json'), 'utf8'));
+  const product = resolveWindowsProduct(root);
   const git = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' });
   const sourceCommit = git.stdout?.trim();
   if (git.status !== 0 || !/^[a-f0-9]{40,64}$/.test(sourceCommit || '')) {
     throw new Error('Cannot bind the retained uninstaller to the checked-out source commit');
   }
-  if (
-    config.appId !== 'com.zhiyuanagent.app' ||
-    config.nsis.artifactName !== '${productName}-Setup-${version}.${ext}'
-  ) {
-    throw new Error('Unexpected community NSIS artifact configuration');
-  }
-  const sourceFileName = `${config.productName}-Setup-${version}.__uninstaller.exe`;
-  const installedFileName = `Uninstall ${config.productName}.exe`;
-  return { version, sourceCommit, sourceFileName, installedFileName };
+  const { version, sourceFileName, installedFileName, appId } = product;
+  return { version, sourceCommit, sourceFileName, installedFileName, appId };
 }
 
 function assertNsisHost(file) {

@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const {
@@ -13,6 +13,7 @@ const {
   verifyRetainedHost,
 } = require('./retain-uninstaller.cjs');
 const roots: string[] = [];
+const { resolveWindowsProduct } = require('../packaging/windows-product.cjs');
 
 function fixture() {
   const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-native-host-'));
@@ -34,17 +35,21 @@ function fixture() {
     const git = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
     expect(git.status, git.stderr).toBe(0);
   }
-  writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '2026.7.16' }));
+  writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({ name: 'fixture', version: '2026.7.16' }),
+  );
   writeFileSync(
     path.join(root, 'electron-builder.json'),
     JSON.stringify({
       appId: 'com.zhiyuanagent.app',
       productName: 'Fixture',
+      executableName: 'Fixture',
       nsis: { artifactName: '${productName}-Setup-${version}.${ext}' },
     }),
   );
   mkdirSync(path.join(root, 'release'));
-  const source = path.join(root, 'release', 'Fixture-Setup-2026.7.16.__uninstaller.exe');
+  const source = path.join(root, 'release', resolveWindowsProduct(root).sourceFileName);
   const bytes = Buffer.alloc(1152, 0);
   bytes.write('MZ');
   bytes.writeUInt32LE(128, 60);
@@ -65,10 +70,12 @@ function fixture() {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-test('retains exactly the native host bytes and binds its current source commit', () => {
+test.each([false, true])('retains exact native host bytes for enterprise=%s', enterprise => {
+  vi.stubEnv('ZHIYUAN_ENTERPRISE_BUILD', enterprise ? '1' : '0');
   const { root, source, bytes } = fixture();
   const manifest = captureUninstaller(root, source);
   expect(manifest.kind).toBe('nsis-uninstall-host');
@@ -77,6 +84,8 @@ test('retains exactly the native host bytes and binds its current source commit'
   expect(manifest.bytes).toBe(bytes.length);
   expect(readFileSync(retainedHostPath(root))).toEqual(bytes);
   expect(verifyRetainedHost(root)).toEqual(manifest);
+  vi.stubEnv('ZHIYUAN_ENTERPRISE_BUILD', enterprise ? '0' : '1');
+  expect(() => verifyRetainedHost(root)).toThrow(/do not match/);
 });
 
 test('rejects a different intermediate source, including an older version', () => {

@@ -10,7 +10,11 @@ interface Workflow {
   on: Record<string, { inputs: Record<string, unknown> }>;
   jobs: Record<
     string,
-    { uses?: string; with?: Record<string, string>; steps?: Array<{ uses?: string; run?: string }> }
+    {
+      uses?: string;
+      with?: Record<string, string | boolean>;
+      steps?: Array<{ uses?: string; run?: string }>;
+    }
   >;
 }
 
@@ -34,9 +38,15 @@ test('both enterprise release entry points use a generic installer with runtime 
   expect(config.aepBaseUrl).toBe('');
 });
 
-test('enterprise packaging prepares the required pinned gateway and document toolchains first', () => {
-  const steps = workflow('enterprise-windows.yml').jobs.package?.steps ?? [];
-  const packageIndex = steps.findIndex(step => step.run?.includes("'dist:win:enterprise'"));
+test('enterprise and community share the release workflow, installer and acceptance gates', () => {
+  const entry = workflow('enterprise-windows.yml').jobs.package;
+  expect(entry.uses).toBe('./.github/workflows/build-windows-release.yml');
+  expect(entry.with?.['enterprise-extension']).toBe(true);
+  expect(workflow('release.yml').jobs['build-windows'].uses).toBe(entry.uses);
+  const steps = workflow('build-windows-release.yml').jobs['windows-release']?.steps ?? [];
+  const packageIndex = steps.findIndex(step =>
+    step.run?.includes('node scripts/build-windows.cjs --signed'),
+  );
   const beforePackage = steps.slice(0, packageIndex);
   expect(packageIndex).toBeGreaterThan(0);
   expect(beforePackage.some(step => step.uses === 'actions/setup-go@v6')).toBe(true);
@@ -48,4 +58,11 @@ test('enterprise packaging prepares the required pinned gateway and document too
         step.run.includes('bun run magpie:verify -- --target win32-x64'),
     ),
   ).toBe(true);
+  expect(steps.some(step => step.uses === './.github/actions/verify-windows-package')).toBe(true);
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+    scripts: Record<string, string>;
+  };
+  for (const name of ['dist:win:offline', 'dist:win:signed', 'dist:win:enterprise']) {
+    expect(pkg.scripts[name]).toMatch(/^node scripts\/build-windows\.cjs(?: |$)/);
+  }
 });

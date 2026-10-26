@@ -47,12 +47,10 @@ public sealed class EngineException : Exception
 /// </summary>
 public sealed class InstallerEngine
 {
-    // UUIDv5("com.zhiyuanagent.app", ns=50e065bc-3134-11e6-9bab-38c9862bdaf3) —
-    // identical to the GUID electron-builder derives for the NSIS installer,
-    // so both installers register/unregister the same keys.
-    public const string AppGuid = "331369f7-5ab3-5702-935d-f3cff6ba8163";
-    public const string AppExeName = "知远.exe";
-    public const string DisplayName = "知远智能体 (ZhiYuan Agent)";
+    // Generated from the same product configuration as the NSIS updater.
+    public const string AppGuid = InstallerProduct.AppGuid;
+    public const string AppExeName = InstallerProduct.AppExeName;
+    public const string DisplayName = InstallerProduct.DisplayName;
     public const string Publisher = "知远智能体 (ZhiYuan Agent)";
 
     internal static readonly string InstallRegistryKey = $@"Software\{AppGuid}";

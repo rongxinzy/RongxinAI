@@ -53,21 +53,15 @@ $installers = @(
     -Filter '*.exe' -File
 )
 $targets = @($appExecutable)
-if ($ExecutableName) {
-  # The enterprise overlay retains its independent NSIS-only distribution.
-  if ($installers.Count -ne 1) { throw 'Expected exactly one enterprise installer.' }
-  $targets += $installers[0].FullName
-} else {
-  $version = (Get-Content -LiteralPath (Join-Path $ProjectRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
-  $shellName = "ZhiYuanAgent-Setup-$version.exe"
-  $shell = @($installers | Where-Object { $_.Name -eq $shellName })
-  $updater = @($installers | Where-Object { $_.Name -ne $shellName })
-  if ($installers.Count -ne 2 -or $shell.Count -ne 1 -or $updater.Count -ne 1) {
-    throw 'Expected one WebView2 installer and one NSIS updater.'
-  }
-  $targets += @($shell[0].FullName, $updater[0].FullName,
-    (Join-Path $ProjectRoot 'scripts\installer-shell\out\ZhiYuanUninstall.exe'))
+$version = (Get-Content -LiteralPath (Join-Path $ProjectRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
+$shellName = "ZhiYuanAgent-Setup-$version.exe"
+$shell = @($installers | Where-Object { $_.Name -eq $shellName })
+$updater = @($installers | Where-Object { $_.Name -ne $shellName })
+if ($installers.Count -ne 2 -or $shell.Count -ne 1 -or $updater.Count -ne 1) {
+  throw 'Expected one WebView2 installer and one NSIS updater.'
 }
+$targets += @($shell[0].FullName, $updater[0].FullName,
+  (Join-Path $ProjectRoot 'scripts\installer-shell\out\ZhiYuanUninstall.exe'))
 $magpieDirectory = Join-Path $ProjectRoot 'release\win-unpacked\resources\magpie\win32-x64'
 $magpieExecutable = Join-Path $magpieDirectory 'magpie.exe'
 $targets += $magpieExecutable

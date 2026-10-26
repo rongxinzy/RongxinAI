@@ -28,7 +28,9 @@ if ($Action -eq 'hold-file') {
   exit
 }
 if ($Action -eq 'registration') {
-  $guid = '331369f7-5ab3-5702-935d-f3cff6ba8163'
+  $product = (& node (Join-Path $PSScriptRoot '../packaging/windows-product.cjs')) | ConvertFrom-Json
+  if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve the installer product identity' }
+  $guid = $product.appGuid
   $result = foreach ($key in @("HKCU:/Software/$guid", "HKCU:/Software/Microsoft/Windows/CurrentVersion/Uninstall/$guid")) {
     if (Test-Path -LiteralPath $key) {
       $item = Get-Item -LiteralPath $key

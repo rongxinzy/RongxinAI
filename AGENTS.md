@@ -106,7 +106,7 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 - `enterprise/` 是知远企业客户端扩展（自 zhiyuanAaaS 仓库迁入，源提交 `7adec4a`）：企业会话、托管模型投影、Agent 控制循环、托管 Skill 与企业设置渲染器。迁移代码保持原仓库结构（`enterprise/src/`），不适用本仓 renderer 的主题与设计体系。
 - 独立构建：`bun run build:enterprise` 产出 `enterprise/dist/extension.cjs`（tsup 单文件 CJS）与 `enterprise/dist/ui/`；测试 `bun run test:enterprise`，类型检查 `bun run typecheck:enterprise`，包体验证 `bun run verify:enterprise:bundle`。根 `npm test` 的 include 不覆盖 `enterprise/`。
 - 宿主经 `src/main/enterpriseExtension` 契约加载：打包产物位于 `resources/zhiyuan-enterprise/extension.cjs`，开发覆盖用 `ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH` 指向本地 bundle。UI bundle 是独立 document，不进入主渲染器主题系统。
-- 企业版 Windows 打包走手动 workflow「Build Zhiyuan Enterprise Windows package (manual)」（输入 version，无需服务端地址），overlay 配置是 `electron-builder.enterprise.cjs`（社区流程 `electron-builder.json` 不加载它），本地入口 `bun run dist:win:enterprise`。AEP 地址在客户端登录时填写，可修改并持久化到企业版用户数据目录的 `zhiyuan-enterprise/connection.json`；安装包不绑定部署。打包产物有意不含 Admin Console bundle（控制台仍是 zhiyuanAaaS 的 Web 部署应用）。
+- 企业版 Windows 手动入口「Build Zhiyuan Enterprise Windows package (manual)」校验 version/source_ref 后，以 `enterprise-extension: true` 调用普通版 `build-windows-release.yml`；不得另建安装器、签名或安装验收流程。两版共用 `scripts/build-windows.cjs` 和 WebView2 安装壳，企业版仅叠加扩展与独立产品标识（`scripts/packaging/windows-product.cjs`、`electron-builder.enterprise.cjs`）。本地入口 `bun run dist:win:enterprise`。AEP 地址在客户端登录时填写，可修改并持久化到企业版用户数据目录的 `zhiyuan-enterprise/connection.json`；安装包不绑定部署。打包产物有意不含 Admin Console bundle（控制台仍是 zhiyuanAaaS 的 Web 部署应用）。
 
 ## 前端设计规则（P0）
 
