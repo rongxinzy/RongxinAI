@@ -62,9 +62,11 @@ for (const colorScheme of ['light', 'dark']) {
     });
     await expect(enabled).toBeEnabled();
     await expect(enabled).toBeChecked();
-    // Daily settings expose only the released character; dormant roster tests retain six-owner coverage.
-    await expect(group.getByRole('combobox')).toHaveCount(0);
-    await expect(group.getByText(/Youli|Tuantuan|Mianmian|Zhuli|Yunmo|Maixiao/)).toHaveCount(0);
+    const appearance = group.getByRole('combobox');
+    await appearance.click();
+    await expect(page.getByRole('option')).toHaveCount(7);
+    await page.getByRole('option', { name: /Youli/ }).click();
+    await expect(appearance).toContainText('Youli');
     const accessibility = await new AxeBuilder({ page })
       .include('section[aria-label="Desktop companion"]')
       .analyze();
@@ -76,7 +78,7 @@ for (const colorScheme of ['light', 'dark']) {
       hideInFullscreen: true,
       roaming: true,
       chatter: true,
-      characterId: 'xiaoyuan',
+      characterId: 'youli',
     });
     // Simulate a tray change through the same API and push subscription used by native settings.
     await page.evaluate(() => window.electron.desktopPet.setSettings({ doNotDisturb: false }));
@@ -87,7 +89,7 @@ for (const colorScheme of ['light', 'dark']) {
     await page.getByText('Login', { exact: true }).first().click();
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
     await expect(enabled).toBeChecked();
-    await expect(group.getByRole('combobox')).toHaveCount(0);
+    await expect(appearance).toContainText('Youli');
     await page.setViewportSize({ width: 1280, height: 800 });
     await group.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `/tmp/desktop-pet-settings-${colorScheme}-1280.png` });
@@ -104,7 +106,8 @@ for (const colorScheme of ['light', 'dark']) {
       await page.setViewportSize({ width, height });
       await enabled.scrollIntoViewIfNeeded();
       await expect(enabled).toBeVisible();
-      await expect(group.getByRole('combobox')).toHaveCount(0);
+      await appearance.scrollIntoViewIfNeeded();
+      await expect(appearance).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
     }
     await group.scrollIntoViewIfNeeded();

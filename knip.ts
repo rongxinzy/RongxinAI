@@ -21,6 +21,8 @@ const config: KnipConfig = {
         // Run from .husky/pre-commit.
         'scripts/check-new-file-tokens.mjs',
         'scripts/generate-cute-skill-icons.mjs',
+        // Documented offline original-art renderer; its helpers stay graph-checked.
+        'scripts/desktop-pet/render-originals.mjs',
         'src/main/main.ts',
         'src/main/preload.ts',
         'src/main/desktopPetPreload.ts',
@@ -112,6 +114,8 @@ const config: KnipConfig = {
   ignoreBinaries: [
     // Operating-system commands, not npm packages.
     'openssl',
+    // Host-installed encoder used only by the offline companion media author.
+    'ffmpeg',
     'reg',
     // Packaged Linux e2e seeds and reads SQLite through the sqlite3 CLI.
     'sqlite3',

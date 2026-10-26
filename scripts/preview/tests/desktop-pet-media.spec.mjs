@@ -124,7 +124,10 @@ test('continuous owl media decodes real frames with alpha and two owned slots', 
   expect(errors).toEqual([]);
 });
 
-for (const character of [{ id: DesktopPetBuiltinId.Xiaoyuan, directory: 'xiaoyuan-original' }]) {
+for (const character of DESKTOP_PET_BUILTINS.map(pet => ({
+  id: pet.id,
+  directory: `${pet.id}-original`,
+}))) {
   test(`${character.id}: all authored clips decode transparent content at their real middle frame`, async ({
     page,
   }) => {
@@ -201,7 +204,7 @@ for (const character of [{ id: DesktopPetBuiltinId.Xiaoyuan, directory: 'xiaoyua
   });
 }
 
-test('hidden character selections keep original Xiaoyuan and reuse two video slots', async ({
+test('all seven original characters switch without retaining another identity in the two video slots', async ({
   page,
 }) => {
   await bridge(page);
@@ -213,7 +216,7 @@ test('hidden character selections keep original Xiaoyuan and reuse two video slo
       value => window.mediaState(value),
       snapshot(DesktopPetState.Idle, character.id),
     );
-    await expect(canvas).toHaveAttribute('data-character', DesktopPetBuiltinId.Xiaoyuan);
+    await expect(canvas).toHaveAttribute('data-character', character.id);
     await expect(canvas).toHaveAttribute('data-media-clip', DesktopPetMotion.Idle);
     await page.evaluate(
       action => window.mediaEffect({ kind: 'action', action }),
@@ -270,7 +273,7 @@ test('hidden character selections keep original Xiaoyuan and reuse two video slo
           window.mediaVideos
             .filter(video => video.getAttribute('src'))
             .every(video => video.src.includes(`/motion/${id}/`)),
-        'xiaoyuan-original',
+        `${character.id}-original`,
       ),
     ).toBe(true);
   }

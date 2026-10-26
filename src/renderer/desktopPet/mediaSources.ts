@@ -1,5 +1,5 @@
-// Released media only. Dormant characters remain in the authoring preview bundle.
+// Only original-art packs. Rejected, separately redrawn rigs cannot enter production.
 export const desktopPetMediaSources = import.meta.glob<string>(
-  '../assets/desktop-pet/motion/xiaoyuan-original/*.{webm,png}',
+  '../assets/desktop-pet/motion/*-original/*.{webm,png}',
   { eager: true, query: '?url', import: 'default' },
 );

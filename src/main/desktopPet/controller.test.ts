@@ -372,21 +372,19 @@ test('settings validate payload and sender, remain enabled while quiet, and sync
   });
 });
 
-test('released character settings reject hidden pets without rewriting saved data or failures', async () => {
+test('released character settings restore saved pets and preserve failures across appearance changes', async () => {
   saved = { characterId: DesktopPetBuiltinId.Youli, enabled: false };
   expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
-    characterId: DesktopPetBuiltinId.Xiaoyuan,
+    characterId: DesktopPetBuiltinId.Youli,
   });
   expect(saved).toEqual({ characterId: DesktopPetBuiltinId.Youli, enabled: false });
   await expect(invoke(DesktopPetIpc.SetSettings, { characterId: '../unknown' })).rejects.toThrow(
     'invalid arguments',
   );
-  await expect(
-    invoke(DesktopPetIpc.SetSettings, {
-      enabled: true,
-      characterId: DesktopPetBuiltinId.Youli,
-    }),
-  ).rejects.toThrow();
+  await invoke(DesktopPetIpc.SetSettings, {
+    enabled: true,
+    characterId: DesktopPetBuiltinId.Youli,
+  });
   await invoke(DesktopPetIpc.SetSettings, { enabled: true });
   const events = new PiUiEventSequencer(() => 'character-failure');
   observeDesktopPetEvent(
@@ -396,20 +394,18 @@ test('released character settings reject hidden pets without rewriting saved dat
       error: { kind: CoworkErrorKind.Unknown, message: 'failed' },
     }),
   );
-  await expect(
-    invoke(DesktopPetIpc.SetSettings, { characterId: DesktopPetBuiltinId.Yunmo }),
-  ).rejects.toThrow();
+  await invoke(DesktopPetIpc.SetSettings, { characterId: DesktopPetBuiltinId.Yunmo });
   expect(mocks.values.get(DESKTOP_PET_FAILURES_KEY)).toHaveLength(1);
   disposeDesktopPet();
   initializeDesktopPet(preferences, getMainWindow, mocks.changed);
   expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({
-    characterId: DesktopPetBuiltinId.Xiaoyuan,
+    characterId: DesktopPetBuiltinId.Yunmo,
   });
   const contents = mocks.windows.at(-1)!.webContents;
   mocks.ipc.get(DesktopPetIpc.Ready)!({ sender: contents, senderFrame: contents.mainFrame });
   expect(contents.send).toHaveBeenLastCalledWith(
     DesktopPetIpc.State,
-    expect.objectContaining({ characterId: DesktopPetBuiltinId.Xiaoyuan, state: 'error' }),
+    expect.objectContaining({ characterId: DesktopPetBuiltinId.Yunmo, state: 'error' }),
   );
 });
 
