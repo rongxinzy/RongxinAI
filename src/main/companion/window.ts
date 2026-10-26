@@ -3,6 +3,7 @@ import { app, BrowserWindow, dialog, globalShortcut, ipcMain, screen } from 'ele
 import {
   COMPANION_PAGE,
   COMPANION_SHORTCUT,
+  CompanionComposerMode,
   CompanionRequestState,
 } from '../../shared/companion/constants';
 import { companionContract } from '../../shared/companion/contract';
@@ -51,6 +52,7 @@ let bubbleAnchor: ReturnType<typeof anchorCompanionBubble> | undefined;
 let windowVisible = false;
 let windowReady = false;
 let showRequested = false;
+let requestedMode: CompanionComposerMode | undefined;
 
 export function isCompanionWindow(candidate: BrowserWindow): boolean {
   return candidate === window;
@@ -68,6 +70,7 @@ function syncCompanionVisibility(visible: boolean): void {
 /** Host suppression also updates draft/dialog visibility when native hide events are absent. */
 export function hideCompanionWindow(): void {
   showRequested = false;
+  requestedMode = undefined;
   if (!window || window.isDestroyed()) return;
   window.hide();
   syncCompanionVisibility(false);
@@ -84,7 +87,7 @@ export function updateActiveCompanionAppearance(
   changed();
 }
 
-function preferences(): CompanionWindowContext {
+function preferences(mode = requestedMode): CompanionWindowContext {
   const config = options?.store.get<{ language?: string; theme?: string; themeStyle?: string }>(
     'app_config',
   );
@@ -93,6 +96,7 @@ function preferences(): CompanionWindowContext {
     theme: config?.theme === 'light' || config?.theme === 'dark' ? config.theme : 'system',
     themeStyle: typeof config?.themeStyle === 'string' ? config.themeStyle : '',
     ...(bubblePlacement ? { bubble: bubblePlacement } : {}),
+    ...(mode ? { mode } : {}),
   };
 }
 
@@ -104,9 +108,11 @@ async function snapshot(): Promise<CompanionWindowState> {
   const availability = await runtime.resume(active);
   const conversation = await runtime.history(active);
   const taskSnapshot = options.getTasks().snapshot(active.petId);
+  const context = preferences(requestedMode);
+  requestedMode = undefined;
   return {
     ...identities,
-    context: preferences(),
+    context,
     availability,
     shortcutAvailable,
     conversation,
@@ -454,16 +460,30 @@ export function prepareCompanionWindow(): void {
   });
 }
 
-export function openCompanionWindow(): void {
+export function openCompanionWindow(mode?: CompanionComposerMode): void {
   if (!options) return;
+  const validMode =
+    mode === CompanionComposerMode.Chat || mode === CompanionComposerMode.Task ? mode : undefined;
+  if (validMode) requestedMode = validMode;
   showRequested = true;
   prepareCompanionWindow();
+  if (
+    validMode &&
+    windowReady &&
+    window &&
+    !window.isDestroyed() &&
+    !window.webContents.isDestroyed()
+  ) {
+    window.webContents.send(IpcChannel.Context, preferences(validMode));
+    requestedMode = undefined;
+  }
   showReadyWindow();
 }
 
 export function disposeCompanionWindow(): void {
   options = null;
   choosingDialog = false;
+  requestedMode = undefined;
   unsubscribe?.();
   unsubscribe = undefined;
   unsubscribeTasks?.();

@@ -108,7 +108,13 @@ export function CompanionView({ api = window.companion }: Props = {}) {
         if (next.context.bubble) setPlacement(next.context.bubble);
         if (activeId.current !== next.activePetId) {
           activeId.current = next.activePetId;
-          replaceDraft(readCompanionDraft(next.activePetId));
+          const saved = readCompanionDraft(next.activePetId);
+          replaceDraft(
+            next.context.mode ? { ...saved, mode: next.context.mode } : saved,
+            next.context.mode ? next.activePetId : undefined,
+          );
+        } else if (next.context.mode && draftRef.current.mode !== next.context.mode) {
+          replaceDraft({ ...draftRef.current, mode: next.context.mode }, next.activePetId);
         }
         const snapshot = rememberTasks({
           petId: next.activePetId,
@@ -131,6 +137,9 @@ export function CompanionView({ api = window.companion }: Props = {}) {
     const unsubscribeContext = api?.onContext(context => {
       applyContext(context);
       if (context.bubble) setPlacement(context.bubble);
+      if (context.mode && draftRef.current.mode !== context.mode) {
+        replaceDraft({ ...draftRef.current, mode: context.mode }, activeId.current ?? undefined);
+      }
     });
     const unsubscribeChanged = api?.onChanged(() => {
       if (visibleRef.current) void refresh.request();
@@ -328,20 +337,38 @@ export function CompanionView({ api = window.companion }: Props = {}) {
       aria-label={t('companionTitle')}
       className="theme-companion-bubble relative flex h-dvh min-h-0 flex-col p-4"
     >
-      <CompanionBubbleFrame placement={placement} />
+      <CompanionBubbleFrame
+        placement={placement}
+        characterId={
+          state?.profiles.find(profile => profile.petId === state.activePetId)?.characterId
+        }
+      />
       <h1 className="sr-only">{t('companionTitle')}</h1>
       <div className="theme-companion-paper-content relative flex min-h-0 w-full flex-1 flex-col py-3">
-        <header className="flex shrink-0 items-center justify-between gap-2 px-3 pb-3">
-          <span className="theme-companion-name">
-            {state
-              ? t(
-                  COMPANION_NAME_KEYS[
-                    state.profiles.find(profile => profile.petId === state.activePetId)!.personaId
-                  ],
-                )
-              : null}
-          </span>
-          <div className="flex items-center gap-1">
+        <header className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 px-3 pb-2.5">
+          <div className="flex min-w-0 items-center justify-self-start">
+            <span className="theme-companion-name truncate">
+              {state
+                ? t(
+                    COMPANION_NAME_KEYS[
+                      state.profiles.find(profile => profile.petId === state.activePetId)!.personaId
+                    ],
+                  )
+                : null}
+            </span>
+          </div>
+          <FluidTabs
+            className="justify-self-center"
+            disabled={!state || sending || choosingWorkspace || choosingFiles}
+            aria-label={t('companionInputMode')}
+            value={taskMode ? CompanionComposerMode.Task : CompanionComposerMode.Chat}
+            onValueChange={mode => updateDraft(draftRef.current.text, { mode })}
+            items={[
+              { value: CompanionComposerMode.Chat, label: t('companionModeChat') },
+              { value: CompanionComposerMode.Task, label: t('companionModeTask') },
+            ]}
+          />
+          <div className="flex items-center gap-0.5 justify-self-end">
             <CompanionHeaderActions
               api={api}
               visible={visible}
@@ -366,7 +393,7 @@ export function CompanionView({ api = window.companion }: Props = {}) {
           }}
         />
         <div
-          className="flex min-h-0 shrink flex-col gap-3 overflow-y-auto px-4 pb-4"
+          className="flex min-h-0 shrink flex-col gap-2.5 overflow-y-auto px-4 pb-3.5"
           onDragEnterCapture={transfers.handleDragEnter}
           onDragOverCapture={transfers.handleDragOver}
           onDragLeaveCapture={transfers.handleDragLeave}
@@ -376,55 +403,43 @@ export function CompanionView({ api = window.companion }: Props = {}) {
             transfers.handlePaste(event);
           }}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <FluidTabs
-              disabled={!state || sending || choosingWorkspace || choosingFiles}
-              aria-label={t('companionInputMode')}
-              value={taskMode ? CompanionComposerMode.Task : CompanionComposerMode.Chat}
-              onValueChange={mode => updateDraft(draftRef.current.text, { mode })}
-              items={[
-                { value: CompanionComposerMode.Chat, label: t('companionModeChat') },
-                { value: CompanionComposerMode.Task, label: t('companionModeTask') },
-              ]}
-            />
-            {taskMode ? (
-              <div className="flex items-center gap-2">
-                <Select
-                  value={draft.workspaceId ?? ''}
-                  disabled={!state || sending || choosingWorkspace || choosingFiles}
-                  onValueChange={id => {
-                    if (id) updateDraft(draftRef.current.text, { workspaceId: id });
-                  }}
+          {taskMode ? (
+            <div className="flex items-center gap-2">
+              <Select
+                value={draft.workspaceId ?? ''}
+                disabled={!state || sending || choosingWorkspace || choosingFiles}
+                onValueChange={id => {
+                  if (id) updateDraft(draftRef.current.text, { workspaceId: id });
+                }}
+              >
+                <SelectTrigger className="w-44" aria-label={t('companionWorkspace')}>
+                  <SelectValue>
+                    {state?.workspaces.find(workspace => workspace.id === draft.workspaceId)
+                      ?.name ?? t('companionChooseWorkspace')}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  listLabel={t('companionWorkspace')}
+                  portalContainer={portalContainer}
                 >
-                  <SelectTrigger className="w-44" aria-label={t('companionWorkspace')}>
-                    <SelectValue>
-                      {state?.workspaces.find(workspace => workspace.id === draft.workspaceId)
-                        ?.name ?? t('companionChooseWorkspace')}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent
-                    listLabel={t('companionWorkspace')}
-                    portalContainer={portalContainer}
-                  >
-                    {state?.workspaces.map(workspace => (
-                      <SelectItem key={workspace.id} value={workspace.id}>
-                        {workspace.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('companionPickFolder')}
-                  disabled={!state || sending || choosingWorkspace || choosingFiles}
-                  onClick={() => void chooseWorkspace()}
-                >
-                  <FolderOpen />
-                </Button>
-              </div>
-            ) : null}
-          </div>
+                  {state?.workspaces.map(workspace => (
+                    <SelectItem key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t('companionPickFolder')}
+                disabled={!state || sending || choosingWorkspace || choosingFiles}
+                onClick={() => void chooseWorkspace()}
+              >
+                <FolderOpen />
+              </Button>
+            </div>
+          ) : null}
           <CompanionFeedback
             conversation={state?.conversation}
             availability={state?.availability}

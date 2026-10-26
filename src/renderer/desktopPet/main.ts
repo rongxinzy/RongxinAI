@@ -162,6 +162,7 @@ function update(snapshot: DesktopPetSnapshot): void {
   media.update({ state, reduced: reducedMotion });
   view.setAttribute('aria-label', snapshot.label);
   view.title = snapshot.label;
+  if (bubble) bubble.dataset.character = snapshot.characterId;
   updateBubble(snapshot.bubble);
   if (reducedMotion) maskDirty = true;
   void selectCharacter(snapshot.characterId);
@@ -172,6 +173,7 @@ async function selectCharacter(id: string): Promise<void> {
   if (!isDesktopPetReleased(id)) id = DesktopPetBuiltinId.Xiaoyuan;
   try {
     if (!(await atlas.select(id))) return;
+    if (bubble) bubble.dataset.character = atlas.character.id;
     const { columns, rows, tempo, energy } = atlas.character;
     animation.configure(columns * rows, tempo, energy);
     media.update({
@@ -239,6 +241,8 @@ view.addEventListener('pointerdown', event => {
   pointerStart = { x: event.screenX, y: event.screenY };
   pointerMoved = false;
   canOpen = false;
+  animation.setPressed(true);
+  refresh();
   view.setPointerCapture(event.pointerId);
   bridge?.dragStart();
 });
@@ -262,9 +266,11 @@ const endDrag = (event: PointerEvent): void => {
   canOpen = !cancelled && !pointerMoved;
   pointerActive = false;
   pointerId = undefined;
+  animation.setPressed(false);
   bridge?.dragEnd(cancelled);
   if (!bridge) animation.setDragging(false);
   if (!bridge) media.update({ dragging: false });
+  refresh();
 };
 view.addEventListener('pointerup', endDrag);
 view.addEventListener('pointercancel', endDrag);

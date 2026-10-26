@@ -5272,29 +5272,48 @@
   background-color: transparent;
 }
 :where(:root, [data-theme]) :where(.theme-companion-sketch) {
-  color: var(--foreground);
+  color: color-mix(in oklab, #4a74d9 78%, var(--foreground));
+  transition-property: color;
+  transition-duration: 150ms;
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="xiaoyuan"]) {
+  color: color-mix(in oklab, #4a74d9 78%, var(--foreground));
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="youli"]) {
+  color: color-mix(in oklab, #d96838 78%, var(--foreground));
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="tuantuan"]) {
+  color: color-mix(in oklab, #35969b 76%, var(--foreground));
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="mianmian"]) {
+  color: color-mix(in oklab, #739a6e 76%, var(--foreground));
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="zhuli"]) {
+  color: color-mix(in oklab, #c45a32 78%, var(--foreground));
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="yunmo"]) {
+  color: color-mix(in oklab, #4f8fd6 78%, var(--foreground));
+}
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="maixiao"]) {
+  color: color-mix(in oklab, #d68835 78%, var(--foreground));
 }
 :where(:root, [data-theme]) :where(.theme-companion-sketch-paper) {
   fill: var(--popover);
-}
-:where(:root, [data-theme]) :where(.theme-companion-pencil-warm) {
-  color: #b98267;
-}
-:where(:root, [data-theme]) :where(.theme-companion-pencil-cool) {
-  color: #6e998b;
 }
 :where(:root, [data-theme]) :where(.theme-companion-paper-content) {
   background-color: transparent;
 }
 :where(:root, [data-theme]) :where(.theme-input-group[data-variant="paper"]) {
-  border-color: var(--zy-text-muted);
+  border-color: var(--zy-input-border);
   background-color: transparent;
   border-radius: 0;
   border-top-width: 0;
   border-left-width: 0;
   border-right-width: 0;
-  border-bottom-width: 2px;
+  border-bottom-width: 1.5px;
   box-shadow: none;
+  transition-property: border-color;
+  transition-duration: 120ms;
 }
 :where(:root, [data-theme]) :where(.theme-companion-selector) {
   border-color: transparent;
@@ -5303,7 +5322,7 @@
 }
 :where(:root, [data-theme]) :where(.theme-companion-name) {
   font-size: var(--zy-component-text-sm);
-  font-weight: 500;
+  font-weight: 600;
   line-height: var(--zy-component-text-sm--line-height);
 }
 :where(:root, [data-theme]) :where(.theme-welcome-screen) {
@@ -8401,9 +8420,14 @@ to {
 :where(:root, [data-theme]) :where(body[data-companion-window]),
 :where(:root, [data-theme]) :where(.theme-companion-bubble),
 :where(:root, [data-theme]) :where(.theme-companion-sketch),
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="xiaoyuan"]),
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="youli"]),
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="tuantuan"]),
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="mianmian"]),
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="zhuli"]),
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="yunmo"]),
+:where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="maixiao"]),
 :where(:root, [data-theme]) :where(.theme-companion-sketch-paper),
-:where(:root, [data-theme]) :where(.theme-companion-pencil-warm),
-:where(:root, [data-theme]) :where(.theme-companion-pencil-cool),
 :where(:root, [data-theme]) :where(.theme-companion-paper-content),
 :where(:root, [data-theme]) :where(.theme-input-group[data-variant="paper"]),
 :where(:root, [data-theme]) :where(.theme-companion-selector),

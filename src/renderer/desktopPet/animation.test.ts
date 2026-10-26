@@ -99,3 +99,14 @@ test('drag, walking, hidden window and reduced motion cancel playback without ca
   expect([a.scaleY, a.offsetY, a.rotate]).toEqual([1, 0, 0]);
   expect(b.weights).toEqual(a.weights);
 });
+
+test('pointer press squishes scaleY gently and springs back on release', () => {
+  const animation = new DesktopPetAnimation();
+  animation.setContinuousMedia(true, 0);
+  expect(animation.sample(0).scaleY).toBe(1);
+  animation.setPressed(true);
+  const squished = animation.sample(80).scaleY;
+  expect(squished).toBeLessThan(0.99);
+  animation.setPressed(false);
+  expect(animation.sample(600).scaleY).toBeCloseTo(1, 3);
+});

@@ -21,6 +21,7 @@ export class DesktopPetAnimation {
   private displacement = 0;
   private velocity = 0;
   private dragging = false;
+  private pressed = false;
   private facing = 1;
   private walking = false;
   private reduced = false;
@@ -72,6 +73,9 @@ export class DesktopPetAnimation {
   setDragging(active: boolean): void {
     if (active && !this.dragging) this.interrupt(this.lastTime ?? 0);
     this.dragging = active;
+  }
+  setPressed(active: boolean): void {
+    this.pressed = active;
   }
   setPose(facing: number, walking: boolean): void {
     if (walking && !this.walking) this.interrupt(this.lastTime ?? 0);
@@ -132,7 +136,7 @@ export class DesktopPetAnimation {
   sample(now: number) {
     const dt = this.lastTime === undefined ? 0 : Math.max(0, (now - this.lastTime) / 1000);
     this.lastTime = now;
-    const target = this.dragging ? 0.025 : 0;
+    const target = this.dragging ? 0.025 : this.pressed ? -0.032 : 0;
     const offset = this.displacement - target;
     const coefficient = (this.velocity + SPRING_DAMPING * offset) / SPRING_FREQUENCY;
     const angle = SPRING_FREQUENCY * dt;
