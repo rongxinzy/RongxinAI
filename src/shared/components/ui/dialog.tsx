@@ -33,7 +33,7 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        'theme-dialog-overlay fixed inset-0 isolate z-50',
+        'theme-dialog-overlay fixed inset-0 isolate z-50 non-draggable',
         disableCloseAnimation && 'theme-dialog-immediate',
         className,
       )}
@@ -60,7 +60,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          'theme-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 sm:max-w-sm',
+          'theme-dialog-content fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 sm:max-w-sm non-draggable',
           // Keep the normal entry motion while allowing status dialogs to disappear immediately.
           disableCloseAnimation && 'theme-dialog-immediate',
           className,
@@ -71,7 +71,13 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            render={<Button variant="ghost" className="absolute top-2 right-2" size="icon-sm" />}
+            render={
+              <Button
+                variant="ghost"
+                className="absolute top-2 right-2 non-draggable"
+                size="icon-sm"
+              />
+            }
           >
             <XIcon />
             <span className="sr-only">Close</span>

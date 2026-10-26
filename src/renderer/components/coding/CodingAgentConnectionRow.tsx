@@ -22,7 +22,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
-import { FieldDescription } from '@shared/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -126,30 +125,62 @@ export function CodingAgentConnectionRow({
 
   return (
     <>
-      <Card size="sm" aria-label={profile.name} aria-busy={busy}>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <CardTitle>{profile.name}</CardTitle>
-              <Badge
-                variant={
-                  failed || profile.status === CodingAgentProfileStatus.Incompatible
-                    ? 'destructive'
-                    : 'secondary'
-                }
-              >
-                {busy ? t('codingAgentChecking') : t(CodingAgentStatusI18nKey[profile.status])}
-              </Badge>
-              {magpieAgent && (
+      <Card
+        size="sm"
+        aria-label={profile.name}
+        aria-busy={busy}
+        className="border border-border/80 bg-card/50 shadow-none"
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-sm font-semibold">{profile.name}</CardTitle>
                 <Badge
-                  variant={magpieAgent.wired ? 'secondary' : 'outline'}
-                  className="text-xs font-normal"
+                  variant={
+                    failed || profile.status === CodingAgentProfileStatus.Incompatible
+                      ? 'destructive'
+                      : 'secondary'
+                  }
+                  className="text-xs"
                 >
-                  {t(magpieAgent.wired ? 'magpieWiredGateway' : 'magpieDirectMode')}
+                  {busy ? t('codingAgentChecking') : t(CodingAgentStatusI18nKey[profile.status])}
                 </Badge>
-              )}
+                {magpieAgent && (
+                  <Badge
+                    variant={magpieAgent.wired ? 'secondary' : 'outline'}
+                    className="text-xs font-normal"
+                  >
+                    {t(magpieAgent.wired ? 'magpieWiredGateway' : 'magpieDirectMode')}
+                  </Badge>
+                )}
+              </div>
+              <CardDescription className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
+                <span>
+                  {t(
+                    profile.isBuiltin
+                      ? 'codingAgentBuiltinSource'
+                      : managed
+                        ? 'codingAgentLocalConfigSource'
+                        : discovered
+                          ? 'codingAgentDiscoveredSource'
+                          : 'codingAgentCustomSource',
+                  )}
+                </span>
+                {!busy && profile.connectionCheck?.checkedAt && (
+                  <span className="text-muted-foreground/70">
+                    ·{' '}
+                    {t('codingAgentCheckLastTime').replace(
+                      '{time}',
+                      new Date(profile.connectionCheck.checkedAt).toLocaleString(
+                        i18nService.getLanguage() === 'zh' ? 'zh-CN' : 'en-US',
+                      ),
+                    )}
+                  </span>
+                )}
+              </CardDescription>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               {profile.status === CodingAgentProfileStatus.Untrusted && (
                 <Button
                   size="sm"
@@ -183,45 +214,41 @@ export function CodingAgentConnectionRow({
               )}
             </div>
           </div>
-          <CardDescription>
-            {t(
-              profile.isBuiltin
-                ? 'codingAgentBuiltinSource'
-                : managed
-                  ? 'codingAgentLocalConfigSource'
-                  : discovered
-                    ? 'codingAgentDiscoveredSource'
-                    : 'codingAgentCustomSource',
-            )}
-          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3">
+        <CardContent className="flex flex-col gap-2.5 pt-0">
           <div aria-live="polite" aria-atomic="true">
             {busy ? (
-              <Alert role="status">
+              <Alert role="status" className="py-2.5 px-3 text-xs">
                 <Spinner aria-hidden="true" />
-                <AlertTitle>
+                <AlertTitle className="text-xs font-medium">
                   {t(phase && running ? checkPhaseLabels[phase] : 'codingAgentChecking')}
                 </AlertTitle>
-                <AlertDescription>{t('codingAgentCheckRequestHint')}</AlertDescription>
+                <AlertDescription className="text-xs text-muted-foreground">
+                  {t('codingAgentCheckRequestHint')}
+                </AlertDescription>
               </Alert>
             ) : phase === CodingAgentCheckPhase.Complete && !failed ? (
-              <Alert role="status">
+              <Alert role="status" className="py-2.5 px-3 text-xs">
                 <CheckCircle2 />
-                <AlertTitle>{t('codingAgentCheckComplete')}</AlertTitle>
-                <AlertDescription>{t('codingAgentCheckVerifiedHint')}</AlertDescription>
+                <AlertTitle className="text-xs font-medium">
+                  {t('codingAgentCheckComplete')}
+                </AlertTitle>
+                <AlertDescription className="text-xs text-muted-foreground">
+                  {t('codingAgentCheckVerifiedHint')}
+                </AlertDescription>
               </Alert>
             ) : !profile.isBuiltin &&
               (profile.status !== CodingAgentProfileStatus.Ready || failed) ? (
               <Alert
                 variant={failed ? 'destructive' : 'default'}
                 role={failed ? 'alert' : 'status'}
+                className="py-2.5 px-3 text-xs"
               >
                 <Info />
-                <AlertTitle>
+                <AlertTitle className="text-xs font-medium">
                   {t(failed ? 'codingAgentCheckFailed' : 'codingAgentCheckNextStep')}
                 </AlertTitle>
-                <AlertDescription>
+                <AlertDescription className="text-xs text-muted-foreground">
                   {t(
                     actionFailed && !profile.connectionCheck?.failure
                       ? 'codingAgentCheckConnectionHelp'
@@ -233,43 +260,48 @@ export function CodingAgentConnectionRow({
             {!busy && failed && magpieAgent && !magpieAgent.wired && (
               <p className="mt-1 text-xs text-muted-foreground">{t('magpieProbeGuideNoModel')}</p>
             )}
-            {!busy && profile.connectionCheck?.checkedAt && (
-              <FieldDescription>
-                {t('codingAgentCheckLastTime').replace(
-                  '{time}',
-                  new Date(profile.connectionCheck.checkedAt).toLocaleString(
-                    i18nService.getLanguage() === 'zh' ? 'zh-CN' : 'en-US',
-                  ),
-                )}
-              </FieldDescription>
-            )}
           </div>
           {!profile.isBuiltin && (
             <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
-              <CollapsibleTrigger nativeButton render={<Button size="sm" variant="ghost" />}>
-                <ChevronDown data-icon="inline-start" />
+              <CollapsibleTrigger
+                nativeButton
+                render={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 -ml-2 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  />
+                }
+              >
+                <ChevronDown data-icon="inline-start" className="size-3.5" />
                 {t(detailsOpen ? 'codingAgentHideDetails' : 'codingAgentShowDetails')}
               </CollapsibleTrigger>
-              <CollapsibleContent className="flex flex-col gap-2">
-                <FieldDescription>{t('codingAgentInstalledPath')}</FieldDescription>
-                <div className="break-all select-text">
-                  {installedCommand ?? t('codingAgentNotInstalled')}
+              <CollapsibleContent className="flex flex-col gap-2 pt-1">
+                <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1.5 rounded-lg border border-border-subtle bg-muted/30 p-3 text-xs">
+                  <span className="text-muted-foreground shrink-0">
+                    {t('codingAgentInstalledPath')}
+                  </span>
+                  <span className="font-mono text-[11px] text-foreground break-all select-text">
+                    {installedCommand ?? t('codingAgentNotInstalled')}
+                  </span>
+                  {profile.environment[CodingAgentEnvironmentKey.ManagedAdapterVersion] && (
+                    <span className="col-span-2 text-muted-foreground">
+                      {t('codingAgentAdapterVersion').replace(
+                        '{version}',
+                        profile.environment[CodingAgentEnvironmentKey.ManagedAdapterVersion],
+                      )}
+                    </span>
+                  )}
+                  {!discovered && profile.description && (
+                    <span className="col-span-2 text-muted-foreground">{profile.description}</span>
+                  )}
+                  <span className="col-span-2 text-muted-foreground pt-1 border-t border-border/30">
+                    {t('codingAgentLocalConfigHelp')}
+                  </span>
                 </div>
-                {profile.environment[CodingAgentEnvironmentKey.ManagedAdapterVersion] && (
-                  <FieldDescription>
-                    {t('codingAgentAdapterVersion').replace(
-                      '{version}',
-                      profile.environment[CodingAgentEnvironmentKey.ManagedAdapterVersion],
-                    )}
-                  </FieldDescription>
-                )}
-                {!discovered && profile.description && (
-                  <FieldDescription>{profile.description}</FieldDescription>
-                )}
-                <FieldDescription>{t('codingAgentLocalConfigHelp')}</FieldDescription>
 
                 {magpieAgent && magpieAgent.models.length > 0 && (
-                  <div className="mt-3 flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
+                  <div className="mt-1 flex flex-col gap-2.5 rounded-lg border border-border-subtle bg-muted/20 p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium text-foreground">
                         {t('magpieModelConfigTitle')}

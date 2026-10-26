@@ -8,6 +8,7 @@ export const zhCommon: Record<string, string> = {
   // 通用
   save: '保存',
   cancel: '取消',
+  confirm: '确认',
   saving: '保存中...',
   delete: '删除',
   edit: '编辑',

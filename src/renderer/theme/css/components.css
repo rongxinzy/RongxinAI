@@ -302,12 +302,20 @@ select::-ms-expand {
   app-region: drag;
 }
 
-.non-draggable {
+.non-draggable,
+[data-slot="dialog-content"],
+[data-slot="dialog-overlay"],
+[data-slot="dialog-close"],
+[data-slot="sheet-content"],
+[data-slot="sheet-overlay"],
+[data-slot="sheet-close"] {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 
-.non-draggable * {
+.non-draggable *,
+[data-slot="dialog-content"] *,
+[data-slot="sheet-content"] * {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
