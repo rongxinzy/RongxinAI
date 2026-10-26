@@ -4,7 +4,7 @@ export const enChannels: Record<string, string> = {
   connectorFeishu: 'Feishu',
   connectorGitHub: 'GitHub',
   connectorsDescription:
-    'Connect the services you use so your agent can find information, work with files, and get more done when needed.',
+    'Connect the services your tasks need and use tools within their permissions.',
   // Email Skill Config
   emailTab: 'Email',
   emailConfig: 'Email Configuration',

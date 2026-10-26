@@ -23,13 +23,16 @@ export const enCowork: Record<string, string> = {
   coworkContextUsageSystem: 'System prompt',
   coworkContextUsageTools: 'Tools',
   coworkContextUsageMessages: 'Conversation',
-  coworkStatsCounts: '{turns} turns · {steps} steps',
-  coworkStatsCountsOneTurn: '{turns} turn · {steps} steps',
-  coworkStatsLlm: 'LLM {duration}',
-  coworkStatsTool: 'Tool call {duration}',
-  coworkStatsTtft: 'TTFT avg {duration}',
-  coworkStatsCache: 'Cache hit {percent}%',
-  coworkStatsTokens: 'Input {input} tok · Output {output} tok',
+  coworkStatsTitle: 'Run details',
+  coworkStatsTurns: 'Conversation turns',
+  coworkStatsSteps: 'Execution steps',
+  coworkStatsModelDuration: 'Model time',
+  coworkStatsToolDuration: 'Tool time',
+  coworkStatsFirstResponse: 'Average first response',
+  coworkStatsSpeed: 'Generation speed',
+  coworkStatsCacheHit: 'Cache hit rate',
+  coworkStatsInputTokens: 'Input tokens',
+  coworkStatsOutputTokens: 'Output tokens',
   coworkWorkspaceLoading: 'Preparing workspace…',
   coworkReEdit: 'Re-edit',
   // ZhiYuan Agent
@@ -37,7 +40,7 @@ export const enCowork: Record<string, string> = {
   coworkSettings: 'ZhiYuan Agent Settings',
   coworkHistory: 'Task History',
   coworkNoSessions: 'No tasks yet',
-  coworkNoSessionsHint: 'Start your first conversation in the input box',
+  coworkNoSessionsHint: 'Start a new task with what you want to get done.',
   coworkPinSession: 'Pin task',
   coworkUnpinSession: 'Unpin task',
   coworkSessionActions: 'More actions',
@@ -53,7 +56,7 @@ export const enCowork: Record<string, string> = {
   coworkSystemPrompt: 'System Prompt',
   coworkSystemPromptPlaceholder: 'Set custom instructions for ZhiYuan Agent...',
   coworkSystemPromptHint: "Optional system prompt to customize ZhiYuan Agent's behavior",
-  coworkModelSettingsRequired: 'Please configure models and API keys in Model Settings first.',
+  coworkModelSettingsRequired: 'Choose an available model in Model Settings first.',
   coworkLocalModelsHeading: 'Local models',
   coworkUseLocalModel: 'Use local model',
   coworkLocalModelNotReady: 'No local model ready',
@@ -193,14 +196,13 @@ export const enCowork: Record<string, string> = {
   coworkTodoBlocked: 'blocked',
   coworkTodoUntitled: 'Untitled todo',
   coworkTodoUnknownStatus: 'Unknown status',
-  coworkDestructiveOperation:
-    'Destructive operation: This command may cause irreversible data loss. Please confirm carefully.',
+  coworkDestructiveOperation: 'This command may cause irreversible data loss. Confirm to run it.',
   coworkCautionOperation:
-    'Caution: This command may modify files or system state. Please review carefully.',
+    'This command may change files or system settings. Review before approving.',
   coworkApprove: 'Approve',
   coworkDeny: 'Deny',
   coworkDenyRequest: 'Deny request',
-  coworkQuestionWizardTitle: 'Confirmation Needed',
+  coworkQuestionWizardTitle: 'Your confirmation is needed',
   coworkQuestionWizardPrevious: 'Previous',
   coworkQuestionWizardNext: 'Next',
   coworkQuestionWizardSubmit: 'Submit',
@@ -211,9 +213,9 @@ export const enCowork: Record<string, string> = {
   coworkWelcome: 'Start Collaborating',
   coworkDescription: 'A 24/7 personal assistant agent that gets work done for you',
   coworkIntermediateProcess: 'Working',
-  coworkExecutionCompletedSummary: 'Completed {thinking} reasoning steps and {tools} tool calls',
-  coworkExecutionCompletedThinkingSummary: 'Completed {thinking} reasoning steps',
-  coworkExecutionCompletedToolsSummary: 'Completed {tools} tool calls',
+  coworkExecutionCompletedSummary: '{thinking} reasoning steps · {tools} tool calls',
+  coworkExecutionCompletedThinkingSummary: '{thinking} reasoning steps',
+  coworkExecutionCompletedToolsSummary: '{tools} tool calls',
   coworkExecutionThinking: 'Working',
   coworkWorkingThinking: 'Thinking',
   coworkContentTruncated:
@@ -274,10 +276,9 @@ export const enCowork: Record<string, string> = {
   coworkResumeTaskFailed: 'Failed to resume task',
   coworkDefaultSessionTitle: 'New Chat',
   coworkContinuePlaceholder: 'Continue the conversation...',
-  coworkRemoteManagedPlaceholder:
-    'This session was created via IM. Please use the corresponding IM platform.',
+  coworkRemoteManagedPlaceholder: 'Continue in the channel where this conversation started',
   coworkStartingSession: 'Starting session...',
-  coworkPreparingEnvironment: 'Preparing environment, please wait',
+  coworkPreparingEnvironment: 'Preparing environment…',
   coworkAddFile: 'Add File',
   coworkDropFileHint: 'Drop files here, or paste files directly',
   coworkAddImage: 'Add Image',
@@ -301,12 +302,11 @@ export const enCowork: Record<string, string> = {
   coworkOpenFolder: 'Open folder',
   // Cowork error messages
   coworkErrorAuthInvalid:
-    'Invalid or expired API key. Please check and update your API key in settings.',
+    'Model authentication failed. Check the account or API key in Model Settings.',
   coworkErrorInsufficientBalance: 'Insufficient API balance. Please top up and try again.',
   coworkErrorInputTooLong:
-    'Input too long, exceeding model context limit. Please shorten the conversation and try again.',
-  coworkErrorCouldNotProcessPdf:
-    'Unable to process the PDF file. Please try converting the PDF to text format and resend.',
+    'This conversation exceeds the model limit. Compact the context or start a new conversation.',
+  coworkErrorCouldNotProcessPdf: 'Unable to read this PDF. Convert it to text and send it again.',
   coworkErrorModelNotFound:
     'The requested model does not exist or is unavailable. Please check the model configuration in settings.',
   coworkErrorModelCapabilityUnsupported:
@@ -314,18 +314,23 @@ export const enCowork: Record<string, string> = {
   coworkErrorProviderUnavailable:
     'The model provider used by this session is disabled or the model has been removed. Re-enable the provider or switch to another model in Settings, then try again.',
   coworkErrorGatewayDisconnected:
-    'AI engine connection lost. Please retry. If the issue persists, try restarting the app.',
-  coworkErrorServiceRestart: 'AI engine is restarting. Please try again later.',
-  coworkErrorGatewayDraining: 'AI engine is restarting. Please wait a moment and try again.',
+    'The model service disconnected. Try again, or restart the app if it stays disconnected.',
+  coworkErrorServiceRestart: 'The model service is restarting. Try again shortly.',
+  coworkErrorGatewayDraining: 'The model service is restarting. Try again shortly.',
   coworkErrorNetworkError:
     'Network connection failed. Please check your network settings and try again.',
   coworkErrorRateLimit: 'Too many requests. Please try again later.',
   coworkErrorContentFiltered:
     'Content did not pass the safety review. Please modify and try again.',
-  coworkErrorServerError: 'Server error occurred. Please try again later.',
+  coworkErrorServerError: 'The model service failed. Try again later.',
   coworkErrorStreamInterrupted:
     'The model connection was interrupted. This task has stopped. Please retry.',
   coworkErrorTurnTimeout: 'The model stopped responding. Please retry or reduce concurrent tasks.',
+  coworkErrorToolTimeout: 'The tool timed out. Please retry.',
+  coworkErrorToolPermissionDenied:
+    'This tool action was not authorized. Check permissions and retry.',
+  coworkErrorMaxIterations:
+    'This run reached its step limit. Continue the task or narrow its scope.',
   coworkErrorFileWriteTruncated:
     'The file content was truncated. Ask the model to write smaller chunks.',
   coworkErrorSessionStartFailed: 'Failed to start session: {error}',
@@ -344,7 +349,7 @@ export const enCowork: Record<string, string> = {
   coworkSlashCompactNotNeeded: 'This session is too small to compact.',
   coworkSlashCompactFailed: 'Session context compaction failed. Try again later.',
   coworkSlashSkillActivated: 'Skill activated',
-  coworkErrorEngineNotReady: 'AI engine is starting up. Please wait a few seconds and try again.',
+  coworkErrorEngineNotReady: 'The model service is starting. Try again shortly.',
   coworkErrorUnknown:
     'Task failed due to an unexpected error. Please retry. If the issue persists, check your model configuration.',
 };
