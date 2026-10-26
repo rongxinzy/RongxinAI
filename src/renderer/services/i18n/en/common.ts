@@ -8,6 +8,7 @@ export const enCommon: Record<string, string> = {
   // Common
   save: 'Save',
   cancel: 'Cancel',
+  confirm: 'Confirm',
   saving: 'Saving...',
   delete: 'Delete',
   edit: 'Edit',

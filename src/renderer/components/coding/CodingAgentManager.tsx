@@ -166,12 +166,14 @@ export const CodingAgentManager = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="theme-control-sizing-4 flex h-[min(44rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden sm:max-w-3xl">
-        <DialogHeader className="theme-part-coding-agent-manager-dialog-header-1">
+      <DialogContent className="theme-control-sizing-4 flex h-[min(42rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden sm:max-w-2xl">
+        <DialogHeader className="theme-part-coding-agent-manager-dialog-header-1 shrink-0">
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 space-y-2">
-              <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
-              <DialogDescription>
+            <div className="min-w-0 space-y-1">
+              <DialogTitle className="text-base font-semibold text-foreground">
+                {i18nService.t('codingAgentManagerTitle')}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
                 {activeTab === CodingAgentManagerTab.Magpie
                   ? i18nService.t('magpieExternalPanelDescription')
                   : summary}
@@ -182,6 +184,7 @@ export const CodingAgentManager = ({
                 type="button"
                 size="sm"
                 variant="outline"
+                className="shrink-0"
                 disabled={discovering || checking}
                 onClick={() => void discover()}
               >
@@ -199,28 +202,30 @@ export const CodingAgentManager = ({
         <Tabs
           value={activeTab}
           onValueChange={value => setActiveTab(value as CodingAgentManagerTabValue)}
-          className="min-h-0 flex-1 gap-0"
+          className="min-h-0 flex-1 flex flex-col gap-0"
         >
-          <PageTabs
-            bare
-            value={activeTab}
-            className="mx-6 mt-2 shrink-0"
-            items={[
-              {
-                value: CodingAgentManagerTab.Local,
-                label: `${i18nService.t('codingAgentLocalAgents')} (${profiles.length})`,
-              },
-              {
-                value: CodingAgentManagerTab.Custom,
-                label: i18nService.t('codingAgentCustomAgent'),
-              },
-              { value: CodingAgentManagerTab.Magpie, label: i18nService.t('magpieTitle') },
-            ]}
-          />
+          <div className="shrink-0 border-b border-border-subtle px-6">
+            <PageTabs
+              bare
+              value={activeTab}
+              className="gap-6"
+              items={[
+                {
+                  value: CodingAgentManagerTab.Local,
+                  label: `${i18nService.t('codingAgentLocalAgents')} (${profiles.length})`,
+                },
+                {
+                  value: CodingAgentManagerTab.Custom,
+                  label: i18nService.t('codingAgentCustomAgent'),
+                },
+                { value: CodingAgentManagerTab.Magpie, label: i18nService.t('magpieTitle') },
+              ]}
+            />
+          </div>
 
-          <TabsContent value={CodingAgentManagerTab.Local} className="min-h-0">
+          <TabsContent value={CodingAgentManagerTab.Local} className="min-h-0 flex-1 flex flex-col">
             <ScrollArea className="h-full">
-              <div className="p-6 pt-4">
+              <div className="p-6">
                 {profiles.length === 0 ? (
                   <Empty className="theme-scene-coding-empty min-h-80">
                     <EmptyHeader>
@@ -262,32 +267,36 @@ export const CodingAgentManager = ({
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value={CodingAgentManagerTab.Magpie} className="min-h-0">
+          <TabsContent
+            value={CodingAgentManagerTab.Magpie}
+            className="min-h-0 flex-1 flex flex-col"
+          >
             <ScrollArea className="h-full">
-              <div className="p-6 pt-4">
+              <div className="p-6">
                 {open && activeTab === CodingAgentManagerTab.Magpie && <MagpieAgentsPanel />}
               </div>
             </ScrollArea>
           </TabsContent>
 
-          <TabsContent value={CodingAgentManagerTab.Custom} className="min-h-0">
+          <TabsContent
+            value={CodingAgentManagerTab.Custom}
+            className="min-h-0 flex-1 flex flex-col"
+          >
             <form className="flex h-full min-h-0 flex-col" onSubmit={event => void submit(event)}>
               <ScrollArea className="min-h-0 flex-1">
-                <div className="p-6 pt-4">
-                  <div className="mb-5 rounded-xl border border-border bg-muted/30 p-4">
-                    <div className="flex gap-3">
-                      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                      <div>
-                        <p className="text-sm font-medium">
-                          {i18nService.t('codingAgentCustomAgentTitle')}
-                        </p>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {i18nService.t('codingAgentCustomAgentDescription')}
-                        </p>
-                      </div>
+                <div className="p-6">
+                  <div className="mb-4 flex items-start gap-3 rounded-lg border border-border-subtle bg-muted/20 p-3.5">
+                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-medium text-foreground">
+                        {i18nService.t('codingAgentCustomAgentTitle')}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {i18nService.t('codingAgentCustomAgentDescription')}
+                      </p>
                     </div>
                   </div>
-                  <FieldGroup>
+                  <FieldGroup className="space-y-3.5">
                     <Field>
                       <FieldLabel htmlFor="coding-agent-name">
                         {i18nService.t('codingAgentProfileName')}
@@ -329,7 +338,7 @@ export const CodingAgentManager = ({
                       </FieldLabel>
                       <Textarea
                         id="coding-agent-arguments"
-                        className="theme-control-sizing-5"
+                        className="theme-control-sizing-5 min-h-[5rem]"
                         value={argumentsText}
                         onChange={event => setArgumentsText(event.target.value)}
                       />
@@ -340,7 +349,14 @@ export const CodingAgentManager = ({
                   </FieldGroup>
                 </div>
               </ScrollArea>
-              <DialogFooter className="theme-part-coding-agent-manager-dialog-footer-1 mx-0 mb-0 shrink-0">
+              <DialogFooter className="theme-part-coding-agent-manager-dialog-footer-1 mx-0 mb-0 shrink-0 border-t border-border-subtle px-6 py-3 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setActiveTab(CodingAgentManagerTab.Local)}
+                >
+                  {i18nService.t('cancel')}
+                </Button>
                 <Button type="submit" disabled={submitting}>
                   {submitting && <Spinner data-icon="inline-start" />}
                   {i18nService.t('codingAgentAddProfile')}
