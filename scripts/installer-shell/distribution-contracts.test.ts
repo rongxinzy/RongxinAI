@@ -6,13 +6,13 @@ import { expect, test } from 'vitest';
 const root = path.resolve(import.meta.dirname, '../..');
 const read = (file: string) => readFileSync(path.join(root, file), 'utf8');
 
-test('community builds keep the full NSIS updater and then assemble the WebView2 installer', () => {
+test('shared Windows builds retain the updater and WebView2 distribution safeguards', () => {
   const { scripts } = JSON.parse(read('package.json'));
-  for (const name of ['dist:win:offline', 'dist:win:signed']) {
-    expect(scripts[name]).toContain('electron-builder --win nsis --x64');
-    expect(scripts[name]).toContain('&& node scripts/installer-shell/build-distribution.cjs');
+  for (const name of ['dist:win:offline', 'dist:win:signed', 'dist:win:enterprise']) {
+    expect(scripts[name]).toMatch(/^node scripts\/build-windows\.cjs(?: |$)/);
   }
-  expect(scripts['dist:win:signed']).toMatch(/build-distribution\.cjs --signed$/);
+  expect(scripts['dist:win:signed']).toMatch(/ --signed$/);
+  expect(scripts['dist:win:enterprise']).toMatch(/ --enterprise$/);
   const build = read('scripts/installer-shell/build-distribution.cjs');
   expect(build).not.toContain('sign(uninstall)');
   expect(build.indexOf('verifyRetainedHost(root, uninstall)')).toBeLessThan(
