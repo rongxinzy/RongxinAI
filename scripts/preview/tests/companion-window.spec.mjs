@@ -46,17 +46,22 @@ for (const language of ['zh', 'en']) {
         ),
       ).toBeVisible();
       await input.fill('A private draft for the first companion');
-      await page.getByRole('combobox').click();
-      await page
-        .getByRole('option', { name: language === 'zh' ? '游栗' : 'Youli', exact: true })
-        .click();
+      // Identity changes arrive through the host API; the bubble offers no switcher.
+      await page.evaluate(async () => {
+        const state = await window.companion.bootstrap();
+        await window.companion.select(
+          state.profiles.find(profile => profile.personaId === 'youli').petId,
+        );
+      });
       await expect(input).toHaveValue('');
       await expect(page.getByText(text, { exact: true })).toHaveCount(0);
       await input.fill('A different draft for Youli');
-      await page.getByRole('combobox').click();
-      await page
-        .getByRole('option', { name: language === 'zh' ? '小远' : 'Xiaoyuan', exact: true })
-        .click();
+      await page.evaluate(async () => {
+        const state = await window.companion.bootstrap();
+        await window.companion.select(
+          state.profiles.find(profile => profile.personaId === 'xiaoyuan').petId,
+        );
+      });
       await expect(input).toHaveValue('A private draft for the first companion');
       await expect(page.locator('[data-slot="select-content"]')).toBeHidden();
       const accessibility = await new AxeBuilder({ page }).analyze();
@@ -128,6 +133,9 @@ test('hot theme and language changes preserve input, focus, selection and open p
   });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/companion.html');
+  await page.getByRole('tab', { name: '交代任务', exact: true }).click();
+  await page.getByRole('combobox', { name: '工作区', exact: true }).click();
+  await page.getByRole('option', { name: 'Preview project', exact: true }).click();
   const input = page.getByRole('textbox');
   await input.fill('A draft that stays while appearance changes');
   await input.evaluate(element => element.setSelectionRange(2, 10));
@@ -140,12 +148,13 @@ test('hot theme and language changes preserve input, focus, selection and open p
     2, 10,
   ]);
   await expect(page.getByRole('main', { name: 'Your intelligent companion' })).toBeVisible();
-  await page.getByRole('combobox').click();
+  await page.getByRole('combobox', { name: 'Workspace', exact: true }).click();
   await page.evaluate(() =>
     window.companionTestContext({ language: 'zh', theme: 'light', themeStyle: '' }),
   );
-  await expect(page.getByRole('option', { name: '游栗', exact: true })).toBeVisible();
-  await expect(page.getByRole('listbox', { name: '切换伙伴', exact: true })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Preview project', exact: true })).toBeVisible();
+  await expect(page.getByRole('listbox', { name: '工作区', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '切换伙伴', exact: true })).toHaveCount(0);
   // Audit the completed light appearance, after the browser has committed the token change.
   await expect(input).toHaveCSS('color', 'rgb(24, 29, 39)');
   await expect(page.locator('[data-slot="select-value"]')).toHaveCSS('color', 'rgb(24, 29, 39)');
@@ -174,6 +183,6 @@ test('hot theme and language changes preserve input, focus, selection and open p
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '开始任务', exact: true })).toBeVisible();
   }
 });
