@@ -45,10 +45,9 @@ import {
   VirtualizedTurnList,
   type VirtualizedTurnListHandle,
 } from './components/VirtualizedTurnList';
-import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
+import type { CoworkPromptInputRef } from './promptInput/types';
 import { CoworkConversationLoadingSkeleton } from './CoworkSessionLoadingState';
 import { CoworkSessionLayout } from './CoworkSessionLayout';
-import PendingMessageQueue from './PendingMessageQueue';
 import {
   buildConversationTurns,
   buildDisplayItems,
@@ -70,6 +69,7 @@ import CoworkPermissionModal from './CoworkPermissionModal';
 import { CoworkRunStatus } from './components/CoworkRunStatus';
 import { SessionArtifactPanelRegion } from './sessionDetail/SessionArtifactPanelRegion';
 import { SessionExportDialog } from './sessionDetail/SessionExportDialog';
+import { SessionComposerOverlay } from './sessionDetail/SessionComposerOverlay';
 import { useArtifactLinkInterception } from './sessionDetail/useArtifactLinkInterception';
 import { useArtifactPanelPresentation } from './sessionDetail/useArtifactPanelPresentation';
 import { useInlineArtifacts } from './sessionDetail/useInlineArtifacts';
@@ -443,61 +443,43 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           </div>
 
           {/* Input Area */}
-          <div
-            ref={composerOverlayRef}
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"
-          >
-            <div className="mx-auto w-full max-w-4xl min-w-[320px] pl-4">
-              <div className="pointer-events-auto relative min-w-0 rounded-t-3xl bg-background pb-4">
-                <CoworkPromptInput
-                  ref={promptInputRef}
-                  topAccessory={
-                    isSessionSwitching ? null : (
-                      <>
-                        {workMode === CoworkSessionMode.Work && currentSession?.id && (
-                          <PendingMessageQueue
-                            sessionId={currentSession.id}
-                            isStreaming={isStreaming}
-                          />
-                        )}
-                      </>
-                    )
-                  }
-                  onSubmit={onContinue}
-                  onStop={onStop}
-                  isStreaming={isSessionSwitching ? false : isStreaming}
-                  placeholder={i18nService.t(
-                    !isSessionSwitching && remoteManaged
-                      ? 'coworkRemoteManagedPlaceholder'
-                      : workMode === 'chat'
-                        ? 'chatPlaceholder'
-                        : 'coworkContinuePlaceholder',
-                  )}
-                  disabled={
-                    !isSessionSwitching &&
-                    (remoteManaged || isAwaitingInlineQuestion || Boolean(inlinePermission))
-                  }
-                  sessionContextPending={isSessionSwitching}
-                  size="large"
-                  remoteManaged={!isSessionSwitching && remoteManaged}
-                  onManageSkills={!isSessionSwitching && remoteManaged ? undefined : onManageSkills}
-                  onManageConnectors={
-                    !isSessionSwitching && remoteManaged ? undefined : onManageConnectors
-                  }
-                  showPermissionModeSelector={workMode === 'work'}
-                  permissionMode={permissionMode}
-                  onPermissionModeChange={onPermissionModeChange}
-                  showModelSelector={true}
-                  resumeTaskActive={Boolean(resumeTaskId)}
-                  onCancelTaskResume={onCancelTaskResume}
-                  sessionId={displayedSessionId ?? currentSession?.id}
-                />
-                <p className="text-center text-xs text-muted-foreground mt-2 select-none">
-                  {i18nService.t('aiGeneratedDisclaimer')}
-                </p>
-              </div>
-            </div>
-          </div>
+          <SessionComposerOverlay
+            overlayRef={composerOverlayRef}
+            promptInputRef={promptInputRef}
+            pendingSessionId={
+              !isSessionSwitching && workMode === CoworkSessionMode.Work
+                ? currentSession.id
+                : undefined
+            }
+            onSubmit={onContinue}
+            onStop={onStop}
+            isStreaming={isSessionSwitching ? false : isStreaming}
+            placeholder={i18nService.t(
+              !isSessionSwitching && remoteManaged
+                ? 'coworkRemoteManagedPlaceholder'
+                : workMode === 'chat'
+                  ? 'chatPlaceholder'
+                  : 'coworkContinuePlaceholder',
+            )}
+            disabled={
+              !isSessionSwitching &&
+              (remoteManaged || isAwaitingInlineQuestion || Boolean(inlinePermission))
+            }
+            sessionContextPending={isSessionSwitching}
+            size="large"
+            remoteManaged={!isSessionSwitching && remoteManaged}
+            onManageSkills={!isSessionSwitching && remoteManaged ? undefined : onManageSkills}
+            onManageConnectors={
+              !isSessionSwitching && remoteManaged ? undefined : onManageConnectors
+            }
+            showPermissionModeSelector={workMode === 'work'}
+            permissionMode={permissionMode}
+            onPermissionModeChange={onPermissionModeChange}
+            showModelSelector={true}
+            resumeTaskActive={Boolean(resumeTaskId)}
+            onCancelTaskResume={onCancelTaskResume}
+            sessionId={displayedSessionId ?? currentSession?.id}
+          />
         </div>
         {!isSessionSwitching && shouldRenderArtifactPanel && (
           <SessionArtifactPanelRegion

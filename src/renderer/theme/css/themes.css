@@ -4871,6 +4871,12 @@
   transition-duration: 120ms;
   transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
+:where(:root, [data-theme]) :where(.theme-composer-backdrop) {
+  background-color: var(--background);
+  border-top-left-radius: var(--zy-style-radius-3xl);
+  border-top-right-radius: var(--zy-style-radius-3xl);
+  padding-bottom: 1rem;
+}
 :where(:root, [data-theme]) :where(.theme-composer-drop-active) {
   box-shadow: 0 0 0 2px var(--primary), var(--zy-style-shadow-elevated);
 }
@@ -8327,6 +8333,7 @@ to {
 :where(:root, [data-theme]) :where(.sidebar-interactive-surface-active),
 :where(:root, [data-theme]) :where([data-active-view]:not([data-active-view="cowork"]) .sidebar-session-row.sidebar-interactive-surface-active),
 :where(:root, [data-theme]) :where(.theme-composer-surface),
+:where(:root, [data-theme]) :where(.theme-composer-backdrop),
 :where(:root, [data-theme]) :where(.theme-composer-drop-active),
 :where(:root, [data-theme]) :where(.theme-message-code-user),
 :where(:root, [data-theme]) :where(.theme-message-cowork-user),
