@@ -51,7 +51,7 @@ export interface DesktopPetPose {
 export interface DesktopPetBridge {
   ready(): void;
   dragStart(): void;
-  dragEnd(): void;
+  dragEnd(cancelled?: boolean): void;
   menu(): void;
   open(): void;
   hitMask(mask: Uint8Array): void;

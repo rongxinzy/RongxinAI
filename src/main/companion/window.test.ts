@@ -178,6 +178,7 @@ test('creates a focusable sandboxed window and reuses it without admitting a mod
   const f = fixture();
   expect(f.window.options).toMatchObject({
     minWidth: 448,
+    alwaysOnTop: false,
     focusable: true,
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });

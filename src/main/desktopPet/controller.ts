@@ -60,6 +60,7 @@ let reducedMotion = false;
 let status = new DesktopPetStatus();
 const companionStatus = new DesktopPetCompanionStatus(sendState);
 let bubbleOpen = false;
+let menuOpen = false;
 let visibility: ReturnType<typeof watchDesktopPetVisibility> | undefined;
 let ready = false;
 let visible = false;
@@ -101,6 +102,7 @@ function syncRoamAllow(state: DesktopPetState): void {
   motion?.setAllowRoam(
     state === DesktopPetState.Idle &&
       !bubbleOpen &&
+      !menuOpen &&
       !greeting &&
       !reducedMotion &&
       settings.roaming,
@@ -251,18 +253,21 @@ function greet(): void {
   }, DESKTOP_PET_TERMINAL_MS);
 }
 
-function playAction(action: DesktopPetPlayableAction): void {
+function playAction(action: DesktopPetPlayableAction, withChatter = true): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
   motion?.rest();
   pet.webContents.send(DesktopPetIpc.Effect, { kind: DesktopPetEffectKind.Action, action });
-  if (visible && !reducedMotion && getDesktopPetSettings().chatter) {
+  if (withChatter && visible && !reducedMotion && getDesktopPetSettings().chatter) {
     chatter.showAction(action, Date.now());
     sendState();
   }
 }
 
 function showMenu(): void {
-  if (!pet) return;
+  if (!pet || menuOpen) return;
+  menuOpen = true;
+  motion?.rest();
+  motion?.pause();
   Menu.buildFromTemplate([
     { label: t(`desktopPet_${currentState()}`), enabled: false },
     { type: 'separator' },
@@ -284,7 +289,14 @@ function showMenu(): void {
     { label: t('desktopPetReset'), click: () => motion?.reset() },
     { type: 'separator' },
     { label: t('desktopPetHide'), click: () => setDesktopPetEnabled(false) },
-  ]).popup({ window: pet });
+  ]).popup({
+    window: pet,
+    callback: () => {
+      menuOpen = false;
+      syncRoamAllow(currentState());
+      if (visible) motion?.resume();
+    },
+  });
 }
 
 export function isDesktopPetWindow(window: BrowserWindow): boolean {
@@ -351,7 +363,7 @@ export function setDesktopPetEnabled(enabled: boolean): void {
     minimizable: false,
     fullscreenable: false,
     hasShadow: false,
-    alwaysOnTop: true,
+    alwaysOnTop: false,
     skipTaskbar: true,
     focusable: false,
     show: false,
@@ -509,15 +521,11 @@ export function initializeDesktopPet(
     sendState();
   });
   bind(DesktopPetIpc.DragStart, () => motion?.begin());
-  bind(DesktopPetIpc.DragEnd, () => {
-    if (motion?.end()) {
-      playAction(DesktopPetPlayableAction.Happy);
-      greet();
-      openCompanionWindow();
-    }
+  bind(DesktopPetIpc.DragEnd, cancelled => {
+    if (motion?.end(cancelled === true)) playAction(DesktopPetPlayableAction.Happy, false);
   });
   bind(DesktopPetIpc.Menu, showMenu);
-  bind(DesktopPetIpc.Open, openTask);
+  bind(DesktopPetIpc.Open, openCompanionWindow);
   bind(DesktopPetIpc.HitMask, payload => {
     if (payload instanceof Uint8Array && payload.length === DESKTOP_PET_SIZE * DESKTOP_PET_SIZE)
       motion?.setMask(payload);
@@ -554,6 +562,8 @@ export function disposeDesktopPet(): void {
   motion?.dispose();
   pet?.destroy();
   pet = null;
+  menuOpen = false;
+  bubbleOpen = false;
   for (const [channel, listener] of listeners) ipcMain.removeListener(channel, listener);
   listeners.clear();
   screen.removeListener('display-removed', onDisplayChanged);

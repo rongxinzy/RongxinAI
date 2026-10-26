@@ -1,3 +1,4 @@
+import { mocks } from '../../../tests/fixtures/desktopPetController';
 import { beforeEach, afterEach, test, expect, vi } from 'vitest';
 import { petMenuItem } from '../../../tests/fixtures/desktopPetMenu';
 
@@ -14,125 +15,6 @@ import {
 } from '../../shared/desktopPet/constants';
 import { PiUiEventSequencer, PiUiEventType } from '../../shared/cowork/piUiEvent';
 import { CoworkErrorKind } from '../../common/coworkError';
-
-const mocks = vi.hoisted(() => ({
-  ipc: new Map<string, (event: unknown, payload?: unknown) => void>(),
-  handles: new Map<string, (event: unknown, ...payload: unknown[]) => Promise<unknown>>(),
-  power: new Map<string, () => void>(),
-  mainEvents: new Map<string, () => void>(),
-  values: new Map<string, unknown>(),
-  fullscreen: false,
-  main: {
-    webContents: { mainFrame: {}, send: vi.fn(), isDestroyed: () => false },
-    isDestroyed: () => false,
-    isMinimized: () => false,
-    show: vi.fn(),
-    focus: vi.fn(),
-  },
-  hide: vi.fn(),
-  show: vi.fn(),
-  pause: vi.fn(),
-  resume: vi.fn(),
-  options: [] as Record<string, unknown>[],
-  windows: [] as Array<{
-    webContents: { mainFrame: object; send: ReturnType<typeof vi.fn> };
-    emit: (event: string) => void;
-    loadURL: ReturnType<typeof vi.fn>;
-  }>,
-  begin: vi.fn(),
-  end: vi.fn(() => false),
-  dispose: vi.fn(),
-  setMask: vi.fn(),
-  screenOn: vi.fn(),
-  screenOff: vi.fn(),
-  changed: vi.fn(),
-}));
-
-vi.mock('electron', () => {
-  class Window {
-    readonly id = 7;
-    readonly webContents = {
-      mainFrame: {},
-      send: vi.fn(),
-      isDestroyed: () => false,
-      setWindowOpenHandler: vi.fn(),
-      on: vi.fn(),
-    };
-    readonly loadURL = vi.fn(() => Promise.resolve());
-    private readonly callbacks = new Map<string, () => void>();
-    constructor(options: Record<string, unknown>) {
-      mocks.options.push(options);
-      mocks.windows.push(this);
-    }
-    once(event: string, callback: () => void) {
-      this.callbacks.set(event, callback);
-    }
-    emit(event: string) {
-      this.callbacks.get(event)?.();
-    }
-    close() {
-      this.emit('closed');
-    }
-    destroy() {
-      this.emit('closed');
-    }
-    isDestroyed() {
-      return false;
-    }
-    getPosition() {
-      return [300, 400];
-    }
-    showInactive = mocks.show;
-    hide = mocks.hide;
-    setVisibleOnAllWorkspaces() {}
-  }
-  const display = { workArea: { x: 0, y: 0, width: 1440, height: 900 } };
-  return {
-    app: { isPackaged: false, getAppPath: () => '/application' },
-    BrowserWindow: Window,
-    powerMonitor: {
-      getSystemIdleState: () => 'active',
-      on: (event: string, listener: () => void) => mocks.power.set(event, listener),
-      removeListener: (event: string) => mocks.power.delete(event),
-    },
-    ipcMain: {
-      handle: (
-        channel: string,
-        handler: (event: unknown, ...args: unknown[]) => Promise<unknown>,
-      ) => mocks.handles.set(channel, handler),
-      removeHandler: (channel: string) => mocks.handles.delete(channel),
-      on: (channel: string, callback: (event: unknown, payload?: unknown) => void) =>
-        mocks.ipc.set(channel, callback),
-      removeListener: (channel: string) => mocks.ipc.delete(channel),
-    },
-    screen: {
-      getPrimaryDisplay: () => display,
-      getDisplayNearestPoint: () => display,
-      on: mocks.screenOn,
-      removeListener: mocks.screenOff,
-    },
-    Menu: { buildFromTemplate: vi.fn(() => ({ popup: vi.fn() })) },
-  };
-});
-
-vi.mock('./motion', () => ({
-  petBounds: () => ({ minX: 0, minY: 0, maxX: 1248, maxY: 708 }),
-  clampPetPosition: (point: unknown) => point,
-  DesktopPetMotion: class {
-    begin = mocks.begin;
-    end = mocks.end;
-    dispose = mocks.dispose;
-    setMask = mocks.setMask;
-    setReducedMotion() {}
-    setRoamingEnabled() {}
-    setAllowRoam() {}
-    pause = mocks.pause;
-    resume = mocks.resume;
-    reset() {}
-    rest() {}
-    ensureVisible() {}
-  },
-}));
 
 import {
   initializeDesktopPet,
@@ -181,6 +63,8 @@ test('the companion is opt-in and uses a dedicated sandboxed preload', () => {
   expect(mocks.options[0]).toMatchObject({
     transparent: true,
     frame: false,
+    alwaysOnTop: false,
+    focusable: false,
     show: false,
     webPreferences: {
       sandbox: true,
@@ -246,7 +130,7 @@ test('the menu offers on-demand actions that reach the pet window as effects', (
   ]);
 });
 
-test('a click (drag end without movement) plays the happy feedback before greeting', () => {
+test('a single click gives quiet visual feedback without opening chat or the workbench', () => {
   setDesktopPetEnabled(true);
   const contents = mocks.windows[0].webContents;
   mocks.end.mockReturnValueOnce(true);
@@ -255,15 +139,52 @@ test('a click (drag end without movement) plays the happy feedback before greeti
     kind: DesktopPetEffectKind.Action,
     action: DesktopPetPlayableAction.Happy,
   });
-  const effectAt = contents.send.mock.calls.findIndex(
-    ([channel]) => channel === DesktopPetIpc.Effect,
+  expect(mocks.openChat).not.toHaveBeenCalled();
+  expect(mocks.main.show).not.toHaveBeenCalled();
+  expect(contents.send).not.toHaveBeenCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ state: 'greeting' }),
   );
-  const greetingAt = contents.send.mock.calls.findIndex(
-    ([channel, snapshot]) =>
-      channel === DesktopPetIpc.State && (snapshot as { state: string }).state === 'greeting',
+});
+
+test('double click opens only chat while the right menu retains task navigation', () => {
+  setDesktopPetEnabled(true);
+  const contents = mocks.windows[0].webContents;
+  mocks.ipc.get(DesktopPetIpc.Open)!({ sender: contents, senderFrame: contents.mainFrame });
+  expect(mocks.openChat).toHaveBeenCalledOnce();
+  expect(mocks.main.show).not.toHaveBeenCalled();
+  petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents)('打开知远智能体').click!();
+  expect(mocks.main.show).toHaveBeenCalledOnce();
+});
+
+test('the native context menu pauses movement and restores only a visible pet', async () => {
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
+  mocks.windows[0].emit('ready-to-show');
+  mocks.pause.mockClear();
+  mocks.resume.mockClear();
+  const contents = mocks.windows[0].webContents;
+  petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents);
+  expect(mocks.pause).toHaveBeenCalledOnce();
+  expect(mocks.rest).toHaveBeenCalled();
+  const close = (mocks.menuPopup.mock.calls.at(-1)![0] as { callback: () => void }).callback;
+  close();
+  expect(mocks.resume).toHaveBeenCalledOnce();
+  petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents)('收起小远').click!();
+  close();
+  expect(mocks.resume).toHaveBeenCalledOnce();
+});
+
+test('cancelled pointer releases cannot trigger a chat, task, or click performance', () => {
+  setDesktopPetEnabled(true);
+  const contents = mocks.windows[0].webContents;
+  contents.send.mockClear();
+  mocks.ipc.get(DesktopPetIpc.DragEnd)!(
+    { sender: contents, senderFrame: contents.mainFrame },
+    true,
   );
-  expect(effectAt).toBeGreaterThanOrEqual(0);
-  expect(greetingAt).toBeGreaterThan(effectAt);
+  expect(mocks.end).toHaveBeenCalledWith(true);
+  expect(mocks.openChat).not.toHaveBeenCalled();
+  expect(contents.send).not.toHaveBeenCalled();
 });
 
 test('menu actions emit matching localized chatter and task bubbles take precedence', async () => {
@@ -318,26 +239,23 @@ test('English action chatter is localized and expires after the show window', as
   );
 });
 
-test('click happy chatter appears during greeting and expires independently', () => {
+test('single click does not create a text bubble, including after its feedback expires', () => {
   setDesktopPetEnabled(true);
   mocks.windows[0].emit('ready-to-show');
   const contents = mocks.windows[0].webContents;
   mocks.end.mockReturnValueOnce(true);
   mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
-  expect(contents.send).toHaveBeenLastCalledWith(
-    DesktopPetIpc.State,
-    expect.objectContaining({ state: 'greeting', bubble: '嘿嘿！' }),
-  );
+  expect(contents.send).toHaveBeenLastCalledWith(DesktopPetIpc.Effect, {
+    kind: DesktopPetEffectKind.Action,
+    action: DesktopPetPlayableAction.Happy,
+  });
   vi.advanceTimersByTime(8_000);
-  expect(contents.send).toHaveBeenLastCalledWith(
-    DesktopPetIpc.State,
-    expect.objectContaining({ state: 'idle', bubble: null }),
-  );
   vi.advanceTimersByTime(2_200);
-  expect(contents.send).toHaveBeenLastCalledWith(
-    DesktopPetIpc.State,
-    expect.objectContaining({ bubble: null }),
-  );
+  const snapshots = contents.send.mock.calls.filter(([channel]) => channel === DesktopPetIpc.State);
+  expect(
+    snapshots.every(([, snapshot]) => (snapshot as { bubble: string | null }).bubble === null),
+  ).toBe(true);
+  expect(mocks.openChat).not.toHaveBeenCalled();
 });
 
 test('action chatter respects settings, visibility, and reduced motion', async () => {
@@ -350,7 +268,13 @@ test('action chatter respects settings, visibility, and reduced motion', async (
     mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
   };
   const lastBubble = () =>
-    (contents.send.mock.calls.at(-1)![1] as { bubble: string | null }).bubble;
+    (
+      contents.send.mock.calls
+        .filter(([channel]) => channel === DesktopPetIpc.State)
+        .at(-1)![1] as {
+        bubble: string | null;
+      }
+    ).bubble;
 
   await invoke(DesktopPetIpc.SetSettings, { chatter: false });
   menu();
@@ -504,7 +428,7 @@ test('task navigation keeps failures until a matching successful acknowledgement
   setDesktopPetEnabled(true);
   const contents = mocks.windows[0].webContents;
   const open = () =>
-    mocks.ipc.get(DesktopPetIpc.Open)!({ sender: contents, senderFrame: contents.mainFrame });
+    petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents)('查看待处理任务').click!();
   open();
   const first = (await invoke(DesktopPetIpc.GetPendingTask)) as {
     requestId: number;

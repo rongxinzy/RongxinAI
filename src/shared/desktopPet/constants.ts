@@ -63,6 +63,7 @@ export type DesktopPetPlayableAction =
   (typeof DesktopPetPlayableAction)[keyof typeof DesktopPetPlayableAction];
 
 export const DESKTOP_PET_SIZE = 192;
+export const DESKTOP_PET_DRAG_THRESHOLD = 5;
 export const DESKTOP_PET_STORE_KEY = 'desktopPet';
 export const DESKTOP_PET_PAGE = 'desktop-pet.html';
 export const DESKTOP_PET_TERMINAL_MS = 8000;
