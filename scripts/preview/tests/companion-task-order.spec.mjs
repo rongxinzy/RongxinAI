@@ -44,7 +44,7 @@ test('a failed task event received during bootstrap survives its older reply', a
     { running: WorkbenchRunStatus.Running, failed: WorkbenchRunStatus.Failed },
   );
   await page.goto('/companion.html');
-  await expect(page.locator('.theme-companion-selector')).toContainText('小远');
+  await expect(page.locator('.theme-companion-name')).toHaveText('小远');
   await page.getByRole('tab', { name: '交代任务', exact: true }).click();
   await expect(page.getByRole('button', { name: /Preserve the failure/ })).toContainText('未完成');
 });

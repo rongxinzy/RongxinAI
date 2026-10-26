@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { attachConsoleGuards } from '../shared/harness.mjs';
 
 for (const theme of ['light', 'dark']) {
-  test(`the release exposes all seven original companions in the bubble and appearance settings in ${theme}`, async ({
+  test(`the bubble has a static name while settings retain seven appearances in ${theme}`, async ({
     page,
   }) => {
     const failures = [];
@@ -12,10 +12,10 @@ for (const theme of ['light', 'dark']) {
     await page.setViewportSize({ width: 480, height: 400 });
     await page.goto(`/companion.html?language=en&theme=${theme}`);
     await expect(page.getByRole('textbox')).toBeEnabled();
-    const chooser = page.getByRole('combobox', { name: 'Switch companion', exact: true });
-    await expect(
-      page.getByRole('combobox', { name: 'Switch companion', exact: true }),
-    ).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Switch companion', exact: true })).toHaveCount(
+      0,
+    );
+    await expect(page.locator('.theme-companion-name')).toHaveText('Xiaoyuan');
     const release = await page.evaluate(async () => {
       const state = await window.companion.bootstrap();
       let refused = false;
@@ -30,9 +30,14 @@ for (const theme of ['light', 'dark']) {
       identities: ['xiaoyuan', 'youli', 'tuantuan', 'mianmian', 'zhuli', 'yunmo', 'maixiao'],
       refused: false,
     });
-    await chooser.click();
-    await expect(page.getByRole('option')).toHaveCount(7);
-    await page.getByRole('option', { name: 'Xiaoyuan', exact: true }).click();
+    await expect(page.locator('.theme-companion-name')).toHaveText('Youli');
+    await page.evaluate(async () => {
+      const state = await window.companion.bootstrap();
+      await window.companion.select(
+        state.profiles.find(profile => profile.personaId === 'xiaoyuan').petId,
+      );
+    });
+    await expect(page.locator('.theme-companion-name')).toHaveText('Xiaoyuan');
     await page.getByRole('textbox').fill('A small thought for Xiaoyuan');
     await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
     const foreground = await page.locator('[data-companion-bubble]').evaluate(element => {

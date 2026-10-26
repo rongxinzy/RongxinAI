@@ -332,42 +332,15 @@ export function CompanionView({ api = window.companion }: Props = {}) {
       <h1 className="sr-only">{t('companionTitle')}</h1>
       <div className="theme-companion-paper-content relative flex min-h-0 w-full flex-1 flex-col py-3">
         <header className="flex shrink-0 items-center justify-between gap-2 px-3 pb-3">
-          {state?.profiles.length === 1 ? (
-            <span className="theme-companion-name">
-              {t(COMPANION_NAME_KEYS[state.profiles[0].personaId])}
-            </span>
-          ) : (
-            <Select
-              value={state?.activePetId ?? ''}
-              disabled={!state || sending || choosingWorkspace || choosingFiles || Boolean(pending)}
-              onValueChange={id => {
-                if (id) void load(id);
-              }}
-            >
-              <SelectTrigger
-                className="theme-companion-selector w-36"
-                aria-label={t('companionChoose')}
-              >
-                <SelectValue>
-                  {state
-                    ? t(
-                        COMPANION_NAME_KEYS[
-                          state.profiles.find(profile => profile.petId === state.activePetId)!
-                            .personaId
-                        ],
-                      )
-                    : t('companionChoose')}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent listLabel={t('companionChoose')} portalContainer={portalContainer}>
-                {state?.profiles.map(profile => (
-                  <SelectItem key={profile.petId} value={profile.petId}>
-                    {t(COMPANION_NAME_KEYS[profile.personaId])}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <span className="theme-companion-name">
+            {state
+              ? t(
+                  COMPANION_NAME_KEYS[
+                    state.profiles.find(profile => profile.petId === state.activePetId)!.personaId
+                  ],
+                )
+              : null}
+          </span>
           <div className="flex items-center gap-1">
             <CompanionHeaderActions
               api={api}
