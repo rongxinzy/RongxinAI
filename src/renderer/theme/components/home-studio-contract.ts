@@ -1,5 +1,8 @@
 /** Home compositions keep stable hooks across editor and menu wrappers. */
 export const HOME_STUDIO_SELECTORS = {
+  'welcome-screen': '.theme-welcome-screen',
+  'welcome-title': '.theme-welcome-title',
+  'welcome-art': '.theme-welcome-art',
   'home-brand': '.theme-home-brand',
   'home-caption': '.theme-home-caption',
   'home-sticky': '.theme-home-sticky',

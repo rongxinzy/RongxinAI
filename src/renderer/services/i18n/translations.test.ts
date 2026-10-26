@@ -1,3 +1,4 @@
+import { welcomeMessages } from '../../../shared/desktopPet/welcomeMessages';
 import { describe, expect, test } from 'vitest';
 
 import { enTranslations } from './en';
@@ -37,6 +38,7 @@ import { zhTodoActivity } from './zh/todoActivity';
 import { zhWorkbench } from './zh/workbench';
 
 const zhModules = [
+  welcomeMessages.zh,
   zhLocalInferenceService,
   zhLocalInferenceCatalog,
   zhCoding,
@@ -56,6 +58,7 @@ const zhModules = [
 ];
 
 const enModules = [
+  welcomeMessages.en,
   enLocalInferenceService,
   enLocalInferenceCatalog,
   enCoding,

@@ -14,6 +14,7 @@ class I18nService {
 
   // 初始化语言设置
   async initialize(): Promise<void> {
+    const previousLanguage = this.currentLanguage;
     try {
       const config = configService.getConfig();
 
@@ -77,6 +78,8 @@ class I18nService {
       this.currentLanguage = 'en';
     }
     this.applyDocumentLanguage();
+    // Startup surfaces can remain mounted while another initialization step is pending.
+    if (previousLanguage !== this.currentLanguage) this.listeners.forEach(listener => listener());
   }
 
   /** Keep the document language in sync for screen readers, spellcheck and font fallback. */

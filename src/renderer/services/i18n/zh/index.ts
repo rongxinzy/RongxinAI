@@ -1,3 +1,4 @@
+import { welcomeMessages } from '../../../../shared/desktopPet/welcomeMessages';
 import { zhLocalInferenceService } from './localInferenceService';
 import { zhLocalInferenceCatalog } from './localInferenceCatalog';
 import { zhCoding } from './coding';
@@ -16,6 +17,7 @@ import { zhSettings } from './settings';
 import { zhCommon } from './common';
 
 export const zhTranslations: Record<string, string> = {
+  ...welcomeMessages.zh,
   ...zhLocalInferenceService,
   ...zhLocalInferenceCatalog,
   ...zhCoding,

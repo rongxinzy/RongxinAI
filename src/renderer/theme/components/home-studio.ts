@@ -3,6 +3,30 @@ import { recipe } from './recipe';
 /** Studio home surfaces inherit every package's colors and typography. */
 export function homeStudioAppearances() {
   return {
+    'welcome-screen': recipe({
+      base: {
+        'background-color': 'var(--background)',
+        color: 'var(--foreground)',
+        'transition-property': 'opacity',
+        'transition-duration': '200ms',
+      },
+      exiting: { opacity: '0' },
+    }),
+    'welcome-title': recipe({
+      base: { 'font-size': '24px', 'line-height': '32px', 'font-weight': '600' },
+    }),
+    'welcome-art': recipe({
+      base: {
+        width: 'min(52rem, 88vw)',
+        height: 'min(24rem, 44vh)',
+        'animation-name': 'component-motion',
+        'animation-duration': '240ms',
+        'animation-timing-function': 'ease-out',
+        'animation-fill-mode': 'both',
+      },
+      motionStart: { opacity: '0', translate: '0 0.5rem' },
+      motionEnd: { opacity: '1', translate: '0 0' },
+    }),
     'home-brand': recipe({ base: { height: '3rem' } }),
     'home-caption': recipe({
       base: {

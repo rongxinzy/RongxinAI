@@ -26,9 +26,10 @@ import type { CodingSidebarSelection } from './components/coding/CodingWorkspace
 import type { McpRegistryId } from './components/mcp/constants';
 import type { SettingsOpenOptions } from './components/settings/types';
 import { prefetchFeatureView } from './components/featureViewPrefetch';
-import { ParticleBootScreen } from './components/boot/ParticleBootScreen';
+import { CompanionWelcomeScreen } from './components/boot/CompanionWelcomeScreen';
+import { useAppToastDisplay } from './app/useAppToastDisplay';
+import { useLocalInferenceVisibility } from './app/useLocalInferenceVisibility';
 import Sidebar from './components/Sidebar';
-import Toast from './components/Toast';
 import AppUpdateSidebarEntry from './components/update/AppUpdateSidebarEntry';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { agentService } from './services/agent';
@@ -41,14 +42,7 @@ import { ZhiyuanModelPoolEvent } from '../shared/modelPool/constants';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
-import { TOAST_DEFAULT_DURATION_MS, TOAST_MAX_DURATION_MS } from './services/errorNormalization';
-import {
-  resolveToastMessage,
-  resolveToastNotification,
-  showAppToast,
-  type ToastNotificationDetail,
-  type ToastNotificationOptions,
-} from './services/toastNotification';
+import { showAppToast } from './services/toastNotification';
 import { workspaceService } from './services/workspace';
 import { RootState, store } from './store';
 import {
@@ -69,18 +63,13 @@ const App: React.FC = () => {
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
   const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);
-  const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
-  const [isLocalInferenceDormant, setIsLocalInferenceDormant] = useState(false);
-  // 2026/09/21 lixiang  keep-alive 视图隐藏超过该时长后真正卸载以释放内存，
-  // 回到视图时重挂载（activeTab 等会话状态经 localStorage 恢复）。
-  const LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS = 10 * 60 * 1000;
+  const { hasMountedLocalInference, isLocalInferenceDormant } =
+    useLocalInferenceVisibility(mainView);
   const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
   const [bootScreenVisible, setBootScreenVisible] = useState(
     () => !(import.meta.env.DEV && shouldSkipPreviewBoot()),
   );
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [isToastError, setIsToastError] = useState(false);
-  const [isToastSuccess, setIsToastSuccess] = useState(false);
+  const toast = useAppToastDisplay();
   const [, forceLanguageRefresh] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [codingSelection, setCodingSelection] = useState<CodingSidebarSelection>({
@@ -96,8 +85,6 @@ const App: React.FC = () => {
     managedProviderPolicy,
     setManagedProviderPolicy,
   } = useAppBootstrap();
-  const toastTimerRef = useRef<number | null>(null);
-  const toastOnCloseRef = useRef<(() => void) | null>(null);
   const appShellRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const currentSessionId = useSelector(selectCurrentSessionId);
@@ -212,22 +199,6 @@ const App: React.FC = () => {
       unsubscribe();
     };
   }, []);
-
-  useEffect(() => {
-    if (mainView === MainView.LocalInference) {
-      setHasMountedLocalInference(true);
-      setIsLocalInferenceDormant(false);
-      return;
-    }
-    // 视图切走后仍保留 keep-alive 渲染一小段时间（快速往返不闪加载态），
-    // 超时后置为休眠：卸载组件树、释放 CodeMirror/图标/模型列表等内存；
-    // 进行中的运行时安装不依赖本视图存活（进度挂在主进程，重挂载可恢复）。
-    if (!hasMountedLocalInference) return;
-    const timer = window.setTimeout(() => {
-      setIsLocalInferenceDormant(true);
-    }, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS);
-    return () => window.clearTimeout(timer);
-  }, [mainView, hasMountedLocalInference, LOCAL_INFERENCE_KEEP_ALIVE_IDLE_MS]);
 
   useNetworkStatusForwarder();
 
@@ -369,47 +340,6 @@ const App: React.FC = () => {
     [dispatch, openNewConversation],
   );
 
-  const dismissToast = useCallback(() => {
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-    setToastMessage(null);
-    setIsToastError(false);
-    setIsToastSuccess(false);
-    const onClose = toastOnCloseRef.current;
-    toastOnCloseRef.current = null;
-    onClose?.();
-  }, []);
-
-  const showToast = useCallback(
-    (message: string, options: ToastNotificationOptions = {}) => {
-      const {
-        autoClose = true,
-        durationMs = TOAST_DEFAULT_DURATION_MS,
-        isError = false,
-        isSuccess = false,
-        onClose = null,
-      } = options;
-      setToastMessage(resolveToastMessage(message, options));
-      setIsToastError(isError);
-      setIsToastSuccess(isSuccess);
-      toastOnCloseRef.current = onClose;
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-      }
-      if (autoClose) {
-        toastTimerRef.current = window.setTimeout(
-          dismissToast,
-          Math.min(Math.max(durationMs, 0), TOAST_MAX_DURATION_MS),
-        );
-      } else {
-        toastTimerRef.current = null;
-      }
-    },
-    [dismissToast],
-  );
-
   const handleOpenAbout = useCallback(() => {
     handleShowSettings({ initialTab: 'about' });
   }, [handleShowSettings]);
@@ -443,26 +373,6 @@ const App: React.FC = () => {
   }, [mainView, refreshAvailableModels]);
 
   useAppKeyboardShortcuts({ onNewChat: handleNewChat, onShowSettings: handleShowSettings });
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-      }
-      toastOnCloseRef.current = null;
-    };
-  }, []);
-
-  // Listen for toast events from child components
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const resolved = resolveToastNotification((e as CustomEvent<ToastNotificationDetail>).detail);
-      if (!resolved) return;
-      showToast(resolved.message, resolved.options);
-    };
-    window.addEventListener('app:showToast', handler);
-    return () => window.removeEventListener('app:showToast', handler);
-  }, [showToast]);
 
   // Listen for ask-ai events: close settings, navigate to cowork, pre-fill input
   useEffect(() => {
@@ -519,8 +429,9 @@ const App: React.FC = () => {
     return (
       <div className="h-screen overflow-hidden flex flex-col">
         {windowsStandaloneTitleBar}
-        <ParticleBootScreen
+        <CompanionWelcomeScreen
           exiting={isInitialized}
+          failed={Boolean(initError)}
           onExitComplete={() => setBootScreenVisible(false)}
         />
       </div>
@@ -550,9 +461,7 @@ const App: React.FC = () => {
         tabIndex={-1}
         className="h-screen overflow-hidden flex flex-col bg-surface outline-none"
       >
-        {toastMessage && (
-          <Toast message={toastMessage} isError={isToastError} isSuccess={isToastSuccess} />
-        )}
+        {toast}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar
             onShowSettings={handleShowSettings}
