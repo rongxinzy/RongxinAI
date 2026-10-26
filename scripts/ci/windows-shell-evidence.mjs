@@ -58,7 +58,7 @@ export function assertDetachedTransaction(state, installRoot) {
   return state.BackupDir;
 }
 
-export async function observeDetachedUpgrade(installRoot) {
+export async function observeDetachedUpgrade(installRoot, executableName) {
   const journalPath = `${installRoot}.setup-state.json`;
   let state;
   try {
@@ -71,7 +71,7 @@ export async function observeDetachedUpgrade(installRoot) {
   // Both real previous payload files must already be in the detached tree,
   // while extraction has created the new installation directory.
   try {
-    const previousExe = await stat(path.join(backup, '知远.exe'));
+    const previousExe = await stat(path.join(backup, executableName));
     const previousAsar = await stat(path.join(backup, 'resources/app.asar'));
     assert(
       previousExe.isFile() &&

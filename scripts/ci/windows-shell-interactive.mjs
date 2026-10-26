@@ -594,7 +594,7 @@ export async function runShellAcceptance() {
         );
         if (!log.some(item => item.type === 'phase' && item.label === '正在解包应用程序'))
           return false;
-        const observation = await observeDetachedUpgrade(installRoot);
+        const observation = await observeDetachedUpgrade(installRoot, product.executableName);
         return (
           observation && {
             ...observation,
