@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { load as loadYaml } from 'js-yaml';
 import { JSDOM } from 'jsdom';
 import { expect, test } from 'vitest';
+import windowsProduct from '../packaging/windows-product.cjs';
 import {
   assertDetachedTransaction,
   assertShellIdentity,
@@ -185,37 +186,56 @@ test('requires a real uncommitted, exact-directory GUID backup for rollback proo
   ]) {
     expect(() => assertDetachedTransaction({ ...state, ...change }, root)).toThrow();
   }
-  expect(script).toContain('observeDetachedUpgrade(installRoot)');
+  expect(script).toContain('observeDetachedUpgrade(installRoot, product.executableName)');
   expect(script).toContain(
     'Post-detach rollback did not restore the old application and registration',
   );
 });
 
-test('observes journal and detached filesystem state rather than an early progress event', async () => {
-  const fixture = fs.mkdtempSync(path.join(tmpdir(), 'shell-detach-observer-'));
-  try {
-    const install = path.join(fixture, 'app');
-    const backup = `${install}.old.${'a'.repeat(32)}`;
-    expect(await observeDetachedUpgrade(install)).toBeNull();
-    fs.writeFileSync(
-      `${install}.setup-state.json`,
-      JSON.stringify({ InstallDir: install, BackupDir: backup, Committed: false }),
-    );
-    expect(await observeDetachedUpgrade(install)).toBeNull();
-    fs.mkdirSync(path.join(backup, 'resources'), { recursive: true });
-    fs.writeFileSync(path.join(backup, '知远.exe'), 'previous executable fixture');
-    fs.writeFileSync(path.join(backup, 'resources/app.asar'), 'previous application fixture');
-    expect(await observeDetachedUpgrade(install)).toBeNull();
-    fs.mkdirSync(install);
-    expect(await observeDetachedUpgrade(install)).toBeNull();
-    fs.writeFileSync(path.join(install, 'partial-file'), 'extracting');
-    const observed = await observeDetachedUpgrade(install);
-    expect(observed.transaction.BackupDir).toBe(backup);
-    expect(observed.partialFiles).toEqual(['partial-file']);
-  } finally {
-    fs.rmSync(fixture, { recursive: true, force: true });
-  }
-});
+test.each([false, true])(
+  'observes the actual detached payload (enterprise: %s)',
+  async enterprise => {
+    const { executableName } = windowsProduct.resolveWindowsProduct(process.cwd(), enterprise);
+    const other = windowsProduct.resolveWindowsProduct(process.cwd(), !enterprise);
+    const fixture = fs.mkdtempSync(path.join(tmpdir(), 'shell-detach-observer-'));
+    try {
+      const install = path.join(fixture, 'app');
+      const backup = `${install}.old.${'a'.repeat(32)}`;
+      expect(await observeDetachedUpgrade(install, executableName)).toBeNull();
+      fs.writeFileSync(
+        `${install}.setup-state.json`,
+        JSON.stringify({ InstallDir: install, BackupDir: backup, Committed: false }),
+      );
+      expect(await observeDetachedUpgrade(install, executableName)).toBeNull();
+      fs.mkdirSync(path.join(backup, 'resources'), { recursive: true });
+      fs.writeFileSync(path.join(backup, other.executableName), 'another product fixture');
+      fs.writeFileSync(path.join(backup, 'resources/app.asar'), 'previous application fixture');
+      expect(await observeDetachedUpgrade(install, executableName)).toBeNull();
+      fs.mkdirSync(install);
+      expect(await observeDetachedUpgrade(install, executableName)).toBeNull();
+      fs.writeFileSync(path.join(install, 'partial-file'), 'extracting');
+      expect(await observeDetachedUpgrade(install, executableName)).toBeNull();
+      fs.renameSync(path.join(backup, other.executableName), path.join(backup, executableName));
+      fs.rmSync(install, { recursive: true });
+      expect(await observeDetachedUpgrade(install, executableName)).toBeNull();
+      fs.mkdirSync(install);
+      expect(await observeDetachedUpgrade(install, executableName)).toBeNull();
+      fs.writeFileSync(path.join(install, 'partial-file'), 'extracting');
+      const observed = await observeDetachedUpgrade(install, executableName);
+      expect(observed.transaction.BackupDir).toBe(backup);
+      expect(observed.partialFiles).toEqual(['partial-file']);
+      fs.writeFileSync(
+        `${install}.setup-state.json`,
+        JSON.stringify({ ...observed.transaction, Committed: true }),
+      );
+      await expect(observeDetachedUpgrade(install, executableName)).rejects.toThrow(
+        'Cancellation must precede transaction commit',
+      );
+    } finally {
+      fs.rmSync(fixture, { recursive: true, force: true });
+    }
+  },
+);
 
 test('rejects hidden, clipped, obscured, overlapping or unhosted actions', () => {
   const valid = snapshot();
