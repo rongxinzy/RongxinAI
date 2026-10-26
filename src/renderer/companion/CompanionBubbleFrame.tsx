@@ -4,23 +4,33 @@ import {
   CompanionBubbleSide,
   type CompanionBubblePlacement,
 } from '../../shared/companion/bubble';
+import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 
 /** Original frame artwork, not an icon. Only its graphite edge receives the dry-pencil texture. */
-export function CompanionBubbleFrame({ placement }: { placement: CompanionBubblePlacement }) {
-  const texture = useId().replaceAll(':', '');
+export function CompanionBubbleFrame({
+  placement,
+  characterId = DesktopPetBuiltinId.Xiaoyuan,
+}: {
+  placement: CompanionBubblePlacement;
+  characterId?: DesktopPetBuiltinId;
+}) {
+  const id = useId().replaceAll(':', '');
+  const texture = `${id}-texture`;
+  const shadow = `${id}-shadow`;
   const above = placement.side === CompanionBubbleSide.Above;
-  const point = Math.max(32, Math.min(COMPANION_BUBBLE_ART_WIDTH - 32, placement.anchorX));
+  const point = Math.max(44, Math.min(COMPANION_BUBBLE_ART_WIDTH - 44, placement.anchorX));
   const tail = above
-    ? `L ${point + 12} 380 Q ${point + 4} 384 ${point} 394 L ${point - 12} 381`
+    ? `L ${point - 13} 380 C ${point - 6} 380 ${point - 3} 391 ${point} 394 C ${point + 3} 391 ${point + 6} 380 ${point + 13} 380`
     : '';
   const topTail = !above
-    ? `L ${point - 12} 19 Q ${point - 4} 16 ${point} 6 L ${point + 12} 20`
+    ? `L ${point + 13} 18 C ${point + 6} 18 ${point + 3} 9 ${point} 6 C ${point - 3} 9 ${point - 6} 18 ${point - 13} 18`
     : '';
-  const outline = `M 20 19 Q 12 20 11 30 L 9 112 L 12 222 L 10 358 Q 10 379 29 380
-    ${tail} L 450 378 Q 469 379 469 359 L 471 270 L 468 164
-    L 470 39 Q 470 20 450 20 ${topTail} Z`;
+  const outline = `M 28 18 Q 10 18 10 36 C 9.5 140 10.5 260 10 362 Q 10 380 28 380
+    ${tail} L 452 380 Q 470 380 470 362 C 470.5 260 469.5 140 470 36
+    Q 470 18 452 18 ${topTail} Z`;
   return (
     <svg
+      data-character={characterId}
       className="theme-companion-sketch pointer-events-none absolute inset-0 h-full w-full"
       viewBox={`0 0 ${COMPANION_BUBBLE_ART_WIDTH} 400`}
       preserveAspectRatio="none"
@@ -28,10 +38,13 @@ export function CompanionBubbleFrame({ placement }: { placement: CompanionBubble
       focusable="false"
     >
       <defs>
+        <filter id={shadow} x="-6%" y="-6%" width="112%" height="114%">
+          <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#0f172a" floodOpacity="0.10" />
+        </filter>
         <filter id={texture} x="-5%" y="-5%" width="110%" height="110%">
           <feTurbulence
             type="fractalNoise"
-            baseFrequency="0.8"
+            baseFrequency="0.75"
             numOctaves="2"
             seed="7"
             result="grain"
@@ -39,38 +52,31 @@ export function CompanionBubbleFrame({ placement }: { placement: CompanionBubble
           <feDisplacementMap
             in="SourceGraphic"
             in2="grain"
-            scale="0.65"
+            scale="0.45"
             xChannelSelector="R"
             yChannelSelector="G"
           />
         </filter>
       </defs>
-      <path className="theme-companion-sketch-paper" d={outline} />
-      <g fill="none" stroke="currentColor" filter={`url(#${texture})`}>
-        <path d={outline} strokeWidth="1.4" strokeOpacity="0.7" vectorEffect="non-scaling-stroke" />
-        <path
-          d="M 18 24 L 12 111 L 16 217 M 14 355 Q 14 375 32 374 L 112 375 M 376 23 L 447 25 Q 466 24 464 42 L 466 137 M 465 283 L 464 355 Q 464 373 448 373"
-          strokeWidth="0.6"
-          strokeOpacity="0.35"
-          vectorEffect="non-scaling-stroke"
-        />
-      </g>
+      <path className="theme-companion-sketch-paper" d={outline} filter={`url(#${shadow})`} />
       <g
         fill="none"
+        stroke="currentColor"
         strokeLinecap="round"
-        strokeWidth="1.3"
-        opacity="0.7"
+        strokeLinejoin="round"
         filter={`url(#${texture})`}
       >
         <path
-          className="theme-companion-pencil-warm"
-          d="M 31 18 L 56 15 M 35 21 L 62 17 M 39 23 L 60 20"
-          stroke="currentColor"
+          d={outline}
+          strokeWidth="1.5"
+          strokeOpacity="0.82"
+          vectorEffect="non-scaling-stroke"
         />
         <path
-          className="theme-companion-pencil-cool"
-          d="M 424 381 L 448 377 M 428 384 L 453 379 M 433 386 L 451 382"
-          stroke="currentColor"
+          d="M 11.2 40 C 11 140 11.2 250 11.2 358 Q 11.2 378.5 30 378.8 M 450 19.2 Q 468.8 19.5 468.8 38 C 469 150 468.6 260 468.8 358"
+          strokeWidth="0.65"
+          strokeOpacity="0.32"
+          vectorEffect="non-scaling-stroke"
         />
       </g>
     </svg>

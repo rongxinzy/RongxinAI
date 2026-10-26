@@ -1,7 +1,11 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, expect, test, vi } from 'vitest';
 import { CompanionIpc as IpcChannel } from '../../shared/ipc/channels';
-import { COMPANION_SHORTCUT, CompanionRequestState } from '../../shared/companion/constants';
+import {
+  COMPANION_SHORTCUT,
+  CompanionComposerMode,
+  CompanionRequestState,
+} from '../../shared/companion/constants';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 import { MemoryKind } from '../../shared/memory/constants';
 
@@ -216,9 +220,13 @@ test('preparing stays hidden without a runtime resume, and opening reuses that r
   expect(await f.invoke(IpcChannel.GetVisibility)).toBe(false);
   expect(f.runtime.resume).not.toHaveBeenCalled();
   expect(f.runtime.history).not.toHaveBeenCalled();
-  openCompanionWindow();
+  openCompanionWindow(CompanionComposerMode.Task);
   expect(f.window.show).toHaveBeenCalledOnce();
   expect(f.window.focus).toHaveBeenCalledOnce();
+  expect(f.window.webContents.send).toHaveBeenCalledWith(
+    IpcChannel.Context,
+    expect.objectContaining({ mode: CompanionComposerMode.Task }),
+  );
   expect(await f.invoke(IpcChannel.GetVisibility)).toBe(true);
   f.window.emit('focus');
   expect(f.window.webContents.send).toHaveBeenCalledWith(IpcChannel.Focus);

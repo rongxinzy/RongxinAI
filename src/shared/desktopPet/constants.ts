@@ -64,6 +64,13 @@ export type DesktopPetPlayableAction =
 
 export const DESKTOP_PET_SIZE = 192;
 export const DESKTOP_PET_DRAG_THRESHOLD = 5;
+export const DESKTOP_PET_CLICK_DELAY_MS = 180;
+export const DESKTOP_PET_CLICK_ACTIONS = [
+  DesktopPetPlayableAction.Happy,
+  DesktopPetPlayableAction.Peek,
+  DesktopPetPlayableAction.Nod,
+  DesktopPetPlayableAction.Flutter,
+] as const;
 export const DESKTOP_PET_STORE_KEY = 'desktopPet';
 export const DESKTOP_PET_PAGE = 'desktop-pet.html';
 export const DESKTOP_PET_TERMINAL_MS = 8000;

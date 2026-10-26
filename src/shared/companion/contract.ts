@@ -20,6 +20,7 @@ import {
 } from './tasks';
 import {
   CompanionCapability,
+  CompanionComposerMode,
   CompanionRequestState,
   CompanionUnavailableReason,
 } from './constants';
@@ -56,6 +57,7 @@ const context = z.object({
       anchorX: z.number().finite().nonnegative(),
     })
     .optional(),
+  mode: z.enum(Object.values(CompanionComposerMode)).optional(),
 });
 const state = z.object({
   context,

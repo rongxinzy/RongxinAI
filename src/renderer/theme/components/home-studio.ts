@@ -5,13 +5,38 @@ export function homeStudioAppearances() {
   return {
     'companion-window': recipe({ base: { 'background-color': 'transparent' } }),
     'companion-bubble': recipe({ base: { 'background-color': 'transparent' } }),
-    'companion-sketch': recipe({ base: { color: 'var(--foreground)' } }),
+    'companion-sketch': recipe({
+      base: {
+        color: 'color-mix(in oklab, #4a74d9 78%, var(--foreground))',
+        'transition-property': 'color',
+        'transition-duration': '150ms',
+      },
+    }),
+    'companion-sketch-xiaoyuan': recipe({
+      base: { color: 'color-mix(in oklab, #4a74d9 78%, var(--foreground))' },
+    }),
+    'companion-sketch-youli': recipe({
+      base: { color: 'color-mix(in oklab, #d96838 78%, var(--foreground))' },
+    }),
+    'companion-sketch-tuantuan': recipe({
+      base: { color: 'color-mix(in oklab, #35969b 76%, var(--foreground))' },
+    }),
+    'companion-sketch-mianmian': recipe({
+      base: { color: 'color-mix(in oklab, #739a6e 76%, var(--foreground))' },
+    }),
+    'companion-sketch-zhuli': recipe({
+      base: { color: 'color-mix(in oklab, #c45a32 78%, var(--foreground))' },
+    }),
+    'companion-sketch-yunmo': recipe({
+      base: { color: 'color-mix(in oklab, #4f8fd6 78%, var(--foreground))' },
+    }),
+    'companion-sketch-maixiao': recipe({
+      base: { color: 'color-mix(in oklab, #d68835 78%, var(--foreground))' },
+    }),
     'companion-sketch-paper': recipe({ base: { fill: 'var(--popover)' } }),
-    'companion-pencil-warm': recipe({ base: { color: '#b98267' } }),
-    'companion-pencil-cool': recipe({ base: { color: '#6e998b' } }),
     'companion-paper-content': recipe({ base: { 'background-color': 'transparent' } }),
     'companion-name': recipe({
-      base: { 'font-size': 'var(--zy-component-text-sm)', 'font-weight': '500' },
+      base: { 'font-size': 'var(--zy-component-text-sm)', 'font-weight': '600' },
     }),
     'companion-selector': recipe({
       base: {
@@ -23,14 +48,16 @@ export function homeStudioAppearances() {
     }),
     'companion-paper-input': recipe({
       base: {
-        'border-color': 'var(--zy-text-muted)',
+        'border-color': 'var(--zy-input-border)',
         'background-color': 'transparent',
         'border-radius': '0',
         'border-top-width': '0',
         'border-left-width': '0',
         'border-right-width': '0',
-        'border-bottom-width': '2px',
+        'border-bottom-width': '1.5px',
         'box-shadow': 'none',
+        'transition-property': 'border-color',
+        'transition-duration': '120ms',
       },
       groupFocus: {
         'outline-style': 'none',

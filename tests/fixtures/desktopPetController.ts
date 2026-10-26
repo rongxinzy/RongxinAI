@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   screenOff: vi.fn(),
   changed: vi.fn(),
   openChat: vi.fn(),
+  hideChat: vi.fn(),
   menuPopup: vi.fn(),
   rest: vi.fn(),
   allowRoam: vi.fn(),
@@ -127,7 +128,7 @@ vi.mock('../../src/main/desktopPet/motion', () => ({
 
 vi.mock('../../src/main/companion/window', () => ({
   openCompanionWindow: mocks.openChat,
-  hideCompanionWindow: vi.fn(),
+  hideCompanionWindow: mocks.hideChat,
   prepareCompanionWindow: vi.fn(),
   updateActiveCompanionAppearance: vi.fn(),
 }));

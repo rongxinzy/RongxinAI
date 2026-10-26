@@ -4,6 +4,8 @@ import path from 'path';
 import {
   DESKTOP_PET_PAGE,
   DESKTOP_PET_SIZE,
+  DESKTOP_PET_CLICK_DELAY_MS,
+  DESKTOP_PET_CLICK_ACTIONS,
   DESKTOP_PET_STORE_KEY,
   DESKTOP_PET_TERMINAL_MS,
   DESKTOP_PET_FAILURES_KEY,
@@ -14,6 +16,7 @@ import {
   DesktopPetState,
   DesktopPetTaskResult,
 } from '../../shared/desktopPet/constants';
+import { CompanionComposerMode } from '../../shared/companion/constants';
 import {
   DESKTOP_PET_CANVAS_TOP,
   DESKTOP_PET_LAYOUT_VERSION,
@@ -54,6 +57,8 @@ let onEnabledChanged: (() => void) | undefined;
 let terminalTimer: ReturnType<typeof setTimeout> | undefined;
 let greetingTimer: ReturnType<typeof setTimeout> | undefined;
 let chatterTimer: ReturnType<typeof setTimeout> | undefined;
+let clickTimer: ReturnType<typeof setTimeout> | undefined;
+let clickActionIndex = 0;
 let greeting = false;
 let chatter = new DesktopPetChatter();
 let reducedMotion = false;
@@ -119,6 +124,11 @@ function chatterAllowed(state: DesktopPetState): boolean {
 function stopChatterLoop(): void {
   clearTimeout(chatterTimer);
   chatterTimer = undefined;
+}
+
+function clearClickTimer(): void {
+  clearTimeout(clickTimer);
+  clickTimer = undefined;
 }
 
 function startChatterLoop(): void {
@@ -199,6 +209,7 @@ function syncVisibility(): void {
     pet.showInactive();
     prepareCompanionWindow();
   } else {
+    clearClickTimer();
     stopChatterLoop();
     chatter.clear();
     motion?.pause();
@@ -263,28 +274,69 @@ function playAction(action: DesktopPetPlayableAction, withChatter = true): void 
   }
 }
 
+function togglePetSetting(key: 'roaming' | 'chatter'): void {
+  if (!store) return;
+  const current = getDesktopPetSettings();
+  store.set(DESKTOP_PET_STORE_KEY, {
+    ...store.get<DesktopPetPreferences>(DESKTOP_PET_STORE_KEY),
+    [key]: !current[key],
+  });
+  const settings = getDesktopPetSettings();
+  motion?.setRoamingEnabled(settings.roaming);
+  syncRoamAllow(currentState());
+  publishSettings();
+  sendState();
+}
+
 function showMenu(): void {
   if (!pet || menuOpen) return;
   menuOpen = true;
   motion?.rest();
   motion?.pause();
+  const settings = getDesktopPetSettings();
   Menu.buildFromTemplate([
     { label: t(`desktopPet_${currentState()}`), enabled: false },
     { type: 'separator' },
-    { label: t('companionTalk'), click: openCompanionWindow },
+    {
+      label: t(bubbleOpen ? 'desktopPetCloseChat' : 'companionTalk'),
+      click: () =>
+        bubbleOpen ? hideCompanionWindow() : openCompanionWindow(CompanionComposerMode.Chat),
+    },
+    {
+      label: t('desktopPetAssignTask'),
+      click: () => openCompanionWindow(CompanionComposerMode.Task),
+    },
     { label: t(status.targetSessionId ? 'desktopPetOpenTask' : 'desktopPetOpen'), click: openTask },
-    { label: t('desktopPetGreet'), click: greet },
+    { type: 'separator' },
     {
-      label: t('desktopPetActionPeek'),
-      click: () => playAction(DesktopPetPlayableAction.Peek),
+      label: t('desktopPetInteract'),
+      submenu: [
+        { label: t('desktopPetGreet'), click: greet },
+        {
+          label: t('desktopPetActionPeek'),
+          click: () => playAction(DesktopPetPlayableAction.Peek),
+        },
+        {
+          label: t('desktopPetActionNod'),
+          click: () => playAction(DesktopPetPlayableAction.Nod),
+        },
+        {
+          label: t('desktopPetActionFlutter'),
+          click: () => playAction(DesktopPetPlayableAction.Flutter),
+        },
+      ],
     },
     {
-      label: t('desktopPetActionNod'),
-      click: () => playAction(DesktopPetPlayableAction.Nod),
+      label: t('desktopPetRoaming'),
+      type: 'checkbox',
+      checked: settings.roaming,
+      click: () => togglePetSetting('roaming'),
     },
     {
-      label: t('desktopPetActionFlutter'),
-      click: () => playAction(DesktopPetPlayableAction.Flutter),
+      label: t('desktopPetChatter'),
+      type: 'checkbox',
+      checked: settings.chatter,
+      click: () => togglePetSetting('chatter'),
     },
     { label: t('desktopPetReset'), click: () => motion?.reset() },
     { type: 'separator' },
@@ -520,12 +572,30 @@ export function initializeDesktopPet(
     sendVisibility();
     sendState();
   });
-  bind(DesktopPetIpc.DragStart, () => motion?.begin());
-  bind(DesktopPetIpc.DragEnd, cancelled => {
-    if (motion?.end(cancelled === true)) playAction(DesktopPetPlayableAction.Happy, false);
+  bind(DesktopPetIpc.DragStart, () => {
+    clearClickTimer();
+    motion?.begin();
   });
-  bind(DesktopPetIpc.Menu, showMenu);
-  bind(DesktopPetIpc.Open, openCompanionWindow);
+  bind(DesktopPetIpc.DragEnd, cancelled => {
+    if (motion?.end(cancelled === true)) {
+      clearClickTimer();
+      clickTimer = setTimeout(() => {
+        clickTimer = undefined;
+        const action =
+          DESKTOP_PET_CLICK_ACTIONS[clickActionIndex++ % DESKTOP_PET_CLICK_ACTIONS.length]!;
+        playAction(action, true);
+      }, DESKTOP_PET_CLICK_DELAY_MS);
+    }
+  });
+  bind(DesktopPetIpc.Menu, () => {
+    clearClickTimer();
+    showMenu();
+  });
+  bind(DesktopPetIpc.Open, () => {
+    clearClickTimer();
+    if (bubbleOpen) hideCompanionWindow();
+    else openCompanionWindow();
+  });
   bind(DesktopPetIpc.HitMask, payload => {
     if (payload instanceof Uint8Array && payload.length === DESKTOP_PET_SIZE * DESKTOP_PET_SIZE)
       motion?.setMask(payload);
@@ -557,6 +627,8 @@ export function observeDesktopPetEvent(event: PiUiEvent): void {
 export function disposeDesktopPet(): void {
   clearTimeout(terminalTimer);
   clearTimeout(greetingTimer);
+  clearClickTimer();
+  clickActionIndex = 0;
   stopChatterLoop();
   chatter.clear();
   motion?.dispose();

@@ -21,7 +21,8 @@ test.beforeEach(async ({ page }) => {
       menu() {
         window.petInput.menus++;
       },
-      onState() {
+      onState(listener) {
+        window.petState = listener;
         return () => {};
       },
       onPose() {
@@ -87,6 +88,43 @@ for (const event of ['pointercancel', 'lostpointercapture']) {
       ends: [true],
       opens: 0,
       menus: 0,
+    });
+  });
+}
+
+for (const colorScheme of ['light', 'dark']) {
+  test(`overhead chatter bubble adapts to ${colorScheme} mode with tail pointer`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await page.evaluate(() => {
+      window.petState({
+        characterId: 'xiaoyuan',
+        state: 'idle',
+        label: '小远 · 随时待命',
+        bubble: '需要帮忙随时叫我，我在这儿陪着你',
+        reducedMotion: true,
+      });
+    });
+    const bubble = page.locator('#desktop-pet-bubble');
+    await expect(bubble).toBeVisible();
+    await expect(bubble).toHaveAttribute('data-visible', 'true');
+    const style = await bubble.evaluate(el => {
+      const computed = getComputedStyle(el);
+      const after = getComputedStyle(el, '::after');
+      return {
+        color: computed.color,
+        whiteSpace: computed.whiteSpace,
+        tailWidth: after.width,
+        overflow: document.documentElement.scrollWidth <= window.innerWidth,
+      };
+    });
+    expect(style.whiteSpace).toBe('normal');
+    expect(style.tailWidth).toBe('8px');
+    expect(style.overflow).toBe(true);
+    await page.screenshot({
+      path: `/tmp/desktop-pet-bubble-${colorScheme}.png`,
+      omitBackground: true,
     });
   });
 }

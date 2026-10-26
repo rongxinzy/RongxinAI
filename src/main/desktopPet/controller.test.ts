@@ -10,9 +10,11 @@ import {
   DesktopPetIpc,
   DesktopPetPlayableAction,
   DesktopPetTaskResult,
+  DESKTOP_PET_CLICK_DELAY_MS,
   DESKTOP_PET_STORE_KEY,
   DESKTOP_PET_FAILURES_KEY,
 } from '../../shared/desktopPet/constants';
+import { CompanionComposerMode } from '../../shared/companion/constants';
 import { PiUiEventSequencer, PiUiEventType } from '../../shared/cowork/piUiEvent';
 import { CoworkErrorKind } from '../../common/coworkError';
 
@@ -20,6 +22,7 @@ import {
   initializeDesktopPet,
   disposeDesktopPet,
   setDesktopPetEnabled,
+  setDesktopPetBubbleVisible,
   isDesktopPetEnabled,
   observeDesktopPetEvent,
 } from './controller';
@@ -130,15 +133,35 @@ test('the menu offers on-demand actions that reach the pet window as effects', (
   ]);
 });
 
-test('a single click gives quiet visual feedback without opening chat or the workbench', () => {
+test('a single click gives varied visual feedback and chatter after debounce without opening chat or the workbench', () => {
   setDesktopPetEnabled(true);
+  mocks.windows[0].emit('ready-to-show');
   const contents = mocks.windows[0].webContents;
-  mocks.end.mockReturnValueOnce(true);
-  mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
-  expect(contents.send).toHaveBeenCalledWith(DesktopPetIpc.Effect, {
-    kind: DesktopPetEffectKind.Action,
-    action: DesktopPetPlayableAction.Happy,
-  });
+  const sender = { sender: contents, senderFrame: contents.mainFrame };
+  const expected = [
+    [DesktopPetPlayableAction.Happy, '嘿嘿！'],
+    [DesktopPetPlayableAction.Peek, '我看一眼～'],
+    [DesktopPetPlayableAction.Nod, '嗯嗯'],
+    [DesktopPetPlayableAction.Flutter, '扑棱一下'],
+  ] as const;
+  for (const [action, bubble] of expected) {
+    contents.send.mockClear();
+    mocks.end.mockReturnValueOnce(true);
+    mocks.ipc.get(DesktopPetIpc.DragEnd)!(sender);
+    expect(contents.send).not.toHaveBeenCalledWith(
+      DesktopPetIpc.Effect,
+      expect.objectContaining({ kind: DesktopPetEffectKind.Action }),
+    );
+    vi.advanceTimersByTime(DESKTOP_PET_CLICK_DELAY_MS);
+    expect(contents.send).toHaveBeenCalledWith(DesktopPetIpc.Effect, {
+      kind: DesktopPetEffectKind.Action,
+      action,
+    });
+    expect(contents.send).toHaveBeenLastCalledWith(
+      DesktopPetIpc.State,
+      expect.objectContaining({ bubble }),
+    );
+  }
   expect(mocks.openChat).not.toHaveBeenCalled();
   expect(mocks.main.show).not.toHaveBeenCalled();
   expect(contents.send).not.toHaveBeenCalledWith(
@@ -147,14 +170,78 @@ test('a single click gives quiet visual feedback without opening chat or the wor
   );
 });
 
-test('double click opens only chat while the right menu retains task navigation', () => {
+test('double click cancels pending single-click feedback and toggles chat while the right menu retains task navigation', () => {
   setDesktopPetEnabled(true);
+  mocks.windows[0].emit('ready-to-show');
   const contents = mocks.windows[0].webContents;
-  mocks.ipc.get(DesktopPetIpc.Open)!({ sender: contents, senderFrame: contents.mainFrame });
+  const sender = { sender: contents, senderFrame: contents.mainFrame };
+  contents.send.mockClear();
+  mocks.end.mockReturnValueOnce(true);
+  mocks.ipc.get(DesktopPetIpc.DragEnd)!(sender);
+  mocks.ipc.get(DesktopPetIpc.Open)!(sender);
+  vi.advanceTimersByTime(DESKTOP_PET_CLICK_DELAY_MS * 2);
+  expect(contents.send).not.toHaveBeenCalledWith(
+    DesktopPetIpc.Effect,
+    expect.objectContaining({ kind: DesktopPetEffectKind.Action }),
+  );
   expect(mocks.openChat).toHaveBeenCalledOnce();
+  expect(mocks.hideChat).not.toHaveBeenCalled();
+  setDesktopPetBubbleVisible(true);
+  mocks.ipc.get(DesktopPetIpc.Open)!(sender);
+  expect(mocks.hideChat).toHaveBeenCalledOnce();
   expect(mocks.main.show).not.toHaveBeenCalled();
   petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents)('打开知远智能体').click!();
   expect(mocks.main.show).toHaveBeenCalledOnce();
+});
+
+test('right-click menu provides mode-specific companion entry, interact submenu, and live preference toggles', async () => {
+  await invoke(DesktopPetIpc.SetSettings, { enabled: true });
+  mocks.windows[0].emit('ready-to-show');
+  const contents = mocks.windows[0].webContents;
+  const openMenu = () => {
+    const lastPopup = mocks.menuPopup.mock.calls.at(-1)?.[0] as
+      | { callback?: () => void }
+      | undefined;
+    lastPopup?.callback?.();
+    return petMenuItem(mocks.ipc.get(DesktopPetIpc.Menu)!, contents);
+  };
+
+  openMenu()('聊两句').click!();
+  expect(mocks.openChat).toHaveBeenLastCalledWith(CompanionComposerMode.Chat);
+
+  setDesktopPetBubbleVisible(true);
+  openMenu()('收起对话').click!();
+  expect(mocks.hideChat).toHaveBeenCalledOnce();
+  setDesktopPetBubbleVisible(false);
+
+  openMenu()('交代任务').click!();
+  expect(mocks.openChat).toHaveBeenLastCalledWith(CompanionComposerMode.Task);
+
+  const interact = openMenu()('互动一下');
+  expect(interact.submenu?.map(item => item.label)).toEqual([
+    '打个招呼',
+    '侧看一眼',
+    '点点头',
+    '展翅一下',
+  ]);
+
+  const roaming = openMenu()('屏幕漫游');
+  expect(roaming).toMatchObject({ type: 'checkbox', checked: true });
+  roaming.click!();
+  expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({ roaming: false });
+  expect(mocks.main.webContents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.SettingsChanged,
+    expect.objectContaining({ roaming: false }),
+  );
+
+  const chatter = openMenu()('偶尔碎碎念');
+  expect(chatter).toMatchObject({ type: 'checkbox', checked: true });
+  chatter.click!();
+  expect(await invoke(DesktopPetIpc.GetSettings)).toMatchObject({ chatter: false });
+  expect(mocks.main.webContents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.SettingsChanged,
+    expect.objectContaining({ chatter: false }),
+  );
 });
 
 test('the native context menu pauses movement and restores only a visible pet', async () => {
@@ -239,22 +326,26 @@ test('English action chatter is localized and expires after the show window', as
   );
 });
 
-test('single click does not create a text bubble, including after its feedback expires', () => {
+test('single click action chatter expires after the show window and does not open chat', () => {
   setDesktopPetEnabled(true);
   mocks.windows[0].emit('ready-to-show');
   const contents = mocks.windows[0].webContents;
   mocks.end.mockReturnValueOnce(true);
   mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
-  expect(contents.send).toHaveBeenLastCalledWith(DesktopPetIpc.Effect, {
+  vi.advanceTimersByTime(DESKTOP_PET_CLICK_DELAY_MS);
+  expect(contents.send).toHaveBeenCalledWith(DesktopPetIpc.Effect, {
     kind: DesktopPetEffectKind.Action,
     action: DesktopPetPlayableAction.Happy,
   });
-  vi.advanceTimersByTime(8_000);
-  vi.advanceTimersByTime(2_200);
-  const snapshots = contents.send.mock.calls.filter(([channel]) => channel === DesktopPetIpc.State);
-  expect(
-    snapshots.every(([, snapshot]) => (snapshot as { bubble: string | null }).bubble === null),
-  ).toBe(true);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ bubble: '嘿嘿！' }),
+  );
+  vi.advanceTimersByTime(4_000);
+  expect(contents.send).toHaveBeenLastCalledWith(
+    DesktopPetIpc.State,
+    expect.objectContaining({ bubble: null }),
+  );
   expect(mocks.openChat).not.toHaveBeenCalled();
 });
 
@@ -266,6 +357,7 @@ test('action chatter respects settings, visibility, and reduced motion', async (
   const happy = () => {
     mocks.end.mockReturnValueOnce(true);
     mocks.ipc.get(DesktopPetIpc.DragEnd)!({ sender: contents, senderFrame: contents.mainFrame });
+    vi.advanceTimersByTime(DESKTOP_PET_CLICK_DELAY_MS);
   };
   const lastBubble = () =>
     (

@@ -46,6 +46,9 @@ for (const language of ['zh', 'en']) {
         ),
       ).toBeVisible();
       await input.fill('A private draft for the first companion');
+      const sketch = page.locator('.theme-companion-sketch');
+      await expect(sketch).toHaveAttribute('data-character', 'xiaoyuan');
+      const xiaoyuanColor = await sketch.evaluate(el => getComputedStyle(el).color);
       // Identity changes arrive through the host API; the bubble offers no switcher.
       await page.evaluate(async () => {
         const state = await window.companion.bootstrap();
@@ -53,6 +56,10 @@ for (const language of ['zh', 'en']) {
           state.profiles.find(profile => profile.personaId === 'youli').petId,
         );
       });
+      await expect(sketch).toHaveAttribute('data-character', 'youli');
+      await expect
+        .poll(() => sketch.evaluate(el => getComputedStyle(el).color))
+        .not.toBe(xiaoyuanColor);
       await expect(input).toHaveValue('');
       await expect(page.getByText(text, { exact: true })).toHaveCount(0);
       await input.fill('A different draft for Youli');
@@ -62,6 +69,7 @@ for (const language of ['zh', 'en']) {
           state.profiles.find(profile => profile.personaId === 'xiaoyuan').petId,
         );
       });
+      await expect(sketch).toHaveAttribute('data-character', 'xiaoyuan');
       await expect(input).toHaveValue('A private draft for the first companion');
       await expect(page.locator('[data-slot="select-content"]')).toBeHidden();
       const accessibility = await new AxeBuilder({ page }).analyze();

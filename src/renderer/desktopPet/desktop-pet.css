@@ -6,6 +6,23 @@ body {
   overflow: hidden;
 }
 
+:root {
+  --pet-accent: #4a74d9;
+  --pet-bubble-bg: #ffffff;
+  --pet-bubble-fg: #181d27;
+  --pet-bubble-border: color-mix(in oklab, var(--pet-accent) 68%, #181d27);
+  --pet-bubble-shadow: 0 4px 12px rgb(16 24 40 / 10%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pet-bubble-bg: #232630;
+    --pet-bubble-fg: #f2f4f8;
+    --pet-bubble-border: color-mix(in oklab, var(--pet-accent) 74%, #dfe1e6);
+    --pet-bubble-shadow: 0 4px 14px rgb(0 0 0 / 38%);
+  }
+}
+
 #desktop-pet-root {
   position: relative;
   width: 192px;
@@ -18,26 +35,66 @@ body {
   left: 50%;
   z-index: 1;
   box-sizing: border-box;
-  max-width: 176px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgb(18 18 22 / 82%);
-  color: #f5f5f7;
+  width: max-content;
+  max-width: 180px;
+  padding: 5px 11px;
+  border: 1.5px solid var(--pet-bubble-border);
+  border-radius: 12px;
+  background: var(--pet-bubble-bg);
+  box-shadow: var(--pet-bubble-shadow);
+  color: var(--pet-bubble-fg);
   font:
-    600 12px/1.35 system-ui,
+    500 12px/1.35 system-ui,
     -apple-system,
     'Segoe UI',
+    'PingFang SC',
     sans-serif;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
   pointer-events: none;
   opacity: 0;
   transform: translate(-50%, 4px);
   transition:
-    opacity 120ms ease,
-    transform 120ms ease;
+    opacity 150ms cubic-bezier(0.2, 0, 0, 1),
+    transform 150ms cubic-bezier(0.2, 0, 0, 1),
+    border-color 150ms ease;
+}
+
+#desktop-pet-bubble[data-character='xiaoyuan'] {
+  --pet-accent: #4a74d9;
+}
+#desktop-pet-bubble[data-character='youli'] {
+  --pet-accent: #d96838;
+}
+#desktop-pet-bubble[data-character='tuantuan'] {
+  --pet-accent: #35969b;
+}
+#desktop-pet-bubble[data-character='mianmian'] {
+  --pet-accent: #739a6e;
+}
+#desktop-pet-bubble[data-character='zhuli'] {
+  --pet-accent: #c45a32;
+}
+#desktop-pet-bubble[data-character='yunmo'] {
+  --pet-accent: #4f8fd6;
+}
+#desktop-pet-bubble[data-character='maixiao'] {
+  --pet-accent: #d68835;
+}
+
+#desktop-pet-bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  width: 8px;
+  height: 8px;
+  background: var(--pet-bubble-bg);
+  border-right: 1.5px solid var(--pet-bubble-border);
+  border-bottom: 1.5px solid var(--pet-bubble-border);
+  border-bottom-right-radius: 2px;
+  transform: translateX(-50%) rotate(45deg);
 }
 
 #desktop-pet-bubble[data-visible='true'] {

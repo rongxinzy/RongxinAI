@@ -12,6 +12,7 @@ import type {
 } from './tasks';
 import type {
   CompanionCapability,
+  CompanionComposerMode,
   CompanionRequestState,
   CompanionUnavailableReason,
 } from './constants';
@@ -63,6 +64,7 @@ export interface CompanionWindowContext {
   theme: 'light' | 'dark' | 'system';
   themeStyle: string;
   bubble?: CompanionBubblePlacement;
+  mode?: CompanionComposerMode;
 }
 
 export interface CompanionWindowState {
