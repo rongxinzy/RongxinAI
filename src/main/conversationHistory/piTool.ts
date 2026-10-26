@@ -4,6 +4,7 @@ import type { ConversationHistoryService } from './service';
 export function buildPiConversationHistoryTool(input: {
   service: ConversationHistoryService;
   workingDirectory: string;
+  sessionId?: string;
 }): Record<string, unknown> {
   return {
     name: CONVERSATION_HISTORY_TOOL_NAME,
@@ -30,6 +31,7 @@ export function buildPiConversationHistoryTool(input: {
         const query = requiredQuery(params.query);
         const matches = input.service.search({
           workingDirectory: input.workingDirectory,
+          ...(input.sessionId ? { sessionId: input.sessionId } : {}),
           query,
           limit: typeof params.limit === 'number' ? params.limit : undefined,
         });

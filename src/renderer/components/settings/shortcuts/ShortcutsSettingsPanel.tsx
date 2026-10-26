@@ -1,5 +1,12 @@
 import { Button } from '@shared/components/ui/button';
-import { Field, FieldGroup, FieldLabel } from '@shared/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from '@shared/components/ui/field';
+import { Input } from '@shared/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -9,6 +16,7 @@ import {
 } from '@shared/components/ui/select';
 import React, { useEffect, useRef, useState } from 'react';
 
+import { COMPANION_SHORTCUT } from '../../../../shared/companion/constants';
 import type { AppConfig } from '../../../config';
 import { i18nService } from '../../../services/i18n';
 import { formatShortcutLabel } from '../../../services/shortcutLabel';
@@ -156,6 +164,23 @@ export default function ShortcutsSettingsPanel({
 }: ShortcutsSettingsPanelProps) {
   return (
     <div className="flex flex-col gap-4">
+      <Field orientation="horizontal">
+        <FieldContent>
+          <FieldLabel htmlFor="shortcut-companion">
+            {i18nService.t('companionShortcutLabel')}
+          </FieldLabel>
+          <FieldDescription id="shortcut-companion-description">
+            {i18nService.t('shortcutGlobal')}
+          </FieldDescription>
+        </FieldContent>
+        <Input
+          id="shortcut-companion"
+          aria-describedby="shortcut-companion-description"
+          readOnly
+          className="w-36"
+          value={formatShortcutLabel(COMPANION_SHORTCUT, isMacPlatform)}
+        />
+      </Field>
       <p className="text-sm text-muted-foreground">{i18nService.t('shortcutRecorderHint')}</p>
       <FieldGroup className="gap-4">
         <Field orientation="horizontal">

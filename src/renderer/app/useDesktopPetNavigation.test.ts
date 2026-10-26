@@ -13,8 +13,12 @@ const mocks = vi.hoisted(() => ({
   load: vi.fn(),
   error: vi.fn(),
   dispatch: vi.fn(),
+  refreshWorkspaces: vi.fn(async () => {}),
 }));
 vi.mock('../services/cowork', () => ({ coworkService: { loadSession: mocks.load } }));
+vi.mock('../services/workspace', () => ({
+  workspaceService: { refreshWorkspaces: mocks.refreshWorkspaces },
+}));
 vi.mock('../services/appToast', () => ({ showAppError: mocks.error }));
 vi.mock('../services/i18n', () => ({ i18nService: { t: (key: string) => key } }));
 vi.mock('../store', () => ({
@@ -79,6 +83,10 @@ test('waits for app initialization and loads a queued request into the conversat
   hook.rerender({ ready: true });
   await waitFor(() => expect(api.resolveTask).toHaveBeenCalledWith(4, DesktopPetTaskResult.Opened));
   expect(hook.result.current).toEqual({ view: MainView.Cowork, session: 'failed-task' });
+  expect(mocks.refreshWorkspaces).toHaveBeenCalledOnce();
+  expect(mocks.refreshWorkspaces.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.load.mock.invocationCallOrder[0],
+  );
 });
 
 test('a failed load preserves the reminder and does not treat a transport failure as deletion', async () => {

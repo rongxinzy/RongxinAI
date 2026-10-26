@@ -29,34 +29,18 @@
  */
 
 import { randomUUID } from 'crypto';
-import { EventEmitter } from 'events';
-import * as os from 'os';
-import path from 'path';
+import { PiRuntimeServiceBindings } from './piRuntimeServiceBindings';
 
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
-import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
-import { persistCoworkImageAttachments } from '../../coworkImageAttachments';
-import type { CoworkStore } from '../../coworkStore';
-import type { ArtifactLedger } from '../../artifactLedger/artifactLedger';
-import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
-import type { ProjectMemoryService } from '../../memory/projectMemoryService';
 import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtractor';
-import type { SessionSummaryBackfillService } from '../../memory/sessionSummaryBackfillService';
-import type { SessionSummaryService } from '../../memory/sessionSummaryService';
-import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
-import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
-import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
 import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
-import { getSkillsRoot } from '../coworkUtil';
-import type { McpServerManager } from '../mcpServerManager';
-import { resolveBundledOcrHelper } from '../ocrHelper';
 import { PiAssistantTranscript } from './piAssistantTranscript';
 import {
   buildPiBackgroundCompletionContext,
@@ -67,7 +51,6 @@ import type { PiCodingElicitationResponse } from './piCodingElicitation';
 import { PiCadViewerService } from './piCadViewerTool';
 import { resolvePiModel } from './piMagpiePiModel';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
-import { invalidatePiSessionDir } from './piSessionStore';
 import { PiRuntimeQueueController } from './piRuntimeQueueController';
 import { PiRuntimeSessionMemory } from './piRuntimeSessionMemory';
 import { continuePiRuntimeSession, patchPiRuntimeSession } from './piRuntimeSessionContinuation';
@@ -102,7 +85,10 @@ import type {
 // tools won't emit escape sequences without this env var.
 if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 
-export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRuntimeAdapterHost {
+export class PiRuntimeAdapter
+  extends PiRuntimeServiceBindings
+  implements PiRuntime, PiRuntimeAdapterHost
+{
   readonly transcript = new PiAssistantTranscript({
     getStore: () => this.store,
     emitMessage: (sessionId, message) => {
@@ -173,7 +159,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
    * but must not keep the Pi session, transcript buffers, or tool maps.
    */
   readonly retainedSessionIds = new Set<string>();
-  private imageAttachmentRoot: string | null = null;
+
   readonly cadViewerService = new PiCadViewerService();
   readonly approvalSessionMap = new Map<string, string>();
   readonly pendingAskUserQuestions = new Map<
@@ -193,30 +179,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
       removeAbortListener?: () => void;
     }
   >();
-  private store: CoworkStore | null = null;
-  private mcpServerManager: McpServerManager | null = null;
-  private bundledSkillsRoot: string | null = null;
-  /**
-   * Pi custom tools are fixed when a session is created. Bump this whenever
-   * MCP discovery changes so the next user turn recreates an outdated session
-   * with the current MCP proxy topology.
-   */
-  private mcpToolManifestGeneration = 0;
-  /** Root of per-session Pi JSONL directories (`<userData>/pi-sessions`). */
-  private piSessionStoreRoot: string | null = null;
+
   private workbenchTaskService: WorkbenchTaskService | null = null;
-  private projectMemoryService: ProjectMemoryService | null = null;
-  private sessionSummaryService: SessionSummaryService | null = null;
-  private sessionSummaryBackfillService: SessionSummaryBackfillService | null = null;
-  private conversationHistoryService: ConversationHistoryService | null = null;
-  private scheduledTaskService: ScheduledTaskService | null = null;
-  private artifactLedgerService: ArtifactLedger | null = null;
+
   readonly initializingSessions = new Map<string, InitializingPiSession>();
   readonly memoryInjectionDedup = new MemoryInjectionDedup();
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
-  /** Bundled image-text helper; null when the platform/build cannot run it. */
-  private readonly bundledOcrHelper = resolveBundledOcrHelper();
 
   readonly recovery = new PiRuntimeTurnRecovery({
     getStore: () => this.store,
@@ -242,84 +211,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
     super();
   }
 
-  setCoworkStore(store: CoworkStore): void {
-    this.store = store;
-  }
-
-  setImageAttachmentRoot(root: string): void {
-    this.imageAttachmentRoot = root;
-  }
-
-  /**
-   * Root directory for file-backed Pi sessions (`<userData>/pi-sessions`).
-   * Each Cowork session then keeps its structured transcript in Pi's own
-   * JSONL and rebuilds reopen it instead of replaying a flattened prompt.
-   */
-  setPiSessionStoreRoot(root: string): void {
-    this.piSessionStoreRoot = root;
-  }
-
-  /** Drops a session's Pi JSONL so the next turn cannot restore stale history. */
-  invalidatePiSessionDir(sessionId: string): void {
-    if (!this.piSessionStoreRoot) return;
-    invalidatePiSessionDir(this.piSessionStoreRoot, sessionId);
-  }
-
-  persistImageAttachments(
-    sessionId: string,
-    attachments: PiStartOptions['imageAttachments'],
-  ): PiStartOptions['imageAttachments'] {
-    if (!attachments?.length || !this.imageAttachmentRoot) return attachments;
-    // Already on disk — skip a second write when IPC (or enqueue) persisted first.
-    if (attachments.every(item => Boolean(item.path) && !item.base64Data)) {
-      return attachments;
-    }
-    return persistCoworkImageAttachments(this.imageAttachmentRoot, sessionId, attachments);
-  }
-
-  /**
-   * Bundled SKILLs root (resources/SKILLs in production). Injected so the
-   * live member source matches the main-session preset snapshot; getSkillsRoot
-   * alone is wrong in packaged builds, where it resolves to the userData copy
-   * that can drift from the bundled truth.
-   */
-  setBundledSkillsRoot(root: string): void {
-    this.bundledSkillsRoot = root;
-  }
-  setProjectMemoryService(service: ProjectMemoryService): void {
-    this.projectMemoryService = service;
-  }
-  setSessionSummaryService(service: SessionSummaryService): void {
-    this.sessionSummaryService = service;
-  }
-  setSessionSummaryBackfillService(service: SessionSummaryBackfillService): void {
-    this.sessionSummaryBackfillService = service;
-  }
-  setConversationHistoryService(service: ConversationHistoryService): void {
-    this.conversationHistoryService = service;
-  }
-  setScheduledTaskService(service: ScheduledTaskService): void {
-    this.scheduledTaskService = service;
-  }
-  /** Resolves the delivery scheduled tasks in a session default to (IM chats). */
-  private scheduledTaskDeliveryResolver:
-    | ((sessionId: string) => ScheduledTaskDelivery | null)
-    | null = null;
-
-  setScheduledTaskDeliveryResolver(
-    resolver: (sessionId: string) => ScheduledTaskDelivery | null,
-  ): () => void {
-    this.scheduledTaskDeliveryResolver = resolver;
-    return () => {
-      if (this.scheduledTaskDeliveryResolver === resolver)
-        this.scheduledTaskDeliveryResolver = null;
-    };
-  }
-
-  getScheduledTaskDeliveryForSession(sessionId: string): ScheduledTaskDelivery | null {
-    return this.scheduledTaskDeliveryResolver?.(sessionId) ?? null;
-  }
-
   setWorkbenchTaskService(service: WorkbenchTaskService): void {
     if (this.workbenchTaskService && this.workbenchApprovalListener) {
       this.workbenchTaskService.off('approvalRequested', this.workbenchApprovalListener);
@@ -336,59 +227,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
     };
     service.on('approvalRequested', this.workbenchApprovalListener);
   }
-  setMcpServerManager(mgr: McpServerManager): void {
-    this.mcpServerManager = mgr;
-    this.mcpInjected = true;
-    this.mcpToolManifestGeneration += 1;
-  }
-  setArtifactLedger(ledger: ArtifactLedger): void {
-    this.artifactLedgerService = ledger;
-  }
-  refreshMcpTools(): void {
-    this.mcpToolManifestGeneration += 1;
-  }
-  hasMcpServerManager(): boolean {
-    return this.mcpInjected;
-  }
-  private mcpInjected = false;
 
   // ── Host contract: late-bound services ──
 
-  getStore(): CoworkStore | null {
-    return this.store;
-  }
   getWorkbenchTaskService(): WorkbenchTaskService | null {
     return this.workbenchTaskService;
-  }
-  getArtifactLedger(): ArtifactLedger | null {
-    return this.artifactLedgerService;
-  }
-  getProjectMemoryService(): ProjectMemoryService | null {
-    return this.projectMemoryService;
-  }
-  getConversationHistoryService(): ConversationHistoryService | null {
-    return this.conversationHistoryService;
-  }
-  getScheduledTaskService(): ScheduledTaskService | null {
-    return this.scheduledTaskService;
-  }
-  getMcpServerManager(): McpServerManager | null {
-    return this.mcpServerManager;
-  }
-  getMcpToolManifestGeneration(): number {
-    return this.mcpToolManifestGeneration;
-  }
-  getPiSessionStoreRoot(): string | null {
-    return this.piSessionStoreRoot;
-  }
-  getOcrCommandFor(): ((imagePath: string) => string) | undefined {
-    return this.bundledOcrHelper?.commandFor;
-  }
-  isStoredSessionWorkMode(sessionId: string): boolean {
-    return (
-      this.store?.getSession(sessionId, 0, { includeArtifacts: false })?.mode !==
-      CoworkSessionMode.Chat
-    );
   }
 
   // ── PiRuntime.on/off ──
@@ -660,21 +503,4 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime, PiRunti
   }
 
   // ── Skills & MCP integration ──
-
-  getPiAgentsDir(): string {
-    const homedir = os.homedir();
-    const configDir = process.env.PI_CODING_AGENT_DIR || path.join(homedir, '.pi', 'agent');
-    return path.join(configDir, 'agents');
-  }
-
-  /**
-   * Live team member definitions for bundled presets. Returns null when the
-   * preset is not bundled, so the subagent tool falls back to the synced pi
-   * agents files (user-imported packages).
-   */
-  resolveBundledMemberProfiles(
-    presetId: string,
-  ): Array<{ id: string; description: string; systemPrompt: string }> | null {
-    return resolveBundledPresetMembers(this.bundledSkillsRoot ?? getSkillsRoot(), presetId);
-  }
 }

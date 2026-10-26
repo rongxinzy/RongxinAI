@@ -74,13 +74,15 @@ export function classicSupplementaryControls() {
     'fluid-tab': recipe({
       base: {
         ...transition,
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
         'border-radius': 'var(--zy-style-radius-md)',
         'padding-inline': '0.75rem',
         'font-size': 'var(--zy-component-text-sm)',
         'line-height': '1.25rem',
         'font-weight': 'var(--zy-component-font-weight-normal)',
         color: 'var(--muted-foreground)',
-        opacity: '0.85',
+        opacity: '1',
         'outline-style': 'none',
       },
       hover: { color: 'var(--foreground)', opacity: '1' },
@@ -90,8 +92,12 @@ export function classicSupplementaryControls() {
         'font-weight': 'var(--zy-component-font-weight-medium)',
       },
       focus: {
-        'box-shadow':
-          '0 0 0 1px var(--muted), 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent)',
+        'outline-style': 'solid',
+        'outline-width': '2px',
+        'outline-color': 'var(--primary)',
+        'outline-offset': '1px',
+        'box-shadow': 'none',
+        opacity: '1',
       },
     }),
     'fluid-tab-default': recipe({ base: { height: '2rem' } }),

@@ -3,6 +3,42 @@ import { recipe } from './recipe';
 /** Studio home surfaces inherit every package's colors and typography. */
 export function homeStudioAppearances() {
   return {
+    'companion-window': recipe({ base: { 'background-color': 'transparent' } }),
+    'companion-bubble': recipe({ base: { 'background-color': 'transparent' } }),
+    'companion-sketch': recipe({ base: { color: 'var(--foreground)' } }),
+    'companion-sketch-paper': recipe({ base: { fill: 'var(--popover)' } }),
+    'companion-pencil-warm': recipe({ base: { color: '#b98267' } }),
+    'companion-pencil-cool': recipe({ base: { color: '#6e998b' } }),
+    'companion-paper-content': recipe({ base: { 'background-color': 'transparent' } }),
+    'companion-name': recipe({
+      base: { 'font-size': 'var(--zy-component-text-sm)', 'font-weight': '500' },
+    }),
+    'companion-selector': recipe({
+      base: {
+        'border-color': 'transparent',
+        'background-color': 'transparent',
+        'box-shadow': 'none',
+      },
+      hover: { 'background-color': 'var(--accent)' },
+    }),
+    'companion-paper-input': recipe({
+      base: {
+        'border-color': 'var(--zy-text-muted)',
+        'background-color': 'transparent',
+        'border-radius': '0',
+        'border-top-width': '0',
+        'border-left-width': '0',
+        'border-right-width': '0',
+        'border-bottom-width': '2px',
+        'box-shadow': 'none',
+      },
+      groupFocus: {
+        'outline-style': 'none',
+        'outline-width': '0',
+        'box-shadow': 'none',
+        'border-color': 'var(--primary)',
+      },
+    }),
     'welcome-screen': recipe({
       base: {
         'background-color': 'var(--background)',

@@ -1,3 +1,4 @@
+import { companionMessages } from '../../../../shared/companion/messages';
 import { welcomeMessages } from '../../../../shared/desktopPet/welcomeMessages';
 import { enLocalInferenceService } from './localInferenceService';
 import { enLocalInferenceCatalog } from './localInferenceCatalog';
@@ -18,6 +19,7 @@ import { enCommon } from './common';
 
 export const enTranslations: Record<string, string> = {
   ...welcomeMessages.en,
+  ...companionMessages.en,
   ...enLocalInferenceService,
   ...enLocalInferenceCatalog,
   ...enCoding,

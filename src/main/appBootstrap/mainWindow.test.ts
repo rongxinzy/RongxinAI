@@ -139,7 +139,14 @@ vi.mock('./runtimeServices', () => ({
 }));
 vi.mock('../contextMenu', () => ({ registerContextMenu: mocks.registerContextMenu }));
 vi.mock('../trayManager', () => ({ createTray: mocks.createTray, updateTrayMenu: vi.fn() }));
-vi.mock('../desktopPet/controller', () => ({ initializeDesktopPet: vi.fn() }));
+vi.mock('../desktopPet/controller', () => ({
+  initializeDesktopPet: vi.fn(),
+  openDesktopPetSession: vi.fn(),
+  getDesktopPetWindow: vi.fn(() => null),
+  setDesktopPetBubbleVisible: vi.fn(),
+  observeDesktopPetCompanionActivity: vi.fn(),
+}));
+vi.mock('../companion/window', () => ({ initializeCompanionWindow: vi.fn() }));
 vi.mock('./appConfigSettings', () => ({ getInitialTheme: () => 'light' }));
 vi.mock('../../scheduledTask/migrate', () => ({
   migrateLegacyScheduledTasksToCanonical: vi.fn(() => Promise.resolve()),

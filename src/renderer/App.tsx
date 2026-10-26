@@ -12,6 +12,7 @@ import { useAppBootstrap } from './app/useAppBootstrap';
 import { useAppKeyboardShortcuts } from './app/useAppKeyboardShortcuts';
 import { useNetworkStatusForwarder } from './app/useNetworkStatusForwarder';
 import { useDesktopPetNavigation } from './app/useDesktopPetNavigation';
+import { useCompanionNavigation } from './app/companionNavigation';
 import {
   InferenceEdition,
   isLocalInferenceEnabledForEdition,
@@ -60,6 +61,7 @@ const App: React.FC = () => {
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
   const [initErrorSettingsOpen, setInitErrorSettingsOpen] = useState(false);
   const [mainView, setMainView] = useState<MainView>(MainView.Cowork);
+  useCompanionNavigation(setMainView);
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
   const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);

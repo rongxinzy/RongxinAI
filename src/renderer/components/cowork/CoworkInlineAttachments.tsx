@@ -161,6 +161,7 @@ const CoworkInlineAttachmentItem = ({
               <AttachmentRemove
                 className="absolute inset-0 duration-150"
                 label={i18nService.t('coworkAttachmentRemove')}
+                aria-description={attachment.name}
               />
             </div>
             <div className="flex min-w-0 flex-1 items-center text-sm text-muted-foreground">
@@ -171,9 +172,9 @@ const CoworkInlineAttachmentItem = ({
         }
       />
       <AttachmentHoverCardContent align="start">
-        <div className="flex w-max flex-col gap-3">
+        <div className="flex w-80 max-w-full flex-col gap-3">
           {mediaCategory === 'image' && data.type === 'file' && data.url && (
-            <div className="flex max-h-96 w-80 items-center justify-center overflow-hidden rounded-md border border-border">
+            <div className="flex max-h-96 w-80 max-w-full items-center justify-center overflow-hidden rounded-md border border-border">
               <img
                 alt={label}
                 className="max-h-96 max-w-full object-contain"
@@ -184,9 +185,11 @@ const CoworkInlineAttachmentItem = ({
             </div>
           )}
           <div className="flex min-w-0 flex-col gap-1 px-0.5">
-            <h4 className="whitespace-nowrap text-sm font-semibold leading-none">{label}</h4>
+            <h4 className="wrap-anywhere whitespace-normal text-sm font-semibold leading-none">
+              {label}
+            </h4>
             {mediaTypeLabel && (
-              <p className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+              <p className="wrap-anywhere whitespace-normal font-mono text-xs text-muted-foreground">
                 {mediaTypeLabel}
               </p>
             )}

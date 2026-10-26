@@ -1,6 +1,7 @@
 import type { TextWorkerInput } from './textWorkerOperations';
 import type { collectWorkbenchArtifacts } from './artifactCollector';
 import { ArtifactWorkerTask } from './artifactWorkerConstants';
+import type { CompanionImageSource } from '../../shared/companion/images';
 
 export interface WorkspaceContentInspection {
   sha256: string;
@@ -10,6 +11,10 @@ export interface WorkspaceContentInspection {
 
 export type ArtifactWorkerInput =
   | { kind: typeof ArtifactWorkerTask.TransformText; input: TextWorkerInput }
+  | {
+      kind: typeof ArtifactWorkerTask.PrepareCompanionImages;
+      input: { sources: CompanionImageSource[] };
+    }
   | {
       kind: typeof ArtifactWorkerTask.Collect;
       input: Parameters<typeof collectWorkbenchArtifacts>[0];

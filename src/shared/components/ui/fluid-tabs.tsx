@@ -36,6 +36,7 @@ export interface FluidTabsProps<Value extends string> {
   items: readonly FluidTabItem<Value>[];
   onValueChange: (value: Value) => void;
   value: Value;
+  disabled?: boolean;
 }
 
 interface IndicatorGeometry {
@@ -55,6 +56,7 @@ export function FluidTabs<Value extends string>({
   items,
   onValueChange,
   value,
+  disabled = false,
 }: FluidTabsProps<Value>) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [indicator, setIndicator] = useState<IndicatorGeometry | null>(null);
@@ -129,6 +131,7 @@ export function FluidTabs<Value extends string>({
             <TabsPrimitive.Tab
               key={item.value}
               value={item.value}
+              disabled={disabled}
               className={cn(
                 'theme-fluid-tab group relative z-10 flex min-w-16 cursor-pointer items-center justify-center whitespace-nowrap',
                 !isActive && inactiveTabClassName,

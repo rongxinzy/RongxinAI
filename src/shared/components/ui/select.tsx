@@ -64,14 +64,16 @@ function SelectContent({
   alignOffset = 0,
   alignItemWithTrigger = false,
   collisionAvoidance,
+  listLabel,
+  portalContainer,
   ...props
 }: SelectPrimitive.Popup.Props &
   Pick<
     SelectPrimitive.Positioner.Props,
     'align' | 'alignOffset' | 'side' | 'sideOffset' | 'alignItemWithTrigger' | 'collisionAvoidance'
-  >) {
+  > & { listLabel?: string; portalContainer?: SelectPrimitive.Portal.Props['container'] }) {
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal container={portalContainer}>
       <SelectPrimitive.Positioner
         side={side}
         sideOffset={sideOffset}
@@ -91,7 +93,7 @@ function SelectContent({
           {...props}
         >
           <SelectScrollUpButton />
-          <SelectPrimitive.List>{children}</SelectPrimitive.List>
+          <SelectPrimitive.List aria-label={listLabel}>{children}</SelectPrimitive.List>
           <SelectScrollDownButton />
         </SelectPrimitive.Popup>
       </SelectPrimitive.Positioner>

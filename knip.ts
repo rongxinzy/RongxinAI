@@ -24,6 +24,7 @@ const config: KnipConfig = {
         'src/main/main.ts',
         'src/main/preload.ts',
         'src/main/desktopPetPreload.ts',
+        'src/main/companionWindowPreload.ts',
         'src/main/llamacppModelDaemonEntry.ts',
         'src/main/workbenchTask/artifactWorker.ts',
         'src/main/magpie/catalogWorker.ts',
@@ -79,7 +80,7 @@ const config: KnipConfig = {
         'electron-builder.xiaoruan.cjs',
       ],
       project: [
-        'src/**/*.{js,mjs,cjs,jsx,ts,tsx,css}',
+        'src/**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx,css}',
         'scripts/**/*.{js,mjs,cjs,jsx,ts,tsx}',
         'tests/**/*.{js,mjs,cjs,jsx,ts,tsx}',
         'electron-builder*.cjs',

@@ -324,6 +324,7 @@
     "esbuild": "0.28.2",
     "extract-zip": "^2.0.1",
     "husky": "^9.1.7",
+    "image-size": "2.0.4",
     "js-yaml": "^4.1.1",
     "jsdom": "^30.0.1",
     "jszip": "^3.10.1",

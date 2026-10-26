@@ -35,6 +35,8 @@ export function projectMagpieCatalog(body: unknown): MagpieModel[] {
         : {};
     const output = strings(modalities.output);
     if (output.length && !output.includes('text')) return [];
+    const endpoints = strings(m.native_endpoints);
+    if (endpoints.length && !endpoints.some(endpoint => ENDPOINTS.has(endpoint))) return [];
     const levels = Array.isArray(m.supported_reasoning_levels)
       ? m.supported_reasoning_levels
           .flatMap((v: unknown) => {
@@ -56,7 +58,7 @@ export function projectMagpieCatalog(body: unknown): MagpieModel[] {
           : {}),
         reasoning: m.reasoning === true || levels.length > 0,
         supported_reasoning_levels: levels,
-        native_endpoints: strings(m.native_endpoints).filter(endpoint => ENDPOINTS.has(endpoint)),
+        native_endpoints: endpoints.filter(endpoint => ENDPOINTS.has(endpoint)),
         ...(positive(m.context_window) ? { context_window: positive(m.context_window) } : {}),
         ...(positive(m.max_output_tokens)
           ? { max_output_tokens: positive(m.max_output_tokens) }

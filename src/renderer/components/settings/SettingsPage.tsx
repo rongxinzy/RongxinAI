@@ -3,12 +3,16 @@ import { cn } from '@shared/lib/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
+import { COMPANION_SHORTCUT } from '../../../shared/companion/constants';
 import type { EnterpriseRendererSettingsPage } from '../../../shared/enterpriseRenderer';
 import { defaultConfig, type AppConfig } from '../../config';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
 import { i18nService, type LanguageType } from '../../services/i18n';
+import { formatShortcutLabel } from '../../services/shortcutLabel';
+import { shortcutsConflict } from '../../services/shortcuts';
 import { themeService } from '../../services/theme';
+import { showAppToast } from '../../services/toastNotification';
 import { selectCoworkConfig } from '../../store/selectors/coworkSelectors';
 import ErrorMessage from '../ErrorMessage';
 import { EnterpriseSettingsPage } from '../enterprise/EnterpriseSettingsPage';
@@ -223,19 +227,27 @@ export default function SettingsPage({
   };
 
   const handleShortcutChange = (key: keyof typeof shortcuts, value: string) => {
+    const isMacPlatform = navigator.platform.includes('Mac');
     const conflictKey =
       value &&
       Object.keys(shortcuts).find(
         candidate =>
           candidate !== key &&
-          shortcuts[candidate as keyof typeof shortcuts] &&
-          shortcuts[candidate as keyof typeof shortcuts] === value,
+          shortcutsConflict(shortcuts[candidate as keyof typeof shortcuts], value, isMacPlatform),
       );
-    if (conflictKey) {
-      const conflictLabel = i18nService.t(shortcutLabelMap[conflictKey] ?? conflictKey);
-      setNoticeMessage(
-        i18nService.t('shortcutConflict').replace('{0}', value).replace('{1}', conflictLabel),
-      );
+    const conflictLabel = shortcutsConflict(COMPANION_SHORTCUT, value, isMacPlatform)
+      ? i18nService.t('companionShortcutLabel')
+      : conflictKey
+        ? i18nService.t(shortcutLabelMap[conflictKey] ?? conflictKey)
+        : null;
+    if (conflictLabel) {
+      showAppToast({
+        message: i18nService
+          .t('shortcutConflict')
+          .replace('{0}', formatShortcutLabel(value, isMacPlatform))
+          .replace('{1}', conflictLabel),
+        isError: false,
+      });
       return;
     }
     const next = { ...shortcuts, [key]: value };

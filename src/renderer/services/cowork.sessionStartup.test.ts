@@ -174,7 +174,7 @@ test('handles an already-removed placeholder without dropping the real session',
 
 test('passes the local placeholder identity from the view instead of deleting it after refresh', () => {
   const source = readFileSync(
-    new URL('../components/cowork/CoworkView.tsx', import.meta.url),
+    new URL('../components/cowork/hooks/useCoworkSessionActions.ts', import.meta.url),
     'utf8',
   );
   const startup = source.slice(source.indexOf('await coworkService.startSession('));

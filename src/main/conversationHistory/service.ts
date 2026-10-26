@@ -1,4 +1,8 @@
 import type Database from 'better-sqlite3';
+import {
+  initializeCompanionTaskAdmissions,
+  resolveCompanionTaskOwner,
+} from '../companion/taskOwnership';
 
 import type { ProjectIdentity } from '../memory/projectIdentity';
 import { resolveProjectIdentity } from '../memory/projectIdentity';
@@ -35,12 +39,16 @@ export class ConversationHistoryService {
   constructor(
     private readonly db: Database.Database,
     private readonly resolveIdentity: (cwd: string) => ProjectIdentity = resolveProjectIdentity,
-  ) {}
+  ) {
+    initializeCompanionTaskAdmissions(db);
+  }
 
   search(input: {
     workingDirectory: string;
     query: string;
     limit?: number;
+    /** Bound by the execution host, not accepted as a tool argument. */
+    sessionId?: string;
   }): ConversationHistoryMatch[] {
     const query = input.query.trim();
     if (!query) return [];
@@ -48,13 +56,14 @@ export class ConversationHistoryService {
     const projectDirectories = this.listProjectDirectories(projectId);
     if (projectDirectories.length === 0) return [];
     const limit = normalizeLimit(input.limit);
-    const exact = this.queryRows(projectDirectories, [query], limit).filter(
+    const owner = input.sessionId ? resolveCompanionTaskOwner(this.db, input.sessionId) : null;
+    const exact = this.queryRows(projectDirectories, [query], limit, owner).filter(
       row => !isThinkingMessage(row.metadata),
     );
     const rows =
       exact.length > 0
         ? exact
-        : this.queryRows(projectDirectories, broadTerms(query), limit).filter(
+        : this.queryRows(projectDirectories, broadTerms(query), limit, owner).filter(
             row => !isThinkingMessage(row.metadata),
           );
     return rows.slice(0, limit).map(row => ({
@@ -85,13 +94,22 @@ export class ConversationHistoryService {
     return projectId;
   }
 
-  private queryRows(directories: string[], terms: string[], limit: number): HistoryRow[] {
+  private queryRows(
+    directories: string[],
+    terms: string[],
+    limit: number,
+    owner: string | null,
+  ): HistoryRow[] {
     if (terms.length === 0) return [];
     const directoryPlaceholders = directories.map(() => '?').join(', ');
     const termPredicates = terms
       .map(() => "LOWER(m.content) LIKE LOWER(?) ESCAPE '\\'")
       .join(' OR ');
     const candidateLimit = Math.min(limit * MAX_CANDIDATE_MULTIPLIER, MAX_RESULT_LIMIT * 10);
+    const ownershipPredicate = owner
+      ? `EXISTS (SELECT 1 FROM companion_task_admissions a
+          WHERE a.session_id = s.id AND a.pet_id = ?)`
+      : `NOT EXISTS (SELECT 1 FROM companion_task_admissions a WHERE a.session_id = s.id)`;
     return this.db
       .prepare(
         `SELECT m.id, m.session_id, s.title AS session_title, m.type, m.content,
@@ -99,6 +117,7 @@ export class ConversationHistoryService {
          FROM cowork_messages m
          INNER JOIN cowork_sessions s ON s.id = m.session_id
          WHERE s.cwd IN (${directoryPlaceholders})
+           AND ${ownershipPredicate}
            AND m.type IN (?, ?)
            AND (${termPredicates})
          ORDER BY m.created_at DESC, COALESCE(m.sequence, m.created_at) DESC
@@ -106,6 +125,7 @@ export class ConversationHistoryService {
       )
       .all(
         ...directories,
+        ...(owner ? [owner] : []),
         ConversationHistoryRole.User,
         ConversationHistoryRole.Assistant,
         ...terms.map(term => `%${escapeLikePattern(term)}%`),

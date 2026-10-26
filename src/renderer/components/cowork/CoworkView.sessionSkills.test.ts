@@ -3,7 +3,10 @@ import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
 
-const source = readFileSync(fileURLToPath(new URL('./CoworkView.tsx', import.meta.url)), 'utf8');
+const source = readFileSync(
+  fileURLToPath(new URL('./hooks/useCoworkSessionActions.ts', import.meta.url)),
+  'utf8',
+);
 
 test('sends the current session skill array on every engine continuation', () => {
   const continuationStart = source.indexOf('const handleContinueSession = async');

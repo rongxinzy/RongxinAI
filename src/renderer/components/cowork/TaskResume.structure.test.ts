@@ -7,6 +7,10 @@ const viewSource = readFileSync(
   fileURLToPath(new URL('./CoworkView.tsx', import.meta.url)),
   'utf8',
 );
+const actionsSource = readFileSync(
+  fileURLToPath(new URL('./hooks/useCoworkSessionActions.ts', import.meta.url)),
+  'utf8',
+);
 const detailSource = readFileSync(
   fileURLToPath(new URL('./CoworkSessionDetail.tsx', import.meta.url)),
   'utf8',
@@ -21,15 +25,15 @@ const turnSource = readFileSync(
 );
 
 test('routes an explicitly selected interruption through a resume run', () => {
-  const resumeBranch = viewSource.indexOf('if (taskResume.interruption)');
-  const normalRunGuard = viewSource.indexOf(
+  const resumeBranch = actionsSource.indexOf('if (taskResume.interruption)');
+  const normalRunGuard = actionsSource.indexOf(
     'if (continuingSessionIdsRef.current.has(currentSession.id))',
     resumeBranch,
   );
 
   expect(resumeBranch).toBeGreaterThanOrEqual(0);
   expect(normalRunGuard).toBeGreaterThan(resumeBranch);
-  expect(viewSource).toContain('amendment: prompt');
+  expect(actionsSource).toContain('amendment: prompt');
   expect(viewSource).toContain('resumeTaskId={taskResume.interruption?.taskId}');
 });
 
