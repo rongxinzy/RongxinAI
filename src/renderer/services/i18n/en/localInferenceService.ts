@@ -101,8 +101,6 @@ export const enLocalInferenceService: Record<string, string> = {
   localInferenceServiceConfigExecutablePathPlaceholder: 'Example: /usr/local/bin/llama-server',
   localInferenceServiceConfigDeviceHint:
     'Limit visible local inference devices. Enter device indexes such as 0, 1, or 2. Separate multiple values with commas. The app maps them to real device IDs when saving. Leave empty to keep all devices visible.',
-  localInferenceServiceConfigNumGpuHint:
-    'Default GPU offload layers; -1 tries full GPU offload, 0 means CPU only.',
   localInferenceServiceConfigModelsMaxHint:
     'Number of models allowed to stay loaded in memory at once. Use 1 for a desktop single-model setup, 2 for switching between models, or leave empty for no limit.',
   localInferenceServiceConfigModelsAutoloadHint:
