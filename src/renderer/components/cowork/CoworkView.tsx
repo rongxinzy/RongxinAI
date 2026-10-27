@@ -28,7 +28,6 @@ import { isScratchWorkspacePath } from '../../utils/path';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
 import type { SettingsOpenOptions } from '../settings/types';
 import PageHeader from '../PageHeader';
-import { LogoLoadingState } from '../LogoLoadingState';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
@@ -301,17 +300,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       window.removeEventListener('focus', handleWindowFocus);
     };
   }, [currentSession, isStreaming]);
-
-  if (!isInitialized) {
-    return (
-      <div data-page-canvas className="flex-1 h-full flex flex-col bg-background">
-        <PageHeader />
-        <div className="flex-1 flex items-center justify-center">
-          <LogoLoadingState label={i18nService.t('coworkWorkspaceLoading')} />
-        </div>
-      </div>
-    );
-  }
 
   const homeHeader = (
     <PageHeader
