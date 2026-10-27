@@ -97,21 +97,6 @@ export const enModelProviders: Record<string, string> = {
     'When enabled, uses the Alibaba Cloud Bailian Coding Plan dedicated API endpoint',
   qwenCodingPlanEndpointHint:
     'When using Coding Plan, you need a dedicated API Key (format: sk-sp-xxxxx)',
-  qwenOAuthTab: 'OAuth Login',
-  qwenOAuthLogin: 'OAuth Login',
-  qwenOAuthLoginFree: 'OAuth Login',
-  qwenOAuthLoggingIn: 'Logging in...',
-  qwenOAuthLoggedIn: 'OAuth Logged In',
-  qwenOAuthLogout: 'Logout',
-  qwenOAuthTokenExpires: 'Token expires at {date}',
-  qwenOAuthSuccess: 'OAuth login successful!',
-  qwenOAuthFailed: 'OAuth login failed',
-  qwenAuthMethod: 'Authentication Method',
-  qwenApiKeyOptional: 'API Key (Optional)',
-  qwenApiKeyPriority: 'sk-xxxxx (Traditional method, higher priority than OAuth)',
-  qwenAuthPriorityHint:
-    '💡 Authentication Priority: API Key > OAuth. If both are configured, API Key will be used first.',
-  qwenOrUseApiKey: 'Or use API Key',
   volcengineCodingPlanHint: 'When enabled, uses the Volcengine Coding Plan dedicated API endpoint',
   volcengineCodingPlanEndpointHint:
     'When using Coding Plan, the system will automatically switch to the dedicated Coding endpoint',
