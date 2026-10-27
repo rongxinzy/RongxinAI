@@ -1,4 +1,4 @@
-import { test, expect } from 'vitest';
+import { test, expect, vi } from 'vitest';
 
 import { DesktopPetRoam } from './roam';
 
@@ -24,4 +24,24 @@ test('roaming stops when disabled', () => {
     roam.tick(30_000, { x: 100, y: 200 }, { minX: 0, minY: 0, maxX: 500, maxY: 500 }, false),
   ).toBeNull();
   expect(roam.isWalking()).toBe(false);
+});
+
+test('roaming distance depends on elapsed time rather than tick frequency or rounding', () => {
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  const bounds = { minX: 0, minY: 0, maxX: 800, maxY: 700 };
+  const walk = (interval: number) => {
+    const roam = new DesktopPetRoam();
+    roam.reset(0);
+    let position = { x: 400, y: 600 };
+    let step = roam.tick(29_000, position, bounds, true, 0);
+    const frames = Math.round(1000 / interval);
+    for (let frame = 1; frame <= frames; frame++) {
+      if (step) position = { x: step.x, y: step.y };
+      step = roam.tick(29_000 + frame * interval, position, bounds, true, interval);
+    }
+    return step!.x;
+  };
+  expect(walk(1000 / 60)).toBeCloseTo(walk(1000 / 30), 8);
+  expect(walk(1000 / 60)).toBeCloseTo(358, 8);
+  random.mockRestore();
 });

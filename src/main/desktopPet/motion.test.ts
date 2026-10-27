@@ -24,9 +24,9 @@ const effect = vi.fn();
 const window = {
   getPosition: () => [position.x, position.y],
   getBounds: () => ({ ...position, width: 192, height: DESKTOP_PET_WINDOW_HEIGHT }),
-  setPosition: (x: number, y: number) => {
+  setPosition: vi.fn((x: number, y: number) => {
     position = { x, y };
-  },
+  }),
   isDestroyed: () => false,
   setIgnoreMouseEvents: ignore,
 } as unknown as BrowserWindow;
@@ -43,6 +43,14 @@ beforeEach(() => {
 afterEach(() => {
   motion.dispose();
   vi.useRealTimers();
+});
+
+test('a stationary drag does not repeatedly rewrite the native window position', () => {
+  motion.begin();
+  vi.advanceTimersByTime(100);
+  expect(window.setPosition).not.toHaveBeenCalled();
+  expect(motion.end()).toBe(true);
+  expect(window.setPosition).not.toHaveBeenCalled();
 });
 
 test('opaque body receives clicks while transparent pixels pass through, using a copied mask', () => {

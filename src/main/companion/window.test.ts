@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import path from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { CompanionIpc as IpcChannel } from '../../shared/ipc/channels';
 import {
@@ -34,6 +35,7 @@ class FakeWindow extends EventEmitter {
   loadURL = vi.fn(async () => {});
   loadFile = vi.fn(async () => {});
   setTitle = vi.fn();
+  getBounds = vi.fn(() => ({ x: 0, y: 0, width: 480, height: 400 }));
   setBounds = vi.fn();
   constructor(readonly options: Record<string, unknown>) {
     super();
@@ -507,6 +509,6 @@ test('binary staging rejects foreign frames, paths, oversized bytes and stale ow
   expect(f.tasks.attachments.stage).toHaveBeenCalledWith(
     f.profile.petId,
     file,
-    '/owned-temp/zhiyuan/attachments/companion',
+    path.join('/owned-temp', 'zhiyuan', 'attachments', 'companion'),
   );
 });
