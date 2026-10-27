@@ -9,7 +9,7 @@ The **Windows CUDA (win-cuda)** installer bundles [Strata](https://github.com/Ni
 | General GGUF, router multi-model, CPU/Vulkan/CUDA backends | **llama.cpp** |
 | Qwen3.8-Flash-Next, Qwen3.6-35B-A3B, DeepSeek-V4.1-Flash (Strata-only stacks) | **Strata** (`strata.exe` + `strata-dsv41.exe` + bundled Python control) |
 
-The installer bundles official Strata **v0.2.4** Windows CUDA13 engine tarballs plus `strata-control-0.1.49.1-windows-x86_64.zip` (SHA-256 pinned in `package.json`). Model weights are **not** included.
+The installer bundles official Strata **v0.2.4** Windows CUDA13 engine tarballs plus `strata-control-0.1.49.2-windows-x86_64.zip` (SHA-256 pinned in `package.json`). Model weights are **not** included.
 
 ## GPU exclusivity
 

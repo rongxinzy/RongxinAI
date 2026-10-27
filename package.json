@@ -54,8 +54,8 @@
     "releaseTag": "v0.2.4",
     "defaultPort": 8096,
     "control": {
-      "assetName": "strata-control-0.1.49.1-windows-x86_64.zip",
-      "sha256": "2bb7e1406a91f2fb92cf0379099fe9e3d267086e6619106a5947d80bd29dc30d"
+      "assetName": "strata-control-0.1.49.2-windows-x86_64.zip",
+      "sha256": "992405e03630ec41e318d90dc91cda21b232d3a3f409d27b48d82d1274afeaab"
     },
     "engineQwen": {
       "assetName": "strata-engine-0.1.48-windows-x86_64-cuda-cuda13.tar.gz",
@@ -63,9 +63,9 @@
       "installFolder": "0.1.48-windows-x86_64-cuda-cuda13"
     },
     "engineDsv41": {
-      "assetName": "strata-dsv41-0.1.49-windows-x86_64-cuda-cuda13.tar.gz",
-      "sha256": "2de85e1c93abcc43127cb8a313ff837157a35b3069d0c5d29655333d53d924c6",
-      "installFolder": "0.1.49-windows-x86_64-cuda-cuda13"
+      "assetName": "strata-dsv41-0.1.49.2-windows-x86_64-cuda-cuda13.tar.gz",
+      "sha256": "57bfba85e1f5998c2e198a18ab125af2b5da32167370cdf5802af87ba8dc3480",
+      "installFolder": "0.1.49.2-windows-x86_64-cuda-cuda13"
     }
   },
   "channelRuntime": {
