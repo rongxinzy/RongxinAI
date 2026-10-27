@@ -163,6 +163,11 @@ export class SkillManager implements SkillManagerContext {
     if (isCoreSkill(id) && !enabled) {
       return this.listSkills();
     }
+    // Unknown ids never reach this method from the UI; ignoring them keeps the
+    // persisted state map limited to Skills that actually exist on disk.
+    if (!this.knownSkillIds().has(id)) {
+      return this.listSkills();
+    }
     const state = this.loadSkillStateMap();
     state[id] = { ...state[id], enabled };
     this.saveSkillStateMap(state);
@@ -172,10 +177,12 @@ export class SkillManager implements SkillManagerContext {
 
   setSkillsEnabled(ids: string[], enabled: boolean): SkillRecord[] {
     const state = this.loadSkillStateMap();
+    const known = this.knownSkillIds();
     const uniqueIds = [...new Set(ids)];
     for (const id of uniqueIds) {
       // Core skills cannot be disabled; skip them on disable batches.
       if (!enabled && isCoreSkill(id)) continue;
+      if (!known.has(id)) continue;
       state[id] = { ...state[id], enabled };
     }
     this.saveSkillStateMap(state);
@@ -204,6 +211,9 @@ export class SkillManager implements SkillManagerContext {
   }
 
   setSkillPinned(id: string, pinned: boolean): SkillRecord[] {
+    if (!this.knownSkillIds().has(id)) {
+      return this.listSkills();
+    }
     const state = this.loadSkillStateMap();
     state[id] = { ...state[id], enabled: state[id]?.enabled ?? true, pinned };
     this.saveSkillStateMap(state);
@@ -321,6 +331,11 @@ ${params.content.trim()}
 
   onSkillsChanged(listener: () => void): () => void {
     return this.watcher.onSkillsChanged(listener);
+  }
+
+  /** Skill ids that currently exist on disk across every registered root. */
+  private knownSkillIds(): Set<string> {
+    return new Set(this.listSkills().map(skill => skill.id));
   }
 
   isBuiltInSkillId(id: string): boolean {
