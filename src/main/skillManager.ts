@@ -163,29 +163,40 @@ export class SkillManager implements SkillManagerContext {
     if (isCoreSkill(id) && !enabled) {
       return this.listSkills();
     }
-    // Unknown ids never reach this method from the UI; ignoring them keeps the
-    // persisted state map limited to Skills that actually exist on disk.
-    if (!this.knownSkillIds().has(id)) {
+    // A stale renderer list can still send ids that were deleted from disk;
+    // those never write `skills_state`.
+    const known = this.knownSkillIds();
+    if (!known.has(id)) {
       return this.listSkills();
     }
     const state = this.loadSkillStateMap();
+    if (state[id]?.enabled === enabled) {
+      return this.listSkills();
+    }
     state[id] = { ...state[id], enabled };
-    this.saveSkillStateMap(state);
+    this.saveSkillStateMap(this.pruneUnknownSkillState(state, known));
     this.notifySkillsChanged();
     return this.listSkills();
   }
 
   setSkillsEnabled(ids: string[], enabled: boolean): SkillRecord[] {
-    const state = this.loadSkillStateMap();
     const known = this.knownSkillIds();
-    const uniqueIds = [...new Set(ids)];
-    for (const id of uniqueIds) {
+    const state = this.loadSkillStateMap();
+    let changed = false;
+    for (const id of new Set(ids)) {
       // Core skills cannot be disabled; skip them on disable batches.
       if (!enabled && isCoreSkill(id)) continue;
       if (!known.has(id)) continue;
+      if (state[id]?.enabled === enabled) continue;
       state[id] = { ...state[id], enabled };
+      changed = true;
     }
-    this.saveSkillStateMap(state);
+    // Nothing applied (all unknown, all core, or already in that state): skip
+    // the SQLite write and the `skills:changed` broadcast.
+    if (!changed) {
+      return this.listSkills();
+    }
+    this.saveSkillStateMap(this.pruneUnknownSkillState(state, known));
     this.notifySkillsChanged();
     return this.listSkills();
   }
@@ -211,12 +222,16 @@ export class SkillManager implements SkillManagerContext {
   }
 
   setSkillPinned(id: string, pinned: boolean): SkillRecord[] {
-    if (!this.knownSkillIds().has(id)) {
+    const known = this.knownSkillIds();
+    if (!known.has(id)) {
       return this.listSkills();
     }
     const state = this.loadSkillStateMap();
+    if (state[id]?.pinned === pinned) {
+      return this.listSkills();
+    }
     state[id] = { ...state[id], enabled: state[id]?.enabled ?? true, pinned };
-    this.saveSkillStateMap(state);
+    this.saveSkillStateMap(this.pruneUnknownSkillState(state, known));
     this.notifySkillsChanged();
     return this.listSkills();
   }
@@ -333,9 +348,29 @@ ${params.content.trim()}
     return this.watcher.onSkillsChanged(listener);
   }
 
-  /** Skill ids that currently exist on disk across every registered root. */
+  /**
+   * Skill directories that currently expose a SKILL.md across every registered
+   * root. Membership only needs the directory id, so this skips the frontmatter
+   * parse, icon decoding and sorting that `listSkills()` performs.
+   */
   private knownSkillIds(): Set<string> {
-    return new Set(this.listSkills().map(skill => skill.id));
+    const ids = new Set<string>();
+    for (const root of this.getSkillRoots(this.ensureSkillsRoot())) {
+      if (!fs.existsSync(root)) continue;
+      for (const dir of listSkillDirs(root)) {
+        if (fs.existsSync(path.join(dir, SKILL_FILE_NAME))) ids.add(path.basename(dir));
+      }
+    }
+    return ids;
+  }
+
+  /** Drops state rows for Skills that no longer exist; only runs on real writes. */
+  private pruneUnknownSkillState(state: SkillStateMap, known: Set<string>): SkillStateMap {
+    const pruned: SkillStateMap = {};
+    for (const [id, entry] of Object.entries(state)) {
+      if (known.has(id)) pruned[id] = entry;
+    }
+    return pruned;
   }
 
   isBuiltInSkillId(id: string): boolean {
