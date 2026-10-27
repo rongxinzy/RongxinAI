@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { mocks } from '../../../tests/fixtures/desktopPetController';
 import { beforeEach, afterEach, test, expect, vi } from 'vitest';
 import { petMenuItem } from '../../../tests/fixtures/desktopPetMenu';
@@ -73,7 +74,7 @@ test('the companion is opt-in and uses a dedicated sandboxed preload', () => {
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
-      preload: '/application/dist-electron/desktopPetPreload.js',
+      preload: path.join('/application', 'dist-electron', 'desktopPetPreload.js'),
     },
   });
   expect(mocks.windows[0].loadURL).toHaveBeenCalledWith(

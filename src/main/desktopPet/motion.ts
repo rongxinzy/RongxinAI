@@ -113,7 +113,10 @@ export class DesktopPetMotion {
   end(cancelled = false): boolean {
     if (!this.dragging) return false;
     const cursor = screen.getCursorScreenPoint();
-    if (!cancelled) this.moveDrag(cursor);
+    if (!cancelled) {
+      const [x, y] = this.window.getPosition();
+      this.moveDrag(cursor, { x, y });
+    }
     const clicked = !cancelled && !this.dragging.moved;
     this.sample(cursor, performance.now());
     this.dragging = undefined;
@@ -187,12 +190,12 @@ export class DesktopPetMotion {
     }
   }
 
-  private moveDrag(cursor: Electron.Point): void {
+  private moveDrag(cursor: Electron.Point, current: Electron.Point): Electron.Point {
     const drag = this.dragging;
-    if (!drag) return;
+    if (!drag) return current;
     if (!drag.moved) {
       if (Math.hypot(cursor.x - drag.start.x, cursor.y - drag.start.y) < DESKTOP_PET_DRAG_THRESHOLD)
-        return;
+        return current;
       drag.moved = true;
       this.effect({ kind: DesktopPetEffectKind.Drag, active: true });
     }
@@ -201,7 +204,8 @@ export class DesktopPetMotion {
       { x: cursor.x - drag.offset.x, y: cursor.y - drag.offset.y },
       petBounds(area),
     );
-    this.window.setPosition(point.x, point.y);
+    if (point.x !== current.x || point.y !== current.y) this.window.setPosition(point.x, point.y);
+    return point;
   }
 
   private tick = (): void => {
@@ -209,9 +213,10 @@ export class DesktopPetMotion {
     const now = performance.now();
     const cursor = screen.getCursorScreenPoint();
     const [x, y] = this.window.getPosition();
+    let position = { x, y };
     if (this.dragging) {
       this.sample(cursor, now);
-      this.moveDrag(cursor);
+      position = this.moveDrag(cursor, position);
       if (now - this.dragging.at > 60_000) {
         this.dragging = undefined;
         this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
@@ -219,7 +224,11 @@ export class DesktopPetMotion {
       }
     } else if (this.flying) {
       // A throw stays on its current display; dragging can move the pet between displays.
-      const area = screen.getDisplayMatching(this.window.getBounds()).workArea;
+      const area = screen.getDisplayMatching({
+        ...position,
+        width: DESKTOP_PET_SIZE,
+        height: DESKTOP_PET_WINDOW_HEIGHT,
+      }).workArea;
       const next = throwStep(this.flying, (now - this.lastTime) / 1000, petBounds(area));
       // Ground friction also marks a step as bounced; only a reversed normal velocity is an impact.
       const impactSpeed = Math.max(
@@ -231,24 +240,34 @@ export class DesktopPetMotion {
           kind: DesktopPetEffectKind.Impact,
           strength: Math.min(1, impactSpeed / 1800),
         });
-      this.window.setPosition(Math.round(next.x), Math.round(next.y));
+      const nextPosition = { x: Math.round(next.x), y: Math.round(next.y) };
+      if (nextPosition.x !== position.x || nextPosition.y !== position.y)
+        this.window.setPosition(nextPosition.x, nextPosition.y);
+      position = nextPosition;
       this.flying = next.atRest ? undefined : next;
       if (next.atRest) this.settled();
     } else if (!this.reducedMotion && this.roamingEnabled && this.allowRoam) {
-      const area = screen.getDisplayMatching(this.window.getBounds()).workArea;
+      const area = screen.getDisplayMatching({
+        ...position,
+        width: DESKTOP_PET_SIZE,
+        height: DESKTOP_PET_WINDOW_HEIGHT,
+      }).workArea;
       const bounds = petBounds(area);
-      const moved = this.roam.tick(now, { x, y }, bounds, true);
+      const elapsedMs = Math.min(100, Math.max(0, now - this.lastTime));
+      const moved = this.roam.tick(now, position, bounds, true, elapsedMs);
       if (moved) {
-        this.window.setPosition(moved.x, moved.y);
+        const nextPosition = { x: Math.round(moved.x), y: Math.round(moved.y) };
+        if (nextPosition.x !== position.x || nextPosition.y !== position.y)
+          this.window.setPosition(nextPosition.x, nextPosition.y);
+        position = nextPosition;
         this.publishPose({ facing: moved.facing, walking: moved.walking });
       } else {
         this.publishPose({ facing: this.roam.facingDirection, walking: false });
       }
     }
     this.lastTime = now;
-    const [hitX, hitY] = this.window.getPosition();
-    const localX = Math.floor(cursor.x - hitX);
-    const localY = Math.floor(cursor.y - hitY - DESKTOP_PET_CANVAS_TOP);
+    const localX = Math.floor(cursor.x - position.x);
+    const localY = Math.floor(cursor.y - position.y - DESKTOP_PET_CANVAS_TOP);
     const hit =
       localX >= 0 &&
       localX < DESKTOP_PET_SIZE &&

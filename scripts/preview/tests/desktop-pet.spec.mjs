@@ -43,14 +43,13 @@ for (const colorScheme of ['light', 'dark']) {
   });
 }
 
-test('desktop companion refreshes with animation frames and freezes immediately for reduced motion', async ({
+test('desktop companion follows decoded video frames and freezes immediately for reduced motion', async ({
   page,
 }) => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 192, height: 192 });
-  await page.clock.install();
   await page.addInitScript(() => {
     window.petFrames = 0;
     window.petMasks = [];
@@ -87,24 +86,26 @@ test('desktop companion refreshes with animation frames and freezes immediately 
   await page.goto('/desktop-pet.html');
   await expect(page.locator('canvas')).toHaveAttribute('data-state', 'idle');
   const start = await page.evaluate(() => window.petFrames);
-  await page.clock.runFor(1000);
+  await page.waitForTimeout(1000);
   const frames = (await page.evaluate(() => window.petFrames)) - start;
-  expect(frames).toBeGreaterThan(50);
-  expect(frames).toBeLessThan(70);
+  expect(frames).toBeGreaterThan(20);
+  expect(frames).toBeLessThan(40);
   await page.evaluate(() => {
     for (let i = 0; i < 10; i++)
       window.petState({ state: 'thinking', label: '思考', reducedMotion: false });
     window.petEffect({ kind: 'drag', active: true });
   });
   const updated = await page.evaluate(() => window.petFrames);
-  await page.clock.runFor(1000);
-  expect((await page.evaluate(() => window.petFrames)) - updated).toBeLessThan(70);
+  await page.waitForTimeout(1000);
+  const interactiveFrames = (await page.evaluate(() => window.petFrames)) - updated;
+  expect(interactiveFrames).toBeGreaterThan(20);
+  expect(interactiveFrames).toBeLessThan(40);
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
     document.dispatchEvent(new Event('visibilitychange'));
   });
   const hiddenFrames = await page.evaluate(() => window.petFrames);
-  await page.clock.runFor(1000);
+  await page.waitForTimeout(1000);
   expect(await page.evaluate(() => window.petFrames)).toBe(hiddenFrames);
   await page.evaluate(() => {
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
@@ -115,12 +116,12 @@ test('desktop companion refreshes with animation frames and freezes immediately 
     window.petEffect({ kind: 'drag', active: false });
     window.petEffect({ kind: 'impact', strength: 1 });
   });
-  await page.clock.runFor(80);
+  await page.waitForTimeout(80);
   await page.screenshot({ path: '/tmp/zhiyuan-pet-smooth-transition.png', omitBackground: true });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await expect.poll(() => page.evaluate(() => window.petReduced)).toBe(true);
   const frozen = await page.locator('canvas').evaluate(canvas => canvas.toDataURL());
-  await page.clock.runFor(500);
+  await page.waitForTimeout(500);
   expect((await page.locator('canvas').evaluate(canvas => canvas.toDataURL())) === frozen).toBe(
     true,
   );

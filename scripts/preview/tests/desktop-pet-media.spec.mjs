@@ -120,6 +120,22 @@ test('continuous owl media decodes real frames with alpha and two owned slots', 
   expect(mask).toHaveLength(192 * 192);
   expect(mask[0]).toBe(0);
   expect(mask[96 * 192 + 96]).toBeGreaterThan(32);
+  const drawModuleUrl = new URL('/src/renderer/desktopPet/draw.ts', page.url()).href;
+  await expect
+    .poll(() =>
+      page.evaluate(async moduleUrl => {
+        const { petMediaHitMask } = await import(moduleUrl);
+        const image = new Image();
+        image.src = '/src/renderer/assets/desktop-pet/motion/xiaoyuan-original/idle-mask.png';
+        await image.decode();
+        const expected = petMediaHitMask([image]);
+        return expected.reduce(
+          (count, value, index) => count + Number(value > 32 && window.mediaMask[index] <= 32),
+          0,
+        );
+      }, drawModuleUrl),
+    )
+    .toBe(0);
   await canvas.screenshot({ path: '/tmp/companion-continuous-owl.png', omitBackground: true });
   expect(errors).toEqual([]);
 });

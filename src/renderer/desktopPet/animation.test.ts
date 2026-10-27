@@ -110,3 +110,19 @@ test('pointer press squishes scaleY gently and springs back on release', () => {
   animation.setPressed(false);
   expect(animation.sample(600).scaleY).toBeCloseTo(1, 3);
 });
+
+test('continuous media can rest between decoded frames while interactions still need rendering', () => {
+  const animation = new DesktopPetAnimation();
+  animation.setContinuousMedia(true, 0);
+  animation.sample(0);
+  expect(animation.needsFrame(16)).toBe(false);
+  animation.setPressed(true);
+  expect(animation.needsFrame(16)).toBe(true);
+  animation.setPressed(false);
+  animation.settle(600);
+  expect(animation.needsFrame(600)).toBe(false);
+  animation.setContinuousMedia(false, 600);
+  expect(animation.needsFrame(600)).toBe(true);
+  animation.setReducedMotion(true, 600);
+  expect(animation.needsFrame(600)).toBe(false);
+});

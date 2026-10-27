@@ -11,8 +11,10 @@ import { isDesktopPetReleased } from '../../shared/desktopPet/availability';
 import stylesheetUrl from './desktop-pet.css?url';
 import { DesktopPetAnimation } from './animation';
 import { DesktopPetAtlas } from './atlas';
-import { drawPetPose, petHitMask, drawPetMedia, petMediaHitMask } from './draw';
+import { drawPetPose, petHitMask, drawPetMedia } from './draw';
 import { DesktopPetMediaController } from './mediaController';
+import { DesktopPetMediaMasks } from './mediaMasks';
+import { DesktopPetRenderLoop } from './renderLoop';
 
 declare global {
   interface Window {
@@ -37,9 +39,10 @@ const animation = new DesktopPetAnimation();
 let state: DesktopPetState = DesktopPetState.Idle;
 let reducedMotion = reduced.matches;
 let systemReducedMotion = false;
-let frameId: number | undefined;
 let maskDirty = true;
 let maskKey = '';
+let contentMaskKey = '';
+let diagnosticsAt = -Infinity;
 let pointerActive = false;
 let pointerId: number | undefined;
 let pointerStart = { x: 0, y: 0 };
@@ -47,13 +50,24 @@ let pointerMoved = false;
 let canOpen = false;
 let disposed = false;
 let nativeVisible = true;
+const hitMasks = new DesktopPetMediaMasks((key, mask) => {
+  if (key !== contentMaskKey) return;
+  bridge?.hitMask(mask);
+  maskKey = key;
+  maskDirty = false;
+});
 const media = new DesktopPetMediaController(() => {
   maskDirty = true;
   refresh();
 });
+const loop = new DesktopPetRenderLoop(draw);
 
-function draw(now: number): void {
-  if (!atlas.image) return;
+function setData(key: string, value: string): void {
+  if (view.dataset[key] !== value) view.dataset[key] = value;
+}
+
+function draw(now: number) {
+  if (!atlas.image) return { video: null, animate: false };
   const ratio = Math.min(2, window.devicePixelRatio || 1);
   const size = Math.round(DESKTOP_PET_SIZE * ratio);
   if (view.width !== size || view.height !== size) view.width = view.height = size;
@@ -98,47 +112,55 @@ function draw(now: number): void {
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
-  view.dataset.state = state;
-  view.dataset.reducedMotion = String(reducedMotion);
-  view.dataset.character = atlas.character.id;
-  view.dataset.sequence = pose.sequence ?? '';
-  view.dataset.progress = String(pose.progress);
-  view.dataset.mediaState = clip.state;
-  view.dataset.mediaClip = drawable?.clip.id ?? '';
-  if (import.meta.env.DEV)
-    view.dataset.mediaTime = String(drawable?.current.video.currentTime ?? 0);
+  setData('state', state);
+  setData('reducedMotion', String(reducedMotion));
+  setData('character', atlas.character.id);
+  setData('sequence', pose.sequence ?? '');
+  setData('progress', String(pose.progress));
+  setData('mediaState', clip.state);
+  setData('mediaClip', drawable?.clip.id ?? '');
+  if (import.meta.env.DEV && now - diagnosticsAt >= 50) {
+    setData('mediaTime', String(drawable?.current.video.currentTime ?? 0));
+    diagnosticsAt = now;
+  }
   const mediaImages = drawable
     ? [drawable.current.mask, ...(drawable.previous ? [drawable.previous.mask] : [])]
     : poster
       ? [poster]
       : [];
   const indices = pose.weights.flatMap((weight, index) => (weight > 0 ? [index] : []));
-  const contentMaskKey = mediaImages.length
+  const nextMaskKey = mediaImages.length
     ? mediaImages.map(image => image.src).join('|')
     : `${reducedMotion}:${indices.join(',')}`;
-  const nextMaskKey = contentMaskKey;
-  if (maskDirty || nextMaskKey !== maskKey) {
-    bridge?.hitMask(
-      mediaImages.length ? petMediaHitMask(mediaImages) : petHitMask(atlas, reducedMotion, indices),
-    );
-    maskDirty = false;
-    maskKey = nextMaskKey;
+  contentMaskKey = nextMaskKey;
+  if (bridge) {
+    if (mediaImages.length) {
+      const mask = hitMasks.get(mediaImages);
+      if (mask && nextMaskKey !== maskKey) {
+        bridge.hitMask(mask);
+        maskKey = nextMaskKey;
+        maskDirty = false;
+      }
+    } else if (maskDirty || nextMaskKey !== maskKey) {
+      bridge.hitMask(petHitMask(atlas, reducedMotion, indices));
+      maskDirty = false;
+      maskKey = nextMaskKey;
+    }
   }
-}
-
-function frame(now: number): void {
-  frameId = undefined;
-  if (disposed || document.hidden || !nativeVisible) return;
-  draw(now);
-  if (!reducedMotion) frameId = requestAnimationFrame(frame);
+  return {
+    video: drawable?.current.video ?? null,
+    animate: !reducedMotion && (Boolean(drawable) || animation.needsFrame(now)),
+  };
 }
 
 function refresh(): void {
-  if (frameId !== undefined) cancelAnimationFrame(frameId);
-  frameId = undefined;
+  if (disposed || document.hidden || !nativeVisible) {
+    loop.pause();
+    return;
+  }
   animation.setReducedMotion(reducedMotion, performance.now());
   animation.setContinuousMedia(media.supported, performance.now());
-  frame(performance.now());
+  loop.refresh();
 }
 
 function updateBubble(text: string | null): void {
@@ -325,7 +347,8 @@ void initialize();
 window.addEventListener('pagehide', () => {
   disposed = true;
   media.dispose();
-  if (frameId !== undefined) cancelAnimationFrame(frameId);
+  hitMasks.dispose();
+  loop.dispose();
   unsubscribe?.();
   unsubscribePose?.();
   unsubscribeEffect?.();

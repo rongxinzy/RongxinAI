@@ -133,6 +133,19 @@ export class DesktopPetAnimation {
       (weight, index) => weight * (1 - motion.influence) + motion.weights[index] * motion.influence,
     );
   }
+  needsFrame(now: number): boolean {
+    if (this.reduced || this.paused) return false;
+    if (!this.continuousMedia) return true;
+    return (
+      now - this.changedAt < TRANSITION_MS ||
+      Boolean(this.recovery) ||
+      this.dragging ||
+      this.pressed ||
+      this.walking ||
+      Math.abs(this.displacement) > 0.0001 ||
+      Math.abs(this.velocity) > 0.001
+    );
+  }
   sample(now: number) {
     const dt = this.lastTime === undefined ? 0 : Math.max(0, (now - this.lastTime) / 1000);
     this.lastTime = now;

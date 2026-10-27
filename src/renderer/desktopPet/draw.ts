@@ -2,6 +2,9 @@ import { DESKTOP_PET_SIZE } from '../../shared/desktopPet/constants';
 import { DesktopPetBuiltinId } from '../../shared/desktopPet/catalog';
 import type { DesktopPetAtlas } from './atlas';
 import { originalPoseGeometry } from './poseGeometry';
+import { drawPetMedia } from './mediaGeometry';
+
+export { drawPetMedia } from './mediaGeometry';
 
 const masks = new WeakMap<
   DesktopPetAtlas,
@@ -106,29 +109,6 @@ export function petHitMask(
   if (cache.values.size >= 32) cache.values.delete(cache.values.keys().next().value!);
   cache.values.set(key, alpha);
   return alpha;
-}
-
-export function drawPetMedia(
-  target: CanvasRenderingContext2D,
-  source: CanvasImageSource,
-  scaleY = 1,
-  facing = 1,
-  rotate = 0,
-  offsetX = 0,
-  offsetY = 0,
-): void {
-  target.save();
-  target.translate(DESKTOP_PET_SIZE / 2 + offsetX, DESKTOP_PET_SIZE - 12 + offsetY);
-  target.rotate(rotate);
-  target.scale(facing / Math.sqrt(scaleY), scaleY);
-  target.drawImage(
-    source,
-    -DESKTOP_PET_SIZE / 2,
-    -(DESKTOP_PET_SIZE - 12),
-    DESKTOP_PET_SIZE,
-    DESKTOP_PET_SIZE,
-  );
-  target.restore();
 }
 
 // One full character pack: 24 masks and 24 loading posters, at most 1.7 MiB.

@@ -31,7 +31,14 @@ export function anchorCompanionBubble(
       y: bounds.y,
     }).workArea;
     const next = companionBubblePlacement(bounds, area);
-    window.setBounds(next.bounds, false);
+    const current = window.getBounds();
+    if (
+      current.x !== next.bounds.x ||
+      current.y !== next.bounds.y ||
+      current.width !== next.bounds.width ||
+      current.height !== next.bounds.height
+    )
+      window.setBounds(next.bounds, false);
     const key = JSON.stringify(next.placement);
     if (key !== previous) {
       previous = key;

@@ -22,6 +22,7 @@ export class DesktopPetRoam {
   private phase: DesktopPetRoamPhase = DesktopPetRoamPhase.Rest;
   private restUntil = 0;
   private targetX = 0;
+  private positionX = 0;
   private facing = 1;
 
   reset(now: number): void {
@@ -42,6 +43,7 @@ export class DesktopPetRoam {
     position: { x: number; y: number },
     bounds: ThrowBounds,
     allow: boolean,
+    elapsedMs = 16,
   ): { x: number; y: number; facing: number; walking: boolean } | null {
     if (!allow) {
       this.reset(now);
@@ -70,17 +72,19 @@ export class DesktopPetRoam {
         this.restUntil = now + randomBetween(REST_MIN_MS, REST_MIN_MS + REST_JITTER_MS);
         return null;
       }
+      this.positionX = position.x;
       this.phase = DesktopPetRoamPhase.Walk;
     }
-    const delta = this.targetX - position.x;
+    const delta = this.targetX - this.positionX;
     if (Math.abs(delta) <= ARRIVE_PX) {
       this.phase = DesktopPetRoamPhase.Rest;
       this.restUntil = now + randomBetween(REST_MIN_MS, REST_MIN_MS + REST_JITTER_MS);
-      return { x: Math.round(this.targetX), y: position.y, facing: this.facing, walking: false };
+      return { x: this.targetX, y: position.y, facing: this.facing, walking: false };
     }
-    const step = Math.sign(delta) * Math.min(Math.abs(delta), (WALK_SPEED_PX_S * 16) / 1000);
+    const step = Math.sign(delta) * Math.min(Math.abs(delta), (WALK_SPEED_PX_S * elapsedMs) / 1000);
+    this.positionX += step;
     return {
-      x: Math.round(position.x + step),
+      x: this.positionX,
       y: position.y,
       facing: this.facing,
       walking: true,

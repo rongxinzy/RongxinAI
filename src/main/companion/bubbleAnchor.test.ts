@@ -82,3 +82,20 @@ test('activation deduplicates bindings, rebinds a newly available pet and cancel
   expect(pet.listenerCount('move')).toBe(0);
   expect(visibility.mock.calls.at(-1)).toEqual([false]);
 });
+
+test('unchanged pet bounds do not repeatedly reposition the transparent bubble', () => {
+  vi.useFakeTimers();
+  const bubble = new FakeWindow();
+  const pet = new FakeWindow();
+  const anchor = anchorCompanionBubble(
+    native(bubble),
+    { getPetWindow: () => native(pet) },
+    vi.fn(),
+  );
+  anchor.activate();
+  bubble.setBounds.mockClear();
+  pet.emit('move');
+  vi.advanceTimersByTime(16);
+  expect(bubble.setBounds).not.toHaveBeenCalled();
+  bubble.emit('closed');
+});
