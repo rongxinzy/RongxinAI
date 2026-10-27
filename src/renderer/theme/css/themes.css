@@ -5329,7 +5329,7 @@
   background-color: var(--background);
   color: var(--foreground);
   transition-property: opacity;
-  transition-duration: 200ms;
+  transition-duration: 360ms;
 }
 :where(:root, [data-theme]) :where(.theme-welcome-title) {
   font-size: 24px;
@@ -5340,7 +5340,7 @@
   width: min(52rem, 88vw);
   height: min(24rem, 44vh);
   animation-name: zy-component-welcome-art-1su47v9;
-  animation-duration: 240ms;
+  animation-duration: 480ms;
   animation-timing-function: ease-out;
   animation-fill-mode: both;
 }

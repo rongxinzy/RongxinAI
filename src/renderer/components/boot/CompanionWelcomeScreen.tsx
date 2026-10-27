@@ -2,18 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import { i18nService } from '../../services/i18n';
 import welcomeArt from '../../assets/desktop-pet/companions-welcome.png';
 
+export const WELCOME_MIN_DISPLAY_MS = 1200;
+export const WELCOME_EXIT_DURATION_MS = 360;
+
 interface Props {
   exiting: boolean;
   failed?: boolean;
   onExitComplete(): void;
 }
 
-/** The welcome follows initialization; it never delays readiness for image loading or a minimum show time. */
+/**
+ * The welcome runs alongside initialization and holds for a brief minimum display window
+ * on normal startups so the user can clearly see the artwork before fading out.
+ */
 export function CompanionWelcomeScreen({ exiting, failed = false, onExitComplete }: Props) {
   const [artFailed, setArtFailed] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
   );
+  const [minDisplayElapsed, setMinDisplayElapsed] = useState(false);
   const finished = useRef(false);
   const complete = useRef(onExitComplete);
   useEffect(() => {
@@ -27,22 +34,35 @@ export function CompanionWelcomeScreen({ exiting, failed = false, onExitComplete
     return () => media.removeEventListener('change', change);
   }, []);
   useEffect(() => {
-    if (!exiting) return;
+    if (reducedMotion || failed) {
+      setMinDisplayElapsed(true);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setMinDisplayElapsed(true);
+    }, WELCOME_MIN_DISPLAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [failed, reducedMotion]);
+
+  const ending = exiting && (minDisplayElapsed || failed || reducedMotion);
+
+  useEffect(() => {
+    if (!ending) return;
     const timer = window.setTimeout(
       () => {
         if (finished.current) return;
         finished.current = true;
         complete.current();
       },
-      reducedMotion ? 0 : 200,
+      reducedMotion ? 0 : WELCOME_EXIT_DURATION_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [exiting, reducedMotion]);
+  }, [ending, reducedMotion]);
 
   return (
     <main
       className="theme-welcome-screen relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden"
-      data-ending-style={exiting ? '' : undefined}
+      data-ending-style={ending ? '' : undefined}
       data-testid="companion-welcome"
     >
       <div className="flex min-h-0 w-full flex-col items-center gap-6 px-6">

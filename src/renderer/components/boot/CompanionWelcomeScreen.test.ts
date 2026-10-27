@@ -2,7 +2,11 @@
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { createElement } from 'react';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { CompanionWelcomeScreen } from './CompanionWelcomeScreen';
+import {
+  CompanionWelcomeScreen,
+  WELCOME_EXIT_DURATION_MS,
+  WELCOME_MIN_DISPLAY_MS,
+} from './CompanionWelcomeScreen';
 
 vi.mock('../../services/i18n', () => ({ i18nService: { t: (key: string) => key } }));
 
@@ -19,7 +23,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test('welcomes with accessible artwork and real readiness, without a minimum presentation time', () => {
+test('welcomes with accessible artwork, holds for the minimum display window on fast init, and fades out smoothly', () => {
   const complete = vi.fn();
   const screen = render(
     createElement(CompanionWelcomeScreen, { exiting: false, onExitComplete: complete }),
@@ -27,13 +31,16 @@ test('welcomes with accessible artwork and real readiness, without a minimum pre
   expect(screen.getByRole('heading').textContent).toBe('welcomeCompanionsTitle');
   expect(screen.getByRole('img').getAttribute('alt')).toBe('welcomeCompanionsAlt');
   expect(screen.getByRole('status').textContent).toBe('welcomeCompanionsPreparing');
-  act(() => vi.advanceTimersByTime(10_000));
-  expect(complete).not.toHaveBeenCalled();
+  act(() => vi.advanceTimersByTime(100));
   screen.rerender(
     createElement(CompanionWelcomeScreen, { exiting: true, onExitComplete: complete }),
   );
   expect(screen.getByRole('status').textContent).toBe('welcomeCompanionsReady');
-  act(() => vi.advanceTimersByTime(200));
+  expect(screen.getByTestId('companion-welcome').hasAttribute('data-ending-style')).toBe(false);
+  act(() => vi.advanceTimersByTime(WELCOME_MIN_DISPLAY_MS - 100));
+  expect(screen.getByTestId('companion-welcome').hasAttribute('data-ending-style')).toBe(true);
+  expect(complete).not.toHaveBeenCalled();
+  act(() => vi.advanceTimersByTime(WELCOME_EXIT_DURATION_MS));
   expect(complete).toHaveBeenCalledOnce();
 });
 
@@ -46,18 +53,19 @@ test('image loading failure cannot hold initialization or repeat the exit callba
   fireEvent.error(screen.getByRole('img'));
   expect(screen.queryByRole('img')).toBeNull();
   screen.rerender(createElement(CompanionWelcomeScreen, { exiting: true, onExitComplete: latest }));
-  act(() => vi.advanceTimersByTime(200));
+  act(() => vi.advanceTimersByTime(WELCOME_MIN_DISPLAY_MS));
+  act(() => vi.advanceTimersByTime(WELCOME_EXIT_DURATION_MS));
   expect(first).not.toHaveBeenCalled();
   expect(latest).toHaveBeenCalledOnce();
   screen.rerender(
     createElement(CompanionWelcomeScreen, { exiting: false, onExitComplete: latest }),
   );
   screen.rerender(createElement(CompanionWelcomeScreen, { exiting: true, onExitComplete: latest }));
-  act(() => vi.advanceTimersByTime(200));
+  act(() => vi.advanceTimersByTime(WELCOME_EXIT_DURATION_MS));
   expect(latest).toHaveBeenCalledOnce();
 });
 
-test('a bootstrap failure exits to the error view without claiming readiness', () => {
+test('a bootstrap failure exits to the error view without waiting for the minimum display window', () => {
   const complete = vi.fn();
   const screen = render(
     createElement(CompanionWelcomeScreen, {
@@ -67,7 +75,7 @@ test('a bootstrap failure exits to the error view without claiming readiness', (
     }),
   );
   expect(screen.getByRole('status').textContent).toBe('welcomeCompanionsFailed');
-  act(() => vi.advanceTimersByTime(200));
+  act(() => vi.advanceTimersByTime(WELCOME_EXIT_DURATION_MS));
   expect(complete).toHaveBeenCalledOnce();
 });
 

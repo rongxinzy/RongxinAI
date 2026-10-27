@@ -440,6 +440,14 @@ const App: React.FC = () => {
     );
   }
 
+  if (!isInitialized) {
+    return (
+      <div className="h-screen overflow-hidden flex flex-col bg-surface">
+        {windowsStandaloneTitleBar}
+      </div>
+    );
+  }
+
   if (initError) {
     return (
       <InitErrorView

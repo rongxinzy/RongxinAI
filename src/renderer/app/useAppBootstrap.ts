@@ -3,10 +3,14 @@ import { useDispatch } from 'react-redux';
 
 import { type ManagedProviderAccessPolicy } from '../../shared/managedProviders';
 import type { SettingsEnterpriseConfig } from '../components/settings/types';
+import { agentService } from '../services/agent';
 import { refreshMagpieModels } from '../services/availableModels';
 import { configService } from '../services/config';
+import { coworkService } from '../services/cowork';
 import { i18nService } from '../services/i18n';
+import { quickActionService } from '../services/quickAction';
 import { themeService } from '../services/theme';
+import { setActions } from '../store/slices/quickActionSlice';
 import { WorkMode } from '../store/workMode/constants';
 import { setWorkMode } from '../store/workMode/workModeSlice';
 import { waitWithTimeout } from './waitWithTimeout';
@@ -85,12 +89,33 @@ export function useAppBootstrap(): AppBootstrapState {
 
         dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
 
-        // Catalog access never starts Magpie; unavailable models do not block the shell.
-        await waitWithTimeout(refreshMagpieModels(), initTimeoutMs, 'magpie.catalog').catch(
-          error => {
+        // Warm up default workbench state alongside model resolution while the welcome screen is visible.
+        await Promise.all([
+          waitWithTimeout(refreshMagpieModels(), initTimeoutMs, 'magpie.catalog').catch(error => {
             console.error('[App] model catalog unavailable:', error);
-          },
-        );
+          }),
+          waitWithTimeout(coworkService.init(), initTimeoutMs, 'coworkService.init').catch(
+            error => {
+              console.error('[App] cowork bootstrap unavailable:', error);
+            },
+          ),
+          waitWithTimeout(
+            agentService.loadAgents(),
+            initTimeoutMs,
+            'agentService.loadAgents',
+          ).catch(error => {
+            console.error('[App] agent bootstrap unavailable:', error);
+          }),
+          (async () => {
+            try {
+              quickActionService.initialize();
+              const actions = await quickActionService.getLocalizedActions();
+              dispatch(setActions(actions));
+            } catch (error) {
+              console.error('[App] quick actions bootstrap unavailable:', error);
+            }
+          })(),
+        ]);
         mark('model resolution done');
 
         setIsInitialized(true);
