@@ -42,6 +42,27 @@ describe('HtmlRenderer', () => {
     expect(await screen.findByText(i18nService.t('artifactPreviewTooLarge'))).toBeTruthy();
     expect(document.querySelector('iframe')).toBeNull();
   });
+  test('keeps the file-backed preview in an opaque origin', () => {
+    render(
+      <HtmlRenderer
+        artifact={makeArtifact({
+          content:
+            '<!DOCTYPE html><html><head><link rel="stylesheet" href="./style.css"></head><body><h1>报告</h1></body></html>',
+          filePath: '/work/report/page.html',
+          fileName: 'page.html',
+        })}
+      />,
+    );
+
+    const frame = document.querySelector('iframe');
+    expect(frame).not.toBeNull();
+    const sandbox = frame?.getAttribute('sandbox') ?? '';
+    // `allow-same-origin` plus `allow-scripts` on srcdoc content lets the page
+    // reach parent.electron; the preview must never opt back into the app origin.
+    expect(sandbox).not.toContain('allow-same-origin');
+    expect(sandbox).toBe('allow-scripts');
+    expect(frame?.getAttribute('srcdoc')).toContain('<base href="file:///work/report/">');
+  });
 });
 
 describe('ensurePreviewColorScheme', () => {

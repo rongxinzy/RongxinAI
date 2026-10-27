@@ -192,12 +192,15 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
       ? artifact.content.replace(/(<head[^>]*>)/i, `$1${baseTag}`)
       : artifact.content;
     const htmlWithBase = preparePreviewHtml(withBase);
+    // `allow-same-origin` would hand the artifact the renderer's origin, so its
+    // scripts could reach `parent.electron` and drive the app's IPC bridge.
+    // Preview markup always runs in an opaque origin, matching the srcDoc branch.
     return (
       <iframe
         srcDoc={htmlWithBase}
         className="w-full h-full border-0"
         style={{ colorScheme: 'light' }}
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts"
         title={artifact.title}
       />
     );
