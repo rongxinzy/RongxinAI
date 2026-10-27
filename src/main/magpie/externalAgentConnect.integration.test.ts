@@ -10,6 +10,7 @@ import { projectMagpieCatalog } from './catalog';
 import { MagpieManager } from './manager';
 import { verifyMagpieBinary } from './integrity';
 import { readFileIfExists, userAgentConfigRoots } from './externalAgentHostConfig';
+import { claudeApiKey, piModelRef } from './externalAgentConnect.settingsPreservation.test';
 
 const magpieResources = path.resolve(process.env.ZHIYUAN_MAGPIE_RESOURCES || 'resources/magpie');
 const magpiePlatformDir = path.join(magpieResources, `${process.platform}-${process.arch}`);
@@ -49,8 +50,6 @@ async function writeFixtureTree(root: string): Promise<Map<string, Buffer>> {
   const snapshots = new Map<string, Buffer>([
     ['opencode.json', opencodeOriginal],
     ['codex.config.toml', codexOriginal],
-    ['claude.settings.json', claudeSettingsOriginal],
-    ['pi.settings.json', piSettingsOriginal],
   ]);
 
   await fs.mkdir(path.join(root, '.claude'), { recursive: true });
@@ -66,15 +65,20 @@ async function writeFixtureTree(root: string): Promise<Map<string, Buffer>> {
   );
   const piAgent = path.join(root, '.pi', 'agent');
   await fs.mkdir(piAgent, { recursive: true });
-  await fs.writeFile(
-    path.join(piAgent, 'settings.json'),
-    `${JSON.stringify({ defaultModel: 'fixture/pi-model' }, null, 2)}\n`,
-  );
+  await fs.writeFile(path.join(piAgent, 'settings.json'), piSettingsOriginal);
   await fs.writeFile(
     path.join(piAgent, 'models.json'),
     `${JSON.stringify({ models: [{ id: 'fixture/pi-model' }] }, null, 2)}\n`,
   );
   return snapshots;
+}
+
+async function expectClaudeAndPiSettingsPreserved(
+  claudeSettingsPath: string,
+  piSettingsPath: string,
+): Promise<void> {
+  expect(claudeApiKey(await fs.readFile(claudeSettingsPath, 'utf8'))).toBe('fixture-key');
+  expect(piModelRef(await fs.readFile(piSettingsPath, 'utf8'))).toBe('fixture/pi-model');
 }
 
 async function installCliStubs(binDir: string): Promise<void> {
@@ -236,15 +240,8 @@ describe('magpie external agent connect smoke', () => {
               baseline.get('codex.config.toml')!.toString('utf8'),
             );
           }
-          if (agentId === 'claude') {
-            expect(await fs.readFile(claudeSettingsPath, 'utf8')).toBe(
-              baseline.get('claude.settings.json')!.toString('utf8'),
-            );
-          }
-          if (agentId === 'pi') {
-            expect(await fs.readFile(piSettingsPath, 'utf8')).toBe(
-              baseline.get('pi.settings.json')!.toString('utf8'),
-            );
+          if (agentId === 'claude' || agentId === 'pi') {
+            await expectClaudeAndPiSettingsPreserved(claudeSettingsPath, piSettingsPath);
           }
           await manager.disconnectAgent(agentId);
           if (agentId === 'opencode') {
@@ -257,15 +254,8 @@ describe('magpie external agent connect smoke', () => {
               baseline.get('codex.config.toml')!.toString('utf8'),
             );
           }
-          if (agentId === 'claude') {
-            expect(await fs.readFile(claudeSettingsPath, 'utf8')).toBe(
-              baseline.get('claude.settings.json')!.toString('utf8'),
-            );
-          }
-          if (agentId === 'pi') {
-            expect(await fs.readFile(piSettingsPath, 'utf8')).toBe(
-              baseline.get('pi.settings.json')!.toString('utf8'),
-            );
+          if (agentId === 'claude' || agentId === 'pi') {
+            await expectClaudeAndPiSettingsPreserved(claudeSettingsPath, piSettingsPath);
           }
         }
 
