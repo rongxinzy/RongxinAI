@@ -80,6 +80,15 @@ const enModules = [
   enCommon,
 ];
 
+describe('translation key parity', () => {
+  test('Chinese and English expose the same key set', () => {
+    // Sorted key lists make the `toEqual` diff name the exact missing keys.
+    const zhKeys = Object.keys(translations.zh).sort();
+    const enKeys = Object.keys(translations.en).sort();
+    expect(zhKeys).toEqual(enKeys);
+  });
+});
+
 describe('split translation modules', () => {
   test('every Chinese module entry is present in the merged translations', () => {
     for (const module of zhModules) {
