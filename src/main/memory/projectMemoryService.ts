@@ -554,7 +554,7 @@ export class ProjectMemoryService {
     this.repository.setLinkStatus(id, MemoryLifecycleStatus.Deleted);
     const outboxId = this.repository.enqueue(
       MemoryOutboxOperation.Forget,
-      { linkId: id, observationId: link.memoryId, hardDelete },
+      { linkId: id, observationId: link.memoryId, hardDelete, projectId: link.projectId },
       id,
     );
     return (await this.processOutboxItem(this.findPending(outboxId))) !== null;

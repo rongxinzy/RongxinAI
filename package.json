@@ -31,23 +31,23 @@
     }
   },
   "engram": {
-    "version": "v1.20.0-zhiyuan.4",
-    "repo": "z189yis/engram-cjk",
+    "version": "v3.6.0-zhiyuan.1",
+    "repo": "rongxinzy/engram",
     "runtimeAssets": {
-      "mac-x64": "engram_v1.20.0-zhiyuan.4_darwin_amd64.tar.gz",
-      "mac-arm64": "engram_v1.20.0-zhiyuan.4_darwin_arm64.tar.gz",
-      "win-x64": "engram_v1.20.0-zhiyuan.4_windows_amd64.zip",
-      "win-arm64": "engram_v1.20.0-zhiyuan.4_windows_arm64.zip",
-      "linux-x64": "engram_v1.20.0-zhiyuan.4_linux_amd64.tar.gz",
-      "linux-arm64": "engram_v1.20.0-zhiyuan.4_linux_arm64.tar.gz"
+      "mac-x64": "engram_v3.6.0-zhiyuan.1_darwin_amd64.tar.gz",
+      "mac-arm64": "engram_v3.6.0-zhiyuan.1_darwin_arm64.tar.gz",
+      "win-x64": "engram_v3.6.0-zhiyuan.1_windows_amd64.zip",
+      "win-arm64": "engram_v3.6.0-zhiyuan.1_windows_arm64.zip",
+      "linux-x64": "engram_v3.6.0-zhiyuan.1_linux_amd64.tar.gz",
+      "linux-arm64": "engram_v3.6.0-zhiyuan.1_linux_arm64.tar.gz"
     },
     "runtimeChecksums": {
-      "mac-x64": "5b85ce91f4ec7f16ce24ef413001988283e5d8e8ff11747cb140bf83e30ec679",
-      "mac-arm64": "7181a883def28f74363bad441b2fba777634225fb56e99e9b56f7b47f37f29e5",
-      "win-x64": "d64879f73d290caf176046802f7d434f45d7e6c6f81adf7f11365bebffa220f2",
-      "win-arm64": "1692029c3123a32bdf7bdec781213b11fd368645518f2291abfab059ace4963f",
-      "linux-x64": "94d567fda8e105c05aaac8fef44bd27d626a5a8c28f3af0edafdaaec41d53d62",
-      "linux-arm64": "cb7f7af2e5bbf49333273f3e8db8435c2b2acb9ba5642f2ad3513d3063a4fbd6"
+      "mac-x64": "55ac7cb87504342672b2e73f855bff977a08ea9ed35c427ccd64de3beeb9d32d",
+      "mac-arm64": "fda0af3999435a37f6e9d72e49b731651070c4c54fecd86af4e87d8bacb1b6a0",
+      "win-x64": "0646ba5827d6951a1fa83f5ac1d4f3f605c9d87e4d328fa8281202dce81776c7",
+      "win-arm64": "0a5998f9a8efc020e48476054e0ca6f750bad5834131d5982db0758b1b496dee",
+      "linux-x64": "20135f961d245e144cef0b21f3837455eba1394ac85976f8775193d32b934a5a",
+      "linux-arm64": "6711fa8b8de3b18ce01f83d43150eeeb14cb95660232d0798efc01343715c63c"
     }
   },
   "strata": {

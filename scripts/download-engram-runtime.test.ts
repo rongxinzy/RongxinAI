@@ -83,8 +83,8 @@ describe('Engram runtime downloader', () => {
     fs.mkdirSync(path.join(rootDir, 'third_party'), { recursive: true });
     fs.writeFileSync(path.join(rootDir, 'third_party', 'engram.LICENSE'), 'license');
     config = {
-      version: 'v1.20.0-zhiyuan.1',
-      repo: 'z189yis/engram-cjk',
+      version: 'v3.6.0-zhiyuan.1',
+      repo: 'rongxinzy/engram',
       runtimeAssets: { [targetId]: 'engram.zip' },
       runtimeChecksums: { [targetId]: checksum },
     };

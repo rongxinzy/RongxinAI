@@ -2,7 +2,7 @@ import { MemoryKind, MemoryScope } from '../../shared/memory';
 import { EngramSearchMatchMode } from './constants';
 import { planRecallQuery, rankRecallResults } from './recallQueryPlanner';
 import type { MemoryRepository } from './repository';
-import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+import { EngramRequestError, type ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
 
 const MAX_ENGRAM_RECALL_LIMIT = 20;
 
@@ -23,40 +23,50 @@ export async function recallMemoryScope(
   if (!plan.exactQuery) return [];
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
   const retrievalLimit = input.scope === MemoryScope.Session ? MAX_ENGRAM_RECALL_LIMIT : limit;
-  let observations = filterRecallable(
-    repository,
-    input,
-    await adapter.recall({
-      query: plan.exactQuery,
-      project: input.projectId,
-      scope: input.scope,
-      limit: retrievalLimit,
-      matchMode: EngramSearchMatchMode.All,
-    }),
-  );
-  if (observations.length === 0 && plan.broadQuery) {
+  const isUnknownProject = (error: unknown): boolean =>
+    error instanceof EngramRequestError && error.status === 404 && error.code === 'unknown_project';
+  let observations;
+  try {
     observations = filterRecallable(
       repository,
       input,
       await adapter.recall({
-        query: plan.broadQuery,
+        query: plan.exactQuery,
         project: input.projectId,
         scope: input.scope,
         limit: retrievalLimit,
-        matchMode: EngramSearchMatchMode.Any,
+        matchMode: EngramSearchMatchMode.All,
       }),
     );
-  }
-  if (observations.length === 0 && plan.allowRecentFallback) {
-    observations = filterRecallable(
-      repository,
-      input,
-      await adapter.recent({
-        project: input.projectId,
-        scope: input.scope,
-        limit: retrievalLimit,
-      }),
-    );
+    if (observations.length === 0 && plan.broadQuery) {
+      observations = filterRecallable(
+        repository,
+        input,
+        await adapter.recall({
+          query: plan.broadQuery,
+          project: input.projectId,
+          scope: input.scope,
+          limit: retrievalLimit,
+          matchMode: EngramSearchMatchMode.Any,
+        }),
+      );
+    }
+    if (observations.length === 0 && plan.allowRecentFallback) {
+      observations = filterRecallable(
+        repository,
+        input,
+        await adapter.recent({
+          project: input.projectId,
+          scope: input.scope,
+          limit: retrievalLimit,
+        }),
+      );
+    }
+  } catch (error) {
+    // A project that has no records yet is an empty branch, not a failure:
+    // other recall scopes must still be allowed to contribute context.
+    if (isUnknownProject(error)) return [];
+    throw error;
   }
   const unique = [
     ...new Map(observations.map(observation => [observation.id, observation])).values(),
