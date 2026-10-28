@@ -132,7 +132,7 @@ export class EngramManager {
     this.child = child;
     // The boundary is the loopback bind on a reserved random port: only local
     // processes can reach the runtime. The token is defense in depth — as of
-    // rongxinzy/engram v3.6.0-zhiyuan.1 the runtime only enforces it on the
+    // rongxinzy/engram v3.6.0-zhiyuan.2 the runtime only enforces it on the
     // destructive and export routes (delete observation/session, export,
     // import, project migration); search and writes are unauthenticated, and
     // the adapter sends the bearer token on every request anyway. The only
