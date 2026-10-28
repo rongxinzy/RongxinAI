@@ -243,6 +243,59 @@ test('uses the native Claude executable from npm and pnpm global package layouts
   }
 });
 
+test('detects an npm OpenCode shim whose registry name is opencode.exe', async () => {
+  const root = path.join(process.cwd(), `.opencode-npm-discovery-${Date.now()}`);
+  const npmDirectory = path.join(root, 'npm');
+  const launcher = path.join(npmDirectory, 'opencode.cmd');
+  const executable = path.join(npmDirectory, 'node_modules', 'opencode-ai', 'bin', 'opencode.exe');
+  const registryPath = path.join(root, 'registry.json');
+  try {
+    await mkdir(path.dirname(executable), { recursive: true });
+    await writeFile(
+      launcher,
+      '@ECHO off\r\n"%dp0%\\node_modules\\opencode-ai\\bin\\opencode.exe" %*\r\n',
+    );
+    await writeFile(executable, '');
+    await writeFile(
+      registryPath,
+      JSON.stringify({
+        agents: [
+          {
+            id: 'opencode',
+            name: 'OpenCode',
+            description: 'The open source coding agent.',
+            distribution: {
+              binary: { 'windows-x86_64': { cmd: './opencode.exe', args: ['acp'] } },
+            },
+          },
+        ],
+      }),
+    );
+
+    const profiles = await new AcpDiscoveryService(registryPath, {
+      platform: 'win32',
+      architecture: 'x64',
+      environment: { PATH: npmDirectory },
+      home: root,
+      adapterRoot: root,
+    }).discover();
+
+    expect(profiles).toContainEqual(
+      expect.objectContaining({
+        name: 'OpenCode',
+        command: await realpath(executable),
+        args: ['acp'],
+        status: CodingAgentProfileStatus.Detected,
+        environment: {
+          [CodingAgentEnvironmentKey.RegistryAgentId]: 'opencode',
+        },
+      }),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test('uses bundled ACP bridges for locally installed Codex and Claude Code', async () => {
   const root = path.join(process.cwd(), `.coding-agent-discovery-${Date.now()}`);
   const directory = path.join(root, 'bin');
