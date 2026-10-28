@@ -190,6 +190,10 @@ export async function syncOpenCodeConfigToUser(
 
   await fs.mkdir(path.dirname(userPath), { recursive: true });
   await fs.writeFile(userPath, `${JSON.stringify(nextUser, null, 2)}\n`, 'utf8');
+  console.log(
+    '[Magpie] OpenCode user config moved onto',
+    gatewayUrl ? `${gatewayUrl}/v1` : 'the gateway copy',
+  );
 }
 
 export async function revertOpenCodeConfigFromUser(
