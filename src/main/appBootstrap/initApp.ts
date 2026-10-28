@@ -8,7 +8,7 @@ import path from 'path';
 
 import { pathToFileURL } from 'url';
 
-import { app, BrowserWindow, dialog, net, powerMonitor, protocol } from 'electron';
+import { app, dialog, net, powerMonitor, protocol } from 'electron';
 
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
@@ -25,7 +25,7 @@ import {
 import { updateTitleBarOverlay } from './windowManagement';
 import { setLanguage } from '../i18n';
 import { ensureWindowsTaskbarBrand, repairWindowsTaskbarIdentity } from './windowBranding';
-import { createMainWindow } from './mainWindow';
+import { createMainWindow, focusOrCreateMainWindow } from './mainWindow';
 import { setContentSecurityPolicy } from './windowSecurity';
 import {
   getStore,
@@ -682,7 +682,7 @@ export const initApp = async (): Promise<void> => {
       if (currentLanguage !== lastLanguage) {
         lastLanguage = currentLanguage;
         setLanguage(currentLanguage === 'en' ? 'en' : 'zh');
-        updateTrayMenu(() => lifecycleRuntime.mainWindow);
+        updateTrayMenu(focusOrCreateMainWindow);
       }
 
       const previousUseSystemProxy = oldConfig
@@ -715,15 +715,10 @@ export const initApp = async (): Promise<void> => {
 
     // 在 macOS 上，当点击 dock 图标时显示已有窗口或重新创建
     app.on('activate', () => {
-      if (lifecycleRuntime.mainWindow && !lifecycleRuntime.mainWindow.isDestroyed()) {
-        if (!lifecycleRuntime.mainWindow.isVisible()) lifecycleRuntime.mainWindow.show();
-        if (!lifecycleRuntime.mainWindow.isFocused()) lifecycleRuntime.mainWindow.focus();
-        return;
-      }
-      if (BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow();
-      }
+      focusOrCreateMainWindow();
     });
+
+    lifecycleRuntime.bootstrapComplete = true;
   };
 
   await runInitApp();

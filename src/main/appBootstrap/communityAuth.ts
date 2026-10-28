@@ -10,6 +10,7 @@ import { app, ipcMain, net, shell } from 'electron';
 import { isEnterprise } from './appEnv';
 import { getStore } from './runtimeServices';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
+import { focusOrCreateMainWindow } from './mainWindow';
 import { COMMUNITY_AUTH_ORIGIN, configureCommunityAuthSession } from '../communityAuthSession';
 import { registerZhiyuanDeepLinkProtocol } from '../deepLinkRegistration';
 import { registerModelPoolIpcHandlers } from '../modelPoolIpc';
@@ -88,12 +89,9 @@ export const registerCommunityAuthBootstrap = (): void => {
       handleDeepLink(deepLink);
     }
 
-    // Focus main window
-    if (lifecycleRuntime.mainWindow) {
-      if (lifecycleRuntime.mainWindow.isMinimized()) lifecycleRuntime.mainWindow.restore();
-      if (!lifecycleRuntime.mainWindow.isVisible()) lifecycleRuntime.mainWindow.show();
-      if (!lifecycleRuntime.mainWindow.isFocused()) lifecycleRuntime.mainWindow.focus();
-    }
+    // Focus the main window, or recreate it when only background surfaces
+    // (companion/pet/tray) survived an unexpected window destruction.
+    focusOrCreateMainWindow();
   });
 };
 
