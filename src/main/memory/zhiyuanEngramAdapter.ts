@@ -105,20 +105,84 @@ export class ZhiYuanEngramAdapter {
     const connection = await this.getConnection();
     if (!connection) return null;
     await this.ensureSession(connection, candidate.sessionId, candidate.project, workingDirectory);
-    const saved = await this.request<{ id: number }>(connection, '/observations', {
+    try {
+      const saved = await this.request<{ id: number }>(connection, '/observations', {
+        method: 'POST',
+        body: JSON.stringify({
+          session_id: candidate.sessionId,
+          project: candidate.project,
+          scope: candidate.scope,
+          type: candidate.type,
+          title: candidate.title,
+          content: candidate.content,
+          topic_key: candidate.topicKey,
+          operation_id: candidate.id,
+        }),
+      });
+      this.candidates.delete(candidateId);
+      return saved.id;
+    } catch (error) {
+      if (!isTimeoutError(error)) throw error;
+      // The write may have committed before the response was lost: recover the
+      // committed result by operation id instead of re-posting the payload.
+      const recovered = await this.request<{ id: number; status: string }>(
+        connection,
+        `/observations/save-result?operation_id=${encodeURIComponent(candidate.id)}`,
+      );
+      this.candidates.delete(candidateId);
+      return recovered.id;
+    }
+  }
+
+  /** Close a session with a caller-authored summary, once per session close
+   * (never per turn). The runtime makes this idempotent per session. */
+  async finalizeSession(
+    sessionId: string,
+    summary: string,
+  ): Promise<{ sessionId: string; state: string; summaryId: string; alreadyFinalized: boolean }> {
+    const connection = await this.getConnection();
+    if (!connection) throw new Error('Memory runtime is unavailable.');
+    const result = await this.request<{
+      session_id: string;
+      state: string;
+      summary_id: string;
+      already_finalized: boolean;
+    }>(connection, `/sessions/${encodeURIComponent(sessionId)}/finalize`, {
       method: 'POST',
-      body: JSON.stringify({
-        session_id: candidate.sessionId,
-        project: candidate.project,
-        scope: candidate.scope,
-        type: candidate.type,
-        title: candidate.title,
-        content: candidate.content,
-        topic_key: candidate.topicKey,
-      }),
+      body: JSON.stringify({ summary }),
     });
-    this.candidates.delete(candidateId);
-    return saved.id;
+    return {
+      sessionId: result.session_id,
+      state: result.state,
+      summaryId: result.summary_id,
+      alreadyFinalized: result.already_finalized,
+    };
+  }
+
+  /** Surface conflicts between candidate and existing memories. Semantic
+   * runner scans are opt-in only (never requested here). */
+  async scanConflicts(input: {
+    project?: string;
+    scope?: string;
+  }): Promise<Record<string, unknown>> {
+    const connection = await this.getConnection();
+    if (!connection) throw new Error('Memory runtime is unavailable.');
+    return await this.request(connection, '/conflicts/scan', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  async judgeConflict(input: {
+    relationIds: number[];
+    decision: 'keep_new' | 'keep_old' | 'keep_both' | 'delete_old';
+  }): Promise<Record<string, unknown>> {
+    const connection = await this.getConnection();
+    if (!connection) throw new Error('Memory runtime is unavailable.');
+    return await this.request(connection, '/conflicts/judge-many', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
   }
 
   async supersede(input: {
@@ -222,4 +286,12 @@ export class ZhiYuanEngramAdapter {
 
 export function redactPrivateBlocks(value: string): string {
   return value.replace(/<private>[\s\S]*?<\/private>/gi, '[REDACTED]');
+}
+
+function isTimeoutError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.name === 'AbortError' ||
+    /abort|timeout|timed out|network|socket|ECONNRESET|ETIMEDOUT/i.test(error.message)
+  );
 }
