@@ -243,6 +243,7 @@
     "better-sqlite3": "13.0.3",
     "bufferutil": "^4.1.0",
     "electron-updater": "6.8.9",
+    "koffi": "3.3.4",
     "node-pty": "1.1.0",
     "npm": "^11.11.0",
     "utf-8-validate": "^6.0.6"

@@ -15,6 +15,8 @@ import { drawPetPose, petHitMask, drawPetMedia } from './draw';
 import { DesktopPetMediaController } from './mediaController';
 import { DesktopPetMediaMasks } from './mediaMasks';
 import { DesktopPetRenderLoop } from './renderLoop';
+import { PetOrientation } from '../../shared/desktopPet/surfaces/constants';
+import { applyPetOrientation, orientPetMask } from './orientation';
 
 declare global {
   interface Window {
@@ -37,6 +39,7 @@ const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 const atlas = new DesktopPetAtlas();
 const animation = new DesktopPetAnimation();
 let state: DesktopPetState = DesktopPetState.Idle;
+let nativeOrientation: PetOrientation = PetOrientation.Upright;
 let reducedMotion = reduced.matches;
 let systemReducedMotion = false;
 let maskDirty = true;
@@ -50,11 +53,11 @@ let pointerMoved = false;
 let canOpen = false;
 let disposed = false;
 let nativeVisible = true;
-const hitMasks = new DesktopPetMediaMasks((key, mask) => {
+const hitMasks = new DesktopPetMediaMasks(key => {
+  // The worker only prepares the envelope; the canvas rotation is applied on the next draw.
   if (key !== contentMaskKey) return;
-  bridge?.hitMask(mask);
-  maskKey = key;
-  maskDirty = false;
+  maskDirty = true;
+  refresh();
 });
 const media = new DesktopPetMediaController(() => {
   maskDirty = true;
@@ -79,7 +82,10 @@ function draw(now: number) {
   const clip = media.sample(now);
   const drawable = !reducedMotion ? clip.playing : null;
   const poster = !reducedMotion ? clip.poster : undefined;
+  const orientation = reducedMotion ? PetOrientation.Upright : nativeOrientation;
   ctx.save();
+  // A quarter-turn keeps the character's feet on the wall contact the window geometry reports.
+  applyPetOrientation(ctx, orientation);
   // Add only during a crossfade; a single layer keeps the original canvas pixel rounding.
   const crossfading =
     drawable?.previous ||
@@ -112,6 +118,7 @@ function draw(now: number) {
   ctx.globalAlpha = 1;
   ctx.globalCompositeOperation = 'source-over';
   ctx.restore();
+  setData('orientation', orientation);
   setData('state', state);
   setData('reducedMotion', String(reducedMotion));
   setData('character', atlas.character.id);
@@ -129,20 +136,21 @@ function draw(now: number) {
       ? [poster]
       : [];
   const indices = pose.weights.flatMap((weight, index) => (weight > 0 ? [index] : []));
-  const nextMaskKey = mediaImages.length
+  const contentKey = mediaImages.length
     ? mediaImages.map(image => image.src).join('|')
     : `${reducedMotion}:${indices.join(',')}`;
-  contentMaskKey = nextMaskKey;
+  contentMaskKey = contentKey;
+  const nextMaskKey = `${orientation}:${contentKey}`;
   if (bridge) {
     if (mediaImages.length) {
       const mask = hitMasks.get(mediaImages);
       if (mask && nextMaskKey !== maskKey) {
-        bridge.hitMask(mask);
+        bridge.hitMask(orientPetMask(mask, orientation));
         maskKey = nextMaskKey;
         maskDirty = false;
       }
     } else if (maskDirty || nextMaskKey !== maskKey) {
-      bridge.hitMask(petHitMask(atlas, reducedMotion, indices));
+      bridge.hitMask(orientPetMask(petHitMask(atlas, reducedMotion, indices), orientation));
       maskDirty = false;
       maskKey = nextMaskKey;
     }
@@ -213,6 +221,7 @@ async function selectCharacter(id: string): Promise<void> {
 
 const unsubscribe = bridge?.onState(update);
 const unsubscribePose = bridge?.onPose(pose => {
+  nativeOrientation = pose.orientation;
   animation.setPose(pose.facing, pose.walking);
   media.update({ walking: pose.walking });
   maskDirty = true;

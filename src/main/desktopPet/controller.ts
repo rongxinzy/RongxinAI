@@ -24,6 +24,7 @@ import {
 } from '../../shared/desktopPet/layout';
 import type {
   DesktopPetFailure,
+  DesktopPetPose,
   DesktopPetPreferences,
   DesktopPetSettings,
   DesktopPetTaskOpen,
@@ -48,9 +49,11 @@ import {
   updateActiveCompanionAppearance,
 } from '../companion/window';
 import { watchDesktopPetVisibility } from './visibility';
+import { DesktopWindowObserver } from './windows/observer';
 
 let pet: BrowserWindow | null = null;
 let motion: DesktopPetMotion | undefined;
+let windowObserver: DesktopWindowObserver | undefined;
 let store: Pick<SqliteStore, 'get' | 'set'> | undefined;
 let mainWindow: (() => BrowserWindow | null) | undefined;
 let onEnabledChanged: (() => void) | undefined;
@@ -143,9 +146,9 @@ function startChatterLoop(): void {
   chatterTimer = setTimeout(step, 1000);
 }
 
-function sendPose(facing: number, walking: boolean): void {
+function sendPose(pose: DesktopPetPose): void {
   if (!pet || pet.isDestroyed() || pet.webContents.isDestroyed()) return;
-  pet.webContents.send(DesktopPetIpc.Pose, { facing, walking });
+  pet.webContents.send(DesktopPetIpc.Pose, pose);
 }
 
 function persistPosition(): void {
@@ -195,8 +198,21 @@ function sendVisibility(): void {
 function syncVisibility(): void {
   if (!pet || pet.isDestroyed()) return;
   const settings = getDesktopPetSettings();
+  windowObserver?.setActive(
+    settings.enabled &&
+      (settings.roaming || settings.hideInFullscreen) &&
+      Boolean(visibility?.canObserve(settings)),
+  );
   pet.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: !settings.hideInFullscreen });
-  const show = ready && settings.enabled && !visibility?.suppressed(settings);
+  const externalFullscreen =
+    settings.hideInFullscreen &&
+    Boolean(
+      windowObserver?.snapshot?.fullscreenDisplays.includes(
+        String(screen.getDisplayMatching(pet.getBounds()).id),
+      ),
+    );
+  const show =
+    ready && settings.enabled && !visibility?.suppressed(settings) && !externalFullscreen;
   if (show === visible) return;
   visible = show;
   companionStatus.setVisible(show);
@@ -438,8 +454,17 @@ export function setDesktopPetEnabled(enabled: boolean): void {
       if (!window.isDestroyed() && !window.webContents.isDestroyed())
         window.webContents.send(DesktopPetIpc.Effect, effect);
     },
-    pose => sendPose(pose.facing, pose.walking),
+    sendPose,
+    active => {
+      if (!window.isDestroyed()) window.setAlwaysOnTop(active);
+    },
   );
+  if (process.platform === 'win32')
+    windowObserver = new DesktopWindowObserver(window, snapshot => {
+      if (pet !== window) return;
+      motion?.setWindowSnapshot(snapshot);
+      syncVisibility();
+    });
   motion.setReducedMotion(reducedMotion);
   motion.pause();
   syncVisibility();
@@ -462,6 +487,9 @@ export function setDesktopPetEnabled(enabled: boolean): void {
   window.once('closed', () => {
     if (pet !== window) return;
     hideCompanionWindow();
+    const observer = windowObserver;
+    windowObserver = undefined;
+    observer?.dispose();
     companionStatus.setVisible(false);
     motion?.dispose();
     motion = undefined;
@@ -488,6 +516,7 @@ export function setDesktopPetEnabled(enabled: boolean): void {
 
 function onDisplayChanged(): void {
   motion?.ensureVisible();
+  windowObserver?.configure();
 }
 
 export function initializeDesktopPet(
@@ -625,6 +654,9 @@ export function observeDesktopPetEvent(event: PiUiEvent): void {
 }
 
 export function disposeDesktopPet(): void {
+  const observer = windowObserver;
+  windowObserver = undefined;
+  observer?.dispose();
   clearTimeout(terminalTimer);
   clearTimeout(greetingTimer);
   clearClickTimer();

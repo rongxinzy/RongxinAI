@@ -14,12 +14,14 @@ export const enSettings: Record<string, string> = {
   desktopPetEnabledDescription: 'Click to chat. Right-click for more actions.',
   desktopPetDoNotDisturb: 'Do not disturb',
   desktopPetDoNotDisturbDescription: 'Hide your companion while tasks continue.',
-  desktopPetHideInFullscreen: 'Hide when the app is fullscreen',
+  desktopPetHideInFullscreen: 'Hide in fullscreen',
   desktopPetRoaming: 'Screen roaming',
-  desktopPetRoamingDescription: 'Take short walks while idle.',
+  desktopPetRoamingDescription:
+    'Walk across the screen while idle; on Windows it also climbs window edges.',
   desktopPetChatter: 'Occasional chatter',
   desktopPetChatterDescription: 'Show an occasional line while idle.',
-  desktopPetHideInFullscreenDescription: 'Hide your companion while this app is fullscreen.',
+  desktopPetHideInFullscreenDescription:
+    'Hide your companion in fullscreen; on Windows this includes other apps.',
   desktopPetTaskOpenFailed:
     'The task could not be opened. Check the conversation list. Unacknowledged failure reminders are kept.',
   // Settings

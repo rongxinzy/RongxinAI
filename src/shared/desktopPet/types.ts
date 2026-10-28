@@ -1,5 +1,6 @@
 import type { DesktopPetPlayableAction, DesktopPetState, DesktopPetTaskResult } from './constants';
 import type { DesktopPetBuiltinId } from './catalog';
+import type { PetOrientation } from './surfaces/constants';
 
 export interface DesktopPetSettings {
   characterId: DesktopPetBuiltinId;
@@ -46,6 +47,7 @@ export interface DesktopPetSnapshot {
 export interface DesktopPetPose {
   facing: number;
   walking: boolean;
+  orientation: PetOrientation;
 }
 
 export interface DesktopPetBridge {

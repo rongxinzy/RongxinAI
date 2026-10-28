@@ -117,6 +117,7 @@ vi.mock('../../src/main/desktopPet/motion', () => ({
     setMask = mocks.setMask;
     setReducedMotion() {}
     setRoamingEnabled() {}
+    setWindowSnapshot() {}
     setAllowRoam = mocks.allowRoam;
     pause = mocks.pause;
     resume = mocks.resume;
