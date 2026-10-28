@@ -11,7 +11,7 @@ import {
   EmptyTitle,
 } from '@shared/components/ui/empty';
 import { Code2 } from 'lucide-react';
-import { useMemo, useState, type ReactNode, type RefObject } from 'react';
+import { useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useSelector } from 'react-redux';
 
 import type { CodingElicitation, CodingEvent } from '../../../shared/codingAgent';
@@ -22,7 +22,10 @@ import type { Artifact } from '../../types/artifact';
 import { CodingConversationTurn } from './CodingConversationTurn';
 import { CodingElicitationCard } from './CodingElicitationCard';
 import { toDetectableCodingMessages } from './codingArtifactMessages';
-import { projectCodingEvents } from './codingEventProjection';
+import {
+  projectCodingEventsIncremental,
+  type CodingProjectionCache,
+} from './codingEventProjectionCache';
 import { useInlineArtifacts } from '../cowork/sessionDetail/useInlineArtifacts';
 import { useLedgerArtifacts } from './useLedgerArtifacts';
 
@@ -74,7 +77,12 @@ export const CodingEventStream = ({
   onRespondElicitation,
   onCancelElicitation,
 }: CodingEventStreamProps) => {
-  const turns = useMemo(() => projectCodingEvents(events), [events]);
+  const projectionCache = useRef<CodingProjectionCache | null>(null);
+  const turns = useMemo(() => {
+    const projected = projectCodingEventsIncremental(events, projectionCache.current);
+    projectionCache.current = projected.cache;
+    return projected.turns;
+  }, [events]);
   const [expandedActivityIds, setExpandedActivityIds] = useState<ReadonlySet<string>>(
     () => new Set(),
   );

@@ -130,6 +130,14 @@ export const CodingStreamUpdateMode = {
 export type CodingStreamUpdateMode =
   (typeof CodingStreamUpdateMode)[keyof typeof CodingStreamUpdateMode];
 
+/**
+ * IPC-only payload field. Present while a text event is streaming: `content`
+ * is either the full text (`content.length === streamContentLength`) or the
+ * suffix appended since the previous flush. Stripped before the renderer
+ * stores the event.
+ */
+export const CodingStreamContentLengthField = 'streamContentLength' as const;
+
 export const CodingToolCallStatus = {
   Pending: 'pending',
   Completed: 'completed',
