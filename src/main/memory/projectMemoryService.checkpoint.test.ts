@@ -1,147 +1,93 @@
+import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
 
-import { MemoryScope } from '../../shared/memory';
-import { MemoryOutboxOperation, MemoryOutboxStatus } from './constants';
+import { MemoryOutboxStatus } from './constants';
 import { processMemoryOutboxItem } from './memoryOutboxProcessor';
 import { ProjectMemoryService } from './projectMemoryService';
-import type { MemoryOutboxItem } from './repository';
+import { MemoryRepository } from './repository';
 
-class FakeRepository {
-  items: MemoryOutboxItem[] = [];
-  links: Array<Record<string, unknown>> = [];
+const identityFor = (cwd: string) => ({ id: 'project-a', displayName: cwd, root: cwd });
 
-  enqueue(operation: MemoryOutboxOperation, payload: Record<string, unknown>) {
-    const id = `outbox-${this.items.length + 1}`;
-    this.items.push({
-      id,
-      operation,
-      payload,
-      status: MemoryOutboxStatus.Pending,
-      attempts: 0,
-      availableAt: new Date(0).toISOString(),
-      lastError: null,
-    });
-    return id;
-  }
-
-  findPendingByLinkId() {
-    return null;
-  }
-
-  listPending() {
-    return this.items.filter(item => item.status === MemoryOutboxStatus.Pending);
-  }
-
-  findActiveTopic() {
-    return null;
-  }
-
-  getLink() {
-    return null;
-  }
-
-  getLinkMetadata() {
-    return {};
-  }
-
-  createLink(input: Record<string, unknown>) {
-    this.links.push(input);
-    return String(input.id);
-  }
-
-  supersedeActiveTopic() {}
-
-  deleteCandidate() {}
-
-  setLinkStatus() {}
-
-  markCompleted(id: string) {
-    const item = this.items.find(candidate => candidate.id === id);
-    if (item) item.status = MemoryOutboxStatus.Completed;
-  }
-
-  markRetry() {}
-
-  maxSessionCheckpointSequence(): number {
-    let max = 0;
-    for (const link of this.links) {
-      const metadata = link.metadata as { checkpointSequence?: number } | undefined;
-      if (typeof metadata?.checkpointSequence === 'number') {
-        max = Math.max(max, metadata.checkpointSequence);
-      }
-    }
-    return max;
-  }
-}
-
-const identityFor = (cwd: string) => ({ id: `project-${cwd}`, displayName: cwd, root: cwd });
-
-function summaryPayload(sequence: number): MemoryOutboxItem {
-  return {
-    id: 'outbox-legacy',
-    operation: MemoryOutboxOperation.SessionSummary,
-    payload: {
-      sessionId: 'session-1',
-      projectId: 'project-/work',
-      projectRoot: '/work',
-      type: 'session_summary',
-      title: 'Session summary',
-      content: 'older checkpoint',
-      topicKey: 'session/session-1',
-      sourceKind: 'session_summary',
-      scope: MemoryScope.Session,
-      linkId: 'link-legacy',
-      metadata: { checkpointSequence: sequence },
-    },
-    status: MemoryOutboxStatus.Pending,
-    attempts: 0,
-    availableAt: new Date(0).toISOString(),
-    lastError: null,
-  };
-}
-
-test('checkpoints get a per-session increasing sequence', async () => {
-  const repository = new FakeRepository();
-  const confirmMemory = vi.fn(async () => 1);
-  const saveCandidate = vi.fn(() => ({ id: 'candidate-1' }));
-  const service = new ProjectMemoryService(
-    repository as never,
-    { saveCandidate, confirmMemory } as never,
+function offlineService(repository: MemoryRepository): ProjectMemoryService {
+  return new ProjectMemoryService(
+    repository,
+    {
+      saveCandidate: vi.fn(),
+      confirmMemory: vi.fn(() => new Promise<null>(() => {})),
+    } as never,
     identityFor,
-    '/tmp',
+    '/personal',
   );
+}
 
-  await service.saveSessionSummary({
+test('offline checkpoints have distinct sequences and an older retry cannot roll back a newer one', async () => {
+  const database = new Database(':memory:');
+  const repository = new MemoryRepository(database);
+  const offline = offlineService(repository);
+  await offline.saveSessionSummary({
     sessionId: 'session-1',
     workingDirectory: '/work',
-    summary: 'first checkpoint',
-    metadata: { format: 'agent-checkpoint' },
+    summary: 'checkpoint A',
+    linkId: 'checkpoint-a',
   });
-  await service.saveSessionSummary({
+  await offline.saveSessionSummary({
     sessionId: 'session-1',
     workingDirectory: '/work',
-    summary: 'second checkpoint',
-    metadata: { format: 'agent-checkpoint' },
+    summary: 'checkpoint B',
+    linkId: 'checkpoint-b',
   });
 
-  const sequences = repository.links.map(
-    link => (link.metadata as { checkpointSequence?: number }).checkpointSequence,
+  const pending = repository.listPending();
+  expect(pending.map(item => item.payload.metadata)).toEqual([
+    { checkpointSequence: 1 },
+    { checkpointSequence: 2 },
+  ]);
+  const adapter = {
+    saveCandidate: vi.fn((input: Record<string, unknown>) => ({ id: 'candidate', ...input })),
+    confirmMemory: vi.fn(async () => 22),
+  };
+  const newer = pending.find(item => item.linkId === 'checkpoint-b') ?? null;
+  const older = pending.find(item => item.linkId === 'checkpoint-a') ?? null;
+  await processMemoryOutboxItem(repository, adapter as never, newer);
+  await processMemoryOutboxItem(repository, adapter as never, older);
+
+  expect(adapter.confirmMemory).toHaveBeenCalledTimes(1);
+  expect(adapter.confirmMemory).toHaveBeenCalledWith(
+    expect.objectContaining({ operationId: 'checkpoint-b' }),
+    '/work',
   );
-  expect(sequences).toEqual([1, 2]);
+  expect(repository.getLink('checkpoint-a')).toBeNull();
+  expect(repository.getLink('checkpoint-b')?.content).toBe('checkpoint B');
+  const recoveredRepository = new MemoryRepository(database);
+  const recovered = new ProjectMemoryService(
+    recoveredRepository,
+    adapter as never,
+    identityFor,
+    '/personal',
+  );
+  await recovered.retryPendingOutbox();
+  expect(adapter.confirmMemory).toHaveBeenCalledTimes(1);
+  expect(
+    recovered.getActiveSessionSummary({ sessionId: 'session-1', workingDirectory: '/work' }),
+  ).toMatchObject({ content: 'checkpoint B', metadata: { checkpointSequence: 2 } });
 });
 
-test('an older retry cannot overwrite a newer checkpoint', async () => {
-  const repository = new FakeRepository();
-  repository.links.push({
-    id: 'link-newer',
-    memoryId: 1,
-    metadata: { checkpointSequence: 2 },
+test('replaying a stable checkpoint id does not rewrite immutable content', async () => {
+  const repository = new MemoryRepository(new Database(':memory:'));
+  const service = offlineService(repository);
+  const input = {
+    sessionId: 'session-1',
+    workingDirectory: '/work',
+    summary: 'original',
+    linkId: 'checkpoint-stable',
+  };
+  await service.saveSessionSummary(input);
+  await service.saveSessionSummary({ ...input, summary: 'replacement' });
+
+  expect(repository.listPending()).toHaveLength(1);
+  expect(repository.getSessionCheckpoint(input.linkId)).toMatchObject({
+    content: 'original',
+    sequence: 1,
+    syncStatus: MemoryOutboxStatus.Pending,
   });
-  const confirmMemory = vi.fn(async () => 1);
-  repository.items.push(summaryPayload(1));
-
-  await processMemoryOutboxItem(repository as never, { confirmMemory } as never, summaryPayload(1));
-
-  expect(confirmMemory).not.toHaveBeenCalled();
-  expect(repository.items[0].status).toBe(MemoryOutboxStatus.Completed);
 });

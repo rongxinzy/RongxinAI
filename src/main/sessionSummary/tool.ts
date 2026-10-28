@@ -88,7 +88,7 @@ export function buildSessionSummaryTool(
       additionalProperties: false,
     },
     execute: async (
-      _toolCallId: string,
+      toolCallId: string,
       params: Record<string, unknown>,
       _signal?: AbortSignal,
     ): Promise<ToolResult> => {
@@ -134,12 +134,10 @@ export function buildSessionSummaryTool(
             sessionId: options.sessionId,
             workingDirectory: options.workingDirectory,
             runId: options.runId,
-            turnId: options.turnId,
+            turnId: options.turnId ?? toolCallId,
           },
           input,
         );
-        if (result.syncState === 'failed')
-          return failure('Failed to persist the session checkpoint locally.');
         options.onOutcome?.('written', reason || undefined);
         return {
           content: [{ type: 'text', text: 'Session checkpoint saved.' }],

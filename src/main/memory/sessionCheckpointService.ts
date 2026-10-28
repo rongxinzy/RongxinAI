@@ -47,12 +47,13 @@ export async function recordSessionCheckpoint(
   service: ProjectMemoryService,
   context: SessionCheckpointContext,
   input: SessionCheckpointInput,
-): Promise<{ checkpointId: string; syncState: 'pending' | 'synced' | 'failed' }> {
-  const content = composeCheckpointContent(input);
-  const checkpointId = await service.saveSessionSummary({
+): Promise<{ checkpointId: string; syncState: 'pending' | 'synced' }> {
+  const checkpointId = `${context.sessionId}:${context.turnId ?? 'session'}`;
+  return await service.saveSessionSummary({
     sessionId: context.sessionId,
     workingDirectory: context.workingDirectory,
-    summary: content,
+    summary: composeCheckpointContent(input),
+    linkId: checkpointId,
     metadata: {
       format: 'agent-checkpoint',
       formatVersion: SESSION_CHECKPOINT_FORMAT_VERSION,
@@ -60,15 +61,13 @@ export async function recordSessionCheckpoint(
       turnId: context.turnId ?? null,
     },
   });
-  return {
-    checkpointId: context.turnId ?? context.sessionId,
-    syncState: checkpointId === null ? 'failed' : 'pending',
-  };
 }
 
 export interface SessionCheckpointFallbackInput {
   sessionId: string;
   workingDirectory: string;
+  runId?: string | null;
+  turnId?: string | null;
   goal: string;
   finalAnswer: string;
   verificationStatus?: string;
@@ -100,9 +99,12 @@ export async function recordCheckpointFallback(
     sessionId: input.sessionId,
     workingDirectory: input.workingDirectory,
     summary: content,
+    linkId: `${input.sessionId}:fallback:${input.turnId ?? input.runId ?? 'session'}`,
     metadata: {
       format: 'fallback-run-record',
       formatVersion: SESSION_CHECKPOINT_FORMAT_VERSION,
+      runId: input.runId ?? null,
+      turnId: input.turnId ?? null,
       reviewRequired: true,
     },
   });

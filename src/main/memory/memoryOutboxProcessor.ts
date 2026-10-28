@@ -47,6 +47,7 @@ export async function processMemoryOutboxItem(
       title: payload.title,
       content: payload.content,
       topicKey: payload.topicKey,
+      operationId: payload.linkId,
     });
     const memoryId =
       item.operation === MemoryOutboxOperation.Supersede && payload.supersededObservationId

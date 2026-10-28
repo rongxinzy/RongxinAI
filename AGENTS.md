@@ -92,7 +92,7 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 
 - 作用域：`project`（id = `workspace-` + sha256(cwd)，见 `src/main/workspaceUtils.ts`、`src/shared/memory/constants.ts`）；`personal`（`personal://zhiyuan-agent/user`，写入进候选队列，用户确认后生效）；`session`（摘要，30 天 TTL）。
 - 写入：显式 `memory` 工具保存走确定性的 `prepareExplicitUserRequestedMemory`（`src/main/memory/piMemoryTool.ts`，无额外 LLM 抽取）；会话检查点由 agent 通过 `session_summary` 工具（`src/main/sessionSummary/tool.ts`）在当前上下文中自写，经 `sessionCheckpointService.ts` 落 SQLite + outbox 同步 Engram。不再按回合做窗口抽取（`runPostTurnMemoryMaintenance` 已退役）。
-- 收尾义务：有文件产出的回合未写检查点时，最多一次纠正提醒（`piSummaryObligation.ts`），仍不写则以确定性兜底（目标/最终回复摘录/验证状态/台账）记为待审运行记录；skip 是显式合法结果。`taskMemoryPromotion` 的任务知识提炼仍走独立的 `AtomicMemoryExtractor`。
+- 收尾义务：有文件产出的回合未写检查点时，不自动续跑模型或注入纠正提醒，只记录遗漏指标并以确定性兜底（目标/最终回复摘录/验证状态/台账）记为待审运行记录；skip 是显式合法结果。`taskMemoryPromotion` 的任务知识提炼仍走独立的 `AtomicMemoryExtractor`。
 - 注入：每轮前 `buildProjectMemoryContextSafe`，预算 project/personal/session = 900/250/350 token。Chat 不用记忆；IM/Cron 同 Work。旧 `MEMORY.md` 只在启动时导入为候选，永不注入 prompt。
 
 ### 其他

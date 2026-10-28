@@ -72,15 +72,39 @@ class FakeRepository {
     return String(input.id);
   }
 
-  maxSessionCheckpointSequence(): number {
-    let max = 0;
-    for (const link of this.links) {
-      const metadata = link.metadata as { checkpointSequence?: number } | undefined;
-      if (typeof metadata?.checkpointSequence === 'number') {
-        max = Math.max(max, metadata.checkpointSequence);
-      }
-    }
-    return max;
+  saveSessionCheckpoint(input: {
+    id: string;
+    sessionId: string;
+    projectId: string;
+    projectRoot: string;
+    summary: string;
+    metadata?: Record<string, unknown>;
+    expiresAt: string;
+  }) {
+    this.items.push({
+      id: `outbox-${this.items.length + 1}`,
+      linkId: input.id,
+      operation: MemoryOutboxOperation.SessionSummary,
+      payload: {
+        sessionId: input.sessionId,
+        projectId: input.projectId,
+        projectRoot: input.projectRoot,
+        type: MemoryKind.SessionSummary,
+        title: 'Session summary',
+        content: input.summary,
+        topicKey: `session/${input.sessionId}`,
+        sourceKind: MemorySourceKind.SessionSummary,
+        scope: MemoryScope.Session,
+        linkId: input.id,
+        metadata: input.metadata,
+        expiresAt: input.expiresAt,
+      },
+      status: MemoryOutboxStatus.Pending,
+      attempts: 0,
+      availableAt: new Date(0).toISOString(),
+      lastError: null,
+    });
+    return { checkpointId: input.id, syncState: 'pending' as const };
   }
 
   markCompleted(id: string) {
@@ -656,8 +680,10 @@ test('stores rolling session summaries with a 30 day expiration', async () => {
         sourceMessageIds: ['message-1'],
         digest: { shouldSave: true },
       },
+      linkId: 'session-1:turn-1',
     }),
-  ).resolves.toBe(21);
+  ).resolves.toEqual({ checkpointId: 'session-1:turn-1', syncState: 'pending' });
+  await service.drainOutbox();
 
   expect(repository.items[0].payload).toMatchObject({
     scope: EngramMemoryScope.Session,

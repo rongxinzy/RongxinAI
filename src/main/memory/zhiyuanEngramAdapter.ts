@@ -18,6 +18,7 @@ interface CandidateInput {
   title: string;
   content: string;
   topicKey?: string;
+  operationId?: string;
 }
 
 export class EngramRequestError extends Error {
@@ -110,7 +111,7 @@ export class ZhiYuanEngramAdapter {
           title: candidate.title,
           content: candidate.content,
           topic_key: candidate.topicKey,
-          operation_id: candidate.id,
+          operation_id: candidate.operationId ?? candidate.id,
         }),
       });
       return saved.id;
@@ -118,7 +119,7 @@ export class ZhiYuanEngramAdapter {
       if (!isTimeoutError(error)) throw error;
       const recovered = await this.request<{ id: number; status: string }>(
         connection,
-        `/observations/save-result?operation_id=${encodeURIComponent(candidate.id)}`,
+        `/observations/save-result?operation_id=${encodeURIComponent(candidate.operationId ?? candidate.id)}`,
       );
       return recovered.id;
     }

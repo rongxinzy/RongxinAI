@@ -8,7 +8,6 @@ test('no obligation without recorded files or when checkpoint is written or skip
       hasRecordedFiles: false,
       checkpointWritten: false,
       checkpointSkipped: false,
-      reminderIssued: false,
     }),
   ).toBe('none');
   expect(
@@ -16,7 +15,6 @@ test('no obligation without recorded files or when checkpoint is written or skip
       hasRecordedFiles: true,
       checkpointWritten: true,
       checkpointSkipped: false,
-      reminderIssued: false,
     }),
   ).toBe('none');
   expect(
@@ -24,26 +22,16 @@ test('no obligation without recorded files or when checkpoint is written or skip
       hasRecordedFiles: true,
       checkpointWritten: false,
       checkpointSkipped: true,
-      reminderIssued: false,
     }),
   ).toBe('none');
 });
 
-test('file-producing turn without a checkpoint gets exactly one reminder, then fallback', () => {
+test('file-producing turn without a checkpoint uses fallback without a reminder', () => {
   expect(
     evaluateSummaryObligation({
       hasRecordedFiles: true,
       checkpointWritten: false,
       checkpointSkipped: false,
-      reminderIssued: false,
-    }),
-  ).toBe('remind');
-  expect(
-    evaluateSummaryObligation({
-      hasRecordedFiles: true,
-      checkpointWritten: false,
-      checkpointSkipped: false,
-      reminderIssued: true,
     }),
   ).toBe('fallback');
 });
