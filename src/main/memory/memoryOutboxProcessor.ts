@@ -103,7 +103,11 @@ async function processMemoryForget(
   const payload = parseForgetPayload(item.payload);
   if (!payload) return retryInvalidOutboxItem(repository, item);
   try {
-    const forgotten = await adapter.forget(payload.observationId, payload.hardDelete);
+    const forgotten = await adapter.forget(
+      payload.observationId,
+      payload.hardDelete,
+      typeof payload.projectId === 'string' ? payload.projectId : undefined,
+    );
     if (!forgotten) {
       repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
       return null;

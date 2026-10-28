@@ -111,19 +111,29 @@ export class ZhiYuanEngramAdapter {
     replacementCandidateId: string;
     workingDirectory: string;
   }): Promise<number | null> {
+    const project = this.candidates.get(input.replacementCandidateId)?.project;
     const replacementId = await this.confirmMemory(
       input.replacementCandidateId,
       input.workingDirectory,
     );
     if (replacementId === null) return null;
-    await this.forget(input.observationId, false);
+    // Same-topic upserts update in place and return the original id: deleting
+    // it would erase the content we just wrote.
+    if (replacementId === input.observationId) return replacementId;
+    await this.forget(input.observationId, false, project);
     return replacementId;
   }
 
-  async forget(observationId: number, hardDelete: boolean): Promise<boolean> {
+  async forget(
+    observationId: number,
+    hardDelete: boolean,
+    expectedProject?: string,
+  ): Promise<boolean> {
     const connection = await this.getConnection();
     if (!connection) return false;
-    await this.request(connection, `/observations/${observationId}?hard=${hardDelete}`, {
+    const owner = expectedProject?.trim();
+    const query = owner ? `&expected_project=${encodeURIComponent(owner)}` : '';
+    await this.request(connection, `/observations/${observationId}?hard=${hardDelete}${query}`, {
       method: 'DELETE',
     });
     return true;
@@ -181,8 +191,9 @@ export class ZhiYuanEngramAdapter {
     });
     if (!response.ok) {
       const method = init.method ?? 'GET';
+      const detail = await response.text().catch(() => '');
       throw new Error(
-        `Memory service request failed with HTTP ${response.status} for ${method} ${pathname}.`,
+        `Memory service request failed with HTTP ${response.status} for ${method} ${pathname}. ${detail.slice(0, 300)}`,
       );
     }
     return (await response.json()) as T;
