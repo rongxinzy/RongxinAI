@@ -170,8 +170,6 @@ export interface ActivePiSession {
   /** Set when the model wrote (or explicitly skipped) this turn's checkpoint. */
   summaryCheckpointWritten?: boolean;
   summaryCheckpointSkipped?: string | true;
-  /** One corrective reminder per turn; further omissions fall back deterministically. */
-  summaryReminderIssued?: boolean;
   /** One retry notice per turn: the user learns the model answered with an error. */
   retryNoticeEmitted: boolean;
   /** Retry attempts Pi reported in the current turn. */

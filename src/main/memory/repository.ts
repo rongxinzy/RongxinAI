@@ -22,6 +22,18 @@ import {
 } from './constants';
 import { EXPLICIT_MEMORY_SOURCE } from './explicitUserRequestedMemory';
 import { migrateLegacyMemoryTimestamps } from './memoryTimestampMigration';
+import {
+  checkpointReceipt,
+  commitSessionCheckpoint,
+  getLatestSessionCheckpoint,
+  getSessionCheckpoint,
+  maxSessionCheckpointSequence as readMaxSessionCheckpointSequence,
+  migrateSessionCheckpointStorage,
+  updateSessionCheckpointDelivery,
+  type SessionCheckpointCommitInput,
+  type SessionCheckpointReceipt,
+  type SessionCheckpointRecord,
+} from './sessionCheckpointRepository';
 import { addColumnIfMissing, runMigrations } from '../sqliteMigrations';
 
 const MEMORY_SCHEMA_SCOPE = 'memory';
@@ -123,6 +135,19 @@ type SqlRow = Record<string, unknown>;
 export class MemoryRepository {
   constructor(private readonly db: Database.Database) {
     this.ensureSchema();
+    if (typeof this.db.prepare === 'function') migrateSessionCheckpointStorage(this.db);
+  }
+
+  saveSessionCheckpoint(input: SessionCheckpointCommitInput): SessionCheckpointReceipt {
+    return checkpointReceipt(commitSessionCheckpoint(this.db, input));
+  }
+
+  getSessionCheckpoint(id: string): SessionCheckpointRecord | null {
+    return getSessionCheckpoint(this.db, id);
+  }
+
+  getLatestSessionCheckpoint(sessionId: string, projectId: string): SessionCheckpointRecord | null {
+    return getLatestSessionCheckpoint(this.db, sessionId, projectId);
   }
 
   createLink(input: MemoryLinkInput): string {
@@ -331,20 +356,8 @@ export class MemoryRepository {
     return row ? mapLink(row, this.getDelivery(String(row.id))) : null;
   }
 
-  /** Highest checkpoint sequence already recorded for a session; retries of an
-   * older checkpoint must not overwrite a newer one. */
   maxSessionCheckpointSequence(sessionId: string): number {
-    const rows = this.db
-      .prepare('SELECT metadata_json FROM memory_links WHERE session_id = ?')
-      .all(sessionId) as Array<{ metadata_json: string }>;
-    let max = 0;
-    for (const row of rows) {
-      const metadata = JSON.parse(row.metadata_json) as { checkpointSequence?: unknown };
-      if (typeof metadata.checkpointSequence === 'number') {
-        max = Math.max(max, metadata.checkpointSequence);
-      }
-    }
-    return max;
+    return readMaxSessionCheckpointSequence(this.db, sessionId);
   }
 
   deleteCandidate(id: string): void {
@@ -409,7 +422,7 @@ export class MemoryRepository {
         `SELECT id, link_id, operation, payload_json, status, attempts, available_at, last_error
          FROM memory_outbox
          WHERE status = ? AND available_at <= ?
-         ORDER BY created_at ASC
+         ORDER BY created_at ASC, rowid ASC
          LIMIT ?`,
       )
       .all(MemoryOutboxStatus.Pending, new Date().toISOString(), limit) as MemoryOutboxRow[];
@@ -422,7 +435,7 @@ export class MemoryRepository {
         `SELECT id, link_id, operation, payload_json, status, attempts, available_at, last_error
          FROM memory_outbox
          WHERE link_id = ? AND operation = ? AND status = ?
-         ORDER BY created_at ASC
+         ORDER BY created_at ASC, rowid ASC
          LIMIT 1`,
       )
       .get(linkId, operation, MemoryOutboxStatus.Pending) as MemoryOutboxRow | undefined;
@@ -430,24 +443,30 @@ export class MemoryRepository {
   }
 
   markCompleted(id: string): void {
-    this.db
-      .prepare(
-        `UPDATE memory_outbox
-         SET status = ?, completed_at = ?, last_error = NULL
-         WHERE id = ?`,
-      )
-      .run(MemoryOutboxStatus.Completed, new Date().toISOString(), id);
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `UPDATE memory_outbox
+           SET status = ?, completed_at = ?, last_error = NULL
+           WHERE id = ?`,
+        )
+        .run(MemoryOutboxStatus.Completed, new Date().toISOString(), id);
+      updateSessionCheckpointDelivery(this.db, id, MemoryOutboxStatus.Completed, null);
+    })();
   }
 
   markRetry(id: string, attempts: number, error: string): void {
     const nextAttemptAt = new Date(Date.now() + Math.min(60_000, 1_000 * 2 ** attempts));
-    this.db
-      .prepare(
-        `UPDATE memory_outbox
-         SET attempts = ?, available_at = ?, last_error = ?
-         WHERE id = ?`,
-      )
-      .run(attempts, nextAttemptAt.toISOString(), error, id);
+    this.db.transaction(() => {
+      this.db
+        .prepare(
+          `UPDATE memory_outbox
+           SET attempts = ?, available_at = ?, last_error = ?
+           WHERE id = ?`,
+        )
+        .run(attempts, nextAttemptAt.toISOString(), error, id);
+      updateSessionCheckpointDelivery(this.db, id, MemoryOutboxStatus.Pending, error);
+    })();
   }
 
   makePendingAvailable(): void {

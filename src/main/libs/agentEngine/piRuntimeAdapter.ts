@@ -66,9 +66,6 @@ import { PiRuntimeTurnEvents } from './piRuntimeTurnEvents';
 import { PiRuntimeTurnRecovery } from './piRuntimeTurnRecovery';
 import { recordCheckpointFallback } from '../../memory/sessionCheckpointService';
 import { HarnessActivationType } from '../../../shared/harness/constants';
-
-const SUMMARY_REMINDER_PROMPT =
-  '本回合有文件产出但未写会话检查点。请调用 session_summary 工具，用 goal、accomplished、discoveries、nextSteps、relevantFiles 写一份检查点；若确无值得记录的内容，调用 session_summary(skip=true, reason=...)。';
 import {
   getPiModules,
   type ActivePiSession,
@@ -151,7 +148,6 @@ export class PiRuntimeAdapter
     imageCapabilityConfiguration: active => this.recovery.imageCapabilityConfiguration(active),
     syncImageInputCapability: sessionIds => this.recovery.syncImageInputCapability(sessionIds),
     createSessionMemoryCompletion: active => this.sessionMemory.createCompletion(active),
-    requestSummaryReminder: (sessionId, active) => this.requestSummaryReminder(sessionId, active),
     recordSummaryOmission: (sessionId, active) => this.recordSummaryOmission(sessionId, active),
   });
 
@@ -264,14 +260,6 @@ export class PiRuntimeAdapter
     return continuePiRuntimeSession(this, sessionId, prompt, options);
   }
 
-  async requestSummaryReminder(sessionId: string, active: ActivePiSession): Promise<void> {
-    this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
-      activation: HarnessActivationType.SummaryGateReminder,
-      mechanism: 'session_checkpoint',
-    });
-    await this.continueSession(sessionId, SUMMARY_REMINDER_PROMPT);
-  }
-
   async recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void> {
     const goal =
       this.store
@@ -288,6 +276,8 @@ export class PiRuntimeAdapter
     await recordCheckpointFallback(this.projectMemoryService, {
       sessionId,
       workingDirectory: active.workspaceRoot,
+      runId: active.workbenchRunId ?? null,
+      turnId: active.lastCompletedAnswerMessageId,
       goal,
       finalAnswer: active.lastCompletedAnswerText,
       verificationStatus: active.turnFailed ? 'failed' : 'unverified',

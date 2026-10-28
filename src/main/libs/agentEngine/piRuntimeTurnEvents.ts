@@ -70,7 +70,6 @@ export interface PiRuntimeTurnHost {
   imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration;
   syncImageInputCapability(sessionIds?: Iterable<string>): Promise<void>;
   createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion;
-  requestSummaryReminder(sessionId: string, active: ActivePiSession): Promise<void>;
   recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void>;
 }
 
@@ -858,14 +857,9 @@ export class PiRuntimeTurnEvents {
             hasRecordedFiles: active.artifactRecorder?.hasRecordedFiles() === true,
             checkpointWritten: active.summaryCheckpointWritten === true,
             checkpointSkipped: active.summaryCheckpointSkipped !== undefined,
-            reminderIssued: active.summaryReminderIssued === true,
           });
-          if (obligation === 'remind') {
-            active.summaryReminderIssued = true;
-            void this.host.requestSummaryReminder(sessionId, active);
-            return;
-          }
           if (obligation === 'fallback') {
+            // Omissions never start another model turn.
             void this.host.recordSummaryOmission(sessionId, active);
           }
         }

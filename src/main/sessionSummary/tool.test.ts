@@ -25,8 +25,13 @@ test('session_summary writes an agent-authored checkpoint with host identity', a
   });
   expect(result.details.status).toBe('written');
   expect(saved).toHaveLength(1);
-  const input = saved[0] as { summary: string; metadata: Record<string, unknown> };
+  const input = saved[0] as {
+    summary: string;
+    linkId: string;
+    metadata: Record<string, unknown>;
+  };
   expect(input.summary).toContain('## Goal\n生成 hello.html');
+  expect(input.linkId).toBe('session-1:turn-1');
   expect(input.summary).toContain('/work/hello.html — deliverable');
   expect(input.metadata.format).toBe('agent-checkpoint');
   expect(input.metadata.runId).toBe('run-1');

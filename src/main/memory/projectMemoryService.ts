@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 
 import {
-  MemoryKind,
   MemoryLifecycleStatus,
   MemoryScope,
   MemorySensitivity,
@@ -36,6 +35,7 @@ import { processMemoryOutboxItem } from './memoryOutboxProcessor';
 import type { ProjectIdentity } from './projectIdentity';
 import type { MemoryMigrationRecord, MemoryOutboxItem } from './repository';
 import { MemoryRepository } from './repository';
+import type { SessionCheckpointReceipt } from './sessionCheckpointRepository';
 import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
 import { redactPrivateBlocks } from './zhiyuanEngramAdapter';
 
@@ -440,41 +440,22 @@ export class ProjectMemoryService {
     workingDirectory: string;
     summary: string;
     metadata?: Record<string, unknown>;
-    linkId?: string;
-  }): Promise<number | null> {
+    linkId: string;
+  }): Promise<SessionCheckpointReceipt> {
     const project = this.resolveIdentity(input.workingDirectory);
-    const topicKey = `session/${input.sessionId}`;
-    const active = this.repository.findActiveTopic(project.id, MemoryScope.Session, topicKey);
-    if (active?.content === input.summary) return active.memoryId;
-    const linkId = input.linkId ?? randomUUID();
-    const existing = input.linkId ? this.repository.getLink(input.linkId) : null;
-    if (existing) return existing.memoryId;
-    const pending = input.linkId
-      ? this.repository.findPendingByLinkId(input.linkId, MemoryOutboxOperation.SessionSummary)
-      : null;
-    if (pending) return await this.processOutboxItem(pending);
-    const checkpointSequence = this.repository.maxSessionCheckpointSequence(input.sessionId) + 1;
-    const outboxId = this.repository.enqueue(
-      MemoryOutboxOperation.SessionSummary,
-      {
-        sessionId: input.sessionId,
-        projectId: project.id,
-        projectRoot: project.root,
-        type: MemoryKind.SessionSummary,
-        title: 'Session summary',
-        content: input.summary,
-        topicKey,
-        sourceKind: MemorySourceKind.SessionSummary,
-        scope: MemoryScope.Session,
-        linkId,
-        metadata: { ...input.metadata, checkpointSequence },
-        expiresAt: new Date(
-          Date.now() + SESSION_SUMMARY_TTL_DAYS * 24 * 60 * 60 * 1_000,
-        ).toISOString(),
-      },
-      linkId,
-    );
-    return await this.processOutboxItem(this.findPending(outboxId));
+    const receipt = this.repository.saveSessionCheckpoint({
+      id: input.linkId,
+      sessionId: input.sessionId,
+      projectId: project.id,
+      projectRoot: project.root,
+      summary: input.summary,
+      metadata: input.metadata,
+      expiresAt: new Date(
+        Date.now() + SESSION_SUMMARY_TTL_DAYS * 24 * 60 * 60 * 1_000,
+      ).toISOString(),
+    });
+    this.scheduleOutboxDrain();
+    return receipt;
   }
 
   getActiveSessionSummary(input: {
@@ -482,6 +463,8 @@ export class ProjectMemoryService {
     workingDirectory: string;
   }): ActiveSessionSummary | null {
     const project = this.resolveIdentity(input.workingDirectory);
+    const local = this.repository.getLatestSessionCheckpoint(input.sessionId, project.id);
+    if (local) return { content: local.content, metadata: local.metadata };
     const active = this.repository.findActiveTopic(
       project.id,
       MemoryScope.Session,
@@ -578,6 +561,21 @@ export class ProjectMemoryService {
     return (await this.processOutboxItem(this.findPending(outboxId))) !== null;
   }
 
+  private outboxDrain: Promise<void> | null = null;
+
+  private scheduleOutboxDrain(): void {
+    if (this.outboxDrain) return;
+    this.outboxDrain = this.drainOutbox()
+      .then((): void => {})
+      .catch(error => {
+        console.warn('[ProjectMemory] Failed to drain pending operations:', error);
+      })
+      .finally(() => {
+        this.outboxDrain = null;
+        if (this.repository.listPending(1).length > 0) this.scheduleOutboxDrain();
+      });
+  }
+
   async drainOutbox(limit = 20): Promise<number> {
     let completed = 0;
     for (const item of this.repository.listPending(limit)) {
@@ -643,8 +641,14 @@ export class ProjectMemoryService {
     return validateMemoryCandidateRelationships(this.repository, candidate, details);
   }
 
+  private outboxItemQueue: Promise<unknown> = Promise.resolve();
+
   private async processOutboxItem(item: MemoryOutboxItem | null): Promise<number | null> {
-    return await processMemoryOutboxItem(this.repository, this.adapter, item);
+    const delivery = this.outboxItemQueue.then(() =>
+      processMemoryOutboxItem(this.repository, this.adapter, item),
+    );
+    this.outboxItemQueue = delivery.catch((): void => {});
+    return await delivery;
   }
 }
 
