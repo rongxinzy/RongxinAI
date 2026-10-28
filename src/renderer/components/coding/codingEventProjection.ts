@@ -295,6 +295,7 @@ export const projectSortedCodingEvents = (
   const bounds: number[] = [];
   let currentTurn: CodingConversationTurn | null = null;
 
+  const getCurrentTurn = (): CodingConversationTurn | null => currentTurn;
   const pushTurn = (turn: CodingConversationTurn, index: number) => {
     turns.push(turn);
     bounds.push(index);
@@ -318,12 +319,14 @@ export const projectSortedCodingEvents = (
       if (!content) continue;
       const role = getMessageRole(event);
       if (role === CodingConversationRole.User) {
+        const openTurn = getCurrentTurn();
         if (
-          currentTurn?.userMessage &&
-          currentTurn.userMessage.content === content &&
-          currentTurn.assistantMessages.length === 0 &&
-          currentTurn.activities.length === 0 &&
-          currentTurn.reasoning === null
+          openTurn !== null &&
+          openTurn.userMessage !== null &&
+          openTurn.userMessage.content === content &&
+          openTurn.assistantMessages.length === 0 &&
+          openTurn.activities.length === 0 &&
+          openTurn.reasoning === null
         ) {
           continue;
         }
