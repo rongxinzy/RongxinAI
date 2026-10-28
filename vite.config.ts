@@ -199,6 +199,25 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
+                // Native Win32 window hooks must stay off Electron's browser process.
+                entry: 'src/main/desktopPetWindowsEntry.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                    rolldownOptions: {
+                      external:
+                        command === 'serve'
+                          ? isElectronDevelopmentExternal
+                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                    },
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // The local inference daemon is launched as an independent Node process.
                 entry: 'src/main/llamacppModelDaemonEntry.ts',
                 vite: {

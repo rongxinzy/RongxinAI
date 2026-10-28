@@ -4,10 +4,14 @@ import {
   DESKTOP_PET_DRAG_THRESHOLD,
   DESKTOP_PET_SIZE,
   DesktopPetEffectKind,
+  DesktopPetPlayableAction,
 } from '../../shared/desktopPet/constants';
 import { DESKTOP_PET_CANVAS_TOP, DESKTOP_PET_WINDOW_HEIGHT } from '../../shared/desktopPet/layout';
+import { PetOrientation } from '../../shared/desktopPet/surfaces/constants';
+import { WindowSurfaceWalker } from '../../shared/desktopPet/surfaces/walker';
+import type { WindowSurfaceSnapshot } from '../../shared/desktopPet/surfaces/types';
+import type { DesktopPetEffect, DesktopPetPose } from '../../shared/desktopPet/types';
 import { DesktopPetRoam } from './roam';
-import type { DesktopPetEffect } from '../../shared/desktopPet/types';
 import {
   estimateReleaseVelocity,
   impactStrength,
@@ -49,13 +53,24 @@ export class DesktopPetMotion {
   private roamingEnabled = true;
   private allowRoam = false;
   private readonly roam = new DesktopPetRoam();
-  private lastPose: { facing: number; walking: boolean } = { facing: 1, walking: false };
+  private readonly surfaces = new WindowSurfaceWalker();
+  private hopping = false;
+  private paused = false;
+  private droppedSupport = false;
+  private supported = false;
+  private lastPose: DesktopPetPose = {
+    facing: 1,
+    walking: false,
+    orientation: PetOrientation.Upright,
+  };
 
   constructor(
     private readonly window: BrowserWindow,
     private readonly settled: () => void,
     private readonly effect: (effect: DesktopPetEffect) => void = () => {},
-    private readonly pose: (pose: { facing: number; walking: boolean }) => void = () => {},
+    private readonly pose: (pose: DesktopPetPose) => void = () => {},
+    /** Lifted only while the pet stands on another window, never permanently on top. */
+    private readonly support: (active: boolean) => void = () => {},
   ) {
     window.setIgnoreMouseEvents(true);
     this.tick();
@@ -65,18 +80,26 @@ export class DesktopPetMotion {
     this.mask = new Uint8Array(mask);
   }
 
+  setWindowSnapshot(snapshot: WindowSurfaceSnapshot | null): void {
+    this.surfaces.setSnapshot(snapshot, performance.now());
+    if (snapshot && !this.paused && !this.reducedMotion && this.surfaces.active) this.restart();
+  }
+
   setReducedMotion(value: boolean): void {
     this.reducedMotion = value;
     if (value && this.flying) {
       this.flying = undefined;
       this.settled();
     }
-    if (value) this.rest();
+    if (value) {
+      this.surfaces.reset(performance.now());
+      this.rest();
+    }
   }
 
   setRoamingEnabled(value: boolean): void {
     this.roamingEnabled = value;
-    if (!value) this.rest();
+    if (!value) this.releaseSupport();
   }
 
   setAllowRoam(value: boolean): void {
@@ -85,20 +108,55 @@ export class DesktopPetMotion {
   }
 
   rest(): void {
-    this.roam.reset(performance.now());
-    this.publishPose({ facing: this.lastPose.facing, walking: false });
+    const now = performance.now();
+    this.roam.reset(now);
+    this.surfaces.rest(now);
+    this.publishPose({
+      facing: this.lastPose.facing,
+      walking: false,
+      orientation: this.surfaces.currentOrientation,
+    });
   }
 
-  private publishPose(next: { facing: number; walking: boolean }): void {
-    if (next.facing === this.lastPose.facing && next.walking === this.lastPose.walking) return;
-    this.lastPose = next;
-    this.pose(next);
+  private publishPose(next: DesktopPetPose): void {
+    if (
+      next.facing === this.lastPose.facing &&
+      next.walking === this.lastPose.walking &&
+      next.orientation === this.lastPose.orientation
+    )
+      return;
+    this.lastPose = {
+      facing: next.facing,
+      walking: next.walking,
+      orientation: next.orientation,
+    };
+    this.pose(this.lastPose);
+  }
+
+  /** Roaming off means the pet belongs on the desktop, not on someone else's window. */
+  private releaseSupport(): void {
+    if (!this.surfaces.active || this.window.isDestroyed()) {
+      this.rest();
+      return;
+    }
+    const [x, y] = this.window.getPosition();
+    const now = performance.now();
+    this.surfaces.startDrop({ x, y }, now);
+    this.hopping = false;
+    this.restart();
   }
 
   begin(): void {
+    this.droppedSupport = false;
     this.flying = undefined;
-    this.roam.reset(performance.now());
-    this.publishPose({ facing: this.roam.facingDirection, walking: false });
+    const now = performance.now();
+    this.roam.reset(now);
+    this.surfaces.rest(now);
+    this.publishPose({
+      facing: this.roam.facingDirection,
+      walking: false,
+      orientation: this.surfaces.currentOrientation,
+    });
     const cursor = screen.getCursorScreenPoint();
     const [x, y] = this.window.getPosition();
     this.dragging = {
@@ -113,19 +171,15 @@ export class DesktopPetMotion {
 
   end(cancelled = false): boolean {
     if (!this.dragging) return false;
+    const now = performance.now();
     const cursor = screen.getCursorScreenPoint();
-    if (!cancelled) {
-      const [x, y] = this.window.getPosition();
-      this.moveDrag(cursor, { x, y });
-    }
+    if (!cancelled) this.moveDrag(cursor, now);
     const clicked = !cancelled && !this.dragging.moved;
-    this.sample(cursor, performance.now());
+    this.sample(cursor, now);
     this.dragging = undefined;
     this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
     const velocity =
-      this.reducedMotion || clicked || cancelled
-        ? null
-        : estimateReleaseVelocity(this.trail, performance.now());
+      this.reducedMotion || clicked || cancelled ? null : estimateReleaseVelocity(this.trail, now);
     if (velocity) {
       const [x, y] = this.window.getPosition();
       this.flying = { x, y, ...velocity };
@@ -137,6 +191,9 @@ export class DesktopPetMotion {
   }
 
   reset(): void {
+    this.droppedSupport = false;
+    this.surfaces.reset(performance.now());
+    this.rest();
     this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
     this.dragging = undefined;
     this.flying = undefined;
@@ -149,6 +206,9 @@ export class DesktopPetMotion {
   }
 
   ensureVisible(): void {
+    this.droppedSupport = false;
+    this.surfaces.reset(performance.now());
+    this.rest();
     this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
     this.dragging = undefined;
     this.flying = undefined;
@@ -160,10 +220,23 @@ export class DesktopPetMotion {
   }
 
   dispose(): void {
+    this.setSupport(false);
     clearTimeout(this.timer);
   }
 
+  private setSupport(active: boolean): void {
+    if (active === this.supported) return;
+    this.supported = active;
+    this.support(active);
+  }
+
   pause(): void {
+    this.paused = true;
+    this.droppedSupport ||= this.surfaces.active;
+    this.surfaces.reset(performance.now());
+    this.hopping = false;
+    this.setSupport(false);
+    this.rest();
     this.dragging = undefined;
     this.flying = undefined;
     this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
@@ -174,6 +247,12 @@ export class DesktopPetMotion {
   }
 
   resume(): void {
+    this.paused = false;
+    if (this.droppedSupport && !this.reducedMotion && !this.window.isDestroyed()) {
+      const [x, y] = this.window.getPosition();
+      this.surfaces.startDrop({ x, y }, performance.now());
+      this.droppedSupport = false;
+    }
     this.restart();
   }
 
@@ -191,13 +270,21 @@ export class DesktopPetMotion {
     }
   }
 
-  private moveDrag(cursor: Electron.Point, current: Electron.Point): Electron.Point {
+  private moveDrag(cursor: Electron.Point, now: number): void {
     const drag = this.dragging;
-    if (!drag) return current;
+    if (!drag) return;
+    this.sample(cursor, now);
     if (!drag.moved) {
       if (Math.hypot(cursor.x - drag.start.x, cursor.y - drag.start.y) < DESKTOP_PET_DRAG_THRESHOLD)
-        return current;
+        return;
       drag.moved = true;
+      this.surfaces.reset(now);
+      this.hopping = false;
+      this.publishPose({
+        facing: this.lastPose.facing,
+        walking: false,
+        orientation: PetOrientation.Upright,
+      });
       this.effect({ kind: DesktopPetEffectKind.Drag, active: true });
     }
     const area = screen.getDisplayNearestPoint(cursor).workArea;
@@ -205,8 +292,7 @@ export class DesktopPetMotion {
       { x: cursor.x - drag.offset.x, y: cursor.y - drag.offset.y },
       petBounds(area),
     );
-    if (point.x !== current.x || point.y !== current.y) this.window.setPosition(point.x, point.y);
-    return point;
+    this.window.setPosition(point.x, point.y);
   }
 
   private tick = (): void => {
@@ -216,8 +302,9 @@ export class DesktopPetMotion {
     const [x, y] = this.window.getPosition();
     let position = { x, y };
     if (this.dragging) {
-      this.sample(cursor, now);
-      position = this.moveDrag(cursor, position);
+      this.moveDrag(cursor, now);
+      const [draggedX, draggedY] = this.window.getPosition();
+      position = { x: draggedX, y: draggedY };
       if (now - this.dragging.at > 60_000) {
         this.dragging = undefined;
         this.effect({ kind: DesktopPetEffectKind.Drag, active: false });
@@ -248,25 +335,53 @@ export class DesktopPetMotion {
       position = nextPosition;
       this.flying = next.atRest ? undefined : next;
       if (next.atRest) this.settled();
-    } else if (!this.reducedMotion && this.roamingEnabled && this.allowRoam) {
-      const area = screen.getDisplayMatching({
-        ...position,
-        width: DESKTOP_PET_SIZE,
-        height: DESKTOP_PET_WINDOW_HEIGHT,
-      }).workArea;
-      const bounds = petBounds(area);
-      const elapsedMs = Math.min(100, Math.max(0, now - this.lastTime));
-      const moved = this.roam.tick(now, position, bounds, true, elapsedMs);
-      if (moved) {
-        const nextPosition = { x: Math.round(moved.x), y: Math.round(moved.y) };
+    } else if (!this.reducedMotion) {
+      const display = screen.getDisplayMatching(this.window.getBounds());
+      const surface = this.surfaces.tick(
+        now,
+        position,
+        String(display.id),
+        display.workArea,
+        this.roamingEnabled && this.allowRoam,
+      );
+      if (surface) {
+        const nextPosition = clampPetPosition(surface, petBounds(display.workArea));
         if (nextPosition.x !== position.x || nextPosition.y !== position.y)
           this.window.setPosition(nextPosition.x, nextPosition.y);
         position = nextPosition;
-        this.publishPose({ facing: moved.facing, walking: moved.walking });
-      } else {
-        this.publishPose({ facing: this.roam.facingDirection, walking: false });
+        this.publishPose(surface);
+        if (surface.hopping && !this.hopping)
+          this.effect({
+            kind: DesktopPetEffectKind.Action,
+            action: DesktopPetPlayableAction.Flutter,
+          });
+        if (surface.landed) this.effect({ kind: DesktopPetEffectKind.Impact, strength: 0.25 });
+        this.hopping = Boolean(surface.hopping);
+      } else if (this.roamingEnabled && this.allowRoam) {
+        this.hopping = false;
+        const bounds = petBounds(display.workArea);
+        const elapsedMs = Math.min(100, Math.max(0, now - this.lastTime));
+        const moved = this.roam.tick(now, position, bounds, true, elapsedMs);
+        if (moved) {
+          const nextPosition = { x: Math.round(moved.x), y: Math.round(moved.y) };
+          if (nextPosition.x !== position.x || nextPosition.y !== position.y)
+            this.window.setPosition(nextPosition.x, nextPosition.y);
+          position = nextPosition;
+          this.publishPose({
+            facing: moved.facing,
+            walking: moved.walking,
+            orientation: PetOrientation.Upright,
+          });
+        } else {
+          this.publishPose({
+            facing: this.roam.facingDirection,
+            walking: false,
+            orientation: PetOrientation.Upright,
+          });
+        }
       }
     }
+    this.setSupport(this.surfaces.active);
     this.lastTime = now;
     const localX = Math.floor(cursor.x - position.x);
     const localY = Math.floor(cursor.y - position.y - DESKTOP_PET_CANVAS_TOP);
@@ -281,7 +396,10 @@ export class DesktopPetMotion {
       this.window.setIgnoreMouseEvents(ignore);
       this.ignoring = ignore;
     }
-    const interval = this.dragging || this.flying || this.roam.isWalking() ? 1000 / 60 : 80;
+    const interval =
+      this.dragging || this.flying || this.roam.isWalking() || this.surfaces.moving
+        ? 1000 / 60
+        : 80;
     this.timer = setTimeout(this.tick, Math.max(1, interval - (performance.now() - now)));
   };
 }
