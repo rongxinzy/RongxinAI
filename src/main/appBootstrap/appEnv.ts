@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 
 import { app, protocol } from 'electron';
@@ -6,7 +7,8 @@ import {
   APP_NAME,
   APP_USER_MODEL_ID,
   ENTERPRISE_APP_NAME,
-  resolveAppDataDirName,
+  SHARED_DEV_USER_DATA_ENV,
+  resolveUserDataDirName,
 } from '../appConstants';
 import { isEnterpriseBuild } from '../enterpriseExtension/host';
 import { ZHIYUAN_ENTERPRISE_RENDERER_PROTOCOL_PRIVILEGES } from '../enterpriseExtension/rendererProtocol';
@@ -77,12 +79,30 @@ export const configureUserDataPath = (): void => {
   }
 
   const appDataPath = app.getPath('appData');
-  const targetUserDataPath = path.join(appDataPath, resolveAppDataDirName(isEnterprise));
+  const sharedDevData = process.env[SHARED_DEV_USER_DATA_ENV] === '1';
+  const targetUserDataPath = path.join(
+    appDataPath,
+    resolveUserDataDirName({
+      isEnterprise,
+      isPackaged: app.isPackaged,
+      sharedDevData,
+    }),
+  );
   const currentUserDataPath = app.getPath('userData');
 
   if (currentUserDataPath !== targetUserDataPath) {
+    // app.setPath requires the target directory to exist; the isolated dev
+    // profile is created on its first launch.
+    if (!fs.existsSync(targetUserDataPath)) {
+      fs.mkdirSync(targetUserDataPath, { recursive: true });
+    }
     app.setPath('userData', targetUserDataPath);
     console.log(`[Main] userData path updated: ${currentUserDataPath} -> ${targetUserDataPath}`);
+    if (!app.isPackaged && !sharedDevData) {
+      console.log(
+        `[Main] development builds use an isolated profile; set ${SHARED_DEV_USER_DATA_ENV}=1 to share the installed profile.`,
+      );
+    }
   }
 };
 

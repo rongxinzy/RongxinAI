@@ -116,7 +116,7 @@ bun install
 bun run web:preview
 ```
 
-Open the Vite URL in a browser to iterate on the renderer with hot reload, without starting Electron. To verify real desktop and IPC flows, run `bun run electron:dev`; it prepares the channel and memory runtimes, then starts Vite and Electron. Initial runtime preparation requires network access. To use local inference, download the inference runtime for your host separately:
+Open the Vite URL in a browser to iterate on the renderer with hot reload, without starting Electron. To verify real desktop and IPC flows, run `bun run electron:dev`; it prepares the channel and memory runtimes, then starts Vite and Electron. Initial runtime preparation requires network access. Development runs use an isolated `ZhiYuanAgentDev` (enterprise: `ZhiYuanAgentEnterpriseDev`) profile so a running dev instance never holds the installed build's single-instance lock; set `ZHIYUAN_DEV_SHARED_USER_DATA=1` to reuse the installed profile instead (the two builds then exclude each other). To use local inference, download the inference runtime for your host separately:
 
 ```bash
 bun run llamacpp:runtime:download

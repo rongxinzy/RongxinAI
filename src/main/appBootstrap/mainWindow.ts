@@ -269,6 +269,15 @@ export const createMainWindow = (): void => {
         lifecycleRuntime.windowStateSaveTimer = null;
       }
       lifecycleRuntime.mainWindow = null;
+      // Hidden companion/pet/tray surfaces keep the event loop alive, so a
+      // destroyed main window used to leave a windowless process holding the
+      // single-instance lock. Nothing can surface that state; quit instead.
+      if (!lifecycleRuntime.isQuitting) {
+        console.warn(
+          '[MainWindow] Main window closed outside a quit; exiting to release the single-instance lock.',
+        );
+        app.quit();
+      }
     });
 
     const forwardWindowState = () => emitWindowState();
@@ -323,11 +332,9 @@ export const createMainWindow = (): void => {
       const initLang = getStore().get<{ language?: string }>('app_config')?.language;
       setLanguage(initLang === 'en' ? 'en' : 'zh');
       // 窗口就绪后创建系统托盘
-      createTray(() => lifecycleRuntime.mainWindow);
-      initializeDesktopPet(
-        getStore(),
-        () => lifecycleRuntime.mainWindow,
-        () => updateTrayMenu(() => lifecycleRuntime.mainWindow),
+      createTray(focusOrCreateMainWindow);
+      initializeDesktopPet(getStore(), focusOrCreateMainWindow, () =>
+        updateTrayMenu(focusOrCreateMainWindow),
       );
       initializeCompanionWindow({
         store: getStore(),
@@ -365,4 +372,29 @@ export const createMainWindow = (): void => {
   };
 
   createWindow();
+};
+
+/**
+ * Focus the existing main window, or recreate it once startup has finished.
+ *
+ * A destroyed main window used to leave only hidden companion/pet windows and
+ * the tray alive, so second-instance and tray activation silently did nothing.
+ * Recreating after bootstrap restores a reachable window; before bootstrap the
+ * pending initApp will create it anyway, and during quit we must not reopen it.
+ */
+export const focusOrCreateMainWindow = (): BrowserWindow | null => {
+  const current = lifecycleRuntime.mainWindow;
+  if (current && !current.isDestroyed()) {
+    if (current.isMinimized()) current.restore();
+    if (!current.isVisible()) current.show();
+    if (!current.isFocused()) current.focus();
+    return current;
+  }
+  if (current?.isDestroyed()) lifecycleRuntime.mainWindow = null;
+
+  if (lifecycleRuntime.isQuitting || !lifecycleRuntime.bootstrapComplete) return null;
+
+  createMainWindow();
+  const created = lifecycleRuntime.mainWindow;
+  return created && !created.isDestroyed() ? created : null;
 };

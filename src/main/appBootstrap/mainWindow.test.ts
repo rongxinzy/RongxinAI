@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => {
     openDevToolsWindow: vi.fn(),
     toggleDevToolsForSender: vi.fn(),
     isAutoLaunched: vi.fn(() => false),
+    appQuit: vi.fn(),
     registerContextMenu: vi.fn(() => unregisterContextMenu),
     shellOpenExternal: vi.fn(),
   };
@@ -94,7 +95,7 @@ vi.mock('electron', () => {
     }
   }
   return {
-    app: { getName: () => 'ZhiYuan Agent', getVersion: () => '0.0.0' },
+    app: { getName: () => 'ZhiYuan Agent', getVersion: () => '0.0.0', quit: mocks.appQuit },
     nativeImage: { createFromPath: () => ({}) },
     shell: { openExternal: mocks.shellOpenExternal },
     BrowserWindow: MockBrowserWindow,
@@ -158,7 +159,7 @@ vi.mock('../../scheduledTask/sqliteScheduledTaskStore', () => ({
 
 import { BrowserWindow } from 'electron';
 
-import { createMainWindow } from './mainWindow';
+import { createMainWindow, focusOrCreateMainWindow } from './mainWindow';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
 
 const mockWindowClass = BrowserWindow as unknown as {
@@ -174,6 +175,8 @@ const currentWindow = (): MockWindow => {
 beforeEach(() => {
   mockWindowClass.instances = [];
   lifecycleRuntime.mainWindow = null;
+  lifecycleRuntime.isQuitting = false;
+  lifecycleRuntime.bootstrapComplete = false;
   mocks.unregisterContextMenu.mockClear();
   vi.clearAllMocks();
 });
@@ -186,7 +189,10 @@ describe('createMainWindow', () => {
     const window = currentWindow();
     expect(lifecycleRuntime.mainWindow).toBe(window);
     expect(window.loadFile).toHaveBeenCalledTimes(1);
-    expect(window.loadFile.mock.calls[0][0]).toContain('dist/index.html');
+    // loadFile receives a native path; Windows uses backslashes.
+    expect(String(window.loadFile.mock.calls[0][0]).replaceAll('\\', '/')).toContain(
+      'dist/index.html',
+    );
     expect(window.setMinimumSize).toHaveBeenCalledWith(1024, 740);
     window.emitWebContents('did-finish-load');
   });
@@ -235,7 +241,7 @@ describe('createMainWindow', () => {
     window.emitWebContents('did-finish-load');
   });
 
-  test('drops the window reference and context menu when the window closes', () => {
+  test('quits when the main window closes outside a quit', () => {
     createMainWindow();
     const window = currentWindow();
 
@@ -243,6 +249,57 @@ describe('createMainWindow', () => {
 
     expect(lifecycleRuntime.mainWindow).toBeNull();
     expect(mocks.unregisterContextMenu).toHaveBeenCalled();
+    expect(mocks.appQuit).toHaveBeenCalledTimes(1);
     window.emitWebContents('did-finish-load');
+  });
+
+  test('does not quit again while a quit is already in progress', () => {
+    createMainWindow();
+    const window = currentWindow();
+    lifecycleRuntime.isQuitting = true;
+
+    window.emit('closed');
+
+    expect(lifecycleRuntime.mainWindow).toBeNull();
+    expect(mocks.appQuit).not.toHaveBeenCalled();
+  });
+});
+
+describe('focusOrCreateMainWindow', () => {
+  test('focuses an existing window without creating another', () => {
+    lifecycleRuntime.bootstrapComplete = true;
+    createMainWindow();
+    const window = currentWindow();
+    window.isVisible.mockImplementation(() => false);
+    window.isFocused.mockImplementation(() => false);
+
+    expect(focusOrCreateMainWindow()).toBe(window);
+    expect(mockWindowClass.instances).toHaveLength(1);
+    expect(window.show).toHaveBeenCalled();
+    expect(window.focus).toHaveBeenCalled();
+    window.emitWebContents('did-finish-load');
+  });
+
+  test('recreates the main window after bootstrap when it is gone', () => {
+    lifecycleRuntime.bootstrapComplete = true;
+
+    const created = focusOrCreateMainWindow();
+
+    expect(created).toBe(currentWindow());
+    expect(mockWindowClass.instances).toHaveLength(1);
+    expect(lifecycleRuntime.mainWindow).toBe(currentWindow());
+  });
+
+  test('does not recreate a window while bootstrap is incomplete', () => {
+    expect(focusOrCreateMainWindow()).toBeNull();
+    expect(mockWindowClass.instances).toHaveLength(0);
+  });
+
+  test('does not recreate a window while quitting', () => {
+    lifecycleRuntime.bootstrapComplete = true;
+    lifecycleRuntime.isQuitting = true;
+
+    expect(focusOrCreateMainWindow()).toBeNull();
+    expect(mockWindowClass.instances).toHaveLength(0);
   });
 });

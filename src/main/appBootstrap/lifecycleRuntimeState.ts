@@ -12,6 +12,8 @@ import type { AppUpdateCoordinator } from '../libs/appUpdateCoordinator';
 export interface LifecycleRuntimeState {
   mainWindow: BrowserWindow | null;
   isQuitting: boolean;
+  /** True once initApp finished wiring startup; guards late window recreation. */
+  bootstrapComplete: boolean;
   lastReloadAt: number;
   windowStateSaveTimer: ReturnType<typeof setTimeout> | null;
   preventSleepBlockerId: number | null;
@@ -23,6 +25,7 @@ export interface LifecycleRuntimeState {
 export const lifecycleRuntime: LifecycleRuntimeState = {
   mainWindow: null,
   isQuitting: false,
+  bootstrapComplete: false,
   lastReloadAt: 0,
   windowStateSaveTimer: null,
   preventSleepBlockerId: null,
