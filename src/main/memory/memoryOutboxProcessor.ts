@@ -52,12 +52,11 @@ export async function processMemoryOutboxItem(
       item.operation === MemoryOutboxOperation.Supersede && payload.supersededObservationId
         ? await adapter.supersede({
             observationId: payload.supersededObservationId,
-            replacementCandidateId: candidate.id,
+            candidate,
             workingDirectory: payload.projectRoot,
           })
-        : await adapter.confirmMemory(candidate.id, payload.projectRoot);
+        : await adapter.confirmMemory(candidate, payload.projectRoot);
     if (memoryId === null) {
-      adapter.discardCandidate(candidate.id);
       repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
       return null;
     }

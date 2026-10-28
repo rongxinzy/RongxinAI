@@ -48,7 +48,7 @@ test('confirmMemory recovers a committed result via save-result after a timeout'
     content: 'content',
   });
 
-  await expect(adapter.confirmMemory(candidate.id, '/workspace/project-a')).resolves.toBe(17);
+  await expect(adapter.confirmMemory(candidate, '/workspace/project-a')).resolves.toBe(17);
   expect(calls.some(call => call.pathname === '/observations/save-result')).toBe(true);
   expect(calls.find(call => call.pathname === '/observations')?.operationId).toBe(candidate.id);
 });
@@ -68,7 +68,7 @@ test('confirmMemory does not recover on non-timeout errors', async () => {
     content: 'content',
   });
 
-  await expect(adapter.confirmMemory(candidate.id, '/workspace/project-a')).rejects.toThrow(
+  await expect(adapter.confirmMemory(candidate, '/workspace/project-a')).rejects.toThrow(
     'HTTP 400',
   );
 });

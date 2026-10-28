@@ -457,7 +457,6 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
   const adapter = {
     saveCandidate: vi.fn(input => ({ id: 'candidate-1', ...input })),
     confirmMemory: vi.fn(async () => null),
-    discardCandidate: vi.fn(),
   };
   const service = new ProjectMemoryService(
     repository as never,
@@ -479,7 +478,6 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
     attempts: 1,
     lastError: 'Memory runtime unavailable.',
   });
-  expect(adapter.discardCandidate).toHaveBeenCalledWith('candidate-1');
   expect(repository.links).toHaveLength(0);
 });
 

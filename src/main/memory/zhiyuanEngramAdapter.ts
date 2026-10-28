@@ -36,7 +36,6 @@ export class EngramRequestError extends Error {
 }
 
 export class ZhiYuanEngramAdapter {
-  private readonly candidates = new Map<string, MemoryCandidate>();
   private readonly registeredSessions = new Set<string>();
 
   constructor(private readonly manager: EngramManager) {}
@@ -84,24 +83,19 @@ export class ZhiYuanEngramAdapter {
   }
 
   saveCandidate(input: CandidateInput): MemoryCandidate {
-    const candidate: MemoryCandidate = {
+    return {
       id: randomUUID(),
       ...input,
       title: redactPrivateBlocks(input.title),
       content: redactPrivateBlocks(input.content),
       createdAt: new Date().toISOString(),
     };
-    this.candidates.set(candidate.id, candidate);
-    return candidate;
   }
 
-  discardCandidate(candidateId: string): void {
-    this.candidates.delete(candidateId);
-  }
-
-  async confirmMemory(candidateId: string, workingDirectory: string): Promise<number | null> {
-    const candidate = this.candidates.get(candidateId);
-    if (!candidate) throw new Error('Memory candidate not found.');
+  async confirmMemory(
+    candidate: MemoryCandidate,
+    workingDirectory: string,
+  ): Promise<number | null> {
     const connection = await this.getConnection();
     if (!connection) return null;
     await this.ensureSession(connection, candidate.sessionId, candidate.project, workingDirectory);
@@ -119,17 +113,13 @@ export class ZhiYuanEngramAdapter {
           operation_id: candidate.id,
         }),
       });
-      this.candidates.delete(candidateId);
       return saved.id;
     } catch (error) {
       if (!isTimeoutError(error)) throw error;
-      // The write may have committed before the response was lost: recover the
-      // committed result by operation id instead of re-posting the payload.
       const recovered = await this.request<{ id: number; status: string }>(
         connection,
         `/observations/save-result?operation_id=${encodeURIComponent(candidate.id)}`,
       );
-      this.candidates.delete(candidateId);
       return recovered.id;
     }
   }
@@ -187,19 +177,15 @@ export class ZhiYuanEngramAdapter {
 
   async supersede(input: {
     observationId: number;
-    replacementCandidateId: string;
+    candidate: MemoryCandidate;
     workingDirectory: string;
   }): Promise<number | null> {
-    const project = this.candidates.get(input.replacementCandidateId)?.project;
-    const replacementId = await this.confirmMemory(
-      input.replacementCandidateId,
-      input.workingDirectory,
-    );
+    const replacementId = await this.confirmMemory(input.candidate, input.workingDirectory);
     if (replacementId === null) return null;
     // Same-topic upserts update in place and return the original id: deleting
     // it would erase the content we just wrote.
     if (replacementId === input.observationId) return replacementId;
-    await this.forget(input.observationId, false, project);
+    await this.forget(input.observationId, false, input.candidate.project);
     return replacementId;
   }
 
@@ -216,24 +202,6 @@ export class ZhiYuanEngramAdapter {
       method: 'DELETE',
     });
     return true;
-  }
-
-  async sessionSummary(input: {
-    sessionId: string;
-    project: string;
-    workingDirectory: string;
-    summary: string;
-  }): Promise<number | null> {
-    const candidate = this.saveCandidate({
-      sessionId: input.sessionId,
-      project: input.project,
-      scope: EngramMemoryScope.Session,
-      type: EngramObservationType.SessionSummary,
-      title: 'Session summary',
-      content: input.summary,
-      topicKey: `session/${input.sessionId}`,
-    });
-    return await this.confirmMemory(candidate.id, input.workingDirectory);
   }
 
   private async getConnection(): Promise<EngramConnection | null> {

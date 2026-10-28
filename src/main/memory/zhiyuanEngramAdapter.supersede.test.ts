@@ -57,7 +57,7 @@ test('supersede does not delete when the replacement reuses the original id', as
   await expect(
     adapter.supersede({
       observationId: 5,
-      replacementCandidateId: candidate.id,
+      candidate,
       workingDirectory: '/workspace/project-a',
     }),
   ).resolves.toBe(5);
@@ -89,7 +89,7 @@ test('supersede passes the replacement project as the owner assertion on delete'
   await expect(
     adapter.supersede({
       observationId: 5,
-      replacementCandidateId: candidate.id,
+      candidate,
       workingDirectory: '/workspace/project-a',
     }),
   ).resolves.toBe(9);

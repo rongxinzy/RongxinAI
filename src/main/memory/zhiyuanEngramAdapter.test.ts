@@ -36,7 +36,7 @@ test('keeps candidates local until they are explicitly confirmed', async () => {
   });
   expect(requests).toHaveLength(0);
 
-  await expect(adapter.confirmMemory(candidate.id, '/workspace/project-a')).resolves.toBe(17);
+  await expect(adapter.confirmMemory(candidate, '/workspace/project-a')).resolves.toBe(17);
   expect(requests.map(request => request.pathname)).toEqual(['/sessions', '/observations']);
   expect(requests[1].init?.headers).toMatchObject({ Authorization: 'Bearer token' });
 });
@@ -59,7 +59,7 @@ test('includes the failed request method and path in runtime errors', async () =
     content: 'Keep local state in SQLite.',
   });
 
-  await expect(adapter.confirmMemory(candidate.id, '/workspace/project-a')).rejects.toThrow(
+  await expect(adapter.confirmMemory(candidate, '/workspace/project-a')).rejects.toThrow(
     'Memory service request failed with HTTP 404 for POST /sessions.',
   );
 });
