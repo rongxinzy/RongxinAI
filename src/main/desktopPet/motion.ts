@@ -10,6 +10,7 @@ import { DesktopPetRoam } from './roam';
 import type { DesktopPetEffect } from '../../shared/desktopPet/types';
 import {
   estimateReleaseVelocity,
+  impactStrength,
   throwStep,
   trimTrail,
   type DragSample,
@@ -235,10 +236,11 @@ export class DesktopPetMotion {
         next.vx * this.flying.vx < 0 ? Math.abs(this.flying.vx) : 0,
         next.vy * this.flying.vy < 0 ? Math.abs(this.flying.vy) : 0,
       );
-      if (next.bounced && impactSpeed > 200 && !this.reducedMotion)
+      const strength = impactStrength(impactSpeed);
+      if (next.bounced && strength > 0 && !this.reducedMotion)
         this.effect({
           kind: DesktopPetEffectKind.Impact,
-          strength: Math.min(1, impactSpeed / 1800),
+          strength,
         });
       const nextPosition = { x: Math.round(next.x), y: Math.round(next.y) };
       if (nextPosition.x !== position.x || nextPosition.y !== position.y)
