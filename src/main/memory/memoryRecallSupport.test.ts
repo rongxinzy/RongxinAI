@@ -2,13 +2,12 @@ import { expect, test, vi } from 'vitest';
 
 import { MemoryScope } from '../../shared/memory';
 import { recallMemoryScope } from './memoryRecallSupport';
+import { EngramRequestError } from './zhiyuanEngramAdapter';
 
 test('treats an unknown project as an empty recall branch instead of failing', async () => {
   const adapter = {
     recall: vi.fn(async () => {
-      throw new Error(
-        'Memory service request failed with HTTP 404 for GET /search. {"code":"unknown_project"}',
-      );
+      throw new EngramRequestError(404, 'GET', '/search', 'unknown_project', '{"code":"unknown_project"}');
     }),
     recent: vi.fn(),
   };
@@ -27,7 +26,7 @@ test('treats an unknown project as an empty recall branch instead of failing', a
 test('does not swallow other runtime failures as empty recall results', async () => {
   const adapter = {
     recall: vi.fn(async () => {
-      throw new Error('Memory service request failed with HTTP 500 for GET /search. boom');
+      throw new EngramRequestError(500, 'GET', '/search', 'internal_error', 'boom');
     }),
     recent: vi.fn(),
   };

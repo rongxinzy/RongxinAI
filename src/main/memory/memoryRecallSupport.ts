@@ -2,7 +2,7 @@ import { MemoryKind, MemoryScope } from '../../shared/memory';
 import { EngramSearchMatchMode } from './constants';
 import { planRecallQuery, rankRecallResults } from './recallQueryPlanner';
 import type { MemoryRepository } from './repository';
-import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+import { EngramRequestError, type ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
 
 const MAX_ENGRAM_RECALL_LIMIT = 20;
 
@@ -24,7 +24,7 @@ export async function recallMemoryScope(
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
   const retrievalLimit = input.scope === MemoryScope.Session ? MAX_ENGRAM_RECALL_LIMIT : limit;
   const isUnknownProject = (error: unknown): boolean =>
-    error instanceof Error && error.message.includes('unknown_project');
+    error instanceof EngramRequestError && error.status === 404 && error.code === 'unknown_project';
   let observations;
   try {
     observations = filterRecallable(

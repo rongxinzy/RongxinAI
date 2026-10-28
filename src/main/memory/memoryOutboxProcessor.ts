@@ -102,12 +102,23 @@ async function processMemoryForget(
 ): Promise<number | null> {
   const payload = parseForgetPayload(item.payload);
   if (!payload) return retryInvalidOutboxItem(repository, item);
-  try {
-    const forgotten = await adapter.forget(
-      payload.observationId,
-      payload.hardDelete,
-      typeof payload.projectId === 'string' ? payload.projectId : undefined,
+  let owner = typeof payload.projectId === 'string' ? payload.projectId.trim() : '';
+  if (!owner) {
+    // Payloads persisted before owner assertions existed recover the owner
+    // from the still-persisted link, after checking it names the same target.
+    const link = repository.getLink(payload.linkId);
+    if (link && link.memoryId === payload.observationId) owner = link.projectId ?? '';
+  }
+  if (!owner) {
+    repository.markRetry(
+      item.id,
+      item.attempts + 1,
+      `Cannot resolve a trusted project owner for forget of link ${payload.linkId}.`,
     );
+    return null;
+  }
+  try {
+    const forgotten = await adapter.forget(payload.observationId, payload.hardDelete, owner);
     if (!forgotten) {
       repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
       return null;

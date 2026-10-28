@@ -20,6 +20,19 @@ interface CandidateInput {
   topicKey?: string;
 }
 
+export class EngramRequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly method: string,
+    readonly pathname: string,
+    readonly code: string | undefined,
+    detail: string,
+  ) {
+    super(`Memory service request failed with HTTP ${status} for ${method} ${pathname}. ${detail.slice(0, 300)}`);
+    this.name = 'EngramRequestError';
+  }
+}
+
 export class ZhiYuanEngramAdapter {
   private readonly candidates = new Map<string, MemoryCandidate>();
   private readonly registeredSessions = new Set<string>();
@@ -192,9 +205,14 @@ export class ZhiYuanEngramAdapter {
     if (!response.ok) {
       const method = init.method ?? 'GET';
       const detail = await response.text().catch(() => '');
-      throw new Error(
-        `Memory service request failed with HTTP ${response.status} for ${method} ${pathname}. ${detail.slice(0, 300)}`,
-      );
+      let code: string | undefined;
+      try {
+        const parsed = JSON.parse(detail) as { code?: unknown };
+        if (typeof parsed.code === 'string') code = parsed.code;
+      } catch {
+        // Non-JSON error bodies stay without a code.
+      }
+      throw new EngramRequestError(response.status, method, pathname, code, detail);
     }
     return (await response.json()) as T;
   }

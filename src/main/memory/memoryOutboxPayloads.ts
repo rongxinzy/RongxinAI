@@ -38,6 +38,7 @@ export interface ForgetPayload {
   linkId: string;
   observationId: number;
   hardDelete: boolean;
+  projectId?: string;
 }
 
 export function parseConfirmPayload(payload: Record<string, unknown>): ConfirmPayload | null {
