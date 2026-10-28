@@ -524,10 +524,12 @@ export async function startPiRuntimeSession(
       return;
     }
     host.activeSessions.set(sessionId, active);
-    void host
-      .getProjectMemoryService()
-      ?.registerSession(sessionId, active.workspaceRoot)
-      .catch(error => console.warn('[SessionResume] registration failed:', error));
+    const projectMemoryService = host.getProjectMemoryService();
+    if (projectMemoryService && typeof projectMemoryService.registerSession === 'function') {
+      void projectMemoryService
+        .registerSession(sessionId, active.workspaceRoot)
+        .catch(error => console.warn('[SessionResume] registration failed:', error));
+    }
     agentResourceDiagnostics.startPiTurn(
       sessionId,
       host.activeSessions.size,
