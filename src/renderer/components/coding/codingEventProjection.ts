@@ -284,19 +284,31 @@ const mergePermissionResolution = (turn: CodingConversationTurn, event: CodingEv
   return true;
 };
 
-export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTurn[] => {
+export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTurn[] =>
+  projectSortedCodingEvents(events.toSorted((left, right) => left.sequence - right.sequence)).turns;
+
+/** `events` must already be ordered by sequence. `bounds` are indexes of each turn's first event. */
+export const projectSortedCodingEvents = (
+  events: CodingEvent[],
+): { turns: CodingConversationTurn[]; bounds: number[] } => {
   const turns: CodingConversationTurn[] = [];
+  const bounds: number[] = [];
   let currentTurn: CodingConversationTurn | null = null;
 
-  const ensureTurn = (event: CodingEvent): CodingConversationTurn => {
+  const pushTurn = (turn: CodingConversationTurn, index: number) => {
+    turns.push(turn);
+    bounds.push(index);
+    currentTurn = turn;
+  };
+  const ensureTurn = (event: CodingEvent, index: number): CodingConversationTurn => {
     if (currentTurn) return currentTurn;
     const turn = createTurn(event);
-    turns.push(turn);
-    currentTurn = turn;
+    pushTurn(turn, index);
     return turn;
   };
 
-  for (const event of events.toSorted((left, right) => left.sequence - right.sequence)) {
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
     if (event.kind === CodingEventKind.Message || event.kind === CodingEventKind.MessageDelta) {
       if (event.kind === CodingEventKind.Message) {
         const messageType = getMessageType(event);
@@ -323,18 +335,17 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
           role,
           isFinalAnswer: false,
         };
-        turns.push(turn);
-        currentTurn = turn;
+        pushTurn(turn, index);
         continue;
       }
-      appendAssistantMessage(ensureTurn(event), event, content);
+      appendAssistantMessage(ensureTurn(event, index), event, content);
       continue;
     }
 
     if (event.kind === CodingEventKind.Reasoning) {
       const content = getCodingEventText(event);
       if (!content) continue;
-      const turn = ensureTurn(event);
+      const turn = ensureTurn(event, index);
       if (turn.reasoning && event.payload.streamUpdateMode === CodingStreamUpdateMode.Replace) {
         turn.reasoning.content = content;
       } else if (turn.reasoning) turn.reasoning.content += content;
@@ -345,7 +356,7 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
 
     const projectedActivityKind = activityKind(event);
     if (projectedActivityKind) {
-      const turn = ensureTurn(event);
+      const turn = ensureTurn(event, index);
       if (mergePermissionResolution(turn, event)) continue;
       const id = getActivityId(turn, event, projectedActivityKind);
       const normalizedEvent = normalizeToolActivityEvent(event);
@@ -379,7 +390,7 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
     }
 
     if (event.kind === CodingEventKind.TurnComplete) {
-      const turn = ensureTurn(event);
+      const turn = ensureTurn(event, index);
       turn.status = CodingConversationTurnStatus.Complete;
       const finalAssistantMessage = turn.assistantMessages.at(-1);
       if (finalAssistantMessage) finalAssistantMessage.isFinalAnswer = true;
@@ -388,7 +399,7 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
       continue;
     }
     if (event.kind === CodingEventKind.TurnCancelled) {
-      const turn = ensureTurn(event);
+      const turn = ensureTurn(event, index);
       turn.status = CodingConversationTurnStatus.Cancelled;
       turn.statusDetail = getCodingEventText(event) || null;
       turn.completedAt = event.createdAt;
@@ -396,7 +407,7 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
       continue;
     }
     if (event.kind === CodingEventKind.TurnFailed) {
-      const turn = ensureTurn(event);
+      const turn = ensureTurn(event, index);
       turn.status = CodingConversationTurnStatus.Failed;
       turn.statusDetail = getCodingEventText(event) || null;
       turn.completedAt = event.createdAt;
@@ -404,12 +415,20 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
     }
   }
 
-  return turns.filter(
-    turn =>
+  const keptTurns: CodingConversationTurn[] = [];
+  const keptBounds: number[] = [];
+  for (let index = 0; index < turns.length; index += 1) {
+    const turn = turns[index];
+    if (
       turn.userMessage !== null ||
       turn.reasoning !== null ||
       turn.activities.length > 0 ||
       turn.assistantMessages.length > 0 ||
-      turn.status !== null,
-  );
+      turn.status !== null
+    ) {
+      keptTurns.push(turn);
+      keptBounds.push(bounds[index]);
+    }
+  }
+  return { turns: keptTurns, bounds: keptBounds };
 };
