@@ -208,6 +208,20 @@ export class ZhiYuanEngramAdapter {
     return this.manager.getConnection() ?? (await this.manager.start());
   }
 
+  /** Register or resume a session at start. The runtime returns a stable
+   * native continuation identity on reopen, so finalize stays idempotent. */
+  async resumeSession(sessionId: string, project: string, workingDirectory: string): Promise<void> {
+    await this.ensureSession(
+      await this.getConnection().then(connection => {
+        if (!connection) throw new Error('Memory runtime is unavailable.');
+        return connection;
+      }),
+      sessionId,
+      project,
+      workingDirectory,
+    );
+  }
+
   private async ensureSession(
     connection: EngramConnection,
     sessionId: string,
