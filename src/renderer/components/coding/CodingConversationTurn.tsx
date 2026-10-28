@@ -327,6 +327,17 @@ const reasoningContentsEqual = (
     a.content === b.content &&
     a.createdAt === b.createdAt);
 
+const activityPayloadEqual = (a: Record<string, unknown>, b: Record<string, unknown>): boolean => {
+  if (a === b) return true;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const key of aKeys) {
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+};
+
 const segmentContentsEqual = (
   a: CodingConversationTurnModel['segments'][number],
   b: CodingConversationTurnModel['segments'][number],
@@ -340,7 +351,7 @@ const segmentContentsEqual = (
       a.activity.id === b.activity.id &&
       a.activity.kind === b.activity.kind &&
       a.activity.event.kind === b.activity.event.kind &&
-      JSON.stringify(a.activity.event.payload) === JSON.stringify(b.activity.event.payload)
+      activityPayloadEqual(a.activity.event.payload, b.activity.event.payload)
     );
   }
   return false;
@@ -370,15 +381,14 @@ const turnContentsEqual = (
         activity.id === b.activities[index].id &&
         activity.kind === b.activities[index].kind &&
         activity.event.kind === b.activities[index].event.kind &&
-        JSON.stringify(activity.event.payload) ===
-          JSON.stringify(b.activities[index].event.payload),
+        activityPayloadEqual(activity.event.payload, b.activities[index].event.payload),
     ));
 
 // CodingEventStream re-projects every event on each streamed chunk, which
 // re-creates all turn objects and defeats the default shallow memo. Comparing
 // the actual turn content lets unchanged completed turns skip re-rendering
 // while the streaming turn (and any turn whose content changed) still updates.
-const conversationTurnPropsEqual = (
+export const conversationTurnPropsEqual = (
   prev: CodingConversationTurnProps,
   next: CodingConversationTurnProps,
 ): boolean =>
