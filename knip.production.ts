@@ -31,6 +31,8 @@ const config: KnipConfig = {
         'src/main/preload.ts!',
         // Dedicated sandbox preload loaded by desktopPet/controller.ts via its bundled path.
         'src/main/desktopPetPreload.ts!',
+        // Window surface helper forked by desktopPet/windows/observer.ts.
+        'src/main/desktopPetWindowsEntry.ts!',
         'src/main/companionWindowPreload.ts!',
         'src/main/llamacppModelDaemonEntry.ts!',
         'src/main/workbenchTask/artifactWorker.ts!',
