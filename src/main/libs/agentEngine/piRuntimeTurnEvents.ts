@@ -44,6 +44,7 @@ import {
   synthesizeTextDeltaChunks,
   translatePiSessionEventToUiChunks,
 } from './piTranslate/piTranslateUiMessageChunk';
+import { evaluateSummaryObligation } from './piSummaryObligation';
 import type { UIMessageChunk } from 'ai';
 import { ProviderName } from '../../../shared/providers';
 import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
@@ -69,11 +70,8 @@ export interface PiRuntimeTurnHost {
   imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration;
   syncImageInputCapability(sessionIds?: Iterable<string>): Promise<void>;
   createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion;
-  runPostTurnMemoryMaintenance(
-    sessionId: string,
-    workingDirectory: string,
-    complete: SessionMemoryCompletion,
-  ): Promise<void>;
+  requestSummaryReminder(sessionId: string, active: ActivePiSession): Promise<void>;
+  recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void>;
 }
 
 export class PiRuntimeTurnEvents {
@@ -856,11 +854,20 @@ export class PiRuntimeTurnEvents {
           store.updateSession(sessionId, { status: 'idle' });
         }
         if (!active.resourceState.chatMode) {
-          void this.host.runPostTurnMemoryMaintenance(
-            sessionId,
-            active.workspaceRoot,
-            this.host.createSessionMemoryCompletion(active),
-          );
+          const obligation = evaluateSummaryObligation({
+            hasRecordedFiles: active.artifactRecorder?.hasRecordedFiles() === true,
+            checkpointWritten: active.summaryCheckpointWritten === true,
+            checkpointSkipped: active.summaryCheckpointSkipped !== undefined,
+            reminderIssued: active.summaryReminderIssued === true,
+          });
+          if (obligation === 'remind') {
+            active.summaryReminderIssued = true;
+            void this.host.requestSummaryReminder(sessionId, active);
+            return;
+          }
+          if (obligation === 'fallback') {
+            void this.host.recordSummaryOmission(sessionId, active);
+          }
         }
         this.host.emit('complete', sessionId);
         void this.host.flushFollowUpQueue(sessionId, active);

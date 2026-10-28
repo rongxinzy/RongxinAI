@@ -70,49 +70,14 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
-    it('rolls up session memory after a successful agent run', async () => {
-      const rollup = vi.fn().mockResolvedValue(null);
-      adapter.setSessionSummaryService({ rollup } as never);
-
+    it('registers the agent-authored session_summary tool for new sessions', async () => {
       await adapter.startSession('summary-session', 'Remember this', {
         workspaceRoot: '/workspace/project',
       });
-      await adapter.patchSession('summary-session', { model: 'openai/gpt-5' });
-      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
-        type: string;
-      }) => void;
-      listener({ type: 'agent_end' });
-      listener({ type: 'agent_settled' });
-
-      expect(rollup).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sessionId: 'summary-session',
-          workingDirectory: '/workspace/project',
-          complete: expect.any(Function),
-        }),
-      );
-      const complete = rollup.mock.calls[0][0].complete as (
-        messages: Array<{ role: string; content: string }>,
-      ) => Promise<string>;
-      await expect(
-        complete([
-          { role: 'system', content: 'Extract memory.' },
-          { role: 'user', content: 'Conversation payload.' },
-        ]),
-      ).resolves.toBe('Hello from Pi');
-      expect(mockCompleteSimple).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'openai/gpt-5', provider: 'magpie' }),
-        {
-          systemPrompt: 'Extract memory.',
-          messages: [
-            expect.objectContaining({
-              role: SessionMemoryCompletionRole.User,
-              content: 'Conversation payload.',
-              timestamp: expect.any(Number),
-            }),
-          ],
-        },
-      );
+      const options = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools: Array<{ name: string }>;
+      };
+      expect(options.customTools.map(tool => tool.name)).toContain('session_summary');
     });
 
     it('serializes background memory completions for the same session', async () => {

@@ -453,6 +453,7 @@ export class ProjectMemoryService {
       ? this.repository.findPendingByLinkId(input.linkId, MemoryOutboxOperation.SessionSummary)
       : null;
     if (pending) return await this.processOutboxItem(pending);
+    const checkpointSequence = this.repository.maxSessionCheckpointSequence(input.sessionId) + 1;
     const outboxId = this.repository.enqueue(
       MemoryOutboxOperation.SessionSummary,
       {
@@ -466,7 +467,7 @@ export class ProjectMemoryService {
         sourceKind: MemorySourceKind.SessionSummary,
         scope: MemoryScope.Session,
         linkId,
-        metadata: input.metadata,
+        metadata: { ...input.metadata, checkpointSequence },
         expiresAt: new Date(
           Date.now() + SESSION_SUMMARY_TTL_DAYS * 24 * 60 * 60 * 1_000,
         ).toISOString(),
@@ -489,6 +490,23 @@ export class ProjectMemoryService {
     return active
       ? { content: active.content, metadata: this.repository.getLinkMetadata(active.id) }
       : null;
+  }
+
+  /** Register/resume a session at start so native continuation identity exists
+   * before any finalize. */
+  async registerSession(sessionId: string, workingDirectory: string): Promise<void> {
+    const project = this.resolveIdentity(workingDirectory);
+    await this.adapter.resumeSession(sessionId, project.id, workingDirectory);
+  }
+
+  /** Commit a final, one-shot summary on real session close (delete, not turn
+   * completion). Failures are logged, never thrown into the delete path. */
+  async finalizeSession(sessionId: string, summary: string): Promise<void> {
+    try {
+      await this.adapter.finalizeSession(sessionId, summary);
+    } catch (error) {
+      console.warn(`[SessionFinalize] failed for session ${sessionId}:`, error);
+    }
   }
 
   listSessionSummaryBackfillRecords(): MemoryMigrationRecord[] {

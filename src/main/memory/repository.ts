@@ -331,6 +331,22 @@ export class MemoryRepository {
     return row ? mapLink(row, this.getDelivery(String(row.id))) : null;
   }
 
+  /** Highest checkpoint sequence already recorded for a session; retries of an
+   * older checkpoint must not overwrite a newer one. */
+  maxSessionCheckpointSequence(sessionId: string): number {
+    const rows = this.db
+      .prepare('SELECT metadata_json FROM memory_links WHERE session_id = ?')
+      .all(sessionId) as Array<{ metadata_json: string }>;
+    let max = 0;
+    for (const row of rows) {
+      const metadata = JSON.parse(row.metadata_json) as { checkpointSequence?: unknown };
+      if (typeof metadata.checkpointSequence === 'number') {
+        max = Math.max(max, metadata.checkpointSequence);
+      }
+    }
+    return max;
+  }
+
   deleteCandidate(id: string): void {
     this.db.transaction(() => {
       this.db
@@ -871,17 +887,20 @@ function parseMetadata(value: unknown): Record<string, unknown> {
 
 function isCurrentSemanticSessionMetadata(metadata: Record<string, unknown>): boolean {
   const digest = metadata.digest as Record<string, unknown> | null;
+  const isAgentCheckpoint =
+    metadata.format === 'agent-checkpoint' || metadata.format === 'fallback-run-record';
   return (
-    metadata.extractorVersion === SESSION_MEMORY_EXTRACTOR_VERSION &&
-    Array.isArray(metadata.sourceMessageIds) &&
-    digest !== null &&
-    typeof digest === 'object' &&
-    !Array.isArray(digest) &&
-    digest.shouldSave === true &&
-    digest.goal !== null &&
-    typeof digest.goal === 'object' &&
-    digest.currentState !== null &&
-    typeof digest.currentState === 'object'
+    isAgentCheckpoint ||
+    (metadata.extractorVersion === SESSION_MEMORY_EXTRACTOR_VERSION &&
+      Array.isArray(metadata.sourceMessageIds) &&
+      digest !== null &&
+      typeof digest === 'object' &&
+      !Array.isArray(digest) &&
+      digest.shouldSave === true &&
+      digest.goal !== null &&
+      typeof digest.goal === 'object' &&
+      digest.currentState !== null &&
+      typeof digest.currentState === 'object')
   );
 }
 

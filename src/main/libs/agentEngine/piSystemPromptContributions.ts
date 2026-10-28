@@ -10,6 +10,7 @@
  * tests read exclusively from this registry.
  */
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
+import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
 import type { McpServerRuntimeStatus, McpToolManifestEntry } from '../mcpServerManager';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
@@ -133,6 +134,10 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     id: 'declare-artifact',
     enabled: context => context.chatMode !== true,
     prompt: DeclareArtifactSystemPrompt,
+  },
+  {
+    id: 'session-summary',
+    prompt: SessionSummarySystemPrompt,
   },
 ];
 

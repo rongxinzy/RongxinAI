@@ -267,6 +267,10 @@ export class ArtifactRecorder {
     });
   }
 
+  hasRecordedFiles(): boolean {
+    return this.recordedKeys.size > 0;
+  }
+
   private annotateDeclare(input: RecorderToolEndInput): void {
     const details = asToolInput((input.result as { details?: unknown } | undefined)?.details);
     const rawPath = typeof details.filePath === 'string' ? details.filePath.trim() : '';

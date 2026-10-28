@@ -185,7 +185,18 @@ export const registerCoworkSessionAdminIpc = (deps: CoworkSessionAdminIpcDeps): 
         // after the DB row is removed.
         forgetCoworkSession(sessionId);
         const coworkStoreInstance = deps.getCoworkStore();
+        const session = coworkStoreInstance.getSession(sessionId, 1);
+        const goal = session?.title ?? sessionId;
+        const accomplished =
+          session?.messages.filter(message => message.type === 'assistant').at(-1)?.content ?? '';
         coworkStoreInstance.deleteSession(sessionId);
+        void deps
+          .getPiRuntimeAdapter()
+          .getProjectMemoryService()
+          ?.finalizeSession(
+            sessionId,
+            `## Goal\n${goal}\n\n## Accomplished\n${accomplished.slice(0, 1500)}`,
+          );
         // Clean up IM session mapping so that new channel messages
         // create a fresh session instead of referencing a deleted one.
         try {

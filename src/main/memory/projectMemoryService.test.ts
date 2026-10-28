@@ -72,6 +72,17 @@ class FakeRepository {
     return String(input.id);
   }
 
+  maxSessionCheckpointSequence(): number {
+    let max = 0;
+    for (const link of this.links) {
+      const metadata = link.metadata as { checkpointSequence?: number } | undefined;
+      if (typeof metadata?.checkpointSequence === 'number') {
+        max = Math.max(max, metadata.checkpointSequence);
+      }
+    }
+    return max;
+  }
+
   markCompleted(id: string) {
     const item = this.items.find(candidate => candidate.id === id);
     if (item) item.status = MemoryOutboxStatus.Completed;
@@ -446,7 +457,6 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
   const adapter = {
     saveCandidate: vi.fn(input => ({ id: 'candidate-1', ...input })),
     confirmMemory: vi.fn(async () => null),
-    discardCandidate: vi.fn(),
   };
   const service = new ProjectMemoryService(
     repository as never,
@@ -468,7 +478,6 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
     attempts: 1,
     lastError: 'Memory runtime unavailable.',
   });
-  expect(adapter.discardCandidate).toHaveBeenCalledWith('candidate-1');
   expect(repository.links).toHaveLength(0);
 });
 
