@@ -187,6 +187,62 @@ describe('externalAgentHostConfig', () => {
     expect(synced.model).toBe('magpie/model');
   });
 
+  it('creates a missing user file on the live gateway without stashing the new port', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'magpie-opencode-missing-user-'));
+    roots.push(root);
+    const privateHome = path.join(root, 'service');
+    const userFile = path.join(root, '.config', 'opencode', 'opencode.json');
+    const privateFile = path.join(privateHome, 'config', 'opencode', 'opencode.json');
+    await fs.mkdir(path.dirname(privateFile), { recursive: true });
+    await fs.writeFile(
+      privateFile,
+      `${JSON.stringify(
+        {
+          provider: {
+            magpie: {
+              baseUrl: 'http://127.0.0.1:1111/v1',
+              options: {
+                apiKey: 'magpie',
+                baseURL: 'http://127.0.0.1:1111/v1',
+                baseUrl: 'http://127.0.0.1:1111/v1',
+              },
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+
+    await syncOpenCodeConfigToUser(privateHome, root, 'http://127.0.0.1:2222/');
+    const synced = JSON.parse(await fs.readFile(userFile, 'utf8')) as {
+      provider: {
+        magpie: { baseUrl: string; options: { apiKey: string; baseURL: string; baseUrl: string } };
+      };
+    };
+    expect(synced.provider.magpie.baseUrl).toBe('http://127.0.0.1:2222/v1');
+    expect(synced.provider.magpie.options).toEqual({
+      apiKey: 'magpie',
+      baseURL: 'http://127.0.0.1:2222/v1',
+      baseUrl: 'http://127.0.0.1:2222/v1',
+    });
+    const stashFile = path.join(privateHome, 'host-agent-stash', 'opencode-merge.json');
+    const stash = await fs.readFile(stashFile, 'utf8');
+    const parsed = JSON.parse(stash) as {
+      addedProviderKeys: string[];
+      replacedProviderValues: Record<string, unknown>;
+    };
+    expect(parsed.addedProviderKeys).toEqual(['magpie']);
+    expect(parsed.replacedProviderValues).toEqual({});
+
+    await syncOpenCodeConfigToUser(privateHome, root, 'http://127.0.0.1:3333');
+    expect(await fs.readFile(stashFile, 'utf8')).toBe(stash);
+    const moved = JSON.parse(await fs.readFile(userFile, 'utf8')) as {
+      provider: { magpie: { options: { baseURL: string } } };
+    };
+    expect(moved.provider.magpie.options.baseURL).toBe('http://127.0.0.1:3333/v1');
+  });
+
   it('clears legacy snapshot trees under host-agent-stash', async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'magpie-stash-legacy-'));
     roots.push(root);

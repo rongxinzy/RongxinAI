@@ -39,9 +39,9 @@ import {
   revertOpenCodeConfigFromUser,
   resolveUserHome,
   stripCodexMagpieProviderBlock,
-  syncOpenCodeConfigToUser,
   canonicalHostAgentId,
 } from './externalAgentHostConfig';
+import { resyncOpenCodeUserConfig, sweepManagedAgentsAfterStart } from './reapplyStartup';
 import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
 import type { MagpieRoutingGateway } from './magpieRoutingGateway';
 import { MagpieRoutingUsageService } from './routingUsageService';
@@ -720,10 +720,10 @@ export class MagpieManager implements MagpieRoutingGateway {
       throw new Error('Invalid subscription sign-in state');
     return { id, agent: result.agent, url: result.url, state: result.state };
   }
-  async agents(): Promise<MagpieAgents> {
+  async agents(readTimeoutMs?: number): Promise<MagpieAgents> {
     if (this.state.state !== 'running') return { agents: [], pending: false };
-    const state = await this.managementJson('/api/state');
-    const cli = await this.managementJson('/api/agents/cli');
+    const state = await this.managementJson('/api/state', {}, readTimeoutMs);
+    const cli = await this.managementJson('/api/agents/cli', {}, readTimeoutMs);
     const records = parseMagpieCliVersions(cli.agents);
     return {
       pending: cli.pending === true,
@@ -787,43 +787,20 @@ export class MagpieManager implements MagpieRoutingGateway {
   }
 
   private async reapplyManagedAgentsAfterStart(): Promise<void> {
-    if (this.state.state !== 'running') return;
-    let snapshot: MagpieAgents | undefined;
-    for (let attempt = 0; attempt < 6 && !snapshot; attempt += 1) {
-      try {
-        const current = await this.agents();
-        this.reapplyErrors = await magpieReapplyConnectedAgents(this.agentClient(), current);
-        snapshot = current;
-      } catch (error) {
-        // The management API can still be warming up right after launch.
-        if (attempt === 5) console.warn('[Magpie] reapply sweep failed during startup:', error);
-        else await new Promise(resolve => setTimeout(resolve, 1_000));
-      }
-    }
-    if (!snapshot) return;
-    await this.resyncOpenCodeUserConfig(snapshot);
-  }
-
-  /**
-   * The user's copy has to follow the gateway the service runs on now: magpie's
-   * reapply can leave its own config on the old port, and builds that keep no
-   * private copy need the live address instead. Only runs when OpenCode is wired
-   * and its reapply did not fail.
-   */
-  private async resyncOpenCodeUserConfig(snapshot: MagpieAgents): Promise<void> {
-    const wired = snapshot.agents.some(
-      agent => agent.wired && canonicalHostAgentId(agent.id) === 'opencode',
-    );
-    if (!wired || this.reapplyErrors.has('opencode')) return;
-    try {
-      await syncOpenCodeConfigToUser(
-        this.options.privateHome,
-        this.userHome(),
-        this.state.state === 'running' ? this.state.gatewayUrl : undefined,
-      );
-    } catch (error) {
-      console.warn('[Magpie] opencode user config was not updated after reapply:', error);
-    }
+    const outcome = await sweepManagedAgentsAfterStart({
+      isRunning: () => this.state.state === 'running',
+      readAgents: timeoutMs => this.agents(timeoutMs),
+      reapply: current => magpieReapplyConnectedAgents(this.agentClient(), current),
+    });
+    if (!outcome) return;
+    this.reapplyErrors = outcome.errors;
+    await resyncOpenCodeUserConfig({
+      snapshot: outcome.snapshot,
+      errors: outcome.errors,
+      privateHome: this.options.privateHome,
+      home: this.userHome(),
+      gatewayUrl: this.state.state === 'running' ? this.state.gatewayUrl : undefined,
+    });
   }
 
   private async finalizeHostConnect(agentId: string): Promise<void> {
@@ -925,8 +902,9 @@ export class MagpieManager implements MagpieRoutingGateway {
   private async managementJson(
     route: string,
     init: RequestInit = {},
+    timeoutMs?: number,
   ): Promise<Record<string, unknown>> {
-    const response = await this.webRequest(route, init);
+    const response = await this.webRequest(route, init, timeoutMs);
     const text = await response.text();
     if (!response.ok)
       throw new Error(formatMagpieManagementError(response.status, response.statusText, text));

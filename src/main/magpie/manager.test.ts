@@ -617,16 +617,20 @@ describe('Magpie owned lifecycle', () => {
       await writePrivate(2222);
 
       await manager.start();
+      const gateway = manager.status().gatewayUrl;
+      expect(gateway).toBeTruthy();
       await vi.waitFor(async () => {
-        expect(await fs.readFile(userFile, 'utf8')).toContain('127.0.0.1:2222');
+        expect(await fs.readFile(userFile, 'utf8')).toContain(`${gateway}/v1`);
       });
+      const written = await fs.readFile(userFile, 'utf8');
+      expect(written).not.toContain('127.0.0.1:2222');
       const stash = JSON.parse(await fs.readFile(stashFile, 'utf8')) as {
         addedProviderKeys: string[];
         replacedProviderValues: Record<string, unknown>;
       };
       expect(stash.addedProviderKeys).toEqual(['magpie']);
       expect(stash.replacedProviderValues).toEqual({});
-      expect(await fs.readFile(userFile, 'utf8')).toContain('https://mine.test/v1');
+      expect(written).toContain('https://mine.test/v1');
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });

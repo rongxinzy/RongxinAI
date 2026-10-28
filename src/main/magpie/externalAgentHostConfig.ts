@@ -145,8 +145,9 @@ export async function syncOpenCodeConfigToUser(
 
   const userPath = userOpenCodeConfig(home);
   if (!(await pathExists(userPath))) {
-    if (hasPrivate) await mergeOpenCodeConfigToUser(privateHome, home);
-    return;
+    if (!hasPrivate) return;
+    await mergeOpenCodeConfigToUser(privateHome, home);
+    if (!(await pathExists(userPath))) return;
   }
 
   const user = parseJsonObject(await fs.readFile(userPath, 'utf8'), 'User OpenCode config');
@@ -161,20 +162,9 @@ export async function syncOpenCodeConfigToUser(
     if (Object.prototype.hasOwnProperty.call(magpie, 'model')) nextUser.model = magpie.model;
   }
 
-  if (gatewayUrl) {
-    const desired = `${gatewayUrl.replace(/\/+$/, '')}/v1`;
-    const entry = nextProvider.magpie;
-    if (isRecord(entry) && isRecord(entry.options)) {
-      const options = entry.options;
-      const key = Object.prototype.hasOwnProperty.call(options, 'baseURL')
-        ? 'baseURL'
-        : Object.prototype.hasOwnProperty.call(options, 'baseUrl')
-          ? 'baseUrl'
-          : null;
-      if (key && options[key] !== desired) {
-        nextProvider.magpie = { ...entry, options: { ...options, [key]: desired } };
-      }
-    }
+  const desired = gatewayUrl ? `${gatewayUrl.replace(/\/+$/, '')}/v1` : undefined;
+  if (desired && isRecord(nextProvider.magpie)) {
+    nextProvider.magpie = pointMagpieProviderAtGateway(nextProvider.magpie, desired);
   }
 
   if (Object.keys(nextProvider).length > 0) nextUser.provider = nextProvider;
@@ -190,11 +180,28 @@ export async function syncOpenCodeConfigToUser(
 
   await fs.mkdir(path.dirname(userPath), { recursive: true });
   await fs.writeFile(userPath, `${JSON.stringify(nextUser, null, 2)}\n`, 'utf8');
-  console.log(
-    '[Magpie] OpenCode user config moved onto',
-    gatewayUrl ? `${gatewayUrl}/v1` : 'the gateway copy',
-  );
+  console.log('[Magpie] OpenCode user config moved onto', desired ?? 'the gateway copy');
 }
+
+const MAGPIE_PROVIDER_URL_KEYS = ['baseURL', 'baseUrl'] as const;
+
+/** Rewrite whichever address field this provider entry already uses. */
+const pointMagpieProviderAtGateway = (
+  entry: Record<string, unknown>,
+  desired: string,
+): Record<string, unknown> => {
+  const next: Record<string, unknown> = { ...entry };
+  for (const key of MAGPIE_PROVIDER_URL_KEYS) {
+    if (typeof next[key] === 'string' && next[key] !== desired) next[key] = desired;
+  }
+  if (!isRecord(next.options)) return next;
+  const options: Record<string, unknown> = { ...next.options };
+  for (const key of MAGPIE_PROVIDER_URL_KEYS) {
+    if (typeof options[key] === 'string' && options[key] !== desired) options[key] = desired;
+  }
+  next.options = options;
+  return next;
+};
 
 export async function revertOpenCodeConfigFromUser(
   privateHome: string,
