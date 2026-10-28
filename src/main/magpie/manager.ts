@@ -39,6 +39,7 @@ import {
   revertOpenCodeConfigFromUser,
   resolveUserHome,
   stripCodexMagpieProviderBlock,
+  syncOpenCodeConfigToUser,
   canonicalHostAgentId,
 } from './externalAgentHostConfig';
 import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
@@ -787,11 +788,41 @@ export class MagpieManager implements MagpieRoutingGateway {
 
   private async reapplyManagedAgentsAfterStart(): Promise<void> {
     if (this.state.state !== 'running') return;
+    let snapshot: MagpieAgents | undefined;
+    for (let attempt = 0; attempt < 6 && !snapshot; attempt += 1) {
+      try {
+        const current = await this.agents();
+        this.reapplyErrors = await magpieReapplyConnectedAgents(this.agentClient(), current);
+        snapshot = current;
+      } catch (error) {
+        // The management API can still be warming up right after launch.
+        if (attempt === 5) console.warn('[Magpie] reapply sweep failed during startup:', error);
+        else await new Promise(resolve => setTimeout(resolve, 1_000));
+      }
+    }
+    if (!snapshot) return;
+    await this.resyncOpenCodeUserConfig(snapshot);
+  }
+
+  /**
+   * The user's copy has to follow the gateway the service runs on now: magpie's
+   * reapply can leave its own config on the old port, and builds that keep no
+   * private copy need the live address instead. Only runs when OpenCode is wired
+   * and its reapply did not fail.
+   */
+  private async resyncOpenCodeUserConfig(snapshot: MagpieAgents): Promise<void> {
+    const wired = snapshot.agents.some(
+      agent => agent.wired && canonicalHostAgentId(agent.id) === 'opencode',
+    );
+    if (!wired || this.reapplyErrors.has('opencode')) return;
     try {
-      const snapshot = await this.agents();
-      this.reapplyErrors = await magpieReapplyConnectedAgents(this.agentClient(), snapshot);
+      await syncOpenCodeConfigToUser(
+        this.options.privateHome,
+        this.userHome(),
+        this.state.state === 'running' ? this.state.gatewayUrl : undefined,
+      );
     } catch (error) {
-      console.warn('[Magpie] reapply sweep failed during startup:', error);
+      console.warn('[Magpie] opencode user config was not updated after reapply:', error);
     }
   }
 

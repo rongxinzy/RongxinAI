@@ -124,6 +124,74 @@ export async function mergeOpenCodeConfigToUser(privateHome: string, home: strin
   await fs.writeFile(opencodeStashPath(privateHome), `${JSON.stringify(stash, null, 2)}\n`, 'utf8');
 }
 
+/**
+ * Move the user's OpenCode config onto the gateway the service runs now.
+ *
+ * The address always comes from the live gateway: a startup reapply may leave
+ * magpie's own copy stale, and builds that keep no private copy still have to be
+ * fixed. Provider/model entries come from magpie's private opencode.json when it
+ * exists. The stash is never rewritten: it keeps meaning "what the user had
+ * before magpie touched this file", so a port change can not turn our added
+ * provider into a replaced one.
+ */
+export async function syncOpenCodeConfigToUser(
+  privateHome: string,
+  home: string,
+  gatewayUrl?: string,
+): Promise<void> {
+  const from = privateOpenCodeConfig(privateHome);
+  const hasPrivate = await pathExists(from);
+  if (!hasPrivate && !gatewayUrl) return;
+
+  const userPath = userOpenCodeConfig(home);
+  if (!(await pathExists(userPath))) {
+    if (hasPrivate) await mergeOpenCodeConfigToUser(privateHome, home);
+    return;
+  }
+
+  const user = parseJsonObject(await fs.readFile(userPath, 'utf8'), 'User OpenCode config');
+  const nextUser: Record<string, unknown> = { ...user };
+  const nextProvider: Record<string, unknown> = isRecord(user.provider) ? { ...user.provider } : {};
+
+  if (hasPrivate) {
+    const magpie = parseJsonObject(await fs.readFile(from, 'utf8'), 'Gateway OpenCode config');
+    for (const [key, value] of Object.entries(isRecord(magpie.provider) ? magpie.provider : {})) {
+      nextProvider[key] = value;
+    }
+    if (Object.prototype.hasOwnProperty.call(magpie, 'model')) nextUser.model = magpie.model;
+  }
+
+  if (gatewayUrl) {
+    const desired = `${gatewayUrl.replace(/\/+$/, '')}/v1`;
+    const entry = nextProvider.magpie;
+    if (isRecord(entry) && isRecord(entry.options)) {
+      const options = entry.options;
+      const key = Object.prototype.hasOwnProperty.call(options, 'baseURL')
+        ? 'baseURL'
+        : Object.prototype.hasOwnProperty.call(options, 'baseUrl')
+          ? 'baseUrl'
+          : null;
+      if (key && options[key] !== desired) {
+        nextProvider.magpie = { ...entry, options: { ...options, [key]: desired } };
+      }
+    }
+  }
+
+  if (Object.keys(nextProvider).length > 0) nextUser.provider = nextProvider;
+  if (JSON.stringify(nextUser) === JSON.stringify(user)) return;
+
+  if (hasPrivate && !(await pathExists(opencodeStashPath(privateHome)))) {
+    // First sync: let the merge record what the user had, then apply the live
+    // gateway on the next pass.
+    await mergeOpenCodeConfigToUser(privateHome, home);
+    await syncOpenCodeConfigToUser(privateHome, home, gatewayUrl);
+    return;
+  }
+
+  await fs.mkdir(path.dirname(userPath), { recursive: true });
+  await fs.writeFile(userPath, `${JSON.stringify(nextUser, null, 2)}\n`, 'utf8');
+}
+
 export async function revertOpenCodeConfigFromUser(
   privateHome: string,
   home: string,
