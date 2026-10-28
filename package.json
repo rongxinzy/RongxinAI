@@ -31,23 +31,23 @@
     }
   },
   "engram": {
-    "version": "v3.6.0-zhiyuan.1",
+    "version": "v3.6.0-zhiyuan.2",
     "repo": "rongxinzy/engram",
     "runtimeAssets": {
-      "mac-x64": "engram_v3.6.0-zhiyuan.1_darwin_amd64.tar.gz",
-      "mac-arm64": "engram_v3.6.0-zhiyuan.1_darwin_arm64.tar.gz",
-      "win-x64": "engram_v3.6.0-zhiyuan.1_windows_amd64.zip",
-      "win-arm64": "engram_v3.6.0-zhiyuan.1_windows_arm64.zip",
-      "linux-x64": "engram_v3.6.0-zhiyuan.1_linux_amd64.tar.gz",
-      "linux-arm64": "engram_v3.6.0-zhiyuan.1_linux_arm64.tar.gz"
+      "mac-x64": "engram_v3.6.0-zhiyuan.2_darwin_amd64.tar.gz",
+      "mac-arm64": "engram_v3.6.0-zhiyuan.2_darwin_arm64.tar.gz",
+      "win-x64": "engram_v3.6.0-zhiyuan.2_windows_amd64.zip",
+      "win-arm64": "engram_v3.6.0-zhiyuan.2_windows_arm64.zip",
+      "linux-x64": "engram_v3.6.0-zhiyuan.2_linux_amd64.tar.gz",
+      "linux-arm64": "engram_v3.6.0-zhiyuan.2_linux_arm64.tar.gz"
     },
     "runtimeChecksums": {
-      "mac-x64": "55ac7cb87504342672b2e73f855bff977a08ea9ed35c427ccd64de3beeb9d32d",
-      "mac-arm64": "fda0af3999435a37f6e9d72e49b731651070c4c54fecd86af4e87d8bacb1b6a0",
-      "win-x64": "0646ba5827d6951a1fa83f5ac1d4f3f605c9d87e4d328fa8281202dce81776c7",
-      "win-arm64": "0a5998f9a8efc020e48476054e0ca6f750bad5834131d5982db0758b1b496dee",
-      "linux-x64": "20135f961d245e144cef0b21f3837455eba1394ac85976f8775193d32b934a5a",
-      "linux-arm64": "6711fa8b8de3b18ce01f83d43150eeeb14cb95660232d0798efc01343715c63c"
+      "mac-x64": "7d2c24a617856e44ba15b2ea6fca77bc2afc3782236b6d0d036342f9dc1f3bd1",
+      "mac-arm64": "4a05c2ee2c9d65b98e7c7095d43f44a767f3fe47094949c16540314150eb9e08",
+      "win-x64": "31e6c8c9a24cf4ea01a27db9d3eb49117721fc848937c1e44f0f7cd52504b232",
+      "win-arm64": "4a2221ae8480300bcbb1b658b33699cffd25ab8be957b18e29b14cbac17ec1bc",
+      "linux-x64": "c4441661eee63fb3f6496a52c4570c801ae63ac43412696ba2e7f82275f78846",
+      "linux-arm64": "f5be29b7b5f86a365d03fd7df085d70636b29503600c8a67eabf2bda89a9cf64"
     }
   },
   "strata": {
