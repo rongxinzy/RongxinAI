@@ -28,7 +28,9 @@ export class EngramRequestError extends Error {
     readonly code: string | undefined,
     detail: string,
   ) {
-    super(`Memory service request failed with HTTP ${status} for ${method} ${pathname}. ${detail.slice(0, 300)}`);
+    super(
+      `Memory service request failed with HTTP ${status} for ${method} ${pathname}. ${detail.slice(0, 300)}`,
+    );
     this.name = 'EngramRequestError';
   }
 }

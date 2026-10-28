@@ -7,7 +7,13 @@ import { EngramRequestError } from './zhiyuanEngramAdapter';
 test('treats an unknown project as an empty recall branch instead of failing', async () => {
   const adapter = {
     recall: vi.fn(async () => {
-      throw new EngramRequestError(404, 'GET', '/search', 'unknown_project', '{"code":"unknown_project"}');
+      throw new EngramRequestError(
+        404,
+        'GET',
+        '/search',
+        'unknown_project',
+        '{"code":"unknown_project"}',
+      );
     }),
     recent: vi.fn(),
   };
