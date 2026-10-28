@@ -8,7 +8,7 @@
  */
 import type { ProjectMemoryService } from './projectMemoryService';
 
-export const SESSION_CHECKPOINT_FORMAT_VERSION = 1;
+const SESSION_CHECKPOINT_FORMAT_VERSION = 1;
 
 export interface SessionCheckpointInput {
   goal: string;

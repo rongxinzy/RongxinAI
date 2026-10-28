@@ -4,8 +4,6 @@ import type { CoworkMessage } from '../coworkStore';
 import { SESSION_MEMORY_EXTRACTOR_VERSION } from './constants';
 import { redactPrivateBlocks } from './zhiyuanEngramAdapter';
 
-export { SESSION_MEMORY_EXTRACTOR_VERSION } from './constants';
-
 const MAX_SOURCE_MESSAGES = 12;
 const MAX_MESSAGE_CHARACTERS = 2_000;
 const MAX_SOURCE_CHARACTERS = 12_000;

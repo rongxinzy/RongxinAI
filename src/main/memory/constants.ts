@@ -60,7 +60,6 @@ export type AtomicMemorySourceKind =
 
 export const ATOMIC_MEMORY_EXTRACTOR_VERSION = 1;
 export const SESSION_MEMORY_EXTRACTOR_VERSION = 1;
-export const SESSION_SUMMARY_BACKFILL_VERSION = 1;
 export const PERSONAL_MEMORY_SESSION_PREFIX = 'personal:';
 export const MANUAL_MEMORY_SESSION_ID = 'settings-memory';
 
@@ -77,17 +76,6 @@ export const MemoryRecordStorageKind = {
 
 export type MemoryRecordStorageKind =
   (typeof MemoryRecordStorageKind)[keyof typeof MemoryRecordStorageKind];
-
-export const SessionSummaryBackfillStatus = {
-  DeliveryPending: 'delivery_pending',
-  Completed: 'completed',
-  EvidenceUnavailable: 'evidence_unavailable',
-  Failed: 'failed',
-  RetainedNoReplacement: 'retained_no_replacement',
-} as const;
-
-export type SessionSummaryBackfillStatus =
-  (typeof SessionSummaryBackfillStatus)[keyof typeof SessionSummaryBackfillStatus];
 
 export const EngramSearchMatchMode = {
   All: 'all',

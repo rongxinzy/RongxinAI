@@ -4,7 +4,7 @@ import {
 } from '../memory/sessionCheckpointService';
 import type { ProjectMemoryService } from '../memory/projectMemoryService';
 
-export const SessionSummaryToolName = 'session_summary';
+const SessionSummaryToolName = 'session_summary';
 
 export const SessionSummarySystemPrompt = [
   '## Session checkpoint',
