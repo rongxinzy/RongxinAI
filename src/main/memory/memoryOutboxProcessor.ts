@@ -23,6 +23,20 @@ export async function processMemoryOutboxItem(
   }
   const payload = parseConfirmPayload(item.payload);
   if (!payload) return retryInvalidOutboxItem(repository, item);
+  const checkpointSequence =
+    typeof payload.metadata?.checkpointSequence === 'number'
+      ? payload.metadata.checkpointSequence
+      : null;
+  if (
+    item.operation === MemoryOutboxOperation.SessionSummary &&
+    checkpointSequence !== null &&
+    repository.maxSessionCheckpointSequence(payload.sessionId) > checkpointSequence
+  ) {
+    // A newer checkpoint already landed. Retrying this older one would roll
+    // the session back, so it is complete by definition rather than an error.
+    repository.markCompleted(item.id);
+    return null;
+  }
   try {
     const { superseded } = validateMemoryOutboxRelationships(repository, payload);
     const candidate = adapter.saveCandidate({

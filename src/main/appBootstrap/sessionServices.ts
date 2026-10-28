@@ -13,8 +13,6 @@ import { ZhiYuanEngramAdapter } from '../memory/zhiyuanEngramAdapter';
 import { resolveProjectIdentity } from '../memory/projectIdentity';
 import { coworkImageRoot } from '../coworkImageAttachments';
 import { ConversationHistoryService } from '../conversationHistory/service';
-import { SessionSummaryService } from '../memory/sessionSummaryService';
-import { SessionSummaryBackfillService } from '../memory/sessionSummaryBackfillService';
 import {
   resolveAnySearchGatewayToken,
   resolveAnySearchGatewayUrl,
@@ -89,12 +87,6 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     agentRuntime.piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     agentRuntime.piRuntimeAdapter.setArtifactLedger(getArtifactLedger());
     agentRuntime.piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
-    agentRuntime.piRuntimeAdapter.setSessionSummaryService(
-      new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),
-    );
-    agentRuntime.piRuntimeAdapter.setSessionSummaryBackfillService(
-      new SessionSummaryBackfillService(getProjectMemoryService(), getCoworkStore()),
-    );
     agentRuntime.piRuntimeAdapter.setConversationHistoryService(
       new ConversationHistoryService(getStore().getDatabase()),
     );

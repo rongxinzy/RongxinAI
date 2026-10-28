@@ -72,6 +72,17 @@ class FakeRepository {
     return String(input.id);
   }
 
+  maxSessionCheckpointSequence(): number {
+    let max = 0;
+    for (const link of this.links) {
+      const metadata = link.metadata as { checkpointSequence?: number } | undefined;
+      if (typeof metadata?.checkpointSequence === 'number') {
+        max = Math.max(max, metadata.checkpointSequence);
+      }
+    }
+    return max;
+  }
+
   markCompleted(id: string) {
     const item = this.items.find(candidate => candidate.id === id);
     if (item) item.status = MemoryOutboxStatus.Completed;

@@ -37,6 +37,8 @@ import { resolvePiSkillRoots } from './piSkillRoots';
 import { buildPiCadViewerTool } from './piCadViewerTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
+import { buildSessionSummaryTool } from '../../sessionSummary/tool';
+import { HarnessActivationType } from '../../../shared/harness/constants';
 import { buildPiOcrTool } from './piOcrTool';
 import { isOcrSupported } from '../../ocr/ocrEngine';
 import { buildPiPythonTools } from './piPythonTools';
@@ -123,6 +125,32 @@ export function buildPiSessionCustomTools(
       ),
     );
   }
+  customTools.push(
+    buildSessionSummaryTool({
+      getProjectMemoryService: () => {
+        const service = host.getProjectMemoryService();
+        if (!service) throw new Error('Project memory service is unavailable.');
+        return service;
+      },
+      sessionId,
+      workingDirectory: workspaceRoot,
+      runId: workbenchRunId,
+      onOutcome: (outcome, reason) => {
+        const active = host.activeSessions.get(sessionId);
+        if (!active) return;
+        if (outcome === 'written') active.summaryCheckpointWritten = true;
+        if (outcome === 'skipped') active.summaryCheckpointSkipped = reason ?? true;
+        host.getWorkbenchTaskService()?.measurement?.recordActivation(workbenchRunId, {
+          activation:
+            outcome === 'written'
+              ? HarnessActivationType.SummaryWritten
+              : HarnessActivationType.SummarySkipped,
+          mechanism: 'session_checkpoint',
+          ...(reason ? { evidence: { reason } } : {}),
+        });
+      },
+    }),
+  );
   const projectMemoryService = host.getProjectMemoryService();
   if (!resourceState.chatMode && projectMemoryService) {
     customTools.push(

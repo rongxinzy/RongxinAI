@@ -40,6 +40,11 @@ export const HarnessActivationType = {
   WorkflowSkipped: 'workflow_skipped',
   RecoveryTriggered: 'recovery_triggered',
   LightweightReviewSkipped: 'lightweight_review_skipped',
+  SummaryGateReminder: 'summary_gate_reminder',
+  SummaryWritten: 'summary_written',
+  SummarySkipped: 'summary_skipped',
+  SummaryOmitted: 'summary_omitted',
+  SummaryFallback: 'summary_fallback',
 } as const;
 export type HarnessActivationType =
   (typeof HarnessActivationType)[keyof typeof HarnessActivationType];

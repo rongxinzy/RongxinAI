@@ -8,8 +8,6 @@ import type { CoworkStore } from '../../coworkStore';
 import type { ArtifactLedger } from '../../artifactLedger/artifactLedger';
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
-import type { SessionSummaryBackfillService } from '../../memory/sessionSummaryBackfillService';
-import type { SessionSummaryService } from '../../memory/sessionSummaryService';
 import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
@@ -78,10 +76,6 @@ export class PiRuntimeServiceBindings extends EventEmitter {
 
   protected projectMemoryService: ProjectMemoryService | null = null;
 
-  protected sessionSummaryService: SessionSummaryService | null = null;
-
-  protected sessionSummaryBackfillService: SessionSummaryBackfillService | null = null;
-
   protected conversationHistoryService: ConversationHistoryService | null = null;
 
   protected scheduledTaskService: ScheduledTaskService | null = null;
@@ -138,14 +132,6 @@ export class PiRuntimeServiceBindings extends EventEmitter {
 
   setProjectMemoryService(service: ProjectMemoryService): void {
     this.projectMemoryService = service;
-  }
-
-  setSessionSummaryService(service: SessionSummaryService): void {
-    this.sessionSummaryService = service;
-  }
-
-  setSessionSummaryBackfillService(service: SessionSummaryBackfillService): void {
-    this.sessionSummaryBackfillService = service;
   }
 
   setConversationHistoryService(service: ConversationHistoryService): void {

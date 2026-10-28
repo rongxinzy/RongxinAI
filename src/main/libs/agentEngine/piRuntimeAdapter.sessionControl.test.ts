@@ -23,6 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
+import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
 import type { CoworkStore } from '../../coworkStore';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
@@ -333,6 +334,7 @@ describe('PiRuntimeAdapter', () => {
       expect(loaderOptions.appendSystemPromptOverride()).toEqual([
         PiAskUserQuestionSystemPrompt,
         DeclareArtifactSystemPrompt,
+        SessionSummarySystemPrompt,
       ]);
     });
   });

@@ -2,8 +2,9 @@
  * Session memory completion for the Pi runtime adapter.
  *
  * Extracted from PiRuntimeAdapter: serializes per-session memory extraction
- * completions (each request chains onto the previous one) and runs the
- * post-turn summary maintenance (rollup + semantic backfill).
+ * completions (each request chains onto the previous one). Session checkpoints
+ * themselves are agent-authored via the session_summary tool, not rolled up
+ * from the transcript here.
  */
 
 import {
@@ -15,13 +16,8 @@ import type {
   SessionMemoryCompletion,
   SessionMemoryCompletionMessage,
 } from '../../memory/sessionMemoryExtractor';
-import type { SessionSummaryBackfillService } from '../../memory/sessionSummaryBackfillService';
-import type { SessionSummaryService } from '../../memory/sessionSummaryService';
 
-export interface PiSessionMemoryHost {
-  getSessionSummaryService(): SessionSummaryService | null;
-  getSessionSummaryBackfillService(): SessionSummaryBackfillService | null;
-}
+export interface PiSessionMemoryHost {}
 
 export class PiRuntimeSessionMemory {
   private readonly pendingMemoryCompletions = new Map<string, Promise<string>>();
@@ -60,28 +56,5 @@ export class PiRuntimeSessionMemory {
       ? await modelRuntime.completeSimple(model, context)
       : await pi.completeSimple(model, context, modelRequestOptions);
     return extractPiBackgroundCompletionText(result);
-  }
-
-  async runPostTurnMaintenance(
-    sessionId: string,
-    workingDirectory: string,
-    complete: SessionMemoryCompletion,
-  ): Promise<void> {
-    const sessionSummaryService = this.host.getSessionSummaryService();
-    if (sessionSummaryService) {
-      try {
-        await sessionSummaryService.rollup({ sessionId, workingDirectory, complete });
-      } catch (error) {
-        console.warn(`[SessionSummary] Failed to roll up session ${sessionId}:`, error);
-      }
-    }
-    const sessionSummaryBackfillService = this.host.getSessionSummaryBackfillService();
-    if (sessionSummaryBackfillService) {
-      try {
-        await sessionSummaryBackfillService.run(complete);
-      } catch (error) {
-        console.warn('[SessionSummaryBackfill] Failed to run semantic backfill:', error);
-      }
-    }
   }
 }

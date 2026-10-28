@@ -64,6 +64,11 @@ import {
 } from './piRuntimeSessionLifecycle';
 import { PiRuntimeTurnEvents } from './piRuntimeTurnEvents';
 import { PiRuntimeTurnRecovery } from './piRuntimeTurnRecovery';
+import { recordCheckpointFallback } from '../../memory/sessionCheckpointService';
+import { HarnessActivationType } from '../../../shared/harness/constants';
+
+const SUMMARY_REMINDER_PROMPT =
+  '本回合有文件产出但未写会话检查点。请调用 session_summary 工具，用 goal、accomplished、discoveries、nextSteps、relevantFiles 写一份检查点；若确无值得记录的内容，调用 session_summary(skip=true, reason=...)。';
 import {
   getPiModules,
   type ActivePiSession,
@@ -126,10 +131,7 @@ export class PiRuntimeAdapter
   }
 
   readonly queue = new PiRuntimeQueueController(this);
-  readonly sessionMemory = new PiRuntimeSessionMemory({
-    getSessionSummaryService: () => this.sessionSummaryService,
-    getSessionSummaryBackfillService: () => this.sessionSummaryBackfillService,
-  });
+  readonly sessionMemory = new PiRuntimeSessionMemory({});
 
   readonly turnEvents = new PiRuntimeTurnEvents({
     getStore: () => this.store,
@@ -149,8 +151,8 @@ export class PiRuntimeAdapter
     imageCapabilityConfiguration: active => this.recovery.imageCapabilityConfiguration(active),
     syncImageInputCapability: sessionIds => this.recovery.syncImageInputCapability(sessionIds),
     createSessionMemoryCompletion: active => this.sessionMemory.createCompletion(active),
-    runPostTurnMemoryMaintenance: (sessionId, workingDirectory, complete) =>
-      this.sessionMemory.runPostTurnMaintenance(sessionId, workingDirectory, complete),
+    requestSummaryReminder: (sessionId, active) => this.requestSummaryReminder(sessionId, active),
+    recordSummaryOmission: (sessionId, active) => this.recordSummaryOmission(sessionId, active),
   });
 
   readonly activeSessions = new Map<string, ActivePiSession>();
@@ -260,6 +262,41 @@ export class PiRuntimeAdapter
     options: PiContinueOptions = {},
   ): Promise<void> {
     return continuePiRuntimeSession(this, sessionId, prompt, options);
+  }
+
+  async requestSummaryReminder(sessionId: string, active: ActivePiSession): Promise<void> {
+    this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
+      activation: HarnessActivationType.SummaryGateReminder,
+      mechanism: 'session_checkpoint',
+    });
+    await this.continueSession(sessionId, SUMMARY_REMINDER_PROMPT);
+  }
+
+  async recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void> {
+    const goal =
+      this.store
+        ?.getSession(sessionId, 1)
+        ?.messages.filter(message => message.type === 'user')
+        .at(-1)?.content ?? '';
+    const artifacts = this.artifactLedgerService?.list(sessionId) ?? [];
+    this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
+      activation: HarnessActivationType.SummaryOmitted,
+      mechanism: 'session_checkpoint',
+      evidence: { artifactsProduced: artifacts.length },
+    });
+    if (!this.projectMemoryService) return;
+    await recordCheckpointFallback(this.projectMemoryService, {
+      sessionId,
+      workingDirectory: active.workspaceRoot,
+      goal,
+      finalAnswer: active.lastCompletedAnswerText,
+      verificationStatus: active.turnFailed ? 'failed' : 'unverified',
+      artifactReferences: artifacts.map(artifact => artifact.filePath ?? artifact.title),
+    });
+    this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
+      activation: HarnessActivationType.SummaryFallback,
+      mechanism: 'deterministic_fallback',
+    });
   }
 
   async patchSession(sessionId: string, patch: PiSessionPatch): Promise<void> {
