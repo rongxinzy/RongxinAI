@@ -33,8 +33,8 @@ const ACCEL_GAIN_MAX = 0.6;
 // ---- 抛掷物理默认值（= assets/config.jsonc 的 physics 段；运行时以配置成品为准） ----
 /** 抛掷重力（px/s²） */
 const GRAVITY = 1400;
-/** 碰边恢复系数：每次反弹保留约 78% 速度 */
-const RESTITUTION = 0.78;
+/** 碰边恢复系数：每次反弹保留约 33% 速度（毛绒质感，2–3 次小回弹） */
+const RESTITUTION = 0.33;
 /** 地面水平摩擦（/s） */
 const GROUND_FRICTION = 2.5;
 
@@ -46,6 +46,17 @@ const DEFAULT_PHYSICS: PhysicsParams = {
   ceilingBounce: true,
   throwPower: 1,
   petCollision: false,
+};
+
+/** 低于该法向速度视为滑行/轻放，不触发落地表演与挤压。 */
+const IMPACT_THRESHOLD = 320;
+/** 达到该速度时撞击反馈取满强度。 */
+const IMPACT_FULL_SPEED = 2400;
+
+/** 把碰撞法向速度换算成 0–1 的视觉反馈强度。 */
+export const impactStrength = (speed: number): number => {
+  if (!Number.isFinite(speed) || speed <= IMPACT_THRESHOLD) return 0;
+  return Math.min(1, speed / IMPACT_FULL_SPEED);
 };
 
 /** 落地时 |vy| 小于它直接停竖直 */

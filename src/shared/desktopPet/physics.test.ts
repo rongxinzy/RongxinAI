@@ -1,6 +1,6 @@
 import { test, expect } from 'vitest';
 
-import { estimateReleaseVelocity, MAX_THROW_SPEED, throwStep } from './physics';
+import { estimateReleaseVelocity, impactStrength, MAX_THROW_SPEED, throwStep } from './physics';
 
 test('a held release and gentle placement stay still, while a flick has bounded velocity', () => {
   const trail = [
@@ -43,4 +43,40 @@ test('a suspended timer cannot teleport the pet through a screen edge', () => {
   const bounds = { minX: 0, minY: 0, maxX: 1000, maxY: 800 };
   const start = { x: 500, y: 100, vx: 100, vy: 100 };
   expect(throwStep(start, 60, bounds)).toEqual(throwStep(start, 0.05, bounds));
+});
+
+test('a plush drop settles in a couple of small bounces', () => {
+  const bounds = { minX: 0, minY: 0, maxX: 1000, maxY: 800 };
+  const dropFrom = (drop: number) => {
+    let state = { x: 500, y: bounds.maxY - drop, vx: 0, vy: 0 };
+    let bounces = 0;
+    let seconds = 0;
+    for (let i = 0; i < 3000; i++) {
+      const previous = state;
+      const next = throwStep(state, 1 / 60, bounds);
+      if (next.vy < 0 && previous.vy > 0) bounces++;
+      state = next;
+      seconds += 1 / 60;
+      if (next.atRest) break;
+    }
+    return { bounces, seconds };
+  };
+
+  for (const drop of [100, 200]) {
+    const { bounces, seconds } = dropFrom(drop);
+    expect(bounces).toBeGreaterThanOrEqual(1);
+    expect(bounces).toBeLessThanOrEqual(3);
+    expect(seconds).toBeLessThan(1.5);
+  }
+});
+
+test('impact feedback only fires for meaningful collisions', () => {
+  expect(impactStrength(Number.NaN)).toBe(0);
+  expect(impactStrength(0)).toBe(0);
+  expect(impactStrength(320)).toBe(0);
+  expect(impactStrength(321)).toBeGreaterThan(0);
+  expect(impactStrength(513)).toBeGreaterThan(0.2);
+  expect(impactStrength(513)).toBeLessThan(0.3);
+  expect(impactStrength(2400)).toBe(1);
+  expect(impactStrength(3600)).toBe(1);
 });
