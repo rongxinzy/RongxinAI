@@ -8,6 +8,7 @@ import { MagpieManager } from './manager';
 import { isolatedMagpieEnvironment, prepareMagpieHome } from './environment';
 import { MAGPIE_LAN_KEY_NAME } from './lanAccess';
 import { verifyMagpieBinary, MAGPIE_COMMIT, MAGPIE_VERSION } from './integrity';
+import { mergeOpenCodeConfigToUser } from './externalAgentHostConfig';
 async function temporary() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'magpie-host-test-'));
 }
@@ -102,6 +103,12 @@ describe('Magpie owned lifecycle', () => {
     serviceEnabled?: { read(): boolean; write(enabled: boolean): void },
     gatewayPort?: { read(): number | undefined; write(port: number): void },
     lanAccess?: { read(): { enabled: boolean; lanToken: string | null } },
+    options?: {
+      agents?: unknown[];
+      onReapply?: (agentId: string) => Promise<void> | void;
+      failReapply?: string[];
+      failAgentsTimes?: number;
+    },
   ) {
     const root = await temporary();
     let port = 21000;
@@ -146,10 +153,14 @@ describe('Magpie owned lifecycle', () => {
         if (index >= 0) callerKeys.splice(index, 1);
         return Response.json({ keys: [] });
       }
+      if (url.endsWith('/api/state') && (options?.failAgentsTimes ?? 0) > 0) {
+        options!.failAgentsTimes! -= 1;
+        return new Response('warming up', { status: 500 });
+      }
       if (url.endsWith('/api/state'))
         return Response.json({
           settings: { secret: 'never-project' },
-          agents: [
+          agents: options?.agents ?? [
             {
               id: 'codex',
               name: 'Codex',
@@ -215,7 +226,13 @@ describe('Magpie owned lifecycle', () => {
         url.endsWith('/api/provider/off')
       )
         return Response.json({ ok: true });
-      if (url.includes('/api/agents/reapply/')) return Response.json({ ok: true });
+      if (url.includes('/api/agents/reapply/')) {
+        const agentId = decodeURIComponent(url.split('/api/agents/reapply/')[1] ?? '');
+        if (options?.failReapply?.includes(agentId))
+          return new Response('reapply failed', { status: 500 });
+        await options?.onReapply?.(agentId);
+        return Response.json({ ok: true });
+      }
       return Response.json({});
     });
     const manager = new MagpieManager({
@@ -569,6 +586,141 @@ describe('Magpie owned lifecycle', () => {
           ([url, init]) => url.includes('/api/agents/reapply/codex') && init?.method === 'POST',
         ),
       ).toBe(true);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('pushes a reapply port change into the user OpenCode config and keeps the stash', async () => {
+    const { manager, root } = await setup(undefined, undefined, undefined, {
+      agents: [{ id: 'opencode', name: 'OpenCode', wired: true }],
+    });
+    const userFile = path.join(root, '.config', 'opencode', 'opencode.json');
+    const privateFile = path.join(root, 'config', 'opencode', 'opencode.json');
+    const stashFile = path.join(root, 'host-agent-stash', 'opencode-merge.json');
+    const writePrivate = async (port: number) => {
+      await fs.mkdir(path.dirname(privateFile), { recursive: true });
+      await fs.writeFile(
+        privateFile,
+        `${JSON.stringify({ provider: { magpie: { baseUrl: `http://127.0.0.1:${port}/v1` } }, model: 'gateway/model' }, null, 2)}\n`,
+      );
+    };
+    try {
+      await fs.mkdir(path.dirname(userFile), { recursive: true });
+      await fs.writeFile(
+        userFile,
+        `${JSON.stringify({ provider: { mine: { baseUrl: 'https://mine.test/v1' } } }, null, 2)}\n`,
+      );
+      await writePrivate(1111);
+      await mergeOpenCodeConfigToUser(root, root);
+      await writePrivate(2222);
+
+      await manager.start();
+      const gateway = manager.status().gatewayUrl;
+      expect(gateway).toBeTruthy();
+      await vi.waitFor(async () => {
+        expect(await fs.readFile(userFile, 'utf8')).toContain(`${gateway}/v1`);
+      });
+      const written = await fs.readFile(userFile, 'utf8');
+      expect(written).not.toContain('127.0.0.1:2222');
+      const stash = JSON.parse(await fs.readFile(stashFile, 'utf8')) as {
+        addedProviderKeys: string[];
+        replacedProviderValues: Record<string, unknown>;
+      };
+      expect(stash.addedProviderKeys).toEqual(['magpie']);
+      expect(stash.replacedProviderValues).toEqual({});
+      expect(written).toContain('https://mine.test/v1');
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('retries a slow startup sweep before syncing the user config', async () => {
+    const { manager, root, fetcher } = await setup(undefined, undefined, undefined, {
+      agents: [{ id: 'opencode', name: 'OpenCode', wired: true }],
+      failAgentsTimes: 1,
+    });
+    const userFile = path.join(root, '.config', 'opencode', 'opencode.json');
+    try {
+      await fs.mkdir(path.dirname(userFile), { recursive: true });
+      await fs.writeFile(
+        userFile,
+        `${JSON.stringify({ provider: { magpie: { options: { baseURL: 'http://127.0.0.1:1111/v1' } } } }, null, 2)}\n`,
+      );
+      await manager.start();
+      const gateway = manager.status().gatewayUrl;
+      await vi.waitFor(
+        async () => {
+          expect(await fs.readFile(userFile, 'utf8')).toContain(`${gateway}/v1`);
+        },
+        { timeout: 5_000 },
+      );
+      expect(
+        fetcher.mock.calls.filter(([url]) => url.includes('/api/agents/reapply/opencode')).length,
+      ).toBeGreaterThan(0);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('updates the user OpenCode config when magpie keeps no private copy', async () => {
+    const { manager, root } = await setup(undefined, undefined, undefined, {
+      agents: [{ id: 'opencode', name: 'OpenCode', wired: true }],
+    });
+    const userFile = path.join(root, '.config', 'opencode', 'opencode.json');
+    try {
+      await fs.mkdir(path.dirname(userFile), { recursive: true });
+      await fs.writeFile(
+        userFile,
+        `${JSON.stringify({ provider: { magpie: { options: { baseURL: 'http://127.0.0.1:1111/v1' } } } }, null, 2)}\n`,
+      );
+
+      await manager.start();
+      const gateway = manager.status().gatewayUrl;
+      expect(gateway).toBeTruthy();
+      await vi.waitFor(async () => {
+        expect(await fs.readFile(userFile, 'utf8')).toContain(`${gateway}/v1`);
+      });
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the previous gateway port when the opencode reapply fails', async () => {
+    const { manager, root, fetcher } = await setup(undefined, undefined, undefined, {
+      agents: [{ id: 'opencode', name: 'OpenCode', wired: true }],
+      failReapply: ['opencode'],
+    });
+    const userFile = path.join(root, '.config', 'opencode', 'opencode.json');
+    const privateFile = path.join(root, 'config', 'opencode', 'opencode.json');
+    const writePrivate = async (port: number) => {
+      await fs.mkdir(path.dirname(privateFile), { recursive: true });
+      await fs.writeFile(
+        privateFile,
+        `${JSON.stringify({ provider: { magpie: { baseUrl: `http://127.0.0.1:${port}/v1` } } }, null, 2)}\n`,
+      );
+    };
+    try {
+      await fs.mkdir(path.dirname(userFile), { recursive: true });
+      await fs.writeFile(userFile, `${JSON.stringify({ provider: {} }, null, 2)}\n`);
+      await writePrivate(1111);
+      await mergeOpenCodeConfigToUser(root, root);
+      await writePrivate(2222);
+
+      await manager.start();
+      await vi.waitFor(() => {
+        expect(
+          fetcher.mock.calls.some(([url]) => url.includes('/api/agents/reapply/opencode')),
+        ).toBe(true);
+      });
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const user = await fs.readFile(userFile, 'utf8');
+      expect(user).toContain('127.0.0.1:1111');
+      expect(user).not.toContain('127.0.0.1:2222');
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });
