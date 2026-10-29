@@ -23,6 +23,7 @@ import {
 import { LlamaCppGatewayCredentialVault } from './llamacppGatewayCredentialVault';
 import type { LlamaCppModelOrchestrator } from './llamacppModelOrchestrator';
 import { findLlamaCppExecutable } from './llamacppRuntimePaths';
+import { LLAMACPP_MODEL_STOP_TIMEOUT_MS } from './llamacppModelProcessStop';
 
 const CONTROL_CONNECT_TIMEOUT_MS = 1_000;
 const MODEL_STARTUP_CONTROL_REQUEST_GRACE_MS = 5_000;
@@ -61,6 +62,12 @@ export function resolveLlamaCppModelDaemonRequestTimeoutMs(
   command: LlamaCppModelDaemonCommand,
   serviceConfig: LlamaCppServiceConfig,
 ): number {
+  if (
+    command === LlamaCppModelDaemonCommand.StopModel ||
+    command === LlamaCppModelDaemonCommand.StopAll
+  ) {
+    return LLAMACPP_MODEL_STOP_TIMEOUT_MS + CONTROL_CONNECT_TIMEOUT_MS;
+  }
   if (command !== LlamaCppModelDaemonCommand.EnsureModel) {
     return CONTROL_CONNECT_TIMEOUT_MS;
   }

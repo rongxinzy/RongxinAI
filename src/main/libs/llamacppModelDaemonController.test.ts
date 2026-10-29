@@ -79,6 +79,15 @@ test('resolves short and model-startup control request timeouts', () => {
   ).toBe(1_000);
 });
 
+test('allows bounded model cleanup to finish before stop control requests expire', () => {
+  for (const command of [
+    LlamaCppModelDaemonCommand.StopModel,
+    LlamaCppModelDaemonCommand.StopAll,
+  ]) {
+    expect(resolveLlamaCppModelDaemonRequestTimeoutMs(command, {})).toBe(3000);
+  }
+});
+
 describe('LlamaCppModelDaemonController', () => {
   const fetchMock = vi.fn();
 
@@ -159,6 +168,46 @@ describe('LlamaCppModelDaemonController', () => {
     await expect(controller.shutdownForQuit()).resolves.toBeUndefined();
     expect(mocks.spawn).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  test('dispatches shutdown before the 5s update cap even when stop-all stalls', async () => {
+    vi.useFakeTimers();
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const abort = new AbortController();
+      setTimeout(() => abort.abort(new Error('control timeout')), ms);
+      return abort.signal;
+    });
+    mocks.readRegistry.mockResolvedValue(registry(18080, 4444));
+    const commands: { command: string; elapsed: number }[] = [];
+    const started = Date.now();
+    let shuttingDown = false;
+    fetchMock.mockImplementation(async (_url, options) => {
+      const { command } = JSON.parse(options.body);
+      commands.push({ command, elapsed: Date.now() - started });
+      if (command === LlamaCppModelDaemonCommand.StopAll) {
+        return await new Promise((_resolve, reject) => {
+          options.signal.addEventListener('abort', () => reject(options.signal.reason), {
+            once: true,
+          });
+        });
+      }
+      if (command === LlamaCppModelDaemonCommand.Shutdown) shuttingDown = true;
+      else if (shuttingDown) throw new Error('daemon stopped');
+      return response();
+    });
+    try {
+      const controller = createController({ port: '8080', keepRunningOnAppQuit: false });
+      const stopped = controller.shutdownForQuit();
+      await vi.advanceTimersByTimeAsync(3000);
+      await stopped;
+      const shutdown = commands.find(item => item.command === LlamaCppModelDaemonCommand.Shutdown);
+      expect(shutdown?.elapsed).toBe(3000);
+      expect(shutdown!.elapsed).toBeLessThan(5000);
+    } finally {
+      timeoutSpy.mockRestore();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
 
   test('does not use a stale registry PID to terminate a process', async () => {
