@@ -172,7 +172,7 @@ export function checkpointReceipt(record: SessionCheckpointRecord): SessionCheck
   return {
     checkpointId: record.id,
     syncState:
-      record.syncStatus === SessionCheckpointSyncState.Synced
+      record.syncStatus === MemoryOutboxStatus.Completed
         ? SessionCheckpointSyncState.Synced
         : record.syncStatus === SessionCheckpointSyncState.Superseded
           ? SessionCheckpointSyncState.Superseded

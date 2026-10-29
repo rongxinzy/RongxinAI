@@ -10,6 +10,7 @@ export interface RuntimeSessionIdentityInput {
   runtimeSessionId: string;
   projectId: string;
   projectRoot: string;
+  makeCurrent?: boolean;
 }
 
 export interface SessionFinalizationInput {
@@ -44,6 +45,32 @@ function migrateSessionLifecycleStorage(db: Database.Database): void {
         `);
       },
     },
+    {
+      version: 4,
+      name: 'runtime-session-history-and-current-pointer',
+      up: database => {
+        database.exec(`
+          CREATE TABLE memory_runtime_sessions_v4 (
+            local_session_id TEXT NOT NULL,
+            runtime_session_id TEXT NOT NULL UNIQUE,
+            project_id TEXT NOT NULL,
+            project_root TEXT NOT NULL,
+            is_current INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(local_session_id, runtime_session_id)
+          );
+          INSERT INTO memory_runtime_sessions_v4 (
+            local_session_id, runtime_session_id, project_id, project_root, is_current, updated_at
+          )
+          SELECT local_session_id, runtime_session_id, project_id, project_root, 1, updated_at
+          FROM memory_runtime_sessions;
+          DROP TABLE memory_runtime_sessions;
+          ALTER TABLE memory_runtime_sessions_v4 RENAME TO memory_runtime_sessions;
+          CREATE UNIQUE INDEX idx_memory_runtime_sessions_current
+            ON memory_runtime_sessions(local_session_id) WHERE is_current = 1;
+        `);
+      },
+    },
   ]);
 }
 
@@ -51,27 +78,39 @@ function saveRuntimeSessionIdentity(
   db: Database.Database,
   input: RuntimeSessionIdentityInput,
 ): void {
-  db.prepare(
-    `INSERT INTO memory_runtime_sessions (
-      local_session_id, runtime_session_id, project_id, project_root, updated_at
-    ) VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(local_session_id) DO UPDATE SET
-      runtime_session_id = excluded.runtime_session_id,
-      project_id = excluded.project_id,
-      project_root = excluded.project_root,
-      updated_at = excluded.updated_at`,
-  ).run(
-    input.localSessionId,
-    input.runtimeSessionId,
-    input.projectId,
-    input.projectRoot,
-    new Date().toISOString(),
-  );
+  db.transaction(() => {
+    const makeCurrent = input.makeCurrent !== false;
+    if (makeCurrent) {
+      db.prepare(
+        'UPDATE memory_runtime_sessions SET is_current = 0 WHERE local_session_id = ?',
+      ).run(input.localSessionId);
+    }
+    db.prepare(
+      `INSERT INTO memory_runtime_sessions (
+        local_session_id, runtime_session_id, project_id, project_root, is_current, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(local_session_id, runtime_session_id) DO UPDATE SET
+        project_id = excluded.project_id,
+        project_root = excluded.project_root,
+        is_current = MAX(memory_runtime_sessions.is_current, excluded.is_current),
+        updated_at = excluded.updated_at`,
+    ).run(
+      input.localSessionId,
+      input.runtimeSessionId,
+      input.projectId,
+      input.projectRoot,
+      makeCurrent ? 1 : 0,
+      new Date().toISOString(),
+    );
+  })();
 }
 
 function getRuntimeSessionId(db: Database.Database, localSessionId: string): string | null {
   const row = db
-    .prepare('SELECT runtime_session_id FROM memory_runtime_sessions WHERE local_session_id = ?')
+    .prepare(
+      `SELECT runtime_session_id FROM memory_runtime_sessions
+       WHERE local_session_id = ? AND is_current = 1 LIMIT 1`,
+    )
     .get(localSessionId) as { runtime_session_id: string } | undefined;
   return row?.runtime_session_id ?? null;
 }
@@ -148,6 +187,42 @@ function queueSessionFinalizations(
   })();
 }
 
+function deferSessionFinalization(
+  db: Database.Database,
+  outboxId: string,
+  localSessionId: string,
+): boolean {
+  const blocker = db
+    .prepare(
+      `SELECT MIN(available_at) AS available_at FROM memory_outbox
+       WHERE status = ? AND operation IN (?, ?, ?)
+         AND json_extract(payload_json, '$.sessionId') = ?`,
+    )
+    .get(
+      MemoryOutboxStatus.Pending,
+      MemoryOutboxOperation.Confirm,
+      MemoryOutboxOperation.SessionSummary,
+      MemoryOutboxOperation.Supersede,
+      localSessionId,
+    ) as { available_at: string | null };
+  if (!blocker.available_at) return false;
+  db.transaction(() => {
+    const message = 'Waiting for earlier session writes.';
+    db.prepare('UPDATE memory_outbox SET available_at = ?, last_error = ? WHERE id = ?').run(
+      blocker.available_at,
+      message,
+      outboxId,
+    );
+    db.prepare(
+      `UPDATE memory_session_finalizations SET status = ?, error = ?
+       WHERE runtime_session_id = (
+         SELECT json_extract(payload_json, '$.runtimeSessionId') FROM memory_outbox WHERE id = ?
+       )`,
+    ).run(MemoryOutboxStatus.Pending, message, outboxId);
+  })();
+  return true;
+}
+
 function getSessionFinalization(
   db: Database.Database,
   runtimeSessionId: string,
@@ -213,6 +288,10 @@ export class SessionLifecycleStore {
 
   queueSessionFinalizations(inputs: SessionFinalizationInput[], deleteSessions: () => void): void {
     queueSessionFinalizations(this.db, inputs, deleteSessions);
+  }
+
+  deferSessionFinalization(outboxId: string, localSessionId: string): boolean {
+    return deferSessionFinalization(this.db, outboxId, localSessionId);
   }
 
   completeSessionFinalization(outboxId: string): void {

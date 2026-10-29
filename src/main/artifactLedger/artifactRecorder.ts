@@ -386,10 +386,12 @@ export class ArtifactRecorder {
     }
     for (const [key, entry] of next.byKey) {
       if (base.byKey.get(key)?.mtimeMs === entry.mtimeMs) continue;
-      // Write/edit already recorded this run; the diff must not duplicate it.
-      // Snapshot keys are bare normalized paths; recordedKeys carries the
-      // `path:`-prefixed artifact key, so compare through the same helper.
-      if (this.recordedKeys.has(artifactKeyForPath(entry.path))) continue;
+      // A new ledger row is unnecessary for an already recorded path, but a
+      // changed mtime is still new work that the checkpoint must cover.
+      if (this.recordedKeys.has(artifactKeyForPath(entry.path))) {
+        this.workVersion += 1;
+        continue;
+      }
       const type = getArtifactTypeByExtension(entry.path);
       if (!type) continue;
       this.record({

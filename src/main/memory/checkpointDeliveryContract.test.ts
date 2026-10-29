@@ -53,6 +53,14 @@ test('offline commit is readable after restart and resumes delivery', async () =
     MemoryOutboxStatus.Completed,
   );
   expect(recoveredRepository.getLink(result.checkpointId)?.memoryId).toBe(17);
+  await expect(
+    recovered.saveSessionSummary({
+      sessionId: 'session-1',
+      workingDirectory: '/work',
+      summary: 'changed by a replay must stay immutable',
+      linkId: result.checkpointId,
+    }),
+  ).resolves.toEqual({ checkpointId: result.checkpointId, syncState: 'synced' });
 });
 
 test('operation id survives a lost response, failed recovery and process restart', async () => {
@@ -67,6 +75,9 @@ test('operation id survives a lost response, failed recovery and process restart
       if (init?.method === 'POST') {
         operationIds.push(JSON.parse(String(init.body)).operation_id);
         throw new Error('socket timeout');
+      }
+      if (parsed.pathname === '/observations/17') {
+        return jsonResponse({ session_id: 'session-1' });
       }
       resultIds.push(parsed.searchParams.get('operation_id') ?? '');
       recoveryAttempts += 1;

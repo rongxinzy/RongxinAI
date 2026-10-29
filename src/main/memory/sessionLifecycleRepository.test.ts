@@ -106,3 +106,108 @@ test('finalize completion and uncertain failure update durable intent distinctly
   expect(getSessionFinalization(database, 'session-2')?.status).toBe(MemoryOutboxStatus.Failed);
   expect(repository.listPending()).toHaveLength(0);
 });
+
+test('finalize waits for an earlier checkpoint even while it is in backoff', async () => {
+  const database = new Database(':memory:');
+  const repository = new MemoryRepository(database);
+  repository.saveSessionCheckpoint({
+    id: 'checkpoint-old',
+    sessionId: 'session-1',
+    projectId: 'project-a',
+    projectRoot: '/work',
+    summary: 'old checkpoint',
+    expiresAt: '2026-12-01T00:00:00.000Z',
+  });
+  const checkpoint = repository.listPending()[0];
+  repository.markRetry(checkpoint.id, 1, 'temporary failure');
+  repository.lifecycle.queueSessionFinalizations(
+    [{ sessionId: 'session-1', projectId: 'project-a', summary: 'final summary' }],
+    () => {},
+  );
+  const close =
+    repository
+      .listPending()
+      .find(item => item.operation === MemoryOutboxOperation.FinalizeSession) ?? null;
+  const calls: string[] = [];
+  const adapter = {
+    saveCandidate: vi.fn((input: Record<string, unknown>) => ({ id: 'candidate', ...input })),
+    confirmMemory: vi.fn(async () => {
+      calls.push('checkpoint');
+      return 42;
+    }),
+    finalizeSession: vi.fn(async () => {
+      calls.push('finalize');
+      return { sessionId: 'session-1', state: 'finalized', summaryId: 17, alreadyFinalized: false };
+    }),
+  };
+
+  await processMemoryOutboxItem(repository, adapter as never, close);
+  expect(adapter.finalizeSession).not.toHaveBeenCalled();
+  expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Pending);
+
+  await processMemoryOutboxItem(repository, adapter as never, checkpoint);
+  repository.makePendingAvailable();
+  await processMemoryOutboxItem(repository, adapter as never, close);
+  expect(calls).toEqual(['checkpoint', 'finalize']);
+});
+
+test('all runtime identities retain their local owner while only the current pointer advances', () => {
+  const repository = new MemoryRepository(new Database(':memory:'));
+  for (const runtimeSessionId of ['session-1:resume:1', 'session-1:resume:2']) {
+    repository.lifecycle.saveRuntimeSessionId({
+      localSessionId: 'session-1',
+      runtimeSessionId,
+      projectId: 'project-a',
+      projectRoot: '/work',
+    });
+  }
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1:resume:2',
+    projectId: 'project-a',
+    projectRoot: '/work',
+  });
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1:resume:1',
+    projectId: 'project-a',
+    projectRoot: '/work',
+    makeCurrent: false,
+  });
+
+  expect(repository.lifecycle.getRuntimeSessionId('session-1')).toBe('session-1:resume:2');
+  expect(repository.lifecycle.getLocalSessionIdByRuntimeId('session-1:resume:1')).toBe('session-1');
+  expect(repository.lifecycle.getLocalSessionIdByRuntimeId('session-1:resume:2')).toBe('session-1');
+});
+
+test('schema v4 migration preserves the current identity and permits later continuations', () => {
+  const database = new Database(':memory:');
+  database.exec(`
+    CREATE TABLE schema_migrations (scope TEXT PRIMARY KEY, version INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+    INSERT INTO schema_migrations (scope, version, updated_at) VALUES ('memory', 3, 1);
+    CREATE TABLE memory_runtime_sessions (
+      local_session_id TEXT PRIMARY KEY,
+      runtime_session_id TEXT NOT NULL UNIQUE,
+      project_id TEXT NOT NULL,
+      project_root TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    INSERT INTO memory_runtime_sessions (
+      local_session_id, runtime_session_id, project_id, project_root, updated_at
+    ) VALUES ('session-1', 'session-1:resume:1', 'project-a', '/work', '2026-10-29T00:00:00Z');
+  `);
+  const repository = new MemoryRepository(database);
+
+  expect(repository.lifecycle.getRuntimeSessionId('session-1')).toBe('session-1:resume:1');
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1:resume:2',
+    projectId: 'project-a',
+    projectRoot: '/work',
+  });
+  expect(repository.lifecycle.getRuntimeSessionId('session-1')).toBe('session-1:resume:2');
+  expect(repository.lifecycle.getLocalSessionIdByRuntimeId('session-1:resume:1')).toBe('session-1');
+  expect(
+    database.prepare("SELECT version FROM schema_migrations WHERE scope = 'memory'").get(),
+  ).toEqual({ version: 4 });
+});

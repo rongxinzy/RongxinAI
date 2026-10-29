@@ -490,3 +490,32 @@ test('work version increases when the same artifact path is modified again', asy
   expect(recorder.recordedWorkVersion()).toBe(0);
   recorder.dispose();
 });
+
+test('script changes to an already recorded path still advance work version', async () => {
+  const { root, recorder } = await createWorkspace();
+  recorder.onRunStart('run-1');
+  recorder.onToolStart('call-write', 'write', { file_path: 'report.xlsx', content: 'first' });
+  recorder.onToolEnd({
+    toolCallId: 'call-write',
+    toolName: 'write',
+    args: { file_path: 'report.xlsx', content: 'first' },
+    isError: false,
+    resultMessageId: 'message-write',
+  });
+  const coveredVersion = recorder.recordedWorkVersion();
+  await fs.writeFile(path.join(root, 'report.xlsx'), 'changed by a script');
+  const changedAt = new Date(Date.now() + 5_000);
+  await fs.utimes(path.join(root, 'report.xlsx'), changedAt, changedAt);
+
+  recorder.onToolEnd({
+    toolCallId: 'call-script',
+    toolName: 'python_execute',
+    args: { code: 'update workbook' },
+    isError: false,
+    resultMessageId: 'message-script',
+  });
+  await recorder.flushDiffs();
+
+  expect(recorder.recordedWorkVersion()).toBeGreaterThan(coveredVersion);
+  recorder.dispose();
+});

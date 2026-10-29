@@ -98,14 +98,17 @@ export class ZhiYuanEngramAdapter {
   async confirmMemory(
     candidate: MemoryCandidate,
     workingDirectory: string,
-    onRuntimeSession?: (runtimeSessionId: string) => void,
+    onRuntimeSession?: (runtimeSessionId: string, recovered?: boolean) => void,
   ): Promise<number | null> {
     const connection = await this.getConnection();
     if (!connection) return null;
     const operationId = candidate.operationId ?? candidate.id;
-    if (candidate.recoverExistingResult && !candidate.runtimeSessionId) {
+    if (candidate.recoverExistingResult) {
       const recovered = await this.recoverObservation(connection, operationId);
-      if (recovered !== null) return recovered;
+      if (recovered) {
+        if (recovered.runtimeSessionId) onRuntimeSession?.(recovered.runtimeSessionId, true);
+        return recovered.id;
+      }
     }
     const runtimeSessionId = await this.ensureSession(
       connection,
@@ -132,7 +135,9 @@ export class ZhiYuanEngramAdapter {
       return saved.id;
     } catch (error) {
       if (!isTimeoutError(error)) throw error;
-      return await this.recoverObservation(connection, operationId);
+      const recovered = await this.recoverObservation(connection, operationId);
+      if (recovered?.runtimeSessionId) onRuntimeSession?.(recovered.runtimeSessionId, true);
+      return recovered?.id ?? null;
     }
   }
 
@@ -196,7 +201,7 @@ export class ZhiYuanEngramAdapter {
     observationId: number;
     candidate: MemoryCandidate;
     workingDirectory: string;
-    onRuntimeSession?: (runtimeSessionId: string) => void;
+    onRuntimeSession?: (runtimeSessionId: string, recovered?: boolean) => void;
   }): Promise<number | null> {
     const replacementId = await this.confirmMemory(
       input.candidate,
@@ -229,13 +234,19 @@ export class ZhiYuanEngramAdapter {
   private async recoverObservation(
     connection: EngramConnection,
     operationId: string,
-  ): Promise<number | null> {
+  ): Promise<{ id: number; runtimeSessionId?: string } | null> {
     try {
-      const recovered = await this.request<{ id: number }>(
+      const recovered = await this.request<{ id: number; session_id?: string }>(
         connection,
         `/observations/save-result?operation_id=${encodeURIComponent(operationId)}`,
       );
-      return recovered.id;
+      const observation = recovered.session_id
+        ? null
+        : await this.request<EngramObservation>(connection, `/observations/${recovered.id}`);
+      return {
+        id: recovered.id,
+        runtimeSessionId: recovered.session_id ?? observation?.session_id,
+      };
     } catch (error) {
       if (error instanceof EngramRequestError && error.status === 404) return null;
       throw error;

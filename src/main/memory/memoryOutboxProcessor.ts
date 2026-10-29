@@ -56,14 +56,15 @@ export async function processMemoryOutboxItem(
       topicKey: payload.topicKey,
       operationId: payload.linkId,
       runtimeSessionId,
-      recoverExistingResult: !runtimeSessionId,
+      recoverExistingResult: true,
     });
-    const onRuntimeSession = (resolvedId: string): void => {
+    const onRuntimeSession = (resolvedId: string, recovered = false): void => {
       repository.lifecycle?.saveRuntimeSessionId({
         localSessionId: payload.sessionId,
         runtimeSessionId: resolvedId,
         projectId: payload.projectId,
         projectRoot: payload.projectRoot,
+        makeCurrent: !recovered,
       });
     };
     const memoryId =
@@ -127,6 +128,7 @@ async function processSessionFinalization(
 ): Promise<number | null> {
   const payload = parseFinalizeSessionPayload(item.payload);
   if (!payload) return retryInvalidOutboxItem(repository, item);
+  if (repository.lifecycle?.deferSessionFinalization(item.id, payload.sessionId)) return null;
   try {
     const result = await adapter.finalizeSession({
       sessionId: payload.runtimeSessionId,
