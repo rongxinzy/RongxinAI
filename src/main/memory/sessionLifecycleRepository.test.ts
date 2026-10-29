@@ -332,3 +332,64 @@ test('a completed close does not suppress finalization after resumed work', asyn
   close('duplicate close with no new work');
   expect(adapter.finalizeSession).toHaveBeenCalledTimes(2);
 });
+
+test('a new lifecycle gets a distinct outbox and never rewrites the old completed intent', async () => {
+  const database = new Database(':memory:');
+  const repository = new MemoryRepository(database);
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1',
+    projectId: 'project-a',
+    projectRoot: '/work',
+  });
+  let failNextContinuation = true;
+  const adapter = {
+    finalizeSession: vi.fn(async (input: { sessionId: string }) => {
+      if (input.sessionId === 'session-1:resume:2' && failNextContinuation) {
+        failNextContinuation = false;
+        throw new Error('socket timeout');
+      }
+      return {
+        sessionId: input.sessionId,
+        state: 'finalized',
+        summaryId: 17,
+        alreadyFinalized: false,
+      };
+    }),
+  };
+  const close = (summary: string) => {
+    repository.lifecycle.queueSessionFinalizations(
+      [{ sessionId: 'session-1', projectId: 'project-a', summary }],
+      () => {},
+    );
+  };
+  close('close root');
+  await processMemoryOutboxItem(repository, adapter as never, repository.listPending()[0]);
+  expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Completed);
+
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1:resume:2',
+    projectId: 'project-a',
+    projectRoot: '/work',
+  });
+  close('close continuation');
+  await processMemoryOutboxItem(repository, adapter as never, repository.listPending()[0]);
+  expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Completed);
+  expect(getSessionFinalization(database, 'session-1:resume:2')?.status).toBe(
+    MemoryOutboxStatus.Failed,
+  );
+
+  close('retry continuation');
+  await processMemoryOutboxItem(repository, adapter as never, repository.listPending()[0]);
+  expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Completed);
+  expect(getSessionFinalization(database, 'session-1:resume:2')?.status).toBe(
+    MemoryOutboxStatus.Completed,
+  );
+  expect(
+    database
+      .prepare('SELECT link_id FROM memory_outbox ORDER BY created_at, rowid')
+      .all()
+      .map(row => (row as { link_id: string }).link_id),
+  ).toEqual(['finalize:session-1', 'finalize:session-1:resume:2']);
+});
