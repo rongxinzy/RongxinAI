@@ -80,6 +80,38 @@ const claudeNativeExecutablePath = (packageRoot: string): string =>
   path.join(packageRoot, '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
 
 /** Resolves npm and pnpm global-package layouts without executing a shell shim. */
+const LAUNCHER_TEXT_LIMIT = 64 * 1024;
+
+/**
+ * npm global shims are `.cmd` files. The process spawner does not run them
+ * through a shell, so follow the shim to the real executable.
+ * `%dp0%` is expanded with this process's separator. CI runs the win32
+ * discovery path on Linux, where a hard-coded backslash is not a separator.
+ */
+const resolveWindowsLauncherExecutable = async (
+  launcherPath: string,
+  platform: NodeJS.Platform,
+): Promise<string> => {
+  if (platform !== 'win32' || !/\.(?:cmd|bat|ps1)$/i.test(launcherPath)) return launcherPath;
+  let text: string;
+  try {
+    text = await readFile(launcherPath, 'utf8');
+  } catch {
+    return launcherPath;
+  }
+  if (text.length > LAUNCHER_TEXT_LIMIT) return launcherPath;
+  const directory = path.dirname(launcherPath);
+  const expanded = text.replace(/%~?dp0%/gi, `${directory}${path.sep}`);
+  const match = expanded.match(/"([^"]+\.exe)"|(\S+\.exe)/i);
+  const target = (match?.[1] ?? match?.[2])?.replace(/[\\/]/g, path.sep);
+  if (!target) return launcherPath;
+  try {
+    return await realpath(path.resolve(directory, target));
+  } catch {
+    return launcherPath;
+  }
+};
+
 export const resolveClaudeNativeExecutable = async (
   cliPath: string,
   platform: NodeJS.Platform,
@@ -200,7 +232,7 @@ export class AcpDiscoveryService {
         return this.profile({
           name: agent.name,
           description: `${agent.description} Detected locally. Probe before using.`,
-          command: resolved,
+          command: await resolveWindowsLauncherExecutable(resolved, this.platform),
           args: agent.args,
           environment: {
             ...agent.environment,
@@ -437,7 +469,10 @@ export class AcpDiscoveryService {
 
   private executableNames(executable: string): string[] {
     if (this.platform !== 'win32') return [executable];
-    return [`${executable}.exe`, `${executable}.cmd`, `${executable}.bat`, executable];
+    // Registry commands are often already `opencode.exe`. Appending another
+    // extension looks for `opencode.exe.cmd` and misses the npm `opencode.cmd`.
+    const stem = executable.replace(/\.(?:exe|cmd|bat)$/i, '');
+    return [`${stem}.exe`, `${stem}.cmd`, `${stem}.bat`, stem];
   }
 
   private async resolve(
