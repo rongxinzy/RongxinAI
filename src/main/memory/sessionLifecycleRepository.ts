@@ -165,13 +165,8 @@ function queueSessionFinalizations(
         previous?.status === MemoryOutboxStatus.Completed
           ? undefined
           : (db
-              .prepare(
-                `SELECT id FROM memory_outbox
-                 WHERE operation = ? AND json_extract(payload_json, '$.sessionId') = ?`,
-              )
-              .get(MemoryOutboxOperation.FinalizeSession, input.sessionId) as
-              | { id: string }
-              | undefined);
+              .prepare('SELECT id FROM memory_outbox WHERE link_id = ? AND operation = ?')
+              .get(linkId, MemoryOutboxOperation.FinalizeSession) as { id: string } | undefined);
       const payload = JSON.stringify({
         sessionId: input.sessionId,
         runtimeSessionId,
