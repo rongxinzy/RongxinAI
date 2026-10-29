@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import type { LlamaCppModelLaunchInput, LlamaCppServiceConfig } from '../../shared/llamacpp';
 import { buildLlamaCppServeEnv, buildLlamaServerModelArgs } from './llamacppServe';
 import { LlamaCppModelPortAllocator } from './llamacppModelPortAllocator';
+import { stopLlamaCppModelProcess } from './llamacppModelProcessStop';
 
 const LOCAL_MODEL_HOST = '127.0.0.1';
 const STARTUP_POLL_INTERVAL_MS = 250;
@@ -32,6 +33,7 @@ export type LlamaCppModelProcessSnapshot = {
 type ManagedModelProcess = LlamaCppModelProcessSnapshot & {
   child: ChildProcess;
   startup: Promise<LlamaCppModelProcessSnapshot>;
+  stopping?: Promise<void>;
 };
 
 type LlamaCppModelProcessManagerOptions = {
@@ -54,7 +56,12 @@ export class LlamaCppModelProcessManager extends EventEmitter {
 
   list(): LlamaCppModelProcessSnapshot[] {
     return Array.from(this.processes.values()).map(
-      ({ child: _child, startup: _startup, ...snapshot }): LlamaCppModelProcessSnapshot => snapshot,
+      ({
+        child: _child,
+        startup: _startup,
+        stopping: _stopping,
+        ...snapshot
+      }): LlamaCppModelProcessSnapshot => snapshot,
     );
   }
 
@@ -65,6 +72,10 @@ export class LlamaCppModelProcessManager extends EventEmitter {
     if (!modelPath) throw new Error(`Model path is required for ${modelName}.`);
 
     const existing = this.processes.get(modelName);
+    if (existing?.stopping) {
+      await existing.stopping;
+      return await this.ensureRunning(input);
+    }
     if (existing) return await existing.startup;
 
     const executablePath = await this.options.getExecutablePath();
@@ -97,8 +108,10 @@ export class LlamaCppModelProcessManager extends EventEmitter {
     this.processes.set(modelName, record);
     this.subscribeToOutput(record);
     child.once('exit', (code, signal) => {
-      if (this.processes.get(modelName) === record) this.processes.delete(modelName);
-      this.portAllocator.release(modelName);
+      if (this.processes.get(modelName) === record) {
+        this.processes.delete(modelName);
+        this.portAllocator.release(modelName);
+      }
       this.emit(LlamaCppModelProcessEvent.Exited, { modelName, code, signal });
     });
     child.once('error', error => {
@@ -122,18 +135,22 @@ export class LlamaCppModelProcessManager extends EventEmitter {
     const normalizedModelName = modelName.trim();
     const record = this.processes.get(normalizedModelName);
     if (!record) return;
-    this.processes.delete(normalizedModelName);
-    this.portAllocator.release(normalizedModelName);
-    if (record.child.exitCode !== null || record.child.signalCode !== null) return;
-    await new Promise<void>(resolve => {
-      record.child.once('exit', () => resolve());
-      record.child.kill();
-    });
+    if (record.stopping) return await record.stopping;
+    record.stopping = stopLlamaCppModelProcess(record.child)
+      .then(() => {
+        if (this.processes.get(normalizedModelName) === record) {
+          this.processes.delete(normalizedModelName);
+          this.portAllocator.release(normalizedModelName);
+        }
+      })
+      .finally(() => {
+        record.stopping = undefined;
+      });
+    await record.stopping;
   }
 
   async stopAll(): Promise<void> {
     await Promise.all(Array.from(this.processes.keys()).map(modelName => this.stop(modelName)));
-    this.portAllocator.releaseAll();
   }
 
   private subscribeToOutput(record: ManagedModelProcess): void {
