@@ -96,6 +96,49 @@ test('a committed result is recovered with its original identity even when a run
   expect(recovered).toEqual([{ id: 'session-1:resume:1', historical: true }]);
 });
 
+test('a failed finalize clears the cached identity so the next write resumes', async () => {
+  let sessionCalls = 0;
+  let observationBody: Record<string, unknown> | undefined;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === '/sessions') {
+        sessionCalls += 1;
+        return jsonResponse({ id: sessionCalls === 1 ? 'session-1' : 'session-1:resume:2' }, 201);
+      }
+      if (parsed.pathname === '/sessions/session-1/finalize') throw new Error('socket timeout');
+      if (parsed.pathname === '/observations/save-result') return jsonResponse({}, 404);
+      if (parsed.pathname === '/observations') {
+        observationBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return jsonResponse({ id: 42 }, 201);
+      }
+      throw new Error(`unexpected request: ${parsed.pathname}`);
+    }),
+  );
+  const adapter = new ZhiYuanEngramAdapter({
+    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+    start: vi.fn(),
+  } as never);
+  await adapter.resumeSession('session-1', 'project-a', '/work');
+  await expect(
+    adapter.finalizeSession({ sessionId: 'session-1', project: 'project-a', summary: 'summary' }),
+  ).rejects.toThrow('socket timeout');
+  const candidate = adapter.saveCandidate({
+    sessionId: 'session-1',
+    project: 'project-a',
+    scope: EngramMemoryScope.Session,
+    type: EngramObservationType.SessionSummary,
+    title: 'Session summary',
+    content: 'checkpoint',
+    recoverExistingResult: true,
+  });
+
+  await expect(adapter.confirmMemory(candidate, '/work')).resolves.toBe(42);
+  expect(sessionCalls).toBe(2);
+  expect(observationBody?.session_id).toBe('session-1:resume:2');
+});
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,

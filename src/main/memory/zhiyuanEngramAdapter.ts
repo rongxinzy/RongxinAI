@@ -151,15 +151,23 @@ export class ZhiYuanEngramAdapter {
   } | null> {
     const connection = await this.getConnection();
     if (!connection) return null;
-    const result = await this.request<{
-      session_id: string;
-      state: string;
-      summary_id: number;
-      already_finalized: boolean;
-    }>(connection, `/sessions/${encodeURIComponent(input.sessionId)}/finalize`, {
-      method: 'POST',
-      body: JSON.stringify({ project: input.project, summary: input.summary }),
-    });
+    let result;
+    try {
+      result = await this.request<{
+        session_id: string;
+        state: string;
+        summary_id: number;
+        already_finalized: boolean;
+      }>(connection, `/sessions/${encodeURIComponent(input.sessionId)}/finalize`, {
+        method: 'POST',
+        body: JSON.stringify({ project: input.project, summary: input.summary }),
+      });
+    } catch (error) {
+      for (const [localId, runtimeId] of this.registeredSessions) {
+        if (runtimeId === input.sessionId) this.registeredSessions.delete(localId);
+      }
+      throw error;
+    }
     for (const [localId, runtimeId] of this.registeredSessions) {
       if (runtimeId === input.sessionId) this.registeredSessions.delete(localId);
     }

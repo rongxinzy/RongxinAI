@@ -145,6 +145,7 @@ test('finalize waits for an earlier checkpoint even while it is in backoff', asy
   expect(adapter.finalizeSession).not.toHaveBeenCalled();
   expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Pending);
 
+  repository.makePendingAvailable();
   await processMemoryOutboxItem(repository, adapter as never, checkpoint);
   repository.makePendingAvailable();
   await processMemoryOutboxItem(repository, adapter as never, close);
@@ -210,4 +211,52 @@ test('schema v4 migration preserves the current identity and permits later conti
   expect(
     database.prepare("SELECT version FROM schema_migrations WHERE scope = 'memory'").get(),
   ).toEqual({ version: 4 });
+});
+
+test('finalize follows the continuation resolved by the covered checkpoint', async () => {
+  const database = new Database(':memory:');
+  const repository = new MemoryRepository(database);
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1',
+    projectId: 'project-a',
+    projectRoot: '/work',
+  });
+  repository.lifecycle.queueSessionFinalizations(
+    [{ sessionId: 'session-1', projectId: 'project-a', summary: 'summary' }],
+    () => {},
+  );
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1:resume:2',
+    projectId: 'project-a',
+    projectRoot: '/work',
+  });
+  const adapter = {
+    finalizeSession: vi.fn(async () => ({
+      sessionId: 'session-1:resume:2',
+      state: 'finalized',
+      summaryId: 17,
+      alreadyFinalized: false,
+    })),
+  };
+
+  await processMemoryOutboxItem(repository, adapter as never, repository.listPending()[0]);
+
+  expect(adapter.finalizeSession).toHaveBeenCalledWith({
+    sessionId: 'session-1:resume:2',
+    project: 'project-a',
+    summary: 'summary',
+  });
+  expect(getSessionFinalization(database, 'session-1:resume:2')?.status).toBe(
+    MemoryOutboxStatus.Completed,
+  );
+  expect(getSessionFinalization(database, 'session-1')).toBeNull();
+  expect(repository.listPending()).toHaveLength(0);
+
+  repository.lifecycle.queueSessionFinalizations(
+    [{ sessionId: 'session-1', projectId: 'project-a', summary: 'summary' }],
+    () => {},
+  );
+  expect(repository.listPending()).toHaveLength(0);
 });

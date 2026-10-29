@@ -14,6 +14,18 @@ export async function processMemoryOutboxItem(
   item: MemoryOutboxItem | null,
 ): Promise<number | null> {
   if (!item) return null;
+  if (
+    item.operation !== MemoryOutboxOperation.Forget &&
+    item.operation !== MemoryOutboxOperation.FinalizeSession &&
+    item.operation !== MemoryOutboxOperation.Confirm &&
+    item.operation !== MemoryOutboxOperation.SessionSummary &&
+    item.operation !== MemoryOutboxOperation.Supersede
+  ) {
+    return null;
+  }
+  const claim = repository.claimOutbox?.(item.id) ?? { item, completedMemoryId: null };
+  if (!claim.item) return claim.completedMemoryId;
+  item = claim.item;
   if (item.operation === MemoryOutboxOperation.Forget) {
     return await processMemoryForget(repository, adapter, item);
   }
@@ -129,11 +141,13 @@ async function processSessionFinalization(
   const payload = parseFinalizeSessionPayload(item.payload);
   if (!payload) return retryInvalidOutboxItem(repository, item);
   if (repository.lifecycle?.deferSessionFinalization(item.id, payload.sessionId)) return null;
+  const delivery =
+    repository.lifecycle?.resolveSessionFinalization(item.id, payload.sessionId) ?? payload;
   try {
     const result = await adapter.finalizeSession({
-      sessionId: payload.runtimeSessionId,
-      project: payload.projectId,
-      summary: payload.summary,
+      sessionId: delivery.runtimeSessionId,
+      project: delivery.projectId,
+      summary: delivery.summary,
     });
     if (!result) {
       repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');

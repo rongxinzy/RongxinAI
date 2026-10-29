@@ -519,3 +519,26 @@ test('script changes to an already recorded path still advance work version', as
   expect(recorder.recordedWorkVersion()).toBeGreaterThan(coveredVersion);
   recorder.dispose();
 });
+
+test.each(['write', 'edit'])('%s is not counted again by the final scan', async toolName => {
+  const { root, recorder } = await createWorkspace();
+  const target = path.join(root, 'report.md');
+  await fs.writeFile(target, 'before');
+  recorder.onRunStart('run-1');
+  recorder.onToolStart('call-1', toolName, { file_path: 'report.md', content: 'after' });
+  await fs.writeFile(target, 'after');
+  recorder.onToolEnd({
+    toolCallId: 'call-1',
+    toolName,
+    args: { file_path: 'report.md', content: 'after' },
+    isError: false,
+    resultMessageId: 'message-1',
+  });
+  const coveredVersion = recorder.recordedWorkVersion();
+
+  recorder.onRunSettled('final-message');
+  await recorder.settled();
+
+  expect(recorder.recordedWorkVersion()).toBe(coveredVersion);
+  recorder.dispose();
+});
