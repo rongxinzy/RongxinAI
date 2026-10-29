@@ -58,6 +58,9 @@ export default function SettingsPage({
   const [language, setLanguage] = useState<LanguageType>('zh');
   const [useSystemProxy, setUseSystemProxy] = useState(false);
   const [sqliteAutoBackupEnabled, setSqliteAutoBackupEnabled] = useState(false);
+  const [sqliteAutoBackupReady, setSqliteAutoBackupReady] = useState(false);
+  const [sqliteAutoBackupSaving, setSqliteAutoBackupSaving] = useState(false);
+  const sqliteAutoBackupPending = useRef(false);
   const [autoLaunch, setAutoLaunch] = useState(false);
   const [preventSleep, setPreventSleep] = useState(false);
   const [codemodeEnabled, setCodemodeEnabled] = useState(false);
@@ -118,6 +121,7 @@ export default function SettingsPage({
         setLanguage(config.language);
         setUseSystemProxy(config.useSystemProxy ?? false);
         setSqliteAutoBackupEnabled(config.sqliteAutoBackupEnabled === true);
+        setSqliteAutoBackupReady(true);
         if (config.shortcuts) {
           setShortcuts(previous => ({ ...previous, ...config.shortcuts }));
         }
@@ -219,6 +223,25 @@ export default function SettingsPage({
     }
   };
 
+  const handleSqliteAutoBackupChange = async (next: boolean) => {
+    // Block a second request even before React commits the disabled switch.
+    if (!sqliteAutoBackupReady || sqliteAutoBackupPending.current) return;
+    sqliteAutoBackupPending.current = true;
+    const previous = sqliteAutoBackupEnabled;
+    setError(null);
+    setSqliteAutoBackupSaving(true);
+    setSqliteAutoBackupEnabled(next);
+    try {
+      await configService.updateConfig({ sqliteAutoBackupEnabled: next });
+    } catch {
+      setSqliteAutoBackupEnabled(previous);
+      setError(i18nService.t('settingsSaveFailed'));
+    } finally {
+      sqliteAutoBackupPending.current = false;
+      setSqliteAutoBackupSaving(false);
+    }
+  };
+
   const shortcutLabelMap: Record<string, string> = {
     newChat: 'newChat',
     search: 'search',
@@ -292,10 +315,8 @@ export default function SettingsPage({
               void persistConfig({ useSystemProxy: next });
             }}
             sqliteAutoBackupEnabled={sqliteAutoBackupEnabled}
-            onSqliteAutoBackupEnabledChange={next => {
-              setSqliteAutoBackupEnabled(next);
-              void persistConfig({ sqliteAutoBackupEnabled: next });
-            }}
+            sqliteAutoBackupDisabled={!sqliteAutoBackupReady || sqliteAutoBackupSaving}
+            onSqliteAutoBackupEnabledChange={next => void handleSqliteAutoBackupChange(next)}
             codemodeEnabled={codemodeEnabled}
             onCodemodeEnabledChange={next => void handleCodemodeChange(next)}
           />

@@ -15,6 +15,7 @@ interface GeneralSettingsPanelProps {
   useSystemProxy: boolean;
   onUseSystemProxyChange: (next: boolean) => void;
   sqliteAutoBackupEnabled: boolean;
+  sqliteAutoBackupDisabled: boolean;
   onSqliteAutoBackupEnabledChange: (next: boolean) => void;
   codemodeEnabled: boolean;
   onCodemodeEnabledChange: (next: boolean) => void;
@@ -30,6 +31,7 @@ export default function GeneralSettingsPanel({
   useSystemProxy,
   onUseSystemProxyChange,
   sqliteAutoBackupEnabled,
+  sqliteAutoBackupDisabled,
   onSqliteAutoBackupEnabledChange,
   codemodeEnabled,
   onCodemodeEnabledChange,
@@ -68,6 +70,7 @@ export default function GeneralSettingsPanel({
             label={i18nService.t('sqliteAutoBackupEnabled')}
             description={i18nService.t('sqliteAutoBackupEnabledDescription')}
             checked={sqliteAutoBackupEnabled}
+            disabled={sqliteAutoBackupDisabled}
             onCheckedChange={onSqliteAutoBackupEnabledChange}
           />
         </FieldGroup>
