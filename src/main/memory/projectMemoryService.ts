@@ -671,7 +671,11 @@ export class ProjectMemoryService {
       processMemoryOutboxItem(this.repository, this.adapter, item),
     );
     this.outboxItemQueue = delivery.catch((): void => {});
-    return await delivery;
+    try {
+      return await delivery;
+    } finally {
+      this.outboxScheduler.kick();
+    }
   }
 }
 

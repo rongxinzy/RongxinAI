@@ -54,14 +54,20 @@ test('continuation identity is used for observations and repeated finalize witho
   expect(requests[3].pathname).toBe('/sessions/session-1%3Aresume%3A2/finalize');
 });
 
-test('an unknown outbox result is recovered before any session resume or rewrite', async () => {
+test('a committed result is recovered with its original identity even when a runtime mapping exists', async () => {
   const requests: string[] = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string | URL, init?: RequestInit) => {
       const parsed = new URL(url);
       requests.push(`${init?.method ?? 'GET'} ${parsed.pathname}`);
-      return jsonResponse({ id: 42, status: 'committed' });
+      if (parsed.pathname === '/observations/save-result') {
+        return jsonResponse({ id: 42, status: 'committed' });
+      }
+      if (parsed.pathname === '/observations/42') {
+        return jsonResponse({ session_id: 'session-1:resume:1' });
+      }
+      throw new Error('must not resume or rewrite a committed observation');
     }),
   );
   const adapter = new ZhiYuanEngramAdapter({
@@ -76,11 +82,18 @@ test('an unknown outbox result is recovered before any session resume or rewrite
     title: 'Session summary',
     content: 'checkpoint',
     operationId: 'checkpoint-stable',
+    runtimeSessionId: 'session-1:resume:1',
     recoverExistingResult: true,
   });
+  const recovered: Array<{ id: string; historical?: boolean }> = [];
 
-  await expect(adapter.confirmMemory(candidate, '/work')).resolves.toBe(42);
-  expect(requests).toEqual(['GET /observations/save-result']);
+  await expect(
+    adapter.confirmMemory(candidate, '/work', (id, historical) => {
+      recovered.push({ id, historical });
+    }),
+  ).resolves.toBe(42);
+  expect(requests).toEqual(['GET /observations/save-result', 'GET /observations/42']);
+  expect(recovered).toEqual([{ id: 'session-1:resume:1', historical: true }]);
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
