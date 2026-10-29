@@ -18,7 +18,7 @@ export interface SessionFinalizationInput {
   summary: string;
 }
 
-export function migrateSessionLifecycleStorage(db: Database.Database): void {
+function migrateSessionLifecycleStorage(db: Database.Database): void {
   runMigrations(db, 'memory', [
     {
       version: 3,
@@ -47,7 +47,7 @@ export function migrateSessionLifecycleStorage(db: Database.Database): void {
   ]);
 }
 
-export function saveRuntimeSessionIdentity(
+function saveRuntimeSessionIdentity(
   db: Database.Database,
   input: RuntimeSessionIdentityInput,
 ): void {
@@ -69,14 +69,14 @@ export function saveRuntimeSessionIdentity(
   );
 }
 
-export function getRuntimeSessionId(db: Database.Database, localSessionId: string): string | null {
+function getRuntimeSessionId(db: Database.Database, localSessionId: string): string | null {
   const row = db
     .prepare('SELECT runtime_session_id FROM memory_runtime_sessions WHERE local_session_id = ?')
     .get(localSessionId) as { runtime_session_id: string } | undefined;
   return row?.runtime_session_id ?? null;
 }
 
-export function getLocalSessionIdByRuntimeId(
+function getLocalSessionIdByRuntimeId(
   db: Database.Database,
   runtimeSessionId: string,
 ): string | null {
@@ -86,7 +86,7 @@ export function getLocalSessionIdByRuntimeId(
   return row?.local_session_id ?? null;
 }
 
-export function queueSessionFinalizations(
+function queueSessionFinalizations(
   db: Database.Database,
   inputs: SessionFinalizationInput[],
   deleteSessions: () => void,
@@ -148,7 +148,7 @@ export function queueSessionFinalizations(
   })();
 }
 
-export function getSessionFinalization(
+function getSessionFinalization(
   db: Database.Database,
   runtimeSessionId: string,
 ): { summary: string; projectId: string; status: string; error: string | null } | null {
@@ -165,7 +165,9 @@ export function getSessionFinalization(
     : null;
 }
 
-export function updateSessionFinalization(
+export { getSessionFinalization };
+
+function updateSessionFinalization(
   db: Database.Database,
   outboxId: string,
   status: string,
