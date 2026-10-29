@@ -135,28 +135,43 @@ function queueSessionFinalizations(
     const now = new Date().toISOString();
     for (const input of inputs) {
       const runtimeSessionId = getRuntimeSessionId(db, input.sessionId) ?? input.sessionId;
-      const linkId = `finalize:${runtimeSessionId}`;
+      const previous = getSessionFinalization(db, runtimeSessionId);
+      const hasPendingWork = hasPendingSessionWrites(db, input.sessionId);
+      if (previous?.status === MemoryOutboxStatus.Completed && !hasPendingWork) continue;
+      const intentKey =
+        previous?.status === MemoryOutboxStatus.Completed
+          ? `pending:${randomUUID()}`
+          : runtimeSessionId;
+      const linkId =
+        previous?.status === MemoryOutboxStatus.Completed
+          ? `finalize:${intentKey}`
+          : `finalize:${runtimeSessionId}`;
       db.prepare(
         `INSERT INTO memory_session_finalizations (
           runtime_session_id, local_session_id, project_id, summary, status, created_at
         ) VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(runtime_session_id) DO NOTHING`,
       ).run(
-        runtimeSessionId,
+        intentKey,
         input.sessionId,
         input.projectId,
         input.summary,
         MemoryOutboxStatus.Pending,
         now,
       );
-      const intent = getSessionFinalization(db, runtimeSessionId);
-      if (!intent || intent.status === MemoryOutboxStatus.Completed) continue;
-      const existing = db
-        .prepare(
-          `SELECT id FROM memory_outbox
-           WHERE operation = ? AND json_extract(payload_json, '$.sessionId') = ?`,
-        )
-        .get(MemoryOutboxOperation.FinalizeSession, input.sessionId) as { id: string } | undefined;
+      const intent = getSessionFinalization(db, intentKey);
+      if (!intent) throw new Error('Session close intent was not persisted.');
+      const existing =
+        previous?.status === MemoryOutboxStatus.Completed
+          ? undefined
+          : (db
+              .prepare(
+                `SELECT id FROM memory_outbox
+                 WHERE operation = ? AND json_extract(payload_json, '$.sessionId') = ?`,
+              )
+              .get(MemoryOutboxOperation.FinalizeSession, input.sessionId) as
+              | { id: string }
+              | undefined);
       const payload = JSON.stringify({
         sessionId: input.sessionId,
         runtimeSessionId,
@@ -185,10 +200,34 @@ function queueSessionFinalizations(
       }
       db.prepare(
         'UPDATE memory_session_finalizations SET status = ?, error = NULL WHERE runtime_session_id = ?',
-      ).run(MemoryOutboxStatus.Pending, runtimeSessionId);
+      ).run(MemoryOutboxStatus.Pending, intentKey);
     }
     deleteSessions();
   })();
+}
+
+function pendingSessionWriteAvailableAt(
+  db: Database.Database,
+  localSessionId: string,
+): string | null {
+  const row = db
+    .prepare(
+      `SELECT MIN(available_at) AS available_at FROM memory_outbox
+       WHERE status = ? AND operation IN (?, ?, ?)
+         AND json_extract(payload_json, '$.sessionId') = ?`,
+    )
+    .get(
+      MemoryOutboxStatus.Pending,
+      MemoryOutboxOperation.Confirm,
+      MemoryOutboxOperation.SessionSummary,
+      MemoryOutboxOperation.Supersede,
+      localSessionId,
+    ) as { available_at: string | null };
+  return row.available_at;
+}
+
+function hasPendingSessionWrites(db: Database.Database, localSessionId: string): boolean {
+  return pendingSessionWriteAvailableAt(db, localSessionId) !== null;
 }
 
 function resolveSessionFinalization(
@@ -196,10 +235,13 @@ function resolveSessionFinalization(
   outboxId: string,
   localSessionId: string,
 ): FinalizeSessionPayload {
-  const row = db.prepare('SELECT payload_json FROM memory_outbox WHERE id = ?').get(outboxId) as {
-    payload_json: string;
-  };
+  const row = db
+    .prepare('SELECT link_id, payload_json FROM memory_outbox WHERE id = ?')
+    .get(outboxId) as { link_id: string | null; payload_json: string };
   const payload = JSON.parse(row.payload_json) as FinalizeSessionPayload;
+  const intentKey = row.link_id?.startsWith('finalize:')
+    ? row.link_id.slice('finalize:'.length)
+    : payload.runtimeSessionId;
   const runtimeSessionId = getRuntimeSessionId(db, localSessionId) ?? payload.runtimeSessionId;
   if (runtimeSessionId === payload.runtimeSessionId) return payload;
   const next = { ...payload, runtimeSessionId };
@@ -214,7 +256,7 @@ function resolveSessionFinalization(
         throw new Error('Finalization continuation belongs to a different local session.');
       }
       db.prepare('DELETE FROM memory_session_finalizations WHERE runtime_session_id = ?').run(
-        payload.runtimeSessionId,
+        intentKey,
       );
       db.prepare(
         `INSERT INTO memory_session_finalizations (
@@ -235,9 +277,10 @@ function resolveSessionFinalization(
     } else {
       db.prepare(
         'UPDATE memory_session_finalizations SET runtime_session_id = ? WHERE runtime_session_id = ?',
-      ).run(runtimeSessionId, payload.runtimeSessionId);
+      ).run(runtimeSessionId, intentKey);
     }
-    db.prepare('UPDATE memory_outbox SET payload_json = ? WHERE id = ?').run(
+    db.prepare('UPDATE memory_outbox SET link_id = ?, payload_json = ? WHERE id = ?').run(
+      `finalize:${runtimeSessionId}`,
       JSON.stringify(next),
       outboxId,
     );
@@ -250,31 +293,19 @@ function deferSessionFinalization(
   outboxId: string,
   localSessionId: string,
 ): boolean {
-  const blocker = db
-    .prepare(
-      `SELECT MIN(available_at) AS available_at FROM memory_outbox
-       WHERE status = ? AND operation IN (?, ?, ?)
-         AND json_extract(payload_json, '$.sessionId') = ?`,
-    )
-    .get(
-      MemoryOutboxStatus.Pending,
-      MemoryOutboxOperation.Confirm,
-      MemoryOutboxOperation.SessionSummary,
-      MemoryOutboxOperation.Supersede,
-      localSessionId,
-    ) as { available_at: string | null };
-  if (!blocker.available_at) return false;
+  const nextAvailableAt = pendingSessionWriteAvailableAt(db, localSessionId);
+  if (!nextAvailableAt) return false;
   db.transaction(() => {
     const message = 'Waiting for earlier session writes.';
     db.prepare('UPDATE memory_outbox SET available_at = ?, last_error = ? WHERE id = ?').run(
-      blocker.available_at,
+      nextAvailableAt,
       message,
       outboxId,
     );
     db.prepare(
       `UPDATE memory_session_finalizations SET status = ?, error = ?
        WHERE runtime_session_id = (
-         SELECT json_extract(payload_json, '$.runtimeSessionId') FROM memory_outbox WHERE id = ?
+         SELECT substr(link_id, 10) FROM memory_outbox WHERE id = ?
        )`,
     ).run(MemoryOutboxStatus.Pending, message, outboxId);
   })();
@@ -321,7 +352,7 @@ function updateSessionFinalization(
     db.prepare(
       `UPDATE memory_session_finalizations SET status = ?, error = ?
        WHERE runtime_session_id = (
-         SELECT json_extract(payload_json, '$.runtimeSessionId') FROM memory_outbox WHERE id = ?
+         SELECT substr(link_id, 10) FROM memory_outbox WHERE id = ?
        )`,
     ).run(status, error, outboxId);
   })();
