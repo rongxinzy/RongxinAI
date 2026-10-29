@@ -34,6 +34,10 @@ export interface SessionSummaryToolOptions {
   workingDirectory: string;
   runId?: string | null;
   turnId?: string | null;
+  getExecutionIdentity?: (toolCallId: string) => {
+    runId?: string | null;
+    turnId?: string | null;
+  };
   onOutcome?: (outcome: 'written' | 'skipped', reason?: string) => void;
 }
 
@@ -127,14 +131,15 @@ export function buildSessionSummaryTool(
           )
           .map(file => ({ path: file.path, ...(file.role ? { role: file.role } : {}) }));
       }
+      const executionIdentity = options.getExecutionIdentity?.(toolCallId);
       try {
         const result = await recordSessionCheckpoint(
           options.getProjectMemoryService(),
           {
             sessionId: options.sessionId,
             workingDirectory: options.workingDirectory,
-            runId: options.runId,
-            turnId: options.turnId ?? toolCallId,
+            runId: executionIdentity?.runId ?? options.runId,
+            turnId: executionIdentity?.turnId ?? options.turnId ?? toolCallId,
           },
           input,
         );

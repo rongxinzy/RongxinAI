@@ -30,6 +30,14 @@ export type EngramObservationType = MemoryKindValue;
 export const MemoryOutboxStatus = MemoryDeliveryStatus;
 export type MemoryOutboxStatus = MemoryDeliveryStatusValue;
 
+export const SessionCheckpointSyncState = {
+  Pending: 'pending',
+  Synced: 'synced',
+  Superseded: 'superseded',
+} as const;
+export type SessionCheckpointSyncState =
+  (typeof SessionCheckpointSyncState)[keyof typeof SessionCheckpointSyncState];
+
 export const MemoryOutboxOperation = SharedMemoryOutboxOperation;
 export type MemoryOutboxOperation = MemoryOutboxOperationValue;
 

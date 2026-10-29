@@ -468,3 +468,25 @@ test('dispose settles parked declarations as failed and ignores later events', a
   });
   expect(ledger.list('session-1')).toEqual([]);
 });
+
+test('work version increases when the same artifact path is modified again', async () => {
+  const { recorder } = await createWorkspace();
+  recorder.onRunStart('run-1');
+  for (const version of [1, 2]) {
+    recorder.onToolStart(`call-${version}`, 'write', {
+      file_path: 'report.md',
+      content: `version-${version}`,
+    });
+    recorder.onToolEnd({
+      toolCallId: `call-${version}`,
+      toolName: 'write',
+      args: { file_path: 'report.md', content: `version-${version}` },
+      isError: false,
+      resultMessageId: `message-${version}`,
+    });
+    expect(recorder.recordedWorkVersion()).toBe(version);
+  }
+  recorder.onRunStart('run-2');
+  expect(recorder.recordedWorkVersion()).toBe(0);
+  recorder.dispose();
+});

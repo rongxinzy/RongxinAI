@@ -1,6 +1,9 @@
-import { MemoryLifecycleStatus } from '../../shared/memory';
 import { MemoryOutboxOperation } from './constants';
-import { parseConfirmPayload, parseForgetPayload } from './memoryOutboxPayloads';
+import {
+  parseConfirmPayload,
+  parseFinalizeSessionPayload,
+  parseForgetPayload,
+} from './memoryOutboxPayloads';
 import { validateMemoryOutboxRelationships } from './memoryRelationshipResolution';
 import type { MemoryOutboxItem, MemoryRepository } from './repository';
 import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
@@ -13,6 +16,9 @@ export async function processMemoryOutboxItem(
   if (!item) return null;
   if (item.operation === MemoryOutboxOperation.Forget) {
     return await processMemoryForget(repository, adapter, item);
+  }
+  if (item.operation === MemoryOutboxOperation.FinalizeSession) {
+    return await processSessionFinalization(repository, adapter, item);
   }
   if (
     item.operation !== MemoryOutboxOperation.Confirm &&
@@ -29,16 +35,17 @@ export async function processMemoryOutboxItem(
       : null;
   if (
     item.operation === MemoryOutboxOperation.SessionSummary &&
+    payload.topicKey === `session/${payload.sessionId}` &&
     checkpointSequence !== null &&
-    repository.maxSessionCheckpointSequence(payload.sessionId) > checkpointSequence
+    repository.maxConfirmedSessionCheckpointSequence(payload.sessionId) > checkpointSequence
   ) {
-    // A newer checkpoint already landed. Retrying this older one would roll
-    // the session back, so it is complete by definition rather than an error.
-    repository.markCompleted(item.id);
+    repository.markSuperseded(item.id);
     return null;
   }
   try {
     const { superseded } = validateMemoryOutboxRelationships(repository, payload);
+    const runtimeSessionId =
+      repository.lifecycle?.getRuntimeSessionId(payload.sessionId) ?? undefined;
     const candidate = adapter.saveCandidate({
       sessionId: payload.sessionId,
       project: payload.projectId,
@@ -48,61 +55,93 @@ export async function processMemoryOutboxItem(
       content: payload.content,
       topicKey: payload.topicKey,
       operationId: payload.linkId,
+      runtimeSessionId,
+      recoverExistingResult: !runtimeSessionId,
     });
+    const onRuntimeSession = (resolvedId: string): void => {
+      repository.lifecycle?.saveRuntimeSessionId({
+        localSessionId: payload.sessionId,
+        runtimeSessionId: resolvedId,
+        projectId: payload.projectId,
+        projectRoot: payload.projectRoot,
+      });
+    };
     const memoryId =
       item.operation === MemoryOutboxOperation.Supersede && payload.supersededObservationId
         ? await adapter.supersede({
             observationId: payload.supersededObservationId,
             candidate,
             workingDirectory: payload.projectRoot,
+            onRuntimeSession,
           })
-        : await adapter.confirmMemory(candidate, payload.projectRoot);
+        : await adapter.confirmMemory(candidate, payload.projectRoot, onRuntimeSession);
     if (memoryId === null) {
       repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
       return null;
     }
-    repository.createLink({
-      id: payload.linkId,
-      memoryId,
-      projectId: payload.projectId,
-      scope: payload.scope,
-      sessionId: payload.sessionId,
-      sourceKind: payload.sourceKind,
-      taskId: payload.taskId,
-      runId: payload.runId,
-      artifactId: payload.artifactId,
-      approvalId: payload.approvalId,
-      title: payload.title,
-      content: payload.content,
-      kind: payload.type,
+    repository.confirmOutboxDelivery({
+      outboxId: item.id,
+      link: {
+        id: payload.linkId,
+        memoryId,
+        projectId: payload.projectId,
+        scope: payload.scope,
+        sessionId: payload.sessionId,
+        sourceKind: payload.sourceKind,
+        taskId: payload.taskId,
+        runId: payload.runId,
+        artifactId: payload.artifactId,
+        approvalId: payload.approvalId,
+        title: payload.title,
+        content: payload.content,
+        kind: payload.type,
+        topicKey: payload.topicKey,
+        importance: payload.importance,
+        confidence: payload.confidence,
+        sensitivity: payload.sensitivity,
+        expiresAt: payload.expiresAt,
+        promotedFromLinkId: payload.promotedFromLinkId,
+        promotionSourceProjectId: payload.promotionSourceProjectId,
+        promotionSourceSessionId: payload.promotionSourceSessionId,
+        metadata: payload.metadata,
+      },
       topicKey: payload.topicKey,
-      importance: payload.importance,
-      confidence: payload.confidence,
-      sensitivity: payload.sensitivity,
-      expiresAt: payload.expiresAt,
-      promotedFromLinkId: payload.promotedFromLinkId,
-      promotionSourceProjectId: payload.promotionSourceProjectId,
-      promotionSourceSessionId: payload.promotionSourceSessionId,
-      metadata: payload.metadata,
+      candidateBacked: payload.candidateBacked,
+      superseded,
     });
-    if (superseded) {
-      repository.setLinkStatus(superseded.id, MemoryLifecycleStatus.Superseded, payload.linkId);
-    }
-    if (payload.topicKey) {
-      repository.supersedeActiveTopic(
-        payload.projectId,
-        payload.scope,
-        payload.topicKey,
-        payload.linkId,
-      );
-    }
-    if (payload.candidateBacked) repository.deleteCandidate(payload.linkId);
-    repository.markCompleted(item.id);
     return memoryId;
   } catch (error) {
     repository.markRetry(
       item.id,
       item.attempts + 1,
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
+}
+
+async function processSessionFinalization(
+  repository: MemoryRepository,
+  adapter: ZhiYuanEngramAdapter,
+  item: MemoryOutboxItem,
+): Promise<number | null> {
+  const payload = parseFinalizeSessionPayload(item.payload);
+  if (!payload) return retryInvalidOutboxItem(repository, item);
+  try {
+    const result = await adapter.finalizeSession({
+      sessionId: payload.runtimeSessionId,
+      project: payload.projectId,
+      summary: payload.summary,
+    });
+    if (!result) {
+      repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
+      return null;
+    }
+    repository.lifecycle.completeSessionFinalization(item.id);
+    return result.summaryId;
+  } catch (error) {
+    repository.lifecycle.failSessionFinalization(
+      item.id,
       error instanceof Error ? error.message : String(error),
     );
     return null;
@@ -132,13 +171,26 @@ async function processMemoryForget(
     return null;
   }
   try {
+    if (
+      repository.lifecycle?.hasOtherObservationReferences(payload.observationId, payload.linkId)
+    ) {
+      repository.completeForget({
+        outboxId: item.id,
+        linkId: payload.linkId,
+        hardDelete: payload.hardDelete,
+      });
+      return payload.observationId;
+    }
     const forgotten = await adapter.forget(payload.observationId, payload.hardDelete, owner);
     if (!forgotten) {
       repository.markRetry(item.id, item.attempts + 1, 'Memory runtime unavailable.');
       return null;
     }
-    repository.markCompleted(item.id);
-    if (payload.hardDelete) repository.deleteLink(payload.linkId);
+    repository.completeForget({
+      outboxId: item.id,
+      linkId: payload.linkId,
+      hardDelete: payload.hardDelete,
+    });
     return payload.observationId;
   } catch (error) {
     repository.markRetry(

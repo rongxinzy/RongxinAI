@@ -365,6 +365,36 @@ export class CoworkSessionStore extends CoworkMessageStore {
     replace();
   }
 
+  getSessionFinalizationSnapshot(id: string): {
+    id: string;
+    title: string;
+    cwd: string;
+    lastAssistantContent: string | null;
+  } | null {
+    const row = this.getOne<{
+      id: string;
+      title: string;
+      cwd: string;
+      last_assistant_content: string | null;
+    }>(
+      `SELECT s.id, s.title, s.cwd,
+        (SELECT m.content FROM cowork_messages m
+         WHERE m.session_id = s.id AND m.type = 'assistant'
+         ORDER BY COALESCE(m.sequence, m.created_at) DESC, m.created_at DESC, m.rowid DESC
+         LIMIT 1) AS last_assistant_content
+       FROM cowork_sessions s WHERE s.id = ?`,
+      [id],
+    );
+    return row
+      ? {
+          id: row.id,
+          title: row.title,
+          cwd: row.cwd,
+          lastAssistantContent: row.last_assistant_content,
+        }
+      : null;
+  }
+
   deleteSession(id: string): void {
     this.db.prepare('DELETE FROM cowork_sessions WHERE id = ?').run(id);
   }

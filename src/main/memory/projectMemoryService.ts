@@ -32,6 +32,7 @@ import {
 } from './memoryRelationshipResolution';
 import { fitObservations, recallMemoryScope } from './memoryRecallSupport';
 import { processMemoryOutboxItem } from './memoryOutboxProcessor';
+import { MemoryOutboxScheduler } from './memoryOutboxScheduler';
 import type { ProjectIdentity } from './projectIdentity';
 import type { MemoryMigrationRecord, MemoryOutboxItem } from './repository';
 import { MemoryRepository } from './repository';
@@ -49,12 +50,22 @@ export interface ActiveSessionSummary {
 }
 
 export class ProjectMemoryService {
+  private readonly outboxScheduler: MemoryOutboxScheduler;
+
   constructor(
     readonly repository: MemoryRepository,
     private readonly adapter: ZhiYuanEngramAdapter,
     private readonly resolveIdentity: (cwd: string) => ProjectIdentity,
     private readonly personalDirectory: string,
-  ) {}
+  ) {
+    this.outboxScheduler = new MemoryOutboxScheduler({
+      drain: () => this.drainOutbox(),
+      nextAvailableAt: () => this.repository.nextPendingAvailableAt(),
+      onError: error => {
+        console.warn('[ProjectMemory] Failed to drain pending operations:', error);
+      },
+    });
+  }
 
   getProjectIdentity(workingDirectory: string): ProjectIdentity {
     return this.resolveIdentity(workingDirectory);
@@ -454,7 +465,7 @@ export class ProjectMemoryService {
         Date.now() + SESSION_SUMMARY_TTL_DAYS * 24 * 60 * 60 * 1_000,
       ).toISOString(),
     });
-    this.scheduleOutboxDrain();
+    this.outboxScheduler.kick();
     return receipt;
   }
 
@@ -475,21 +486,32 @@ export class ProjectMemoryService {
       : null;
   }
 
-  /** Register/resume a session at start so native continuation identity exists
-   * before any finalize. */
   async registerSession(sessionId: string, workingDirectory: string): Promise<void> {
     const project = this.resolveIdentity(workingDirectory);
-    await this.adapter.resumeSession(sessionId, project.id, workingDirectory);
+    const runtimeSessionId = await this.adapter.resumeSession(
+      sessionId,
+      project.id,
+      project.root,
+      this.repository.lifecycle.getRuntimeSessionId(sessionId) ?? undefined,
+    );
+    this.repository.lifecycle.saveRuntimeSessionId({
+      localSessionId: sessionId,
+      runtimeSessionId,
+      projectId: project.id,
+      projectRoot: project.root,
+    });
   }
 
-  /** Commit a final, one-shot summary on real session close (delete, not turn
-   * completion). Failures are logged, never thrown into the delete path. */
-  async finalizeSession(sessionId: string, summary: string): Promise<void> {
-    try {
-      await this.adapter.finalizeSession(sessionId, summary);
-    } catch (error) {
-      console.warn(`[SessionFinalize] failed for session ${sessionId}:`, error);
-    }
+  finalizeSessionsForDeletion(
+    sessions: Array<{ sessionId: string; workingDirectory: string; summary: string }>,
+    deleteSessions: () => void,
+  ): void {
+    const finalizations = sessions.map(session => {
+      const project = this.resolveIdentity(session.workingDirectory);
+      return { sessionId: session.sessionId, projectId: project.id, summary: session.summary };
+    });
+    this.repository.lifecycle.queueSessionFinalizations(finalizations, deleteSessions);
+    this.outboxScheduler.kick();
   }
 
   listSessionSummaryBackfillRecords(): MemoryMigrationRecord[] {
@@ -561,19 +583,18 @@ export class ProjectMemoryService {
     return (await this.processOutboxItem(this.findPending(outboxId))) !== null;
   }
 
-  private outboxDrain: Promise<void> | null = null;
+  startOutboxScheduler(): void {
+    this.outboxScheduler.start();
+  }
 
-  private scheduleOutboxDrain(): void {
-    if (this.outboxDrain) return;
-    this.outboxDrain = this.drainOutbox()
-      .then((): void => {})
-      .catch(error => {
-        console.warn('[ProjectMemory] Failed to drain pending operations:', error);
-      })
-      .finally(() => {
-        this.outboxDrain = null;
-        if (this.repository.listPending(1).length > 0) this.scheduleOutboxDrain();
-      });
+  resumeOutboxDrain(): void {
+    this.repository.makePendingAvailable();
+    this.outboxScheduler.kick();
+  }
+
+  async stopOutboxScheduler(): Promise<void> {
+    await this.outboxScheduler.stop();
+    await this.outboxItemQueue;
   }
 
   async drainOutbox(limit = 20): Promise<number> {
@@ -586,7 +607,9 @@ export class ProjectMemoryService {
 
   async retryPendingOutbox(limit = 20): Promise<number> {
     this.repository.makePendingAvailable();
-    return await this.drainOutbox(limit);
+    const completed = await this.drainOutbox(limit);
+    this.outboxScheduler.kick();
+    return completed;
   }
 
   private requireCandidateOrLink(id: string): ManagedMemoryRecord {

@@ -230,11 +230,12 @@ export const initApp = async (): Promise<void> => {
     }
     profiler.measure('initStore');
     console.log('[Main] initApp: store initialized');
+    const projectMemoryService = getProjectMemoryService();
+    projectMemoryService.startOutboxScheduler();
     void getEngramManager()
       .start()
       .then(connection => {
-        if (!connection) return;
-        return getProjectMemoryService().drainOutbox();
+        if (connection) projectMemoryService.resumeOutboxDrain();
       })
       .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
     refreshEndpointsTestMode(storageRuntime.store);
@@ -643,6 +644,7 @@ export const initApp = async (): Promise<void> => {
     }
 
     powerMonitor.on('resume', () => {
+      projectMemoryService.resumeOutboxDrain();
       if (
         Date.now() - lifecycleRuntime.lastSuccessfulAppUpdateCheckAt >=
         APP_UPDATE_POLL_INTERVAL_MS

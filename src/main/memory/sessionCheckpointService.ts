@@ -47,7 +47,7 @@ export async function recordSessionCheckpoint(
   service: ProjectMemoryService,
   context: SessionCheckpointContext,
   input: SessionCheckpointInput,
-): Promise<{ checkpointId: string; syncState: 'pending' | 'synced' }> {
+): Promise<{ checkpointId: string; syncState: 'pending' | 'synced' | 'superseded' }> {
   const checkpointId = `${context.sessionId}:${context.turnId ?? 'session'}`;
   return await service.saveSessionSummary({
     sessionId: context.sessionId,

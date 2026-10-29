@@ -170,6 +170,8 @@ export interface ActivePiSession {
   /** Set when the model wrote (or explicitly skipped) this turn's checkpoint. */
   summaryCheckpointWritten?: boolean;
   summaryCheckpointSkipped?: string | true;
+  /** Artifact work covered by the latest checkpoint outcome in this run. */
+  summaryCheckpointWorkVersion?: number;
   /** One retry notice per turn: the user learns the model answered with an error. */
   retryNoticeEmitted: boolean;
   /** Retry attempts Pi reported in the current turn. */

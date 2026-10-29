@@ -409,8 +409,10 @@ test('memory repository records its scope version and does not re-run reconcile'
   const db = new Database(':memory:');
   try {
     new MemoryRepository(db);
-    expect(scopeRow(db, 'memory')?.version).toBe(2);
+    expect(scopeRow(db, 'memory')?.version).toBe(3);
     expect(columnNames(db, 'memory_checkpoints').has('checkpoint_sequence')).toBe(true);
+    expect(columnNames(db, 'memory_runtime_sessions').has('runtime_session_id')).toBe(true);
+    expect(columnNames(db, 'memory_session_finalizations').has('status')).toBe(true);
     const versionRow = scopeRow(db, 'memory');
 
     new MemoryRepository(db);

@@ -84,7 +84,7 @@ test('finalizeSession posts the caller-authored summary once per close', async (
         JSON.stringify({
           session_id: 'session-1',
           state: 'finalized',
-          summary_id: 'sum-1',
+          summary_id: 101,
           already_finalized: true,
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -92,10 +92,15 @@ test('finalizeSession posts the caller-authored summary once per close', async (
     }),
   );
   const adapter = new ZhiYuanEngramAdapter(stubManager());
-  const result = await adapter.finalizeSession('session-1', '## Goal\nShip it');
+  const result = await adapter.finalizeSession({
+    sessionId: 'session-1',
+    project: 'project-a',
+    summary: '## Goal\nShip it',
+  });
   expect(requests[0].pathname).toBe('/sessions/session-1/finalize');
-  expect(requests[0].body).toEqual({ summary: '## Goal\nShip it' });
-  expect(result.alreadyFinalized).toBe(true);
+  expect(requests[0].body).toEqual({ project: 'project-a', summary: '## Goal\nShip it' });
+  expect(result?.alreadyFinalized).toBe(true);
+  expect(result?.summaryId).toBe(101);
 });
 
 test('scanConflicts never opts into the external semantic runner by default', async () => {

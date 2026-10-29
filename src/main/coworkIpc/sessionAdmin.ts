@@ -46,6 +46,36 @@ export interface CoworkSessionAdminIpcDeps {
   getIMGatewayManager: () => ChannelAccountManager | undefined;
 }
 
+function deleteCoworkSessions(deps: CoworkSessionAdminIpcDeps, sessionIds: string[]): void {
+  for (const sessionId of sessionIds) forgetCoworkSession(sessionId);
+  const store = deps.getCoworkStore();
+  const finalizations = sessionIds.flatMap(sessionId => {
+    const session = store.getSessionFinalizationSnapshot(sessionId);
+    return session
+      ? [
+          {
+            sessionId,
+            workingDirectory: session.cwd,
+            summary: `## Goal\n${session.title}\n\n## Accomplished\n${(session.lastAssistantContent ?? '').slice(0, 1500)}`,
+          },
+        ]
+      : [];
+  });
+  const memory = deps.getPiRuntimeAdapter().getProjectMemoryService();
+  if (memory) {
+    memory.finalizeSessionsForDeletion(finalizations, () => store.deleteSessions(sessionIds));
+  } else {
+    store.deleteSessions(sessionIds);
+  }
+  for (const sessionId of sessionIds) {
+    try {
+      deps.getIMGatewayManager()?.getIMStore()?.deleteSessionMappingByCoworkSessionId(sessionId);
+    } catch {
+      // IM mapping cleanup is independent from the committed session deletion.
+    }
+  }
+}
+
 export const registerCoworkSessionAdminIpc = (deps: CoworkSessionAdminIpcDeps): void => {
   handleIpcContract(coworkSessionAdminContract, {
     stopSession: async (_event, sessionId) => {
@@ -181,32 +211,7 @@ export const registerCoworkSessionAdminIpc = (deps: CoworkSessionAdminIpcDeps): 
 
     deleteSession: async (_event, sessionId) => {
       try {
-        // Purge runtime state first so late events cannot write to the session
-        // after the DB row is removed.
-        forgetCoworkSession(sessionId);
-        const coworkStoreInstance = deps.getCoworkStore();
-        const session = coworkStoreInstance.getSession(sessionId, 1);
-        const goal = session?.title ?? sessionId;
-        const accomplished =
-          session?.messages.filter(message => message.type === 'assistant').at(-1)?.content ?? '';
-        coworkStoreInstance.deleteSession(sessionId);
-        void deps
-          .getPiRuntimeAdapter()
-          .getProjectMemoryService()
-          ?.finalizeSession(
-            sessionId,
-            `## Goal\n${goal}\n\n## Accomplished\n${accomplished.slice(0, 1500)}`,
-          );
-        // Clean up IM session mapping so that new channel messages
-        // create a fresh session instead of referencing a deleted one.
-        try {
-          deps
-            .getIMGatewayManager()
-            ?.getIMStore()
-            ?.deleteSessionMappingByCoworkSessionId(sessionId);
-        } catch {
-          // IM rt.store may not be initialised yet; safe to ignore.
-        }
+        deleteCoworkSessions(deps, [sessionId]);
         return { success: true as const };
       } catch (error) {
         return {
@@ -218,23 +223,7 @@ export const registerCoworkSessionAdminIpc = (deps: CoworkSessionAdminIpcDeps): 
 
     deleteSessions: async (_event, sessionIds) => {
       try {
-        // Purge runtime state before deleting DB rows so late events cannot
-        // recreate or write to sessions that are being removed.
-        for (const sessionId of sessionIds) {
-          forgetCoworkSession(sessionId);
-        }
-        const coworkStoreInstance = deps.getCoworkStore();
-        coworkStoreInstance.deleteSessions(sessionIds);
-        for (const sessionId of sessionIds) {
-          try {
-            deps
-              .getIMGatewayManager()
-              ?.getIMStore()
-              ?.deleteSessionMappingByCoworkSessionId(sessionId);
-          } catch {
-            // IM rt.store may not be initialised yet; safe to ignore.
-          }
-        }
+        deleteCoworkSessions(deps, sessionIds);
         return { success: true as const };
       } catch (error) {
         return {

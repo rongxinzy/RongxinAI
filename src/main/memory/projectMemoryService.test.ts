@@ -72,6 +72,38 @@ class FakeRepository {
     return String(input.id);
   }
 
+  getLink(id: string) {
+    return this.links.find(link => link.id === id) ?? null;
+  }
+
+  confirmOutboxDelivery(input: {
+    outboxId: string;
+    link: Record<string, unknown>;
+    candidateBacked?: boolean;
+  }) {
+    this.createLink(input.link);
+    if (input.candidateBacked && input.link.id) this.deleteCandidate(String(input.link.id));
+    this.markCompleted(input.outboxId);
+  }
+
+  completeForget(input: { outboxId: string; linkId: string; hardDelete: boolean }) {
+    this.markCompleted(input.outboxId);
+    if (input.hardDelete) this.deleteLink(input.linkId);
+  }
+
+  hasOtherObservationReferences() {
+    return false;
+  }
+
+  deleteCandidate(id: string) {
+    const index = this.links.findIndex(link => link.id === id);
+    if (index >= 0) this.links.splice(index, 1);
+  }
+
+  deleteLink(id: string) {
+    this.deleteCandidate(id);
+  }
+
   saveSessionCheckpoint(input: {
     id: string;
     sessionId: string;
@@ -340,6 +372,11 @@ test('records an import rejection before permanently forgetting a confirmed lega
     listPending: vi.fn(() => [pending]),
     markCompleted: vi.fn(),
     deleteLink: vi.fn(),
+    hasOtherObservationReferences: vi.fn(() => false),
+    completeForget: vi.fn(() => {
+      repository.markCompleted(pending.id);
+      repository.deleteLink(link.id);
+    }),
   };
   const adapter = { forget: vi.fn(async () => true) };
   const service = new ProjectMemoryService(
@@ -433,6 +470,17 @@ test('supersedes a legacy Project link through the durable outbox', async () => 
     supersedeActiveTopic: vi.fn(),
     markCompleted: vi.fn(),
     markRetry: vi.fn(),
+    confirmOutboxDelivery: vi.fn(input => {
+      repository.createLink(input.link);
+      if (input.superseded) {
+        repository.setLinkStatus(
+          input.superseded.id,
+          MemoryLifecycleStatus.Superseded,
+          input.link.id,
+        );
+      }
+      repository.markCompleted(input.outboxId);
+    }),
   };
   const adapter = {
     saveCandidate: vi.fn(input => ({ id: 'replacement-candidate', ...input })),

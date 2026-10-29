@@ -16,17 +16,25 @@ import {
   MemoryOutboxStatus,
   MemoryRecordStorageKind,
   SESSION_MEMORY_EXTRACTOR_VERSION,
+  SessionCheckpointSyncState,
   type MemoryOutboxOperation,
   type MemoryRecordStorageKind as MemoryRecordStorageKindValue,
   type MemorySourceKind,
 } from './constants';
 import { EXPLICIT_MEMORY_SOURCE } from './explicitUserRequestedMemory';
+import {
+  commitMemoryForgetCompletion,
+  commitMemoryOutboxConfirmation,
+  type MemoryForgetCompletionInput,
+  type MemoryOutboxConfirmationInput,
+} from './memoryOutboxConfirmation';
 import { migrateLegacyMemoryTimestamps } from './memoryTimestampMigration';
 import {
   checkpointReceipt,
   commitSessionCheckpoint,
   getLatestSessionCheckpoint,
   getSessionCheckpoint,
+  maxConfirmedSessionCheckpointSequence as readConfirmedSessionCheckpointSequence,
   maxSessionCheckpointSequence as readMaxSessionCheckpointSequence,
   migrateSessionCheckpointStorage,
   updateSessionCheckpointDelivery,
@@ -34,6 +42,7 @@ import {
   type SessionCheckpointReceipt,
   type SessionCheckpointRecord,
 } from './sessionCheckpointRepository';
+import { SessionLifecycleStore } from './sessionLifecycleRepository';
 import { addColumnIfMissing, runMigrations } from '../sqliteMigrations';
 
 const MEMORY_SCHEMA_SCOPE = 'memory';
@@ -133,9 +142,12 @@ interface MemoryOutboxRow {
 type SqlRow = Record<string, unknown>;
 
 export class MemoryRepository {
+  readonly lifecycle: SessionLifecycleStore;
+
   constructor(private readonly db: Database.Database) {
     this.ensureSchema();
     if (typeof this.db.prepare === 'function') migrateSessionCheckpointStorage(this.db);
+    this.lifecycle = new SessionLifecycleStore(this.db);
   }
 
   saveSessionCheckpoint(input: SessionCheckpointCommitInput): SessionCheckpointReceipt {
@@ -177,7 +189,8 @@ export class MemoryRepository {
           promotion_source_project_id = excluded.promotion_source_project_id,
           promotion_source_session_id = excluded.promotion_source_session_id,
           metadata_json = excluded.metadata_json,
-          updated_at = excluded.updated_at`,
+          updated_at = excluded.updated_at
+          WHERE memory_links.status = ?`,
       )
       .run(
         id,
@@ -205,8 +218,17 @@ export class MemoryRepository {
         JSON.stringify(input.metadata ?? {}),
         now,
         now,
+        MemoryLifecycleStatus.Active,
       );
     return id;
+  }
+
+  confirmOutboxDelivery(input: MemoryOutboxConfirmationInput): void {
+    commitMemoryOutboxConfirmation(this.db, this, input);
+  }
+
+  completeForget(input: MemoryForgetCompletionInput): void {
+    commitMemoryForgetCompletion(this.db, this, input);
   }
 
   createPersonalCandidate(input: PersonalMemoryCandidateInput): string {
@@ -360,6 +382,10 @@ export class MemoryRepository {
     return readMaxSessionCheckpointSequence(this.db, sessionId);
   }
 
+  maxConfirmedSessionCheckpointSequence(sessionId: string): number {
+    return readConfirmedSessionCheckpointSequence(this.db, sessionId);
+  }
+
   deleteCandidate(id: string): void {
     this.db.transaction(() => {
       this.db
@@ -429,6 +455,13 @@ export class MemoryRepository {
     return rows.map(mapOutbox);
   }
 
+  nextPendingAvailableAt(): string | null {
+    const row = this.db
+      .prepare('SELECT MIN(available_at) AS available_at FROM memory_outbox WHERE status = ?')
+      .get(MemoryOutboxStatus.Pending) as { available_at: string | null };
+    return row.available_at;
+  }
+
   findPendingByLinkId(linkId: string, operation: MemoryOutboxOperation): MemoryOutboxItem | null {
     const row = this.db
       .prepare(
@@ -452,6 +485,15 @@ export class MemoryRepository {
         )
         .run(MemoryOutboxStatus.Completed, new Date().toISOString(), id);
       updateSessionCheckpointDelivery(this.db, id, MemoryOutboxStatus.Completed, null);
+    })();
+  }
+
+  markSuperseded(id: string): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare('UPDATE memory_outbox SET status = ?, last_error = NULL WHERE id = ?')
+        .run(MemoryOutboxStatus.Completed, id);
+      updateSessionCheckpointDelivery(this.db, id, SessionCheckpointSyncState.Superseded, null);
     })();
   }
 

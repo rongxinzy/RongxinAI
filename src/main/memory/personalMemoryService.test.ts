@@ -82,6 +82,29 @@ class PersonalRepositoryFake {
     return id;
   }
 
+  confirmOutboxDelivery(input: {
+    outboxId: string;
+    link: Record<string, unknown>;
+    candidateBacked?: boolean;
+    superseded: ManagedMemoryRecord | null;
+  }) {
+    this.createLink(input.link);
+    if (input.superseded) this.setLinkStatus(input.superseded.id, MemoryLifecycleStatus.Superseded);
+    if (input.candidateBacked && input.link.id) this.deleteCandidate(String(input.link.id));
+    this.markCompleted(input.outboxId);
+  }
+
+  completeForget(input: { outboxId: string; linkId: string; hardDelete: boolean }) {
+    this.markCompleted(input.outboxId);
+    if (input.hardDelete) this.deleteLink(input.linkId);
+  }
+
+  hasOtherObservationReferences() {
+    return false;
+  }
+
+  supersedeActiveTopic() {}
+
   deleteCandidate(id: string) {
     this.candidates.delete(id);
   }

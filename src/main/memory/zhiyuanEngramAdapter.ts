@@ -19,6 +19,8 @@ interface CandidateInput {
   content: string;
   topicKey?: string;
   operationId?: string;
+  runtimeSessionId?: string;
+  recoverExistingResult?: boolean;
 }
 
 export class EngramRequestError extends Error {
@@ -37,7 +39,7 @@ export class EngramRequestError extends Error {
 }
 
 export class ZhiYuanEngramAdapter {
-  private readonly registeredSessions = new Set<string>();
+  private readonly registeredSessions = new Map<string, string>();
 
   constructor(private readonly manager: EngramManager) {}
 
@@ -96,52 +98,66 @@ export class ZhiYuanEngramAdapter {
   async confirmMemory(
     candidate: MemoryCandidate,
     workingDirectory: string,
+    onRuntimeSession?: (runtimeSessionId: string) => void,
   ): Promise<number | null> {
     const connection = await this.getConnection();
     if (!connection) return null;
-    await this.ensureSession(connection, candidate.sessionId, candidate.project, workingDirectory);
+    const operationId = candidate.operationId ?? candidate.id;
+    if (candidate.recoverExistingResult && !candidate.runtimeSessionId) {
+      const recovered = await this.recoverObservation(connection, operationId);
+      if (recovered !== null) return recovered;
+    }
+    const runtimeSessionId = await this.ensureSession(
+      connection,
+      candidate.sessionId,
+      candidate.project,
+      workingDirectory,
+      candidate.runtimeSessionId,
+    );
+    onRuntimeSession?.(runtimeSessionId);
     try {
       const saved = await this.request<{ id: number }>(connection, '/observations', {
         method: 'POST',
         body: JSON.stringify({
-          session_id: candidate.sessionId,
+          session_id: runtimeSessionId,
           project: candidate.project,
           scope: candidate.scope,
           type: candidate.type,
           title: candidate.title,
           content: candidate.content,
           topic_key: candidate.topicKey,
-          operation_id: candidate.operationId ?? candidate.id,
+          operation_id: operationId,
         }),
       });
       return saved.id;
     } catch (error) {
       if (!isTimeoutError(error)) throw error;
-      const recovered = await this.request<{ id: number; status: string }>(
-        connection,
-        `/observations/save-result?operation_id=${encodeURIComponent(candidate.operationId ?? candidate.id)}`,
-      );
-      return recovered.id;
+      return await this.recoverObservation(connection, operationId);
     }
   }
 
   /** Close a session with a caller-authored summary, once per session close
    * (never per turn). The runtime makes this idempotent per session. */
-  async finalizeSession(
-    sessionId: string,
-    summary: string,
-  ): Promise<{ sessionId: string; state: string; summaryId: string; alreadyFinalized: boolean }> {
+  async finalizeSession(input: { sessionId: string; project: string; summary: string }): Promise<{
+    sessionId: string;
+    state: string;
+    summaryId: number;
+    alreadyFinalized: boolean;
+  } | null> {
     const connection = await this.getConnection();
-    if (!connection) throw new Error('Memory runtime is unavailable.');
+    if (!connection) return null;
     const result = await this.request<{
       session_id: string;
       state: string;
-      summary_id: string;
+      summary_id: number;
       already_finalized: boolean;
-    }>(connection, `/sessions/${encodeURIComponent(sessionId)}/finalize`, {
+    }>(connection, `/sessions/${encodeURIComponent(input.sessionId)}/finalize`, {
       method: 'POST',
-      body: JSON.stringify({ summary }),
+      body: JSON.stringify({ project: input.project, summary: input.summary }),
     });
+    for (const [localId, runtimeId] of this.registeredSessions) {
+      if (runtimeId === input.sessionId) this.registeredSessions.delete(localId);
+    }
     return {
       sessionId: result.session_id,
       state: result.state,
@@ -180,8 +196,13 @@ export class ZhiYuanEngramAdapter {
     observationId: number;
     candidate: MemoryCandidate;
     workingDirectory: string;
+    onRuntimeSession?: (runtimeSessionId: string) => void;
   }): Promise<number | null> {
-    const replacementId = await this.confirmMemory(input.candidate, input.workingDirectory);
+    const replacementId = await this.confirmMemory(
+      input.candidate,
+      input.workingDirectory,
+      input.onRuntimeSession,
+    );
     if (replacementId === null) return null;
     // Same-topic upserts update in place and return the original id: deleting
     // it would erase the content we just wrote.
@@ -205,21 +226,40 @@ export class ZhiYuanEngramAdapter {
     return true;
   }
 
+  private async recoverObservation(
+    connection: EngramConnection,
+    operationId: string,
+  ): Promise<number | null> {
+    try {
+      const recovered = await this.request<{ id: number }>(
+        connection,
+        `/observations/save-result?operation_id=${encodeURIComponent(operationId)}`,
+      );
+      return recovered.id;
+    } catch (error) {
+      if (error instanceof EngramRequestError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
   private async getConnection(): Promise<EngramConnection | null> {
     return this.manager.getConnection() ?? (await this.manager.start());
   }
 
-  /** Register or resume a session at start. The runtime returns a stable
-   * native continuation identity on reopen, so finalize stays idempotent. */
-  async resumeSession(sessionId: string, project: string, workingDirectory: string): Promise<void> {
-    await this.ensureSession(
-      await this.getConnection().then(connection => {
-        if (!connection) throw new Error('Memory runtime is unavailable.');
-        return connection;
-      }),
+  async resumeSession(
+    sessionId: string,
+    project: string,
+    workingDirectory: string,
+    runtimeSessionId?: string,
+  ): Promise<string> {
+    const connection = await this.getConnection();
+    if (!connection) throw new Error('Memory runtime is unavailable.');
+    return await this.ensureSession(
+      connection,
       sessionId,
       project,
       workingDirectory,
+      runtimeSessionId,
     );
   }
 
@@ -228,13 +268,21 @@ export class ZhiYuanEngramAdapter {
     sessionId: string,
     project: string,
     workingDirectory: string,
-  ): Promise<void> {
-    if (this.registeredSessions.has(sessionId)) return;
-    await this.request(connection, '/sessions', {
+    runtimeSessionId?: string,
+  ): Promise<string> {
+    const cached = this.registeredSessions.get(sessionId);
+    if (cached) return cached;
+    const registered = await this.request<{ id: string }>(connection, '/sessions', {
       method: 'POST',
-      body: JSON.stringify({ id: sessionId, project, directory: workingDirectory }),
+      body: JSON.stringify({
+        id: runtimeSessionId ?? sessionId,
+        project,
+        directory: workingDirectory,
+        resume: true,
+      }),
     });
-    this.registeredSessions.add(sessionId);
+    this.registeredSessions.set(sessionId, registered.id);
+    return registered.id;
   }
 
   private async request<T = unknown>(

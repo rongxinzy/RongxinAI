@@ -857,6 +857,8 @@ export class PiRuntimeTurnEvents {
             hasRecordedFiles: active.artifactRecorder?.hasRecordedFiles() === true,
             checkpointWritten: active.summaryCheckpointWritten === true,
             checkpointSkipped: active.summaryCheckpointSkipped !== undefined,
+            workVersion: active.artifactRecorder?.recordedWorkVersion() ?? 0,
+            coveredWorkVersion: active.summaryCheckpointWorkVersion,
           });
           if (obligation === 'fallback') {
             // Omissions never start another model turn.

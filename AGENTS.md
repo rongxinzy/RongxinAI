@@ -88,11 +88,13 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 
 ### 记忆系统
 
-本地 Engram（`vendor/engram-runtime`）+ SQLite 投影表 `memory_links` / `memory_candidates` / `memory_outbox`。
+本地 Engram（`vendor/engram-runtime`）+ SQLite 投影表 `memory_links` / `memory_candidates` / `memory_outbox`。业务检查点、同步状态、原生会话身份与关闭意图分别存于 `memory_checkpoints` / `memory_runtime_sessions` / `memory_session_finalizations`。
 
 - 作用域：`project`（id = `workspace-` + sha256(cwd)，见 `src/main/workspaceUtils.ts`、`src/shared/memory/constants.ts`）；`personal`（`personal://zhiyuan-agent/user`，写入进候选队列，用户确认后生效）；`session`（摘要，30 天 TTL）。
-- 写入：显式 `memory` 工具保存走确定性的 `prepareExplicitUserRequestedMemory`（`src/main/memory/piMemoryTool.ts`，无额外 LLM 抽取）；会话检查点由 agent 通过 `session_summary` 工具（`src/main/sessionSummary/tool.ts`）在当前上下文中自写，经 `sessionCheckpointService.ts` 落 SQLite + outbox 同步 Engram。不再按回合做窗口抽取（`runPostTurnMemoryMaintenance` 已退役）。
+- 写入：显式 `memory` 工具保存走确定性的 `prepareExplicitUserRequestedMemory`（`src/main/memory/piMemoryTool.ts`，无额外 LLM 抽取）；会话检查点由 agent 通过 `session_summary` 工具（`src/main/sessionSummary/tool.ts`）在当前上下文中自写，经 `sessionCheckpointService.ts` 将不可变正文与 outbox 原子落 SQLite，再同步 Engram。不再按回合做窗口抽取（`runPostTurnMemoryMaintenance` 已退役）。新检查点使用独立 `session/<sessionId>/checkpoint/<checkpointId>` topic 保留可召回历史，本地最新检查点表示当前状态；旧滚动 topic 只兼容既有记录。
+- 身份与生命周期：工具执行时读取当前 run/turn 和产物工作版本，written/skip 只覆盖当时的工作量；新回合或后续新增、修改产物会重新激活摘要义务。`memory_runtime_sessions` 持久化 Engram 返回的 effective/continuation ID，不自行拼接。单删与批删在同一个共享 SQLite 事务中写关闭意图、finalize outbox 并删除会话。
 - 收尾义务：有文件产出的回合未写检查点时，不自动续跑模型或注入纠正提醒，只记录遗漏指标并以确定性兜底（目标/最终回复摘录/验证状态/台账）记为待审运行记录；skip 是显式合法结果。`taskMemoryPromotion` 的任务知识提炼仍走独立的 `AtomicMemoryExtractor`。
+- 投递与治理：outbox 按最早 `available_at` 自动唤醒、串行排空，应用退出先停止调度再停止边车。远端回执对应的 link 生命周期和 outbox 状态在同一本地事务确认；重放不得复活归档/删除项，历史 link 删除不得破坏其他修订共享的 observation。未发送的 finalize 请求失败可退避，结果不确定的请求不得自动盲目重放。
 - 注入：每轮前 `buildProjectMemoryContextSafe`，预算 project/personal/session = 900/250/350 token。Chat 不用记忆；IM/Cron 同 Work。旧 `MEMORY.md` 只在启动时导入为候选，永不注入 prompt。
 
 ### 其他

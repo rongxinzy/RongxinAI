@@ -135,12 +135,20 @@ export function buildPiSessionCustomTools(
       sessionId,
       workingDirectory: workspaceRoot,
       runId: workbenchRunId,
+      getExecutionIdentity: toolCallId => {
+        const active = host.activeSessions.get(sessionId);
+        return {
+          runId: active?.workbenchRunId ?? workbenchRunId,
+          turnId: active?.assistantMessageId ?? toolCallId,
+        };
+      },
       onOutcome: (outcome, reason) => {
         const active = host.activeSessions.get(sessionId);
         if (!active) return;
         if (outcome === 'written') active.summaryCheckpointWritten = true;
         if (outcome === 'skipped') active.summaryCheckpointSkipped = reason ?? true;
-        host.getWorkbenchTaskService()?.measurement?.recordActivation(workbenchRunId, {
+        active.summaryCheckpointWorkVersion = active.artifactRecorder?.recordedWorkVersion() ?? 0;
+        recordActivation({
           activation:
             outcome === 'written'
               ? HarnessActivationType.SummaryWritten
