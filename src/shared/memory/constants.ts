@@ -53,6 +53,7 @@ export const MemoryOutboxOperation = {
   SessionSummary: 'session_summary',
   Supersede: 'supersede',
   Forget: 'forget',
+  FinalizeSession: 'finalize_session',
 } as const;
 
 export type MemoryOutboxOperation =

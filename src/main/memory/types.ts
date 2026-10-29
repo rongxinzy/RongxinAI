@@ -42,5 +42,7 @@ export interface MemoryCandidate {
   /** Stable idempotency key for save-result recovery across outbox retries
    * and process restarts (defaults to the candidate id when unset). */
   operationId?: string;
+  runtimeSessionId?: string;
+  recoverExistingResult?: boolean;
   createdAt: string;
 }

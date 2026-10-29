@@ -80,6 +80,7 @@ export class ArtifactRecorder {
 
   private runId: string | null = null;
   private recordedKeys = new Set<string>();
+  private workVersion = 0;
   private baseline: WorkspaceSnapshot | null = null;
   private latest: WorkspaceSnapshot | null = null;
   private baselinePromise: Promise<WorkspaceSnapshot | null> | null = null;
@@ -103,6 +104,7 @@ export class ArtifactRecorder {
     this.runId = runId;
     this.runGeneration += 1;
     this.recordedKeys = new Set();
+    this.workVersion = 0;
     this.baseline = null;
     this.latest = null;
     const generation = this.runGeneration;
@@ -271,6 +273,10 @@ export class ArtifactRecorder {
     return this.recordedKeys.size > 0;
   }
 
+  recordedWorkVersion(): number {
+    return this.workVersion;
+  }
+
   private annotateDeclare(input: RecorderToolEndInput): void {
     const details = asToolInput((input.result as { details?: unknown } | undefined)?.details);
     const rawPath = typeof details.filePath === 'string' ? details.filePath.trim() : '';
@@ -292,6 +298,7 @@ export class ArtifactRecorder {
         toolCallId: input.toolCallId,
         runId: this.runId,
       });
+      this.workVersion += 1;
       this.recordedKeys.add(artifactKeyForPath(absolutePath));
       publishArtifactUpsert(this.sessionId, artifact);
     } catch (error) {
@@ -331,6 +338,7 @@ export class ArtifactRecorder {
         createdAt: Date.now(),
       });
       if (artifact) {
+        this.workVersion += 1;
         this.recordedKeys.add(artifactKeyForPath(input.filePath));
         publishArtifactUpsert(this.sessionId, artifact);
       }

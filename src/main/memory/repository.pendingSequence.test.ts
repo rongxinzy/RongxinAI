@@ -1,60 +1,71 @@
 import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
 
-import { MemoryScope } from '../../shared/memory';
+import { MemoryKind, MemoryScope, MemorySourceKind } from '../../shared/memory';
 import { MemoryOutboxOperation, MemoryOutboxStatus } from './constants';
 import { processMemoryOutboxItem } from './memoryOutboxProcessor';
-import { MemoryRepository } from './repository';
+import { MemoryRepository, type MemoryOutboxItem } from './repository';
 
-test('checkpoint sequence covers pending outbox payloads and rejects older retries', async () => {
-  const repository = new MemoryRepository(new Database(':memory:'));
-  repository.enqueue(
-    MemoryOutboxOperation.SessionSummary,
-    {
-      sessionId: 'session-1',
-      projectId: 'project-a',
-      projectRoot: '/work',
-      type: 'session_summary',
-      title: 'Session summary',
-      content: 'older checkpoint',
-      topicKey: 'session/session-1',
-      sourceKind: 'session_summary',
-      scope: MemoryScope.Session,
-      linkId: 'link-older',
-      metadata: { checkpointSequence: 3 },
-    },
-    'link-older',
-  );
-
-  expect(repository.maxSessionCheckpointSequence('session-1')).toBe(3);
-
-  const item = {
-    id: 'outbox-old',
+function legacyItem(id: string, linkId: string, sequence: number): MemoryOutboxItem {
+  return {
+    id,
+    linkId,
     operation: MemoryOutboxOperation.SessionSummary,
     payload: {
       sessionId: 'session-1',
       projectId: 'project-a',
       projectRoot: '/work',
-      type: 'session_summary',
+      type: MemoryKind.SessionSummary,
       title: 'Session summary',
-      content: 'older checkpoint',
+      content: linkId,
       topicKey: 'session/session-1',
-      sourceKind: 'session_summary',
+      sourceKind: MemorySourceKind.SessionSummary,
       scope: MemoryScope.Session,
-      linkId: 'link-old',
-      metadata: { checkpointSequence: 1 },
+      linkId,
+      metadata: { checkpointSequence: sequence },
     },
     status: MemoryOutboxStatus.Pending,
     attempts: 0,
     availableAt: new Date(0).toISOString(),
     lastError: null,
   };
-  const adapter = { saveCandidate: vi.fn(), confirmMemory: vi.fn() };
-  await processMemoryOutboxItem(repository, adapter as never, item);
+}
 
-  expect(adapter.confirmMemory).not.toHaveBeenCalled();
-  const pending = repository.listPending();
-  expect(pending).toHaveLength(1);
-  expect(pending[0].linkId).toBe('link-older');
-  expect(pending[0].payload.metadata).toEqual({ checkpointSequence: 3 });
+function adapter() {
+  return {
+    saveCandidate: vi.fn((input: Record<string, unknown>) => ({ id: 'candidate', ...input })),
+    confirmMemory: vi.fn(async () => 17),
+  };
+}
+
+test('a pending newer checkpoint does not discard an unsent older legacy checkpoint', async () => {
+  const repository = new MemoryRepository(new Database(':memory:'));
+  const newer = legacyItem('outbox-new', 'link-new', 3);
+  const older = legacyItem('outbox-old', 'link-old', 1);
+  repository.enqueue(newer.operation, newer.payload, 'link-new');
+  repository.enqueue(older.operation, older.payload, 'link-old');
+
+  expect(repository.maxSessionCheckpointSequence('session-1')).toBe(3);
+  const remote = adapter();
+  await processMemoryOutboxItem(repository, remote as never, repository.listPending()[1]);
+
+  expect(remote.confirmMemory).toHaveBeenCalledTimes(1);
+  expect(repository.getLink('link-old')?.memoryId).toBe(17);
+  expect(repository.listPending().map(item => item.linkId)).toEqual(['link-new']);
+});
+
+test('a confirmed newer legacy revision supersedes rather than reports an old retry as synced', async () => {
+  const repository = new MemoryRepository(new Database(':memory:'));
+  const newer = legacyItem('outbox-new', 'link-new', 3);
+  const older = legacyItem('outbox-old', 'link-old', 1);
+  repository.enqueue(newer.operation, newer.payload, 'link-new');
+  repository.enqueue(older.operation, older.payload, 'link-old');
+  const remote = adapter();
+  await processMemoryOutboxItem(repository, remote as never, repository.listPending()[0]);
+  await processMemoryOutboxItem(repository, remote as never, repository.listPending()[0]);
+
+  expect(remote.confirmMemory).toHaveBeenCalledTimes(1);
+  expect(repository.getLink('link-old')).toBeNull();
+  expect(repository.listPending()).toHaveLength(0);
+  expect(repository.getSessionCheckpoint('link-old')).toBeNull();
 });

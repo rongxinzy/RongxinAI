@@ -41,6 +41,21 @@ export interface ForgetPayload {
   projectId?: string;
 }
 
+export interface FinalizeSessionPayload {
+  sessionId: string;
+  runtimeSessionId: string;
+  projectId: string;
+  summary: string;
+}
+
+export function parseFinalizeSessionPayload(
+  payload: Record<string, unknown>,
+): FinalizeSessionPayload | null {
+  const required = ['sessionId', 'runtimeSessionId', 'projectId', 'summary'] as const;
+  if (required.some(key => typeof payload[key] !== 'string' || !payload[key])) return null;
+  return payload as unknown as FinalizeSessionPayload;
+}
+
 export function parseConfirmPayload(payload: Record<string, unknown>): ConfirmPayload | null {
   const required = [
     'sessionId',

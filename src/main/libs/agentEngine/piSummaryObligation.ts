@@ -5,8 +5,11 @@ export function evaluateSummaryObligation(input: {
   hasRecordedFiles: boolean;
   checkpointWritten: boolean;
   checkpointSkipped: boolean;
+  workVersion: number;
+  coveredWorkVersion?: number;
 }): SummaryObligation {
-  return !input.hasRecordedFiles || input.checkpointWritten || input.checkpointSkipped
-    ? 'none'
-    : 'fallback';
+  const covered =
+    (input.checkpointWritten || input.checkpointSkipped) &&
+    input.coveredWorkVersion === input.workVersion;
+  return !input.hasRecordedFiles || covered ? 'none' : 'fallback';
 }

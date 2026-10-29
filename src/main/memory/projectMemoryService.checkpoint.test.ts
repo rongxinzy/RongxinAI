@@ -20,56 +20,71 @@ function offlineService(repository: MemoryRepository): ProjectMemoryService {
   );
 }
 
-test('offline checkpoints have distinct sequences and an older retry cannot roll back a newer one', async () => {
-  const database = new Database(':memory:');
-  const repository = new MemoryRepository(database);
+test('immutable checkpoints retain independently recallable history', async () => {
+  const repository = new MemoryRepository(new Database(':memory:'));
   const offline = offlineService(repository);
-  await offline.saveSessionSummary({
-    sessionId: 'session-1',
-    workingDirectory: '/work',
-    summary: 'checkpoint A',
-    linkId: 'checkpoint-a',
-  });
-  await offline.saveSessionSummary({
-    sessionId: 'session-1',
-    workingDirectory: '/work',
-    summary: 'checkpoint B',
-    linkId: 'checkpoint-b',
-  });
+  for (const [linkId, summary] of [
+    ['checkpoint-a', 'invoiceworkbook'],
+    ['checkpoint-b', 'gitbranch'],
+  ] as const) {
+    await offline.saveSessionSummary({
+      sessionId: 'session-1',
+      workingDirectory: '/work',
+      summary,
+      linkId,
+      metadata: { format: 'agent-checkpoint' },
+    });
+  }
 
   const pending = repository.listPending();
   expect(pending.map(item => item.payload.metadata)).toEqual([
-    { checkpointSequence: 1 },
-    { checkpointSequence: 2 },
+    { format: 'agent-checkpoint', checkpointSequence: 1 },
+    { format: 'agent-checkpoint', checkpointSequence: 2 },
+  ]);
+  expect(pending.map(item => item.payload.topicKey)).toEqual([
+    'session/session-1/checkpoint/checkpoint-a',
+    'session/session-1/checkpoint/checkpoint-b',
   ]);
   const adapter = {
     saveCandidate: vi.fn((input: Record<string, unknown>) => ({ id: 'candidate', ...input })),
-    confirmMemory: vi.fn(async () => 22),
+    confirmMemory: vi.fn(async (candidate: { content: string }) =>
+      candidate.content === 'invoiceworkbook' ? 21 : 22,
+    ),
+    recall: vi.fn(async (input: { query: string }) =>
+      [
+        { id: 21, session_id: 'session-1', content: 'invoiceworkbook' },
+        { id: 22, session_id: 'session-1', content: 'gitbranch' },
+      ].filter(observation => observation.content.includes(input.query)),
+    ),
   };
-  const newer = pending.find(item => item.linkId === 'checkpoint-b') ?? null;
-  const older = pending.find(item => item.linkId === 'checkpoint-a') ?? null;
-  await processMemoryOutboxItem(repository, adapter as never, newer);
-  await processMemoryOutboxItem(repository, adapter as never, older);
+  const service = new ProjectMemoryService(repository, adapter as never, identityFor, '/personal');
+  await processMemoryOutboxItem(repository, adapter as never, pending[1]);
+  await processMemoryOutboxItem(repository, adapter as never, pending[0]);
 
-  expect(adapter.confirmMemory).toHaveBeenCalledTimes(1);
-  expect(adapter.confirmMemory).toHaveBeenCalledWith(
-    expect.objectContaining({ operationId: 'checkpoint-b' }),
-    '/work',
-  );
-  expect(repository.getLink('checkpoint-a')).toBeNull();
-  expect(repository.getLink('checkpoint-b')?.content).toBe('checkpoint B');
-  const recoveredRepository = new MemoryRepository(database);
-  const recovered = new ProjectMemoryService(
-    recoveredRepository,
-    adapter as never,
-    identityFor,
-    '/personal',
-  );
-  await recovered.retryPendingOutbox();
-  expect(adapter.confirmMemory).toHaveBeenCalledTimes(1);
+  expect(adapter.confirmMemory).toHaveBeenCalledTimes(2);
+  expect(repository.getLink('checkpoint-a')?.memoryId).toBe(21);
+  expect(repository.getLink('checkpoint-b')?.memoryId).toBe(22);
   expect(
-    recovered.getActiveSessionSummary({ sessionId: 'session-1', workingDirectory: '/work' }),
-  ).toMatchObject({ content: 'checkpoint B', metadata: { checkpointSequence: 2 } });
+    (
+      await service.recallSession({
+        sessionId: 'session-1',
+        workingDirectory: '/work',
+        query: 'invoiceworkbook',
+      })
+    ).map(observation => observation.id),
+  ).toEqual([21]);
+  expect(
+    (
+      await service.recallSession({
+        sessionId: 'session-1',
+        workingDirectory: '/work',
+        query: 'gitbranch',
+      })
+    ).map(observation => observation.id),
+  ).toEqual([22]);
+  expect(
+    service.getActiveSessionSummary({ sessionId: 'session-1', workingDirectory: '/work' }),
+  ).toMatchObject({ content: 'gitbranch', metadata: { checkpointSequence: 2 } });
 });
 
 test('replaying a stable checkpoint id does not rewrite immutable content', async () => {

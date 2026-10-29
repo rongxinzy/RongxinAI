@@ -86,7 +86,10 @@ function filterRecallable<T extends { id: number; type?: string; session_id?: st
 ): T[] {
   const observationsInScope = observations.filter(observation => {
     if (input.scope === MemoryScope.Session) {
-      return Boolean(input.sessionId) && observation.session_id === input.sessionId;
+      const owner =
+        repository.lifecycle?.getLocalSessionIdByRuntimeId(observation.session_id) ??
+        observation.session_id;
+      return Boolean(input.sessionId) && owner === input.sessionId;
     }
     return observation.type !== MemoryKind.SessionSummary;
   });

@@ -179,6 +179,9 @@ const runAppCleanup = async (): Promise<void> => {
     {
       name: 'memoryRuntime',
       run: async () => {
+        await memoryRuntime.projectMemoryService?.stopOutboxScheduler().catch(error => {
+          console.error('[MemoryRuntime] Failed to stop outbox delivery:', error);
+        });
         if (!memoryRuntime.engramManager) return;
         await memoryRuntime.engramManager.stop().catch(error => {
           console.error('[MemoryRuntime] Failed to stop local memory service:', error);

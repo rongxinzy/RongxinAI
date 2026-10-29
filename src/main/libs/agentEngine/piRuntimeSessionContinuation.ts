@@ -348,6 +348,9 @@ export async function continuePiRuntimeSession(
   active.retryNoticeEmitted = false;
   active.retryAttempts = 0;
   active.retryStreamReusePending = false;
+  active.summaryCheckpointWritten = false;
+  active.summaryCheckpointSkipped = undefined;
+  active.summaryCheckpointWorkVersion = undefined;
   active.turnExperts = (
     host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.experts ?? []
   )

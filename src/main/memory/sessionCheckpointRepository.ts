@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3';
 
 import { MemoryKind, MemoryScope, MemorySourceKind } from '../../shared/memory';
 import { runMigrations } from '../sqliteMigrations';
-import { MemoryOutboxOperation, MemoryOutboxStatus } from './constants';
+import { MemoryOutboxOperation, MemoryOutboxStatus, SessionCheckpointSyncState } from './constants';
 
 export interface SessionCheckpointRecord {
   id: string;
@@ -28,7 +28,7 @@ export interface SessionCheckpointCommitInput {
 
 export interface SessionCheckpointReceipt {
   checkpointId: string;
-  syncState: 'pending' | 'synced';
+  syncState: 'pending' | 'synced' | 'superseded';
 }
 
 interface CheckpointRow {
@@ -114,7 +114,7 @@ export function commitSessionCheckpoint(
         type: MemoryKind.SessionSummary,
         title: 'Session summary',
         content: input.summary,
-        topicKey: `session/${input.sessionId}`,
+        topicKey: `session/${input.sessionId}/checkpoint/${input.id}`,
         sourceKind: MemorySourceKind.SessionSummary,
         scope: MemoryScope.Session,
         linkId: input.id,
@@ -171,12 +171,34 @@ export function updateSessionCheckpointDelivery(
 export function checkpointReceipt(record: SessionCheckpointRecord): SessionCheckpointReceipt {
   return {
     checkpointId: record.id,
-    syncState: record.syncStatus === MemoryOutboxStatus.Completed ? 'synced' : 'pending',
+    syncState:
+      record.syncStatus === SessionCheckpointSyncState.Synced
+        ? SessionCheckpointSyncState.Synced
+        : record.syncStatus === SessionCheckpointSyncState.Superseded
+          ? SessionCheckpointSyncState.Superseded
+          : SessionCheckpointSyncState.Pending,
   };
 }
 
-export function maxSessionCheckpointSequence(db: Database.Database, sessionId: string): number {
+export function maxConfirmedSessionCheckpointSequence(
+  db: Database.Database,
+  sessionId: string,
+): number {
+  const rows = db
+    .prepare('SELECT metadata_json FROM memory_links WHERE session_id = ?')
+    .all(sessionId) as Array<{ metadata_json: string }>;
   let max = 0;
+  for (const row of rows) {
+    const metadata = JSON.parse(row.metadata_json) as { checkpointSequence?: unknown };
+    if (typeof metadata.checkpointSequence === 'number') {
+      max = Math.max(max, metadata.checkpointSequence);
+    }
+  }
+  return max;
+}
+
+export function maxSessionCheckpointSequence(db: Database.Database, sessionId: string): number {
+  let max = maxConfirmedSessionCheckpointSequence(db, sessionId);
   const readSequence = (metadata: { checkpointSequence?: unknown }): void => {
     if (typeof metadata.checkpointSequence === 'number') {
       max = Math.max(max, metadata.checkpointSequence);
@@ -188,10 +210,6 @@ export function maxSessionCheckpointSequence(db: Database.Database, sessionId: s
     )
     .get(sessionId) as { sequence: number | null };
   max = Math.max(max, local.sequence ?? 0);
-  const links = db
-    .prepare('SELECT metadata_json FROM memory_links WHERE session_id = ?')
-    .all(sessionId) as Array<{ metadata_json: string }>;
-  for (const row of links) readSequence(JSON.parse(row.metadata_json));
   const pending = db
     .prepare("SELECT payload_json FROM memory_outbox WHERE status IN ('pending', 'retry')")
     .all() as Array<{ payload_json: string }>;
