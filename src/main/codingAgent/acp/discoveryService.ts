@@ -85,8 +85,10 @@ const LAUNCHER_TEXT_LIMIT = 64 * 1024;
 /**
  * npm global shims are `.cmd` files. The process spawner does not run them
  * through a shell, so follow the shim to the real executable.
+ * `%dp0%` is expanded with this process's separator. CI runs the win32
+ * discovery path on Linux, where a hard-coded backslash is not a separator.
  */
-export const resolveWindowsLauncherExecutable = async (
+const resolveWindowsLauncherExecutable = async (
   launcherPath: string,
   platform: NodeJS.Platform,
 ): Promise<string> => {
@@ -99,9 +101,9 @@ export const resolveWindowsLauncherExecutable = async (
   }
   if (text.length > LAUNCHER_TEXT_LIMIT) return launcherPath;
   const directory = path.dirname(launcherPath);
-  const expanded = text.replace(/%~?dp0%/gi, `${directory}\\`);
+  const expanded = text.replace(/%~?dp0%/gi, `${directory}${path.sep}`);
   const match = expanded.match(/"([^"]+\.exe)"|(\S+\.exe)/i);
-  const target = match?.[1] ?? match?.[2];
+  const target = (match?.[1] ?? match?.[2])?.replace(/[\\/]/g, path.sep);
   if (!target) return launcherPath;
   try {
     return await realpath(path.resolve(directory, target));
