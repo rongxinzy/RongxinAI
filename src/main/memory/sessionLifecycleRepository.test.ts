@@ -260,3 +260,75 @@ test('finalize follows the continuation resolved by the covered checkpoint', asy
   );
   expect(repository.listPending()).toHaveLength(0);
 });
+
+test('a completed close does not suppress finalization after resumed work', async () => {
+  const database = new Database(':memory:');
+  const repository = new MemoryRepository(database);
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1',
+    projectId: 'project-a',
+    projectRoot: '/work',
+  });
+  const adapter = {
+    finalizeSession: vi.fn(async () => ({
+      sessionId: 'session-1',
+      state: 'finalized',
+      summaryId: 17,
+      alreadyFinalized: false,
+    })),
+  };
+  const close = (summary: string) => {
+    repository.lifecycle.queueSessionFinalizations(
+      [{ sessionId: 'session-1', projectId: 'project-a', summary }],
+      () => {},
+    );
+  };
+  close('first close');
+  await processMemoryOutboxItem(repository, adapter as never, repository.listPending()[0]);
+  expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Completed);
+
+  repository.saveSessionCheckpoint({
+    id: 'resumed-checkpoint',
+    sessionId: 'session-1',
+    projectId: 'project-a',
+    projectRoot: '/work',
+    summary: 'resumed work',
+    expiresAt: '2026-12-01T00:00:00.000Z',
+  });
+  close('close resumed lifecycle');
+  expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Completed);
+  expect(
+    repository
+      .listPending()
+      .filter(item => item.operation === MemoryOutboxOperation.FinalizeSession),
+  ).toHaveLength(1);
+
+  const checkpoint = repository.listPending().find(item => item.linkId === 'resumed-checkpoint');
+  if (!checkpoint) throw new Error('Expected a resumed checkpoint.');
+  repository.markCompleted(checkpoint.id);
+  repository.lifecycle.saveRuntimeSessionId({
+    localSessionId: 'session-1',
+    runtimeSessionId: 'session-1:resume:2',
+    projectId: 'project-a',
+    projectRoot: '/work',
+  });
+  const resumedClose = repository
+    .listPending()
+    .find(item => item.operation === MemoryOutboxOperation.FinalizeSession);
+  await processMemoryOutboxItem(repository, adapter as never, resumedClose ?? null);
+
+  expect(adapter.finalizeSession).toHaveBeenCalledTimes(2);
+  expect(adapter.finalizeSession).toHaveBeenLastCalledWith({
+    sessionId: 'session-1:resume:2',
+    project: 'project-a',
+    summary: 'close resumed lifecycle',
+  });
+  expect(getSessionFinalization(database, 'session-1')?.status).toBe(MemoryOutboxStatus.Completed);
+  expect(getSessionFinalization(database, 'session-1:resume:2')?.status).toBe(
+    MemoryOutboxStatus.Completed,
+  );
+
+  close('duplicate close with no new work');
+  expect(adapter.finalizeSession).toHaveBeenCalledTimes(2);
+});
