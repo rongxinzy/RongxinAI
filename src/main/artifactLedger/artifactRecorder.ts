@@ -10,6 +10,8 @@
  * Also owns the pending-write registry that `declare_artifact` awaits, so a
  * declaration racing a parallel write resolves once the write settles.
  */
+import { stat } from 'fs/promises';
+
 import {
   extractFilePath,
   normalizeToolName,
@@ -80,6 +82,8 @@ export class ArtifactRecorder {
 
   private runId: string | null = null;
   private recordedKeys = new Set<string>();
+  private readonly recordedMtimes = new Map<string, number>();
+  private readonly pendingMtimeReads = new Set<Promise<void>>();
   private workVersion = 0;
   private baseline: WorkspaceSnapshot | null = null;
   private latest: WorkspaceSnapshot | null = null;
@@ -104,6 +108,7 @@ export class ArtifactRecorder {
     this.runId = runId;
     this.runGeneration += 1;
     this.recordedKeys = new Set();
+    this.recordedMtimes.clear();
     this.workVersion = 0;
     this.baseline = null;
     this.latest = null;
@@ -267,6 +272,7 @@ export class ArtifactRecorder {
       role: ArtifactRole.Intermediate,
       declared: false,
     });
+    this.rememberRecordedMtime(input.absolutePath);
   }
 
   hasRecordedFiles(): boolean {
@@ -301,6 +307,7 @@ export class ArtifactRecorder {
       this.workVersion += 1;
       this.recordedKeys.add(artifactKeyForPath(absolutePath));
       publishArtifactUpsert(this.sessionId, artifact);
+      this.rememberRecordedMtime(absolutePath);
     } catch (error) {
       console.warn(
         `[ArtifactRecorder] failed to annotate artifact for session ${this.sessionId}:`,
@@ -359,6 +366,22 @@ export class ArtifactRecorder {
     pending.resolvers = [];
   }
 
+  private rememberRecordedMtime(filePath: string): void {
+    const key = artifactKeyForPath(filePath);
+    const generation = this.runGeneration;
+    const pending = stat(filePath)
+      .then(info => {
+        if (!this.disposed && generation === this.runGeneration) {
+          this.recordedMtimes.set(key, info.mtimeMs);
+        }
+      })
+      .catch((): void => {})
+      .finally(() => {
+        this.pendingMtimeReads.delete(pending);
+      });
+    this.pendingMtimeReads.add(pending);
+  }
+
   private scheduleDiff(anchorMessageId: string): void {
     if (this.diffTimer) clearTimeout(this.diffTimer);
     this.diffAnchor = anchorMessageId;
@@ -384,12 +407,16 @@ export class ArtifactRecorder {
       this.warnOnceIfTruncated(next.truncated ? next : base);
       return;
     }
+    await Promise.all([...this.pendingMtimeReads]);
+    if (this.disposed || generation !== this.runGeneration) return;
     for (const [key, entry] of next.byKey) {
       if (base.byKey.get(key)?.mtimeMs === entry.mtimeMs) continue;
-      // A new ledger row is unnecessary for an already recorded path, but a
-      // changed mtime is still new work that the checkpoint must cover.
-      if (this.recordedKeys.has(artifactKeyForPath(entry.path))) {
-        this.workVersion += 1;
+      const artifactKey = artifactKeyForPath(entry.path);
+      if (this.recordedKeys.has(artifactKey)) {
+        if (this.recordedMtimes.get(artifactKey) !== entry.mtimeMs) {
+          this.workVersion += 1;
+        }
+        this.recordedMtimes.set(artifactKey, entry.mtimeMs);
         continue;
       }
       const type = getArtifactTypeByExtension(entry.path);
@@ -407,6 +434,7 @@ export class ArtifactRecorder {
         role: ArtifactRole.Intermediate,
         declared: false,
       });
+      this.recordedMtimes.set(artifactKey, entry.mtimeMs);
     }
     this.latest = next;
     if (isFinal) this.diffAnchor = '';

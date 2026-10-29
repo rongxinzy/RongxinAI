@@ -22,6 +22,7 @@ import {
   type MemorySourceKind,
 } from './constants';
 import { EXPLICIT_MEMORY_SOURCE } from './explicitUserRequestedMemory';
+import { claimMemoryOutboxItem } from './memoryOutboxClaim';
 import {
   commitMemoryForgetCompletion,
   commitMemoryOutboxConfirmation,
@@ -417,6 +418,10 @@ export class MemoryRepository {
 
   hasImportRejection(id: string): boolean {
     return Boolean(this.db.prepare('SELECT 1 FROM memory_import_rejections WHERE id = ?').get(id));
+  }
+
+  claimOutbox(id: string) {
+    return claimMemoryOutboxItem(this.db, id);
   }
 
   enqueue(

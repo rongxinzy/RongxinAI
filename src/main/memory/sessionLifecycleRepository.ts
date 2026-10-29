@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 
 import { MemoryLifecycleStatus } from '../../shared/memory';
 import { runMigrations } from '../sqliteMigrations';
+import type { FinalizeSessionPayload } from './memoryOutboxPayloads';
 import { MemoryOutboxOperation, MemoryOutboxStatus } from './constants';
 
 export interface RuntimeSessionIdentityInput {
@@ -151,8 +152,11 @@ function queueSessionFinalizations(
       const intent = getSessionFinalization(db, runtimeSessionId);
       if (!intent || intent.status === MemoryOutboxStatus.Completed) continue;
       const existing = db
-        .prepare('SELECT id FROM memory_outbox WHERE link_id = ? AND operation = ?')
-        .get(linkId, MemoryOutboxOperation.FinalizeSession) as { id: string } | undefined;
+        .prepare(
+          `SELECT id FROM memory_outbox
+           WHERE operation = ? AND json_extract(payload_json, '$.sessionId') = ?`,
+        )
+        .get(MemoryOutboxOperation.FinalizeSession, input.sessionId) as { id: string } | undefined;
       const payload = JSON.stringify({
         sessionId: input.sessionId,
         runtimeSessionId,
@@ -185,6 +189,60 @@ function queueSessionFinalizations(
     }
     deleteSessions();
   })();
+}
+
+function resolveSessionFinalization(
+  db: Database.Database,
+  outboxId: string,
+  localSessionId: string,
+): FinalizeSessionPayload {
+  const row = db.prepare('SELECT payload_json FROM memory_outbox WHERE id = ?').get(outboxId) as {
+    payload_json: string;
+  };
+  const payload = JSON.parse(row.payload_json) as FinalizeSessionPayload;
+  const runtimeSessionId = getRuntimeSessionId(db, localSessionId) ?? payload.runtimeSessionId;
+  if (runtimeSessionId === payload.runtimeSessionId) return payload;
+  const next = { ...payload, runtimeSessionId };
+  db.transaction(() => {
+    const target = db
+      .prepare(
+        'SELECT local_session_id FROM memory_session_finalizations WHERE runtime_session_id = ?',
+      )
+      .get(runtimeSessionId) as { local_session_id: string } | undefined;
+    if (target) {
+      if (target.local_session_id !== localSessionId) {
+        throw new Error('Finalization continuation belongs to a different local session.');
+      }
+      db.prepare('DELETE FROM memory_session_finalizations WHERE runtime_session_id = ?').run(
+        payload.runtimeSessionId,
+      );
+      db.prepare(
+        `INSERT INTO memory_session_finalizations (
+          runtime_session_id, local_session_id, project_id, summary, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(runtime_session_id) DO UPDATE SET
+          local_session_id = excluded.local_session_id,
+          project_id = excluded.project_id,
+          summary = excluded.summary`,
+      ).run(
+        runtimeSessionId,
+        localSessionId,
+        payload.projectId,
+        payload.summary,
+        MemoryOutboxStatus.Pending,
+        new Date().toISOString(),
+      );
+    } else {
+      db.prepare(
+        'UPDATE memory_session_finalizations SET runtime_session_id = ? WHERE runtime_session_id = ?',
+      ).run(runtimeSessionId, payload.runtimeSessionId);
+    }
+    db.prepare('UPDATE memory_outbox SET payload_json = ? WHERE id = ?').run(
+      JSON.stringify(next),
+      outboxId,
+    );
+  })();
+  return next;
 }
 
 function deferSessionFinalization(
@@ -288,6 +346,10 @@ export class SessionLifecycleStore {
 
   queueSessionFinalizations(inputs: SessionFinalizationInput[], deleteSessions: () => void): void {
     queueSessionFinalizations(this.db, inputs, deleteSessions);
+  }
+
+  resolveSessionFinalization(outboxId: string, localSessionId: string): FinalizeSessionPayload {
+    return resolveSessionFinalization(this.db, outboxId, localSessionId);
   }
 
   deferSessionFinalization(outboxId: string, localSessionId: string): boolean {
