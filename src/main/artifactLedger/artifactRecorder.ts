@@ -30,6 +30,7 @@ import {
   resolveArtifactInputPath,
 } from './artifactLedger';
 import { publishArtifactUpsert } from './publisher';
+import { isInternalWorkflowStatePath } from './summaryWork';
 import {
   takeWorkspaceSnapshot,
   type WorkspaceSnapshot,
@@ -276,7 +277,7 @@ export class ArtifactRecorder {
   }
 
   hasRecordedFiles(): boolean {
-    return this.recordedKeys.size > 0;
+    return this.workVersion > 0;
   }
 
   recordedWorkVersion(): number {
@@ -304,7 +305,7 @@ export class ArtifactRecorder {
         toolCallId: input.toolCallId,
         runId: this.runId,
       });
-      this.workVersion += 1;
+      if (!isInternalWorkflowStatePath(absolutePath, this.workspaceRoot)) this.workVersion += 1;
       this.recordedKeys.add(artifactKeyForPath(absolutePath));
       publishArtifactUpsert(this.sessionId, artifact);
       this.rememberRecordedMtime(absolutePath);
@@ -345,7 +346,7 @@ export class ArtifactRecorder {
         createdAt: Date.now(),
       });
       if (artifact) {
-        this.workVersion += 1;
+        if (!isInternalWorkflowStatePath(input.filePath, this.workspaceRoot)) this.workVersion += 1;
         this.recordedKeys.add(artifactKeyForPath(input.filePath));
         publishArtifactUpsert(this.sessionId, artifact);
       }
@@ -413,7 +414,10 @@ export class ArtifactRecorder {
       if (base.byKey.get(key)?.mtimeMs === entry.mtimeMs) continue;
       const artifactKey = artifactKeyForPath(entry.path);
       if (this.recordedKeys.has(artifactKey)) {
-        if (this.recordedMtimes.get(artifactKey) !== entry.mtimeMs) {
+        if (
+          this.recordedMtimes.get(artifactKey) !== entry.mtimeMs &&
+          !isInternalWorkflowStatePath(entry.path, this.workspaceRoot)
+        ) {
           this.workVersion += 1;
         }
         this.recordedMtimes.set(artifactKey, entry.mtimeMs);
