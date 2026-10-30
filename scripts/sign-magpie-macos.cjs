@@ -4,6 +4,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { signAsync } = require('@electron/osx-sign');
 const { binaryName, sha256File, verifyRuntime } = require('./magpie-runtime.cjs');
+const { createSignAsyncWithTimestampRetry } = require('./macos-sign-timestamp-retry.cjs');
+
+const signAsyncWithTimestampRetry = createSignAsyncWithTimestampRetry(signAsync);
 
 const MAC_TARGETS = ['darwin-x64', 'darwin-arm64'];
 const MACHO_MAGICS = new Set([
@@ -73,7 +76,7 @@ function optionsForSignedFile(options, filename) {
   return perFile.hardenedRuntime === true ? perFile : { ...perFile, hardenedRuntime: true };
 }
 
-async function signWithRuntimeManifest(options, signer = signAsync) {
+async function signWithRuntimeManifest(options, signer = signAsyncWithTimestampRetry) {
   const root = path.join(options.app, 'Contents', 'Resources', 'magpie');
   const packagedTargets = listPackagedMacMagpieTargets(root);
   if (packagedTargets.length === 0) {
