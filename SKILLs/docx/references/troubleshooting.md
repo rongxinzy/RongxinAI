@@ -72,17 +72,6 @@ Common violations:
 - `trPr` must come before `tc` in `w:tr`
 - `tcPr` must come before content in `w:tc`
 
-```bash
-# Validate to find ordering issues
-$CLI validate --input doc.docx --xsd assets/xsd/wml-subset.xsd
-
-# Auto-fix element ordering
-$CLI fix-order --input doc.docx
-
-# Re-validate
-$CLI validate --input doc.docx --xsd assets/xsd/wml-subset.xsd
-```
-
 **Fix:**
 ```bash
 $CLI fix-order --input doc.docx
@@ -499,8 +488,6 @@ When a document has multiple problems, fix them in this priority order:
 ```bash
 # Full recovery pipeline
 $CLI unpack --input broken.docx --output unpacked/
-$CLI validate --input broken.docx --xsd assets/xsd/wml-subset.xsd  # find all errors
 $CLI fix-order --input broken.docx                                   # fix element ordering
-$CLI validate --input broken.docx --business                         # check business rules
 scripts/docx_preview.sh broken.docx                                  # visual check
 ```

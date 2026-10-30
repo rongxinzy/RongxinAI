@@ -8,15 +8,11 @@ import { test } from 'vitest';
 const root = path.resolve(__dirname, '..');
 const skillRoot = path.join(root, 'SKILLs', 'pdf');
 
-test('PDF skill exposes an executable visual-QA route through the managed uv runtime', () => {
-  const inspector = path.join(skillRoot, 'scripts', 'pdf_inspect.py');
-  assert.equal(existsSync(inspector), true, 'PDF visual inspector is missing');
-  execFileSync('python3', [inspector, '--help'], { stdio: 'pipe' });
-
-  const instructions = readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8');
-  assert.match(instructions, /uv run --with pypdfium2 --with pillow/);
-  assert.match(instructions, /contact-sheet\.png/);
-  assert.match(instructions, /inspection\.json/);
+test('PDF skill exposes optional rendering through the managed uv runtime', () => {
+  const preview = path.join(skillRoot, 'scripts', 'pdf_preview.py');
+  assert.equal(existsSync(preview), true, 'PDF preview renderer is missing');
+  const python = process.platform === 'win32' ? 'python' : 'python3';
+  execFileSync(python, [preview, '--help'], { stdio: 'pipe' });
 
   const pipeline = readFileSync(path.join(skillRoot, 'scripts', 'make.sh'), 'utf8');
   assert.match(pipeline, /run --quiet --no-project --python/);

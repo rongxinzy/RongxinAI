@@ -1,7 +1,6 @@
 {
-  "title": "Presentation Studio validation fixture",
+  "title": "Presentation Studio example",
   "canvas": { "width": 1280, "height": 720 },
-  "safeMargin": 36,
   "theme": {
     "colors": {
       "background": "#F2EFE8", "surface": "#E5E0D6", "text": "#202124", "muted": "#8B8376",
@@ -10,7 +9,7 @@
     },
     "textStyles": {
       "title": { "fontSize": 48, "fontFace": "Aptos Display", "color": "$primary", "bold": true },
-      "body": { "fontSize": 20, "fontFace": "Microsoft YaHei", "color": "$text", "lineHeight": 1.35 }
+      "body": { "fontSize": 20, "fontFace": "Microsoft YaHei", "color": "$text" }
     }
   },
   "pages": ["pages/01-cover.json"]

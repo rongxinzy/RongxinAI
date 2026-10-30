@@ -12,7 +12,7 @@ metadata:
 description: >
   Professional DOCX document creation, editing, and formatting using OpenXML SDK (.NET).
   Three pipelines: (A) create new documents from scratch, (B) fill/edit content in existing
-  documents, (C) apply template formatting with XSD validation gate-check.
+  documents, (C) apply template formatting.
   MUST use this skill whenever the user wants to produce, modify, or format a Word document —
   including when they say "write a report", "draft a proposal", "make a contract",
   "fill in this form", "reformat to match this template", or any task whose final output
@@ -47,12 +47,12 @@ Example:
 
 **First time (CLI reference):** `bash scripts/setup.sh` (or `powershell scripts/setup.ps1` on Windows, `--minimal` to skip optional deps). Inside ZhiYuan, run the corresponding setup script with `run_skill_script`.
 
-**First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. `LIMITED` means that the bundled local Markdown converter can create a simple DOCX without downloads, but structural editing, template operations, and OpenXML validation still require .NET 8+. (Skip on subsequent operations within the same session.)
+**First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. `LIMITED` means that the bundled local Markdown converter can create a simple DOCX without downloads, but structural editing and template operations still require .NET 8+. (Skip on subsequent operations within the same session.)
 
 ## Capability routing
 
-- **Full OpenXML path:** use the pipelines below when .NET 8+ is available; it supports structural editing, templates, and XSD/business-rule validation.
-- **Bundled Markdown fallback:** when the environment check reports `LIMITED`, use only for a new, simple document. Write the content to Markdown, then run `scripts/markdown_to_docx.mjs content.md output.docx` through `run_skill_script`. It supports headings, paragraphs, basic inline emphasis, lists, quotes, code blocks, and simple tables. Do not use it for preserving an existing document's formatting, filling templates, tracked changes, images, or template validation. Render and inspect the result before delivery.
+- **Full OpenXML path:** use the pipelines below when .NET 8+ is available; it supports structural editing and templates.
+- **Bundled Markdown fallback:** when the environment check reports `LIMITED`, use only for a new, simple document. Write the content to Markdown, then run `scripts/markdown_to_docx.mjs content.md output.docx` through `run_skill_script`. It supports headings, paragraphs, basic inline emphasis, lists, quotes, code blocks, and simple tables. Do not use it for preserving an existing document's formatting, filling templates, tracked changes, or images. Previews are optional when useful to the task.
 
 ## Quick Start: Direct C# Path
 
@@ -132,19 +132,17 @@ Read `references/scenario_a_create.md`, `references/typography_guide.md`, and `r
 
 CLI options: `--type` (report|letter|memo|academic), `--title`, `--author`, `--page-size` (letter|a4|legal|a3), `--margins` (standard|narrow|wide), `--header`, `--footer`, `--page-numbers`, `--toc`, `--content-json`.
 
-Then run the **validation pipeline** (below).
-
 If only the bundled Markdown fallback is available, create the content as Markdown and run:
 
 ```bash
 node scripts/markdown_to_docx.mjs content.md out.docx
 ```
 
-Then run the rendered-preview and controlled-shortcut delivery gate below. Record in the validation report that the fallback was used and that OpenXML XSD/business-rule validation was unavailable.
+Save the generated DOCX and return its path to the user.
 
 ## Scenario B: Edit / Fill
 
-Read `references/scenario_b_edit_content.md` first. Preview → analyze → edit → validate.
+Read `references/scenario_b_edit_content.md` first. Preview → analyze → edit → save.
 
 **Choose your path:**
 - **Simple** (text replacement, placeholder fill): use CLI subcommands.
@@ -161,7 +159,7 @@ $CLI edit replace-text --input in.docx --output out.docx --find "OLD" --replace 
 $CLI edit fill-placeholders --input in.docx --output out.docx --data '{"name":"John"}'
 ```
 
-Then run the **validation pipeline**. Also run diff to verify minimal changes:
+Use diff when a comparison of the requested edits is useful:
 ```bash
 $CLI diff --before in.docx --after out.docx
 ```
@@ -176,58 +174,13 @@ $CLI apply-template --input source.docx --template template.docx --output out.do
 
 For complex template operations (multi-template merge, per-section headers/footers, style merging), write C# directly — see Critical Rules below for required patterns.
 
-Run the **validation pipeline**, then the **hard gate-check**:
-```bash
-$CLI validate --input out.docx --gate-check assets/xsd/business-rules.xsd
-```
-Gate-check is a **hard requirement**. Do NOT deliver until it passes. If it fails: diagnose, fix, re-run.
+Use diff when a content comparison is useful: `$CLI diff --before source.docx --after out.docx`
 
-Also diff to verify content preservation: `$CLI diff --before source.docx --after out.docx`
+## Delivery
 
-## Validation pipeline
-
-Run after every write operation. For Scenario C the full pipeline is **mandatory**; for A/B it is **recommended** (skip only if the operation was trivially simple).
-
-```bash
-$CLI merge-runs --input doc.docx                                    # 1. consolidate runs
-$CLI validate --input doc.docx --xsd assets/xsd/wml-subset.xsd     # 2. XSD structure
-$CLI validate --input doc.docx --business                           # 3. business rules
-```
-
-If XSD fails, auto-repair and retry:
-```bash
-$CLI fix-order --input doc.docx
-$CLI validate --input doc.docx --xsd assets/xsd/wml-subset.xsd
-```
-
-If XSD still fails, fall back to business rules + preview:
-```bash
-$CLI validate --input doc.docx --business
-bash scripts/docx_preview.sh doc.docx
-# Verify: font contamination=0, table count correct, drawing count correct, sectPr count correct
-```
-
-Final text inspection: `bash scripts/docx_preview.sh doc.docx`
-
-For the controlled shortcut, render a real visual preview (not text/XML) before
-finishing. First record the DOCX as the deliverable, then ask the application
-to render and record the preview with its bundled cross-platform renderer:
-
-```json
-{
-  "action": "render_preview",
-  "deliverablePath": "doc.docx",
-  "path": "output/doc-page-1.png"
-}
-```
-
-For the controlled Docs shortcut, save a nonempty `.md`, `.txt`, or `.json`
-validation report in the workspace after this pipeline. Render at least one
-page to a `.png` preview and inspect it for layout defects. Record the DOCX
-with `workflow_state` role `deliverable`, the report with role `validation`,
-then use `workflow_state` action `render_preview`. The application records
-the generated image as role `preview`; inspect it before completion. Do not
-finish from a claimed output path alone.
+Save the requested DOCX and return its path. No validation report, preview evidence,
+or separate workflow completion request is required. Preview tools remain available
+when the user requests a preview or it helps with the task.
 
 ## Critical rules
 

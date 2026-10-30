@@ -255,7 +255,7 @@ JSON
 
   # Step 4: merge
   echo ""
-  bold "Step 4/4  Merging and QA..."
+  bold "Step 4/4  Merging PDF..."
   run_python "$SCRIPTS/merge.py" \
     --cover "$workdir/cover.pdf" \
     --body  "$workdir/body.pdf" \
@@ -362,7 +362,7 @@ cmd_demo() {
   {"type":"numbered","text":"cover.py renders the cover HTML using the selected pattern"},
   {"type":"numbered","text":"render_cover.js uses Playwright to convert the HTML cover to PDF"},
   {"type":"numbered","text":"render_body.py builds inner pages from content.json using ReportLab"},
-  {"type":"numbered","text":"merge.py combines cover + body and runs final QA checks"},
+  {"type":"numbered","text":"merge.py combines cover + body into the final PDF"},
 
   {"type":"h2",      "text":"Cover Patterns"},
   {"type":"table",

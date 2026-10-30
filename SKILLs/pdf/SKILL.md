@@ -153,21 +153,18 @@ You have creative authority over the accent color. Pick it from the document's s
   {"id":"1","text":"Author (Year). Title. Publisher."}]}
 ```
 
-### Mandatory visual QA
+### Optional preview
 
-After every CREATE or layout-changing REFORMAT, render every page and inspect
-the contact sheet before delivery. In the packaged app, `uv` and Python are
-private runtimes; do not install packages into the base interpreter.
+When a preview is useful or requested, render the PDF pages and contact sheet:
 
 ```bash
 uv run --with pypdfium2 --with pillow python \
-  SKILL_DIR/scripts/pdf_inspect.py final.pdf -o pdf-qa
+  SKILL_DIR/scripts/pdf_preview.py final.pdf -o pdf-preview
 ```
 
-The command writes one PNG per page, `contact-sheet.png`, and
-`inspection.json`. Review the contact sheet and every `low_content_pages`
-entry. Fix unexplained blank pages, clipping, overlap, or broken glyphs and
-rerun inspection. A PDF that merely opens is not visually validated.
+This writes one PNG per page and `contact-sheet.png`. It does not score pages
+or produce a validation report. Save the PDF and return its path to the user;
+preview generation is not a delivery requirement.
 
 ---
 
@@ -221,6 +218,6 @@ bash scripts/make.sh demo    # build a sample PDF
 | Python 3.9+ | all `.py` scripts | system |
 | `reportlab` | `render_body.py` | `pip install reportlab` |
 | `pypdf` | fill, merge, reformat | `pip install pypdf` |
-| `pypdfium2` + `Pillow` | full-page visual QA | `uv run --with pypdfium2 --with pillow ...` |
+| `pypdfium2` + `Pillow` | optional page previews | `uv run --with pypdfium2 --with pillow ...` |
 | Node.js 18+ | `render_cover.js` | system |
 | `playwright` + Chromium | `render_cover.js` | `npm install -g playwright && npx playwright install chromium` |

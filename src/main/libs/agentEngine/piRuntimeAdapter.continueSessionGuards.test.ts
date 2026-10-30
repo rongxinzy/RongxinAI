@@ -16,8 +16,6 @@ import {
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
-import path from 'path';
-
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -353,10 +351,8 @@ describe('PiRuntimeAdapter', () => {
       const greetingOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{ name: string }>;
       };
-      expect(greetingOptions.customTools?.map(tool => tool.name)).toContain('workflow_state');
-      expect(mockSession.prompt).toHaveBeenLastCalledWith(
-        expect.stringContaining('## Controlled PPT presentation workflow'),
-      );
+      expect(greetingOptions.customTools?.map(tool => tool.name)).not.toContain('workflow_state');
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('你好');
     });
 
     it('starts a fresh model-decided task after a shortcut approval is denied', async () => {
@@ -393,7 +389,7 @@ describe('PiRuntimeAdapter', () => {
 
         const current = service.getCurrent('denied-shortcut')!;
         expect(current.task.id).not.toBe(first.task.id);
-        expect(current.task.contract.kind).toBe(WorkbenchContractKind.Shortcut);
+        expect(current.task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
         expect(service.getDetail(first.task.id)?.task.status).toBe(WorkbenchTaskStatus.Cancelled);
         expect(mockCreateAgentSession).toHaveBeenCalledOnce();
         const greetingOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {

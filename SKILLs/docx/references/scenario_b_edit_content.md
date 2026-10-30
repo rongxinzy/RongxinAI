@@ -25,8 +25,8 @@ Do NOT use when: the user wants to change the look/style of the entire document 
 2. Analyze   → Understand structure: sections, styles, headings, tables
 3. Identify  → Locate exact edit targets (paragraph index, table index, placeholder text)
 4. Edit      → Apply surgical changes via CLI or direct XML
-5. Validate  → CLI: validate <output.docx>
-6. Diff      → Compare before/after to verify only intended changes were made
+5. Save      → Write the requested output document
+6. Diff      → Compare before/after when requested
 ```
 
 ---
@@ -277,7 +277,7 @@ Deleting text with tracking:
 
 ## Diff Verification
 
-After editing, always compare the before and after states:
+When a comparison is useful, compare the before and after states:
 
 ```bash
 # Structural diff — shows only changed elements

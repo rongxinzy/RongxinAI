@@ -80,7 +80,7 @@ jobs:
           bun run test:bundle-budget
         env:
           VITE_SKIP_ELECTRON: '1'
-      - name: Verify Presentation Studio compiler and validator
+      - name: Test Presentation Studio compiler
         run: npm test --prefix SKILLs/presentation-studio
       - name: Typecheck Electron without rebuilding native modules or emitting duplicate application code
         run: bun run typecheck:electron

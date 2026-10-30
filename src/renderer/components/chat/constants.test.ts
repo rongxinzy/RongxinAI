@@ -5,12 +5,12 @@
  * Regression covered: locally enabled skills were filtered out of Chat even
  * though the same skills were available in Work.
  */
-import { AcademicResearchSkillIds, isCoreSkill } from '@shared/skills/constants';
+import { AcademicResearchSkillIds, CoreSkillId, isCoreSkill } from '@shared/skills/constants';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { isAcademicResearchSkillSet } from '../../../main/libs/agentEngine/piResearchRun';
-import { resolveShortcutWorkflowKind } from '../../../main/libs/agentEngine/piShortcutWorkflow';
+import { resolvePiShortcutWorkflowKind } from '../../../main/libs/agentEngine/piRuntimeWorkbenchContract';
 
 import { expect, test } from 'vitest';
 
@@ -105,15 +105,20 @@ test('quick skill selections automatically allow tools for their chat session on
   );
 });
 
-test('every sidebar shortcut is protected by a Pi completion controller', () => {
+test('Office uses native completion while other sidebar shortcuts retain their controllers', () => {
+  const nativeCompletionSkills = new Set<string>([
+    CoreSkillId.PresentationStudio,
+    CoreSkillId.Docx,
+    CoreSkillId.Xlsx,
+  ]);
   for (const shortcut of CHAT_SKILL_SHORTCUTS) {
     const selectedIds = [...(shortcut.skillIds || [shortcut.skillId])];
     const protectedByAcademicHarness = isAcademicResearchSkillSet(selectedIds);
-    const protectedByShortcutHarness = resolveShortcutWorkflowKind(selectedIds) !== null;
+    const protectedByShortcutHarness = resolvePiShortcutWorkflowKind(selectedIds) !== null;
     expect(
       protectedByAcademicHarness || protectedByShortcutHarness,
-      `shortcut ${shortcut.id} has no completion controller`,
-    ).toBe(true);
+      `shortcut ${shortcut.id} completion policy does not match its skill`,
+    ).toBe(!nativeCompletionSkills.has(shortcut.skillId));
   }
 });
 
