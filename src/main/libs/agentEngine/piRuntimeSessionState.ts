@@ -27,10 +27,7 @@ import {
 import { PiResearchRunController } from './piResearchRun';
 import { PiShortcutWorkflowController } from './piShortcutWorkflow';
 import { PiStreamAccumulator } from './piStreamAccumulator';
-import {
-  createPiTranslatorState,
-  type PiTranslatorState,
-} from './piTranslate/piTranslateUiMessageChunk';
+import type { PiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import type { PiStartOptions } from './piRuntimeTypes';
 import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
@@ -172,6 +169,8 @@ export interface ActivePiSession {
   summaryCheckpointSkipped?: string | true;
   /** Artifact work covered by the latest checkpoint outcome in this run. */
   summaryCheckpointWorkVersion?: number;
+  /** Original request for this turn, before history, memory or workflow injection. */
+  summaryCheckpointGoal?: string;
   /** One retry notice per turn: the user learns the model answered with an error. */
   retryNoticeEmitted: boolean;
   /** Retry attempts Pi reported in the current turn. */

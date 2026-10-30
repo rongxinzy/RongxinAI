@@ -351,6 +351,7 @@ export async function continuePiRuntimeSession(
   active.summaryCheckpointWritten = false;
   active.summaryCheckpointSkipped = undefined;
   active.summaryCheckpointWorkVersion = undefined;
+  active.summaryCheckpointGoal = prompt;
   active.turnExperts = (
     host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.experts ?? []
   )

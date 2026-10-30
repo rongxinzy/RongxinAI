@@ -454,6 +454,7 @@ export async function startPiRuntimeSession(
       thinkingLifecycle: new PiThinkingLifecycle(),
       lastCompletedAnswerMessageId: null,
       lastCompletedAnswerText: '',
+      summaryCheckpointGoal: prompt,
       requestStartedAt: null,
       firstVisibleTextAt: null,
       piSessionCreatedAt,
