@@ -5,6 +5,7 @@ import { createElement, useState } from 'react';
 import { beforeAll, expect, test, vi } from 'vitest';
 
 import { CoworkPermissionMode } from '../../../shared/cowork/constants';
+import { toCatalogModel } from '../../services/availableModels';
 import { CoworkModelPicker } from './CoworkModelPicker';
 import PermissionModeMenu from './PermissionModeMenu';
 
@@ -65,6 +66,46 @@ test('keeps an accessible empty model trigger and empty menu state', async () =>
   expect(screen.getByRole('option', { name: 'modelSelectorNone' })).toHaveAttribute(
     'aria-disabled',
     'true',
+  );
+});
+
+test('searches and announces the supplier name while selecting the unchanged catalog identity', async () => {
+  const user = userEvent.setup();
+  const onSelect = vi.fn();
+  const model = toCatalogModel(
+    { id: 'exact-model-id', display_name: 'GLM-5.3-Flash', owned_by: 'provider-generated-id' },
+    [
+      {
+        id: 'provider-generated-id',
+        name: 'Zhipu GLM',
+        api: 'openai-completions',
+        baseUrl: 'https://example.com/v1',
+        models: ['GLM-5.3-Flash'],
+        off: false,
+        hasKey: true,
+      },
+    ],
+  );
+  render(
+    createElement(CoworkModelPicker, {
+      models: [model],
+      selectedModel: model,
+      open: true,
+      onOpenChange: vi.fn(),
+      onSelect,
+    }),
+  );
+  const search = screen.getByPlaceholderText('searchModels');
+  await user.type(search, 'zhipu');
+  const option = screen.getByRole('option', { name: model.name });
+  expect(option).toHaveTextContent('Zhipu GLM');
+  expect(option).toHaveAttribute('aria-description', 'Zhipu GLM, currentModel');
+  await user.keyboard('{ArrowDown}{Enter}');
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({
+      id: 'exact-model-id',
+      providerKey: 'provider-generated-id',
+    }),
   );
 });
 
