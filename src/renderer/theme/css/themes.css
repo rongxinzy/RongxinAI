@@ -6609,8 +6609,11 @@
 :where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-button-navigation[data-active="true"], .theme-shell-sidebar .chat-skill-shortcut[data-active="true"]):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):active:not([aria-haspopup])) {
   background-color: var(--sidebar-accent);
 }
-:where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-sidebar-task-main):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):active:not([aria-haspopup])) {
+:where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-surface-agent-row):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):active:not([aria-haspopup])) {
   background-color: var(--sidebar-accent);
+}
+:where(:root, [data-theme]) :where(.theme-shell-sidebar .theme-sidebar-task-main):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):active:not([aria-haspopup])) {
+  background-color: transparent;
   translate: 0px 1px;
 }
 :where(:root, [data-theme]) :where(.theme-sidebar-workspace-main):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):active:not([aria-haspopup])) {
