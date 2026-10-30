@@ -9,14 +9,22 @@
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { WorkbenchContractKind, type WorkbenchTaskContract } from '../../../shared/workbenchTask';
 import { isAcademicResearchSkillSet } from './piResearchRun';
-import { resolveShortcutWorkflowKind } from './piShortcutWorkflow';
+import { resolveShortcutWorkflowKind, ShortcutWorkflowKind } from './piShortcutWorkflow';
+
+export function resolvePiShortcutWorkflowKind(
+  skillIds: string[] | undefined,
+): ShortcutWorkflowKind | null {
+  // PPT exports directly and uses Pi's native completion instead of evidence gates.
+  const kind = resolveShortcutWorkflowKind(skillIds);
+  return kind === ShortcutWorkflowKind.Ppt ? null : kind;
+}
 
 export function createPiWorkbenchContract(
   sessionMode: CoworkSessionMode | undefined,
   skillIds: string[] | undefined,
 ): WorkbenchTaskContract {
   const research = isAcademicResearchSkillSet(skillIds);
-  const shortcut = research ? null : resolveShortcutWorkflowKind(skillIds);
+  const shortcut = research ? null : resolvePiShortcutWorkflowKind(skillIds);
   const kind =
     sessionMode === CoworkSessionMode.Chat
       ? WorkbenchContractKind.Chat

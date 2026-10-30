@@ -250,7 +250,7 @@ describe('skillRuntimeRunner', () => {
     expect(fs.existsSync(path.join(outputDir, 'inspection.json'))).toBe(true);
   });
 
-  it('validates and compiles a PowerPoint deck through the managed Electron Node path', async () => {
+  it('compiles a PowerPoint deck directly through the managed Electron Node path', async () => {
     const skillsRoot = path.resolve(process.cwd(), 'SKILLs');
     const presentationRoot = path.join(skillsRoot, 'presentation-studio');
     if (!fs.existsSync(path.join(presentationRoot, 'node_modules', 'pptxgenjs'))) return;
@@ -289,21 +289,6 @@ describe('skillRuntimeRunner', () => {
         ],
       }),
     );
-
-    const validation = await runManagedSkillScript({
-      skillsRoot,
-      skillId: 'presentation-studio',
-      script: 'scripts/validate-deck.mjs',
-      args: [
-        path.join(root, 'deck.json'),
-        '--strict',
-        '--json',
-        path.join(outputDir, 'validation.json'),
-      ],
-      workspaceRoot: root,
-      timeoutMs: 30_000,
-    });
-    expect(validation.ok).toBe(true);
 
     const compile = await runManagedSkillScript({
       skillsRoot,

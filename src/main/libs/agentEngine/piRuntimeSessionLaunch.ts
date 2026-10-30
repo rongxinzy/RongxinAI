@@ -33,7 +33,6 @@ import { assertLlamaCppWorkModeContext } from '../llamacppWorkModeContextGuard';
 import { PiPlanModePrompt } from './piPlanTool';
 import { resolvePiTurnWorkflowSkills } from './piTurnWorkflow';
 import { isAcademicResearchSkillSet } from './piResearchRun';
-import { resolveShortcutWorkflowKind } from './piShortcutWorkflow';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
@@ -49,7 +48,10 @@ import {
   resolvePiSessionModel,
 } from './piRuntimeSettingsOverrides';
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
-import { createPiWorkbenchContract } from './piRuntimeWorkbenchContract';
+import {
+  createPiWorkbenchContract,
+  resolvePiShortcutWorkflowKind,
+} from './piRuntimeWorkbenchContract';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
 import { openPersistentPiSessionManager } from './piSessionStore';
 import { buildPiSessionCustomTools } from './piRuntimeSessionCustomTools';
@@ -220,7 +222,7 @@ export async function startPiRuntimeSession(
     });
     const shortcutKindForContract = isAcademicResearchSkillSet(workflowSkillIds)
       ? null
-      : resolveShortcutWorkflowKind(workflowSkillIds);
+      : resolvePiShortcutWorkflowKind(workflowSkillIds);
     const workbenchContract = createPiWorkbenchContract(options.sessionMode, workflowSkillIds);
     const workbenchTaskService = host.getWorkbenchTaskService();
     if (workbenchTaskService && !chatMode) {

@@ -1,1 +1,0 @@
-Create a middle-school lesson explaining how a river ecosystem recovers after restoration. Include a food-web diagram, before/after evidence, a timeline, and a class question. Make it curious and legible without childish clip-art.
