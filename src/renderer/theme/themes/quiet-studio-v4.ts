@@ -1,5 +1,6 @@
 import type { ComponentAppearances } from '../components/contract';
 import { recipe } from '../components/recipe';
+import { sidebarTaskAppearances } from '../components/sidebar-task';
 
 /**
  * v4.0 Quiet Studio appearance overrides.
@@ -463,47 +464,7 @@ export function quietStudioAppearances(): Partial<ComponentAppearances> {
       },
       pressed: { 'background-color': 'var(--sidebar-accent)' },
     }),
-    'shell-sidebar-task': recipe({
-      base: {
-        ...transition,
-        height: '2rem',
-        padding: '0px',
-        'border-width': '0px',
-        'box-shadow': 'none',
-        'font-size': 'var(--zy-component-text-sm)',
-        'font-weight': 'var(--zy-component-font-weight-normal)',
-        'border-radius': 'var(--zy-style-radius-lg)',
-      },
-    }),
-    'shell-sidebar-task-selected': recipe({
-      base: {
-        'background-color': 'var(--sidebar-accent)',
-        color: 'var(--zy-text-primary)',
-        'font-weight': 'var(--zy-component-font-weight-medium)',
-      },
-    }),
-    'shell-sidebar-task-idle': recipe({
-      base: { 'background-color': 'transparent', color: 'var(--zy-text-primary)' },
-      hover: { 'background-color': 'var(--accent)', color: 'var(--zy-text-primary)' },
-    }),
-    'shell-sidebar-task-main': recipe({
-      base: {
-        ...transition,
-        height: '2rem',
-        'padding-left': '0.625rem',
-        'padding-right': '0.625rem',
-        'background-color': 'transparent',
-        'border-width': '0px',
-        'box-shadow': 'none',
-        'font-weight': 'inherit',
-        'text-align': 'left',
-        color: 'inherit',
-        'border-radius': 'var(--zy-style-radius-lg)',
-      },
-      hover: { 'background-color': 'transparent' },
-      pressed: { 'background-color': 'var(--sidebar-accent)', translate: '0px 1px' },
-      focus: focusRing,
-    }),
+    ...sidebarTaskAppearances(),
     'shell-sidebar-caption': recipe({
       base: {
         'font-size': 'var(--zy-component-text-xs)',
