@@ -38,9 +38,10 @@ export class ConfigService {
       const current = preferences(stored);
       const patch = typeof update === 'function' ? update(current) : update;
       if (!patch) return;
-      this.config = preferences({ ...current, ...patch });
+      const next = preferences({ ...current, ...patch });
       // Preserve unrelated historical storage without exposing it as live config.
-      await localStore.setItem(CONFIG_KEYS.APP_CONFIG, { ...stored, ...this.config });
+      await localStore.setItem(CONFIG_KEYS.APP_CONFIG, { ...stored, ...next });
+      this.config = next;
       window.dispatchEvent(new CustomEvent('config-updated'));
     });
   }

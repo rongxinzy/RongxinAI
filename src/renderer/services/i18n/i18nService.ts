@@ -113,15 +113,9 @@ class I18nService {
     }
 
     // 更新配置
-    try {
-      const config = configService.getConfig();
-      configService.updateConfig({
-        ...config,
-        language,
-      });
-    } catch (error) {
+    void configService.updateConfig({ language }).catch(error => {
       console.error('Failed to save language setting:', error);
-    }
+    });
   }
 
   // 获取当前语言
