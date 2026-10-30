@@ -85,7 +85,10 @@ test('signed releases check the packaged Magpie helper signature and sealed dige
   expect(authenticode).toContain("signing.format -ne 'authenticode'");
   for (const filename of ['build-inference-editions.yml']) {
     const workflow = read(`.github/workflows/${filename}`);
+    const staplerWorkaround = workflow.indexOf('scripts/ci/block-stapler-http3-udp443.sh');
     const staple = workflow.indexOf('xcrun stapler validate "$app_path"');
+    expect(staplerWorkaround).toBeGreaterThan(-1);
+    expect(staplerWorkaround).toBeLessThan(staple);
     const helper = workflow.indexOf(
       'node scripts/ci/verify-packaged-magpie-signature.mjs "$app_path"',
     );
