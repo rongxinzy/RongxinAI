@@ -347,6 +347,12 @@ jobs:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      # Intel macOS runners: stapler CloudKit ticket fetch over HTTP/3/UDP fails intermittently.
+      # https://github.com/actions/runner-images/issues/14924
+      - name: Block UDP/443 for stapler (macOS x64)
+        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && matrix.arch == 'x64' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
+        shell: bash
+        run: scripts/ci/block-stapler-http3-udp443.sh
       - name: Build signed macOS release
         if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
         run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
