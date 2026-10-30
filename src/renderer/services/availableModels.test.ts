@@ -2,10 +2,13 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { refreshMagpieModels, selectMagpieDefaultModel, toCatalogModel } from './availableModels';
 import { store } from '../store';
 import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
-const api = { catalog: vi.fn(), selectDefault: vi.fn(), start: vi.fn() };
+import type { MagpieProviderSummary } from '../../shared/magpie/types';
+import { setSelectedModel } from '../store/slices/modelSlice';
+const api = { catalog: vi.fn(), selectDefault: vi.fn(), start: vi.fn(), providers: vi.fn() };
 const llamacpp = { listRunningModels: vi.fn() };
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
+  api.providers.mockResolvedValue([]);
   llamacpp.listRunningModels.mockResolvedValue([]);
   vi.stubGlobal('window', { electron: { magpie: api, llamacpp } });
 });
@@ -112,4 +115,92 @@ test('an unavailable local service leaves the catalog without local eligibility'
   api.catalog.mockResolvedValue(catalog);
   await refreshMagpieModels();
   expect(store.getState().model.availableModels[0]?.llamaCppAgentEligibility).toBeUndefined();
+});
+
+const provider: MagpieProviderSummary = {
+  id: 'provider-generated-id',
+  name: 'Zhipu GLM',
+  api: 'openai-completions',
+  baseUrl: 'https://example.com/v1',
+  models: ['GLM-5.3-Flash'],
+  off: false,
+  hasKey: true,
+};
+const namedCatalog = {
+  ...catalog,
+  models: [{ id: 'GLM-5.3-Flash', owned_by: provider.id }],
+  defaultModelId: 'GLM-5.3-Flash',
+};
+
+test('shows supplier names while preserving exact model and routing identities', async () => {
+  api.providers.mockResolvedValue([provider]);
+  api.catalog.mockResolvedValue(namedCatalog);
+  await refreshMagpieModels();
+  expect(store.getState().model.defaultSelectedModel).toMatchObject({
+    id: 'GLM-5.3-Flash',
+    provider: provider.name,
+    providerKey: provider.id,
+  });
+  api.selectDefault.mockResolvedValue(namedCatalog);
+  await selectMagpieDefaultModel('GLM-5.3-Flash');
+  expect(api.selectDefault).toHaveBeenCalledExactlyOnceWith('GLM-5.3-Flash');
+  expect(store.getState().model.defaultSelectedModel.provider).toBe(provider.name);
+});
+
+test('a renamed supplier refreshes default and agent labels without changing selections', async () => {
+  api.providers.mockResolvedValue([provider]);
+  api.catalog.mockResolvedValue(namedCatalog);
+  await refreshMagpieModels();
+  store.dispatch(
+    setSelectedModel({
+      agentId: 'test-agent',
+      model: store.getState().model.defaultSelectedModel,
+    }),
+  );
+  api.providers.mockResolvedValue([{ ...provider, name: 'Renamed supplier' }]);
+  await refreshMagpieModels();
+  const state = store.getState().model;
+  expect(state.defaultSelectedModel).toMatchObject({
+    id: namedCatalog.defaultModelId,
+    provider: 'Renamed supplier',
+    providerKey: provider.id,
+  });
+  expect(state.selectedModelByAgent['test-agent']).toEqual(state.defaultSelectedModel);
+});
+
+test('unknown or blank supplier names preserve the owner, including built-in providers', () => {
+  for (const providers of [[], [{ ...provider, name: '  ' }]]) {
+    expect(toCatalogModel(namedCatalog.models[0], providers).provider).toBe(provider.id);
+    expect(
+      toCatalogModel({ id: 'local', owned_by: LOCAL_GPU_MAGPIE_PROVIDER_ID }, providers).provider,
+    ).toBe(LOCAL_GPU_MAGPIE_PROVIDER_ID);
+    expect(toCatalogModel({ id: 'unowned' }, providers).provider).toBeUndefined();
+  }
+});
+
+test('supplier metadata failure does not discard models or a confirmed default', async () => {
+  api.catalog.mockResolvedValue(namedCatalog);
+  api.providers.mockRejectedValue(new Error('metadata unavailable'));
+  await refreshMagpieModels();
+  expect(store.getState().model.availableModels[0]?.provider).toBe(provider.id);
+  api.selectDefault.mockResolvedValue(namedCatalog);
+  await selectMagpieDefaultModel(namedCatalog.defaultModelId);
+  expect(store.getState().model.defaultSelectedModel.id).toBe(namedCatalog.defaultModelId);
+});
+
+test('an older supplier read cannot replace the labels from a newer refresh', async () => {
+  let finishOld!: (value: MagpieProviderSummary[]) => void;
+  api.catalog.mockResolvedValue(namedCatalog);
+  api.providers.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        finishOld = resolve;
+      }),
+  );
+  const older = refreshMagpieModels();
+  api.providers.mockResolvedValue([{ ...provider, name: 'New supplier name' }]);
+  await refreshMagpieModels();
+  finishOld([provider]);
+  await older;
+  expect(store.getState().model.defaultSelectedModel.provider).toBe('New supplier name');
 });

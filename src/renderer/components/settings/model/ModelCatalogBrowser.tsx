@@ -4,17 +4,18 @@ import { Field, FieldLabel } from '@shared/components/ui/field';
 import { Input } from '@shared/components/ui/input';
 import { ChevronDown } from 'lucide-react';
 import { useId, useMemo, useState } from 'react';
-import type { MagpieModel } from '../../../../shared/magpie/types';
+import type { MagpieModel, MagpieProviderSummary } from '../../../../shared/magpie/types';
 import { i18nService } from '../../../services/i18n';
+import { getMagpieProviderName } from '../../../services/magpieProviderNames';
 
 const PAGE_SIZE = 10;
 
-function ModelCapabilities({ model }: { model: MagpieModel }) {
+function ModelCapabilities({ model, source }: { model: MagpieModel; source: string }) {
   const unknown = i18nService.t('modelBrowseUnknown');
   const number = (value?: number) =>
     value !== undefined && Number.isFinite(value) && value > 0 ? String(value) : unknown;
   const fields = [
-    ['modelBrowseSource', model.owned_by || unknown],
+    ['modelBrowseSource', source],
     ['modelBrowseContext', number(model.context_window)],
     ['modelBrowseOutputLimit', number(model.max_output_tokens)],
     ['modelBrowseInput', model.modalities?.input.join(' · ') || unknown],
@@ -45,12 +46,14 @@ function ModelCapabilities({ model }: { model: MagpieModel }) {
 
 export function ModelCatalogBrowser({
   models,
+  providers = [],
   defaultModelId,
   selection,
   disabled,
   onSelect,
 }: {
   models: MagpieModel[];
+  providers?: readonly MagpieProviderSummary[];
   defaultModelId: string | null;
   selection: string;
   disabled: boolean;
@@ -62,13 +65,18 @@ export function ModelCatalogBrowser({
   const filtered = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase();
     return models.filter(model =>
-      [model.id, model.display_name, model.owned_by]
+      [
+        model.id,
+        model.display_name,
+        model.owned_by,
+        getMagpieProviderName(model.owned_by, providers),
+      ]
         .filter(Boolean)
         .join(' ')
         .toLocaleLowerCase()
         .includes(needle),
     );
-  }, [models, query]);
+  }, [models, providers, query]);
   const currentPage = Math.min(page, Math.max(0, Math.ceil(filtered.length / PAGE_SIZE) - 1));
   const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
   const saved = models.find(model => model.id === defaultModelId);
@@ -121,7 +129,8 @@ export function ModelCatalogBrowser({
                   <p className="break-all text-sm text-muted-foreground">{model.id}</p>
                   <p className="break-all text-sm text-muted-foreground">
                     {i18nService.t('modelBrowseSource')}:{' '}
-                    {model.owned_by || i18nService.t('modelBrowseUnknown')}
+                    {getMagpieProviderName(model.owned_by, providers) ||
+                      i18nService.t('modelBrowseUnknown')}
                   </p>
                 </div>
                 <Button
@@ -164,7 +173,13 @@ export function ModelCatalogBrowser({
                 </Badge>
               </div>
               <p className="break-all text-sm text-muted-foreground">{selected.id}</p>
-              <ModelCapabilities model={selected} />
+              <ModelCapabilities
+                model={selected}
+                source={
+                  getMagpieProviderName(selected.owned_by, providers) ||
+                  i18nService.t('modelBrowseUnknown')
+                }
+              />
             </div>
           </details>
         </section>
