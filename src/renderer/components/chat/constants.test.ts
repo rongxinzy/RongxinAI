@@ -105,15 +105,20 @@ test('quick skill selections automatically allow tools for their chat session on
   );
 });
 
-test('PPT uses native completion while other sidebar shortcuts retain their controllers', () => {
+test('Office uses native completion while other sidebar shortcuts retain their controllers', () => {
+  const nativeCompletionSkills = new Set<string>([
+    CoreSkillId.PresentationStudio,
+    CoreSkillId.Docx,
+    CoreSkillId.Xlsx,
+  ]);
   for (const shortcut of CHAT_SKILL_SHORTCUTS) {
     const selectedIds = [...(shortcut.skillIds || [shortcut.skillId])];
     const protectedByAcademicHarness = isAcademicResearchSkillSet(selectedIds);
     const protectedByShortcutHarness = resolvePiShortcutWorkflowKind(selectedIds) !== null;
     expect(
       protectedByAcademicHarness || protectedByShortcutHarness,
-      `shortcut ${shortcut.id} has no completion controller`,
-    ).toBe(shortcut.skillId !== CoreSkillId.PresentationStudio);
+      `shortcut ${shortcut.id} completion policy does not match its skill`,
+    ).toBe(!nativeCompletionSkills.has(shortcut.skillId));
   }
 });
 
