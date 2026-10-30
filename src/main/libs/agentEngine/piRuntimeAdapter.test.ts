@@ -168,54 +168,57 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('lets a PPT task finish without verification artifacts or a completion signal', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-      const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-ppt-runtime-'));
-      try {
-        await adapter.startSession('ppt-session', 'Create a deck', {
-          workspaceRoot,
-          sessionMode: CoworkSessionMode.Work,
-          skillIds: [CoreSkillId.PresentationStudio],
-        });
-        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools: Array<{ name: string }>;
-        };
-        const toolNames = sessionOptions.customTools.map(tool => tool.name);
-        expect(toolNames).not.toContain('workflow_state');
-        expect(toolNames).toContain('run_skill_script');
-        expect(mockSession.prompt).toHaveBeenCalledWith('Create a deck');
-        expect(fs.existsSync(path.join(workspaceRoot, '.zhiyuan', 'shortcut-workflows'))).toBe(
-          false,
-        );
-        const complete = vi.fn();
-        adapter.on('complete', complete);
+    it.each([CoreSkillId.PresentationStudio, CoreSkillId.Docx, CoreSkillId.Xlsx, 'pdf'])(
+      'lets %s finish without verification artifacts or a completion signal',
+      async skillId => {
+        const db = new Database(':memory:');
+        initializeWorkbenchTaskSchema(db);
+        const service = new RealWorkbenchTaskService(db);
+        adapter.setWorkbenchTaskService(service);
+        const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-ppt-runtime-'));
+        try {
+          await adapter.startSession('ppt-session', 'Create a deck', {
+            workspaceRoot,
+            sessionMode: CoworkSessionMode.Work,
+            skillIds: [skillId],
+          });
+          const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+            customTools: Array<{ name: string }>;
+          };
+          const toolNames = sessionOptions.customTools.map(tool => tool.name);
+          expect(toolNames).not.toContain('workflow_state');
+          expect(toolNames).toContain('run_skill_script');
+          expect(mockSession.prompt).toHaveBeenCalledWith('Create a deck');
+          expect(fs.existsSync(path.join(workspaceRoot, '.zhiyuan', 'shortcut-workflows'))).toBe(
+            false,
+          );
+          const complete = vi.fn();
+          adapter.on('complete', complete);
 
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: unknown) => void;
-        listener({
-          type: 'message_end',
-          message: {
-            role: 'assistant',
-            content: [{ type: 'text', text: 'The presentation is ready.' }],
-            stopReason: 'stop',
-          },
-        });
-        listener({ type: 'agent_end' });
-        listener({ type: 'agent_settled' });
+          const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: unknown) => void;
+          listener({
+            type: 'message_end',
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: 'The presentation is ready.' }],
+              stopReason: 'stop',
+            },
+          });
+          listener({ type: 'agent_end' });
+          listener({ type: 'agent_settled' });
 
-        await vi.waitFor(() => expect(complete).toHaveBeenCalled());
-        expect(mockSession.prompt).toHaveBeenCalledOnce();
-        const task = service.getCurrent('ppt-session')!.task;
-        expect(task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
-        expect(task.status).toBe(WorkbenchTaskStatus.Completed);
-      } finally {
-        await adapter.stopAllSessions();
-        db.close();
-        fs.rmSync(workspaceRoot, { recursive: true, force: true });
-      }
-    });
+          await vi.waitFor(() => expect(complete).toHaveBeenCalled());
+          expect(mockSession.prompt).toHaveBeenCalledOnce();
+          const task = service.getCurrent('ppt-session')!.task;
+          expect(task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
+          expect(task.status).toBe(WorkbenchTaskStatus.Completed);
+        } finally {
+          await adapter.stopAllSessions();
+          db.close();
+          fs.rmSync(workspaceRoot, { recursive: true, force: true });
+        }
+      },
+    );
 
     it('uses native completion for ordinary Work, including resume and expert turns', async () => {
       const db = new Database(':memory:');

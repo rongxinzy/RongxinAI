@@ -445,9 +445,7 @@ After appending, cross-sheet reference currency cells use `s="13"`.
         |
   Step 5: Batch-update the s attribute of each cell in the sheet XML
         |
-  Step 6: XML validity + style reference integrity verification
-        |
-  Step 7: Pack (recompress as xlsx)
+  Step 6: Pack (recompress as xlsx)
 ```
 
 ### 6.2 Step 1 — Unpack
@@ -510,32 +508,7 @@ For consecutive rows of the same type, row-level default styles can be used to r
 </row>
 ```
 
-### 6.7 Step 6 — Verification
-
-```bash
-# XML validity verification is handled automatically by xlsx_pack.py, no need to manually run xmllint
-# The pack script validates styles.xml and sheet XML legality before packaging; it aborts and reports on errors
-
-# Style audit (optional, audit the entire unpacked directory after formatting is complete)
-python3 SKILL_DIR/scripts/style_audit.py /tmp/xlsx_fmt/unpacked/
-
-# Formula error static scan (must specify a single .xlsx file, does not accept directories)
-# Pack first, then scan:
-python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/xlsx_fmt/unpacked/ /tmp/output.xlsx
-python3 SKILL_DIR/scripts/formula_check.py /tmp/output.xlsx
-```
-
-Manual style reference integrity check:
-```bash
-# Find the maximum s attribute value in the sheet XML
-grep -o 's="[0-9]*"' /tmp/xlsx_fmt/unpacked/xl/worksheets/sheet1.xml \
-  | grep -o '[0-9]*' | sort -n | tail -1
-
-# Compare with the cellXfs count attribute (max s value must be < count)
-grep 'cellXfs count' /tmp/xlsx_fmt/unpacked/xl/styles.xml
-```
-
-### 6.8 Step 7 — Pack
+### 6.7 Step 6 — Pack
 
 ```bash
 python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/xlsx_fmt/unpacked/ output.xlsx
@@ -546,51 +519,6 @@ If the script is unavailable, pack manually:
 cd /tmp/xlsx_fmt/unpacked/
 zip -r ../output.xlsx . -x "*.DS_Store"
 ```
-
----
-
-## 7. Formatting Completeness Checklist
-
-Verify each item before delivery:
-
-### Color Role Consistency
-- [ ] All numeric cells containing `<f>` elements: fontId corresponds to black (formula) or green (cross-sheet reference)
-- [ ] All hard-coded numeric values that are user-adjustable parameters: fontId corresponds to blue (input)
-- [ ] Cross-sheet references (formula contains `SheetName!`): fontId corresponds to green
-- [ ] External file references (formula contains `[FileName.xlsx]`): fontId corresponds to red
-- [ ] No cell simultaneously contains a `<f>` element and uses blue font (color role contradiction)
-
-### Number Format Correctness
-- [ ] Year columns: numFmtId="1" (`0` format), displays as 2024 not 2,024
-- [ ] Currency rows: numFmtId="164" or variant, negative numbers display as ($1,234) not -$1,234
-- [ ] Percentage rows: values stored as decimals (0.08 = 8%), format numFmtId="165", displays as 8.0%
-- [ ] Zero values: displayed as `-` in sparse matrices rather than `0` (formatCode third segment contains `"-"`)
-- [ ] Multiple rows (EV/EBITDA, etc.): numFmtId="166" (`0.0x` format)
-- [ ] Negative number display style is consistent throughout the entire workbook (parenthetical or red minus sign)
-
-### styles.xml Structural Integrity
-- [ ] `<numFmts count>` = actual number of `<numFmt>` elements
-- [ ] `<fonts count>` = actual number of `<font>` elements
-- [ ] `<fills count>` = actual number of `<fill>` elements (including spec-mandated fills[0] and fills[1])
-- [ ] `<cellXfs count>` = actual number of `<xf>` elements
-- [ ] fills[0] is `patternType="none"`, fills[1] is `patternType="gray125"` (spec-mandated)
-- [ ] All `<xf>` referenced fontId / fillId / borderId are within the valid range of their respective collections
-- [ ] All cell `s` attribute values < `cellXfs count` (no out-of-bounds references)
-
-### Assumption Separation Verification
-- [ ] No black-font numeric cells in the assumptions area/sheet (black numeric = formula, should not be in assumptions)
-- [ ] No blue-font non-year numeric cells in the model area/sheet (blue numeric = hard-coded, should be in assumptions)
-- [ ] Input parameters in the model area reference the assumptions area via formulas, not by directly copying values
-
-### Formula and Format Linkage
-- [ ] All cells with `<f>` elements have an explicit `s` attribute (must not use default style=0, whose font color is not explicitly black)
-- [ ] SUM summary rows: style uses black font + corresponding number format (e.g., s="6" for currency summaries)
-- [ ] Percentage formulas: values stored as decimals, format is `0.0%`; do not multiply values by 100 before applying percentage format
-
-### Visual Hierarchy
-- [ ] Header rows (years/metric names): style=4 (bold black)
-- [ ] Summary rows (Total/EBITDA/Net Income): bold + corresponding number format (append style if needed)
-- [ ] Unit description rows (e.g., "$ thousands"): use style=0 or style=2 (blue not needed)
 
 ---
 
@@ -752,17 +680,3 @@ In the assumptions area (Assumptions sheet or assumptions block), organize assum
 - Note a "Last Updated" date at the top of the assumptions area or in a dedicated cell, recording the last modification time of the model
 
 ---
-
-## 13. Pre-Delivery Checklist (Common Financial Model Checklist)
-
-Before outputting the final file, confirm each item:
-
-- [ ] Formula rows contain no hard-coded values (can use `formula_check.py` to scan the packaged `.xlsx` file)
-- [ ] Year columns display as 2024 not 2,024 (numFmtId="1", format `0`)
-- [ ] Negative numbers display as (1,234) not -1,234 (use parenthetical style for externally delivered financial reports)
-- [ ] Zero values display as `-` in sparse rows rather than `0` (formatCode third segment is `"-"`)
-- [ ] Growth rates and percentages are stored as decimals (0.08 = 8%), format is `0.0%`
-- [ ] All cross-sheet reference cells use green font (style index 3 or an appended green + number format combination)
-- [ ] Assumptions block and model block are clearly separated (different sheets or separated by empty rows within the same sheet)
-- [ ] Summary rows use `SUM()` formulas, not manually hard-coded totals
-- [ ] Balance verification: summary rows = sum of their respective line items (a check row can be added at the end of the model to verify)

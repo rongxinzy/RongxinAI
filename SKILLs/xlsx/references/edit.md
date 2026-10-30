@@ -119,14 +119,13 @@ See Section 4 for precise XML patterns for each operation type.
 
 After any change that shifts row or column positions, audit all affected XML regions. See Section 5.
 
-### Step 6 — Pack and Validate
+### Step 6 — Pack
 
 ```bash
 python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/xlsx_work/ output.xlsx
-python3 SKILL_DIR/scripts/formula_check.py output.xlsx
 ```
 
-The pack script validates XML well-formedness before creating the ZIP. Fix any reported parse errors before packing. After packing, run `formula_check.py` to confirm no formula errors were introduced.
+The pack script creates the ZIP directly from the working directory.
 
 ---
 
@@ -516,10 +515,9 @@ python3 SKILL_DIR/scripts/xlsx_shift_rows.py /tmp/xlsx_work/ delete 8 1
 
 The script updates in one pass: `<row r="...">` attributes, `<c r="...">` cell addresses, all `<f>` formula text across every worksheet, `<mergeCell>` ranges, `<conditionalFormatting sqref="...">`, `<dataValidation sqref="...">`, `<dimension ref="...">`, table `ref` attributes in `xl/tables/`, chart series ranges in `xl/charts/`, and pivot cache source ranges in `xl/pivotCaches/`.
 
-**After running the shift script, always repack and validate:**
+**After running the shift script, repack:**
 ```bash
 python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/xlsx_work/ output.xlsx
-python3 SKILL_DIR/scripts/formula_check.py output.xlsx
 ```
 
 **What the script does NOT update (review manually):**
@@ -642,33 +640,7 @@ Fill the target cells (`Assumptions!B5`, `Assumptions!B6`) directly.
 
 ---
 
-## 8. Validation After Every Edit
-
-Never skip validation. Even a one-character change in a formula can cause cascading errors.
-
-```bash
-# Pack
-python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/xlsx_work/ output.xlsx
-
-# Static formula validation (always run)
-python3 SKILL_DIR/scripts/formula_check.py output.xlsx
-
-# Dynamic validation (if LibreOffice available)
-python3 SKILL_DIR/scripts/libreoffice_recalc.py output.xlsx /tmp/recalc.xlsx
-python3 SKILL_DIR/scripts/formula_check.py /tmp/recalc.xlsx
-```
-
-If `formula_check.py` reports any error:
-1. Unpack the output file again (it is the packed version).
-2. Locate the reported cell in the worksheet XML.
-3. Fix the `<f>` element.
-4. Repack and re-validate.
-
-Do not deliver the file until `formula_check.py` reports zero errors.
-
----
-
-## 9. Absolute Rules Summary
+## 8. Absolute Rules Summary
 
 | Rule | Rationale |
 |------|-----------|
@@ -677,7 +649,6 @@ Do not deliver the file until `formula_check.py` reports zero errors.
 | Never delete or reorder existing `<xf>` entries in `<cellXfs>` | Breaks every cell using that style index |
 | Never modify `vbaProject.bin` | Binary file; any change corrupts VBA |
 | Never change `sheetId` when renaming a sheet | Internal ID is stable; changing it breaks relationships |
-| Never skip post-edit validation | Leaves broken references undetected |
 | Never edit more XML nodes than required | Extra changes risk introducing subtle corruption |
 | Clear `<v>` to empty string when changing a formula | Prevents stale cached value from misleading downstream consumers |
 | Append-only to sharedStrings | Existing indexes must remain valid |

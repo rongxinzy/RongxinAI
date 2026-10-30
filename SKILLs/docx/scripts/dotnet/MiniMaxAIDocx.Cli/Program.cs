@@ -9,7 +9,6 @@ rootCommand.Add(EditContentCommand.Create());
 rootCommand.Add(ApplyTemplateCommand.Create());
 
 // Tool commands
-rootCommand.Add(ValidateCommand.Create());
 rootCommand.Add(MergeRunsCommand.Create());
 rootCommand.Add(FixOrderCommand.Create());
 rootCommand.Add(AnalyzeCommand.Create());

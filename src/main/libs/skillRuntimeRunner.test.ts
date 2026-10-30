@@ -198,7 +198,7 @@ describe('skillRuntimeRunner', () => {
     expect(preview.stdout).not.toContain('DOCX .');
   });
 
-  it('runs the PDF inspection pipeline with the packaged PDF Skill environment', async () => {
+  it('renders PDF previews with the packaged PDF Skill environment', async () => {
     const sourceRoot = path.resolve(process.cwd(), 'SKILLs', 'pdf');
     const requirementsPath = path.join(sourceRoot, 'requirements.txt');
     const packagedEnvironment = path.resolve(process.cwd(), 'resources', 'skill-python', 'pdf');
@@ -211,8 +211,8 @@ describe('skillRuntimeRunner', () => {
     fs.mkdirSync(scriptDir, { recursive: true });
     fs.copyFileSync(requirementsPath, path.join(skillDir, 'requirements.txt'));
     fs.copyFileSync(
-      path.join(sourceRoot, 'scripts', 'pdf_inspect.py'),
-      path.join(scriptDir, 'pdf_inspect.py'),
+      path.join(sourceRoot, 'scripts', 'pdf_preview.py'),
+      path.join(scriptDir, 'pdf_preview.py'),
     );
     fs.writeFileSync(
       path.join(scriptDir, 'create_pdf.py'),
@@ -225,7 +225,7 @@ describe('skillRuntimeRunner', () => {
       ].join('\n'),
     );
     const inputPath = path.join(root, 'input.pdf');
-    const outputDir = path.join(root, 'inspection');
+    const outputDir = path.join(root, 'preview');
 
     const create = await runManagedSkillScript({
       skillsRoot: root,
@@ -237,17 +237,18 @@ describe('skillRuntimeRunner', () => {
     });
     expect(create.ok).toBe(true);
 
-    const inspect = await runManagedSkillScript({
+    const preview = await runManagedSkillScript({
       skillsRoot: root,
       skillId: 'pdf',
-      script: 'scripts/pdf_inspect.py',
+      script: 'scripts/pdf_preview.py',
       args: [inputPath, '--output', outputDir],
       workspaceRoot: root,
       timeoutMs: 30_000,
     });
-    expect(inspect.ok).toBe(true);
-    expect(inspect.runtime).toBe('python');
-    expect(fs.existsSync(path.join(outputDir, 'inspection.json'))).toBe(true);
+    expect(preview.ok).toBe(true);
+    expect(preview.runtime).toBe('python');
+    expect(fs.statSync(path.join(outputDir, 'page-001.png')).size).toBeGreaterThan(0);
+    expect(fs.statSync(path.join(outputDir, 'contact-sheet.png')).size).toBeGreaterThan(0);
   });
 
   it('compiles a PowerPoint deck directly through the managed Electron Node path', async () => {

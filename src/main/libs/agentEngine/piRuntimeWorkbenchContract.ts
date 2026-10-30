@@ -14,9 +14,15 @@ import { resolveShortcutWorkflowKind, ShortcutWorkflowKind } from './piShortcutW
 export function resolvePiShortcutWorkflowKind(
   skillIds: string[] | undefined,
 ): ShortcutWorkflowKind | null {
-  // PPT exports directly and uses Pi's native completion instead of evidence gates.
+  // Office skills export directly and use Pi's native completion.
   const kind = resolveShortcutWorkflowKind(skillIds);
-  return kind === ShortcutWorkflowKind.Ppt ? null : kind;
+  if (
+    kind === ShortcutWorkflowKind.Ppt ||
+    kind === ShortcutWorkflowKind.Docs ||
+    kind === ShortcutWorkflowKind.Sheets
+  )
+    return null;
+  return kind;
 }
 
 export function createPiWorkbenchContract(

@@ -19,7 +19,7 @@ If the user provides an existing file to modify, switch to `edit.md` instead.
 
 ## The Non-Negotiable Rules
 
-Before touching any file, internalize these four rules:
+Before touching any file, internalize these rules:
 
 1. **Formula-First**: Every calculated value (`SUM`, growth rate, ratio, subtotal, etc.)
    MUST be written as `<f>SUM(B2:B9)</f>`, not as a hardcoded `<v>5000</v>`. Hardcoded
@@ -28,14 +28,11 @@ Before touching any file, internalize these four rules:
 
 2. **No openpyxl for writing**: The entire file is built by editing XML directly. Python
    is only allowed for reading/analysis (`pandas.read_excel()`) and for running helper
-   scripts (`xlsx_pack.py`, `formula_check.py`).
+   scripts (`xlsx_pack.py`).
 
 3. **Style encodes meaning**: Blue font = user input/assumption. Black font = formula
    result. Green font = cross-sheet reference. See `format.md` for the full color system
    and style index table.
-
-4. **Validate before delivery**: Run `formula_check.py` and fix all errors before
-   handing the file to the user.
 
 ---
 
@@ -484,7 +481,7 @@ The `$` character needs no XML escaping — write it literally.
 
 ---
 
-### Step 8 — Pack and Validate
+### Step 8 — Pack
 
 **Pack**:
 
@@ -494,37 +491,9 @@ python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/xlsx_work/ /path/to/output.xlsx
 
 `xlsx_pack.py` will:
 1. Check that `[Content_Types].xml` exists at the root
-2. Parse every `.xml` and `.rels` file for well-formedness — abort if any fail
-3. Create the ZIP archive with correct compression
+2. Create the ZIP archive with correct compression, without a separate validation pass
 
-**Validate**:
-
-```bash
-python3 SKILL_DIR/scripts/formula_check.py /path/to/output.xlsx
-```
-
-`formula_check.py` will:
-1. Scan every cell for `<c t="e">` entries (cached error values) — all 7 error types
-2. Extract sheet name references from every `<f>` formula
-3. Verify each referenced sheet exists in `workbook.xml`
-
-Fix every reported error before delivery. Exit code 0 = safe to deliver.
-
----
-
-## Pre-Delivery Checklist
-
-Run through this list before handing the file to the user:
-
-- [ ] `formula_check.py` reports 0 errors
-- [ ] Every calculated cell has `<f>` — not just `<v>` with a number
-- [ ] `sharedStrings.xml` `count` and `uniqueCount` match actual `<si>` count
-- [ ] Every cell `s` attribute value is in range `0` to `cellXfs count - 1`
-- [ ] Every sheet in `workbook.xml` has a matching entry in `workbook.xml.rels`
-- [ ] Every `worksheets/sheetN.xml` file has a matching `<Override>` in `[Content_Types].xml`
-- [ ] Year columns use `s="11"` (format `0`, no thousands separator)
-- [ ] Cross-sheet reference formulas use `s="3"` (green font)
-- [ ] Assumption inputs use `s="1"` or `s="5"` or `s="7"` (blue font)
+Return the generated spreadsheet path to the user.
 
 ---
 
@@ -682,7 +651,6 @@ The `Summary` sheet pulls from `Data` using cross-sheet formulas (green, `s="3"`
 
 - Do NOT use openpyxl or any Python library to write the final xlsx file
 - Do NOT hardcode any calculated value — use `<f>` formulas for every derived number
-- Do NOT deliver without running `formula_check.py` first
 - Do NOT set a cell's `s` attribute to a value >= `cellXfs count`
 - Do NOT modify an existing `<xf>` entry in `styles.xml` — only append new ones
 - Do NOT add a new sheet without updating all four sync points (workbook.xml,

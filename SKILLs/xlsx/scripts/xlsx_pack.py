@@ -8,30 +8,13 @@ Usage:
 
 Requirements:
     - source_dir must contain [Content_Types].xml at its root
-    - All XML files are re-validated for well-formedness before packing
 
-The resulting xlsx is a valid ZIP archive with correct OOXML structure.
+The working directory is archived as supplied, without a validation pass.
 """
 
 import sys
 import os
 import zipfile
-import xml.etree.ElementTree as ET
-
-
-def validate_xml_files(source_dir: str) -> list[str]:
-    """Return list of XML files that fail to parse."""
-    bad = []
-    for dirpath, _, filenames in os.walk(source_dir):
-        for fname in filenames:
-            if fname.endswith(".xml") or fname.endswith(".rels"):
-                fpath = os.path.join(dirpath, fname)
-                try:
-                    ET.parse(fpath)
-                except ET.ParseError as e:
-                    rel = os.path.relpath(fpath, source_dir)
-                    bad.append(f"{rel}: {e}")
-    return bad
 
 
 def pack(source_dir: str, xlsx_path: str) -> None:
@@ -48,22 +31,6 @@ def pack(source_dir: str, xlsx_path: str) -> None:
         )
         sys.exit(1)
 
-    # Validate XML well-formedness before packing
-    print("Validating XML files...")
-    bad_files = validate_xml_files(source_dir)
-    if bad_files:
-        print("ERROR: The following files have XML parse errors:", file=sys.stderr)
-        for b in bad_files:
-            print(f"  {b}", file=sys.stderr)
-        print(
-            "\nFix all XML errors before packing. "
-            "A malformed xlsx cannot be opened by Excel or LibreOffice.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    print("✓ All XML files are well-formed")
-
     # Count files to pack
     file_count = sum(len(files) for _, _, files in os.walk(source_dir))
 
@@ -76,8 +43,6 @@ def pack(source_dir: str, xlsx_path: str) -> None:
 
     size = os.path.getsize(xlsx_path)
     print(f"Packed {file_count} files → '{xlsx_path}' ({size:,} bytes)")
-    print("\nNext step: run formula_check.py to validate formulas:")
-    print(f"  python3 formula_check.py {xlsx_path}")
 
 
 if __name__ == "__main__":

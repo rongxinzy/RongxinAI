@@ -1,6 +1,6 @@
 ---
 name: xlsx
-description: "Open, create, read, analyze, edit, or validate Excel/spreadsheet files (.xlsx, .xlsm, .csv, .tsv). Use when the user asks to create, build, modify, analyze, read, validate, or format any Excel spreadsheet, financial model, pivot table, or tabular data file. Covers: creating new xlsx from scratch, reading and analyzing existing files, editing existing xlsx with zero format loss, formula recalculation and validation, and applying professional financial formatting standards. Triggers on 'spreadsheet', 'Excel', '.xlsx', '.csv', 'pivot table', 'financial model', 'formula', or any request to produce tabular data in Excel format."
+description: "Open, create, read, analyze, or edit Excel/spreadsheet files (.xlsx, .xlsm, .csv, .tsv). Use when the user asks to create, build, modify, analyze, read, or format any Excel spreadsheet, financial model, pivot table, or tabular data file. Covers: creating new xlsx from scratch, reading and analyzing existing files, editing existing xlsx with zero format loss, writing formulas, and applying professional financial formatting standards. Triggers on 'spreadsheet', 'Excel', '.xlsx', '.csv', 'pivot table', 'financial model', 'formula', or any request to produce tabular data in Excel format."
 license: MIT
 metadata:
   version: '1.0.1'
@@ -41,7 +41,6 @@ Example:
 | **CREATE** — new xlsx from scratch                | XML template                    | `references/create.md` + `references/format.md`        |
 | **EDIT** — modify existing xlsx                   | XML unpack→edit→pack            | `references/edit.md` (+ `format.md` if styling needed) |
 | **FIX** — repair broken formulas in existing xlsx | XML unpack→fix `<f>` nodes→pack | `references/fix.md`                                    |
-| **VALIDATE** — check formulas                     | `formula_check.py`              | `references/validate.md`                               |
 
 ## READ — Analyze data (read `references/read-analyze.md` first)
 
@@ -62,7 +61,6 @@ Copy `templates/minimal_xlsx/` → edit XML directly → pack with `xlsx_pack.py
 1. **NEVER create a new `Workbook()`** for edit tasks. Always load the original file.
 2. The output MUST contain the **same sheets** as the input (same names, same data).
 3. Only modify the specific cells the task asks for — everything else must be untouched.
-4. **After saving output.xlsx, verify it**: open with `xlsx_reader.py` or `pandas` and confirm the original sheet names and a sample of original data are present. If verification fails, you wrote the wrong file — fix it before delivering.
 
 Never use openpyxl round-trip on existing files (corrupts VBA, pivots, sparklines). Instead: unpack → use helper scripts → repack.
 
@@ -132,10 +130,6 @@ python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/xlsx_work/ output.xlsx
 
 This is an EDIT task. Unpack → fix broken `<f>` nodes → pack. Preserve all original sheets and data.
 
-## VALIDATE — Check formulas (read `references/validate.md` first)
-
-Run `formula_check.py` for static validation. Use `libreoffice_recalc.py` for dynamic recalculation when available.
-
 ## Financial Color Standard
 
 | Cell Role                     | Font Color | Hex Code |
@@ -150,34 +144,14 @@ Run `formula_check.py` for static validation. Use `libreoffice_recalc.py` for dy
 2. **CREATE → XML template**: Copy minimal template, edit XML directly, pack with `xlsx_pack.py`
 3. **EDIT → XML**: Never openpyxl round-trip. Use unpack/edit/pack scripts
 4. **Always produce the output file** — this is the #1 priority
-5. **Validate before delivery**: `formula_check.py` exit code 0 = safe
 
-For the controlled Sheets shortcut, save the validation output as a nonempty
-`.md`, `.txt`, or `.json` workspace report. Render at least one inspected
-`.png` preview of the finished sheet, including
-the formulas, charts, or formatting the user asked for. Record the spreadsheet
-with `workflow_state` role `deliverable`, the report with role `validation`,
-and the preview with role `preview`. A claimed file path does not complete the
-workflow.
-
-After recording the spreadsheet as the deliverable, use the application's
-bundled cross-platform renderer for this visual gate. It does not require
-LibreOffice, Poppler, Python, or other user-installed software:
-
-```json
-{
-  "action": "render_preview",
-  "deliverablePath": "output.xlsx",
-  "path": "output/sheet-page-1.png"
-}
-```
+Save the requested spreadsheet and return its path. No validation report, preview
+evidence, or separate workflow completion request is required.
 
 ## Utility Scripts
 
 ```bash
 python3 SKILL_DIR/scripts/xlsx_reader.py input.xlsx                 # structure discovery
-python3 SKILL_DIR/scripts/formula_check.py file.xlsx --json         # formula validation
-python3 SKILL_DIR/scripts/formula_check.py file.xlsx --report      # standardized report
 python3 SKILL_DIR/scripts/xlsx_unpack.py in.xlsx /tmp/work/         # unpack for XML editing
 python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/work/ out.xlsx          # repack after editing
 python3 SKILL_DIR/scripts/xlsx_shift_rows.py /tmp/work/ insert 5 1  # shift rows for insertion

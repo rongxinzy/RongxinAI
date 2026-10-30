@@ -24,7 +24,7 @@ What it updates in every XML file under <work_dir>:
   - PivotCache source <worksheetSource ref="..."> in xl/pivotCaches/*.xml
 
 IMPORTANT: Run this script on the UNPACKED directory before repacking.
-After running, repack with xlsx_pack.py and re-validate with formula_check.py.
+After running, repack with xlsx_pack.py.
 
 Limitations:
   - Named ranges in workbook.xml <definedNames> are NOT updated automatically.
@@ -389,7 +389,6 @@ def main() -> None:
     print("Next steps:")
     print("  1. Review the changes above")
     print(f"  2. python3 xlsx_pack.py {work_dir} output.xlsx")
-    print("  3. python3 formula_check.py output.xlsx")
 
 
 if __name__ == "__main__":

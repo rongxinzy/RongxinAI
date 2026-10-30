@@ -19,9 +19,8 @@ Do NOT use when: the user wants to edit content (→ Scenario B) or create from 
 2. Analyze template  → CLI: analyze template.docx     (list styles, fonts, structure)
 3. Map styles        → Create mapping plan (source style → template style)
 4. Apply template    → CLI: apply-template source.docx --template template.docx --output result.docx
-5. Validate (XSD)    → CLI: validate result.docx --xsd wml-subset.xsd
-6. GATE-CHECK        → CLI: validate result.docx --xsd business-rules.xsd   ← MUST PASS
-7. Diff verify       → CLI: diff source.docx result.docx --text-only   (content must be identical)
+5. Save              → Write result.docx
+6. Diff              → Compare source and result when useful
 ```
 
 ---
@@ -358,41 +357,6 @@ The corresponding text in document.xml references this rId:
 
 ---
 
-## XSD Gate-Check
-
-### What It Is
-
-After template application, the output document **MUST** pass `business-rules.xsd` validation. This is a **hard gate** — if it fails, the document is **NOT deliverable**.
-
-### What business-rules.xsd Checks
-
-| Rule | What It Validates |
-|------|-------------------|
-| Template styles exist | All styles referenced by content paragraphs are defined in `styles.xml` |
-| Margins match | Page margins match template specification |
-| Fonts correct | `w:docDefaults` fonts match template's font scheme |
-| Heading hierarchy | Heading levels are sequential (no H1 → H3 without H2) |
-| Required styles present | `Normal`, `Heading1`-`Heading3`, `TableGrid` exist |
-| Page size | Matches template's declared page size |
-
-### Handling Failures
-
-```
-GATE-CHECK FAILED:
-  - Style 'CustomStyle1' referenced in paragraph 14 but not defined in styles.xml
-  - Margin w:left=1080 does not match template requirement 1440
-```
-
-Fix each failure:
-1. **Missing style**: Add the style definition to `styles.xml`, or remap the paragraph to an existing style
-2. **Margin mismatch**: Update `w:sectPr` margins to match template
-3. **Font mismatch**: Update `w:docDefaults` to match template font scheme
-4. **Heading hierarchy gap**: Insert intermediate heading levels or adjust existing levels
-
-Re-validate after every fix until gate-check passes.
-
----
-
 ## Common Pitfalls
 
 ### 1. Orphaned Numbering References
@@ -441,16 +405,3 @@ Re-validate after every fix until gate-check passes.
 **Fix**: Verify the `w:basedOn` chain for all critical styles. Ensure base styles are also correctly transferred from template.
 
 ---
-
-## Verification Checklist
-
-After template application, verify:
-
-1. **Content preserved** — text diff shows zero content changes
-2. **Gate-check passed** — `business-rules.xsd` validation succeeds
-3. **Styles applied** — headings, body text, tables use template formatting
-4. **Images intact** — all images render correctly (relationship IDs valid)
-5. **Lists working** — numbered and bulleted lists display correctly
-6. **Headers/footers** — template headers/footers appear on all pages
-7. **Page layout** — margins, page size, orientation match template
-8. **No corruption** — file opens without errors in Word

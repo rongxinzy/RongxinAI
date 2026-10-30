@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
-"""Render every PDF page and write visual-QA evidence for the PDF Skill."""
+"""Render PDF pages and a contact sheet without quality scoring."""
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Render every PDF page, generate a contact sheet, and report low-content pages."
+        description="Render every PDF page and generate a contact sheet."
     )
-    parser.add_argument("input", type=Path, help="PDF to inspect")
+    parser.add_argument("input", type=Path, help="PDF to render")
     parser.add_argument("-o", "--output", required=True, type=Path, help="Output directory")
     parser.add_argument("--scale", type=float, default=1.5, help="Render scale (default: 1.5)")
     return parser.parse_args()
@@ -29,10 +28,10 @@ def main() -> int:
         return 2
     try:
         import pypdfium2 as pdfium
-        from PIL import Image, ImageDraw, ImageStat
+        from PIL import Image, ImageDraw
     except ImportError as error:
         print(
-            "PDF visual inspection needs pypdfium2 and Pillow. Run with uv run --with pypdfium2 --with pillow.",
+            "PDF preview rendering needs pypdfium2 and Pillow. Run with uv run --with pypdfium2 --with pillow.",
             file=sys.stderr,
         )
         print(error, file=sys.stderr)
@@ -41,28 +40,13 @@ def main() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     document = pdfium.PdfDocument(str(args.input))
     page_images: list[Path] = []
-    pages: list[dict[str, object]] = []
     try:
         for page_number in range(len(document)):
             page = document[page_number]
             image = page.render(scale=args.scale).to_pil().convert("RGB")
             output = args.output / f"page-{page_number + 1:03d}.png"
             image.save(output)
-            gray = image.convert("L")
-            stats = ImageStat.Stat(gray)
-            average, variance = float(stats.mean[0]), float(stats.var[0])
             page_images.append(output)
-            pages.append(
-                {
-                    "page": page_number + 1,
-                    "path": output.name,
-                    "width": image.width,
-                    "height": image.height,
-                    "mean_luminance": round(average, 2),
-                    "luminance_variance": round(variance, 2),
-                    "low_content": average > 252.0 and variance < 12.0,
-                }
-            )
             page.close()
     finally:
         document.close()
@@ -93,17 +77,7 @@ def main() -> int:
         draw.text((left, top + image.height + 4), f"Page {index + 1}", fill="black")
     contact_sheet = args.output / "contact-sheet.png"
     sheet.save(contact_sheet)
-    report = {
-        "input": str(args.input.resolve()),
-        "page_count": len(pages),
-        "contact_sheet": contact_sheet.name,
-        "low_content_pages": [page["page"] for page in pages if page["low_content"]],
-        "pages": pages,
-    }
-    report_path = args.output / "inspection.json"
-    report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(f"Rendered {len(pages)} page(s): {contact_sheet}")
-    print(f"Inspection report: {report_path}")
+    print(f"Rendered {len(page_images)} page(s): {contact_sheet}")
     return 0
 
 
