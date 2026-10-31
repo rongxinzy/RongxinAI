@@ -19,8 +19,8 @@ const panelGuard = compact(
               <PromptPanel action={selectedAction} onPromptSelect={handleQuickActionPromptSelect} />
             )}`,
 );
-const spacer = 'min-h-[max(1.5rem,calc(45%-10rem))]';
-const columnWrapper = 'mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-6 px-6';
+const spacer = 'min-h-[max(24px,calc(36%-8rem))]';
+const columnWrapper = 'mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-8 px-6';
 const galleryWrapper = 'flex w-full flex-col gap-4 pb-8';
 
 const countOf = (needle: string) => source.split(needle).length - 1;
@@ -98,7 +98,7 @@ test('pins the prompt input while the case list scrolls underneath it', () => {
 
   // The brand mark travels in the same layer: it has to stay on screen next to the
   // input rather than sliding away with the cases, so it must be nested inside it.
-  const brandIndex = source.indexOf('flex-col items-center justify-center gap-4');
+  const brandIndex = source.indexOf('flex-col items-center justify-center gap-3');
   expect(brandIndex).toBeGreaterThan(stickyIndex);
   expect(source.indexOf('max-w-3xl flex-col gap-3')).toBeGreaterThan(brandIndex);
 

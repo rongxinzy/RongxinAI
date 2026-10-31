@@ -778,7 +778,14 @@ export function quietStudioAppearances(): Partial<ComponentAppearances> {
       base: {
         'font-size': 'var(--zy-component-text-sm)',
         'line-height': 'var(--zy-component-text-sm--line-height)',
-        color: 'var(--zy-text-muted)',
+        color: 'var(--zy-text-secondary)',
+      },
+    }),
+    'home-sticky': recipe({
+      base: {
+        'background-color': 'var(--background)',
+        'padding-bottom': '0.5rem',
+        'box-shadow': '0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent)',
       },
     }),
     'home-prompt-editor': recipe({
@@ -851,8 +858,8 @@ export function quietStudioAppearances(): Partial<ComponentAppearances> {
     }),
     'page-quick-action-bar-button-1': recipe({
       base: {
-        gap: '0.25rem',
-        'padding-inline': '0.5rem',
+        gap: '0.5rem',
+        'padding-inline': '0.75rem',
         'padding-block': '0px',
         height: '2rem',
         'border-radius': '9999px',

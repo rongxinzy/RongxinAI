@@ -54,7 +54,7 @@ function SidebarNavigationItem({ entry }: { entry: SidebarNavigationEntry }) {
       onFocus={entry.onIntent}
     >
       <div className="flex size-4 shrink-0 items-center justify-center">
-        <Icon aria-hidden="true" className="size-4" strokeWidth={1.75} />
+        <Icon aria-hidden="true" className="size-4" strokeWidth={1.5} />
       </div>
       <span className="min-w-0 truncate">{entry.label}</span>
       {entry.running && (
@@ -139,7 +139,7 @@ export function SidebarNavigationView({
           type="button"
           variant="secondary"
           size="lg"
-          className="w-full justify-start gap-2.5"
+          className="w-full justify-start gap-2"
           aria-label={newConversation.label}
           data-testid={newConversation.testId}
           data-active={newConversation.active || undefined}
@@ -157,7 +157,7 @@ export function SidebarNavigationView({
             type="button"
             variant="navigation"
             size="navigation"
-            className="w-full justify-start gap-2.5"
+            className="w-full justify-start gap-2"
             aria-label={search.label}
             aria-haspopup="dialog"
             onClick={search.onClick}

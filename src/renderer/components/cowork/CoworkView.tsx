@@ -357,11 +357,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       {homeHeader}
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto min-h-0 relative">
+      <div className="flex-1 overflow-y-auto min-h-0 relative pb-12">
         {/* Anchor to the viewport so opening a long case gallery never moves the input. */}
-        <div aria-hidden className="min-h-[max(1.5rem,calc(45%-10rem))]" />
+        <div aria-hidden className="min-h-[max(24px,calc(36%-8rem))]" />
 
-        <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-6 px-6">
+        <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-8 px-6">
           {/* Welcome Section and the prompt input share one sticky layer: once the
               cases start scrolling, the brand mark and the input both stay on screen
               instead of sliding away with the list. The layer is opaque and full
@@ -369,11 +369,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               same column as the list, which is the box the sticky range is measured
               against, so it holds all the way to the last case. */}
           <div className="sticky theme-home-sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
-            <div className="flex flex-col items-center justify-center gap-4 text-center">
-              <h1 className="theme-home-greeting max-w-2xl">{i18nService.t(homeGreetingKey())}</h1>
+            <div className="flex flex-col items-center justify-center gap-3 text-center">
+              <h1 className="theme-home-greeting max-w-2xl text-balance">
+                {i18nService.t(homeGreetingKey())}
+              </h1>
               <p
                 className={cn(
-                  'theme-home-caption max-w-md px-2',
+                  'theme-home-caption max-w-md text-pretty px-2',
                   workMode === WorkMode.Chat && 'invisible',
                 )}
               >

@@ -119,6 +119,7 @@
     "preview:screenshots": "node scripts/preview/web-preview-check.mjs",
     "site:snapshots": "node scripts/site-screenshots/capture.mjs",
     "preview:doc-screenshots": "node scripts/preview/capture-doc-screenshots.mjs",
+    "preview:unslop": "node scripts/preview/capture-main-unslop.mjs",
     "test:memory-leak": "node scripts/ci/memory-leak-check.mjs",
     "test:e2e:packaged-linux": "bash tests/e2e/packaged-linux/run-with-headless-deps.sh",
     "test:bundle-budget": "node scripts/check-renderer-bundle-budget.cjs",

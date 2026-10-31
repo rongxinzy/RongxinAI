@@ -45,7 +45,7 @@ export const zhCowork: Record<string, string> = {
   coworkUnpinSession: '取消置顶',
   coworkSessionActions: '更多操作',
   coworkPlaceholder: '描述一个任务，或者问任何问题',
-  coworkHomeSubtitle: '读取本地文件、执行多步任务，关键操作前会先征得你的同意',
+  coworkHomeSubtitle: '本地运行：读写本地文件、多步执行，敏感操作前先确认',
   homeGreetingMorning: '早上好，今天想完成什么？',
   homeGreetingAfternoon: '下午好，今天想完成什么？',
   homeGreetingEvening: '晚上好，今天想完成什么？',
