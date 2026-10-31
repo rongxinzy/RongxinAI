@@ -7,6 +7,7 @@ import {
   Presentation,
   Smartphone,
   Telescope,
+  type LucideIcon,
 } from 'lucide-react';
 import React from 'react';
 
@@ -18,7 +19,7 @@ interface QuickActionBarProps {
 }
 
 // 图标映射
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+const iconMap: Record<string, LucideIcon> = {
   Presentation,
   Globe,
   Smartphone,
