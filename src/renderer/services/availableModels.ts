@@ -1,6 +1,11 @@
 import type { LlamaCppAgentEligibility } from '../../shared/llamacpp';
 import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
-import type { MagpieModel, MagpieModelCatalog } from '../../shared/magpie/types';
+import type {
+  MagpieModel,
+  MagpieModelCatalog,
+  MagpieProviderSummary,
+} from '../../shared/magpie/types';
+import { getMagpieProviderName } from './magpieProviderNames';
 import { getRunningModelAgentEligibility } from '../utils/llamacppAgentEligibility';
 import { ModelCapabilityStatus } from '../../shared/providers';
 import { store } from '../store';
@@ -29,12 +34,23 @@ function localModelEligibility(model: MagpieModel): LlamaCppAgentEligibility | u
   const slash = model.id.indexOf('/');
   return localEligibility.get(model.id) ?? localEligibility.get(model.id.slice(slash + 1));
 }
-export function toCatalogModel(model: MagpieModel): Model {
+async function readProviders(): Promise<MagpieProviderSummary[]> {
+  try {
+    return await window.electron.magpie.providers();
+  } catch {
+    // Display metadata must not make an otherwise usable catalog unavailable.
+    return [];
+  }
+}
+export function toCatalogModel(
+  model: MagpieModel,
+  providers: readonly MagpieProviderSummary[] = [],
+): Model {
   const llamaCppAgentEligibility = localModelEligibility(model);
   return {
     id: model.id,
     name: model.display_name || model.id,
-    provider: model.owned_by,
+    provider: getMagpieProviderName(model.owned_by, providers),
     providerKey: model.owned_by,
     supportsImage: model.modalities?.input.includes('image') ?? false,
     supportsThinkingToggle: model.reasoning,
@@ -47,34 +63,44 @@ export function toCatalogModel(model: MagpieModel): Model {
     ...(llamaCppAgentEligibility ? { llamaCppAgentEligibility } : {}),
   };
 }
-export function applyMagpieCatalog(catalog: MagpieModelCatalog): void {
+export function applyMagpieCatalog(
+  catalog: MagpieModelCatalog,
+  providers: readonly MagpieProviderSummary[] = [],
+): void {
   store.dispatch(
     setModelCatalog({
-      models: catalog.status.state === 'running' ? catalog.models.map(toCatalogModel) : [],
+      models:
+        catalog.status.state === 'running'
+          ? catalog.models.map(model => toCatalogModel(model, providers))
+          : [],
       defaultModelId: catalog.defaultModelId,
     }),
   );
 }
 export async function refreshMagpieModels(): Promise<MagpieModelCatalog> {
   const request = ++catalogRequest;
-  const [catalog, eligibility] = await Promise.all([
+  const [catalog, eligibility, providers] = await Promise.all([
     window.electron.magpie.catalog(),
     readLocalEligibility(),
+    readProviders(),
   ]);
   if (request !== catalogRequest) return catalog;
   localEligibility = eligibility;
-  applyMagpieCatalog(catalog);
+  applyMagpieCatalog(catalog, providers);
   return catalog;
 }
 export async function selectMagpieDefaultModel(id: string): Promise<MagpieModelCatalog> {
   ++catalogRequest;
   const request = ++selectionRequest;
-  const catalog = await window.electron.magpie.selectDefault(id);
+  const [catalog, providers] = await Promise.all([
+    window.electron.magpie.selectDefault(id),
+    readProviders(),
+  ]);
   if (request === selectionRequest) {
     // A focus refresh may have started while the write was pending. Its older
     // snapshot must not replace the newly confirmed default when it finishes.
     ++catalogRequest;
-    applyMagpieCatalog(catalog);
+    applyMagpieCatalog(catalog, providers);
   }
   return catalog;
 }

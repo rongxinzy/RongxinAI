@@ -189,7 +189,7 @@ if [ "$STATUS" = "READY" ]; then
         echo "Status: READY"
     fi
 elif [ "$STATUS" = "LIMITED" ]; then
-    echo "Status: LIMITED (bundled Markdown fallback is available for simple document creation; OpenXML editing/template validation requires .NET 8+)"
+    echo "Status: LIMITED (bundled Markdown fallback is available for simple document creation; OpenXML editing/template operations require .NET 8+)"
 else
     echo "Status: NOT READY"
     echo ""

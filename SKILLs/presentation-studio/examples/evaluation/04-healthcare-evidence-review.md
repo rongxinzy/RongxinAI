@@ -1,1 +1,0 @@
-Prepare a clinical evidence review on reducing post-operative infection. Include study design, evidence table, effect-size chart, limitations, and recommendation. It must be scholarly, calm, and easy to audit.

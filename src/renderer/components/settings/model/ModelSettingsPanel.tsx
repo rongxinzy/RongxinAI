@@ -399,6 +399,7 @@ export default function ModelSettingsPanel() {
                 )}
                 <ModelCatalogBrowser
                   models={models}
+                  providers={providers}
                   defaultModelId={catalog?.defaultModelId ?? null}
                   selection={selection}
                   disabled={busy}

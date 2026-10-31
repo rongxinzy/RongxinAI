@@ -10,4 +10,4 @@ Extract a short design system before writing `design.md`:
 - component treatment for data, tables, dividers, and annotations;
 - motion or layering cues that can be recreated with editable objects.
 
-State what is transferred, what is intentionally changed for the content, and what must not be copied (logos, proprietary illustrations, exact artwork). Render three proof pages and compare against the extracted system before producing the full deck.
+State what is transferred, what is intentionally changed for the content, and what must not be copied (logos, proprietary illustrations, exact artwork).

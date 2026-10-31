@@ -261,11 +261,7 @@ export class PiRuntimeAdapter
   }
 
   async recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void> {
-    const goal =
-      this.store
-        ?.getSession(sessionId, 1)
-        ?.messages.filter(message => message.type === 'user')
-        .at(-1)?.content ?? '';
+    const goal = active.summaryCheckpointGoal ?? '';
     const artifacts = this.artifactLedgerService?.list(sessionId) ?? [];
     this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
       activation: HarnessActivationType.SummaryOmitted,

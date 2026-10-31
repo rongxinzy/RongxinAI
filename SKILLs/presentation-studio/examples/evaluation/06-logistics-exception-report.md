@@ -1,1 +1,0 @@
-Create a monthly logistics exception report for operations leadership. Include service-level trend, delay root causes, regional comparison, owners, and next actions. Make the most important exception visually unmistakable.

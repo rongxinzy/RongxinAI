@@ -201,7 +201,7 @@ scripts/
   cover.py                ← tokens.json → cover.html
   render_cover.js         ← cover.html → cover.pdf  (Playwright)
   render_body.py          ← tokens.json + content.json → body.pdf  (ReportLab)
-  merge.py                ← cover.pdf + body.pdf → final.pdf + QA report
+  merge.py                ← cover.pdf + body.pdf → final.pdf
 ```
 
 Design tokens (color, typography, spacing) are written once by `palette.py` and consumed by every downstream script. This guarantees visual consistency between cover and body without any manual coordination.

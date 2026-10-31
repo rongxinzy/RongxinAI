@@ -1,10 +1,11 @@
 {
   "name": "zhiyuan-presentation-studio",
   "private": true,
+  "type": "module",
   "version": "1.0.0",
   "description": "Native DeckSpec compiler dependencies for ZhiYuan Agent.",
   "scripts": {
-    "test": "node scripts/test-validator.mjs"
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
     "image-size": "^1.2.1",

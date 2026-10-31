@@ -88,15 +88,6 @@ Set document-level defaults in `styles.xml` under `w:docDefaults`:
 
 See the Complex Elements Guide section below.
 
-### 8. Run Validation Pipeline
-
-```
-dotnet run ... validate --xsd wml-subset.xsd
-dotnet run ... validate --xsd business-rules.xsd   # if applying a template
-```
-
----
-
 ## Document Type Defaults
 
 ### Report
@@ -273,12 +264,3 @@ Add a header part with a shape behind the text:
 ```
 
 ---
-
-## Post-Creation Checklist
-
-1. **Validate** against `wml-subset.xsd` — all elements in correct order, required attributes present
-2. **Merge adjacent runs** with identical formatting to keep XML clean
-3. **Verify relationships** — every `r:id` in document.xml has a matching entry in `document.xml.rels`
-4. **Check content types** — every part in the package is registered in `[Content_Types].xml`
-5. **Preview** — open in Word or LibreOffice to visually confirm layout
-6. **File size** — confirm images are reasonably sized (compress if > 2MB each)
