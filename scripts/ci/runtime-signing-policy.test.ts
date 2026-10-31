@@ -96,6 +96,9 @@ test('signed releases check the packaged Magpie helper signature and sealed dige
     expect(staple).toBeGreaterThan(-1);
     expect(helper).toBeGreaterThan(staple);
     expect(gatekeeper).toBeGreaterThan(helper);
+    expect(workflow).toMatch(
+      /if spctl --assess --type execute --verbose=4 "\$app_path"; then[\s\S]*::warning title=Gatekeeper assessment failed::/,
+    );
   }
 });
 
