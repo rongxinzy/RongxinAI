@@ -75,10 +75,17 @@ jobs:
               aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable.previous-pointer.json \
                 manifest/previous-pointer.json > /dev/null
               previous_generation="$(jq -er 'select(.schemaVersion == 1) | .generation | select(type == "string" and test("^[A-Za-z0-9._-]+$"))' manifest/previous-pointer.json)"
-              echo "previous_generation=$previous_generation" >> "$GITHUB_OUTPUT"
-              aws s3api get-object --bucket "$R2_BUCKET" \
-                --key "generations/${previous_generation}/legacy/stable.json" manifest/previous.json > /dev/null
-              echo 'previous=true' >> "$GITHUB_OUTPUT"
+              protect_previous="$(node scripts/release/cleanup-retention.mjs manifest/previous-head.json)"
+              if [[ "$protect_previous" == 'true' ]]; then
+                echo "previous_generation=$previous_generation" >> "$GITHUB_OUTPUT"
+                aws s3api get-object --bucket "$R2_BUCKET" \
+                  --key "generations/${previous_generation}/legacy/stable.json" manifest/previous.json > /dev/null
+                echo 'previous=true' >> "$GITHUB_OUTPUT"
+              else
+                # The planner may already have removed this expired generation.
+                echo 'previous=false' >> "$GITHUB_OUTPUT"
+                echo 'previous_generation=-' >> "$GITHUB_OUTPUT"
+              fi
             elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
               echo 'previous=false' >> "$GITHUB_OUTPUT"
               echo 'previous_generation=-' >> "$GITHUB_OUTPUT"
