@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import { isPreviousReleaseProtected, RETENTION_MS } from './cleanup-retention.mjs';
 import {
   loadTrustedReleaseKey,
   readAndVerifyCollection,
@@ -35,8 +36,8 @@ for (const generation of [activeGeneration, previousGeneration]) {
   }
 }
 
-const retentionMs = 24 * 60 * 60 * 1000;
-const cutoff = Date.now() - retentionMs;
+const now = Date.now();
+const cutoff = now - RETENTION_MS;
 const trustedKey = loadTrustedReleaseKey();
 const stableEntries = await readAndVerifyCollection(stablePath, trustedKey);
 const referencedKeys = referencedObjectKeys(stableEntries);
@@ -47,11 +48,7 @@ if (activeGeneration !== '-') {
 
 if (previousPath !== '-' && previousHeadPath !== '-') {
   const previousHead = JSON.parse(await fs.readFile(previousHeadPath, 'utf8'));
-  const previousPublishedAt = Date.parse(previousHead.LastModified);
-  if (!Number.isFinite(previousPublishedAt)) {
-    throw new Error('stable.previous.json has an invalid LastModified timestamp');
-  }
-  if (previousPublishedAt >= cutoff) {
+  if (isPreviousReleaseProtected(previousHead, now)) {
     const previousEntries = await readAndVerifyCollection(previousPath, trustedKey);
     for (const key of referencedObjectKeys(previousEntries)) referencedKeys.add(key);
     if (previousGeneration !== '-') {
