@@ -53,6 +53,17 @@ jobs:
             windows-installer-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - name: Read pinned Magpie Go toolchain
+        id: magpie-toolchain
+        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
+          cache: false
+      - name: Build and verify pinned Magpie gateway
+        run: |
+          bun run magpie:build -- --target win32-x64
+          bun run magpie:verify -- --target win32-x64
       - name: Validate real Windows interaction drivers
         # These suites spawn real PowerShell processes and a C# compiler. Avoid
         # cross-suite CPU contention on the hosted runner; retain every timeout.
