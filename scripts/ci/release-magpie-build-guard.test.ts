@@ -44,3 +44,22 @@ test('Kylin workflow builds and verifies Magpie before packaging', () => {
   expect(kylinWorkflow).toContain('bun run magpie:build -- --target linux-x64');
   expect(kylinWorkflow).toContain('bun run magpie:verify -- --target linux-x64');
 });
+
+test.each([
+  ['linux-install-pr.yml', 'linux-x64', 'Build Linux installer artifacts'],
+  ['windows-installer-pr.yml', 'win32-x64', 'Build complete offline installer'],
+])(
+  'installation preflight builds its pinned runtime before packaging in %s',
+  (file, target, name) => {
+    const workflow = read(file);
+    const toolchain = workflow.indexOf('uses: actions/setup-go@v6');
+    const build = workflow.indexOf(`bun run magpie:build -- --target ${target}`);
+    const verify = workflow.indexOf(`bun run magpie:verify -- --target ${target}`);
+    expect(toolchain).toBeGreaterThan(-1);
+    expect(workflow).toContain("require('./resources/magpie/upstream.json')");
+    expect(workflow).toContain('go-version: ${{ steps.magpie-toolchain.outputs.go-version }}');
+    expect(build).toBeGreaterThan(toolchain);
+    expect(verify).toBeGreaterThan(build);
+    expect(workflow.indexOf(`name: ${name}`)).toBeGreaterThan(verify);
+  },
+);

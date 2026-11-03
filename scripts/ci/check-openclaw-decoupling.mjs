@@ -152,7 +152,15 @@ for (const workflowFile of workflowFiles) {
   const content = fs.readFileSync(path.join(root, workflowFile), 'utf8');
   const magpieGatewayReleaseBuild =
     workflowFile === '.github/workflows/release.yml' && /magpie:build/.test(content);
-  const forbiddenGoSetup = /actions\/setup-go/.test(content) && !magpieGatewayReleaseBuild;
+  // Installation preflight builds the same pinned gateway as signed releases.
+  // This toolchain is independent of the published channel transport runtime.
+  const pinnedMagpieGatewayBuild =
+    /resources\/magpie\/upstream\.json/.test(content) &&
+    /bun run magpie:build -- --target (?:linux|win32)-x64/.test(content) &&
+    /bun run magpie:verify -- --target (?:linux|win32)-x64/.test(content) &&
+    /go-version: \$\{\{ steps\.magpie-toolchain\.outputs\.go-version \}\}/.test(content);
+  const forbiddenGoSetup =
+    /actions\/setup-go/.test(content) && !magpieGatewayReleaseBuild && !pinnedMagpieGatewayBuild;
   if (
     /repository:\s*rongxinzy\/pi-connect|ZHIYUAN_CC_CONNECT_SOURCE/.test(content) ||
     forbiddenGoSetup

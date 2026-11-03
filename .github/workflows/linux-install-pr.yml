@@ -58,6 +58,17 @@ jobs:
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - name: Read pinned Magpie Go toolchain
+        id: magpie-toolchain
+        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
+          cache: false
+      - name: Build and verify pinned Magpie gateway
+        run: |
+          bun run magpie:build -- --target linux-x64
+          bun run magpie:verify -- --target linux-x64
       - name: Set up bundled Linux runtimes
         run: |
           bun run setup:posix-uv-runtime

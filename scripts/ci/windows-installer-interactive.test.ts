@@ -355,7 +355,7 @@ test.skipIf(process.platform !== 'win32')(
       'PASS: real directory identities and cancellation backup differences',
     );
     expect(result.stdout).toContain(
-      'PASS: all seven owned component sets and preserved personal runtime content',
+      'PASS: all edition components and preserved personal runtime content',
     );
   },
 );

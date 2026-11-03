@@ -9,13 +9,14 @@ const { registerExpert } =
   require('../../SKILLs/zhiyuan-expert-manager/scripts/register_expert.js') as {
     registerExpert: (
       expertDir: string,
-      options: { dbPath?: string; update?: boolean },
+      options: { dbPath?: string; update?: boolean; skillSourceRoots?: string[] },
     ) => { pluginJson: { name: string }; agentIds: string[] };
   };
 
 let tempRoot: string;
 let dbPath: string;
 let presetDir: string;
+let skillSourceRoot: string;
 
 /** Minimal valid expert package in a temp dir — exercises the register/upgrade path without touching real user data. */
 const buildPreset = (version: string, skillIds: string[]): void => {
@@ -108,6 +109,13 @@ beforeEach(() => {
   tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'expert-upgrade-test-'));
   dbPath = path.join(tempRoot, 'test.sqlite');
   presetDir = path.join(tempRoot, 'preset');
+  // Use owned source fixtures, independent of dependency installs in bundled skills.
+  skillSourceRoot = path.join(tempRoot, 'bundled-skills');
+  for (const id of ['web-search', 'deep-research']) {
+    const directory = path.join(skillSourceRoot, id);
+    fs.mkdirSync(directory, { recursive: true });
+    fs.writeFileSync(path.join(directory, 'SKILL.md'), `# ${id} upgrade fixture`);
+  }
   // Keep the pi agents sync hermetic — never touch ~/.pi/agent.
   process.env.PI_CODING_AGENT_DIR = path.join(tempRoot, 'pi-agent');
 });
@@ -131,7 +139,8 @@ test('registers a preset and upgrades it in place with --update', () => {
   const sqlite = require('better-sqlite3') as typeof import('better-sqlite3');
 
   buildPreset('1.0.0', ['web-search']);
-  const first = registerExpert(presetDir, { dbPath });
+  const options = { dbPath, skillSourceRoots: [skillSourceRoot] };
+  const first = registerExpert(presetDir, options);
   expect(first.agentIds).toHaveLength(1);
 
   const installed = queryAgent(sqlite, '升级测试专家');
@@ -139,11 +148,11 @@ test('registers a preset and upgrades it in place with --update', () => {
   expect(JSON.parse(installed.skill_ids)).toEqual(['web-search', 'upgrade-test-skill']);
 
   // Re-registering without --update must fail, not create a duplicate.
-  expect(() => registerExpert(presetDir, { dbPath })).toThrow(/already exists/);
+  expect(() => registerExpert(presetDir, options)).toThrow(/already exists/);
 
   // Upgrade replaces the system prompt and skill list in place.
   buildPreset('2.0.0', ['web-search', 'deep-research']);
-  const upgraded = registerExpert(presetDir, { dbPath, update: true });
+  const upgraded = registerExpert(presetDir, { ...options, update: true });
   expect(upgraded.agentIds).toEqual(first.agentIds);
 
   const after = queryAgent(sqlite, '升级测试专家');
@@ -154,6 +163,11 @@ test('registers a preset and upgrades it in place with --update', () => {
     'deep-research',
     'upgrade-test-skill',
   ]);
+  for (const id of ['web-search', 'deep-research']) {
+    expect(fs.readFileSync(path.join(tempRoot, 'SKILLs', id, 'SKILL.md'), 'utf8')).toBe(
+      `# ${id} upgrade fixture`,
+    );
+  }
 
   // Only one agent row exists — no timestamp-suffixed duplicates.
   const Database = sqlite.default ?? sqlite;
@@ -167,12 +181,13 @@ test('upgrade refreshes packaged skills in the user data skills directory', () =
   const userDataSkillsDir = path.join(tempRoot, 'SKILLs');
 
   buildPreset('1.0.0', []);
-  registerExpert(presetDir, { dbPath });
+  const options = { dbPath, skillSourceRoots: [skillSourceRoot] };
+  registerExpert(presetDir, options);
 
   const skillPath = path.join(userDataSkillsDir, 'upgrade-test-skill', 'SKILL.md');
   expect(fs.readFileSync(skillPath, 'utf-8')).toContain('v1.0.0');
 
   buildPreset('2.0.0', []);
-  registerExpert(presetDir, { dbPath, update: true });
+  registerExpert(presetDir, { ...options, update: true });
   expect(fs.readFileSync(skillPath, 'utf-8')).toContain('v2.0.0');
 });
