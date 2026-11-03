@@ -53,6 +53,21 @@ describe('Kylin packaging', () => {
     }
   });
 
+  test('downloads CPU llama.cpp archives through curl and a Kylin mirror', () => {
+    const downloader = readFileSync(
+      path.join(process.cwd(), 'scripts/sync-vendor-llamacpp-cpu-edition.cjs'),
+      'utf8',
+    );
+    const workflow = readFileSync(
+      path.join(process.cwd(), '.github/workflows/build-kylin-release.yml'),
+      'utf8',
+    );
+    expect(downloader).toContain('function downloadWithCurl');
+    expect(downloader).toContain("'--retry'");
+    expect(workflow).toContain('LLAMACPP_RUNTIME_BASE_URL=');
+    expect(workflow).toContain('https://gh-proxy.com/https://github.com/');
+  });
+
   test('builds Magpie runtime resources before the RPM installer', () => {
     const calls: string[][] = [];
     buildKylin({

@@ -59,19 +59,62 @@ function readExpectedArchiveSha256(assetName) {
   return undefined;
 }
 
+function downloadWithCurl(url, outputPath) {
+  fs.rmSync(outputPath, { force: true });
+  const result = spawnSync(
+    'curl',
+    [
+      '--location',
+      '--fail',
+      '--retry',
+      '5',
+      '--retry-delay',
+      '2',
+      '--connect-timeout',
+      '30',
+      '--max-time',
+      '900',
+      '--output',
+      outputPath,
+      url,
+    ],
+    { stdio: 'inherit', windowsHide: true },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`curl exited with code ${result.status ?? 'unknown'}`);
+  }
+}
+
+async function downloadWithFetch(url, outputPath) {
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'ZhiYuanAgent/sync-vendor-llamacpp-cpu-edition' },
+    signal: AbortSignal.timeout(120_000),
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, Buffer.from(await response.arrayBuffer()));
+}
+
 async function downloadToFile(urls, outputPath) {
   const errors = [];
   for (const url of urls) {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'ZhiYuanAgent/sync-vendor-llamacpp-cpu-edition' },
-    });
-    if (!response.ok || !response.body) {
-      errors.push(`${url} HTTP ${response.status}`);
-      continue;
+    console.log(`[sync-vendor-llamacpp-cpu-edition] Downloading ${url}`);
+    try {
+      downloadWithCurl(url, outputPath);
+      return url;
+    } catch (error) {
+      errors.push(`${url} curl: ${error instanceof Error ? error.message : String(error)}`);
     }
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, Buffer.from(await response.arrayBuffer()));
-    return url;
+    try {
+      await downloadWithFetch(url, outputPath);
+      return url;
+    } catch (error) {
+      errors.push(`${url} fetch: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    fs.rmSync(outputPath, { force: true });
   }
   throw new Error(`CPU runtime download failed: ${errors.join('; ')}`);
 }

@@ -132,6 +132,14 @@ jobs:
           bash scripts/ci/with-download-retries.sh bun run setup:posix-uv-runtime
           bash scripts/ci/with-download-retries.sh bun run setup:posix-python-runtime
 
+      - name: Configure Kylin llama.cpp runtime mirror
+        shell: bash
+        run: |
+          node -e "const fs=require('node:fs'); const p=require('./package.json');
+          const repo=p.llamacpp.runtimeRepo.replace(/^https:\/\/github\.com\//,'').replace(/\.git$/,'');
+          const base='https://gh-proxy.com/https://github.com/'+repo+'/releases/download/'+p.llamacpp.runtimeReleaseTag;
+          fs.appendFileSync(process.env.GITHUB_ENV, 'LLAMACPP_RUNTIME_BASE_URL='+base+'\n')"
+
       - name: Build Kylin V11 RPM package
         env:
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
