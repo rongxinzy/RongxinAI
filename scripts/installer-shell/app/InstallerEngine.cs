@@ -111,7 +111,7 @@ public sealed class InstallerEngine
     private string TargetsPath => Path.Combine(payloadDir!, "component-targets.json");
     private static readonly string[] RequiredComponentKeys =
         { "channel-runtime", "skills", "mcps", "portable-git", "python", "skill-python", "uv" };
-    private static readonly string[] OptionalComponentKeys = { "llamacpp-bundled" };
+    private static readonly string[] OptionalComponentKeys = { "llamacpp-bundled", "strata-bundled" };
 
     private string? extractedPayloadDir;
     private readonly InstallDirectoryTransaction transaction;
@@ -607,7 +607,7 @@ public sealed class InstallerEngine
         var resources = Path.Combine(installDir, "resources");
         using var targets = JsonDocument.Parse(File.ReadAllText(TargetsPath));
         // The seven fixed components are always required; cpu/cuda editions
-        // add only the bundled llama.cpp runtime. The count is not fixed.
+        // add the bundled local runtime and CUDA also adds Strata.
         var keys = targets.RootElement.EnumerateArray()
             .Select(t => t.GetProperty("key").GetString() ?? "")
             .ToList();

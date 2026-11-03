@@ -57,11 +57,10 @@ function New-LiteralDirectoryJunction {
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 $targets = @((Get-Content -LiteralPath $TargetsPath -Raw -ErrorAction Stop | ConvertFrom-Json))
 # Component contract: the seven fixed application components are always
-# required. The cpu/cuda editions' WebView2 setup additionally carries the
-# bundled llama.cpp runtime ('llamacpp-bundled'); no other key is accepted.
-# The count is therefore not fixed (lite 7, cpu/cuda 8).
+# required. CPU adds the bundled local runtime; CUDA also adds Strata.
+# No other key is accepted (lite 7, cpu 8, cuda 9).
 $requiredKeys = @('channel-runtime', 'mcps', 'portable-git', 'python', 'skill-python', 'skills', 'uv')
-$optionalKeys = @('llamacpp-bundled')
+$optionalKeys = @('llamacpp-bundled', 'strata-bundled')
 $targetKeys = @($targets | ForEach-Object { [string]$_.key } | Sort-Object)
 $manifestKeys = @($manifest.components | ForEach-Object { [string]$_.key } | Sort-Object)
 $missingKeys = @($requiredKeys | Where-Object { $targetKeys -cnotcontains $_ })

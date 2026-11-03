@@ -12,7 +12,7 @@ $states = @(Get-Content -LiteralPath $statePath)
 # Validate the entire journal before touching any pointer. Retired/unknown
 # component records must remain available without restoring their runtimes.
 foreach ($state in $states) {
-  if ($state -cnotmatch '^(?:channel-runtime|mcps|portable-git|python|skill-python|skills|uv)\|(?:True|False)\z') {
+  if ($state -cnotmatch '^(?:channel-runtime|mcps|portable-git|python|skill-python|skills|uv|llamacpp-bundled|strata-bundled)\|(?:True|False)\z') {
     throw "Unsupported component recovery state; preserving journal: $state"
   }
 }
