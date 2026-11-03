@@ -59,33 +59,107 @@ function readExpectedArchiveSha256(assetName) {
   return undefined;
 }
 
-function downloadWithAria2(url, outputPath) {
-  fs.rmSync(outputPath, { force: true });
+function readContentLength(url) {
   const result = spawnSync(
-    'aria2c',
+    'curl',
     [
-      '--allow-overwrite=true',
-      '--auto-file-renaming=false',
-      '--file-allocation=none',
-      '--max-tries=5',
-      '--retry-wait=2',
-      '--summary-interval=30',
-      '--timeout=60',
-      '--connect-timeout=30',
-      '--split=8',
-      '--max-connection-per-server=8',
-      '--min-split-size=1M',
-      '--dir',
-      path.dirname(outputPath),
-      '--out',
-      path.basename(outputPath),
+      '--location',
+      '--fail',
+      '--silent',
+      '--show-error',
+      '--connect-timeout',
+      '30',
+      '--max-time',
+      '60',
+      '--head',
       url,
     ],
-    { stdio: 'inherit', windowsHide: true },
+    { encoding: 'utf8', windowsHide: true },
   );
   if (result.error) throw result.error;
   if (result.status !== 0) {
-    throw new Error(`aria2c exited with code ${result.status ?? 'unknown'}`);
+    throw new Error(`curl HEAD exited with code ${result.status ?? 'unknown'}`);
+  }
+  const matches = [...result.stdout.matchAll(/^content-length:\s*(\d+)\s*$/gim)];
+  const size = Number(matches.at(-1)?.[1]);
+  return Number.isSafeInteger(size) && size > 0 ? size : null;
+}
+
+function downloadRange(url, range, outputPath) {
+  return new Promise(resolve => {
+    const child = spawn(
+      'curl',
+      [
+        '--location',
+        '--fail',
+        '--retry',
+        '2',
+        '--retry-delay',
+        '2',
+        '--connect-timeout',
+        '30',
+        '--max-time',
+        '300',
+        '--range',
+        `${range.start}-${range.end}`,
+        '--output',
+        outputPath,
+        url,
+      ],
+      { stdio: 'ignore', windowsHide: true },
+    );
+    child.on('error', error => resolve({ ok: false, error }));
+    child.on('exit', code =>
+      resolve(
+        code === 0
+          ? { ok: true }
+          : { ok: false, error: new Error(`curl exited with code ${code}`) },
+      ),
+    );
+  });
+}
+
+async function downloadWithParallelRanges(url, outputPath) {
+  const size = readContentLength(url);
+  if (!size) throw new Error('server did not report Content-Length');
+  const chunkSize = 4 * 1024 * 1024;
+  const ranges = [];
+  for (let start = 0; start < size; start += chunkSize) {
+    ranges.push({ start, end: Math.min(start + chunkSize - 1, size - 1) });
+  }
+  const parts = ranges.map(range => ({
+    ...range,
+    path: `${outputPath}.part-${range.start}`,
+    size: range.end - range.start + 1,
+  }));
+  let cursor = 0;
+  let failure;
+  async function worker() {
+    while (cursor < parts.length) {
+      const part = parts[cursor++];
+      fs.rmSync(part.path, { force: true });
+      try {
+        const result = await downloadRange(url, part, part.path);
+        if (!result.ok) throw result.error;
+        if (!fs.existsSync(part.path) || fs.statSync(part.path).size !== part.size) {
+          throw new Error(`range ${part.start}-${part.end} returned an unexpected size`);
+        }
+      } catch (error) {
+        failure ??= error;
+        return;
+      }
+    }
+  }
+  try {
+    await Promise.all(Array.from({ length: Math.min(8, parts.length) }, () => worker()));
+    if (failure) throw failure;
+    fs.rmSync(outputPath, { force: true });
+    for (const part of parts) fs.appendFileSync(outputPath, fs.readFileSync(part.path));
+    if (fs.statSync(outputPath).size !== size) {
+      throw new Error(`assembled size mismatch: expected ${size}`);
+    }
+  } finally {
+    for (const part of parts) fs.rmSync(part.path, { force: true });
   }
 }
 
@@ -133,10 +207,10 @@ async function downloadToFile(urls, outputPath) {
   for (const url of urls) {
     console.log(`[sync-vendor-llamacpp-cpu-edition] Downloading ${url}`);
     try {
-      downloadWithAria2(url, outputPath);
+      await downloadWithParallelRanges(url, outputPath);
       return url;
     } catch (error) {
-      errors.push(`${url} aria2c: ${error instanceof Error ? error.message : String(error)}`);
+      errors.push(`${url} ranges: ${error instanceof Error ? error.message : String(error)}`);
     }
     try {
       downloadWithCurl(url, outputPath);

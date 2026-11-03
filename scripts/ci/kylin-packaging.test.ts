@@ -63,13 +63,12 @@ describe('Kylin packaging', () => {
       'utf8',
     );
     expect(downloader).toContain('function downloadWithCurl');
-    expect(downloader).toContain('function downloadWithAria2');
+    expect(downloader).toContain('function downloadWithParallelRanges');
     expect(downloader).toContain("'--retry'");
-    expect(downloader).toContain("'--split=8'");
+    expect(downloader).toContain('Math.min(8, parts.length)');
     expect(downloader).toContain('Reusing verified');
     expect(workflow).toContain('LLAMACPP_RUNTIME_BASE_URL=');
     expect(workflow).toContain('https://gh-proxy.com/https://github.com/');
-    expect(workflow).toContain('aria2');
     expect(workflow).toContain('vendor/llamacpp');
   });
 
