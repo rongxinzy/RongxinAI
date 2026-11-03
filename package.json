@@ -178,6 +178,7 @@
     "dist:linux": "bun run build && bun run build:skills && bun run engram:runtime:linux-x64 && electron-builder --linux --publish never",
     "dist:linux:cpu": "cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run sync:vendor-llamacpp-cpu && cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run dist:linux",
     "dist:linux:cuda": "cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run sync:vendor-llamacpp-cpu && bash scripts/build-llamacpp-cuda-rtx40.sh linux && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run finalize:vendor-llamacpp-cuda && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run dist:linux",
+    "dist:kylin:x64": "node scripts/build-kylin.cjs",
     "clean:release": "rimraf release",
     "generate:tray-icons": "node scripts/generate-tray-icons.js",
     "generate:app-icons": "python3 scripts/generate-app-icons.py",

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const devPort = Number(process.env.VITE_DEV_PORT ?? 5176);
+const defaultLocale = process.env.ZHIYUAN_DEFAULT_LOCALE?.trim() || '';
 
 /**
  * Browser preview configuration.
@@ -14,6 +15,7 @@ const devPort = Number(process.env.VITE_DEV_PORT ?? 5176);
 export default defineConfig(async () => ({
   define: {
     __VERSION__: JSON.stringify('0.16.0'),
+    __ZHIYUAN_DEFAULT_LOCALE__: JSON.stringify(defaultLocale),
   },
   plugins: [
     (await import('@tailwindcss/vite')).default(),

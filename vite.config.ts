@@ -14,6 +14,7 @@ import { copyCompanionPhoton } from './scripts/copy-companion-photon.mjs';
 // https://vitejs.dev/config/
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const devPort = Number(process.env.VITE_DEV_PORT ?? 5175);
+const defaultLocale = process.env.ZHIYUAN_DEFAULT_LOCALE?.trim() || '';
 const katexVersion = process.env.npm_package_dependencies_katex?.replace(/^[~^]/, '') || '0.16.0';
 const packageJson = JSON.parse(
   fs.readFileSync(path.resolve(projectRoot, 'package.json'), 'utf8'),
@@ -145,6 +146,7 @@ export default defineConfig(async ({ command }) => {
     define: {
       // KaTeX ESM bundle references this compile-time constant.
       __VERSION__: JSON.stringify(katexVersion),
+      __ZHIYUAN_DEFAULT_LOCALE__: JSON.stringify(defaultLocale),
     },
     plugins: [
       (await import('@tailwindcss/vite')).default(),

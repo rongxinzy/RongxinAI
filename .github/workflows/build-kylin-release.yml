@@ -1,0 +1,156 @@
+name: Build Kylin V11 package (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      source-ref:
+        description: Commit, tag, or branch to build
+        type: string
+        required: true
+      app-build-version:
+        description: SemVer embedded in the RPM package
+        type: string
+        required: true
+      runner-labels:
+        description: JSON array of self-hosted Kylin V11 runner labels
+        type: string
+        default: '["self-hosted","linux","x64","kylin-v11"]'
+    secrets:
+      MODELSCOPE_TOKENS:
+        required: false
+  workflow_dispatch:
+    inputs:
+      source-ref:
+        description: Commit, tag, or branch to build
+        type: string
+        default: main
+        required: true
+      app-build-version:
+        description: SemVer embedded in the RPM package
+        type: string
+        required: true
+      runner-labels:
+        description: JSON array of self-hosted Kylin V11 runner labels
+        type: string
+        default: '["self-hosted","linux","x64","kylin-v11"]'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ZHIYUAN_DEFAULT_LOCALE: zh-CN
+  ZHIYUAN_UPDATE_VARIANT: cpu
+
+jobs:
+  kylin-v11-rpm:
+    runs-on: ${{ fromJSON(inputs.runner-labels) }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref }}
+
+      - name: Verify Kylin V11 x86_64 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          arch="$(uname -m)"
+          [[ "$arch" == "x86_64" ]] || {
+            echo "Kylin V11 package requires x86_64, got $arch" >&2
+            exit 1
+          }
+          source /etc/os-release
+          [[ "${ID:-}" == "kylin" && "${VERSION_ID:-}" == "V11" ]] || {
+            echo "Expected Kylin V11, got ${PRETTY_NAME:-unknown}" >&2
+            exit 1
+          }
+
+      - name: Install builder dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo_cmd=()
+          if [[ "$(id -u)" -ne 0 ]]; then sudo_cmd=(sudo); fi
+          "${sudo_cmd[@]}" dnf install -y \
+            at-spi2-core ca-certificates curl file gcc-c++ git gtk3 make \
+            libnotify libsecret libXScrnSaver libXtst libuuid mesa-libgbm nss \
+            python3 rpm-build tar unzip xdg-utils xorg-x11-server-Xvfb
+
+      - name: Set up Bun workspace
+        uses: ./.github/actions/setup-bun-workspace
+        with:
+          include-electron: true
+          save-cache: true
+
+      - name: Restore Kylin packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            resources/uv-linux
+            resources/python-linux
+            resources/skill-python
+            vendor/engram-runtime
+            vendor/channel-runtime
+          key: packaging-Kylin-V11-linux-x64-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js') }}
+          restore-keys: |
+            packaging-Kylin-V11-linux-x64-node24-bun1.4.0-
+
+      - name: Read pinned Magpie Go toolchain
+        id: magpie-toolchain
+        run: >-
+          node -e "const p=require('./resources/magpie/upstream.json');
+          require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT,
+          'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
+          cache: false
+
+      - name: Build and verify pinned Magpie gateway
+        run: |
+          set -euo pipefail
+          go version | grep -Fq "go${{ steps.magpie-toolchain.outputs.go-version }}"
+          bun run magpie:build -- --target linux-x64
+          bun run magpie:verify -- --target linux-x64
+
+      - name: Prepare Kylin runtimes
+        run: |
+          set -euo pipefail
+          bash scripts/ci/with-download-retries.sh bun run setup:posix-uv-runtime
+          bash scripts/ci/with-download-retries.sh bun run setup:posix-python-runtime
+
+      - name: Build Kylin V11 RPM package
+        env:
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+          NODE_OPTIONS: '--max-old-space-size=4096'
+        run: bun run dist:kylin:x64
+
+      - name: Verify Kylin V11 RPM package
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          rpms=(release/*.rpm)
+          [[ ${#rpms[@]} -eq 1 ]] || {
+            echo "Expected exactly one Kylin V11 RPM package, found ${#rpms[@]}" >&2
+            exit 1
+          }
+          rpm -qip "${rpms[0]}"
+          rpm -qlp "${rpms[0]}" | grep -Fq '/opt/'
+          mkdir -p kylin-assets
+          cp "${rpms[0]}" kylin-assets/
+          (
+            cd kylin-assets
+            sha256sum ./*.rpm > SHA256SUMS
+          )
+
+      - name: Upload Kylin V11 RPM package
+        uses: actions/upload-artifact@v6
+        with:
+          name: kylin-v11-x64-rpm
+          path: kylin-assets/*
+          if-no-files-found: error
+          retention-days: 14

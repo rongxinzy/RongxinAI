@@ -433,6 +433,19 @@ function configureInferenceEditionPublishUrls(context) {
   const platformName = context?.electronPlatformName;
   if (!platformName) return;
 
+  if (process.env.ZHIYUAN_DISTRIBUTION === 'kylin-v11') {
+    for (const section of [
+      context.packager.config,
+      context.packager.config.mac,
+      context.packager.config.win,
+      context.packager.config.linux,
+    ]) {
+      if (section && typeof section === 'object') section.publish = [];
+    }
+    console.log('[electron-builder-hooks] Kylin V11 package: auto-update metadata disabled.');
+    return;
+  }
+
   /** @type {string | undefined} */
   let publishUrl;
   if (platformName === 'darwin') {

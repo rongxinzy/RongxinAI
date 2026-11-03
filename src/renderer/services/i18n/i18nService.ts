@@ -1,5 +1,6 @@
 import { configService } from '../config';
 
+import { getPackagedDefaultLanguage, resolveFirstRunLanguage } from './defaultLanguage';
 import { translations } from './translations';
 import type { LanguageType } from './types';
 
@@ -37,7 +38,7 @@ class I18nService {
           // 新用户或使用默认中文的旧用户:检测系统语言
           try {
             const systemLocale = await window.electron.appInfo.getSystemLocale();
-            const defaultLanguage = this.inferLanguageFromLocale(systemLocale);
+            const defaultLanguage = resolveFirstRunLanguage(systemLocale);
 
             console.log(
               `[i18n] First run detected. System locale: ${systemLocale}, default language: ${defaultLanguage}`,
@@ -52,10 +53,10 @@ class I18nService {
             });
           } catch (error) {
             console.error('Failed to get system locale:', error);
-            // 如果获取系统语言失败,默认使用英文
-            this.currentLanguage = 'en';
+            // Kylin ships a compile-time zh-CN default; other packages retain English.
+            this.currentLanguage = getPackagedDefaultLanguage() ?? 'en';
             configService.updateConfig({
-              language: 'en',
+              language: this.currentLanguage,
               language_initialized: true,
             });
           }
@@ -86,15 +87,6 @@ class I18nService {
   private applyDocumentLanguage(): void {
     if (typeof document === 'undefined') return;
     document.documentElement.lang = this.currentLanguage === 'zh' ? 'zh-CN' : 'en';
-  }
-
-  // 根据系统语言推断应用语言
-  private inferLanguageFromLocale(systemLocale: string): LanguageType {
-    // 只有 zh-CN (简体中文) 才使用中文,其他所有情况都使用英文
-    if (systemLocale === 'zh-CN') {
-      return 'zh';
-    }
-    return 'en'; // 默认英文 (包括 zh-TW, zh-HK, en-*, 以及其他所有语言)
   }
 
   // 设置语言

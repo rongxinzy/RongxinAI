@@ -152,8 +152,11 @@ bun run dist:win:cpu           # cpu edition: bundled llama.cpp CPU + Vulkan
 bun run dist:win:cuda          # cuda edition: RTX 40 / CUDA 12.4 llama.cpp + CPU fallback
 bun run dist:win:signed        # Certum-signed lite; :cpu / :cuda suffixes for the other editions
 bun run dist:linux:cpu         # or dist:linux:cuda; Linux has no lite edition
+bun run dist:kylin:x64         # Kylin V11 x86_64 RPM package, Chinese UI by default
 bun run dist:mac:arm64         # or dist:mac:x64; macOS ships the cpu edition only
 ```
+
+Kylin V11 packages are built on a native Kylin V11 x86_64 self-hosted runner. Register the runner with `self-hosted`, `linux`, `x64`, and `kylin-v11` labels, or pass a JSON label array through the reusable workflow's `runner-labels` input. The package is an RPM `.rpm`; it is published as a GitHub Release asset but intentionally stays outside the signed Ubuntu AppImage auto-update channel. For a standalone CI build, run the "Build Kylin V11 package (reusable)" workflow manually and download the `kylin-v11-x64-rpm` artifact from the workflow run.
 
 See [README.md](README.md#editions) for the edition matrix.
 

@@ -46,7 +46,7 @@
 
 ## 开始使用
 
-1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包：**Windows** x64 轻量版、CPU 版、CUDA 版（`.exe`）；**macOS** Apple Silicon 与 Intel 的 CPU 版（`.dmg` 与 `.zip`）；**Linux** x64 CPU 与 CUDA 版（`.deb` 与 AppImage）。
+1. **下载**：从[官网](https://www.rongxzyai.com/#download)或 [GitHub Releases](https://github.com/rongxinzy/RongxinAI/releases) 获取安装包：**Windows** x64 轻量版、CPU 版、CUDA 版（`.exe`）；**macOS** Apple Silicon 与 Intel 的 CPU 版（`.dmg` 与 `.zip`）；**Linux** x64 CPU 与 CUDA 版（`.deb` 与 AppImage）；**麒麟 V11** x86_64 CPU 版（`.rpm`，默认中文界面）。
 2. **打开应用**：直接用内置免费模型对话，无需 API Key。
 3. **派任务**：选择项目目录、描述任务，查看执行过程并处理授权请求。
 
@@ -72,7 +72,7 @@
 | --- | :-: | :-: | :-: | :-: | :-: |
 | 在微信/飞书/钉钉里直接派任务 | ✅（另有企业微信、QQ、邮箱） | ❌（连接器有 Slack、Gmail） | ❌（有 Slack 连接器） | ❌ | ❌ |
 | 开源桌面应用 | ✅ AGPL-3.0 | ❌ 闭源 | ❌ 闭源 | ✅ AGPL-3.0 | ❌ 开源（Apache-2.0）但为终端工具，图形界面是另一个项目 |
-| Windows / macOS / Linux 安装包 | ✅ | ❌ | ✅ | ✅ | ❌ |
+| Windows / macOS / Linux / 麒麟 V11 安装包 | ✅ | ❌ | ✅ | ✅ | ❌ |
 | 内置 GGUF 模型市场（无需 Ollama） | ✅ 基于 llama.cpp | ❌ 仅云端 | ❌ 仅云端 | ❌ 需借助 Ollama / LM Studio | ❌ 需借助 Ollama / LM Studio |
 | 免费模型 + 本地模型 + 完全开源 | ✅ 三者兼具 | ❌ 仅免费额度（每日 300 积分） | ❌ 仅免费版 | ✅ CherryAI 免费（Qwen3-8B）+ Ollama/LM Studio | ❌ 无内置免费模型 |
 | 智能体：文件 + 命令 + 浏览器 | ✅ | ✅ | ✅ 仅付费版（Cowork） | ? | ✅（浏览器经 QA 技能） |
@@ -154,9 +154,10 @@ bun run llamacpp:runtime:download
 | `bun run dist:win:cpu` / `dist:win:cuda` | 同上，cpu 或 cuda 版 |
 | `bun run dist:win:signed` / `dist:win:signed:cpu` / `dist:win:signed:cuda` | Certum 签名的 lite / cpu / cuda；需要 `CERTUM_CERT_THUMBPRINT`，由发布流水线使用 |
 | `bun run dist:linux:cpu` / `dist:linux:cuda` | Linux deb + AppImage，cpu 或 cuda（`dist:linux:cuda` 会用 `scripts/build-llamacpp-cuda-rtx40.sh` 在本机编译 CUDA llama-server） |
+| `bun run dist:kylin:x64` | 麒麟 V11 x86_64 RPM 安装包，使用 CPU 本地推理并默认中文界面 |
 | `bun run dist:mac:arm64` / `dist:mac:x64` | macOS 安装包；发布流水线按 cpu 版构建 |
 
-打包还涉及平台运行时、资源与签名配置，详见[贡献指南](CONTRIBUTING.md)、[RELEASING.md](RELEASING.md) 及 [`package.json`](package.json)。
+麒麟包必须在一台原生 Kylin V11 x86_64 构建机或自托管 runner 上构建，并将 runner 标记为 `self-hosted`、`linux`、`x64`、`kylin-v11`。打包还涉及平台运行时、资源与签名配置，详见[贡献指南](CONTRIBUTING.md)、[RELEASING.md](RELEASING.md) 及 [`package.json`](package.json)。
 
 ### 项目结构
 
