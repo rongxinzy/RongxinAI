@@ -5303,6 +5303,33 @@
 :where(:root, [data-theme]) :where(.theme-companion-paper-content) {
   background-color: transparent;
 }
+:where(:root, [data-theme]) :where(.theme-companion-paper-content .theme-fluid-list) {
+  background-color: transparent;
+  border-bottom-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: 0;
+}
+:where(:root, [data-theme]) :where(.theme-companion-paper-content .theme-fluid-indicator) {
+  background-color: var(--popover);
+  border-color: var(--muted-foreground);
+  border-radius: 8px 10px 7px 9px / 9px 7px 10px 8px;
+  box-shadow: none;
+}
+:where(:root, [data-theme]) :where(.theme-companion-paper-content .theme-button) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: color-mix(in oklab, var(--foreground) 45%, transparent);
+  border-radius: 8px 10px 7px 9px / 9px 7px 10px 8px;
+}
+:where(:root, [data-theme]) :where(.theme-companion-message .theme-message-body) {
+  background-color: transparent;
+  padding-inline: 1rem;
+  padding-block: 0.75rem;
+}
+:where(:root, [data-theme]) :where(.theme-companion-message[data-companion-message="user"] .theme-message-body) {
+  color: var(--primary-foreground);
+}
 :where(:root, [data-theme]) :where(.theme-input-group[data-variant="paper"]) {
   border-color: var(--zy-input-border);
   background-color: transparent;
@@ -7111,6 +7138,9 @@
   outline-offset: 1px;
   box-shadow: none;
 }
+:where(:root, [data-theme]) :where(.theme-companion-paper-content .theme-button):where(:not(:disabled):not([aria-disabled="true"]):not([data-disabled=""]):not([data-disabled="true"]):focus-visible) {
+  border-color: var(--ring);
+}
 :where(:root, [data-theme]) :where(.theme-radio):where(:is([aria-invalid="true"], [data-invalid])) {
   border-color: var(--zy-state-destructive-border);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--destructive) var(--zy-state-destructive-focus-ring), transparent);
@@ -8434,6 +8464,11 @@ to {
 :where(:root, [data-theme]) :where(.theme-companion-sketch[data-character="maixiao"]),
 :where(:root, [data-theme]) :where(.theme-companion-sketch-paper),
 :where(:root, [data-theme]) :where(.theme-companion-paper-content),
+:where(:root, [data-theme]) :where(.theme-companion-paper-content .theme-fluid-list),
+:where(:root, [data-theme]) :where(.theme-companion-paper-content .theme-fluid-indicator),
+:where(:root, [data-theme]) :where(.theme-companion-paper-content .theme-button),
+:where(:root, [data-theme]) :where(.theme-companion-message .theme-message-body),
+:where(:root, [data-theme]) :where(.theme-companion-message[data-companion-message="user"] .theme-message-body),
 :where(:root, [data-theme]) :where(.theme-input-group[data-variant="paper"]),
 :where(:root, [data-theme]) :where(.theme-companion-selector),
 :where(:root, [data-theme]) :where(.theme-companion-name),

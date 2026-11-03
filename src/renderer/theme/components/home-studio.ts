@@ -35,6 +35,40 @@ export function homeStudioAppearances() {
     }),
     'companion-sketch-paper': recipe({ base: { fill: 'var(--popover)' } }),
     'companion-paper-content': recipe({ base: { 'background-color': 'transparent' } }),
+    'companion-fluid-list': recipe({
+      base: {
+        'background-color': 'transparent',
+        'border-bottom-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'var(--border)',
+        'border-radius': '0',
+      },
+    }),
+    'companion-fluid-indicator': recipe({
+      base: {
+        'background-color': 'var(--popover)',
+        'border-color': 'var(--muted-foreground)',
+        'border-radius': '8px 10px 7px 9px / 9px 7px 10px 8px',
+        'box-shadow': 'none',
+      },
+    }),
+    'companion-button': recipe({
+      base: {
+        'border-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'color-mix(in oklab, var(--foreground) 45%, transparent)',
+        'border-radius': '8px 10px 7px 9px / 9px 7px 10px 8px',
+      },
+      focus: { 'border-color': 'var(--ring)' },
+    }),
+    'companion-message-body': recipe({
+      base: {
+        'background-color': 'transparent',
+        'padding-inline': '1rem',
+        'padding-block': '0.75rem',
+      },
+    }),
+    'companion-message-user': recipe({ base: { color: 'var(--primary-foreground)' } }),
     'companion-name': recipe({
       base: { 'font-size': 'var(--zy-component-text-sm)', 'font-weight': '600' },
     }),

@@ -12,6 +12,12 @@ export const HOME_STUDIO_SELECTORS = {
   'companion-sketch-maixiao': '.theme-companion-sketch[data-character="maixiao"]',
   'companion-sketch-paper': '.theme-companion-sketch-paper',
   'companion-paper-content': '.theme-companion-paper-content',
+  'companion-fluid-list': '.theme-companion-paper-content .theme-fluid-list',
+  'companion-fluid-indicator': '.theme-companion-paper-content .theme-fluid-indicator',
+  'companion-button': '.theme-companion-paper-content .theme-button',
+  'companion-message-body': '.theme-companion-message .theme-message-body',
+  'companion-message-user':
+    '.theme-companion-message[data-companion-message="user"] .theme-message-body',
   'companion-paper-input': '.theme-input-group[data-variant="paper"]',
   'companion-selector': '.theme-companion-selector',
   'companion-name': '.theme-companion-name',
