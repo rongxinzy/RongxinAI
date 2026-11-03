@@ -150,7 +150,7 @@ try {
   $countBefore = Invoke-ProductionHelper 'CountInstallDirProcesses' 'count' $PID
   if ($countBefore.exitCode -ne 3) { throw "Expected three real processes under the Unicode install root: $(Format-ProcessFailure $countBefore)" }
   $stopped = Invoke-ProductionHelper 'StopAppProcesses' 'stop' $excluded
-  if ($stopped.exitCode -ne 0 -or $stopped.output -notmatch 'stopped=3 remaining=0') {
+  if ($stopped.exitCode -ne 0 -or $stopped.output.Trim() -cne 'stopped=3 forced=0 remaining=0') {
     throw "Production process stop did not report success: $(Format-ProcessFailure $stopped)"
   }
   foreach ($process in $processes[0..2]) {

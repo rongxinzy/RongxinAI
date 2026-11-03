@@ -182,6 +182,7 @@ $timingLog = Join-Path $env:APPDATA 'ZhiYuanAgent\install-timing.log'
 $componentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')
 $edition = if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT.Trim().ToLowerInvariant() } else { 'lite' }
 if ($edition -in @('cpu', 'cuda')) { $componentKeys += 'llamacpp-bundled' }
+if ($edition -eq 'cuda') { $componentKeys += 'strata-bundled' }
 
 function Assert-InstalledInferenceRuntime {
   if ($edition -notin @('cpu', 'cuda')) { return }

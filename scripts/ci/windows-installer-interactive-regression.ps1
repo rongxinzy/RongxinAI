@@ -33,6 +33,7 @@ $newBackup = "$installRoot.old.2"
 $heldBackup = "$installRoot.cancel-test-held-backup"
 $detachedRoot = "$installRoot.cancel-test-detached"
 $runtimeFixture = "$installRoot.runtime-completion"
+$componentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv', 'llamacpp-bundled', 'strata-bundled')
 $sleeper = $null
 Add-Type -AssemblyName System.Drawing
 Add-Type -Path (Join-Path (Split-Path $DriverPath) 'windows-installer-ui.cs') -ReferencedAssemblies System,System.Core,System.Drawing
@@ -159,24 +160,24 @@ try {
   # A /T on the root can remove a later child in the same snapshot. A second
   # cleanup of an already-exited PID must not mask the original test failure.
   Stop-AcceptanceProcess $sleeper.Id
-  foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')) {
+  foreach ($key in $componentKeys) {
     $component = Join-Path $runtimeFixture $key
     $version = Join-Path $component ('a' * 64)
     New-Item -ItemType Directory -Path $version,(Join-Path $component 'current'),(Join-Path $component 'personal') -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $version '.complete'), ('a' * 64) + '|verified')
     [IO.File]::WriteAllText((Join-Path $component 'personal\keep.txt'), 'preserve')
   }
-  if (@(Get-OwnedRuntimeEntries $runtimeFixture).Count -ne 14) { throw 'Uninstall probe missed owned components or active pointers' }
+  if (@(Get-OwnedRuntimeEntries $runtimeFixture).Count -ne (2 * $componentKeys.Count)) { throw 'Uninstall probe missed owned components or active pointers' }
   foreach ($entry in @(Get-OwnedRuntimeEntries $runtimeFixture)) { Remove-Item -LiteralPath $entry -Recurse -Force }
   if (@(Get-OwnedRuntimeEntries $runtimeFixture).Count) { throw 'Uninstall probe requires deletion of unowned runtime directories' }
-  foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')) {
+  foreach ($key in $componentKeys) {
     if ([IO.File]::ReadAllText((Join-Path $runtimeFixture "$key\personal\keep.txt")) -cne 'preserve') {
       throw 'Uninstall completion regression removed personal runtime content'
     }
   }
   Write-Output 'PASS: registration and repeated process cleanup regressions'
   Write-Output 'PASS: real directory identities and cancellation backup differences'
-  Write-Output 'PASS: all seven owned component sets and preserved personal runtime content'
+  Write-Output 'PASS: all edition components and preserved personal runtime content'
 } finally {
   if ($null -ne $sleeper -and -not $sleeper.HasExited) { Stop-Process -Id $sleeper.Id -Force -ErrorAction SilentlyContinue }
   Remove-Item -LiteralPath $installKey,$uninstallKey -Recurse -Force -ErrorAction SilentlyContinue
