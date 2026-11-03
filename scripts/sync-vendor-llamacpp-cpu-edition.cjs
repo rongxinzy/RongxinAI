@@ -59,6 +59,36 @@ function readExpectedArchiveSha256(assetName) {
   return undefined;
 }
 
+function downloadWithAria2(url, outputPath) {
+  fs.rmSync(outputPath, { force: true });
+  const result = spawnSync(
+    'aria2c',
+    [
+      '--allow-overwrite=true',
+      '--auto-file-renaming=false',
+      '--file-allocation=none',
+      '--max-tries=5',
+      '--retry-wait=2',
+      '--summary-interval=30',
+      '--timeout=60',
+      '--connect-timeout=30',
+      '--split=8',
+      '--max-connection-per-server=8',
+      '--min-split-size=1M',
+      '--dir',
+      path.dirname(outputPath),
+      '--out',
+      path.basename(outputPath),
+      url,
+    ],
+    { stdio: 'inherit', windowsHide: true },
+  );
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`aria2c exited with code ${result.status ?? 'unknown'}`);
+  }
+}
+
 function downloadWithCurl(url, outputPath) {
   fs.rmSync(outputPath, { force: true });
   const result = spawnSync(
@@ -67,13 +97,13 @@ function downloadWithCurl(url, outputPath) {
       '--location',
       '--fail',
       '--retry',
-      '5',
+      '2',
       '--retry-delay',
       '2',
       '--connect-timeout',
       '30',
       '--max-time',
-      '900',
+      '600',
       '--output',
       outputPath,
       url,
@@ -103,6 +133,12 @@ async function downloadToFile(urls, outputPath) {
   for (const url of urls) {
     console.log(`[sync-vendor-llamacpp-cpu-edition] Downloading ${url}`);
     try {
+      downloadWithAria2(url, outputPath);
+      return url;
+    } catch (error) {
+      errors.push(`${url} aria2c: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    try {
       downloadWithCurl(url, outputPath);
       return url;
     } catch (error) {
@@ -117,6 +153,30 @@ async function downloadToFile(urls, outputPath) {
     fs.rmSync(outputPath, { force: true });
   }
   throw new Error(`CPU runtime download failed: ${errors.join('; ')}`);
+}
+
+function existingEditionIsValid(targetId, releaseTag, bundle) {
+  const manifestPath = path.join(CPU_EDITION_ROOT, 'manifest.json');
+  let manifest;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch {
+    return false;
+  }
+  if (manifest?.schemaVersion !== 2 || manifest?.backend?.version !== releaseTag) return false;
+  const entries = bundle
+    ? [
+        [manifest.executable, manifest.sha256],
+        [manifest.cpuFallbackExecutable, manifest.cpuFallbackSha256],
+      ]
+    : [[manifest.executable, manifest.sha256]];
+  return entries.every(([relativePath, expectedSha256]) => {
+    if (typeof relativePath !== 'string' || !/^[a-f0-9]{64}$/.test(expectedSha256 ?? '')) {
+      return false;
+    }
+    const executablePath = path.join(CPU_EDITION_ROOT, relativePath);
+    return fs.existsSync(executablePath) && sha256File(executablePath) === expectedSha256;
+  });
 }
 
 function findExecutablePath(rootDir, executableName) {
@@ -242,6 +302,12 @@ async function main() {
   const targetId = process.env.LLAMACPP_CPU_TARGET_ID?.trim() || resolveRuntimeTargetId();
   const releaseTag = resolveRuntimeReleaseTag(ROOT);
   const bundle = CPU_VULKAN_BUNDLE[targetId];
+  if (existingEditionIsValid(targetId, releaseTag, Boolean(bundle))) {
+    console.log(
+      `[sync-vendor-llamacpp-cpu-edition] Reusing verified ${targetId} edition at ${CPU_EDITION_ROOT}.`,
+    );
+    return;
+  }
   fs.rmSync(CPU_EDITION_ROOT, { recursive: true, force: true });
   fs.mkdirSync(CPU_EDITION_ROOT, { recursive: true });
 

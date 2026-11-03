@@ -74,7 +74,7 @@ jobs:
           sudo_cmd=()
           if [[ "$(id -u)" -ne 0 ]]; then sudo_cmd=(sudo); fi
           "${sudo_cmd[@]}" dnf install -y \
-            at-spi2-core ca-certificates curl file gcc-c++ git gtk3 make \
+            aria2 at-spi2-core ca-certificates curl file gcc-c++ git gtk3 make \
             libnotify libsecret libXScrnSaver libXtst libuuid mesa-libgbm nss \
             python3 rpm-build tar unzip xdg-utils xorg-x11-server-Xvfb
 
@@ -93,6 +93,7 @@ jobs:
             resources/skill-python
             vendor/engram-runtime
             vendor/channel-runtime
+            vendor/llamacpp
           key: packaging-Kylin-V11-linux-x64-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js') }}
           restore-keys: |
             packaging-Kylin-V11-linux-x64-node24-bun1.4.0-
