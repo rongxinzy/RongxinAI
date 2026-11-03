@@ -12,6 +12,12 @@ const { KYLIN_ENV, buildKylin } = require('../build-kylin.cjs') as {
     arch: string;
   }): void;
 };
+const { cleanGoEnvironment } = require('../build-magpie-runtime.cjs') as {
+  cleanGoEnvironment(
+    cacheRoot: string,
+    target: { goos: string; goarch: string },
+  ): Record<string, string>;
+};
 
 describe('Kylin packaging', () => {
   test('uses the Chinese default and CPU runtime', () => {
@@ -32,6 +38,19 @@ describe('Kylin packaging', () => {
     expect(kylinGuard).toBeGreaterThan(-1);
     expect(linuxUrl).toBeGreaterThan(kylinGuard);
     expect(hooks).toContain('Kylin V11 package: auto-update metadata disabled');
+  });
+
+  test('uses the Kylin Go module proxy without changing the default builder contract', () => {
+    const previous = process.env.ZHIYUAN_GO_PROXY;
+    try {
+      process.env.ZHIYUAN_GO_PROXY = 'https://goproxy.cn,direct';
+      const env = cleanGoEnvironment('/tmp/magpie', { goos: 'linux', goarch: 'amd64' });
+      expect(env.GOPROXY).toBe('https://goproxy.cn,direct');
+      expect(env.GOSUMDB).toBe('sum.golang.org');
+    } finally {
+      if (previous === undefined) delete process.env.ZHIYUAN_GO_PROXY;
+      else process.env.ZHIYUAN_GO_PROXY = previous;
+    }
   });
 
   test('builds Magpie runtime resources before the RPM installer', () => {

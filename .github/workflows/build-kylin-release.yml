@@ -40,6 +40,7 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   ZHIYUAN_DEFAULT_LOCALE: zh-CN
+  ZHIYUAN_GO_PROXY: https://goproxy.cn,direct
   ZHIYUAN_UPDATE_VARIANT: cpu
 
 jobs:
@@ -112,7 +113,17 @@ jobs:
         run: |
           set -euo pipefail
           go version | grep -Fq "go${{ steps.magpie-toolchain.outputs.go-version }}"
-          bun run magpie:build -- --target linux-x64
+          for attempt in 1 2 3; do
+            if bun run magpie:build -- --target linux-x64; then
+              break
+            fi
+            if [[ "$attempt" == "3" ]]; then
+              echo "Magpie build failed after $attempt attempts" >&2
+              exit 1
+            fi
+            echo "Magpie build attempt $attempt failed; retrying in 15 seconds..." >&2
+            sleep 15
+          done
           bun run magpie:verify -- --target linux-x64
 
       - name: Prepare Kylin runtimes
