@@ -403,7 +403,11 @@ test('tag release publishes beta and archives build metadata for promotion', () 
   assert.match(workflow, /app-build-version:/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-inference-editions\.yml/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-windows-release\.yml/);
-  assert.match(workflow, /needs: \[prepare-release, build-windows, build-macos, build-linux\]/);
+  assert.match(workflow, /uses: \.\/\.github\/workflows\/build-kylin-release\.yml/);
+  assert.match(
+    workflow,
+    /needs: \[prepare-release, build-windows, build-macos, build-linux, build-kylin\]/,
+  );
   assert.match(buildWorkflow, /create-release-candidate\.mjs/);
   const publishScript = readFileSync(
     path.join(root, 'scripts', 'release', 'publish-platform-beta-release.sh'),
