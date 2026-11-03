@@ -78,25 +78,20 @@ jobs:
             libnotify libsecret libXScrnSaver libXtst libuuid mesa-libgbm nss \
             python3 rpm-build tar unzip xdg-utils xorg-x11-server-Xvfb
 
-      - name: Set up Bun workspace
-        uses: ./.github/actions/setup-bun-workspace
+      - uses: actions/setup-node@v6
         with:
-          include-electron: true
-          save-cache: true
+          node-version-file: .nvmrc
+          check-latest: true
 
-      - name: Restore Kylin packaging caches
-        uses: actions/cache@v5
+      - uses: oven-sh/setup-bun@v2
         with:
-          path: |
-            resources/uv-linux
-            resources/python-linux
-            resources/skill-python
-            vendor/engram-runtime
-            vendor/channel-runtime
-            vendor/llamacpp
-          key: packaging-Kylin-V11-linux-x64-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js') }}
-          restore-keys: |
-            packaging-Kylin-V11-linux-x64-node24-bun1.4.0-
+          bun-version: '1.4.0'
+
+      - name: Install Bun dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Apply project patches
+        run: bun run apply:patches
 
       - name: Read pinned Magpie Go toolchain
         id: magpie-toolchain

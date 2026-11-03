@@ -69,7 +69,16 @@ describe('Kylin packaging', () => {
     expect(downloader).toContain('Reusing verified');
     expect(workflow).toContain('LLAMACPP_RUNTIME_BASE_URL=');
     expect(workflow).toContain('https://gh-proxy.com/https://github.com/');
-    expect(workflow).toContain('vendor/llamacpp');
+  });
+
+  test('does not block on GitHub Actions cache restore for Kylin', () => {
+    const workflow = readFileSync(
+      path.join(process.cwd(), '.github/workflows/build-kylin-release.yml'),
+      'utf8',
+    );
+    expect(workflow).not.toContain('uses: actions/cache');
+    expect(workflow).not.toContain('uses: ./.github/actions/setup-bun-workspace');
+    expect(workflow).toContain('bun install --frozen-lockfile --ignore-scripts');
   });
 
   test('builds Magpie runtime resources before the RPM installer', () => {
