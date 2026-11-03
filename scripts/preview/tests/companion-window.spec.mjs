@@ -45,6 +45,11 @@ for (const language of ['zh', 'en']) {
           { exact: true },
         ),
       ).toBeVisible();
+      for (const role of ['user', 'assistant']) {
+        const bubble = page.locator(`[data-companion-message="${role}"]`);
+        await expect(bubble).toHaveAttribute('data-ink-ready', '');
+        await expect(bubble.locator('svg[data-ink="bubble"] path').first()).toBeAttached();
+      }
       await input.fill('A private draft for the first companion');
       const sketch = page.locator('.theme-companion-sketch');
       await expect(sketch).toHaveAttribute('data-character', 'xiaoyuan');

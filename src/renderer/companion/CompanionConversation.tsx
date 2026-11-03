@@ -7,6 +7,7 @@ import { WorkbenchRunStatus } from '../../shared/workbenchTask';
 import type { CompanionWindowState } from '../../shared/companion/types';
 import { i18nService } from '../services/i18n';
 import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttachments';
+import { CompanionMessageBubble } from './CompanionMessageBubble';
 
 interface Props {
   state: CompanionWindowState | null;
@@ -86,17 +87,19 @@ export function CompanionConversation({
         ) : state?.conversation.messages.length ? (
           state.conversation.messages.map(message => (
             <Message key={`${message.id}-${message.role}`} from={message.role}>
-              <MessageContent>
-                {message.attachments?.length ? (
-                  <CoworkInlineAttachments
-                    attachments={message.attachments.map(file => ({
-                      path: file.id,
-                      name: file.name,
-                    }))}
-                  />
-                ) : null}
-                {message.text ? <MessageResponse>{message.text}</MessageResponse> : null}
-              </MessageContent>
+              <CompanionMessageBubble user={message.role === 'user'}>
+                <MessageContent>
+                  {message.attachments?.length ? (
+                    <CoworkInlineAttachments
+                      attachments={message.attachments.map(file => ({
+                        path: file.id,
+                        name: file.name,
+                      }))}
+                    />
+                  ) : null}
+                  {message.text ? <MessageResponse>{message.text}</MessageResponse> : null}
+                </MessageContent>
+              </CompanionMessageBubble>
             </Message>
           ))
         ) : (

@@ -25,9 +25,18 @@ export function CompanionBubbleFrame({
   const topTail = !above
     ? `L ${point + 13} 18 C ${point + 6} 18 ${point + 3} 9 ${point} 6 C ${point - 3} 9 ${point - 6} 18 ${point - 13} 18`
     : '';
-  const outline = `M 28 18 Q 10 18 10 36 C 9.5 140 10.5 260 10 362 Q 10 380 28 380
-    ${tail} L 452 380 Q 470 380 470 362 C 470.5 260 469.5 140 470 36
-    Q 470 18 452 18 ${topTail} Z`;
+  const bottomEdge = above
+    ? `L ${point - 13} 380 ${tail} L 452 380`
+    : 'C 170 381.5 320 378.5 452 380';
+  const topEdge = above ? 'C 322 16.5 164 19.5 28 18' : `${topTail} L 28 18`;
+  const spareEdge = above
+    ? 'M 24 20 C 73 18 117 20 157 19 M 323 19 C 367 20 412 17 454 20'
+    : 'M 27 378 C 74 380 111 378 148 379 M 329 379 C 373 378 418 381 451 378';
+  const outline = `M 28 18 C 16 17 10 24 10 36 C 8.5 91 11.5 137 10 190
+    C 8.5 250 11.5 308 10 362 C 10 374 16 381 28 380
+    ${bottomEdge} C 464 381 470 374 470 362
+    C 471.5 306 468.5 250 470 195 C 471.5 139 468.5 86 470 36
+    C 470 24 464 17 452 18 ${topEdge} Z`;
   return (
     <svg
       data-character={characterId}
@@ -73,9 +82,10 @@ export function CompanionBubbleFrame({
           vectorEffect="non-scaling-stroke"
         />
         <path
-          d="M 11.2 40 C 11 140 11.2 250 11.2 358 Q 11.2 378.5 30 378.8 M 450 19.2 Q 468.8 19.5 468.8 38 C 469 150 468.6 260 468.8 358"
-          strokeWidth="0.65"
-          strokeOpacity="0.32"
+          d={`${spareEdge} M 12 45 C 10 96 13 145 11 182 M 11 246 C 13 288 10 330 12 359
+            M 468 42 C 466 92 470 142 468 182 M 469 240 C 467 283 470 328 468 358`}
+          strokeWidth="0.85"
+          strokeOpacity="0.42"
           vectorEffect="non-scaling-stroke"
         />
       </g>
