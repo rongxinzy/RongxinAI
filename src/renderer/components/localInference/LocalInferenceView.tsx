@@ -38,7 +38,6 @@ import { useRuntimeInstallBackgroundNotifications } from './hooks/useRuntimeInst
 import { useRuntimeInstallProgress } from './hooks/useRuntimeInstallProgress';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
-import { StrataCatalogPanel } from './panels/StrataCatalogPanel';
 import {
   LocalInferenceToastKind,
   type LocalInferenceToastKind as LocalInferenceToastKindType,
@@ -573,7 +572,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 className="min-h-0"
                 contentClassName="min-h-0"
               >
-                <StrataCatalogPanel />
                 <ModelsPanel
                   loading={loading}
                   loadingModelName={loadingModelName}
