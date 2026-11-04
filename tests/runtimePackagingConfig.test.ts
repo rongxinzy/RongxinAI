@@ -403,11 +403,17 @@ test('tag release publishes beta and archives build metadata for promotion', () 
   assert.match(workflow, /app-build-version:/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-inference-editions\.yml/);
   assert.match(workflow, /uses: \.\/\.github\/workflows\/build-windows-release\.yml/);
-  assert.match(workflow, /uses: \.\/\.github\/workflows\/build-kylin-release\.yml/);
+  assert.doesNotMatch(workflow, /build-kylin-release\.yml/);
   assert.match(
     workflow,
-    /needs: \[prepare-release, build-windows, build-macos, build-linux, build-kylin\]/,
+    /needs: \[prepare-release, build-windows, build-macos, build-linux\]/,
   );
+  const kylinWorkflow = readFileSync(
+    path.join(root, '.github', 'workflows', 'package-kylin-v11.yml'),
+    'utf8',
+  );
+  assert.match(kylinWorkflow, /workflow_dispatch:/);
+  assert.match(kylinWorkflow, /uses: \.\/\.github\/workflows\/build-kylin-release\.yml/);
   assert.match(buildWorkflow, /create-release-candidate\.mjs/);
   const publishScript = readFileSync(
     path.join(root, 'scripts', 'release', 'publish-platform-beta-release.sh'),
