@@ -65,11 +65,6 @@ function verifyPackagedNodePty(context) {
     throw new Error(`[PackagedNativeVerify] Packaged node-pty binding is empty: ${binding}`);
   }
 
-  const spawnHelper = path.join(path.dirname(binding), 'spawn-helper');
-  if (!fs.existsSync(spawnHelper)) {
-    throw new Error(`[PackagedNativeVerify] Missing node-pty spawn-helper next to ${binding}`);
-  }
-
   const observedGlibc = assertMaxGlibcVersion(binding, LINUX_NATIVE_GLIBC_BASELINE);
   console.log(
     `[PackagedNativeVerify] node-pty glibc max ${observedGlibc} (baseline <= ${LINUX_NATIVE_GLIBC_BASELINE})`,

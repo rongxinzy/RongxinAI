@@ -14,7 +14,8 @@ describe('rebuild-electron-native-linux-docker.sh', () => {
     expect(script).toMatch(/ubuntu:22\.04/);
     expect(script).toMatch(/xz-utils/);
     expect(script).toMatch(/electron-rebuild --only better-sqlite3,node-pty/);
-    expect(script).toMatch(/spawn-helper/);
+    expect(script).not.toMatch(/node-pty\/build\/Release\/spawn-helper/);
     expect(script).toMatch(/require_cmd/);
+    expect(script).toMatch(/pty\.node/);
   });
 });

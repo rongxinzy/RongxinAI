@@ -44,15 +44,11 @@ describe('verifyPackagedNodePty', () => {
     expect(findPackagedNodePtyBinding(appOutDir)).toBe(binding);
   });
 
-  test('rejects packaged node-pty when spawn-helper is missing', () => {
+  test('does not require spawn-helper on linux (macOS-only node-pty target)', () => {
     const appOutDir = tempRoot();
-    writePackagedPty(appOutDir, 'build/Release/pty.node');
-    expect(() =>
-      verifyPackagedNodePty({
-        electronPlatformName: 'linux',
-        appOutDir,
-      }),
-    ).toThrow(/spawn-helper/);
+    const binding = writePackagedPty(appOutDir, 'build/Release/pty.node');
+    expect(fs.existsSync(path.join(path.dirname(binding), 'spawn-helper'))).toBe(false);
+    expect(findPackagedNodePtyBinding(appOutDir)).toBe(binding);
   });
 
   test('rejects linux packages without a loadable pty binding', () => {
