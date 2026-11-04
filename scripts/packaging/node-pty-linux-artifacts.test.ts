@@ -22,6 +22,15 @@ describe('node-pty Linux packaging artifacts', () => {
     );
   });
 
+  test('matches better-sqlite3 binding.gyp (skips compile when Linux prebuild exists)', () => {
+    const bindingGyp = readFileSync(
+      path.join(root, 'node_modules/better-sqlite3/binding.gyp'),
+      'utf8',
+    );
+    expect(bindingGyp).toMatch(/prebuild_exists%/);
+    expect(bindingGyp).toMatch(/force_build==1 or prebuild_exists==0/);
+  });
+
   test('matches node-pty binding.gyp (spawn-helper target is macOS-only)', () => {
     const bindingGyp = readFileSync(path.join(root, 'node_modules/node-pty/binding.gyp'), 'utf8');
     expect(bindingGyp).toMatch(/'target_name': 'spawn-helper'/);
