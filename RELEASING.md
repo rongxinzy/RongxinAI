@@ -1,6 +1,6 @@
 # Releasing 知远智能体 (ZhiYuan Agent)
 
-Two workflows, one build, two channels: a `v*` tag runs `release.yml`, which publishes **beta**; `promote.yml` re-signs that same build as **stable**.
+Tag releases and stable promotion form one build with two channels: a `v*` tag runs `release.yml`, which publishes **beta**; `promote.yml` re-signs that same build as **stable**. Kylin V11 packaging is intentionally separate and does not gate standard releases.
 
 Daily PR/push CI runs lint and unit tests only (`bun run test`, alias `test:unit`), without application builds or Electron downloads. Real runtime integration tests and Electron ABI fixtures remain in `test:full` and release preflight.
 
@@ -18,6 +18,7 @@ Before tagging, run **Release preflight** (`release-preflight.yml`) against the 
    - Upload immutable artifacts to R2
    - Publish one complete **beta** update feed (`channels/beta-pointer.json`), preventing platform jobs from overwriting shared metadata or exposing a partial generation
    - Create a GitHub **pre-release** with auto-generated release notes and attached installers
+   - Kylin V11 is not part of this workflow; use the separate manual workflow below when a Kylin RPM is needed
 
 User-facing release text: copy the top section from [`docs/RELEASE_NOTES_TEMPLATE.md`](docs/RELEASE_NOTES_TEMPLATE.md) into the GitHub Release body above the auto-generated PR list. Auto notes are categorized via [`.github/release.yml`](.github/release.yml).
 
@@ -41,13 +42,11 @@ Release size policy (krli, 2026-10-19): all editions report installer, component
 
 Windows compiles application code once, then packages and signs each edition with its own metadata and component routing. Packaging must run the normal hooks: `--prepackaged` would reuse lite metadata and skip the CPU/CUDA component preparation. Each edition is checkpointed with its public signing certificate, final package metadata and candidate payload before the next edition changes the output directory. Three independent acceptance jobs restore those exact bytes, check signatures and runtimes, exercise NSIS cold install/cache upgrade/uninstall and WebView2/native uninstall, then upload the accepted candidates. The shared compression qualification is measured once and verified against each restored archive.
 
-### Manual release without Kylin
+### Kylin V11 package (manual)
 
-Use **Release Windows, macOS and Linux (no Kylin)** (`release-no-kylin.yml`) with a `tag` such as `v2026.11.4-build.1` to publish the standard desktop editions without building or waiting for a Kylin RPM. It reuses the same platform builds, package validation, signing and beta publication steps, without invoking the standalone release preflight. The original tag workflow remains available.
+Use **Package Kylin V11** (`package-kylin-v11.yml`) with a source ref and app build version to produce a standalone `kylin-v11-x64-rpm` Actions artifact. It calls the `build-kylin-release.yml` reusable workflow on the `self-hosted`, `linux`, `x64`, `kylin-v11` runner.
 
-For a new tag, dispatch this workflow on `main` directly: it fixes the source to the dispatched commit and creates the tag when publishing the GitHub pre-release. The workflow's `GITHUB_TOKEN` prevents that tag creation from starting the original tag workflow. Existing tags must resolve to a commit reachable from `main`.
-
-After it completes, use the stable promotion below as usual.
+This workflow does not publish a GitHub Release and is not part of `release.yml`. A failed or cancelled Kylin build therefore cannot block or delay Windows, macOS or Linux beta publication. If a Kylin RPM must be attached to an existing release, download the artifact and upload it separately after the standalone package run succeeds.
 
 ## 2. Promote → stable (`promote.yml`)
 

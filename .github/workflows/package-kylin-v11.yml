@@ -1,0 +1,37 @@
+name: Package Kylin V11
+
+# Standalone Kylin packaging. This workflow never gates or publishes the
+# standard Windows/macOS/Linux release; successful runs upload an RPM artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      source-ref:
+        description: Commit, tag, or branch to build
+        type: string
+        default: main
+        required: true
+      app-build-version:
+        description: SemVer embedded in the RPM package
+        type: string
+        required: true
+      runner-labels:
+        description: JSON array of self-hosted Kylin V11 runner labels
+        type: string
+        default: '["self-hosted","linux","x64","kylin-v11"]'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kylin-v11-package-${{ inputs.source-ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Build Kylin V11 RPM
+    uses: ./.github/workflows/build-kylin-release.yml
+    with:
+      source-ref: ${{ inputs.source-ref }}
+      app-build-version: ${{ inputs.app-build-version }}
+      runner-labels: ${{ inputs.runner-labels }}
+    secrets: inherit
