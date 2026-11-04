@@ -117,17 +117,8 @@ jobs:
       UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
       MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
 
-  build-kylin:
-    needs: prepare-release
-    uses: ./.github/workflows/build-kylin-release.yml
-    with:
-      source-ref: ${{ needs.prepare-release.outputs.commit }}
-      app-build-version: ${{ needs.prepare-release.outputs.version }}
-    secrets:
-      MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-
   publish:
-    needs: [prepare-release, build-windows, build-macos, build-linux, build-kylin]
+    needs: [prepare-release, build-windows, build-macos, build-linux]
     runs-on: ubuntu-latest
     environment: release
     concurrency:
@@ -243,11 +234,6 @@ jobs:
             '${{ needs.prepare-release.outputs.commit }}' \
             '${{ github.run_id }}'
           ls -la release-assets
-      - name: Download Kylin V11 RPM package
-        uses: actions/download-artifact@v8
-        with:
-          name: kylin-v11-x64-rpm
-          path: kylin-assets
       - name: Create GitHub pre-release
         uses: softprops/action-gh-release@v2
         with:
@@ -257,7 +243,6 @@ jobs:
           generate_release_notes: true
           files: |
             release-assets/*
-            kylin-assets/*
       - name: Summarize beta release
         shell: bash
         run: |

@@ -9,11 +9,17 @@ const read = (name: string) =>
 // so the Magpie build/verify ordering guard lives there.
 const releaseWorkflow = read('release.yml');
 const editionsWorkflow = read('build-inference-editions.yml');
+const kylinPackageWorkflow = read('package-kylin-v11.yml');
 const kylinWorkflow = read('build-kylin-release.yml');
 
 test('release workflow packages through the reusable inference-edition workflow', () => {
   expect(releaseWorkflow).toContain('uses: ./.github/workflows/build-inference-editions.yml');
-  expect(releaseWorkflow).toContain('uses: ./.github/workflows/build-kylin-release.yml');
+  expect(releaseWorkflow).not.toContain('uses: ./.github/workflows/build-kylin-release.yml');
+});
+
+test('Kylin workflow is exposed through a standalone manual package entry', () => {
+  expect(kylinPackageWorkflow).toContain('workflow_dispatch:');
+  expect(kylinPackageWorkflow).toContain('uses: ./.github/workflows/build-kylin-release.yml');
 });
 
 test('inference-edition workflow builds and verifies Magpie before packaging', () => {
