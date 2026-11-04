@@ -99,7 +99,7 @@ describe('Kylin packaging', () => {
       'bun run prepare:inference-edition-runtime',
       'bun run build',
       'bun run build:skills',
-      'bun run rebuild:electron-native',
+      'bun run rebuild:electron-native:linux-packaging',
       'bunx electron-builder --linux rpm --x64 --config electron-builder.kylin.cjs --publish never',
     ]);
   });

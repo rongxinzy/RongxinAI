@@ -38,16 +38,21 @@ function writePackagedPty(appOutDir: string, relativePath: string) {
 }
 
 describe('verifyPackagedNodePty', () => {
-  test('accepts a packaged linux-x64 pty.node under asar unpack', () => {
+  test('finds a packaged linux-x64 pty.node under asar unpack', () => {
     const appOutDir = tempRoot();
     const binding = writePackagedPty(appOutDir, 'build/Release/pty.node');
     expect(findPackagedNodePtyBinding(appOutDir)).toBe(binding);
+  });
+
+  test('rejects packaged node-pty when spawn-helper is missing', () => {
+    const appOutDir = tempRoot();
+    writePackagedPty(appOutDir, 'build/Release/pty.node');
     expect(() =>
       verifyPackagedNodePty({
         electronPlatformName: 'linux',
         appOutDir,
       }),
-    ).not.toThrow();
+    ).toThrow(/spawn-helper/);
   });
 
   test('rejects linux packages without a loadable pty binding', () => {

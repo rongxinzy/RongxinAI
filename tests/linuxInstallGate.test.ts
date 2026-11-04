@@ -19,7 +19,7 @@ test('selected pull requests install and start the generated Ubuntu package', ()
   assert.match(workflow, /bun run dist:linux/);
 
   const packageJson = readFileSync(path.join(root, 'package.json'), 'utf8');
-  assert.match(packageJson, /"predist:linux": "[^"]*rebuild:electron-native/);
+  assert.match(packageJson, /"predist:linux": "[^"]*rebuild:electron-native:linux-packaging/);
   assert.match(workflow, /sudo apt-get install -y/);
   assert.match(workflow, /realpath/);
   assert.match(workflow, /'\/opt\/知远智能体 \(ZhiYuan Agent\)\/知远'/);
