@@ -70,6 +70,10 @@ docker run --rm \
     npm --version
 
     cd /workspace
+    # better-sqlite3 13 skips its GYP targets when this prebuild exists, even
+    # with electron-rebuild --force --build-from-source. Its loader also prefers
+    # the prebuild, so remove it before rebuilding against the glibc baseline.
+    rm -f node_modules/better-sqlite3/prebuilds/linux-x64.node
     ./node_modules/.bin/electron-rebuild --only better-sqlite3,node-pty --force --build-from-source
 
     chown -R "${HOST_UID}:${HOST_GID}" \
