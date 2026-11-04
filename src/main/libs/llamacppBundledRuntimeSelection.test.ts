@@ -1,5 +1,4 @@
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
@@ -107,7 +106,7 @@ describe('llamacppBundledRuntimeSelection', () => {
 
     const resolved = await resolveBundledEditionRuntime({ manifest, platform: 'linux' });
     expect(resolved.accelerator).toBe('cpu');
-    expect(resolved.executablePath).toContain('linux-x64/bin');
+    expect(resolved.executablePath).toBe(path.join(vendorRoot, cpuRel));
   });
 
   test('forceCpuPath selects cpu fallback', async () => {

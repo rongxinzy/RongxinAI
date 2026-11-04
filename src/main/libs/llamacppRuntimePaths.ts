@@ -14,13 +14,44 @@ import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/l
 import { isPathInside } from './llamacppModelCatalog';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { resolveLlamaCppRuntimeTargetId } from './llamacppRuntimeInstaller';
+import { usesBundledLlamaCppRuntime } from './inferenceEditionPolicy';
+import { readBundledLlamaCppRuntimeManifest } from './llamacppBundledRuntime';
+import { resolveBundledEditionRuntime } from './llamacppBundledRuntimeSelection';
+import {
+  primaryGpuSupportsCudaEdition,
+  resolveCudaEditionGpuMessage,
+  shouldEnforceCudaEditionGpuPolicy,
+} from './llamacppCudaEditionPolicy';
+import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from './llamacppNvidiaEnvironment';
 export { prependEnvPathEntry, resolveExecutableDir } from './llamacppProcessRuntimePaths';
 
 const execFileAsync = promisify(execFile);
 
 export async function findLlamaCppExecutable(
-  _config: LlamaCppServiceConfig = {},
+  config: LlamaCppServiceConfig = {},
 ): Promise<string | null> {
+  // Router startup and capability probes must use the same bundled backend
+  // selection as installation, rather than finding the primary CUDA binary
+  // by filename on hosts where its driver cannot be loaded.
+  if (usesBundledLlamaCppRuntime()) {
+    const manifest = readBundledLlamaCppRuntimeManifest();
+    if (!manifest) return null;
+    let preferCpuFallback = config.runtimeBackend === LlamaCppRuntimeBackend.Cpu;
+    if (manifest.backend.backend.includes('cuda')) {
+      const snapshot = await getLlamaCppNvidiaSnapshot();
+      const unsupportedGpu =
+        !hasAvailableNvidiaGpu(snapshot) ||
+        (shouldEnforceCudaEditionGpuPolicy() && !primaryGpuSupportsCudaEdition(snapshot));
+      if (unsupportedGpu) {
+        if (!manifest.cpuFallbackExecutable) {
+          throw new Error(resolveCudaEditionGpuMessage(snapshot));
+        }
+        preferCpuFallback = true;
+      }
+    }
+    return (await resolveBundledEditionRuntime({ manifest, preferCpuFallback })).executablePath;
+  }
+
   for (const candidate of buildLlamaCppExecutableCandidates({
     platform: process.platform,
     isPackaged: app.isPackaged,

@@ -1,9 +1,9 @@
-import { createHash } from 'crypto';
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
 import type { LlamaCppBackendRef } from '../../shared/llamacpp';
+import { sha256FileStream } from './fileHasher';
 
 import {
   buildLlamaCppServeEnv,
@@ -13,7 +13,6 @@ import {
 import {
   type BundledRuntimeManifest,
   resolveBundledLlamaCppRuntimeRoot,
-  resolveBundledLlamaCppExecutablePath,
 } from './llamacppBundledRuntime';
 
 const gpuProbeCache = new Map<string, boolean>();
@@ -37,21 +36,20 @@ export type ResolvedBundledRuntime = {
   accelerator: 'cpu' | 'vulkan' | 'cuda' | 'metal';
 };
 
-function verifyBundledSha256(
+async function verifyBundledSha256(
   manifest: BundledRuntimeManifest,
   relativePath: string,
   sha256Key: 'sha256' | 'vulkanSha256' | 'cpuFallbackSha256',
-): string {
+): Promise<string> {
   const root = resolveBundledLlamaCppRuntimeRoot();
   const absolute = path.join(root, relativePath);
-  if (!fs.existsSync(absolute)) {
+  if (!(await fs.promises.stat(absolute).catch((): null => null))?.isFile()) {
     throw new Error(`Bundled llama.cpp runtime executable is missing: ${relativePath}`);
   }
   const expected = manifest[sha256Key];
   if (expected) {
-    const hash = createHash('sha256');
-    hash.update(fs.readFileSync(absolute));
-    if (hash.digest('hex').toLowerCase() !== expected.trim().toLowerCase()) {
+    const digest = await sha256FileStream(absolute);
+    if (digest !== expected.trim().toLowerCase()) {
       throw new Error('The bundled llama.cpp runtime failed SHA-256 verification.');
     }
   }
@@ -98,7 +96,7 @@ export async function resolveBundledEditionRuntime(input: {
   const forceCpuPath = input.forceCpuPath ?? false;
 
   if ((preferCpuFallback || forceCpuPath) && manifest.cpuFallbackExecutable) {
-    const executablePath = verifyBundledSha256(
+    const executablePath = await verifyBundledSha256(
       manifest,
       manifest.cpuFallbackExecutable,
       'cpuFallbackSha256',
@@ -119,7 +117,7 @@ export async function resolveBundledEditionRuntime(input: {
     vulkanRelative.length > 0;
 
   if (useVulkanSelection) {
-    const vulkanPath = verifyBundledSha256(manifest, vulkanRelative, 'vulkanSha256');
+    const vulkanPath = await verifyBundledSha256(manifest, vulkanRelative, 'vulkanSha256');
     if (await detectUsableBundledVulkanGpu(vulkanPath)) {
       return {
         executablePath: vulkanPath,
@@ -129,7 +127,7 @@ export async function resolveBundledEditionRuntime(input: {
     }
     if (cpuRelative) {
       const shaKey = manifest.cpuFallbackExecutable ? 'cpuFallbackSha256' : 'sha256';
-      const executablePath = verifyBundledSha256(manifest, cpuRelative, shaKey);
+      const executablePath = await verifyBundledSha256(manifest, cpuRelative, shaKey);
       return {
         executablePath,
         backend: normalizeBackendRef(manifest.backend, manifest.cpuFallbackBackend),
@@ -138,10 +136,7 @@ export async function resolveBundledEditionRuntime(input: {
     }
   }
 
-  const executablePath = resolveBundledLlamaCppExecutablePath(manifest, { preferCpuFallback });
-  if (!executablePath) {
-    throw new Error('Bundled llama.cpp runtime executable is missing from this installation.');
-  }
+  const executablePath = await verifyBundledSha256(manifest, manifest.executable, 'sha256');
   const accelerator =
     platform === 'darwin' ? 'metal' : manifest.backend.backend.includes('cuda') ? 'cuda' : 'cpu';
   return {
