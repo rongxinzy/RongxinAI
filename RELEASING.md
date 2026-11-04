@@ -41,6 +41,14 @@ Release size policy (krli, 2026-10-19): all editions report installer, component
 
 Windows compiles application code once, then packages and signs each edition with its own metadata and component routing. Packaging must run the normal hooks: `--prepackaged` would reuse lite metadata and skip the CPU/CUDA component preparation. Each edition is checkpointed with its public signing certificate, final package metadata and candidate payload before the next edition changes the output directory. Three independent acceptance jobs restore those exact bytes, check signatures and runtimes, exercise NSIS cold install/cache upgrade/uninstall and WebView2/native uninstall, then upload the accepted candidates. The shared compression qualification is measured once and verified against each restored archive.
 
+### Manual release without Kylin
+
+Use **Release Windows, macOS and Linux (no Kylin)** (`release-no-kylin.yml`) with a `tag` such as `v2026.11.4-build.1` to publish the standard desktop editions without building or waiting for a Kylin RPM. It reuses the same platform builds, package validation, signing and beta publication steps, without invoking the standalone release preflight. The original tag workflow remains available.
+
+For a new tag, dispatch this workflow on `main` directly: it fixes the source to the dispatched commit and creates the tag when publishing the GitHub pre-release. The workflow's `GITHUB_TOKEN` prevents that tag creation from starting the original tag workflow. Existing tags must resolve to a commit reachable from `main`.
+
+After it completes, use the stable promotion below as usual.
+
 ## 2. Promote → stable (`promote.yml`)
 
 Manual **workflow_dispatch** with one input:
