@@ -3,6 +3,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { LINUX_NATIVE_GLIBC_BASELINE } = require('./linux-native-baseline.constants.cjs');
+const { assertMaxGlibcVersion } = require('./linux-glibc-version.cjs');
+
 const NODE_PTY_RELATIVE_CANDIDATES = [
   'build/Release/pty.node',
   'build/Debug/pty.node',
@@ -61,6 +64,16 @@ function verifyPackagedNodePty(context) {
   if (!stats.isFile() || stats.size === 0) {
     throw new Error(`[PackagedNativeVerify] Packaged node-pty binding is empty: ${binding}`);
   }
+
+  const spawnHelper = path.join(path.dirname(binding), 'spawn-helper');
+  if (!fs.existsSync(spawnHelper)) {
+    throw new Error(`[PackagedNativeVerify] Missing node-pty spawn-helper next to ${binding}`);
+  }
+
+  const observedGlibc = assertMaxGlibcVersion(binding, LINUX_NATIVE_GLIBC_BASELINE);
+  console.log(
+    `[PackagedNativeVerify] node-pty glibc max ${observedGlibc} (baseline <= ${LINUX_NATIVE_GLIBC_BASELINE})`,
+  );
 }
 
 module.exports = {
