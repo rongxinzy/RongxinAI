@@ -52,9 +52,12 @@ describe('verifyPackagedNodePty', () => {
 
   test('rejects linux packages without a loadable pty binding', () => {
     const appOutDir = tempRoot();
-    fs.mkdirSync(path.join(appOutDir, 'resources', 'app.asar.unpacked', 'node_modules', 'node-pty'), {
-      recursive: true,
-    });
+    fs.mkdirSync(
+      path.join(appOutDir, 'resources', 'app.asar.unpacked', 'node_modules', 'node-pty'),
+      {
+        recursive: true,
+      },
+    );
     expect(findPackagedNodePtyBinding(appOutDir)).toBeNull();
     expect(() =>
       verifyPackagedNodePty({
