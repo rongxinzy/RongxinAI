@@ -41,6 +41,7 @@ function buildKylin({ run = defaultRun, platform = process.platform, arch = proc
     ['bun', ['run', 'prepare:inference-edition-runtime']],
     ['bun', ['run', 'build']],
     ['bun', ['run', 'build:skills']],
+    ['bun', ['run', 'rebuild:electron-native']],
     [
       'bunx',
       [

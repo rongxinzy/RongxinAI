@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { verifyPackagedMagpie } = require('../magpie-runtime.cjs');
+const { verifyPackagedNodePty } = require('./verify-packaged-native-modules.cjs');
 const {
   verifyWindowsCompressedChannelRuntime,
 } = require('./verify-windows-packaged-components.cjs');
@@ -170,6 +171,7 @@ function verifyPackagedDeliverables(context) {
   verifyPackagedChannelRuntime(context);
   verifyPackagedMagpie(context);
   verifyPackagedLlamaCppBundled(context);
+  verifyPackagedNodePty(context);
 }
 
 module.exports = {
