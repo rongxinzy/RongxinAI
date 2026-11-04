@@ -70,14 +70,25 @@ docker run --rm \
     npm --version
 
     cd /workspace
-    # better-sqlite3 13 skips its GYP targets when this prebuild exists, even
-    # with electron-rebuild --force --build-from-source. Its loader also prefers
-    # the prebuild, so remove it before rebuilding against the glibc baseline.
-    rm -f node_modules/better-sqlite3/prebuilds/linux-x64.node
+    node scripts/packaging/prepare-linux-electron-native-rebuild.cjs
     ./node_modules/.bin/electron-rebuild --only better-sqlite3,node-pty --force --build-from-source
+
+    sqlite_binding="node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+    pty_binding="node_modules/node-pty/build/Release/pty.node"
+    if [[ ! -f "${sqlite_binding}" ]]; then
+      echo "[rebuild-electron-native-linux-docker] electron-rebuild reported success but ${sqlite_binding} is missing." >&2
+      echo "[rebuild-electron-native-linux-docker] better-sqlite3 build tree:" >&2
+      find node_modules/better-sqlite3/build -type f 2>/dev/null | head -50 >&2 || true
+      exit 2
+    fi
+    if [[ ! -f "${pty_binding}" ]]; then
+      echo "[rebuild-electron-native-linux-docker] electron-rebuild reported success but ${pty_binding} is missing." >&2
+      exit 2
+    fi
 
     chown -R "${HOST_UID}:${HOST_GID}" \
       node_modules/better-sqlite3/build \
+      node_modules/better-sqlite3/prebuilds \
       node_modules/node-pty/build
   '
 

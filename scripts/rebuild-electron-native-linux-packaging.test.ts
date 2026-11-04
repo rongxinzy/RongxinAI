@@ -25,4 +25,13 @@ describe('rebuild-electron-native-linux-packaging', () => {
     expect(entry).toMatch(/assertMaxGlibcVersion/);
     expect(entry).not.toMatch(/spawn-helper/);
   });
+
+  test('prepare step strips Linux better-sqlite3 prebuilds before Docker rebuild', () => {
+    const prepare = readFileSync(
+      path.join(root, 'scripts/packaging/prepare-linux-electron-native-rebuild.cjs'),
+      'utf8',
+    );
+    expect(prepare).toMatch(/stripLinuxBetterSqlite3Prebuilds/);
+    expect(prepare).toMatch(/linux-x64\.node/);
+  });
 });
