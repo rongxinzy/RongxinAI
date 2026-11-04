@@ -23,5 +23,6 @@ describe('rebuild-electron-native-linux-packaging', () => {
     );
     expect(entry).toMatch(/rebuild-electron-native-linux-docker\.sh/);
     expect(entry).toMatch(/assertMaxGlibcVersion/);
+    expect(entry).not.toMatch(/spawn-helper/);
   });
 });

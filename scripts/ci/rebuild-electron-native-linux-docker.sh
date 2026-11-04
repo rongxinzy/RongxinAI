@@ -77,9 +77,9 @@ docker run --rm \
       node_modules/node-pty/build
   '
 
+# spawn-helper is macOS-only in node-pty binding.gyp; Linux uses forkpty in pty.cc.
 for artifact in \
   "${ROOT_DIR}/node_modules/node-pty/build/Release/pty.node" \
-  "${ROOT_DIR}/node_modules/node-pty/build/Release/spawn-helper" \
   "${ROOT_DIR}/node_modules/better-sqlite3/build/Release/better_sqlite3.node"; do
   if [[ ! -f "${artifact}" ]]; then
     echo "[rebuild-electron-native-linux-docker] Missing rebuilt artifact: ${artifact}" >&2

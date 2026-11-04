@@ -5,6 +5,10 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 
 const { LINUX_NATIVE_GLIBC_BASELINE } = require('./packaging/linux-native-baseline.constants.cjs');
+const {
+  LINUX_ELECTRON_NATIVE_ARTIFACTS,
+  LINUX_NODE_PTY_BINDING,
+} = require('./packaging/node-pty-linux-artifacts.cjs');
 const { assertMaxGlibcVersion } = require('./packaging/linux-glibc-version.cjs');
 
 const projectRoot = path.join(__dirname, '..');
@@ -29,19 +33,20 @@ function runDockerRebuild() {
 }
 
 function verifyLinuxNativeArtifacts() {
-  const nodePtyBinding = path.join(projectRoot, 'node_modules/node-pty/build/Release/pty.node');
-  const nodePtyHelper = path.join(projectRoot, 'node_modules/node-pty/build/Release/spawn-helper');
-  const sqliteBinding = path.join(
-    projectRoot,
-    'node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+  const artifactPaths = LINUX_ELECTRON_NATIVE_ARTIFACTS.map(relative =>
+    path.join(projectRoot, relative),
   );
-
-  for (const artifact of [nodePtyBinding, nodePtyHelper, sqliteBinding]) {
+  for (const artifact of artifactPaths) {
     if (!fs.existsSync(artifact)) {
       throw new Error(`[LinuxNativePackaging] Missing native artifact after rebuild: ${artifact}`);
     }
   }
 
+  const nodePtyBinding = path.join(projectRoot, LINUX_NODE_PTY_BINDING);
+  const sqliteBinding = path.join(
+    projectRoot,
+    'node_modules/better-sqlite3/build/Release/better_sqlite3.node',
+  );
   const ptyGlibc = assertMaxGlibcVersion(nodePtyBinding, LINUX_NATIVE_GLIBC_BASELINE);
   const sqliteGlibc = assertMaxGlibcVersion(sqliteBinding, LINUX_NATIVE_GLIBC_BASELINE);
   console.log(
