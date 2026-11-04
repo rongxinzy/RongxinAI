@@ -174,7 +174,7 @@
     "dist:win:signed:cuda": "cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run dist:win:signed",
     "sync:vendor-llamacpp-cpu": "node scripts/sync-vendor-llamacpp-cpu-edition.cjs",
     "finalize:vendor-llamacpp-cuda": "node scripts/finalize-llamacpp-cuda-edition.cjs",
-    "predist:linux": "bun run channel:runtime:linux-x64 && bun run engram:runtime:linux-x64 && node scripts/ensure-build-version.js && bun run prepare:update-release",
+    "predist:linux": "bun run channel:runtime:linux-x64 && bun run engram:runtime:linux-x64 && bun run rebuild:electron-native && node scripts/ensure-build-version.js && bun run prepare:update-release",
     "dist:linux": "bun run build && bun run build:skills && bun run engram:runtime:linux-x64 && electron-builder --linux --publish never",
     "dist:linux:cpu": "cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run sync:vendor-llamacpp-cpu && cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cpu bun run dist:linux",
     "dist:linux:cuda": "cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run sync:vendor-llamacpp-cpu && bash scripts/build-llamacpp-cuda-rtx40.sh linux && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run finalize:vendor-llamacpp-cuda && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run prepare:inference-edition-runtime && cross-env ZHIYUAN_UPDATE_VARIANT=cuda bun run dist:linux",

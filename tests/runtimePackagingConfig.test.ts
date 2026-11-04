@@ -116,6 +116,13 @@ test('does not package ModelScope token files or source maps', () => {
   assert.match(hooks, /pinElectronLanguages\(context\.packager\.config\)/);
   assert.match(hooks, /applyPackagingExcludes\(context\.packager\.config\)/);
   assert.match(hooks, /assertPackagedApp\(/);
+  assert.match(hooks, /verifyPackagedDeliverables\(context\)/);
+
+  const runtimeVerify = readFileSync(
+    path.join(root, 'scripts', 'packaging', 'verify-packaged-runtimes.cjs'),
+    'utf8',
+  );
+  assert.match(runtimeVerify, /verifyPackagedNodePty\(context\)/);
 
   const packageJson = readFileSync(path.join(root, 'package.json'), 'utf8');
   assert.doesNotMatch(packageJson, /prepare:modelscope-tokens &&/);
