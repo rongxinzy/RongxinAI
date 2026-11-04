@@ -35,13 +35,37 @@ docker run --rm \
   bash -lc '
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
+
+    require_cmd() {
+      if ! command -v "$1" >/dev/null 2>&1; then
+        echo "[rebuild-electron-native-linux-docker] Missing required tool in container: $1" >&2
+        exit 2
+      fi
+    }
+
     apt-get update
     apt-get install -y --no-install-recommends \
-      ca-certificates curl python3 make g++ git binutils
+      ca-certificates curl xz-utils python3 make g++ git binutils
     rm -rf /var/lib/apt/lists/*
 
-    curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
-      | tar -xJ -C /usr/local --strip-components=1
+    for tool in curl tar xz python3 make g++; do
+      require_cmd "${tool}"
+    done
+
+    node_archive="/tmp/node-v${NODE_VERSION}-linux-x64.tar.xz"
+    node_url="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz"
+    if ! curl -fsSL "${node_url}" -o "${node_archive}"; then
+      echo "[rebuild-electron-native-linux-docker] Failed to download Node ${NODE_VERSION} from ${node_url}" >&2
+      exit 2
+    fi
+    if ! tar -xJf "${node_archive}" -C /usr/local --strip-components=1; then
+      echo "[rebuild-electron-native-linux-docker] Failed to extract ${node_archive} (is xz-utils installed?)" >&2
+      exit 2
+    fi
+    rm -f "${node_archive}"
+
+    require_cmd node
+    require_cmd npm
     node --version
     npm --version
 
