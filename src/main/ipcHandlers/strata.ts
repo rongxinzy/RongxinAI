@@ -5,6 +5,7 @@ import type {
   StrataStartInput,
   StrataStatusSnapshot,
 } from '../../shared/strata/types';
+import { StrataServiceStatus } from '../../shared/strata/types';
 import { StrataIpcChannel } from '../../shared/strata/constants';
 import { strataContract } from '../../shared/ipc/strataContract';
 import { handleIpcContract } from '../ipc/handleIpcContract';
@@ -57,7 +58,9 @@ export function registerStrataIpcHandlers(
 
   const sendStatus = (status: StrataStatusSnapshot) => {
     broadcast(StrataIpcChannel.StatusChanged, status);
-    if (status.status === 'running') void refreshBindings();
+    // refreshBindings reads the snapshot the manager just published; it must
+    // not probe the service again or the status event would re-trigger itself.
+    if (status.status === StrataServiceStatus.Running) void refreshBindings();
     else void publishBindings({ baseUrl: null, models: [] });
   };
 

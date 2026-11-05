@@ -76,7 +76,10 @@ export const setupMagpieRuntime = (): void => {
   inferenceRuntime.managedMagpieBindings.setStrataReader(async () => {
     const manager = getStrataManager();
     inferenceRuntime.managedMagpieBindings?.setExpectedStrataPort(manager.resolvePort());
-    return readStrataProviderSnapshot(manager);
+    // A catalog read is an explicit user-facing refresh, so probe health before
+    // publishing models; the snapshot itself never triggers another probe.
+    const status = await manager.detect();
+    return readStrataProviderSnapshot(manager, status);
   });
   inferenceRuntime.managedMagpieBindings.setGpuReader(async () => {
     const orchestrator = inferenceRuntime.llamaCppModelOrchestrator;
