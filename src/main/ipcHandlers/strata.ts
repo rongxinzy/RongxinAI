@@ -5,6 +5,7 @@ import type {
   StrataStartInput,
   StrataStatusSnapshot,
 } from '../../shared/strata/types';
+import { StrataServiceStatus } from '../../shared/strata/types';
 import { StrataIpcChannel } from '../../shared/strata/constants';
 import { strataContract } from '../../shared/ipc/strataContract';
 import { handleIpcContract } from '../ipc/handleIpcContract';
@@ -45,20 +46,30 @@ export function registerStrataIpcHandlers(
     }
   };
 
+  let bindingRevision = 0;
+  const clearBindings = async (): Promise<void> => {
+    bindingRevision++;
+    await publishBindings({ baseUrl: null, models: [] });
+  };
+
   const refreshBindings = async (): Promise<void> => {
+    const revision = ++bindingRevision;
     let snapshot: StrataProviderSnapshot;
     try {
       snapshot = await readStrataProviderSnapshot(manager);
     } catch {
       snapshot = { baseUrl: null, models: [] };
     }
-    await publishBindings(snapshot);
+    // A stop, exit or newer refresh supersedes any older model-list response.
+    if (revision === bindingRevision) await publishBindings(snapshot);
   };
 
   const sendStatus = (status: StrataStatusSnapshot) => {
     broadcast(StrataIpcChannel.StatusChanged, status);
-    if (status.status === 'running') void refreshBindings();
-    else void publishBindings({ baseUrl: null, models: [] });
+    // refreshBindings reads the snapshot the manager just published; it must
+    // not probe the service again or the status event would re-trigger itself.
+    if (status.status === StrataServiceStatus.Running) void refreshBindings();
+    else void clearBindings();
   };
 
   manager.on('status', sendStatus);
@@ -74,7 +85,7 @@ export function registerStrataIpcHandlers(
     },
     stop: async () => {
       const status = await manager.stop();
-      await publishBindings({ baseUrl: null, models: [] });
+      await clearBindings();
       return status;
     },
     getServiceConfig: async () => getStrataServiceConfig(options.getStore()),
