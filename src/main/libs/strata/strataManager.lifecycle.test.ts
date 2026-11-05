@@ -231,6 +231,147 @@ describe('StrataManager lifecycle', () => {
     expect(manager.getStatus().activeModelId).toBe('strata-deepseek-v41-flash');
   });
 
+  test('reusing a running process preserves its exit listener', async () => {
+    strataClientMock.health.mockResolvedValue(true);
+    const manager = createManager();
+    await start(manager);
+    await start(manager);
+
+    child.exit(0, null);
+
+    expect(manager.getStatus().status).toBe(StrataServiceStatus.Stopped);
+    expect(manager.getStatus().managedByApp).toBe(false);
+    strataClientMock.health.mockResolvedValue(false);
+    expect((await manager.detect()).status).toBe(StrataServiceStatus.Stopped);
+  });
+
+  test('the latest A request wins during an A to B to A switch', async () => {
+    const firstChild = new FakeChild();
+    const lastChild = new FakeChild();
+    childProcessMock.spawn.mockReturnValueOnce(firstChild).mockReturnValueOnce(lastChild);
+    const manager = createManager();
+    const firstStart = start(manager);
+    await flush();
+
+    const middleStart = manager.start({ catalogId: 'strata-deepseek-v41-flash' });
+    await flush();
+    const lastStart = start(manager);
+    strataClientMock.health.mockResolvedValue(true);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const [first, middle, last] = await Promise.all([firstStart, middleStart, lastStart]);
+
+    expect(first.status).toBe(StrataServiceStatus.Stopped);
+    expect(middle.status).toBe(StrataServiceStatus.Stopped);
+    expect(last.status).toBe(StrataServiceStatus.Running);
+    expect(last.activeModelId).toBe(CATALOG_ID);
+    expect(manager.getStatus().activeModelId).toBe(CATALOG_ID);
+    expect(childProcessMock.spawn).toHaveBeenCalledTimes(2);
+    expect(childProcessMock.spawn.mock.calls[1][1]).toContain('gyro-s');
+  });
+
+  test('reusing a running process preserves its error listener', async () => {
+    strataClientMock.health.mockResolvedValue(true);
+    const manager = createManager();
+    await start(manager);
+    await start(manager);
+
+    child.emit('error', new Error('reused child failed'));
+
+    expect(manager.getStatus().status).toBe(StrataServiceStatus.Error);
+    expect(manager.getStatus().error).toBe('reused child failed');
+    expect(manager.getStatus().managedByApp).toBe(false);
+  });
+
+  test.each(['exit', 'error'] as const)(
+    'a pending detect cannot overwrite the current child %s',
+    async event => {
+      strataClientMock.health.mockResolvedValue(true);
+      const manager = createManager();
+      await start(manager);
+      let resolveHealth: (healthy: boolean) => void = () => {};
+      strataClientMock.health.mockImplementationOnce(
+        () =>
+          new Promise<boolean>(resolve => {
+            resolveHealth = resolve;
+          }),
+      );
+      const detection = manager.detect();
+      if (event === 'exit') child.exit(0, null);
+      else child.emit('error', new Error('child failed during detect'));
+      const terminal = manager.getStatus();
+      resolveHealth(true);
+      await detection;
+
+      expect(manager.getStatus()).toEqual(terminal);
+      expect(terminal.managedByApp).toBe(false);
+    },
+  );
+
+  test('stop cancels the latest request while switch cleanup is still running', async () => {
+    const manager = createManager();
+    const firstStart = start(manager);
+    await flush();
+    const nextStart = manager.start({ catalogId: 'strata-deepseek-v41-flash' });
+    await flush();
+
+    const stopPromise = manager.stop();
+    strataClientMock.health.mockResolvedValue(true);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const results = await Promise.all([firstStart, nextStart, stopPromise]);
+
+    expect(results.map(result => result.status)).toEqual([
+      StrataServiceStatus.Stopped,
+      StrataServiceStatus.Stopped,
+      StrataServiceStatus.Stopped,
+    ]);
+    expect(childProcessMock.spawn).toHaveBeenCalledTimes(1);
+    expect(manager.getStatus().status).toBe(StrataServiceStatus.Stopped);
+    expect(manager.getStatus().managedByApp).toBe(false);
+  });
+
+  test('duplicate queued requests share the replacement process', async () => {
+    const secondChild = new FakeChild();
+    childProcessMock.spawn.mockReturnValueOnce(child).mockReturnValueOnce(secondChild);
+    const manager = createManager();
+    const firstStart = start(manager);
+    await flush();
+    const input = { catalogId: 'strata-deepseek-v41-flash' };
+    const secondStart = manager.start(input);
+    const duplicate = manager.start(input);
+    strataClientMock.health.mockResolvedValue(true);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const [first, second, repeated] = await Promise.all([firstStart, secondStart, duplicate]);
+
+    expect(first.status).toBe(StrataServiceStatus.Stopped);
+    expect(second.status).toBe(StrataServiceStatus.Running);
+    expect(repeated.activeModelId).toBe(input.catalogId);
+    expect(childProcessMock.spawn).toHaveBeenCalledTimes(2);
+    expect(child.killSignals).toEqual(['SIGTERM', 'SIGKILL']);
+    child.emit('exit', 1, null);
+    child.emit('error', new Error('stale child failed'));
+    expect(manager.getStatus().status).toBe(StrataServiceStatus.Running);
+    expect(manager.getStatus().activeModelId).toBe(input.catalogId);
+  });
+
+  test('same-catalog start after stop does not join the cancelled startup', async () => {
+    const secondChild = new FakeChild();
+    childProcessMock.spawn.mockReturnValueOnce(child).mockReturnValueOnce(secondChild);
+    const manager = createManager();
+    const firstStart = start(manager);
+    await flush();
+    const stopPromise = manager.stop();
+    const nextStart = start(manager);
+    strataClientMock.health.mockResolvedValue(true);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const [first, stopped, next] = await Promise.all([firstStart, stopPromise, nextStart]);
+
+    expect(first.status).toBe(StrataServiceStatus.Stopped);
+    expect(stopped.status).toBe(StrataServiceStatus.Stopped);
+    expect(next.status).toBe(StrataServiceStatus.Running);
+    expect(next.activeModelId).toBe(CATALOG_ID);
+    expect(childProcessMock.spawn).toHaveBeenCalledTimes(2);
+  });
+
   test('start during stop waits for cleanup and is not overwritten by the stale stop', async () => {
     strataClientMock.health.mockResolvedValue(true);
     const firstChild = new FakeChild();

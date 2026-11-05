@@ -51,6 +51,7 @@ export class StrataManager extends EventEmitter {
   private generation = 0;
   private startInFlight: Promise<StrataStatusSnapshot> | null = null;
   private startCatalogId: string | undefined;
+  private startGeneration = 0;
   private stopInFlight: Promise<StrataStatusSnapshot> | null = null;
   private status: StrataStatusSnapshot = {
     status: StrataServiceStatus.Unknown,
@@ -97,9 +98,12 @@ export class StrataManager extends EventEmitter {
     // not race them into `starting` or `running`.
     if (this.phase !== 'idle') return this.status;
     const generation = this.generation;
+    const child = this.process;
     const port = this.resolvePort();
     const healthy = await new StrataClient(`http://127.0.0.1:${port}`).health();
-    if (generation !== this.generation || this.phase !== 'idle') return this.status;
+    if (generation !== this.generation || this.phase !== 'idle' || child !== this.process) {
+      return this.status;
+    }
     if (healthy) {
       this.setStatus({
         status: StrataServiceStatus.Running,
@@ -125,15 +129,23 @@ export class StrataManager extends EventEmitter {
   }
 
   async start(input: StrataStartInput): Promise<StrataStatusSnapshot> {
-    // Coalesce duplicate requests for the same catalog, but never merge a
-    // request for another catalog: supersede the old startup and run this one.
-    while (this.startInFlight) {
-      if (this.startCatalogId === input.catalogId) return this.startInFlight;
-      await this.supersedeActiveStart(this.startInFlight);
+    // Only the latest, uncancelled request can accept duplicate callers.
+    if (
+      this.startInFlight &&
+      this.startCatalogId === input.catalogId &&
+      this.startGeneration === this.generation
+    ) {
+      return this.startInFlight;
     }
-    const task = this.runStart(input);
+    const previous = this.startInFlight;
+    const cleanup = previous ? this.stop() : this.stopInFlight;
+    const generation = ++this.generation;
+    // Publish the new request before waiting for cleanup. A later A in an
+    // A -> B -> A switch must replace queued B, not join the cancelled first A.
+    const task = this.runQueuedStart(input, generation, previous, cleanup);
     this.startInFlight = task;
     this.startCatalogId = input.catalogId;
+    this.startGeneration = generation;
     try {
       return await task;
     } finally {
@@ -144,38 +156,33 @@ export class StrataManager extends EventEmitter {
     }
   }
 
-  /**
-   * Cancels an in-flight startup for a different catalog. The superseded
-   * caller gets a stopped snapshot; the new caller only proceeds after the old
-   * child is gone, so two starts can never share process/status state.
-   */
-  private async supersedeActiveStart(pending: Promise<StrataStatusSnapshot>): Promise<void> {
-    this.generation++;
-    // Keep probes out while the superseded child is being killed; the new
-    // start runs only after this cleanup and then owns the status again.
-    this.phase = 'stopping';
-    this.activeCatalogId = undefined;
-    const port = this.resolvePort();
-    this.setStatus({
+  private async runQueuedStart(
+    input: StrataStartInput,
+    generation: number,
+    previous: Promise<StrataStatusSnapshot> | null,
+    cleanup: Promise<StrataStatusSnapshot> | null,
+  ): Promise<StrataStatusSnapshot> {
+    if (cleanup) await cleanup;
+    if (previous) await previous.catch(() => {});
+    if (generation === this.generation) {
+      const result = await this.runStart(input, generation);
+      if (generation === this.generation) return result;
+    }
+    // A superseded caller must not report the newer request's success.
+    return {
+      ...this.getStatus(),
       status: StrataServiceStatus.Stopped,
-      port,
       baseUrl: undefined,
       activeModelId: undefined,
-      bundled: this.isBundled(),
       managedByApp: false,
       error: undefined,
-    });
-    const child = this.process;
-    if (child) await this.terminateChild(child);
-    await pending.catch(() => {});
-    if (this.phase === 'stopping') this.phase = 'idle';
-    if (this.startInFlight === pending) {
-      this.startInFlight = null;
-      this.startCatalogId = undefined;
-    }
+    };
   }
 
-  private async runStart(input: StrataStartInput): Promise<StrataStatusSnapshot> {
+  private async runStart(
+    input: StrataStartInput,
+    generation: number,
+  ): Promise<StrataStatusSnapshot> {
     if (!this.isBundled()) {
       this.setStatus({ status: StrataServiceStatus.NotBundled, bundled: false });
       return this.status;
@@ -184,14 +191,6 @@ export class StrataManager extends EventEmitter {
     if (!entry) {
       throw new Error(`Unknown Strata catalog id: ${input.catalogId}`);
     }
-
-    const generation = ++this.generation;
-    // A stop() that was already running owns the old child. Wait for its
-    // cleanup before probing, otherwise a stale health success could make this
-    // start return `running` for a process stop() is about to kill.
-    const pendingStop = this.stopInFlight;
-    if (pendingStop) await pendingStop.catch(() => {});
-    if (generation !== this.generation) return this.status;
 
     const port = this.resolvePort();
     const healthy = await new StrataClient(`http://127.0.0.1:${port}`).health();
@@ -269,7 +268,7 @@ export class StrataManager extends EventEmitter {
         env,
       });
       this.process = child;
-      this.attachProcessListeners(child, generation, port);
+      this.attachProcessListeners(child, port);
       await this.waitUntilHealthy(generation, child, port, entry.id, START_TIMEOUT_MS);
       // A stop() during startup owns the terminal snapshot; wait for its
       // cleanup so start() resolves with `stopped` rather than `stopping`.
@@ -298,6 +297,8 @@ export class StrataManager extends EventEmitter {
   }
 
   async stop(): Promise<StrataStatusSnapshot> {
+    // Even an already-running cleanup must cancel starts queued after it.
+    this.generation++;
     if (this.stopInFlight) return this.stopInFlight;
     const task = this.runStop();
     this.stopInFlight = task;
@@ -310,8 +311,6 @@ export class StrataManager extends EventEmitter {
 
   private async runStop(): Promise<StrataStatusSnapshot> {
     const port = this.resolvePort();
-    // Invalidate any in-flight detect()/start() work before touching the child.
-    this.generation++;
     const child = this.process;
     if (!child) {
       this.phase = 'idle';
@@ -357,18 +356,15 @@ export class StrataManager extends EventEmitter {
     return await this.stop();
   }
 
-  private attachProcessListeners(
-    child: ChildProcessWithoutNullStreams,
-    generation: number,
-    port: number,
-  ): void {
+  private attachProcessListeners(child: ChildProcessWithoutNullStreams, port: number): void {
     child.stdout.on('data', chunk => console.debug(`[Strata] ${chunk.toString().trim()}`));
     child.stderr.on('data', chunk => console.warn(`[Strata] ${chunk.toString().trim()}`));
     child.on('exit', (code, signal) => {
       console.log(
         `[Strata] process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`,
       );
-      if (this.process !== child || generation !== this.generation) return;
+      // Requests may reuse this process; its identity outlives their generation.
+      if (this.process !== child) return;
       this.process = null;
       this.activeCatalogId = undefined;
       if (this.phase === 'stopping') return;
@@ -388,7 +384,7 @@ export class StrataManager extends EventEmitter {
     });
     child.on('error', error => {
       console.warn('[Strata] process failed:', error);
-      if (this.process !== child || generation !== this.generation) return;
+      if (this.process !== child) return;
       this.process = null;
       this.activeCatalogId = undefined;
       if (this.phase === 'stopping') return;
