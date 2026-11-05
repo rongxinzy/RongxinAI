@@ -100,7 +100,6 @@ export const enSecurity: Record<string, string> = {
   securityFindingJsxray_sql_injection: 'SQL injection',
   preventSleepUpdateFailed: 'Failed to update background keep-alive setting',
   preventSleep: 'Prevent automatic sleep while running',
-  preventSleepDescription: 'Keep the app open. Tasks stop when you quit.',
   linkSafetyOpenExternalTitle: 'Open external link?',
   linkSafetyOpenExternalWarning:
     "You're about to visit an external website. Make sure you trust this link.",
