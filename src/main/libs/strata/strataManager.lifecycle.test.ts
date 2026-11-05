@@ -206,6 +206,56 @@ describe('StrataManager lifecycle', () => {
     expect(manager.getStatus().activeModelId).toBe(CATALOG_ID);
   });
 
+  test('a different catalog supersedes the in-flight startup', async () => {
+    const firstChild = new FakeChild();
+    const secondChild = new FakeChild();
+    childProcessMock.spawn.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild);
+    const manager = createManager();
+
+    strataClientMock.health.mockResolvedValue(false);
+    const firstStart = start(manager);
+    await flush();
+    expect(childProcessMock.spawn).toHaveBeenCalledTimes(1);
+
+    const secondStart = manager.start({ catalogId: 'strata-deepseek-v41-flash' });
+    await vi.advanceTimersByTimeAsync(0);
+    strataClientMock.health.mockResolvedValue(true);
+    await vi.advanceTimersByTimeAsync(20_000);
+
+    const [firstStatus, secondStatus] = await Promise.all([firstStart, secondStart]);
+    expect(firstChild.killSignals).toContain('SIGTERM');
+    expect(childProcessMock.spawn).toHaveBeenCalledTimes(2);
+    expect(childProcessMock.spawn.mock.calls[1][1]).toContain('IST-DAS-2.00bpw');
+    expect(firstStatus.status).toBe(StrataServiceStatus.Stopped);
+    expect(secondStatus.status).toBe(StrataServiceStatus.Running);
+    expect(manager.getStatus().activeModelId).toBe('strata-deepseek-v41-flash');
+  });
+
+  test('start during stop waits for cleanup and is not overwritten by the stale stop', async () => {
+    strataClientMock.health.mockResolvedValue(true);
+    const firstChild = new FakeChild();
+    const secondChild = new FakeChild();
+    childProcessMock.spawn.mockReturnValueOnce(firstChild).mockReturnValueOnce(secondChild);
+    const manager = createManager();
+
+    await start(manager);
+    expect(manager.getStatus().status).toBe(StrataServiceStatus.Running);
+
+    const events: string[] = [];
+    manager.on('status', snapshot => events.push(snapshot.status));
+    const stopPromise = manager.stop();
+    await vi.advanceTimersByTimeAsync(0);
+    const secondStart = start(manager);
+    await vi.advanceTimersByTimeAsync(20_000);
+    const [stopped, started] = await Promise.all([stopPromise, secondStart]);
+
+    expect(stopped.status).toBe(StrataServiceStatus.Stopped);
+    expect(started.status).toBe(StrataServiceStatus.Running);
+    expect(childProcessMock.spawn).toHaveBeenCalledTimes(2);
+    expect(manager.getStatus().status).toBe(StrataServiceStatus.Running);
+    expect(events.at(-1)).toBe(StrataServiceStatus.Running);
+  });
+
   test('a late health result from before stop does not overwrite the stopped state', async () => {
     const manager = createManager();
     let resolveHealth: (healthy: boolean) => void = () => {};
