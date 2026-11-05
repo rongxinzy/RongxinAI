@@ -124,7 +124,6 @@ const ImportMcpDialog: React.FC<ImportMcpDialogProps> = ({ open, onOpenChange, o
           )}
 
           <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">方式一：从本地文件导入</span>
             <Button
               type="button"
               variant="outline"
@@ -133,19 +132,15 @@ const ImportMcpDialog: React.FC<ImportMcpDialogProps> = ({ open, onOpenChange, o
               className="gap-1.5 h-8 text-xs"
             >
               <FileUp className="size-3.5" />
-              选择配置文件 (.json)
+              {i18nService.t('importMcpChooseFile')}
             </Button>
-          </div>
-
-          <div className="relative flex py-1 items-center">
-            <div className="flex-grow border-t border-border" />
-            <span className="flex-shrink mx-3 text-xs text-muted-foreground uppercase">或者</span>
-            <div className="flex-grow border-t border-border" />
           </div>
 
           <Field className="flex-1 flex flex-col min-h-56">
             <div className="flex items-center justify-between mb-1.5">
-              <FieldLabel className="text-xs font-medium">方式二：直接粘贴 JSON 配置</FieldLabel>
+              <FieldLabel className="text-xs font-medium">
+                {i18nService.t('importMcpContentLabel')}
+              </FieldLabel>
               <Button
                 type="button"
                 variant="ghost"
@@ -154,7 +149,7 @@ const ImportMcpDialog: React.FC<ImportMcpDialogProps> = ({ open, onOpenChange, o
                 className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
               >
                 <Sparkles className="size-3.5" />
-                填充示例模板
+                {i18nService.t('importMcpInsertSample')}
               </Button>
             </div>
             <Textarea

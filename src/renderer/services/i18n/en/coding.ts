@@ -42,11 +42,9 @@ export const enCoding: Record<string, string> = {
   codingAttachmentAdd: 'Add images or files',
   codingAttachmentRemove: 'Remove attachment',
   codingSessionDraft: 'New session',
-  codingSessionDraftDescription:
-    'This is only a blank draft. The session is created after the first message succeeds, then its agent and working directory are locked.',
+  codingSessionDraftDescription: 'Describe your programming task to start collaborating.',
   codingSessionSetupTitle: 'Choose an agent to start coding',
-  codingSessionSetupDescription:
-    'Choose a ready agent. The first successful message creates and binds the session.',
+  codingSessionSetupDescription: 'Choose a coding agent and directory to start.',
   codingSessionSetupConfigureTitle: 'Configure a coding agent first',
   codingSessionCreateFailed: 'The agent or model is unavailable. No session was created.',
   codingSessionCollaborator: 'Collaborator',
@@ -470,5 +468,5 @@ export const enCoding: Record<string, string> = {
   magpieTitle: 'External Agents',
   magpieExternalPanelDescription:
     'Connect local CLI Agents to the ZhiYuan model gateway to manage providers and default models in one place.',
-  magpieExternalAgentPi: 'Pi CLI',
+  magpieExternalAgentPi: 'ZhiYuan CLI',
 };

@@ -347,8 +347,7 @@ export const zhCommon: Record<string, string> = {
   expertPresetsEmpty: '暂无预设专家',
   expertPresetsLoadFailed: '预设专家加载失败，请重试。',
   expertPresetsRetry: '重试',
-  expertsDescription:
-    '专家是技能(Skill)、连接器(MCP)与提示词的组合，以全栈自研的统一内核 Pi 作为承载 Runtime',
+  expertsDescription: '组合技能、连接器与定制指令，打造专注特定任务领域的专属专家',
   expertGoToConversation: '与专家对话',
   expertWorkScope: '工作范围',
   expertWorkflow: '工作流程',
@@ -425,8 +424,12 @@ export const zhCommon: Record<string, string> = {
   unknownError: '未知错误',
   // 通用设置
   autoLaunch: '开机自启动',
-  autoLaunchDescription: '系统启动时自动运行应用',
+  autoLaunchDescription: '开机登录后自动在后台启动',
   autoLaunchUpdateFailed: '更新开机自启动设置失败',
+  preventSleepDescription: '有正在执行的会话或定时任务时保持系统唤醒',
+  desktopPetDoNotDisturbDescription: '隐藏屏幕悬浮形象，后台任务不受影响',
+  desktopPetHideInFullscreenDescription: '运行全屏应用或演讲放映时自动隐藏',
+  shortcutRecording: '请按下按键...',
   useSystemProxy: '使用系统代理',
   useSystemProxyDescription: '开启后网络请求将跟随系统代理（立即生效）',
   sqliteAutoBackupEnabled: '数据自动备份与恢复',

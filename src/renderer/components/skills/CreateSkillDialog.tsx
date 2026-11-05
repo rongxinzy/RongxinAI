@@ -75,7 +75,7 @@ const CreateSkillDialog: React.FC<CreateSkillDialogProps> = ({ open, onOpenChang
     const trimmedContent = content.trim();
 
     if (!trimmedId) {
-      setError(i18nService.t('skillIdentifier') + ' 不能为空');
+      setError(i18nService.t('skillIdentifierRequired'));
       return;
     }
 
@@ -194,7 +194,7 @@ const CreateSkillDialog: React.FC<CreateSkillDialogProps> = ({ open, onOpenChang
                 className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
               >
                 <Sparkles className="size-3.5" />
-                填充规约模板
+                {i18nService.t('skillFillTemplate')}
               </Button>
             </div>
             <Textarea

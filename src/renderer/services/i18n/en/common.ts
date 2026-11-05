@@ -359,7 +359,7 @@ export const enCommon: Record<string, string> = {
   expertPresetsLoadFailed: 'Could not load preset experts. Please try again.',
   expertPresetsRetry: 'Retry',
   expertsDescription:
-    'Experts are combinations of skills, MCP connectors, and prompts powered by the full-stack Pi runtime.',
+    'Combine skills, connectors, and custom instructions to build a specialized expert.',
   expertGoToConversation: 'Chat with expert',
   expertWorkScope: 'Work scope',
   expertWorkflow: 'Workflow',
@@ -436,8 +436,12 @@ export const enCommon: Record<string, string> = {
   unknownError: 'Unknown error',
   // General Settings
   autoLaunch: 'Launch at Login',
-  autoLaunchDescription: 'Automatically start the app when you log in',
+  autoLaunchDescription: 'Start automatically in background on system login',
   autoLaunchUpdateFailed: 'Failed to update launch at login setting',
+  preventSleepDescription: 'Keep system awake while sessions or scheduled tasks are running',
+  desktopPetDoNotDisturbDescription: 'Hide desktop pet from screen; background tasks continue',
+  desktopPetHideInFullscreenDescription: 'Automatically hide when running fullscreen applications',
+  shortcutRecording: 'Press keys...',
   useSystemProxy: 'Use System Proxy',
   useSystemProxyDescription:
     'When enabled, network requests follow system proxy settings (applies immediately)',

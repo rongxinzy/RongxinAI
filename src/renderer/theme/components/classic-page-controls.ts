@@ -555,8 +555,8 @@ export function classicPageControls() {
     }),
     'page-quick-action-bar-button-1': recipe({
       base: {
-        gap: '0.25rem',
-        'padding-inline': '0.5rem',
+        gap: '0.375rem',
+        'padding-inline': '0.875rem',
         'padding-block': '0.5rem',
         'border-radius': '9999px',
         'font-size': 'var(--zy-component-text-sm)',

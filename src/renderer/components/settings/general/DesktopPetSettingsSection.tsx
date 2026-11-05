@@ -1,11 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Field,
-  FieldLabel,
-  FieldDescription,
-  FieldGroup,
-  FieldError,
-} from '@shared/components/ui/field';
+import { Field, FieldLabel, FieldGroup, FieldError } from '@shared/components/ui/field';
 import {
   Select,
   SelectTrigger,
@@ -68,7 +62,6 @@ export function DesktopPetSettingsSection() {
             <FieldLabel htmlFor="desktop-pet-character">
               {i18nService.t('desktopPetCharacter')}
             </FieldLabel>
-            <FieldDescription>{i18nService.t('desktopPetCharacterDescription')}</FieldDescription>
             <Select
               value={settings?.characterId ?? ''}
               disabled={!settings || saving}

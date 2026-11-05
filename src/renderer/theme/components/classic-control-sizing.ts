@@ -9,10 +9,10 @@ export function classicControlSizing() {
     'composition-button-icon': recipe({ base: { width: '1rem', height: '1rem' } }),
     'composition-button-icon-xs': recipe({ base: { width: '0.75rem', height: '0.75rem' } }),
     'composition-button-icon-sm': recipe({ base: { width: '0.875rem', height: '0.875rem' } }),
-    'composition-button-leading': recipe({ base: { 'padding-left': '0.5rem' } }),
-    'composition-button-trailing': recipe({ base: { 'padding-right': '0.5rem' } }),
-    'composition-button-small-leading': recipe({ base: { 'padding-left': '0.375rem' } }),
-    'composition-button-small-trailing': recipe({ base: { 'padding-right': '0.375rem' } }),
+    'composition-button-leading': recipe({ base: { 'padding-left': '0.75rem' } }),
+    'composition-button-trailing': recipe({ base: { 'padding-right': '0.75rem' } }),
+    'composition-button-small-leading': recipe({ base: { 'padding-left': '0.5rem' } }),
+    'composition-button-small-trailing': recipe({ base: { 'padding-right': '0.5rem' } }),
     'composition-model-outline': recipe({
       base: {
         'border-style': 'none',

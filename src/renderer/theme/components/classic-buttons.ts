@@ -114,7 +114,7 @@ export function classicButtons(): ButtonAppearances {
       },
     }),
     'button-size-default': recipe({
-      base: { height: '2rem', gap: '0.375rem', 'padding-inline': '0.625rem' },
+      base: { height: '2rem', gap: '0.5rem', 'padding-inline': '0.875rem' },
     }),
     'button-size-xs': recipe({
       base: {
@@ -126,10 +126,10 @@ export function classicButtons(): ButtonAppearances {
       },
     }),
     'button-size-sm': recipe({
-      base: { ...small, height: '1.75rem', gap: '0.25rem', 'padding-inline': '0.625rem' },
+      base: { ...small, height: '1.75rem', gap: '0.375rem', 'padding-inline': '0.625rem' },
     }),
     'button-size-lg': recipe({
-      base: { height: '2.25rem', gap: '0.375rem', 'padding-inline': '0.625rem' },
+      base: { height: '2.25rem', gap: '0.5rem', 'padding-inline': '1rem' },
     }),
     'button-size-appearance': recipe({
       base: {

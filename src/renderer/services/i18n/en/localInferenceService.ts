@@ -10,7 +10,7 @@ export const enLocalInferenceService: Record<string, string> = {
   localInferenceRuntimeServiceRunning: 'Service is running',
   localInferenceRuntimeServiceNotRunning: 'Service is installed but not running',
   localInferenceRuntimeServiceUnavailable: 'The local inference service is not installed',
-  localInferenceService: 'Llama.cpp Service',
+  localInferenceService: 'Local Inference Service',
   localInferenceServiceHint: '{local} local models registered, {running} models loaded.',
   localInferenceServiceManagedByApp: 'Managed by this app',
   localInferenceServiceExternal: 'External process',
@@ -68,7 +68,7 @@ export const enLocalInferenceService: Record<string, string> = {
     'The current runtime did not report usable GPU acceleration parameters, so GPU-specific settings are hidden.',
   localInferenceServiceConfigHostLabel: 'Listen address',
   localInferenceServiceConfigPortLabel: 'Port',
-  localInferenceServiceConfigExecutablePathLabel: 'llama-server path',
+  localInferenceServiceConfigExecutablePathLabel: 'Inference Engine Path',
   localInferenceServiceConfigCtxSizeLabel: 'Context length',
   localInferenceServiceConfigParallelLabel: 'Concurrent slots',
   localInferenceServiceConfigGpuLayersLabel: 'GPU offload',
@@ -97,8 +97,8 @@ export const enLocalInferenceService: Record<string, string> = {
     'OpenAI-compatible API port. Clients will connect to this port after it changes.',
   localInferenceKeepRunningOnAppQuit: 'Keep service running after app quit',
   localInferenceServiceConfigExecutablePathHint:
-    'Advanced option. Fill this only when explicitly using an existing llama-server. Leave empty to use the app-managed fixed runtime.',
-  localInferenceServiceConfigExecutablePathPlaceholder: 'Example: /usr/local/bin/llama-server',
+    'Advanced option. Fill this only to use a custom engine binary. Leave empty to use the built-in runtime.',
+  localInferenceServiceConfigExecutablePathPlaceholder: 'e.g. /usr/local/bin/inference-server',
   localInferenceServiceConfigDeviceHint:
     'Limit visible local inference devices. Enter device indexes such as 0, 1, or 2. Separate multiple values with commas. The app maps them to real device IDs when saving. Leave empty to keep all devices visible.',
   localInferenceServiceConfigModelsMaxHint:
@@ -389,11 +389,12 @@ export const enLocalInferenceService: Record<string, string> = {
   localInferenceLaunchBooleanDisabled: 'Disabled',
   localInferenceLaunchLoadOnly: 'Preload',
   localInferenceLaunchLoadAndDebug: 'Start Debugging',
-  strataCatalogTitle: 'Strata models (Windows CUDA)',
+  strataCatalogTitle: 'MoE High-Performance Models (Windows CUDA)',
   strataCatalogSubtitle:
-    'Large MoE families that require the bundled Strata engine. GPU is exclusive with llama.cpp.',
-  strataCatalogHardwareGate: 'Strata docs: ≥{ram} GB RAM, ≥{vram} GB VRAM, ≥{disk} GB disk',
-  strataCatalogStart: 'Start Strata',
-  strataCatalogStop: 'Stop Strata',
-  strataStartRequested: 'Strata start requested. Large models may take several minutes.',
+    'Dedicated MoE model; GPU resources are exclusively allocated and cannot be shared with other local models.',
+  strataCatalogHardwareGate:
+    'Recommended hardware: ≥{ram} GB RAM, ≥{vram} GB VRAM, ≥{disk} GB disk',
+  strataCatalogStart: 'Start Engine',
+  strataCatalogStop: 'Stop Engine',
+  strataStartRequested: 'Engine start requested. Model initialization may take several minutes.',
 };

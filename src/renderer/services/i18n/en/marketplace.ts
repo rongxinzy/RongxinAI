@@ -1,11 +1,10 @@
 // Marketplace and enterprise managed
 export const enMarketplace: Record<string, string> = {
   marketplaceTitle: 'Model Marketplace',
-  marketplaceDescription: 'Search and install GGUF models by keyword',
+  marketplaceDescription: 'Search and install local models by keyword',
   marketplaceSearch: 'Search',
   marketplaceSearchPlaceholder: 'Search models, e.g. qwen3, deepseek-r1...',
-  marketplaceSearchHint:
-    'Search the cloud catalogue for GGUF language models with verified repository files.',
+  marketplaceSearchHint: 'Search the cloud catalogue for verified local language models.',
   marketplaceInstall: 'Install',
   marketplaceInstalled: 'Installed',
   marketplaceInfer: 'Infer',
@@ -28,7 +27,7 @@ export const enMarketplace: Record<string, string> = {
   marketplaceSearchStatusWarning: 'Search limited',
   marketplaceResultCount: '{count} models',
   marketplaceResultRecommended: 'Recommended for you',
-  marketplaceResultAll: 'All GGUF models',
+  marketplaceResultAll: 'All local models',
   marketplaceResultSearch: 'Search results',
   marketplaceResultCategory: 'Category',
   marketplaceBrowse: 'Browse',
@@ -62,7 +61,7 @@ export const enMarketplace: Record<string, string> = {
   marketplacePageSummary: 'Page {page} / {total}',
   marketplacePageUnit: 'pages',
   marketplaceDataSourceHint:
-    'Source: cloud GGUF catalogue; file size and SHA-256 come from the ModelScope repository files API',
+    'Source: cloud model catalogue; file size and SHA-256 come from the ModelScope repository files API',
   marketplaceRepoLabel: 'Repository',
   marketplaceDetails: 'Details',
   marketplacePublisherLabel: 'Publisher:',
@@ -80,7 +79,7 @@ export const enMarketplace: Record<string, string> = {
   marketplaceHardwareMemoryLabel: 'Memory:',
   marketplaceHardwareNotDetected: 'Not detected',
   marketplaceHardwareDetecting: 'Detecting device…',
-  marketplaceRecommendedFileLabel: 'Recommended GGUF',
+  marketplaceRecommendedFileLabel: 'Recommended variant',
   marketplaceInstalledPathLabel: 'Installed Path',
   marketplaceInstallProgress: 'Installing',
   marketplaceInstallStarting: 'Preparing',

@@ -6,7 +6,7 @@ export const zhLocalInferenceCatalog: Record<string, string> = {
   localInferenceLibraryMenuItem: '模型库',
   localInferenceTitle: '本地推理',
   localInferenceSidebarTitle: '端侧推理',
-  localInferenceExternalServiceHint: 'Llama.cpp 正由外部进程运行，请在系统服务或终端中关闭。',
+  localInferenceExternalServiceHint: '本地推理服务正由外部进程运行，请在系统服务或终端中关闭。',
   localInferenceLibrarySettings: '模型库设置',
   localInferenceLibraryDirectory: '模型库目录',
   localInferenceLibraryDirectoryHint: '模型将自动下载或手动导入至此目录。',
@@ -80,20 +80,17 @@ export const zhLocalInferenceCatalog: Record<string, string> = {
   localInferenceMemorySettingsSaved: '统一内存设置已保存，将在下次加载模型时生效。',
   localInferenceImportRuntime: '从本地导入...',
   localInferenceImportRuntimeTooltip:
-    '选择本地推理 backend 主包压缩包（zip 或 tar.gz），或选择已解压的完整目录，导入到知远智能体 管理的 backend 目录。',
+    '选择本地推理运行时压缩包（zip 或 tar.gz）或已解压的完整目录，导入到知远智能体管理的运行环境目录。',
   localInferenceImportRuntimeSuccess: '本地推理运行时导入成功。',
   localInferenceImportGuideTitle: '导入本地推理运行时',
   localInferenceImportGuideDescription:
     '请确保所选目录包含完整的本地推理运行环境。以下是各操作系统的文件要求和推荐获取方式：',
-  localInferenceImportGuideFilesWin:
-    '必需文件：llama-server.exe, ggml.dll, llama.dll, ggml-cpu-*.dll, libomp*.dll 等',
-  localInferenceImportGuideFilesMac:
-    '必需文件：llama-server, libggml.dylib, libllama.dylib, libggml-metal.dylib, libmtmd.dylib 等',
-  localInferenceImportGuideFilesLinux:
-    '必需文件：llama-server, libggml.so, libllama.so, libggml-cpu.so 等',
+  localInferenceImportGuideFilesWin: '必需文件：服务运行时及依赖动态链接库（.exe、.dll 等）',
+  localInferenceImportGuideFilesMac: '必需文件：服务运行时及依赖动态链接库（.dylib 等）',
+  localInferenceImportGuideFilesLinux: '必需文件：服务运行时及依赖动态链接库（.so 等）',
   localInferenceImportGuideStep1: '从 GitHub Releases 下载对应平台的预编译包：',
-  localInferenceImportGuideStep1LinkLabel: 'ggml-org/本地推理 Releases',
-  localInferenceImportGuideStep1Url: 'https://github.com/ggml-org/本地推理/releases',
+  localInferenceImportGuideStep1LinkLabel: '查看官方预编译发布页 ↗',
+  localInferenceImportGuideStep1Url: 'https://github.com/ggml-org/llama.cpp/releases',
   localInferenceImportGuideStep1WinNote:
     'Windows 用户请选择包含 "win-cpu-x64" 或 "win-cpu-arm64" 的 zip 文件',
   localInferenceImportGuideStep1MacNote:
@@ -107,7 +104,7 @@ export const zhLocalInferenceCatalog: Record<string, string> = {
   localInferenceImportGuideInlineDescription:
     '请先到本地推理官方发布页下载与你当前电脑匹配的 backend 主压缩包，再回到这里直接导入该压缩包。',
   localInferenceImportGuideInlineStepArchive: '1. 打开官方发布页',
-  localInferenceImportGuideInlineReleaseUrl: 'https://github.com/ggml-org/本地推理/releases',
+  localInferenceImportGuideInlineReleaseUrl: 'https://github.com/ggml-org/llama.cpp/releases',
   localInferenceImportGuideInlineStepExtracted: '2. 按你的机器选择对应压缩包',
   localInferenceImportGuideInlinePlatformWinX64Cpu: 'Windows x64 CPU：选 win-cpu-x64',
   localInferenceImportGuideInlinePlatformWinArm64Cpu: 'Windows ARM64 CPU：选 win-cpu-arm64',
@@ -123,9 +120,8 @@ export const zhLocalInferenceCatalog: Record<string, string> = {
   localInferenceTabInference: '推理调试',
   localInferenceTabModels: '本地模型',
   localInferenceTabMarketplace: '模型市场',
-  localInferencePullTitle: '从 ModelScope 安装 GGUF 仓库',
-  localInferencePullHint:
-    '输入 owner/repo 仓库名即可安装，若未指定文件，后端会自动选择推荐 GGUF 量化。',
+  localInferencePullTitle: '从 ModelScope 安装模型仓库',
+  localInferencePullHint: '输入 owner/repo 仓库名即可安装；若未指定文件，将自动匹配推荐量化版本。',
   localInferencePullPlaceholder: 'unsloth/Qwen3.5-0.8B-GGUF',
   localInferencePull: '安装',
   localInferenceActiveDownloads: '正在下载',
@@ -133,8 +129,7 @@ export const zhLocalInferenceCatalog: Record<string, string> = {
   localInferencePullDone: '模型 {name} 已拉取完成',
   localInferenceRegisteredModels: '已注册模型',
   localInferenceLocalModelsEmptyTitle: '暂无本地模型',
-  localInferenceLocalModelsEmptyDescription:
-    '前往模型市场安装 GGUF 模型，或将本地模型文件导入模型库后再刷新。',
+  localInferenceLocalModelsEmptyDescription: '前往模型市场安装模型，或将本地模型导入后再刷新。',
   localInferenceLocalModelsEmptyAction: '前往模型市场',
   localInferenceOpenModels: '打开本地模型',
   localInferenceConfigureLaunch: '配置启动',

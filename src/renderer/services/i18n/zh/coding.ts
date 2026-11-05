@@ -37,10 +37,9 @@ export const zhCoding: Record<string, string> = {
   codingAttachmentAdd: '添加图片或文件',
   codingAttachmentRemove: '移除附件',
   codingSessionDraft: '新会话',
-  codingSessionDraftDescription:
-    '当前只是空白草稿。首条消息发送成功后才会创建会话，并永久绑定所选 Agent 与工作目录。',
+  codingSessionDraftDescription: '描述你的编程任务或代码修改目标，即可开始协作。',
   codingSessionSetupTitle: '选择 Agent 开始编程',
-  codingSessionSetupDescription: '选择一个可用 Agent；首条消息发送成功后将创建并绑定会话。',
+  codingSessionSetupDescription: '选择协作 Agent 与代码目录，开启编程任务。',
   codingSessionSetupConfigureTitle: '先配置编程 Agent',
   codingSessionCreateFailed: 'Agent 或模型当前不可用，会话未创建。',
   codingSessionCollaborator: '协作者',
@@ -424,5 +423,5 @@ export const zhCoding: Record<string, string> = {
   codingErrorAcpProtocolUnsupported: '该编程 Agent 的协议版本不受支持，请更换 Agent。',
   magpieTitle: '外部 Agent',
   magpieExternalPanelDescription: '让本机 CLI Agent 接入知远模型网关，统一管理模型渠道与默认模型。',
-  magpieExternalAgentPi: 'Pi CLI',
+  magpieExternalAgentPi: '知远 CLI',
 };

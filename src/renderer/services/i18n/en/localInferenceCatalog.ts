@@ -7,7 +7,7 @@ export const enLocalInferenceCatalog: Record<string, string> = {
   localInferenceTitle: 'Local Inference',
   localInferenceSidebarTitle: 'Edge Inference',
   localInferenceExternalServiceHint:
-    'Llama.cpp is running outside this app. Stop it from the system service or your terminal.',
+    'The local inference engine is occupied by another process. Please stop it first.',
   localInferenceLibrarySettings: 'Model Library Settings',
   localInferenceLibraryDirectory: 'Model Library Directory',
   localInferenceLibraryDirectoryHint: 'Models are downloaded or imported into this directory.',
@@ -86,21 +86,21 @@ export const enLocalInferenceCatalog: Record<string, string> = {
     'Memory management settings saved and will apply to the next model load.',
   localInferenceImportRuntime: 'Import from local...',
   localInferenceImportRuntimeTooltip:
-    'Select a local inference backend archive (zip or tar.gz), or a fully extracted backend directory, to import into the backend directory managed by ZhiYuan Agent.',
+    'Select a local inference runtime archive (zip or tar.gz), or a fully extracted runtime directory, to import into the directory managed by ZhiYuan Agent.',
   localInferenceImportRuntimeSuccess: 'local inference runtime imported successfully.',
   localInferenceImportRuntimeFailed: 'Import failed',
   localInferenceImportGuideTitle: 'Import local inference Runtime',
   localInferenceImportGuideDescription:
     'The selected directory must contain a complete local inference runtime environment. Here are the required files and recommended sources for each operating system:',
   localInferenceImportGuideFilesWin:
-    'Required: llama-server.exe, ggml.dll, llama.dll, ggml-cpu-*.dll, libomp*.dll, etc.',
+    'Required files: Inference server executable and runtime libraries (.exe, .dll, etc.)',
   localInferenceImportGuideFilesMac:
-    'Required: llama-server, libggml.dylib, libllama.dylib, libggml-metal.dylib, libmtmd.dylib, etc.',
+    'Required files: Inference server executable and runtime libraries (.dylib, etc.)',
   localInferenceImportGuideFilesLinux:
-    'Required: llama-server, libggml.so, libllama.so, libggml-cpu.so, etc.',
+    'Required files: Inference server executable and runtime libraries (.so, etc.)',
   localInferenceImportGuideStep1: 'Download the prebuilt package from GitHub Releases:',
-  localInferenceImportGuideStep1LinkLabel: 'ggml-org/local inference Releases',
-  localInferenceImportGuideStep1Url: 'https://github.com/ggml-org/local inference/releases',
+  localInferenceImportGuideStep1LinkLabel: 'View official releases page ↗',
+  localInferenceImportGuideStep1Url: 'https://github.com/ggml-org/llama.cpp/releases',
   localInferenceImportGuideStep1WinNote:
     'Windows users: choose a zip containing "win-cpu-x64" or "win-cpu-arm64"',
   localInferenceImportGuideStep1MacNote:
@@ -114,7 +114,7 @@ export const enLocalInferenceCatalog: Record<string, string> = {
   localInferenceImportGuideInlineDescription:
     'First download the backend main archive that matches your current machine from the official local inference releases page, then import that archive directly here.',
   localInferenceImportGuideInlineStepArchive: '1. Open the official releases page',
-  localInferenceImportGuideInlineReleaseUrl: 'https://github.com/ggml-org/local inference/releases',
+  localInferenceImportGuideInlineReleaseUrl: 'https://github.com/ggml-org/llama.cpp/releases',
   localInferenceImportGuideInlineStepExtracted: '2. Choose the archive that matches your machine',
   localInferenceImportGuideInlinePlatformWinX64Cpu: 'Windows x64 CPU: use win-cpu-x64',
   localInferenceImportGuideInlinePlatformWinArm64Cpu: 'Windows ARM64 CPU: use win-cpu-arm64',
@@ -129,9 +129,9 @@ export const enLocalInferenceCatalog: Record<string, string> = {
   localInferenceTabInference: 'Inference',
   localInferenceTabModels: 'Local Models',
   localInferenceTabMarketplace: 'Marketplace',
-  localInferencePullTitle: 'Install GGUF Repo From ModelScope',
+  localInferencePullTitle: 'Install Model Repo From ModelScope',
   localInferencePullHint:
-    'Enter an owner/repo repository. If no file is specified, the backend chooses a recommended GGUF quantization.',
+    'Enter an owner/repo repository. If no file is specified, the recommended variant will be selected automatically.',
   localInferencePullPlaceholder: 'unsloth/Qwen3.5-0.8B-GGUF',
   localInferencePull: 'Install',
   localInferenceActiveDownloads: 'Downloading',
@@ -140,7 +140,7 @@ export const enLocalInferenceCatalog: Record<string, string> = {
   localInferenceRegisteredModels: 'Registered Models',
   localInferenceLocalModelsEmptyTitle: 'No local models yet',
   localInferenceLocalModelsEmptyDescription:
-    'Install a GGUF model from the model marketplace, or import local model files into the library and refresh.',
+    'Install models from the marketplace, or import local model files into the library and refresh.',
   localInferenceLocalModelsEmptyAction: 'Go to model marketplace',
   localInferenceOpenModels: 'Open Local Models',
   localInferenceConfigureLaunch: 'Configure Launch',

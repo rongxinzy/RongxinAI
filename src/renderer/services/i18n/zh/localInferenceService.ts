@@ -10,7 +10,7 @@ export const zhLocalInferenceService: Record<string, string> = {
   localInferenceRuntimeServiceRunning: '服务运行中',
   localInferenceRuntimeServiceNotRunning: '服务程序已安装但未运行',
   localInferenceRuntimeServiceUnavailable: '未安装本地推理服务程序',
-  localInferenceService: 'Llama.cpp 服务',
+  localInferenceService: '本地推理服务',
   localInferenceServiceHint: '本机已注册 {local} 个模型，当前加载 {running} 个模型。',
   localInferenceServiceManagedByApp: '由本 App 管理',
   localInferenceServiceExternal: '外部运行',
@@ -61,7 +61,7 @@ export const zhLocalInferenceService: Record<string, string> = {
     '当前 runtime 未检测到可用的 GPU 加速参数，因此已隐藏多卡与显卡相关配置。',
   localInferenceServiceConfigHostLabel: '监听地址',
   localInferenceServiceConfigPortLabel: '端口',
-  localInferenceServiceConfigExecutablePathLabel: 'llama-server 路径',
+  localInferenceServiceConfigExecutablePathLabel: '推理内核路径',
   localInferenceServiceConfigCtxSizeLabel: '上下文长度',
   localInferenceServiceConfigParallelLabel: '并发槽位',
   localInferenceServiceConfigGpuLayersLabel: 'GPU 卸载',
@@ -88,8 +88,8 @@ export const zhLocalInferenceService: Record<string, string> = {
   localInferenceServiceConfigPortHint: 'OpenAI-compatible API 端口；修改后客户端会使用新端口连接。',
   localInferenceKeepRunningOnAppQuit: '退出应用后保持服务运行',
   localInferenceServiceConfigExecutablePathHint:
-    '高级选项；显式选择已有 llama-server 时才填写。留空时使用 App 下载的固定版本。',
-  localInferenceServiceConfigExecutablePathPlaceholder: '例如 /usr/local/bin/llama-server',
+    '高级选项；仅在使用自定义内核程序时填写，留空使用内置引擎。',
+  localInferenceServiceConfigExecutablePathPlaceholder: '例如 /usr/local/bin/inference-server',
   localInferenceServiceConfigDeviceHint:
     '限制本地推理可见设备；请填写 0、1、2 这类设备索引，多个值用英文逗号分隔，保存时会映射成真实设备 ID。留空默认全部可见。',
   localInferenceServiceConfigModelsMaxHint:
@@ -344,11 +344,10 @@ export const zhLocalInferenceService: Record<string, string> = {
   localInferenceLaunchBooleanDisabled: '禁用',
   localInferenceLaunchLoadOnly: '预加载',
   localInferenceLaunchLoadAndDebug: '开始调试',
-  strataCatalogTitle: 'Strata 模型（Windows CUDA）',
-  strataCatalogSubtitle:
-    '需使用内置 Strata 引擎的大型 MoE 模型；GPU 与 llama.cpp 互斥，不可同时占用。',
-  strataCatalogHardwareGate: 'Strata 文档门槛：内存 ≥{ram} GB、显存 ≥{vram} GB、磁盘 ≥{disk} GB',
-  strataCatalogStart: '启动 Strata',
-  strataCatalogStop: '停止 Strata',
-  strataStartRequested: '已请求启动 Strata；大模型可能需要数分钟准备。',
+  strataCatalogTitle: 'MoE 高性能模型（Windows CUDA）',
+  strataCatalogSubtitle: '大型 MoE 专属模型；显卡资源由本地引擎独占，不可与其他模型同时加载。',
+  strataCatalogHardwareGate: '推荐硬件配置：内存 ≥{ram} GB、显存 ≥{vram} GB、磁盘 ≥{disk} GB',
+  strataCatalogStart: '启动引擎',
+  strataCatalogStop: '停止引擎',
+  strataStartRequested: '已请求启动引擎；模型初始化可能需要数分钟，请稍候。',
 };

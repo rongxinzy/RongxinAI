@@ -67,7 +67,7 @@ function DestructiveConfirmDialog({
             <Button
               type="button"
               variant="ghost"
-              className="theme-confirm-cancel min-w-16"
+              className="theme-confirm-cancel"
               data-destructive-confirm-cancel-button="true"
               disabled={isConfirming}
               onClick={onCancel}
@@ -78,7 +78,7 @@ function DestructiveConfirmDialog({
               <Button
                 type="button"
                 variant="ghost"
-                className="theme-confirm-secondary min-w-16"
+                className="theme-confirm-secondary"
                 data-destructive-confirm-secondary-button="true"
                 disabled={isConfirming}
                 onClick={onSecondaryConfirm}
@@ -89,7 +89,7 @@ function DestructiveConfirmDialog({
             <Button
               type="button"
               variant={confirmVariant}
-              className="theme-confirm-button min-w-16"
+              className="theme-confirm-button"
               data-destructive-confirm-button="true"
               disabled={confirmDisabled || isConfirming}
               onClick={onConfirm}

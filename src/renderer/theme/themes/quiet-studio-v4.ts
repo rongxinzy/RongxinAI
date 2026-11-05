@@ -724,13 +724,13 @@ export function quietStudioAppearances(): Partial<ComponentAppearances> {
       },
     }),
     'button-size-default': recipe({
-      base: { height: '2rem', gap: '0.375rem', 'padding-inline': '0.625rem' },
+      base: { height: '2rem', gap: '0.5rem', 'padding-inline': '0.875rem' },
     }),
     'button-size-sm': recipe({
-      base: { height: '2rem', gap: '0.375rem', 'padding-inline': '0.625rem' },
+      base: { height: '1.75rem', gap: '0.375rem', 'padding-inline': '0.625rem' },
     }),
     'button-size-lg': recipe({
-      base: { height: '2.25rem', gap: '0.5rem', 'padding-inline': '0.75rem' },
+      base: { height: '2.25rem', gap: '0.5rem', 'padding-inline': '1rem' },
     }),
     'button-size-navigation': recipe({
       base: { height: '2rem', gap: '0.625rem', 'padding-inline': '0.625rem' },
@@ -858,8 +858,8 @@ export function quietStudioAppearances(): Partial<ComponentAppearances> {
     }),
     'page-quick-action-bar-button-1': recipe({
       base: {
-        gap: '0.5rem',
-        'padding-inline': '0.75rem',
+        gap: '0.375rem',
+        'padding-inline': '0.875rem',
         'padding-block': '0px',
         height: '2rem',
         'border-radius': '9999px',

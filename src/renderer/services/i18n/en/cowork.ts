@@ -45,8 +45,7 @@ export const enCowork: Record<string, string> = {
   coworkUnpinSession: 'Unpin task',
   coworkSessionActions: 'More actions',
   coworkPlaceholder: 'Describe a task or ask any question',
-  coworkHomeSubtitle:
-    'On your machine: local files, multi-step runs, confirmation before sensitive steps',
+  coworkHomeSubtitle: 'Local-first · Multi-step execution · Action verification',
   homeGreetingMorning: 'Good morning — what would you like to get done',
   homeGreetingAfternoon: 'Good afternoon — what would you like to get done',
   homeGreetingEvening: 'Good evening — what would you like to get done',
@@ -68,13 +67,12 @@ export const enCowork: Record<string, string> = {
   coworkApiConfigHint:
     'Supports Anthropic-compatible and OpenAI-compatible APIs (OpenAI compatibility is bridged by a local adapter).',
   coworkAgentEngine: 'Agent Engine',
-  coworkAgentEnginePi: 'Pi (Beta)',
-  coworkAgentEnginePiHint:
-    'Minimal agent loop, runs in-process. Dedicated for Work/Chat mode. No extra startup required.',
+  coworkAgentEnginePi: 'ZhiYuan Core',
+  coworkAgentEnginePiHint: 'Built-in unified agent runtime, always ready.',
   coworkEngineArchInfo:
     'ZhiYuan Agent runs a dual-kernel architecture with both engines running simultaneously, each with fixed responsibilities:',
   coworkEnginePiRole:
-    'Handles Cowork Work (Agent mode) and Chat (direct LLM). Runs in-process, no extra startup required.',
+    'Handles Cowork task execution and direct chat. Runs in-process, ready out of the box.',
   coworkAgentEngineClaudeLegacy: 'Cowork',
   coworkAgentEngineClaudeLegacyHint:
     'Built-in engine, ready out of the box, recommended for daily tasks.',
@@ -150,7 +148,7 @@ export const enCowork: Record<string, string> = {
     'Range 0-1. Higher means more embedding influence. Recommended: 0.62',
   coworkMemoryEmbeddingProvider: 'Embedding provider',
   coworkMemoryEmbeddingProviderHint: 'Choose how embeddings are computed',
-  coworkMemoryEmbeddingProviderLocal: 'Local (GGUF)',
+  coworkMemoryEmbeddingProviderLocal: 'Local Embedding Model',
   coworkMemoryEmbeddingProviderOpenai: 'OpenAI',
   coworkMemoryEmbeddingProviderGemini: 'Gemini',
   coworkMemoryEmbeddingProviderVoyage: 'Voyage',

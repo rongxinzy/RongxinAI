@@ -472,7 +472,7 @@ export default function SettingsPage({
                   <Button
                     type="button"
                     variant="ghost"
-                    className="theme-confirm-cancel min-w-16"
+                    className="theme-confirm-cancel"
                     onClick={onClose}
                   >
                     {i18nService.t('close')}

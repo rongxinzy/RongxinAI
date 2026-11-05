@@ -247,7 +247,7 @@ const EditProjectDialog: React.FC<EditProjectDialogProps> = ({
           <Button
             type="button"
             variant="ghost"
-            className="theme-confirm-cancel min-w-16"
+            className="theme-confirm-cancel"
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
           >

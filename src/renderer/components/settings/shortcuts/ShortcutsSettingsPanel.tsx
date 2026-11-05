@@ -109,12 +109,18 @@ const ShortcutRecorder: React.FC<{ id: string; value: string; onChange: (v: stri
       type="button"
       variant="outline"
       data-shortcut-input="true"
+      title={i18nService.t('shortcutRecorderHint')}
+      aria-label={i18nService.t('shortcutRecorderHint')}
       onKeyDown={handleKeyDown}
       onClick={() => setRecording(true)}
       onBlur={() => setRecording(false)}
       className={`theme-shortcut-input w-36 justify-center select-none ${recording ? 'theme-shortcut-recording' : ''}`}
     >
-      {value ? formatShortcutLabel(value, isMacPlatform) : i18nService.t('shortcutNotSet')}
+      {recording
+        ? i18nService.t('shortcutRecording')
+        : value
+          ? formatShortcutLabel(value, isMacPlatform)
+          : i18nService.t('shortcutNotSet')}
     </Button>
   );
 };
@@ -181,7 +187,6 @@ export default function ShortcutsSettingsPanel({
           value={formatShortcutLabel(COMPANION_SHORTCUT, isMacPlatform)}
         />
       </Field>
-      <p className="text-sm text-muted-foreground">{i18nService.t('shortcutRecorderHint')}</p>
       <FieldGroup className="gap-4">
         <Field orientation="horizontal">
           <FieldLabel htmlFor="shortcut-new-chat">{i18nService.t('newChat')}</FieldLabel>

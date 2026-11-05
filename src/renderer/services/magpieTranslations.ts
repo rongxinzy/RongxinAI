@@ -17,12 +17,11 @@ export const magpieTranslations = {
       '已允许订阅账号发现与使用。遥测和局域网访问关闭。停止服务不会撤销已写入的 Agent 配置。',
 
     magpieCatalogTitle: '模型服务',
-    magpieCatalogHint:
-      '聊天、计划任务与 Coding 共享同一模型目录。渠道在「渠道」中管理，模型能力与默认模型在这里配置。',
+    magpieCatalogHint: '统一管理各功能共享的模型服务商、路由调度规则与默认模型。',
     magpieCatalogRefresh: '刷新目录',
     magpieDefaultModel: '默认模型',
-    magpieDefaultModelHint: '新会话以及使用默认模型的请求会解析到该模型。',
-    magpieCatalogEmpty: '目录暂无模型。请在「渠道」中配置服务商，或启动本地模型后刷新。',
+    magpieDefaultModelHint: '用于新建会话与未指定模型的自动化任务。',
+    magpieCatalogEmpty: '目录暂无模型。请在服务商列表中配置，或启动本地模型后刷新。',
     magpieCatalogEnable: '启用模型服务',
     magpieCatalogConsent:
       '启用后会启动本机模型服务，并读取、同步已连接 Agent 的模型配置。订阅账号需单独启用；遥测与局域网访问默认关闭。',
@@ -63,8 +62,7 @@ export const magpieTranslations = {
       '将修改 OpenCode 配置中的 provider 与模型项，使其经知远网关转发请求。',
     magpieExternalConnectHintGemini:
       '将修改 Gemini CLI 配置中的模型与端点，使其经知远网关转发请求。',
-    magpieExternalConnectHintPi:
-      '将修改 ~/.pi/agent 下的 settings.json 等文件，使其经知远网关转发请求。',
+    magpieExternalConnectHintPi: '配置知远终端助手的模型网关连接，使其经知远统一路由转发请求。',
     magpieExternalConnectHintCodex:
       '将修改 ~/.codex/config.toml 中的 model 等字段，使其经知远网关转发请求（不启用 ChatGPT 订阅接入）。',
     magpieActivationNotice:
@@ -368,11 +366,10 @@ export const magpieTranslations = {
 
     magpieCatalogTitle: 'Model service',
     magpieCatalogHint:
-      'Chat, scheduled work, and Coding share one model catalog. Manage providers in Providers; model capabilities and the default model live here.',
+      'Manage shared model providers, routing rules, and the default model in one place.',
     magpieCatalogRefresh: 'Refresh catalog',
     magpieDefaultModel: 'Default model',
-    magpieDefaultModelHint:
-      'New sessions and requests that resolve the default model use this model.',
+    magpieDefaultModelHint: 'Used for new sessions and tasks without an explicit model.',
     magpieCatalogEmpty:
       'No models in the catalog. Configure a provider in Providers, or start a local model and refresh.',
     magpieCatalogEnable: 'Enable model service',
@@ -420,7 +417,7 @@ export const magpieTranslations = {
     magpieExternalConnectHintGemini:
       'Updates Gemini CLI model and endpoint settings to route requests through the gateway.',
     magpieExternalConnectHintPi:
-      'Updates ~/.pi/agent settings to route requests through the gateway.',
+      'Configures ZhiYuan CLI model gateway settings to route requests through the gateway.',
     magpieExternalConnectHintCodex:
       'Updates model fields in ~/.codex/config.toml to route through the gateway (ChatGPT subscription join stays disabled).',
     magpieActivationNotice:

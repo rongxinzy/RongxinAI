@@ -8,6 +8,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        primary: 'theme-button-default',
         default: 'theme-button-default',
         outline: 'theme-button-outline',
         secondary: 'theme-button-secondary',
