@@ -98,7 +98,6 @@ export const zhSecurity: Record<string, string> = {
   securityFindingJsxray_sql_injection: 'SQL 注入',
   preventSleepUpdateFailed: '更新后台保活设置失败',
   preventSleep: '后台运行时防止自动休眠',
-  preventSleepDescription: '应用需保持运行，退出后任务不会继续。',
   linkSafetyOpenExternalTitle: '打开外部链接？',
   linkSafetyOpenExternalWarning: '你即将访问外部网站，请确认链接可信。',
   linkSafetyCopyLink: '复制链接',
