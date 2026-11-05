@@ -10,6 +10,10 @@ import { Worker } from 'node:worker_threads';
 import type { collectWorkbenchArtifacts } from './artifactCollector';
 import { ArtifactWorkerLimit, ArtifactWorkerTask } from './artifactWorkerConstants';
 import type { ArtifactWorkerInput, WorkspaceContentInspection } from './artifactWorkerTypes';
+import {
+  isValidArtifactWorkerResult,
+  resolveDeclaredDeliverablePaths,
+} from './artifactWorkerResult';
 import { COMPANION_MAX_ATTACHMENTS } from '../../shared/companion/attachments';
 import {
   CompanionImageLimit,
@@ -31,6 +35,7 @@ type Response = {
 };
 type Job = {
   task: ArtifactWorkerInput;
+  declaredDeliverablePaths: readonly string[];
   queuedAt: number;
   resolve: (result: Result) => void;
   reject: (error: Error) => void;
@@ -64,9 +69,11 @@ export class WorkbenchArtifactWorkerPool {
     } catch (error) {
       return Promise.reject(error);
     }
-    return this.enqueue({ kind: ArtifactWorkerTask.Collect, input }, signal).then(
-      result => result as Artifacts,
-    );
+    return resolveDeclaredDeliverablePaths(input)
+      .then(declaredPaths =>
+        this.enqueue({ kind: ArtifactWorkerTask.Collect, input }, signal, declaredPaths),
+      )
+      .then(result => result as Artifacts);
   }
 
   transform(input: TextWorkerInput, signal?: AbortSignal): Promise<TextWorkerOutput> {
@@ -118,7 +125,11 @@ export class WorkbenchArtifactWorkerPool {
     }
   }
 
-  private enqueue(task: ArtifactWorkerInput, signal?: AbortSignal): Promise<Result> {
+  private enqueue(
+    task: ArtifactWorkerInput,
+    signal?: AbortSignal,
+    declaredDeliverablePaths: readonly string[] = [],
+  ): Promise<Result> {
     if (signal?.aborted) return Promise.reject(new Error('Artifact collection cancelled.'));
     if (this.queue.length >= ArtifactWorkerLimit.Queue) {
       return Promise.reject(new Error('Artifact collection queue is full.'));
@@ -126,6 +137,7 @@ export class WorkbenchArtifactWorkerPool {
     return new Promise((resolve, reject) => {
       const job: Job = {
         task,
+        declaredDeliverablePaths,
         signal,
         resolve,
         reject,
@@ -231,11 +243,11 @@ export class WorkbenchArtifactWorkerPool {
             !Array.isArray(response.artifacts) ||
             response.artifacts.some(
               artifact =>
-                artifact.taskId !== (job.task.input as Input).taskId ||
-                artifact.runId !== (job.task.input as Input).runId ||
-                !/^[a-f0-9]{64}$/.test(artifact.contentHash) ||
-                path.isAbsolute(artifact.reference) ||
-                artifact.reference.split(/[/\\]/)[0] === '..',
+                !isValidArtifactWorkerResult(
+                  artifact,
+                  job.task.input as Input,
+                  job.declaredDeliverablePaths,
+                ),
             )
           ) {
             this.finish(created, new Error(response.error || 'Invalid artifact worker result.'));

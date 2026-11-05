@@ -4,7 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { WorkbenchArtifactCandidateSource } from '../../shared/workbenchTask';
+import {
+  WorkbenchArtifactCandidateSource,
+  WorkbenchArtifactProvenance,
+} from '../../shared/workbenchTask';
+import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
+import { buildDeclareArtifactTool } from '../declareArtifact/tool';
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import { WorkbenchArtifactWorkerPool } from './artifactWorkerPool';
 import { ArtifactWorkerLimit } from './artifactWorkerConstants';
@@ -71,6 +76,48 @@ test('the worker returns the same hashes and rejects paths outside the workspace
       ],
     }),
   ).toEqual([]);
+});
+
+test('declarations accept external deliverables with minimal or complete parameters', async () => {
+  const workspaceRoot = path.join(fixture, 'workspace');
+  const filePath = path.join(fixture, 'external', '项目', 'output', 'presentation.pptx');
+  fs.mkdirSync(workspaceRoot, { recursive: true });
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, 'presentation fixture');
+  const tool = buildDeclareArtifactTool({
+    onDeclare: async artifact => {
+      const artifacts = await pool.collect({
+        ...input,
+        workspaceRoot,
+        artifactCandidates: [
+          {
+            path: artifact.filePath,
+            source: WorkbenchArtifactCandidateSource.Declaration,
+            role: artifact.role,
+            title: artifact.title,
+            kind: artifact.kind,
+          },
+        ],
+      });
+      expect(artifacts).toHaveLength(1);
+      expect(artifacts[0]).toMatchObject({
+        reference: fs.realpathSync(filePath),
+        provenance: WorkbenchArtifactProvenance.External,
+        metadata: { outsideWorkspace: true, role: CoworkArtifactRole.Deliverable },
+      });
+    },
+  }) as unknown as {
+    execute: (
+      id: string,
+      params: Record<string, unknown>,
+    ) => Promise<{ details: Record<string, unknown> }>;
+  };
+  for (const params of [
+    { filePath },
+    { filePath, title: '课程大纲', kind: 'document', role: CoworkArtifactRole.Deliverable },
+  ]) {
+    expect((await tool.execute('external-declaration', params)).details.error).toBeUndefined();
+  }
 });
 test('collection enforces input limits and supports cancellation', async () => {
   await expect(
