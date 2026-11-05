@@ -92,3 +92,32 @@ test('a running status event refreshes bindings without re-probing the service',
     models: [{ id: 'strata-model', name: 'Strata Model', input: ['text'] }],
   });
 });
+
+test('a delayed model list cannot restore bindings after the service stops', async () => {
+  vi.spyOn(ipcMain, 'handle').mockImplementation(() => {});
+  vi.spyOn(BrowserWindow, 'getAllWindows').mockReturnValue([]);
+  let resolveModels: (models: { id: string; name: string }[]) => void = () => {};
+  strataClientMock.health.mockResolvedValue(true);
+  strataClientMock.listModels.mockImplementationOnce(
+    () =>
+      new Promise(resolve => {
+        resolveModels = resolve;
+      }),
+  );
+  const manager = new StrataManager(() => ({ port: '8096' }));
+  const snapshots: StrataProviderSnapshot[] = [];
+  registerStrataIpcHandlers(manager, {
+    getStore: () => ({ get: () => ({}), set: () => {} }) as unknown as SqliteStore,
+    onModelBindingsChanged: snapshot => {
+      snapshots.push(snapshot);
+    },
+  });
+
+  await manager.detect();
+  await manager.stop();
+  expect(snapshots.at(-1)).toEqual({ baseUrl: null, models: [] });
+  resolveModels([{ id: 'stale-model', name: 'Stale Model' }]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  expect(snapshots.at(-1)).toEqual({ baseUrl: null, models: [] });
+});
