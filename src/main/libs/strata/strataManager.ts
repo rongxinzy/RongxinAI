@@ -151,7 +151,9 @@ export class StrataManager extends EventEmitter {
    */
   private async supersedeActiveStart(pending: Promise<StrataStatusSnapshot>): Promise<void> {
     this.generation++;
-    this.phase = 'idle';
+    // Keep probes out while the superseded child is being killed; the new
+    // start runs only after this cleanup and then owns the status again.
+    this.phase = 'stopping';
     this.activeCatalogId = undefined;
     const port = this.resolvePort();
     this.setStatus({
@@ -166,6 +168,7 @@ export class StrataManager extends EventEmitter {
     const child = this.process;
     if (child) await this.terminateChild(child);
     await pending.catch(() => {});
+    if (this.phase === 'stopping') this.phase = 'idle';
     if (this.startInFlight === pending) {
       this.startInFlight = null;
       this.startCatalogId = undefined;
