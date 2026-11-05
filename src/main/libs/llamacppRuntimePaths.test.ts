@@ -35,6 +35,8 @@ vi.mock('./llamacppNvidiaEnvironment', async importOriginal => ({
 }));
 vi.mock('./fileHasher', () => ({ sha256FileStream: mocks.hash }));
 
+const originalPlatform = process.platform;
+
 let root: string;
 let manifest: BundledRuntimeManifest;
 
@@ -81,6 +83,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Object.defineProperty(process, 'platform', { value: originalPlatform });
   vi.restoreAllMocks();
   fs.rmSync(root, { recursive: true, force: true });
 });
@@ -128,15 +131,30 @@ test('a missing CPU executable fails instead of retrying the incompatible CUDA b
   expect(mocks.execFile).not.toHaveBeenCalled();
 });
 
-test('CPU editions retain manifest-based Vulkan selection', async () => {
-  manifest.backend.backend = 'win-x64-cpu-vulkan-bundle';
+test.each(['win32', 'linux'] as const)(
+  'CPU editions retain manifest-based Vulkan selection on %s',
+  async platform => {
+    Object.defineProperty(process, 'platform', { value: platform });
+    manifest.backend.backend = 'win-x64-cpu-vulkan-bundle';
+    manifest.vulkanExecutable = manifest.executable;
+    mocks.execFile.mockImplementation((_file, _args, _options, callback) => {
+      callback(null, 'Vulkan0: Intel UHD Graphics 770\n', '');
+    });
+    await expect(findLlamaCppExecutable()).resolves.toBe(
+      path.join(root, manifest.vulkanExecutable),
+    );
+    expect(mocks.nvidia).not.toHaveBeenCalled();
+    expect(mocks.execFile).toHaveBeenCalledOnce();
+  },
+);
+
+test('macOS uses its primary bundled runtime without Vulkan probing', async () => {
+  Object.defineProperty(process, 'platform', { value: 'darwin' });
+  manifest.backend.backend = 'mac-arm64';
   manifest.vulkanExecutable = manifest.executable;
-  mocks.execFile.mockImplementation((_file, _args, _options, callback) => {
-    callback(null, 'Vulkan0: Intel UHD Graphics 770\n', '');
-  });
-  await expect(findLlamaCppExecutable()).resolves.toBe(path.join(root, manifest.vulkanExecutable));
+  await expect(findLlamaCppExecutable()).resolves.toBe(path.join(root, manifest.executable));
   expect(mocks.nvidia).not.toHaveBeenCalled();
-  expect(mocks.execFile).toHaveBeenCalledOnce();
+  expect(mocks.execFile).not.toHaveBeenCalled();
 });
 
 test('bundled hash verification awaits the worker and rejects a modified CPU executable', async () => {
