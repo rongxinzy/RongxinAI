@@ -19,7 +19,7 @@ const SecurityStatusIndicator: React.FC<SecurityStatusIndicatorProps> = ({ permi
   );
 
   return (
-    <div className="flex items-center gap-1.5 mr-2 px-2" title={description}>
+    <div className="flex items-center gap-1.5 px-2" title={description}>
       <span
         className={
           allowAll ? 'theme-shell-status-dot-warning shrink-0' : 'theme-shell-status-dot shrink-0'

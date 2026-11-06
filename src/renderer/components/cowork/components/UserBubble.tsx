@@ -171,7 +171,7 @@ export const UserBubble: React.FC<{
       onMouseLeave={handleMouseLeave}
       onBlur={handleBlur}
     >
-      <div className="mx-auto flex w-full max-w-6xl min-w-[320px] flex-col items-end pl-4">
+      <div className="mx-auto flex w-full max-w-4xl min-w-[320px] flex-col items-end">
         {hasTextContent && (
           <Message from="user" className="ml-auto items-end">
             <MessageContent className="theme-message-cowork-user">

@@ -55,7 +55,7 @@ export function McpCustomTab({
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap gap-2">
+            <div className="col-span-full flex flex-wrap gap-2 mb-1">
               <Button type="button" variant="outline" onClick={onImportConfig}>
                 <Upload data-icon="inline-start" />
                 {i18nService.t('mcpImportConfig')}

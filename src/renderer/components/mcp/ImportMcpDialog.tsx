@@ -162,7 +162,7 @@ const ImportMcpDialog: React.FC<ImportMcpDialogProps> = ({ open, onOpenChange, o
           </Field>
         </div>
 
-        <DialogFooter className="flex items-center justify-end gap-2.5">
+        <DialogFooter className="-mx-6 -mb-6 px-6 py-4 flex items-center justify-end gap-2.5">
           <Button
             type="button"
             variant="outline"

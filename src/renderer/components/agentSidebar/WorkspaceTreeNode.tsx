@@ -224,20 +224,20 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                 <Button
                   variant="ghost"
                   onClick={() => onRetryLoadTasks(workspace.id)}
-                  className="theme-page-workspace-tree-node-button-2 ml-[-6px] flex justify-start"
+                  className="theme-page-workspace-tree-node-button-2 flex w-full justify-start pl-[36px]"
                 >
                   {i18nService.t('myAgentSidebarLoadFailed')}
                 </Button>
               )}
               {workspace.isLoadingTasks && workspace.tasks.length === 0 && (
-                <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-sm text-muted-foreground">
+                <div className="flex h-7 w-full items-center pl-[36px] pr-2.5 text-sm text-muted-foreground">
                   {i18nService.t('loading')}
                 </div>
               )}
               {!workspace.isLoadingTasks &&
                 !workspace.hasLoadError &&
                 workspace.tasks.length === 0 && (
-                  <div className="ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center pl-[38px] pr-2.5 text-sm text-muted-foreground">
+                  <div className="flex h-7 w-full items-center pl-[36px] pr-2.5 text-sm text-muted-foreground">
                     {i18nService.t('myAgentSidebarNoTasks')}
                   </div>
                 )}

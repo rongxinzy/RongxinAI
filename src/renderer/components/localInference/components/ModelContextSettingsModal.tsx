@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { Input } from '@shared/components/ui/input';
 import {
   InputGroup,
   InputGroupAddon,
@@ -251,7 +252,7 @@ export function ModelContextSettingsModal({
 
       {!hideContextEditor ? (
         <div className="flex flex-col gap-3">
-          <div className="flex min-h-7 items-center gap-0">
+          <div className="flex min-h-8 items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground">
               {i18nService.t('localInferenceServiceConfigCtxSizeLabel')}：
             </span>
@@ -269,17 +270,17 @@ export function ModelContextSettingsModal({
 
       {!hideNCpuMoeEditor ? (
         <div className="flex flex-col gap-1.5">
-          <div className="flex min-h-7 items-center gap-2">
+          <div className="flex min-h-8 items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground">
               {i18nService.t('localInferenceNCpuMoeLabel')}
             </span>
-            <input
+            <Input
               type="number"
               min={0}
               step={1}
               value={nCpuMoeValue}
               aria-invalid={Boolean(getNCpuMoeError(nCpuMoeValue))}
-              className="theme-control-sizing-22 h-7 w-28 rounded-md border border-border-subtle bg-transparent px-2 text-sm text-foreground outline-none focus-visible:border-border"
+              className="h-8 w-24 text-sm"
               onChange={event => setNCpuMoeValue(event.target.value)}
             />
           </div>
@@ -350,7 +351,7 @@ export function ModelContextSettingsModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="theme-local-context-modal w-full max-w-md p-0"
+      className="theme-local-context-modal w-full sm:max-w-md p-0"
     >
       {content}
     </Modal>

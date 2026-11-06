@@ -105,8 +105,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
   return (
     <div
       className={`theme-surface-agent-row sidebar-session-row group relative ${
-        // 2026/09/22 lixiang  文件夹下任务整体左缩进 15px（与 padding-left 15px 等效需求）
-        isNested ? 'ml-[15px] w-[calc(100%-15px)]' : 'ml-0 w-full'
+        isNested ? 'pl-[36px] w-full' : 'pl-[10px] w-full'
       } flex items-center ${
         isSelected ? 'theme-surface-agent-selected' : 'theme-surface-agent-idle'
       }`}

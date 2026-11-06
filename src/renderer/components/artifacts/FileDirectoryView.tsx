@@ -1,4 +1,18 @@
+import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
+import { cn } from '@shared/lib/utils';
+import {
+  Box,
+  File,
+  FileCode,
+  FileQuestion,
+  FileSpreadsheet,
+  FileText,
+  Globe,
+  Image,
+  Network,
+  Palette,
+} from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 import { i18nService } from '@/services/i18n';
@@ -7,17 +21,17 @@ import { CoworkArtifactSource } from '../../../shared/cowork/artifacts';
 
 const t = (key: string) => i18nService.t(key);
 
-const TYPE_ICONS: Record<ArtifactType, string> = {
-  html: '🌐',
-  svg: '🎨',
-  image: '🖼',
-  mermaid: '📊',
-  code: '📄',
-  markdown: '📝',
-  text: '📄',
-  document: '📑',
-  model: '📐',
-  unsupported: '📑',
+const TYPE_ICONS: Record<ArtifactType, React.ComponentType<{ className?: string }>> = {
+  html: Globe,
+  svg: Palette,
+  image: Image,
+  mermaid: Network,
+  code: FileCode,
+  markdown: FileText,
+  text: File,
+  document: FileSpreadsheet,
+  model: Box,
+  unsupported: FileQuestion,
 };
 
 const TYPE_ORDER: Record<ArtifactType, number> = {
@@ -122,42 +136,51 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
                     {t(TYPE_LABEL_KEYS[artifact.type] || 'artifactCode')}
                   </div>
                 )}
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onSelect(artifact.id)}
-                  onKeyDown={e => {
-                    if (e.key !== 'Enter' && e.key !== ' ') return;
-                    e.preventDefault();
-                    onSelect(artifact.id);
-                  }}
-                  className={`theme-surface-file-row flex items-center gap-2 px-3 py-2 cursor-pointer
-                    ${artifact.id === selectedId ? 'theme-surface-file-selected' : 'theme-surface-file-idle'}`}
-                >
-                  {!compact && (
-                    <span className="shrink-0 text-base">{TYPE_ICONS[artifact.type] || '📄'}</span>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="truncate">{artifact.fileName || artifact.title}</div>
-                    {!compact && artifact.filePath && (
-                      <div className="text-xs text-muted-foreground truncate">
-                        {getShortPath(artifact.filePath)}
-                      </div>
-                    )}
-                    {!compact &&
-                      !artifact.filePath &&
-                      artifact.source === CoworkArtifactSource.CodeBlock && (
-                        <div className="text-xs text-muted-foreground">
-                          {t('artifactResponseFragment')}
-                        </div>
+                {(() => {
+                  const IconComponent = TYPE_ICONS[artifact.type] || File;
+                  return (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => onSelect(artifact.id)}
+                      className={cn(
+                        'theme-surface-file-row h-auto w-full justify-start gap-2 px-3 py-2 text-left font-normal',
+                        artifact.id === selectedId
+                          ? 'theme-surface-file-selected'
+                          : 'theme-surface-file-idle',
                       )}
-                  </div>
-                  {!compact && (
-                    <span className="shrink-0 text-xs text-muted-foreground uppercase">
-                      {artifact.type}
-                    </span>
-                  )}
-                </div>
+                    >
+                      {!compact && (
+                        <IconComponent
+                          className="size-4 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm">
+                          {artifact.fileName || artifact.title}
+                        </div>
+                        {!compact && artifact.filePath && (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {getShortPath(artifact.filePath)}
+                          </div>
+                        )}
+                        {!compact &&
+                          !artifact.filePath &&
+                          artifact.source === CoworkArtifactSource.CodeBlock && (
+                            <div className="text-xs text-muted-foreground">
+                              {t('artifactResponseFragment')}
+                            </div>
+                          )}
+                      </div>
+                      {!compact && (
+                        <span className="shrink-0 text-xs uppercase text-muted-foreground">
+                          {artifact.type}
+                        </span>
+                      )}
+                    </Button>
+                  );
+                })()}
               </React.Fragment>
             );
           })

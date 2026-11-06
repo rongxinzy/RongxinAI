@@ -23,7 +23,7 @@ export const SessionExportDialog: React.FC<SessionExportDialogProps> = ({
 }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xs">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-base font-semibold">
             {i18nService.t('coworkExportAs')}

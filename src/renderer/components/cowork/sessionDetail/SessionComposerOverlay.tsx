@@ -18,7 +18,7 @@ export function SessionComposerOverlay({
 }: SessionComposerOverlayProps) {
   return (
     <div ref={overlayRef} className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4">
-      <div className="mx-auto w-full max-w-4xl min-w-[320px] pl-4">
+      <div className="mx-auto w-full max-w-4xl min-w-[320px]">
         <div className="theme-composer-backdrop pointer-events-auto relative min-w-0">
           <CoworkPromptInput
             ref={promptInputRef}

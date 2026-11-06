@@ -36,7 +36,7 @@ const FailureDetailModal: React.FC<FailureDetailModalProps> = ({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="theme-control-card-surface">
+      <DialogContent className="theme-control-card-surface sm:max-w-xl">
         <DialogHeader>
           <div>
             <DialogTitle>{i18nService.t('scheduledTasksFailureDetailTitle')}</DialogTitle>

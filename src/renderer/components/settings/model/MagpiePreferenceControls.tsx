@@ -26,12 +26,12 @@ export function MagpiePreferenceRow({
   control: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
       <div className="min-w-0 flex-1">
         <h3 className="text-base font-medium text-foreground">{title}</h3>
         {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
       </div>
-      <div className="w-full shrink-0 lg:w-auto">{control}</div>
+      <div className="w-full shrink-0 sm:w-auto">{control}</div>
     </div>
   );
 }
@@ -72,7 +72,7 @@ export function MagpieModelSelect({
       }}
       disabled={disabled}
     >
-      <SelectTrigger className="w-full lg:w-64" aria-label={label}>
+      <SelectTrigger className="w-full sm:w-64" aria-label={label}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -115,7 +115,7 @@ export function MagpieEffortSelect({
       }}
       disabled={disabled}
     >
-      <SelectTrigger className="w-full lg:w-40" aria-label={label}>
+      <SelectTrigger className="w-full sm:w-64" aria-label={label}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -149,7 +149,7 @@ export function MagpieListEditor({
     setDraft('');
   };
   return (
-    <div className="flex w-full flex-col gap-2">
+    <div className="flex w-full sm:w-64 flex-col gap-2">
       <div className="flex items-center gap-2">
         <Input
           value={draft}

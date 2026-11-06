@@ -1,0 +1,213 @@
+<!doctype html>
+<html>
+<head>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 12px;
+      color: var(--figma-color-text, #333333);
+      background: var(--figma-color-bg, #ffffff);
+    }
+    #plugin-root {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-sizing: border-box;
+    }
+    .header {
+      padding: 12px 16px 8px 16px;
+      border-bottom: 1px solid var(--figma-color-border, #e5e5e5);
+    }
+    .title {
+      font-size: 13px;
+      font-weight: 600;
+      margin: 0 0 4px 0;
+      color: var(--figma-color-text, #111111);
+    }
+    .subtitle {
+      font-size: 11px;
+      color: var(--figma-color-text-secondary, #666666);
+      margin: 0;
+    }
+    .content {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .btn {
+      width: 100%;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid var(--figma-color-border, #d1d5db);
+      background: var(--figma-color-bg, #ffffff);
+      color: var(--figma-color-text, #111827);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 0 10px;
+      gap: 8px;
+      transition: background 0.15s ease;
+    }
+    .btn:hover {
+      background: var(--figma-color-bg-hover, #f3f4f6);
+    }
+    .btn.primary {
+      background: var(--figma-color-bg-brand, #2563eb);
+      color: #ffffff;
+      border-color: transparent;
+      justify-content: center;
+      font-weight: 600;
+    }
+    .btn.primary:hover {
+      background: var(--figma-color-bg-brand-hover, #1d4ed8);
+    }
+    .badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--figma-color-bg-tertiary, #f3f4f6);
+      color: var(--figma-color-text-secondary, #4b5563);
+      margin-left: auto;
+    }
+    .status-bar {
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: var(--figma-color-bg-secondary, #f9fafb);
+      border: 1px solid var(--figma-color-border, #e5e7eb);
+      font-size: 11px;
+      line-height: 1.4;
+      min-height: 20px;
+    }
+    .status-bar.error {
+      color: #dc2626;
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+    .log-container {
+      max-height: 120px;
+      overflow-y: auto;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: monospace;
+      font-size: 10px;
+      padding: 8px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="plugin-root">
+    <div class="header">
+      <h1 class="title">知远设计系统 · 布局几何对齐同步器</h1>
+      <p class="subtitle">Quiet Studio v4.0 (FIG1 - FIG11) 自动化规范对齐</p>
+    </div>
+
+    <div class="content">
+      <button class="btn primary" id="btn-all">
+        ⚡ 一键全量规范同步 (FIG1-FIG11)
+      </button>
+
+      <div class="status-bar" id="status-box">准备就绪，点击上方按钮开始同步。</div>
+
+      <div class="btn-group">
+        <button class="btn" id="btn-fig1">
+          <span>📐 FIG1: 首页 Auto Layout 现代化</span>
+          <span class="badge">Page 02</span>
+        </button>
+        <button class="btn" id="btn-fig2_3_4">
+          <span>🎯 FIG2-4: 舞台中心岛 1px 偏心消除</span>
+          <span class="badge">1012px 舞台</span>
+        </button>
+        <button class="btn" id="btn-fig5">
+          <span>⚖️ FIG5: 输入岛配件垂直基线统合</span>
+          <span class="badge">消除 7px 锯齿</span>
+        </button>
+        <button class="btn" id="btn-fig6">
+          <span>📖 FIG6: 会话流 896px 对称阅读列</span>
+          <span class="badge">Page 03</span>
+        </button>
+        <button class="btn" id="btn-fig7_8">
+          <span>🧩 FIG7-8: 导航与按钮 Fill / Hug 约束</span>
+          <span class="badge">Page 01</span>
+        </button>
+        <button class="btn" id="btn-fig9">
+          <span>📑 FIG9: 设置中心 744px 边缘齐平</span>
+          <span class="badge">Page 04</span>
+        </button>
+        <button class="btn" id="btn-fig10">
+          <span>🪟 FIG10: 448px 基础弹窗母版体系</span>
+          <span class="badge">512px 治理</span>
+        </button>
+        <button class="btn" id="btn-fig11">
+          <span>📊 FIG11: 本地推理卡片网格 gap=16</span>
+          <span class="badge">Page 06</span>
+        </button>
+      </div>
+
+      <div class="log-container" id="log-box">// 执行日志将在此实时显示...</div>
+    </div>
+  </div>
+
+  <script>
+    const post = (msg) => parent.postMessage({ pluginMessage: msg }, '*');
+
+    const statusBox = document.getElementById('status-box');
+    const logBox = document.getElementById('log-box');
+
+    function addLog(text) {
+      logBox.textContent += '\n' + text;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    // Task dispatchers
+    document.getElementById('btn-all').addEventListener('click', () => {
+      logBox.textContent = '// 开始全量同步...';
+      post({ type: 'run-sync', task: 'all' });
+    });
+    document.getElementById('btn-fig1').addEventListener('click', () => post({ type: 'run-sync', task: 'fig1' }));
+    document.getElementById('btn-fig2_3_4').addEventListener('click', () => post({ type: 'run-sync', task: 'fig2_3_4' }));
+    document.getElementById('btn-fig5').addEventListener('click', () => post({ type: 'run-sync', task: 'fig5' }));
+    document.getElementById('btn-fig6').addEventListener('click', () => post({ type: 'run-sync', task: 'fig6' }));
+    document.getElementById('btn-fig7_8').addEventListener('click', () => post({ type: 'run-sync', task: 'fig7_8' }));
+    document.getElementById('btn-fig9').addEventListener('click', () => post({ type: 'run-sync', task: 'fig9' }));
+    document.getElementById('btn-fig10').addEventListener('click', () => post({ type: 'run-sync', task: 'fig10' }));
+    document.getElementById('btn-fig11').addEventListener('click', () => post({ type: 'run-sync', task: 'fig11' }));
+
+    // Listen from sandbox
+    window.onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      if (!msg) return;
+      if (msg.type === 'log') {
+        addLog(msg.message);
+      }
+      if (msg.type === 'status') {
+        statusBox.textContent = msg.message;
+        if (msg.isError) {
+          statusBox.classList.add('error');
+        } else {
+          statusBox.classList.remove('error');
+        }
+      }
+    };
+
+    // Auto resize
+    const root = document.getElementById('plugin-root');
+    new ResizeObserver(() => {
+      post({ type: 'resize', height: Math.ceil(root.getBoundingClientRect().height) });
+    }).observe(root);
+  </script>
+</body>
+</html>

@@ -28,7 +28,7 @@ export const CoworkSessionTitleLoadingSkeleton = () => (
 
 export const CoworkConversationLoadingSkeleton = () => (
   <div
-    className="mx-auto flex h-full w-full max-w-5xl flex-col justify-between gap-6 overflow-hidden px-8 py-6"
+    className="mx-auto flex h-full w-full max-w-4xl flex-col justify-between gap-6 overflow-hidden px-4 py-6"
     role="status"
     aria-busy="true"
   >
@@ -68,7 +68,7 @@ export const CoworkSessionColdStartSkeleton = () => (
         <Skeleton
           className={cn(
             shimmerClassName,
-            'theme-scene-loading-composer mx-auto h-24 w-full max-w-5xl',
+            'theme-scene-loading-composer mx-auto h-24 w-full max-w-4xl',
           )}
         />
       </div>

@@ -240,7 +240,7 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
                 icon={`custom:${selectedIcon}:${selectedGradient}`}
                 className="size-14 text-xl"
               />
-              <span className="text-[11px] text-muted-foreground">头像预览</span>
+              <span className="text-xs text-muted-foreground">头像预览</span>
             </div>
 
             <div className="flex-1 flex flex-col gap-3">
@@ -332,14 +332,14 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
                 {i18nService.t('expertSystemPrompt')} <span className="text-destructive">*</span>
               </FieldLabel>
               <div className="flex items-center gap-1.5">
-                <span className="text-[11px] text-muted-foreground mr-1">快速套用模板:</span>
+                <span className="text-xs text-muted-foreground mr-1">快速套用模板:</span>
                 {PROMPT_TEMPLATES.map(tpl => (
                   <Button
                     key={tpl.name}
                     type="button"
                     variant="outline"
                     size="xs"
-                    className="h-6 text-[11px] px-2"
+                    className="h-7 text-xs px-2"
                     onClick={() => setSystemPrompt(tpl.prompt)}
                   >
                     <FileText className="size-3 mr-1" />
@@ -363,7 +363,7 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
               <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
                 <Sparkles className="size-3.5 text-primary" />
                 {i18nService.t('expertBoundSkills')}
-                <span className="text-[11px] text-muted-foreground font-normal">
+                <span className="text-xs text-muted-foreground font-normal">
                   ({selectedSkillIds.length} 已选)
                 </span>
               </span>
@@ -408,7 +408,7 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
               <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
                 <Cable className="size-3.5 text-primary" />
                 {i18nService.t('expertBoundMcp')}
-                <span className="text-[11px] text-muted-foreground font-normal">
+                <span className="text-xs text-muted-foreground font-normal">
                   ({selectedMcpIds.length} 已选)
                 </span>
               </span>
@@ -442,7 +442,7 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
                     >
                       {isChecked && <Check className="size-3 stroke-[2.5]" />}
                       <span>{server.name}</span>
-                      <span className="text-[10px] opacity-70">({server.transportType})</span>
+                      <span className="text-xs opacity-70">({server.transportType})</span>
                     </button>
                   );
                 })
@@ -451,7 +451,7 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
           </div>
         </div>
 
-        <DialogFooter className="pt-2">
+        <DialogFooter className="-mx-6 -mb-6 px-6 py-4">
           <Button
             type="button"
             variant="outline"

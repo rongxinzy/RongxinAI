@@ -92,7 +92,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
     <Modal
       onClose={() => onAction('cancel')}
       overlayClassName="theme-skill-modal-backdrop fixed inset-0 z-50 flex items-center justify-center"
-      className="theme-skill-security-modal w-full max-w-xl mx-4 overflow-hidden"
+      className="theme-skill-security-modal w-full sm:max-w-xl overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">

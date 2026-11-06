@@ -83,10 +83,10 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           value={EXPERT_TAB.Experts}
           activeValue={activeTab}
           direction={tabDirection}
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
           contentClassName="h-full"
         >
-          <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 px-4 pt-4 pb-8 sm:px-6">
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-3 pb-4">
             <ExpertManager onChatWithExpert={onChatWithExpert} />
           </div>
         </LayeredTabsContent>
@@ -114,7 +114,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           value={EXPERT_TAB.Mcp}
           activeValue={activeTab}
           direction={tabDirection}
-          className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+          className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
           contentClassName="h-full"
         >
           <div className="mx-auto h-full w-full max-w-4xl">

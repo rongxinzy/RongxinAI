@@ -1,4 +1,13 @@
 import { Button } from '@shared/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
+import { File, FileSpreadsheet, Presentation } from 'lucide-react';
 import React, { useCallback } from 'react';
 
 import type { Artifact } from '@/types/artifact';
@@ -16,18 +25,24 @@ export const FileInfoFallback: React.FC<{ artifact: Artifact }> = ({ artifact })
     }
   }, [artifact.filePath]);
 
+  const Icon = ext === '.pptx' ? Presentation : ext === '.xlsx' ? FileSpreadsheet : File;
+
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-4 p-6">
-      <div className="text-5xl">{ext === '.pptx' ? '📊' : ext === '.xlsx' ? '📑' : '📄'}</div>
-      <div className="text-center">
-        <div className="text-sm font-medium">{artifact.fileName || artifact.title}</div>
-        <div className="text-xs text-muted-foreground mt-1">{ext.toUpperCase().slice(1)}</div>
-      </div>
+    <Empty className="h-full p-6">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Icon className="size-8 text-muted-foreground" aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle>{artifact.fileName || artifact.title}</EmptyTitle>
+        <EmptyDescription>{ext.toUpperCase().slice(1)}</EmptyDescription>
+      </EmptyHeader>
       {artifact.filePath && (
-        <Button onClick={handleOpenWithApp} className="theme-page-document-renderer-button-1 mt-2">
-          {t('artifactOpenWithApp')}
-        </Button>
+        <EmptyContent>
+          <Button onClick={handleOpenWithApp} className="theme-page-document-renderer-button-1">
+            {t('artifactOpenWithApp')}
+          </Button>
+        </EmptyContent>
       )}
-    </div>
+    </Empty>
   );
 };

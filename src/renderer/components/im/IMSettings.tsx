@@ -305,7 +305,7 @@ const IMSettings: React.FC = () => {
       />
 
       {/* Platform Settings - Right Side */}
-      <div className="flex-1 min-w-0 pl-4 pr-2 flex flex-col gap-4 overflow-y-auto scrollbar-gutter-stable">
+      <div className="flex-1 min-w-0 px-4 flex flex-col gap-4 overflow-y-auto scrollbar-gutter-stable">
         {/* Header with status (only for single-instance platforms without per-instance headers) */}
         {activePlatform === 'weixin' && (
           <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">

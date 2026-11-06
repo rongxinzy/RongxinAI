@@ -74,7 +74,7 @@ export function McpOfficialConnectDialog({
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
       <DialogContent
-        className="theme-control-sizing-4 max-w-[26rem] gap-0 overflow-hidden sm:max-w-[26rem]"
+        className="theme-control-sizing-4 gap-0 overflow-hidden sm:max-w-md"
         showCloseButton
       >
         {entry && (

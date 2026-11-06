@@ -463,12 +463,7 @@ export default function SettingsPage({
 
             {!isEnterpriseTab(activeTab) && (
               <div className="shrink-0 border-t border-border bg-background">
-                <div
-                  className={cn(
-                    'flex flex-wrap items-center justify-end gap-2 px-4 py-3 sm:px-6',
-                    contentWidthClass,
-                  )}
-                >
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 px-4 py-3 sm:px-6">
                   <Button
                     type="button"
                     variant="ghost"

@@ -329,7 +329,7 @@ const TurnBlockComponent: React.FC<{
 
   return (
     <div className="py-2">
-      <div className="mx-auto w-full max-w-6xl min-w-[320px] pl-4">
+      <div className="mx-auto w-full max-w-4xl min-w-[320px]">
         <div className="flex min-w-0 flex-col gap-3 py-3">
           {primaryExpert ? (
             <div className="flex items-center gap-2 text-sm font-semibold text-foreground">

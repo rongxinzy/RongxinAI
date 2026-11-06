@@ -38,7 +38,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect
     // One centered row on wide screens; below the composer width the actions
     // become a balanced grid so a wrapped tail never leaves a lonely pill.
     <div className="@container mx-auto w-full max-w-3xl">
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:@4xl:flex xl:@4xl:flex-wrap xl:@4xl:items-center xl:@4xl:justify-center">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:flex xl:flex-wrap xl:items-center xl:justify-center">
         {actions.map(action => {
           const IconComponent = iconMap[action.icon];
 

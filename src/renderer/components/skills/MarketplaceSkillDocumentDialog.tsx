@@ -75,7 +75,7 @@ export function MarketplaceSkillDocumentDialog({
       }}
     >
       <section className="flex h-[min(32rem,calc(100%-3rem))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
-        <header className="flex h-14 shrink-0 items-center justify-between px-5">
+        <header className="flex h-14 shrink-0 items-center justify-between px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar className="theme-scene-skill-document-avatar">
               {skill.iconUrl && (
@@ -103,7 +103,7 @@ export function MarketplaceSkillDocumentDialog({
         </header>
 
         <ScrollArea className="min-h-0 flex-1">
-          <div className="mx-auto max-w-3xl px-8 py-6">
+          <div className="mx-auto max-w-3xl px-6 py-6">
             <p className="break-words text-sm text-muted-foreground">
               {resolveLocalizedText(skill.description)}
             </p>

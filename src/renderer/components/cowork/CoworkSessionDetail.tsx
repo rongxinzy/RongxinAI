@@ -414,7 +414,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                     <div className="mx-auto w-full max-w-4xl">{renderConversationTurns()}</div>
                     {inlineQuestionPermission && onRespondToInlineQuestion && (
                       <div className="px-3 pt-3">
-                        <div className="mx-auto w-full max-w-4xl min-w-[320px] pl-4">
+                        <div className="mx-auto w-full max-w-4xl min-w-[320px]">
                           <AskUserQuestionCard
                             permission={inlineQuestionPermission}
                             onRespond={onRespondToInlineQuestion}
@@ -427,7 +427,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                       onRespondToInlinePermission &&
                       !hasInlineToolPermissionCard && (
                         <div className="px-3 pt-3">
-                          <div className="mx-auto w-full max-w-4xl min-w-[320px] pl-4">
+                          <div className="mx-auto w-full max-w-4xl min-w-[320px]">
                             <CoworkPermissionModal
                               permission={inlinePermission}
                               onRespond={onRespondToInlinePermission}

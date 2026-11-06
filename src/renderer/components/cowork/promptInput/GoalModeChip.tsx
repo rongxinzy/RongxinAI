@@ -11,7 +11,7 @@ const GoalModeChip: React.FC<{ onRemove: () => void; compact?: boolean }> = ({
 }) => (
   <span
     className={cn(
-      'inline-flex h-6 items-center gap-1.5 rounded-full px-1.5 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)',
+      'inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)',
       compact && 'px-1',
     )}
     title={i18nService.t('goalMode')}

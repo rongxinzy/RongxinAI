@@ -72,10 +72,10 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   expect(composerRecipes).toContain("'border-top-left-radius': 'var(--zy-style-radius-3xl)'");
   expect(composerRecipes).toContain("'border-top-right-radius': 'var(--zy-style-radius-3xl)'");
   expect(composerSource).toContain('ref={promptInputRef}');
-  expect(turnBlockSource).toContain('className="mx-auto w-full max-w-6xl min-w-[320px] pl-4"');
+  expect(turnBlockSource).toContain('className="mx-auto w-full max-w-4xl min-w-[320px]"');
   expect(turnBlockSource).toContain('className="flex min-w-0 flex-col gap-3 py-3"');
   expect(userBubbleSource).toContain(
-    'className="mx-auto flex w-full max-w-6xl min-w-[320px] flex-col items-end pl-4"',
+    'className="mx-auto flex w-full max-w-4xl min-w-[320px] flex-col items-end"',
   );
   // 验收卡改由末轮 TurnBlock.beforeCopySlot 注入，不再挂在对话流底部
   expect(source).toContain('beforeCopySlot={');

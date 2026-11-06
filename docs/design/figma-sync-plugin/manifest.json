@@ -1,0 +1,12 @@
+{
+  "name": "知远智能体 · 布局几何对齐同步器",
+  "id": "77f95319-bde7-45c4-b9f9-10e5859f3075",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "capabilities": [],
+  "enableProposedApi": false,
+  "editorType": [
+    "figma"
+  ]
+}

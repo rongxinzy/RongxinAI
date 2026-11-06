@@ -155,7 +155,7 @@ export function SkillDocumentDialog({
         aria-label={skill.displayName || skill.name}
         className="flex h-[min(32rem,calc(100%-3rem))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg"
       >
-        <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-5">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar className="theme-scene-skill-document-avatar">
               {skill.iconUrl && (
@@ -194,7 +194,7 @@ export function SkillDocumentDialog({
         </header>
 
         <ScrollArea className="min-h-0 flex-1">
-          <div className="flex min-w-0 flex-col gap-5 px-8 py-5">
+          <div className="flex min-w-0 flex-col gap-5 px-6 py-5">
             <dl className="grid gap-4 text-sm leading-6">
               {getMetadataEntries(skill)
                 .filter(([key]) => key.toLowerCase() !== 'skillmd')

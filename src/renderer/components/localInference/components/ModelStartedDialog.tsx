@@ -31,15 +31,15 @@ export const ModelStartedDialog: React.FC<ModelStartedDialogProps> = ({
     }}
   >
     <DialogContent
-      className="w-[min(28rem,calc(100%-2rem))] gap-4"
+      className="w-[min(28rem,calc(100%-2rem))] sm:max-w-md gap-4"
       disableCloseAnimation
       showCloseButton={false}
     >
-      <DialogHeader className="gap-1">
+      <DialogHeader className="gap-1 text-center">
         <DialogTitle className="text-center">
           {i18nService.t('localInferenceModelStartedTitle')}
         </DialogTitle>
-        <DialogDescription>
+        <DialogDescription className="text-center">
           {i18nService
             .t('localInferenceModelStartedDescription')
             .replace('{name}', startedModelName ?? '')}

@@ -2,7 +2,6 @@ import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
 import { X } from 'lucide-react';
 import React from 'react';
-import { createPortal } from 'react-dom';
 
 import { i18nService } from '../../../services/i18n';
 import Modal from '../../common/Modal';
@@ -19,8 +18,7 @@ interface RemoteImportModalProps {
 }
 
 /**
- * Remote (URL) skill import dialog. Rendered as a portal to document.body
- * while open; focus and Escape handling stay with the owner.
+ * Remote (URL) skill import dialog. Focus and Escape handling stay with the owner.
  */
 export const RemoteImportModal: React.FC<RemoteImportModalProps> = ({
   open,
@@ -33,11 +31,11 @@ export const RemoteImportModal: React.FC<RemoteImportModalProps> = ({
   onClose,
 }) => {
   if (!open) return null;
-  return createPortal(
+  return (
     <Modal
       onClose={onClose}
       overlayClassName="theme-skill-modal-backdrop fixed inset-0 z-50 flex items-center justify-center"
-      className="theme-skill-import-modal w-full max-w-md mx-4 p-6"
+      className="theme-skill-import-modal w-full sm:max-w-md p-6"
     >
       <div className="flex items-start justify-between">
         <div className="text-lg font-semibold text-foreground">
@@ -83,7 +81,6 @@ export const RemoteImportModal: React.FC<RemoteImportModalProps> = ({
           {isDownloading ? i18nService.t('importingSkill') : i18nService.t('importSkill')}
         </Button>
       </div>
-    </Modal>,
-    document.body,
+    </Modal>
   );
 };

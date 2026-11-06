@@ -21,7 +21,7 @@ export const CodingSessionRecoveryDialog = ({
   onConfirm,
 }: CodingSessionRecoveryDialogProps) => (
   <Dialog open>
-    <DialogContent showCloseButton={false}>
+    <DialogContent className="sm:max-w-lg" showCloseButton={false}>
       <DialogHeader>
         <DialogTitle>{i18nService.t('codingAgentRecoveryTitle')}</DialogTitle>
         <DialogDescription>{i18nService.t('codingAgentRecoveryDescription')}</DialogDescription>
@@ -53,7 +53,7 @@ export const CodingLaneChangesDialog = ({
   onClose,
 }: CodingLaneChangesDialogProps) => (
   <Dialog open onOpenChange={open => !open && onClose()}>
-    <DialogContent className="max-w-3xl">
+    <DialogContent className="sm:max-w-3xl">
       <DialogHeader>
         <DialogTitle>{i18nService.t('codingAgentApplyChangesTitle')}</DialogTitle>
         <DialogDescription>{i18nService.t('codingAgentApplyChangesDescription')}</DialogDescription>
@@ -83,7 +83,7 @@ export const CodingApplyConflictDialog = ({
   onClose,
 }: CodingApplyConflictDialogProps) => (
   <Dialog open onOpenChange={open => !open && onClose()}>
-    <DialogContent>
+    <DialogContent className="sm:max-w-lg">
       <DialogHeader>
         <DialogTitle>{i18nService.t('codingAgentConflictTitle')}</DialogTitle>
         <DialogDescription>{i18nService.t('codingAgentConflictDescription')}</DialogDescription>

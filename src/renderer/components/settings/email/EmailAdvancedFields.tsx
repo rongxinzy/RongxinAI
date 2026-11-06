@@ -51,7 +51,7 @@ export function EmailAdvancedFields({
         />
       </CollapsibleTrigger>
 
-      <CollapsibleContent className="flex flex-col gap-6 px-1 pb-1">
+      <CollapsibleContent className="flex flex-col gap-6 pb-1">
         <FieldSet>
           <FieldLegend variant="label">{i18nService.t('emailImapSmtpConfig')}</FieldLegend>
           <FieldDescription>{i18nService.t('emailServerConfigDescription')}</FieldDescription>
@@ -129,7 +129,7 @@ export function EmailAdvancedFields({
         <FieldSet>
           <FieldLegend variant="label">{i18nService.t('emailSecuritySettings')}</FieldLegend>
           <FieldGroup className="gap-4">
-            <Field orientation="horizontal" className="theme-scene-email-field">
+            <Field orientation="horizontal">
               <FieldContent>
                 <FieldLabel htmlFor="email-imap-tls">{i18nService.t('emailImapTls')}</FieldLabel>
                 <FieldDescription>{i18nService.t('emailImapTlsDescription')}</FieldDescription>
@@ -141,7 +141,7 @@ export function EmailAdvancedFields({
               />
             </Field>
 
-            <Field orientation="horizontal" className="theme-scene-email-field">
+            <Field orientation="horizontal">
               <FieldContent>
                 <FieldLabel htmlFor="email-smtp-ssl">{i18nService.t('emailSmtpSsl')}</FieldLabel>
                 <FieldDescription>{i18nService.t('emailSmtpSslDescription')}</FieldDescription>
@@ -153,7 +153,7 @@ export function EmailAdvancedFields({
               />
             </Field>
 
-            <Field orientation="horizontal" className="theme-scene-email-field">
+            <Field orientation="horizontal">
               <FieldContent>
                 <FieldLabel htmlFor="email-insecure-cert">
                   {i18nService.t('emailAllowInsecureCert')}

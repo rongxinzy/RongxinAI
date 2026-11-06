@@ -1,11 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from '@shared/components/ui/field';
+import { Field, FieldDescription, FieldGroup, FieldLabel } from '@shared/components/ui/field';
 import { Input } from '@shared/components/ui/input';
 import {
   Select,
@@ -170,15 +164,15 @@ export default function ShortcutsSettingsPanel({
 }: ShortcutsSettingsPanelProps) {
   return (
     <div className="flex flex-col gap-4">
-      <Field orientation="horizontal">
-        <FieldContent>
+      <Field orientation="horizontal" className="!items-center">
+        <div className="flex flex-col">
           <FieldLabel htmlFor="shortcut-companion">
             {i18nService.t('companionShortcutLabel')}
           </FieldLabel>
           <FieldDescription id="shortcut-companion-description">
             {i18nService.t('shortcutGlobal')}
           </FieldDescription>
-        </FieldContent>
+        </div>
         <Input
           id="shortcut-companion"
           aria-describedby="shortcut-companion-description"
@@ -188,7 +182,7 @@ export default function ShortcutsSettingsPanel({
         />
       </Field>
       <FieldGroup className="gap-4">
-        <Field orientation="horizontal">
+        <Field orientation="horizontal" className="!items-center">
           <FieldLabel htmlFor="shortcut-new-chat">{i18nService.t('newChat')}</FieldLabel>
           <ShortcutRecorder
             id="shortcut-new-chat"
@@ -196,7 +190,7 @@ export default function ShortcutsSettingsPanel({
             onChange={v => onShortcutChange('newChat', v)}
           />
         </Field>
-        <Field orientation="horizontal">
+        <Field orientation="horizontal" className="!items-center">
           <FieldLabel htmlFor="shortcut-search">{i18nService.t('search')}</FieldLabel>
           <ShortcutRecorder
             id="shortcut-search"
@@ -204,7 +198,7 @@ export default function ShortcutsSettingsPanel({
             onChange={v => onShortcutChange('search', v)}
           />
         </Field>
-        <Field orientation="horizontal">
+        <Field orientation="horizontal" className="!items-center">
           <FieldLabel htmlFor="shortcut-open-settings">{i18nService.t('openSettings')}</FieldLabel>
           <ShortcutRecorder
             id="shortcut-open-settings"
@@ -212,7 +206,7 @@ export default function ShortcutsSettingsPanel({
             onChange={v => onShortcutChange('settings', v)}
           />
         </Field>
-        <Field orientation="horizontal">
+        <Field orientation="horizontal" className="!items-center">
           <FieldLabel htmlFor="shortcut-send-message">
             {i18nService.t('sendMessageShortcut')}
           </FieldLabel>

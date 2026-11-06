@@ -37,7 +37,7 @@ export const CodingAuthTerminalDialog = ({
   if (!authTerminal) return null;
   return (
     <Dialog open onOpenChange={open => !open && onCancelAuthTerminal(authTerminal.id)}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{i18nService.t('codingAgentTerminalAuthentication')}</DialogTitle>
           <DialogDescription>

@@ -461,7 +461,7 @@ function MemoryEditorDialog(props: {
   const valid = Boolean(draft.title.trim() && draft.content.trim());
   return (
     <Dialog open={editor !== null} onOpenChange={open => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             {editor?.record

@@ -34,7 +34,7 @@ const ActiveExpertBadge: React.FC<ActiveExpertBadgeProps> = ({
   return (
     <span
       className={cn(
-        'theme-prompt-expert-chip sidebar-interactive-surface inline-flex max-w-48 items-center gap-1.5',
+        'theme-prompt-expert-chip sidebar-interactive-surface inline-flex h-8 max-w-48 items-center gap-1.5 rounded-lg px-2',
         className,
       )}
       title={displayName}

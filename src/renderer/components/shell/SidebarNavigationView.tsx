@@ -138,8 +138,8 @@ export function SidebarNavigationView({
         <Button
           type="button"
           variant="secondary"
-          size="lg"
-          className="w-full justify-start gap-2"
+          size="navigation"
+          className="w-full justify-start"
           aria-label={newConversation.label}
           data-testid={newConversation.testId}
           data-active={newConversation.active || undefined}
@@ -157,7 +157,7 @@ export function SidebarNavigationView({
             type="button"
             variant="navigation"
             size="navigation"
-            className="w-full justify-start gap-2"
+            className="w-full justify-start"
             aria-label={search.label}
             aria-haspopup="dialog"
             onClick={search.onClick}

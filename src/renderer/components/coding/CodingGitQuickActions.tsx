@@ -468,7 +468,7 @@ export const CodingGitQuickActions = ({
         </PopoverContent>
       </Popover>
       <Dialog open={commitOpen} onOpenChange={setCommitOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <GitBranch />
@@ -534,7 +534,7 @@ export const CodingGitQuickActions = ({
         </DialogContent>
       </Dialog>
       <Dialog open={pullRequestOpen} onOpenChange={handlePullRequestOpenChange}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-muted-foreground">
               {status?.branch ?? i18nService.t('codingGitDetached')} → {pullRequestBase}
@@ -605,7 +605,7 @@ export const CodingGitQuickActions = ({
         </DialogContent>
       </Dialog>
       <Dialog open={createBranchOpen} onOpenChange={setCreateBranchOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{i18nService.t('codingGitCreateBranchTitle')}</DialogTitle>
             <DialogDescription>

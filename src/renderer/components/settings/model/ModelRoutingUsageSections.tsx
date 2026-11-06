@@ -53,7 +53,11 @@ function UsagePeriodSelect({ period, disabled, onPeriodChange }: PeriodSelectPro
 
 export function ModelRoutingQuotaSection({ quotas }: { quotas: MagpieSubscriptionQuota[] | null }) {
   if (!quotas?.length) {
-    return <p className="text-sm text-muted-foreground">{i18nService.t('modelQuotaEmpty')}</p>;
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-muted-foreground">
+        <p>{i18nService.t('modelQuotaEmpty')}</p>
+      </div>
+    );
   }
   return (
     <ul className="flex flex-col gap-3">
@@ -124,7 +128,9 @@ export function ModelRoutingCallsSection({
     <div className="flex flex-col gap-3">
       <UsagePeriodSelect period={period} disabled={disabled} onPeriodChange={onPeriodChange} />
       {!requests?.rows.length ? (
-        <p className="text-sm text-muted-foreground">{i18nService.t('modelCallsEmpty')}</p>
+        <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-muted-foreground">
+          <p>{i18nService.t('modelCallsEmpty')}</p>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-border-subtle">
           <table className="w-full min-w-[36rem] text-left text-sm">
@@ -248,7 +254,9 @@ export function ModelRoutingCostSection({
           </div>
         </dl>
       ) : (
-        <p className="text-sm text-muted-foreground">{i18nService.t('modelCostEmpty')}</p>
+        <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-muted-foreground">
+          <p>{i18nService.t('modelCostEmpty')}</p>
+        </div>
       )}
       {budget ? (
         <div className="rounded-lg border border-border-subtle px-4 py-3 text-sm text-muted-foreground">

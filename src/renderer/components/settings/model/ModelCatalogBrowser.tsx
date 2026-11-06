@@ -106,7 +106,9 @@ export function ModelCatalogBrowser({
         </p>
       )}
       {query && !filtered.length && (
-        <p className="text-sm">{i18nService.t('modelBrowseNoMatches')}</p>
+        <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-muted-foreground">
+          <p>{i18nService.t('modelBrowseNoMatches')}</p>
+        </div>
       )}
       <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
         {visible.map(model => {

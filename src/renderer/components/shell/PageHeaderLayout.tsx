@@ -24,7 +24,7 @@ export function PageHeaderLayout({
       <div
         className={cn(
           'draggable flex h-12 items-center justify-between gap-3 px-4',
-          !tabs && divider && 'border-b border-border-subtle',
+          !tabs && divider && 'border-b border-border',
         )}
       >
         <div className="flex h-8 min-w-0 flex-1 items-center gap-3">
@@ -36,7 +36,7 @@ export function PageHeaderLayout({
           {windowControls}
         </div>
       </div>
-      {tabs ? <div className="non-draggable border-b border-border-subtle px-4">{tabs}</div> : null}
+      {tabs ? <div className="non-draggable border-b border-border px-4">{tabs}</div> : null}
     </header>
   );
 }

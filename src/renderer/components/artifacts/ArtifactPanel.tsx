@@ -424,7 +424,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
             {/* Header: file list toggle + filename + type + actions */}
             <div
-              className={`h-10 flex items-center gap-2 border-b border-border shrink-0 ${
+              className={`h-12 flex items-center gap-2 border-b border-border shrink-0 ${
                 isMac && isTopLevelPanel ? 'pl-20 pr-3' : 'px-3'
               }`}
             >
@@ -615,7 +615,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           /* No artifact selected: show full-width file list */
           <div className="flex-1 flex flex-col h-full overflow-hidden">
             <div
-              className={`h-10 flex items-center border-b border-border shrink-0 ${
+              className={`h-12 flex items-center border-b border-border shrink-0 ${
                 isMac && isTopLevelPanel ? 'pl-20 pr-3' : 'px-3'
               }`}
             >

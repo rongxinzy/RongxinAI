@@ -395,10 +395,10 @@ export function ModelsPanel({
           </>
         ) : (
           <Empty className="theme-scene-model-empty mx-auto min-h-80 w-full max-w-[800px]">
-            <EmptyMedia variant="icon">
-              <Box className="size-5" />
-            </EmptyMedia>
             <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Box className="size-5" />
+              </EmptyMedia>
               <EmptyTitle className="theme-scene-model-empty-title">
                 {i18nService.t('localInferenceLocalModelsEmptyTitle')}
               </EmptyTitle>

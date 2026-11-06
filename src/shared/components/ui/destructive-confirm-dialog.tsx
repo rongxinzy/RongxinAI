@@ -51,13 +51,13 @@ function DestructiveConfirmDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className={cn('theme-confirm-dialog w-full max-w-sm', className)}
+        className={cn('theme-confirm-dialog w-full sm:max-w-md', className)}
       >
         <div className="flex w-full min-w-0 flex-col gap-5 p-6">
           <div className="flex min-w-0 flex-col gap-2">
             <DialogTitle className="theme-confirm-title">{title}</DialogTitle>
             <DialogDescription
-              className="theme-confirm-description min-w-0 truncate"
+              className="theme-confirm-description min-w-0 text-sm text-muted-foreground whitespace-normal break-words"
               title={description}
             >
               {description}
