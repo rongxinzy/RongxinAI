@@ -19,7 +19,7 @@ export type WorkflowJobSummary = {
   completed_at?: string;
 };
 
-export type ArtifactSummary = {
+type ArtifactSummary = {
   id: number;
   name: string;
   workflow_run_id?: number;

@@ -3,7 +3,7 @@ import { PackagingJob } from './constants.ts';
 export const RELEASE_CANDIDATE_ATTESTATION_SCHEMA_VERSION = 1 as const;
 export const RELEASE_CANDIDATE_ATTESTATION_ARTIFACT_NAME = 'release-candidate-attestation';
 export const RELEASE_CANDIDATE_ATTESTATION_FILE = 'release-candidate-attestation.json';
-export const RELEASE_PREFLIGHT_WORKFLOW_PATH = '.github/workflows/release-preflight.yml';
+const RELEASE_PREFLIGHT_WORKFLOW_PATH = '.github/workflows/release-preflight.yml';
 
 export type ReleaseCandidateAttestationV1 = {
   schemaVersion: typeof RELEASE_CANDIDATE_ATTESTATION_SCHEMA_VERSION;
