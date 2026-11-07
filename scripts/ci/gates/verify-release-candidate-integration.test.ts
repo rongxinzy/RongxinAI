@@ -68,12 +68,22 @@ test('positive integration uses recorded artifact REST shape with nested workflo
         return artifactsFixture;
       }
       if (url.includes(`/attempts/1/jobs`)) {
-        return JSON.parse(
-          readFileSync(
-            'scripts/ci/gates/fixtures/github-rest-preflight-attempt-jobs-200.json',
-            'utf8',
-          ),
-        );
+        return {
+          jobs: [
+            { name: 'source', status: 'completed', conclusion: 'success' },
+            { name: 'preflight-gate', status: 'completed', conclusion: 'success' },
+            {
+              name: 'linux-install / install-and-start',
+              status: 'completed',
+              conclusion: 'success',
+            },
+            {
+              name: 'windows-install / package-and-install',
+              status: 'completed',
+              conclusion: 'success',
+            },
+          ],
+        };
       }
       throw new Error(`unexpected url ${url}`);
     },
@@ -133,12 +143,22 @@ test('rejects attestation when nested workflow_run.id disagrees with run listing
       }
       if (url.includes('/artifacts')) return badArtifacts;
       if (url.includes('/attempts/1/jobs')) {
-        return JSON.parse(
-          readFileSync(
-            'scripts/ci/gates/fixtures/github-rest-preflight-attempt-jobs-200.json',
-            'utf8',
-          ),
-        );
+        return {
+          jobs: [
+            { name: 'source', status: 'completed', conclusion: 'success' },
+            { name: 'preflight-gate', status: 'completed', conclusion: 'success' },
+            {
+              name: 'linux-install / install-and-start',
+              status: 'completed',
+              conclusion: 'success',
+            },
+            {
+              name: 'windows-install / package-and-install',
+              status: 'completed',
+              conclusion: 'success',
+            },
+          ],
+        };
       }
       throw new Error(url);
     },
@@ -158,4 +178,66 @@ test('rejects attestation when nested workflow_run.id disagrees with run listing
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
   ).rejects.toThrow(/workflow_run.id/);
+});
+
+test('recorded preflight run 42340332484 blocks release at failed run conclusion', async () => {
+  const sha = '977abbf023dfb8cbb3cf998b1d4e09e66ec86655';
+  const branchHead = sha;
+  const runId = 42340332484;
+  const sourceRecord = JSON.parse(
+    readFileSync(
+      'scripts/ci/gates/fixtures/release-preflight-source-42340332484.json',
+      'utf8',
+    ),
+  );
+  const artifactsPayload = JSON.parse(
+    readFileSync(
+      'scripts/ci/gates/fixtures/github-rest-preflight-run-artifacts-42340332484.json',
+      'utf8',
+    ),
+  ) as Record<string, unknown>;
+  const attemptJobs = JSON.parse(
+    readFileSync(
+      'scripts/ci/gates/fixtures/github-rest-preflight-attempt-jobs-42340332484.json',
+      'utf8',
+    ),
+  );
+  const client = {
+    async fetchJson(url: string) {
+      if (url.includes('/workflows/release-preflight.yml/runs')) {
+        return {
+          workflow_runs: [
+            {
+              id: runId,
+              run_number: 1,
+              run_attempt: 1,
+              status: 'completed',
+              conclusion: 'failure',
+              head_sha: branchHead,
+              head_branch: 'release/validation-ci-gates-1778',
+              created_at: '2026-11-07T04:52:00Z',
+              event: 'workflow_dispatch',
+              path: '.github/workflows/release-preflight.yml',
+            },
+          ],
+        };
+      }
+      if (url.includes(`/actions/runs/${runId}/artifacts`)) return artifactsPayload;
+      if (url.includes('/attempts/1/jobs')) return attemptJobs;
+      throw new Error(`unexpected url ${url}`);
+    },
+    async fetchBytes(url: string) {
+      if (!url.includes('/artifacts/13560394788/zip')) throw new Error(url);
+      return new TextEncoder().encode(JSON.stringify(sourceRecord)).buffer;
+    },
+    unzipMember(buffer: ArrayBuffer) {
+      return new TextDecoder().decode(buffer);
+    },
+  };
+  await expect(
+    verifyPreflightAttestationProvenance(client, {
+      repository: 'rongxinzy/RongxinAI',
+      sourceCommit: sha,
+    }),
+  ).rejects.toThrow(/concluded failure/);
 });

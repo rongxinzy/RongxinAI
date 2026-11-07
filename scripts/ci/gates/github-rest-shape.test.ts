@@ -36,6 +36,19 @@ test('recorded reusable-workflow jobs use caller / callee names', () => {
   expect(jobs.some(job => job.name === 'linux-install')).toBe(false);
 });
 
+test('recorded preflight attempt jobs use reusable packaging names', () => {
+  const payload = JSON.parse(
+    readFileSync(
+      'scripts/ci/gates/fixtures/github-rest-preflight-attempt-jobs-42340332484.json',
+      'utf8',
+    ),
+  ) as Record<string, unknown>;
+  const jobs = parseWorkflowJobs(payload);
+  expect(jobs.some(job => job.name === 'linux-install / install-and-start')).toBe(true);
+  expect(jobs.some(job => job.name === 'windows-install / package-and-install')).toBe(true);
+  expect(jobs.some(job => job.name === 'linux-install')).toBe(false);
+});
+
 test('recorded workflow run and jobs fixtures parse for verifier transport', () => {
   const run = JSON.parse(
     readFileSync('scripts/ci/gates/fixtures/github-rest-workflow-run-200.json', 'utf8'),
