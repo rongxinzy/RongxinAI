@@ -185,10 +185,7 @@ test('recorded preflight run 42340332484 blocks release at failed run conclusion
   const branchHead = sha;
   const runId = 42340332484;
   const sourceRecord = JSON.parse(
-    readFileSync(
-      'scripts/ci/gates/fixtures/release-preflight-source-42340332484.json',
-      'utf8',
-    ),
+    readFileSync('scripts/ci/gates/fixtures/release-preflight-source-42340332484.json', 'utf8'),
   );
   const artifactsPayload = JSON.parse(
     readFileSync(
