@@ -91,6 +91,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ needs.prepare-release.outputs.commit }}
           sparse-checkout: |
             .nvmrc
             scripts/ci/gates
@@ -98,7 +99,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           check-latest: true
-      - name: Require green daily ci-gate and Release preflight on the tagged commit
+      - name: Require green daily ci-gate and packaged Release preflight attestation
         run: node scripts/ci/gates/verify-release-candidate-readiness.mjs
         env:
           SOURCE_COMMIT: ${{ needs.prepare-release.outputs.commit }}

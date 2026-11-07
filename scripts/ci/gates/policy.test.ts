@@ -2,7 +2,6 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
 import { BaselineJob, JobResult, PackagingJob, PreflightJob, TestShardCount } from './constants.ts';
-import { findSuccessfulCheck, findSuccessfulWorkflowRun } from './release-candidate.ts';
 import { verifyGateResults, verifyPreflightResults } from './policy.ts';
 
 type Step = { name?: string; run?: string; uses?: string; with?: Record<string, unknown> };
@@ -130,32 +129,19 @@ test('release builds platforms in parallel and publication waits for all platfor
   expect(release.jobs.publish.if).toBeUndefined();
 });
 
-test('release candidate readiness requires successful ci-gate and matching preflight', () => {
-  expect(
-    findSuccessfulCheck(
-      [
-        { name: 'ci-gate', status: 'completed', conclusion: 'success' },
-        { name: 'lint', status: 'completed', conclusion: 'failure' },
-      ],
-      'ci-gate',
-    ),
-  ).not.toBeNull();
-  expect(
-    findSuccessfulCheck(
-      [{ name: 'ci-gate', status: 'completed', conclusion: 'failure' }],
-      'ci-gate',
-    ),
-  ).toBeNull();
-  const sha = 'a'.repeat(40);
-  expect(
-    findSuccessfulWorkflowRun([{ head_sha: sha, status: 'completed', conclusion: 'success' }], sha),
-  ).not.toBeNull();
-  expect(
-    findSuccessfulWorkflowRun(
-      [{ head_sha: 'b'.repeat(40), status: 'completed', conclusion: 'success' }],
-      sha,
-    ),
-  ).toBeNull();
+test('release preflight publishes packaging attestation only after the preflight gate', () => {
+  const gate = workflow('release-preflight.yml').jobs['preflight-gate'];
+  const joined = gate.steps?.map(step => step.run ?? step.uses ?? '').join('\n') ?? '';
+  expect(joined).toContain('publish-release-candidate-attestation.mjs');
+  expect(joined).toContain('actions/upload-artifact@v4');
+  expect(joined).toContain('release-candidate-attestation');
+  expect(gate.permissions).toMatchObject({ actions: 'write' });
+});
+
+test('release verifier checks out the trusted tagged source commit', () => {
+  const verify = workflow('release.yml').jobs['verify-release-candidate'];
+  const checkout = verify.steps?.find(step => step.uses === 'actions/checkout@v6');
+  expect(checkout?.with?.ref).toBe('${{ needs.prepare-release.outputs.commit }}');
 });
 
 test('no secondary workflow can start heavy builds for a feature pull request', () => {

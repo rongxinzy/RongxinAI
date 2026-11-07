@@ -1,5 +1,19 @@
 #!/usr/bin/env node
-import { findSuccessfulCheck, findSuccessfulWorkflowRun } from './release-candidate.ts';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  RELEASE_CANDIDATE_ATTESTATION_ARTIFACT_NAME,
+  RELEASE_CANDIDATE_ATTESTATION_FILE,
+  parseReleaseCandidateAttestation,
+} from './release-candidate-attestation.ts';
+import {
+  assertLatestDailyCiPermitsRelease,
+  paginateItemsOrThrow,
+  selectLatestWorkflowRun,
+  selectNewestValidAttestation,
+} from './release-candidate.ts';
 
 const commit = process.env.SOURCE_COMMIT ?? '';
 const repository = process.env.GITHUB_REPOSITORY ?? '';
@@ -29,48 +43,110 @@ async function fetchJson(url) {
   return response.json();
 }
 
-async function listCheckRuns(sha) {
-  const runs = [];
+async function paginate(urlBuilder, itemKey) {
+  const pages = [];
   let page = 1;
   for (;;) {
-    const payload = await fetchJson(
-      `https://api.github.com/repos/${repository}/commits/${sha}/check-runs?per_page=100&page=${page}`,
-    );
-    runs.push(...(payload.check_runs ?? []));
-    if (!payload.check_runs?.length || runs.length >= payload.total_count) break;
+    const payload = await fetchJson(urlBuilder(page));
+    const items = payload[itemKey] ?? [];
+    pages.push({ items });
+    if (!items.length) break;
+    if (payload.total_count != null && page * 100 >= payload.total_count) break;
+    if (items.length < 100) break;
     page += 1;
   }
-  return runs;
+  return paginateItemsOrThrow(pages);
 }
 
-async function listPreflightRuns(sha) {
-  const payload = await fetchJson(
-    `https://api.github.com/repos/${repository}/actions/workflows/release-preflight.yml/runs?head_sha=${sha}&status=completed&per_page=30`,
+function readAttestationJsonFromZip(bytes) {
+  const dir = mkdtempSync(join(tmpdir(), 'release-candidate-attest-'));
+  const zipPath = join(dir, 'attestation.zip');
+  try {
+    writeFileSync(zipPath, Buffer.from(bytes));
+    execFileSync('unzip', ['-o', zipPath, '-d', dir], { stdio: 'pipe' });
+    const jsonPath = join(dir, RELEASE_CANDIDATE_ATTESTATION_FILE);
+    return JSON.parse(readFileSync(jsonPath, 'utf8'));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+async function downloadArtifactJson(artifactId) {
+  const response = await fetch(
+    `https://api.github.com/repos/${repository}/actions/artifacts/${artifactId}/zip`,
+    { headers, redirect: 'follow' },
   );
-  return payload.workflow_runs ?? [];
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Artifact download failed with ${response.status}: ${body}`);
+  }
+  return readAttestationJsonFromZip(await response.arrayBuffer());
+}
+
+async function listCiRuns() {
+  return paginate(
+    page =>
+      `https://api.github.com/repos/${repository}/actions/workflows/ci.yml/runs?head_sha=${commit}&per_page=100&page=${page}`,
+    'workflow_runs',
+  );
+}
+
+async function listAttestationArtifacts() {
+  return paginate(
+    page =>
+      `https://api.github.com/repos/${repository}/actions/artifacts?name=${RELEASE_CANDIDATE_ATTESTATION_ARTIFACT_NAME}&per_page=100&page=${page}`,
+    'artifacts',
+  );
+}
+
+async function loadAttestationCandidates(artifacts) {
+  const active = artifacts.filter(artifact => artifact.expired !== true);
+  const parsed = [];
+  for (const artifact of active) {
+    const body = await downloadArtifactJson(artifact.id);
+    parsed.push({
+      ...body,
+      artifactId: artifact.id,
+      createdAt: artifact.created_at,
+    });
+  }
+  return parsed;
 }
 
 try {
-  const checkRuns = await listCheckRuns(commit);
-  const ciGate = findSuccessfulCheck(checkRuns, 'ci-gate');
-  if (!ciGate) {
-    console.error(
-      `[ReleaseCandidate] Commit ${commit} has no successful ci-gate check. Merge only after daily CI is green, or re-run CI on that commit.`,
-    );
-    process.exit(1);
+  const ciRuns = await listCiRuns();
+  const latest = selectLatestWorkflowRun(ciRuns.filter(run => run.head_sha === commit));
+  if (!latest) {
+    throw new Error(`No CI workflow run found for commit ${commit}`);
   }
+  const jobsPayload = await fetchJson(
+    `https://api.github.com/repos/${repository}/actions/runs/${latest.id}/jobs?per_page=100`,
+  );
+  const ciRun = assertLatestDailyCiPermitsRelease(ciRuns, jobsPayload.jobs ?? [], commit);
 
-  const preflightRuns = await listPreflightRuns(commit);
-  const preflight = findSuccessfulWorkflowRun(preflightRuns, commit);
-  if (!preflight) {
-    console.error(
-      `[ReleaseCandidate] Commit ${commit} has no successful Release preflight workflow run. Run release-preflight.yml (workflow_dispatch) against this exact SHA before tagging.`,
+  const artifacts = await listAttestationArtifacts();
+  const candidates = await loadAttestationCandidates(artifacts);
+  const selected = selectNewestValidAttestation(
+    candidates.map(item => ({
+      sourceCommit: item.sourceCommit,
+      issuedAt: item.issuedAt,
+      createdAt: item.createdAt,
+      raw: item,
+    })),
+    commit,
+  );
+  if (!selected) {
+    throw new Error(
+      `No release-candidate attestation artifact for commit ${commit}. Run Release preflight (workflow_dispatch) with source-ref set to this SHA and include-packaging=true.`,
     );
-    process.exit(1);
   }
+  const attestation = parseReleaseCandidateAttestation(selected.raw, {
+    repository,
+    sourceCommit: commit,
+  });
 
   console.log(
-    `[ReleaseCandidate] ci-gate ${ciGate.html_url ?? 'ok'}; Release preflight run ${preflight.id ?? 'ok'} permits release for ${commit}`,
+    `[ReleaseCandidate] ci run ${ciRun.id} ci-gate ok; attestation artifact ${selected.raw.artifactId} from preflight run ${attestation.workflowRunId} (dispatch ${attestation.dispatchRef}, workflow head ${attestation.workflowHeadSha}) permits ${commit}`,
   );
 } catch (error) {
   console.error('[ReleaseCandidate] readiness verification failed:', error);

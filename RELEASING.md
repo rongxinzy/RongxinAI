@@ -6,7 +6,9 @@ Daily PR/push CI runs lint, parallel `build:tsc`, and unit tests (`bun run test:
 
 Local unit runs preserve the existing native addons, reuse separately cached Node ABI output, and restore the original files on completion. Switching back to Electron does not force another rebuild just because tests ran.
 
-Before tagging, run **Release preflight** (`release-preflight.yml`) against the intended source commit. Its default `include-packaging=true` also builds and installs unsigned Windows/Linux packages. All checks use one resolved commit and must pass. **Tag pushes cannot bypass this:** `release.yml` verifies a successful preflight workflow run on the exact tagged SHA and a successful `ci-gate` on that commit before any platform build starts, then runs a cheap Ubuntu `build:tsc` gate. Raw tag creation without a matching preflight record still fails closed in CI; branch rules cannot block tag pushes. Tag releases do not re-run preflight inside `release.yml` (signed packages already undergo installation acceptance). Quality, runtime, browser, enterprise and memory checks remain mandatory in preflight.
+Before tagging, run **Release preflight** (`release-preflight.yml`) with **`source-ref` set to the candidate commit** (not only the dispatch branch). Default `include-packaging=true` builds and installs unsigned Windows/Linux packages; the preflight gate uploads a **`release-candidate-attestation`** artifact binding `sourceCommit`, packaging results, and workflow metadata. The workflow run's `head_sha` is the **dispatch ref** revision (for example `main`); it is not proof of which commit was tested—see `scripts/ci/gates/README.md`.
+
+**Tag pushes cannot bypass this:** `release.yml` verifies the latest successful `ci-gate` on the tagged SHA, validates the newest matching attestation (`include-packaging=true`, install jobs successful), then runs Ubuntu `build:tsc` before platform builds. Preflight with `include-packaging=false` does not publish an attestation and cannot release. Raw tag pushes are still possible; enforcement is in `release.yml`.
 
 ## 1. Tag → beta (`release.yml`)
 
@@ -14,7 +16,7 @@ Before tagging, run **Release preflight** (`release-preflight.yml`) against the 
 2. Create and push an annotated tag on `main`: `v<semver>` (no spaces), e.g. `v2026.10.16-build.1`.  
    The tag is the **only** version source; CI sets `APP_BUILD_VERSION` from it.
 3. Push triggers **Release (tag)**:
-   - Platform builds start only after Ubuntu `build:tsc`, a successful `ci-gate` on the source commit, and a successful Release preflight workflow run on that exact SHA; publication waits for every platform's build/installation acceptance
+   - Platform builds start only after Ubuntu `build:tsc`, the latest green `ci-gate` on the source commit, and a Release preflight **attestation** for that exact SHA with packaging installs; publication waits for every platform's build/installation acceptance
    - Upload immutable artifacts to R2
    - Publish one complete **beta** update feed (`channels/beta-pointer.json`), preventing platform jobs from overwriting shared metadata or exposing a partial generation
    - Create a GitHub **pre-release** with auto-generated release notes and attached installers
