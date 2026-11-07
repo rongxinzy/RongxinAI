@@ -26,9 +26,19 @@ Preflight **cannot** resolve `source-ref` from the job outputs API. Instead, the
 - **`workflow_run.head_sha`** = workflow definition revision at dispatch (e.g. `main` tip).
 - **`release-preflight-source.sourceCommit`** = tested SHA after checkout (`inputs.source-ref`).
 
-### Residual limits
+### Artifact API shape
 
-- **Scan window:** newest 40 `workflow_dispatch` preflight runs only.
-- **Newer pending dispatch:** any newer eligible dispatch still `in_progress` blocks release even if an older green proof exists for the same SHA.
-- **Unobserved reruns:** a newer dispatch without a source artifact yet cannot be tied to a SHA; the pending-dispatch rule above fail-closes when that run is still active.
-- **Branch allowlist:** dispatches from branches other than `main` / `release/**` are ignored.
+`GET .../actions/runs/{run_id}/artifacts` returns `artifacts[].workflow_run.id` (nested). There is **no** top-level `workflow_run_id`. Fixtures: `fixtures/github-rest-run-artifacts-200.json`.
+
+### Rerun policy
+
+- `upload-artifact@v4` uses **`overwrite: true`** on source and attestation names so workflow reruns on the same attempt can replace fixed names.
+- Job checks use **`/actions/runs/{id}/attempts/{attempt}/jobs`** so conclusions match the attested attempt. **Re-run failed jobs only** (no `source` on latest attempt) is **unsupported** and fails closed.
+
+### Residual limits (conservative)
+
+- **Scan window:** newest 40 `workflow_dispatch` preflight runs.
+- **Newer pending dispatch:** eligible runs with higher `run_number` still `queued` / `in_progress` block release.
+- **Newer failed dispatch without source artifact:** cannot prove same SHA; an older green proof **may still pass** (not claimed blocked).
+- **Newer failed dispatch with source artifact** for the SHA: latest matching binding fails on non-success conclusion.
+- **Branch allowlist:** `main` / `release/**` only.

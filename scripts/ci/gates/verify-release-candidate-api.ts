@@ -1,5 +1,13 @@
 import { PackagingJob } from './constants.ts';
 import {
+  assertArtifactBoundToRun,
+  parseRunArtifacts,
+  parseWorkflowJobs,
+  parseWorkflowRuns,
+  type GitHubArtifact,
+  type GitHubWorkflowRun,
+} from './github-rest.ts';
+import {
   PREFLIGHT_SOURCE_ARTIFACT_NAME,
   PREFLIGHT_SOURCE_RECORD_FILE,
   RELEASE_CANDIDATE_ATTESTATION_ARTIFACT_NAME,
@@ -13,7 +21,6 @@ import {
   paginateItemsOrThrow,
   selectLatestWorkflowRun,
   type WorkflowJobSummary,
-  type WorkflowRunSummary,
 } from './release-candidate.ts';
 
 const RELEASE_PREFLIGHT_WORKFLOW_FILE = 'release-preflight.yml';
@@ -35,15 +42,8 @@ export type VerifyReleaseCandidateOptions = {
   maxPreflightRuns?: number;
 };
 
-type RunArtifactSummary = {
-  id: number;
-  name: string;
-  workflow_run_id?: number;
-  expired?: boolean;
-};
-
 type SourceRunBinding = {
-  run: WorkflowRunSummary;
+  run: GitHubWorkflowRun;
   sourceRecord: PreflightSourceRecordV1;
 };
 
@@ -55,7 +55,7 @@ function isTrustedDispatchHeadBranch(headBranch: string | undefined): boolean {
   return headBranch === 'main' || (headBranch?.startsWith('release/') ?? false);
 }
 
-function assertEligiblePreflightRun(run: WorkflowRunSummary): void {
+function assertEligiblePreflightRun(run: GitHubWorkflowRun): void {
   if (run.event !== 'workflow_dispatch') throw new Error(`run ${run.id} is not workflow_dispatch`);
   if (!run.path?.endsWith(RELEASE_PREFLIGHT_WORKFLOW_FILE))
     throw new Error(`run ${run.id} wrong path`);
@@ -63,7 +63,7 @@ function assertEligiblePreflightRun(run: WorkflowRunSummary): void {
     throw new Error(`run ${run.id} untrusted branch`);
 }
 
-function findArtifact(artifacts: RunArtifactSummary[], name: string): RunArtifactSummary | null {
+function findArtifact(artifacts: GitHubArtifact[], name: string): GitHubArtifact | null {
   return artifacts.find(artifact => artifact.name === name && artifact.expired !== true) ?? null;
 }
 
@@ -71,28 +71,39 @@ async function paginateWorkflowRuns(
   client: GitHubClient,
   url: string,
   maxItems: number,
-): Promise<WorkflowRunSummary[]> {
-  const pages: Array<{ items?: WorkflowRunSummary[] }> = [];
+): Promise<GitHubWorkflowRun[]> {
+  const pages: Array<{ items?: GitHubWorkflowRun[] }> = [];
   for (let page = 1; pages.length < 10; page += 1) {
     const payload = await client.fetchJson(`${url}&per_page=100&page=${page}`);
-    const items = (payload.workflow_runs ?? []) as WorkflowRunSummary[];
-    pages.push({ items });
+    pages.push({ items: parseWorkflowRuns(payload) });
+    const items = pages.at(-1)?.items ?? [];
     if (items.length < 100) break;
   }
   return paginateItemsOrThrow(pages).slice(0, maxItems);
 }
 
+async function fetchAttemptJobs(
+  client: GitHubClient,
+  repository: string,
+  run: GitHubWorkflowRun,
+): Promise<WorkflowJobSummary[]> {
+  const attempt = run.run_attempt ?? 1;
+  const payload = await client.fetchJson(
+    `${repoBase(repository)}/actions/runs/${run.id}/attempts/${attempt}/jobs?per_page=100`,
+  );
+  return parseWorkflowJobs(payload) as WorkflowJobSummary[];
+}
+
 async function loadJsonArtifact(
   client: GitHubClient,
   repository: string,
-  artifact: RunArtifactSummary,
+  artifact: GitHubArtifact,
+  runId: number,
   memberName: string,
   maxZipBytes: number,
   maxJsonBytes: number,
 ): Promise<unknown> {
-  if (artifact.workflow_run_id == null) {
-    throw new Error(`Artifact ${artifact.id} is missing workflow_run_id metadata`);
-  }
+  assertArtifactBoundToRun(artifact, runId);
   const zipBytes = await client.fetchBytes(
     `${repoBase(repository)}/actions/artifacts/${artifact.id}/zip`,
     maxZipBytes,
@@ -101,7 +112,7 @@ async function loadJsonArtifact(
   return JSON.parse(jsonText);
 }
 
-function assertRecordMatchesRun(record: PreflightSourceRecordV1, run: WorkflowRunSummary): void {
+function assertRecordMatchesRun(record: PreflightSourceRecordV1, run: GitHubWorkflowRun): void {
   const attempt = run.run_attempt ?? 1;
   if (record.workflowRunId !== run.id) throw new Error('source record workflowRunId mismatch');
   if (record.workflowRunAttempt !== attempt)
@@ -114,14 +125,10 @@ function assertRecordMatchesRun(record: PreflightSourceRecordV1, run: WorkflowRu
 
 function assertAttestationMatchesRun(
   attestation: ReturnType<typeof parseReleaseCandidateAttestation>,
-  run: WorkflowRunSummary,
-  artifact: RunArtifactSummary,
+  run: GitHubWorkflowRun,
   sourceRecord: PreflightSourceRecordV1,
 ): void {
   const attempt = run.run_attempt ?? 1;
-  if (artifact.workflow_run_id != null && artifact.workflow_run_id !== run.id) {
-    throw new Error('attestation artifact workflow_run_id mismatch');
-  }
   if (attestation.workflowRunId !== run.id) throw new Error('attestation workflowRunId mismatch');
   if (attestation.workflowRunAttempt !== attempt)
     throw new Error('attestation workflowRunAttempt mismatch');
@@ -136,6 +143,12 @@ function assertAttestationMatchesRun(
 }
 
 function assertPreflightJobs(jobs: WorkflowJobSummary[]): void {
+  const source = jobs.find(job => job.name === 'source');
+  if (!source || source.status !== 'completed' || source.conclusion !== 'success') {
+    throw new Error(
+      `Preflight job source must be success on latest attempt, got ${source?.conclusion ?? 'missing'}`,
+    );
+  }
   const required = ['preflight-gate', ...Object.values(PackagingJob)];
   for (const name of required) {
     const job = jobs.find(entry => entry.name === name);
@@ -145,7 +158,7 @@ function assertPreflightJobs(jobs: WorkflowJobSummary[]): void {
   }
 }
 
-function assertRunPermitsRelease(run: WorkflowRunSummary, sourceCommit: string): void {
+function assertRunPermitsRelease(run: GitHubWorkflowRun, sourceCommit: string): void {
   if (terminalIncomplete.has(run.status)) {
     throw new Error(`Preflight run ${run.id} for ${sourceCommit} is still ${run.status}`);
   }
@@ -155,8 +168,8 @@ function assertRunPermitsRelease(run: WorkflowRunSummary, sourceCommit: string):
 }
 
 function assertNoNewerPendingDispatch(
-  runs: WorkflowRunSummary[],
-  accepted: WorkflowRunSummary,
+  runs: GitHubWorkflowRun[],
+  accepted: GitHubWorkflowRun,
 ): void {
   for (const run of runs) {
     if (run.run_number <= accepted.run_number) continue;
@@ -177,7 +190,7 @@ async function verifyDailyCi(
   client: GitHubClient,
   repository: string,
   sourceCommit: string,
-): Promise<WorkflowRunSummary> {
+): Promise<GitHubWorkflowRun> {
   const runs = await paginateWorkflowRuns(
     client,
     `${repoBase(repository)}/actions/workflows/ci.yml/runs?head_sha=${sourceCommit}`,
@@ -190,7 +203,7 @@ async function verifyDailyCi(
   );
   return assertLatestDailyCiPermitsRelease(
     runs,
-    (jobsPayload.jobs ?? []) as WorkflowJobSummary[],
+    parseWorkflowJobs(jobsPayload) as WorkflowJobSummary[],
     sourceCommit,
   );
 }
@@ -198,7 +211,7 @@ async function verifyDailyCi(
 export async function verifyPreflightAttestationProvenance(
   client: GitHubClient,
   options: VerifyReleaseCandidateOptions,
-): Promise<{ run: WorkflowRunSummary; artifactId: number }> {
+): Promise<{ run: GitHubWorkflowRun; artifactId: number }> {
   const { repository, sourceCommit } = options;
   const maxRuns = options.maxPreflightRuns ?? MAX_PREFLIGHT_DISPATCH_RUNS_SCANNED;
   const dispatchRuns = await paginateWorkflowRuns(
@@ -218,7 +231,7 @@ export async function verifyPreflightAttestationProvenance(
       `${repoBase(repository)}/actions/runs/${run.id}/artifacts?per_page=100`,
     );
     const sourceArtifact = findArtifact(
-      (artifactsPayload.artifacts ?? []) as RunArtifactSummary[],
+      parseRunArtifacts(artifactsPayload),
       PREFLIGHT_SOURCE_ARTIFACT_NAME,
     );
     if (!sourceArtifact) continue;
@@ -227,6 +240,7 @@ export async function verifyPreflightAttestationProvenance(
         client,
         repository,
         sourceArtifact,
+        run.id,
         PREFLIGHT_SOURCE_RECORD_FILE,
         MAX_SOURCE_ZIP_BYTES,
         8_192,
@@ -267,7 +281,7 @@ export async function verifyPreflightAttestationProvenance(
     `${repoBase(repository)}/actions/runs/${latest.id}/artifacts?per_page=100`,
   );
   const attestationArtifact = findArtifact(
-    (artifactsPayload.artifacts ?? []) as RunArtifactSummary[],
+    parseRunArtifacts(artifactsPayload),
     RELEASE_CANDIDATE_ATTESTATION_ARTIFACT_NAME,
   );
   if (!attestationArtifact) {
@@ -279,18 +293,17 @@ export async function verifyPreflightAttestationProvenance(
       client,
       repository,
       attestationArtifact,
+      latest.id,
       RELEASE_CANDIDATE_ATTESTATION_FILE,
       MAX_ATTESTATION_ZIP_BYTES,
       65_536,
     ),
     { repository, sourceCommit },
   );
-  assertAttestationMatchesRun(attestation, latest, attestationArtifact, binding.sourceRecord);
+  assertAttestationMatchesRun(attestation, latest, binding.sourceRecord);
 
-  const jobsPayload = await client.fetchJson(
-    `${repoBase(repository)}/actions/runs/${latest.id}/jobs?per_page=100`,
-  );
-  assertPreflightJobs((jobsPayload.jobs ?? []) as WorkflowJobSummary[]);
+  const jobs = await fetchAttemptJobs(client, repository, latest);
+  assertPreflightJobs(jobs);
 
   return { run: latest, artifactId: attestationArtifact.id };
 }

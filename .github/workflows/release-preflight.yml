@@ -57,6 +57,7 @@ jobs:
           name: release-preflight-source
           path: release-preflight-source.json
           retention-days: 90
+          overwrite: true
 
   quality:
     needs: source
@@ -282,3 +283,4 @@ jobs:
           name: release-candidate-attestation
           path: release-candidate-attestation.json
           retention-days: 90
+          overwrite: true
