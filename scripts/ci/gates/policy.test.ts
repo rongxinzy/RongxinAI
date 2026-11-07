@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
 import { BaselineJob, JobResult, PackagingJob, PreflightJob, TestShardCount } from './constants.ts';
+import { findSuccessfulCheck, findSuccessfulWorkflowRun } from './release-candidate.ts';
 import { verifyGateResults, verifyPreflightResults } from './policy.ts';
 
 type Step = { name?: string; run?: string; uses?: string; with?: Record<string, unknown> };
@@ -20,9 +21,17 @@ const workflow = (name: string) =>
 const resultsFor = (names: string[]) =>
   Object.fromEntries(names.map(name => [name, { result: JobResult.Success as string }]));
 
-test('daily feature CI runs only lint and parallel unit tests before its gate', () => {
+test('daily feature CI runs lint, typecheck, and parallel unit tests before its gate', () => {
   const ci = workflow('ci.yml');
-  expect(Object.keys(ci.jobs).sort()).toEqual(['ci-gate', 'lint', 'test']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['ci-gate', 'lint', 'test', 'typecheck']);
+  const typecheckRuns = ci.jobs.typecheck.steps?.map(step => step.run ?? '').join('\n') ?? '';
+  expect(typecheckRuns).toContain('bun run build:tsc');
+  expect(
+    ci.jobs.typecheck.steps?.some(step => step.uses === './.github/actions/setup-bun-workspace'),
+  ).toBe(true);
+  expect(
+    typecheckRuns.match(/compile:electron|rebuild:electron-native|build:vite|dist:/) ?? [],
+  ).toHaveLength(0);
   expect(ci.jobs.test.needs).toBeUndefined();
   expect(ci.jobs.test.strategy?.matrix?.shard).toEqual(
     Array.from({ length: TestShardCount }, (_, i) => i + 1),
@@ -100,13 +109,53 @@ test('only tag builds may replace unsigned install runs with their signed packag
 test('release builds platforms in parallel and publication waits for all platforms', () => {
   const release = workflow('release.yml');
   expect(release.jobs.preflight).toBeUndefined();
+  const releaseJobs = ['release-typecheck', 'verify-release-candidate'];
+  for (const job of releaseJobs) {
+    expect(release.jobs[job].needs).toBe('prepare-release');
+  }
+  const typecheckRuns =
+    release.jobs['release-typecheck'].steps?.map(step => step.run ?? '').join('\n') ?? '';
+  expect(typecheckRuns).toContain('bun run build:tsc');
+  const candidateVerify =
+    release.jobs['verify-release-candidate'].steps?.map(step => step.run ?? '').join('\n') ?? '';
+  expect(candidateVerify).toContain('verify-release-candidate-readiness.mjs');
   for (const platform of ['windows', 'macos', 'linux']) {
-    expect(release.jobs[`build-${platform}`].needs).toBe('prepare-release');
+    expect(release.jobs[`build-${platform}`].needs).toEqual(
+      expect.arrayContaining(['prepare-release', ...releaseJobs]),
+    );
     expect(release.jobs.publish.needs).toEqual(
       expect.arrayContaining(['prepare-release', `build-${platform}`]),
     );
   }
   expect(release.jobs.publish.if).toBeUndefined();
+});
+
+test('release candidate readiness requires successful ci-gate and matching preflight', () => {
+  expect(
+    findSuccessfulCheck(
+      [
+        { name: 'ci-gate', status: 'completed', conclusion: 'success' },
+        { name: 'lint', status: 'completed', conclusion: 'failure' },
+      ],
+      'ci-gate',
+    ),
+  ).not.toBeNull();
+  expect(
+    findSuccessfulCheck(
+      [{ name: 'ci-gate', status: 'completed', conclusion: 'failure' }],
+      'ci-gate',
+    ),
+  ).toBeNull();
+  const sha = 'a'.repeat(40);
+  expect(
+    findSuccessfulWorkflowRun([{ head_sha: sha, status: 'completed', conclusion: 'success' }], sha),
+  ).not.toBeNull();
+  expect(
+    findSuccessfulWorkflowRun(
+      [{ head_sha: 'b'.repeat(40), status: 'completed', conclusion: 'success' }],
+      sha,
+    ),
+  ).toBeNull();
 });
 
 test('no secondary workflow can start heavy builds for a feature pull request', () => {

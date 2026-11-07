@@ -22,6 +22,7 @@ concurrency:
 permissions:
   contents: write
   actions: read
+  checks: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
@@ -66,8 +67,46 @@ jobs:
             echo '- channel: beta (stable requires promote workflow)'
           } >> "$GITHUB_STEP_SUMMARY"
 
-  build-windows:
+  release-typecheck:
     needs: prepare-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit }}
+      - uses: ./.github/actions/setup-bun-workspace
+        with:
+          save-cache: 'true'
+      - name: Typecheck release source before platform builds
+        run: bun run build:tsc
+
+  verify-release-candidate:
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            .nvmrc
+            scripts/ci/gates
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+      - name: Require green daily ci-gate and Release preflight on the tagged commit
+        run: node scripts/ci/gates/verify-release-candidate-readiness.mjs
+        env:
+          SOURCE_COMMIT: ${{ needs.prepare-release.outputs.commit }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
+
+  build-windows:
+    needs: [prepare-release, release-typecheck, verify-release-candidate]
     uses: ./.github/workflows/build-windows-release.yml
     with:
       source-ref: ${{ needs.prepare-release.outputs.commit }}
@@ -81,7 +120,7 @@ jobs:
       MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
 
   build-macos:
-    needs: prepare-release
+    needs: [prepare-release, release-typecheck, verify-release-candidate]
     uses: ./.github/workflows/build-inference-editions.yml
     with:
       source-ref: ${{ needs.prepare-release.outputs.commit }}
@@ -102,7 +141,7 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
   build-linux:
-    needs: prepare-release
+    needs: [prepare-release, release-typecheck, verify-release-candidate]
     uses: ./.github/workflows/build-inference-editions.yml
     with:
       source-ref: ${{ needs.prepare-release.outputs.commit }}

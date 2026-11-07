@@ -2,11 +2,11 @@
 
 Tag releases and stable promotion form one build with two channels: a `v*` tag runs `release.yml`, which publishes **beta**; `promote.yml` re-signs that same build as **stable**. Kylin V11 packaging is intentionally separate and does not gate standard releases.
 
-Daily PR/push CI runs lint and unit tests only (`bun run test`, alias `test:unit`), without application builds or Electron downloads. Real runtime integration tests and Electron ABI fixtures remain in `test:full` and release preflight.
+Daily PR/push CI runs lint, parallel `build:tsc`, and unit tests (`bun run test:unit`), without Vite production builds or Electron downloads. Real runtime integration tests and Electron ABI fixtures remain in `test:full` and release preflight.
 
 Local unit runs preserve the existing native addons, reuse separately cached Node ABI output, and restore the original files on completion. Switching back to Electron does not force another rebuild just because tests ran.
 
-Before tagging, run **Release preflight** (`release-preflight.yml`) against the intended source commit. Its default `include-packaging=true` also builds and installs unsigned Windows/Linux packages. All checks use one resolved commit and must pass. Tag releases run the same preflight with `include-packaging=false`: their own signed packages already undergo installation acceptance, so an extra unsigned build would duplicate that work. Quality, runtime, browser, enterprise and memory checks remain mandatory.
+Before tagging, run **Release preflight** (`release-preflight.yml`) against the intended source commit. Its default `include-packaging=true` also builds and installs unsigned Windows/Linux packages. All checks use one resolved commit and must pass. **Tag pushes cannot bypass this:** `release.yml` verifies a successful preflight workflow run on the exact tagged SHA and a successful `ci-gate` on that commit before any platform build starts, then runs a cheap Ubuntu `build:tsc` gate. Raw tag creation without a matching preflight record still fails closed in CI; branch rules cannot block tag pushes. Tag releases do not re-run preflight inside `release.yml` (signed packages already undergo installation acceptance). Quality, runtime, browser, enterprise and memory checks remain mandatory in preflight.
 
 ## 1. Tag → beta (`release.yml`)
 
@@ -14,7 +14,7 @@ Before tagging, run **Release preflight** (`release-preflight.yml`) against the 
 2. Create and push an annotated tag on `main`: `v<semver>` (no spaces), e.g. `v2026.10.16-build.1`.  
    The tag is the **only** version source; CI sets `APP_BUILD_VERSION` from it.
 3. Push triggers **Release (tag)**:
-   - Release preflight and Windows/macOS/Linux builds run in parallel; publication waits for preflight and every platform's build/installation acceptance
+   - Platform builds start only after Ubuntu `build:tsc`, a successful `ci-gate` on the source commit, and a successful Release preflight workflow run on that exact SHA; publication waits for every platform's build/installation acceptance
    - Upload immutable artifacts to R2
    - Publish one complete **beta** update feed (`channels/beta-pointer.json`), preventing platform jobs from overwriting shared metadata or exposing a partial generation
    - Create a GitHub **pre-release** with auto-generated release notes and attached installers
