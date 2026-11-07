@@ -80,20 +80,6 @@ export function assertLatestDailyCiPermitsRelease(
   return latest;
 }
 
-export function selectNewestValidAttestation<
-  T extends { sourceCommit: string; issuedAt: string; createdAt: string },
->(candidates: T[], expectedSourceCommit: string): T | null {
-  const matching = candidates.filter(item => item.sourceCommit === expectedSourceCommit);
-  if (matching.length === 0) return null;
-  return (
-    [...matching].sort((a, b) => {
-      const artifactTime = b.createdAt.localeCompare(a.createdAt);
-      if (artifactTime !== 0) return artifactTime;
-      return b.issuedAt.localeCompare(a.issuedAt);
-    })[0] ?? null
-  );
-}
-
 export type PaginatedPage<T> = { items: T[]; totalCount: number | null };
 
 export function mergePaginatedPages<T>(pages: PaginatedPage<T>[]): T[] {

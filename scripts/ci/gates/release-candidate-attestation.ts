@@ -3,7 +3,23 @@ import { PackagingJob } from './constants.ts';
 export const RELEASE_CANDIDATE_ATTESTATION_SCHEMA_VERSION = 1 as const;
 export const RELEASE_CANDIDATE_ATTESTATION_ARTIFACT_NAME = 'release-candidate-attestation';
 export const RELEASE_CANDIDATE_ATTESTATION_FILE = 'release-candidate-attestation.json';
+const PREFLIGHT_SOURCE_SCHEMA_VERSION = 1 as const;
+export const PREFLIGHT_SOURCE_ARTIFACT_NAME = 'release-preflight-source';
+export const PREFLIGHT_SOURCE_RECORD_FILE = 'release-preflight-source.json';
 const RELEASE_PREFLIGHT_WORKFLOW_PATH = '.github/workflows/release-preflight.yml';
+
+export type PreflightSourceRecordV1 = {
+  schemaVersion: typeof PREFLIGHT_SOURCE_SCHEMA_VERSION;
+  repository: string;
+  workflowPath: typeof RELEASE_PREFLIGHT_WORKFLOW_PATH;
+  workflowRunId: number;
+  workflowRunAttempt: number;
+  dispatchRef: string;
+  workflowHeadSha: string;
+  sourceCommit: string;
+  includePackaging: boolean;
+  issuedAt: string;
+};
 
 export type ReleaseCandidateAttestationV1 = {
   schemaVersion: typeof RELEASE_CANDIDATE_ATTESTATION_SCHEMA_VERSION;
@@ -27,6 +43,65 @@ function requireString(value: unknown, label: string): string {
     throw new Error(`${label} must be a non-empty string`);
   }
   return value;
+}
+
+export function buildPreflightSourceRecord(input: {
+  repository: string;
+  workflowRunId: number;
+  workflowRunAttempt: number;
+  dispatchRef: string;
+  workflowHeadSha: string;
+  sourceCommit: string;
+  includePackaging: boolean;
+  issuedAt?: string;
+}): PreflightSourceRecordV1 {
+  for (const sha of [input.workflowHeadSha, input.sourceCommit]) {
+    if (!shaPattern.test(sha)) throw new Error(`Invalid Git SHA: ${sha}`);
+  }
+  return {
+    schemaVersion: PREFLIGHT_SOURCE_SCHEMA_VERSION,
+    repository: input.repository,
+    workflowPath: RELEASE_PREFLIGHT_WORKFLOW_PATH,
+    workflowRunId: input.workflowRunId,
+    workflowRunAttempt: input.workflowRunAttempt,
+    dispatchRef: input.dispatchRef,
+    workflowHeadSha: input.workflowHeadSha,
+    sourceCommit: input.sourceCommit,
+    includePackaging: input.includePackaging,
+    issuedAt: input.issuedAt ?? new Date().toISOString(),
+  };
+}
+
+export function parsePreflightSourceRecord(
+  value: unknown,
+  expected: { repository: string; sourceCommit?: string },
+): PreflightSourceRecordV1 {
+  if (typeof value !== 'object' || value === null) {
+    throw new Error('Preflight source record must be an object');
+  }
+  const record = value as Record<string, unknown>;
+  if (record.schemaVersion !== PREFLIGHT_SOURCE_SCHEMA_VERSION) {
+    throw new Error(`Unsupported source record schemaVersion: ${String(record.schemaVersion)}`);
+  }
+  const repository = requireString(record.repository, 'repository');
+  if (repository !== expected.repository) {
+    throw new Error(
+      `Source record repository mismatch: expected ${expected.repository}, got ${repository}`,
+    );
+  }
+  if (requireString(record.workflowPath, 'workflowPath') !== RELEASE_PREFLIGHT_WORKFLOW_PATH) {
+    throw new Error('Unexpected source record workflowPath');
+  }
+  const sourceCommit = requireString(record.sourceCommit, 'sourceCommit');
+  if (expected.sourceCommit && sourceCommit !== expected.sourceCommit) {
+    throw new Error(
+      `Source record sourceCommit mismatch: expected ${expected.sourceCommit}, got ${sourceCommit}`,
+    );
+  }
+  if (typeof record.includePackaging !== 'boolean') {
+    throw new Error('Source record includePackaging must be boolean');
+  }
+  return record as PreflightSourceRecordV1;
 }
 
 export function buildReleaseCandidateAttestation(input: {

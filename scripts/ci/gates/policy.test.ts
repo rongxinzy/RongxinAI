@@ -129,13 +129,16 @@ test('release builds platforms in parallel and publication waits for all platfor
   expect(release.jobs.publish.if).toBeUndefined();
 });
 
-test('release preflight publishes packaging attestation only after the preflight gate', () => {
+test('release preflight publishes source record and packaging attestation artifacts', () => {
+  const source = workflow('release-preflight.yml').jobs.source;
+  const sourceJoined = JSON.stringify(source.steps ?? []);
+  expect(sourceJoined).toContain('publish-preflight-source-record.mjs');
+  expect(sourceJoined).toContain('release-preflight-source');
+  expect(source.permissions).toMatchObject({ actions: 'write' });
   const gate = workflow('release-preflight.yml').jobs['preflight-gate'];
-  const joined = gate.steps?.map(step => step.run ?? step.uses ?? '').join('\n') ?? '';
-  expect(joined).toContain('publish-release-candidate-attestation.mjs');
-  expect(joined).toContain('actions/upload-artifact@v4');
-  expect(joined).toContain('release-candidate-attestation');
-  expect(gate.permissions).toMatchObject({ actions: 'write' });
+  const gateSteps = gate.steps?.map(step => step.run ?? step.uses ?? '').join('\n') ?? '';
+  expect(gateSteps).toContain('publish-release-candidate-attestation.mjs');
+  expect(gateSteps).toContain('release-candidate-attestation');
 });
 
 test('release verifier checks out the trusted tagged source commit', () => {

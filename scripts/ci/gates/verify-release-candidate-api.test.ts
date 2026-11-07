@@ -1,37 +1,52 @@
 import { expect, test } from 'vitest';
-import { buildReleaseCandidateAttestation } from './release-candidate-attestation.ts';
+import {
+  PREFLIGHT_SOURCE_RECORD_FILE,
+  buildPreflightSourceRecord,
+  buildReleaseCandidateAttestation,
+} from './release-candidate-attestation.ts';
 import { verifyPreflightAttestationProvenance } from './verify-release-candidate-api.ts';
 
 const repo = 'rongxinzy/RongxinAI';
 const sha = 'a'.repeat(40);
-const shaOther = 'b'.repeat(40);
 const headMain = 'main';
+const workflowHead = 'c'.repeat(40);
 
-function attestationJson(runId: number, sourceCommit: string, attempt = 1, forgedRunId?: number) {
-  const body = buildReleaseCandidateAttestation({
-    repository: repo,
-    workflowRunId: forgedRunId ?? runId,
-    workflowRunAttempt: attempt,
-    dispatchRef: 'refs/heads/main',
-    workflowHeadSha: 'c'.repeat(40),
-    sourceCommit,
-    packagingResults: { 'linux-install': 'success', 'windows-install': 'success' },
-  });
-  return JSON.stringify(body);
+function attestationJson(runId: number, sourceCommit: string, forgedRunId?: number) {
+  return JSON.stringify(
+    buildReleaseCandidateAttestation({
+      repository: repo,
+      workflowRunId: forgedRunId ?? runId,
+      workflowRunAttempt: 1,
+      dispatchRef: 'refs/heads/main',
+      workflowHeadSha: workflowHead,
+      sourceCommit,
+      packagingResults: { 'linux-install': 'success', 'windows-install': 'success' },
+    }),
+  );
 }
 
-function run(
-  id: number,
-  runNumber: number,
-  partial: Record<string, unknown> = {},
-): Record<string, unknown> {
+function sourceJson(runId: number, sourceCommit: string, includePackaging = true) {
+  return JSON.stringify(
+    buildPreflightSourceRecord({
+      repository: repo,
+      workflowRunId: runId,
+      workflowRunAttempt: 1,
+      dispatchRef: 'refs/heads/main',
+      workflowHeadSha: workflowHead,
+      sourceCommit,
+      includePackaging,
+    }),
+  );
+}
+
+function run(id: number, runNumber: number, partial: Record<string, unknown> = {}) {
   return {
     id,
     run_number: runNumber,
     run_attempt: 1,
     status: 'completed',
     conclusion: 'success',
-    head_sha: 'c'.repeat(40),
+    head_sha: workflowHead,
     head_branch: headMain,
     created_at: `2026-11-07T0${runNumber}:00:00Z`,
     event: 'workflow_dispatch',
@@ -40,49 +55,42 @@ function run(
   };
 }
 
-function jobsFor(runId: number, sourceCommit: string, packagingSuccess = true) {
+function jobsFor(packagingSuccess = true) {
   const packagingConclusion = packagingSuccess ? 'success' : 'skipped';
   return {
     jobs: [
-      { id: runId * 10 + 1, name: 'source', status: 'completed', conclusion: 'success' },
-      {
-        id: runId * 10 + 2,
-        name: 'preflight-gate',
-        status: 'completed',
-        conclusion: 'success',
-      },
-      {
-        id: runId * 10 + 3,
-        name: 'linux-install',
-        status: 'completed',
-        conclusion: packagingConclusion,
-      },
-      {
-        id: runId * 10 + 4,
-        name: 'windows-install',
-        status: 'completed',
-        conclusion: packagingConclusion,
-      },
+      { name: 'preflight-gate', status: 'completed', conclusion: 'success' },
+      { name: 'linux-install', status: 'completed', conclusion: packagingConclusion },
+      { name: 'windows-install', status: 'completed', conclusion: packagingConclusion },
     ],
   };
 }
 
 function mockClient(handlers: {
   preflightRuns: Record<string, unknown>[];
-  artifactsByRun: Record<number, Record<string, unknown>[]>;
-  zipByArtifact: Record<number, string>;
+  artifactsByRun: Record<number, Array<Record<string, unknown>>>;
+  zipPayload: Record<string, string>;
   jobsByRun: Record<number, Record<string, unknown>>;
-  sourceOutputByJob: Record<number, string>;
 }) {
   const calls: string[] = [];
+  let artifactSeq = 7000;
+  const artifactIndex: Record<number, { id: number; name: string; workflow_run_id: number }> = {};
+  for (const [runId, artifacts] of Object.entries(handlers.artifactsByRun)) {
+    for (const artifact of artifacts) {
+      const id = artifactSeq++;
+      artifactIndex[id] = {
+        id,
+        name: String(artifact.name),
+        workflow_run_id: Number(runId),
+      };
+    }
+  }
   return {
     calls,
     client: {
       async fetchJson(url: string) {
         calls.push(url);
-        if (url.includes('/workflows/ci.yml/runs')) {
-          return { workflow_runs: [], total_count: 0 };
-        }
+        if (url.includes('/workflows/ci.yml/runs')) return { workflow_runs: [], total_count: 0 };
         if (url.includes('/workflows/release-preflight.yml/runs')) {
           return {
             workflow_runs: handlers.preflightRuns,
@@ -92,178 +100,157 @@ function mockClient(handlers: {
         const artifactsMatch = url.match(/\/actions\/runs\/(\d+)\/artifacts/);
         if (artifactsMatch) {
           const runId = Number(artifactsMatch[1]);
-          return { artifacts: handlers.artifactsByRun[runId] ?? [], total_count: 0 };
+          const artifacts = (handlers.artifactsByRun[runId] ?? []).map(artifact => {
+            const entry = Object.values(artifactIndex).find(
+              item => item.workflow_run_id === runId && item.name === artifact.name,
+            );
+            return { ...artifact, id: entry?.id, workflow_run_id: runId, expired: false };
+          });
+          return { artifacts, total_count: artifacts.length };
         }
         const jobsMatch = url.match(/\/actions\/runs\/(\d+)\/jobs/);
         if (jobsMatch) {
           const runId = Number(jobsMatch[1]);
           return handlers.jobsByRun[runId] ?? { jobs: [] };
         }
-        const jobDetailMatch = url.match(/\/actions\/jobs\/(\d+)$/);
-        if (jobDetailMatch) {
-          const jobId = Number(jobDetailMatch[1]);
-          const commit = handlers.sourceOutputByJob[jobId];
-          return { outputs: commit ? { commit } : {} };
-        }
-        throw new Error(`Unexpected fetchJson url: ${url}`);
+        throw new Error(`Unexpected fetchJson: ${url}`);
       },
       async fetchBytes(url: string, maxBytes: number) {
         calls.push(url);
         const match = url.match(/\/artifacts\/(\d+)\/zip/);
-        if (!match) throw new Error(`Unexpected fetchBytes url: ${url}`);
+        if (!match) throw new Error(`Unexpected fetchBytes: ${url}`);
         const id = Number(match[1]);
-        const text = handlers.zipByArtifact[id];
-        if (!text) throw new Error(`Missing zip for artifact ${id}`);
-        const bytes = new TextEncoder().encode(text);
+        const meta = artifactIndex[id];
+        const key = `${meta.workflow_run_id}:${meta.name}`;
+        const payload = handlers.zipPayload[key];
+        if (!payload) throw new Error(`Missing zip payload for ${key}`);
+        const bytes = new TextEncoder().encode(payload);
         if (bytes.byteLength > maxBytes) throw new Error('zip too large');
         return bytes.buffer;
       },
       unzipMember(zipBytes: ArrayBuffer, memberName: string) {
         const text = new TextDecoder().decode(zipBytes);
-        if (memberName !== 'release-candidate-attestation.json') {
-          throw new Error(`Refusing to extract ${memberName}`);
-        }
         const marker = '::JSON::';
-        const index = text.indexOf(marker);
-        if (index < 0) throw new Error('malformed unrelated artifact payload');
-        return text.slice(index + marker.length);
+        const markerIndex = text.indexOf(marker);
+        if (markerIndex < 0) throw new Error(`Refusing malformed artifact member ${memberName}`);
+        return text.slice(markerIndex + marker.length);
       },
     },
   };
 }
 
-test('accepts attestation only from run-scoped artifact with matching API provenance', async () => {
-  const runId = 100;
-  const artifactId = 500;
-  const zipPayload = `noise::JSON::${attestationJson(runId, sha)}`;
+function zipPayload(runId: number, source: string, attestation: string) {
+  return {
+    [`${runId}:release-preflight-source`]: `::JSON::${source}`,
+    [`${runId}:release-candidate-attestation`]: `::JSON::${attestation}`,
+  };
+}
+
+test('accepts run-scoped source record plus attestation with API metadata', async () => {
   const { client } = mockClient({
     preflightRuns: [run(100, 5)],
     artifactsByRun: {
-      100: [{ id: artifactId, name: 'release-candidate-attestation', workflow_run_id: 100 }],
+      100: [{ name: 'release-preflight-source' }, { name: 'release-candidate-attestation' }],
     },
-    zipByArtifact: { [artifactId]: zipPayload },
-    jobsByRun: { 100: jobsFor(100, sha) },
-    sourceOutputByJob: { 1001: sha },
+    zipPayload: zipPayload(100, sourceJson(100, sha), attestationJson(100, sha)),
+    jobsByRun: { 100: jobsFor(true) },
   });
   const result = await verifyPreflightAttestationProvenance(client, {
     repository: repo,
     sourceCommit: sha,
-    maxPreflightRuns: 10,
   });
-  expect(result.run.id).toBe(runId);
-  expect(result.artifactId).toBe(artifactId);
+  expect(result.run.id).toBe(100);
 });
 
-test('rejects forged workflowRunId inside attestation JSON', async () => {
-  const runId = 101;
-  const artifactId = 501;
-  const zipPayload = `::JSON::${attestationJson(runId, sha, 1, 999)}`;
+test('rejects forged attestation workflowRunId', async () => {
   const { client } = mockClient({
     preflightRuns: [run(101, 6)],
     artifactsByRun: {
-      101: [{ id: artifactId, name: 'release-candidate-attestation', workflow_run_id: 101 }],
+      101: [{ name: 'release-preflight-source' }, { name: 'release-candidate-attestation' }],
     },
-    zipByArtifact: { [artifactId]: zipPayload },
-    jobsByRun: { 101: jobsFor(101, sha) },
-    sourceOutputByJob: { 1011: sha },
+    zipPayload: zipPayload(101, sourceJson(101, sha), attestationJson(101, sha, 999)),
+    jobsByRun: { 101: jobsFor(true) },
   });
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
   ).rejects.toThrow(/workflowRunId/);
 });
 
-test('rejects newer failed preflight for the same resolved source commit', async () => {
-  const goodArtifact = 601;
+test('rejects newer failed preflight for same source record SHA', async () => {
   const { client } = mockClient({
-    preflightRuns: [
-      run(201, 8, { status: 'completed', conclusion: 'failure' }),
-      run(200, 7, { status: 'completed', conclusion: 'success' }),
-    ],
+    preflightRuns: [run(201, 8, { status: 'completed', conclusion: 'failure' }), run(200, 7)],
     artifactsByRun: {
-      200: [{ id: goodArtifact, name: 'release-candidate-attestation', workflow_run_id: 200 }],
-      201: [],
+      200: [{ name: 'release-preflight-source' }, { name: 'release-candidate-attestation' }],
+      201: [{ name: 'release-preflight-source' }],
     },
-    zipByArtifact: { [goodArtifact]: `::JSON::${attestationJson(200, sha)}` },
-    jobsByRun: {
-      200: jobsFor(200, sha),
-      201: jobsFor(201, sha),
+    zipPayload: {
+      ...zipPayload(200, sourceJson(200, sha), attestationJson(200, sha)),
+      '201:release-preflight-source': `::JSON::${sourceJson(201, sha)}`,
     },
-    sourceOutputByJob: { 2001: sha, 2011: sha },
+    jobsByRun: { 200: jobsFor(true), 201: jobsFor(true) },
   });
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
-  ).rejects.toThrow(/Latest Release preflight/);
+  ).rejects.toThrow(/concluded failure/);
 });
 
-test('rejects in-progress latest preflight for resolved source', async () => {
+test('rejects newer in-progress dispatch before source resolution completes', async () => {
   const { client } = mockClient({
-    preflightRuns: [run(300, 9, { status: 'in_progress', conclusion: null })],
-    artifactsByRun: { 300: [] },
-    zipByArtifact: {},
-    jobsByRun: { 300: jobsFor(300, sha) },
-    sourceOutputByJob: { 3001: sha },
-  });
-  await expect(
-    verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
-  ).rejects.toThrow(/still|in_progress|Latest Release preflight/);
-});
-
-test('rejects packaging=false latest run without attestation for source', async () => {
-  const { client } = mockClient({
-    preflightRuns: [run(400, 10)],
-    artifactsByRun: { 400: [] },
-    zipByArtifact: {},
-    jobsByRun: { 400: jobsFor(400, sha, false) },
-    sourceOutputByJob: { 4001: sha },
-  });
-  await expect(
-    verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
-  ).rejects.toThrow(/no release-candidate-attestation/);
-});
-
-test('ignores candidate SHA mismatch via source job output binding', async () => {
-  const artifactId = 701;
-  const { client } = mockClient({
-    preflightRuns: [run(500, 11)],
+    preflightRuns: [run(301, 10, { status: 'in_progress', conclusion: null }), run(300, 9)],
     artifactsByRun: {
-      500: [{ id: artifactId, name: 'release-candidate-attestation', workflow_run_id: 500 }],
+      300: [{ name: 'release-preflight-source' }, { name: 'release-candidate-attestation' }],
+      301: [],
     },
-    zipByArtifact: { [artifactId]: `::JSON::${attestationJson(500, shaOther)}` },
-    jobsByRun: { 500: jobsFor(500, sha) },
-    sourceOutputByJob: { 5001: sha },
+    zipPayload: zipPayload(300, sourceJson(300, sha), attestationJson(300, sha)),
+    jobsByRun: { 300: jobsFor(true) },
   });
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
-  ).rejects.toThrow(/sourceCommit/);
+  ).rejects.toThrow(/newer than accepted/);
 });
 
-test('does not download repo-wide artifacts and rejects malformed unrelated payloads', async () => {
-  const artifactId = 801;
+test('rejects include-packaging=false source record even if attestation existed', async () => {
+  const { client } = mockClient({
+    preflightRuns: [run(400, 11)],
+    artifactsByRun: { 400: [{ name: 'release-preflight-source' }] },
+    zipPayload: { '400:release-preflight-source': `::JSON::${sourceJson(400, sha, false)}` },
+    jobsByRun: { 400: jobsFor(false) },
+  });
+  await expect(
+    verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
+  ).rejects.toThrow(/include-packaging=false/);
+});
+
+test('ignores source record for other SHAs and never lists repo-wide artifacts', async () => {
   const { client, calls } = mockClient({
-    preflightRuns: [run(600, 12)],
+    preflightRuns: [run(500, 12)],
     artifactsByRun: {
-      600: [{ id: artifactId, name: 'release-candidate-attestation', workflow_run_id: 600 }],
+      500: [{ name: 'release-preflight-source' }],
     },
-    zipByArtifact: { [artifactId]: 'binary noise without json marker' },
-    jobsByRun: { 600: jobsFor(600, sha) },
-    sourceOutputByJob: { 6001: sha },
+    zipPayload: { '500:release-preflight-source': `::JSON::${sourceJson(500, 'b'.repeat(40))}` },
+    jobsByRun: { 500: jobsFor(true) },
   });
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
-  ).rejects.toThrow(/malformed unrelated/);
+  ).rejects.toThrow(/release-preflight-source artifact for/);
   expect(calls.some(url => url.includes('/actions/artifacts?'))).toBe(false);
-  expect(calls.some(url => url.includes(`/actions/runs/600/artifacts`))).toBe(true);
+  expect(calls.some(url => url.includes(`/actions/runs/500/artifacts`))).toBe(true);
 });
 
-test('skips workflow_dispatch runs from untrusted branches', async () => {
+test('rejects malformed unrelated artifact payloads without full extraction', async () => {
   const { client } = mockClient({
-    preflightRuns: [run(700, 13, { head_branch: 'feature/foo' })],
-    artifactsByRun: {},
-    zipByArtifact: {},
-    jobsByRun: {},
-    sourceOutputByJob: {},
+    preflightRuns: [run(600, 13)],
+    artifactsByRun: {
+      600: [{ name: 'release-preflight-source' }, { name: 'release-candidate-attestation' }],
+    },
+    zipPayload: {
+      '600:release-preflight-source': `::JSON::${sourceJson(600, sha)}`,
+      '600:release-candidate-attestation': 'not-json',
+    },
+    jobsByRun: { 600: jobsFor(true) },
   });
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
-  ).rejects.toThrow(/No workflow_dispatch Release preflight run/);
+  ).rejects.toThrow();
+  expect(PREFLIGHT_SOURCE_RECORD_FILE).toBe('release-preflight-source.json');
 });

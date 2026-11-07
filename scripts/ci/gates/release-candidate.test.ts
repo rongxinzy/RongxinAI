@@ -10,7 +10,6 @@ import {
   mergePaginatedPages,
   paginateItemsOrThrow,
   selectLatestWorkflowRun,
-  selectNewestValidAttestation,
   type WorkflowRunSummary,
 } from './release-candidate.ts';
 
@@ -145,27 +144,6 @@ test('wrong source-ref attestation does not satisfy a different tagged SHA', () 
   expect(() =>
     parseReleaseCandidateAttestation(attestation, { repository: 'owner/repo', sourceCommit: shaB }),
   ).toThrow(/sourceCommit mismatch/);
-});
-
-test('selectNewestValidAttestation prefers newer artifact for the same sourceCommit', () => {
-  const chosen = selectNewestValidAttestation(
-    [
-      {
-        sourceCommit: shaA,
-        issuedAt: '2026-11-07T01:00:00Z',
-        createdAt: '2026-11-07T01:00:00Z',
-        id: 1,
-      },
-      {
-        sourceCommit: shaA,
-        issuedAt: '2026-11-07T03:00:00Z',
-        createdAt: '2026-11-07T03:00:00Z',
-        id: 2,
-      },
-    ],
-    shaA,
-  );
-  expect(chosen?.id).toBe(2);
 });
 
 test('mergePaginatedPages preserves order across pages', () => {

@@ -32,6 +32,9 @@ env:
 jobs:
   source:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     outputs:
       commit: ${{ steps.source.outputs.commit }}
     steps:
@@ -43,6 +46,17 @@ jobs:
           commit="$(git rev-parse --verify HEAD)"
           [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Write preflight source record
+        run: node scripts/ci/gates/publish-preflight-source-record.mjs
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          INCLUDE_PACKAGING: ${{ inputs.include-packaging }}
+      - name: Upload preflight source record
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-preflight-source
+          path: release-preflight-source.json
+          retention-days: 90
 
   quality:
     needs: source
