@@ -5,6 +5,7 @@ export type WorkflowRunSummary = {
   status: string;
   conclusion: string | null;
   head_sha: string;
+  head_branch?: string;
   created_at: string;
   event?: string;
   path?: string;
