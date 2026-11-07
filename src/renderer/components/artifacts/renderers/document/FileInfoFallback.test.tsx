@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { CoworkArtifactRole, CoworkArtifactSource } from '../../../../../shared/cowork/artifacts';
@@ -24,7 +23,7 @@ test('renders empty state layout with standard Lucide icon and title', () => {
     fileName: 'deck.pptx',
     filePath: '/tmp/deck.pptx',
     role: CoworkArtifactRole.Deliverable,
-    source: CoworkArtifactSource.ToolEffect,
+    source: CoworkArtifactSource.Tool,
     content: '',
     createdAt: Date.now(),
   };
