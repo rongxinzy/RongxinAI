@@ -19,7 +19,7 @@ Preflight **cannot** resolve `source-ref` from the job outputs API. Instead, the
 1. Latest green `ci.yml` + `ci-gate` on `SOURCE_COMMIT`.
 2. Newest eligible `workflow_dispatch` `release-preflight.yml` run on `main` / `release/**` where the run-scoped **source record** names `SOURCE_COMMIT`, `includePackaging=true`, and API run metadata matches the JSON (`workflowRunId`, `head_sha`, `dispatchRef`).
 3. That same run is **completed success**; no newer eligible dispatch is `queued` / `in_progress` / etc. (fail-closed while a newer preflight is pending).
-4. Same run has **`release-candidate-attestation`**; ZIP size-capped; only `release-candidate-attestation.json` extracted via `unzip -p`. Job list API confirms `preflight-gate`, `linux-install`, and `windows-install` conclusions are `success`.
+4. Same run has **`release-candidate-attestation`**; ZIP size-capped; only `release-candidate-attestation.json` extracted via `unzip -p`. The attestation’s `packaging` map (caller ids `linux-install`, `windows-install` from `needs`) is authoritative for packaging: `preflight-gate` only runs after `verify-preflight.ts` requires those needs to succeed. The REST attempt-jobs API check only requires direct jobs **`source`** and **`preflight-gate`** to be `success`—reusable packaging jobs appear as **`linux-install / install-and-start`** and **`windows-install / package-and-install`**, not bare caller ids (see live `build-linux / …` pattern in `fixtures/github-rest-reusable-workflow-jobs-200.json`, run `42247491102`).
 
 ### `workflow_dispatch` ref vs tested SHA
 
@@ -29,6 +29,10 @@ Preflight **cannot** resolve `source-ref` from the job outputs API. Instead, the
 ### Artifact API shape
 
 `GET .../actions/runs/{run_id}/artifacts` returns `artifacts[].workflow_run.id` (nested). There is **no** top-level `workflow_run_id`. Fixtures: `fixtures/github-rest-run-artifacts-200.json`.
+
+### Source-record scan
+
+While building bindings, runs whose source artifact is missing, malformed, or mismatched to API metadata are **skipped** (not fatal). Historical failed reruns with stale records therefore do not block a newer matching run.
 
 ### Rerun policy
 

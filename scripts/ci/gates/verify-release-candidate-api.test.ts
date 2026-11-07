@@ -61,13 +61,12 @@ function artifact(id: number, runId: number, name: string) {
   };
 }
 
-function jobs(packagingSuccess = true) {
-  const packagingConclusion = packagingSuccess ? 'success' : 'skipped';
+function jobs() {
   return [
     { name: 'source', status: 'completed', conclusion: 'success' },
     { name: 'preflight-gate', status: 'completed', conclusion: 'success' },
-    { name: 'linux-install', status: 'completed', conclusion: packagingConclusion },
-    { name: 'windows-install', status: 'completed', conclusion: packagingConclusion },
+    { name: 'linux-install / install-and-start', status: 'completed', conclusion: 'success' },
+    { name: 'windows-install / package-and-install', status: 'completed', conclusion: 'success' },
   ];
 }
 
@@ -94,7 +93,7 @@ function mockClient(config: {
         const attemptJobs = url.match(/\/attempts\/(\d+)\/jobs/);
         if (attemptJobs) {
           const runId = Number(url.match(/\/runs\/(\d+)\//)?.[1]);
-          return { jobs: config.jobsByRun?.[runId ?? 0] ?? jobs(true) };
+          return { jobs: config.jobsByRun?.[runId ?? 0] ?? jobs() };
         }
         throw new Error(`Unexpected fetchJson: ${url}`);
       },
@@ -123,7 +122,7 @@ test('rejects forged attestation workflowRunId against nested workflow_run bindi
       ],
     },
     jsonByArtifact: { 501: JSON.stringify(source), 502: JSON.stringify(bad) },
-    jobsByRun: { 101: jobs(true) },
+    jobsByRun: { 101: jobs() },
   });
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
@@ -147,7 +146,7 @@ test('newer failed run with source record blocks stale success', async () => {
       602: JSON.stringify(good.attestation),
       603: JSON.stringify(badSource.source),
     },
-    jobsByRun: { 200: jobs(true), 201: jobs(true) },
+    jobsByRun: { 200: jobs(), 201: jobs() },
   });
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
@@ -184,9 +183,36 @@ test('partial rerun without source job on latest attempt fails closed', async ()
       ],
     },
     jsonByArtifact: { 801: JSON.stringify(good.source), 802: JSON.stringify(good.attestation) },
-    jobsByRun: { 400: jobs(true).filter(job => job.name !== 'source') },
+    jobsByRun: { 400: jobs().filter(job => job.name !== 'source') },
   });
   await expect(
     verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
   ).rejects.toThrow(/job source must be success/);
+});
+
+test('skips unrelated historical source records while selecting latest binding', async () => {
+  const good = records(500, sha);
+  const stale = records(501, sha);
+  stale.workflowRunAttempt = 99;
+  const { client } = mockClient({
+    runs: [run(500, 12), run(501, 11, { run_attempt: 2 })],
+    artifacts: {
+      500: [
+        artifact(901, 500, 'release-preflight-source'),
+        artifact(902, 500, 'release-candidate-attestation'),
+      ],
+      501: [artifact(903, 501, 'release-preflight-source')],
+    },
+    jsonByArtifact: {
+      901: JSON.stringify(good.source),
+      902: JSON.stringify(good.attestation),
+      903: JSON.stringify(stale),
+    },
+    jobsByRun: { 500: jobs(), 501: jobs() },
+  });
+  const result = await verifyPreflightAttestationProvenance(client, {
+    repository: repo,
+    sourceCommit: sha,
+  });
+  expect(result.run.id).toBe(500);
 });

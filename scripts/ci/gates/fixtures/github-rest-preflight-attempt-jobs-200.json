@@ -1,0 +1,30 @@
+{
+  "_fixtureNote": "Attempt-jobs shape for release-preflight packaging=true. Caller ids match release-preflight.yml; nested job ids match linux-install-pr.yml (install-and-start) and windows-installer-pr.yml (package-and-install). Slash naming pattern recorded from GET .../actions/runs/42247491102/jobs (see github-rest-reusable-workflow-jobs-200.json). Replace with a live preflight run id when available.",
+  "total_count": 4,
+  "jobs": [
+    {
+      "name": "source",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "name": "preflight-gate",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "name": "linux-install / install-and-start",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "name": "windows-install / package-and-install",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    }
+  ]
+}

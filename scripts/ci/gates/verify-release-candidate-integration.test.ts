@@ -68,14 +68,12 @@ test('positive integration uses recorded artifact REST shape with nested workflo
         return artifactsFixture;
       }
       if (url.includes(`/attempts/1/jobs`)) {
-        return {
-          jobs: [
-            { name: 'source', status: 'completed', conclusion: 'success' },
-            { name: 'preflight-gate', status: 'completed', conclusion: 'success' },
-            { name: 'linux-install', status: 'completed', conclusion: 'success' },
-            { name: 'windows-install', status: 'completed', conclusion: 'success' },
-          ],
-        };
+        return JSON.parse(
+          readFileSync(
+            'scripts/ci/gates/fixtures/github-rest-preflight-attempt-jobs-200.json',
+            'utf8',
+          ),
+        );
       }
       throw new Error(`unexpected url ${url}`);
     },
@@ -106,9 +104,13 @@ test('positive integration uses recorded artifact REST shape with nested workflo
 });
 
 test('rejects attestation when nested workflow_run.id disagrees with run listing', async () => {
+  const pl = payload();
   const badArtifacts = structuredClone(artifactsFixture);
   const artifacts = badArtifacts.artifacts as Array<Record<string, unknown>>;
-  artifacts[0].workflow_run = { id: runId + 1, head_branch: 'main', head_sha: workflowHead };
+  const attestationEntry = artifacts.find(
+    entry => (entry as { name?: string }).name === 'release-candidate-attestation',
+  ) as { workflow_run?: { id: number } };
+  attestationEntry.workflow_run = { id: runId + 1, head_branch: 'main', head_sha: workflowHead };
   const client = {
     async fetchJson(url: string) {
       if (url.includes('/workflows/release-preflight.yml/runs')) {
@@ -130,13 +132,27 @@ test('rejects attestation when nested workflow_run.id disagrees with run listing
         };
       }
       if (url.includes('/artifacts')) return badArtifacts;
+      if (url.includes('/attempts/1/jobs')) {
+        return JSON.parse(
+          readFileSync(
+            'scripts/ci/gates/fixtures/github-rest-preflight-attempt-jobs-200.json',
+            'utf8',
+          ),
+        );
+      }
       throw new Error(url);
     },
-    async fetchBytes() {
-      return new ArrayBuffer(0);
+    async fetchBytes(url: string) {
+      const match = url.match(/artifacts\/(\d+)\/zip/);
+      if (!match) throw new Error(url);
+      const id = Number(match[1]);
+      const body = id === 41000001 ? pl.source : id === 41000002 ? pl.attestation : '';
+      return new TextEncoder().encode(body).buffer;
     },
-    unzipMember() {
-      return '{}';
+    unzipMember(buffer: ArrayBuffer, member: string) {
+      const text = new TextDecoder().decode(buffer);
+      if (!member.endsWith('.json')) throw new Error('bad member');
+      return text;
     },
   };
   await expect(

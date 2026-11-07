@@ -1,4 +1,3 @@
-import { PackagingJob } from './constants.ts';
 import {
   assertArtifactBoundToRun,
   parseRunArtifacts,
@@ -142,19 +141,18 @@ function assertAttestationMatchesRun(
   }
 }
 
-function assertPreflightJobs(jobs: WorkflowJobSummary[]): void {
+function assertDirectPreflightGateJobs(jobs: WorkflowJobSummary[]): void {
   const source = jobs.find(job => job.name === 'source');
   if (!source || source.status !== 'completed' || source.conclusion !== 'success') {
     throw new Error(
       `Preflight job source must be success on latest attempt, got ${source?.conclusion ?? 'missing'}`,
     );
   }
-  const required = ['preflight-gate', ...Object.values(PackagingJob)];
-  for (const name of required) {
-    const job = jobs.find(entry => entry.name === name);
-    if (!job || job.status !== 'completed' || job.conclusion !== 'success') {
-      throw new Error(`Preflight job ${name} must be success, got ${job?.conclusion ?? 'missing'}`);
-    }
+  const gate = jobs.find(job => job.name === 'preflight-gate');
+  if (!gate || gate.status !== 'completed' || gate.conclusion !== 'success') {
+    throw new Error(
+      `Preflight job preflight-gate must be success, got ${gate?.conclusion ?? 'missing'}`,
+    );
   }
 }
 
@@ -224,32 +222,32 @@ export async function verifyPreflightAttestationProvenance(
   for (const run of dispatchRuns) {
     try {
       assertEligiblePreflightRun(run);
+      const artifactsPayload = await client.fetchJson(
+        `${repoBase(repository)}/actions/runs/${run.id}/artifacts?per_page=100`,
+      );
+      const sourceArtifact = findArtifact(
+        parseRunArtifacts(artifactsPayload),
+        PREFLIGHT_SOURCE_ARTIFACT_NAME,
+      );
+      if (!sourceArtifact) continue;
+      const record = parsePreflightSourceRecord(
+        await loadJsonArtifact(
+          client,
+          repository,
+          sourceArtifact,
+          run.id,
+          PREFLIGHT_SOURCE_RECORD_FILE,
+          MAX_SOURCE_ZIP_BYTES,
+          8_192,
+        ),
+        { repository },
+      );
+      assertRecordMatchesRun(record, run);
+      if (record.sourceCommit !== sourceCommit) continue;
+      bindings.push({ run, sourceRecord: record });
     } catch {
       continue;
     }
-    const artifactsPayload = await client.fetchJson(
-      `${repoBase(repository)}/actions/runs/${run.id}/artifacts?per_page=100`,
-    );
-    const sourceArtifact = findArtifact(
-      parseRunArtifacts(artifactsPayload),
-      PREFLIGHT_SOURCE_ARTIFACT_NAME,
-    );
-    if (!sourceArtifact) continue;
-    const record = parsePreflightSourceRecord(
-      await loadJsonArtifact(
-        client,
-        repository,
-        sourceArtifact,
-        run.id,
-        PREFLIGHT_SOURCE_RECORD_FILE,
-        MAX_SOURCE_ZIP_BYTES,
-        8_192,
-      ),
-      { repository },
-    );
-    assertRecordMatchesRun(record, run);
-    if (record.sourceCommit !== sourceCommit) continue;
-    bindings.push({ run, sourceRecord: record });
   }
 
   const latest = selectLatestWorkflowRun(bindings.map(binding => binding.run));
@@ -303,7 +301,7 @@ export async function verifyPreflightAttestationProvenance(
   assertAttestationMatchesRun(attestation, latest, binding.sourceRecord);
 
   const jobs = await fetchAttemptJobs(client, repository, latest);
-  assertPreflightJobs(jobs);
+  assertDirectPreflightGateJobs(jobs);
 
   return { run: latest, artifactId: attestationArtifact.id };
 }

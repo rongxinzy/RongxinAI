@@ -26,6 +26,16 @@ test('recorded run-artifacts fixture uses nested workflow_run only', () => {
   expect(() => assertArtifactBoundToRun(artifacts[0], 9002)).toThrow(/workflow_run.id/);
 });
 
+test('recorded reusable-workflow jobs use caller / callee names', () => {
+  const payload = JSON.parse(
+    readFileSync('scripts/ci/gates/fixtures/github-rest-reusable-workflow-jobs-200.json', 'utf8'),
+  ) as Record<string, unknown>;
+  const jobs = parseWorkflowJobs(payload);
+  expect(jobs.some(job => job.name === 'prepare-release')).toBe(true);
+  expect(jobs.some(job => job.name.startsWith('build-linux /'))).toBe(true);
+  expect(jobs.some(job => job.name === 'linux-install')).toBe(false);
+});
+
 test('recorded workflow run and jobs fixtures parse for verifier transport', () => {
   const run = JSON.parse(
     readFileSync('scripts/ci/gates/fixtures/github-rest-workflow-run-200.json', 'utf8'),
