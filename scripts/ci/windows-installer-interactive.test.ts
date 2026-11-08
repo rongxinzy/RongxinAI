@@ -95,9 +95,15 @@ test('reports real outer bounds and never substitutes client bounds for a failed
   // window) and drives layout math, so a GetWindowRect failure must fail the
   // inspection with the real Win32 error instead of silently reporting a
   // client rect mapped through an unchecked MapWindowPoints as outer bounds.
-  const inspect = helper.slice(helper.indexOf('private static WindowInfo Inspect('), helper.indexOf('public static WindowInfo[] Windows()'));
+  const inspect = helper.slice(
+    helper.indexOf('private static WindowInfo Inspect('),
+    helper.indexOf('public static WindowInfo[] Windows()'),
+  );
   expect(inspect).toContain('ReadOuterBounds(window)');
-  const outer = helper.slice(helper.indexOf('private static Rect ReadOuterBounds('), helper.indexOf('private static WindowInfo Inspect('));
+  const outer = helper.slice(
+    helper.indexOf('private static Rect ReadOuterBounds('),
+    helper.indexOf('private static WindowInfo Inspect('),
+  );
   expect(outer).toContain('if (!GetWindowRect(window, out bounds))');
   expect(outer).toContain('throw Win32("GetWindowRect failed for HWND 0x"');
   // The throw must sit at the failing call so the attributed Win32 code is
