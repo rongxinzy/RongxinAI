@@ -32,7 +32,9 @@ Preflight **cannot** resolve `source-ref` from the job outputs API. Instead, the
 
 ### Source-record scan
 
-While building bindings, runs whose source artifact is missing, malformed, or mismatched to API metadata are **skipped** (not fatal). Historical failed reruns with stale records therefore do not block a newer matching run.
+While building bindings, ineligible runs and missing source artifacts are **skipped**. Successfully read JSON records with an invalid schema or mismatched API metadata are also skipped, so historical stale records do not block a newer matching run.
+
+Artifact-list API errors, artifact binding failures, download failures, ZIP extraction failures, and invalid JSON **abort verification**. A read failure cannot establish that a run is unrelated to the requested SHA, so it must never fall back to an older successful proof. This conservative check applies to every eligible run in the scan window, including older runs whose source cannot be established.
 
 ### Rerun policy
 

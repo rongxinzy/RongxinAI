@@ -222,32 +222,38 @@ export async function verifyPreflightAttestationProvenance(
   for (const run of dispatchRuns) {
     try {
       assertEligiblePreflightRun(run);
-      const artifactsPayload = await client.fetchJson(
-        `${repoBase(repository)}/actions/runs/${run.id}/artifacts?per_page=100`,
-      );
-      const sourceArtifact = findArtifact(
-        parseRunArtifacts(artifactsPayload),
-        PREFLIGHT_SOURCE_ARTIFACT_NAME,
-      );
-      if (!sourceArtifact) continue;
-      const record = parsePreflightSourceRecord(
-        await loadJsonArtifact(
-          client,
-          repository,
-          sourceArtifact,
-          run.id,
-          PREFLIGHT_SOURCE_RECORD_FILE,
-          MAX_SOURCE_ZIP_BYTES,
-          8_192,
-        ),
-        { repository },
-      );
-      assertRecordMatchesRun(record, run);
-      if (record.sourceCommit !== sourceCommit) continue;
-      bindings.push({ run, sourceRecord: record });
     } catch {
       continue;
     }
+
+    // Read failures cannot prove this run is unrelated to the requested source.
+    // Propagate them instead of falling back to an older successful proof.
+    const artifactsPayload = await client.fetchJson(
+      `${repoBase(repository)}/actions/runs/${run.id}/artifacts?per_page=100`,
+    );
+    const sourceArtifact = findArtifact(
+      parseRunArtifacts(artifactsPayload),
+      PREFLIGHT_SOURCE_ARTIFACT_NAME,
+    );
+    if (!sourceArtifact) continue;
+    const sourceValue = await loadJsonArtifact(
+      client,
+      repository,
+      sourceArtifact,
+      run.id,
+      PREFLIGHT_SOURCE_RECORD_FILE,
+      MAX_SOURCE_ZIP_BYTES,
+      8_192,
+    );
+    let record: PreflightSourceRecordV1;
+    try {
+      record = parsePreflightSourceRecord(sourceValue, { repository });
+      assertRecordMatchesRun(record, run);
+    } catch {
+      continue;
+    }
+    if (record.sourceCommit !== sourceCommit) continue;
+    bindings.push({ run, sourceRecord: record });
   }
 
   const latest = selectLatestWorkflowRun(bindings.map(binding => binding.run));

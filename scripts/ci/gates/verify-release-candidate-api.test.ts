@@ -153,6 +153,54 @@ test('newer failed run with source record blocks stale success', async () => {
   ).rejects.toThrow(/concluded failure/);
 });
 
+for (const failure of ['artifact-list', 'source-download', 'source-extraction'] as const) {
+  test(`fails closed on ${failure} for a newer failed preflight`, async () => {
+    const good = records(200, sha);
+    const failed = records(201, sha);
+    const { client, calls } = mockClient({
+      runs: [run(201, 8, { conclusion: 'failure' }), run(200, 7)],
+      artifacts: {
+        200: [
+          artifact(601, 200, 'release-preflight-source'),
+          artifact(602, 200, 'release-candidate-attestation'),
+        ],
+        201: [artifact(603, 201, 'release-preflight-source')],
+      },
+      jsonByArtifact: {
+        601: JSON.stringify(good.source),
+        602: JSON.stringify(good.attestation),
+        603: JSON.stringify(failed.source),
+      },
+    });
+    const error = new Error(`HTTP 503 or unreadable source ZIP: ${failure}`);
+    const failingClient = {
+      ...client,
+      async fetchJson(url: string) {
+        if (failure === 'artifact-list' && url.includes('/runs/201/artifacts')) throw error;
+        return client.fetchJson(url);
+      },
+      async fetchBytes(url: string) {
+        if (failure === 'source-download' && url.includes('/artifacts/603/zip')) throw error;
+        return client.fetchBytes(url);
+      },
+      unzipMember(buffer: ArrayBuffer) {
+        if (failure === 'source-extraction') {
+          const record = JSON.parse(new TextDecoder().decode(buffer));
+          if (record.workflowRunId === 201) throw error;
+        }
+        return client.unzipMember(buffer);
+      },
+    };
+    await expect(
+      verifyPreflightAttestationProvenance(failingClient, {
+        repository: repo,
+        sourceCommit: sha,
+      }),
+    ).rejects.toThrow(error);
+    expect(calls.some(url => url.includes('/attempts/1/jobs'))).toBe(false);
+  });
+}
+
 test('newer in-progress dispatch blocks without downloading repo-wide artifacts', async () => {
   const good = records(300, sha);
   const { client, calls } = mockClient({
@@ -192,7 +240,7 @@ test('partial rerun without source job on latest attempt fails closed', async ()
 
 test('skips unrelated historical source records while selecting latest binding', async () => {
   const good = records(500, sha);
-  const stale = records(501, sha);
+  const stale = records(501, sha).source;
   stale.workflowRunAttempt = 99;
   const { client } = mockClient({
     runs: [run(500, 12), run(501, 11, { run_attempt: 2 })],
