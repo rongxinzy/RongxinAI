@@ -158,6 +158,7 @@ function Invoke-RecordedArm {
     passLineMismatch = $passMismatch
     stderrHas203 = ($stderr -match 'environment option that was entered|203|ERROR_ENVVAR_NOT_FOUND')
     stderrHasWin32Exception = ($stderr -match 'Win32Exception')
+    vitestCollectionFailed = ($stderr -match 'Failed Suites|ENOENT.*windows-installer-interactive')
     stdoutPath = $stdoutPath
     stderrPath = $stderrPath
   }
@@ -221,7 +222,7 @@ $report = [ordered]@{
   }).Count -gt 0
   hypotheses = [ordered]@{
     H9_projectRoot = $(if ($arms[0].succeeded -and -not $arms[1].succeeded) { 'supported' } elseif ($arms[0].succeeded -and $arms[1].succeeded) { 'excluded-this-run' } else { 'inconclusive' })
-    H5_vitestParent = $(if ($arms[1].succeeded -and -not $arms[-1].succeeded) { 'supported' } elseif ($arms[-1].succeeded) { 'excluded-this-run' } else { 'inconclusive' })
+    H5_vitestParent = $(if ($arms[-1].vitestCollectionFailed) { 'invalid-arm-orchestration' } elseif ($arms[1].succeeded -and -not $arms[-1].succeeded -and $arms[-1].stderrHas203) { 'supported' } elseif ($arms[-1].succeeded) { 'excluded-this-run' } elseif ($arms[1].succeeded -and $arms[-1].succeeded) { 'excluded-this-run' } else { 'inconclusive' })
   }
 }
 ($report | ConvertTo-Json -Depth 10) | Out-File -FilePath (Join-Path $outDir 'comparison.report.json') -Encoding utf8

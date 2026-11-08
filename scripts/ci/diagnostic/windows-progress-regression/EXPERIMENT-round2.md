@@ -17,6 +17,11 @@ Preflight failure: vitest arm in [run 42340332484](https://github.com/rongxinzy/
 - Each arm: **process exit code** is authoritative (`0` = pass); `passLine` logged as `stdoutPassLine` only; mismatch flagged, never upgrades failure to pass.
 - Job workflow step **continues on error** so a reproduced failure still uploads artifacts.
 
+## Notes
+
+- Frozen `original/windows-installer-interactive.test.ts` is renamed `*.frozen-977abbf02` so root `vitest` discovery does not load it (missing `windows-installer-interactive.ps1` in package).
+- Arm C uses only `scripts/ci/windows-installer-interactive.test.ts` (production path).
+
 ## Not claimed
 
 - Passing all arms does **not** prove preflight root cause fixed (runner/time variance).
