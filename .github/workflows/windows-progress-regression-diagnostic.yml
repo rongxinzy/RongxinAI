@@ -1,0 +1,54 @@
+name: Windows progress regression diagnostic
+
+# Isolated, manual-only probe for preflight failure on frozen SHA 977abbf02.
+# Not part of daily CI or release-preflight gates.
+
+on:
+  workflow_dispatch:
+    inputs:
+      max-seconds:
+        description: Per-variant timeout (original + diagnostic on same runner)
+        type: number
+        default: 120
+  # Runs automatically when this isolated diagnostic branch is pushed (no main merge required).
+  push:
+    branches:
+      - cursor/windows-progress-regression-diag-1778
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  progress-regression-diagnostic:
+    name: progress-regression diagnostic
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Run original vs diagnostic harness (frozen 977abbf02 sources in package)
+        shell: pwsh
+        run: |
+          $pkg = Join-Path $env:GITHUB_WORKSPACE 'scripts/ci/diagnostic/windows-progress-regression'
+          $max = [int]'${{ inputs.max-seconds }}'
+          if ($max -lt 30 -or $max -gt 300) { throw 'max-seconds must be between 30 and 300' }
+          Set-Location $pkg
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-ProgressRegressionDiagnostic.ps1 -Mode Both -MaxSeconds $max
+          if (-not (Test-Path '.\out')) { New-Item -ItemType Directory -Path '.\out' | Out-Null }
+      - name: Stop stray fixture processes
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process -Name 'ProgressFixture' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $env:TEMP -Filter 'zhiyuan-progress-*' -Directory -ErrorAction SilentlyContinue |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+      - name: Upload diagnostic output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-progress-regression-diagnostic-${{ github.run_id }}
+          path: scripts/ci/diagnostic/windows-progress-regression/out/**
+          retention-days: 14
+          if-no-files-found: warn

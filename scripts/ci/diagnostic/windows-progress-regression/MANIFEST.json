@@ -1,0 +1,13 @@
+{
+  "sourceCommit": "977abbf023dfb8cbb3cf998b1d4e09e66ec86655",
+  "preflightRunId": 42340332484,
+  "githubJobId": 128306426233,
+  "extractedAtUtc": "2026-11-08T09:57:00Z",
+  "files": {
+    "original/windows-installer-ui.cs": "from scripts/ci/windows-installer-ui.cs",
+    "original/windows-installer-progress-regression.ps1": "from scripts/ci/windows-installer-progress-regression.ps1",
+    "original/windows-installer-progress-fixture.cs": "from scripts/ci/windows-installer-progress-fixture.cs",
+    "diagnostic/windows-installer-ui-diagnostic.cs": "instrumented copy; asserts unchanged",
+    "diagnostic/windows-installer-progress-regression-diagnostic.ps1": "loads diagnostic UI + JSONL trace"
+  }
+}
