@@ -106,7 +106,17 @@ namespace ZhiYuan.Acceptance {
     }
 
     private static Win32Exception Win32(string context) {
-      return new Win32Exception(Marshal.GetLastWin32Error(), context);
+      var code = Marshal.GetLastWin32Error();
+      return new Win32Exception(code, context + " (Win32=" + code + ")");
+    }
+
+    private static bool TryReadBounds(IntPtr window, out Rect bounds) {
+      if (GetWindowRect(window, out bounds)) return true;
+      Rect client;
+      if (!GetClientRect(window, out client)) return false;
+      bounds = client;
+      MapWindowPoints(window, IntPtr.Zero, ref bounds, 2);
+      return true;
     }
 
     private static WindowInfo Inspect(IntPtr window) {
@@ -118,7 +128,7 @@ namespace ZhiYuan.Acceptance {
       GetWindowText(window, text, text.Capacity);
       GetClassName(window, className, className.Capacity);
       Rect bounds;
-      if (!GetWindowRect(window, out bounds))
+      if (!TryReadBounds(window, out bounds))
         throw Win32("GetWindowRect failed for HWND 0x" + window.ToInt64().ToString("X"));
       return new WindowInfo {
         Handle = window.ToInt64(), ProcessId = (int)processId,
