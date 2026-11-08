@@ -1,16 +1,22 @@
 name: Windows progress regression diagnostic
 
-# Isolated, manual-only probe for preflight failure on frozen SHA 977abbf02.
+# Isolated probe for preflight failure on frozen SHA 977abbf02.
 # Not part of daily CI or release-preflight gates.
 
 on:
   workflow_dispatch:
     inputs:
       max-seconds:
-        description: Per-variant timeout (original + diagnostic on same runner)
+        description: Per-arm timeout (PowerShell / vitest children)
         type: number
         default: 120
-  # Runs automatically when this isolated diagnostic branch is pushed (no main merge required).
+      experiment:
+        description: single-progress (A/B/C) or bundle12-progress (+ vitest 12-file)
+        type: choice
+        options:
+          - single-progress
+          - bundle12-progress
+        default: single-progress
   push:
     branches:
       - cursor/windows-progress-regression-diag-1778
@@ -20,15 +26,24 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+  HUSKY: 0
 
 jobs:
   progress-regression-diagnostic:
     name: progress-regression diagnostic
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-      - name: Run original vs diagnostic harness (frozen 977abbf02 sources in package)
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Install dependencies (vitest arms)
+        run: bun install --frozen-lockfile
+      - name: Round 2 bare PS vs vitest comparison (frozen 977abbf02)
+        id: comparison
+        continue-on-error: true
         shell: pwsh
         run: |
           $pkg = Join-Path $env:GITHUB_WORKSPACE 'scripts/ci/diagnostic/windows-progress-regression'
@@ -36,9 +51,10 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($raw)) { $raw = '120' }
           $max = [int]$raw
           if ($max -lt 30 -or $max -gt 300) { throw 'max-seconds must be between 30 and 300' }
+          $exp = '${{ inputs.experiment }}'
+          if ([string]::IsNullOrWhiteSpace($exp)) { $exp = 'single-progress' }
           Set-Location $pkg
-          powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-ProgressRegressionDiagnostic.ps1 -Mode Both -MaxSeconds $max
-          if (-not (Test-Path '.\out')) { New-Item -ItemType Directory -Path '.\out' | Out-Null }
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-ProgressComparisonExperiment.ps1 -Experiment $exp -MaxSeconds $max -Workspace $env:GITHUB_WORKSPACE
       - name: Stop stray fixture processes
         if: always()
         shell: pwsh
@@ -54,3 +70,10 @@ jobs:
           path: scripts/ci/diagnostic/windows-progress-regression/out/**
           retention-days: 14
           if-no-files-found: warn
+      - name: Report comparison outcome
+        if: always()
+        shell: pwsh
+        run: |
+          if ('${{ steps.comparison.outcome }}' -ne 'success') {
+            Write-Warning 'One or more comparison arms failed; see artifact comparison.report.json (exit 0 orchestration).'
+          }

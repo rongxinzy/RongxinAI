@@ -69,23 +69,25 @@ function Invoke-Variant {
     ) -WorkingDirectory $WorkingDirectory -PassThru -NoNewWindow `
       -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
     $deadline = [DateTime]::UtcNow.AddSeconds($MaxSeconds)
-    while (-not $process.HasExited) {
-      if ([DateTime]::UtcNow -gt $deadline) {
-        try { $process.Kill() } catch {}
-        throw "$Name exceeded ${MaxSeconds}s"
-      }
-      Start-Sleep -Milliseconds 200
+    $waitMs = $MaxSeconds * 1000
+    if (-not $process.WaitForExit($waitMs)) {
+      try { $process.Kill() } catch {}
+      throw "$Name exceeded ${MaxSeconds}s"
     }
+    $exitCode = if ($null -eq $process.ExitCode) { -999 } else { [int]$process.ExitCode }
     $stdout = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
     $stderr = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue
+    $passLine = ($stdout -match 'PASS: real page-scoped IDs distinguish hero, progress and finish')
     $summary = [ordered]@{
       variant = $Name
-      exitCode = $process.ExitCode
+      succeeded = ($exitCode -eq 0)
+      exitCode = $exitCode
       timedOut = $false
       stdoutPath = $stdoutPath
       stderrPath = $stderrPath
       eventsPath = $(if ($Name -eq 'diagnostic') { $eventsPath } else { $null })
-      passLine = ($stdout -match 'PASS:')
+      stdoutPassLine = [bool]$passLine
+      passLineMismatch = ($exitCode -eq 0 -and -not $passLine) -or ($exitCode -ne 0 -and $passLine)
     }
     ($summary | ConvertTo-Json -Depth 6) | Out-File -FilePath $summaryPath -Encoding utf8
     return $summary
@@ -139,10 +141,6 @@ $report = [ordered]@{
 }
 ($report | ConvertTo-Json -Depth 8) | Out-File -FilePath (Join-Path $outDir 'report.json') -Encoding utf8
 Write-Output "DIAG_REPORT=$($report | ConvertTo-Json -Compress -Depth 8)"
-$failed = @($results | Where-Object {
-    if ($_.passLine -eq $true) { return $false }
-    if ($null -ne $_.exitCode) { return $_.exitCode -ne 0 }
-    return $true
-  })
+$failed = @($results | Where-Object { -not $_.succeeded })
 if ($failed.Count -gt 0) { exit 1 }
 exit 0
