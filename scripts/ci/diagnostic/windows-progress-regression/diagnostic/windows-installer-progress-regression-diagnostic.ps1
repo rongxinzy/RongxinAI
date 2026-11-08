@@ -35,8 +35,10 @@ function Assert-RemovalResult {
 [IO.Directory]::CreateDirectory($root) | Out-Null
 Add-Type -AssemblyName System.Drawing
 $refs = @('System', 'System.Core', 'System.Drawing')
-Add-Type -Path (Join-Path $ProjectRoot 'DiagnosticTrace.cs') -ReferencedAssemblies $refs
-Add-Type -Path (Join-Path $ProjectRoot 'windows-installer-ui-diagnostic.cs') -ReferencedAssemblies $refs
+Add-Type -Path @(
+  (Join-Path $ProjectRoot 'DiagnosticTrace.cs'),
+  (Join-Path $ProjectRoot 'windows-installer-ui-diagnostic.cs')
+) -ReferencedAssemblies $refs
 [ZhiYuan.Acceptance.DiagnosticTrace]::Initialize($diagLog)
 
 try {
