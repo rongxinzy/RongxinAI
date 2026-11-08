@@ -32,13 +32,14 @@ function Assert-RemovalResult {
   if ($rejected -ne $ExpectedRejection) { throw "Incorrect progress destruction result: rejected=$rejected expected=$ExpectedRejection" }
 }
 
+[IO.Directory]::CreateDirectory($root) | Out-Null
+Add-Type -AssemblyName System.Drawing
+$refs = @('System', 'System.Core', 'System.Drawing')
+Add-Type -Path (Join-Path $ProjectRoot 'DiagnosticTrace.cs') -ReferencedAssemblies $refs
+Add-Type -Path (Join-Path $ProjectRoot 'windows-installer-ui-diagnostic.cs') -ReferencedAssemblies $refs
+[ZhiYuan.Acceptance.DiagnosticTrace]::Initialize($diagLog)
+
 try {
-  [IO.Directory]::CreateDirectory($root) | Out-Null
-  Add-Type -AssemblyName System.Drawing
-  $refs = @('System', 'System.Core', 'System.Drawing')
-  Add-Type -Path (Join-Path $ProjectRoot 'DiagnosticTrace.cs') -ReferencedAssemblies $refs
-  Add-Type -Path (Join-Path $ProjectRoot 'windows-installer-ui-diagnostic.cs') -ReferencedAssemblies $refs
-  [ZhiYuan.Acceptance.DiagnosticTrace]::Initialize($diagLog)
   [ZhiYuan.Acceptance.DiagnosticTrace]::Event('script_begin', 0, $ProjectRoot, $null)
   $executable = Join-Path $root 'ProgressFixture.exe'
   $provider = New-Object Microsoft.CSharp.CSharpCodeProvider
@@ -112,7 +113,9 @@ try {
   }
   Write-Output 'PASS: real page-scoped IDs distinguish hero, progress and finish; visible and hidden progress residue fail'
 } finally {
-  [ZhiYuan.Acceptance.DiagnosticTrace]::Event('script_finally', 0, $root, $null)
-  [ZhiYuan.Acceptance.DiagnosticTrace]::Close()
+  try {
+    [ZhiYuan.Acceptance.DiagnosticTrace]::Event('script_finally', 0, $root, $null)
+    [ZhiYuan.Acceptance.DiagnosticTrace]::Close()
+  } catch {}
   if ([IO.Directory]::Exists($root)) { [IO.Directory]::Delete($root, $true) }
 }

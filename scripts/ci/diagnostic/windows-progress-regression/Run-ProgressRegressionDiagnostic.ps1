@@ -64,7 +64,8 @@ function Invoke-Variant {
   }
   $process = $null
   try {
-    $process = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+    $shell = if (Get-Command pwsh.exe -ErrorAction SilentlyContinue) { 'pwsh.exe' } else { 'powershell.exe' }
+    $process = Start-Process -FilePath $shell -ArgumentList @(
       '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $ScriptPath
     ) -WorkingDirectory $WorkingDirectory -PassThru -NoNewWindow `
       -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
