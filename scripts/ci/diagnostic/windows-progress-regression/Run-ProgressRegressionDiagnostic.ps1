@@ -139,5 +139,10 @@ $report = [ordered]@{
 }
 ($report | ConvertTo-Json -Depth 8) | Out-File -FilePath (Join-Path $outDir 'report.json') -Encoding utf8
 Write-Output "DIAG_REPORT=$($report | ConvertTo-Json -Compress -Depth 8)"
-if ($results | Where-Object { $_.exitCode -ne 0 }) { exit 1 }
+$failed = @($results | Where-Object {
+    if ($_.passLine -eq $true) { return $false }
+    if ($null -ne $_.exitCode) { return $_.exitCode -ne 0 }
+    return $true
+  })
+if ($failed.Count -gt 0) { exit 1 }
 exit 0
