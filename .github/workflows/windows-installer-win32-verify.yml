@@ -1,0 +1,49 @@
+name: Windows installer win32 verify
+
+# Isolated push-only gate for the progress-regression vitest path (preflight parity).
+# Not wired into daily CI or release-preflight until merged deliberately.
+
+on:
+  push:
+    branches:
+      - cursor/fix-windows-installer-ui-win32-1778
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+  HUSKY: 0
+
+jobs:
+  win32-progress-regression:
+    name: win32 progress regression
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - run: bun install --frozen-lockfile
+      - name: Bare progress regression (preflight spawn shape)
+        shell: pwsh
+        run: |
+          powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass `
+            -File "$env:GITHUB_WORKSPACE\scripts\ci\windows-installer-progress-regression.ps1" `
+            -ProjectRoot "$env:GITHUB_WORKSPACE"
+          if ($LASTEXITCODE -ne 0) { throw "bare regression exit $LASTEXITCODE" }
+      - name: Vitest progress regression (preflight driver path)
+        run: >
+          bunx vitest run --maxWorkers=1
+          -t "distinguishes real cross-process page ID reuse and rejects visible or hidden progress residue"
+          scripts/ci/windows-installer-interactive.test.ts
+      - name: Stop stray fixture processes
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process -Name 'ProgressFixture' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-ChildItem -Path $env:TEMP -Filter 'zhiyuan-progress-*' -Directory -ErrorAction SilentlyContinue |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
