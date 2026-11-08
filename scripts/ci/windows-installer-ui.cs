@@ -110,13 +110,15 @@ namespace ZhiYuan.Acceptance {
       return new Win32Exception(code, context + " (Win32=" + code + ")");
     }
 
-    private static bool TryReadBounds(IntPtr window, out Rect bounds) {
-      if (GetWindowRect(window, out bounds)) return true;
-      Rect client;
-      if (!GetClientRect(window, out client)) return false;
-      bounds = client;
-      MapWindowPoints(window, IntPtr.Zero, ref bounds, 2);
-      return true;
+    // Outer bounds only. Client dimensions are not outer bounds: Capture()
+    // prints the whole window and layout math expects screen coordinates, so
+    // substituting a client rect here would crop evidence or misstate geometry
+    // while still reporting success. Fail closed with the real error instead.
+    private static Rect ReadOuterBounds(IntPtr window) {
+      Rect bounds;
+      if (!GetWindowRect(window, out bounds))
+        throw Win32("GetWindowRect failed for HWND 0x" + window.ToInt64().ToString("X"));
+      return bounds;
     }
 
     private static WindowInfo Inspect(IntPtr window) {
@@ -127,9 +129,7 @@ namespace ZhiYuan.Acceptance {
       var className = new StringBuilder(256);
       GetWindowText(window, text, text.Capacity);
       GetClassName(window, className, className.Capacity);
-      Rect bounds;
-      if (!TryReadBounds(window, out bounds))
-        throw Win32("GetWindowRect failed for HWND 0x" + window.ToInt64().ToString("X"));
+      var bounds = ReadOuterBounds(window);
       return new WindowInfo {
         Handle = window.ToInt64(), ProcessId = (int)processId,
         ParentHandle = GetParent(window).ToInt64(),
