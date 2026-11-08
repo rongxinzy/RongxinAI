@@ -10,7 +10,9 @@ namespace ZhiYuan.Acceptance {
 
     public static void Initialize(string jsonlPath) {
       lock (Gate) {
-        writer?.Dispose();
+        if (writer != null) {
+          writer.Dispose();
+        }
         writer = new StreamWriter(jsonlPath, false, Encoding.UTF8) { AutoFlush = true };
         childOrdinal = 0;
       }
@@ -18,7 +20,9 @@ namespace ZhiYuan.Acceptance {
 
     public static void Close() {
       lock (Gate) {
-        writer?.Dispose();
+        if (writer != null) {
+          writer.Dispose();
+        }
         writer = null;
       }
     }
