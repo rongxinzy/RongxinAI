@@ -74,6 +74,7 @@ function Invoke-Variant {
       try { $process.Kill() } catch {}
       throw "$Name exceeded ${MaxSeconds}s"
     }
+    $process.Refresh()
     $exitCode = if ($null -eq $process.ExitCode) { -999 } else { [int]$process.ExitCode }
     $stdout = Get-Content -LiteralPath $stdoutPath -Raw -ErrorAction SilentlyContinue
     $stderr = Get-Content -LiteralPath $stderrPath -Raw -ErrorAction SilentlyContinue

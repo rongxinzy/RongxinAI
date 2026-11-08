@@ -95,20 +95,6 @@ function Stop-FixtureProcesses {
     }
 }
 
-function Wait-ProcessExit {
-  param(
-    [System.Diagnostics.Process]$Proc,
-    [int]$TimeoutSeconds
-  )
-  if (-not $Proc.WaitForExit($TimeoutSeconds * 1000)) {
-    try { $Proc.Kill() } catch {}
-    throw "timeout after ${TimeoutSeconds}s"
-  }
-  if (-not $Proc.HasExited) { throw 'process did not exit' }
-  if ($null -eq $Proc.ExitCode) { return -999 }
-  return [int]$Proc.ExitCode
-}
-
 function Invoke-RecordedArm {
   param(
     [string]$ArmId,
@@ -128,20 +114,22 @@ function Invoke-RecordedArm {
   $process = $null
   $armError = $null
   $exitCode = -1
+  $exitCodeSource = 'process'
   $timedOut = $false
   try {
     $process = Start-Process -FilePath $Executable -ArgumentList $ArgumentList `
-      -WorkingDirectory $WorkingDirectory -PassThru -NoNewWindow `
+      -WorkingDirectory $WorkingDirectory -PassThru -NoNewWindow -Wait `
       -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
-    $exitCode = Wait-ProcessExit -Proc $process -TimeoutSeconds $MaxSeconds
+    $process.Refresh()
+    if ($null -eq $process.ExitCode) { $exitCode = -999; $exitCodeSource = 'unavailable' }
+    else { $exitCode = [int]$process.ExitCode }
   } catch {
     $armError = $_.Exception.Message
     $timedOut = $armError -match 'timeout'
-    if ($null -ne $process -and -not $process.HasExited) {
-      try { $process.Kill() } catch {}
-      $null = $process.WaitForExit(5000)
+    if ($null -ne $process) {
+      $process.Refresh()
+      if ($null -ne $process.ExitCode) { $exitCode = [int]$process.ExitCode }
     }
-    if ($null -ne $process -and $null -ne $process.ExitCode) { $exitCode = [int]$process.ExitCode }
   } finally {
     foreach ($key in $ExtraEnv.Keys) {
       if ($null -eq $envBackup[$key]) { Remove-Item "Env:$key" -ErrorAction SilentlyContinue }
@@ -159,6 +147,7 @@ function Invoke-RecordedArm {
     arm = $ArmId
     succeeded = ($exitCode -eq 0)
     exitCode = $exitCode
+    exitCodeSource = $exitCodeSource
     timedOut = $timedOut
     error = $armError
     executable = $Executable
@@ -212,7 +201,7 @@ try {
   } else {
     $arms += Invoke-RecordedArm -ArmId 'C-vitest-single' -Executable 'bun' -ArgumentList @(
       'x', 'vitest', 'run', '--maxWorkers=1',
-      '-t', 'distinguishes real cross-process page ID reuse',
+      '-t', 'distinguishes real cross-process page ID reuse and rejects visible or hidden progress residue',
       'scripts/ci/windows-installer-interactive.test.ts'
     ) -WorkingDirectory $Workspace
   }
