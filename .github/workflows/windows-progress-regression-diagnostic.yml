@@ -32,7 +32,9 @@ jobs:
         shell: pwsh
         run: |
           $pkg = Join-Path $env:GITHUB_WORKSPACE 'scripts/ci/diagnostic/windows-progress-regression'
-          $max = [int]'${{ inputs.max-seconds }}'
+          $raw = '${{ inputs.max-seconds }}'
+          if ([string]::IsNullOrWhiteSpace($raw)) { $raw = '120' }
+          $max = [int]$raw
           if ($max -lt 30 -or $max -gt 300) { throw 'max-seconds must be between 30 and 300' }
           Set-Location $pkg
           powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-ProgressRegressionDiagnostic.ps1 -Mode Both -MaxSeconds $max
