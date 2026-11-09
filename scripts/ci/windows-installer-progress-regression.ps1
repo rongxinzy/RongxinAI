@@ -16,6 +16,20 @@ function Wait-Fixture {
   throw "Timed out waiting for real fixture $Label"
 }
 
+function Wait-FixtureAction {
+  param([long]$Handle, [long]$Parent, [int]$ProcessId, [string]$Text)
+  return Wait-Fixture {
+    # This button survives both page transitions. Enumerating the changing
+    # descendant tree here races DestroyWindow in the fixture UI thread.
+    $control = [ZhiYuan.Acceptance.InstallerUi]::Control($Handle)
+    if ($control.ProcessId -ne $ProcessId -or $control.ParentHandle -ne $Parent -or
+        $control.ClassName -ne 'Button' -or $control.ControlId -ne 1100) {
+      throw 'Persistent fixture action identity changed'
+    }
+    if ($control.Visible -and $control.Enabled -and $control.Text -eq $Text) { return $control }
+  } $Text
+}
+
 function Assert-RemovalResult {
   param([long]$Window, [bool]$ExpectedRejection)
   $rejected = $false
@@ -69,9 +83,7 @@ try {
       Assert-RemovalResult $window.Handle $false
 
       [ZhiYuan.Acceptance.InstallerUi]::Click($advance.Handle)
-      $finish = Wait-Fixture {
-        [ZhiYuan.Acceptance.InstallerUi]::Controls($window.Handle) | Where-Object { $_.Visible -and $_.Text -eq 'Finish fixture' }
-      } 'progress controls'
+      $finish = Wait-FixtureAction $advance.Handle $window.Handle $child.Id 'Finish fixture'
       $expectedProgress = $mode -notin @('incomplete', 'wrong-title')
       $hasProgress = [ZhiYuan.Acceptance.InstallerUi]::HasBrandedProgress($window.Handle, 'Installing ZhiYuan Agent')
       if ($hasProgress -ne $expectedProgress) { throw "Incorrect real progress recognition for $mode" }
@@ -79,9 +91,7 @@ try {
       Assert-RemovalResult $window.Handle $true
 
       [ZhiYuan.Acceptance.InstallerUi]::Click($finish.Handle)
-      $null = Wait-Fixture {
-        [ZhiYuan.Acceptance.InstallerUi]::Controls($window.Handle) | Where-Object { $_.Visible -and $_.Text -eq 'Fixture finished' }
-      } 'finish controls'
+      $null = Wait-FixtureAction $advance.Handle $window.Handle $child.Id 'Fixture finished'
       $finishIds = @([ZhiYuan.Acceptance.InstallerUi]::Controls($window.Handle) | Where-Object { $_.ParentHandle -ne $window.Handle -and $_.ControlId -ge 1200 -and $_.ControlId -le 1203 })
       if ($finishIds.Count -ne 4) { throw 'Fixture must reproduce the four reused finish IDs' }
       if ([ZhiYuan.Acceptance.InstallerUi]::HasBrandedProgress($window.Handle, 'Installing ZhiYuan Agent')) { throw 'Finish IDs were mistaken for branded progress' }

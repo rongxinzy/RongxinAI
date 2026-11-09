@@ -142,6 +142,12 @@ namespace ZhiYuan.Acceptance {
       };
     }
 
+    // Read a known, persistent HWND without traversing siblings that may be
+    // destroyed during an asynchronous page transition. Inspection stays strict.
+    public static WindowInfo Control(long handle) {
+      return Inspect(new IntPtr(handle));
+    }
+
     public static WindowInfo[] Windows() {
       var windows = new List<WindowInfo>();
       EnumWindows((window, state) => {
