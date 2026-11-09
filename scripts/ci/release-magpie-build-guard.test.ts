@@ -1,9 +1,12 @@
+import { readInferenceWorkflow } from './read-inference-workflow.mjs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from 'vitest';
 
 const read = (name: string) =>
-  readFileSync(path.join(process.cwd(), '.github/workflows', name), 'utf8');
+  name === 'build-inference-editions.yml'
+    ? readInferenceWorkflow()
+    : readFileSync(path.join(process.cwd(), '.github/workflows', name), 'utf8');
 
 // release.yml delegates packaging to the reusable inference-edition workflow,
 // so the Magpie build/verify ordering guard lives there.

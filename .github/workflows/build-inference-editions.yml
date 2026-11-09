@@ -151,245 +151,27 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.0'
-      - name: Restore llama.cpp runtime
-        id: llama-runtime
-        uses: ./.github/actions/cache-llamacpp-runtime
+      - name: Build inference packages
+        id: build-inference-packages
+        uses: ./.github/actions/build-inference-packages
         with:
-          mode: restore
-      - name: Restore packaging caches
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ~/.npm
-            ~/.cache/electron
-            ~/.cache/electron-builder
-            ~/Library/Caches/electron
-            ~/Library/Caches/electron-builder
-            ~/AppData/Local/electron/Cache
-            ~/AppData/Local/electron-builder/Cache
-            resources/uv-mac
-            resources/uv-linux
-            resources/python-mac
-            resources/python-linux
-            resources/skill-python
-            vendor/engram-runtime
-            vendor/channel-runtime
-          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js') }}
-          restore-keys: |
-            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
-      - name: Install Electron system dependencies
-        if: ${{ inputs.mode == 'verify' && matrix.platform == 'linux' }}
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
-            libxss1 libxtst6 libuuid1 xdg-utils xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
-      - name: Read pinned Magpie Go toolchain
-        id: magpie-toolchain
-        run: node -e "const p=require('./resources/magpie/upstream.json'); require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, 'go-version='+p.goVersion.replace(/^go/,'')+'\n')"
-      - uses: actions/setup-go@v6
-        with:
-          go-version: ${{ steps.magpie-toolchain.outputs.go-version }}
-          cache: false
-      - name: Cache Magpie module and build scratch
-        uses: actions/cache@v5
-        with:
-          path: |
-            .cache/magpie
-            resources/magpie
-          key: magpie-${{ runner.os }}-${{ matrix.runtime_target }}-go${{ steps.magpie-toolchain.outputs.go-version }}-${{ hashFiles('resources/magpie/upstream.json', 'scripts/build-magpie-runtime.cjs', 'scripts/magpie-runtime.cjs') }}
-      - name: Build and verify pinned Magpie gateway
-        shell: bash
-        env:
-          MAGPIE_TARGET: ${{ matrix.platform == 'linux' && 'linux-x64' || matrix.platform == 'windows' && 'win32-x64' || (matrix.arch == 'arm64' && 'darwin-arm64' || 'darwin-x64') }}
-        run: |
-          set -euo pipefail
-          go version | grep -Fq "go${{ steps.magpie-toolchain.outputs.go-version }}"
-          bun run magpie:build -- --target "${MAGPIE_TARGET}"
-          bun run magpie:verify -- --target "${MAGPIE_TARGET}"
-      - name: Set up installer shell SDK
-        if: ${{ matrix.platform == 'windows' }}
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '8.0.x'
-      - name: Set up Windows runtimes
-        if: ${{ matrix.platform == 'windows' }}
-        run: |
-          bun run setup:uv-runtime
-          bun run setup:python-runtime
-          bun run engram:runtime:${{ matrix.runtime_target }}
-      - name: Set up POSIX runtimes
-        if: ${{ matrix.platform != 'windows' }}
-        run: |
-          bash scripts/ci/with-download-retries.sh bun run setup:posix-uv-runtime
-          bash scripts/ci/with-download-retries.sh bun run setup:posix-python-runtime
-          bun run engram:runtime:${{ matrix.runtime_target }}
-      - name: Sync vendor llama.cpp CPU edition
-        if: ${{ matrix.inference_edition != 'lite' }}
-        run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
-        env:
-          LLAMACPP_CPU_TARGET_ID: ${{ matrix.runtime_target }}
-      - name: Prepare pinned Windows CUDA runtime
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'windows' }}
-        uses: ./.github/actions/prepare-windows-cuda
-      - name: Restore Linux CUDA llama.cpp runtime
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' }}
-        id: linux-cuda-runtime
-        uses: actions/cache/restore@v5
-        with:
-          path: vendor/llamacpp/cuda
-          key: linux-cuda-v1-ubuntu2204-cuda12.4.1-sm89-${{ hashFiles('package.json', 'resources/llamacpp-backends/manifest.json', 'scripts/ci/build-llamacpp-cuda-linux-in-docker.sh', 'scripts/build-llamacpp-cuda-rtx40.sh', 'scripts/ci/stage-linux-cuda-runtime-libs.sh', 'scripts/finalize-llamacpp-cuda-edition.cjs', 'scripts/finalize-llamacpp-cuda-edition.lib.cjs') }}
-      - name: Build RTX 40 CUDA llama.cpp runtime (Linux, Docker CUDA 12.4 / Ubuntu 22.04)
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' && steps.linux-cuda-runtime.outputs.cache-hit != 'true' }}
-        shell: bash
-        run: bash scripts/ci/build-llamacpp-cuda-linux-in-docker.sh
-      - name: Finalize CUDA llama.cpp edition bundle
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' && steps.linux-cuda-runtime.outputs.cache-hit != 'true' }}
-        run: node scripts/finalize-llamacpp-cuda-edition.cjs
-        env:
-          LLAMACPP_CUDA_PLATFORM: ${{ matrix.platform == 'windows' && 'win32' || 'linux' }}
-      - name: Save Linux CUDA llama.cpp runtime
-        if: ${{ matrix.inference_edition == 'cuda' && matrix.platform == 'linux' && steps.linux-cuda-runtime.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v5
-        with:
-          path: vendor/llamacpp/cuda
-          key: ${{ steps.linux-cuda-runtime.outputs.cache-primary-key }}
-      - name: Stage bundled llama.cpp runtime
-        if: ${{ matrix.inference_edition != 'lite' }}
-        run: bun run prepare:inference-edition-runtime
-        env:
-          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
-      - name: Connect Certum SimplySign
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
-        id: certum-signing
-        uses: ./.github/actions/setup-certum-signing
-        with:
-          user-id: ${{ secrets.CERTUM_USER_ID }}
-          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
-          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
-      - name: Build Windows (verify)
-        if: ${{ inputs.mode == 'verify' && matrix.platform == 'windows' }}
-        run: bun run dist:win:${{ matrix.inference_edition }}
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build Windows release (lite)
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'lite' }}
-        run: bun run dist:win:signed
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build Windows release (cpu)
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'cpu' }}
-        run: bun run dist:win:signed:cpu
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build Windows release (cuda)
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' && matrix.inference_edition == 'cuda' }}
-        run: bun run dist:win:signed:cuda
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Validate optional macOS signing credentials
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' }}
-        shell: bash
-        run: |
-          values=("$CSC_LINK" "$CSC_KEY_PASSWORD" "$APPLE_ID" "$APPLE_APP_SPECIFIC_PASSWORD" "$APPLE_TEAM_ID")
-          provided=0
-          for value in "${values[@]}"; do [[ -n "$value" ]] && provided=$((provided + 1)); done
-          if [[ $provided -eq 0 ]]; then
-            echo 'ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=false' >> "$GITHUB_ENV"
-            echo 'CSC_IDENTITY_AUTO_DISCOVERY=false' >> "$GITHUB_ENV"
-            echo '::warning title=Unsigned macOS release::Apple signing credentials are unavailable.'
-          elif [[ $provided -ne ${#values[@]} ]]; then
-            echo 'macOS signing credentials are only partially configured' >&2
-            exit 1
-          else
-            echo 'ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=true' >> "$GITHUB_ENV"
-            echo 'CSC_IDENTITY_AUTO_DISCOVERY=true' >> "$GITHUB_ENV"
-          fi
-        env:
-          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      - name: Build macOS (verify)
-        if: ${{ inputs.mode == 'verify' && matrix.platform == 'macos' }}
-        run: node scripts/ensure-build-version.js && bun run dist:mac:${{ matrix.arch }}
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build unsigned macOS release
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      # Intel macOS runners: stapler CloudKit ticket fetch over HTTP/3/UDP fails intermittently.
-      # https://github.com/actions/runner-images/issues/14924
-      - name: Block UDP/443 for stapler (macOS x64)
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && matrix.arch == 'x64' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
-        shell: bash
-        run: scripts/ci/block-stapler-http3-udp443.sh
-      - name: Build signed macOS release
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
-        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac:${{ matrix.arch }}
-        env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build Linux (verify)
-        if: ${{ inputs.mode == 'verify' && matrix.platform == 'linux' }}
-        # The CUDA llama-server is already built in Docker, finalized and staged
-        # above; dist:linux:cuda would rebuild it on the host against the
-        # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
-        run: ${{ matrix.inference_edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', matrix.inference_edition) }}
-        env:
-          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Build Linux release
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
-        # The CUDA llama-server is already built in Docker, finalized and staged
-        # above; dist:linux:cuda would rebuild it on the host against the
-        # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
-        run: ${{ matrix.inference_edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', matrix.inference_edition) }}
-        env:
-          ZHIYUAN_UPDATE_VARIANT: ${{ matrix.inference_edition }}
-          NODE_OPTIONS: '--max-old-space-size=4096'
-          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+          app-build-version: ${{ inputs.app-build-version }}
+          mode: ${{ inputs.mode }}
+          arch: ${{ matrix.arch }}
+          inference-edition: ${{ matrix.inference_edition }}
+          platform: ${{ matrix.platform }}
+          runtime-target: ${{ matrix.runtime_target }}
+          APPLE-APP-SPECIFIC-PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE-ID: ${{ secrets.APPLE_ID }}
+          APPLE-TEAM-ID: ${{ secrets.APPLE_TEAM_ID }}
+          CERTUM-CERT-THUMBPRINT: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+          CERTUM-OTP-URI: ${{ secrets.CERTUM_OTP_URI }}
+          CERTUM-USER-ID: ${{ secrets.CERTUM_USER_ID }}
+          MACOS-CSC-KEY-PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          MACOS-CSC-LINK: ${{ secrets.MACOS_CSC_LINK }}
+          MODELSCOPE-TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+          UPDATE-MANIFEST-KEY-ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE-MANIFEST-PUBLIC-KEY-BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
       - name: Verify signed and notarized macOS release
         if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
         shell: bash
@@ -418,7 +200,7 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/verify-windows-authenticode.ps1
           -ProjectRoot '${{ github.workspace }}'
-          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
+          -ExpectedThumbprint '${{ steps.build-inference-packages.outputs.thumbprint }}'
       - name: Verify Windows release size and runtimes
         if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
         shell: powershell
@@ -500,7 +282,7 @@ jobs:
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-shell-uninstall.ps1 -Action verify
-          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
+          -ExpectedThumbprint '${{ steps.build-inference-packages.outputs.thumbprint }}'
       - name: Upload shell acceptance evidence
         if: ${{ always() && inputs.mode == 'verify' && matrix.platform == 'windows' }}
         uses: actions/upload-artifact@v6
@@ -517,91 +299,34 @@ jobs:
           path: acceptance-diagnostics
           if-no-files-found: error
           retention-days: 7
-      - name: Assemble Windows release payload
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'windows' }}
-        shell: bash
-        env:
-          EDITION: ${{ matrix.inference_edition }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          installers=(release/ZhiYuanAgent-Setup-*.exe)
-          updaters=()
-          for file in release/*.exe; do
-            [[ "$(basename "$file")" == ZhiYuanAgent-Setup-* ]] || updaters+=("$file")
-          done
-          blockmaps=(release/*.exe.blockmap)
-          [[ ${#installers[@]} -eq 1 && ${#updaters[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one WebView2 installer, NSIS updater, and updater blockmap' >&2; exit 1; }
-          [[ "${blockmaps[0]}" == "${updaters[0]}.blockmap" ]] || { echo 'Blockmap must belong to the NSIS updater' >&2; exit 1; }
-          node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ inputs.app-build-version }}' win32 x64 "$EDITION" \
-            release/latest.yml release/electron-updater/latest.yml
-          node scripts/release/create-release-candidate.mjs \
-            '${{ inputs.app-build-version }}' \
-            '${{ steps.source-commit.outputs.commit }}' \
-            '${{ github.run_id }}' candidate "candidate-win32-x64-${EDITION}.json" \
-            "${installers[0]}:win32:x64:${EDITION}:installer" \
-            "${updaters[0]}:win32:x64:${EDITION}:updater" \
-            "${blockmaps[0]}:win32:x64:${EDITION}:blockmap" \
-            "release/electron-updater/latest.yml:win32:x64:${EDITION}:metadata"
-      - name: Assemble macOS release payload
-        if: ${{ inputs.mode == 'release' && matrix.platform == 'macos' }}
-        shell: bash
-        env:
-          EDITION: ${{ matrix.inference_edition }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          dmgs=(release/*.dmg)
-          zips=(release/*.zip)
-          blockmaps=(release/*.zip.blockmap)
-          [[ ${#dmgs[@]} -eq 1 && ${#zips[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one macOS DMG, ZIP, and blockmap' >&2; exit 1; }
-          node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ inputs.app-build-version }}' darwin '${{ matrix.arch }}' "$EDITION" \
-            release/latest-mac.yml release/electron-updater/latest-mac.yml
-          node scripts/release/create-release-candidate.mjs \
-            '${{ inputs.app-build-version }}' \
-            '${{ steps.source-commit.outputs.commit }}' \
-            '${{ github.run_id }}' candidate "candidate-darwin-${{ matrix.arch }}-${EDITION}.json" \
-            "${dmgs[0]}:darwin:${{ matrix.arch }}:${EDITION}:installer" \
-            "${zips[0]}:darwin:${{ matrix.arch }}:${EDITION}:updater" \
-            "${blockmaps[0]}:darwin:${{ matrix.arch }}:${EDITION}:blockmap" \
-            "release/electron-updater/latest-mac.yml:darwin:${{ matrix.arch }}:${EDITION}:metadata"
-      - name: Assemble Linux release payload
+      - name: Accept final Linux release packages
         if: ${{ inputs.mode == 'release' && matrix.platform == 'linux' }}
+        timeout-minutes: 10
         shell: bash
         env:
-          EDITION: ${{ matrix.inference_edition }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          debs=(release/*.deb)
-          appimages=(release/*.AppImage)
-          [[ ${#debs[@]} -eq 1 && ${#appimages[@]} -eq 1 ]] || { echo 'Expected one Linux deb and AppImage' >&2; exit 1; }
-          node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ inputs.app-build-version }}' linux x64 "appimage-${EDITION}" \
-            release/latest-linux.yml release/electron-updater/latest-linux.yml
-          node scripts/release/normalize-electron-updater-metadata.mjs \
-            '${{ inputs.app-build-version }}' linux x64 "deb-${EDITION}" \
-            release/latest-linux.yml release/electron-updater/deb/latest-linux.yml
-          node scripts/release/create-release-candidate.mjs \
-            '${{ inputs.app-build-version }}' \
-            '${{ steps.source-commit.outputs.commit }}' \
-            '${{ github.run_id }}' candidate "candidate-linux-x64-${EDITION}.json" \
-            "${debs[0]}:linux:x64:deb-${EDITION}:installer" \
-            "${debs[0]}:linux:x64:deb-${EDITION}:updater" \
-            "release/electron-updater/deb/latest-linux.yml:linux:x64:deb-${EDITION}:metadata" \
-            "${appimages[0]}:linux:x64:appimage-${EDITION}:installer" \
-            "${appimages[0]}:linux:x64:appimage-${EDITION}:updater" \
-            "release/electron-updater/latest-linux.yml:linux:x64:appimage-${EDITION}:metadata"
-      - name: Upload release payload
-        if: ${{ inputs.mode == 'release' }}
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          ZHIYUAN_SOURCE_COMMIT: ${{ steps.source-commit.outputs.commit }}
+        run: node scripts/ci/linux-release-acceptance.mjs accept
+      - name: Upload Linux release acceptance evidence
+        if: ${{ always() && inputs.mode == 'release' && matrix.platform == 'linux' }}
         uses: actions/upload-artifact@v6
         with:
-          name: release-candidate-${{ inputs.app-build-version }}-${{ matrix.target }}
-          path: candidate/
+          name: linux-release-acceptance-${{ matrix.inference_edition }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release/linux-release-acceptance/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
+      - name: Assemble inference candidate
+        id: assemble-inference-candidate
+        if: ${{ inputs.mode == 'release' }}
+        uses: ./.github/actions/assemble-inference-candidate
+        with:
+          app-build-version: ${{ inputs.app-build-version }}
+          mode: ${{ inputs.mode }}
+          arch: ${{ matrix.arch }}
+          inference-edition: ${{ matrix.inference_edition }}
+          platform: ${{ matrix.platform }}
+          target: ${{ matrix.target }}
+          source-commit: ${{ steps.source-commit.outputs.commit }}
       - uses: actions/upload-artifact@v6
         if: ${{ inputs.mode == 'verify' && matrix.platform == 'macos' }}
         with:
@@ -628,5 +353,5 @@ jobs:
         uses: ./.github/actions/cache-llamacpp-runtime
         with:
           mode: save
-          cache-hit: ${{ steps.llama-runtime.outputs.cache-hit }}
-          cache-primary-key: ${{ steps.llama-runtime.outputs.cache-primary-key }}
+          cache-hit: ${{ steps.build-inference-packages.outputs.cache-hit }}
+          cache-primary-key: ${{ steps.build-inference-packages.outputs.cache-primary-key }}
