@@ -16,9 +16,7 @@ test('waits for the persistent action before enumerating transitioned fixture co
   expect(wait).toContain('$control.ParentHandle -ne $Parent');
   expect(wait).toContain("$control.ClassName -ne 'Button'");
   expect(wait).toContain('$control.ControlId -ne 1100');
-  expect(wait).toContain(
-    '$control.Visible -and $control.Enabled -and $control.Text -eq $Text',
-  );
+  expect(wait).toContain('$control.Visible -and $control.Enabled -and $control.Text -eq $Text');
   for (const [start, end, expected] of [
     ['::Click($advance.Handle)', '$expectedProgress =', 'Finish fixture'],
     ['::Click($finish.Handle)', '$finishIds =', 'Fixture finished'],
