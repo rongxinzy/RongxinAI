@@ -238,8 +238,6 @@ jobs:
     uses: ./.github/workflows/linux-install-pr.yml
     with:
       source-ref: ${{ needs.source.outputs.commit }}
-    secrets:
-      MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
 
   windows-install:
     needs: source

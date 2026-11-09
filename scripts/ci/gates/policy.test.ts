@@ -83,6 +83,19 @@ test('release preflight gates every retained heavy check and binds one source co
   expect(quality).toContain('bun run test:bundle-budget');
 });
 
+test('release preflight does not forward secrets to unsigned Linux packaging', () => {
+  const preflight = workflow('release-preflight.yml');
+  const linux = preflight.jobs['linux-install'];
+  expect(linux).not.toHaveProperty('secrets');
+  expect(linux.uses).toBe('./.github/workflows/linux-install-pr.yml');
+  expect(linux.if).toBe('inputs.include-packaging');
+  expect(linux.with?.['source-ref']).toBe('${{ needs.source.outputs.commit }}');
+  const callable = preflight.on.workflow_call as {
+    secrets?: { MODELSCOPE_TOKENS?: { required?: boolean } };
+  };
+  expect(callable.secrets?.MODELSCOPE_TOKENS?.required).toBe(false);
+});
+
 test('preflight refuses every missing, skipped, failed, or cancelled mandatory check', () => {
   const required = Object.values(PreflightJob);
   for (const name of required) {
