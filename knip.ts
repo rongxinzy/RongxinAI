@@ -76,6 +76,8 @@ const config: KnipConfig = {
         'scripts/installer-shell/e2e-sfx.cjs',
         'scripts/installer-shell/e2e-uninstall.cjs',
         'scripts/installer-ui/build-preview.cjs',
+        // Run directly as documented in scripts/preview/README.md.
+        'scripts/preview/verify-1280x800-layout.mjs',
         // Renderer workers constructed with `new Worker(new URL(..., import.meta.url))`.
         'src/renderer/components/artifacts/renderers/csvPreview.worker.ts',
         'src/renderer/components/artifacts/renderers/dxfPreview.worker.ts',
