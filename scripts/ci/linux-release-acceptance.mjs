@@ -5,11 +5,11 @@ import { execFileSync } from 'node:child_process';
 import {
   expectedDebVersion,
   fingerprintArtifacts,
-  installedExecutable,
   releaseArtifacts,
   releaseIdentity,
   verifyEvidence,
 } from './linux-release-acceptance-lib.mjs';
+import { queryInstalledExecutable } from './linux-installed-executable.mjs';
 
 const mode = process.argv[2];
 if (!['accept', 'verify'].includes(mode)) {
@@ -54,8 +54,7 @@ if (mode === 'verify') {
   const installedVersion = run('dpkg-query', ['-W', '-f=${Version}', packageName], true);
   if (installedVersion !== debVersion) throw new Error('Installed deb version mismatch');
   const builder = JSON.parse(await fs.readFile('electron-builder.json', 'utf8'));
-  const installedFiles = run('dpkg-query', ['-L', packageName], true).split('\n');
-  const executable = installedExecutable(installedFiles, builder.executableName);
+  const executable = await queryInstalledExecutable(packageName, builder.executableName);
   await fs.access(executable, constants.X_OK);
   run(process.execPath, [
     'scripts/verify-linux-renderer.mjs',
