@@ -1,0 +1,76 @@
+{
+  "_fixtureNote": "Recorded 2026-11-07 GET .../actions/runs/42340332484/attempts/1/jobs (workflow_dispatch Release preflight, sourceCommit workflowHeadSha 977abbf023dfb8cbb3cf998b1d4e09e66ec86655)",
+  "total_count": 10,
+  "jobs": [
+    {
+      "id": 128306371300,
+      "name": "source",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "id": 128306426049,
+      "name": "enterprise",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "id": 128306426098,
+      "name": "browser-preview",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "id": 128306426126,
+      "name": "quality",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "id": 128306426189,
+      "name": "python-runtime-linux",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "id": 128306426209,
+      "name": "linux-install / install-and-start",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "id": 128306426233,
+      "name": "windows-install / package-and-install",
+      "status": "completed",
+      "conclusion": "failure",
+      "run_attempt": 1
+    },
+    {
+      "id": 128306426257,
+      "name": "memory-leak / memory-leak",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "id": 128306426263,
+      "name": "channel-runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1
+    },
+    {
+      "id": 128309327981,
+      "name": "preflight-gate",
+      "status": "completed",
+      "conclusion": "failure",
+      "run_attempt": 1
+    }
+  ]
+}

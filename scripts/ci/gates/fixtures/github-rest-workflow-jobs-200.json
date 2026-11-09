@@ -1,0 +1,22 @@
+{
+  "_fixtureNote": "Recorded 2026-11-07 GET .../actions/runs/42335885916/jobs (filter=latest)",
+  "total_count": 5,
+  "jobs": [
+    {
+      "id": 128292591974,
+      "run_id": 42335885916,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "name": "test (1)"
+    },
+    {
+      "id": 128293347085,
+      "run_id": 42335885916,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "name": "ci-gate"
+    }
+  ]
+}

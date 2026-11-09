@@ -5,7 +5,7 @@ export const JobResult = {
   Cancelled: 'cancelled',
 } as const;
 
-export const BaselineJob = { Lint: 'lint', Test: 'test' } as const;
+export const BaselineJob = { Lint: 'lint', Typecheck: 'typecheck', Test: 'test' } as const;
 
 export const PreflightJob = {
   Source: 'source',

@@ -1,0 +1,45 @@
+{
+  "_fixtureNote": "Recorded 2026-11-07 GET .../runs/42340332484/artifacts",
+  "total_count": 3,
+  "artifacts": [
+    {
+      "id": 13561940288,
+      "name": "linux-install-startup-diagnostics",
+      "expired": false,
+      "size_in_bytes": 227286,
+      "workflow_run": {
+        "id": 42340332484,
+        "repository_id": 1235259928,
+        "head_repository_id": 1235259928,
+        "head_branch": "release/validation-ci-gates-1778",
+        "head_sha": "977abbf023dfb8cbb3cf998b1d4e09e66ec86655"
+      }
+    },
+    {
+      "id": 13561397849,
+      "name": "memory-leak-diagnostics",
+      "expired": false,
+      "size_in_bytes": 51604931,
+      "workflow_run": {
+        "id": 42340332484,
+        "repository_id": 1235259928,
+        "head_repository_id": 1235259928,
+        "head_branch": "release/validation-ci-gates-1778",
+        "head_sha": "977abbf023dfb8cbb3cf998b1d4e09e66ec86655"
+      }
+    },
+    {
+      "id": 13560394788,
+      "name": "release-preflight-source",
+      "expired": false,
+      "size_in_bytes": 439,
+      "workflow_run": {
+        "id": 42340332484,
+        "repository_id": 1235259928,
+        "head_repository_id": 1235259928,
+        "head_branch": "release/validation-ci-gates-1778",
+        "head_sha": "977abbf023dfb8cbb3cf998b1d4e09e66ec86655"
+      }
+    }
+  ]
+}
