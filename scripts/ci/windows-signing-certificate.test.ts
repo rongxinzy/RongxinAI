@@ -42,8 +42,8 @@ test('windows-release signs in one Certum session and verifier enforces public D
   expect(acceptance.strategy?.matrix.edition).toEqual(['lite', 'cpu', 'cuda']);
   expect(JSON.stringify(acceptance)).not.toContain('secrets.');
   expect(JSON.stringify(acceptance)).not.toContain('setup-certum-signing');
-  const restore = acceptance.steps.findIndex(step =>
-    step.run?.includes('build-checkpoint.mjs restore'),
+  const restore = acceptance.steps.findIndex(
+    step => step.run?.includes('build-checkpoint.mjs restore'),
   );
   const publicIdentity = acceptance.steps.findIndex(step => step.run?.includes('X509Certificate2'));
   const verify = acceptance.steps.findIndex(
@@ -69,6 +69,8 @@ test.skipIf(process.platform !== 'win32')(
   'public certificate acceptance works after deleting the signing-store entry and rejects a different pin',
   () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'public-signing-context-'));
+    const fixtureId = process.env.WINDOWS_CERT_FIXTURE_ID || path.basename(root);
+    const recordPath = process.env.WINDOWS_CERT_FIXTURE_RECORD || path.join(root, 'certificate.json');
     try {
       mkdirSync(path.join(root, 'release'));
       mkdirSync(path.join(root, 'scripts/ci'), { recursive: true });
@@ -80,14 +82,18 @@ test.skipIf(process.platform !== 'win32')(
         `$ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1')
 Import-Module (Join-Path $PSHOME 'Modules/PKI/PKI.psd1')
-$certificate = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=CI public certificate fixture' -CertStoreLocation Cert:\\CurrentUser\\My -KeyExportPolicy NonExportable
+$subject = 'CN=CI public certificate fixture ' + $env:WINDOWS_CERT_FIXTURE_ID
+if (@(Get-ChildItem Cert:\\CurrentUser\\My | Where-Object { $_.Subject -ceq $subject }).Count -ne 0) { throw 'Fixture certificate identity already exists' }
+@{ subject = $subject; thumbprint = $null } | ConvertTo-Json | Set-Content -LiteralPath $env:WINDOWS_CERT_FIXTURE_RECORD
+$certificate = New-SelfSignedCertificate -Type CodeSigningCert -Subject $subject -CertStoreLocation Cert:\\CurrentUser\\My -KeyExportPolicy NonExportable
 $storePath = 'Cert:\\CurrentUser\\My\\' + $certificate.Thumbprint
 try {
+  @{ subject = $subject; thumbprint = $certificate.Thumbprint } | ConvertTo-Json | Set-Content -LiteralPath $env:WINDOWS_CERT_FIXTURE_RECORD
   $env:CERTUM_CERT_THUMBPRINT = $certificate.Thumbprint
   $env:THUMBPRINT = $certificate.Thumbprint
   $expectedDer = [Convert]::ToBase64String($certificate.RawData)
   & ./export.ps1
-  Remove-Item -LiteralPath $storePath -Force
+  Remove-Item -LiteralPath $storePath -Force -DeleteKey
   . ./scripts/ci/windows-signing-certificate.ps1
   $public = Resolve-WindowsSigningCertificate -ExpectedThumbprint $env:CERTUM_CERT_THUMBPRINT -CertificatePath release/signing-certificate.cer
   if ($public.HasPrivateKey -or [Convert]::ToBase64String($public.RawData) -cne $expectedDer) { throw 'Public DER identity changed' }
@@ -103,14 +109,23 @@ try {
   Expect-Rejection { Resolve-WindowsSigningCertificate -ExpectedThumbprint $env:CERTUM_CERT_THUMBPRINT -CertificatePath release/corrupt.cer }
   Write-Output 'PASS: public certificate verified without a signing store or private key'
 } finally {
-  if (Test-Path -LiteralPath $storePath) { Remove-Item -LiteralPath $storePath -Force }
+  if (Test-Path -LiteralPath $storePath) { Remove-Item -LiteralPath $storePath -Force -DeleteKey }
 }
 `,
       );
       const result = spawnSync(
         'powershell.exe',
         ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', probe],
-        { cwd: root, encoding: 'utf8', timeout: 30_000 },
+        {
+          cwd: root,
+          encoding: 'utf8',
+          timeout: 30_000,
+          env: {
+            ...process.env,
+            WINDOWS_CERT_FIXTURE_ID: fixtureId,
+            WINDOWS_CERT_FIXTURE_RECORD: recordPath,
+          },
+        },
       );
       expect(result.error, result.stderr).toBeUndefined();
       expect(result.status, result.stderr || result.stdout).toBe(0);
