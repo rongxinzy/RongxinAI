@@ -5,6 +5,11 @@ import { inflateSync } from 'node:zlib';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
 import {
+  isMainRendererReady,
+  isMainRendererTarget,
+  readMainRendererState,
+} from './ci/linux-main-renderer.mjs';
+import {
   installSmokeCleanup,
   readBrowserEndpoint,
   stopProcessGroup,
@@ -119,13 +124,7 @@ async function waitForPageTarget(browserEndpoint) {
       });
       if (response.ok) {
         const targets = await response.json();
-        const page = targets.find(
-          target =>
-            target.type === 'page' &&
-            typeof target.webSocketDebuggerUrl === 'string' &&
-            typeof target.url === 'string' &&
-            target.url.startsWith('file:'),
-        );
+        const page = targets.find(isMainRendererTarget);
         if (page) return page;
       }
     } catch {
@@ -202,18 +201,11 @@ async function waitForRenderedContent(devTools) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
     const evaluation = await devTools.send('Runtime.evaluate', {
-      expression: `(() => {
-        const root = document.getElementById('root');
-        return {
-          readyState: document.readyState,
-          rootChildren: root?.childElementCount ?? 0,
-          text: document.body?.innerText?.trim().slice(0, 500) ?? ''
-        };
-      })()`,
+      expression: `(${readMainRendererState.toString()})(document)`,
       returnByValue: true,
     });
     const state = evaluation.result?.value;
-    if (state?.readyState === 'complete' && state.rootChildren > 0 && state.text.length >= 10) {
+    if (isMainRendererReady(state)) {
       return state;
     }
     await delay(500);
