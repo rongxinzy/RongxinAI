@@ -382,3 +382,26 @@ test('accepts a complete rerun bound to the current attempt', async () => {
   expect(calls.filter(url => url.endsWith('/runs/900/artifacts?per_page=100')).length).toBe(2);
   expect(calls.some(url => url.includes('/actions/artifacts?'))).toBe(false);
 });
+
+test('newer failed preflight with an invalid source SHA cannot reuse older success', async () => {
+  const good = records(1000, sha);
+  const failed = records(1001, sha);
+  const { client } = mockClient({
+    runs: [run(1001, 21, { conclusion: 'failure' }), run(1000, 20)],
+    artifacts: {
+      1000: [
+        artifact(1401, 1000, 'release-preflight-source'),
+        artifact(1402, 1000, 'release-candidate-attestation'),
+      ],
+      1001: [artifact(1403, 1001, 'release-preflight-source')],
+    },
+    jsonByArtifact: {
+      1401: JSON.stringify(good.source),
+      1402: JSON.stringify(good.attestation),
+      1403: JSON.stringify({ ...failed.source, sourceCommit: 'not-a-sha' }),
+    },
+  });
+  await expect(
+    verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
+  ).rejects.toThrow(/newer than accepted.*source cannot be verified/);
+});

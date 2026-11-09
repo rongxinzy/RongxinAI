@@ -45,6 +45,12 @@ function requireString(value: unknown, label: string): string {
   return value;
 }
 
+function requireSha(value: unknown, label: string): string {
+  const sha = requireString(value, label);
+  if (!shaPattern.test(sha)) throw new Error(`Invalid ${label}`);
+  return sha;
+}
+
 export function buildPreflightSourceRecord(input: {
   repository: string;
   workflowRunId: number;
@@ -92,7 +98,8 @@ export function parsePreflightSourceRecord(
   if (requireString(record.workflowPath, 'workflowPath') !== RELEASE_PREFLIGHT_WORKFLOW_PATH) {
     throw new Error('Unexpected source record workflowPath');
   }
-  const sourceCommit = requireString(record.sourceCommit, 'sourceCommit');
+  const sourceCommit = requireSha(record.sourceCommit, 'sourceCommit');
+  requireSha(record.workflowHeadSha, 'workflowHeadSha');
   if (expected.sourceCommit && sourceCommit !== expected.sourceCommit) {
     throw new Error(
       `Source record sourceCommit mismatch: expected ${expected.sourceCommit}, got ${sourceCommit}`,
@@ -162,7 +169,8 @@ export function parseReleaseCandidateAttestation(
   if (workflowPath !== RELEASE_PREFLIGHT_WORKFLOW_PATH) {
     throw new Error(`Unexpected workflowPath: ${workflowPath}`);
   }
-  const sourceCommit = requireString(record.sourceCommit, 'sourceCommit');
+  const sourceCommit = requireSha(record.sourceCommit, 'sourceCommit');
+  requireSha(record.workflowHeadSha, 'workflowHeadSha');
   if (sourceCommit !== expected.sourceCommit) {
     throw new Error(
       `Attestation sourceCommit mismatch: expected ${expected.sourceCommit}, got ${sourceCommit}`,
@@ -190,10 +198,6 @@ export function parseReleaseCandidateAttestation(
   const workflowRunAttempt = record.workflowRunAttempt;
   if (typeof workflowRunAttempt !== 'number' || !Number.isInteger(workflowRunAttempt)) {
     throw new Error('workflowRunAttempt must be an integer');
-  }
-  for (const shaLabel of ['workflowHeadSha'] as const) {
-    const sha = requireString(record[shaLabel], shaLabel);
-    if (!shaPattern.test(sha)) throw new Error(`Invalid ${shaLabel}`);
   }
   requireString(record.dispatchRef, 'dispatchRef');
   requireString(record.issuedAt, 'issuedAt');
