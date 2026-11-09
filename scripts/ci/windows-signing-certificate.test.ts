@@ -53,7 +53,9 @@ test('windows-release signs in one Certum session and verifier enforces public D
   expect(publicIdentity).toBeGreaterThan(restore);
   expect(verify).toBeGreaterThan(publicIdentity);
   expect(acceptance.steps[publicIdentity].run).toContain('if ($certificate.HasPrivateKey) { throw');
-  expect(acceptance.steps[verify].with?.['certificate-path']).toBe('release/signing-certificate.cer');
+  expect(acceptance.steps[verify].with?.['certificate-path']).toBe(
+    'release/signing-certificate.cer',
+  );
   expect(acceptance.steps[verify].with?.['certificate-thumbprint']).toBe(
     '${{ steps.public-signing-identity.outputs.thumbprint }}',
   );
@@ -70,7 +72,8 @@ test.skipIf(process.platform !== 'win32')(
   () => {
     const root = mkdtempSync(path.join(os.tmpdir(), 'public-signing-context-'));
     const fixtureId = process.env.WINDOWS_CERT_FIXTURE_ID || path.basename(root);
-    const recordPath = process.env.WINDOWS_CERT_FIXTURE_RECORD || path.join(root, 'certificate.json');
+    const recordPath =
+      process.env.WINDOWS_CERT_FIXTURE_RECORD || path.join(root, 'certificate.json');
     try {
       mkdirSync(path.join(root, 'release'));
       mkdirSync(path.join(root, 'scripts/ci'), { recursive: true });
