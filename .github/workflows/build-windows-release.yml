@@ -13,6 +13,10 @@ on:
       app-build-version:
         required: true
         type: string
+      include-modelscope-token:
+        description: Pass the optional legacy token to packaging processes
+        type: boolean
+        default: true
       enterprise-extension:
         description: Add the enterprise extension and product identity to the shared installer
         type: boolean
@@ -29,7 +33,7 @@ on:
       UPDATE_MANIFEST_PUBLIC_KEY_BASE64:
         required: true
       MODELSCOPE_TOKENS:
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -141,7 +145,7 @@ jobs:
           CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+          MODELSCOPE_TOKENS: ${{ inputs.include-modelscope-token && secrets.MODELSCOPE_TOKENS || '' }}
       - name: Verify shared Windows installer
         if: ${{ inputs.enterprise-extension }}
         uses: ./.github/actions/verify-windows-package
@@ -199,7 +203,7 @@ jobs:
           CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+          MODELSCOPE_TOKENS: ${{ inputs.include-modelscope-token && secrets.MODELSCOPE_TOKENS || '' }}
       - name: Checkpoint final Windows cpu bytes
         if: ${{ !inputs.enterprise-extension }}
         uses: ./.github/actions/checkpoint-windows-package
@@ -229,7 +233,7 @@ jobs:
           CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+          MODELSCOPE_TOKENS: ${{ inputs.include-modelscope-token && secrets.MODELSCOPE_TOKENS || '' }}
       - name: Checkpoint final Windows cuda bytes
         if: ${{ !inputs.enterprise-extension }}
         uses: ./.github/actions/checkpoint-windows-package
