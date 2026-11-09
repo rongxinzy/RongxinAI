@@ -17,6 +17,7 @@ const source = readFileSync('.github/workflows/linux-package-acceptance.yml', 'u
 const workflow = load(source) as {
   on: { push: { branches: string[] } };
   permissions: Record<string, string>;
+  concurrency: { group: string; 'cancel-in-progress': boolean };
   jobs: Record<
     string,
     {
@@ -41,6 +42,10 @@ test('Linux package acceptance is restricted to the repair branch without releas
     push: { branches: ['fix/linux-final-acceptance-20261109'] },
   });
   assert.deepEqual(workflow.permissions, { contents: 'read' });
+  assert.deepEqual(workflow.concurrency, {
+    group: 'linux-package-acceptance-${{ github.ref }}',
+    'cancel-in-progress': true,
+  });
   assert.deepEqual(Object.keys(workflow.jobs), ['verify-linux-packages']);
   assert.equal(job.environment, undefined);
   assert.equal(job.secrets, undefined);
