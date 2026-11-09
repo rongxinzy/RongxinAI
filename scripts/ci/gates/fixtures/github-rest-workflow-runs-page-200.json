@@ -1,0 +1,18 @@
+{
+  "_fixtureNote": "Shape from GET .../actions/workflows/ci.yml/runs (first page); preflight rows are schema-accurate placeholders",
+  "total_count": 2,
+  "workflow_runs": [
+    {
+      "id": 42335885916,
+      "run_number": 3407,
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "df95ea2bef590157418607b4942bb17e013f3a30",
+      "head_branch": "cursor/lightweight-ci-gates-1778",
+      "event": "pull_request",
+      "path": ".github/workflows/ci.yml",
+      "created_at": "2026-11-07T03:51:30Z"
+    }
+  ]
+}
