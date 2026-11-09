@@ -1,0 +1,69 @@
+name: Windows release contract fixtures
+
+on:
+  push:
+    branches: [fix/windows-release-acceptance-20261109]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+  HUSKY: '0'
+
+jobs:
+  windows-contracts:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Run Windows certificate and package contract fixtures
+        shell: pwsh
+        env:
+          WINDOWS_CERT_FIXTURE_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          WINDOWS_CERT_FIXTURE_RECORD: ${{ runner.temp }}/windows-contract-certificate.json
+        run: >-
+          bun run vitest run
+          scripts/ci/windows-signing-certificate.test.ts
+          scripts/ci/build-checkpoint.test.ts
+          scripts/release/windows/archive-windows-acceptance.test.ts
+          scripts/release/windows/assemble-windows-edition.test.ts
+      - name: Detect and clean only this fixture certificate
+        if: always()
+        shell: powershell
+        env:
+          WINDOWS_CERT_FIXTURE_ID: ${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          WINDOWS_CERT_FIXTURE_RECORD: ${{ runner.temp }}/windows-contract-certificate.json
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1')
+          $recordPath = $env:WINDOWS_CERT_FIXTURE_RECORD
+          if (-not (Test-Path -LiteralPath $recordPath)) { exit 0 }
+          $record = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
+          $expectedSubject = 'CN=CI public certificate fixture ' + $env:WINDOWS_CERT_FIXTURE_ID
+          if ($record.subject -cne $expectedSubject) { throw 'Fixture cleanup identity mismatch' }
+          $remaining = @(Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -ceq $expectedSubject })
+          if ($remaining.Count -gt 1) { throw 'Ambiguous fixture ownership; refusing cleanup' }
+          if ($remaining.Count -eq 1) {
+            $certificate = $remaining[0]
+            if ($record.thumbprint -and $certificate.Thumbprint -cne $record.thumbprint) {
+              throw 'Fixture cleanup thumbprint mismatch; refusing cleanup'
+            }
+            $storePath = 'Cert:\CurrentUser\My\' + $certificate.Thumbprint
+            Remove-Item -LiteralPath $storePath -Force -DeleteKey
+            if (Test-Path -LiteralPath $storePath) { throw 'Fixture certificate cleanup failed' }
+            throw 'Fixture certificate survived the test; removed its certificate and key, validation failed'
+          }
+          Write-Output 'PASS: no certificate remains for this run/attempt fixture identity'
