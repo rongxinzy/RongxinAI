@@ -4,6 +4,14 @@ inputs:
   certificate-thumbprint:
     required: true
     description: Expected Certum signer
+  certificate-path:
+    required: false
+    default: ''
+    description: Public certificate restored from a package checkpoint
+  artifact-suffix:
+    required: false
+    default: '${{ github.job }}-${{ github.run_attempt }}'
+    description: Unique edition identity for compression evidence
 runs:
   using: composite
   steps:
@@ -11,19 +19,24 @@ runs:
       shell: pwsh
       env:
         EXPECTED_THUMBPRINT: ${{ inputs.certificate-thumbprint }}
+        CERTIFICATE_PATH: ${{ inputs.certificate-path }}
       run: |
         $product = (node scripts/packaging/windows-product.cjs) | ConvertFrom-Json
         if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve installer product' }
         node scripts/ci/verify-packaged-app-version.mjs $product.version
         if ($LASTEXITCODE -ne 0) { throw 'Packaged version verification failed' }
         $env:ZHIYUAN_ELECTRON_EXECUTABLE_NAME = [IO.Path]::GetFileNameWithoutExtension($product.executableName)
-        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/verify-windows-authenticode.ps1 -ProjectRoot $pwd -ExpectedThumbprint $env:EXPECTED_THUMBPRINT -ExecutableName $env:ZHIYUAN_ELECTRON_EXECUTABLE_NAME
+        $certificateArgs = @()
+        if ($env:CERTIFICATE_PATH) { $certificateArgs = @('-CertificatePath', $env:CERTIFICATE_PATH) }
+        powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/verify-windows-authenticode.ps1 -ProjectRoot $pwd -ExpectedThumbprint $env:EXPECTED_THUMBPRINT -ExecutableName $env:ZHIYUAN_ELECTRON_EXECUTABLE_NAME @certificateArgs
         if ($LASTEXITCODE -ne 0) { throw 'Signature verification failed' }
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot $pwd
         if ($LASTEXITCODE -ne 0) { throw 'Installer size measurement failed' }
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot $pwd
         if ($LASTEXITCODE -ne 0) { throw 'Bundled runtime verification failed' }
     - uses: ./.github/actions/verify-windows-compression
+      with:
+        artifact-suffix: ${{ inputs.artifact-suffix }}
     - name: Prepare native uninstall acceptance
       shell: powershell
       run: ./scripts/ci/windows-shell-uninstall.ps1 -Action prepare
