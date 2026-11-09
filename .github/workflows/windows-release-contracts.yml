@@ -67,10 +67,3 @@ jobs:
             throw 'Fixture certificate survived the test; removed its certificate and key, validation failed'
           }
           Write-Output 'PASS: no certificate remains for this run/attempt fixture identity'
-      - name: Show formatter diff for the public contract test
-        if: always()
-        shell: pwsh
-        run: |
-          bun run oxfmt scripts/ci/windows-signing-certificate.test.ts
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          git diff -- scripts/ci/windows-signing-certificate.test.ts

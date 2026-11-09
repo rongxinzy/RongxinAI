@@ -42,8 +42,8 @@ test('windows-release signs in one Certum session and verifier enforces public D
   expect(acceptance.strategy?.matrix.edition).toEqual(['lite', 'cpu', 'cuda']);
   expect(JSON.stringify(acceptance)).not.toContain('secrets.');
   expect(JSON.stringify(acceptance)).not.toContain('setup-certum-signing');
-  const restore = acceptance.steps.findIndex(
-    step => step.run?.includes('build-checkpoint.mjs restore'),
+  const restore = acceptance.steps.findIndex(step =>
+    step.run?.includes('build-checkpoint.mjs restore'),
   );
   const publicIdentity = acceptance.steps.findIndex(step => step.run?.includes('X509Certificate2'));
   const verify = acceptance.steps.findIndex(
