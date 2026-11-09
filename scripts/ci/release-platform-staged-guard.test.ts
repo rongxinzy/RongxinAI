@@ -1,3 +1,4 @@
+import { readInferenceWorkflow } from './read-inference-workflow.mjs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from 'vitest';
@@ -53,10 +54,7 @@ test('Kylin package builds on a native Kylin V11 x64 runner with Chinese default
 });
 
 test('build inference editions skips Windows matrix when release is staged', () => {
-  const workflow = readFileSync(
-    path.join(process.cwd(), '.github/workflows/build-inference-editions.yml'),
-    'utf8',
-  );
+  const workflow = readInferenceWorkflow();
   expect(workflow).toContain('windows-release-staged');
   expect(workflow).toContain('with-download-retries.sh');
 });
