@@ -9,7 +9,10 @@ export function installSmokeCleanup(cleanup) {
     cleanupPromise ??= Promise.resolve().then(cleanup);
     return cleanupPromise;
   };
-  for (const [signal, exitCode] of [['SIGTERM', 143], ['SIGINT', 130]]) {
+  for (const [signal, exitCode] of [
+    ['SIGTERM', 143],
+    ['SIGINT', 130],
+  ]) {
     process.on(signal, () => {
       void runCleanup()
         .catch(error => console.error('[LinuxRendererSmoke] interrupted cleanup failed:', error))
@@ -36,7 +39,10 @@ export function readBrowserEndpoint(output) {
 }
 
 function parseProcessStat(stat) {
-  const fields = stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/);
+  const fields = stat
+    .slice(stat.lastIndexOf(')') + 2)
+    .trim()
+    .split(/\s+/);
   return { state: fields[0], group: Number(fields[2]) };
 }
 

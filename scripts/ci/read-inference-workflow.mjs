@@ -19,7 +19,10 @@ export function readInferenceWorkflow(root = process.cwd()) {
       action === 'assemble-inference-candidate' ? "${{ inputs.mode == 'release' }}" : undefined;
     if (condition !== expected) throw new Error(`Unexpected ${action} call condition`);
     const bindings = new Map(
-      [...call.matchAll(/^          ([\w-]+): \$\{\{ (.+) \}\}$/gm)].map(match => [match[1], match[2]]),
+      [...call.matchAll(/^          ([\w-]+): \$\{\{ (.+) \}\}$/gm)].map(match => [
+        match[1],
+        match[2],
+      ]),
     );
     const source = readFileSync(path.join(root, '.github/actions', action, 'action.yml'), 'utf8');
     const header = source.slice(source.indexOf('inputs:\n'), source.indexOf('runs:\n'));

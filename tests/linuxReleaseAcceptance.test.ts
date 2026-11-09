@@ -29,7 +29,9 @@ test('Linux acceptance requires complete immutable run identity', () => {
   assert.throws(() => releaseIdentity({ ...env, GITHUB_RUN_ATTEMPT: '0' }));
   expect(expectedDebVersion('1.2.3')).toBe('1.2.3');
   expect(expectedDebVersion('1.2.3-rc-1')).toBe('1.2.3~rc~1');
-  expect(installedExecutable(['/opt/sanitized-product/app'], 'app')).toBe('/opt/sanitized-product/app');
+  expect(installedExecutable(['/opt/sanitized-product/app'], 'app')).toBe(
+    '/opt/sanitized-product/app',
+  );
   assert.throws(() => installedExecutable(['/usr/bin/app'], 'app'));
   assert.throws(() => installedExecutable(['/opt/one/app', '/opt/two/app'], 'app'));
 });

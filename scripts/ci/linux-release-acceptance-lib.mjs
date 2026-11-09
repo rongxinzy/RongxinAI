@@ -41,7 +41,10 @@ export function installedExecutable(installedFiles, executableName) {
 export async function releaseArtifacts(directory) {
   const entries = await fs.readdir(directory);
   const artifacts = {};
-  for (const [format, extension] of [['deb', '.deb'], ['appimage', '.AppImage']]) {
+  for (const [format, extension] of [
+    ['deb', '.deb'],
+    ['appimage', '.AppImage'],
+  ]) {
     const matches = entries.filter(name => name.endsWith(extension));
     if (matches.length !== 1) throw new Error(`Expected exactly one final ${format} artifact`);
     const artifact = path.resolve(directory, matches[0]);
