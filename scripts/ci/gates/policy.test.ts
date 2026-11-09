@@ -1,3 +1,4 @@
+import { readInferenceWorkflow } from '../read-inference-workflow.mjs';
 import { readFileSync, readdirSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
@@ -179,9 +180,11 @@ test('no secondary workflow can start heavy builds for a feature pull request', 
 
 test('Windows CUDA preflight and release share exact caches and always verify restored output', () => {
   for (const file of ['build-windows-release.yml', 'build-inference-editions.yml']) {
-    expect(readFileSync(`.github/workflows/${file}`, 'utf8')).toContain(
-      'uses: ./.github/actions/prepare-windows-cuda',
-    );
+    expect(
+      file === 'build-inference-editions.yml'
+        ? readInferenceWorkflow()
+        : readFileSync(`.github/workflows/${file}`, 'utf8'),
+    ).toContain('uses: ./.github/actions/prepare-windows-cuda');
   }
   const action = load(readFileSync('.github/actions/prepare-windows-cuda/action.yml', 'utf8')) as {
     runs: { steps: Array<Step & { if?: string }> };

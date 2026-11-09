@@ -2,6 +2,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
+import os from 'node:os';
+import { randomUUID } from 'node:crypto';
+import {
+  installSmokeCleanup,
+  readBrowserEndpoint,
+  stopProcessGroup,
+  verifyBrowserProcess,
+} from './ci/linux-smoke-session.mjs';
 
 const [executableInput, screenshotPath = 'release/linux-render-smoke.png'] = process.argv.slice(2);
 if (!executableInput) {
@@ -34,8 +42,10 @@ async function resolveExecutable(inputPath) {
 }
 
 const executablePath = await resolveExecutable(executableInput);
-const remoteDebuggingPort = 9222;
+const profilePath = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-linux-smoke-'));
+const nonce = randomUUID();
 let applicationOutput = '';
+let launchError;
 
 const application = spawn(
   'xvfb-run',
@@ -46,7 +56,7 @@ const application = spawn(
     executablePath,
     '--no-sandbox',
     '--zhiyuan-linux-renderer-smoke',
-    `--remote-debugging-port=${remoteDebuggingPort}`,
+    '--remote-debugging-port=0',
   ],
   {
     detached: true,
@@ -54,10 +64,22 @@ const application = spawn(
       ...process.env,
       ELECTRON_ENABLE_LOGGING: 'true',
       ZHIYUAN_ENABLE_GPU: 'false',
+      ZHIYUAN_MEMORY_LEAK_TEST_USER_DATA: profilePath,
+      ZHIYUAN_LINUX_SMOKE_NONCE: nonce,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   },
 );
+application.on('error', error => {
+  launchError = error;
+});
+let devTools;
+let browserDevTools;
+const cleanup = installSmokeCleanup(async () => {
+  devTools?.close();
+  browserDevTools?.close();
+  await stopApplication();
+});
 
 for (const stream of [application.stdout, application.stderr]) {
   stream?.on('data', chunk => {
@@ -69,14 +91,30 @@ function delay(milliseconds) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
 }
 
-async function waitForPageTarget() {
+async function waitForBrowserEndpoint() {
   const deadline = Date.now() + 60_000;
   while (Date.now() < deadline) {
+    if (launchError) throw launchError;
+    if (application.exitCode !== null) {
+      throw new Error(`Linux application exited before DevTools started:\n${applicationOutput}`);
+    }
+    const endpoint = readBrowserEndpoint(applicationOutput);
+    if (endpoint) return endpoint;
+    await delay(100);
+  }
+  throw new Error(`Timed out waiting for this launch's DevTools:\n${applicationOutput}`);
+}
+
+async function waitForPageTarget(browserEndpoint) {
+  const deadline = Date.now() + 60_000;
+  while (Date.now() < deadline) {
+    if (launchError) throw launchError;
     if (application.exitCode !== null) {
       throw new Error(`Linux application exited before rendering:\n${applicationOutput}`);
     }
     try {
-      const response = await fetch(`http://127.0.0.1:${remoteDebuggingPort}/json/list`, {
+      const port = new URL(browserEndpoint).port;
+      const response = await fetch(`http://127.0.0.1:${port}/json/list`, {
         signal: AbortSignal.timeout(1_500),
       });
       if (response.ok) {
@@ -103,17 +141,36 @@ function connectToDevTools(webSocketDebuggerUrl) {
     const socket = new WebSocket(webSocketDebuggerUrl);
     const pending = new Map();
     let sequence = 0;
+    const openTimeout = setTimeout(() => {
+      socket.close();
+      reject(new Error('DevTools WebSocket connection timed out'));
+    }, 5_000);
+
+    function rejectPending() {
+      clearTimeout(openTimeout);
+      for (const command of pending.values()) {
+        clearTimeout(command.timeout);
+        command.reject(new Error('DevTools WebSocket closed'));
+      }
+      pending.clear();
+    }
 
     socket.addEventListener('open', () => {
+      clearTimeout(openTimeout);
       resolve({
         send(method, params = {}) {
           const id = (sequence += 1);
           socket.send(JSON.stringify({ id, method, params }));
           return new Promise((resolveCommand, rejectCommand) => {
-            pending.set(id, { resolve: resolveCommand, reject: rejectCommand });
+            const timeout = setTimeout(() => {
+              pending.delete(id);
+              rejectCommand(new Error(`DevTools command timed out: ${method}`));
+            }, 5_000);
+            pending.set(id, { resolve: resolveCommand, reject: rejectCommand, timeout });
           });
         },
         close() {
+          rejectPending();
           socket.close();
         },
       });
@@ -123,13 +180,21 @@ function connectToDevTools(webSocketDebuggerUrl) {
       if (!message.id || !pending.has(message.id)) return;
       const command = pending.get(message.id);
       pending.delete(message.id);
+      clearTimeout(command.timeout);
       if (message.error) {
         command.reject(new Error(message.error.message));
       } else {
         command.resolve(message.result);
       }
     });
-    socket.addEventListener('error', () => reject(new Error('DevTools WebSocket failed')));
+    socket.addEventListener('error', () => {
+      rejectPending();
+      reject(new Error('DevTools WebSocket failed'));
+    });
+    socket.addEventListener('close', () => {
+      rejectPending();
+      reject(new Error('DevTools WebSocket closed'));
+    });
   });
 }
 
@@ -254,20 +319,8 @@ function analyzeScreenshot(png) {
 }
 
 async function stopApplication() {
-  if (!application.pid || application.exitCode !== null) return;
-  try {
-    process.kill(-application.pid, 'SIGTERM');
-  } catch {
-    // The application may already have exited after the smoke test.
-  }
-  await Promise.race([new Promise(resolve => application.once('exit', resolve)), delay(5_000)]);
-  if (application.exitCode === null) {
-    try {
-      process.kill(-application.pid, 'SIGKILL');
-    } catch {
-      // Ignore a race with normal shutdown.
-    }
-  }
+  await stopProcessGroup(application.pid);
+  await fs.rm(profilePath, { recursive: true, force: true });
 }
 
 async function captureScreenshot(devTools) {
@@ -301,9 +354,12 @@ async function waitForNonBlankScreenshot(devTools) {
   );
 }
 
-let devTools;
 try {
-  const page = await waitForPageTarget();
+  const browserEndpoint = await waitForBrowserEndpoint();
+  browserDevTools = await connectToDevTools(browserEndpoint);
+  const { processInfo } = await browserDevTools.send('SystemInfo.getProcessInfo');
+  await verifyBrowserProcess(processInfo, application.pid, nonce);
+  const page = await waitForPageTarget(browserEndpoint);
   devTools = await connectToDevTools(page.webSocketDebuggerUrl);
   await devTools.send('Page.enable');
   await devTools.send('Page.bringToFront');
@@ -328,6 +384,5 @@ try {
     `[LinuxRendererSmoke] rendered ${renderedState.rootChildren} root element(s) with visible text; screenshot ${screenshotAnalysis.width}x${screenshotAnalysis.height}, ${screenshotAnalysis.distinctColors} sampled colors`,
   );
 } finally {
-  devTools?.close();
-  await stopApplication();
+  await cleanup();
 }

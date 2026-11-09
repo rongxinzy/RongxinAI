@@ -1,3 +1,4 @@
+import { readInferenceWorkflow } from './read-inference-workflow.mjs';
 import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,7 +31,9 @@ test('architecture gate accepts the currently pinned signed runtime release', ()
 });
 
 function read(filename: string): string {
-  return readFileSync(path.join(root, filename), 'utf8');
+  return filename === '.github/workflows/build-inference-editions.yml'
+    ? readInferenceWorkflow(root)
+    : readFileSync(path.join(root, filename), 'utf8');
 }
 
 test('Windows packaging does not require runtime signature verification or public signer configuration', () => {
