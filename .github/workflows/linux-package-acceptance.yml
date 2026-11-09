@@ -1,0 +1,94 @@
+name: Verify final Linux package installation (repair branch)
+
+# Temporary opt-in entry for the approved packaging repair branch. This does not
+# produce a release candidate or replace the protected release acceptance run.
+on:
+  push:
+    branches: [fix/linux-final-acceptance-20261109]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-package-acceptance-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  verify-linux-packages:
+    if: ${{ github.repository == 'rongxinzy/RongxinAI' && github.ref == 'refs/heads/fix/linux-final-acceptance-20261109' && contains(github.event.head_commit.message, '[linux-package-acceptance]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [cpu, cuda]
+    env:
+      ZHIYUAN_UPDATE_VARIANT: ${{ matrix.edition }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Bind verification to the checked-out source and version
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse HEAD)"
+          [[ "$commit" == "$GITHUB_SHA" ]]
+          base_version="$(node -p "require('./package.json').version")"
+          [[ "$base_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+          version="${base_version}-acceptance.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Require real AppImage FUSE support before building
+        shell: bash
+        run: test -r /dev/fuse && test -w /dev/fuse
+      - name: Build unsigned final Linux verification packages
+        uses: ./.github/actions/build-inference-packages
+        with:
+          mode: verify
+          platform: linux
+          runtime-target: linux-x64
+          inference-edition: ${{ matrix.edition }}
+          app-build-version: ${{ steps.identity.outputs.version }}
+        env:
+          APP_BUILD_VERSION: ${{ steps.identity.outputs.version }}
+          ZHIYUAN_SOURCE_COMMIT: ${{ steps.identity.outputs.commit }}
+      - name: Install and render the final verification packages
+        timeout-minutes: 15
+        shell: bash
+        env:
+          APP_BUILD_VERSION: ${{ steps.identity.outputs.version }}
+          ZHIYUAN_SOURCE_COMMIT: ${{ steps.identity.outputs.commit }}
+        run: |
+          set -euo pipefail
+          node scripts/ci/linux-release-acceptance.mjs accept
+          node scripts/ci/linux-release-acceptance.mjs verify
+      - name: Upload verification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-verification-evidence-${{ matrix.edition }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release/linux-release-acceptance/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload accepted verification packages
+        uses: actions/upload-artifact@v6
+        with:
+          name: linux-verification-packages-${{ matrix.edition }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release/*.deb
+            release/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
