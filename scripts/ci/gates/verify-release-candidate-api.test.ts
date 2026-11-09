@@ -264,3 +264,121 @@ test('skips unrelated historical source records while selecting latest binding',
   });
   expect(result.run.id).toBe(500);
 });
+
+for (const failure of ['missing', 'expired', 'stale-attempt', 'wrong-schema'] as const) {
+  test(`newer failed preflight with ${failure} source cannot reuse older success`, async () => {
+    const good = records(600, sha);
+    const failed = records(601, sha);
+    const sourceArtifact = artifact(1003, 601, 'release-preflight-source');
+    const source =
+      failure === 'wrong-schema' ? { ...failed.source, schemaVersion: 99 } : failed.source;
+    const { client } = mockClient({
+      runs: [
+        run(601, 14, {
+          conclusion: 'failure',
+          run_attempt: failure === 'stale-attempt' ? 2 : 1,
+        }),
+        run(600, 13),
+      ],
+      artifacts: {
+        600: [
+          artifact(1001, 600, 'release-preflight-source'),
+          artifact(1002, 600, 'release-candidate-attestation'),
+        ],
+        601: failure === 'missing' ? [] : [{ ...sourceArtifact, expired: failure === 'expired' }],
+      },
+      jsonByArtifact: {
+        1001: JSON.stringify(good.source),
+        1002: JSON.stringify(good.attestation),
+        1003: JSON.stringify(source),
+      },
+    });
+    await expect(
+      verifyPreflightAttestationProvenance(client, { repository: repo, sourceCommit: sha }),
+    ).rejects.toThrow(/newer than accepted.*source cannot be verified/);
+  });
+}
+
+test('older missing source does not block a newer verified success', async () => {
+  const good = records(700, sha);
+  const { client } = mockClient({
+    runs: [run(700, 16), run(701, 15, { conclusion: 'failure' })],
+    artifacts: {
+      700: [
+        artifact(1101, 700, 'release-preflight-source'),
+        artifact(1102, 700, 'release-candidate-attestation'),
+      ],
+      701: [],
+    },
+    jsonByArtifact: {
+      1101: JSON.stringify(good.source),
+      1102: JSON.stringify(good.attestation),
+    },
+  });
+  const result = await verifyPreflightAttestationProvenance(client, {
+    repository: repo,
+    sourceCommit: sha,
+  });
+  expect(result.run.id).toBe(700);
+});
+
+test('newer failed preflight verified for another source does not block', async () => {
+  const good = records(800, sha);
+  const unrelated = records(801, 'b'.repeat(40));
+  const { client } = mockClient({
+    runs: [run(801, 18, { conclusion: 'failure' }), run(800, 17)],
+    artifacts: {
+      800: [
+        artifact(1201, 800, 'release-preflight-source'),
+        artifact(1202, 800, 'release-candidate-attestation'),
+      ],
+      801: [artifact(1203, 801, 'release-preflight-source')],
+    },
+    jsonByArtifact: {
+      1201: JSON.stringify(good.source),
+      1202: JSON.stringify(good.attestation),
+      1203: JSON.stringify(unrelated.source),
+    },
+  });
+  const result = await verifyPreflightAttestationProvenance(client, {
+    repository: repo,
+    sourceCommit: sha,
+  });
+  expect(result.run.id).toBe(800);
+});
+
+test('accepts a complete rerun bound to the current attempt', async () => {
+  const good = records(900, sha, true, 2);
+  const { client, calls } = mockClient({
+    runs: [run(900, 19, { run_attempt: 2 })],
+    artifacts: {
+      900: [
+        artifact(1301, 900, 'release-preflight-source'),
+        artifact(1302, 900, 'release-candidate-attestation'),
+      ],
+    },
+    jsonByArtifact: {
+      1301: JSON.stringify(good.source),
+      1302: JSON.stringify(good.attestation),
+    },
+    jobsByRun: {
+      900: jobs().map(job => ({ ...job, run_attempt: 2 })),
+    },
+  });
+  const result = await verifyPreflightAttestationProvenance(client, {
+    repository: repo,
+    sourceCommit: sha,
+  });
+  expect(result.run.id).toBe(900);
+  expect(result.run.run_attempt).toBe(2);
+  expect(result.artifactId).toBe(1302);
+  expect(
+    calls.includes(
+      'https://api.github.com/repos/rongxinzy/RongxinAI/actions/runs/900/attempts/2/jobs?per_page=100',
+    ),
+  ).toBe(true);
+  expect(calls.some(url => url.includes('/attempts/1/jobs'))).toBe(false);
+  expect(calls.some(url => url.includes('/runs/900/jobs'))).toBe(false);
+  expect(calls.filter(url => url.endsWith('/runs/900/artifacts?per_page=100')).length).toBe(2);
+  expect(calls.some(url => url.includes('/actions/artifacts?'))).toBe(false);
+});

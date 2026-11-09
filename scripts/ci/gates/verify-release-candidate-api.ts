@@ -219,6 +219,7 @@ export async function verifyPreflightAttestationProvenance(
   );
 
   const bindings: SourceRunBinding[] = [];
+  const unboundRuns: GitHubWorkflowRun[] = [];
   for (const run of dispatchRuns) {
     try {
       assertEligiblePreflightRun(run);
@@ -235,7 +236,10 @@ export async function verifyPreflightAttestationProvenance(
       parseRunArtifacts(artifactsPayload),
       PREFLIGHT_SOURCE_ARTIFACT_NAME,
     );
-    if (!sourceArtifact) continue;
+    if (!sourceArtifact) {
+      unboundRuns.push(run);
+      continue;
+    }
     const sourceValue = await loadJsonArtifact(
       client,
       repository,
@@ -250,6 +254,7 @@ export async function verifyPreflightAttestationProvenance(
       record = parsePreflightSourceRecord(sourceValue, { repository });
       assertRecordMatchesRun(record, run);
     } catch {
+      unboundRuns.push(run);
       continue;
     }
     if (record.sourceCommit !== sourceCommit) continue;
@@ -261,6 +266,13 @@ export async function verifyPreflightAttestationProvenance(
     throw new Error(
       `No trusted workflow_dispatch preflight with release-preflight-source artifact for ${sourceCommit}`,
     );
+  }
+  for (const run of unboundRuns) {
+    if (run.run_number > latest.run_number) {
+      throw new Error(
+        `Preflight run ${run.id} is newer than accepted run ${latest.id} and its source cannot be verified`,
+      );
+    }
   }
   const binding = bindings.find(entry => entry.run.id === latest.id);
   if (!binding) throw new Error(`Internal error: missing binding for preflight run ${latest.id}`);

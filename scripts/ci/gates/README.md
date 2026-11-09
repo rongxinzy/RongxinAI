@@ -32,7 +32,7 @@ Preflight **cannot** resolve `source-ref` from the job outputs API. Instead, the
 
 ### Source-record scan
 
-While building bindings, ineligible runs and missing source artifacts are **skipped**. Successfully read JSON records with an invalid schema or mismatched API metadata are also skipped, so historical stale records do not block a newer matching run.
+While building bindings, ineligible runs are skipped. Eligible runs with missing or expired source artifacts, invalid source schemas, or mismatched API metadata remain unresolved. An unresolved run newer than the selected proof blocks release: its source cannot be established, so it cannot safely be treated as unrelated. Older unresolved records do not block a newer verified proof. A valid source record bound to its run and attempt may establish that a completed run tested another source SHA.
 
 Artifact-list API errors, artifact binding failures, download failures, ZIP extraction failures, and invalid JSON **abort verification**. A read failure cannot establish that a run is unrelated to the requested SHA, so it must never fall back to an older successful proof. This conservative check applies to every eligible run in the scan window, including older runs whose source cannot be established.
 
@@ -45,6 +45,6 @@ Artifact-list API errors, artifact binding failures, download failures, ZIP extr
 
 - **Scan window:** newest 40 `workflow_dispatch` preflight runs.
 - **Newer pending dispatch:** eligible runs with higher `run_number` still `queued` / `in_progress` block release.
-- **Newer failed dispatch without source artifact:** cannot prove same SHA; an older green proof **may still pass** (not claimed blocked).
+- **Newer dispatch with unresolved source:** missing or expired source artifacts, invalid schemas, and mismatched run/attempt metadata block fallback to an older green proof, even after the newer run completes.
 - **Newer failed dispatch with source artifact** for the SHA: latest matching binding fails on non-success conclusion.
 - **Branch allowlist:** `main` / `release/**` only.
