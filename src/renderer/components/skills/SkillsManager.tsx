@@ -35,6 +35,7 @@ import {
 import type { DirectImportSource } from './manager/types';
 import { useInstalledSkillList } from './manager/useInstalledSkillList';
 import { useMarketplaceCatalog } from './manager/useMarketplaceCatalog';
+import { isDefenseEdition } from '../../../shared/branding';
 import { useSkillInstallFlow } from './manager/useSkillInstallFlow';
 
 interface SkillsManagerProps {
@@ -358,6 +359,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
 
     if (!skillCreator) {
       // Not installed → switch to marketplace tab and search
+      if (isDefenseEdition()) return;
       setActiveTab(SkillTab.Marketplace);
       setSkillSearchQuery('skill-creator');
       showAppToast(i18nService.t('skillCreatorNotInstalled'));

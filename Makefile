@@ -89,6 +89,14 @@ dist-mac:
 dist-win:
 	bun run dist:win
 
+## dist-win-defense: 本地打包 Windows x64 国防版
+dist-win-defense:
+	bun run dist:win:defense
+
+## dist-kylin-defense: 本地打包麒麟 V11 x64 国防版 RPM
+dist-kylin-defense:
+	bun run dist:kylin:defense
+
 ## dist-linux: 打包 Linux
 dist-linux:
 	bun run dist:linux
@@ -116,4 +124,5 @@ doctor:
 
 .PHONY: help install dev dev-enterprise web web-check build compile-electron \
 	lint format format-check knip test test-full test-enterprise \
-	theme-generate rebuild-native runtimes dist-mac dist-win dist-linux clean doctor
+	theme-generate rebuild-native runtimes dist-mac dist-win dist-linux \
+	dist-win-defense dist-kylin-defense clean doctor

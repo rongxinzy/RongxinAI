@@ -3,6 +3,8 @@
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { isDefenseEdition } from '../../shared/branding';
+import { CoworkBundledPromptMarker, ZhiyuanIdentityPrompt } from '../coworkPrompt/constants';
 
 import {
   CoworkPermissionMode,
@@ -105,7 +107,17 @@ export const getDefaultSystemPrompt = (): string => {
   }
   try {
     const promptPath = path.join(app.getAppPath(), 'resources', 'SYSTEM_PROMPT.md');
-    cachedDefaultSystemPrompt = fs.readFileSync(promptPath, 'utf-8');
+    let prompt = fs.readFileSync(promptPath, 'utf-8');
+    if (isDefenseEdition()) {
+      const { IdentityStart, IdentityEnd } = CoworkBundledPromptMarker;
+      const start = prompt.indexOf(IdentityStart);
+      const end = prompt.indexOf(IdentityEnd, start + IdentityStart.length);
+      if (start !== -1 && end !== -1) {
+        prompt = `${prompt.slice(0, start + IdentityStart.length)}\n\n${ZhiyuanIdentityPrompt}\n\n${prompt.slice(end)}`;
+      }
+      prompt = prompt.replace(/^## 联网与浏览\r?\n[\s\S]*?(?=^## |(?![\s\S]))/m, '').trimEnd();
+    }
+    cachedDefaultSystemPrompt = prompt;
   } catch {
     cachedDefaultSystemPrompt = '';
   }

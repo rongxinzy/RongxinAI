@@ -4,6 +4,7 @@
  * no appBootstrap imports).
  */
 import { session } from 'electron';
+import { isDefenseEdition } from '../../shared/branding';
 
 import type { SkillManager } from '../skillManager';
 import type { SqliteStore } from '../sqliteStore';
@@ -121,9 +122,12 @@ export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
     setConfig: (_event, skillId, config) => deps.getSkillManager().setSkillConfig(skillId, config),
 
     testEmailConnectivity: (_event, skillId, config) =>
-      deps.getSkillManager().testEmailConnectivity(skillId, config),
+      isDefenseEdition()
+        ? { success: false }
+        : deps.getSkillManager().testEmailConnectivity(skillId, config),
 
     fetchMarketplace: async (_event, options) => {
+      if (isDefenseEdition()) return { success: false };
       try {
         const userToken = deps.getStore().get<string>(ModelScopeStoreKey.ApiToken);
         const token = createModelScopeTokenPool({
@@ -150,6 +154,7 @@ export const registerSkillsIpc = (deps: SkillsIpcDeps): void => {
     },
 
     fetchMarketplaceContent: async (_event, skillId) => {
+      if (isDefenseEdition()) return { success: false };
       try {
         const userToken = deps.getStore().get<string>(ModelScopeStoreKey.ApiToken);
         const token = createModelScopeTokenPool({

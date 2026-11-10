@@ -19,3 +19,11 @@ export const PiPythonEnvSystemPrompt = [
   "- Inside a user project that pins its own toolchain (venv, uv, poetry, ...), follow that project's commands instead.",
   '- Bundled Skill scripts run through the `run_skill_script` tool; check `skill_runtime_capabilities` for environment readiness first, and never invoke them with `python`/`python3` on a Skills directory path.',
 ].join('\n');
+
+export const PiDefensePythonEnvSystemPrompt = [
+  '## Managed Python environment',
+  '',
+  '- Use `python_execute` for workspace Python. The managed environment includes common document, spreadsheet, PDF, image, scientific and HTTP libraries and starts offline.',
+  '- Use `python_install` for additional pinned wheels. It uses the bundled wheels and the deployment-configured index, when available.',
+  '- Run bundled Skill scripts through `run_skill_script` so their pinned environment is selected. Check `skill_runtime_capabilities` before using an optional Skill.',
+].join('\n');

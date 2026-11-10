@@ -21,7 +21,7 @@ interface CodingSessionSetupDialogProps {
   workspace: CodingWorkspaceSummary;
   profiles: CodingAgentProfile[];
   onCancel: () => void;
-  onManageAgents: () => void;
+  onManageAgents?: () => void;
   onSubmit: (input: { profileId: string; sourceRoot: string }) => void;
 }
 
@@ -134,12 +134,12 @@ export const CodingSessionSetupDialog = ({
             <Button type="button" disabled={!profileId || !sourceRoot} onClick={submit}>
               {i18nService.t('codingSessionConfirm')}
             </Button>
-          ) : (
+          ) : onManageAgents ? (
             <Button type="button" onClick={onManageAgents}>
               <Settings2 data-icon="inline-start" />
               {i18nService.t('codingAgentManageAgents')}
             </Button>
-          )}
+          ) : null}
         </div>
       </div>
     </section>

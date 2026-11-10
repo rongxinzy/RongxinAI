@@ -1,4 +1,6 @@
 import type { LlamaCppAgentEligibility } from '../../shared/llamacpp';
+import { isDefenseEdition } from '../../shared/branding';
+import { AISphere } from '../../shared/aisphere';
 import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
 import type {
   MagpieModel,
@@ -17,6 +19,7 @@ let selectionRequest = 0;
 /** Agent eligibility of the running local models, keyed by the name the GPU provider registers. */
 let localEligibility = new Map<string, LlamaCppAgentEligibility>();
 async function readLocalEligibility(): Promise<Map<string, LlamaCppAgentEligibility>> {
+  if (isDefenseEdition()) return new Map();
   try {
     const running = await window.electron.llamacpp.listRunningModels();
     return new Map(
@@ -35,6 +38,7 @@ function localModelEligibility(model: MagpieModel): LlamaCppAgentEligibility | u
   return localEligibility.get(model.id) ?? localEligibility.get(model.id.slice(slash + 1));
 }
 async function readProviders(): Promise<MagpieProviderSummary[]> {
+  if (isDefenseEdition()) return [];
   try {
     return await window.electron.magpie.providers();
   } catch {
@@ -50,7 +54,10 @@ export function toCatalogModel(
   return {
     id: model.id,
     name: model.display_name || model.id,
-    provider: getMagpieProviderName(model.owned_by, providers),
+    provider:
+      model.owned_by === AISphere.Provider
+        ? 'AISphere'
+        : getMagpieProviderName(model.owned_by, providers),
     providerKey: model.owned_by,
     supportsImage: model.modalities?.input.includes('image') ?? false,
     supportsThinkingToggle: model.reasoning,

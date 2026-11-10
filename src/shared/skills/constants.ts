@@ -27,3 +27,11 @@ export const AcademicResearchSkillIds = [
   CoreSkillId.DeepResearch,
   CoreSkillId.WebSearch,
 ] as const;
+
+const defenseQuickActionSkills = new Set<string>([
+  CoreSkillId.PresentationStudio,
+  CoreSkillId.Docx,
+  CoreSkillId.Xlsx,
+]);
+
+export const isDefenseQuickActionSkill = (id: string): boolean => defenseQuickActionSkills.has(id);

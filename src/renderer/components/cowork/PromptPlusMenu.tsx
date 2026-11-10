@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
+import { isDefenseEdition } from '../../../shared/branding';
 import { i18nService } from '../../services/i18n';
 import { normalizeError } from '../../services/errorNormalization';
 import { showAppToast } from '../../services/toastNotification';
@@ -71,6 +72,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   disabled = false,
 }) => {
   const dispatch = useDispatch();
+  const defense = isDefenseEdition();
   const [open, setOpen] = useState(false);
   const [mcpLoading, setMcpLoading] = useState(false);
   const [pendingServerId, setPendingServerId] = useState<string | null>(null);
@@ -124,7 +126,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   // Refresh the connector list every time the menu opens so management changes
   // elsewhere are reflected.
   useEffect(() => {
-    if (!open) return;
+    if (!open || defense) return;
     let cancelled = false;
     setMcpLoading(true);
     mcpService
@@ -138,11 +140,11 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open, dispatch]);
+  }, [defense, open, dispatch]);
 
   useEffect(() => {
     const requestedIds = JSON.parse(serverRegistryIdsKey) as string[];
-    if (!open || requestedIds.length === 0) return;
+    if (defense || !open || requestedIds.length === 0) return;
     let cancelled = false;
 
     const loadServerIcons = async () => {
@@ -176,7 +178,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open, serverRegistryIdsKey]);
+  }, [defense, open, serverRegistryIdsKey]);
 
   useEffect(() => {
     return mcpService.onBridgeSyncDone(({ error }) => {
@@ -352,56 +354,60 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
           </DropdownMenuSub>
         )}
 
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>
-            <Cable className="size-4" />
-            <span className="truncate">{i18nService.t('connectors')}</span>
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent align="center" sideOffset={8} className="w-56">
-            {mcpLoading ? (
-              <DropdownMenuItem disabled>{i18nService.t('loading')}</DropdownMenuItem>
-            ) : mcpServers.length === 0 ? (
-              <DropdownMenuItem disabled>{i18nService.t('noConnectorsAvailable')}</DropdownMenuItem>
-            ) : (
-              mcpServers.map(server => (
-                <DropdownMenuItem
-                  key={server.id}
-                  closeOnClick={false}
-                  disabled={pendingServerId !== null}
-                  onClick={() => {
-                    void handleToggleServer(server.id, !server.enabled);
-                  }}
-                >
-                  {serverIcons[server.registryId ?? server.id] ? (
-                    <img
-                      src={serverIcons[server.registryId ?? server.id]}
-                      alt=""
-                      className="size-4 object-contain"
-                    />
-                  ) : (
-                    <Cable className="size-4" />
-                  )}
-                  <span className="truncate">{server.name}</span>
-                  <Switch
-                    checked={server.enabled}
-                    disabled={pendingServerId !== null}
-                    className="ml-auto"
-                    aria-label={server.name}
-                    onClick={event => event.stopPropagation()}
-                    onCheckedChange={checked => {
-                      void handleToggleServer(server.id, checked);
-                    }}
-                  />
+        {!defense && (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+              <Cable className="size-4" />
+              <span className="truncate">{i18nService.t('connectors')}</span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent align="center" sideOffset={8} className="w-56">
+              {mcpLoading ? (
+                <DropdownMenuItem disabled>{i18nService.t('loading')}</DropdownMenuItem>
+              ) : mcpServers.length === 0 ? (
+                <DropdownMenuItem disabled>
+                  {i18nService.t('noConnectorsAvailable')}
                 </DropdownMenuItem>
-              ))
-            )}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onManageConnectors}>
-              <PlusMenuManageIcon className="size-4" />
-              <span className="truncate">{i18nService.t('manageConnectors')}</span>
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+              ) : (
+                mcpServers.map(server => (
+                  <DropdownMenuItem
+                    key={server.id}
+                    closeOnClick={false}
+                    disabled={pendingServerId !== null}
+                    onClick={() => {
+                      void handleToggleServer(server.id, !server.enabled);
+                    }}
+                  >
+                    {serverIcons[server.registryId ?? server.id] ? (
+                      <img
+                        src={serverIcons[server.registryId ?? server.id]}
+                        alt=""
+                        className="size-4 object-contain"
+                      />
+                    ) : (
+                      <Cable className="size-4" />
+                    )}
+                    <span className="truncate">{server.name}</span>
+                    <Switch
+                      checked={server.enabled}
+                      disabled={pendingServerId !== null}
+                      className="ml-auto"
+                      aria-label={server.name}
+                      onClick={event => event.stopPropagation()}
+                      onCheckedChange={checked => {
+                        void handleToggleServer(server.id, checked);
+                      }}
+                    />
+                  </DropdownMenuItem>
+                ))
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onManageConnectors}>
+                <PlusMenuManageIcon className="size-4" />
+                <span className="truncate">{i18nService.t('manageConnectors')}</span>
+              </DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

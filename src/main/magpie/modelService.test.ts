@@ -39,6 +39,23 @@ function fixture() {
   };
 }
 describe('single authoritative model service', () => {
+  it('rejects a catalog read that spans a managed gateway credential rotation', async () => {
+    let key = 'before';
+    const service = new MagpieModelService(
+      {
+        status: () => ({ state: 'running', version: 'test', gatewayUrl: 'http://127.0.0.1:1234' }),
+        runtimeApiKey: () => key,
+        models: async () => {
+          key = 'after';
+          return [{ id: 'managed' }];
+        },
+      },
+      { readDefaultModelId: () => 'managed', writeDefaultModelId: () => {} },
+    );
+    await expect(service.resolve()).rejects.toThrow('Model service changed');
+    await expect(service.resolve()).resolves.toMatchObject({ runtimeApiKey: 'after' });
+  });
+
   it('accepts a selected unified model without a legacy provider configuration or credential projection', async () => {
     const f = fixture();
     await f.service.selectDefault('vendor/model');

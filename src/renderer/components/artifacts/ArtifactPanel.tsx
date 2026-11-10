@@ -2,6 +2,7 @@ import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { resolveArtifactPath } from '@shared/cowork/artifactPath';
+import { isDefenseEdition } from '@shared/branding';
 import {
   ArrowLeft,
   Copy,
@@ -87,6 +88,7 @@ function buildBrowserHtml(artifact: Artifact): string | null {
     case 'svg':
       return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${artifact.title}</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f5f5f5}</style></head><body>${artifact.content}</body></html>`;
     case 'mermaid':
+      if (isDefenseEdition()) return null;
       return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${artifact.title}</title><script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"><\/script><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;font-family:system-ui,sans-serif}</style></head><body><pre class="mermaid">${escapeHtml(artifact.content)}</pre><script>mermaid.initialize({startOnLoad:true,theme:'default',securityLevel:'loose'});<\/script></body></html>`;
     default:
       return null;

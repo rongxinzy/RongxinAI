@@ -5,6 +5,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { verifyPackagedMagpie } = require('../magpie-runtime.cjs');
+const {
+  isDefensePackage,
+  verifyDefenseResources,
+  verifyDefenseAsar,
+} = require('./defense-edition.cjs');
 const { verifyPackagedNodePty } = require('./verify-packaged-native-modules.cjs');
 const {
   verifyWindowsCompressedChannelRuntime,
@@ -168,6 +173,13 @@ function verifyNoRetiredRuntimeArtifacts(context) {
 
 function verifyPackagedDeliverables(context) {
   verifyNoRetiredRuntimeArtifacts(context);
+  if (isDefensePackage(context)) {
+    const root = packagedResourcesRoot(context);
+    verifyDefenseResources(root, context.electronPlatformName);
+    verifyDefenseAsar(root);
+    verifyPackagedNodePty(context);
+    return;
+  }
   verifyPackagedChannelRuntime(context);
   verifyPackagedMagpie(context);
   verifyPackagedLlamaCppBundled(context);

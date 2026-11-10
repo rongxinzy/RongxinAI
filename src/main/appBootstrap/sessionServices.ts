@@ -1,6 +1,7 @@
 import path from 'path';
 
 import { app } from 'electron';
+import { isDefenseEdition } from '../../shared/branding';
 
 import { agentRuntime } from './agentRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
@@ -75,14 +76,19 @@ export const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
   if (!agentRuntime.piRuntimeAdapter) {
     // Pi shell tools inherit the main-process environment. Keep the gateway
     // credential here so installed builds work without user configuration.
-    process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN = resolveAnySearchGatewayToken();
-    process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL = resolveAnySearchGatewayUrl();
+    if (isDefenseEdition()) {
+      delete process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN;
+      delete process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL;
+    } else {
+      process.env.ZHIYUAN_ANYSEARCH_GATEWAY_TOKEN = resolveAnySearchGatewayToken();
+      process.env.ZHIYUAN_ANYSEARCH_GATEWAY_URL = resolveAnySearchGatewayUrl();
+    }
     agentRuntime.piRuntimeAdapter = new PiRuntimeAdapter();
     agentRuntime.piRuntimeAdapter.setImageAttachmentRoot(coworkImageRoot(app.getPath('userData')));
     // File-backed Pi sessions live beside the SQLite transcript under
     // userData; one directory per Cowork session id.
     agentRuntime.piRuntimeAdapter.setPiSessionStoreRoot(app.getPath('userData'));
-    agentRuntime.piRuntimeAdapter.setCompanionStore(getStore());
+    if (!isDefenseEdition()) agentRuntime.piRuntimeAdapter.setCompanionStore(getStore());
     agentRuntime.piRuntimeAdapter.setCoworkStore(getCoworkStore());
     agentRuntime.piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     agentRuntime.piRuntimeAdapter.setArtifactLedger(getArtifactLedger());

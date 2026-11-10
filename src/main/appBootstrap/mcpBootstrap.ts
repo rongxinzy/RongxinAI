@@ -3,6 +3,7 @@
  * startup/reconcile and Pi tool-manifest synchronization.
  */
 import { BrowserWindow } from 'electron';
+import { isDefenseEdition } from '../../shared/branding';
 
 import { agentRuntime } from './agentRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
@@ -74,6 +75,7 @@ export const refreshMcpOAuthHeaders = async <
  * Returns the tool manifest (may be empty if no MCP servers are configured).
  */
 export const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
+  if (isDefenseEdition()) return [];
   if (mcpRuntime.initPromise) return mcpRuntime.initPromise;
   const generation = mcpRuntime.lifecycleGeneration;
 
@@ -150,6 +152,7 @@ const broadcastMcpBridgeSync = (channel: string, data?: Record<string, unknown>)
 };
 
 export const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
+  if (isDefenseEdition()) return Promise.resolve({ tools: 0 });
   if (mcpRuntime.bridgeRefreshPromise) {
     // A server setting changed while the current pass was reading the enabled
     // list. Schedule one more pass after it completes so the bridge converges

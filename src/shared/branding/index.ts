@@ -1,13 +1,31 @@
 import { zhiyuanBranding } from './defaultBranding';
+import { DEFENSE_EDITION_ID, defenseBranding } from './editions/defense';
 import { xiaoruanBranding } from './editions/xiaoruan';
 import type { ProductBrandingConfig } from './types';
 
 const registeredEditions: Record<string, ProductBrandingConfig> = {
   zhiyuan: zhiyuanBranding,
   xiaoruan: xiaoruanBranding,
+  [DEFENSE_EDITION_ID]: defenseBranding,
 };
 
+declare const __ZHIYUAN_DEFENSE_BUILD__: boolean;
+let packagedDefense: boolean | undefined;
+
 function resolveCurrentEditionId(): string {
+  if (typeof __ZHIYUAN_DEFENSE_BUILD__ !== 'undefined' && __ZHIYUAN_DEFENSE_BUILD__) {
+    return DEFENSE_EDITION_ID;
+  }
+  if (typeof process !== 'undefined' && process.versions?.electron && process.type === 'browser') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { app } = require('electron') as typeof import('electron');
+    const name = app.getName();
+    packagedDefense ??=
+      app.isPackaged && (name === defenseBranding.productName || name === defenseBranding.appId);
+    if (packagedDefense) {
+      return DEFENSE_EDITION_ID;
+    }
+  }
   // Check build-time or runtime environment in Node / Electron main process
   if (typeof process !== 'undefined' && process.env) {
     if (process.env.APP_EDITION) {
@@ -48,6 +66,10 @@ function resolveCurrentEditionId(): string {
 export function getBranding(editionId?: string): ProductBrandingConfig {
   const id = editionId || resolveCurrentEditionId();
   return registeredEditions[id] || zhiyuanBranding;
+}
+
+export function isDefenseEdition(): boolean {
+  return resolveCurrentEditionId() === DEFENSE_EDITION_ID;
 }
 
 export type { ProductBrandingConfig } from './types';

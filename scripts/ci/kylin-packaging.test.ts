@@ -7,7 +7,12 @@ const require = createRequire(import.meta.url);
 const { KYLIN_ENV, buildKylin } = require('../build-kylin.cjs') as {
   KYLIN_ENV: Record<string, string>;
   buildKylin(options: {
-    run: (command: string, args: string[]) => { status: number };
+    defense?: boolean;
+    run: (
+      command: string,
+      args: string[],
+      options: { env?: Record<string, string> },
+    ) => { status: number };
     platform: NodeJS.Platform;
     arch: string;
   }): void;
@@ -120,6 +125,35 @@ describe('Kylin packaging', () => {
       Name: '知远智能体',
       Categories: 'Utility;Development;',
     });
+  });
+
+  test('builds the defense RPM locally without community services or inference runtimes', () => {
+    const calls: string[] = [];
+    buildKylin({
+      defense: true,
+      platform: 'linux',
+      arch: 'x64',
+      run: (command, args, options) => {
+        expect(options.env).toMatchObject({
+          APP_EDITION: 'defense',
+          ZHIYUAN_UPDATE_VARIANT: 'lite',
+        });
+        calls.push([command, ...args].join(' '));
+        return { status: 0 };
+      },
+    });
+    expect(calls).toEqual([
+      'bun run engram:runtime:linux-x64',
+      'node scripts/ensure-build-version.js',
+      'bun run build',
+      'node scripts/build-docx-runtime.cjs --required --linux-x64',
+      'bun run rebuild:electron-native:linux-packaging',
+      'bunx electron-builder --linux rpm --x64 --config electron-builder.defense-kylin.cjs --publish never',
+    ]);
+    const config = require('../../electron-builder.defense-kylin.cjs');
+    expect(config.appId).toBe('com.zhiyuanagent.defense');
+    expect(config.linux).toMatchObject({ target: ['rpm'], publish: [], extraResources: [] });
+    expect(config.directories.output).toBe('release/defense-kylin');
   });
 
   test('wires the package script to the Kylin build entrypoint', () => {

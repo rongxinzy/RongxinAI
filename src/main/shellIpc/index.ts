@@ -6,8 +6,10 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 
 import { shell } from 'electron';
+import { isDefenseEdition } from '../../shared/branding';
 
 import { normalizeWindowsShellPath } from './shellPathNormalize';
+import { isOwnedExternalUrl } from './ownedExternalUrls';
 import { isAllowedShellOpenPath, isSensitivePath } from '../shellPathValidation';
 import { resolveLocalPathCandidate } from '../localPathResolver';
 import { getAllowedShellProbeRoots } from '../dialogIpc';
@@ -77,6 +79,9 @@ export const registerShellIpc = (deps: ShellIpcDeps): void => {
 
     shellOpenExternal: async (_event, url) => {
       try {
+        if (isDefenseEdition() && isOwnedExternalUrl(url)) {
+          return { success: false, error: 'Access denied' };
+        }
         await shell.openExternal(url);
         return { success: true };
       } catch (error) {

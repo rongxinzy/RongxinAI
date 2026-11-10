@@ -4,7 +4,12 @@ import {
   CoworkPermissionMode,
   type CoworkPermissionMode as CoworkPermissionModeType,
 } from '../../../shared/cowork/constants';
-import { AcademicResearchSkillIds, CoreSkillId } from '@shared/skills/constants';
+import {
+  AcademicResearchSkillIds,
+  CoreSkillId,
+  isDefenseQuickActionSkill,
+} from '@shared/skills/constants';
+import { isDefenseEdition } from '@shared/branding';
 
 /**
  * Chat quick-skill shortcut entries.
@@ -23,7 +28,7 @@ export interface ChatSkillShortcut {
   placeholderKey: string;
 }
 
-export const CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
+const ALL_CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
   {
     id: 'ppt',
     skillId: CoreSkillId.PresentationStudio,
@@ -71,6 +76,11 @@ export const CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
     placeholderKey: 'chatSkillPlaceholderSheets',
   },
 ] as const;
+
+export const CHAT_SKILL_SHORTCUTS = ALL_CHAT_SKILL_SHORTCUTS.filter(
+  entry =>
+    !isDefenseEdition() || (entry.skillIds ?? [entry.skillId]).every(isDefenseQuickActionSkill),
+);
 
 export const findChatSkillShortcut = (skillId: string): ChatSkillShortcut | undefined =>
   CHAT_SKILL_SHORTCUTS.find(entry => entry.skillId === skillId);

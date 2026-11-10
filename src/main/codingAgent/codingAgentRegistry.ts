@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import { EventEmitter } from 'events';
 import path from 'path';
+import { isDefenseEdition } from '../../shared/branding';
 
 import {
   CodingAgentDriverKind,
@@ -78,11 +79,13 @@ export class CodingAgentRegistry extends EventEmitter {
     return updated;
   }
   hydrate(): void {
+    if (isDefenseEdition()) return;
     for (const profile of this.repository?.listExternal() ?? [])
       this.profiles.set(profile.id, profile);
     this.emit('changed');
   }
   registerExternal(profile: Omit<CodingAgentProfile, 'id' | 'isBuiltin'>): CodingAgentProfile {
+    if (isDefenseEdition()) throw new Error(CodingErrorMessage.ProfileNotFound);
     const registered = {
       ...profile,
       environment: profile.environment ?? {},
@@ -231,6 +234,7 @@ export class CodingAgentRegistry extends EventEmitter {
   }
 
   async discoverExternalAgents(): Promise<void> {
+    if (isDefenseEdition()) return;
     const discovered = await new AcpDiscoveryService(this.acpRegistryPath, {
       ...this.acpDiscoveryOptions,
       adapterRoot: this.acpAdapterRoot,

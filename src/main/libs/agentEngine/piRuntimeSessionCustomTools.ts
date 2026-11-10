@@ -9,6 +9,7 @@
  */
 
 import path from 'path';
+import { isDefenseEdition } from '../../../shared/branding';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
@@ -100,7 +101,7 @@ export function buildPiSessionCustomTools(
   // Each call creates a distinct tool instance for this Pi session, so its
   // sequential execution mode cannot block another session.
   const customTools: Record<string, unknown>[] = [];
-  if (resourceState.chatMode) customTools.push(buildPiWebSearchTool());
+  if (resourceState.chatMode && !isDefenseEdition()) customTools.push(buildPiWebSearchTool());
 
   if (options.planTool === true || options.planMode === true) {
     // The plan tool never touches the workspace: it publishes the structured
@@ -250,7 +251,9 @@ export function buildPiSessionCustomTools(
   // It owns durable state and completion gates for the lifetime of this
   // session (and reloads the same state directory after a session restart).
   const researchRun =
-    options.sessionMode !== CoworkSessionMode.Chat && isAcademicResearchSkillSet(workflowSkillIds)
+    !isDefenseEdition() &&
+    options.sessionMode !== CoworkSessionMode.Chat &&
+    isAcademicResearchSkillSet(workflowSkillIds)
       ? new PiResearchRunController({
           sessionId,
           workspaceRoot,
@@ -262,7 +265,11 @@ export function buildPiSessionCustomTools(
     researchRun.resumeForPrompt(prompt);
     customTools.push(buildPiResearchStateTool(researchRun));
   }
-  const shortcutKind = researchRun ? null : shortcutKindForContract;
+  const shortcutKind =
+    researchRun ||
+    (isDefenseEdition() && shortcutKindForContract === ShortcutWorkflowKind.DeepResearch)
+      ? null
+      : shortcutKindForContract;
   const shortcutWorkflow =
     shortcutKind && options.sessionMode !== CoworkSessionMode.Chat
       ? new PiShortcutWorkflowController({

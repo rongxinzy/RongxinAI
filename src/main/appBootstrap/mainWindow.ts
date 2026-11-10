@@ -10,6 +10,7 @@ import { PRELOAD_PATH, applyWindowsWindowIcon } from './windowBranding';
 import { emitWindowState, schedulePersistAppWindowState } from './windowManagement';
 import { openDevToolsWindow, toggleDevToolsForSender } from '../appIpc';
 import { isWecomAuthUrl } from './windowSecurity';
+import { isOwnedExternalUrl } from '../shellIpc/ownedExternalUrls';
 import { logAppQuitContextOnce } from './appLifecycle';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { isAutoLaunched } from '../autoLaunchManager';
@@ -33,6 +34,7 @@ import {
   observeDesktopPetCompanionActivity,
 } from '../desktopPet/controller';
 import { initializeCompanionWindow } from '../companion/window';
+import { isDefenseEdition } from '../../shared/branding';
 import { getCompanionTasks } from './companionTasks';
 import { openDesktopPetSession } from '../desktopPet/controller';
 import { getPiRuntimeAdapter } from './sessionServices';
@@ -128,6 +130,9 @@ export const createMainWindow = (): void => {
 
     // 处理 window.open 请求（企微 SDK 授权弹窗等）
     lifecycleRuntime.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+      if (isDefenseEdition() && (isOwnedExternalUrl(url) || isWecomAuthUrl(url))) {
+        return { action: 'deny' };
+      }
       if (isWecomAuthUrl(url)) {
         return {
           action: 'allow',
@@ -333,20 +338,22 @@ export const createMainWindow = (): void => {
       setLanguage(initLang === 'en' ? 'en' : 'zh');
       // 窗口就绪后创建系统托盘
       createTray(focusOrCreateMainWindow);
-      initializeDesktopPet(getStore(), focusOrCreateMainWindow, () =>
-        updateTrayMenu(focusOrCreateMainWindow),
-      );
-      initializeCompanionWindow({
-        store: getStore(),
-        getMainWindow: () => lifecycleRuntime.mainWindow,
-        getPetWindow: getDesktopPetWindow,
-        onBubbleVisibility: setDesktopPetBubbleVisible,
-        onActivity: observeDesktopPetCompanionActivity,
-        getCompanions: () => getPiRuntimeAdapter().getCompanions(),
-        getTasks: getCompanionTasks,
-        openTask: openDesktopPetSession,
-        onProfileChanged: profile => setDesktopPetAppearance(profile.characterId),
-      });
+      if (!isDefenseEdition()) {
+        initializeDesktopPet(getStore(), focusOrCreateMainWindow, () =>
+          updateTrayMenu(focusOrCreateMainWindow),
+        );
+        initializeCompanionWindow({
+          store: getStore(),
+          getMainWindow: () => lifecycleRuntime.mainWindow,
+          getPetWindow: getDesktopPetWindow,
+          onBubbleVisibility: setDesktopPetBubbleVisible,
+          onActivity: observeDesktopPetCompanionActivity,
+          getCompanions: () => getPiRuntimeAdapter().getCompanions(),
+          getTasks: getCompanionTasks,
+          openTask: openDesktopPetSession,
+          onProfileChanged: profile => setDesktopPetAppearance(profile.characterId),
+        });
+      }
 
       (async () => {
         // One-time migration: import legacy SQLite task records into the

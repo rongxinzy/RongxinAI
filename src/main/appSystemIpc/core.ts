@@ -1,5 +1,6 @@
 /** Core store access and enterprise session/renderer bridge IPC handlers. */
 import { appSystemContract } from '../../shared/ipc/appSystemContract';
+import { isDefenseEdition } from '../../shared/branding';
 import { providersContract } from '../../shared/ipc/providersContract';
 import type { SqliteStore } from '../sqliteStore';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
@@ -26,6 +27,13 @@ export const registerCoreIpc = (deps: CoreIpcDeps): void => {
     },
   });
 
+  if (isDefenseEdition()) {
+    handleIpcContractSubset(providersContract, {
+      enterpriseGetConfig: () => null,
+      enterpriseSettingsPages: () => [],
+    });
+    return;
+  }
   handleIpcContractSubset(providersContract, {
     enterpriseGetConfig: () => {
       try {

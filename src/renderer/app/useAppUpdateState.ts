@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { isDefenseEdition } from '../../shared/branding';
 
 import { type AppUpdateRuntimeState, AppUpdateStatus } from '../../shared/appUpdate/constants';
 
@@ -25,7 +26,7 @@ const publish = (next: AppUpdateRuntimeState): void => {
 };
 
 const start = (): void => {
-  if (release) return;
+  if (release || isDefenseEdition()) return;
   const api = window.electron?.appUpdate;
   if (!api) return;
   release = api.onStateChanged(publish);

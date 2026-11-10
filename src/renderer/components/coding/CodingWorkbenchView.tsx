@@ -30,6 +30,7 @@ import PageHeader from '../PageHeader';
 import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
 import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 import { CodingAgentManager } from './CodingAgentManager';
+import { isDefenseEdition } from '../../../shared/branding';
 import { CodingAuthTerminalDialog } from './CodingAuthTerminalDialog';
 import { CodingComposer } from './CodingComposer';
 import { CodingEventStream } from './CodingEventStream';
@@ -366,7 +367,8 @@ export const CodingWorkbenchView = ({
     if (snapshot) setManagerProfiles(snapshot.profiles);
   }, [snapshot]);
 
-  const agentManagerElement = (
+  const defense = isDefenseEdition();
+  const agentManagerElement = !defense && (
     <CodingAgentManager
       open={agentManagerOpen}
       onOpenChange={setAgentManagerOpen}
@@ -384,10 +386,12 @@ export const CodingWorkbenchView = ({
       isSidebarCollapsed={isSidebarCollapsed}
       onToggleSidebar={onToggleSidebar}
       actions={
-        <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
-          <Bot className="mr-1 size-4" />
-          {i18nService.t('codingAgentManageButton')}
-        </Button>
+        !defense && (
+          <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
+            <Bot className="mr-1 size-4" />
+            {i18nService.t('codingAgentManageButton')}
+          </Button>
+        )
       }
     />
   );
@@ -467,10 +471,12 @@ export const CodingWorkbenchView = ({
         }
         actions={
           <>
-            <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
-              <Bot className="mr-1 size-4" />
-              {i18nService.t('codingAgentManageButton')}
-            </Button>
+            {!defense && (
+              <Button size="sm" variant="outline" onClick={() => setAgentManagerOpen(true)}>
+                <Bot className="mr-1 size-4" />
+                {i18nService.t('codingAgentManageButton')}
+              </Button>
+            )}
             {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
               <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
                 <FileDiff className="mr-1 size-4" />
@@ -695,7 +701,7 @@ export const CodingWorkbenchView = ({
               workspace={sessionSetupWorkspace}
               profiles={snapshot.profiles}
               onCancel={closeSessionSetup}
-              onManageAgents={() => setAgentManagerOpen(true)}
+              onManageAgents={defense ? undefined : () => setAgentManagerOpen(true)}
               onSubmit={input => submitSessionSetup(sessionSetupWorkspace, input)}
             />
           ) : null}

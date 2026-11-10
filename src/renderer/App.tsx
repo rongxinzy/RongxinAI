@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { ManagedProviderAccessMode } from '../shared/managedProviders';
-import { getBranding } from '../shared/branding';
+import { getBranding, isDefenseEdition } from '../shared/branding';
 import { shouldSkipPreviewBoot } from './browserMock/previewQuery';
 import { InitErrorView } from './app/InitErrorView';
 import { MainViewCanvas } from './app/MainViewCanvas';
@@ -69,7 +69,7 @@ const App: React.FC = () => {
     useLocalInferenceVisibility(mainView);
   const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
   const [bootScreenVisible, setBootScreenVisible] = useState(
-    () => !(import.meta.env.DEV && shouldSkipPreviewBoot()),
+    () => !isDefenseEdition() && !(import.meta.env.DEV && shouldSkipPreviewBoot()),
   );
   const toast = useAppToastDisplay();
   const [, forceLanguageRefresh] = useState(0);
@@ -100,14 +100,16 @@ const App: React.FC = () => {
     selectPendingPermissionForSession(state, currentSessionId),
   );
   const isWindows = window.electron.platform === 'win32';
-  const managedModelsOnly = managedProviderPolicy?.mode === ManagedProviderAccessMode.Exclusive;
+  const defense = isDefenseEdition();
+  const managedModelsOnly =
+    defense || managedProviderPolicy?.mode === ManagedProviderAccessMode.Exclusive;
   const [inferenceEdition, setInferenceEdition] = useState<InferenceEdition>(InferenceEdition.Lite);
   useEffect(() => {
     void window.electron.appInfo
       .getInferenceEdition()
       .then(value => setInferenceEdition(normalizeInferenceEdition(value)));
   }, []);
-  const localInferenceEnabled = isLocalInferenceEnabledForEdition(inferenceEdition);
+  const localInferenceEnabled = !defense && isLocalInferenceEnabledForEdition(inferenceEdition);
 
   useEffect(() => {
     if (!isInitialized || initError) return;
@@ -172,9 +174,9 @@ const App: React.FC = () => {
       handleLlamaCppRunningModelsChanged,
     );
     window.addEventListener(ZhiyuanModelPoolEvent.AuthChanged, handleLlamaCppRunningModelsChanged);
-    const unsubscribeModelBindings = window.electron.llamacpp.onModelBindingsChanged(
-      handleLlamaCppModelBindingsChanged,
-    );
+    const unsubscribeModelBindings =
+      !defense &&
+      window.electron.llamacpp.onModelBindingsChanged(handleLlamaCppModelBindingsChanged);
     const unsubscribeManagedProviders = window.electron.managedProviders.onChanged(
       handleManagedProvidersChanged,
     );
@@ -188,10 +190,10 @@ const App: React.FC = () => {
         ZhiyuanModelPoolEvent.AuthChanged,
         handleLlamaCppRunningModelsChanged,
       );
-      unsubscribeModelBindings();
+      if (unsubscribeModelBindings) unsubscribeModelBindings();
       unsubscribeManagedProviders();
     };
-  }, [isInitialized, refreshAvailableModels]);
+  }, [defense, isInitialized, refreshAvailableModels]);
 
   useEffect(() => {
     const unsubscribe = i18nService.subscribe(() => {
@@ -225,7 +227,7 @@ const App: React.FC = () => {
     setMainView(MainView.Cowork);
   }, []);
   useDesktopPetNavigation(
-    isInitialized && !initError && !bootScreenVisible,
+    !defense && isInitialized && !initError && !bootScreenVisible,
     mainView,
     currentSessionId,
     handleShowCowork,
@@ -418,7 +420,7 @@ const App: React.FC = () => {
     return unsubscribe;
   }, [handleNewChat]);
 
-  const updateEntry = (
+  const updateEntry = !defense && (
     <AppUpdateSidebarEntry collapsed={isSidebarCollapsed} onOpenAbout={handleOpenAbout} />
   );
   const windowsStandaloneTitleBar = isWindows ? (
@@ -514,7 +516,7 @@ const App: React.FC = () => {
             onChatWithExpert={handleChatWithExpert}
             expertInitialTab={expertInitialTab}
             onUseMcp={handleTryMcp}
-            onShowConnectors={handleShowMcpMarketplace}
+            onShowConnectors={defense ? undefined : handleShowMcpMarketplace}
             mcpOpenRegistryId={mcpOpenRegistryId}
             mcpOpenMarketplace={mcpOpenMarketplace}
             onShowScheduledTasks={handleShowScheduledTasks}

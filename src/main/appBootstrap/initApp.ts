@@ -8,7 +8,7 @@ import path from 'path';
 
 import { pathToFileURL } from 'url';
 
-import { app, dialog, net, powerMonitor, protocol } from 'electron';
+import { app, dialog, net, powerMonitor, protocol, session } from 'electron';
 
 import { ZHIYUAN_ENTERPRISE_RENDERER_SCHEME } from '../enterpriseExtension/rendererBridge';
 import { lifecycleRuntime } from './lifecycleRuntimeState';
@@ -56,7 +56,7 @@ import { ensureEmbeddedPiAgentDir } from '../libs/agentEngine/piAgentDir';
 import { handleDeepLink } from './communityAuth';
 import { getCronJobService } from '../ipcHandlers/scheduledTask';
 import { aisphereService, startAISphereGateway } from '../extensions/aisphere';
-import { getBranding } from '../../shared/branding';
+import { getBranding, isDefenseEdition } from '../../shared/branding';
 import { DB_FILENAME } from '../appConstants';
 import { startSqliteDiagnostics } from '../sqliteDiagnostics';
 import { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
@@ -100,6 +100,8 @@ import { setAutoLaunchEnabled } from '../autoLaunchManager';
 import { updateTrayMenu } from '../trayManager';
 import { APP_UPDATE_POLL_INTERVAL_MS } from '../../shared/appUpdate/constants';
 import { channelRuntime } from './channelRuntimeState';
+import { DEV_SERVER_URL } from './appEnv';
+import { restrictDefenseChromiumNetwork } from './defenseNetwork';
 
 export const initApp = async (): Promise<void> => {
   // Original bootstrap body, kept as one unit; invoked below so exported
@@ -110,6 +112,12 @@ export const initApp = async (): Promise<void> => {
     profiler.mark('app.whenReady');
     console.log('[Main] initApp: waiting for app.whenReady()');
     await app.whenReady();
+    if (isDefenseEdition()) {
+      restrictDefenseChromiumNetwork(
+        session.defaultSession,
+        app.isPackaged ? undefined : DEV_SERVER_URL,
+      );
+    }
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
     await ensureEmbeddedPiAgentDir(app.getPath('userData')).catch(error => {
@@ -120,36 +128,38 @@ export const initApp = async (): Promise<void> => {
     repairWindowsTaskbarIdentity();
     ensureWindowsTaskbarBrand();
 
-    protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, async request => {
-      const assetPath = zhiyuanEnterpriseRendererBridge.resolveAsset(request.url);
-      if (!assetPath) return new Response(null, { status: 404 });
-      const response = await net.fetch(pathToFileURL(assetPath).toString());
-      return allowEnterpriseRendererOpaqueOrigin(response);
-    });
+    if (!isDefenseEdition()) {
+      protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, async request => {
+        const assetPath = zhiyuanEnterpriseRendererBridge.resolveAsset(request.url);
+        if (!assetPath) return new Response(null, { status: 404 });
+        const response = await net.fetch(pathToFileURL(assetPath).toString());
+        return allowEnterpriseRendererOpaqueOrigin(response);
+      });
 
-    const enterpriseExtension = await initializeZhiyuanEnterpriseExtension({
-      appVersion: app.getVersion(),
-      isPackaged: app.isPackaged,
-      platform: process.platform,
-      resourcesPath: process.resourcesPath,
-      userDataPath: app.getPath('userData'),
-      developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
-      sessionCapability: zhiyuanEnterpriseSessionBridge,
-      managedProviderCapability: zhiyuanManagedProviderBridge,
-      createSkillCapability: () =>
-        new ZhiyuanEnterpriseSkillBridge({
-          userDataPath: app.getPath('userData'),
-          refreshSkills: () => getSkillManager().handleWorkingDirectoryChange(),
-        }),
-      createRendererCapability: extensionDirectory =>
-        zhiyuanEnterpriseRendererBridge.createScopedCapability(extensionDirectory),
-      createSettingsCapability: extensionDirectory =>
-        zhiyuanEnterpriseRendererBridge.createScopedSettingsCapability(extensionDirectory),
-    });
-    if (enterpriseExtension.extensionId) {
-      console.log(
-        `[EnterpriseExtension] Initialized ${enterpriseExtension.extensionId} with API version 1.`,
-      );
+      const enterpriseExtension = await initializeZhiyuanEnterpriseExtension({
+        appVersion: app.getVersion(),
+        isPackaged: app.isPackaged,
+        platform: process.platform,
+        resourcesPath: process.resourcesPath,
+        userDataPath: app.getPath('userData'),
+        developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
+        sessionCapability: zhiyuanEnterpriseSessionBridge,
+        managedProviderCapability: zhiyuanManagedProviderBridge,
+        createSkillCapability: () =>
+          new ZhiyuanEnterpriseSkillBridge({
+            userDataPath: app.getPath('userData'),
+            refreshSkills: () => getSkillManager().handleWorkingDirectoryChange(),
+          }),
+        createRendererCapability: extensionDirectory =>
+          zhiyuanEnterpriseRendererBridge.createScopedCapability(extensionDirectory),
+        createSettingsCapability: extensionDirectory =>
+          zhiyuanEnterpriseRendererBridge.createScopedSettingsCapability(extensionDirectory),
+      });
+      if (enterpriseExtension.extensionId) {
+        console.log(
+          `[EnterpriseExtension] Initialized ${enterpriseExtension.extensionId} with API version 1.`,
+        );
+      }
     }
 
     void getEngramManager()
@@ -218,7 +228,16 @@ export const initApp = async (): Promise<void> => {
     if (getBranding().features.enableAISphere) {
       try {
         const aisphereGateway = await startAISphereGateway();
-        await aisphereService.initialize(storageRuntime.store, aisphereGateway.baseUrl);
+        await aisphereService.initialize(storageRuntime.store, aisphereGateway.baseUrl, {
+          backgroundRefresh: isDefenseEdition(),
+          restrictedPlatform: isDefenseEdition()
+            ? {
+                inferenceOrigins: (process.env.ZHIYUAN_DEFENSE_AISPHERE_INFERENCE_ORIGINS ?? '')
+                  .split(',')
+                  .map(origin => origin.trim()),
+              }
+            : undefined,
+        });
         aisphereService.busy = () => Boolean(agentRuntime.piRuntimeAdapter?.hasRunningSessions());
         app.once('before-quit', () => {
           void aisphereGateway.close();
@@ -240,12 +259,14 @@ export const initApp = async (): Promise<void> => {
       .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
     refreshEndpointsTestMode(storageRuntime.store);
     storageRuntime.sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
-    await startCcConnectBridge().catch(error =>
-      console.error('[cc-connect] Failed to start local bridge:', error),
-    );
-    await reconcileCcConnectChannelSidecars().catch(error => {
-      console.error('[ChannelRuntime] Failed to start unified runtime:', error);
-    });
+    if (!isDefenseEdition()) {
+      await startCcConnectBridge().catch(error =>
+        console.error('[cc-connect] Failed to start local bridge:', error),
+      );
+      await reconcileCcConnectChannelSidecars().catch(error => {
+        console.error('[ChannelRuntime] Failed to start unified runtime:', error);
+      });
+    }
     const startSqliteBackupLoop = async (): Promise<void> => {
       if (!storageRuntime.sqliteBackupManager) return;
       await storageRuntime.sqliteBackupManager.startPeriodicBackupLoop(() =>
@@ -353,11 +374,12 @@ export const initApp = async (): Promise<void> => {
         `[CodingAgent] recovered ${recoveredCodingLanes} interrupted lane(s) after restart`,
       );
     }
-    void getCodingRoomService()
-      .registry.discoverExternalAgents()
-      .catch(error => {
-        console.warn('[CodingAgent] External ACP discovery failed:', error);
-      });
+    if (!isDefenseEdition())
+      void getCodingRoomService()
+        .registry.discoverExternalAgents()
+        .catch(error => {
+          console.warn('[CodingAgent] External ACP discovery failed:', error);
+        });
     registerMemoryIpcHandlers({
       getService: getProjectMemoryService,
       resolveSessionTitles: sessionIds =>
@@ -379,50 +401,52 @@ export const initApp = async (): Promise<void> => {
         void getPiRuntimeAdapter().resetImageInputCapabilities();
       }
     });
-    const localInferenceManager = getLlamaCppManager();
-    localInferenceManager.initializeModelsDir();
-    inferenceRuntime.llamaCppModelOrchestrator = registerLlamaCppIpcHandlers(
-      localInferenceManager,
-      {
+    if (!isDefenseEdition()) {
+      const localInferenceManager = getLlamaCppManager();
+      localInferenceManager.initializeModelsDir();
+      inferenceRuntime.llamaCppModelOrchestrator = registerLlamaCppIpcHandlers(
+        localInferenceManager,
+        {
+          getStore,
+          onModelBindingsChanged: async (url, models) => {
+            inferenceRuntime.managedMagpieBindings?.setGpuSnapshot(url, models);
+            if (inferenceRuntime.magpieManager?.status().state === 'running')
+              await inferenceRuntime.managedMagpieBindings?.synchronize();
+          },
+          onLanAccessChanged: async () => {
+            await inferenceRuntime.magpieManager?.onLanAccessChanged();
+          },
+          onLanAccessTokenRegenerated: async () => {
+            await inferenceRuntime.magpieManager?.onLanAccessTokenRegenerated();
+          },
+        },
+      );
+      // Warm the short-lived backend cache before the runtime settings dialog is opened.
+      void localInferenceManager.listBackends();
+      registerOllamaIpcHandlers(getOllamaManager(), {
         getStore,
-        onModelBindingsChanged: async (url, models) => {
-          inferenceRuntime.managedMagpieBindings?.setGpuSnapshot(url, models);
+        onModelBindingsChanged: async snapshot => {
+          inferenceRuntime.managedMagpieBindings?.setOllamaSnapshot(snapshot);
           if (inferenceRuntime.magpieManager?.status().state === 'running')
             await inferenceRuntime.managedMagpieBindings?.synchronize();
         },
-        onLanAccessChanged: async () => {
-          await inferenceRuntime.magpieManager?.onLanAccessChanged();
+      });
+      registerStrataIpcHandlers(getStrataManager(), {
+        getStore,
+        onModelBindingsChanged: async snapshot => {
+          inferenceRuntime.managedMagpieBindings?.setExpectedStrataPort(
+            getStrataManager().resolvePort(),
+          );
+          inferenceRuntime.managedMagpieBindings?.setStrataSnapshot(snapshot);
+          if (inferenceRuntime.magpieManager?.status().state === 'running')
+            await inferenceRuntime.managedMagpieBindings?.synchronize();
         },
-        onLanAccessTokenRegenerated: async () => {
-          await inferenceRuntime.magpieManager?.onLanAccessTokenRegenerated();
-        },
-      },
-    );
-    // Warm the short-lived backend cache before the runtime settings dialog is opened.
-    void localInferenceManager.listBackends();
-    registerOllamaIpcHandlers(getOllamaManager(), {
-      getStore,
-      onModelBindingsChanged: async snapshot => {
-        inferenceRuntime.managedMagpieBindings?.setOllamaSnapshot(snapshot);
-        if (inferenceRuntime.magpieManager?.status().state === 'running')
-          await inferenceRuntime.managedMagpieBindings?.synchronize();
-      },
-    });
-    registerStrataIpcHandlers(getStrataManager(), {
-      getStore,
-      onModelBindingsChanged: async snapshot => {
-        inferenceRuntime.managedMagpieBindings?.setExpectedStrataPort(
-          getStrataManager().resolvePort(),
-        );
-        inferenceRuntime.managedMagpieBindings?.setStrataSnapshot(snapshot);
-        if (inferenceRuntime.magpieManager?.status().state === 'running')
-          await inferenceRuntime.managedMagpieBindings?.synchronize();
-      },
-    });
-    registerMarketplaceIpcHandlers({
-      getModelsDir: () => getLlamaCppManager().getModelsDir(),
-      userDataPath: app.getPath('userData'),
-    });
+      });
+      registerMarketplaceIpcHandlers({
+        getModelsDir: () => getLlamaCppManager().getModelsDir(),
+        userDataPath: app.getPath('userData'),
+      });
+    }
     // Remove the stored GitHub OAuth token from the retired in-app Copilot
     // device-flow sign-in; subscription sign-in now goes through the model gateway.
     cleanupLegacyCopilotStoredToken(getStore());
@@ -430,7 +454,7 @@ export const initApp = async (): Promise<void> => {
     // Enterprise config sync must run before agent services initialize.
     profiler.mark('enterpriseConfigSync');
     // so enterprise data is in SQLite when the config is generated.
-    const enterpriseConfigPath = resolveEnterpriseConfigPath();
+    const enterpriseConfigPath = isDefenseEdition() ? null : resolveEnterpriseConfigPath();
     if (enterpriseConfigPath) {
       try {
         const mcpStoreInstance = getMcpStore();
@@ -505,7 +529,7 @@ export const initApp = async (): Promise<void> => {
 
     profiler.mark('applyProxyPreference');
     const appConfig = getStore().get<AppConfigSettings>('app_config');
-    await applyProxyPreference(getUseSystemProxyFromConfig(appConfig));
+    await applyProxyPreference(!isDefenseEdition() && getUseSystemProxyFromConfig(appConfig));
     profiler.measure('applyProxyPreference');
     if (getStore().get<boolean>('magpie_service_enabled') === true) {
       await inferenceRuntime.magpieManager?.ensureRunning().catch(error => {
@@ -544,7 +568,7 @@ export const initApp = async (): Promise<void> => {
     createMainWindow();
     profiler.measure('createWindow');
     console.log('[Main] initApp: window created');
-    startAppUpdatePolling();
+    if (!isDefenseEdition()) startAppUpdatePolling();
 
     // ── Step 2-4: Skill bootstrap (non-blocking) ────────────────────
     console.log('[Main] initApp: starting skill bootstrap');
@@ -611,9 +635,7 @@ export const initApp = async (): Promise<void> => {
     // memory-leak scenario intentionally omits optional services so a fresh
     // isolated profile cannot block the Electron first-window check while
     // synchronously repairing web-search dependencies.
-    if (process.env.ZHIYUAN_MEMORY_LEAK_TEST === '1') {
-      console.log('[Main] initApp: skipping optional skill services for memory leak test');
-    } else {
+    if (!isDefenseEdition() && process.env.ZHIYUAN_MEMORY_LEAK_TEST !== '1') {
       try {
         const skillServices = getSkillServiceManager();
         console.log('[Main] initApp: getSkillServiceManager done');
@@ -639,15 +661,15 @@ export const initApp = async (): Promise<void> => {
     // Windows/Linux cold start: parse deep link from process.argv
     // Always buffer since renderer is not ready yet after createWindow()
     const coldStartDeepLink = process.argv.find(arg => arg.startsWith('zhiyuan://'));
-    if (coldStartDeepLink) {
+    if (!isDefenseEdition() && coldStartDeepLink) {
       handleDeepLink(coldStartDeepLink);
     }
 
     powerMonitor.on('resume', () => {
       projectMemoryService.resumeOutboxDrain();
       if (
-        Date.now() - lifecycleRuntime.lastSuccessfulAppUpdateCheckAt >=
-        APP_UPDATE_POLL_INTERVAL_MS
+        !isDefenseEdition() &&
+        Date.now() - lifecycleRuntime.lastSuccessfulAppUpdateCheckAt >= APP_UPDATE_POLL_INTERVAL_MS
       ) {
         checkForAppUpdate();
       }
@@ -695,7 +717,7 @@ export const initApp = async (): Promise<void> => {
         console.log(
           `[Proxy] system proxy preference changed from ${previousUseSystemProxy} to ${currentUseSystemProxy}`,
         );
-        void applyProxyPreference(currentUseSystemProxy);
+        if (!isDefenseEdition()) void applyProxyPreference(currentUseSystemProxy);
       }
       lastUseSystemProxy = currentUseSystemProxy;
 

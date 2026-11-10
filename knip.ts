@@ -48,6 +48,7 @@ const config: KnipConfig = {
         'scripts/write-windows-dev-shortcut.cjs',
         'scripts/prepare-visual-blind-review.mjs',
         'scripts/ci/validate-docx-smoke.mjs',
+        'scripts/ci/windows-defense-python-smoke.cjs',
         'scripts/ci/verify-packaged-acp-resources.mjs',
         // Invoked by the shared composite Windows acceptance action.
         'scripts/ci/verify-packaged-app-version.mjs',

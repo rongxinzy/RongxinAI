@@ -6,6 +6,8 @@ import type {
   QuickActionsI18n,
 } from '../types/quickAction';
 import { i18nService } from './i18n';
+import { isDefenseEdition } from '../../shared/branding';
+import { isDefenseQuickActionSkill } from '../../shared/skills/constants';
 
 const CONFIG_PATH = './quick-actions.json';
 const I18N_PATH = './quick-actions-i18n.json';
@@ -37,6 +39,13 @@ export class QuickActionService {
       }
       const data = await response.json();
       this.config = data as QuickActionsConfig;
+      if (isDefenseEdition()) {
+        this.config.actions = this.config.actions.filter(action =>
+          (action.skillIds?.length ? action.skillIds : [action.skillMapping]).every(
+            isDefenseQuickActionSkill,
+          ),
+        );
+      }
       return this.config;
     } catch (error) {
       console.error('Failed to load quick actions config:', error);

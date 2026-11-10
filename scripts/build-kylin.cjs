@@ -2,6 +2,7 @@
 
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { defenseEdition } = require('./packaging/defense-edition.cjs');
 
 const projectRoot = path.resolve(__dirname, '..');
 
@@ -28,41 +29,76 @@ function runStep(run, command, args, options = {}) {
   }
 }
 
-function buildKylin({ run = defaultRun, platform = process.platform, arch = process.arch } = {}) {
+function buildKylin({
+  run = defaultRun,
+  platform = process.platform,
+  arch = process.arch,
+  defense = false,
+} = {}) {
   if (platform !== 'linux' || arch !== 'x64') {
     throw new Error(`Kylin V11 packages require a linux-x64 host, got ${platform}-${arch}`);
   }
 
-  const steps = [
-    ['bun', ['run', 'channel:runtime:linux-x64']],
-    ['bun', ['run', 'engram:runtime:linux-x64']],
-    ['node', ['scripts/ensure-build-version.js']],
-    ['bun', ['run', 'sync:vendor-llamacpp-cpu']],
-    ['bun', ['run', 'prepare:inference-edition-runtime']],
-    ['bun', ['run', 'build']],
-    ['bun', ['run', 'build:skills']],
-    ['bun', ['run', 'rebuild:electron-native:linux-packaging']],
-    [
-      'bunx',
-      [
-        'electron-builder',
-        '--linux',
-        'rpm',
-        '--x64',
-        '--config',
-        'electron-builder.kylin.cjs',
-        '--publish',
-        'never',
-      ],
-    ],
-  ];
+  const steps = defense
+    ? [
+        ['bun', ['run', 'engram:runtime:linux-x64']],
+        ['node', ['scripts/ensure-build-version.js']],
+        ['bun', ['run', 'build']],
+        ['node', ['scripts/build-docx-runtime.cjs', '--required', '--linux-x64']],
+        ['bun', ['run', 'rebuild:electron-native:linux-packaging']],
+        [
+          'bunx',
+          [
+            'electron-builder',
+            '--linux',
+            'rpm',
+            '--x64',
+            '--config',
+            'electron-builder.defense-kylin.cjs',
+            '--publish',
+            'never',
+          ],
+        ],
+      ]
+    : [
+        ['bun', ['run', 'channel:runtime:linux-x64']],
+        ['bun', ['run', 'engram:runtime:linux-x64']],
+        ['node', ['scripts/ensure-build-version.js']],
+        ['bun', ['run', 'sync:vendor-llamacpp-cpu']],
+        ['bun', ['run', 'prepare:inference-edition-runtime']],
+        ['bun', ['run', 'build']],
+        ['bun', ['run', 'build:skills']],
+        ['bun', ['run', 'rebuild:electron-native:linux-packaging']],
+        [
+          'bunx',
+          [
+            'electron-builder',
+            '--linux',
+            'rpm',
+            '--x64',
+            '--config',
+            'electron-builder.kylin.cjs',
+            '--publish',
+            'never',
+          ],
+        ],
+      ];
 
-  for (const [command, args] of steps) runStep(run, command, args);
+  const options = defense
+    ? {
+        env: {
+          APP_EDITION: defenseEdition,
+          ZHIYUAN_UPDATE_VARIANT: 'lite',
+          CERTUM_CERT_THUMBPRINT: '',
+        },
+      }
+    : undefined;
+  for (const [command, args] of steps) runStep(run, command, args, options);
 }
 
 if (require.main === module) {
   try {
-    buildKylin();
+    buildKylin({ defense: process.argv.includes('--defense') });
   } catch (error) {
     console.error(`[kylin-build] ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;

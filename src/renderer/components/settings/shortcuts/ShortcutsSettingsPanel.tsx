@@ -11,6 +11,7 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 
 import { COMPANION_SHORTCUT } from '../../../../shared/companion/constants';
+import { isDefenseEdition } from '../../../../shared/branding';
 import type { AppConfig } from '../../../config';
 import { i18nService } from '../../../services/i18n';
 import { formatShortcutLabel } from '../../../services/shortcutLabel';
@@ -164,23 +165,25 @@ export default function ShortcutsSettingsPanel({
 }: ShortcutsSettingsPanelProps) {
   return (
     <div className="flex flex-col gap-4">
-      <Field orientation="horizontal" className="!items-center">
-        <div className="flex flex-col">
-          <FieldLabel htmlFor="shortcut-companion">
-            {i18nService.t('companionShortcutLabel')}
-          </FieldLabel>
-          <FieldDescription id="shortcut-companion-description">
-            {i18nService.t('shortcutGlobal')}
-          </FieldDescription>
-        </div>
-        <Input
-          id="shortcut-companion"
-          aria-describedby="shortcut-companion-description"
-          readOnly
-          className="w-36"
-          value={formatShortcutLabel(COMPANION_SHORTCUT, isMacPlatform)}
-        />
-      </Field>
+      {!isDefenseEdition() && (
+        <Field orientation="horizontal" className="!items-center">
+          <div className="flex flex-col">
+            <FieldLabel htmlFor="shortcut-companion">
+              {i18nService.t('companionShortcutLabel')}
+            </FieldLabel>
+            <FieldDescription id="shortcut-companion-description">
+              {i18nService.t('shortcutGlobal')}
+            </FieldDescription>
+          </div>
+          <Input
+            id="shortcut-companion"
+            aria-describedby="shortcut-companion-description"
+            readOnly
+            className="w-36"
+            value={formatShortcutLabel(COMPANION_SHORTCUT, isMacPlatform)}
+          />
+        </Field>
+      )}
       <FieldGroup className="gap-4">
         <Field orientation="horizontal" className="!items-center">
           <FieldLabel htmlFor="shortcut-new-chat">{i18nService.t('newChat')}</FieldLabel>

@@ -2,6 +2,7 @@ import { runCommandCapture } from '../../skills/processRunner';
 import { app } from 'electron';
 import { existsSync } from 'fs';
 import { delimiter, join } from 'path';
+import { isDefenseEdition } from '../../../shared/branding';
 
 import { applyManagedPythonEnv } from '../managedPythonEnv';
 import { getFeishuCliBinDirectory } from '../feishuConnectorPaths';
@@ -69,7 +70,7 @@ export async function applyApplicationRuntimeEnv(
     env.ZHIYUAN_ELECTRON_PATH = electronNodeRuntimePath;
   }
 
-  if (includePackageMirrors) {
+  if (includePackageMirrors && !isDefenseEdition()) {
     applyDomesticPackageMirrorDefaults(env);
   }
 

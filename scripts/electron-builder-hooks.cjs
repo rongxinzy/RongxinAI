@@ -22,6 +22,12 @@ const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-pyt
 const { configureMagpieResources } = require('./magpie-runtime.cjs');
 const { verifyPackagedDeliverables } = require('./packaging/verify-packaged-runtimes.cjs');
 const {
+  defenseEdition,
+  isDefensePackage,
+  prepareDefenseSkills,
+  configureDefenseResources,
+} = require('./packaging/defense-edition.cjs');
+const {
   ensurePortableUvRuntime,
   checkRuntimeHealth: checkUvRuntimeHealth,
 } = require('./setup-uv-runtime.js');
@@ -434,7 +440,8 @@ function configureInferenceEditionPublishUrls(context) {
   const platformName = context?.electronPlatformName;
   if (!platformName) return;
 
-  if (process.env.ZHIYUAN_DISTRIBUTION === 'kylin-v11') {
+  const kylin = process.env.ZHIYUAN_DISTRIBUTION === 'kylin-v11';
+  if (isDefensePackage(context) || kylin) {
     for (const section of [
       context.packager.config,
       context.packager.config.mac,
@@ -443,7 +450,11 @@ function configureInferenceEditionPublishUrls(context) {
     ]) {
       if (section && typeof section === 'object') section.publish = [];
     }
-    console.log('[electron-builder-hooks] Kylin V11 package: auto-update metadata disabled.');
+    console.log(
+      kylin
+        ? '[electron-builder-hooks] Kylin V11 package: auto-update metadata disabled.'
+        : '[electron-builder-hooks] Defense package: auto-update metadata disabled.',
+    );
     return;
   }
 
@@ -545,14 +556,30 @@ function configureInferenceEditionResources(context) {
 }
 
 async function beforePack(context) {
-  assertModelCatalog(path.join(__dirname, '..', 'resources', 'model-catalog.sqlite'));
-  configureMagpieResources(context);
+  const defense = isDefensePackage(context);
+  if (defense) {
+    const kylin = isLinuxTarget(context) && process.env.ZHIYUAN_DISTRIBUTION === 'kylin-v11';
+    if ((!isWindowsTarget(context) && !kylin) || resolveTargetArch(context) !== 'x64') {
+      throw new Error('Defense packaging requires Windows x64 or Kylin V11 x64.');
+    }
+    if (
+      process.env.APP_EDITION !== defenseEdition ||
+      process.env.ZHIYUAN_UPDATE_VARIANT !== 'lite'
+    ) {
+      throw new Error('Build with make dist-win-defense or make dist-kylin-defense.');
+    }
+  } else {
+    assertModelCatalog(path.join(__dirname, '..', 'resources', 'model-catalog.sqlite'));
+    configureMagpieResources(context);
+  }
   configureMacAutoUpdateMetadata(context);
   configureInferenceEditionPublishUrls(context);
   configureInferenceEditionResources(context);
-  ensureBundledChannelRuntime(context);
-  // Install skill dependencies first (for all platforms)
-  installSkillDependencies();
+  if (!defense) {
+    ensureBundledChannelRuntime(context);
+    installSkillDependencies();
+  }
+  const defenseSkillsRoot = defense ? prepareDefenseSkills(context.packager.projectDir) : undefined;
 
   if (isWindowsTarget(context)) {
     console.log(
@@ -644,13 +671,16 @@ async function beforePack(context) {
       platform: targetPlatform,
       arch: targetArch,
       required: true,
+      ...(defense && { defense: true, skillsRoot: defenseSkillsRoot }),
     });
     console.log(
       `[electron-builder-hooks] Bundled Python environments ready: ${skillPythonResult.environments.length}`,
     );
   }
 
-  if (isWindowsTarget(context)) {
+  if (defense) {
+    configureDefenseResources(context, defenseSkillsRoot);
+  } else if (isWindowsTarget(context)) {
     // The installer remains fully offline, while each non-llama.cpp component
     // gets an independent content ID so upgrades expand only changed pieces.
     const projectRoot = path.join(__dirname, '..');
@@ -736,15 +766,19 @@ async function beforePack(context) {
 }
 
 async function afterPack(context) {
-  const resourcesDir = isMacTarget(context)
-    ? path.join(
-        context.appOutDir,
-        `${context.packager.appInfo.productFilename}.app`,
-        'Contents',
-        'Resources',
-      )
-    : path.join(context.appOutDir, 'resources');
-  assertModelCatalog(path.join(resourcesDir, 'model-catalog.sqlite'));
+  if (isDefensePackage(context)) {
+    if (isWindowsTarget(context)) verifyPackagedPortableGitRuntimeDirs(context.appOutDir);
+  } else {
+    const resourcesDir = isMacTarget(context)
+      ? path.join(
+          context.appOutDir,
+          `${context.packager.appInfo.productFilename}.app`,
+          'Contents',
+          'Resources',
+        )
+      : path.join(context.appOutDir, 'resources');
+    assertModelCatalog(path.join(resourcesDir, 'model-catalog.sqlite'));
+  }
   verifyPackagedDeliverables(context);
   assertPackagedApp({
     projectRoot: path.join(__dirname, '..'),
