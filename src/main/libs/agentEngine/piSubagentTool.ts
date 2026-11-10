@@ -20,6 +20,7 @@
 import * as fs from 'fs';
 import path from 'path';
 
+import { safeSlice } from '../../../shared/lib/safeSlice';
 import { CoreSkillId } from '../../../shared/skills/constants';
 import {
   PiSubagentProfileId,
@@ -52,6 +53,9 @@ const MEMBER_FILE_SEPARATOR = '--';
 
 /** Placeholder replaced with the previous step's output in chain mode. */
 const CHAIN_PREVIOUS_PLACEHOLDER = '{previous}';
+
+/** Maximum characters returned by subagent execution to prevent context overflow (clamped to 30,000 for CJK token safety). */
+export const PI_SUBAGENT_MAX_OUTPUT_CHARS = 30_000;
 
 // ── Types ──
 
@@ -418,10 +422,20 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
   const availableAgentIds = profiles.map(profile => profile.id).join(', ');
   const agentList = profiles.map(profile => `  - ${profile.id}: ${profile.description}`).join('\n');
 
-  const textResult = (text: string, details: Record<string, unknown> = {}): SubagentToolResult => ({
-    content: [{ type: 'text', text }],
-    details,
-  });
+  const textResult = (text: string, details: Record<string, unknown> = {}): SubagentToolResult => {
+    if (text.length > PI_SUBAGENT_MAX_OUTPUT_CHARS) {
+      const sliced = safeSlice(text, PI_SUBAGENT_MAX_OUTPUT_CHARS);
+      const notice = `\n\n[Subagent output truncated to ${PI_SUBAGENT_MAX_OUTPUT_CHARS.toLocaleString()} characters (total: ${text.length.toLocaleString()} characters)]`;
+      return {
+        content: [{ type: 'text', text: `${sliced}${notice}` }],
+        details: { ...details, truncated: true },
+      };
+    }
+    return {
+      content: [{ type: 'text', text }],
+      details,
+    };
+  };
 
   const unknownAgentMessage = (agentId: string): string =>
     `Unknown agent "${agentId}". Available agents: ${availableAgentIds}`;

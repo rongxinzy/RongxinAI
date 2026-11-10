@@ -100,3 +100,46 @@ test('publishes the harness document-reading policy', () => {
   expect(PiDocumentReaderSystemPrompt).toContain('read_document');
   expect(PiDocumentReaderSystemPrompt).toContain('local OCR');
 });
+
+test('truncates documents exceeding PI_DOCUMENT_READER_MAX_CHARS', async () => {
+  const root = createRoot();
+  const oversizedText = 'A'.repeat(90_000);
+  await writeDocxFixture(path.join(root, 'large.docx'), oversizedText);
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root }) as {
+    execute: (
+      id: string,
+      params: { path: string },
+    ) => Promise<{
+      content: Array<{ text: string }>;
+      details: { truncated: boolean; markdownCharacters: number };
+    }>;
+  };
+
+  const result = await tool.execute('tool-1', { path: 'large.docx' });
+
+  expect(result.details.truncated).toBe(true);
+  expect(result.details.markdownCharacters).toBeGreaterThanOrEqual(90_000);
+  expect(result.content[0]?.text).toContain('Output truncated to 30,000 characters');
+  expect(result.content[0]?.text).toContain(
+    `read ${result.details.markdownCharacters.toLocaleString()} characters`,
+  );
+});
+
+test('safely truncates documents with astral plane surrogates at boundary', async () => {
+  const root = createRoot();
+  const boundaryText = 'B'.repeat(29_999) + '🚀tail';
+  await writeDocxFixture(path.join(root, 'boundary.docx'), boundaryText);
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root }) as {
+    execute: (
+      id: string,
+      params: { path: string },
+    ) => Promise<{
+      content: Array<{ text: string }>;
+      details: { truncated: boolean };
+    }>;
+  };
+
+  const result = await tool.execute('tool-1', { path: 'boundary.docx' });
+  expect(result.details.truncated).toBe(true);
+  expect(result.content[0]?.text).toContain('Output truncated to 30,000 characters');
+});

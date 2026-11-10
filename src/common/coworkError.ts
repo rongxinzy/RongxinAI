@@ -73,6 +73,8 @@ export interface CoworkError {
   message: string;
   /** HTTP status code, if available */
   statusCode?: number;
+  /** HTTP status code alias */
+  status?: number;
   /** Suggested retry delay in milliseconds (e.g. from Retry-After header) */
   retryAfterMs?: number;
   /** Provider that returned the error (e.g. 'anthropic', 'deepseek') */
@@ -128,8 +130,12 @@ const RULES: ErrorRule[] = [
   {
     kind: CoworkErrorKind.InputTooLong,
     pattern:
-      /input.*too.*long|context.*length.*exceeded|range of input length|\b413\b|payload.*too.*large|request.*entity.*too.*large|max[_\s]tokens/i,
-    extract: () => ({ statusCode: 413 }),
+      /input.*too.*long|prompt.*too.*long|context.*length.*exceeded|range of input length|\b413\b|payload.*too.*large|request.*entity.*too.*large|max[_\s]tokens|exceed.*context|context.*(?:size|window|limit|length).*exceed|exceed_context_size_error|context_overflow|maximum context length|is longer than the model'?s context length|prompt token.*exceed|token.*limit.*exceed|exceed.*token.*limit|reduce the length of the messages|prompt exceeds max length|larger than the maximum context length|超出.*(?:上下文|长度)|(?:上下文|输入).*(?:超限|过长|超出)|model requires context size/i,
+    extract: (error: string) => {
+      const m = error.match(/\b(400|413)\b/);
+      const code = m ? parseInt(m[1], 10) : 400;
+      return { statusCode: code, status: code };
+    },
   },
 
   // ── Model not found ─────────────────────────────────────────────────────
@@ -271,11 +277,14 @@ export function classifyCoworkError(rawError: string): CoworkError {
   // Find first matching rule
   for (const rule of RULES) {
     if (rule.pattern.test(rawError)) {
+      const extracted = rule.extract ? rule.extract(rawError) : {};
+      const statusCode = extracted.statusCode ?? extracted.status;
       return {
         kind: rule.kind,
         message: rawError,
         raw: rawError,
-        ...(rule.extract ? rule.extract(rawError) : {}),
+        ...extracted,
+        ...(statusCode !== undefined ? { statusCode, status: statusCode } : {}),
       };
     }
   }
@@ -297,7 +306,13 @@ export function makeCoworkError(
   message: string,
   extra?: Partial<CoworkError>,
 ): CoworkError {
-  return { kind, message, ...extra };
+  const statusCode = extra?.statusCode ?? extra?.status;
+  return {
+    kind,
+    message,
+    ...extra,
+    ...(statusCode !== undefined ? { statusCode, status: statusCode } : {}),
+  };
 }
 
 // ─── Log Level ──────────────────────────────────────────────────────────────

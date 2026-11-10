@@ -2,6 +2,7 @@ import * as fs from 'fs';
 
 import { formatFromPath, toMarkdown } from '@firecrawl/anydoc';
 
+import { safeSlice } from '../../../shared/lib/safeSlice';
 import { resolveWorkspaceFile } from '../../workbenchTask/artifactCollector';
 import { isOcrSupported } from '../../ocr/ocrEngine';
 import { ocrPdf } from '../../ocr/pdfOcr';
@@ -17,7 +18,9 @@ export const PiDocumentReaderSystemPrompt = [
 ].join('\n');
 
 const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
-const MAX_MARKDOWN_CHARS = 1_000_000;
+// Lowered to 30,000 characters to match other tools and protect 64k models in CJK workflows
+export const PI_DOCUMENT_READER_MAX_CHARS = 30_000;
+const MAX_MARKDOWN_CHARS = PI_DOCUMENT_READER_MAX_CHARS;
 /** Below this many non-whitespace characters a PDF is treated as image-only. */
 const SCANNED_PDF_TEXT_THRESHOLD = 80;
 
@@ -111,13 +114,18 @@ export function buildPiDocumentReaderTool(options: {
               .join('\n\n');
             if (body.replace(/\s+/g, '').length > 0) {
               const truncated = body.length > MAX_MARKDOWN_CHARS;
-              const output = truncated ? body.slice(0, MAX_MARKDOWN_CHARS) : body;
+              const output = truncated ? safeSlice(body, MAX_MARKDOWN_CHARS) : body;
               const header = [
                 `Document: ${requestedPath}`,
                 'Format: PDF (scanned; text extracted with local OCR)',
                 `Pages: ${ocr.renderedCount}/${ocr.pageCount}${ocr.truncated ? ' (page limit reached)' : ''}`,
+                truncated
+                  ? `Output truncated to ${MAX_MARKDOWN_CHARS.toLocaleString()} characters (read ${body.length.toLocaleString()} characters); use a more focused file or split the document.`
+                  : '',
                 '',
-              ].join('\n');
+              ]
+                .filter(Boolean)
+                .join('\n');
               return {
                 content: [{ type: 'text', text: `${header}\n${output}` }],
                 details: {
@@ -139,13 +147,13 @@ export function buildPiDocumentReaderTool(options: {
           }
         }
         const truncated = markdown.length > MAX_MARKDOWN_CHARS;
-        const output = truncated ? markdown.slice(0, MAX_MARKDOWN_CHARS) : markdown;
+        const output = truncated ? safeSlice(markdown, MAX_MARKDOWN_CHARS) : markdown;
         const header = [
           `Document: ${requestedPath}`,
           `Format: ${format ?? 'auto-detected from document bytes'}`,
           `Local conversion: AnyDoc`,
           truncated
-            ? `Output truncated to ${MAX_MARKDOWN_CHARS.toLocaleString()} characters; use a more focused file or split the document.`
+            ? `Output truncated to ${MAX_MARKDOWN_CHARS.toLocaleString()} characters (read ${markdown.length.toLocaleString()} characters); use a more focused file or split the document.`
             : '',
           '',
         ]

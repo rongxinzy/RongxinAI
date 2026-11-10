@@ -492,5 +492,37 @@ describe('buildPiSubagentTool', () => {
       expect(result.content[0].text).toContain('Chain stopped at step 1 (scout)');
       expect(hoisted.mockCreateAgentSession).toHaveBeenCalledTimes(1);
     });
+
+    it('truncates oversized subagent output beyond PI_SUBAGENT_MAX_OUTPUT_CHARS', async () => {
+      const oversized = 'y'.repeat(60_000);
+      hoisted.mockCreateAgentSession.mockResolvedValueOnce({
+        session: createAutoSession(oversized),
+      });
+
+      const { tool } = buildTool();
+      const result = await tool.execute('call-1', { agent: 'scout', task: 'big task' });
+
+      expect((result.details as { truncated?: boolean }).truncated).toBe(true);
+      expect(result.content[0].text).toContain(
+        '[Subagent output truncated to 30,000 characters (total: 60,000 characters)]',
+      );
+    });
+
+    it('safely slices without trailing high surrogate when output is truncated', async () => {
+      // 29,999 'z's + '🚀' (2 units) + 'rest'
+      const boundaryText = 'z'.repeat(29_999) + '🚀rest';
+      hoisted.mockCreateAgentSession.mockResolvedValueOnce({
+        session: createAutoSession(boundaryText),
+      });
+
+      const { tool } = buildTool();
+      const result = await tool.execute('call-1', { agent: 'scout', task: 'emoji task' });
+
+      expect((result.details as { truncated?: boolean }).truncated).toBe(true);
+      expect(result.content[0].text.startsWith('z'.repeat(29_999))).toBe(true);
+      expect(result.content[0].text).toContain(
+        `[Subagent output truncated to 30,000 characters (total: ${boundaryText.length.toLocaleString()} characters)]`,
+      );
+    });
   });
 });

@@ -324,7 +324,7 @@ export class PiAssistantTranscript {
     }
     for (const entry of entries) {
       if (finalize && this.finalizedMessageIds.has(entry.messageId)) continue;
-      const content = this.resolveStreamedContent(entry.messageId, active, entry.kind);
+      let content = this.resolveStreamedContent(entry.messageId, active, entry.kind);
       const streamingMetadata =
         entry.kind === 'thinking'
           ? { isStreaming: true, isFinal: false, isThinking: true }
@@ -359,26 +359,33 @@ export class PiAssistantTranscript {
       if (entry.kind === 'answer' && !content.trim()) {
         const resolved = this.resolveStreamedContent(entry.messageId, active, 'answer');
         if (!resolved.trim()) {
-          this.removeEmptyAnswerPlaceholder(sessionId, entry.messageId, active);
-          if (active.assistantMessageId === entry.messageId) {
-            active.assistantMessageId = null;
-          }
-          // A placeholder row that survives (it holds streamed text) must
-          // still get the final metadata so later loads stop treating it as
-          // streaming; a removed row makes this write a no-op.
-          if (this.host.getStore()) {
-            this.host
-              .getStore()
-              .updateMessage(
-                sessionId,
-                entry.messageId,
-                { content, metadata },
-                { touchUpdatedAt: false },
-              );
+          if (active.thinkingMessageId && active.lastAssistantMessage?.stopReason === 'length') {
+            const notice =
+              '[模型推理达到输出限制 (max_tokens)，未能生成正文回复。请调大最大输出 tokens 或降低思考强度。]';
+            this.streamInto(sessionId, active, 'answer', notice);
+            content = notice;
+          } else {
+            this.removeEmptyAnswerPlaceholder(sessionId, entry.messageId, active);
+            if (active.assistantMessageId === entry.messageId) {
+              active.assistantMessageId = null;
+            }
+            // A placeholder row that survives (it holds streamed text) must
+            // still get the final metadata so later loads stop treating it as
+            // streaming; a removed row makes this write a no-op.
+            if (this.host.getStore()) {
+              this.host
+                .getStore()
+                .updateMessage(
+                  sessionId,
+                  entry.messageId,
+                  { content, metadata },
+                  { touchUpdatedAt: false },
+                );
+            }
+            this.clearThrottleMapsForMessage(entry.messageId);
+            continue;
           }
         }
-        this.clearThrottleMapsForMessage(entry.messageId);
-        continue;
       }
       this.clearThrottleMapsForMessage(entry.messageId);
       if (!this.host.getStore()) continue;

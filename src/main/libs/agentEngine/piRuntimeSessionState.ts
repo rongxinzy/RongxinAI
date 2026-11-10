@@ -160,6 +160,8 @@ export interface ActivePiSession {
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
   lastCompletedAnswerText: string;
+  /** Latest assistant message payload from Pi, including stopReason. */
+  lastAssistantMessage?: PiEvent['message'];
   /**
    * Set once a settled turn's error was shown, preventing duplicate reporting.
    */

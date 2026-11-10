@@ -1,4 +1,5 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 import type {
@@ -641,6 +642,8 @@ export class LlamaCppManager extends LlamaCppManagerService {
     const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
     const runtimeConfig = applyAutomaticLlamaCppServiceDefaults(this.getServiceConfig(), {
       nvidiaSnapshot,
+      platform: process.platform,
+      totalMemoryMiB: Math.floor(os.totalmem() / (1024 * 1024)),
     });
     return normalizePositiveInteger(runtimeConfig.ctxSize);
   }

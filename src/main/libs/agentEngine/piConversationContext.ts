@@ -1,4 +1,5 @@
 import type { CoworkMessage } from '../../coworkStore';
+import { safeSlice } from '../../../shared/lib/safeSlice';
 import { formatConversationAttachments } from './piConversationAttachments';
 
 const PiConversationContextLimit = {
@@ -22,12 +23,17 @@ export const calculatePiConversationHistoryCharLimit = (
     Number.isFinite(maxOutputTokens) && (maxOutputTokens ?? 0) > 0
       ? maxOutputTokens!
       : PiConversationContextLimit.DefaultMaxOutputTokens;
-  const availableTokens = Math.max(
-    1,
-    contextWindow - outputTokens - PiConversationContextLimit.ReservedPromptTokens,
+  const reservedPromptTokens = Math.min(
+    PiConversationContextLimit.ReservedPromptTokens,
+    Math.floor(contextWindow * 0.25),
+  );
+  const availableTokens = Math.max(1, contextWindow - outputTokens - reservedPromptTokens);
+  const totalCharsLimit = Math.max(
+    PiConversationContextLimit.TotalChars,
+    Math.floor(contextWindow * 2),
   );
   return Math.min(
-    PiConversationContextLimit.TotalChars,
+    totalCharsLimit,
     Math.max(2_000, Math.floor(availableTokens * PiConversationContextLimit.CharsPerToken)),
   );
 };
@@ -39,7 +45,7 @@ const truncateEntry = (
   const normalized = value.trim();
   if (normalized.length <= maxChars) return normalized;
   const suffix = '\n[truncated]';
-  return `${normalized.slice(0, Math.max(0, maxChars - suffix.length))}${suffix}`;
+  return `${safeSlice(normalized, Math.max(0, maxChars - suffix.length))}${suffix}`;
 };
 
 const formatHistoryMessage = (
@@ -75,10 +81,10 @@ const formatHistoryMessage = (
 };
 
 const resolveHistoryBudget = (maxChars?: number): { totalChars: number; entryBudget: number } => {
-  const totalChars = Math.min(
-    PiConversationContextLimit.TotalChars,
-    Math.max(2_000, Math.floor(maxChars ?? PiConversationContextLimit.TotalChars)),
-  );
+  const totalChars =
+    typeof maxChars === 'number' && Number.isFinite(maxChars) && maxChars > 0
+      ? Math.max(2_000, Math.floor(maxChars))
+      : PiConversationContextLimit.TotalChars;
   // Reserve space for several messages even when one tool observation is huge.
   const entryBudget = Math.min(PiConversationContextLimit.EntryChars, Math.floor(totalChars / 4));
   return { totalChars, entryBudget };

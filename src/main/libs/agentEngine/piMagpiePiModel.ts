@@ -77,7 +77,8 @@ export function buildMagpiePiModel(
       )
     : undefined;
   const contextWindow = selected.context_window ?? 32768;
-  const maxTokens = Math.min(selected.max_output_tokens ?? 4096, contextWindow);
+  const defaultOutputTokens = selected.reasoning === true ? 8192 : 4096;
+  const maxTokens = Math.min(selected.max_output_tokens ?? defaultOutputTokens, contextWindow);
   const baseUrl = api === 'anthropic-messages' ? url.origin : `${url.origin}/v1`;
   const imageInput = magpieImageInput(selected);
   const supportsImage = imageInput === ModelCapabilityStatus.Supported;

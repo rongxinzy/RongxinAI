@@ -111,4 +111,40 @@ describe('McpPiAdapter', () => {
     expect(result.content[0].text).toContain('archive: unavailable, 0 tool(s)');
     expect(result.content[0].text).toContain('Authentication required');
   });
+
+  it('truncates oversized tool output to MCP_MAX_OUTPUT_CHARS', async () => {
+    const manager = createManager();
+    const oversized = 'x'.repeat(70_000);
+    vi.mocked(manager.callTool).mockResolvedValueOnce({
+      content: [{ type: 'text', text: oversized }],
+      isError: false,
+    });
+    const tool = getGateway(manager);
+
+    const result = await tool.execute('call', { tool: 'list_events' });
+
+    expect((result.details as { truncated?: boolean }).truncated).toBe(true);
+    expect(result.content[0].text).toContain(
+      '[MCP tool output truncated to 30,000 characters (total: 70,000 characters)]',
+    );
+  });
+
+  it('safely truncates without leaving dangling high surrogates at boundary', async () => {
+    const manager = createManager();
+    // 29,999 'a's followed by '🚀' (2 code units) -> total 30,001 chars
+    const boundarySurrogate = 'a'.repeat(29_999) + '🚀extra';
+    vi.mocked(manager.callTool).mockResolvedValueOnce({
+      content: [{ type: 'text', text: boundarySurrogate }],
+      isError: false,
+    });
+    const tool = getGateway(manager);
+
+    const result = await tool.execute('call', { tool: 'list_events' });
+    expect((result.details as { truncated?: boolean }).truncated).toBe(true);
+    // Boundary cut should drop the high surrogate, so prefix is 29,999 'a's
+    expect(result.content[0].text.startsWith('a'.repeat(29_999))).toBe(true);
+    expect(result.content[0].text).toContain(
+      `[MCP tool output truncated to 30,000 characters (total: ${boundarySurrogate.length.toLocaleString()} characters)]`,
+    );
+  });
 });

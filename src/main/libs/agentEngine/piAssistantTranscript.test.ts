@@ -514,4 +514,55 @@ describe('PiAssistantTranscript', () => {
       expect.objectContaining({ isStreaming: false, isFinal: true }),
     );
   });
+
+  it('provides an informative notice when CoT reasoning exhausts max_tokens with empty answer', () => {
+    const updateMessage = vi.fn();
+    const emitMessageUpdate = vi.fn();
+    const row = {
+      id: 'answer-empty-1',
+      type: 'assistant' as const,
+      content: '',
+      metadata: { isStreaming: true },
+    };
+    const active = baseActive();
+    active.assistantMessageId = row.id;
+    active.thinkingMessageId = 'thinking-1';
+    active.lastAssistantMessage = {
+      role: 'assistant',
+      content: [{ type: 'thinking', thinking: 'Deep thoughts...' }],
+      stopReason: 'length',
+    };
+
+    const local = new PiAssistantTranscript({
+      getStore: () =>
+        ({
+          getMessage: (_sessionId: string, messageId: string) =>
+            messageId === row.id ? row : null,
+          updateMessage,
+          deleteMessage: vi.fn(),
+        }) as never,
+      emitMessage: vi.fn(),
+      emitMessageUpdate,
+      emitMessageRemoved: vi.fn(),
+      hasStreamingTextSubscribers: () => true,
+      getActiveSession: () => active,
+    });
+
+    local.closeIdlePlaceholders('session', active, { finalize: true });
+
+    expect(updateMessage).toHaveBeenCalledWith(
+      'session',
+      row.id,
+      expect.objectContaining({
+        content: expect.stringContaining('模型推理达到输出限制 (max_tokens)'),
+      }),
+      expect.anything(),
+    );
+    expect(emitMessageUpdate).toHaveBeenCalledWith(
+      'session',
+      row.id,
+      expect.stringContaining('模型推理达到输出限制 (max_tokens)'),
+      expect.anything(),
+    );
+  });
 });
