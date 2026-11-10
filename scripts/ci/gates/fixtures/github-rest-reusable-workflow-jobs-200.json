@@ -1,0 +1,69 @@
+{
+  "_fixtureNote": "Recorded 2026-11-07 GET .../actions/runs/42247491102/jobs (release.yml reusable callers)",
+  "jobs": [
+    {
+      "conclusion": "success",
+      "id": 127993426253,
+      "name": "prepare-release",
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "id": 127993566304,
+      "name": "build-macos / plan-matrix",
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "failure",
+      "id": 127993566352,
+      "name": "build-windows / windows-release",
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "success",
+      "id": 127993566442,
+      "name": "build-linux / plan-matrix",
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "failure",
+      "id": 127993610194,
+      "name": "build-linux / build (linux, ubuntu-latest, linux-cpu-build, linux-x64, cpu, linux-x64-cpu)",
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "failure",
+      "id": 127993610586,
+      "name": "build-linux / build (linux, ubuntu-latest, linux-cuda-build, linux-x64, cuda, linux-x64-cuda)",
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "failure",
+      "id": 127993612111,
+      "name": "build-macos / build (macos, macos-15-intel, macos-x64-cpu-build, mac-x64, x64, cpu, darwin-x64-cpu)",
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "failure",
+      "id": 127993612260,
+      "name": "build-macos / build (macos, macos-latest, macos-arm64-cpu-build, mac-arm64, arm64, cpu, darwin-arm64-cpu)",
+      "run_attempt": 1,
+      "status": "completed"
+    },
+    {
+      "conclusion": "skipped",
+      "id": 128005586716,
+      "name": "publish",
+      "run_attempt": 1,
+      "status": "completed"
+    }
+  ],
+  "total_count": 9
+}

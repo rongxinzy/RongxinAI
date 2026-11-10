@@ -72,6 +72,8 @@ const config: KnipConfig = {
         // Invoked from tests/e2e/packaged-linux/run-with-headless-deps.sh.
         'tests/e2e/packaged-linux/run-packaged-smoke.mjs',
         // Manual installer and preview harnesses. Workflows do not call them.
+        // Run directly as documented in scripts/preview/README.md.
+        'scripts/preview/verify-1280x800-layout.mjs',
         'scripts/installer-shell/assert-e2e.cjs',
         'scripts/installer-shell/e2e-sfx.cjs',
         'scripts/installer-shell/e2e-uninstall.cjs',

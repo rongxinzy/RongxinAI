@@ -1,0 +1,19 @@
+{
+  "_fixtureNote": "Recorded 2026-11-07 via GET /repos/rongxinzy/RongxinAI/actions/jobs/128290989210 (official REST schema has no job.outputs).",
+  "id": 128290989210,
+  "run_id": 42335371241,
+  "workflow_name": "CI",
+  "head_branch": "cursor/lightweight-ci-gates-1778",
+  "head_sha": "23f864018e54e84e60e9e44004fc1769a31de2a4",
+  "status": "completed",
+  "conclusion": "success",
+  "name": "typecheck",
+  "steps": [
+    {
+      "name": "Typecheck application and unit test sources",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4
+    }
+  ]
+}

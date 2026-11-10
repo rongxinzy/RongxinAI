@@ -94,7 +94,7 @@ test('reports each failed retry even while the previous error toast is visible',
     fireEvent.click(backupSwitch());
     await waitFor(() => expect(backupSwitch()).not.toHaveAttribute('aria-disabled', 'true'));
     expect(backupSwitch()).not.toBeChecked();
-    expect(showAppToast).toHaveBeenCalledTimes(attempts);
+    await waitFor(() => expect(showAppToast).toHaveBeenCalledTimes(attempts));
   }
 });
 

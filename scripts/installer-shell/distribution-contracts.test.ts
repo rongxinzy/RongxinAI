@@ -1,10 +1,14 @@
+import { readInferenceWorkflow } from '../ci/read-inference-workflow.mjs';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { expect, test } from 'vitest';
 
 const root = path.resolve(import.meta.dirname, '../..');
-const read = (file: string) => readFileSync(path.join(root, file), 'utf8');
+const read = (file: string) =>
+  file === '.github/workflows/build-inference-editions.yml'
+    ? readInferenceWorkflow(root)
+    : readFileSync(path.join(root, file), 'utf8');
 
 test('shared Windows builds retain the updater and WebView2 distribution safeguards', () => {
   const { scripts } = JSON.parse(read('package.json'));

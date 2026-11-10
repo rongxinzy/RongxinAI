@@ -1,0 +1,35 @@
+{
+  "_fixtureNote": "Schema per GET .../actions/runs/{run_id}/artifacts; nested workflow_run only (no workflow_run_id)",
+  "total_count": 2,
+  "artifacts": [
+    {
+      "id": 41000001,
+      "node_id": "MDg6QXJ0aWZhY3Q0MTAwMDAwMQ==",
+      "name": "release-preflight-source",
+      "size_in_bytes": 512,
+      "expired": false,
+      "created_at": "2026-11-07T04:00:00Z",
+      "updated_at": "2026-11-07T04:00:00Z",
+      "expires_at": "2026-12-07T04:00:00Z",
+      "archive_download_url": "https://api.github.com/repos/OWNER/REPO/actions/artifacts/41000001/zip",
+      "workflow_run": {
+        "id": 9001,
+        "repository_id": 1,
+        "head_repository_id": 1,
+        "head_branch": "main",
+        "head_sha": "cccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "id": 41000002,
+      "name": "release-candidate-attestation",
+      "size_in_bytes": 1200,
+      "expired": false,
+      "workflow_run": {
+        "id": 9001,
+        "head_branch": "main",
+        "head_sha": "cccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  ]
+}
