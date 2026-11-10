@@ -8,9 +8,30 @@ import QuickActionBar from './QuickActionBar';
 afterEach(cleanup);
 
 const mockActions = [
-  { id: 'slides', label: '制作幻灯片', icon: 'Presentation', prompt: '' },
-  { id: 'data', label: '分析数据', icon: 'ChartColumn', prompt: '' },
-  { id: 'web', label: '搭建网站', icon: 'Globe', prompt: '' },
+  {
+    id: 'slides',
+    label: '制作幻灯片',
+    icon: 'Presentation',
+    color: '#000000',
+    skillMapping: 'slides',
+    prompts: [],
+  },
+  {
+    id: 'data',
+    label: '分析数据',
+    icon: 'ChartColumn',
+    color: '#000000',
+    skillMapping: 'data',
+    prompts: [],
+  },
+  {
+    id: 'web',
+    label: '搭建网站',
+    icon: 'Globe',
+    color: '#000000',
+    skillMapping: 'web',
+    prompts: [],
+  },
 ];
 
 test('renders quick action buttons and calls onActionSelect', async () => {

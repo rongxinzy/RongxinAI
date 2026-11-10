@@ -1,3 +1,5 @@
+import { MAX_CONTEXT_TOKENS } from '../../shared/magpie/contexts';
+
 /** Main-only contract. Never expose this (or upstream credentials) in renderer IPC. */
 export interface MagpieHostProvider {
   id: string;
@@ -46,7 +48,7 @@ export function hostProviderPayload(provider: MagpieHostProvider): Record<string
     for (const value of [model.contextWindow, model.maxTokens]) {
       if (
         value !== undefined &&
-        (!Number.isSafeInteger(value) || value <= 0 || value > 100_000_000)
+        (!Number.isSafeInteger(value) || value <= 0 || value > MAX_CONTEXT_TOKENS)
       )
         throw new Error('Invalid host model limit');
     }

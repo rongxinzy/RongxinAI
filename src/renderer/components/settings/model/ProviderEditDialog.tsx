@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@shared/components/ui/dialog';
 import { Input } from '@shared/components/ui/input';
+import { Field, FieldError, FieldLabel } from '@shared/components/ui/field';
 import { Label } from '@shared/components/ui/label';
 import {
   Select,
@@ -35,6 +36,7 @@ import type {
   MagpieTestProviderResult,
 } from '../../../../shared/magpie/types';
 import { i18nService } from '../../../services/i18n';
+import { formatContextTokens, parseContextTokens } from './modelContextValue';
 import { PRESET_KEYS, PRESETS, type PresetKey } from './providerPresets';
 
 interface ProviderEditDialogProps {
@@ -59,6 +61,10 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
   const [models, setModels] = useState<string[]>([]);
   const [fallbackModels, setFallbackModels] = useState<string[]>([]);
   const [fallbackRawText, setFallbackRawText] = useState('');
+  const [contextDefault, setContextDefault] = useState('');
+  const [contextOverrides, setContextOverrides] = useState<Record<string, string>>({});
+  const [contextsTouched, setContextsTouched] = useState(false);
+  const [pendingContextModel, setPendingContextModel] = useState('');
   const [preset, setPreset] = useState<PresetKey>('custom');
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -94,6 +100,33 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
     return Boolean(apiKey.trim() || (isEditing && provider?.hasKey));
   }, [apiKey, isEditing, provider?.hasKey]);
 
+  const contextDefaultParsed = useMemo(() => parseContextTokens(contextDefault), [contextDefault]);
+  const contextRows = useMemo(
+    () =>
+      Object.keys(contextOverrides).map(id => ({
+        id,
+        parsed: parseContextTokens(contextOverrides[id] ?? ''),
+      })),
+    [contextOverrides],
+  );
+  const contextCandidates = useMemo(
+    () => models.filter(modelId => !(modelId in contextOverrides)),
+    [models, contextOverrides],
+  );
+  const hasInvalidContext = !contextDefaultParsed.ok || contextRows.some(row => !row.parsed.ok);
+  const collectContexts = (): Record<string, number> | undefined => {
+    // Untouched: omit the field, so a name or key edit never rewrites windows.
+    if (!contextsTouched) return undefined;
+    const contexts: Record<string, number> = {};
+    if (contextDefaultParsed.ok && contextDefaultParsed.value !== undefined) {
+      contexts['*'] = contextDefaultParsed.value;
+    }
+    for (const row of contextRows) {
+      if (row.parsed.ok && row.parsed.value !== undefined) contexts[row.id] = row.parsed.value;
+    }
+    return contexts;
+  };
+
   useEffect(() => {
     if (open) {
       editVersionRef.current = 0;
@@ -109,6 +142,15 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
         const initialFallback = provider.fallback || [];
         setFallbackModels(initialFallback);
         setFallbackRawText(initialFallback.join(', '));
+        const contexts = provider.contexts ?? {};
+        setContextDefault(formatContextTokens(contexts['*']));
+        const overrides: Record<string, string> = {};
+        for (const [modelId, tokens] of Object.entries(contexts)) {
+          if (modelId !== '*') overrides[modelId] = formatContextTokens(tokens);
+        }
+        setContextOverrides(overrides);
+        setContextsTouched(false);
+        setPendingContextModel('');
         setPreset('custom');
         setHasUserModifiedModels(true);
       } else {
@@ -120,6 +162,10 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
         setRawText('');
         setFallbackModels([]);
         setFallbackRawText('');
+        setContextDefault('');
+        setContextOverrides({});
+        setContextsTouched(false);
+        setPendingContextModel('');
         setPreset('custom');
         setHasUserModifiedModels(false);
       }
@@ -217,6 +263,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
       .split(',')
       .map(f => f.trim())
       .filter(Boolean);
+    const contexts = collectContexts();
     return {
       ...(provider?.id ? { id: provider.id } : {}),
       name: name.trim() || i18nService.t('magpieProviderDefaultName'),
@@ -225,6 +272,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
       ...(apiKey.trim() ? { key: apiKey.trim() } : {}),
       models,
       fallback,
+      ...(contexts !== undefined ? { contexts } : {}),
     };
   };
 
@@ -311,7 +359,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !baseUrl.trim()) return;
+    if (!name.trim() || !baseUrl.trim() || hasInvalidContext) return;
     setIsSaving(true);
     try {
       const ok = await onSave(getPayload());
@@ -538,7 +586,17 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
                         <p>
                           {testResult.requiresKey
                             ? i18nService.t('magpieTestRequiresKey')
-                            : testResult.error}
+                            : testResult.errorCode === 'html-endpoint'
+                              ? i18nService.t('magpieTestHtmlEndpoint')
+                              : testResult.errorCode === 'not-json'
+                                ? i18nService.t('magpieTestNotJson')
+                                : testResult.errorCode === 'too-large'
+                                  ? i18nService.t('magpieTestTooLarge')
+                                  : testResult.errorCode === 'api-error'
+                                    ? i18nService
+                                        .t('magpieTestApiError')
+                                        .replace('{message}', testResult.error ?? '')
+                                    : testResult.error}
                         </p>
                       </div>
                     </>
@@ -735,7 +793,154 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               )}
             </div>
 
-            {/* 5. 容灾回退模型列表 (P2: 保留独立文本状态，避免逗号和空格被提前吃掉) */}
+            {/* 5. 上下文窗口：默认值作用于该渠道全部模型，按模型行覆盖单个模型 */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="provider-context-default" className="text-sm font-medium">
+                  {i18nService.t('magpieProviderContext')}
+                </Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                  onClick={() => {
+                    setContextsTouched(true);
+                    setContextDefault('');
+                    setContextOverrides({});
+                  }}
+                  disabled={isSaving}
+                >
+                  {i18nService.t('magpieProviderContextReset')}
+                </Button>
+              </div>
+              <Field data-invalid={!contextDefaultParsed.ok || undefined} className="gap-1.5">
+                <Input
+                  id="provider-context-default"
+                  value={contextDefault}
+                  onChange={event => {
+                    setContextsTouched(true);
+                    setContextDefault(event.target.value);
+                  }}
+                  placeholder={i18nService.t('magpieProviderContextPlaceholder')}
+                  aria-invalid={!contextDefaultParsed.ok}
+                  disabled={isSaving}
+                  className="h-8"
+                />
+                {contextDefaultParsed.ok ? (
+                  <p className="text-xs text-muted-foreground">
+                    {contextDefaultParsed.value !== undefined
+                      ? i18nService
+                          .t('magpieProviderContextParsed')
+                          .replace('{tokens}', String(contextDefaultParsed.value))
+                      : i18nService.t('magpieProviderContextHint')}
+                  </p>
+                ) : (
+                  <FieldError>{i18nService.t('magpieProviderContextInvalid')}</FieldError>
+                )}
+              </Field>
+              {contextRows.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    {i18nService.t('magpieProviderContextOverridesHint')}
+                  </span>
+                  {contextRows.map(row => (
+                    <div key={row.id} className="flex flex-col gap-1">
+                      <Field
+                        orientation="horizontal"
+                        data-invalid={!row.parsed.ok || undefined}
+                        className="gap-2"
+                      >
+                        <FieldLabel
+                          htmlFor={`provider-context-model-${row.id}`}
+                          className="min-w-0 flex-1 truncate text-xs font-normal"
+                        >
+                          {row.id}
+                        </FieldLabel>
+                        <Input
+                          id={`provider-context-model-${row.id}`}
+                          value={contextOverrides[row.id] ?? ''}
+                          onChange={event => {
+                            setContextsTouched(true);
+                            setContextOverrides(previous => ({
+                              ...previous,
+                              [row.id]: event.target.value,
+                            }));
+                          }}
+                          placeholder={i18nService.t('magpieProviderContextInherit')}
+                          aria-invalid={!row.parsed.ok}
+                          disabled={isSaving}
+                          className="h-8 w-32"
+                        />
+                        <span className="w-16 text-right text-xs text-muted-foreground">
+                          {row.parsed.ok ? (row.parsed.value ?? '') : ''}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          title={i18nService.t('magpieProviderContextRemove')}
+                          aria-label={i18nService.t('magpieProviderContextRemove')}
+                          onClick={() => {
+                            setContextsTouched(true);
+                            setContextOverrides(previous => {
+                              const next = { ...previous };
+                              delete next[row.id];
+                              return next;
+                            });
+                          }}
+                        >
+                          <X className="size-3" />
+                        </Button>
+                      </Field>
+                      {!row.parsed.ok && (
+                        <FieldError>{i18nService.t('magpieProviderContextInvalid')}</FieldError>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {contextCandidates.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Select
+                    items={Object.fromEntries(contextCandidates.map(modelId => [modelId, modelId]))}
+                    value={pendingContextModel}
+                    onValueChange={value => setPendingContextModel(String(value ?? ''))}
+                  >
+                    <SelectTrigger className="h-8 flex-1">
+                      <SelectValue placeholder={i18nService.t('magpieProviderContextChoose')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {contextCandidates.map(modelId => (
+                        <SelectItem key={modelId} value={modelId}>
+                          {modelId}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 shrink-0 gap-1 text-xs"
+                    disabled={!pendingContextModel || isSaving}
+                    onClick={() => {
+                      setContextsTouched(true);
+                      setContextOverrides(previous => ({
+                        ...previous,
+                        [pendingContextModel]: '',
+                      }));
+                      setPendingContextModel('');
+                    }}
+                  >
+                    <Plus className="size-3" />
+                    {i18nService.t('magpieProviderContextAdd')}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* 6. 容灾回退模型列表 (P2: 保留独立文本状态，避免逗号和空格被提前吃掉) */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="provider-fallback" className="text-sm">
                 {i18nService.t('magpieProviderFallback')}
@@ -771,7 +976,10 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
             >
               {i18nService.t('cancel')}
             </Button>
-            <Button type="submit" disabled={isSaving || !name.trim() || !baseUrl.trim()}>
+            <Button
+              type="submit"
+              disabled={isSaving || !name.trim() || !baseUrl.trim() || hasInvalidContext}
+            >
               {isSaving && <LoaderCircle className="size-4 animate-spin" />}
               {i18nService.t('save')}
             </Button>
