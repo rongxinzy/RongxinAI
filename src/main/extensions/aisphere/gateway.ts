@@ -56,6 +56,7 @@ export async function startAISphereGateway(
         body: limited.body,
         signal: controller.signal,
         redirect: 'error',
+        requireTrustedCertificate: service.requiresTrustedCertificate(),
       });
       response.writeHead(upstream.status, {
         'Content-Type': upstream.headers.get('content-type') ?? 'application/json',

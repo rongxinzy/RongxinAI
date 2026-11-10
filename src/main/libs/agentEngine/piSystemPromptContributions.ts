@@ -19,9 +19,10 @@ import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { PiOcrSystemPrompt } from './piOcrTool';
 import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
-import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
+import { PiDefensePythonEnvSystemPrompt, PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
 import { PiWebSearchSystemPrompt } from './piWebSearchTool';
+import { isDefenseEdition } from '../../../shared/branding';
 
 export interface PiSystemPromptContext {
   /** Whether the session is a direct Chat lane without Work orchestration. */
@@ -59,7 +60,7 @@ export interface PiSystemPromptContribution {
 export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContribution> = [
   {
     id: 'web-search',
-    enabled: context => context.chatMode === true,
+    enabled: context => context.chatMode === true && !isDefenseEdition(),
     prompt: PiWebSearchSystemPrompt,
   },
   {
@@ -80,7 +81,14 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
   {
     id: 'python-runtime',
     requiresFileTools: true,
+    enabled: () => !isDefenseEdition(),
     prompt: PiPythonEnvSystemPrompt,
+  },
+  {
+    id: 'python-runtime-defense',
+    requiresFileTools: true,
+    enabled: () => isDefenseEdition(),
+    prompt: PiDefensePythonEnvSystemPrompt,
   },
   {
     id: 'document-reader',

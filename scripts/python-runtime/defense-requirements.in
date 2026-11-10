@@ -1,0 +1,8 @@
+# Additional productivity dependencies shared by the offline Skill layer and workspaces.
+beautifulsoup4>=4.13,<5
+httpx>=0.28,<1
+lxml>=6,<7
+python-docx>=1.2,<2
+python-pptx>=1.0,<2
+pyyaml>=6,<7
+requests>=2.32,<3

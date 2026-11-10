@@ -30,7 +30,9 @@ const CSPROJ = path.join(
 const OUTPUT_DIR = path.join(SKILL_ROOT, 'runtime');
 // The CLI project keeps its own assembly name; renaming it collides with the
 // MiniMaxAIDocx.Core assembly ("Ambiguous project name").
-const EXECUTABLE_NAME = 'MiniMaxAIDocx.Cli.exe';
+const RUNTIME_IDENTIFIER = process.argv.includes('--linux-x64') ? 'linux-x64' : 'win-x64';
+const EXECUTABLE_NAME =
+  RUNTIME_IDENTIFIER === 'win-x64' ? 'MiniMaxAIDocx.Cli.exe' : 'MiniMaxAIDocx.Cli';
 const EXECUTABLE = path.join(OUTPUT_DIR, EXECUTABLE_NAME);
 const BUILD_INFO = path.join(OUTPUT_DIR, 'build-info.json');
 
@@ -71,7 +73,8 @@ function isUpToDate() {
     // Trimming must stay off: System.Text.Json reflection is disabled by the
     // trimmer, which breaks `--json`, `analyze`, `diff` and `fill-placeholders`.
     if (info.trimmed !== false) return false;
-    if (info.assemblyName !== EXECUTABLE_NAME) return false;
+    if (info.assemblyName !== EXECUTABLE_NAME || info.runtimeIdentifier !== RUNTIME_IDENTIFIER)
+      return false;
   } catch {
     return false;
   }
@@ -111,7 +114,7 @@ function main() {
     '-c',
     'Release',
     '-r',
-    'win-x64',
+    RUNTIME_IDENTIFIER,
     '--self-contained',
     'true',
     // Trimming is intentionally off. With PublishTrimmed the SDK disables
@@ -155,7 +158,7 @@ function main() {
     `${JSON.stringify(
       {
         schemaVersion: 1,
-        runtimeIdentifier: 'win-x64',
+        runtimeIdentifier: RUNTIME_IDENTIFIER,
         selfContained: true,
         trimmed: false,
         assemblyName: EXECUTABLE_NAME,

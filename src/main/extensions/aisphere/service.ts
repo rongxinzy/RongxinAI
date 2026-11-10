@@ -7,6 +7,7 @@ import {
 } from '../../../shared/aisphere';
 import { ManagedProviderAccessMode } from '../../../shared/managedProviders';
 import type { ProviderConfig } from '../../../shared/providers';
+import { isOwnedExternalUrl } from '../../shellIpc/ownedExternalUrls';
 import {
   normalizePlatformAddress,
   parsePlatformModels,
@@ -14,6 +15,10 @@ import {
   type PlatformModel,
 } from './catalog';
 import { platformFetch, type PlatformFetch } from './transport';
+
+interface RestrictedPlatform {
+  inferenceOrigins: readonly string[];
+}
 
 interface Store {
   get<T>(key: string): T | undefined;
@@ -40,6 +45,7 @@ export class AISphereService {
   private changing = false;
   private active = 0;
   private gateway = '';
+  private restrictedPlatform?: RestrictedPlatform;
   private readonly listeners = new Set<() => void>();
   private gatewayToken = randomBytes(32).toString('hex');
   get token(): string {
@@ -49,18 +55,53 @@ export class AISphereService {
 
   constructor(private readonly fetcher: PlatformFetch = platformFetch) {}
 
-  async initialize(store: Store, gateway: string): Promise<void> {
+  async initialize(
+    store: Store,
+    gateway: string,
+    options?: { backgroundRefresh?: boolean; restrictedPlatform?: RestrictedPlatform },
+  ): Promise<void> {
     this.store = store;
     this.gateway = gateway;
+    this.restrictedPlatform = options?.restrictedPlatform;
     const stored = store.get<string>(AISphere.StoreKey);
     if (stored) {
       try {
-        this.address = normalizePlatformAddress(stored);
+        this.address = this.normalizeAddress(stored);
       } catch {
         /* Invalid binding stays closed. */
       }
     }
-    await this.refresh().catch((): void => {});
+    const refresh = this.refresh().catch((): void => {});
+    if (!options?.backgroundRefresh) await refresh;
+  }
+
+  modelGatewayOrigin(): string {
+    return this.gateway;
+  }
+
+  requiresTrustedCertificate(): boolean {
+    return Boolean(this.restrictedPlatform);
+  }
+
+  private normalizeAddress(input: unknown): string {
+    const address = normalizePlatformAddress(input);
+    if (this.restrictedPlatform && isOwnedExternalUrl(address)) {
+      throw new Error(AISphereError.InvalidAddress);
+    }
+    return address;
+  }
+
+  defaultModel(): string | undefined {
+    return this.store?.get<Config>(AISphere.AppConfigKey)?.model?.defaultModel;
+  }
+
+  setDefaultModel(model: string): void {
+    this.selection(model, AISphere.Provider);
+    const current = this.store?.get<Config>(AISphere.AppConfigKey) ?? {};
+    this.store?.set(AISphere.AppConfigKey, {
+      ...current,
+      model: { ...current.model, defaultModel: model, defaultModelProvider: AISphere.Provider },
+    });
   }
 
   snapshot(): AISphereSnapshot {
@@ -92,6 +133,7 @@ export class AISphereService {
     const response = await this.fetcher(url, {
       redirect: 'error',
       signal: AbortSignal.timeout(10000),
+      requireTrustedCertificate: this.requiresTrustedCertificate(),
     });
     if (!response.ok || !response.body) throw new Error(AISphereError.Unavailable);
     // Discovery responses are small and bounded; do not read unlimited server payloads.
@@ -123,7 +165,18 @@ export class AISphereService {
       ) {
         throw new Error(AISphereError.InvalidPlatform);
       }
-      return parsePlatformModels(await this.json(address + AISphere.ModelsPath));
+      const models = parsePlatformModels(await this.json(address + AISphere.ModelsPath));
+      if (this.restrictedPlatform) {
+        const origins = new Set([address, ...this.restrictedPlatform.inferenceOrigins]);
+        if (
+          models.some(
+            model => isOwnedExternalUrl(model.url) || !origins.has(new URL(model.url).origin),
+          )
+        ) {
+          throw new Error(AISphereError.InvalidModels);
+        }
+      }
+      return models;
     } catch (error) {
       if (
         error instanceof Error &&
@@ -136,7 +189,7 @@ export class AISphereService {
   }
 
   async connect(input: unknown): Promise<AISphereSnapshot> {
-    const address = normalizePlatformAddress(input);
+    const address = this.normalizeAddress(input);
     if (this.changing || this.active || this.busy()) throw new Error(AISphereError.Busy);
     this.changing = true;
     try {
@@ -152,19 +205,17 @@ export class AISphereService {
       this.checkedAt = Date.now();
       // A new binding must not retain an old platform's default selection.
       const current = this.store?.get<Config>(AISphere.AppConfigKey) ?? {};
-      this.store?.set(
-        AISphere.AppConfigKey,
-        this.project({
-          ...current,
-          model: {
-            ...current.model,
-            defaultModel: switching
-              ? (models[0]?.id ?? '')
-              : (current.model?.defaultModel ?? models[0]?.id ?? ''),
-            defaultModelProvider: AISphere.Provider,
-          },
-        }),
-      );
+      const next = {
+        ...current,
+        model: {
+          ...current.model,
+          defaultModel: switching
+            ? (models[0]?.id ?? '')
+            : (current.model?.defaultModel ?? models[0]?.id ?? ''),
+          defaultModelProvider: AISphere.Provider,
+        },
+      };
+      this.store?.set(AISphere.AppConfigKey, this.restrictedPlatform ? next : this.project(next));
       this.notify();
       return this.snapshot();
     } finally {

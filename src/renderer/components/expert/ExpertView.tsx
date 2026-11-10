@@ -2,6 +2,7 @@ import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
 import React, { useRef, useState } from 'react';
+import { isDefenseEdition } from '../../../shared/branding';
 
 import { i18nService } from '../../services/i18n';
 import McpManager from '../mcp/McpManager';
@@ -45,14 +46,17 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   onUseMcp,
   initialTab,
 }) => {
-  const [activeTab, setActiveTab] = useState<ExpertTab>(initialTab ?? EXPERT_TAB.Experts);
+  const defense = isDefenseEdition();
+  const [activeTab, setActiveTab] = useState<ExpertTab>(
+    (defense && initialTab === EXPERT_TAB.Mcp ? undefined : initialTab) ?? EXPERT_TAB.Experts,
+  );
   const [tabDirection, setTabDirection] = useState(1);
   const detailContainerRef = useRef<HTMLDivElement>(null);
   const expertTabs = [
     { value: EXPERT_TAB.Experts, label: i18nService.t('expert') },
     { value: EXPERT_TAB.Skills, label: i18nService.t('skills') },
     { value: EXPERT_TAB.Mcp, label: i18nService.t('connectors') },
-  ] as const;
+  ].filter(tab => !defense || tab.value !== EXPERT_TAB.Mcp);
 
   const handleTabChange = (value: string) => {
     const nextTab = value as ExpertTab;
@@ -110,17 +114,19 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           </div>
         </LayeredTabsContent>
 
-        <LayeredTabsContent
-          value={EXPERT_TAB.Mcp}
-          activeValue={activeTab}
-          direction={tabDirection}
-          className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
-          contentClassName="h-full"
-        >
-          <div className="mx-auto h-full w-full max-w-4xl">
-            <McpManager onUseMcp={onUseMcp} />
-          </div>
-        </LayeredTabsContent>
+        {!defense && (
+          <LayeredTabsContent
+            value={EXPERT_TAB.Mcp}
+            activeValue={activeTab}
+            direction={tabDirection}
+            className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
+            contentClassName="h-full"
+          >
+            <div className="mx-auto h-full w-full max-w-4xl">
+              <McpManager onUseMcp={onUseMcp} />
+            </div>
+          </LayeredTabsContent>
+        )}
       </Tabs>
     </div>
   );

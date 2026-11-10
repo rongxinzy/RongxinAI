@@ -16,6 +16,8 @@ import {
   type AISphereSnapshot,
 } from '../../../shared/aisphere';
 import { configService } from '../../services/config';
+import { isDefenseEdition } from '../../../shared/branding';
+import { selectMagpieDefaultModel } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
 
 export function AISphereSettings() {
@@ -73,13 +75,18 @@ export function AISphereSettings() {
     setBusy(true);
     setError('');
     try {
-      await configService.updateConfig({
-        model: {
-          ...(configService.getConfig().model ?? {}),
-          defaultModel: value,
-          defaultModelProvider: AISphere.Provider,
-        },
-      });
+      if (isDefenseEdition()) {
+        await selectMagpieDefaultModel(value);
+        await configService.reload();
+      } else {
+        await configService.updateConfig({
+          model: {
+            ...(configService.getConfig().model ?? {}),
+            defaultModel: value,
+            defaultModelProvider: AISphere.Provider,
+          },
+        });
+      }
       setSelected(value);
     } catch {
       setError(AISphereError.Unavailable);

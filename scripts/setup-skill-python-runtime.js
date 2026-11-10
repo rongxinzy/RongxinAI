@@ -13,6 +13,13 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { finalizeWindowsSkillPython } = require('./setup-windows-skill-python.cjs');
+const {
+  defenseWheelhouseInstallArgs,
+  DEFENSE_REQUIREMENTS,
+  WHEELHOUSE_ROOT,
+  ensureDefenseWheelhouse,
+  isDefenseWheelhouseReady,
+} = require('./setup-defense-python-wheelhouse.cjs');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const SKILLS_ROOT = path.join(PROJECT_ROOT, 'SKILLs');
@@ -53,6 +60,10 @@ const IMPORT_NAME_OVERRIDES = {
   'scikit-learn': 'sklearn',
   'psycopg2-binary': 'psycopg2',
   pypdfium2: 'pypdfium2',
+  beautifulsoup4: 'bs4',
+  'python-docx': 'docx',
+  'python-pptx': 'pptx',
+  pyyaml: 'yaml',
 };
 const PYTHON_STDLIB_MODULES = new Set([
   '__future__',
@@ -145,9 +156,9 @@ function isPresetSkillDir(skillDir) {
  * The subset of declared requirements that ships offline. Anything not listed in
  * CORE_SKILL_IDS (or living under a preset) is resolved on demand at runtime.
  */
-function selectCoreRequirements(requirements) {
+function selectCoreRequirements(requirements, defense = false) {
   return requirements.filter(
-    entry => CORE_SKILL_IDS.has(entry.skillId) && !isPresetSkillDir(entry.skillDir),
+    entry => (defense || CORE_SKILL_IDS.has(entry.skillId)) && !isPresetSkillDir(entry.skillDir),
   );
 }
 
@@ -420,7 +431,7 @@ function rebaseEnvironmentSymlinks(environmentRoot, basePythonPath) {
     ) {
       continue;
     }
-    const relativeTarget = path.relative(path.dirname(linkPath), resolvedTarget);
+    const relativeTarget = path.relative(fs.realpathSync(path.dirname(linkPath)), resolvedTarget);
     fs.unlinkSync(linkPath);
     fs.symlinkSync(relativeTarget, linkPath);
   }
@@ -638,7 +649,7 @@ function checkSkillPythonRuntimeHealth(options = {}) {
   const platform = normalizePlatform(options.platform);
   const arch = options.arch || process.arch;
   const requirements = listRequirementFiles(options.skillsRoot || SKILLS_ROOT);
-  const coreRequirements = selectCoreRequirements(requirements);
+  const coreRequirements = selectCoreRequirements(requirements, options.defense);
   const coreSkillIds = new Set(coreRequirements.map(entry => entry.skillId));
   const environments = [];
   const declarations = validateSkillDependencyDeclarations(options.skillsRoot || SKILLS_ROOT);
@@ -664,6 +675,15 @@ function checkSkillPythonRuntimeHealth(options = {}) {
     missing.push('shared: matching runtime.json');
   }
   if (!fs.existsSync(sharedLock)) missing.push('shared: requirements lock');
+  if (
+    options.defense &&
+    !isDefenseWheelhouseReady(options.wheelhouseRoot || WHEELHOUSE_ROOT, sharedLock, {
+      platform,
+      arch,
+    })
+  ) {
+    missing.push('shared: defense wheelhouse');
+  }
   if (!isEnvironmentRelocatable(sharedRoot)) missing.push('shared: relocatable symlinks');
 
   // Only the offline layer's packages are probed: overlay Skills are installed on
@@ -748,8 +768,10 @@ async function ensureSkillPythonRuntimes(options = {}) {
   const runtimeRoot = options.runtimeRoot || RUNTIME_ROOT;
   const sharedLock = sharedLockPath(runtimeRoot);
   const requirements = listRequirementFiles(skillsRoot);
-  const coreRequirements = selectCoreRequirements(requirements);
+  const coreRequirements = selectCoreRequirements(requirements, options.defense);
   const coreSkillIds = new Set(coreRequirements.map(entry => entry.skillId));
+  if (options.defense) coreRequirements.push(DEFENSE_REQUIREMENTS);
+  const wheelhouse = options.defense ? options.wheelhouseRoot || WHEELHOUSE_ROOT : null;
   const overlayRequirements = requirements.filter(entry => !coreSkillIds.has(entry.skillId));
   const lockPaths = requirements.map(entry =>
     path.join(runtimeRoot, LOCKS_DIRECTORY_NAME, `${entry.skillId}.txt`),
@@ -796,6 +818,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
     isEnvironmentRelocatable(sharedRoot) &&
     manifestMatches(readManifest(sharedRoot), sharedExpected) &&
     fs.existsSync(sharedLock) &&
+    (!wheelhouse || isDefenseWheelhouseReady(wheelhouse, sharedLock, { platform, arch })) &&
     lockPaths.every(lockPath => fs.existsSync(lockPath)) &&
     overlayRequirements.every(entry => fs.existsSync(deltaLockPath(runtimeRoot, entry.skillId))) &&
     probePython(existingPython, coreImports).ok;
@@ -813,12 +836,14 @@ async function ensureSkillPythonRuntimes(options = {}) {
         'pip',
         'compile',
         '--generate-hashes',
+        ...(wheelhouse ? ['--only-binary', ':all:', '--no-header', '--no-annotate'] : []),
         '--output-file',
         sharedLock,
         ...coreRequirements.map(entry => entry.requirementsPath),
       ],
       { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } },
     );
+    if (wheelhouse) ensureDefenseWheelhouse(wheelhouse, sharedLock, { platform, arch }, base, run);
     for (const [index, entry] of requirements.entries()) {
       run(
         base.uvPath,
@@ -863,6 +888,7 @@ async function ensureSkillPythonRuntimes(options = {}) {
       'copy',
       '--no-managed-python',
       '--no-python-downloads',
+      ...defenseWheelhouseInstallArgs(wheelhouse),
     ];
     run(base.uvPath, installArgs, { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } });
     finalizeWindowsSkillPython(sharedRoot, base.pythonPath, platform);
@@ -917,7 +943,13 @@ async function ensureSkillPythonRuntimes(options = {}) {
     };
   }
 
-  const health = checkSkillPythonRuntimeHealth({ platform, arch, skillsRoot, runtimeRoot });
+  const health = checkSkillPythonRuntimeHealth({
+    ...options,
+    platform,
+    arch,
+    skillsRoot,
+    runtimeRoot,
+  });
   if (!health.ok)
     throw new Error(`Skill Python runtime health check failed: ${health.missing.join('; ')}`);
   return { ok: true, skipped: false, environments: health.environments };

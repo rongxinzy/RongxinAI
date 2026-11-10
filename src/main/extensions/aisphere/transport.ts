@@ -8,6 +8,7 @@ interface PlatformRequest {
   body?: string;
   signal?: AbortSignal;
   redirect?: 'error';
+  requireTrustedCertificate?: boolean;
 }
 export type PlatformFetch = (url: string, options?: PlatformRequest) => Promise<Response>;
 
@@ -76,6 +77,7 @@ export const platformFetch: PlatformFetch = async (address, options = {}) => {
     return await send(true);
   } catch (error) {
     if (
+      options.requireTrustedCertificate ||
       url.protocol !== 'https:' ||
       !error ||
       typeof error !== 'object' ||

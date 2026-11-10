@@ -17,6 +17,7 @@ export interface MagpieModelBackend {
   models(): Promise<MagpieModel[]>;
   providers?(): Promise<MagpieProviderSummary[]>;
   recordError?(message: string, providerId?: string): void;
+  runtimeApiKey?(): string;
 }
 export interface MagpieModelServiceOptions {
   readDefaultModelId(): string | undefined | null;
@@ -36,6 +37,10 @@ export class MagpieModelService {
   ) {}
   recordError(message: string, providerId?: string): void {
     this.backend.recordError?.(message, providerId);
+  }
+
+  private runtimeApiKey(): string {
+    return this.backend.runtimeApiKey?.() ?? MAGPIE_RUNTIME_API_KEY;
   }
 
   /** Last catalog projection, for synchronous capability reads between turns. */
@@ -86,10 +91,14 @@ export class MagpieModelService {
       };
     }
   }
-  async resolve(
-    modelRef?: string,
-  ): Promise<{ model: MagpieModel; catalog: MagpieModelCatalog; gatewayUrl: string }> {
+  async resolve(modelRef?: string): Promise<{
+    model: MagpieModel;
+    catalog: MagpieModelCatalog;
+    gatewayUrl: string;
+    runtimeApiKey: string;
+  }> {
     await this.backend.ensureRunning?.();
+    const runtimeApiKey = this.runtimeApiKey();
     const catalog = await this.catalog();
     if (catalog.status.state !== 'running' || !catalog.status.gatewayUrl)
       throw new Error('Enable the unified model service in model settings before starting a task.');
@@ -121,7 +130,10 @@ export class MagpieModelService {
       throw new Error(
         'The selected model is no longer available or is restricted. Choose a model in model settings.',
       );
-    return { model, catalog, gatewayUrl: catalog.status.gatewayUrl };
+    if (runtimeApiKey !== this.runtimeApiKey()) {
+      throw new Error('Model service changed while resolving the model. Try again.');
+    }
+    return { model, catalog, gatewayUrl: catalog.status.gatewayUrl, runtimeApiKey };
   }
 
   /** Companion requests use existing consent and policy, without changing the global default. */

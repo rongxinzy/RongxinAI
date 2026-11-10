@@ -6,17 +6,14 @@
  */
 
 import type { Model } from '@earendil-works/pi-ai';
+import { isDefenseEdition } from '../../../shared/branding';
 import {
   ZhiyuanModelPoolHeader,
   type ZhiyuanModelPoolWorkload as ZhiyuanModelPoolWorkloadValue,
 } from '../../../shared/modelPool/constants';
 import { ModelCapabilityStatus, ProviderName } from '../../../shared/providers';
 import type { MagpieModel } from '../../../shared/magpie/types';
-import {
-  getMagpieModelService,
-  hasMagpieModelService,
-  MAGPIE_RUNTIME_API_KEY,
-} from '../../magpie/modelService';
+import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
 import { ImageInputVerdict, imageInputVerdict } from './piImageInputFallback';
 import type { PiModelRuntime, PiModules, PiResolvedModel } from './piRuntimeSessionState';
 
@@ -126,7 +123,12 @@ export async function resolvePiModel(
       baseUrl,
       api,
       maxTokens,
-    } = buildMagpiePiModel(resolution.model, resolution.gatewayUrl, modelPoolRequestContext);
+    } = buildMagpiePiModel(
+      resolution.model,
+      resolution.gatewayUrl,
+      isDefenseEdition() ? undefined : modelPoolRequestContext,
+    );
+    const { runtimeApiKey } = resolution;
     const modelRuntime =
       existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
     modelRuntime.registerProvider('magpie', {
@@ -135,7 +137,7 @@ export async function resolvePiModel(
       api,
       models: [customModel],
     });
-    await modelRuntime.setRuntimeApiKey('magpie', MAGPIE_RUNTIME_API_KEY);
+    await modelRuntime.setRuntimeApiKey('magpie', runtimeApiKey);
 
     const imageInput = magpieImageInput(resolution.model);
     const effectiveImageInput = imageInputVerdict(
@@ -160,7 +162,7 @@ export async function resolvePiModel(
       maxOutputTokens: maxTokens,
       providerName: ProviderName.Magpie,
       capabilities: { imageInput },
-      requestOptions: { apiKey: MAGPIE_RUNTIME_API_KEY },
+      requestOptions: { apiKey: runtimeApiKey },
     };
   }
 

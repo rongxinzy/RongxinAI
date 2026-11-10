@@ -43,7 +43,7 @@ export interface MainViewCanvasProps {
   expertInitialTab: ExpertTab | undefined;
   /** MCP */
   onUseMcp: (prompt?: string) => void;
-  onShowConnectors: () => void;
+  onShowConnectors?: () => void;
   mcpOpenRegistryId: McpRegistryId | undefined;
   mcpOpenMarketplace: boolean;
   /** Activity */

@@ -31,6 +31,7 @@ esac
 # --- Full pipeline: bundled self-contained CLI, then .NET SDK ---
 BUNDLED_CLI="$PROJECT_DIR/runtime/MiniMaxAIDocx.Cli.exe"
 [ -x "$BUNDLED_CLI" ] || BUNDLED_CLI="$PROJECT_DIR/runtime/MiniMaxAIDocx.exe"
+[ -x "$BUNDLED_CLI" ] || BUNDLED_CLI="$PROJECT_DIR/runtime/MiniMaxAIDocx.Cli"
 RUNTIME_AVAILABLE=false
 if [ -x "$BUNDLED_CLI" ]; then
     RUNTIME_AVAILABLE=true

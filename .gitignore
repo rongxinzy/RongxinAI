@@ -52,6 +52,7 @@ resources/python-mac/
 resources/uv-linux/
 resources/python-linux/
 resources/skill-python/
+resources/defense-python/
 resources/modelscope.tokens.local.json
 
 # SKILLs runtime files

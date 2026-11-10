@@ -3,11 +3,11 @@ import { BrowserWindow } from 'electron';
 
 import { aisphereService } from '../extensions/aisphere';
 import { zhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
-import { AISphere } from '../../shared/aisphere';
+import { AISphere, AISphereError } from '../../shared/aisphere';
 import { ManagedProviderIpc } from '../../shared/ipc/channels';
 import { providersContract } from '../../shared/ipc/providersContract';
 import { handleIpcContractSubset } from '../ipc/handleIpcContract';
-import { getBranding } from '../../shared/branding';
+import { getBranding, isDefenseEdition } from '../../shared/branding';
 
 export interface ManagedProvidersIpcDeps {
   isMagpieRunning: () => boolean;
@@ -18,7 +18,12 @@ export const registerManagedProvidersIpc = (deps: ManagedProvidersIpcDeps): void
   if (getBranding().features.enableAISphere) {
     handleIpcContractSubset(providersContract, {
       aisphereSnapshot: async () => aisphereService.snapshot(),
-      aisphereConnect: async (_event, address) => aisphereService.connect(address),
+      aisphereConnect: async (_event, address) => {
+        if (isDefenseEdition() && !aisphereService.modelGatewayOrigin()) {
+          throw new Error(AISphereError.Unavailable);
+        }
+        return aisphereService.connect(address);
+      },
       aisphereRefresh: async () => {
         await aisphereService.refresh();
         return aisphereService.snapshot();

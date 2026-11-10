@@ -1,6 +1,11 @@
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { isDefenseEdition } from '../../shared/branding';
+import {
+  applyDefensePythonPackageEnvironment,
+  DEFENSE_WHEELHOUSE_DIRECTORY,
+} from '../pythonRuntime/defensePackagePolicy';
 
 import { applyUvPackageIndexDefaults, MANAGED_UV_CONFIG } from './pythonPackageIndexes';
 import { getManagedPythonExecutable } from './pythonRuntime';
@@ -153,6 +158,13 @@ export function configureUvForManagedPython(
   env: Record<string, string | undefined>,
 ): Record<string, string | undefined> {
   if (!['win32', 'darwin', 'linux'].includes(process.platform)) return env;
+  const defense = isDefenseEdition();
+  if (defense) {
+    const resources = app.isPackaged
+      ? process.resourcesPath
+      : path.join(app.getAppPath(), 'resources');
+    applyDefensePythonPackageEnvironment(env, path.join(resources, DEFENSE_WHEELHOUSE_DIRECTORY));
+  }
   const uv = findBundledUvExecutable(executableName('uv'));
   const python = getManagedPythonExecutable();
   if (!uv || !python) return env;
@@ -160,7 +172,7 @@ export function configureUvForManagedPython(
   env.UV_NO_MANAGED_PYTHON = '1';
   env.UV_CACHE_DIR = path.join(app.getPath('userData'), 'runtimes', 'uv-cache');
   env.UV_TOOL_DIR = path.join(app.getPath('userData'), 'runtimes', 'uv-tools');
-  const configPath = ensureManagedUvConfig();
+  const configPath = defense ? null : ensureManagedUvConfig();
   if (configPath) {
     env.UV_CONFIG_FILE = configPath;
     // Environment variables have higher priority than uv.toml. Pin both indexes

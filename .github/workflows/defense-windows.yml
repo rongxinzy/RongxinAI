@@ -1,0 +1,55 @@
+name: Build Zhiyuan Defense Windows package (manual)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  package:
+    runs-on: windows-2022
+    environment: release
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Connect Certum SimplySign
+        id: certum-signing
+        uses: ./.github/actions/setup-certum-signing
+        with:
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+      - name: Build signed defense installer
+        run: bun run dist:win:defense --signed
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+      - name: Verify installed application with outbound access blocked
+        shell: pwsh
+        run: ./scripts/ci/windows-defense-smoke.ps1 -ExpectedThumbprint $env:CERTUM_CERT_THUMBPRINT
+        env:
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: zhiyuan-defense-windows-x64
+          path: |
+            release/defense/ZhiYuanAgentDefense-Setup-*.exe
+            release/defense/SHA256SUMS.txt
+          if-no-files-found: error

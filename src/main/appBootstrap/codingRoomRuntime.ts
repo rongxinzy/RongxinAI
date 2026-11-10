@@ -35,6 +35,8 @@ import { GitWorktreeService } from '../codingAgent/gitWorktreeService';
 import { normalizePiMessage, normalizePiToolActivity } from '../codingAgent/piCodingEventAdapter';
 import { probeCoworkModelReadiness } from '../libs/coworkUtil';
 import type { PiThinkingLevel } from '../libs/agentEngine/piRuntimeTypes';
+import { isDefenseEdition } from '../../shared/branding';
+import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 
 let codingCommandCatalogGeneration = 0;
 export const bumpCodingCommandCatalog = (): void => {
@@ -59,9 +61,9 @@ export const getCodingRoomService = (): CodingRoomService => {
       new CodingAgentRegistry(
         new CodingAgentProfileRepository(getStore().getDatabase()),
         () => {
-          const enabled = getStore().get<boolean>('magpie_service_enabled') === true;
-          const modelId = getStore().get<string>('magpie_default_model_id')?.trim();
-          return enabled && Boolean(modelId);
+          const enabled =
+            isDefenseEdition() || getStore().get<boolean>('magpie_service_enabled') === true;
+          return enabled && Boolean(resolveDefaultAgentModelRef());
         },
         app.isPackaged
           ? path.join(process.resourcesPath, 'acp', 'registry.json')

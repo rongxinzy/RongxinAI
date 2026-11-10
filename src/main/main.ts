@@ -90,6 +90,7 @@ import { registerImInstanceIpc } from './imIpc/instance';
 import { registerAppLifecycleHandlers } from './appBootstrap/appLifecycle';
 import { initApp } from './appBootstrap/initApp';
 import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
+import { isDefenseEdition } from '../shared/branding';
 
 // App identity and privileged schemes must be configured before app ready.
 applyAppIdentity();
@@ -106,7 +107,8 @@ if (!gotTheLock) {
   // taking over a stale older-version instance, then exit.
   handleSecondInstanceExit();
 } else {
-  registerCommunityAuthBootstrap();
+  const defense = isDefenseEdition();
+  if (!defense) registerCommunityAuthBootstrap();
   registerCoreIpc({ getStore });
   registerManagedProvidersIpc({
     isMagpieRunning: isMagpieGatewayRunning,
@@ -120,16 +122,17 @@ if (!gotTheLock) {
     showSystemMenu,
     reconcileCcConnectChannelSidecars,
     getMainWindow: () => lifecycleRuntime.mainWindow,
-    hasIMGatewayManager: () => channelRuntime.gatewayManager !== null,
+    hasIMGatewayManager: () => !defense && channelRuntime.gatewayManager !== null,
   });
-  registerCommunityAuthIpc();
+  if (!defense) registerCommunityAuthIpc();
   registerSkillsIpc({ getSkillManager, getStore });
-  registerMcpIpc({
-    getMcpStore,
-    getStore,
-    getActiveMcpAuthorizations,
-    setActiveMcpAuthorizations,
-  });
+  if (!defense)
+    registerMcpIpc({
+      getMcpStore,
+      getStore,
+      getActiveMcpAuthorizations,
+      setActiveMcpAuthorizations,
+    });
   registerWorkspaceIpc();
   registerProjectIpc({
     getDefaultProjectBaseDir,
@@ -177,28 +180,31 @@ if (!gotTheLock) {
     getIMGatewayManager,
   });
   registerPermissionsIpc();
-  registerImGatewayIpc({
-    getIMGatewayManager,
-    reconcileCcConnectChannelSidecars,
-    refreshCcConnectPlatformStatuses,
-    resolveCcConnectSidecarExecutable,
-    resolveCcConnectAccountRuntimeStatus: accountId =>
-      resolveCcConnectAccountRuntimeStatus(
-        channelRuntime.statuses,
-        accountId,
-        channelRuntime.sidecarManager?.running === true,
-      ),
-  });
-  registerImInstanceIpc({
-    getIMGatewayManager,
-    reconcileCcConnectChannelSidecars,
-  });
-  registerIntegrationsIpc({
-    getIMGatewayManager,
-    getMagpieModelService,
-    isInternalWorkspacePath,
-    getCoworkStore,
-  });
+  if (!defense)
+    registerImGatewayIpc({
+      getIMGatewayManager,
+      reconcileCcConnectChannelSidecars,
+      refreshCcConnectPlatformStatuses,
+      resolveCcConnectSidecarExecutable,
+      resolveCcConnectAccountRuntimeStatus: accountId =>
+        resolveCcConnectAccountRuntimeStatus(
+          channelRuntime.statuses,
+          accountId,
+          channelRuntime.sidecarManager?.running === true,
+        ),
+    });
+  if (!defense)
+    registerImInstanceIpc({
+      getIMGatewayManager,
+      reconcileCcConnectChannelSidecars,
+    });
+  if (!defense)
+    registerIntegrationsIpc({
+      getIMGatewayManager,
+      getMagpieModelService,
+      isInternalWorkspacePath,
+      getCoworkStore,
+    });
   registerDialogIpc({ getCoworkStore });
   registerShellIpc({
     getCoworkStore,
@@ -210,10 +216,11 @@ if (!gotTheLock) {
           ...workspace.sources.map(source => source.path),
         ]),
   });
-  registerAppUpdateIpc({
-    getAppUpdateCoordinator,
-    hasRunningSessions: () => getPiRuntimeAdapter().hasRunningSessions(),
-  });
+  if (!defense)
+    registerAppUpdateIpc({
+      getAppUpdateCoordinator,
+      hasRunningSessions: () => getPiRuntimeAdapter().hasRunningSessions(),
+    });
   registerAppLifecycleHandlers();
 
   // 启动应用

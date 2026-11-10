@@ -32,6 +32,7 @@ import {
 import { i18nService } from '../../services/i18n';
 import { PlusMenuSkillsIcon } from '../cowork/plusMenuIcons';
 import { SkillTab } from './constants';
+import { isDefenseEdition } from '../../../shared/branding';
 
 interface SkillsPageToolbarProps {
   activeTab: SkillTab;
@@ -68,6 +69,7 @@ export function SkillsPageToolbar({
   onOpenMarketplace,
   onCreateCustomSkill,
 }: SkillsPageToolbarProps) {
+  const defense = isDefenseEdition();
   return (
     <header className="flex flex-col gap-4">
       <div className="flex items-center gap-4">
@@ -156,10 +158,12 @@ export function SkillsPageToolbar({
                   <FolderOpen />
                   {i18nService.t('uploadSkillFolder')}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={onOpenRemoteImport} disabled={isDownloading}>
-                  <Link />
-                  {i18nService.t('remoteImport')}
-                </DropdownMenuItem>
+                {!defense && (
+                  <DropdownMenuItem onClick={onOpenRemoteImport} disabled={isDownloading}>
+                    <Link />
+                    {i18nService.t('remoteImport')}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -186,7 +190,9 @@ export function SkillsPageToolbar({
                   <Badge variant="secondary">{installedCount}</Badge>
                 ) : undefined,
             },
-            { value: SkillTab.Marketplace, label: i18nService.t('skillMarketplace') },
+            ...(!defense
+              ? [{ value: SkillTab.Marketplace, label: i18nService.t('skillMarketplace') }]
+              : []),
           ]}
         />
       </div>

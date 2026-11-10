@@ -16,7 +16,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { getBranding } from '../../shared/branding';
+import { getBranding, isDefenseEdition } from '../../shared/branding';
+import { zhiyuanBranding } from '../../shared/branding/defaultBranding';
 import { agentService } from '../services/agent';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
@@ -405,6 +406,9 @@ const Sidebar: React.FC<SidebarProps> = ({
     </div>
   );
 
+  const branding = getBranding();
+  const logoAppId = isDefenseEdition() ? zhiyuanBranding.appId : branding.appId;
+
   return (
     <MotionConfig reducedMotion="user">
       <aside
@@ -428,13 +432,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className={cn('theme-shell-brand flex items-center gap-2', isMac && 'pl-[68px]')}
               >
                 <img
-                  src={`${getBranding().appId}-logo-light.svg`}
-                  alt={getBranding().shortName}
+                  src={`${logoAppId}-logo-light.svg`}
+                  alt={branding.shortName}
                   className="theme-shell-brand-mark logo-light w-auto select-none"
                 />
                 <img
-                  src={`${getBranding().appId}-logo-dark.svg`}
-                  alt={getBranding().shortName}
+                  src={`${logoAppId}-logo-dark.svg`}
+                  alt={branding.shortName}
                   className="theme-shell-brand-mark logo-dark w-auto select-none"
                 />
               </div>

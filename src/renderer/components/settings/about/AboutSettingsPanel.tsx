@@ -1,7 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import { Progress } from '@shared/components/ui/progress';
 import { Switch } from '@shared/components/ui/switch';
-import { getBranding } from '@shared/branding';
+import { getBranding, isDefenseEdition } from '@shared/branding';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -37,10 +37,11 @@ export default function AboutSettingsPanel({
 
   useEffect(() => {
     void window.electron.appInfo.getVersion().then(setAppVersion);
-    void window.electron.appUpdate
-      .getChannel()
-      .then(channel => setBetaChannelEnabled(channel === AppUpdateChannelPreference.Beta))
-      .catch(() => setBetaChannelEnabled(false));
+    if (!isDefenseEdition())
+      void window.electron.appUpdate
+        .getChannel()
+        .then(channel => setBetaChannelEnabled(channel === AppUpdateChannelPreference.Beta))
+        .catch(() => setBetaChannelEnabled(false));
     // Preload may lag behind Vite HMR after adding appInfo.isDev; never crash Settings on mount.
     const isDev = window.electron.appInfo.isDev;
     if (typeof isDev === 'function') {
@@ -126,7 +127,7 @@ export default function AboutSettingsPanel({
             <span className="text-sm text-muted-foreground">{appVersion}</span>
           </div>
         </div>
-        {!isEnterpriseBuild && (
+        {!isDefenseEdition() && !isEnterpriseBuild && (
           <>
             <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border">
               <div className="min-w-0">
@@ -340,31 +341,37 @@ export default function AboutSettingsPanel({
             </div>
           </>
         )}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <span className="text-sm text-foreground">{i18nService.t('aboutOfficialWebsite')}</span>
-          <a
-            href={OFFICIAL_WEBSITE_URL}
-            onClick={event => {
-              event.preventDefault();
-              void window.electron.shell.openExternal(OFFICIAL_WEBSITE_URL);
-            }}
-            rel="noopener noreferrer"
-            className="theme-surface-settings-link"
-          >
-            {OFFICIAL_WEBSITE_URL}
-          </a>
-        </div>
-        <div className="flex items-center justify-between px-4 py-3">
-          <span className="text-sm text-foreground">{i18nService.t('aboutUsLabel')}</span>
-          <a
-            href="http://www.rongxzy.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="theme-surface-settings-link"
-          >
-            {i18nService.t('aboutCompanyName')}
-          </a>
-        </div>
+        {!isDefenseEdition() && (
+          <>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <span className="text-sm text-foreground">
+                {i18nService.t('aboutOfficialWebsite')}
+              </span>
+              <a
+                href={OFFICIAL_WEBSITE_URL}
+                onClick={event => {
+                  event.preventDefault();
+                  void window.electron.shell.openExternal(OFFICIAL_WEBSITE_URL);
+                }}
+                rel="noopener noreferrer"
+                className="theme-surface-settings-link"
+              >
+                {OFFICIAL_WEBSITE_URL}
+              </a>
+            </div>
+            <div className="flex items-center justify-between px-4 py-3">
+              <span className="text-sm text-foreground">{i18nService.t('aboutUsLabel')}</span>
+              <a
+                href="http://www.rongxzy.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="theme-surface-settings-link"
+              >
+                {i18nService.t('aboutCompanyName')}
+              </a>
+            </div>
+          </>
+        )}
       </div>
       <div className="mt-auto w-full pt-14 pb-2 flex flex-col items-center gap-2">
         {isDevBuild && (

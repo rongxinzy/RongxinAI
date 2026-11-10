@@ -3,6 +3,7 @@ import { app } from 'electron';
 import extractZip from 'extract-zip';
 import fs from 'fs';
 import path from 'path';
+import { isDefenseEdition } from '../../shared/branding';
 
 import { cpRecursiveSync } from '../fsCompat';
 import { t } from '../i18n';
@@ -56,7 +57,11 @@ export async function downloadSkillImpl(
       return { success: false, error: 'Missing skill source' };
     }
 
-    const resolvedSource = await resolveMarketplaceSkillSource(trimmed);
+    const offline = isDefenseEdition();
+    if (offline && (!path.isAbsolute(trimmed) || !fs.existsSync(trimmed))) {
+      return { success: false, error: t('skillErrInvalidSource') };
+    }
+    const resolvedSource = offline ? trimmed : await resolveMarketplaceSkillSource(trimmed);
     if (!resolvedSource) {
       return { success: false, error: t('skillErrModelScopeInstallUnavailable') };
     }
@@ -85,6 +90,8 @@ export async function downloadSkillImpl(
       } else {
         console.log('[SkillManager] downloadSkill: detected local directory');
       }
+    } else if (offline) {
+      return { success: false, error: t('skillErrInvalidSource') };
     } else if (isRemoteZipUrl(resolvedSource)) {
       console.log('[SkillManager] downloadSkill: detected remote zip URL');
       const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'zhiyuan-skill-zip-'));

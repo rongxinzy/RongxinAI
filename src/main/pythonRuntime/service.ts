@@ -23,6 +23,7 @@ export class PythonRuntimeService {
       preinstalledRuntime?: PythonRunnerRequest['preinstalledRuntime'];
       /** Shared uv cache directory (work package G: one cache across stacks). */
       uvCacheDir?: string;
+      defensePackages?: PythonRunnerRequest['defensePackages'];
     },
   ) {}
 

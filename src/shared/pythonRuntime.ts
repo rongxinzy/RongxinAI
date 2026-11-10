@@ -36,6 +36,8 @@ export type PythonRunnerRequest = {
   };
   /** Shared uv cache (defaults to <storageRoot>/uv-cache). uv locks safely across processes. */
   uvCacheDir?: string;
+  /** Locked bundled packages and the deployment's single optional package index. */
+  defensePackages?: { wheelhouseRoot: string; indexUrl?: string };
 };
 export type PythonRunnerResponse =
   | { success: true; result: PythonExecutionResult }

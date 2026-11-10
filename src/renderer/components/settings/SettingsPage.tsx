@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { COMPANION_SHORTCUT } from '../../../shared/companion/constants';
+import { isDefenseEdition } from '../../../shared/branding';
 import type { EnterpriseRendererSettingsPage } from '../../../shared/enterpriseRenderer';
 import { defaultConfig, type AppConfig } from '../../config';
 import { configService } from '../../services/config';
@@ -53,7 +54,14 @@ export default function SettingsPage({
   const [enterpriseSettingsPages, setEnterpriseSettingsPages] = useState<
     readonly EnterpriseRendererSettingsPage[]
   >([]);
-  const activeTab = requestedActiveTab;
+  const defense = isDefenseEdition();
+  const activeTab = defense
+    ? requestedActiveTab === 'model'
+      ? 'aisphere'
+      : requestedActiveTab === 'im' || requestedActiveTab === 'email'
+        ? 'general'
+        : requestedActiveTab
+    : requestedActiveTab;
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const [language, setLanguage] = useState<LanguageType>('zh');
   const [useSystemProxy, setUseSystemProxy] = useState(false);
@@ -258,11 +266,12 @@ export default function SettingsPage({
           candidate !== key &&
           shortcutsConflict(shortcuts[candidate as keyof typeof shortcuts], value, isMacPlatform),
       );
-    const conflictLabel = shortcutsConflict(COMPANION_SHORTCUT, value, isMacPlatform)
-      ? i18nService.t('companionShortcutLabel')
-      : conflictKey
-        ? i18nService.t(shortcutLabelMap[conflictKey] ?? conflictKey)
-        : null;
+    const conflictLabel =
+      !defense && shortcutsConflict(COMPANION_SHORTCUT, value, isMacPlatform)
+        ? i18nService.t('companionShortcutLabel')
+        : conflictKey
+          ? i18nService.t(shortcutLabelMap[conflictKey] ?? conflictKey)
+          : null;
     if (conflictLabel) {
       showAppToast({
         message: i18nService
@@ -437,7 +446,7 @@ export default function SettingsPage({
                   activeTab === 'email' ? 'block' : 'hidden',
                 )}
               >
-                <EmailSettingsPage />
+                {!defense && <EmailSettingsPage />}
               </div>
               <div
                 className={cn(

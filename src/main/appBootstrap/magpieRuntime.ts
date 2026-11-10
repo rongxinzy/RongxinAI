@@ -1,7 +1,7 @@
 /** Magpie manager bootstrap: manager construction, managed-provider bindings and model service. */
 import path from 'path';
 
-import { app } from 'electron';
+import { app, type IpcMainInvokeEvent } from 'electron';
 
 import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
@@ -19,6 +19,11 @@ import { getLlamaCppServiceConfig } from '../ipcHandlers/llamacpp';
 import { registerMagpieIpc } from '../magpie/registerIpc';
 import { registerAcpMagpieModelApply } from '../codingAgent/acpMagpieModel';
 import { zhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
+import { isDefenseEdition } from '../../shared/branding';
+import { providersContract } from '../../shared/ipc/providersContract';
+import { handleIpcContractSubset } from '../ipc/handleIpcContract';
+import { aisphereService } from '../extensions/aisphere';
+import { createAISphereModelService } from '../extensions/aisphere/modelBackend';
 
 let magpieModelService: MagpieModelService | undefined;
 
@@ -32,7 +37,31 @@ const getLanCredentialVault = (): LlamaCppGatewayCredentialVault => {
   return lanCredentialVault;
 };
 
+const isTrustedModelRequest = (event: IpcMainInvokeEvent): boolean =>
+  Boolean(
+    lifecycleRuntime.mainWindow &&
+    !lifecycleRuntime.mainWindow.isDestroyed() &&
+    event.sender === lifecycleRuntime.mainWindow.webContents &&
+    event.senderFrame === lifecycleRuntime.mainWindow.webContents.mainFrame,
+  );
+
 export const setupMagpieRuntime = (): void => {
+  if (isDefenseEdition()) {
+    const modelService = createAISphereModelService(aisphereService);
+    magpieModelService = modelService;
+    inferenceRuntime.disposeMagpieModels = installMagpieModelService(modelService);
+    handleIpcContractSubset(providersContract, {
+      magpieCatalog: event => {
+        if (!isTrustedModelRequest(event)) throw new Error('Untrusted model management request');
+        return modelService.catalog();
+      },
+      magpieSelectDefault: (event, model) => {
+        if (!isTrustedModelRequest(event)) throw new Error('Untrusted model management request');
+        return modelService.selectDefault(model);
+      },
+    });
+    return;
+  }
   inferenceRuntime.magpieManager = new MagpieManager({
     resourcesRoot: app.isPackaged
       ? path.join(process.resourcesPath, 'magpie')
@@ -125,13 +154,7 @@ export const setupMagpieRuntime = (): void => {
   });
   inferenceRuntime.disposeMagpie = registerMagpieIpc(
     inferenceRuntime.magpieManager,
-    event =>
-      Boolean(
-        lifecycleRuntime.mainWindow &&
-        !lifecycleRuntime.mainWindow.isDestroyed() &&
-        event.sender === lifecycleRuntime.mainWindow.webContents &&
-        event.senderFrame === lifecycleRuntime.mainWindow.webContents.mainFrame,
-      ),
+    isTrustedModelRequest,
     modelService,
     inferenceRuntime.magpieManager.routingUsage,
   );

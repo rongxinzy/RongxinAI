@@ -1,8 +1,10 @@
 import { app } from 'electron';
 import { join } from 'node:path';
+import { isDefenseEdition } from '../../shared/branding';
 import { getManagedPythonExecutable } from '../libs/pythonRuntime';
 import { findBundledUvExecutable } from '../libs/uvRuntime';
 import { bundledRuntimeId } from './bundledRuntime';
+import { DEFENSE_INDEX_ENV, DEFENSE_WHEELHOUSE_DIRECTORY } from './defensePackagePolicy';
 import { PythonRuntimeService } from './service';
 
 let service: PythonRuntimeService | undefined;
@@ -44,6 +46,17 @@ export function getPythonRuntimeService(): PythonRuntimeService {
     // One uv cache across both managed stacks (wheels fetched for workspace
     // venvs are reused by Skill-layer builds and vice versa); uv locks safely.
     uvCacheDir: join(app.getPath('userData'), 'runtimes', 'uv-cache'),
+    ...(isDefenseEdition()
+      ? {
+          defensePackages: {
+            wheelhouseRoot: join(
+              app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'resources'),
+              DEFENSE_WHEELHOUSE_DIRECTORY,
+            ),
+            indexUrl: process.env[DEFENSE_INDEX_ENV],
+          },
+        }
+      : {}),
   });
   return service;
 }

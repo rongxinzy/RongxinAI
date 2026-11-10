@@ -8,6 +8,7 @@ export const enMain4 = {
   modelPoolStreamInterrupted:
     'The response was interrupted. Received content is preserved. Retry or ask to continue.',
 
+  aisphereNotConfigured: 'Connect to an AISphere platform in Settings first.',
   aisphereMissingModel:
     'The selected model is not available on AISphere. Refresh and select a platform model.',
   aisphereUnavailable:

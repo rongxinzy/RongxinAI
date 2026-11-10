@@ -1,6 +1,7 @@
 import './index.css';
 
 import { TooltipProvider } from '@shared/components/ui/tooltip';
+import { isDefenseEdition } from '@shared/branding';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
@@ -37,7 +38,8 @@ async function renderRoot(): Promise<void> {
     installBrowserMock();
   }
 
-  if (isModelLaunchLogWindow) {
+  const defense = isDefenseEdition();
+  if (!defense && isModelLaunchLogWindow) {
     const { ModelLaunchLogWindow } =
       await import('./components/localInference/windows/ModelLaunchLogWindow');
     root.render(
@@ -63,14 +65,15 @@ async function renderRoot(): Promise<void> {
   const activityResult = await window.electron.activity.list();
   if (activityResult.success) store.dispatch(hydrateRuns(activityResult.runs));
 
+  const SessionGate = defense ? React.Fragment : EnterpriseSessionGate;
   root.render(
     <React.StrictMode>
-      <EnterpriseSessionGate>
+      <SessionGate>
         <Provider store={store}>
           <App />
           <ContextMenu />
         </Provider>
-      </EnterpriseSessionGate>
+      </SessionGate>
     </React.StrictMode>,
   );
 }

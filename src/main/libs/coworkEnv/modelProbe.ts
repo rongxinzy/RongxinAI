@@ -1,8 +1,4 @@
-import {
-  getMagpieModelService,
-  hasMagpieModelService,
-  MAGPIE_RUNTIME_API_KEY,
-} from '../../magpie/modelService';
+import { getMagpieModelService, hasMagpieModelService } from '../../magpie/modelService';
 import { extractApiErrorSnippet } from '../coworkModelApi';
 
 const COWORK_MODEL_PROBE_TIMEOUT_MS = 20000;
@@ -19,8 +15,11 @@ export async function probeCoworkModelReadiness(
   let endpoint: string;
   let modelId: string;
   let body: string;
+  let runtimeApiKey: string;
   try {
-    const resolved = await getMagpieModelService().resolve();
+    const service = getMagpieModelService();
+    const resolved = await service.resolve();
+    runtimeApiKey = resolved.runtimeApiKey;
     const gateway = new URL(resolved.gatewayUrl);
     modelId = resolved.model.id;
     const native = resolved.model.native_endpoints ?? [];
@@ -54,7 +53,7 @@ export async function probeCoworkModelReadiness(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${MAGPIE_RUNTIME_API_KEY}`,
+        Authorization: `Bearer ${runtimeApiKey}`,
       },
       body,
       signal: controller.signal,

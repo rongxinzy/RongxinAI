@@ -3,13 +3,14 @@ import { access, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:f
 import { join, resolve } from 'node:path';
 import { isolatedEnvironment, runtimeNetworkEnvironment, runProcess } from './process';
 import type { PythonExecutionResult, PythonRunnerRequest } from '../../shared/pythonRuntime';
+import { readDefensePythonIndex } from './defensePackagePolicy';
 
 const REQUIREMENT =
   /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9_,.-]+\])?==[A-Za-z0-9][A-Za-z0-9.!+_-]*$/;
-export function validatePackages(packages: unknown): string[] {
+export function validatePackages(packages: unknown, limit = 40): string[] {
   if (
     !Array.isArray(packages) ||
-    packages.length > 40 ||
+    packages.length > limit ||
     packages.some(p => typeof p !== 'string' || p.length > 200 || !REQUIREMENT.test(p))
   )
     throw new Error(
@@ -55,10 +56,19 @@ export async function resolvePreinstalledRuntime(
       throw new Error(`The bundled ${label} is missing (${path}). Reinstall the application.`);
     }
   }
+  let runtimeId = preinstalled.runtimeId;
+  if (request.defensePackages) {
+    try {
+      const lock = await readFile(join(request.defensePackages.wheelhouseRoot, 'requirements.txt'));
+      runtimeId += `-${createHash('sha256').update(lock).digest('hex').slice(0, 16)}`;
+    } catch {
+      throw new Error('The bundled Python dependency lock is missing. Reinstall the application.');
+    }
+  }
   return {
     python: preinstalled.pythonPath,
     uv: preinstalled.uvPath,
-    runtimeId: preinstalled.runtimeId,
+    runtimeId,
   };
 }
 
@@ -92,7 +102,8 @@ export async function runPythonOperation(
     (!/^[a-zA-Z0-9._-]+$/.test(current.environmentId) || typeof current.runtimeId !== 'string')
   )
     throw new Error('Invalid Python environment record.');
-  if (current) validatePackages(current.requirements);
+  const installedPackageLimit = request.defensePackages ? 512 : 40;
+  if (current) validatePackages(current.requirements, installedPackageLimit);
   const rebuild = request.operation === 'install' && 'rebuild' in input && input.rebuild;
   if (current && current.runtimeId !== runtime.runtimeId && !rebuild)
     throw new Error(
@@ -144,25 +155,97 @@ export async function runPythonOperation(
       ]);
       if (created.exitCode !== 0)
         throw new Error(`Unable to create Python environment: ${created.stderr}`);
+      const candidatePython = pythonIn(candidate);
+      const installArgs = [
+        'pip',
+        'install',
+        '--no-config',
+        '--no-python-downloads',
+        '--python',
+        candidatePython,
+        '--only-binary',
+        ':all:',
+      ];
+      const freeze = async () => {
+        const result = await run(runtime.uv, [
+          'pip',
+          'freeze',
+          '--no-config',
+          '--python',
+          candidatePython,
+        ]);
+        if (result.exitCode !== 0)
+          throw new Error(`Unable to record Python environment: ${result.stderr}`);
+        return validatePackages(
+          result.stdout.split(/\r?\n/).filter(Boolean),
+          installedPackageLimit,
+        );
+      };
+      const defense = request.defensePackages;
+      const bundledPackages = new Set<string>();
+      const bundledSource = defense ? ['--find-links', join(defense.wheelhouseRoot, 'wheels')] : [];
+      if (defense) {
+        const seeded = await run(runtime.uv, [
+          ...installArgs,
+          ...bundledSource,
+          '--offline',
+          '--no-index',
+          '--require-hashes',
+          '--requirement',
+          join(defense.wheelhouseRoot, 'requirements.txt'),
+        ]);
+        if (seeded.exitCode !== 0)
+          throw new Error(
+            `Unable to install the bundled Python dependencies. Reinstall the application. ${seeded.stderr}`,
+          );
+        if (current?.requirements.length || packages.length) {
+          for (const requirement of await freeze()) bundledPackages.add(requirement);
+        }
+      }
       const overridden = new Set(packages.map(packageName));
       const desired = [
         ...(current?.requirements ?? []).filter(p => !overridden.has(packageName(p))),
         ...packages,
       ];
       if (desired.length) {
-        installOutput = await run(runtime.uv, [
-          'pip',
-          'install',
-          '--no-config',
-          '--no-python-downloads',
-          '--python',
-          pythonIn(candidate),
-          '--index-url',
-          'https://pypi.org/simple',
-          '--only-binary',
-          ':all:',
-          ...desired,
-        ]);
+        if (defense) {
+          installOutput = await run(runtime.uv, [
+            ...installArgs,
+            ...bundledSource,
+            '--offline',
+            '--no-index',
+            ...desired,
+          ]);
+          if (installOutput.exitCode !== 0) {
+            const index = readDefensePythonIndex(defense.indexUrl ?? '');
+            if (index) {
+              installOutput = await run(runtime.uv, [
+                ...installArgs,
+                ...bundledSource,
+                '--default-index',
+                index,
+                ...desired,
+              ]);
+            }
+          }
+        } else {
+          installOutput = await run(runtime.uv, [
+            ...installArgs,
+            '--index-url',
+            'https://pypi.org/simple',
+            ...desired,
+          ]);
+        }
+        if (defense && installOutput.exitCode === 0) {
+          const check = await run(runtime.uv, [
+            'pip',
+            'check',
+            '--no-config',
+            '--python',
+            candidatePython,
+          ]);
+          if (check.exitCode !== 0) installOutput = check;
+        }
         if (installOutput.exitCode !== 0)
           return {
             ...installOutput,
@@ -170,16 +253,11 @@ export async function runPythonOperation(
             environmentId: current?.environmentId ?? '',
           };
       }
-      const frozen = await run(runtime.uv, [
-        'pip',
-        'freeze',
-        '--no-config',
-        '--python',
-        pythonIn(candidate),
-      ]);
-      if (frozen.exitCode !== 0)
-        throw new Error(`Unable to record Python environment: ${frozen.stderr}`);
-      candidate.requirements = validatePackages(frozen.stdout.split(/\r?\n/).filter(Boolean));
+      if (!defense || desired.length) {
+        candidate.requirements = (await freeze()).filter(
+          requirement => !bundledPackages.has(requirement),
+        );
+      }
       signal.throwIfAborted();
       const next = `${currentFile}.${randomUUID()}.tmp`;
       await writeFile(next, JSON.stringify(candidate));

@@ -15,6 +15,7 @@ import { copyCompanionPhoton } from './scripts/copy-companion-photon.mjs';
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const devPort = Number(process.env.VITE_DEV_PORT ?? 5175);
 const defaultLocale = process.env.ZHIYUAN_DEFAULT_LOCALE?.trim() || '';
+const defenseBuild = process.env.APP_EDITION === 'defense';
 const katexVersion = process.env.npm_package_dependencies_katex?.replace(/^[~^]/, '') || '0.16.0';
 const packageJson = JSON.parse(
   fs.readFileSync(path.resolve(projectRoot, 'package.json'), 'utf8'),
@@ -147,6 +148,7 @@ export default defineConfig(async ({ command }) => {
       // KaTeX ESM bundle references this compile-time constant.
       __VERSION__: JSON.stringify(katexVersion),
       __ZHIYUAN_DEFAULT_LOCALE__: JSON.stringify(defaultLocale),
+      __ZHIYUAN_DEFENSE_BUILD__: JSON.stringify(defenseBuild),
     },
     plugins: [
       (await import('@tailwindcss/vite')).default(),
@@ -176,68 +178,72 @@ export default defineConfig(async ({ command }) => {
                 },
                 onstart() {},
               },
-              {
-                entry: 'src/main/desktopPetPreload.ts',
-                vite: {
-                  build: {
-                    watch: null,
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                  },
-                },
-                onstart() {},
-              },
-              {
-                entry: 'src/main/companionWindowPreload.ts',
-                vite: {
-                  build: {
-                    watch: null,
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                  },
-                },
-                onstart() {},
-              },
-              {
-                // Native Win32 window hooks must stay off Electron's browser process.
-                entry: 'src/main/desktopPetWindowsEntry.ts',
-                vite: {
-                  build: {
-                    watch: command === 'serve' ? {} : null,
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                    rolldownOptions: {
-                      external:
-                        command === 'serve'
-                          ? isElectronDevelopmentExternal
-                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+              ...(defenseBuild
+                ? []
+                : [
+                    {
+                      entry: 'src/main/desktopPetPreload.ts',
+                      vite: {
+                        build: {
+                          watch: null,
+                          sourcemap: electronSourceMap,
+                          outDir: 'dist-electron',
+                          minify: false,
+                        },
+                      },
+                      onstart() {},
                     },
-                  },
-                },
-                onstart() {},
-              },
-              {
-                // The local inference daemon is launched as an independent Node process.
-                entry: 'src/main/llamacppModelDaemonEntry.ts',
-                vite: {
-                  build: {
-                    watch: null,
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                    rolldownOptions: {
-                      external:
-                        command === 'serve'
-                          ? isElectronDevelopmentExternal
-                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                    {
+                      entry: 'src/main/companionWindowPreload.ts',
+                      vite: {
+                        build: {
+                          watch: null,
+                          sourcemap: electronSourceMap,
+                          outDir: 'dist-electron',
+                          minify: false,
+                        },
+                      },
+                      onstart() {},
                     },
-                  },
-                },
-                onstart() {},
-              },
+                    {
+                      // Native Win32 window hooks must stay off Electron's browser process.
+                      entry: 'src/main/desktopPetWindowsEntry.ts',
+                      vite: {
+                        build: {
+                          watch: command === 'serve' ? {} : null,
+                          sourcemap: electronSourceMap,
+                          outDir: 'dist-electron',
+                          minify: false,
+                          rolldownOptions: {
+                            external:
+                              command === 'serve'
+                                ? isElectronDevelopmentExternal
+                                : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                          },
+                        },
+                      },
+                      onstart() {},
+                    },
+                    {
+                      // The local inference daemon is launched as an independent Node process.
+                      entry: 'src/main/llamacppModelDaemonEntry.ts',
+                      vite: {
+                        build: {
+                          watch: null,
+                          sourcemap: electronSourceMap,
+                          outDir: 'dist-electron',
+                          minify: false,
+                          rolldownOptions: {
+                            external:
+                              command === 'serve'
+                                ? isElectronDevelopmentExternal
+                                : id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                          },
+                        },
+                      },
+                      onstart() {},
+                    },
+                  ]),
               {
                 // Pure artifact parsing and hashing run outside the main process.
                 entry: 'src/main/workbenchTask/artifactWorker.ts',
@@ -251,19 +257,23 @@ export default defineConfig(async ({ command }) => {
                 },
                 onstart() {},
               },
-              {
-                // Parse model catalogs without blocking Electron's main process.
-                entry: 'src/main/magpie/catalogWorker.ts',
-                vite: {
-                  build: {
-                    watch: command === 'serve' ? {} : null,
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                  },
-                },
-                onstart() {},
-              },
+              ...(defenseBuild
+                ? []
+                : [
+                    {
+                      // Parse model catalogs without blocking Electron's main process.
+                      entry: 'src/main/magpie/catalogWorker.ts',
+                      vite: {
+                        build: {
+                          watch: command === 'serve' ? {} : null,
+                          sourcemap: electronSourceMap,
+                          outDir: 'dist-electron',
+                          minify: false,
+                        },
+                      },
+                      onstart() {},
+                    },
+                  ]),
               {
                 // Stream SHA-256 file digests without blocking the main process.
                 entry: 'src/main/libs/hashWorker.ts',
@@ -357,6 +367,7 @@ export default defineConfig(async ({ command }) => {
                 // 主进程入口文件
                 entry: 'src/main/main.ts',
                 vite: {
+                  define: { __ZHIYUAN_DEFENSE_BUILD__: JSON.stringify(defenseBuild) },
                   plugins: [copyPhotonWasmPlugin()],
                   build: {
                     sourcemap: electronSourceMap,
@@ -410,8 +421,10 @@ export default defineConfig(async ({ command }) => {
         input: {
           main: path.resolve(projectRoot, 'index.html'),
           officePreview: path.resolve(projectRoot, 'office-preview.html'),
-          desktopPet: path.resolve(projectRoot, 'desktop-pet.html'),
-          companion: path.resolve(projectRoot, 'companion.html'),
+          ...(!defenseBuild && {
+            desktopPet: path.resolve(projectRoot, 'desktop-pet.html'),
+            companion: path.resolve(projectRoot, 'companion.html'),
+          }),
         },
       },
       // CI 中指定 chrome130（Electron 40 运行时）跳过降级转译省内存

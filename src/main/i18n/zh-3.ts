@@ -126,6 +126,7 @@ export const zhMain3 = {
   modelPoolSessionBusy: '当前会话仍在处理，请稍后再试。',
   modelPoolStreamInterrupted: '回答意外中断，已保留收到的内容。请重试或要求继续。',
 
+  aisphereNotConfigured: '请先在设置中连接 AISphere 平台。',
   aisphereMissingModel: '所选模型不在当前 AISphere 平台列表中，请刷新后重新选择。',
   aisphereUnavailable: '无法连接 AISphere 平台，请检查平台地址和网络后重试。',
   aisphereBusy: '请先停止正在运行的任务，再切换 AISphere地址。',
