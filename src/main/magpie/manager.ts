@@ -1,10 +1,10 @@
+import type { MagpieManagerOptions } from './managerOptions';
+import { MagpieManagerProviders } from './managerProviders';
+import { MagpieManagerAgents } from './managerAgents';
+import { MagpieManagerManagement } from './managerManagement';
 import type { MagpieSignInState } from './oauthPolicy';
-import { parseMagpieCatalog, readBoundedCatalog } from './catalogReader';
-import {
-  HOST_PROVIDER_PREFIX,
-  hostProviderPayload,
-  type MagpieHostProvider,
-} from './hostProviders';
+
+import { type MagpieHostProvider } from './hostProviders';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import type {
@@ -17,71 +17,21 @@ import type {
   MagpieTestProviderResult,
   MagpieDiagnosticSummary,
 } from '../../shared/magpie/types';
-import {
-  magpieAgentConnect,
-  magpieAgentDisconnect,
-  magpieAgentPreview,
-  magpieDisconnectAllManaged,
-  magpieReapplyConnectedAgents,
-  parseMagpieCliVersions,
-} from './agentControl';
+
 import { isolatedMagpieEnvironment, prepareMagpieHome } from './environment';
-import { syncMagpieLanAccessKey } from './lanAccess';
-import { resolveMagpieGatewayPort, type MagpieGatewayPortStore } from './gatewayPort';
+
+import { resolveMagpieGatewayPort } from './gatewayPort';
 import { MAGPIE_VERSION, verifyMagpieBinary } from './integrity';
 import type { MagpieAgentConnectPreview } from '../../shared/magpie/types';
-import { formatMagpieManagementError } from './managementErrors';
-import { probeProviderEndpoint } from './providerTest';
-import { RecentErrors } from './recentErrors';
-import { mergeMagpiePreferences, projectMagpiePreferences } from './preferences';
+
 import type { MagpiePreferences, MagpiePreferencesPatch } from '../../shared/magpie/preferences';
-import {
-  clearLegacyHostAgentStorage,
-  mergeOpenCodeConfigToUser,
-  revertOpenCodeConfigFromUser,
-  resolveUserHome,
-  stripCodexMagpieProviderBlock,
-  canonicalHostAgentId,
-} from './externalAgentHostConfig';
-import { resyncOpenCodeUserConfig, sweepManagedAgentsAfterStart } from './reapplyStartup';
-import { isMagpieManagedAgentId } from '../../shared/magpie/constants';
+
 import type { MagpieRoutingGateway } from './magpieRoutingGateway';
 import { MagpieRoutingUsageService } from './routingUsageService';
-import { MAGPIE_AGENT_MODEL_FIELDS, delay, freePort } from './magpieManagerUtils';
-import {
-  enrichMagpieProviderSummariesWithStoredKeys,
-  isUsableMagpieProviderKey,
-  parseMagpieProviderKeyResponse,
-} from './magpieProviderKey';
-import {
-  buildMagpieProviderSavePayload,
-  normalizeProviderContexts,
-  projectMagpieProviderSummaries,
-  resolveMagpieProviderSaveKey,
-  sanitizeProviderContexts,
-} from './projectMagpieProviders';
+import { delay, freePort } from './magpieManagerUtils';
 
-export interface MagpieManagerOptions {
-  resourcesRoot: string;
-  privateHome: string;
-  /** Tests must supply temporary HOME and USERPROFILE; production retains the real CLI home. */
-  environment?: NodeJS.ProcessEnv;
-  verify?: typeof verifyMagpieBinary;
-  spawn?: typeof spawn;
-  fetch?: typeof fetch;
-  port?: () => Promise<number>;
-  gatewayPort?: MagpieGatewayPortStore;
-  startupTimeoutMs?: number;
-  parseCatalog?: typeof parseMagpieCatalog;
-  serviceEnabled?: { read(): boolean; write(enabled: boolean): void };
-  subscriptionAccounts?: { read(): boolean; write(enabled: boolean): void | Promise<void> };
-  /**
-   * Local-inference LAN access: when on, the gateway binds 0.0.0.0 (non-loopback
-   * requests then require a gateway key) and the LAN token is imported as the
-   * `zhiyuan-lan` key after each start. `enabled` alone must not run the service.
-   */
-  lanAccess?: { read(): { enabled: boolean; lanToken: string | null } };
-}
+export type { MagpieManagerOptions } from './managerOptions';
+
 /** Owns exactly one verified, isolated upstream process. Never attaches to existing gateways. */
 export class MagpieManager implements MagpieRoutingGateway {
   private state: MagpieStatus = { state: 'stopped', version: MAGPIE_VERSION };
@@ -95,16 +45,40 @@ export class MagpieManager implements MagpieRoutingGateway {
   private memoryEnabled = false;
   private deniedAfterPersistenceFailure = false;
   private subscriptionChange?: Promise<MagpieStatus>;
-  private catalogRead?: Promise<MagpieModel[]>;
-  private hostSync: Promise<void> = Promise.resolve();
-  private hostSignatures = new Map<string, string>();
-  private readonly recentErrors = new RecentErrors();
-  private cachedActiveProviderCount = 0;
-  private providersListHydrated = false;
-  private reapplyErrors = new Map<string, string>();
   private lanAccessChange?: Promise<MagpieStatus>;
+  private readonly providerOperations: MagpieManagerProviders;
+  private readonly agentOperations: MagpieManagerAgents;
+  private readonly managementOperations: MagpieManagerManagement;
   readonly routingUsage: MagpieRoutingUsageService;
   constructor(private readonly options: MagpieManagerOptions) {
+    this.providerOperations = new MagpieManagerProviders({
+      state: () => this.state,
+      ensureRunning: () => this.ensureRunning(),
+      managementJson: (route, init, timeoutMs) => this.managementJson(route, init, timeoutMs),
+      request: (url, init, timeoutMs) => this.request(url, init, timeoutMs),
+      options,
+      providers: () => this.providers(),
+      clearRecentErrors: filter => this.clearRecentErrors(filter),
+      diagnostics: () => this.diagnostics(),
+    });
+    this.agentOperations = new MagpieManagerAgents({
+      state: () => this.state,
+      ensureRunning: () => this.ensureRunning(),
+      managementJson: (route, init, timeoutMs) => this.managementJson(route, init, timeoutMs),
+      agents: timeoutMs => this.agents(timeoutMs),
+      options,
+    });
+    this.managementOperations = new MagpieManagerManagement({
+      state: () => this.state,
+      abort: () => this.abort,
+      options,
+      recordError: message => this.recordError(message),
+      status: () => this.status(),
+      ensureRunning: () => this.ensureRunning(),
+      webRequest: (route, init, timeoutMs) => this.webRequest(route, init, timeoutMs),
+      managementJson: (route, init) => this.managementJson(route, init),
+      request: (url, init, timeoutMs) => this.request(url, init, timeoutMs),
+    });
     this.routingUsage = new MagpieRoutingUsageService(this);
   }
   status(): MagpieStatus {
@@ -112,10 +86,7 @@ export class MagpieManager implements MagpieRoutingGateway {
       ...this.state,
       enabled: this.isServiceEnabled(),
       subscriptionAccountsEnabled: this.options.subscriptionAccounts?.read() === true,
-      diagnostics: {
-        activeProviderCount: this.cachedActiveProviderCount,
-        recentErrors: this.recentErrors.list(),
-      },
+      diagnostics: this.providerOperations.summary(),
     };
   }
   private isServiceEnabled(): boolean {
@@ -198,7 +169,7 @@ export class MagpieManager implements MagpieRoutingGateway {
         exited = true;
         if (this.child === child) {
           this.child = undefined;
-          this.hostSignatures.clear();
+          this.providerOperations.clearHostSignatures();
           this.webKey = undefined;
           this.webPort = undefined;
           if (this.state.state === 'running')
@@ -220,8 +191,8 @@ export class MagpieManager implements MagpieRoutingGateway {
           const web = await this.webRequest('/', { signal });
           if (data.name === 'magpie' && data.version === MAGPIE_VERSION && web.ok && !exited) {
             this.state = { state: 'running', version: MAGPIE_VERSION, gatewayUrl };
-            void this.reapplyManagedAgentsAfterStart();
-            if (lanAccessEnabled) void this.syncLanAccessKeyAfterStart();
+            void this.agentOperations.reapplyManagedAgentsAfterStart();
+            if (lanAccessEnabled) void this.managementOperations.syncLanAccessKeyAfterStart();
             return this.status();
           }
         } catch {
@@ -263,17 +234,10 @@ export class MagpieManager implements MagpieRoutingGateway {
     return this.webRequest(route, init, timeoutMs);
   }
   preferences(): Promise<MagpiePreferences> {
-    return this.managementJson('/api/settings').then(projectMagpiePreferences);
+    return this.managementOperations.preferences();
   }
-  async updatePreferences(patch: MagpiePreferencesPatch): Promise<MagpiePreferences> {
-    const raw = await this.managementJson('/api/settings');
-    const merged = mergeMagpiePreferences(raw, patch);
-    const saved = await this.managementJson('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(merged),
-    });
-    return projectMagpiePreferences(saved);
+  updatePreferences(patch: MagpiePreferencesPatch): Promise<MagpiePreferences> {
+    return this.managementOperations.updatePreferences(patch);
   }
   /** Main-only descriptor: never send this key through renderer IPC or logs. */
   managementConnection(): { url: string; cookieName: string; key: string } {
@@ -286,24 +250,7 @@ export class MagpieManager implements MagpieRoutingGateway {
     };
   }
   models(): Promise<MagpieModel[]> {
-    if (this.catalogRead) return this.catalogRead;
-    this.catalogRead = this.readModels().finally(() => {
-      this.catalogRead = undefined;
-    });
-    return this.catalogRead;
-  }
-  private async readModels(): Promise<MagpieModel[]> {
-    if (this.state.state !== 'running' || !this.state.gatewayUrl) return [];
-    const gateway = this.state.gatewayUrl;
-    const signal = AbortSignal.any([this.abort!.signal, AbortSignal.timeout(15_000)]);
-    const response = await this.request(`${gateway}/v1/models`, { signal });
-    if (!response.ok) throw new Error('Unable to load local models');
-    const bytes = await readBoundedCatalog(response, signal);
-    const models = await (this.options.parseCatalog ?? parseMagpieCatalog)(bytes, signal);
-    signal.throwIfAborted();
-    if (this.state.state !== 'running' || this.state.gatewayUrl !== gateway)
-      throw new Error('Model service changed while reading its catalog');
-    return models;
+    return this.managementOperations.models();
   }
   /** Only a previously explicit, persisted enable permits lazy startup or one recovery attempt. */
   async ensureRunning(): Promise<MagpieStatus> {
@@ -346,322 +293,39 @@ export class MagpieManager implements MagpieRoutingGateway {
     return run;
   }
 
-  /** Best-effort key import after the gateway is up; failures surface in diagnostics. */
-  private async syncLanAccessKeyAfterStart(): Promise<void> {
-    const lanToken = this.options.lanAccess?.read().lanToken;
-    if (!lanToken) return;
-    try {
-      await this.syncLanAccessKey(lanToken);
-    } catch (error) {
-      console.warn('[Magpie] failed to import the LAN access key:', error);
-      this.recordError('LAN access key import failed');
-    }
-  }
-
   /** Re-imports the (already rotated) LAN token as the `zhiyuan-lan` gateway key. */
-  async onLanAccessTokenRegenerated(): Promise<void> {
-    if (this.state.state !== 'running') return;
-    const lanToken = this.options.lanAccess?.read().lanToken;
-    if (!lanToken) return;
-    await this.syncLanAccessKey(lanToken);
+  onLanAccessTokenRegenerated(): Promise<void> {
+    return this.managementOperations.onLanAccessTokenRegenerated();
   }
-  private async syncLanAccessKey(lanToken: string): Promise<void> {
-    await syncMagpieLanAccessKey(
-      { managementJson: (route, init) => this.managementJson(route, init) },
-      lanToken,
-    );
-  }
-  /** Main-only authoritative host binding snapshot; external Provider credentials never enter here. */
   syncHostProviders(definitions: readonly MagpieHostProvider[]): Promise<void> {
-    const payloads = definitions.map(hostProviderPayload);
-    const ids = new Set(payloads.map(p => String(p.id)));
-    if (ids.size !== payloads.length)
-      return Promise.reject(new Error('Duplicate host provider id'));
-    const run = this.hostSync
-      .catch((): void => undefined)
-      .then(async () => {
-        await this.ensureRunning();
-        // Discover only reserved ids. Do not forward or log the management response.
-        const state = await this.managementJson('/api/providers');
-        const existing = new Set<string>(
-          (Array.isArray(state.providers) ? state.providers : []).flatMap((p: unknown) =>
-            p &&
-            typeof p === 'object' &&
-            'id' in p &&
-            typeof p.id === 'string' &&
-            p.id.startsWith(HOST_PROVIDER_PREFIX)
-              ? [p.id]
-              : [],
-          ),
-        );
-        for (const id of existing) {
-          if (!ids.has(id)) {
-            await this.managementJson('/api/provider/off', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id }),
-            });
-            this.hostSignatures.delete(id);
-          }
-        }
-        for (const payload of payloads) {
-          const id = String(payload.id);
-          const signature = JSON.stringify(payload);
-          // Authoritative binding changes are written through upstream's API, never its files.
-          const actual = (Array.isArray(state.providers) ? state.providers : []).find(
-            (entry: { id?: string }) => entry.id === id,
-          );
-          const sameTarget =
-            actual &&
-            actual.off !== true &&
-            ['chat', 'responses', 'anthropic', 'name'].every(
-              field => actual[field] === payload[field],
-            ) &&
-            !actual.fallback?.length &&
-            !actual.headers &&
-            !actual.extraBody &&
-            JSON.stringify(actual.chosen ?? []) === JSON.stringify(payload.models) &&
-            JSON.stringify(actual.contexts ?? {}) === JSON.stringify(payload.contexts) &&
-            JSON.stringify(actual.outputs ?? {}) === JSON.stringify(payload.outputs);
-          if (existing.has(id) && this.hostSignatures.get(id) === signature && sameTarget) continue;
-          await this.managementJson('/api/provider/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...payload,
-              headers: {},
-              extraBody: {},
-              fallback: [],
-              new: !existing.has(id),
-            }),
-          });
-          // Upstream preserves provider disabled state across provider/save; a host endpoint returning
-          // after unload/logout must explicitly re-enable that same reserved provider.
-          if (existing.has(id) && actual?.off === true) {
-            await this.managementJson('/api/provider/on', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id }),
-            });
-          }
-          this.hostSignatures.set(id, signature);
-        }
-        this.providersListHydrated = false;
-      });
-    this.hostSync = run;
-    return run;
+    return this.providerOperations.syncHostProviders(definitions);
   }
-
   recordError(message: string, providerId?: string): void {
-    this.recentErrors.record(message, providerId);
+    this.providerOperations.recordError(message, providerId);
   }
-
   clearRecentErrors(filter?: { providerIds?: string[]; providerNames?: string[] }): void {
-    this.recentErrors.clear(filter);
+    this.providerOperations.clearRecentErrors(filter);
   }
-
-  async clearDiagnostics(): Promise<MagpieDiagnosticSummary> {
-    this.clearRecentErrors();
-    return this.diagnostics();
+  clearDiagnostics(): Promise<MagpieDiagnosticSummary> {
+    return this.providerOperations.clearDiagnostics();
   }
-
-  async providers(): Promise<MagpieProviderSummary[]> {
-    if (this.state.state !== 'running') return [];
-    try {
-      const state = await this.managementJson('/api/providers');
-      const rawList = Array.isArray(state.providers) ? state.providers : [];
-      const list = projectMagpieProviderSummaries(state);
-      await enrichMagpieProviderSummariesWithStoredKeys(list, rawList, id =>
-        this.fetchStoredProviderKey(id),
-      );
-      this.cachedActiveProviderCount = list.filter(p => !p.off).length;
-      this.providersListHydrated = true;
-      return list;
-    } catch {
-      return [];
-    }
+  providers(): Promise<MagpieProviderSummary[]> {
+    return this.providerOperations.providers();
   }
-
-  private async fetchStoredProviderKey(providerId: string): Promise<string | undefined> {
-    const body = await this.managementJson('/api/provider/key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: providerId }),
-    });
-    return parseMagpieProviderKeyResponse(body);
+  saveProvider(input: MagpieSaveProviderInput): Promise<MagpieProviderSummary[]> {
+    return this.providerOperations.saveProvider(input);
   }
-
-  async saveProvider(input: MagpieSaveProviderInput): Promise<MagpieProviderSummary[]> {
-    if (!input || typeof input !== 'object') throw new Error('Invalid provider payload');
-    const name = input.name?.trim();
-    if (!name || name.length > 100)
-      throw new Error('Provider name is required (max 100 characters)');
-    const baseUrl = input.baseUrl?.trim();
-    if (!baseUrl) throw new Error('Base URL is required');
-    try {
-      const parsedUrl = new URL(baseUrl);
-      if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error();
-    } catch {
-      throw new Error('Base URL must be a valid http or https URL');
-    }
-    if (input.id && input.id.startsWith(HOST_PROVIDER_PREFIX)) {
-      throw new Error('Host-managed providers cannot be modified via user settings');
-    }
-    // Fail before starting the service on a value upstream would reject.
-    const contexts = normalizeProviderContexts(input.contexts);
-    await this.ensureRunning();
-    const state = await this.managementJson('/api/providers');
-    const existingList = Array.isArray(state.providers) ? state.providers : [];
-    const existing = input.id
-      ? existingList.find((p: Record<string, unknown>) => p.id === input.id)
-      : undefined;
-
-    const id =
-      input.id?.trim() ||
-      `provider-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    if (id.startsWith(HOST_PROVIDER_PREFIX)) {
-      throw new Error('Invalid provider id');
-    }
-
-    const targetField =
-      input.api === 'anthropic-messages'
-        ? 'anthropic'
-        : input.api === 'openai-responses'
-          ? 'responses'
-          : 'chat';
-
-    const payload = buildMagpieProviderSavePayload(
-      { ...input, name, contexts },
-      existing as Record<string, unknown> | undefined,
-      id,
-      targetField,
-      baseUrl,
-    );
-
-    await this.managementJson('/api/provider/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const existingName =
-      existing && 'name' in existing && typeof existing.name === 'string'
-        ? existing.name
-        : undefined;
-    const existingTarget =
-      existing && targetField in existing && typeof existing[targetField] === 'string'
-        ? existing[targetField]
-        : '';
-    const previousContexts = sanitizeProviderContexts(existing?.contexts);
-    const nextContexts = contexts ?? previousContexts;
-    // A key-only save leaves the error that made the user open the dialog.
-    const configChanged =
-      !existing ||
-      existingTarget !== baseUrl ||
-      existingName !== name ||
-      JSON.stringify(nextContexts ?? null) !== JSON.stringify(previousContexts ?? null);
-    if (configChanged) {
-      this.clearRecentErrors({
-        providerIds: [id],
-        providerNames: [name, ...(existingName ? [existingName] : [])],
-      });
-    }
-
-    return this.providers();
+  setProviderEnabled(id: string, enabled: boolean): Promise<MagpieProviderSummary[]> {
+    return this.providerOperations.setProviderEnabled(id, enabled);
   }
-
-  async setProviderEnabled(id: string, enabled: boolean): Promise<MagpieProviderSummary[]> {
-    if (typeof id !== 'string' || id.startsWith(HOST_PROVIDER_PREFIX)) {
-      throw new Error('Host-managed providers cannot be toggled via user settings');
-    }
-    await this.ensureRunning();
-    const name = await this.providerName(id);
-    await this.managementJson(enabled ? '/api/provider/on' : '/api/provider/off', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id }),
-    });
-    this.clearRecentErrors({ providerIds: [id], ...(name ? { providerNames: [name] } : {}) });
-    return this.providers();
+  deleteProvider(id: string): Promise<MagpieProviderSummary[]> {
+    return this.providerOperations.deleteProvider(id);
   }
-
-  async deleteProvider(id: string): Promise<MagpieProviderSummary[]> {
-    if (typeof id !== 'string' || id.startsWith(HOST_PROVIDER_PREFIX)) {
-      throw new Error('Host-managed providers cannot be deleted via user settings');
-    }
-    await this.ensureRunning();
-    // Best effort: a failed listing must not stop the delete it only names.
-    const name = await this.providerName(id);
-    try {
-      await this.managementJson('/api/provider/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-    } catch {
-      await this.managementJson('/api/provider/off', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-    }
-    this.clearRecentErrors({ providerIds: [id], ...(name ? { providerNames: [name] } : {}) });
-    return this.providers();
+  testProvider(input: MagpieSaveProviderInput): Promise<MagpieTestProviderResult> {
+    return this.providerOperations.testProvider(input);
   }
-
-  private async providerName(id: string): Promise<string | undefined> {
-    try {
-      const state = await this.managementJson('/api/providers');
-      const list = Array.isArray(state.providers) ? state.providers : [];
-      const row = list.find((provider: Record<string, unknown>) => provider.id === id);
-      return row && 'name' in row && typeof row.name === 'string' ? row.name : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  async testProvider(input: MagpieSaveProviderInput): Promise<MagpieTestProviderResult> {
-    if (!input.baseUrl) return { ok: false, error: 'Base URL is required' };
-    let key = resolveMagpieProviderSaveKey(input.key);
-    if (!isUsableMagpieProviderKey(key) && input.id) {
-      const stored = await this.fetchStoredProviderKey(input.id);
-      if (isUsableMagpieProviderKey(stored)) key = stored;
-    }
-    return probeProviderEndpoint(
-      input.baseUrl,
-      input.api,
-      isUsableMagpieProviderKey(key) ? key : '',
-      this.options.fetch ?? fetch,
-    );
-  }
-
-  async diagnostics(): Promise<MagpieDiagnosticSummary> {
-    let latencyMs: number | undefined;
-    if (this.state.state === 'running' && this.state.gatewayUrl) {
-      const start = Date.now();
-      try {
-        await this.request(`${this.state.gatewayUrl}/api/hello`, {
-          signal: AbortSignal.timeout(3_000),
-        });
-        latencyMs = Date.now() - start;
-      } catch {
-        /* ignore ping error */
-      }
-    }
-    let activeProviderCount = this.cachedActiveProviderCount;
-    if (this.state.state === 'running' && !this.providersListHydrated) {
-      try {
-        const all = await this.providers();
-        activeProviderCount = all.filter(p => !p.off).length;
-      } catch {
-        activeProviderCount = 0;
-      }
-    }
-    return {
-      latencyMs,
-      activeProviderCount,
-      recentErrors: this.recentErrors.list(),
-    };
+  diagnostics(): Promise<MagpieDiagnosticSummary> {
+    return this.providerOperations.diagnostics();
   }
 
   /** Called only by the host's explicitly confirmed subscription-account switch. */
@@ -703,211 +367,33 @@ export class MagpieManager implements MagpieRoutingGateway {
     return this.subscriptionChange;
   }
   /** Main-only read of a flow created by the official management page. */
-  async signInStatus(id: string): Promise<MagpieSignInState> {
-    if (!/^[A-Za-z0-9_-]{1,80}$/.test(id) || !this.status().subscriptionAccountsEnabled)
-      throw new Error('Subscription sign-in is unavailable');
-    await this.ensureRunning();
-    const result = await this.managementJson(`/api/signin/${encodeURIComponent(id)}`);
-    if (
-      result.id !== id ||
-      typeof result.agent !== 'string' ||
-      typeof result.url !== 'string' ||
-      typeof result.state !== 'string' ||
-      result.url.length > 8192
-    )
-      throw new Error('Invalid subscription sign-in state');
-    return { id, agent: result.agent, url: result.url, state: result.state };
+  signInStatus(id: string): Promise<MagpieSignInState> {
+    return this.managementOperations.signInStatus(id);
   }
-  async agents(readTimeoutMs?: number): Promise<MagpieAgents> {
-    if (this.state.state !== 'running') return { agents: [], pending: false };
-    const state = await this.managementJson('/api/state', {}, readTimeoutMs);
-    const cli = await this.managementJson('/api/agents/cli', {}, readTimeoutMs);
-    const records = parseMagpieCliVersions(cli.agents);
-    return {
-      pending: cli.pending === true,
-      agents: (Array.isArray(state.agents) ? state.agents : [])
-        .slice(0, 200)
-        .flatMap((a: Record<string, unknown>) => {
-          if (typeof a.id !== 'string' || typeof a.name !== 'string') return [];
-          const version = records[a.id] ?? {};
-          return [
-            {
-              id: a.id,
-              name: a.name,
-              cliMissing: a.cliMissing === true,
-              wired: a.wired === true,
-              ...(typeof version.version === 'string' ? { version: version.version } : {}),
-              ...(typeof version.app === 'string' ? { appVersion: version.app } : {}),
-              ...(this.reapplyErrors.has(a.id)
-                ? { reapplyError: this.reapplyErrors.get(a.id) }
-                : {}),
-              models: (Array.isArray(a.fields) ? a.fields : [])
-                .filter(
-                  (f: Record<string, unknown>) =>
-                    typeof f.key === 'string' &&
-                    MAGPIE_AGENT_MODEL_FIELDS.has(f.key) &&
-                    typeof f.value === 'string',
-                )
-                .map((f: Record<string, unknown>) => ({
-                  key: String(f.key),
-                  label: typeof f.label === 'string' ? f.label : String(f.key),
-                  value: String(f.value),
-                  options: (Array.isArray(f.options) ? f.options : [])
-                    .slice(0, 2000)
-                    .flatMap((option: Record<string, unknown>) =>
-                      typeof option.value === 'string'
-                        ? [
-                            {
-                              value: option.value,
-                              ...(typeof option.label === 'string' ? { label: option.label } : {}),
-                            },
-                          ]
-                        : [],
-                    ),
-                })),
-            },
-          ];
-        }),
-    };
+  agents(readTimeoutMs?: number): Promise<MagpieAgents> {
+    return this.agentOperations.agents(readTimeoutMs);
   }
-  private agentClient(): {
-    managementJson(route: string, init?: RequestInit): Promise<Record<string, unknown>>;
-    agents(): Promise<MagpieAgents>;
-  } {
-    return {
-      managementJson: (route, init) => this.managementJson(route, init),
-      agents: () => this.agents(),
-    };
+  previewAgent(agentId: string): Promise<MagpieAgentConnectPreview> {
+    return this.agentOperations.previewAgent(agentId);
   }
-
-  private userHome(): string {
-    return resolveUserHome(this.options.environment);
+  connectAgent(agentId: string): Promise<MagpieAgents> {
+    return this.agentOperations.connectAgent(agentId);
   }
-
-  private async reapplyManagedAgentsAfterStart(): Promise<void> {
-    const outcome = await sweepManagedAgentsAfterStart({
-      isRunning: () => this.state.state === 'running',
-      readAgents: timeoutMs => this.agents(timeoutMs),
-      reapply: current => magpieReapplyConnectedAgents(this.agentClient(), current),
-    });
-    if (!outcome) return;
-    this.reapplyErrors = outcome.errors;
-    await resyncOpenCodeUserConfig({
-      snapshot: outcome.snapshot,
-      errors: outcome.errors,
-      privateHome: this.options.privateHome,
-      home: this.userHome(),
-      gatewayUrl: this.state.state === 'running' ? this.state.gatewayUrl : undefined,
-    });
+  disconnectAgent(agentId: string): Promise<MagpieAgents> {
+    return this.agentOperations.disconnectAgent(agentId);
   }
-
-  private async finalizeHostConnect(agentId: string): Promise<void> {
-    if (canonicalHostAgentId(agentId) !== 'opencode') return;
-    await mergeOpenCodeConfigToUser(this.options.privateHome, this.userHome());
+  disconnectAllAgents(): Promise<MagpieAgents> {
+    return this.agentOperations.disconnectAllAgents();
   }
-
-  private async finalizeHostDisconnect(agentId: string): Promise<void> {
-    const canonical = canonicalHostAgentId(agentId);
-    const home = this.userHome();
-    if (canonical === 'opencode')
-      await revertOpenCodeConfigFromUser(this.options.privateHome, home);
-    if (canonical === 'codex') await stripCodexMagpieProviderBlock(home);
-    await clearLegacyHostAgentStorage(this.options.privateHome);
+  setModel(selection: MagpieModelSelection): Promise<MagpieAgents> {
+    return this.agentOperations.setModel(selection);
   }
-
-  private wiredManagedAgentIds(agents: MagpieAgents): string[] {
-    const ids = new Set<string>();
-    for (const agent of agents.agents) {
-      if (!agent.wired || !isMagpieManagedAgentId(agent.id)) continue;
-      ids.add(canonicalHostAgentId(agent.id));
-    }
-    return [...ids];
-  }
-
-  async previewAgent(agentId: string): Promise<MagpieAgentConnectPreview> {
-    await this.ensureRunning();
-    return magpieAgentPreview(this.agentClient(), agentId);
-  }
-
-  async connectAgent(agentId: string): Promise<MagpieAgents> {
-    await this.ensureRunning();
-    await clearLegacyHostAgentStorage(this.options.privateHome);
-    await magpieAgentConnect(this.agentClient(), agentId);
-    await this.finalizeHostConnect(agentId);
-    return this.agents();
-  }
-
-  async disconnectAgent(agentId: string): Promise<MagpieAgents> {
-    if (this.state.state !== 'running') return { agents: [], pending: false };
-    const before = await this.agents();
-    const wasWired = before.agents.some(agent => agent.id === agentId && agent.wired);
-    const agents = await magpieAgentDisconnect(this.agentClient(), agentId);
-    if (wasWired) await this.finalizeHostDisconnect(agentId);
-    this.reapplyErrors.delete(agentId);
-    return agents;
-  }
-
-  async disconnectAllAgents(): Promise<MagpieAgents> {
-    if (this.state.state !== 'running') return { agents: [], pending: false };
-    const before = await this.agents();
-    const wired = this.wiredManagedAgentIds(before);
-    if (wired.length === 0) return before;
-    const next = await magpieDisconnectAllManaged(this.agentClient());
-    for (const id of wired) {
-      await this.finalizeHostDisconnect(id).catch(error => {
-        console.warn(`[Magpie] host disconnect cleanup failed for ${id}:`, error);
-      });
-    }
-    this.reapplyErrors.clear();
-    return next;
-  }
-
-  async setModel(selection: MagpieModelSelection): Promise<MagpieAgents> {
-    if (
-      !selection ||
-      typeof selection.agentId !== 'string' ||
-      selection.agentId.length > 100 ||
-      !MAGPIE_AGENT_MODEL_FIELDS.has(selection.field) ||
-      typeof selection.value !== 'string' ||
-      selection.value.length > 500
-    )
-      throw new Error('Invalid model selection');
-    const agents = await this.agents();
-    if (
-      !agents.agents.some(
-        a =>
-          a.id === selection.agentId &&
-          a.models.some(
-            f =>
-              f.key === selection.field &&
-              (f.value === selection.value ||
-                f.options.some(option => option.value === selection.value)),
-          ),
-      )
-    )
-      throw new Error('Unknown agent model selection');
-    await this.managementJson('/api/set', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        Agent: selection.agentId,
-        Field: selection.field,
-        Value: selection.value,
-      }),
-    });
-    return this.agents();
-  }
-  private async managementJson(
+  private managementJson(
     route: string,
     init: RequestInit = {},
     timeoutMs?: number,
   ): Promise<Record<string, unknown>> {
-    const response = await this.webRequest(route, init, timeoutMs);
-    const text = await response.text();
-    if (!response.ok)
-      throw new Error(formatMagpieManagementError(response.status, response.statusText, text));
-    if (text.length > 1024 * 1024) throw new Error('Management response exceeds size limit');
-    return JSON.parse(text);
+    return this.managementOperations.managementJson(route, init, timeoutMs);
   }
   /** Explicit user disable. Application exit and internal restarts must use shutdown/stopOwned. */
   stop(): Promise<MagpieStatus> {
@@ -944,8 +430,7 @@ export class MagpieManager implements MagpieRoutingGateway {
         await this.terminate();
       }
       this.state = { state: 'stopped', version: MAGPIE_VERSION };
-      this.providersListHydrated = false;
-      this.cachedActiveProviderCount = 0;
+      this.providerOperations.resetHydration();
       return this.status();
     })()
       .catch(error => {
@@ -982,6 +467,6 @@ export class MagpieManager implements MagpieRoutingGateway {
     this.child = undefined;
     this.webKey = undefined;
     this.webPort = undefined;
-    this.hostSignatures.clear();
+    this.providerOperations.clearHostSignatures();
   }
 }
