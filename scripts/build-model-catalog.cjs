@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '..');
 const input = process.argv[2];
 if (!input) throw new Error('Pass the verified catalog snapshot JSON path');
 const snapshot = JSON.parse(fs.readFileSync(input, 'utf8'));
+const strataCatalog = require('../resources/strata/marketplace-catalog.json');
 const destination = path.join(root, 'resources', 'model-catalog.sqlite');
 const staged = `${destination}.tmp`;
 if (!Number.isSafeInteger(snapshot.revision) || !snapshot.updatedAt || !snapshot.models?.length) {
@@ -27,12 +28,20 @@ try {
       featured_rank INTEGER
     );
     CREATE INDEX catalog_models_position ON catalog_models (position, repo_id);
+    CREATE TABLE strata_marketplace (
+      catalog_id TEXT PRIMARY KEY,
+      payload TEXT NOT NULL CHECK (json_valid(payload))
+    );
     BEGIN;
   `);
   db.prepare('INSERT INTO catalog_version VALUES (?, ?)').run(
     snapshot.revision,
     snapshot.updatedAt,
   );
+  const insertStrata = db.prepare('INSERT INTO strata_marketplace VALUES (?, ?)');
+  for (const [id, variants] of Object.entries(strataCatalog)) {
+    insertStrata.run(id, JSON.stringify(variants));
+  }
   const insert = db.prepare('INSERT INTO catalog_models VALUES (?, ?, ?, ?, ?, ?, ?)');
   for (const [position, model] of snapshot.models.entries()) {
     if (!/^[a-z0-9_-][a-z0-9_.-]*\/[a-z0-9_-][a-z0-9_.-]*$/i.test(model.repoId)) {

@@ -47,6 +47,10 @@ function main() {
   const targetRoot = path.join(ROOT, 'resources', 'strata-bundled');
   copyTree(path.join(VENDOR_ROOT, 'control'), path.join(targetRoot, 'runtime'));
   copyTree(path.join(VENDOR_ROOT, 'components'), path.join(targetRoot, 'components'));
+  fs.copyFileSync(
+    path.join(ROOT, 'resources', 'strata', 'managed-launch.py'),
+    path.join(targetRoot, 'runtime', 'managed-launch.py'),
+  );
 
   const pythonExe = path.join(targetRoot, 'runtime', 'python', 'python.exe');
   const qwenEntry = path.join(

@@ -39,6 +39,20 @@ export function createStrata(runtime: BrowserMockRuntime): Window['electron']['s
         managedByApp: true,
       };
     },
+    install: async _p0 => {
+      void _p0;
+      runtime.warnOnce('strata.install');
+    },
+    installState: async () => {
+      runtime.warnOnce('strata.installState');
+      return {
+        installed: [],
+      };
+    },
+    cancelInstall: async _p0 => {
+      void _p0;
+      runtime.warnOnce('strata.cancelInstall');
+    },
     getServiceConfig: async () => {
       runtime.warnOnce('strata.getServiceConfig');
       return {};
