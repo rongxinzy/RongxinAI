@@ -139,6 +139,13 @@ export function createMagpie(runtime: BrowserMockRuntime): Window['electron']['m
         recentErrors: [],
       };
     },
+    clearDiagnostics: async () => {
+      runtime.warnOnce('magpie.clearDiagnostics');
+      return {
+        activeProviderCount: 0,
+        recentErrors: [],
+      };
+    },
     preferences: async () => {
       runtime.warnOnce('magpie.preferences');
       return {

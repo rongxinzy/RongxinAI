@@ -1,5 +1,3 @@
-import { ipcRenderer } from 'electron';
-
 import { CommunityAuthIpc, ManagedProviderIpc, ModelPoolIpc } from '../../shared/ipc/channels';
 import { providersContractChannels } from '../../shared/ipc/providersContract.channels';
 import type { providersContract } from '../../shared/ipc/providersContract';
@@ -101,6 +99,7 @@ export const providersApi = {
     deleteProvider: asApi('magpieDeleteProvider'),
     testProvider: asApi('magpieTestProvider'),
     diagnostics: asApi('magpieDiagnostics'),
+    clearDiagnostics: asApi('magpieClearDiagnostics'),
     preferences: asApi('magpiePreferences'),
     updatePreferences: asApi('magpieUpdatePreferences'),
     routingGroups: asApi('magpieRoutingGroups'),
@@ -210,6 +209,7 @@ export const providersApi = {
     deleteProvider: 'magpieDeleteProvider';
     testProvider: 'magpieTestProvider';
     diagnostics: 'magpieDiagnostics';
+    clearDiagnostics: 'magpieClearDiagnostics';
     preferences: 'magpiePreferences';
     updatePreferences: 'magpieUpdatePreferences';
     routingGroups: 'magpieRoutingGroups';

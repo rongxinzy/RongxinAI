@@ -29,6 +29,7 @@ export const MagpieIpc = {
   deleteProvider: 'magpie:deleteProvider',
   testProvider: 'magpie:testProvider',
   diagnostics: 'magpie:diagnostics',
+  clearDiagnostics: 'magpie:clearDiagnostics',
   preferences: 'magpie:preferences',
   updatePreferences: 'magpie:updatePreferences',
   routingGroups: 'magpie:routingGroups',
@@ -54,6 +55,11 @@ export interface MagpieProviderSummary {
   hasKey: boolean;
   keyMasked?: string;
   fallback?: string[];
+  /**
+   * Windows the user declared for this provider's models: `"*"` covers every
+   * model, a model id overrides one. Omitted when upstream has none.
+   */
+  contexts?: Record<string, number>;
   chat?: string;
   responses?: string;
   anthropic?: string;
@@ -67,7 +73,20 @@ export interface MagpieSaveProviderInput {
   key?: string;
   models: string[];
   fallback?: string[];
+  /**
+   * `undefined` keeps whatever upstream has (a save that doesn't say);
+   * `{}` clears every declared window. Values are token counts.
+   */
+  contexts?: Record<string, number>;
 }
+
+type MagpieTestProviderErrorCode =
+  | 'html-endpoint'
+  | 'not-json'
+  | 'too-large'
+  | 'api-error'
+  | 'network'
+  | 'http';
 
 export interface MagpieTestProviderResult {
   ok: boolean;
@@ -76,6 +95,7 @@ export interface MagpieTestProviderResult {
   discoveredModels?: string[];
   requiresKey?: boolean;
   error?: string;
+  errorCode?: MagpieTestProviderErrorCode;
 }
 
 export interface MagpieDiagnosticSummary {
@@ -131,6 +151,7 @@ export interface MagpieApi {
   deleteProvider(id: string): Promise<MagpieProviderSummary[]>;
   testProvider(input: MagpieSaveProviderInput): Promise<MagpieTestProviderResult>;
   diagnostics(): Promise<MagpieDiagnosticSummary>;
+  clearDiagnostics(): Promise<MagpieDiagnosticSummary>;
   preferences(): Promise<MagpiePreferences>;
   updatePreferences(patch: MagpiePreferencesPatch): Promise<MagpiePreferences>;
   routingGroups(): Promise<MagpieRoutingState>;

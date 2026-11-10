@@ -1,8 +1,12 @@
+import { MAX_CONTEXT_TOKENS } from '../../shared/magpie/contexts';
 import type { MagpieModel } from '../../shared/magpie/types';
 
 const ENDPOINTS = new Set(['/v1/chat/completions', '/v1/responses', '/v1/messages']);
 const positive = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value > 0 && value <= 100_000_000
+  typeof value === 'number' &&
+  Number.isSafeInteger(value) &&
+  value > 0 &&
+  value <= MAX_CONTEXT_TOKENS
     ? value
     : undefined;
 const strings = (value: unknown, limit = 20): string[] =>

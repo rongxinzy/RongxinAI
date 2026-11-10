@@ -179,6 +179,7 @@ const MagpieSaveProviderInputSchema = z.object({
   key: z.string().optional(),
   models: z.array(z.string()),
   fallback: z.array(z.string()).optional(),
+  contexts: z.record(z.string(), z.number().int().positive().max(100_000_000)).optional(),
 });
 const MagpieTestProviderResultSchema2 = z.custom<MagpieTestProviderResult>(
   value => typeof value === 'object',
@@ -394,6 +395,11 @@ export const providersContract = defineIpcContract({
   },
   magpieDiagnostics: {
     channel: MagpieIpc.diagnostics,
+    args: z.tuple([]),
+    result: MagpieDiagnosticSummarySchema,
+  },
+  magpieClearDiagnostics: {
+    channel: MagpieIpc.clearDiagnostics,
     args: z.tuple([]),
     result: MagpieDiagnosticSummarySchema,
   },
