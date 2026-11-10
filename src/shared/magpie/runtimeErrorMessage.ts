@@ -11,7 +11,7 @@ export function extractRuntimeErrorMessage(text: string): string {
   }
   const fromParsed = messageOf(parsed);
   if (fromParsed) return fromParsed;
-  const quoted = /message"?\s*:\s*"((?:\\.|[^"\\])*)"/.exec(text);
+  const quoted = /(?:m)?essage"?\s*:\s*"((?:\\.|[^"\\])*)"/.exec(text);
   if (quoted) {
     try {
       const decoded: unknown = JSON.parse(`"${quoted[1]}"`);

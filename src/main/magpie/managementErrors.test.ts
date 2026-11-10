@@ -30,6 +30,11 @@ describe('extractRuntimeErrorMessage', () => {
         'message":"公司: answered 200 OK with a web page (text/html), not an API reply: “New API”","param":null',
       ),
     ).toBe('公司: answered 200 OK with a web page (text/html), not an API reply: “New API”');
+    expect(
+      extractRuntimeErrorMessage(
+        'essage":"公司: answered 200 OK with a web page (text/html), not an API reply: “New API”","param":null',
+      ),
+    ).toBe('公司: answered 200 OK with a web page (text/html), not an API reply: “New API”');
     expect(extractRuntimeErrorMessage('429 Too Many Requests')).toBe('429 Too Many Requests');
   });
 });
