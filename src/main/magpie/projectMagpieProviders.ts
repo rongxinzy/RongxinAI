@@ -1,3 +1,4 @@
+import { MAX_CONTEXT_TOKENS } from '../../shared/magpie/contexts';
 import type {
   MagpieProviderApi,
   MagpieProviderSummary,
@@ -11,6 +12,47 @@ const MAX_MODEL_IDS = 500;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isContextKey(key: string): boolean {
+  return (
+    key === '*' ||
+    (key.length > 0 && key.length <= MAX_MODEL_ID_LENGTH && !/[\u0000-\u001f]/.test(key))
+  );
+}
+
+function isContextTokens(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isSafeInteger(value) &&
+    value > 0 &&
+    value <= MAX_CONTEXT_TOKENS
+  );
+}
+
+/** Drops every entry upstream can't use, for what the renderer reads. */
+export function sanitizeProviderContexts(value: unknown): Record<string, number> | undefined {
+  if (!isRecord(value)) return undefined;
+  const contexts: Record<string, number> = {};
+  for (const [key, tokens] of Object.entries(value)) {
+    if (isContextKey(key) && isContextTokens(tokens)) contexts[key] = tokens;
+  }
+  return Object.keys(contexts).length > 0 ? contexts : undefined;
+}
+
+/** Strict form of {@link sanitizeProviderContexts} for a save the user wrote. */
+export function normalizeProviderContexts(value: unknown): Record<string, number> | undefined {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) throw new Error('Model context windows must be an object');
+  const contexts: Record<string, number> = {};
+  for (const [key, tokens] of Object.entries(value)) {
+    if (!isContextKey(key)) throw new Error('Invalid model id in context windows');
+    if (!isContextTokens(tokens)) {
+      throw new Error('Model context window must be between 1 and 100000000 tokens');
+    }
+    contexts[key] = tokens;
+  }
+  return contexts;
 }
 
 /** Model ids the user has exposed or explicitly picked in upstream state. */
@@ -93,6 +135,7 @@ export function projectMagpieProviderSummaries(state: unknown): MagpieProviderSu
       (f): f is string => typeof f === 'string',
     );
     const hasKey = providerHasKey(p);
+    const contexts = sanitizeProviderContexts(p.contexts);
     return [
       {
         id,
@@ -108,6 +151,7 @@ export function projectMagpieProviderSummaries(state: unknown): MagpieProviderSu
         hasKey,
         keyMasked: providerKeyMasked(p, isHostManaged),
         fallback,
+        ...(contexts ? { contexts } : {}),
       },
     ];
   });
@@ -133,6 +177,7 @@ export function buildMagpieProviderSavePayload(
   const fallback = Array.isArray(input.fallback)
     ? input.fallback.filter(f => typeof f === 'string')
     : [];
+  const contexts = normalizeProviderContexts(input.contexts);
   return {
     id,
     from: id,
@@ -147,6 +192,8 @@ export function buildMagpieProviderSavePayload(
     models,
     noModels: models.length === 0,
     fallback,
+    // A save that doesn't say keeps what upstream has; {} clears every window.
+    ...(contexts !== undefined ? { contexts } : {}),
     proxy: 'direct',
     unredacted: true,
     off: existing ? existing.off === true : false,

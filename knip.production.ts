@@ -66,6 +66,7 @@ const config: KnipConfig = {
     'src/main/coworkStore/coworkStore.testHarness.ts': ['files'],
     'src/main/libs/agentEngine/piRuntimeAdapter.testHarness.ts': ['files'],
     'src/main/libs/appUpdateCoordinator.testHarness.ts': ['files'],
+    'src/main/magpie/manager.testHarness.ts': ['files'],
     'src/main/im/__tests__/**': ['files'],
     'src/scheduledTask/fixtures.ts': ['files'],
     // Opt-in Magpie SMOKE (`integration.test.ts` dynamic import); not bundled in app.
