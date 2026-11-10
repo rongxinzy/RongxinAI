@@ -5,7 +5,8 @@ export const zhMarketplace: Record<string, string> = {
   marketplaceCatalogGeneral: '通用模型',
   marketplaceCatalogStrata: 'Strata 适配模型',
   marketplaceCatalogStrataDescription:
-    '这些规格来自随包目录，供 Windows CUDA 版高性能推理使用。当前可查看文件规格，下载与安装入口尚未开放。',
+    '安装适用于 Windows CUDA 的高性能推理模型包。下载中断后可续传。',
+  marketplaceCatalogStrataStarting: '正在准备并启动模型…',
   marketplaceCatalogStrataUnavailable: '本地 Strata 目录暂不可用。',
   marketplaceCatalogStrataLoading: '正在读取本地 Strata 目录…',
   marketplaceDescription: '输入关键词搜索并安装本地模型',

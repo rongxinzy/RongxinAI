@@ -1,16 +1,20 @@
 import { app, BrowserWindow } from 'electron';
+import path from 'node:path';
 
 import type {
   StrataServiceConfig,
   StrataStartInput,
   StrataStatusSnapshot,
+  StrataMarketplaceVariant,
+  StrataInstallState,
 } from '../../shared/strata/types';
 import { StrataServiceStatus } from '../../shared/strata/types';
 import { StrataIpcChannel } from '../../shared/strata/constants';
 import { strataContract } from '../../shared/ipc/strataContract';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import type { StrataManager } from '../libs/strata/strataManager';
-import { STRATA_MODEL_CATALOG } from '../libs/strata/strataModelCatalog';
+import { STRATA_MODEL_CATALOG, getStrataCatalogEntry } from '../libs/strata/strataModelCatalog';
+import { StrataModelInstallation } from '../libs/strata/strataModelInstallation';
 import { getAppLocalModelCatalog } from '../libs/appLocalModelCatalog';
 import {
   readStrataProviderSnapshot,
@@ -32,6 +36,14 @@ export function registerStrataIpcHandlers(
     onModelBindingsChanged?: (snapshot: StrataProviderSnapshot) => void | Promise<void>;
   },
 ): void {
+  const userData = app.getPath('userData');
+  let variants: Map<string, StrataMarketplaceVariant[]> | undefined;
+  const readVariants = () =>
+    (variants ??= getAppLocalModelCatalog(userData).readBundledStrataVariants());
+  const installation = new StrataModelInstallation(path.join(userData, 'strata'), readVariants);
+  const requireBundled = () => {
+    if (!manager.isBundled()) throw new Error('Strata requires the Windows CUDA edition.');
+  };
   const broadcast = (channel: string, payload: unknown): void => {
     BrowserWindow.getAllWindows().forEach(win => {
       if (win.isDestroyed()) return;
@@ -78,15 +90,30 @@ export function registerStrataIpcHandlers(
   handleIpcContract(strataContract, {
     isBundled: async () => manager.isBundled(),
     catalog: async () => {
-      const variants = getAppLocalModelCatalog(app.getPath('userData')).readBundledStrataVariants();
+      const variants = readVariants();
       return STRATA_MODEL_CATALOG.map(entry => ({
         ...entry,
         marketplaceVariants: variants.get(entry.id),
       }));
     },
     status: async () => manager.detect(),
+    install: async (_event, ref) => {
+      requireBundled();
+      installation.start(ref);
+    },
+    installState: async (): Promise<StrataInstallState> =>
+      manager.isBundled() ? installation.state() : { installed: [] },
+    cancelInstall: async (_event, ref) => installation.cancel(ref),
     start: async (_event, input: StrataStartInput) => {
-      const status = await manager.start(input);
+      requireBundled();
+      const launchId = input.launchId ?? getStrataCatalogEntry(input.catalogId)?.modelLaunchId;
+      if (
+        !launchId ||
+        !(await installation.isInstalled({ catalogId: input.catalogId, launchId }))
+      ) {
+        throw new Error('Install this Strata model in the model marketplace before starting it.');
+      }
+      const status = await manager.start({ ...input, launchId }, installation.dataDir);
       await refreshBindings();
       return status;
     },

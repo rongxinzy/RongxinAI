@@ -302,7 +302,7 @@ describe('StrataManager lifecycle', () => {
     expect(last.activeModelId).toBe(CATALOG_ID);
     expect(manager.getStatus().activeModelId).toBe(CATALOG_ID);
     expect(childProcessMock.spawn).toHaveBeenCalledTimes(2);
-    expect(childProcessMock.spawn.mock.calls[1][1]).toContain('gyro-s');
+    expect(childProcessMock.spawn.mock.calls[1][1]).toContain('Gyro-S');
   });
 
   test('reusing a running process preserves its error listener', async () => {

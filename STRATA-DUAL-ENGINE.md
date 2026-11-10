@@ -13,6 +13,10 @@ The installer bundles official Strata **v0.2.4** Windows CUDA13 engine tarballs 
 
 The model marketplace reads a separate `strata_marketplace` table in the bundled SQLite catalog. The seed records model repository IDs, immutable revisions, file sizes and SHA-256 values from the bundled control package's `setup.py`. It includes the Gyro, Qwen3.6 MTP and DeepSeek V4.1 file sets. Byte totals cover the files in the listed set. Optional image projectors and additional setup disk requirements are separate. General catalog updates only replace the ModelScope catalog records.
 
+The Windows CUDA marketplace downloads these packages from the pinned upstream URLs using the same resumable file transfer as general models. Strata writes verified weights to the control package's native library layout under `userData/strata/models`. Each file is published after size, SHA-256 and GGUF checks, then gets the control package's `.done` stamp. DeepSeek variants reuse their verified shared files. Cancelled transfers retain partial files for the next attempt.
+
+The marketplace starts the selected installed variant and passes the same data directory to the pinned control package. Strata generates its model-specific runtime configuration on first start. These marketplace packages are text-only.
+
 ## GPU exclusivity
 
 - Before starting Strata, the app calls llama.cpp orchestrator **`stopAll`** (unload router models).

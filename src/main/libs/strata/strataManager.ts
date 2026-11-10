@@ -36,6 +36,7 @@ const STATUS_FIELDS = [
   'port',
   'baseUrl',
   'activeModelId',
+  'activeLaunchId',
   'managedByApp',
   'error',
   'bundled',
@@ -48,11 +49,13 @@ function statusesEqual(a: StrataStatusSnapshot, b: StrataStatusSnapshot): boolea
 export class StrataManager extends EventEmitter {
   private process: ChildProcessWithoutNullStreams | null = null;
   private activeCatalogId: string | undefined;
+  private activeLaunchId: string | undefined;
   private phase: StrataPhase = 'idle';
   /** Bumped by start()/stop(); async work from an older generation must not apply. */
   private generation = 0;
   private startInFlight: Promise<StrataStatusSnapshot> | null = null;
   private startCatalogId: string | undefined;
+  private startLaunchId: string | undefined;
   private startGeneration = 0;
   private stopInFlight: Promise<StrataStatusSnapshot> | null = null;
   private status: StrataStatusSnapshot = {
@@ -113,6 +116,7 @@ export class StrataManager extends EventEmitter {
         port,
         baseUrl: `http://127.0.0.1:${port}/v1`,
         activeModelId: this.activeCatalogId,
+        activeLaunchId: this.activeLaunchId,
         managedByApp: Boolean(this.process),
         bundled: true,
         error: undefined,
@@ -124,6 +128,7 @@ export class StrataManager extends EventEmitter {
       port,
       baseUrl: undefined,
       activeModelId: undefined,
+      activeLaunchId: undefined,
       managedByApp: Boolean(this.process),
       bundled: true,
       error: undefined,
@@ -131,11 +136,12 @@ export class StrataManager extends EventEmitter {
     return this.status;
   }
 
-  async start(input: StrataStartInput): Promise<StrataStatusSnapshot> {
+  async start(input: StrataStartInput, dataDir?: string): Promise<StrataStatusSnapshot> {
     // Only the latest, uncancelled request can accept duplicate callers.
     if (
       this.startInFlight &&
       this.startCatalogId === input.catalogId &&
+      this.startLaunchId === input.launchId &&
       this.startGeneration === this.generation
     ) {
       return this.startInFlight;
@@ -145,9 +151,10 @@ export class StrataManager extends EventEmitter {
     const generation = ++this.generation;
     // Publish the new request before waiting for cleanup. A later A in an
     // A -> B -> A switch must replace queued B, not join the cancelled first A.
-    const task = this.runQueuedStart(input, generation, previous, cleanup);
+    const task = this.runQueuedStart(input, generation, previous, cleanup, dataDir);
     this.startInFlight = task;
     this.startCatalogId = input.catalogId;
+    this.startLaunchId = input.launchId;
     this.startGeneration = generation;
     try {
       return await task;
@@ -155,6 +162,7 @@ export class StrataManager extends EventEmitter {
       if (this.startInFlight === task) {
         this.startInFlight = null;
         this.startCatalogId = undefined;
+        this.startLaunchId = undefined;
       }
     }
   }
@@ -164,11 +172,12 @@ export class StrataManager extends EventEmitter {
     generation: number,
     previous: Promise<StrataStatusSnapshot> | null,
     cleanup: Promise<StrataStatusSnapshot> | null,
+    dataDir?: string,
   ): Promise<StrataStatusSnapshot> {
     if (cleanup) await cleanup;
     if (previous) await previous.catch(() => {});
     if (generation === this.generation) {
-      const result = await this.runStart(input, generation);
+      const result = await this.runStart(input, generation, dataDir);
       if (generation === this.generation) return result;
     }
     // A superseded caller must not report the newer request's success.
@@ -177,6 +186,7 @@ export class StrataManager extends EventEmitter {
       status: StrataServiceStatus.Stopped,
       baseUrl: undefined,
       activeModelId: undefined,
+      activeLaunchId: undefined,
       managedByApp: false,
       error: undefined,
     };
@@ -185,6 +195,7 @@ export class StrataManager extends EventEmitter {
   private async runStart(
     input: StrataStartInput,
     generation: number,
+    dataDir?: string,
   ): Promise<StrataStatusSnapshot> {
     if (!this.isBundled()) {
       this.setStatus({ status: StrataServiceStatus.NotBundled, bundled: false });
@@ -194,6 +205,7 @@ export class StrataManager extends EventEmitter {
     if (!entry) {
       throw new Error(`Unknown Strata catalog id: ${input.catalogId}`);
     }
+    const launchId = input.launchId ?? entry.modelLaunchId;
 
     const port = this.resolvePort();
     const healthy = await new StrataClient(`http://127.0.0.1:${port}`).health();
@@ -202,13 +214,15 @@ export class StrataManager extends EventEmitter {
       this.phase === 'idle' &&
       this.status.status === StrataServiceStatus.Running &&
       healthy &&
-      this.activeCatalogId === entry.id
+      this.activeCatalogId === entry.id &&
+      this.activeLaunchId === launchId
     ) {
       this.setStatus({
         status: StrataServiceStatus.Running,
         port,
         baseUrl: `http://127.0.0.1:${port}/v1`,
         activeModelId: entry.id,
+        activeLaunchId: launchId,
         managedByApp: Boolean(this.process),
         bundled: true,
         error: undefined,
@@ -246,11 +260,13 @@ export class StrataManager extends EventEmitter {
 
     this.phase = 'starting';
     this.activeCatalogId = undefined;
+    this.activeLaunchId = undefined;
     this.setStatus({
       status: StrataServiceStatus.Starting,
       port,
       baseUrl: undefined,
       activeModelId: undefined,
+      activeLaunchId: undefined,
       bundled: true,
       managedByApp: true,
       error: undefined,
@@ -261,7 +277,8 @@ export class StrataManager extends EventEmitter {
       '--family',
       entry.family,
       '--model',
-      entry.modelLaunchId,
+      launchId,
+      ...(dataDir ? ['--data-dir', dataDir, '--vision', 'off'] : []),
       '--port',
       String(port),
       '--yes',
@@ -304,7 +321,7 @@ export class StrataManager extends EventEmitter {
           servingAt ??= Date.now();
         },
       );
-      await this.waitUntilHealthy(generation, child, port, entry.id, () => ({
+      await this.waitUntilHealthy(generation, child, port, entry.id, launchId, () => ({
         readyModel,
         servingAt,
       }));
@@ -324,6 +341,7 @@ export class StrataManager extends EventEmitter {
           port,
           baseUrl: undefined,
           activeModelId: undefined,
+          activeLaunchId: undefined,
           bundled: true,
           managedByApp: false,
         });
@@ -353,11 +371,13 @@ export class StrataManager extends EventEmitter {
     if (!child) {
       this.phase = 'idle';
       this.activeCatalogId = undefined;
+      this.activeLaunchId = undefined;
       this.setStatus({
         status: StrataServiceStatus.Stopped,
         port,
         baseUrl: undefined,
         activeModelId: undefined,
+        activeLaunchId: undefined,
         bundled: this.isBundled(),
         managedByApp: false,
         error: undefined,
@@ -371,6 +391,7 @@ export class StrataManager extends EventEmitter {
       port,
       baseUrl: undefined,
       activeModelId: undefined,
+      activeLaunchId: undefined,
       bundled: true,
       managedByApp: true,
       error: undefined,
@@ -380,12 +401,14 @@ export class StrataManager extends EventEmitter {
       return this.status;
     }
     this.activeCatalogId = undefined;
+    this.activeLaunchId = undefined;
     this.phase = 'idle';
     this.setStatus({
       status: StrataServiceStatus.Stopped,
       port,
       baseUrl: undefined,
       activeModelId: undefined,
+      activeLaunchId: undefined,
       bundled: this.isBundled(),
       managedByApp: false,
       error: undefined,
@@ -408,6 +431,7 @@ export class StrataManager extends EventEmitter {
       if (this.process !== child) return;
       this.process = null;
       this.activeCatalogId = undefined;
+      this.activeLaunchId = undefined;
       if (this.phase === 'stopping') return;
       const wasRunning = this.status.status === StrataServiceStatus.Running;
       this.phase = 'idle';
@@ -419,6 +443,7 @@ export class StrataManager extends EventEmitter {
         port,
         baseUrl: undefined,
         activeModelId: undefined,
+        activeLaunchId: undefined,
         bundled: true,
         managedByApp: false,
       });
@@ -429,6 +454,7 @@ export class StrataManager extends EventEmitter {
       if (this.phase === 'stopping' && child.pid) return;
       this.process = null;
       this.activeCatalogId = undefined;
+      this.activeLaunchId = undefined;
       if (this.phase === 'stopping') return;
       this.phase = 'idle';
       this.setStatus({
@@ -437,6 +463,7 @@ export class StrataManager extends EventEmitter {
         port,
         baseUrl: undefined,
         activeModelId: undefined,
+        activeLaunchId: undefined,
         bundled: true,
         managedByApp: false,
       });
@@ -448,6 +475,7 @@ export class StrataManager extends EventEmitter {
     child: ChildProcessWithoutNullStreams,
     port: number,
     catalogId: string,
+    launchId: string,
     getLaunchProgress: () => { readyModel?: string; servingAt?: number },
   ): Promise<void> {
     const client = new StrataClient(`http://127.0.0.1:${port}`);
@@ -464,11 +492,13 @@ export class StrataManager extends EventEmitter {
       ) {
         if (!this.isActiveStart(generation, child)) return;
         this.activeCatalogId = catalogId;
+        this.activeLaunchId = launchId;
         this.setStatus({
           status: StrataServiceStatus.Running,
           port,
           baseUrl: `http://127.0.0.1:${port}/v1`,
           activeModelId: catalogId,
+          activeLaunchId: launchId,
           managedByApp: true,
           bundled: true,
           error: undefined,
@@ -508,6 +538,7 @@ export class StrataManager extends EventEmitter {
       port,
       baseUrl: undefined,
       activeModelId: undefined,
+      activeLaunchId: undefined,
       bundled: true,
       managedByApp: false,
     });
@@ -524,6 +555,7 @@ export class StrataManager extends EventEmitter {
       port,
       baseUrl: undefined,
       activeModelId: undefined,
+      activeLaunchId: undefined,
       bundled: true,
       managedByApp: true,
       error: cause

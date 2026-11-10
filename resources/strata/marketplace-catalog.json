@@ -2,6 +2,7 @@
   "strata-qwen-flash-next": [
     {
       "label": "Gyro-S",
+      "launchId": "Gyro-S",
       "files": [
         {
           "repoId": "agentionai/Qwen3.8-Flash-Next-Gyro-GGUF",
@@ -14,6 +15,7 @@
     },
     {
       "label": "Gyro-M",
+      "launchId": "Gyro-M",
       "files": [
         {
           "repoId": "agentionai/Qwen3.8-Flash-Next-Gyro-GGUF",
@@ -28,6 +30,7 @@
   "strata-qwen36-35b-a3b": [
     {
       "label": "UD-Q4_K_XL",
+      "launchId": "UD-Q4_K_XL",
       "files": [
         {
           "repoId": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
@@ -40,6 +43,7 @@
     },
     {
       "label": "UD-Q6_K_XL",
+      "launchId": "UD-Q6_K_XL",
       "files": [
         {
           "repoId": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
@@ -52,6 +56,7 @@
     },
     {
       "label": "Q8_0",
+      "launchId": "Q8_0",
       "files": [
         {
           "repoId": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
@@ -66,6 +71,7 @@
   "strata-deepseek-v41-flash": [
     {
       "label": "ISTA-DAS 1.75 bpw",
+      "launchId": "IST-DAS-1.75bpw",
       "files": [
         {
           "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
@@ -100,26 +106,30 @@
           "revision": "cb02422c900df489cea5833e8a92171224059b3c",
           "path": "DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf",
           "bytes": 110595290816,
-          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a"
+          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a",
+          "shared": true
         },
         {
           "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
           "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
           "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00001-of-00009.gguf",
           "bytes": 5780589,
-          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f"
+          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f",
+          "shared": true
         },
         {
           "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
           "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
           "path": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
           "bytes": 7976914240,
-          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a"
+          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a",
+          "shared": true
         }
       ]
     },
     {
       "label": "ISTA-DAS 2.00 bpw",
+      "launchId": "IST-DAS-2.00bpw",
       "files": [
         {
           "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
@@ -154,26 +164,30 @@
           "revision": "cb02422c900df489cea5833e8a92171224059b3c",
           "path": "DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf",
           "bytes": 110595290816,
-          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a"
+          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a",
+          "shared": true
         },
         {
           "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
           "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
           "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00001-of-00009.gguf",
           "bytes": 5780589,
-          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f"
+          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f",
+          "shared": true
         },
         {
           "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
           "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
           "path": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
           "bytes": 7976914240,
-          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a"
+          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a",
+          "shared": true
         }
       ]
     },
     {
       "label": "ISTA-DAS 2.25 bpw",
+      "launchId": "IST-DAS-2.25bpw",
       "files": [
         {
           "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
@@ -208,26 +222,30 @@
           "revision": "cb02422c900df489cea5833e8a92171224059b3c",
           "path": "DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf",
           "bytes": 110595290816,
-          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a"
+          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a",
+          "shared": true
         },
         {
           "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
           "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
           "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00001-of-00009.gguf",
           "bytes": 5780589,
-          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f"
+          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f",
+          "shared": true
         },
         {
           "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
           "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
           "path": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
           "bytes": 7976914240,
-          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a"
+          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a",
+          "shared": true
         }
       ]
     },
     {
       "label": "UD-Q8_K_XL",
+      "launchId": "UD-Q8_K_XL",
       "files": [
         {
           "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",

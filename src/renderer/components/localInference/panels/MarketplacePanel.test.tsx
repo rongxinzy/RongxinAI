@@ -97,18 +97,34 @@ describe('MarketplacePanel result grid', () => {
         marketplaceVariants: [
           {
             label: 'Gyro-S',
+            launchId: 'Gyro-S',
             files: [{ bytes: 58_487_015_808, repoId: 'agentionai/Qwen3.8-Flash-Next-Gyro-GGUF' }],
           },
         ],
       },
     ]);
-    vi.stubGlobal('electron', { strata: { catalog } });
+    const install = vi.fn(async () => {});
+    vi.stubGlobal('electron', {
+      strata: {
+        catalog,
+        install,
+        isBundled: async () => true,
+        installState: async () => ({ installed: [] }),
+        status: async () => ({ status: 'stopped' }),
+        onStatusChanged: () => () => {},
+      },
+    });
     try {
       const { props } = renderPanel();
       expect(catalog).not.toHaveBeenCalled();
       await userEvent.click(screen.getByRole('tab', { name: 'Strata 适配模型' }));
       expect(await screen.findByText('Gyro-S')).toBeVisible();
       expect(catalog).toHaveBeenCalledOnce();
+      await userEvent.click(await screen.findByRole('button', { name: '安装' }));
+      expect(install).toHaveBeenCalledWith({
+        catalogId: 'strata-qwen-flash-next',
+        launchId: 'Gyro-S',
+      });
       expect(props.onSearch).not.toHaveBeenCalled();
       expect(props.onInstall).not.toHaveBeenCalled();
     } finally {

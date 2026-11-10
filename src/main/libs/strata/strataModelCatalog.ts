@@ -13,7 +13,7 @@ export const STRATA_MODEL_CATALOG: readonly StrataCatalogEntry[] = [
     family: StrataFamilyId.QwenFlashNext,
     engine: StrataEngineKind.Qwen,
     displayName: 'Qwen3.8-Flash-Next (Strata)',
-    modelLaunchId: 'gyro-s',
+    modelLaunchId: 'Gyro-S',
     hardware: {
       minSystemRamGb: 32,
       minVramGb: 12,

@@ -1,5 +1,7 @@
 import fs from 'fs';
 import { createHash } from 'crypto';
+import { pipeline } from 'node:stream/promises';
+import { sha256FileStream } from './fileHasher';
 
 const DOWNLOAD_SPEED_SAMPLE_INTERVAL_MS = 500;
 const DOWNLOAD_SPEED_MIN_SAMPLE_DURATION_MS = 100;
@@ -11,6 +13,7 @@ export async function downloadLocalModelFile(
   signal?: AbortSignal,
   expectedSha256?: string,
   expectedSizeBytes?: number,
+  onVerify?: () => void,
 ): Promise<void> {
   const candidates = typeof urls === 'string' ? [urls] : [...urls];
   const errors: string[] = [];
@@ -27,6 +30,7 @@ export async function downloadLocalModelFile(
         signal,
         expectedSha256,
         expectedSizeBytes,
+        onVerify,
       );
       return;
     } catch (error) {
@@ -63,102 +67,44 @@ async function downloadFileOnce(
   signal?: AbortSignal,
   expectedSha256?: string,
   expectedSizeBytes?: number,
+  onVerify?: () => void,
 ): Promise<void> {
   const tempPath = `${targetPath}.download`;
-  let completedSuccessfully = false;
   try {
-    const resumeFrom = fs.existsSync(tempPath) ? fs.statSync(tempPath).size : 0;
-    let speedSampleAt = Date.now();
-    let speedSampleCompleted = resumeFrom;
-    let latestSpeed: number | undefined;
-    const calculateSpeed = (completed: number): number | undefined => {
-      const now = Date.now();
-      const elapsedMs = now - speedSampleAt;
-      if (elapsedMs >= DOWNLOAD_SPEED_SAMPLE_INTERVAL_MS || latestSpeed === undefined) {
-        const transferred = completed - speedSampleCompleted;
-        if (transferred > 0) {
-          const sampleDurationMs = Math.max(elapsedMs, DOWNLOAD_SPEED_MIN_SAMPLE_DURATION_MS);
-          latestSpeed = transferred / (sampleDurationMs / 1000);
-        }
-        speedSampleAt = now;
-        speedSampleCompleted = completed;
-      }
-      return latestSpeed;
-    };
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        signal,
-        ...(resumeFrom > 0 ? { headers: { Range: `bytes=${resumeFrom}-` } } : {}),
-      });
-    } catch {
+    signal?.throwIfAborted();
+    let resumeFrom = fs.existsSync(tempPath) ? fs.statSync(tempPath).size : 0;
+    if (expectedSizeBytes && resumeFrom > expectedSizeBytes) {
+      await fs.promises.unlink(tempPath);
+      resumeFrom = 0;
+    }
+    if (!expectedSizeBytes || resumeFrom !== expectedSizeBytes) {
+      await transferModelFile(url, tempPath, resumeFrom, onProgress, signal, expectedSizeBytes);
+    }
+    const actualSize = fs.statSync(tempPath).size;
+    if (
+      expectedSizeBytes &&
+      Number.isSafeInteger(expectedSizeBytes) &&
+      actualSize !== expectedSizeBytes
+    ) {
       throw new Error(
-        'Model download failed due to network error. Please check your network connection or proxy settings.',
+        `Model download failed: byte-size mismatch (expected ${expectedSizeBytes}, received ${actualSize}).`,
       );
     }
-    if (!response.ok || !response.body) {
-      throw new Error(`Model download failed: HTTP ${response.status}`);
-    }
-    const resumed = resumeFrom > 0 && response.status === 206;
-    const totalHeader = response.headers.get('content-length');
-    const contentRangeTotal = parseContentRangeTotal(response.headers.get('content-range'));
-    const total =
-      contentRangeTotal ??
-      (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
-    const file = fs.createWriteStream(tempPath, { flags: resumed ? 'a' : 'w' });
-    const reader = response.body.getReader();
-    const cancelReader = () => reader.cancel().catch((): void => undefined);
-    const onAbort = () => {
-      void cancelReader();
-    };
-    signal?.addEventListener('abort', onAbort);
-    let completed = resumed ? resumeFrom : 0;
-    try {
-      if (completed > 0) onProgress(completed, Number.isFinite(total) ? total : undefined);
-      while (true) {
-        if (signal?.aborted) throw new Error('Install cancelled');
-        const { value, done } = await reader.read();
-        if (signal?.aborted) throw new Error('Install cancelled');
-        if (done) break;
-        completed += value.byteLength;
-        if (!file.write(Buffer.from(value))) {
-          await new Promise<void>(resolve => file.once('drain', resolve));
-        }
-        onProgress(
-          completed,
-          Number.isFinite(total) ? total : undefined,
-          calculateSpeed(completed),
-        );
-      }
-      completedSuccessfully = true;
-    } finally {
-      signal?.removeEventListener('abort', onAbort);
-      await cancelReader();
-      await new Promise<void>(resolve => file.end(resolve));
-    }
-    if (completedSuccessfully) {
-      const actualSize = fs.statSync(tempPath).size;
-      if (
-        expectedSizeBytes &&
-        Number.isSafeInteger(expectedSizeBytes) &&
-        actualSize !== expectedSizeBytes
-      ) {
+    onProgress(actualSize, actualSize);
+    onVerify?.();
+    if (expectedSha256) {
+      const actualSha256 = await sha256File(tempPath, signal);
+      if (actualSha256.toLowerCase() !== expectedSha256.trim().toLowerCase()) {
         throw new Error(
-          `Model download failed: byte-size mismatch (expected ${expectedSizeBytes}, received ${actualSize}).`,
+          'Model download failed: SHA-256 checksum mismatch. Please retry the download.',
         );
       }
-      if (expectedSha256) {
-        const actualSha256 = await sha256File(tempPath);
-        if (actualSha256.toLowerCase() !== expectedSha256.trim().toLowerCase()) {
-          throw new Error(
-            'Model download failed: SHA-256 checksum mismatch. Please retry the download.',
-          );
-        }
-      }
-      assertValidGgufFile(tempPath);
-      fs.renameSync(tempPath, targetPath);
     }
+    signal?.throwIfAborted();
+    assertValidGgufFile(tempPath);
+    fs.renameSync(tempPath, targetPath);
   } catch (error) {
+    if (signal?.aborted) throw new Error('Install cancelled');
     if (
       error instanceof Error &&
       /(?:SHA-256 checksum mismatch|byte-size mismatch|invalid GGUF)/.test(error.message) &&
@@ -168,6 +114,92 @@ async function downloadFileOnce(
     }
     throw error;
   }
+}
+
+async function transferModelFile(
+  url: string,
+  tempPath: string,
+  resumeFrom: number,
+  onProgress: (completed: number, total?: number, speed?: number) => void,
+  signal?: AbortSignal,
+  expectedSizeBytes?: number,
+): Promise<void> {
+  let speedSampleAt = Date.now();
+  let speedSampleCompleted = resumeFrom;
+  let latestSpeed: number | undefined;
+  const calculateSpeed = (completed: number): number | undefined => {
+    const now = Date.now();
+    const elapsedMs = now - speedSampleAt;
+    if (elapsedMs >= DOWNLOAD_SPEED_SAMPLE_INTERVAL_MS || latestSpeed === undefined) {
+      const transferred = completed - speedSampleCompleted;
+      if (transferred > 0) {
+        const sampleDurationMs = Math.max(elapsedMs, DOWNLOAD_SPEED_MIN_SAMPLE_DURATION_MS);
+        latestSpeed = transferred / (sampleDurationMs / 1000);
+      }
+      speedSampleAt = now;
+      speedSampleCompleted = completed;
+    }
+    return latestSpeed;
+  };
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      signal,
+      ...(resumeFrom > 0 ? { headers: { Range: `bytes=${resumeFrom}-` } } : {}),
+    });
+  } catch {
+    signal?.throwIfAborted();
+    throw new Error(
+      'Model download failed due to network error. Please check your network connection or proxy settings.',
+    );
+  }
+  if (!response.ok || !response.body) {
+    throw new Error(`Model download failed: HTTP ${response.status}`);
+  }
+  const resumed = resumeFrom > 0 && response.status === 206;
+  if (
+    response.status === 206 &&
+    !response.headers.get('content-range')?.startsWith(`bytes ${resumeFrom}-`)
+  ) {
+    await response.body.cancel();
+    throw new Error('Model download failed: invalid response range.');
+  }
+  const totalHeader = response.headers.get('content-length');
+  const contentRangeTotal = parseContentRangeTotal(response.headers.get('content-range'));
+  const total =
+    contentRangeTotal ??
+    (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
+  const body = response.body;
+  async function* chunks() {
+    const reader = body.getReader();
+    let completed = resumed ? resumeFrom : 0;
+    try {
+      if (completed > 0) onProgress(completed, Number.isFinite(total) ? total : undefined);
+      while (true) {
+        signal?.throwIfAborted();
+        const { value, done } = await reader.read();
+        signal?.throwIfAborted();
+        if (done) break;
+        completed += value.byteLength;
+        if (expectedSizeBytes && completed > expectedSizeBytes) {
+          throw new Error(
+            `Model download failed: byte-size mismatch (expected ${expectedSizeBytes}, received at least ${completed}).`,
+          );
+        }
+        yield Buffer.from(value);
+        onProgress(
+          completed,
+          Number.isFinite(total) ? total : undefined,
+          calculateSpeed(completed),
+        );
+      }
+    } finally {
+      await reader.cancel().catch(() => {});
+    }
+  }
+  await pipeline(chunks(), fs.createWriteStream(tempPath, { flags: resumed ? 'a' : 'w' }), {
+    signal,
+  });
 }
 
 export function assertValidGgufFile(filePath: string): void {
@@ -189,10 +221,14 @@ export function assertValidGgufFile(filePath: string): void {
   }
 }
 
-export async function sha256File(filePath: string): Promise<string> {
+export async function sha256File(filePath: string, signal?: AbortSignal): Promise<string> {
+  const { size } = await fs.promises.stat(filePath);
+  if (size > 512 * 1024 * 1024) {
+    return sha256FileStream(filePath, { signal, maxBytes: size, timeoutMs: 60 * 60_000 });
+  }
   return new Promise((resolve, reject) => {
     const hash = createHash('sha256');
-    const stream = fs.createReadStream(filePath);
+    const stream = fs.createReadStream(filePath, { signal });
     stream.on('data', chunk => hash.update(chunk));
     stream.on('error', reject);
     stream.on('end', () => resolve(hash.digest('hex')));

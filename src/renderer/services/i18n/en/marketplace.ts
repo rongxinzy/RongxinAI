@@ -5,7 +5,8 @@ export const enMarketplace: Record<string, string> = {
   marketplaceCatalogGeneral: 'General models',
   marketplaceCatalogStrata: 'Strata models',
   marketplaceCatalogStrataDescription:
-    'These bundled listings are for high-performance inference on Windows CUDA. File specifications are available to browse. Download and installation are not yet available here.',
+    'Install a model package for high-performance inference on Windows CUDA. Interrupted downloads can be resumed.',
+  marketplaceCatalogStrataStarting: 'Preparing and starting the model…',
   marketplaceCatalogStrataUnavailable: 'The local Strata catalog is unavailable.',
   marketplaceCatalogStrataLoading: 'Reading the local Strata catalog…',
   marketplaceDescription: 'Search and install local models by keyword',
