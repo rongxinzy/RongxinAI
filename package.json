@@ -136,6 +136,8 @@
     "test:sqlite-backup:seed": "node tests/sqlite-backup/generate-large-db.cjs",
     "preview": "vite preview",
     "compile:electron": "tsc --project electron-tsconfig.json",
+    "model-catalog:build": "node scripts/build-model-catalog.cjs",
+    "model-catalog:publish": "node scripts/publish-model-catalog.cjs",
     "typecheck:electron": "tsc --project electron-tsconfig.json --noEmit",
     "rebuild:electron-native": "electron-rebuild --only better-sqlite3,node-pty --force --build-from-source",
     "rebuild:electron-native:linux-packaging": "node scripts/rebuild-electron-native-linux-packaging.cjs",

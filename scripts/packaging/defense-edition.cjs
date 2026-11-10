@@ -16,6 +16,7 @@ const excludedDefenseEntries = {
     'companionWindowPreload.js',
     'llamacppModelDaemonEntry.js',
     'catalogWorker.js',
+    'modelCatalogUpdateWorker.js',
     'appUpdateHashWorker.js',
   ],
 };
@@ -120,6 +121,7 @@ function verifyDefenseResources(resourcesRoot, platform = 'win32') {
     'llamacpp-bundled',
     'llamacpp-backends',
     'magpie',
+    'model-catalog.sqlite',
     'MCPs',
     'strata-bundled',
     'zhiyuan-enterprise',

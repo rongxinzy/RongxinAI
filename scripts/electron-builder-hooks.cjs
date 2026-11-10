@@ -49,6 +49,7 @@ const {
   assertPackagedApp,
   pinElectronLanguages,
 } = require('./packaging/assert-package-contents.cjs');
+const { assertModelCatalog } = require('./packaging/assert-model-catalog.cjs');
 
 const {
   buildWindowsResourceBundleManifest,
@@ -568,6 +569,7 @@ async function beforePack(context) {
       throw new Error('Build with make dist-win-defense or make dist-kylin-defense.');
     }
   } else {
+    assertModelCatalog(path.join(__dirname, '..', 'resources', 'model-catalog.sqlite'));
     configureMagpieResources(context);
   }
   configureMacAutoUpdateMetadata(context);
@@ -764,8 +766,18 @@ async function beforePack(context) {
 }
 
 async function afterPack(context) {
-  if (isDefensePackage(context) && isWindowsTarget(context)) {
-    verifyPackagedPortableGitRuntimeDirs(context.appOutDir);
+  if (isDefensePackage(context)) {
+    if (isWindowsTarget(context)) verifyPackagedPortableGitRuntimeDirs(context.appOutDir);
+  } else {
+    const resourcesDir = isMacTarget(context)
+      ? path.join(
+          context.appOutDir,
+          `${context.packager.appInfo.productFilename}.app`,
+          'Contents',
+          'Resources',
+        )
+      : path.join(context.appOutDir, 'resources');
+    assertModelCatalog(path.join(resourcesDir, 'model-catalog.sqlite'));
   }
   verifyPackagedDeliverables(context);
   assertPackagedApp({

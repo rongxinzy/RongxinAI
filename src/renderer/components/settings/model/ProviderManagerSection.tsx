@@ -5,15 +5,19 @@ import { Lock, Plus, Power, RefreshCw, Settings, Trash2 } from 'lucide-react';
 import React, { useState } from 'react';
 
 import type {
+  MagpieModel,
   MagpieProviderSummary,
   MagpieSaveProviderInput,
   MagpieTestProviderResult,
 } from '../../../../shared/magpie/types';
 import { i18nService } from '../../../services/i18n';
+import { summarizeProviderContexts, type ProviderContextSource } from './providerContextSummary';
 import { ProviderEditDialog } from './ProviderEditDialog';
 
 interface ProviderManagerSectionProps {
   providers: MagpieProviderSummary[];
+  /** The live gateway catalog, for the window each model is actually told. */
+  models?: readonly MagpieModel[];
   loading?: boolean;
   disabled?: boolean;
   onRefresh: () => Promise<void>;
@@ -23,8 +27,72 @@ interface ProviderManagerSectionProps {
   onTestProvider?: (input: MagpieSaveProviderInput) => Promise<MagpieTestProviderResult>;
 }
 
+function contextSourceLabel(source: ProviderContextSource): string {
+  switch (source) {
+    case 'manual':
+      return i18nService.t('magpieProviderContextSourceManual');
+    case 'auto':
+      return i18nService.t('magpieProviderContextSourceAuto');
+    case 'system':
+      return i18nService.t('magpieProviderContextSourceSystem');
+    case 'unset':
+      return '';
+  }
+}
+
+function formatProviderContext(
+  provider: MagpieProviderSummary,
+  models: readonly MagpieModel[],
+): { text: string; hint?: string } | null {
+  const entries = summarizeProviderContexts(provider, models);
+  if (entries.length === 0) return null;
+  const uniform = entries.every(
+    entry => entry.tokens === entries[0].tokens && entry.source === entries[0].source,
+  );
+  if (uniform) {
+    const [first] = entries;
+    if (first.tokens === undefined) {
+      return {
+        text: i18nService.t('magpieProviderContextUnset'),
+        hint: i18nService.t('magpieProviderContextUnsetHint'),
+      };
+    }
+    return {
+      text: i18nService
+        .t('magpieProviderContextEffective')
+        .replace(
+          '{value}',
+          `${first.tokens.toLocaleString()} · ${contextSourceLabel(first.source)}`,
+        ),
+    };
+  }
+  const shown = entries
+    .slice(0, 2)
+    .map(entry =>
+      entry.tokens === undefined
+        ? i18nService.t('magpieProviderContextItemUnset').replace('{model}', entry.modelId)
+        : i18nService
+            .t('magpieProviderContextItem')
+            .replace('{model}', entry.modelId)
+            .replace('{tokens}', entry.tokens.toLocaleString())
+            .replace('{source}', contextSourceLabel(entry.source)),
+    );
+  if (entries.length > 2) {
+    shown.push(
+      i18nService.t('magpieProviderContextMore').replace('{count}', String(entries.length - 2)),
+    );
+  }
+  return {
+    text: i18nService.t('magpieProviderContextEffective').replace('{value}', shown.join(' · ')),
+    ...(entries.every(entry => entry.tokens === undefined)
+      ? { hint: i18nService.t('magpieProviderContextUnsetHint') }
+      : {}),
+  };
+}
+
 export const ProviderManagerSection: React.FC<ProviderManagerSectionProps> = ({
   providers,
+  models = [],
   loading = false,
   disabled = false,
   onRefresh,
@@ -104,6 +172,7 @@ export const ProviderManagerSection: React.FC<ProviderManagerSectionProps> = ({
           {providers.map(provider => {
             const isHost = provider.isHostManaged === true;
             const isActive = !provider.off;
+            const contextSummary = formatProviderContext(provider, models);
 
             return (
               <div
@@ -138,6 +207,15 @@ export const ProviderManagerSection: React.FC<ProviderManagerSectionProps> = ({
                   <p className="truncate text-sm text-muted-foreground">
                     {provider.baseUrl || i18nService.t('magpieLoopbackGateway')}
                   </p>
+
+                  {contextSummary && (
+                    <p
+                      className="truncate text-xs text-muted-foreground"
+                      title={[contextSummary.text, contextSummary.hint].filter(Boolean).join('\n')}
+                    >
+                      {contextSummary.text}
+                    </p>
+                  )}
 
                   {provider.models.length > 0 && (
                     <div className="flex flex-wrap items-center gap-1.5">

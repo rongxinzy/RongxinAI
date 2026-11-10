@@ -23,6 +23,8 @@ import {
 import { i18nService } from '../../../services/i18n';
 import { showAppError } from '../../../services/appToast';
 import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
+import { extractRuntimeErrorMessage } from '../../../../shared/magpie/runtimeErrorMessage';
+import { isHtmlEndpointRuntimeError } from './magpieRuntimeError';
 import { MagpieModelPreferences } from './MagpieModelPreferences';
 import { MagpieNetworkPreferences } from './MagpieNetworkPreferences';
 import { MagpiePrivacyPreferences } from './MagpiePrivacyPreferences';
@@ -67,6 +69,7 @@ export default function ModelSettingsPanel() {
   const mounted = useRef(false);
   const locked = useRef(false);
   const actionVersion = useRef(0);
+  const diagnosticsRequest = useRef(0);
 
   useEffect(() => {
     const query = window.matchMedia('(max-width: 1100px)');
@@ -75,22 +78,30 @@ export default function ModelSettingsPanel() {
     return () => query.removeEventListener('change', onChange);
   }, []);
 
+  const refreshDiagnostics = useCallback(async () => {
+    if (!window.electron.magpie?.diagnostics) return;
+    const request = ++diagnosticsRequest.current;
+    try {
+      const next = await window.electron.magpie.diagnostics();
+      if (mounted.current && request === diagnosticsRequest.current) setDiagnostics(next);
+    } catch {
+      /* diagnostics are advisory */
+    }
+  }, []);
+
   const loadProviders = useCallback(async () => {
     if (!window.electron.magpie?.providers) return;
     setProvidersLoading(true);
     try {
       const list = await window.electron.magpie.providers();
       if (mounted.current) setProviders(list);
-      if (window.electron.magpie.diagnostics) {
-        const diag = await window.electron.magpie.diagnostics();
-        if (mounted.current) setDiagnostics(diag);
-      }
+      await refreshDiagnostics();
     } catch {
       /* ignore */
     } finally {
       if (mounted.current) setProvidersLoading(false);
     }
-  }, []);
+  }, [refreshDiagnostics]);
 
   const apply = (next: MagpieModelCatalog, confirmed = false) => {
     if (!mounted.current) return;
@@ -153,6 +164,7 @@ export default function ModelSettingsPanel() {
       const updated = await window.electron.magpie.saveProvider(input);
       setProviders(updated);
       apply(await refreshMagpieModels());
+      void refreshDiagnostics();
       return true;
     } catch (err: unknown) {
       showAppError(err instanceof Error ? err.message : 'Save provider failed');
@@ -165,6 +177,7 @@ export default function ModelSettingsPanel() {
       const updated = await window.electron.magpie.setProviderEnabled(id, enabled);
       setProviders(updated);
       apply(await refreshMagpieModels());
+      void refreshDiagnostics();
       return true;
     } catch (err: unknown) {
       showAppError(err instanceof Error ? err.message : 'Toggle provider failed');
@@ -177,6 +190,7 @@ export default function ModelSettingsPanel() {
       const updated = await window.electron.magpie.deleteProvider(id);
       setProviders(updated);
       apply(await refreshMagpieModels());
+      void refreshDiagnostics();
       return true;
     } catch (err: unknown) {
       showAppError(err instanceof Error ? err.message : 'Delete provider failed');
@@ -188,8 +202,21 @@ export default function ModelSettingsPanel() {
     return window.electron.magpie.testProvider(input);
   };
 
+  const handleClearDiagnostics = async () => {
+    try {
+      const next = await window.electron.magpie.clearDiagnostics();
+      if (mounted.current) setDiagnostics(next);
+    } catch {
+      /* diagnostics are advisory */
+    }
+  };
+
   const running = catalog?.status.state === 'running';
   const models = running ? catalog.models : [];
+  const latestError = diagnostics?.recentErrors?.[0];
+  const latestErrorMessage = latestError
+    ? neutralRuntimeName(extractRuntimeErrorMessage(latestError.message))
+    : undefined;
   const selected = models.find(model => model.id === selection);
   const saved = models.find(model => model.id === catalog?.defaultModelId);
   const needsPreferences = running && section === ModelSection.Advanced;
@@ -329,13 +356,27 @@ export default function ModelSettingsPanel() {
                 </span>
               )}
               {diagnostics.recentErrors && diagnostics.recentErrors.length > 0 && (
-                <Badge
-                  variant="destructive"
-                  className="max-w-full truncate font-normal"
-                  title={neutralRuntimeName(diagnostics.recentErrors[0].message)}
-                >
-                  {neutralRuntimeName(diagnostics.recentErrors[0].message)}
-                </Badge>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Badge
+                    variant="destructive"
+                    className="max-w-full truncate font-normal"
+                    title={latestErrorMessage}
+                  >
+                    {latestErrorMessage}
+                  </Badge>
+                  <span className="text-xs">
+                    {new Date(diagnostics.recentErrors[0].timestamp).toLocaleString()}
+                  </span>
+                  {diagnostics.recentErrors.length > 1 && (
+                    <span className="text-xs">+{diagnostics.recentErrors.length - 1}</span>
+                  )}
+                  {isHtmlEndpointRuntimeError(diagnostics.recentErrors[0].message) && (
+                    <span className="text-xs">{i18nService.t('magpieRuntimeHtmlHint')}</span>
+                  )}
+                  <Button type="button" variant="ghost" size="sm" onClick={handleClearDiagnostics}>
+                    {i18nService.t('magpieDiagnosticsClear')}
+                  </Button>
+                </div>
               )}
             </div>
           )}
@@ -373,6 +414,7 @@ export default function ModelSettingsPanel() {
               <section className="flex flex-col gap-4 border-t border-border pt-6">
                 <ProviderManagerSection
                   providers={providers}
+                  models={models}
                   loading={providersLoading}
                   disabled={busy}
                   onRefresh={loadProviders}

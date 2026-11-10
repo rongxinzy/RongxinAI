@@ -39,7 +39,12 @@ module.exports = {
   extraResources: [
     ...baseConfig.extraResources.filter(
       resource =>
-        !['acp/registry.json', 'llamacpp-bundled', 'magpie/upstream.json'].includes(resource.to),
+        ![
+          'acp/registry.json',
+          'llamacpp-bundled',
+          'magpie/upstream.json',
+          'model-catalog.sqlite',
+        ].includes(resource.to),
     ),
     { from: 'LICENSE', to: 'LICENSE.txt' },
   ],

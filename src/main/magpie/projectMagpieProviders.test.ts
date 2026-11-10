@@ -103,7 +103,7 @@ describe('buildMagpieProviderSavePayload', () => {
     existing => {
       const baseUrl = 'http://192.168.1.10:8080/v1';
       const payload = buildMagpieProviderSavePayload(
-        { name: 'LAN llama-server', api: 'openai-completions', baseUrl, key: ' abcd ' },
+        { name: 'LAN llama-server', api: 'openai-completions', baseUrl, key: ' abcd ', models: [] },
         existing,
         'lan',
         'chat',
@@ -129,5 +129,81 @@ describe('buildMagpieProviderSavePayload', () => {
     expect(payload.key).toBe('');
     expect(payload.models).toEqual(['gpt-4o']);
     expect(payload.new).toBe(false);
+  });
+
+  it('projects declared context windows and drops values upstream cannot use', () => {
+    const [provider] = projectMagpieProviderSummaries({
+      providers: [
+        {
+          id: 'relay',
+          name: 'Relay',
+          chat: 'https://relay.test/v1',
+          contexts: { '*': 65536, 'gpt-4o': 131072, bad: -1, empty: 0, float: 1.5 },
+        },
+      ],
+    });
+    expect(provider?.contexts).toEqual({ '*': 65536, 'gpt-4o': 131072 });
+  });
+
+  it('omits contexts when upstream has none', () => {
+    const [provider] = projectMagpieProviderSummaries({
+      providers: [{ id: 'relay', name: 'Relay', chat: 'https://relay.test/v1' }],
+    });
+    expect(provider).not.toHaveProperty('contexts');
+  });
+
+  it('sends the whole context table the user edited, and clears only on {}', () => {
+    const baseUrl = 'https://relay.test/v1';
+    const withContexts = buildMagpieProviderSavePayload(
+      {
+        name: 'Relay',
+        api: 'openai-completions',
+        baseUrl,
+        models: ['gpt-4o'],
+        contexts: { '*': 65536, 'gpt-4o': 131072 },
+      },
+      { id: 'relay' },
+      'relay',
+      'chat',
+      baseUrl,
+    );
+    expect(withContexts.contexts).toEqual({ '*': 65536, 'gpt-4o': 131072 });
+
+    const untouched = buildMagpieProviderSavePayload(
+      { name: 'Relay', api: 'openai-completions', baseUrl, models: ['gpt-4o'] },
+      { id: 'relay' },
+      'relay',
+      'chat',
+      baseUrl,
+    );
+    expect(untouched).not.toHaveProperty('contexts');
+
+    const cleared = buildMagpieProviderSavePayload(
+      { name: 'Relay', api: 'openai-completions', baseUrl, models: ['gpt-4o'], contexts: {} },
+      { id: 'relay' },
+      'relay',
+      'chat',
+      baseUrl,
+    );
+    expect(cleared.contexts).toEqual({});
+  });
+
+  it('rejects context values upstream would refuse', () => {
+    const baseUrl = 'https://relay.test/v1';
+    expect(() =>
+      buildMagpieProviderSavePayload(
+        {
+          name: 'Relay',
+          api: 'openai-completions',
+          baseUrl,
+          models: ['gpt-4o'],
+          contexts: { '*': -1 },
+        },
+        undefined,
+        'relay',
+        'chat',
+        baseUrl,
+      ),
+    ).toThrow('100000000');
   });
 });

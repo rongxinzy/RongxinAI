@@ -70,6 +70,7 @@ export function registerMagpieIpc(
     }),
     magpieTestProvider: gated((_event, input) => manager.testProvider(input)),
     magpieDiagnostics: gated(() => manager.diagnostics()),
+    magpieClearDiagnostics: gated(() => manager.clearDiagnostics()),
     magpiePreferences: gated(() => manager.preferences()),
     magpieUpdatePreferences: gated((_event, patch) => manager.updatePreferences(patch)),
     magpieRoutingGroups: gated(() => usage.routingGroups()),

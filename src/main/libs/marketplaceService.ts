@@ -9,6 +9,7 @@ import {
   type MarketplaceSearchResult,
 } from '../../shared/marketplace';
 import { resolveMarketplaceParameterCount } from './marketplaceModelOrder';
+import type { LocalModelCatalog } from './localModelCatalog';
 import {
   ModelCatalogClient,
   type CatalogFetchLike,
@@ -16,6 +17,7 @@ import {
 } from './modelCatalogClient';
 
 type MarketplaceServiceOptions = {
+  localCatalog?: LocalModelCatalog;
   catalogApiUrl?: string | null;
   fetchImpl?: CatalogFetchLike;
   // Optional directory for a disk cache of catalogue responses. The catalogue
@@ -67,6 +69,35 @@ export class MarketplaceService {
     params: MarketplaceSearchParams = {},
     signal?: AbortSignal,
   ): Promise<MarketplaceSearchResult> {
+    if (this.options.localCatalog) {
+      signal?.throwIfAborted();
+      const page = this.options.localCatalog.search(params);
+      const root = this.getModelsDir().trim();
+      const models = await Promise.all(
+        page.models.map(async model => {
+          if (!root) return model;
+          const repoDir = path.join(root, 'modelscope', model.repoId);
+          for (const file of model.files ?? []) {
+            if (!file.path.toLowerCase().endsWith('.gguf') || file.kind === 'mmproj') continue;
+            const installedPath = path.join(repoDir, file.path);
+            const stats = await fs.promises.stat(installedPath).catch((): null => null);
+            if (stats?.isFile() && stats.size > 0) {
+              return { ...model, installed: true, installedPath };
+            }
+          }
+          return { ...model, installed: false, installedPath: undefined };
+        }),
+      );
+      signal?.throwIfAborted();
+      return {
+        models,
+        totalCount: page.totalCount,
+        nextCursor: page.nextCursor,
+        hasMore: Boolean(page.nextCursor),
+        catalogUpdatedAt: page.updatedAt,
+        source: 'local-sqlite',
+      };
+    }
     const catalogUrl = this.resolveCatalogUrl();
     if (!catalogUrl) {
       return {
@@ -154,6 +185,7 @@ export class MarketplaceService {
   async resolveModel(repoId: string): Promise<MarketplaceModel | null> {
     const normalizedRepoId = repoId.trim();
     if (!normalizedRepoId) return null;
+    if (this.options.localCatalog) return this.options.localCatalog.find(normalizedRepoId);
 
     const catalogUrl = this.resolveCatalogUrl();
     if (catalogUrl) {
