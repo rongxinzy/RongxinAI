@@ -295,5 +295,4 @@ describe('Magpie provider diagnostics and probing', () => {
       await fs.rm(root, { recursive: true, force: true });
     }
   });
-
 });

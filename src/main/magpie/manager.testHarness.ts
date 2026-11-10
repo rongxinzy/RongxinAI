@@ -125,8 +125,7 @@ export async function setup(
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
-    if (url.includes('jsonerror.test'))
-      return Response.json({ error: { message: 'invalid key' } });
+    if (url.includes('jsonerror.test')) return Response.json({ error: { message: 'invalid key' } });
     if (url.endsWith('/v1/models'))
       return Response.json({ data: [{ id: 'm1', owned_by: 'test', key: 'secret' }] });
     if (url.endsWith('/api/providers'))
@@ -183,8 +182,7 @@ export async function setup(
   const manager = new MagpieManager({
     serviceEnabled,
     ...(lanAccess ? { lanAccess } : {}),
-    parseCatalog: async bytes =>
-      projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
+    parseCatalog: async bytes => projectMagpieCatalog(JSON.parse(new TextDecoder().decode(bytes))),
     resourcesRoot: root,
     privateHome: root,
     environment: { HOME: root, USERPROFILE: root },

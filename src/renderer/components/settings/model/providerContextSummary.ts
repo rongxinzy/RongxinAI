@@ -53,7 +53,10 @@ function catalogContext(
   const owned = catalogModels.filter(
     model => model.id.startsWith(`${providerId}/`) || model.owned_by === providerId,
   );
-  const pool = owned.length > 0 ? owned : catalogModels;
+  const pool =
+    owned.length > 0
+      ? owned
+      : catalogModels.filter(model => model.id === modelId && !model.owned_by);
   const exact = pool.filter(model => model.id === modelId);
   const candidates =
     exact.length > 0 ? exact : pool.filter(model => model.id.endsWith(`/${modelId}`));

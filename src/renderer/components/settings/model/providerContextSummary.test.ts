@@ -37,8 +37,8 @@ describe('summarizeProviderContexts', () => {
     const entries = summarizeProviderContexts(
       provider(),
       catalog(
-        { id: 'gpt-4o', context_window: 128000 },
-        { id: 'vendor/glm-5-3-flash', context_window: 1000000 },
+        { id: 'gpt-4o', owned_by: 'relay', context_window: 128000 },
+        { id: 'relay/glm-5-3-flash', context_window: 1000000 },
       ),
     );
     expect(entries).toEqual([
@@ -63,6 +63,29 @@ describe('summarizeProviderContexts', () => {
       ),
     );
     expect(entries).toEqual([{ modelId: 'gpt-4o', tokens: 128000, source: 'auto' }]);
+  });
+
+  it('does not borrow another provider window when its own catalog rows are absent', () => {
+    for (const model of [
+      { id: 'relay-b/gpt-4o', context_window: 1000000 },
+      { id: 'gpt-4o', owned_by: 'relay-b', context_window: 1000000 },
+    ]) {
+      expect(
+        summarizeProviderContexts(
+          provider({ id: 'relay-a', models: ['gpt-4o'], off: true }),
+          catalog(model),
+        ),
+      ).toEqual([{ modelId: 'gpt-4o', source: 'unset' }]);
+    }
+  });
+
+  it('retains exact catalog ids without provider metadata', () => {
+    expect(
+      summarizeProviderContexts(
+        provider({ models: ['gpt-4o'] }),
+        catalog({ id: 'gpt-4o', context_window: 128000 }),
+      ),
+    ).toEqual([{ modelId: 'gpt-4o', tokens: 128000, source: 'auto' }]);
   });
 
   it('marks host-managed windows as system even when the catalog supplies them', () => {
