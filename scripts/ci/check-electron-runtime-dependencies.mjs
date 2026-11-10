@@ -70,7 +70,7 @@ function assertDaemonIsNodeSafe(source) {
   }
 }
 
-export function checkElectronRuntimeDependencies(projectRoot) {
+export function checkElectronRuntimeDependencies(projectRoot, edition = '') {
   const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
   const declared = Object.keys(packageJson.dependencies ?? {}).sort();
   const expected = [...ELECTRON_RUNTIME_DEPENDENCIES].sort();
@@ -87,10 +87,12 @@ export function checkElectronRuntimeDependencies(projectRoot) {
   }
 
   const daemonPath = path.join(outputDirectory, 'llamacppModelDaemonEntry.js');
-  if (!fs.existsSync(daemonPath)) {
-    throw new Error(`Llama.cpp daemon bundle is missing: ${daemonPath}`);
+  if (edition !== 'defense') {
+    if (!fs.existsSync(daemonPath)) {
+      throw new Error(`Llama.cpp daemon bundle is missing: ${daemonPath}`);
+    }
+    assertDaemonIsNodeSafe(fs.readFileSync(daemonPath, 'utf8'));
   }
-  assertDaemonIsNodeSafe(fs.readFileSync(daemonPath, 'utf8'));
 
   const externalRoots = collectLiteralExternalRoots(fs.readFileSync(mainPath, 'utf8'));
   const undeclared = externalRoots.filter(root => !declared.includes(root));
@@ -115,5 +117,5 @@ export function checkElectronRuntimeDependencies(projectRoot) {
 
 const scriptPath = process.argv[1] ? path.resolve(process.argv[1]) : '';
 if (scriptPath === fileURLToPath(import.meta.url)) {
-  checkElectronRuntimeDependencies(process.cwd());
+  checkElectronRuntimeDependencies(process.cwd(), process.env.APP_EDITION);
 }

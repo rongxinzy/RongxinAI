@@ -59,6 +59,16 @@ describe('Electron runtime dependency check', () => {
     ]);
   });
 
+  test('requires the daemon only in editions that build it', () => {
+    const root = createFixture();
+    fs.unlinkSync(path.join(root, 'dist-electron', 'llamacppModelDaemonEntry.js'));
+
+    expect(() => checkElectronRuntimeDependencies(root)).toThrow('daemon bundle is missing');
+    expect(checkElectronRuntimeDependencies(root, 'defense').externalRoots).toEqual([
+      'electron-updater',
+    ]);
+  });
+
   test('rejects production dependency allowlist drift', () => {
     const root = createFixture();
     const packageJsonPath = path.join(root, 'package.json');
