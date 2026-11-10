@@ -113,7 +113,7 @@ startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 
 ### 模型市场目录
 
-`resources/model-catalog.sqlite` 是预填充的发布输入，由 Electron Builder 复制到应用资源目录。首次使用直接读取随包版本。本地搜索、详情和安装元数据解析不依赖云目录，模型权重按文件版本从 ModelScope 下载并校验。初版包含 32 个仓库、372 个带校验和的文件规格。
+`resources/model-catalog.sqlite` 是预填充的发布输入，由 Electron Builder 复制到应用资源目录。首次使用直接读取随包版本。本地搜索、详情和安装元数据解析不依赖云目录，模型权重按文件版本从 ModelScope 下载并校验。打包前后均校验至少 100 个不同仓库，数据库大小不超过 100 MB。
 
 更新随包版本时，先取得上游发布快照 JSON，再运行 `bun run scripts/build-model-catalog.cjs /path/to/current-snapshot.json`。检查 `PRAGMA integrity_check` 和模型数量后提交更新后的数据库。上游使用 `scripts/publish-model-catalog.cjs` 生成完整快照和可选增量，再发布到 `/v1/catalog/feed`。
 

@@ -2,6 +2,7 @@ const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+const { MIN_MODELS } = require('./packaging/assert-model-catalog.cjs');
 
 const [input, directory, previousInput] = process.argv.slice(2);
 const MAX_UPDATE_BYTES = 8 * 1024 * 1024;
@@ -55,12 +56,15 @@ function writeAtomic(name, data) {
 }
 
 const current = readSnapshot(input);
+if (current.models.size < MIN_MODELS) {
+  throw new Error(`Published catalog must contain at least ${MIN_MODELS} repositories`);
+}
 const previous = previousInput ? readSnapshot(previousInput) : null;
 if (previous && previous.revision >= current.revision)
   throw new Error('Catalog revision must increase');
 fs.mkdirSync(directory, { recursive: true });
 
-function publish(baseRevision, upserts, deletes) {
+function prepareArtifact(baseRevision, upserts, deletes) {
   const name =
     baseRevision === null
       ? `snapshot-${current.revision}.json`
@@ -72,30 +76,35 @@ function publish(baseRevision, upserts, deletes) {
     upserts,
     deletes,
   });
-  if (Buffer.byteLength(data) > MAX_UPDATE_BYTES) {
-    throw new Error(`Catalog artifact exceeds the desktop size limit: ${name}`);
-  }
+  return { name, data, bytes: Buffer.byteLength(data) };
+}
+
+function publish({ name, data, bytes }) {
   writeAtomic(name, data);
   return {
-    bytes: Buffer.byteLength(data),
+    bytes,
     sha256: createHash('sha256').update(data).digest('hex'),
   };
 }
 
+const snapshot = prepareArtifact(null, [...current.models.values()], []);
+if (snapshot.bytes > MAX_UPDATE_BYTES) {
+  throw new Error(`Catalog artifact exceeds the desktop size limit: ${snapshot.name}`);
+}
 const manifest = {
   schema: 1,
   revision: current.revision,
-  snapshot: publish(null, [...current.models.values()], []),
+  snapshot: publish(snapshot),
 };
 if (previous) {
   const upserts = [...current.models]
     .filter(([id, item]) => JSON.stringify(item) !== JSON.stringify(previous.models.get(id)))
     .map(([, item]) => item);
   const deletes = [...previous.models.keys()].filter(id => !current.models.has(id));
-  manifest.delta = {
-    baseRevision: previous.revision,
-    ...publish(previous.revision, upserts, deletes),
-  };
+  const delta = prepareArtifact(previous.revision, upserts, deletes);
+  if (delta.bytes < snapshot.bytes) {
+    manifest.delta = { baseRevision: previous.revision, ...publish(delta) };
+  }
 }
 
 // Publish artifacts before the manifest so clients never see dangling references.

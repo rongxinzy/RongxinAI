@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+const { assertModelCatalog } = require('./packaging/assert-model-catalog.cjs');
 
 const root = path.resolve(__dirname, '..');
 const input = process.argv[2];
@@ -41,6 +42,7 @@ try {
       const segments = file.path.split('/');
       if (
         !file.path.toLowerCase().endsWith('.gguf') ||
+        /imatrix/i.test(file.path) ||
         segments.some(
           segment => !segment || segment === '.' || segment === '..' || /[\\:*?"<>|]/.test(segment),
         ) ||
@@ -77,4 +79,10 @@ try {
 } finally {
   db.close();
 }
-fs.renameSync(staged, destination);
+try {
+  const { count, bytes } = assertModelCatalog(staged);
+  fs.renameSync(staged, destination);
+  console.log(`Bundled ${count} ModelScope repositories in ${bytes} bytes`);
+} finally {
+  fs.rmSync(staged, { force: true });
+}

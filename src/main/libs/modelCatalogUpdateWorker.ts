@@ -8,6 +8,7 @@ import { toCatalogUpsert } from './modelCatalogUpdateTypes';
 const repoPattern = /^[a-z0-9_-][a-z0-9_.-]*\/[a-z0-9_-][a-z0-9_.-]*$/i;
 const safeFile = (file: string) =>
   file.toLowerCase().endsWith('.gguf') &&
+  !/imatrix/i.test(file) &&
   file
     .split('/')
     .every(
