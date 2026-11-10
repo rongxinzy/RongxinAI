@@ -112,6 +112,10 @@ export function homeStudioAppearances() {
     'welcome-title': recipe({
       base: { 'font-size': '24px', 'line-height': '32px', 'font-weight': '600' },
     }),
+    'defense-welcome-ink': recipe({ base: { color: '#842621', 'background-color': '#f5e6c7' } }),
+    'defense-welcome-slogan': recipe({
+      base: { 'font-size': 'clamp(24px, 4vw, 44px)', 'line-height': '1.18', 'font-weight': '600' },
+    }),
     'welcome-art': recipe({
       base: {
         width: 'min(52rem, 88vw)',

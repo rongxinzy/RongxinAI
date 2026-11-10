@@ -18,11 +18,11 @@ export const registerManagedProvidersIpc = (deps: ManagedProvidersIpcDeps): void
   if (getBranding().features.enableAISphere) {
     handleIpcContractSubset(providersContract, {
       aisphereSnapshot: async () => aisphereService.snapshot(),
-      aisphereConnect: async (_event, address) => {
+      aisphereConnect: async (_event, address, accessKey) => {
         if (isDefenseEdition() && !aisphereService.modelGatewayOrigin()) {
           throw new Error(AISphereError.Unavailable);
         }
-        return aisphereService.connect(address);
+        return aisphereService.connect(address, accessKey);
       },
       aisphereRefresh: async () => {
         await aisphereService.refresh();

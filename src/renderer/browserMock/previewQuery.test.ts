@@ -20,6 +20,12 @@ describe('previewQuery', () => {
     expect(shouldSkipPreviewBoot(params)).toBe(true);
   });
 
+  test('parses the defense preview edition', () => {
+    const params = new URLSearchParams(`${PreviewQuery.Edition}=${PreviewEdition.Defense}`);
+    expect(readPreviewEdition(params)).toBe(PreviewEdition.Defense);
+    expect(buildPreviewSearch({ edition: PreviewEdition.Defense })).toBe('?previewEdition=defense');
+  });
+
   test('buildPreviewSearch omits default values', () => {
     expect(buildPreviewSearch({})).toBe('');
     expect(buildPreviewSearch({ scenario: PreviewScenario.Loading, skipBoot: true })).toBe(

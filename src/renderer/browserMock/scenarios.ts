@@ -1,21 +1,15 @@
 /**
  * Scenario-specific overrides for browser preview interaction tests and local walkthroughs.
  */
-import {
-  PreviewEdition as PreviewEditionConst,
-  PreviewScenario,
-  type PreviewEdition,
-} from './previewQuery';
+import { PreviewScenario, type PreviewEdition } from './previewQuery';
 import type { DeepPartial } from './scenarioTypes';
 import { createSiteDemoOverrides } from './siteDemo';
 
 type ElectronApi = Window['electron'];
 
 export function editionWindowInjection(edition: PreviewEdition): void {
-  if (edition === PreviewEditionConst.Xiaoruan) {
-    (window as unknown as { __APP_EDITION__?: string }).__APP_EDITION__ =
-      PreviewEditionConst.Xiaoruan;
-  }
+  if (typeof window === 'undefined') return;
+  (window as unknown as { __APP_EDITION__?: string }).__APP_EDITION__ = edition;
 }
 
 export function createScenarioOverrides(

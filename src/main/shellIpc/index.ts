@@ -9,7 +9,6 @@ import { shell } from 'electron';
 import { isDefenseEdition } from '../../shared/branding';
 
 import { normalizeWindowsShellPath } from './shellPathNormalize';
-import { isOwnedExternalUrl } from './ownedExternalUrls';
 import { isAllowedShellOpenPath, isSensitivePath } from '../shellPathValidation';
 import { resolveLocalPathCandidate } from '../localPathResolver';
 import { getAllowedShellProbeRoots } from '../dialogIpc';
@@ -79,7 +78,7 @@ export const registerShellIpc = (deps: ShellIpcDeps): void => {
 
     shellOpenExternal: async (_event, url) => {
       try {
-        if (isDefenseEdition() && isOwnedExternalUrl(url)) {
+        if (isDefenseEdition()) {
           return { success: false, error: 'Access denied' };
         }
         await shell.openExternal(url);
@@ -91,6 +90,9 @@ export const registerShellIpc = (deps: ShellIpcDeps): void => {
 
     shellOpenHtmlInBrowser: async (_event, htmlContent) => {
       try {
+        if (isDefenseEdition()) {
+          return { success: false, error: 'Access denied' };
+        }
         const tmpDir = path.join(os.tmpdir(), 'zhiyuan-preview');
         fs.mkdirSync(tmpDir, { recursive: true });
         const tmpFile = path.join(tmpDir, `preview-${Date.now()}.html`);

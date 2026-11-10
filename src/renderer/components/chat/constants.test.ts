@@ -105,7 +105,7 @@ test('quick skill selections automatically allow tools for their chat session on
   );
 });
 
-test('Office uses native completion while other sidebar shortcuts retain their controllers', () => {
+test('document skills use native completion while other shortcuts retain their controllers', () => {
   const nativeCompletionSkills = new Set<string>([
     CoreSkillId.PresentationStudio,
     CoreSkillId.Docx,

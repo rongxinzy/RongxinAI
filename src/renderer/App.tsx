@@ -69,7 +69,7 @@ const App: React.FC = () => {
     useLocalInferenceVisibility(mainView);
   const [localInferenceRefreshRequestId, setLocalInferenceRefreshRequestId] = useState(0);
   const [bootScreenVisible, setBootScreenVisible] = useState(
-    () => !isDefenseEdition() && !(import.meta.env.DEV && shouldSkipPreviewBoot()),
+    () => !(import.meta.env.DEV && shouldSkipPreviewBoot()),
   );
   const toast = useAppToastDisplay();
   const [, forceLanguageRefresh] = useState(0);
@@ -434,6 +434,7 @@ const App: React.FC = () => {
       <div className="h-screen overflow-hidden flex flex-col">
         {windowsStandaloneTitleBar}
         <CompanionWelcomeScreen
+          defense={defense}
           exiting={isInitialized}
           failed={Boolean(initError)}
           onExitComplete={() => setBootScreenVisible(false)}

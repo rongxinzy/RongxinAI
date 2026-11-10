@@ -6,8 +6,13 @@ import { build } from 'vite-plugin-electron';
 import { extractExternalDeps } from 'vite-plugin-electron/plugin';
 import { ELECTRON_MAIN_EXTERNALS } from './electron-runtime-dependencies.mjs';
 import { copyCompanionPhoton } from './copy-companion-photon.mjs';
+import defensePackaging from './packaging/defense-edition.cjs';
 
+const { prepareDefenseSkills } = defensePackaging;
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
+if (process.env.APP_EDITION === 'defense') {
+  prepareDefenseSkills(path.resolve(scriptDirectory, '..'));
+}
 const projectRoot = path.resolve(scriptDirectory, '..');
 const outputDirectory = path.join(projectRoot, 'dist-electron');
 const readyPath = path.join(outputDirectory, '.electron-ready');
@@ -31,6 +36,7 @@ function createBuildOptions(entry, extraBuildOptions = {}) {
     entry,
     vite: {
       root: projectRoot,
+      define: { __ZHIYUAN_DEFENSE_BUILD__: JSON.stringify(process.env.APP_EDITION === 'defense') },
       build: {
         outDir: outputDirectory,
         emptyOutDir: false,

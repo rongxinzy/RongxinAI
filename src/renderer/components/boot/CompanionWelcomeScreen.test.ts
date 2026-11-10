@@ -79,6 +79,32 @@ test('a bootstrap failure exits to the error view without waiting for the minimu
   expect(complete).toHaveBeenCalledOnce();
 });
 
+test('defense startup displays the three slogans and immediately hands off bootstrap errors', () => {
+  const complete = vi.fn();
+  const screen = render(
+    createElement(CompanionWelcomeScreen, {
+      defense: true,
+      exiting: false,
+      onExitComplete: complete,
+    }),
+  );
+  expect(screen.getByTestId('defense-welcome')).toBeDefined();
+  expect(screen.getByRole('heading').textContent).toBe(
+    'defenseWelcomeSloganCommanddefenseWelcomeSloganVictorydefenseWelcomeSloganDiscipline',
+  );
+  expect(screen.queryByRole('img')).toBeNull();
+  screen.rerender(
+    createElement(CompanionWelcomeScreen, {
+      defense: true,
+      failed: true,
+      exiting: true,
+      onExitComplete: complete,
+    }),
+  );
+  act(() => vi.advanceTimersByTime(0));
+  expect(complete).toHaveBeenCalledOnce();
+});
+
 test('reduced motion can end a pending transition immediately and unmount cancels work', () => {
   const complete = vi.fn();
   const screen = render(

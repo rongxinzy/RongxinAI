@@ -208,4 +208,21 @@ describe('preload entry', () => {
     expect(api.platform).toBe(process.platform);
     expect(api.arch).toBe(process.arch);
   });
+
+  test('omits online updates from the defense bridge', async () => {
+    vi.resetModules();
+    vi.stubEnv('APP_EDITION', 'defense');
+    try {
+      const { contextBridge: bridge } = await import('electron');
+      const expose = vi.spyOn(bridge, 'exposeInMainWorld');
+      await import('../preload');
+
+      expect(expose).toHaveBeenCalledOnce();
+      const [, api] = expose.mock.calls[0];
+      expect(api).not.toHaveProperty('appUpdate');
+      expect(api).toHaveProperty('appInfo.getVersion');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

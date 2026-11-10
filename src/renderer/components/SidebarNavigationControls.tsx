@@ -1,5 +1,6 @@
 import { useSelector } from 'react-redux';
 
+import { isDefenseEdition } from '../../shared/branding';
 import { i18nService } from '../services/i18n';
 import { workspaceService } from '../services/workspace';
 import { shouldShowLocalInferenceNavigation } from '../services/managedModelUiPolicy';
@@ -101,7 +102,9 @@ export const SidebarNavigationControls = ({
       onShowScheduledTasks,
       'scheduledTasks',
     );
-    addView('activity', i18nService.t('activityTitle'), onShowActivity, 'activity');
+    if (!isDefenseEdition()) {
+      addView('activity', i18nService.t('activityTitle'), onShowActivity, 'activity');
+    }
     addView('expert', i18nService.t('expert'), onShowExpert, 'expert');
   }
   return (

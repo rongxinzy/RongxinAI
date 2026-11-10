@@ -2,6 +2,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
+import { isDefenseEdition } from '../shared/branding';
 import { isCoreSkill } from '../shared/skills/constants';
 import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscopeTokenPool';
 import { SqliteStore } from './sqliteStore';
@@ -63,6 +64,9 @@ export class SkillManager implements SkillManagerContext {
   }
 
   getSkillsRoot(): string {
+    if (isDefenseEdition()) {
+      return path.resolve(app.getPath('userData'), SKILLS_DIR_NAME);
+    }
     const projectRoot = path.resolve(__dirname, '..');
     const projectSkillsRoot = path.resolve(projectRoot, SKILLS_DIR_NAME);
     if (!app.isPackaged && fs.existsSync(projectSkillsRoot)) {
@@ -435,6 +439,10 @@ ${params.content.trim()}
       }
 
       return path.resolve(app.getAppPath(), SKILLS_DIR_NAME);
+    }
+
+    if (isDefenseEdition()) {
+      return path.resolve(app.getAppPath(), 'build-tar', 'defense', SKILLS_DIR_NAME);
     }
 
     // __dirname is dist-electron/, so we need to go up one level to get to project root

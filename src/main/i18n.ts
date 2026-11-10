@@ -22,6 +22,7 @@ import { enMain2 } from './i18n/en-2';
 import { enMain3 } from './i18n/en-3';
 import { enMain4 } from './i18n/en-4';
 import { companionMessages } from '../shared/companion/messages';
+import { isDefenseEdition } from '../shared/branding';
 
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: { ...zhMain1, ...zhMain2, ...zhMain3, ...companionMessages.zh },
@@ -32,7 +33,7 @@ let currentLanguage: LanguageType = 'zh';
 
 /** Set the active language. Call this when app_config.language changes. */
 export function setLanguage(language: LanguageType): void {
-  currentLanguage = language;
+  currentLanguage = isDefenseEdition() ? 'zh' : language;
 }
 
 /**

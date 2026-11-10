@@ -26,6 +26,7 @@ import type {
 } from '../../../scheduledTask/types';
 import type { Workspace } from '../../../shared/workspace';
 import { CoworkSessionSource } from '../../../shared/cowork/constants';
+import { isDefenseEdition } from '../../../shared/branding';
 import { i18nService } from '../../services/i18n';
 import {
   getLastPathSegment,
@@ -125,7 +126,8 @@ const TaskForm: React.FC<TaskFormProps> = ({
 
   const isAdvanced = form.planType === 'advanced';
   const isCron = form.planType === 'cron';
-  const showConversationSelector = isIMChannel(form.notifyChannel);
+  const defense = isDefenseEdition();
+  const showConversationSelector = !defense && isIMChannel(form.notifyChannel);
   const selectedConversation = conversations.find(
     conversation => conversation.conversationId === form.notifyTo,
   );
@@ -146,6 +148,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
   }, [form.workspaceId, initialWorkspaceId, currentWorkspaceId, workspaces]);
 
   useEffect(() => {
+    if (defense) return;
     let cancelled = false;
     void scheduledTaskService.listChannels().then(channels => {
       if (cancelled || channels.length === 0) return;
@@ -182,7 +185,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [defense]);
 
   useEffect(() => {
     if (!showConversationSelector) {
@@ -636,102 +639,104 @@ const TaskForm: React.FC<TaskFormProps> = ({
   }, [form, cronPreview, task, planSelect, updateForm]);
 
   const notificationControl = useMemo(
-    () => (
-      <div className="flex items-center gap-3">
-        <Select
-          value={
-            form.notifyChannel === 'none'
-              ? 'none'
-              : channelOptionValue({
-                  value: form.notifyChannel,
-                  accountId: form.notifyAccountId,
-                })
-          }
-          onValueChange={value => {
-            const selected = findChannelOption(channelOptions, value);
-            updateForm({
-              notifyChannel: selected?.value ?? 'none',
-              notifyTo: '',
-              notifyAccountId: selected?.accountId,
-            });
-          }}
-        >
-          <SelectTrigger className="flex-1 min-w-0">
-            <SelectValue>
-              {form.notifyChannel === 'none'
-                ? i18nService.t('scheduledTasksFormNotifyChannelNone')
-                : (() => {
-                    const channel = channelOptions.find(
-                      option =>
-                        option.value === form.notifyChannel &&
-                        option.accountId === form.notifyAccountId,
-                    );
-                    return channel ? getNotifyChannelLabel(channel) : form.notifyChannel;
-                  })()}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="none">
-                {i18nService.t('scheduledTasksFormNotifyChannelNone')}
-              </SelectItem>
-              {channelOptions.map(channel => {
-                const baseDisplayName = getNotifyChannelLabel(channel);
-                const duplicateLabels = channelOptions.filter(
-                  option => getNotifyChannelLabel(option) === baseDisplayName,
-                );
-                const displayName =
-                  duplicateLabels.length > 1 && channel.accountId
-                    ? `${baseDisplayName} · ${channel.accountId.slice(-4)}`
-                    : baseDisplayName;
-                return (
-                  <SelectItem
-                    key={`${channel.value}:${channel.accountId ?? ''}`}
-                    value={channelOptionValue(channel)}
-                  >
-                    {displayName}
-                  </SelectItem>
-                );
-              })}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        {showConversationSelector && (
+    () =>
+      defense ? null : (
+        <div className="flex items-center gap-3">
           <Select
-            value={form.notifyTo}
-            onValueChange={value => updateForm({ notifyTo: value ?? '' })}
-            disabled={conversationsLoading}
+            value={
+              form.notifyChannel === 'none'
+                ? 'none'
+                : channelOptionValue({
+                    value: form.notifyChannel,
+                    accountId: form.notifyAccountId,
+                  })
+            }
+            onValueChange={value => {
+              const selected = findChannelOption(channelOptions, value);
+              updateForm({
+                notifyChannel: selected?.value ?? 'none',
+                notifyTo: '',
+                notifyAccountId: selected?.accountId,
+              });
+            }}
           >
             <SelectTrigger className="flex-1 min-w-0">
-              <SelectValue
-                placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')}
-              >
-                {selectedConversation
-                  ? getNotifyConversationLabel(selectedConversation)
-                  : undefined}
+              <SelectValue>
+                {form.notifyChannel === 'none'
+                  ? i18nService.t('scheduledTasksFormNotifyChannelNone')
+                  : (() => {
+                      const channel = channelOptions.find(
+                        option =>
+                          option.value === form.notifyChannel &&
+                          option.accountId === form.notifyAccountId,
+                      );
+                      return channel ? getNotifyChannelLabel(channel) : form.notifyChannel;
+                    })()}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                {conversations.length === 0 ? (
-                  <SelectItem value="no-conversation" disabled>
-                    {i18nService.t('scheduledTasksFormNotifyConversationNone')}
-                  </SelectItem>
-                ) : (
-                  conversations.map(conv => (
-                    <SelectItem key={conv.conversationId} value={conv.conversationId}>
-                      {getNotifyConversationLabel(conv)}
+                <SelectItem value="none">
+                  {i18nService.t('scheduledTasksFormNotifyChannelNone')}
+                </SelectItem>
+                {channelOptions.map(channel => {
+                  const baseDisplayName = getNotifyChannelLabel(channel);
+                  const duplicateLabels = channelOptions.filter(
+                    option => getNotifyChannelLabel(option) === baseDisplayName,
+                  );
+                  const displayName =
+                    duplicateLabels.length > 1 && channel.accountId
+                      ? `${baseDisplayName} · ${channel.accountId.slice(-4)}`
+                      : baseDisplayName;
+                  return (
+                    <SelectItem
+                      key={`${channel.value}:${channel.accountId ?? ''}`}
+                      value={channelOptionValue(channel)}
+                    >
+                      {displayName}
                     </SelectItem>
-                  ))
-                )}
+                  );
+                })}
               </SelectGroup>
             </SelectContent>
           </Select>
-        )}
-      </div>
-    ),
+
+          {showConversationSelector && (
+            <Select
+              value={form.notifyTo}
+              onValueChange={value => updateForm({ notifyTo: value ?? '' })}
+              disabled={conversationsLoading}
+            >
+              <SelectTrigger className="flex-1 min-w-0">
+                <SelectValue
+                  placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')}
+                >
+                  {selectedConversation
+                    ? getNotifyConversationLabel(selectedConversation)
+                    : undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {conversations.length === 0 ? (
+                    <SelectItem value="no-conversation" disabled>
+                      {i18nService.t('scheduledTasksFormNotifyConversationNone')}
+                    </SelectItem>
+                  ) : (
+                    conversations.map(conv => (
+                      <SelectItem key={conv.conversationId} value={conv.conversationId}>
+                        {getNotifyConversationLabel(conv)}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      ),
     [
+      defense,
       form.notifyChannel,
       form.notifyAccountId,
       form.notifyTo,

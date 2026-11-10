@@ -1,4 +1,5 @@
 import { contextBridge } from 'electron';
+import { isDefenseEdition } from '../shared/branding';
 
 import { appSystemApi } from './preload/appSystem';
 import { artifactsApi } from './preload/artifacts';
@@ -11,12 +12,15 @@ import { memoryApi } from './preload/memory';
 import { providersApi } from './preload/providers';
 import { skillsAndMcpApi } from './preload/skillsAndMcp';
 
+const { appUpdate, ...appSystem } = appSystemApi;
+
 // ─── Exposed API ────────────────────────────────────────────────────────────
 contextBridge.exposeInMainWorld('electron', {
   platform: process.platform,
   arch: process.arch,
 
-  ...appSystemApi,
+  ...appSystem,
+  ...(!isDefenseEdition() && { appUpdate }),
   ...skillsAndMcpApi,
   ...artifactsApi,
   ...localInferenceApi,

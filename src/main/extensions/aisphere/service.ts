@@ -7,9 +7,12 @@ import {
 } from '../../../shared/aisphere';
 import { ManagedProviderAccessMode } from '../../../shared/managedProviders';
 import type { ProviderConfig } from '../../../shared/providers';
+import { isDefenseEdition } from '../../../shared/branding';
 import { isOwnedExternalUrl } from '../../shellIpc/ownedExternalUrls';
+import { readAISphereCredential, writeAISphereCredential } from './credentials';
 import {
   normalizePlatformAddress,
+  parseOpenAIModels,
   parsePlatformModels,
   publicModel,
   type PlatformModel,
@@ -38,6 +41,7 @@ interface Config {
 export class AISphereService {
   private store?: Store;
   private address = '';
+  private accessKey = '';
   private models: PlatformModel[] = [];
   private ready = false;
   private checkedAt = 0;
@@ -67,8 +71,10 @@ export class AISphereService {
     if (stored) {
       try {
         this.address = this.normalizeAddress(stored);
+        this.accessKey = isDefenseEdition() ? readAISphereCredential(store) : '';
       } catch {
-        /* Invalid binding stays closed. */
+        this.address = '';
+        this.accessKey = '';
       }
     }
     const refresh = this.refresh().catch((): void => {});
@@ -129,8 +135,9 @@ export class AISphereService {
     for (const callback of this.listeners) callback();
   }
 
-  private async json(url: string): Promise<unknown> {
+  private async json(url: string, headers?: Record<string, string>): Promise<unknown> {
     const response = await this.fetcher(url, {
+      headers,
       redirect: 'error',
       signal: AbortSignal.timeout(10000),
       requireTrustedCertificate: this.requiresTrustedCertificate(),
@@ -154,7 +161,21 @@ export class AISphereService {
     }
   }
 
-  private async discover(address: string): Promise<PlatformModel[]> {
+  private assertAllowedModels(models: PlatformModel[], address: string): PlatformModel[] {
+    if (this.restrictedPlatform) {
+      const origins = new Set([address, ...this.restrictedPlatform.inferenceOrigins]);
+      if (
+        models.some(
+          model => isOwnedExternalUrl(model.url) || !origins.has(new URL(model.url).origin),
+        )
+      ) {
+        throw new Error(AISphereError.InvalidModels);
+      }
+    }
+    return models;
+  }
+
+  private async discover(address: string, accessKey = this.accessKey): Promise<PlatformModel[]> {
     try {
       const identity = await this.json(address + AISphere.VerifyPath);
       if (
@@ -166,18 +187,14 @@ export class AISphereService {
         throw new Error(AISphereError.InvalidPlatform);
       }
       const models = parsePlatformModels(await this.json(address + AISphere.ModelsPath));
-      if (this.restrictedPlatform) {
-        const origins = new Set([address, ...this.restrictedPlatform.inferenceOrigins]);
-        if (
-          models.some(
-            model => isOwnedExternalUrl(model.url) || !origins.has(new URL(model.url).origin),
-          )
-        ) {
-          throw new Error(AISphereError.InvalidModels);
-        }
-      }
-      return models;
+      return this.assertAllowedModels(models, address);
     } catch (error) {
+      if (isDefenseEdition() && accessKey) {
+        const result = await this.json(address + AISphere.OpenAIModelsPath, {
+          Authorization: `Bearer ${accessKey}`,
+        });
+        return parseOpenAIModels(result, address, accessKey);
+      }
       if (
         error instanceof Error &&
         Object.values(AISphereError).some(code => code === error.message)
@@ -188,18 +205,21 @@ export class AISphereService {
     }
   }
 
-  async connect(input: unknown): Promise<AISphereSnapshot> {
+  async connect(input: unknown, credential?: string): Promise<AISphereSnapshot> {
     const address = this.normalizeAddress(input);
     if (this.changing || this.active || this.busy()) throw new Error(AISphereError.Busy);
     this.changing = true;
     try {
       await this.pending?.catch((): void => {});
-      const models = await this.discover(address);
+      const accessKey = isDefenseEdition() ? (credential?.trim() ?? this.accessKey) : '';
+      const models = await this.discover(address, accessKey);
       if (this.active || this.busy()) throw new Error(AISphereError.Busy);
       const switching = address !== this.address;
+      if (this.store && accessKey) writeAISphereCredential(this.store, accessKey);
       this.store?.set(AISphere.StoreKey, address);
       if (switching) this.gatewayToken = randomBytes(32).toString('hex');
       this.address = address;
+      this.accessKey = accessKey;
       this.models = models;
       this.ready = true;
       this.checkedAt = Date.now();

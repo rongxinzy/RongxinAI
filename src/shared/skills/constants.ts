@@ -18,8 +18,15 @@ export const CoreSkillId = {
 
 export type CoreSkillId = (typeof CoreSkillId)[keyof typeof CoreSkillId];
 
-export const isCoreSkill = (id: string): id is CoreSkillId =>
-  (Object.values(CoreSkillId) as string[]).includes(id);
+export const DefenseSkillId = {
+  OperationsDocumentWriting: 'operations-document-writing',
+  CommandPostExerciseDocuments: 'command-post-exercise-documents',
+} as const;
+
+export type DefenseSkillId = (typeof DefenseSkillId)[keyof typeof DefenseSkillId];
+
+export const isCoreSkill = (id: string): id is CoreSkillId | DefenseSkillId =>
+  ([...Object.values(CoreSkillId), ...Object.values(DefenseSkillId)] as string[]).includes(id);
 
 /** Skills that together form the first-class Academic Research workflow. */
 export const AcademicResearchSkillIds = [
@@ -29,7 +36,8 @@ export const AcademicResearchSkillIds = [
 ] as const;
 
 const defenseQuickActionSkills = new Set<string>([
-  CoreSkillId.PresentationStudio,
+  DefenseSkillId.OperationsDocumentWriting,
+  DefenseSkillId.CommandPostExerciseDocuments,
   CoreSkillId.Docx,
   CoreSkillId.Xlsx,
 ]);

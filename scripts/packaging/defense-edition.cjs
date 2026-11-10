@@ -2,8 +2,6 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-
 const defenseAppId = 'com.zhiyuanagent.defense';
 const defenseProductName = '知远智能体 国防版';
 const defenseEdition = 'defense';
@@ -20,27 +18,8 @@ const excludedDefenseEntries = {
     'appUpdateHashWorker.js',
   ],
 };
-const defenseSkills = [
-  'docx',
-  'xlsx',
-  'pdf',
-  'presentation-studio',
-  'code-arch-optimizer',
-  'code-safety-audit',
-  'code-to-chart',
-  'copy-editor',
-  'git-repo-audit',
-  'humanizer-zh',
-  'log-diagnostic',
-  'meeting-recap',
-  'process-doc',
-  'programming-tutor',
-  'py-perf-analyzer',
-  'regression-insight',
-  'skill-creator',
-  'smart-commit-gen',
-  'sql-tutor',
-];
+const defenseOnlySkills = ['operations-document-writing', 'command-post-exercise-documents'];
+const defenseSkills = [...defenseOnlySkills, 'docx', 'xlsx', 'pdf'];
 
 function defenseStage(root) {
   return path.join(root, 'build-tar', defenseEdition);
@@ -52,11 +31,13 @@ function isDefensePackage(context) {
 
 function prepareDefenseSkills(root) {
   const source = path.join(root, 'SKILLs');
+  const defenseSource = path.join(root, 'scripts', 'packaging', 'defense-skills');
   const destination = path.join(defenseStage(root), 'SKILLs');
   fs.rmSync(destination, { recursive: true, force: true });
   fs.mkdirSync(destination, { recursive: true });
   for (const skill of defenseSkills) {
-    fs.cpSync(path.join(source, skill), path.join(destination, skill), {
+    const sourceRoot = defenseOnlySkills.includes(skill) ? defenseSource : source;
+    fs.cpSync(path.join(sourceRoot, skill), path.join(destination, skill), {
       recursive: true,
       filter: filename => {
         const basename = path.basename(filename);
@@ -82,15 +63,6 @@ function prepareDefenseSkills(root) {
 
 function configureDefenseResources(context, skillsRoot) {
   const projectRoot = context.packager.projectDir;
-  const presentationRoot = path.join(skillsRoot, 'presentation-studio');
-  const installed = spawnSync(
-    'bun',
-    ['install', '--frozen-lockfile', '--production', '--ignore-scripts', '--linker', 'hoisted'],
-    { cwd: presentationRoot, stdio: 'inherit', windowsHide: true },
-  );
-  if (installed.error) throw installed.error;
-  if (installed.status !== 0) throw new Error('Could not prepare offline presentation runtime.');
-
   const resources = [
     [path.relative(projectRoot, skillsRoot), 'SKILLs'],
     ...(context.electronPlatformName === 'win32'
@@ -115,8 +87,8 @@ function configureDefenseResources(context, skillsRoot) {
 
 function verifyDefenseResources(resourcesRoot, platform = 'win32') {
   const windows = platform === 'win32';
+  fs.rmSync(path.join(resourcesRoot, 'app-update.yml'), { force: true });
   for (const name of [
-    'app-update.yml',
     'channel-runtime',
     'llamacpp-bundled',
     'llamacpp-backends',
@@ -147,8 +119,6 @@ function verifyDefenseResources(resourcesRoot, platform = 'win32') {
     'defense-python/requirements.txt',
     'defense-python/runtime.json',
     windows ? 'SKILLs/docx/runtime/MiniMaxAIDocx.Cli.exe' : 'SKILLs/docx/runtime/MiniMaxAIDocx.Cli',
-    'SKILLs/presentation-studio/node_modules/pptxgenjs/package.json',
-    'SKILLs/presentation-studio/node_modules/image-size/package.json',
     ...defenseSkills.map(skill => `SKILLs/${skill}/SKILL.md`),
   ]) {
     const stats = fs.statSync(path.join(resourcesRoot, filename), { throwIfNoEntry: false });

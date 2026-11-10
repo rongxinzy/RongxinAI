@@ -3,9 +3,11 @@ import type { ModelCapabilities } from '../providers';
 export const AISphere = {
   Provider: 'custom_aisphere',
   StoreKey: 'aisphere_binding',
+  CredentialStoreKey: 'aisphere_credential',
   AppConfigKey: 'app_config',
   VerifyPath: '/v1/agent/is_aisphere',
   ModelsPath: '/v1/agent/models',
+  OpenAIModelsPath: '/v1/models',
   ChatPath: '/v1/chat/completions',
 } as const;
 
@@ -41,6 +43,8 @@ export const AISphereError = {
   InvalidAddress: 'aisphereInvalidAddress',
   InvalidPlatform: 'aisphereInvalidPlatform',
   InvalidModels: 'aisphereInvalidModels',
+  InvalidCredential: 'aisphereInvalidCredential',
+  CredentialStorageUnavailable: 'aisphereCredentialStorageUnavailable',
   Unavailable: 'aisphereUnavailable',
   MissingModel: 'aisphereMissingModel',
   Busy: 'aisphereBusy',

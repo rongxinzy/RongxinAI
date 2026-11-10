@@ -38,6 +38,12 @@ export const enSettings: Record<string, string> = {
   // TODO: translate
   aboutCompanyName: 'Beijing Rongxin Zhiyuan Technology Co., Ltd.',
   aboutVersion: 'Version',
+  defenseAboutModel: 'Model platform',
+  defenseAboutUpgrade: 'Upgrade method',
+  defenseAboutOfflineInstaller: 'Offline installers distributed by your administrator',
+  defenseWelcomeSloganCommand: 'Follow the Party’s command',
+  defenseWelcomeSloganVictory: 'Be capable of winning battles',
+  defenseWelcomeSloganDiscipline: 'Maintain exemplary conduct',
   aboutUpdateBetaChannel: 'Receive beta updates',
   aboutUpdateBetaChannelHint: 'Turn off to receive stable updates only.',
   aboutOfficialWebsite: 'Official website',

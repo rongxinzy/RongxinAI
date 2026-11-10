@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { i18nService } from '../../services/i18n';
 import welcomeArt from '../../assets/desktop-pet/companions-welcome.png';
+import defensePoster from '../../assets/defense-welcome-poster.svg';
 
 export const WELCOME_MIN_DISPLAY_MS = 1200;
 export const WELCOME_EXIT_DURATION_MS = 360;
@@ -8,6 +9,7 @@ export const WELCOME_EXIT_DURATION_MS = 360;
 interface Props {
   exiting: boolean;
   failed?: boolean;
+  defense?: boolean;
   onExitComplete(): void;
 }
 
@@ -15,7 +17,12 @@ interface Props {
  * The welcome runs alongside initialization and holds for a brief minimum display window
  * on normal startups so the user can clearly see the artwork before fading out.
  */
-export function CompanionWelcomeScreen({ exiting, failed = false, onExitComplete }: Props) {
+export function CompanionWelcomeScreen({
+  exiting,
+  failed = false,
+  defense = false,
+  onExitComplete,
+}: Props) {
   const [artFailed, setArtFailed] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(
     () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
@@ -54,39 +61,56 @@ export function CompanionWelcomeScreen({ exiting, failed = false, onExitComplete
         finished.current = true;
         complete.current();
       },
-      reducedMotion ? 0 : WELCOME_EXIT_DURATION_MS,
+      reducedMotion || (defense && failed) ? 0 : WELCOME_EXIT_DURATION_MS,
     );
     return () => window.clearTimeout(timer);
-  }, [ending, reducedMotion]);
+  }, [defense, ending, failed, reducedMotion]);
 
   return (
     <main
       className="theme-welcome-screen relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden"
       data-ending-style={ending ? '' : undefined}
-      data-testid="companion-welcome"
+      data-testid={defense ? 'defense-welcome' : 'companion-welcome'}
     >
       <div className="flex min-h-0 w-full flex-col items-center gap-6 px-6">
-        <h1 className="theme-welcome-title text-center">
-          {i18nService.t('welcomeCompanionsTitle')}
-        </h1>
-        <figure
-          className="theme-welcome-art m-0 flex shrink-0 items-center justify-center"
-          aria-hidden={artFailed ? true : undefined}
-        >
-          {!artFailed && (
+        {defense ? (
+          <div className="theme-welcome-art theme-defense-welcome-ink relative flex shrink-0 items-center justify-center overflow-hidden">
             <img
-              src={welcomeArt}
-              width={1899}
-              height={828}
-              alt={i18nService.t('welcomeCompanionsAlt')}
-              className="h-full w-full select-none object-contain"
-              draggable={false}
-              decoding="async"
-              fetchPriority="high"
-              onError={() => setArtFailed(true)}
+              src={defensePoster}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
             />
-          )}
-        </figure>
+            <h1 className="theme-defense-welcome-slogan relative flex flex-col gap-2 px-4 text-center">
+              <span>{i18nService.t('defenseWelcomeSloganCommand')}</span>
+              <span>{i18nService.t('defenseWelcomeSloganVictory')}</span>
+              <span>{i18nService.t('defenseWelcomeSloganDiscipline')}</span>
+            </h1>
+          </div>
+        ) : (
+          <>
+            <h1 className="theme-welcome-title text-center">
+              {i18nService.t('welcomeCompanionsTitle')}
+            </h1>
+            <figure
+              className="theme-welcome-art m-0 flex shrink-0 items-center justify-center"
+              aria-hidden={artFailed ? true : undefined}
+            >
+              {!artFailed && (
+                <img
+                  src={welcomeArt}
+                  width={1899}
+                  height={828}
+                  alt={i18nService.t('welcomeCompanionsAlt')}
+                  className="h-full w-full select-none object-contain"
+                  draggable={false}
+                  decoding="async"
+                  fetchPriority="high"
+                  onError={() => setArtFailed(true)}
+                />
+              )}
+            </figure>
+          </>
+        )}
         <p role="status" aria-live="polite" className="theme-home-caption text-center">
           {i18nService.t(
             failed

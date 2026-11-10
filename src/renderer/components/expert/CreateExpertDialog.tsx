@@ -14,6 +14,7 @@ import { Cable, Check, FileText, MessageSquare, Sparkles } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
+import { isDefenseEdition } from '../../../shared/branding';
 import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
@@ -82,7 +83,10 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
   onSaved,
 }) => {
   const skills = useSelector((state: RootState) => state.skill.skills);
-  const mcpServers = useSelector((state: RootState) => state.mcp.servers);
+  const mcpServers = useSelector((state: RootState) =>
+    isDefenseEdition() ? [] : state.mcp.servers,
+  );
+  const defense = isDefenseEdition();
 
   const [name, setName] = useState('');
   const [profession, setProfession] = useState('');
@@ -333,19 +337,21 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
               </FieldLabel>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-muted-foreground mr-1">快速套用模板:</span>
-                {PROMPT_TEMPLATES.map(tpl => (
-                  <Button
-                    key={tpl.name}
-                    type="button"
-                    variant="outline"
-                    size="xs"
-                    className="h-7 text-xs px-2"
-                    onClick={() => setSystemPrompt(tpl.prompt)}
-                  >
-                    <FileText className="size-3 mr-1" />
-                    {tpl.name}
-                  </Button>
-                ))}
+                {PROMPT_TEMPLATES.filter(tpl => !defense || tpl.nameKey !== 'templateResearch').map(
+                  tpl => (
+                    <Button
+                      key={tpl.name}
+                      type="button"
+                      variant="outline"
+                      size="xs"
+                      className="h-7 text-xs px-2"
+                      onClick={() => setSystemPrompt(tpl.prompt)}
+                    >
+                      <FileText className="size-3 mr-1" />
+                      {tpl.name}
+                    </Button>
+                  ),
+                )}
               </div>
             </div>
             <Textarea
@@ -402,53 +408,54 @@ export const CreateExpertDialog: React.FC<CreateExpertDialogProps> = ({
             </div>
           </div>
 
-          {/* Bound MCP Connectors (Multi-select) */}
-          <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-3.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                <Cable className="size-3.5 text-primary" />
-                {i18nService.t('expertBoundMcp')}
-                <span className="text-xs text-muted-foreground font-normal">
-                  ({selectedMcpIds.length} 已选)
+          {!defense && (
+            <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-3.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Cable className="size-3.5 text-primary" />
+                  {i18nService.t('expertBoundMcp')}
+                  <span className="text-xs text-muted-foreground font-normal">
+                    ({selectedMcpIds.length} 已选)
+                  </span>
                 </span>
-              </span>
-              <Input
-                value={mcpSearch}
-                onChange={e => setMcpSearch(e.target.value)}
-                placeholder="过滤连接器..."
-                className="h-7 w-44 text-xs"
-              />
-            </div>
+                <Input
+                  value={mcpSearch}
+                  onChange={e => setMcpSearch(e.target.value)}
+                  placeholder="过滤连接器..."
+                  className="h-7 w-44 text-xs"
+                />
+              </div>
 
-            <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pt-1">
-              {filteredMcpServers.length === 0 ? (
-                <span className="text-xs text-muted-foreground py-2">
-                  暂无已配置连接器，可在“连接器”模块配置或导入
-                </span>
-              ) : (
-                filteredMcpServers.map(server => {
-                  const isChecked = selectedMcpIds.includes(server.id);
-                  return (
-                    <button
-                      key={server.id}
-                      type="button"
-                      onClick={() => toggleMcp(server.id)}
-                      className={cn(
-                        'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all border',
-                        isChecked
-                          ? 'bg-primary text-primary-foreground border-primary shadow-xs'
-                          : 'bg-background text-foreground/80 border-border/80 hover:bg-muted',
-                      )}
-                    >
-                      {isChecked && <Check className="size-3 stroke-[2.5]" />}
-                      <span>{server.name}</span>
-                      <span className="text-xs opacity-70">({server.transportType})</span>
-                    </button>
-                  );
-                })
-              )}
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto pt-1">
+                {filteredMcpServers.length === 0 ? (
+                  <span className="text-xs text-muted-foreground py-2">
+                    暂无已配置连接器，可在“连接器”模块配置或导入
+                  </span>
+                ) : (
+                  filteredMcpServers.map(server => {
+                    const isChecked = selectedMcpIds.includes(server.id);
+                    return (
+                      <button
+                        key={server.id}
+                        type="button"
+                        onClick={() => toggleMcp(server.id)}
+                        className={cn(
+                          'inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-all border',
+                          isChecked
+                            ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                            : 'bg-background text-foreground/80 border-border/80 hover:bg-muted',
+                        )}
+                      >
+                        {isChecked && <Check className="size-3 stroke-[2.5]" />}
+                        <span>{server.name}</span>
+                        <span className="text-xs opacity-70">({server.transportType})</span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <DialogFooter className="-mx-6 -mb-6 px-6 py-4">

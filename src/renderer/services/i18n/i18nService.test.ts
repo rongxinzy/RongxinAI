@@ -4,11 +4,22 @@ import { i18nService } from './i18nService';
 import { configService } from '../config';
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
   i18nService.setLanguage('zh', { persist: false });
 });
 
 describe('i18nService', () => {
+  test('defense always uses Simplified Chinese without reading or persisting a language preference', async () => {
+    vi.stubEnv('APP_EDITION', 'defense');
+    const getConfig = vi.spyOn(configService, 'getConfig');
+    i18nService.setLanguage('en');
+    expect(i18nService.getLanguage()).toBe('zh');
+    await i18nService.initialize();
+    expect(i18nService.getLanguage()).toBe('zh');
+    expect(getConfig).not.toHaveBeenCalled();
+  });
+
   test('notifies mounted startup surfaces when initialization resolves a different language', async () => {
     vi.spyOn(configService, 'getConfig').mockReturnValue({
       ...configService.getConfig(),

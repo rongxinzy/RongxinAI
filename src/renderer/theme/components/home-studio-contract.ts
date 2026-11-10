@@ -24,6 +24,8 @@ export const HOME_STUDIO_SELECTORS = {
   'welcome-screen': '.theme-welcome-screen',
   'welcome-title': '.theme-welcome-title',
   'welcome-art': '.theme-welcome-art',
+  'defense-welcome-ink': '.theme-defense-welcome-ink',
+  'defense-welcome-slogan': '.theme-defense-welcome-slogan',
   'home-brand': '.theme-home-brand',
   'home-caption': '.theme-home-caption',
   'home-sticky': '.theme-home-sticky',

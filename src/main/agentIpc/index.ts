@@ -2,13 +2,15 @@
 import fs from 'fs';
 import path from 'path';
 
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow } from 'electron';
 
 import {
   listAllMatchingSessionIds,
   forgetCoworkSession,
 } from '../appBootstrap/coworkSessionImages';
 import { listPresetExperts } from '../presetExpertCatalog';
+import { listDefenseExperts, resolveDefenseExpert } from '../defenseExpertCatalog';
+import { isDefenseEdition } from '../../shared/branding';
 import { DB_FILENAME } from '../appConstants';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
 import { CoworkStreamIpc } from '../../shared/ipc/channels';
@@ -134,6 +136,17 @@ export const registerAgentIpc = (deps: AgentIpcDeps): void => {
     agentsImportExpertPackage: async (_event, expertDir) => {
       try {
         const bundledSkillsRoot = deps.getSkillManager().getBundledSkillsRoot();
+        if (isDefenseEdition()) {
+          const request = resolveDefenseExpert(bundledSkillsRoot, expertDir);
+          if (!request) return { success: false, error: 'Unknown defense expert' };
+          const existing = deps.getAgentManager().getAgent(request.id ?? '');
+          const agent = existing
+            ? deps.getAgentManager().updateAgent(existing.id, request)
+            : deps.getAgentManager().createAgent(request, deps.resolveDefaultAgentModelRef());
+          if (!agent) return { success: false, error: 'Failed to install defense expert' };
+          deps.bumpCodingCommandCatalog();
+          return { success: true, agentIds: [agent.id], expertType: 'agent', name: agent.name };
+        }
         const registerExpertModule = require(
           path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'scripts', 'register_expert'),
         ) as {
@@ -244,7 +257,11 @@ export const registerAgentIpc = (deps: AgentIpcDeps): void => {
     agentsGetPresetExperts: async () => {
       try {
         const bundledSkillsRoot = deps.getSkillManager().getBundledSkillsRoot();
-        return { experts: listPresetExperts(bundledSkillsRoot) };
+        return {
+          experts: isDefenseEdition()
+            ? listDefenseExperts(bundledSkillsRoot)
+            : listPresetExperts(bundledSkillsRoot),
+        };
       } catch (error) {
         return {
           experts: [],

@@ -44,7 +44,9 @@ export default function GeneralSettingsPanel({
           {i18nService.t('settingsGeneralSectionApplication')}
         </h2>
         <FieldGroup className="gap-4">
-          <GeneralLanguageField value={language} onValueChange={onLanguageChange} />
+          {!isDefenseEdition() && (
+            <GeneralLanguageField value={language} onValueChange={onLanguageChange} />
+          )}
 
           <SettingsToggleRow
             label={i18nService.t('autoLaunch')}

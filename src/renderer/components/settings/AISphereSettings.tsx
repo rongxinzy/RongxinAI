@@ -23,6 +23,7 @@ import { i18nService } from '../../services/i18n';
 export function AISphereSettings() {
   const [snapshot, setSnapshot] = useState<AISphereSnapshot>();
   const [address, setAddress] = useState('');
+  const [accessKey, setAccessKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState(configService.getConfig().model?.defaultModel ?? '');
@@ -52,9 +53,10 @@ export function AISphereSettings() {
     try {
       const value = refresh
         ? await window.electron.managedProviders.aisphereRefresh()
-        : await window.electron.managedProviders.aisphereConnect(address);
+        : await window.electron.managedProviders.aisphereConnect(address, accessKey || undefined);
       setSnapshot(value);
       setAddress(value.address);
+      setAccessKey('');
       const config = await configService.reload();
       setSelected(config.model?.defaultModel ?? '');
       window.dispatchEvent(new CustomEvent('config-updated'));
@@ -113,6 +115,20 @@ export function AISphereSettings() {
           disabled={busy}
           autoComplete="off"
         />
+        {isDefenseEdition() && (
+          <>
+            <Label htmlFor="aisphere-access-key">{t('aisphereAccessKey')}</Label>
+            <Input
+              id="aisphere-access-key"
+              type="password"
+              value={accessKey}
+              onChange={event => setAccessKey(event.target.value)}
+              placeholder={t('aisphereAccessKeyPlaceholder')}
+              disabled={busy}
+              autoComplete="off"
+            />
+          </>
+        )}
         <p className="text-sm text-muted-foreground">{t('aisphereDescription')}</p>
         <div className="flex flex-wrap gap-2">
           <Button

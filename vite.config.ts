@@ -169,6 +169,7 @@ export default defineConfig(async ({ command }) => {
                 // can stall the main bundle on Vite 8.
                 entry: 'src/main/preload.ts',
                 vite: {
+                  define: { __ZHIYUAN_DEFENSE_BUILD__: JSON.stringify(defenseBuild) },
                   build: {
                     watch: null,
                     sourcemap: electronSourceMap,

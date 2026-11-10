@@ -7,8 +7,10 @@
  */
 import { createGeneratedSurface } from './generated/surface';
 import { createInteractiveOverrides } from './interactive';
+import { createEditionOverrides } from './editions';
 import { applyOverrides } from './merge';
 import {
+  PreviewEdition,
   readPreviewEdition,
   readPreviewLocale,
   readPreviewPlatform,
@@ -20,13 +22,15 @@ import { createBrowserMockRuntime } from './runtime';
 const runtime = createBrowserMockRuntime();
 
 function buildBrowserMockElectron(): Window['electron'] {
-  editionWindowInjection(readPreviewEdition());
+  const edition = readPreviewEdition();
+  editionWindowInjection(edition);
   const scenario = readPreviewScenario();
   const platform = readPreviewPlatform();
   const locale = readPreviewLocale();
   let electron: Window['electron'] = createGeneratedSurface(runtime);
   electron = applyOverrides<Window['electron']>(electron, createInteractiveOverrides(runtime));
   electron = applyOverrides<Window['electron']>(electron, createScenarioOverrides(scenario));
+  electron = applyOverrides<Window['electron']>(electron, createEditionOverrides(edition));
   if (platform) {
     electron = applyOverrides<Window['electron']>(electron, { platform });
   }
@@ -35,6 +39,7 @@ function buildBrowserMockElectron(): Window['electron'] {
       appInfo: { getSystemLocale: () => Promise.resolve(locale) },
     });
   }
+  if (edition === PreviewEdition.Defense) Reflect.deleteProperty(electron, 'appUpdate');
   return electron;
 }
 

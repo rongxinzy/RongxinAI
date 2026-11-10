@@ -32,8 +32,12 @@ let codingFailureUnsubscribe: (() => void) | null = null;
 
 async function renderRoot(): Promise<void> {
   // Browser preview (`bun run web:preview`): no preload bridge, so install the IPC mock.
-  // Gated on DEV so the mock is tree-shaken out of production bundles.
-  if (import.meta.env.DEV && typeof window.electron?.platform !== 'string') {
+  // Gated on DEV and a browser UA so an Electron preload/load retry can never install mocks.
+  if (
+    import.meta.env.DEV &&
+    !navigator.userAgent.includes('Electron/') &&
+    typeof window.electron?.platform !== 'string'
+  ) {
     const { installBrowserMock } = await import('./browserMock/installMock');
     installBrowserMock();
   }

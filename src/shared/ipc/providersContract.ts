@@ -509,7 +509,7 @@ export const providersContract = defineIpcContract({
   },
   aisphereConnect: {
     channel: AISphereIpc.Connect,
-    args: z.tuple([z.string()]),
+    args: z.tuple([z.string(), z.string().max(16384).optional()]),
     result: AISphereSnapshotSchema,
   },
   aisphereRefresh: {

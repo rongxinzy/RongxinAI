@@ -30,6 +30,7 @@ export type PreviewScenario = (typeof PreviewScenario)[keyof typeof PreviewScena
 export const PreviewEdition = {
   Zhiyuan: 'zhiyuan',
   Xiaoruan: 'xiaoruan',
+  Defense: 'defense',
 } as const;
 
 export type PreviewEdition = (typeof PreviewEdition)[keyof typeof PreviewEdition];
@@ -53,6 +54,7 @@ export function readPreviewScenario(searchParams = readPreviewSearchParams()): P
 export function readPreviewEdition(searchParams = readPreviewSearchParams()): PreviewEdition {
   const raw = searchParams.get(PreviewQuery.Edition)?.trim().toLowerCase();
   if (raw === PreviewEdition.Xiaoruan) return PreviewEdition.Xiaoruan;
+  if (raw === PreviewEdition.Defense) return PreviewEdition.Defense;
   return PreviewEdition.Zhiyuan;
 }
 

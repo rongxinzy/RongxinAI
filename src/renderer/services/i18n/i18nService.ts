@@ -1,4 +1,5 @@
 import { configService } from '../config';
+import { isDefenseEdition } from '../../../shared/branding';
 
 import { getPackagedDefaultLanguage, resolveFirstRunLanguage } from './defaultLanguage';
 import { translations } from './translations';
@@ -15,6 +16,10 @@ class I18nService {
 
   // 初始化语言设置
   async initialize(): Promise<void> {
+    if (isDefenseEdition()) {
+      this.setLanguage('zh', { persist: false });
+      return;
+    }
     const previousLanguage = this.currentLanguage;
     try {
       const config = configService.getConfig();
@@ -92,20 +97,22 @@ class I18nService {
   // 设置语言
   setLanguage(language: LanguageType, options: { persist?: boolean } = {}): void {
     const { persist = true } = options;
-    const hasChanged = this.currentLanguage !== language;
-    this.currentLanguage = language;
+    const defense = isDefenseEdition();
+    const nextLanguage = defense ? 'zh' : language;
+    const hasChanged = this.currentLanguage !== nextLanguage;
+    this.currentLanguage = nextLanguage;
     this.applyDocumentLanguage();
 
     if (hasChanged) {
       this.listeners.forEach(listener => listener());
     }
 
-    if (!persist) {
+    if (!persist || defense) {
       return;
     }
 
     // 更新配置
-    void configService.updateConfig({ language }).catch(error => {
+    void configService.updateConfig({ language: nextLanguage }).catch(error => {
       console.error('Failed to save language setting:', error);
     });
   }

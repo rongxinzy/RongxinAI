@@ -173,6 +173,7 @@ const currentWindow = (): MockWindow => {
 };
 
 beforeEach(() => {
+  vi.unstubAllEnvs();
   mockWindowClass.instances = [];
   lifecycleRuntime.mainWindow = null;
   lifecycleRuntime.isQuitting = false;
@@ -225,6 +226,20 @@ describe('createMainWindow', () => {
     const wecom = handler({ url: 'https://wecom.example/oauth' });
     expect(wecom.action).toBe('allow');
     expect(mocks.shellOpenExternal).toHaveBeenCalledTimes(1);
+    window.emitWebContents('did-finish-load');
+  });
+
+  test('defense denies every window.open request without invoking the system browser', () => {
+    vi.stubEnv('APP_EDITION', 'defense');
+    createMainWindow();
+    const window = currentWindow();
+    const handler = window.webContents.setWindowOpenHandler.mock.calls[0][0] as (details: {
+      url: string;
+    }) => { action: string };
+
+    expect(handler({ url: 'https://example.com/' })).toEqual({ action: 'deny' });
+    expect(handler({ url: 'https://wecom.example/oauth' })).toEqual({ action: 'deny' });
+    expect(mocks.shellOpenExternal).not.toHaveBeenCalled();
     window.emitWebContents('did-finish-load');
   });
 

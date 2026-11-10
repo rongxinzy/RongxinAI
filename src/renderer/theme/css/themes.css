@@ -5371,6 +5371,15 @@
   animation-timing-function: ease-out;
   animation-fill-mode: both;
 }
+:where(:root, [data-theme]) :where(.theme-defense-welcome-ink) {
+  color: #842621;
+  background-color: #f5e6c7;
+}
+:where(:root, [data-theme]) :where(.theme-defense-welcome-slogan) {
+  font-size: clamp(24px, 4vw, 44px);
+  line-height: 1.18;
+  font-weight: 600;
+}
 :where(:root, [data-theme]) :where(.theme-home-brand) {
   height: 3rem;
 }
@@ -8475,6 +8484,8 @@ to {
 :where(:root, [data-theme]) :where(.theme-welcome-screen),
 :where(:root, [data-theme]) :where(.theme-welcome-title),
 :where(:root, [data-theme]) :where(.theme-welcome-art),
+:where(:root, [data-theme]) :where(.theme-defense-welcome-ink),
+:where(:root, [data-theme]) :where(.theme-defense-welcome-slogan),
 :where(:root, [data-theme]) :where(.theme-home-brand),
 :where(:root, [data-theme]) :where(.theme-home-caption),
 :where(:root, [data-theme]) :where(.theme-home-sticky),

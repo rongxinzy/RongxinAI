@@ -28,7 +28,7 @@ export interface ChatSkillShortcut {
   placeholderKey: string;
 }
 
-const ALL_CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
+const BASE_CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
   {
     id: 'ppt',
     skillId: CoreSkillId.PresentationStudio,
@@ -77,7 +77,7 @@ const ALL_CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
   },
 ] as const;
 
-export const CHAT_SKILL_SHORTCUTS = ALL_CHAT_SKILL_SHORTCUTS.filter(
+export const CHAT_SKILL_SHORTCUTS = BASE_CHAT_SKILL_SHORTCUTS.filter(
   entry =>
     !isDefenseEdition() || (entry.skillIds ?? [entry.skillId]).every(isDefenseQuickActionSkill),
 );

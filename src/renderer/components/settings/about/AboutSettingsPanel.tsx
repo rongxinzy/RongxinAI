@@ -23,33 +23,8 @@ interface AboutSettingsPanelProps {
   setNoticeMessage: (message: string | null) => void;
 }
 
-export default function AboutSettingsPanel({
-  setError,
-  setNoticeMessage,
-}: AboutSettingsPanelProps) {
-  const update = useAppUpdateState();
-  const [appVersion, setAppVersion] = useState('');
-  const [isDevBuild, setIsDevBuild] = useState(false);
-  const isEnterpriseBuild = useIsEnterpriseBuild();
+function useAboutLogExport({ setError, setNoticeMessage }: AboutSettingsPanelProps) {
   const [isExportingLogs, setIsExportingLogs] = useState(false);
-  const [betaChannelEnabled, setBetaChannelEnabled] = useState(false);
-  const [isInstallStarting, setIsInstallStarting] = useState(false);
-
-  useEffect(() => {
-    void window.electron.appInfo.getVersion().then(setAppVersion);
-    if (!isDefenseEdition())
-      void window.electron.appUpdate
-        .getChannel()
-        .then(channel => setBetaChannelEnabled(channel === AppUpdateChannelPreference.Beta))
-        .catch(() => setBetaChannelEnabled(false));
-    // Preload may lag behind Vite HMR after adding appInfo.isDev; never crash Settings on mount.
-    const isDev = window.electron.appInfo.isDev;
-    if (typeof isDev === 'function') {
-      void isDev()
-        .then(setIsDevBuild)
-        .catch(() => setIsDevBuild(false));
-    }
-  }, []);
 
   const handleExportLogs = useCallback(async () => {
     if (isExportingLogs) {
@@ -87,6 +62,71 @@ export default function AboutSettingsPanel({
       setIsExportingLogs(false);
     }
   }, [isExportingLogs, setError, setNoticeMessage]);
+
+  return { isExportingLogs, handleExportLogs };
+}
+
+export function DefenseAboutSettingsPanel(props: AboutSettingsPanelProps) {
+  const { isExportingLogs, handleExportLogs } = useAboutLogExport(props);
+  const [appVersion, setAppVersion] = useState('');
+  useEffect(() => {
+    void window.electron.appInfo.getVersion().then(setAppVersion);
+  }, []);
+
+  const rows = [
+    [i18nService.t('aboutVersion'), appVersion],
+    [i18nService.t('defenseAboutModel'), 'AISphere'],
+    [i18nService.t('defenseAboutUpgrade'), i18nService.t('defenseAboutOfflineInstaller')],
+  ];
+  return (
+    <section className="flex flex-col gap-6 py-6">
+      <h2 className="theme-welcome-title">{getBranding().productName}</h2>
+      <dl className="flex flex-col gap-4">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-baseline justify-between gap-4">
+            <dt className="theme-home-caption shrink-0">{label}</dt>
+            <dd className="theme-home-caption min-w-0 text-end">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleExportLogs}
+          disabled={isExportingLogs}
+        >
+          {i18nService.t(isExportingLogs ? 'aboutExportingLogs' : 'aboutExportLogs')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+export default function AboutSettingsPanel(props: AboutSettingsPanelProps) {
+  const update = useAppUpdateState();
+  const [appVersion, setAppVersion] = useState('');
+  const [isDevBuild, setIsDevBuild] = useState(false);
+  const isEnterpriseBuild = useIsEnterpriseBuild();
+  const { isExportingLogs, handleExportLogs } = useAboutLogExport(props);
+  const [betaChannelEnabled, setBetaChannelEnabled] = useState(false);
+  const [isInstallStarting, setIsInstallStarting] = useState(false);
+
+  useEffect(() => {
+    void window.electron.appInfo.getVersion().then(setAppVersion);
+    void window.electron.appUpdate
+      .getChannel()
+      .then(channel => setBetaChannelEnabled(channel === AppUpdateChannelPreference.Beta))
+      .catch(() => setBetaChannelEnabled(false));
+    // Preload may lag behind Vite HMR after adding appInfo.isDev; never crash Settings on mount.
+    const isDev = window.electron.appInfo.isDev;
+    if (typeof isDev === 'function') {
+      void isDev()
+        .then(setIsDevBuild)
+        .catch(() => setIsDevBuild(false));
+    }
+  }, []);
 
   const progress = update.progress;
   const isDownloading = update.status === AppUpdateStatus.Downloading;

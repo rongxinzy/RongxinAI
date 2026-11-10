@@ -1,6 +1,7 @@
 import { app } from 'electron';
 import { existsSync } from 'fs';
 import { join } from 'path';
+import { isDefenseEdition } from '../../../shared/branding';
 
 /**
  * Get SKILLs directory path (handles both development and production)
@@ -9,6 +10,9 @@ export function getSkillsRoot(): string {
   if (app.isPackaged) {
     // In production, SKILLs are copied to userData
     return join(app.getPath('userData'), 'SKILLs');
+  }
+  if (isDefenseEdition()) {
+    return join(app.getAppPath(), 'build-tar', 'defense', 'SKILLs');
   }
 
   // In development, __dirname can vary with bundling output (e.g. dist-electron/ or dist-electron/libs/).

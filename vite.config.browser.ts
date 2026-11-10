@@ -16,6 +16,7 @@ export default defineConfig(async () => ({
   define: {
     __VERSION__: JSON.stringify('0.16.0'),
     __ZHIYUAN_DEFAULT_LOCALE__: JSON.stringify(defaultLocale),
+    __ZHIYUAN_DEFENSE_BUILD__: JSON.stringify(process.env.APP_EDITION === 'defense'),
   },
   plugins: [
     (await import('@tailwindcss/vite')).default(),

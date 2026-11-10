@@ -15,6 +15,11 @@ export const enModelProviders: Record<string, string> = {
   aisphereInvalidAddress: 'Enter an HTTP or HTTPS platform address without an API path.',
   aisphereInvalidPlatform: 'This address did not pass AISphere verification.',
   aisphereInvalidModels: 'The platform returned an invalid model list. Contact your administrator.',
+  aisphereAccessKey: 'Access key (OpenAI-compatible platform)',
+  aisphereAccessKeyPlaceholder: 'Leave blank to use the saved key',
+  aisphereInvalidCredential: 'The access key is invalid or unreadable. Enter it again.',
+  aisphereCredentialStorageUnavailable:
+    'System secure storage is unavailable; the key cannot be saved.',
   aisphereUnavailable: 'Cannot connect to AISphere. Check the address and network, then retry.',
   aisphereMissingModel: 'This model is no longer available. Refresh and select a platform model.',
   aisphereBusy: 'Stop running tasks before switching the AISphere address.',

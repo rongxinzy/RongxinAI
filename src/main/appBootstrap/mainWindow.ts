@@ -10,7 +10,6 @@ import { PRELOAD_PATH, applyWindowsWindowIcon } from './windowBranding';
 import { emitWindowState, schedulePersistAppWindowState } from './windowManagement';
 import { openDevToolsWindow, toggleDevToolsForSender } from '../appIpc';
 import { isWecomAuthUrl } from './windowSecurity';
-import { isOwnedExternalUrl } from '../shellIpc/ownedExternalUrls';
 import { logAppQuitContextOnce } from './appLifecycle';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { isAutoLaunched } from '../autoLaunchManager';
@@ -130,9 +129,7 @@ export const createMainWindow = (): void => {
 
     // 处理 window.open 请求（企微 SDK 授权弹窗等）
     lifecycleRuntime.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-      if (isDefenseEdition() && (isOwnedExternalUrl(url) || isWecomAuthUrl(url))) {
-        return { action: 'deny' };
-      }
+      if (isDefenseEdition()) return { action: 'deny' };
       if (isWecomAuthUrl(url)) {
         return {
           action: 'allow',

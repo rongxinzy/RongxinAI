@@ -5,6 +5,7 @@ import type { ExpertTab } from '../components/expert/ExpertView';
 import { LazyChunkErrorBoundary } from '../components/LazyChunkErrorBoundary';
 import type { McpRegistryId } from '../components/mcp/constants';
 import type { InferenceEdition } from '../../shared/inferenceEdition';
+import { isDefenseEdition } from '../../shared/branding';
 import type { SettingsEnterpriseConfig, SettingsOpenOptions } from '../components/settings/types';
 import type { CoworkPermissionRequest, CoworkPermissionResult } from '../types/cowork';
 import { MainView } from './constants';
@@ -163,7 +164,7 @@ export function MainViewCanvas({
                 onNewChat={onNewChat}
                 updateBadge={null}
               />
-            ) : mainView === MainView.Activity ? (
+            ) : !isDefenseEdition() && mainView === MainView.Activity ? (
               <ActivityView
                 isSidebarCollapsed={isSidebarCollapsed}
                 onToggleSidebar={onToggleSidebar}

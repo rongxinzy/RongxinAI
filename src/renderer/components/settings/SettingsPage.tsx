@@ -18,7 +18,7 @@ import { selectCoworkConfig } from '../../store/selectors/coworkSelectors';
 import ErrorMessage from '../ErrorMessage';
 import { EnterpriseSettingsPage } from '../enterprise/EnterpriseSettingsPage';
 import PageHeader from '../PageHeader';
-import AboutSettingsPanel from './about/AboutSettingsPanel';
+import AboutSettingsPanel, { DefenseAboutSettingsPanel } from './about/AboutSettingsPanel';
 import { AISphereSettings } from './AISphereSettings';
 import { AppearanceSettingsPanel } from './appearance/AppearanceSettingsPanel';
 import { EmailSettingsPage } from './email/EmailSettingsPage';
@@ -356,7 +356,11 @@ export default function SettingsPage({
         return <ImSettingsPanel />;
 
       case 'about':
-        return <AboutSettingsPanel setError={setError} setNoticeMessage={setNoticeMessage} />;
+        return defense ? (
+          <DefenseAboutSettingsPanel setError={setError} setNoticeMessage={setNoticeMessage} />
+        ) : (
+          <AboutSettingsPanel setError={setError} setNoticeMessage={setNoticeMessage} />
+        );
 
       default:
         return null;

@@ -1,4 +1,4 @@
-import { AISphereError, type AISphereModel } from '../../../shared/aisphere';
+import { AISphere, AISphereError, type AISphereModel } from '../../../shared/aisphere';
 import { ModelCapabilityStatus } from '../../../shared/providers';
 
 export interface PlatformModel extends AISphereModel {
@@ -92,6 +92,40 @@ export function parsePlatformModels(input: unknown): PlatformModel[] {
       contextWindow: limit(item.context_length),
       maxInput: limit(item.max_input),
       maxTokens: limit(item.max_output),
+    };
+  });
+}
+
+export function parseOpenAIModels(
+  input: unknown,
+  address: string,
+  apiKey: string,
+): PlatformModel[] {
+  if (
+    !input ||
+    typeof input !== 'object' ||
+    !('data' in input) ||
+    !Array.isArray(input.data) ||
+    input.data.length > 256
+  ) {
+    throw new Error(AISphereError.InvalidModels);
+  }
+  const ids = new Set<string>();
+  return input.data.map((raw: unknown) => {
+    if (!raw || typeof raw !== 'object' || !('id' in raw)) {
+      throw new Error(AISphereError.InvalidModels);
+    }
+    const id = text(raw.id, 256);
+    if (ids.has(id)) throw new Error(AISphereError.InvalidModels);
+    ids.add(id);
+    return {
+      id,
+      name: id,
+      url: address + AISphere.ChatPath,
+      apiKey,
+      capabilities: {},
+      contextWindow: 49_152,
+      maxTokens: 16_384,
     };
   });
 }
