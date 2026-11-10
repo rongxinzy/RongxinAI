@@ -111,6 +111,14 @@ startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 
 单测按域拆分：`llamacppManager/serve.test.ts`、`models.test.ts`、`install.test.ts`；根 `llamacppManager.test.ts` 仅聚合 side-effect import。
 
+### 模型市场目录
+
+`resources/model-catalog.sqlite` 是预填充的发布输入，由 Electron Builder 复制到应用资源目录。首次使用直接读取随包版本。本地搜索、详情和安装元数据解析不依赖云目录，模型权重按文件版本从 ModelScope 下载并校验。初版包含 32 个仓库、372 个带校验和的文件规格。
+
+更新随包版本时，先取得上游发布快照 JSON，再运行 `bun run scripts/build-model-catalog.cjs /path/to/current-snapshot.json`。检查 `PRAGMA integrity_check` 和模型数量后提交更新后的数据库。上游使用 `scripts/publish-model-catalog.cjs` 生成完整快照和可选增量，再发布到 `/v1/catalog/feed`。
+
+桌面端完成本地查询后独立检查更新，搜索响应无需等待网络。校验通过后对暂存 SQLite 应用更新并原子切换指针。当前会话固定目录版本以保证分页和安装一致，下一次启动启用新版本。增量基线不匹配时下载完整快照，网络或校验失败时保留上一版。
+
 ## IPC 与渲染层约定
 
 ### Preload 表面

@@ -133,7 +133,7 @@ export type MarketplaceSearchResult = {
   nextCursor?: string;
   hasMore?: boolean;
   warning?: string;
-  source?: 'd1' | 'cloud-catalog' | 'modelscope' | 'curated';
+  source?: 'd1' | 'cloud-catalog' | 'modelscope' | 'curated' | 'local-sqlite';
   catalogUpdatedAt?: string;
   scoreVersion?: string;
 };
