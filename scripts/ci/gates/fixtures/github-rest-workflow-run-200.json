@@ -1,0 +1,12 @@
+{
+  "_fixtureNote": "Recorded 2026-11-07 GET .../actions/runs/42335885916",
+  "id": 42335885916,
+  "run_number": 3407,
+  "run_attempt": 1,
+  "status": "completed",
+  "conclusion": "success",
+  "head_sha": "df95ea2bef590157418607b4942bb17e013f3a30",
+  "head_branch": "cursor/lightweight-ci-gates-1778",
+  "event": "pull_request",
+  "path": ".github/workflows/ci.yml"
+}

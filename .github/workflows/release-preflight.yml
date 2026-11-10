@@ -32,6 +32,9 @@ env:
 jobs:
   source:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     outputs:
       commit: ${{ steps.source.outputs.commit }}
     steps:
@@ -43,6 +46,18 @@ jobs:
           commit="$(git rev-parse --verify HEAD)"
           [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Write preflight source record
+        run: node scripts/ci/gates/publish-preflight-source-record.mjs
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          INCLUDE_PACKAGING: ${{ inputs.include-packaging }}
+      - name: Upload preflight source record
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-preflight-source
+          path: release-preflight-source.json
+          retention-days: 90
+          overwrite: true
 
   quality:
     needs: source
@@ -223,8 +238,6 @@ jobs:
     uses: ./.github/workflows/linux-install-pr.yml
     with:
       source-ref: ${{ needs.source.outputs.commit }}
-    secrets:
-      MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
 
   windows-install:
     needs: source
@@ -237,6 +250,9 @@ jobs:
     if: always()
     needs: [source, quality, enterprise, channel-runtime, python-runtime-linux, browser-preview, memory-leak, linux-install, windows-install]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -251,3 +267,18 @@ jobs:
         env:
           PREFLIGHT_RESULTS: ${{ toJSON(needs) }}
           INCLUDE_PACKAGING: ${{ inputs.include-packaging }}
+      - name: Write release candidate attestation
+        if: ${{ success() && inputs.include-packaging == true }}
+        run: node scripts/ci/gates/publish-release-candidate-attestation.mjs
+        env:
+          INCLUDE_PACKAGING: ${{ inputs.include-packaging }}
+          PREFLIGHT_RESULTS: ${{ toJSON(needs) }}
+          SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
+      - name: Upload release candidate attestation
+        if: ${{ success() && inputs.include-packaging == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate-attestation
+          path: release-candidate-attestation.json
+          retention-days: 90
+          overwrite: true
