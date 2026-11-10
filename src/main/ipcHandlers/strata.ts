@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 
 import type {
   StrataServiceConfig,
@@ -11,6 +11,7 @@ import { strataContract } from '../../shared/ipc/strataContract';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import type { StrataManager } from '../libs/strata/strataManager';
 import { STRATA_MODEL_CATALOG } from '../libs/strata/strataModelCatalog';
+import { getAppLocalModelCatalog } from '../libs/appLocalModelCatalog';
 import {
   readStrataProviderSnapshot,
   type StrataProviderSnapshot,
@@ -76,7 +77,13 @@ export function registerStrataIpcHandlers(
 
   handleIpcContract(strataContract, {
     isBundled: async () => manager.isBundled(),
-    catalog: async () => [...STRATA_MODEL_CATALOG],
+    catalog: async () => {
+      const variants = getAppLocalModelCatalog(app.getPath('userData')).readBundledStrataVariants();
+      return STRATA_MODEL_CATALOG.map(entry => ({
+        ...entry,
+        marketplaceVariants: variants.get(entry.id),
+      }));
+    },
     status: async () => manager.detect(),
     start: async (_event, input: StrataStartInput) => {
       const status = await manager.start(input);

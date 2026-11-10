@@ -27,6 +27,22 @@ const CatalogEntrySchema = z.object({
     docNoteKey: z.string(),
   }),
   docUrl: z.string(),
+  marketplaceVariants: z
+    .array(
+      z.object({
+        label: z.string(),
+        files: z.array(
+          z.object({
+            repoId: z.string(),
+            revision: z.string(),
+            path: z.string(),
+            bytes: z.number(),
+            sha256: z.string(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
 });
 
 const ServiceConfigSchema = z.object({

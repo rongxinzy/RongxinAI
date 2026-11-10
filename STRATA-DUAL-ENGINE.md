@@ -11,6 +11,8 @@ The **Windows CUDA (win-cuda)** installer bundles [Strata](https://github.com/Ni
 
 The installer bundles official Strata **v0.2.4** Windows CUDA13 engine tarballs plus `strata-control-0.1.49.2-windows-x86_64.zip` (SHA-256 pinned in `package.json`). Model weights are **not** included.
 
+The model marketplace reads a separate `strata_marketplace` table in the bundled SQLite catalog. The seed records model repository IDs, immutable revisions, file sizes and SHA-256 values from the bundled control package's `setup.py`. It includes the Gyro, Qwen3.6 MTP and DeepSeek V4.1 file sets. Byte totals cover the files in the listed set. Optional image projectors and additional setup disk requirements are separate. General catalog updates only replace the ModelScope catalog records.
+
 ## GPU exclusivity
 
 - Before starting Strata, the app calls llama.cpp orchestrator **`stopAll`** (unload router models).

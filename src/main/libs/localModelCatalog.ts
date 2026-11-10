@@ -7,6 +7,7 @@ import { setImmediate as yieldToMainLoop } from 'node:timers/promises';
 import Database from 'better-sqlite3';
 
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../shared/marketplace';
+import type { StrataMarketplaceVariant } from '../../shared/strata/types';
 import type { CatalogUpdate, CatalogVersion } from './modelCatalogUpdateTypes';
 
 export const LOCAL_MODEL_CATALOG_FILE = 'model-catalog.sqlite';
@@ -56,6 +57,21 @@ export class LocalModelCatalog {
 
   private open(filePath: string): Database.Database {
     return new Database(filePath, { readonly: true, fileMustExist: true });
+  }
+
+  readBundledStrataVariants(): Map<string, StrataMarketplaceVariant[]> {
+    const db = this.open(this.bundledPath);
+    try {
+      const rows = db.prepare('SELECT catalog_id, payload FROM strata_marketplace').all() as {
+        catalog_id: string;
+        payload: string;
+      }[];
+      return new Map(
+        rows.map(row => [row.catalog_id, JSON.parse(row.payload) as StrataMarketplaceVariant[]]),
+      );
+    } finally {
+      db.close();
+    }
   }
 
   private version(db: Database.Database): CatalogVersion {

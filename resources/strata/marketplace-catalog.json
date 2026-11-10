@@ -1,0 +1,298 @@
+{
+  "strata-qwen-flash-next": [
+    {
+      "label": "Gyro-S",
+      "files": [
+        {
+          "repoId": "agentionai/Qwen3.8-Flash-Next-Gyro-GGUF",
+          "revision": "1ada08422e404aca51ab9df665f089f34c419c6b",
+          "path": "Qwen3.8-Flash-Next-Gyro-S-TQ1_0.gguf",
+          "bytes": 58487015808,
+          "sha256": "c6ea1b08ca312f99095b27588ba35976b53f948268e7f91e7761926aa01d9c87"
+        }
+      ]
+    },
+    {
+      "label": "Gyro-M",
+      "files": [
+        {
+          "repoId": "agentionai/Qwen3.8-Flash-Next-Gyro-GGUF",
+          "revision": "1ada08422e404aca51ab9df665f089f34c419c6b",
+          "path": "Qwen3.8-Flash-Next-Gyro-M-TQ2_0.gguf",
+          "bytes": 91965774272,
+          "sha256": "7aa36d15131d255179ab6c87fa9c9f81a0b541fc9e81e959d4c3e29eb20feb5f"
+        }
+      ]
+    }
+  ],
+  "strata-qwen36-35b-a3b": [
+    {
+      "label": "UD-Q4_K_XL",
+      "files": [
+        {
+          "repoId": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+          "revision": "5bc3e238d916f48a861bac2f8a1990a0e9b7e98d",
+          "path": "Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+          "bytes": 22853663008,
+          "sha256": "55983c5a75a1ab969824077b3bb3de4146e82a9234072b48ad4e8f92ad3fe9f1"
+        }
+      ]
+    },
+    {
+      "label": "UD-Q6_K_XL",
+      "files": [
+        {
+          "repoId": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+          "revision": "5bc3e238d916f48a861bac2f8a1990a0e9b7e98d",
+          "path": "Qwen3.6-35B-A3B-UD-Q6_K_XL.gguf",
+          "bytes": 32611711264,
+          "sha256": "35fce994cd36104a7dc1bd8a4bdf13778145664c00fdef6773aebc9246e5019c"
+        }
+      ]
+    },
+    {
+      "label": "Q8_0",
+      "files": [
+        {
+          "repoId": "unsloth/Qwen3.6-35B-A3B-MTP-GGUF",
+          "revision": "5bc3e238d916f48a861bac2f8a1990a0e9b7e98d",
+          "path": "Qwen3.6-35B-A3B-Q8_0.gguf",
+          "bytes": 37801097504,
+          "sha256": "c1283d8b80c3e38b2735ddbc9766d3b3126f44d6c484be419d4e101d09a76131"
+        }
+      ]
+    }
+  ],
+  "strata-deepseek-v41-flash": [
+    {
+      "label": "ISTA-DAS 1.75 bpw",
+      "files": [
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ1_M-00001-of-00004.gguf",
+          "bytes": 39358830464,
+          "sha256": "6e3f0d5ff53d00428ec32c079db9e8255cb410ccaa435e5342aaa8a47fe1339d"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ1_M-00002-of-00004.gguf",
+          "bytes": 39176113248,
+          "sha256": "34d68c99fdae9948f9f0af0dafe308e805ce0a78d2c48641b24cc57242fdc0af"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ1_M-00003-of-00004.gguf",
+          "bytes": 39997334720,
+          "sha256": "a08468c83955e0c4d3a9eb3f7b86c45b7bbac55d99c4640039a296a8a4b327ea"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ1_M-00004-of-00004.gguf",
+          "bytes": 2188841824,
+          "sha256": "b05f26a92325aa6845cebcb3ec1f93d2e65ebf89bdc3f805695960d2f0681832"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf",
+          "bytes": 110595290816,
+          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00001-of-00009.gguf",
+          "bytes": 5780589,
+          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
+          "bytes": 7976914240,
+          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a"
+        }
+      ]
+    },
+    {
+      "label": "ISTA-DAS 2.00 bpw",
+      "files": [
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00001-of-00004.gguf",
+          "bytes": 39075714624,
+          "sha256": "d46efb67ccffd8fb5d7f18b423896381b9e06d8491e161c370ddf3b05b07e050"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00002-of-00004.gguf",
+          "bytes": 39388449504,
+          "sha256": "cec1b2c3da429dc768b8bb9bc4dc4403d81f74d34db660a6a34ee3e555bf2c70"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00003-of-00004.gguf",
+          "bytes": 39246891616,
+          "sha256": "9d9c2140fcb134a0b9a74dedd0e5167e68077af6d08ce7f856bce112f0a35dd3"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XXS-00004-of-00004.gguf",
+          "bytes": 20527837312,
+          "sha256": "9b790a2297ed3cdede379fc984f4a52bb95f3b23724c797af11d1fa6a69db059"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf",
+          "bytes": 110595290816,
+          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00001-of-00009.gguf",
+          "bytes": 5780589,
+          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
+          "bytes": 7976914240,
+          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a"
+        }
+      ]
+    },
+    {
+      "label": "ISTA-DAS 2.25 bpw",
+      "files": [
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XS-00001-of-00004.gguf",
+          "bytes": 39535776992,
+          "sha256": "4c65307992ab586c527ca1f6f64062aa96a33b23c02b7fed103f45f75e854798"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XS-00002-of-00004.gguf",
+          "bytes": 39494617536,
+          "sha256": "933461a974fcccee741bf2f9798201e72ab4aa3f8a952be56f849896ca6ea30e"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XS-00003-of-00004.gguf",
+          "bytes": 39423838496,
+          "sha256": "bbf91fa346a85ebaf32dd4fd5c456b534d780d381e54f46ac90783a481373240"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-1017-GSQ-RCO-IQ2_XS-00004-of-00004.gguf",
+          "bytes": 36771591232,
+          "sha256": "e5b2f8781fab688cd4bc3bc7a69651b5dbb90ed94965657c6bead8bb4774f3cf"
+        },
+        {
+          "repoId": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF",
+          "revision": "cb02422c900df489cea5833e8a92171224059b3c",
+          "path": "DeepSeek-V4.1-Flash-Engram-IQ4_NL.gguf",
+          "bytes": 110595290816,
+          "sha256": "eb19f30d368d393784e1fc54fdfaffc427ebb2110bf3762fdf5a8fbb9a2d740a"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00001-of-00009.gguf",
+          "bytes": 5780589,
+          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
+          "bytes": 7976914240,
+          "sha256": "6ba6ac1b331c540691a209e7fc97dec2a24e295acb1e755c84c7d24a4373927a"
+        }
+      ]
+    },
+    {
+      "label": "UD-Q8_K_XL",
+      "files": [
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00001-of-00009.gguf",
+          "bytes": 5780589,
+          "sha256": "cc15d470afcb030558bbc4d8e2ccd840182e2e95de1a95198138efe63a5fd99f"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00002-of-00009.gguf",
+          "bytes": 50536121984,
+          "sha256": "9cb2047676bd20e448be2377b480080c97fb38fae117f4846e07de2c65bb8522"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00003-of-00009.gguf",
+          "bytes": 50536121984,
+          "sha256": "17d398dd327e7ff1991b382677814db75d970b074661757564b6f2ac3d0c8d95"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00004-of-00009.gguf",
+          "bytes": 50536122016,
+          "sha256": "7ea8da1143b9a6bf1424a361eb1b0d6f66c7ce79eac9711162f212cc4f39c319"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00005-of-00009.gguf",
+          "bytes": 50536122016,
+          "sha256": "1952da19a841176b46f9681c99ea57c674f8a8861e16d76fb35cec4befe039b2"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00006-of-00009.gguf",
+          "bytes": 50536122016,
+          "sha256": "d6711781d8effab79b410af9c40920bffcc0c28976e509bc1227ff0c6669c33a"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00007-of-00009.gguf",
+          "bytes": 36097230048,
+          "sha256": "2ebc8d198d03a14865e8a85df637285ceb5dd79b1ffc78424bd3c3e06df57823"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00008-of-00009.gguf",
+          "bytes": 202758032592,
+          "sha256": "12df293355efbd104b088a77e13ee22410fb1ec3f7ab3863947f09896e64bec7"
+        },
+        {
+          "repoId": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+          "revision": "f924b94f19c1fea02c06a65c8475b0a45e2b88b1",
+          "path": "UD-Q8_K_XL/DeepSeek-V4.1-Flash-1017-UD-Q8_K_XL-00009-of-00009.gguf",
+          "bytes": 16835109952,
+          "sha256": "df33722d1dcf5ffe0347ed8406f7acb3b18061f4ded2c13c2b0a184b8d41c9ea"
+        }
+      ]
+    }
+  ]
+}

@@ -31,11 +31,37 @@ import {
 import { ListPagination } from '../../common/ListPagination';
 import { localInferenceCompactButtonClass, MARKETPLACE_PAGE_SIZE } from '../constants';
 import { getInstallableMarketplaceModels } from '../utils/marketplace';
+import { StrataMarketplaceCatalog } from './StrataMarketplaceCatalog';
 
 const marketplaceGridClassName =
   'grid w-full grid-cols-1 auto-rows-min content-start gap-4 @3xl/marketplace:grid-cols-2';
 
-export function MarketplacePanel({
+const CatalogView = { General: 'general', Strata: 'strata' } as const;
+type CatalogView = (typeof CatalogView)[keyof typeof CatalogView];
+
+export function MarketplacePanel(props: Parameters<typeof GeneralMarketplacePanel>[0]) {
+  const [view, setView] = useState<CatalogView>(CatalogView.General);
+  return (
+    <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-3">
+      <FluidTabs
+        size={FluidTabsSize.Small}
+        aria-label={i18nService.t('marketplaceCatalogSource')}
+        value={view}
+        onValueChange={value => setView(value as CatalogView)}
+        items={[
+          { value: CatalogView.General, label: i18nService.t('marketplaceCatalogGeneral') },
+          { value: CatalogView.Strata, label: i18nService.t('marketplaceCatalogStrata') },
+        ]}
+      />
+      <div className={view === CatalogView.General ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
+        <GeneralMarketplacePanel {...props} />
+      </div>
+      {view === CatalogView.Strata ? <StrataMarketplaceCatalog /> : null}
+    </div>
+  );
+}
+
+function GeneralMarketplacePanel({
   loading,
   models,
   hasSearched,

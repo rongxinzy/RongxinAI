@@ -33,6 +33,18 @@ export interface StrataCatalogEntry {
   hardware: StrataHardwareGate;
   /** Strata docs URL section for this family. */
   docUrl: string;
+  marketplaceVariants?: StrataMarketplaceVariant[];
+}
+
+export interface StrataMarketplaceVariant {
+  label: string;
+  files: {
+    repoId: string;
+    revision: string;
+    path: string;
+    bytes: number;
+    sha256: string;
+  }[];
 }
 
 export interface StrataServiceConfig {

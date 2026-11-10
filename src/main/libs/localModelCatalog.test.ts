@@ -13,6 +13,19 @@ import { toCatalogUpsert } from './modelCatalogUpdateTypes';
 const bundled = path.resolve('resources/model-catalog.sqlite');
 const seedRepo = 'Qwen/Qwen3-0.6B-GGUF';
 
+test('the offline Strata catalog preserves upstream file pins outside the general catalog', () => {
+  const catalog = new LocalModelCatalog(bundled, '');
+  const variants = catalog.readBundledStrataVariants();
+  expect([...variants.values()].map(group => group.length).sort()).toEqual([2, 3, 4]);
+  const deepSeek = variants
+    .get('strata-deepseek-v41-flash')
+    ?.find(pack => pack.label.includes('2.00'));
+  expect(deepSeek?.files).toHaveLength(7);
+  expect(deepSeek?.files.some(file => file.path.includes('Engram'))).toBe(true);
+  expect(deepSeek?.files.every(file => /^[a-f0-9]{64}$/.test(file.sha256))).toBe(true);
+  expect(catalog.find('strata-deepseek-v41-flash')).toBeNull();
+});
+
 test('the bundled catalog searches, pages, and resolves an install with the remote catalog unavailable', async () => {
   const data = mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-catalog-'));
   try {

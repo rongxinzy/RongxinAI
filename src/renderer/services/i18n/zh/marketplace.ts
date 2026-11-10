@@ -1,6 +1,13 @@
 // 模型市场与企业托管
 export const zhMarketplace: Record<string, string> = {
   marketplaceTitle: '模型市场',
+  marketplaceCatalogSource: '模型目录',
+  marketplaceCatalogGeneral: '通用模型',
+  marketplaceCatalogStrata: 'Strata 适配模型',
+  marketplaceCatalogStrataDescription:
+    '这些规格来自随包目录，供 Windows CUDA 版高性能推理使用。当前可查看文件规格，下载与安装入口尚未开放。',
+  marketplaceCatalogStrataUnavailable: '本地 Strata 目录暂不可用。',
+  marketplaceCatalogStrataLoading: '正在读取本地 Strata 目录…',
   marketplaceDescription: '输入关键词搜索并安装本地模型',
   marketplaceSearch: '搜索',
   marketplaceSearchPlaceholder: '搜索模型，如 qwen3、deepseek-r1...',

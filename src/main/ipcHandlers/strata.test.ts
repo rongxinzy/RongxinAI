@@ -7,6 +7,14 @@ import type { StrataProviderSnapshot } from '../magpie/strataProviderBinding';
 import type { SqliteStore } from '../sqliteStore';
 import { registerStrataIpcHandlers } from './strata';
 
+vi.mock('electron', async importOriginal => {
+  const electron = await importOriginal<typeof import('electron')>();
+  return {
+    ...electron,
+    app: { ...electron.app, isPackaged: false, getAppPath: () => process.cwd() },
+  };
+});
+
 const strataClientMock = vi.hoisted(() => ({
   health: vi.fn(async () => true),
   listModels: vi.fn(async () => [{ id: 'strata-model', name: 'Strata Model' }]),
@@ -44,6 +52,25 @@ type IpcHandler = (event: unknown, ...args: unknown[]) => unknown;
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+test('the catalog IPC returns the bundled Strata variants', async () => {
+  const handlers = new Map<string, IpcHandler>();
+  vi.spyOn(ipcMain, 'handle').mockImplementation((channel, listener) => {
+    handlers.set(channel, listener as unknown as IpcHandler);
+  });
+  registerStrataIpcHandlers(new StrataManager(), {
+    getStore: () => ({}) as SqliteStore,
+  });
+  const entries = await handlers.get(StrataIpcChannel.Catalog)!({});
+  expect(entries).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: 'strata-qwen-flash-next',
+        marketplaceVariants: expect.arrayContaining([expect.objectContaining({ label: 'Gyro-S' })]),
+      }),
+    ]),
+  );
 });
 
 test('a running status event refreshes bindings without re-probing the service', async () => {

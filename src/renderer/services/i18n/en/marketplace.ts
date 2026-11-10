@@ -1,6 +1,13 @@
 // Marketplace and enterprise managed
 export const enMarketplace: Record<string, string> = {
   marketplaceTitle: 'Model Marketplace',
+  marketplaceCatalogSource: 'Model catalog',
+  marketplaceCatalogGeneral: 'General models',
+  marketplaceCatalogStrata: 'Strata models',
+  marketplaceCatalogStrataDescription:
+    'These bundled listings are for high-performance inference on Windows CUDA. File specifications are available to browse. Download and installation are not yet available here.',
+  marketplaceCatalogStrataUnavailable: 'The local Strata catalog is unavailable.',
+  marketplaceCatalogStrataLoading: 'Reading the local Strata catalog…',
   marketplaceDescription: 'Search and install local models by keyword',
   marketplaceSearch: 'Search',
   marketplaceSearchPlaceholder: 'Search models, e.g. qwen3, deepseek-r1...',
