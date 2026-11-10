@@ -31,7 +31,8 @@ import { resolveMagpieGatewayPort, type MagpieGatewayPortStore } from './gateway
 import { MAGPIE_VERSION, verifyMagpieBinary } from './integrity';
 import type { MagpieAgentConnectPreview } from '../../shared/magpie/types';
 import { formatMagpieManagementError } from './managementErrors';
-import { extractRuntimeErrorMessage } from '../../shared/magpie/runtimeErrorMessage';
+import { probeProviderEndpoint } from './providerTest';
+import { RecentErrors } from './recentErrors';
 import { mergeMagpiePreferences, projectMagpiePreferences } from './preferences';
 import type { MagpiePreferences, MagpiePreferencesPatch } from '../../shared/magpie/preferences';
 import {
@@ -59,47 +60,6 @@ import {
   resolveMagpieProviderSaveKey,
   sanitizeProviderContexts,
 } from './projectMagpieProviders';
-const TEST_BODY_LIMIT_BYTES = 256 * 1024;
-
-/** Reads at most `limit` bytes so a channel can't stream an unbounded page into main. */
-async function readBoundedBody(
-  response: Response,
-  limit: number,
-): Promise<{ text: string; truncated: boolean }> {
-  if (!response.body) return { text: '', truncated: false };
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  let truncated = false;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const room = limit - size;
-      if (value.byteLength > room) {
-        chunks.push(value.subarray(0, room));
-        size = limit;
-        truncated = true;
-        break;
-      }
-      chunks.push(value);
-      size += value.byteLength;
-    }
-  } finally {
-    try {
-      await reader.cancel();
-    } catch {
-      // The stream may already be closed by the peer.
-    }
-  }
-  const merged = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return { text: new TextDecoder().decode(merged), truncated };
-}
 
 export interface MagpieManagerOptions {
   resourcesRoot: string;
@@ -138,7 +98,7 @@ export class MagpieManager implements MagpieRoutingGateway {
   private catalogRead?: Promise<MagpieModel[]>;
   private hostSync: Promise<void> = Promise.resolve();
   private hostSignatures = new Map<string, string>();
-  private recentErrors: { timestamp: number; message: string; providerId?: string }[] = [];
+  private readonly recentErrors = new RecentErrors();
   private cachedActiveProviderCount = 0;
   private providersListHydrated = false;
   private reapplyErrors = new Map<string, string>();
@@ -154,7 +114,7 @@ export class MagpieManager implements MagpieRoutingGateway {
       subscriptionAccountsEnabled: this.options.subscriptionAccounts?.read() === true,
       diagnostics: {
         activeProviderCount: this.cachedActiveProviderCount,
-        recentErrors: this.recentErrors,
+        recentErrors: this.recentErrors.list(),
       },
     };
   }
@@ -493,29 +453,11 @@ export class MagpieManager implements MagpieRoutingGateway {
   }
 
   recordError(message: string, providerId?: string): void {
-    this.recentErrors.unshift({ timestamp: Date.now(), message, providerId });
-    if (this.recentErrors.length > 10) this.recentErrors.pop();
+    this.recentErrors.record(message, providerId);
   }
 
-  /**
-   * Drops the cached runtime errors a provider change made stale. Provider ids
-   * cover errors recorded with one; the name prefix covers the runtime errors
-   * that carry only the upstream message (`name: ...`).
-   */
   clearRecentErrors(filter?: { providerIds?: string[]; providerNames?: string[] }): void {
-    if (!filter) {
-      this.recentErrors = [];
-      return;
-    }
-    const ids = new Set(filter.providerIds ?? []);
-    const names = (filter.providerNames ?? [])
-      .map(name => name.trim())
-      .filter(name => name.length > 0);
-    this.recentErrors = this.recentErrors.filter(error => {
-      if (error.providerId && ids.has(error.providerId)) return false;
-      const message = extractRuntimeErrorMessage(error.message).replace(/^\s*(?:Error:\s*)+/i, '');
-      return !names.some(name => message.startsWith(`${name}:`));
-    });
+    this.recentErrors.clear(filter);
   }
 
   async clearDiagnostics(): Promise<MagpieDiagnosticSummary> {
@@ -680,111 +622,17 @@ export class MagpieManager implements MagpieRoutingGateway {
 
   async testProvider(input: MagpieSaveProviderInput): Promise<MagpieTestProviderResult> {
     if (!input.baseUrl) return { ok: false, error: 'Base URL is required' };
-    const start = Date.now();
-    try {
-      let key = resolveMagpieProviderSaveKey(input.key);
-      if (!isUsableMagpieProviderKey(key) && input.id) {
-        const stored = await this.fetchStoredProviderKey(input.id);
-        if (isUsableMagpieProviderKey(stored)) key = stored;
-      }
-      const url = input.baseUrl.replace(/\/+$/, '');
-      const testEndpoint =
-        input.api === 'anthropic-messages' ? `${url}/v1/messages` : `${url}/models`;
-      const headers: Record<string, string> = {};
-      if (isUsableMagpieProviderKey(key)) {
-        if (input.api === 'anthropic-messages') {
-          headers['x-api-key'] = key;
-          headers['anthropic-version'] = '2023-06-01';
-        } else {
-          headers['Authorization'] = `Bearer ${key}`;
-        }
-      }
-      const signal = AbortSignal.timeout(8_000);
-      const res = await (this.options.fetch ?? fetch)(testEndpoint, {
-        method: 'GET',
-        headers,
-        signal,
-      });
-      const latencyMs = Date.now() - start;
-      if (res.ok) {
-        const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
-        const body = await readBoundedBody(res, TEST_BODY_LIMIT_BYTES);
-        const text = body.text.replace(/^\uFEFF/, '');
-        const trimmed = text.trimStart();
-        if (contentType.includes('text/html') || trimmed.startsWith('<')) {
-          return {
-            ok: false,
-            latencyMs,
-            errorCode: 'html-endpoint',
-            error: 'The endpoint returned a web page, not a model API',
-          };
-        }
-        // A cut body can't prove the list is JSON, and a success without models
-        // would let a new provider be saved with an empty model list.
-        if (body.truncated) {
-          return {
-            ok: false,
-            latencyMs,
-            errorCode: 'too-large',
-            error: 'The model list exceeds 256 KiB; enter the model ids manually',
-          };
-        }
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(text);
-        } catch {
-          return {
-            ok: false,
-            latencyMs,
-            errorCode: 'not-json',
-            error: 'The endpoint did not return JSON',
-          };
-        }
-        let modelCount: number | undefined;
-        let discoveredModels: string[] | undefined;
-        let data: unknown[] | undefined;
-        let hasErrorEnvelope = false;
-        if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          if ('data' in parsed && Array.isArray(parsed.data)) data = parsed.data;
-          hasErrorEnvelope = 'error' in parsed || 'message' in parsed;
-        }
-        if (!data && hasErrorEnvelope) {
-          return {
-            ok: false,
-            latencyMs,
-            errorCode: 'api-error',
-            error: extractRuntimeErrorMessage(text),
-          };
-        }
-        if (data) {
-          const rawModels = data
-            .map(item => {
-              if (typeof item === 'string') return item.trim();
-              if (item && typeof item === 'object' && 'id' in item && typeof item.id === 'string') {
-                return item.id.trim();
-              }
-              return '';
-            })
-            .filter(Boolean);
-          discoveredModels = Array.from(new Set(rawModels));
-          modelCount = discoveredModels.length;
-        }
-        return { ok: true, latencyMs, modelCount, discoveredModels };
-      }
-      const requiresKey = res.status === 401 || res.status === 403;
-      return {
-        ok: false,
-        latencyMs,
-        requiresKey,
-        errorCode: 'http',
-        error: requiresKey
-          ? 'API Key is required or invalid (HTTP 401/403)'
-          : `HTTP ${res.status}: ${res.statusText}`,
-      };
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { ok: false, errorCode: 'network', error: message };
+    let key = resolveMagpieProviderSaveKey(input.key);
+    if (!isUsableMagpieProviderKey(key) && input.id) {
+      const stored = await this.fetchStoredProviderKey(input.id);
+      if (isUsableMagpieProviderKey(stored)) key = stored;
     }
+    return probeProviderEndpoint(
+      input.baseUrl,
+      input.api,
+      isUsableMagpieProviderKey(key) ? key : '',
+      this.options.fetch ?? fetch,
+    );
   }
 
   async diagnostics(): Promise<MagpieDiagnosticSummary> {
@@ -812,7 +660,7 @@ export class MagpieManager implements MagpieRoutingGateway {
     return {
       latencyMs,
       activeProviderCount,
-      recentErrors: this.recentErrors,
+      recentErrors: this.recentErrors.list(),
     };
   }
 
