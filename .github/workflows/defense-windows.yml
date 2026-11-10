@@ -1,6 +1,8 @@
-name: Build Zhiyuan Defense Windows package (manual)
+name: Build Zhiyuan Defense Windows package
 
 on:
+  push:
+    branches: [release/defense]
   workflow_dispatch:
 
 permissions:
