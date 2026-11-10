@@ -90,6 +90,31 @@ test('uses a real native Button and its parent notification in the progress fixt
   expect(helper).toContain('control.ClassName != "Button"');
 });
 
+test('reports real outer bounds and never substitutes client bounds for a failed GetWindowRect', () => {
+  // WindowInfo geometry sizes Capture() bitmaps (PrintWindow renders the full
+  // window) and drives layout math, so a GetWindowRect failure must fail the
+  // inspection with the real Win32 error instead of silently reporting a
+  // client rect mapped through an unchecked MapWindowPoints as outer bounds.
+  const inspect = helper.slice(
+    helper.indexOf('private static WindowInfo Inspect('),
+    helper.indexOf('public static WindowInfo[] Windows()'),
+  );
+  expect(inspect).toContain('ReadOuterBounds(window)');
+  const outer = helper.slice(
+    helper.indexOf('private static Rect ReadOuterBounds('),
+    helper.indexOf('private static WindowInfo Inspect('),
+  );
+  expect(outer).toContain('if (!GetWindowRect(window, out bounds))');
+  expect(outer).toContain('throw Win32("GetWindowRect failed for HWND 0x"');
+  // The throw must sit at the failing call so the attributed Win32 code is
+  // GetWindowRect's, not a later fallback call's.
+  expect(outer.indexOf('GetWindowRect(window, out bounds)')).toBeLessThan(outer.indexOf('throw'));
+  expect(inspect).not.toContain('GetClientRect');
+  expect(inspect).not.toContain('MapWindowPoints');
+  expect(helper).not.toContain('TryReadBounds');
+  expect(helper).not.toMatch(/bounds\s*=\s*client/);
+});
+
 test('requires actual windows, screenshots, real DPI and usable actions', () => {
   for (const marker of [
     'PrintWindow(window, dc, 2)',
