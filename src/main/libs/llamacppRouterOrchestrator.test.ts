@@ -56,6 +56,14 @@ describe('buildLlamaCppRouterProcessArgs', () => {
 });
 
 describe('LlamaCppRouterOrchestrator', () => {
+  test('stopAll rejects when the router still reports a resident model after unload', async () => {
+    await orchestrator.applyConfig({ port: String(gatewayPort) });
+    modelStates.set('resident', 'loaded');
+    unloadHandler = () => {};
+    await expect(orchestrator.stopAll()).rejects.toThrow('still reports active model processes');
+    expect(routerCalls).toContainEqual({ method: 'POST', url: '/models/unload' });
+  });
+
   let routerServer: http.Server | null = null;
   let gatewayPort = 0;
   let routerCalls: Array<{ method: string; url: string }>;

@@ -25,6 +25,19 @@ vi.mock('child_process', () => ({
   default: {},
 }));
 
+vi.mock('./strataProcess', () => ({
+  resolveStrataProcessCommand: (executable: string, args: string[]) => ({ executable, args }),
+  watchStrataReady: (
+    _stdout: unknown,
+    _port: number,
+    ready: (id: string) => void,
+    serving: () => void,
+  ) => {
+    serving();
+    ready('model');
+  },
+}));
+
 vi.mock('./strataEditionPolicy', () => ({
   isStrataFeatureEnabled: () => true,
 }));
@@ -90,6 +103,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
   strataClientMock.health.mockResolvedValue(false);
+  strataClientMock.listModels.mockResolvedValue([{ id: 'model' }]);
   child = new FakeChild();
   childProcessMock.spawn.mockReturnValue(child);
 });
@@ -99,6 +113,28 @@ afterEach(() => {
 });
 
 describe('StrataManager lifecycle', () => {
+  test('keeps ownership when the process ignores termination and permits a stop retry', async () => {
+    const manager = createManager();
+    child.exitOnSigkill = false;
+    const starting = start(manager);
+    await flush();
+    const stopping = manager.stop();
+    await vi.advanceTimersByTimeAsync(8_000);
+    expect(await stopping).toMatchObject({
+      status: StrataServiceStatus.Error,
+      managedByApp: true,
+    });
+    await starting;
+    expect(await manager.detect()).toMatchObject({
+      status: StrataServiceStatus.Error,
+      managedByApp: true,
+    });
+    child.exitOnSigkill = true;
+    const retry = manager.stop();
+    await vi.advanceTimersByTimeAsync(6_000);
+    expect(await retry).toMatchObject({ status: StrataServiceStatus.Stopped, managedByApp: false });
+  });
+
   test('does not emit status events while the running snapshot is unchanged', async () => {
     strataClientMock.health.mockResolvedValue(true);
     const manager = createManager();

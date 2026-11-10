@@ -23,7 +23,7 @@ import {
   upsertLlamaCppRouterModelPresetSection,
   writeLlamaCppRouterPresetGlobalSection,
 } from './llamacppRouterProcess';
-import type { LlamaCppRouterModelSlots } from './llamacppRouterStatus';
+import type { LlamaCppRouterModelSlots, LlamaCppRouterModelSnapshot } from './llamacppRouterStatus';
 import { LLAMACPP_ROUTER_SLOTS_BUSY_UNKNOWN } from './llamacppRouterStatus';
 import { findLlamaCppExecutable } from './llamacppRuntimePaths';
 
@@ -173,11 +173,14 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
 
   async stopAll(): Promise<LlamaCppModelDaemonStatus> {
     if (this.routerClient) {
-      for (const model of [...this.lastRunningModels]) {
-        const modelName = (model.name || model.model || model.id || '').trim();
-        if (modelName) {
-          await this.routerClient.unloadModel(modelName).catch((): undefined => undefined);
-        }
+      const ownsProcess = (model: LlamaCppRouterModelSnapshot) =>
+        (model.state !== 'unloaded' && model.state !== 'failed') || Boolean(model.port);
+      const models = await this.routerClient.listRouterModels();
+      for (const model of models.filter(ownsProcess)) {
+        await this.routerClient.unloadModel(model.id);
+      }
+      if ((await this.routerClient.listRouterModels()).some(ownsProcess)) {
+        throw new Error('The local inference router still reports active model processes.');
       }
       this.lastRunningModels = [];
     }
