@@ -37,7 +37,7 @@ import {
   PiSubagentEventType,
 } from '../src/main/libs/agentEngine/piSubagentExecution';
 import type { CoworkMessage } from '../src/main/coworkStore';
-import type { McpServerManager } from '../src/main/mcpServerManager';
+import type { McpServerManager } from '../src/main/libs/mcpServerManager';
 
 describe('Adversarial Stress Harness: Payload Truncation Bounds', () => {
   // 2. Truncation Stress Harness on Large Payloads (100KB, 500KB, 2MB)

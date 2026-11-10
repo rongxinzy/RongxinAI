@@ -1,15 +1,40 @@
 /**
  * Standalone verification script for GLM-5.3-flash live endpoint.
+ * Set GLM53_VERIFY_BASE_URL and GLM53_VERIFY_API_KEY in the environment first.
  * Run with: bun run scripts/verify-glm53-live-endpoint.ts
+ * Never commit credentials or put them in command-line arguments.
  */
+import { pathToFileURL } from 'node:url';
+
 import { classifyCoworkError, CoworkErrorKind } from '../src/common/coworkError';
 import { safeSlice } from '../src/shared/lib/safeSlice';
 
-const ENDPOINT_BASE_URL = 'http://172.18.5.188:3000/v1';
-const API_KEY = 'sk-pBz2QZgtUNKl4a5zBH1c7qY5vHat8FWj0T3GCqAfmF18CRKt';
 const MODEL_ID = 'glm-5.3-flash';
 
-async function main(): Promise<void> {
+export async function verifyGlm53LiveEndpoint(): Promise<void> {
+  const baseUrl = process.env.GLM53_VERIFY_BASE_URL?.trim();
+  const apiKey = process.env.GLM53_VERIFY_API_KEY?.trim();
+  if (!baseUrl || !apiKey) {
+    throw new Error('Set GLM53_VERIFY_BASE_URL and GLM53_VERIFY_API_KEY before live verification.');
+  }
+
+  let endpoint: URL;
+  try {
+    endpoint = new URL(baseUrl);
+  } catch {
+    throw new Error('GLM53_VERIFY_BASE_URL must be an absolute HTTP or HTTPS URL.');
+  }
+  if (
+    !['http:', 'https:'].includes(endpoint.protocol) ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash
+  ) {
+    throw new Error(
+      'GLM53_VERIFY_BASE_URL must use HTTP or HTTPS without credentials, query, or fragment.',
+    );
+  }
   console.log('=== GLM-5.3-flash Live Verification Harness ===\n');
 
   // 1. Verify Error Classification Regex
@@ -51,17 +76,16 @@ async function main(): Promise<void> {
     '\n',
   );
 
-  // 3. Live Connectivity and CoT Reasoning Probe (if endpoint is reachable)
+  // 3. Explicitly configured live connectivity and reasoning probe.
   console.log('Test 3: Live Endpoint Connectivity & Reasoning Extraction...');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
-
-    const response = await fetch(`${ENDPOINT_BASE_URL}/chat/completions`, {
+    const response = await fetch(`${endpoint.href.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: MODEL_ID,
@@ -71,13 +95,10 @@ async function main(): Promise<void> {
         max_tokens: 8192,
       }),
       signal: controller.signal,
+      redirect: 'error',
     });
-    clearTimeout(timer);
-
     if (!response.ok) {
-      console.warn(
-        `Live endpoint responded with HTTP ${response.status}: ${await response.text()}`,
-      );
+      throw new Error(`Live endpoint responded with HTTP ${response.status}.`);
     } else {
       const data = (await response.json()) as {
         model?: string;
@@ -90,22 +111,31 @@ async function main(): Promise<void> {
         }>;
       };
       const choice = data.choices?.[0];
-      console.log('Backend Model Reported:', data.model);
+      console.log('Has model identifier:', typeof data.model === 'string');
       console.log('Has reasoning_content:', Boolean(choice?.message?.reasoning_content));
       console.log('Has content:', Boolean(choice?.message?.content));
-      console.log('Finish Reason:', choice?.finish_reason);
+      console.log('Has finish reason:', typeof choice?.finish_reason === 'string');
       console.log('✓ Live endpoint responded successfully with adequate max_tokens allocation!');
     }
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
-    console.log('ℹ Live network connection skipped (offline or intranet only):', errorMsg);
-    console.log('  (Harness logic verified offline via synthetic payloads)');
+  } catch {
+    // Provider bodies and transport errors can echo credentials. Do not log them.
+    throw new Error(
+      'Live endpoint verification failed. Check endpoint availability and credentials.',
+    );
+  } finally {
+    clearTimeout(timer);
   }
 
   console.log('\n=== All Verification Harness Checks Complete ===');
 }
 
-main().catch(err => {
-  console.error('Harness failed:', err);
-  process.exit(1);
-});
+const invokedPath = process.argv[1];
+if (invokedPath && import.meta.url === pathToFileURL(invokedPath).href) {
+  void verifyGlm53LiveEndpoint().catch((error: unknown) => {
+    console.error(
+      'Harness failed:',
+      error instanceof Error ? error.message : 'Verification failed.',
+    );
+    process.exitCode = 1;
+  });
+}

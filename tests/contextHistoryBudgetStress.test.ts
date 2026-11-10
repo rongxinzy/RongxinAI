@@ -37,7 +37,6 @@ import {
   PiSubagentEventType,
 } from '../src/main/libs/agentEngine/piSubagentExecution';
 import type { CoworkMessage } from '../src/main/coworkStore';
-import type { McpServerManager } from '../src/main/mcpServerManager';
 
 describe('Adversarial Stress Harness: Context Calculations & Truncation Bounds', () => {
   const makeMsg = (id: string, role: 'user' | 'assistant', text: string): CoworkMessage => ({

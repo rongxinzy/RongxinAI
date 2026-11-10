@@ -32,7 +32,6 @@ import {
   PiMessageRole,
   PiSubagentEventType,
 } from '../src/main/libs/agentEngine/piSubagentExecution';
-import type { McpServerManager } from '../src/main/mcpServerManager';
 
 describe('Adversarial Challenger Suite: Tool Truncation Bounds', () => {
   const assertNoDanglingHighSurrogate = (str: string, contextMsg = '') => {

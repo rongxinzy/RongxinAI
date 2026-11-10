@@ -32,7 +32,6 @@ import {
   PiMessageRole,
   PiSubagentEventType,
 } from '../src/main/libs/agentEngine/piSubagentExecution';
-import type { McpServerManager } from '../src/main/mcpServerManager';
 
 describe('Adversarial Challenger Suite: safeSlice & Tool Truncation Bounds', () => {
   // Helper to assert no dangling high surrogate at end of string
