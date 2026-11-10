@@ -586,8 +586,9 @@ async function downloadFileOnce(
       (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
     const file = fs.createWriteStream(tempPath, { flags: resumed ? 'a' : 'w' });
     const reader = response.body.getReader();
+    const cancelReader = () => reader.cancel().catch((): void => undefined);
     const onAbort = () => {
-      void reader.cancel();
+      void cancelReader();
     };
     signal?.addEventListener('abort', onAbort);
     let completed = resumed ? resumeFrom : 0;
@@ -611,7 +612,7 @@ async function downloadFileOnce(
       completedSuccessfully = true;
     } finally {
       signal?.removeEventListener('abort', onAbort);
-      void reader.cancel();
+      await cancelReader();
       await new Promise<void>(resolve => file.end(resolve));
     }
     if (completedSuccessfully) {
