@@ -14,8 +14,6 @@ import {
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
-import path from 'path';
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
 import type { CoworkStore } from '../../coworkStore';
@@ -170,8 +168,10 @@ describe('PiRuntimeAdapter', () => {
         },
       });
 
-      expect(mockSession.steer).toHaveBeenCalledOnce();
-      expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining('2048 characters'));
+      expect(mockSession.prompt).toHaveBeenCalledWith(expect.stringContaining('2000 characters'), {
+        streamingBehavior: 'followUp',
+      });
+      expect(mockSession.steer).not.toHaveBeenCalled();
     });
 
     it('persists a token reading only when the provider reported usage', async () => {

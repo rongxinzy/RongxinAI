@@ -32,7 +32,7 @@ type PiSubagentEvent = {
 };
 
 export type PiSubagentSession = {
-  prompt(text: string): Promise<void>;
+  prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
   steer(text: string): Promise<void>;
   subscribe(listener: (event: PiSubagentEvent) => void): () => void;
 };

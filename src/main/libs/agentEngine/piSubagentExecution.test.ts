@@ -131,7 +131,11 @@ test('queues Pi write recovery and keeps waiting after a truncated subagent writ
       ],
     },
   });
-  expect(session.steer).toHaveBeenCalledOnce();
+  expect(session.prompt).toHaveBeenCalledTimes(2);
+  expect(session.prompt).toHaveBeenNthCalledWith(2, expect.stringContaining('write or edit'), {
+    streamingBehavior: 'followUp',
+  });
+  expect(session.steer).not.toHaveBeenCalled();
 
   emit({
     type: PiSubagentEventType.MessageEnd,
