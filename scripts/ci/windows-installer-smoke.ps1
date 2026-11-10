@@ -205,6 +205,13 @@ function Assert-InstalledInferenceRuntime {
   } finally { $env:PATH = $savedPath }
 }
 
+function Assert-InstalledModelCatalog {
+  Invoke-Checked 'node' @(
+    (Join-Path $ProjectRoot 'scripts\packaging\assert-model-catalog.cjs'),
+    (Join-Path $installRoot 'resources\model-catalog.sqlite')
+  ) 'installed offline model catalog verification'
+}
+
 try {
   Invoke-Installer $installer 'cold installation' 2700 $timingLog
   Assert-Path $installRoot 'installation root'
@@ -234,6 +241,7 @@ try {
   }
   Assert-InstallDurationBudget $coldLog 'cold installation' 300
   Assert-InstalledInferenceRuntime
+  Assert-InstalledModelCatalog
 
   # Existing user-owned/unknown runtime content is outside uninstall ownership.
   $preservedFiles = @(
@@ -271,6 +279,7 @@ try {
   }
   Assert-InstallDurationBudget $upgradeLog 'cache-hit upgrade' 180
   Assert-InstalledInferenceRuntime
+  Assert-InstalledModelCatalog
 
   $uninstallers = @(Get-ChildItem -LiteralPath $installRoot -Filter 'Uninstall*.exe' -File)
   if ($uninstallers.Count -ne 1) {

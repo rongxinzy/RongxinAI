@@ -22,3 +22,8 @@ function assertModelCatalog(file) {
 }
 
 module.exports = { assertModelCatalog, MIN_MODELS };
+
+if (require.main === module) {
+  const { count, bytes } = assertModelCatalog(process.argv[2]);
+  console.log(`[ModelCatalog] verified ${count} bundled repositories in ${bytes} bytes`);
+}
