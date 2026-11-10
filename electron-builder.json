@@ -92,6 +92,10 @@
   ],
   "extraResources": [
     {
+      "from": "resources/model-catalog.sqlite",
+      "to": "model-catalog.sqlite"
+    },
+    {
       "from": "build/icons/win/icon.ico",
       "to": "app-icons/icon.ico"
     },

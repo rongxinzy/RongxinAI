@@ -43,6 +43,7 @@ const {
   assertPackagedApp,
   pinElectronLanguages,
 } = require('./packaging/assert-package-contents.cjs');
+const { assertModelCatalog } = require('./packaging/assert-model-catalog.cjs');
 
 const {
   buildWindowsResourceBundleManifest,
@@ -544,6 +545,7 @@ function configureInferenceEditionResources(context) {
 }
 
 async function beforePack(context) {
+  assertModelCatalog(path.join(__dirname, '..', 'resources', 'model-catalog.sqlite'));
   configureMagpieResources(context);
   configureMacAutoUpdateMetadata(context);
   configureInferenceEditionPublishUrls(context);
@@ -734,6 +736,15 @@ async function beforePack(context) {
 }
 
 async function afterPack(context) {
+  const resourcesDir = isMacTarget(context)
+    ? path.join(
+        context.appOutDir,
+        `${context.packager.appInfo.productFilename}.app`,
+        'Contents',
+        'Resources',
+      )
+    : path.join(context.appOutDir, 'resources');
+  assertModelCatalog(path.join(resourcesDir, 'model-catalog.sqlite'));
   verifyPackagedDeliverables(context);
   assertPackagedApp({
     projectRoot: path.join(__dirname, '..'),

@@ -1,12 +1,50 @@
-import { describe, expect, test } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { describe, expect, test, vi } from 'vitest';
 
 import type { LlamaCppInstallModelInput } from '../../shared/llamacpp';
 import {
   collectSplitVariantFiles,
+  installModelOnce,
   isSameInstallRequest,
   shardGroupKey,
 } from './llamacppModelInstallation';
 import type { MarketplaceModelFile } from '../../shared/marketplace';
+
+test('an aborted response does not produce an unhandled stream cancellation', async () => {
+  const modelsDir = mkdtempSync(path.join(tmpdir(), 'model-install-abort-'));
+  const abort = new AbortController();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array([1, 2, 3]));
+      abort.signal.addEventListener('abort', () => controller.error(abort.signal.reason));
+    },
+  });
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(body));
+  try {
+    await expect(
+      installModelOnce({
+        request: {
+          modelId: 'org/model',
+          filePath: 'model.gguf',
+          downloadUrl: 'https://www.modelscope.cn/model.gguf',
+          sha256: 'a'.repeat(64),
+        },
+        modelsDir,
+        safeModelDir: modelsDir,
+        onProgress: progress => {
+          if (progress.phase === 'downloading-progress') abort.abort();
+        },
+        options: { signal: abort.signal },
+        refreshModelsAfterInstall: async () => {},
+      }),
+    ).rejects.toThrow('Install cancelled');
+  } finally {
+    fetch.mockRestore();
+    rmSync(modelsDir, { recursive: true, force: true });
+  }
+});
 
 const file = (
   path: string,

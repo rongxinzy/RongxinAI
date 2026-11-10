@@ -71,6 +71,7 @@ await build(createBuildOptions('src/main/companionWindowPreload.ts'));
 await build(createBuildOptions('src/main/llamacppModelDaemonEntry.ts'));
 await build(createBuildOptions('src/main/workbenchTask/artifactWorker.ts'));
 await build(createBuildOptions('src/main/magpie/catalogWorker.ts'));
+await build(createBuildOptions('src/main/libs/modelCatalogUpdateWorker.ts'));
 await build(createBuildOptions('src/main/libs/hashWorker.ts'));
 await build(createBuildOptions('src/main/libs/sqliteBackup/sqliteVerifyWorker.ts'));
 await build(createBuildOptions('src/main/libs/skillSecurity/skillSecurityScanWorker.ts'));
