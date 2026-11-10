@@ -49,11 +49,12 @@ namespace ZhiYuan.Acceptance {
     private delegate bool EnumProc(IntPtr window, IntPtr state);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc callback, IntPtr state);
     [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, EnumProc callback, IntPtr state);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(IntPtr window, StringBuilder text, int capacity);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder text, int capacity);
-    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr window, out Rect rect);
-    [DllImport("user32.dll")] private static extern bool GetClientRect(IntPtr window, out Rect rect);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool GetWindowRect(IntPtr window, out Rect rect);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool GetClientRect(IntPtr window, out Rect rect);
     [DllImport("user32.dll")] private static extern int MapWindowPoints(IntPtr from, IntPtr to, ref Rect rect, uint points);
     [DllImport("user32.dll")] private static extern int GetDlgCtrlID(IntPtr window);
     [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr window);
@@ -95,7 +96,8 @@ namespace ZhiYuan.Acceptance {
           throw new Win32Exception(error, "Cannot identify directory: " + path);
         }
         FileInformation information;
-        if (!GetFileInformationByHandle(directory, out information)) throw new Win32Exception();
+        if (!GetFileInformationByHandle(directory, out information))
+          throw new Win32Exception(Marshal.GetLastWin32Error(), "GetFileInformationByHandle failed");
         if ((information.Attributes & 0x10) == 0 || (information.Attributes & 0x400) != 0)
           throw new InvalidOperationException("Expected a real directory, not a file or reparse point: " + path);
         return information.VolumeSerialNumber.ToString("X8") + ":" +
@@ -103,15 +105,31 @@ namespace ZhiYuan.Acceptance {
       }
     }
 
+    private static Win32Exception Win32(string context) {
+      var code = Marshal.GetLastWin32Error();
+      return new Win32Exception(code, context + " (Win32=" + code + ")");
+    }
+
+    // Outer bounds only. Client dimensions are not outer bounds: Capture()
+    // prints the whole window and layout math expects screen coordinates, so
+    // substituting a client rect here would crop evidence or misstate geometry
+    // while still reporting success. Fail closed with the real error instead.
+    private static Rect ReadOuterBounds(IntPtr window) {
+      Rect bounds;
+      if (!GetWindowRect(window, out bounds))
+        throw Win32("GetWindowRect failed for HWND 0x" + window.ToInt64().ToString("X"));
+      return bounds;
+    }
+
     private static WindowInfo Inspect(IntPtr window) {
+      if (!IsWindow(window)) throw Win32("Inspect: invalid HWND 0x" + window.ToInt64().ToString("X"));
       uint processId;
       GetWindowThreadProcessId(window, out processId);
       var text = new StringBuilder(4096);
       var className = new StringBuilder(256);
       GetWindowText(window, text, text.Capacity);
       GetClassName(window, className, className.Capacity);
-      Rect bounds;
-      if (!GetWindowRect(window, out bounds)) throw new Win32Exception();
+      var bounds = ReadOuterBounds(window);
       return new WindowInfo {
         Handle = window.ToInt64(), ProcessId = (int)processId,
         ParentHandle = GetParent(window).ToInt64(),
@@ -124,10 +142,17 @@ namespace ZhiYuan.Acceptance {
       };
     }
 
+    // Read a known, persistent HWND without traversing siblings that may be
+    // destroyed during an asynchronous page transition. Inspection stays strict.
+    public static WindowInfo Control(long handle) {
+      return Inspect(new IntPtr(handle));
+    }
+
     public static WindowInfo[] Windows() {
       var windows = new List<WindowInfo>();
       EnumWindows((window, state) => {
-        if (IsWindowVisible(window)) windows.Add(Inspect(window));
+        if (!IsWindow(window) || !IsWindowVisible(window)) return true;
+        windows.Add(Inspect(window));
         return true;
       }, IntPtr.Zero);
       return windows.ToArray();
@@ -136,6 +161,7 @@ namespace ZhiYuan.Acceptance {
     public static WindowInfo[] Controls(long parent) {
       var controls = new List<WindowInfo>();
       EnumChildWindows(new IntPtr(parent), (window, state) => {
+        if (!IsWindow(window)) return true;
         controls.Add(Inspect(window));
         return true;
       }, IntPtr.Zero);
@@ -224,11 +250,11 @@ namespace ZhiYuan.Acceptance {
         throw new InvalidOperationException("Cannot click an invisible, disabled, or non-button control: " + control.Text);
       // BM_CLICK reaches the same NSIS control callback as a user click.
       // Posting keeps the driver responsive during real synchronous install work.
-      if (!PostMessage(window, 0x00F5, IntPtr.Zero, IntPtr.Zero)) throw new Win32Exception();
+      if (!PostMessage(window, 0x00F5, IntPtr.Zero, IntPtr.Zero)) throw Win32("PostMessage BM_CLICK failed");
     }
 
     public static void Close(long handle) {
-      if (!PostMessage(new IntPtr(handle), 0x0010, IntPtr.Zero, IntPtr.Zero)) throw new Win32Exception();
+      if (!PostMessage(new IntPtr(handle), 0x0010, IntPtr.Zero, IntPtr.Zero)) throw Win32("PostMessage WM_CLOSE failed");
     }
 
     public static ActionFontContract ReadActionFontContract(string themePath) {
@@ -253,7 +279,7 @@ namespace ZhiYuan.Acceptance {
       if (!control.Visible || control.Width <= 0 || control.Height <= 0)
         throw new InvalidOperationException("Action is not visible: " + control.Text);
       Rect client;
-      if (!GetClientRect(new IntPtr(parent), out client)) throw new Win32Exception();
+      if (!GetClientRect(new IntPtr(parent), out client)) throw Win32("GetClientRect failed for wizard parent");
       MapWindowPoints(new IntPtr(parent), IntPtr.Zero, ref client, 2);
       if (control.Left < client.Left || control.Top < client.Top ||
           control.Left + control.Width > client.Right || control.Top + control.Height > client.Bottom)
@@ -280,7 +306,7 @@ namespace ZhiYuan.Acceptance {
         if (DrawText(dc, control.Text, -1, ref measured, 0x0420) <= 0)
           throw new InvalidOperationException("Could not measure action text: " + control.Text);
         Rect inner;
-        if (!GetClientRect(window, out inner)) throw new Win32Exception();
+        if (!GetClientRect(window, out inner)) throw Win32("GetClientRect failed for action control");
         var style = GetWindowLong(window, -16) & 0xF;
         var checkbox = style == 2 || style == 3 || style == 5 || style == 6;
         var allowance = checkbox ? (int)Math.Ceiling(20 * control.Dpi / 96.0) : 8;
