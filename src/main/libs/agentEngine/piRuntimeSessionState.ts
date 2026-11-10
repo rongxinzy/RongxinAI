@@ -48,6 +48,7 @@ export interface PiSession {
     options?: { deliverAs?: 'steer' | 'followUp' },
   ): Promise<void>;
   steer(text: string): Promise<void>;
+  followUp?(text: string): Promise<void>;
   abort(): Promise<void>;
   abortBash(): void;
   reload(): Promise<void>;
