@@ -21,7 +21,7 @@ const identity = {
   target: 'win32-x64-lite',
 };
 function fixture() {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'checkpoint-'));
+  const root = mkdtempSync(path.join(os.tmpdir(), 'checkpoint 中文 空格-'));
   temporary.push(root);
   mkdirSync(path.join(root, 'release'));
   writeFileSync(path.join(root, 'release/app'), 'final signed bytes');

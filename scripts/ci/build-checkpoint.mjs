@@ -25,6 +25,7 @@ export async function checkpoint(action, directory, identity, paths = [], root =
   const windows = process.platform === 'win32';
   const tar = windows ? path.join(process.env.ProgramFiles, 'Git', 'usr', 'bin', 'tar.exe') : 'tar';
   const local = windows ? ['--force-local'] : [];
+  if (windows && !existsSync(tar)) throw new Error(`Git for Windows tar is missing: ${tar}`);
   for (const key of ['commit', 'runId', 'runAttempt', 'target', 'version']) {
     if (!identity[key]) throw new Error(`Missing checkpoint identity: ${key}`);
   }
