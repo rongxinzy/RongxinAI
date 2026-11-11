@@ -1,0 +1,27 @@
+diff --git a/node_modules/@earendil-works/pi-ai/dist/api/simple-options.js b/node_modules/@earendil-works/pi-ai/dist/api/simple-options.js
+--- a/node_modules/@earendil-works/pi-ai/dist/api/simple-options.js
++++ b/node_modules/@earendil-works/pi-ai/dist/api/simple-options.js
+@@ -19,6 +19,11 @@
+     if (room < MIN_OUTPUT_WITH_RATIO_MARGIN) {
+         room = Math.min(MIN_OUTPUT_WITH_RATIO_MARGIN, model.contextWindow - input - CONTEXT_SAFETY_TOKENS);
+     }
++    if (room < MIN_MAX_TOKENS) {
++        // Surface context pressure to the caller's native overflow recovery. Sending a
++        // one-token request here manufactures a length stop without making any progress.
++        throw new Error(`Context window exceeded: estimated input ${input} leaves no output budget in ${model.contextWindow} tokens`);
++    }
+     return Math.min(maxTokens, Math.max(MIN_MAX_TOKENS, room));
+ }
+ export function resolveSamplingParams(model, thinkingLevel, requestParams) {
+diff --git a/node_modules/@earendil-works/pi-ai/dist/utils/overflow.js b/node_modules/@earendil-works/pi-ai/dist/utils/overflow.js
+index 2878759..2f3bf08 100644
+--- a/node_modules/@earendil-works/pi-ai/dist/utils/overflow.js
++++ b/node_modules/@earendil-works/pi-ai/dist/utils/overflow.js
+@@ -48,6 +48,7 @@ const OVERFLOW_PATTERNS = [
+     /input \(\d+ tokens\) is longer than the model'?s context length \(\d+ tokens\)/i, // Together AI
+     /exceeds the limit of \d+/i, // GitHub Copilot
+     /exceeds the available context size/i, // llama.cpp server
++    /context size has been exceeded/i, // llama.cpp server (mid-stream SSE error frame variant)
+     /greater than the context length/i, // LM Studio
+     /context window exceeds limit/i, // MiniMax
+     /exceeded model token limit/i, // Kimi For Coding

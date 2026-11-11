@@ -130,7 +130,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
     });
 
-    it('passes the model context window through to Chat Pi sessions and caps compaction at fixed ceilings', async () => {
+    it('passes the Chat context window to Pi without replacing native compaction policy', async () => {
       mockGetModel.mockImplementationOnce(() => undefined);
       await adapter.startSession('chat-context-limit', 'First', {
         sessionMode: 'chat',
@@ -143,13 +143,9 @@ describe('PiRuntimeAdapter', () => {
       expect(sessionOptions.model?.contextWindow).toBe(272_000);
 
       const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
-      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
-        compaction: {
-          enabled: true,
-          reserveTokens: 16_384,
-          keepRecentTokens: 20_000,
-        },
-      });
+      expect(settingsManager.applyOverrides).not.toHaveBeenCalledWith(
+        expect.objectContaining({ compaction: expect.anything() }),
+      );
     });
 
     it('shares one isolated Pi SettingsManager with resource loading and the agent session', async () => {
@@ -164,13 +160,9 @@ describe('PiRuntimeAdapter', () => {
       expect(mockCreateAgentSession.mock.calls[0]?.[0]).toEqual(
         expect.objectContaining({ settingsManager }),
       );
-      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
-        compaction: {
-          enabled: true,
-          reserveTokens: 8_192,
-          keepRecentTokens: 16_384,
-        },
-      });
+      expect(settingsManager.applyOverrides).not.toHaveBeenCalledWith(
+        expect.objectContaining({ compaction: expect.anything() }),
+      );
     });
 
     it('keeps codemode extensions off the default session wiring', async () => {

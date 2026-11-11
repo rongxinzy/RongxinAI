@@ -33,7 +33,6 @@ import {
   type PiSubagentSession,
 } from './piSubagentExecution';
 import type { PiExtensionFactory } from './piExtensionTypes';
-import { applyPiCompactionOverrides } from './piRuntimeSettingsOverrides';
 import type { PiSettingsManager } from './piRuntimeSessionState';
 
 // ── Constants ──
@@ -308,10 +307,6 @@ async function runSubagent(
     ) {
       const settingsManager = (resourceLoader as { settingsManager: PiSettingsManager })
         .settingsManager;
-      applyPiCompactionOverrides(
-        settingsManager,
-        typeof model.contextWindow === 'number' ? model.contextWindow : undefined,
-      );
       subOptions.settingsManager = settingsManager;
     }
     if (resolvedModel.modelRuntime) {

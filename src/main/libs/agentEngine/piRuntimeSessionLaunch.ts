@@ -43,11 +43,7 @@ import { PiEventProjectionQueue } from './piEventProjectionQueue';
 import { ToolActivityTracker } from './toolActivity';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
-import {
-  createPiSettingsManager,
-  applyPiCompactionOverrides,
-  resolvePiSessionModel,
-} from './piRuntimeSettingsOverrides';
+import { createPiSettingsManager, resolvePiSessionModel } from './piRuntimeSettingsOverrides';
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { createPiWorkbenchContract, PiGoalModePrompt } from './piRuntimeWorkbenchContract';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
@@ -314,10 +310,6 @@ export async function startPiRuntimeSession(
 
     console.debug(`[PiRuntime] loading isolated resources for session ${sessionId}`);
     const settingsManager = createPiSettingsManager(pi, workspaceRoot);
-    const contextWindowTokens =
-      typeof resolvedModel.model.contextWindow === 'number'
-        ? resolvedModel.model.contextWindow
-        : undefined;
     const codemodeEnabled =
       options.codemode === true && !resourceState.chatMode && options.confirmationMode !== 'text';
     const expertMcpIds = Array.isArray(expertSession?.capabilityPolicy?.mcpIds)
@@ -344,11 +336,6 @@ export async function startPiRuntimeSession(
         enableMcpNative: mcpNativeBridge,
         expertMcpIds,
       },
-    );
-    applyPiCompactionOverrides(
-      settingsManager,
-      contextWindowTokens,
-      resolvedModel.modelCompactionOverride,
     );
     if (codemodeEnabled && settingsManager) {
       // "+codemode" adds the sandbox tool on top of the default tool set;
@@ -407,7 +394,6 @@ export async function startPiRuntimeSession(
       model: sessionModel,
       modelRuntime: resolvedModel.modelRuntime,
       modelRequestOptions: resolvedModel.requestOptions,
-      modelCompactionOverride: resolvedModel.modelCompactionOverride,
       codemodeEnabled,
       mcpNativeBridge,
       imageEndpointKey: resolvedModel.endpointKey,

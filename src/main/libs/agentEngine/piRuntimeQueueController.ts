@@ -18,7 +18,7 @@ import { hasVisiblePromptContent } from '../../../shared/cowork/submissionConten
 import { WorkbenchContractKind } from '../../../shared/workbenchTask';
 import type { CoworkMessage } from '../../coworkStore';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
-import { applyPiCompactionOverrides, applyPiShellOverride } from './piRuntimeSettingsOverrides';
+import { applyPiShellOverride } from './piRuntimeSettingsOverrides';
 import {
   haveSameStringList,
   mergeSkillIds,
@@ -186,11 +186,6 @@ export class PiRuntimeQueueController {
         // AgentSession.reload() reloads SettingsManager from disk, so restore
         // the per-process bundled PortableGit override after every reload.
         await applyPiShellOverride(active.settingsManager);
-        applyPiCompactionOverrides(
-          active.settingsManager,
-          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-          active.modelCompactionOverride,
-        );
         active.requestedSkillIds = steeredSkillIds;
       } catch (error) {
         active.resourceState.skillIds = previousSkillIds;
