@@ -19,7 +19,8 @@ env:
 
 jobs:
   install-and-start:
-    runs-on: ubuntu-latest
+    # Ubuntu 26.04 runners currently fail DNS resolution inside Docker builds.
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6

@@ -106,7 +106,7 @@ jobs:
             for edition in "${linux_editions[@]}"; do
               edition="${edition// /}"
               if [[ -z "$edition" ]]; then continue; fi
-              matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-${edition}-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"${edition}\",\"target\":\"linux-x64-${edition}\"}"
+              matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-24.04\",\"artifact\":\"linux-${edition}-build\",\"runtime_target\":\"linux-x64\",\"inference_edition\":\"${edition}\",\"target\":\"linux-x64-${edition}\"}"
               separator=','
             done
           fi
