@@ -169,9 +169,12 @@ async function transferModelFile(
   const total =
     contentRangeTotal ??
     (totalHeader ? Number(totalHeader) + (resumed ? resumeFrom : 0) : undefined);
-  const body = response.body;
+  const reader = response.body.getReader();
+  const cancelReader = (): void => {
+    void reader.cancel().catch(() => {});
+  };
+  signal?.addEventListener('abort', cancelReader, { once: true });
   async function* chunks() {
-    const reader = body.getReader();
     let completed = resumed ? resumeFrom : 0;
     try {
       if (completed > 0) onProgress(completed, Number.isFinite(total) ? total : undefined);
@@ -197,9 +200,26 @@ async function transferModelFile(
       await reader.cancel().catch(() => {});
     }
   }
-  await pipeline(chunks(), fs.createWriteStream(tempPath, { flags: resumed ? 'a' : 'w' }), {
-    signal,
-  });
+  let file: Awaited<ReturnType<typeof fs.promises.open>> | undefined;
+  try {
+    signal?.throwIfAborted();
+    file = await fs.promises.open(tempPath, resumed ? 'a' : 'w');
+    const destination = file;
+    await pipeline(
+      chunks(),
+      async source => {
+        for await (const chunk of source) {
+          await destination.writeFile(chunk);
+        }
+      },
+      { signal },
+    );
+  } finally {
+    signal?.removeEventListener('abort', cancelReader);
+    await reader.cancel().catch(() => {});
+    reader.releaseLock();
+    await file?.close();
+  }
 }
 
 export function assertValidGgufFile(filePath: string): void {
