@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { Type } from '@earendil-works/pi-ai';
+import { Type } from 'typebox';
 import { defineTool } from '@earendil-works/pi-durable';
 import { MemoryKind, MemoryLifecycleStatus } from '../../shared/memory/index.js';
 import { CompanionMemoryTool } from './constants.js';

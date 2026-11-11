@@ -10,7 +10,6 @@ import { ModelRuntime } from '../../../../node_modules/@earendil-works/pi-coding
 import { DefaultResourceLoader } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js';
 import { SessionManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js';
 import { SettingsManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js';
-import { applyPiCompactionOverrides } from './piRuntimeSettingsOverrides';
 import { createPiPromptOverrides } from './piPromptOverrides';
 import { PiGoalModePrompt } from './piRuntimeWorkbenchContract';
 
@@ -42,7 +41,6 @@ test.each(['threshold', 'overflow'] as const)(
     });
     await runtime.setRuntimeApiKey(model.provider, 'offline-test');
     const settings = SettingsManager.inMemory();
-    applyPiCompactionOverrides(settings, model.contextWindow);
     const loader = new DefaultResourceLoader({
       cwd,
       agentDir: cwd,
@@ -58,7 +56,6 @@ test.each(['threshold', 'overflow'] as const)(
       ),
     });
     await loader.reload();
-    applyPiCompactionOverrides(settings, model.contextWindow);
     let completed = 0;
     let summaries = 0;
     let overflowSent = false;
@@ -153,7 +150,7 @@ test.each(['threshold', 'overflow'] as const)(
     try {
       await session.prompt(`${PiGoalModePrompt}\nCreate and verify 32 files.`);
       expect(session.agent.state.systemPrompt).toContain(
-        'You are an expert coding assistant operating inside pi',
+        'You are a coding assistant running inside pi',
       );
       expect(session.agent.state.systemPrompt).toContain('You are the assigned specialist.');
       expect(completed).toBe(32);

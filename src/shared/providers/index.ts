@@ -9,7 +9,6 @@ export {
 } from './constants';
 export { isLocalModelRef, isLocalProviderName } from './local';
 export { normalizeProviderModelPiRuntimeConfig } from './piRuntime';
-export type { ProviderModelPiCompaction } from './piRuntime';
 export type { ProviderConfig } from './types';
 export {
   clampRuntimeContextWindow,

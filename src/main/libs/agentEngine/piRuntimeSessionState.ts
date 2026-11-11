@@ -11,7 +11,7 @@ import type { CoworkError } from '../../../common/coworkError';
 import type { CoworkMessageExpertIdentity } from '../../../shared/cowork/sessionExperts';
 import type { HarnessModelProfileInput } from '../../../shared/harness';
 import type { WorkbenchApprovalMode, WorkbenchTaskContract } from '../../../shared/workbenchTask';
-import type { ModelCapabilities, ProviderModelPiCompaction } from '../../../shared/providers';
+import type { ModelCapabilities } from '../../../shared/providers';
 import type { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
 import {
   buildPiBackgroundCompletionContext,
@@ -124,8 +124,6 @@ export interface ActivePiSession {
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
   modelRequestOptions?: { apiKey?: string };
-  /** Per-model compaction budgets applied on create and every reload. */
-  modelCompactionOverride?: PiResolvedModel['modelCompactionOverride'];
   /** Whether this session runs with the pi 1.0 codemode tool active. */
   codemodeEnabled: boolean;
   /** Whether pi's builtin MCP extension owns this session's MCP tools. */
@@ -359,11 +357,6 @@ export type PiResolvedModel = {
   capabilities?: Partial<ModelCapabilities>;
   requestOptions?: {
     apiKey?: string;
-  };
-  /** Per-model compaction budgets keyed for pi's compaction.modelOverrides. */
-  modelCompactionOverride?: {
-    key: string;
-    compaction: ProviderModelPiCompaction;
   };
 };
 

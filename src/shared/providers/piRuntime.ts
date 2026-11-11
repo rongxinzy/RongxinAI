@@ -101,7 +101,7 @@ interface ProviderModelPiInputLimits {
 }
 
 /** Per-model compaction budgets; unset fields fall back to the session defaults. */
-export interface ProviderModelPiCompaction {
+interface ProviderModelPiCompaction {
   readonly reserveTokens?: number;
   readonly keepRecentTokens?: number;
 }

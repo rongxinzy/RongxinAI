@@ -3,11 +3,10 @@
  *
  * Extracted from PiRuntimeAdapter: pure helpers that build the in-memory Pi
  * settings manager, clamp model/output budgets to Cowork chat-mode limits,
- * and re-apply per-process overrides (compaction, bundled shell) that Pi's
+ * and re-apply the bundled shell override that Pi's
  * own reload-from-disk behavior would otherwise drop.
  */
 
-import type { ProviderModelPiCompaction } from '../../../shared/providers';
 import { resolveGitBashPathForPi } from '../coworkUtil';
 import { calculatePiConversationHistoryCharLimit } from './piConversationContext';
 import { applyPiEmbeddedHttpIdleTimeout } from './piHttpIdleTimeout';
@@ -25,48 +24,6 @@ export function createPiSettingsManager(pi: PiModules, cwd: string): PiSettingsM
     pi.SettingsManager.inMemory?.() ?? pi.SettingsManager.create(cwd, pi.getAgentDir());
   applyPiEmbeddedHttpIdleTimeout(settingsManager);
   return settingsManager;
-}
-
-export function applyPiCompactionOverrides(
-  settingsManager: PiSettingsManager | null,
-  contextWindowTokens?: number,
-  perModel?: { key: string; compaction: ProviderModelPiCompaction },
-): void {
-  if (!settingsManager) return;
-  const contextWindow =
-    Number.isFinite(contextWindowTokens) && (contextWindowTokens ?? 0) > 0
-      ? Math.floor(contextWindowTokens!)
-      : 32_768;
-  // Keep compaction's summary request and retained conversation inside the
-  // active model window. Pi's defaults (16K reserve, 20K recent) are tuned
-  // for large hosted models and can exceed a local 16K/32K model's budget.
-  const reserveTokens = Math.max(2_048, Math.min(16_384, Math.floor(contextWindow * 0.25)));
-  const keepRecentTokens = Math.max(2_048, Math.min(20_000, Math.floor(contextWindow * 0.5)));
-  settingsManager.applyOverrides({
-    compaction: {
-      enabled: true,
-      reserveTokens,
-      keepRecentTokens,
-      // Per-model budgets ride pi's modelOverrides keyed by provider/modelId;
-      // unconfigured fields fall back to the flat session budgets above. The
-      // key is omitted entirely when unconfigured so the override payload
-      // stays byte-identical to the pre-modelOverrides shape.
-      ...(perModel
-        ? {
-            modelOverrides: {
-              [perModel.key]: {
-                ...(perModel.compaction.reserveTokens !== undefined
-                  ? { reserveTokens: perModel.compaction.reserveTokens }
-                  : {}),
-                ...(perModel.compaction.keepRecentTokens !== undefined
-                  ? { keepRecentTokens: perModel.compaction.keepRecentTokens }
-                  : {}),
-              },
-            },
-          }
-        : {}),
-    },
-  });
 }
 
 export function resolvePiSessionModel(

@@ -341,7 +341,7 @@ describe('PiRuntimeAdapter', () => {
   // ── Model updates ──
 
   describe('patchSession', () => {
-    it('recomputes compaction when the context shrinks without an output-budget change', async () => {
+    it('passes a smaller model to Pi without retaining host compaction overrides', async () => {
       applyTestResolution({
         config: { model: 'large-audit' },
         providerMetadata: { contextWindow: 131072, maxTokens: 4096 },
@@ -355,9 +355,12 @@ describe('PiRuntimeAdapter', () => {
         providerMetadata: { contextWindow: 16384, maxTokens: 4096 },
       });
       await adapter.patchSession('shrink-context', { model: 'small-audit' });
-      expect(overrides).toHaveBeenCalledWith({
-        compaction: { enabled: true, reserveTokens: 4096, keepRecentTokens: 8192 },
-      });
+      expect(mockSession.setModel).toHaveBeenCalledWith(
+        expect.objectContaining({ contextWindow: 16384 }),
+      );
+      expect(overrides).not.toHaveBeenCalledWith(
+        expect.objectContaining({ compaction: expect.anything() }),
+      );
       expect(mockSession.reload).not.toHaveBeenCalled();
     });
     it('should update the model and reload its write budget when the output limit changes', async () => {

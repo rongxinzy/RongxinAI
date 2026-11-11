@@ -172,7 +172,7 @@ describe('buildPiSubagentTool', () => {
     for (const session of sessions) expect(session.abort).toHaveBeenCalledOnce();
   });
 
-  it('configures compaction for the child model window before creating its session', async () => {
+  it('passes the child model and settings to native compaction without host overrides', async () => {
     const applyOverrides = vi.fn();
     const { tool } = buildTool({
       resolvedModel: {
@@ -183,9 +183,13 @@ describe('buildPiSubagentTool', () => {
       createPiResourceLoader: async () => ({ settingsManager: { applyOverrides } }),
     });
     await tool.execute('small', { agent: 'scout', task: 'inspect' });
-    expect(applyOverrides).toHaveBeenCalledWith({
-      compaction: { enabled: true, reserveTokens: 4096, keepRecentTokens: 8192 },
-    });
+    expect(applyOverrides).not.toHaveBeenCalled();
+    expect(hoisted.mockCreateAgentSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: expect.objectContaining({ contextWindow: 16384 }),
+        settingsManager: { applyOverrides },
+      }),
+    );
   });
 
   // ── Parameter validation ──

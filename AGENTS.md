@@ -36,7 +36,7 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 - 会话、流式回复、设置、Skills、MCP、自动化、本地推理和 IM 的数据在 `browserMock/interactive.ts` 与 `browserMock/fixtures/`。改了 preload 契约后跑 `bun run web:preview:codegen`，并提交 `src/renderer/browserMock/generated/`。`bun run web:preview:codegen:check` 会在生成结果过期时失败。
 - `bun run web:preview:check`（先 `bunx playwright install chromium`）在 headless Chromium 中跑 Playwright 交互测试与 warn-only 的 axe 抽检；mock 仍支持 URL 参数 `previewScenario` / `previewEdition` / `previewSkipBoot` 供本地走查。`console.error` 与 `pageerror` 会让检查失败。Preload 契约：`bun run web:preview:contract`；生成面校验：`bun run web:preview:codegen:check`。这些检查由发布前 `release-preflight.yml` 的 `browser-preview` job 统一执行，日常 PR 不自动启动浏览器。
 
-Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致）。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。桌面壳 Electron **44.x**；Agent 执行栈 `@earendil-works/pi-*` **1.4.0**（见 `package.json`）。
+Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致）。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。桌面壳 Electron **44.x**；Agent 执行栈 `@earendil-works/pi-*` **1.5.2**，带原生 fork 修复（见 `package.json`、[上下文压力修复](docs/architecture/pi-context-pressure-fork.zh-CN.md)）。
 
 ## 产品与品牌
 

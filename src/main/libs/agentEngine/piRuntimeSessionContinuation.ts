@@ -31,7 +31,6 @@ import { collectImagePathReferences } from './piImageInputFallback';
 import { waitForPiRetryCancellation } from './piRetryCancellation';
 import { resolvePiModel } from './piMagpiePiModel';
 import {
-  applyPiCompactionOverrides,
   applyPiShellOverride,
   resolveConversationHistoryCharLimit,
   resolvePiSessionModel,
@@ -260,11 +259,6 @@ export async function continuePiRuntimeSession(
       // AgentSession.reload() reloads SettingsManager from disk, so restore
       // the per-process bundled PortableGit override after every reload.
       await applyPiShellOverride(active.settingsManager);
-      applyPiCompactionOverrides(
-        active.settingsManager,
-        typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-        active.modelCompactionOverride,
-      );
       active.requestedSystemPrompt = nextSystemPrompt;
       active.requestedSkillIds = requestedSkillIds;
       console.debug('[PiRuntime] reloaded session resources after prompt change');
@@ -456,7 +450,6 @@ export async function patchPiRuntimeSession(
     active.requestedModelOverride = patch.model;
     active.modelRuntime = resolvedModel.modelRuntime;
     active.modelRequestOptions = resolvedModel.requestOptions;
-    active.modelCompactionOverride = resolvedModel.modelCompactionOverride;
     active.capabilities = {
       ...active.capabilities,
       ...resolvedModel.capabilities,
@@ -479,11 +472,6 @@ export async function patchPiRuntimeSession(
       await active.piSession.reload();
       await applyPiShellOverride(active.settingsManager);
     }
-    applyPiCompactionOverrides(
-      active.settingsManager,
-      typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-      active.modelCompactionOverride,
-    );
     console.log('[PiRuntime] Model updated via patchSession:', patch.model);
   } catch (err) {
     console.warn('[PiRuntime] Failed to update model via patchSession:', err);
