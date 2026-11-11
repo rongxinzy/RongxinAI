@@ -64,7 +64,7 @@ function renderPrompt(loader: DefaultResourceLoader): string {
 }
 
 function expectDefaultPrompt(prompt: string) {
-  expect(prompt).toContain('You are an expert coding assistant operating inside pi');
+  expect(prompt).toContain('You are a coding assistant running inside pi');
   expect(prompt).toContain(`- read: ${toolSnippet}`);
   expect(prompt).toContain(toolGuideline);
   expect(prompt).toContain('Be concise in your responses');
@@ -91,7 +91,7 @@ test('a nonempty system override bypasses default tool descriptions and guidelin
   const prompt = renderPrompt(loader);
   expect(prompt).toContain(identity);
   expect(prompt).toContain(existingAppend);
-  expect(prompt).not.toContain('Available tools:');
+  expect(prompt).not.toContain('<tools>');
   expect(prompt).not.toContain(toolSnippet);
   expect(prompt).not.toContain(toolGuideline);
 });
