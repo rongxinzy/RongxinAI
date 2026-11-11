@@ -24,6 +24,8 @@ Before tagging, run **Release preflight** (`release-preflight.yml`) with **`sour
 
 User-facing release text: copy the top section from [`docs/RELEASE_NOTES_TEMPLATE.md`](docs/RELEASE_NOTES_TEMPLATE.md) into the GitHub Release body above the auto-generated PR list. Auto notes are categorized via [`.github/release.yml`](.github/release.yml).
 
+Windows manual downloads on GitHub Releases must contain only the WebView2 single-file setup (`kind=installer`, `ZhiYuanAgent-Setup-<version>.exe`). The NSIS `kind=updater` executable is delivered through the signed automatic-update feed. The GitHub asset collector excludes Windows updater executables. Before upload or GitHub staging, Windows manual installers must pass the existing PE, ZYP2 payload/footer and ZIP boundary inspection. After publication, the GitHub API gate requires exactly three Windows downloads for lite, CPU and CUDA, with uploaded state, filename, size and SHA-256 matching the verified candidate manifests. Extra native executables or mismatched public bytes fail the release workflow.
+
 Beta users opt in under **Settings → About → Beta update channel**.
 
 ### Edition matrix

@@ -283,6 +283,14 @@ jobs:
           generate_release_notes: true
           files: |
             release-assets/*
+      - name: Verify public Windows downloads are the accepted WebView2 installers
+        run: |
+          node scripts/release/verify-github-windows-downloads.mjs \
+            '${{ needs.prepare-release.outputs.version }}' \
+            '${{ needs.prepare-release.outputs.commit }}' \
+            '${{ github.run_id }}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Summarize beta release
         shell: bash
         run: |

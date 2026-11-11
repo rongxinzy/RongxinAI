@@ -10,11 +10,32 @@ import { createImmutableUploader } from './upload-release-candidate.mjs';
 const VERSION = '2026.8.13-build.2';
 const temporaryDirectories: string[] = [];
 
+function webSetupBytes() {
+  const bytes = Buffer.alloc(560);
+  const peOffset = 128;
+  const optionalOffset = peOffset + 24;
+  bytes.write('MZ');
+  bytes.writeUInt32LE(peOffset, 60);
+  bytes.writeUInt32LE(0x4550, peOffset);
+  bytes.writeUInt16LE(0x8664, peOffset + 4);
+  bytes.writeUInt16LE(1, peOffset + 6);
+  bytes.writeUInt16LE(240, peOffset + 20);
+  bytes.writeUInt16LE(0x20b, optionalOffset);
+  bytes.writeUInt32LE(16, optionalOffset + 108);
+  bytes.writeUInt32LE(0x06054b50, 512);
+  bytes.writeBigUInt64LE(512n, 536);
+  bytes.writeBigUInt64LE(22n, 544);
+  bytes.writeUInt32LE(24, 552);
+  bytes.write('ZYP2', 556);
+  return bytes;
+}
+
 async function candidateArtifact(kind = 'installer') {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-candidate-upload-'));
   temporaryDirectories.push(directory);
   const filePath = path.join(directory, 'ZhiYuan-Setup.exe');
-  const content = Buffer.from('validated candidate bytes');
+  const content = webSetupBytes();
+  if (kind === 'updater') content.fill(0, 512);
   await fs.writeFile(filePath, content);
   return {
     filePath,
@@ -44,6 +65,14 @@ afterEach(async () => {
 });
 
 describe('release candidate immutable upload', () => {
+  test('blocks a native updater labeled as a manual installer before any R2 request', async () => {
+    const { filePath, artifact } = await candidateArtifact('updater');
+    artifact.kind = 'installer';
+    const runAws = vi.fn();
+    const upload = createImmutableUploader({ bucket: 'test', releaseVersion: VERSION, runAws });
+    await expect(upload(filePath, artifact, new Map())).rejects.toThrow('Missing ZYP2 setup payload footer');
+    expect(runAws).not.toHaveBeenCalled();
+  });
   test('accepts an identical existing immutable object without uploading it', async () => {
     const { filePath, artifact } = await candidateArtifact();
     const runAws = vi.fn((args: string[]) =>

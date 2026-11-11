@@ -2,6 +2,7 @@ import { constants } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import sfx from '../installer-shell/sfx-format.cjs';
 import { listReleaseCandidateBundles } from './release-candidate-layout.mjs';
 import { verifyCandidateManifests } from './release-candidate-manifest.mjs';
 
@@ -17,14 +18,16 @@ const manifests = await Promise.all(bundles.map(async ({ manifestName }, index) 
 ));
 await verifyCandidateManifests({ releaseVersion, sourceCommit, candidateRunId, manifests, payloadRoots });
 
-// Target names preserve every edition when electron-builder uses the same
-// updater filename. Copy only manifest-listed installers/updaters, never logs.
+// Windows manual downloads use the WebView2 installer. Its NSIS updater is
+// delivered through the signed update feed and must stay off the download page.
 const assets = new Map();
 for (const [index, manifest] of manifests.entries()) {
   for (const artifact of manifest.artifacts) {
     if (!['installer', 'updater'].includes(artifact.kind)) continue;
+    if (artifact.platform === 'win32' && artifact.kind !== 'installer') continue;
     const name = `${artifact.platform}-${artifact.arch}-${artifact.variant}-${artifact.filename}`;
     const source = path.join(payloadRoots[index], artifact.relativePath);
+    if (artifact.platform === 'win32') sfx.inspectSetup(source);
     if (assets.has(name) && assets.get(name) !== source) {
       throw new Error(`Conflicting GitHub release asset: ${name}`);
     }

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
+import sfx from '../installer-shell/sfx-format.cjs';
 import { resolveReleaseArtifactFormat } from './inference-edition-targets.mjs';
 import { verifyCandidateManifests } from './release-candidate-manifest.mjs';
 
@@ -58,6 +59,9 @@ export async function verifyLocalArtifact(filePath, artifact) {
     (await hashFile(filePath, 'sha512', 'base64')) !== artifact.sha512
   ) {
     throw new Error(`Candidate bytes changed before upload: ${artifact.relativePath}`);
+  }
+  if (artifact.platform === 'win32' && artifact.kind === 'installer') {
+    sfx.inspectSetup(filePath);
   }
   return format;
 }
