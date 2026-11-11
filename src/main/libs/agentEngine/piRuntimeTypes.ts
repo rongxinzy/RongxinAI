@@ -5,7 +5,10 @@ import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
-import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
+import type {
+  WorkbenchApprovalMode,
+  WorkbenchVerificationResult,
+} from '../../../shared/workbenchTask';
 import type { PiPlanEntry } from './piPlanTool';
 import type { PiRunProgressEvent } from './piRunState';
 import type { UIMessageChunk } from 'ai';
@@ -67,7 +70,8 @@ export interface PiRuntimeEvents {
   ) => void;
   /** A plan-mode turn published its structured plan. */
   plan: (sessionId: string, plan: { entries: PiPlanEntry[] }) => void;
-  complete: (sessionId: string) => void;
+  /** Execution ended normally; acceptance_required is not verified task success. */
+  complete: (sessionId: string, verification?: WorkbenchVerificationResult) => void;
   error: (sessionId: string, error: CoworkError) => void;
   /**
    * Pi is retrying a failed attempt. Transient by nature: the renderer shows it

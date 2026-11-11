@@ -9,12 +9,12 @@
  * tests/abLongTask.harness.test.ts) when the scenario or prompts change.
  */
 
-import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { LONGTASK_DOC_COUNT, runLongTaskScenario } from './replay/piLongTaskScenario';
+import { inspectLongTaskArtifacts } from './replay/piLongTaskAcceptance';
 
 const TAPE_PATH = path.resolve(__dirname, 'replay/tapes/longtask-32doc.jsonl.gz');
 const WORK_DIR = path.join(os.tmpdir(), 'pi-longtask-replay-work');
@@ -50,13 +50,7 @@ describe.skip('Pi long-task replay (recorded provider)', () => {
         expect(size, `${name} should exist`).not.toBeNull();
       }
 
-      const summaries = fs.readFileSync(path.join(WORK_DIR, 'summaries.md'), 'utf8');
-      expect(summaries.match(/^## doc-/gm)?.length).toBe(LONGTASK_DOC_COUNT);
-      const csvLines = fs
-        .readFileSync(path.join(WORK_DIR, 'index.csv'), 'utf8')
-        .split('\n')
-        .filter(line => line.trim().length > 0);
-      expect(csvLines.length).toBe(LONGTASK_DOC_COUNT + 1);
+      expect(inspectLongTaskArtifacts(WORK_DIR, LONGTASK_DOC_COUNT)).toEqual([]);
     },
   );
 });

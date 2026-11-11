@@ -22,6 +22,7 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { forwardTapeResponse } from './piProviderTapeForwarding';
 
 const WORK_DIR_PLACEHOLDER = '<PI_REPLAY_WORKDIR>';
 const REPO_ROOT_PLACEHOLDER = '<PI_REPLAY_REPOROOT>';
@@ -152,7 +153,14 @@ export class PiProviderTapeServer {
     const tape = new PiProviderTapeServer(options);
     if (options.mode === 'replay') tape.loadTape();
     const server = http.createServer((req, res) => {
-      void tape.handleRequest(req, res);
+      void tape.handleRequest(req, res).catch(() => {
+        if (res.destroyed || res.writableEnded) return;
+        if (res.headersSent) res.destroy();
+        else {
+          res.writeHead(502, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Tape upstream request failed.' }));
+        }
+      });
     });
     tape.server = server;
     await new Promise<void>((resolve, reject) => {
@@ -197,6 +205,7 @@ export class PiProviderTapeServer {
     if (!this.server) return;
     const server = this.server;
     this.server = null;
+    server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
 
@@ -331,13 +340,13 @@ export class PiProviderTapeServer {
     };
     if (this.options.upstreamApiKey)
       headers.authorization = `Bearer ${this.options.upstreamApiKey}`;
-    const response = await fetch(`${upstream}${req.url}`, {
-      method: req.method,
+    const { status, contentType, responseBody } = await forwardTapeResponse(
+      req,
+      res,
+      upstream,
       headers,
-      body: req.method === 'GET' || req.method === 'HEAD' ? undefined : body,
-    });
-    const responseBody = await response.text();
-    const contentType = response.headers.get('content-type') ?? 'application/json';
+      body,
+    );
     const normalizedBody = this.normalize(body);
     this.entries.push({
       seq: this.entries.length,
@@ -348,15 +357,14 @@ export class PiProviderTapeServer {
       requestHead: normalizedBody.slice(0, REQUEST_HEAD_STORAGE_LENGTH),
       requestTail: normalizedBody.slice(-REQUEST_TAIL_STORAGE_LENGTH),
       requestSnippet: normalizedBody.slice(0, REQUEST_SNIPPET_LENGTH),
-      status: response.status,
+      status,
       contentType,
       responseBody,
     });
     // A crashed recording must not lose everything captured so far: flush
     // incrementally instead of only at close.
     this.flushTape();
-    res.writeHead(response.status, { 'content-type': contentType });
-    res.end(responseBody);
+    res.end();
   }
 
   private async serveFromTape(
