@@ -1,0 +1,44 @@
+name: Freeze Windows candidate
+description: Bind final accepted bytes and diagnostics before another edition replaces release output
+inputs:
+  edition:
+    required: true
+    description: Verified Windows edition
+  version:
+    required: true
+    description: Release version
+  source-commit:
+    required: true
+    description: Exact source commit
+runs:
+  using: composite
+  steps:
+    - name: Archive acceptance and freeze candidate
+      shell: bash
+      env:
+        EDITION: ${{ inputs.edition }}
+        VERSION: ${{ inputs.version }}
+        SOURCE_COMMIT: ${{ inputs.source-commit }}
+      run: |
+        set -euo pipefail
+        out_dir="bundle-win32-x64-${EDITION}"
+        shopt -s nullglob
+        installers=(release/ZhiYuanAgent-Setup-*.exe)
+        updaters=()
+        for file in release/*.exe; do
+          [[ "$(basename "$file")" == ZhiYuanAgent-Setup-* ]] || updaters+=("$file")
+        done
+        blockmaps=(release/*.exe.blockmap)
+        [[ ${#installers[@]} -eq 1 && ${#updaters[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one installer, updater, and blockmap' >&2; exit 1; }
+        [[ "${blockmaps[0]}" == "${updaters[0]}.blockmap" ]] || { echo 'Blockmap must belong to the updater' >&2; exit 1; }
+        node scripts/release/windows/archive-windows-acceptance.mjs \
+          "$EDITION" "$VERSION" "$SOURCE_COMMIT" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "${installers[0]}" "$out_dir"
+        metadata="release/electron-updater/${EDITION}/latest.yml"
+        node scripts/release/normalize-electron-updater-metadata.mjs \
+          "$VERSION" win32 x64 "$EDITION" release/latest.yml "$metadata"
+        node scripts/release/create-release-candidate.mjs \
+          "$VERSION" "$SOURCE_COMMIT" "$GITHUB_RUN_ID" "$out_dir" "candidate-win32-x64-${EDITION}.json" \
+          "${installers[0]}:win32:x64:${EDITION}:installer" \
+          "${updaters[0]}:win32:x64:${EDITION}:updater" \
+          "${blockmaps[0]}:win32:x64:${EDITION}:blockmap" \
+          "${metadata}:win32:x64:${EDITION}:metadata"

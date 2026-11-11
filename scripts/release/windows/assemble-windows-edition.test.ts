@@ -53,25 +53,128 @@ test('a failed edition package cannot continue to assemble an installer from sta
   expect(f.calls.some(call => call.args[0].endsWith('build-distribution.cjs'))).toBe(false);
 });
 
-test('windows-release assembles and directly uploads all three edition release candidates', () => {
-  type Step = { name?: string; run?: string; uses?: string; if?: string; with?: Record<string, unknown> };
-  const workflow = load(readFileSync('.github/workflows/build-windows-release.yml', 'utf8')) as {
-    jobs: Record<string, { needs?: string; steps: Step[] }>;
+type ReleaseStep = {
+  name?: string;
+  run?: string;
+  uses?: string;
+  if?: string;
+  with?: Record<string, unknown>;
+  'continue-on-error'?: boolean;
+};
+type ReleaseJob = {
+  needs?: string;
+  if?: string;
+  env?: Record<string, string>;
+  strategy?: { matrix: { edition: string[] } };
+  steps: ReleaseStep[];
+};
+function releaseWorkflow() {
+  return load(readFileSync('.github/workflows/build-windows-release.yml', 'utf8')) as {
+    jobs: Record<string, ReleaseJob>;
   };
-  expect(workflow.jobs['windows-release'].needs).toBeUndefined();
-  expect(workflow.jobs.acceptance).toBeUndefined();
-  const steps = workflow.jobs['windows-release'].steps;
-  const uploads = steps.filter(step => step.uses === 'actions/upload-artifact@v6');
-  const candidates = uploads.filter(step => String(step.with?.name).startsWith('release-candidate-'));
-  expect(candidates.map(step => step.with?.name)).toEqual([
-    'release-candidate-${{ inputs.app-build-version }}-win32-x64-lite',
-    'release-candidate-${{ inputs.app-build-version }}-win32-x64-cpu',
-    'release-candidate-${{ inputs.app-build-version }}-win32-x64-cuda',
-  ]);
-  expect(candidates.every(step => step.if === '${{ !inputs.enterprise-extension }}')).toBe(true);
-  const enterprise = uploads.find(step => String(step.with?.name).startsWith('zhiyuan-enterprise-windows-'));
+}
+
+test('each edition restores exact inputs on a fresh runner before shared acceptance', () => {
+  const acceptance = releaseWorkflow().jobs.acceptance;
+  expect(acceptance.needs).toBe('windows-release');
+  expect(acceptance.if).toBe('${{ !inputs.enterprise-extension }}');
+  expect(acceptance.strategy?.matrix.edition).toEqual(['lite', 'cpu', 'cuda']);
+  expect(acceptance.env?.ZHIYUAN_UPDATE_VARIANT).toBe('${{ matrix.edition }}');
+  const steps = acceptance.steps;
+  const restore = steps.findIndex(step => step.run?.includes('build-checkpoint.mjs restore'));
+  const verify = steps.findIndex(step => step.uses === './.github/actions/verify-windows-package');
+  const freeze = steps.findIndex(
+    step => step.uses === './.github/actions/freeze-windows-candidate',
+  );
+  const upload = steps.findIndex(step =>
+    String(step.with?.name).startsWith('release-candidate-'),
+  );
+  expect(restore).toBeGreaterThan(-1);
+  expect(verify).toBeGreaterThan(restore);
+  expect(freeze).toBeGreaterThan(verify);
+  expect(upload).toBeGreaterThan(freeze);
+  for (const step of steps.slice(restore, upload + 1)) {
+    expect(step.if).toBeUndefined();
+    expect(step['continue-on-error']).toBeUndefined();
+  }
+  expect(steps[verify].with?.['certificate-path']).toBe('release/signing-certificate.cer');
+  expect(steps[verify].with?.['artifact-suffix']).toBe(
+    '${{ matrix.edition }}-${{ github.run_attempt }}',
+  );
+  expect(JSON.stringify(acceptance)).not.toContain('secrets.');
+});
+
+test('producer checkpoints editions before repackaging without publishing candidates', () => {
+  const steps = releaseWorkflow().jobs['windows-release'].steps;
+  const checkpoints = steps.filter(
+    step => step.uses === './.github/actions/checkpoint-windows-package',
+  );
+  expect(checkpoints.map(step => step.with?.edition)).toEqual(['lite', 'cpu', 'cuda']);
+  for (const edition of ['lite', 'cpu', 'cuda']) {
+    const checkpoint = steps.findIndex(
+      step =>
+        step.uses === './.github/actions/checkpoint-windows-package' &&
+        step.with?.edition === edition,
+    );
+    const upload = steps.findIndex(step =>
+      String(step.with?.name).endsWith(`-${edition}`) &&
+      String(step.with?.name).startsWith('windows-acceptance-'),
+    );
+    expect(upload).toBeGreaterThan(checkpoint);
+    const nextBuild = steps.findIndex(
+      (step, index) =>
+        index > checkpoint && Boolean(step.run?.includes('assemble-windows-edition.cjs')),
+    );
+    if (nextBuild !== -1) expect(nextBuild).toBeGreaterThan(upload);
+  }
+  expect(steps.some(step => String(step.with?.name).startsWith('release-candidate-'))).toBe(false);
+  const enterprise = steps.find(step => step.name === 'Verify shared Windows installer');
   expect(enterprise?.if).toBe('${{ inputs.enterprise-extension }}');
-  const diagnostics = uploads.find(step => String(step.with?.name).startsWith('windows-package-diagnostics-'));
-  expect(diagnostics?.if).toBe('${{ failure() }}');
-  expect(uploads).toHaveLength(candidates.length + 2);
+});
+
+test('checkpoint contains public acceptance inputs and identity uses the current attempt', () => {
+  const action = readFileSync('.github/actions/checkpoint-windows-package/action.yml', 'utf8');
+  expect(action).toContain('Export-Certificate');
+  expect(action).toContain('-Type CERT');
+  expect(action).not.toContain('Export-PfxCertificate');
+  for (const input of [
+    'package.json release build-tar/windows-components resources/skill-python',
+    'scripts/installer-shell/out/ZhiYuanUninstall.exe.manifest.json',
+  ]) expect(action).toContain(input);
+  const workflow = readFileSync('.github/workflows/build-windows-release.yml', 'utf8');
+  expect(workflow).toContain('windows-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-');
+  expect(workflow).toContain(
+    'release-candidate-${{ inputs.app-build-version }}-win32-x64-${{ matrix.edition }}',
+  );
+});
+
+test('candidate freezing validates evidence before candidate creation', () => {
+  const action = readFileSync('.github/actions/freeze-windows-candidate/action.yml', 'utf8');
+  expect(action).toContain('set -euo pipefail');
+  expect(action).toContain('out_dir="bundle-win32-x64-${EDITION}"');
+  expect(action).toContain('Blockmap must belong to the updater');
+  expect(action.indexOf('archive-windows-acceptance.mjs')).toBeLessThan(
+    action.indexOf('create-release-candidate.mjs'),
+  );
+  expect(action).not.toContain('continue-on-error');
+});
+
+
+test('signer identity comes from the verified public checkpoint, not a masked job output', () => {
+  const workflow = readFileSync('.github/workflows/build-windows-release.yml', 'utf8');
+  expect(workflow).not.toContain('needs.windows-release.outputs.thumbprint');
+  expect(workflow).not.toContain('      thumbprint: ${{ steps.certum-signing.outputs.thumbprint }}');
+  const steps = releaseWorkflow().jobs.acceptance.steps;
+  const restore = steps.findIndex(step => step.run?.includes('build-checkpoint.mjs restore'));
+  const certificate = steps.findIndex(step => step.run?.includes('X509Certificate2'));
+  const verify = steps.findIndex(step => step.uses === './.github/actions/verify-windows-package');
+  expect(certificate).toBeGreaterThan(restore);
+  expect(verify).toBeGreaterThan(certificate);
+  expect(steps[certificate].run).toContain('Resolve-Path -LiteralPath release/signing-certificate.cer');
+  expect(steps[certificate].run).toContain('if ($certificate.HasPrivateKey) { throw');
+  expect(steps[verify].with?.['certificate-thumbprint']).toBe(
+    '${{ steps.public-signing-identity.outputs.thumbprint }}',
+  );
+  const checkpoint = readFileSync('.github/actions/checkpoint-windows-package/action.yml', 'utf8');
+  expect(checkpoint).toContain('if ($certificate.Thumbprint -ne $thumbprint) { throw');
 });

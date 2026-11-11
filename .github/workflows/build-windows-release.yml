@@ -13,6 +13,10 @@ on:
       app-build-version:
         required: true
         type: string
+      include-modelscope-token:
+        description: Pass the optional legacy token to packaging processes
+        type: boolean
+        default: true
       enterprise-extension:
         description: Add the enterprise extension and product identity to the shared installer
         type: boolean
@@ -29,7 +33,7 @@ on:
       UPDATE_MANIFEST_PUBLIC_KEY_BASE64:
         required: true
       MODELSCOPE_TOKENS:
-        required: true
+        required: false
 
 permissions:
   contents: read
@@ -39,6 +43,8 @@ env:
 
 jobs:
   windows-release:
+    outputs:
+      commit: ${{ steps.source-commit.outputs.commit }}
     runs-on: windows-2022
     environment: release
     timeout-minutes: 180
@@ -139,8 +145,9 @@ jobs:
           CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+          MODELSCOPE_TOKENS: ${{ inputs.include-modelscope-token && secrets.MODELSCOPE_TOKENS || '' }}
       - name: Verify shared Windows installer
+        if: ${{ inputs.enterprise-extension }}
         uses: ./.github/actions/verify-windows-package
         with:
           certificate-thumbprint: ${{ steps.certum-signing.outputs.thumbprint }}
@@ -167,72 +174,86 @@ jobs:
             acceptance-diagnostics/
           if-no-files-found: error
           retention-days: 14
-      - name: Assemble Windows release payloads (lite, cpu, cuda)
+      - name: Checkpoint final Windows lite bytes
         if: ${{ !inputs.enterprise-extension }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          assemble_bundle() {
-            local edition="$1"
-            local out_dir="bundle-win32-x64-${edition}"
-            mkdir -p "$out_dir"
-            shopt -s nullglob
-            local installers=(release/ZhiYuanAgent-Setup-*.exe)
-            local updaters=()
-            local file
-            for file in release/*.exe; do
-              [[ "$(basename "$file")" == ZhiYuanAgent-Setup-* ]] || updaters+=("$file")
-            done
-            local blockmaps=(release/*.exe.blockmap)
-            local metadata="release/electron-updater/${edition}/latest.yml"
-            mkdir -p "release/electron-updater/${edition}"
-            node scripts/release/normalize-electron-updater-metadata.mjs \
-              '${{ inputs.app-build-version }}' win32 x64 "$edition" \
-              release/latest.yml "$metadata"
-            node scripts/release/create-release-candidate.mjs \
-              '${{ inputs.app-build-version }}' \
-              '${{ steps.source-commit.outputs.commit }}' \
-              '${{ github.run_id }}' "$out_dir" "candidate-win32-x64-${edition}.json" \
-              "${installers[0]}:win32:x64:${edition}:installer" \
-              "${updaters[0]}:win32:x64:${edition}:updater" \
-              "${blockmaps[0]}:win32:x64:${edition}:blockmap" \
-              "${metadata}:win32:x64:${edition}:metadata"
-          }
-          assemble_bundle lite
-          node scripts/release/windows/assemble-windows-edition.cjs cpu
-          assemble_bundle cpu
-          node scripts/release/windows/assemble-windows-edition.cjs cuda
-          assemble_bundle cuda
+        uses: ./.github/actions/checkpoint-windows-package
+        with:
+          edition: lite
+          version: ${{ inputs.app-build-version }}
+          certificate-thumbprint: ${{ steps.certum-signing.outputs.thumbprint }}
+      - name: Upload Windows lite acceptance inputs
+        if: ${{ !inputs.enterprise-extension }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-lite
+          path: checkpoint-win32-x64-lite/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove uploaded Windows lite checkpoint
+        if: ${{ !inputs.enterprise-extension }}
+        shell: pwsh
+        run: Remove-Item -LiteralPath checkpoint-win32-x64-lite -Recurse
+      - name: Assemble signed Windows cpu installer
+        if: ${{ !inputs.enterprise-extension }}
+        run: node scripts/release/windows/assemble-windows-edition.cjs cpu
         env:
+          ZHIYUAN_UPDATE_VARIANT: cpu
           APP_BUILD_VERSION: ${{ inputs.app-build-version }}
           CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
-      - name: Upload Windows lite release candidate
+          MODELSCOPE_TOKENS: ${{ inputs.include-modelscope-token && secrets.MODELSCOPE_TOKENS || '' }}
+      - name: Checkpoint final Windows cpu bytes
+        if: ${{ !inputs.enterprise-extension }}
+        uses: ./.github/actions/checkpoint-windows-package
+        with:
+          edition: cpu
+          version: ${{ inputs.app-build-version }}
+          certificate-thumbprint: ${{ steps.certum-signing.outputs.thumbprint }}
+      - name: Upload Windows cpu acceptance inputs
         if: ${{ !inputs.enterprise-extension }}
         uses: actions/upload-artifact@v6
         with:
-          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-lite
-          path: bundle-win32-x64-lite/
+          name: windows-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-cpu
+          path: checkpoint-win32-x64-cpu/
+          compression-level: 0
           if-no-files-found: error
-          retention-days: 14
-      - name: Upload Windows cpu release candidate
+          retention-days: 7
+      - name: Remove uploaded Windows cpu checkpoint
+        if: ${{ !inputs.enterprise-extension }}
+        shell: pwsh
+        run: Remove-Item -LiteralPath checkpoint-win32-x64-cpu -Recurse
+      - name: Assemble signed Windows cuda installer
+        if: ${{ !inputs.enterprise-extension }}
+        run: node scripts/release/windows/assemble-windows-edition.cjs cuda
+        env:
+          ZHIYUAN_UPDATE_VARIANT: cuda
+          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ inputs.include-modelscope-token && secrets.MODELSCOPE_TOKENS || '' }}
+      - name: Checkpoint final Windows cuda bytes
+        if: ${{ !inputs.enterprise-extension }}
+        uses: ./.github/actions/checkpoint-windows-package
+        with:
+          edition: cuda
+          version: ${{ inputs.app-build-version }}
+          certificate-thumbprint: ${{ steps.certum-signing.outputs.thumbprint }}
+      - name: Upload Windows cuda acceptance inputs
         if: ${{ !inputs.enterprise-extension }}
         uses: actions/upload-artifact@v6
         with:
-          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-cpu
-          path: bundle-win32-x64-cpu/
+          name: windows-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-cuda
+          path: checkpoint-win32-x64-cuda/
+          compression-level: 0
           if-no-files-found: error
-          retention-days: 14
-      - name: Upload Windows cuda release candidate
+          retention-days: 7
+      - name: Remove uploaded Windows cuda checkpoint
         if: ${{ !inputs.enterprise-extension }}
-        uses: actions/upload-artifact@v6
-        with:
-          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-cuda
-          path: bundle-win32-x64-cuda/
-          if-no-files-found: error
-          retention-days: 14
+        shell: pwsh
+        run: Remove-Item -LiteralPath checkpoint-win32-x64-cuda -Recurse
       - name: Preserve Windows packaging diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
@@ -245,4 +266,77 @@ jobs:
             scripts/installer-shell/out/setup-size.json
             ${{ runner.temp }}/zhiyuan-build-logs
           if-no-files-found: ignore
+          retention-days: 7
+
+  acceptance:
+    needs: windows-release
+    if: ${{ !inputs.enterprise-extension }}
+    strategy:
+      fail-fast: false
+      matrix:
+        edition: [lite, cpu, cuda]
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      ZHIYUAN_UPDATE_VARIANT: ${{ matrix.edition }}
+      APP_BUILD_VERSION: ${{ inputs.app-build-version }}
+      ZHIYUAN_SOURCE_COMMIT: ${{ needs.windows-release.outputs.commit }}
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      HUSKY: '0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.windows-release.outputs.commit }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          check-latest: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.edition }}
+          path: checkpoint/
+      - name: Restore and verify exact signed package inputs
+        shell: bash
+        run: node scripts/ci/build-checkpoint.mjs restore checkpoint win32-x64-${{ matrix.edition }}
+      - name: Read restored public signing identity
+        id: public-signing-identity
+        shell: pwsh
+        run: |
+          $path = (Resolve-Path -LiteralPath release/signing-certificate.cer).Path
+          $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($path)
+          if ($certificate.HasPrivateKey) { throw 'Acceptance certificate must contain only a public key' }
+          $thumbprint = $certificate.Thumbprint
+          if ($thumbprint -notmatch '^[A-Fa-f0-9]{40}$') { throw 'Invalid public certificate thumbprint' }
+          "thumbprint=$thumbprint" >> $env:GITHUB_OUTPUT
+      - name: Verify final Windows installer on a fresh runner
+        uses: ./.github/actions/verify-windows-package
+        with:
+          certificate-thumbprint: ${{ steps.public-signing-identity.outputs.thumbprint }}
+          certificate-path: release/signing-certificate.cer
+          artifact-suffix: ${{ matrix.edition }}-${{ github.run_attempt }}
+      - name: Freeze verified Windows candidate
+        uses: ./.github/actions/freeze-windows-candidate
+        with:
+          edition: ${{ matrix.edition }}
+          version: ${{ inputs.app-build-version }}
+          source-commit: ${{ needs.windows-release.outputs.commit }}
+      - name: Upload accepted Windows release candidate
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-candidate-${{ inputs.app-build-version }}-win32-x64-${{ matrix.edition }}
+          path: bundle-win32-x64-${{ matrix.edition }}/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve edition acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-acceptance-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.edition }}
+          path: acceptance-diagnostics/
+          if-no-files-found: warn
           retention-days: 7

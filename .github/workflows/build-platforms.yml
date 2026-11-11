@@ -1,10 +1,25 @@
 name: Verify inference edition builds (manual)
 
-# Full unsigned matrix is explicit release preparation, never a feature PR check.
+# Default: full unsigned matrix. Signed Windows acceptance is an explicit manual opt-in.
+# Neither mode publishes a release or updates a channel.
 
 on:
   workflow_dispatch:
     inputs:
+      signed_windows_acceptance:
+        description: 'Sign and accept Windows packages only; never publish'
+        required: true
+        default: false
+        type: boolean
+      source_sha:
+        description: 'Reviewed 40-character head SHA (required for signed Windows acceptance)'
+        required: false
+        type: string
+      test_version:
+        description: 'Test-only version ending in -acceptance.N'
+        required: false
+        default: '2026.11.12-acceptance.1'
+        type: string
       build_macos:
         description: 'Build macOS'
         required: true
@@ -25,14 +40,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: verify-inference-editions-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ${{ inputs.signed_windows_acceptance && 'signed-windows-acceptance' || 'verify-inference-editions' }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !inputs.signed_windows_acceptance }}
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   verify-inference-editions:
+    if: ${{ !inputs.signed_windows_acceptance }}
     uses: ./.github/workflows/build-inference-editions.yml
     with:
       source-ref: ${{ github.sha }}
@@ -44,3 +60,50 @@ jobs:
       linux-inference-editions: 'cpu,cuda'
     secrets:
       MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+
+  signed-windows-identity:
+    if: ${{ inputs.signed_windows_acceptance }}
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.identity.outputs.commit }}
+      version: ${{ steps.identity.outputs.version }}
+    steps:
+      - name: Validate reviewed source and test-only version
+        id: identity
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          TEST_VERSION: ${{ inputs.test_version }}
+          DISPATCH_SHA: ${{ github.sha }}
+          DISPATCH_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          [[ "$DISPATCH_REF" == 'refs/heads/codex/windows-final-release-acceptance' ]] || {
+            echo 'Signed acceptance is restricted to the reviewed Windows repair branch' >&2
+            exit 1
+          }
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ && "$SOURCE_SHA" == "$DISPATCH_SHA" ]] || {
+            echo 'Source must be the exact reviewed 40-character dispatched head SHA' >&2
+            exit 1
+          }
+          [[ "$TEST_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-acceptance\.[1-9][0-9]*$ ]] || {
+            echo 'Expected a test-only version such as 2026.11.12-acceptance.1' >&2
+            exit 1
+          }
+          echo "commit=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          echo "version=$TEST_VERSION" >> "$GITHUB_OUTPUT"
+
+  signed-windows-acceptance:
+    needs: signed-windows-identity
+    uses: ./.github/workflows/build-windows-release.yml
+    with:
+      source-ref: ${{ needs.signed-windows-identity.outputs.commit }}
+      app-build-version: ${{ needs.signed-windows-identity.outputs.version }}
+      enterprise-extension: false
+      include-modelscope-token: false
+    secrets:
+      CERTUM_USER_ID: ${{ secrets.CERTUM_USER_ID }}
+      CERTUM_OTP_URI: ${{ secrets.CERTUM_OTP_URI }}
+      CERTUM_CERT_THUMBPRINT: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
+      UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+      UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
