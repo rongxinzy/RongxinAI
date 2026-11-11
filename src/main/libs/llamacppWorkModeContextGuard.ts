@@ -72,7 +72,11 @@ export function assertWorkModeContextWindow(input: {
     input.contextWindow < WORK_MODE_MIN_CONTEXT_WINDOW
   ) {
     throw new Error(
-      `Model "${input.modelId}" context window (${input.contextWindow} tokens) is below the minimum ${WORK_MODE_MIN_CONTEXT_WINDOW} required for Work mode. Work mode requires at least ${WORK_MODE_MIN_CONTEXT_WINDOW} tokens to load system prompts, skills, and tools. Please select a model with at least ${WORK_MODE_MIN_CONTEXT_WINDOW} context tokens or switch to Chat mode.`,
+      t('coworkWorkContextWindowTooSmall', {
+        model: input.modelId,
+        current: String(input.contextWindow),
+        required: String(WORK_MODE_MIN_CONTEXT_WINDOW),
+      }),
     );
   }
 }

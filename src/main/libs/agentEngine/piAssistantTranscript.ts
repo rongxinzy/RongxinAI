@@ -12,6 +12,7 @@
 import { randomUUID } from 'crypto';
 
 import type { CoworkMessage, CoworkStore } from '../../coworkStore';
+import { t } from '../../i18n';
 import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import type { ActivePiSession, PiStartupLatency, PiUsage } from './piRuntimeSessionState';
 import {
@@ -360,8 +361,7 @@ export class PiAssistantTranscript {
         const resolved = this.resolveStreamedContent(entry.messageId, active, 'answer');
         if (!resolved.trim()) {
           if (active.thinkingMessageId && active.lastAssistantMessage?.stopReason === 'length') {
-            const notice =
-              '[模型推理达到输出限制 (max_tokens)，未能生成正文回复。请调大最大输出 tokens 或降低思考强度。]';
+            const notice = t('coworkReasoningOutputTruncated');
             this.streamInto(sessionId, active, 'answer', notice);
             content = notice;
           } else {

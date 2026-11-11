@@ -1,4 +1,8 @@
 export const zhMain2 = {
+  coworkWorkContextWindowTooSmall:
+    '模型「{model}」的上下文长度为 {current} tokens，工作模式至少需要 {required} tokens。请选择上下文更长的模型，或切换到聊天模式。',
+  coworkReasoningOutputTruncated:
+    '模型推理达到输出上限，未能生成正文。请提高最大输出 token 数或降低思考强度。',
   coworkLlamaCppContextWindowTooSmall:
     '该本地推理模型当前运行上下文过小（当前 {current}，Agent 引擎至少需要 {required}）。请调大 ctx-size 后重新加载模型。',
   coworkLlamaCppTrainingContextTooSmall:

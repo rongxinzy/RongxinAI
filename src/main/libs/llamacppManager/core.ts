@@ -22,7 +22,6 @@ import type {
 } from '../../../shared/llamacpp';
 import type { LlamaCppBackendRef } from '../../../shared/llamacpp';
 import {
-  applyAutomaticLlamaCppServiceDefaults,
   isLikelyCudaDriverMismatchError,
   LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
   resolveLlamaCppLaunchContext,
@@ -107,7 +106,11 @@ import {
 } from '../llamacppServe';
 import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
 import { MarketplaceService } from '../marketplaceService';
-import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from '../llamacppNvidiaEnvironment';
+import {
+  getLlamaCppNvidiaSnapshot,
+  hasAvailableNvidiaGpu,
+  resolveLlamaCppHostServiceDefaults,
+} from '../llamacppNvidiaEnvironment';
 import { t } from '../../i18n';
 import {
   buildLlamaCppPresetGlobalGpuSection,
@@ -700,10 +703,7 @@ export class LlamaCppManagerCore extends EventEmitter {
     }
 
     const runtimeConfig = await this.resolveRuntimeServiceConfig();
-    const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
-    const resolvedRuntimeConfig = applyAutomaticLlamaCppServiceDefaults(runtimeConfig, {
-      nvidiaSnapshot,
-    });
+    const resolvedRuntimeConfig = await resolveLlamaCppHostServiceDefaults(runtimeConfig);
     const runtimeCapabilities = await this.getRuntimeCapabilities().catch((): null => null);
     const filteredRuntimeConfig = filterLlamaCppServiceConfigByRuntimeCapabilities(
       resolvedRuntimeConfig,

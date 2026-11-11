@@ -102,7 +102,7 @@ const getWriteCallKeys = (message: PiWriteRecoveryMessage): string[] => {
 export class PiWriteTokenLimitRecovery {
   private readonly recoveredWriteCalls = new Set<string>();
   private readonly chunkCharacterLimit: number;
-  private recoveryAttempts = 0;
+  private readonly recoveryAttempts = { file: 0, text: 0 };
   private generation = 0;
 
   constructor(maxOutputTokens: number) {
@@ -112,7 +112,8 @@ export class PiWriteTokenLimitRecovery {
   reset(): void {
     this.generation += 1;
     this.recoveredWriteCalls.clear();
-    this.recoveryAttempts = 0;
+    this.recoveryAttempts.file = 0;
+    this.recoveryAttempts.text = 0;
   }
 
   queueIfNeeded(message: PiWriteRecoveryMessage, session: PiSteeringSession): boolean {
@@ -120,11 +121,12 @@ export class PiWriteTokenLimitRecovery {
     const newKeys = writeCallKeys.filter(key => !this.recoveredWriteCalls.has(key));
     if (newKeys.length === 0) return false;
     const fileMutation = newKeys.some(key => !key.startsWith(TRUNCATED_RESPONSE_KEY));
-    if (!fileMutation && this.recoveryAttempts >= MAX_WRITE_RECOVERY_ATTEMPTS) return false;
+    const recoveryKind = fileMutation ? 'file' : 'text';
+    if (this.recoveryAttempts[recoveryKind] >= MAX_WRITE_RECOVERY_ATTEMPTS) return false;
 
     const queuedGeneration = this.generation;
     for (const key of newKeys) this.recoveredWriteCalls.add(key);
-    if (!fileMutation) this.recoveryAttempts += 1;
+    this.recoveryAttempts[recoveryKind] += 1;
     const prompt = fileMutation
       ? [
           'The previous built-in write or edit call hit the output token limit and was not executed.',
@@ -142,7 +144,7 @@ export class PiWriteTokenLimitRecovery {
     const rollback = (error: unknown): void => {
       if (queuedGeneration === this.generation) {
         for (const key of newKeys) this.recoveredWriteCalls.delete(key);
-        if (!fileMutation) this.recoveryAttempts = Math.max(0, this.recoveryAttempts - 1);
+        this.recoveryAttempts[recoveryKind] -= 1;
       }
       console.warn('[PiWriteRecovery] failed to queue chunked write guidance:', error);
     };

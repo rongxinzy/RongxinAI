@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { t } from '../../i18n';
 import { PiAssistantTranscript } from './piAssistantTranscript';
 import type { ActivePiSession } from './piRuntimeSessionState';
 import {
@@ -554,14 +555,14 @@ describe('PiAssistantTranscript', () => {
       'session',
       row.id,
       expect.objectContaining({
-        content: expect.stringContaining('模型推理达到输出限制 (max_tokens)'),
+        content: t('coworkReasoningOutputTruncated'),
       }),
       expect.anything(),
     );
     expect(emitMessageUpdate).toHaveBeenCalledWith(
       'session',
       row.id,
-      expect.stringContaining('模型推理达到输出限制 (max_tokens)'),
+      t('coworkReasoningOutputTruncated'),
       expect.anything(),
     );
   });

@@ -93,7 +93,7 @@ test('steers each truncated write call once and resets for the next user turn', 
   expect(session.steer).toHaveBeenCalledTimes(3);
 });
 
-test('allows distinct file mutation recoveries independently of the text recovery budget', () => {
+test('bounds file mutation recovery independently of the text recovery budget', () => {
   const recovery = new PiWriteTokenLimitRecovery(4096);
   const session = { steer: vi.fn().mockResolvedValue(undefined) };
 
@@ -113,6 +113,15 @@ test('allows distinct file mutation recoveries independently of the text recover
       {
         stopReason: PiAssistantStopReason.Length,
         content: [writeCall('write-7', 'large.md')],
+      },
+      session,
+    ),
+  ).toBe(false);
+  expect(
+    recovery.queueIfNeeded(
+      {
+        stopReason: PiAssistantStopReason.Length,
+        content: [{ type: PiContentBlockType.Text, text: 'unfinished answer' }],
       },
       session,
     ),
