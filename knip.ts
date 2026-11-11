@@ -21,6 +21,8 @@ const config: KnipConfig = {
         // Run from .husky/pre-commit.
         'scripts/check-new-file-tokens.mjs',
         'scripts/generate-cute-skill-icons.mjs',
+        // Manual live-model verification; requires explicit endpoint and credential env vars.
+        'scripts/verify-glm53-live-endpoint.ts',
         // Documented offline original-art renderer; its helpers stay graph-checked.
         'scripts/desktop-pet/render-originals.mjs',
         'src/main/main.ts',

@@ -8,6 +8,7 @@ export const PiAssistantStopReason = {
 export const PiBuiltinFileToolName = {
   Bash: 'bash',
   Write: 'write',
+  Edit: 'edit',
 } as const;
 
 export const PiContentBlockType = {
@@ -16,10 +17,11 @@ export const PiContentBlockType = {
 } as const;
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
-const MAX_CHUNK_CHARACTERS = 8000;
+const MAX_CHUNK_CHARACTERS = 2000;
 const CHUNK_CHARACTERS_PER_OUTPUT_TOKEN = 0.5;
-const MAX_WRITE_RECOVERY_ATTEMPTS = 3;
+const MAX_WRITE_RECOVERY_ATTEMPTS = 6;
 const UNKNOWN_WRITE_CALL_KEY = '__unknown_write_call__';
+const TRUNCATED_RESPONSE_KEY = '__truncated_response__';
 
 type PiMessageContentBlock = {
   type: string;
@@ -36,6 +38,8 @@ export type PiWriteRecoveryMessage = {
 
 export type PiSteeringSession = {
   steer(text: string): Promise<void>;
+  followUp?(text: string): Promise<void>;
+  prompt?(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
 };
 
 const normalizeMaxOutputTokens = (maxOutputTokens: number): number =>
@@ -74,7 +78,8 @@ const getWriteCallKeys = (message: PiWriteRecoveryMessage): string[] => {
     .filter(
       block =>
         block.type === PiContentBlockType.ToolCall &&
-        block.name?.toLowerCase() === PiBuiltinFileToolName.Write,
+        (block.name?.toLowerCase() === PiBuiltinFileToolName.Write ||
+          block.name?.toLowerCase() === PiBuiltinFileToolName.Edit),
     )
     .map(block => {
       if (block.id?.trim()) return `call:${block.id.trim()}`;
@@ -86,13 +91,18 @@ const getWriteCallKeys = (message: PiWriteRecoveryMessage): string[] => {
       return UNKNOWN_WRITE_CALL_KEY;
     });
 
-  return [...new Set(keys)];
+  if (keys.length > 0) return [...new Set(keys)];
+  const responseSuffix = message.content
+    .map(block => block.text ?? '')
+    .join('')
+    .slice(-120);
+  return [`${TRUNCATED_RESPONSE_KEY}:${responseSuffix}`];
 };
 
 export class PiWriteTokenLimitRecovery {
   private readonly recoveredWriteCalls = new Set<string>();
   private readonly chunkCharacterLimit: number;
-  private recoveryAttempts = 0;
+  private readonly recoveryAttempts = { file: 0, text: 0 };
   private generation = 0;
 
   constructor(maxOutputTokens: number) {
@@ -102,35 +112,48 @@ export class PiWriteTokenLimitRecovery {
   reset(): void {
     this.generation += 1;
     this.recoveredWriteCalls.clear();
-    this.recoveryAttempts = 0;
+    this.recoveryAttempts.file = 0;
+    this.recoveryAttempts.text = 0;
   }
 
   queueIfNeeded(message: PiWriteRecoveryMessage, session: PiSteeringSession): boolean {
     const writeCallKeys = getWriteCallKeys(message);
     const newKeys = writeCallKeys.filter(key => !this.recoveredWriteCalls.has(key));
-    if (newKeys.length === 0 || this.recoveryAttempts >= MAX_WRITE_RECOVERY_ATTEMPTS) return false;
+    if (newKeys.length === 0) return false;
+    const fileMutation = newKeys.some(key => !key.startsWith(TRUNCATED_RESPONSE_KEY));
+    const recoveryKind = fileMutation ? 'file' : 'text';
+    if (this.recoveryAttempts[recoveryKind] >= MAX_WRITE_RECOVERY_ATTEMPTS) return false;
 
     const queuedGeneration = this.generation;
     for (const key of newKeys) this.recoveredWriteCalls.add(key);
-    this.recoveryAttempts += 1;
-    const prompt = [
-      'The previous built-in write call hit the output token limit and was not executed.',
-      'Do not retry the complete content in one call.',
-      'Use write to create a small skeleton with a unique continuation marker, then use edit to replace the marker with one chunk plus the marker on each subsequent model turn.',
-      `Keep each write.content or edit.edits[].newText payload at or below ${this.chunkCharacterLimit} characters and emit only one content-bearing file mutation per response.`,
-      'Remove the marker and verify the completed file before reporting success.',
-    ].join(' ');
+    this.recoveryAttempts[recoveryKind] += 1;
+    const prompt = fileMutation
+      ? [
+          'The previous built-in write or edit call hit the output token limit and was not executed.',
+          'Do not retry the complete content in one call.',
+          'Use write to create a small skeleton with a unique continuation marker, then use edit to replace the marker with one chunk plus the marker on each subsequent model turn.',
+          `Keep each write.content or edit.edits[].newText payload at or below ${this.chunkCharacterLimit} characters and emit only one content-bearing file mutation per response.`,
+          'Remove the marker and verify the completed file before reporting success.',
+        ].join(' ')
+      : [
+          'The previous response hit the output token limit and was truncated.',
+          'Continue the unfinished task without repeating completed tool calls.',
+          'Keep the next response short and use small tool arguments. For large files, use the established continuation marker and chunked write/edit workflow.',
+        ].join(' ');
 
     const rollback = (error: unknown): void => {
       if (queuedGeneration === this.generation) {
         for (const key of newKeys) this.recoveredWriteCalls.delete(key);
-        this.recoveryAttempts = Math.max(0, this.recoveryAttempts - 1);
+        this.recoveryAttempts[recoveryKind] -= 1;
       }
       console.warn('[PiWriteRecovery] failed to queue chunked write guidance:', error);
     };
 
     try {
-      void session.steer(prompt).catch(error => rollback(error));
+      const queue = session.prompt ?? session.followUp ?? session.steer;
+      void queue
+        .call(session, prompt, { streamingBehavior: 'followUp' })
+        .catch((error: unknown) => rollback(error));
     } catch (error) {
       rollback(error);
       return false;

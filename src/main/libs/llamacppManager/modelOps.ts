@@ -12,7 +12,6 @@ import type {
   LlamaCppRuntimeInstallResult,
 } from '../../../shared/llamacpp';
 import {
-  applyAutomaticLlamaCppServiceDefaults,
   LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
   resolveLlamaCppLaunchContext,
   type LlamaCppStatusSnapshot,
@@ -61,7 +60,11 @@ import {
   restartLlamaCppBackendVersionService,
 } from '../llamacppBackendVersionSwitch';
 import { getUserLlamaCppRuntimeRoot } from '../llamacppRuntimePaths';
-import { getLlamaCppNvidiaSnapshot, hasAvailableNvidiaGpu } from '../llamacppNvidiaEnvironment';
+import {
+  getLlamaCppNvidiaSnapshot,
+  hasAvailableNvidiaGpu,
+  resolveLlamaCppHostServiceDefaults,
+} from '../llamacppNvidiaEnvironment';
 
 import { LlamaCppManagerService } from './serviceLifecycle';
 
@@ -638,10 +641,7 @@ export class LlamaCppManager extends LlamaCppManagerService {
       return configuredContextSize;
     }
 
-    const nvidiaSnapshot = await getLlamaCppNvidiaSnapshot();
-    const runtimeConfig = applyAutomaticLlamaCppServiceDefaults(this.getServiceConfig(), {
-      nvidiaSnapshot,
-    });
+    const runtimeConfig = await resolveLlamaCppHostServiceDefaults(this.getServiceConfig());
     return normalizePositiveInteger(runtimeConfig.ctxSize);
   }
 

@@ -48,6 +48,7 @@ export interface PiSession {
     options?: { deliverAs?: 'steer' | 'followUp' },
   ): Promise<void>;
   steer(text: string): Promise<void>;
+  followUp?(text: string): Promise<void>;
   abort(): Promise<void>;
   abortBash(): void;
   reload(): Promise<void>;
@@ -160,6 +161,8 @@ export interface ActivePiSession {
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
   lastCompletedAnswerText: string;
+  /** Latest assistant message payload from Pi, including stopReason. */
+  lastAssistantMessage?: PiEvent['message'];
   /**
    * Set once a settled turn's error was shown, preventing duplicate reporting.
    */

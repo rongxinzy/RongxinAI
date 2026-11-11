@@ -17,25 +17,25 @@ const writeCall = (id: string, path: string) => ({
 });
 
 test('derives a conservative character budget from the model output limit', () => {
-  expect(calculatePiWriteChunkCharacterLimit(4096)).toBe(2048);
-  expect(calculatePiWriteChunkCharacterLimit(16384)).toBe(8000);
+  expect(calculatePiWriteChunkCharacterLimit(4096)).toBe(2000);
+  expect(calculatePiWriteChunkCharacterLimit(16384)).toBe(2000);
   expect(calculatePiWriteChunkCharacterLimit(512)).toBe(256);
   expect(calculatePiWriteChunkCharacterLimit(1)).toBe(1);
-  expect(calculatePiWriteChunkCharacterLimit(Number.NaN)).toBe(2048);
+  expect(calculatePiWriteChunkCharacterLimit(Number.NaN)).toBe(2000);
 });
 
 test('instructs Pi to reuse write, edit, read, grep, and bash for chunked writes', () => {
   const prompt = createPiLargeFileWriteSystemPrompt(4096);
 
   expect(prompt).toContain('built-in write tool');
-  expect(prompt).toContain('2048 characters');
+  expect(prompt).toContain('2000 characters');
   expect(prompt).toContain('use edit');
   expect(prompt).toContain('read or grep');
   expect(prompt).toContain('built-in bash tool');
   expect(prompt).toContain('only one content-bearing write or edit call');
 });
 
-test('does not steer normal responses or truncated non-write calls', () => {
+test('does not steer normal responses but resumes truncated non-write calls', () => {
   const recovery = new PiWriteTokenLimitRecovery(4096);
   const session = { steer: vi.fn().mockResolvedValue(undefined) };
 
@@ -60,8 +60,8 @@ test('does not steer normal responses or truncated non-write calls', () => {
       },
       session,
     ),
-  ).toBe(false);
-  expect(session.steer).not.toHaveBeenCalled();
+  ).toBe(true);
+  expect(session.steer).toHaveBeenCalledOnce();
 });
 
 test('steers each truncated write call once and resets for the next user turn', () => {
@@ -84,18 +84,20 @@ test('steers each truncated write call once and resets for the next user turn', 
     ),
   ).toBe(true);
   expect(session.steer).toHaveBeenCalledTimes(2);
-  expect(session.steer).toHaveBeenCalledWith(expect.stringContaining('2048 characters'));
+  expect(session.steer).toHaveBeenCalledWith(expect.stringContaining('2000 characters'), {
+    streamingBehavior: 'followUp',
+  });
 
   recovery.reset();
   expect(recovery.queueIfNeeded(firstMessage, session)).toBe(true);
   expect(session.steer).toHaveBeenCalledTimes(3);
 });
 
-test('caps recovery attempts within one user turn', () => {
+test('bounds file mutation recovery independently of the text recovery budget', () => {
   const recovery = new PiWriteTokenLimitRecovery(4096);
   const session = { steer: vi.fn().mockResolvedValue(undefined) };
 
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
     expect(
       recovery.queueIfNeeded(
         {
@@ -110,12 +112,21 @@ test('caps recovery attempts within one user turn', () => {
     recovery.queueIfNeeded(
       {
         stopReason: PiAssistantStopReason.Length,
-        content: [writeCall('write-4', 'large.md')],
+        content: [writeCall('write-7', 'large.md')],
       },
       session,
     ),
   ).toBe(false);
-  expect(session.steer).toHaveBeenCalledTimes(3);
+  expect(
+    recovery.queueIfNeeded(
+      {
+        stopReason: PiAssistantStopReason.Length,
+        content: [{ type: PiContentBlockType.Text, text: 'unfinished answer' }],
+      },
+      session,
+    ),
+  ).toBe(true);
+  expect(session.steer).toHaveBeenCalledTimes(7);
 });
 
 test('allows recovery to be queued again when Pi rejects steering', async () => {

@@ -87,10 +87,16 @@ test('calculates a conservative history budget for the default 32K context', () 
 });
 
 test('scales history budget down for small and invalid model contexts', () => {
-  expect(calculatePiConversationHistoryCharLimit(16_384, 4_096)).toBe(2_048);
-  expect(calculatePiConversationHistoryCharLimit(8_192, 2_048)).toBe(2_000);
+  expect(calculatePiConversationHistoryCharLimit(16_384, 4_096)).toBe(4_096);
+  expect(calculatePiConversationHistoryCharLimit(8_192, 2_048)).toBe(2_048);
+  expect(calculatePiConversationHistoryCharLimit(4_096, 1_024)).toBe(2_000);
   expect(calculatePiConversationHistoryCharLimit(0, 0)).toBe(10_240);
   expect(calculatePiConversationHistoryCharLimit(Number.NaN, -1)).toBe(10_240);
+});
+
+test('scales history budget up for large context windows (128K, 200K)', () => {
+  expect(calculatePiConversationHistoryCharLimit(128_000, 4_096)).toBe(57_856);
+  expect(calculatePiConversationHistoryCharLimit(200_000, 4_096)).toBe(93_856);
 });
 
 test('preserves the request and recent evidence when the last tool result exceeds the budget', () => {

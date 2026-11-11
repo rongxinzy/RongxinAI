@@ -57,3 +57,26 @@ function normalizeLlamaCppModelId(modelId: string): string {
   const prefix = `${ProviderName.LlamaCpp}/`;
   return trimmed.startsWith(prefix) ? trimmed.slice(prefix.length) : trimmed;
 }
+
+export const WORK_MODE_MIN_CONTEXT_WINDOW = 16384;
+
+export function assertWorkModeContextWindow(input: {
+  providerName: string;
+  modelId: string;
+  contextWindow?: number;
+}): void {
+  if (
+    typeof input.contextWindow === 'number' &&
+    Number.isFinite(input.contextWindow) &&
+    input.contextWindow > 0 &&
+    input.contextWindow < WORK_MODE_MIN_CONTEXT_WINDOW
+  ) {
+    throw new Error(
+      t('coworkWorkContextWindowTooSmall', {
+        model: input.modelId,
+        current: String(input.contextWindow),
+        required: String(WORK_MODE_MIN_CONTEXT_WINDOW),
+      }),
+    );
+  }
+}

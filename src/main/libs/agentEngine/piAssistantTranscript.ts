@@ -12,6 +12,7 @@
 import { randomUUID } from 'crypto';
 
 import type { CoworkMessage, CoworkStore } from '../../coworkStore';
+import { t } from '../../i18n';
 import { hasReportedTokenUsage } from '../../../shared/cowork/messageUsage';
 import type { ActivePiSession, PiStartupLatency, PiUsage } from './piRuntimeSessionState';
 import {
@@ -324,7 +325,7 @@ export class PiAssistantTranscript {
     }
     for (const entry of entries) {
       if (finalize && this.finalizedMessageIds.has(entry.messageId)) continue;
-      const content = this.resolveStreamedContent(entry.messageId, active, entry.kind);
+      let content = this.resolveStreamedContent(entry.messageId, active, entry.kind);
       const streamingMetadata =
         entry.kind === 'thinking'
           ? { isStreaming: true, isFinal: false, isThinking: true }
@@ -359,26 +360,32 @@ export class PiAssistantTranscript {
       if (entry.kind === 'answer' && !content.trim()) {
         const resolved = this.resolveStreamedContent(entry.messageId, active, 'answer');
         if (!resolved.trim()) {
-          this.removeEmptyAnswerPlaceholder(sessionId, entry.messageId, active);
-          if (active.assistantMessageId === entry.messageId) {
-            active.assistantMessageId = null;
-          }
-          // A placeholder row that survives (it holds streamed text) must
-          // still get the final metadata so later loads stop treating it as
-          // streaming; a removed row makes this write a no-op.
-          if (this.host.getStore()) {
-            this.host
-              .getStore()
-              .updateMessage(
-                sessionId,
-                entry.messageId,
-                { content, metadata },
-                { touchUpdatedAt: false },
-              );
+          if (active.thinkingMessageId && active.lastAssistantMessage?.stopReason === 'length') {
+            const notice = t('coworkReasoningOutputTruncated');
+            this.streamInto(sessionId, active, 'answer', notice);
+            content = notice;
+          } else {
+            this.removeEmptyAnswerPlaceholder(sessionId, entry.messageId, active);
+            if (active.assistantMessageId === entry.messageId) {
+              active.assistantMessageId = null;
+            }
+            // A placeholder row that survives (it holds streamed text) must
+            // still get the final metadata so later loads stop treating it as
+            // streaming; a removed row makes this write a no-op.
+            if (this.host.getStore()) {
+              this.host
+                .getStore()
+                .updateMessage(
+                  sessionId,
+                  entry.messageId,
+                  { content, metadata },
+                  { touchUpdatedAt: false },
+                );
+            }
+            this.clearThrottleMapsForMessage(entry.messageId);
+            continue;
           }
         }
-        this.clearThrottleMapsForMessage(entry.messageId);
-        continue;
       }
       this.clearThrottleMapsForMessage(entry.messageId);
       if (!this.host.getStore()) continue;

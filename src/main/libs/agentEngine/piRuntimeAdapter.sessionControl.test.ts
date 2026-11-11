@@ -16,8 +16,6 @@ import {
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
-import path from 'path';
-
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
@@ -358,7 +356,7 @@ describe('PiRuntimeAdapter', () => {
         appendSystemPromptOverride: () => string[];
       };
       expect(loaderOptions.appendSystemPromptOverride()).toEqual(
-        expect.arrayContaining([expect.stringContaining('8000 characters')]),
+        expect.arrayContaining([expect.stringContaining('2000 characters')]),
       );
     });
 

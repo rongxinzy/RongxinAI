@@ -1,12 +1,49 @@
+import { safeSlice } from '../../../shared/lib/safeSlice';
 import type { McpServerManager, McpToolManifestEntry } from '../mcpServerManager';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
 
 interface PiToolResult {
   content: Array<{ type: string; text?: string }>;
-  details: { isError?: boolean };
+  details: { isError?: boolean; truncated?: boolean };
 }
 
 type PiCustomTool = Record<string, unknown>;
+
+// Clamped to 30,000 characters for CJK token density safety (~30k-42k tokens on 64k models)
+export const MCP_MAX_OUTPUT_CHARS = 30_000;
+
+export function truncateMcpContent(
+  content: Array<{ type: string; text?: string }>,
+  maxChars = MCP_MAX_OUTPUT_CHARS,
+): {
+  content: Array<{ type: string; text?: string }>;
+  truncated: boolean;
+} {
+  let truncated = false;
+  let remainingChars = maxChars;
+
+  const result = content.map(item => {
+    if (item.type !== 'text' || typeof item.text !== 'string') {
+      return item;
+    }
+    const originalText = item.text;
+    if (originalText.length <= remainingChars) {
+      remainingChars -= originalText.length;
+      return item;
+    }
+    truncated = true;
+    const allowed = Math.max(0, remainingChars);
+    remainingChars = 0;
+    const sliced = safeSlice(originalText, allowed);
+    const notice = `\n\n[MCP tool output truncated to ${maxChars.toLocaleString()} characters (total: ${originalText.length.toLocaleString()} characters)]`;
+    return {
+      ...item,
+      text: `${sliced}${notice}`,
+    };
+  });
+
+  return { content: result, truncated };
+}
 
 /**
  * The only MCP-to-Pi bridge for user-configured MCP servers. Connection,
@@ -112,7 +149,14 @@ export class McpPiAdapter {
       server = candidates[0].server;
     }
     const result = await this.serverManager.callTool(server, tool, args);
-    return { content: result.content, details: { isError: result.isError } };
+    const { content, truncated } = truncateMcpContent(result.content);
+    return {
+      content,
+      details: {
+        isError: result.isError,
+        ...(truncated ? { truncated: true } : {}),
+      },
+    };
   }
 
   private searchTools(manifest: McpToolManifestEntry[], search: string): PiToolResult {

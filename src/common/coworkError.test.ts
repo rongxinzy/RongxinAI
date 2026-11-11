@@ -87,3 +87,93 @@ test('ProviderUnavailable maps to its own i18n key', () => {
     'coworkErrorProviderUnavailable',
   );
 });
+
+// ─── Input too long / context overflow ─────────────────────────────────────
+
+test('vLLM context overflow with completion tokens classifies as InputTooLong with status 400, not ServerError or 500', () => {
+  const vllmError =
+    '{"error":{"message":"This model\'s maximum context length is 4096 tokens. However, you requested 5000 tokens (4500 in the messages, 500 in the completion).","type":"BadRequestError","param":null,"code":400}}';
+  const result = classifyCoworkError(vllmError);
+  expect(result.kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(result.kind).not.toBe(CoworkErrorKind.ServerError);
+  expect(result.statusCode).toBe(400);
+  expect(result.status).toBe(400);
+});
+
+test('classifies SGLang context overflow as InputTooLong', () => {
+  const sglangError =
+    "The input (4500 tokens) is longer than the model's context length (4096 tokens).";
+  const result = classifyCoworkError(sglangError);
+  expect(result.kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(result.statusCode).toBe(400);
+  expect(result.status).toBe(400);
+
+  const sglangError2 =
+    'The prompt length (4500 tokens) is larger than the maximum context length (4096 tokens).';
+  const result2 = classifyCoworkError(sglangError2);
+  expect(result2.kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(result2.statusCode).toBe(400);
+  expect(result2.status).toBe(400);
+});
+
+test('classifies live endpoint context overflow errors as InputTooLong', () => {
+  const liveError =
+    '{"error":{"message":"request (75574 tokens) exceeds the available context size (65536 tokens), try increasing it","type":"exceed_context_size_error","param":"","code":400}}';
+  const result = classifyCoworkError(liveError);
+  expect(result.kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(result.statusCode).toBe(400);
+  expect(result.status).toBe(400);
+
+  // Individual phrases
+  expect(classifyCoworkError('request exceeds the available context size').kind).toBe(
+    CoworkErrorKind.InputTooLong,
+  );
+  expect(classifyCoworkError('error type: exceed_context_size_error').kind).toBe(
+    CoworkErrorKind.InputTooLong,
+  );
+});
+
+test('classifies Chinese provider context overflow as InputTooLong', () => {
+  const chineseError = '输入token超出模型上下文长度限制';
+  const result = classifyCoworkError(chineseError);
+  expect(result.kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(result.statusCode).toBe(400);
+  expect(result.status).toBe(400);
+
+  expect(classifyCoworkError('超出模型上下文长度限制').kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(classifyCoworkError('输入超出最大长度').kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(classifyCoworkError('输入内容过长').kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(classifyCoworkError('上下文超出限制').kind).toBe(CoworkErrorKind.InputTooLong);
+});
+
+test('classifies context_overflow and prompt too long as InputTooLong', () => {
+  expect(classifyCoworkError('context_overflow: maximum context reached').kind).toBe(
+    CoworkErrorKind.InputTooLong,
+  );
+  expect(classifyCoworkError('prompt is too long').kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(classifyCoworkError('The input message exceeds the context limit.').kind).toBe(
+    CoworkErrorKind.InputTooLong,
+  );
+  expect(
+    classifyCoworkError(
+      "This model's maximum context length is 8192 tokens. However, your messages resulted in 9123 tokens. Please reduce the length of the messages.",
+    ).kind,
+  ).toBe(CoworkErrorKind.InputTooLong);
+  expect(classifyCoworkError('Prompt token count of 5000 exceeds the limit of 4096').kind).toBe(
+    CoworkErrorKind.InputTooLong,
+  );
+  expect(
+    classifyCoworkError('Your request exceeded model token limit: 5000 (requested: 6000)').kind,
+  ).toBe(CoworkErrorKind.InputTooLong);
+  expect(classifyCoworkError('Prompt exceeds max length').kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(classifyCoworkError('model requires context size of 8192 but got 12000').kind).toBe(
+    CoworkErrorKind.InputTooLong,
+  );
+});
+
+test('extracts 413 status code for standard payload too large errors', () => {
+  const result = classifyCoworkError('HTTP 413 Payload Too Large');
+  expect(result.kind).toBe(CoworkErrorKind.InputTooLong);
+  expect(result.statusCode).toBe(413);
+  expect(result.status).toBe(413);
+});

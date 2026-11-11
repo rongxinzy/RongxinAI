@@ -179,6 +179,7 @@ export class PiRuntimeTurnEvents {
           active.retryPriorAnswer = '';
           active.assistantMessageId = null;
           active.thinkingMessageId = null;
+          active.lastAssistantMessage = undefined;
           active.answerText = '';
           active.thinkingText = '';
           active.streamAccumulator.reset();
@@ -379,6 +380,7 @@ export class PiRuntimeTurnEvents {
 
       case 'message_end': {
         if (event.message?.role === 'assistant') {
+          active.lastAssistantMessage = event.message;
           active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
           if (event.message.stopReason === 'error') {
             // The turn was already reported as failed (non-retryable error).
@@ -436,10 +438,13 @@ export class PiRuntimeTurnEvents {
             if (
               !active.errorSurfaced &&
               active.pendingError.classified.kind !== CoworkErrorKind.Unknown &&
-              !isTransient(active.pendingError.classified.kind)
+              !isTransient(active.pendingError.classified.kind) &&
+              active.pendingError.classified.kind !== CoworkErrorKind.InputTooLong
             ) {
               // Keep the original failure until Pi settles. If the SDK retries,
               // auto_retry_start cancels its newly installed backoff controller.
+              // Note: InputTooLong context overflows are self-healing via Pi's auto-compaction
+              // retry (_runAutoCompaction("overflow")), so do not mark them sticky.
               active.pendingError.sticky = true;
             }
             if (imageRejection) {
@@ -721,7 +726,10 @@ export class PiRuntimeTurnEvents {
       }
 
       case 'auto_retry_start':
-        if (active.pendingError?.sticky) {
+        if (
+          active.pendingError?.sticky &&
+          active.pendingError.classified.kind !== CoworkErrorKind.InputTooLong
+        ) {
           void cancelPiRetry(active.piSession).catch(error => {
             console.error(`[PiRuntime] failed to cancel retry for session ${sessionId}:`, error);
           });
