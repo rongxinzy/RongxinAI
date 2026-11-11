@@ -20,7 +20,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { runLongTaskScenario } from './replay/piLongTaskScenario';
+import { LONGTASK_DOC_COUNT, runLongTaskScenario } from './replay/piLongTaskScenario';
+import { inspectLongTaskArtifacts } from './replay/piLongTaskAcceptance';
 
 const MODE = process.env.AB_LONGTASK;
 const TAPE_PATH = path.resolve(__dirname, 'replay/tapes/longtask-32doc.jsonl.gz');
@@ -44,6 +45,12 @@ describe.skipIf(!MODE || MODE === '0')('A/B long-task manual driver', () => {
       });
       console.log('summary:', JSON.stringify(summary, null, 2).slice(0, 4000));
       expect(summary.outcome.status).toBe('complete');
+      expect(summary.errors).toEqual([]);
+      expect(inspectLongTaskArtifacts(WORK_DIR, LONGTASK_DOC_COUNT)).toEqual([]);
+      if (summary.tape) {
+        expect(summary.tape.misses, summary.tape.missReport).toBe(0);
+        if (mode === 'replay') expect(summary.tape.consumed).toBe(summary.tape.total);
+      }
     },
   );
 });

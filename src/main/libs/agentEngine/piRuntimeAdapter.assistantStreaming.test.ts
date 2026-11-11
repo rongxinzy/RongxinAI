@@ -333,45 +333,51 @@ describe('PiRuntimeAdapter', () => {
       ).toBe(2);
     });
 
-    it('should preserve the latest answer across a trailing thinking-only internal turn', async () => {
-      const updates: Array<{
-        messageId: string;
-        content: string;
-        metadata?: Record<string, unknown>;
-      }> = [];
-      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
-        updates.push({ messageId, content, metadata }),
-      );
+    it.each([PiAssistantStopReason.Stop, PiAssistantStopReason.Length])(
+      'preserves the latest answer only when trailing thinking ends normally (%s)',
+      async stopReason => {
+        const error = vi.fn();
+        adapter.on('error', error);
+        const updates: Array<{
+          messageId: string;
+          content: string;
+          metadata?: Record<string, unknown>;
+        }> = [];
+        adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+          updates.push({ messageId, content, metadata }),
+        );
 
-      await adapter.startSession('test', 'Hi');
-      driveAssistantTurn('Answer before trailing reasoning');
-      listener!({ type: 'turn_start' });
-      listener!({
-        type: 'message_update',
-        message: {
-          role: 'assistant',
-          content: [{ type: 'thinking', thinking: 'Checking completion.' }],
-        },
-      });
-      listener!({
-        type: 'message_end',
-        message: {
-          role: 'assistant',
-          content: [{ type: 'thinking', thinking: 'Checking completion.' }],
-          stopReason: 'length',
-        },
-      });
-      listener!({ type: 'agent_end' });
-      listener!({ type: 'agent_settled' });
+        await adapter.startSession('test', 'Hi');
+        driveAssistantTurn('Answer before trailing reasoning');
+        listener!({ type: 'turn_start' });
+        listener!({
+          type: 'message_update',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'Checking completion.' }],
+          },
+        });
+        listener!({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'Checking completion.' }],
+            stopReason,
+          },
+        });
+        listener!({ type: 'agent_end' });
+        listener!({ type: 'agent_settled' });
 
-      expect(
-        updates.some(
-          update =>
-            update.content === 'Answer before trailing reasoning' &&
-            update.metadata?.isFinalAnswer === true,
-        ),
-      ).toBe(true);
-    });
+        expect(
+          updates.some(
+            update =>
+              update.content === 'Answer before trailing reasoning' &&
+              update.metadata?.isFinalAnswer === true,
+          ),
+        ).toBe(stopReason === PiAssistantStopReason.Stop);
+        expect(error).toHaveBeenCalledTimes(stopReason === PiAssistantStopReason.Stop ? 0 : 1);
+      },
+    );
 
     it('should render thinking as a separate isThinking message, not as the answer', async () => {
       const messages: Array<{ id: string; metadata?: Record<string, unknown> }> = [];

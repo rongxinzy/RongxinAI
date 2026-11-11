@@ -14,6 +14,8 @@ import {
   makeCoworkError,
 } from '../../../common/coworkError';
 import type { CoworkMessage } from '../../coworkStore';
+import { t } from '../../i18n';
+import type { WorkbenchVerificationResult } from '../../../shared/workbenchTask';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
@@ -756,6 +758,20 @@ export class PiRuntimeTurnEvents {
     // Flush artifact capture before completion decides the run's fate: the
     // final diff anchors to the last completed answer message.
     active.artifactRecorder?.onRunSettled(active.lastCompletedAnswerMessageId);
+    // Pi has exhausted its own continuations. A truncated/aborted/tool-only
+    // final attempt is an interruption, never a successful task completion.
+    if (
+      active.lastAssistantMessage &&
+      invalidatesPiFinalResponse(active.lastAssistantMessage) &&
+      !active.pendingError &&
+      !active.errorSurfaced
+    ) {
+      const message = t('modelPoolStreamInterrupted');
+      active.pendingError = {
+        message,
+        classified: makeCoworkError(CoworkErrorKind.StreamInterrupted, message),
+      };
+    }
     // Run settled with a deferred or surfaced failure: never complete it.
     // flushPendingError is idempotent after auto_retry_end.
     if (active.pendingError || active.errorSurfaced) {
@@ -787,24 +803,27 @@ export class PiRuntimeTurnEvents {
       this.host.sessionCount(),
       this.host.activeSessions().filter(session => session.isRunning).length,
     );
-    let verification: Promise<unknown> | undefined;
+    let verification: Promise<WorkbenchVerificationResult | undefined> | undefined;
     const completingWorkbench = this.host.getWorkbench();
     if (active.workbenchRunId && completingWorkbench) {
-      verification = completingWorkbench.completeRun({
-        sessionId,
-        runId: active.workbenchRunId,
-        signal: active.abortController.signal,
-        workspaceRoot: active.workspaceRoot,
-        finalAnswer: active.lastCompletedAnswerText,
-        finalMessageId: active.lastCompletedAnswerMessageId,
-        artifactsSettled: active.artifactRecorder?.settled(),
-      });
+      const runId = active.workbenchRunId;
+      verification = completingWorkbench
+        .completeRun({
+          sessionId,
+          runId: active.workbenchRunId,
+          signal: active.abortController.signal,
+          workspaceRoot: active.workspaceRoot,
+          finalAnswer: active.lastCompletedAnswerText,
+          finalMessageId: active.lastCompletedAnswerMessageId,
+          artifactsSettled: active.artifactRecorder?.settled(),
+        })
+        .then(detail => detail.runs.find(run => run.id === runId)?.verificationResult ?? undefined);
     }
     void settlePiWorkbenchCompletion(
       active,
       verification,
       () => this.host.getActiveSession(sessionId) === active && !active.aborted,
-      () => {
+      result => {
         const store = this.host.getStore();
         if (store) {
           store.updateSession(sessionId, { status: 'idle' });
@@ -822,7 +841,7 @@ export class PiRuntimeTurnEvents {
             void this.host.recordSummaryOmission(sessionId, active);
           }
         }
-        this.host.emit('complete', sessionId);
+        this.host.emit('complete', sessionId, result);
         void this.host.flushFollowUpQueue(sessionId, active);
       },
       error => {

@@ -25,7 +25,7 @@ test('only a terminal response qualifies as a final answer', () => {
   expect(isPiFinalResponse({})).toBe(false);
 });
 
-test('tool responses invalidate an earlier final answer but trailing reasoning preserves it', () => {
+test('tool responses and interrupted responses invalidate an earlier final answer', () => {
   expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.ToolUse })).toBe(true);
   expect(
     invalidatesPiFinalResponse({
@@ -33,5 +33,7 @@ test('tool responses invalidate an earlier final answer but trailing reasoning p
       content: [{ type: PiContentBlockType.ToolCall }],
     }),
   ).toBe(true);
-  expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Length })).toBe(false);
+  expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Length })).toBe(true);
+  expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Aborted })).toBe(true);
+  expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Error })).toBe(true);
 });

@@ -1,8 +1,13 @@
+import {
+  WorkbenchVerificationOutcome,
+  type WorkbenchVerificationResult,
+} from '../../../shared/workbenchTask';
+
 export function settlePiWorkbenchCompletion(
   active: { isRunning: boolean; completionPending?: Promise<void>; workbenchRunId?: string | null },
-  verification: Promise<unknown> | undefined,
+  verification: Promise<WorkbenchVerificationResult | undefined> | undefined,
   isCurrent: () => boolean,
-  complete: () => void,
+  complete: (verification?: WorkbenchVerificationResult) => void,
   failed: (error: unknown) => void,
 ): Promise<void> {
   const runId = active.workbenchRunId;
@@ -15,10 +20,13 @@ export function settlePiWorkbenchCompletion(
   }
   active.isRunning = true;
   const pending = Promise.resolve(verification)
-    .then(() => {
+    .then(result => {
       if (!isCurrent() || active.workbenchRunId !== runId) return;
+      if (result?.outcome === WorkbenchVerificationOutcome.Failed) {
+        throw new Error(result.summary);
+      }
       active.isRunning = false;
-      complete();
+      complete(result);
     })
     .catch(error => {
       if (!isCurrent() || active.workbenchRunId !== runId) return;

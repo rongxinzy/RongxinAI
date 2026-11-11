@@ -231,6 +231,14 @@ describe('PiRuntimeAdapter', () => {
         const onComplete = vi.fn();
         adapter.on('complete', onComplete);
         const listener = mockSession.subscribe.mock.calls.at(-1)![0];
+        listener({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'The report is verified.' }],
+            stopReason: 'stop',
+          },
+        });
         listener({ type: 'agent_end' });
         listener({ type: 'agent_settled' });
         await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce());

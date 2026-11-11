@@ -1,4 +1,5 @@
 export const PiAssistantStopReason = {
+  Aborted: 'aborted',
   Error: 'error',
   Length: 'length',
   Stop: 'stop',
