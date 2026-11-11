@@ -42,6 +42,17 @@ test('acceptance restores exact bytes without rebuilding and preserves executabl
     expect(statSync(path.join(root, 'release/app')).mode & 0o111).toBe(0o111);
 });
 
+test('restores Chinese and spaced directory and file names with exact bytes', async () => {
+  const { root, archive } = fixture();
+  const filename = path.join(root, 'release', '安装 目录', '知远.exe');
+  mkdirSync(path.dirname(filename));
+  writeFileSync(filename, Buffer.from([0, 1, 127, 128, 255]));
+  await checkpoint('create', archive, identity, ['release'], root);
+  rmSync(path.join(root, 'release'), { recursive: true });
+  await checkpoint('restore', archive, identity, [], root);
+  expect(readFileSync(filename)).toEqual(Buffer.from([0, 1, 127, 128, 255]));
+});
+
 test.each(['commit', 'version', 'runId', 'runAttempt', 'target'])(
   'rejects mismatched %s before extraction',
   async key => {
