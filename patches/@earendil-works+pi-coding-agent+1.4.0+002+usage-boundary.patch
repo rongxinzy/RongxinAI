@@ -1,0 +1,19 @@
+diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
+--- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
++++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
+@@ -2500,9 +2500,14 @@
+                 // have stale usage reflecting the old (larger) context and would falsely
+                 // trigger compaction right after one just finished.
+                 const usageMsg = messages[estimate.lastUsageIndex];
++                const usageEntryId = this._findPersistedMessageEntryId(usageMsg);
++                const usageIndex = usageEntryId ? branch.findIndex((entry) => entry.id === usageEntryId) : -1;
++                const usageIsFromBeforeCompaction = compactionEntry !== null && (usageIndex >= 0 && compactionIndex >= 0
++                    ? usageIndex < compactionIndex
++                    : usageMsg.timestamp < new Date(compactionEntry.timestamp).getTime());
+                 if (compactionEntry &&
+                     usageMsg.role === "assistant" &&
+-                    usageMsg.timestamp <= new Date(compactionEntry.timestamp).getTime()) {
++                    usageIsFromBeforeCompaction) {
+                     return false;
+                 }
+             }

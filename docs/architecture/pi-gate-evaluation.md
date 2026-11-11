@@ -24,6 +24,7 @@
 ## 验证
 
 - `piNativeLongTask.integration.test.ts`：真实安装的 Pi SDK，离线可控 provider 响应。单次 prompt 完成 32 步真实文件写入，固定时钟下覆盖多次 threshold compaction 和 overflow compact-and-retry；结算只发生一次。压缩边界用例在旧补丁下失败、新补丁下通过。它证明执行/压缩接线，不证明真实模型推理质量或吞吐。
+- `piCompactionUsageBoundary.integration.test.ts`：真实安装 SDK，公开 `session.prompt` 路径和离线 provider。覆盖 stop/error 的零 usage 回退、压缩后同毫秒/较晚的新 usage、压缩前保留的旧 usage。阈值估算使用会话记录顺序判断来源是否仍有效；同毫秒两项在旧补丁下失败，修复后六项通过。这只证明该压缩边界遗漏，不证明真实 32/48 文档任务质量或其失败根因。
 - `piPromptAppend.integration.test.ts`：使用真实 SDK 的资源加载和提示构建，验证 Work/Chat、重载及环境 SYSTEM.md 情况下，专家指令追加一次且原生工具指南完整保留。
 - `piRuntimeAdapter.workQueue.test.ts`：应用 run 在压缩后续跑期间仍活动；成功压缩重置记忆去重，失败压缩不重置；没有 harness 额外提示。
 - `taskService.approvals.test.ts`：并发审批、拒绝后不能复活、实际副作用不重复执行。
