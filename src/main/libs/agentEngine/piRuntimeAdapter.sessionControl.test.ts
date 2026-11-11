@@ -358,7 +358,7 @@ describe('PiRuntimeAdapter', () => {
         appendSystemPromptOverride: () => string[];
       };
       expect(loaderOptions.appendSystemPromptOverride()).toEqual(
-        expect.arrayContaining([expect.stringContaining('8000 characters')]),
+        expect.arrayContaining([expect.stringContaining('2000 characters')]),
       );
     });
 
