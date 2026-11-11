@@ -50,6 +50,19 @@ test('非 darwin 平台与缺少凭据时都不触发公证', async () => {
   expect(notarizeApp).not.toHaveBeenCalled();
 });
 
+test('国防版 Windows 包不签名未包含的 Magpie 运行时', async () => {
+  const signWindowsMagpie = vi.fn();
+  await notarizing(
+    {
+      ...context,
+      electronPlatformName: 'win32',
+      packager: { config: { appId: 'com.zhiyuanagent.defense' } },
+    },
+    { signWindowsMagpie },
+  );
+  expect(signWindowsMagpie).not.toHaveBeenCalled();
+});
+
 test('looksLikeStapleFailure 只认票据/网络类失败', () => {
   // Apple 票据服务的偶发故障（CI 里最常见的那两种措辞）
   expect(looksLikeStapleFailure(STAPLE_ERROR)).toBe(true);

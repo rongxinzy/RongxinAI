@@ -2,6 +2,7 @@ const { execFileSync } = require('child_process');
 const { notarize } = require('@electron/notarize');
 const path = require('path');
 const { signPackagedWindowsMagpie } = require('./magpie-runtime.cjs');
+const { isDefensePackage } = require('./packaging/defense-edition.cjs');
 
 // Load .env when dotenv is available, but do not require it for packaging.
 try {
@@ -69,7 +70,9 @@ async function notarizing(context, deps = {}) {
   const { electronPlatformName, appOutDir } = context;
 
   if (electronPlatformName === 'win32') {
-    (deps.signWindowsMagpie || signPackagedWindowsMagpie)(context);
+    if (!isDefensePackage(context)) {
+      (deps.signWindowsMagpie || signPackagedWindowsMagpie)(context);
+    }
     return;
   }
 
