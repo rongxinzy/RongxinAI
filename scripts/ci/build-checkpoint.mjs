@@ -20,10 +20,11 @@ async function digest(file) {
 export async function checkpoint(action, directory, identity, paths = [], root = process.cwd()) {
   const archive = path.resolve(directory, 'payload.tar');
   const metadata = path.resolve(directory, 'identity.json');
-  // Git Bash's GNU tar treats D:\... as a remote host. Use native bsdtar on
-  // Windows so drive-qualified paths work regardless of the calling shell.
-  const tar =
-    process.platform === 'win32' ? path.join(process.env.SystemRoot, 'System32', 'tar.exe') : 'tar';
+  // The GitHub Windows runner's system bsdtar can crash on production payloads.
+  // Git for Windows supplies GNU tar; force local paths for drive letters.
+  const windows = process.platform === 'win32';
+  const tar = windows ? path.join(process.env.ProgramFiles, 'Git', 'usr', 'bin', 'tar.exe') : 'tar';
+  const local = windows ? ['--force-local'] : [];
   for (const key of ['commit', 'runId', 'runAttempt', 'target', 'version']) {
     if (!identity[key]) throw new Error(`Missing checkpoint identity: ${key}`);
   }
@@ -33,7 +34,7 @@ export async function checkpoint(action, directory, identity, paths = [], root =
     }
     mkdirSync(directory, { recursive: true });
     // TAR retains executable bits and symlinks. Do not recompress signed installers/7z.
-    execFileSync(tar, ['-cf', archive, ...paths], { cwd: root, stdio: 'inherit' });
+    execFileSync(tar, [...local, '-cf', archive, ...paths], { cwd: root, stdio: 'inherit' });
     writeFileSync(metadata, JSON.stringify({ ...identity, sha256: await digest(archive) }));
   } else if (action === 'restore') {
     const saved = JSON.parse(readFileSync(metadata, 'utf8'));
@@ -43,7 +44,7 @@ export async function checkpoint(action, directory, identity, paths = [], root =
       }
     }
     if (saved.sha256 !== (await digest(archive))) throw new Error('Checkpoint SHA-256 mismatch');
-    execFileSync(tar, ['-xf', archive], { cwd: root, stdio: 'inherit' });
+    execFileSync(tar, [...local, '-xf', archive], { cwd: root, stdio: 'inherit' });
     if (process.env.GITHUB_ENV && typeof saved.macAutoUpdateEnabled === 'boolean') {
       appendFileSync(
         process.env.GITHUB_ENV,
