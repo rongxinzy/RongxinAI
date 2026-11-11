@@ -32,7 +32,6 @@ import {
   WorkbenchRunTrigger,
   WorkbenchTaskStatus,
 } from '../../../shared/workbenchTask';
-import { PiAgentLoopToolName } from './piAgentLoop';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -135,37 +134,16 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
-    it('initializes a controlled persistent run for academic research', async () => {
-      const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-academic-runtime-'));
-      try {
-        await adapter.startSession('academic-session', 'Research reliable agents', {
-          workspaceRoot,
-          skillIds: [...AcademicResearchSkillIds],
-        });
-        expect(mockSession.prompt).toHaveBeenCalledWith(
-          expect.stringContaining('Academic research run initialized'),
-        );
-        expect(
-          fs.existsSync(
-            path.join(
-              workspaceRoot,
-              '.zhiyuan',
-              'research',
-              'academic-session',
-              'state',
-              'progress.json',
-            ),
-          ),
-        ).toBe(true);
-        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-          customTools: Array<{ name: string }>;
-        };
-        expect(sessionOptions.customTools.map(tool => tool.name)).toEqual(
-          expect.arrayContaining(['agent_loop', 'research_state', 'subagent']),
-        );
-      } finally {
-        fs.rmSync(workspaceRoot, { recursive: true, force: true });
-      }
+    it('loads research skills without installing a completion protocol', async () => {
+      await adapter.startSession('academic-session', 'Research reliable agents', {
+        skillIds: [...AcademicResearchSkillIds],
+      });
+      expect(mockSession.prompt).toHaveBeenCalledWith('Research reliable agents');
+      const options = mockCreateAgentSession.mock.calls[0][0];
+      const names = (options.customTools as Array<{ name: string }>).map(tool => tool.name);
+      expect(names).toContain('subagent');
+      expect(names).not.toContain('agent_loop');
+      expect(names).not.toContain('research_state');
     });
 
     it.each([CoreSkillId.PresentationStudio, CoreSkillId.Docx, CoreSkillId.Xlsx, 'pdf'])(
@@ -247,7 +225,7 @@ describe('PiRuntimeAdapter', () => {
         for (const [options] of mockCreateAgentSession.mock.calls) {
           const names = (options.customTools as Array<{ name: string }>).map(tool => tool.name);
           expect(names).not.toContain('production_loop');
-          expect(names).not.toContain(PiAgentLoopToolName);
+          expect(names).not.toContain('agent_loop');
         }
         const promptCount = mockSession.prompt.mock.calls.length;
         const onComplete = vi.fn();
@@ -270,7 +248,7 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('changes loop tools only when Goal mode is explicitly toggled', async () => {
+    it('changes Goal guidance without rebuilding the native session', async () => {
       await adapter.startSession('goal-toggle', 'First', { sessionMode: 'work' });
       await adapter.continueSession('goal-toggle', 'Keep working', {
         sessionMode: 'work',
@@ -283,10 +261,10 @@ describe('PiRuntimeAdapter', () => {
       const toolNames = mockCreateAgentSession.mock.calls.map(([options]) =>
         (options.customTools as Array<{ name: string }>).map(tool => tool.name),
       );
-      expect(toolNames).toHaveLength(3);
-      expect(toolNames[0]).not.toContain(PiAgentLoopToolName);
-      expect(toolNames[1]).toContain(PiAgentLoopToolName);
-      expect(toolNames[2]).not.toContain(PiAgentLoopToolName);
+      expect(toolNames).toHaveLength(1);
+      expect(toolNames[0]).not.toContain('agent_loop');
+      expect(mockSession.prompt.mock.calls[1][0]).toContain('Continue working toward');
+      expect(mockSession.prompt.mock.calls[2][0]).toBe('Answer directly');
     });
 
     it('records non-sensitive runtime context on initial and reused workbench runs', async () => {
@@ -367,42 +345,15 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('reactivates a completed academic loop when the same session receives a follow-up', async () => {
-      const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-academic-follow-up-'));
-      try {
-        await adapter.startSession('academic-follow-up', 'Research reliable agents', {
-          workspaceRoot,
-          skillIds: [...AcademicResearchSkillIds],
-        });
-        const activeSessions = (
-          adapter as unknown as {
-            activeSessions: Map<
-              string,
-              {
-                agentLoop: {
-                  stop(): void;
-                  getState(): { active: boolean };
-                };
-              }
-            >;
-          }
-        ).activeSessions;
-        const active = activeSessions.get('academic-follow-up');
-        expect(active).toBeDefined();
-        active?.agentLoop.stop();
-        mockSession.prompt.mockClear();
-
-        await adapter.continueSession('academic-follow-up', 'Investigate a follow-up.', {
-          skillIds: [...AcademicResearchSkillIds],
-        });
-
-        expect(active?.agentLoop.getState().active).toBe(true);
-        expect(mockSession.prompt).toHaveBeenCalledWith(
-          expect.stringContaining('Academic research run initialized'),
-        );
-      } finally {
-        fs.rmSync(workspaceRoot, { recursive: true, force: true });
-      }
+    it('continues research follow-ups without resetting a harness protocol', async () => {
+      await adapter.startSession('research-follow-up', 'Research agents', {
+        skillIds: [...AcademicResearchSkillIds],
+      });
+      await adapter.continueSession('research-follow-up', 'Investigate a follow-up.', {
+        skillIds: [...AcademicResearchSkillIds],
+      });
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('Investigate a follow-up.');
     });
   });
 });

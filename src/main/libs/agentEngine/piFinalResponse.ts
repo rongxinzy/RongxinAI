@@ -1,4 +1,4 @@
-import { PiAssistantStopReason, PiContentBlockType } from './piWriteTokenLimit';
+import { PiAssistantStopReason, PiContentBlockType } from './piToolConstants';
 
 export const isPiFinalResponse = (message: { stopReason?: string; content?: unknown }): boolean =>
   message.stopReason === PiAssistantStopReason.Stop &&

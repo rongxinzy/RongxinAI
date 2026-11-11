@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { execFileSync } from 'node:child_process';
 import { expect, test } from 'vitest';
 
 import { NpmCommandAbortedError, NpmCommandError, runNpmCommand } from './npmRuntimeExec';
@@ -111,6 +112,13 @@ const liveProcessMark = (pid: number): string | null => {
     }
   }
   try {
+    if (process.platform !== 'linux') {
+      const state = execFileSync('ps', ['-p', String(pid), '-o', 'stat=', '-o', 'lstart='], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim();
+      return !state || state.startsWith('Z') ? null : state;
+    }
     const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
     const rest = stat.slice(stat.lastIndexOf(') ') + 2);
     if (rest.startsWith('Z')) return null;

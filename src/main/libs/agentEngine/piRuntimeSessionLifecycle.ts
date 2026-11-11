@@ -33,7 +33,6 @@ export function disposePiSessionForRecreation(
   host.queue.dropControlActions(sessionId);
   host.recovery.dismissAskUserQuestionsBySession(sessionId);
   host.recovery.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
-  active.agentLoop.stop();
   active.artifactRecorder?.dispose();
   active.pendingError = null;
   active.toolStartedAtByCallId.clear();
@@ -91,7 +90,6 @@ export function stopActivePiRuntimeSession(
   active.aborted = true;
   active.isRunning = false;
   active.turnFailed = false;
-  active.agentLoop.stop();
   active.artifactRecorder?.dispose();
   // Drop any deferred error without surfacing it — the user stopped the turn.
   active.pendingError = null;

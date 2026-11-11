@@ -9,6 +9,7 @@
 
 import {
   adapter,
+  applyTestResolution,
   mockCreateAgentSession,
   mockDefaultResourceLoader,
   mockModelRuntime,
@@ -340,6 +341,25 @@ describe('PiRuntimeAdapter', () => {
   // ── Model updates ──
 
   describe('patchSession', () => {
+    it('recomputes compaction when the context shrinks without an output-budget change', async () => {
+      applyTestResolution({
+        config: { model: 'large-audit' },
+        providerMetadata: { contextWindow: 131072, maxTokens: 4096 },
+      });
+      await adapter.startSession('shrink-context', 'Work');
+      const active = adapter.activeSessions.get('shrink-context')!;
+      const overrides = vi.spyOn(active.settingsManager!, 'applyOverrides');
+      overrides.mockClear();
+      applyTestResolution({
+        config: { model: 'small-audit' },
+        providerMetadata: { contextWindow: 16384, maxTokens: 4096 },
+      });
+      await adapter.patchSession('shrink-context', { model: 'small-audit' });
+      expect(overrides).toHaveBeenCalledWith({
+        compaction: { enabled: true, reserveTokens: 4096, keepRecentTokens: 8192 },
+      });
+      expect(mockSession.reload).not.toHaveBeenCalled();
+    });
     it('should update the model and reload its write budget when the output limit changes', async () => {
       await adapter.startSession('test', 'Hello');
       await adapter.patchSession('test', { model: 'openai/gpt-5.2' });
@@ -356,7 +376,7 @@ describe('PiRuntimeAdapter', () => {
         appendSystemPromptOverride: () => string[];
       };
       expect(loaderOptions.appendSystemPromptOverride()).toEqual(
-        expect.arrayContaining([expect.stringContaining('2000 characters')]),
+        expect.not.arrayContaining([expect.stringContaining('2000 characters')]),
       );
     });
 

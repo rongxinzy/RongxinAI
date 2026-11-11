@@ -73,7 +73,6 @@ const resolveWorkspaceFile = (workspaceRoot: string, reference: string): string 
   const lexical = path.isAbsolute(reference)
     ? path.normalize(reference)
     : path.resolve(root, reference);
-  if (isOutside(root, lexical) || !fs.existsSync(lexical)) return null;
   try {
     const resolvedRoot = fs.realpathSync(root);
     const resolved = fs.realpathSync(lexical);
@@ -106,7 +105,6 @@ export function collectWorkbenchArtifacts(input: {
   workspaceRoot: string;
   finalAnswer: string;
   finalMessageId?: string | null;
-  workflowSnapshot?: Record<string, unknown> | null;
   artifactCandidates?: WorkbenchArtifactCandidate[];
 }): ArtifactInput[] {
   const artifacts: ArtifactInput[] = [];
@@ -138,37 +136,7 @@ export function collectWorkbenchArtifacts(input: {
     });
   }
 
-  const snapshotFiles: WorkbenchArtifactCandidate[] = [
-    ...(Array.isArray(input.workflowSnapshot?.files) ? input.workflowSnapshot.files : []).map(
-      value => ({
-        ...(value && typeof value === 'object' ? (value as Record<string, unknown>) : {}),
-        path:
-          value &&
-          typeof value === 'object' &&
-          typeof (value as Record<string, unknown>).path === 'string'
-            ? String((value as Record<string, unknown>).path)
-            : '',
-        source: WorkbenchArtifactCandidateSource.DomainWorkflow,
-        verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-      }),
-    ),
-    ...(Array.isArray(input.workflowSnapshot?.artifacts)
-      ? input.workflowSnapshot.artifacts
-      : []
-    ).map(value => ({
-      ...(value && typeof value === 'object' ? (value as Record<string, unknown>) : {}),
-      path:
-        value &&
-        typeof value === 'object' &&
-        typeof (value as Record<string, unknown>).path === 'string'
-          ? String((value as Record<string, unknown>).path)
-          : '',
-      source: WorkbenchArtifactCandidateSource.DomainWorkflow,
-      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
-    })),
-    ...(input.artifactCandidates ?? []),
-  ];
-  for (const candidate of snapshotFiles) {
+  for (const candidate of input.artifactCandidates ?? []) {
     const reference = candidate.path;
     const isDeclaredDeliverable =
       candidate.source === WorkbenchArtifactCandidateSource.Declaration &&
@@ -201,7 +169,10 @@ export function collectWorkbenchArtifacts(input: {
       runId: input.runId,
       kind: WorkbenchArtifactKind.File,
       mimeType: mimeForPath(reference),
-      reference: outsideWorkspace ? resolved : path.relative(input.workspaceRoot, resolved),
+      // Match validation's canonical root, including macOS /var aliases.
+      reference: outsideWorkspace
+        ? resolved
+        : path.relative(fs.realpathSync(input.workspaceRoot), resolved),
       contentHash,
       provenance,
       verificationStatus:

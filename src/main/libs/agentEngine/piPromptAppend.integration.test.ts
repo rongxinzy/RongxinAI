@@ -143,12 +143,15 @@ test('production Chat overrides preserve defaults and update fragments on contin
   expect(renderPrompt(loader).split(CHAT_IDENTITY_PROMPT)).toHaveLength(2);
 });
 
-test('production Work overrides retain their existing prompt behavior without Chat identity', async () => {
+test('production Work preserves native tools and appends expert instructions without replacement', async () => {
   await writeFile(path.join(agentDir, 'SYSTEM.md'), 'Work base.');
   const state = { chatMode: false, systemPrompt: 'Work expert.' };
   const loader = createLoader(createPiPromptOverrides(state, () => [toolGuideline]));
   await loader.reload();
-  expect(loader.getSystemPrompt()).toBe('Work base.\n\nWork expert.');
-  expect(loader.getAppendSystemPrompt()).toEqual([existingAppend, toolGuideline]);
+  expect(loader.getSystemPrompt()).toBeUndefined();
+  expectDefaultPrompt(renderPrompt(loader));
+  expect(renderPrompt(loader)).toContain('Work expert.');
+  expect(renderPrompt(loader)).not.toContain('Work base.');
+  expect(loader.getAppendSystemPrompt()).toEqual([existingAppend, toolGuideline, 'Work expert.']);
   expect(renderPrompt(loader)).not.toContain(CHAT_IDENTITY_PROMPT);
 });

@@ -22,14 +22,11 @@ import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
 import { restorePiConversationPrompt, summarizePiHistoryFromStore } from './piConversationContext';
 import { hasPersistedPiSession } from './piSessionStore';
-import { PiAgentLoopMode } from './piAgentLoop';
 import { PiPlanModePrompt } from './piPlanTool';
-import { resolvePiTurnWorkflowSkills } from './piTurnWorkflow';
 import {
   finalizePiPromptWithProjectMemory,
   resolveProjectMemoryContextForPiPrompt,
 } from '../../memory/piRuntimeProjectMemoryPrompt';
-import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { waitForPiRetryCancellation } from './piRetryCancellation';
 import { resolvePiModel } from './piMagpiePiModel';
@@ -39,7 +36,7 @@ import {
   resolveConversationHistoryCharLimit,
   resolvePiSessionModel,
 } from './piRuntimeSettingsOverrides';
-import { createPiWorkbenchContract } from './piRuntimeWorkbenchContract';
+import { createPiWorkbenchContract, PiGoalModePrompt } from './piRuntimeWorkbenchContract';
 import {
   getPiModules,
   haveSameStringList,
@@ -153,11 +150,6 @@ export async function continuePiRuntimeSession(
       goalMode: options.goalMode ?? active?.goalMode,
       unattended: nextUnattended,
       _piPromptOverride: restored.prompt,
-      _workflowSkillIdsOverride: resolvePiTurnWorkflowSkills({
-        attachedSkillIds: options.attachedSkillIds,
-        previousWorkflowSkillIds: active?.requestedWorkflowSkillIds,
-        availableSkillIds: options.skillIds,
-      }),
     });
   }
 
@@ -166,15 +158,6 @@ export async function continuePiRuntimeSession(
     options.skillIds === undefined ? active.requestedSkillIds : normalizeSkillIds(options.skillIds);
   const requestedExpertIds =
     options.expertIds === undefined ? active.requestedExpertIds : explicitExpertIds;
-  const requestedWorkflowSkillIds = resolvePiTurnWorkflowSkills({
-    attachedSkillIds: options.attachedSkillIds,
-    previousWorkflowSkillIds: active.requestedWorkflowSkillIds,
-    availableSkillIds: requestedSkillIds,
-  });
-  const workflowChanged = !haveSameStringList(
-    requestedWorkflowSkillIds,
-    active.requestedWorkflowSkillIds,
-  );
   const requestedSessionMode =
     options.sessionMode ??
     (active.workbenchContract.kind === WorkbenchContractKind.Chat
@@ -193,12 +176,10 @@ export async function continuePiRuntimeSession(
     (options.modelOverride !== undefined &&
       options.modelOverride !== active.requestedModelOverride) ||
     !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
-    nextGoalMode !== active.goalMode ||
     nextCodemode !== active.codemodeEnabled ||
     nextMcpNativeBridge !== active.mcpNativeBridge ||
     mcpToolTopologyChanged ||
-    unattendedTopologyChanged ||
-    workflowChanged
+    unattendedTopologyChanged
   ) {
     if (mcpToolTopologyChanged) {
       console.log('[PiRuntime] recreating session after MCP tool manifest refresh');
@@ -224,7 +205,6 @@ export async function continuePiRuntimeSession(
       mcpNativeBridge: nextMcpNativeBridge,
       unattended: nextUnattended,
       _piPromptOverride: restored.prompt,
-      _workflowSkillIdsOverride: requestedWorkflowSkillIds,
     });
   }
 
@@ -262,7 +242,6 @@ export async function continuePiRuntimeSession(
       mcpNativeBridge: nextMcpNativeBridge,
       unattended: nextUnattended,
       _piPromptOverride: restored.prompt,
-      _workflowSkillIdsOverride: requestedWorkflowSkillIds,
     });
   }
 
@@ -341,7 +320,6 @@ export async function continuePiRuntimeSession(
   active.preparingToolCallIdByContentIndex.clear();
   const clearActivity = active.toolActivityTracker.clear();
   if (clearActivity) host.emit('toolActivity', sessionId, clearActivity);
-  active.writeTokenLimitRecovery.reset();
   active.pendingError = null;
   active.turnFailed = false;
   active.errorSurfaced = false;
@@ -399,32 +377,7 @@ export async function continuePiRuntimeSession(
   if (nextPlanMode) {
     nextPrompt = `${PiPlanModePrompt}\n\n${nextPrompt}`;
   }
-  const completionWorkflow = active.researchRun || active.shortcutWorkflow;
-  if (options.goalMode !== undefined && !completionWorkflow) {
-    active.goalMode = options.goalMode;
-    if (!active.goalMode && active.agentLoop.getState().active) {
-      active.agentLoop.stop();
-    }
-  }
-  const shouldRunGoalLoop =
-    active.goalMode && active.workbenchContract.kind !== WorkbenchContractKind.Chat;
-  if ((completionWorkflow || shouldRunGoalLoop) && !active.agentLoop.getState().active) {
-    completionWorkflow?.resumeForPrompt(prompt);
-    const loopPrompt = active.agentLoop.start({
-      mode: PiAgentLoopMode.Goal,
-      goal: completionWorkflow?.goal || prompt,
-      passes: 0,
-      stages: [],
-    });
-    nextPrompt = active.researchRun
-      ? active.researchRun.buildInitialPrompt(prompt)
-      : active.shortcutWorkflow
-        ? active.shortcutWorkflow.buildInitialPrompt(prompt)
-        : prompt;
-    if (!completionWorkflow) {
-      nextPrompt = `${loopPrompt}\n\n${nextPrompt}`;
-    }
-  }
+  if (active.goalMode) nextPrompt = `${PiGoalModePrompt}\n\n${nextPrompt}`;
   try {
     const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
       chatMode: active.resourceState.chatMode,
@@ -433,7 +386,9 @@ export async function continuePiRuntimeSession(
       workspaceRoot: active.workspaceRoot,
       sessionId,
       userPrompt: prompt,
+      signal: active.abortController.signal,
     });
+    active.abortController.signal.throwIfAborted();
     nextPrompt = finalizePiPromptWithProjectMemory({
       chatMode: active.resourceState.chatMode,
       sessionId,
@@ -454,6 +409,7 @@ export async function continuePiRuntimeSession(
     await active.eventProjection?.drain();
     await active.completionPending;
   } catch (error) {
+    host.memoryInjectionDedup.reset(sessionId);
     active.isRunning = false;
     if (active.abortController.signal.aborted) {
       host.emit('sessionStopped', sessionId);
@@ -518,17 +474,16 @@ export async function patchPiRuntimeSession(
     const maxOutputTokens = active.resourceState.chatMode
       ? Math.min(resolvedModel.maxOutputTokens, PiChatRuntimeLimit.MaxOutputTokens)
       : resolvedModel.maxOutputTokens;
-    active.writeTokenLimitRecovery = new PiWriteTokenLimitRecovery(maxOutputTokens);
     if (active.resourceState.maxOutputTokens !== maxOutputTokens) {
       active.resourceState.maxOutputTokens = maxOutputTokens;
       await active.piSession.reload();
       await applyPiShellOverride(active.settingsManager);
-      applyPiCompactionOverrides(
-        active.settingsManager,
-        typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
-        active.modelCompactionOverride,
-      );
     }
+    applyPiCompactionOverrides(
+      active.settingsManager,
+      typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+      active.modelCompactionOverride,
+    );
     console.log('[PiRuntime] Model updated via patchSession:', patch.model);
   } catch (err) {
     console.warn('[PiRuntime] Failed to update model via patchSession:', err);

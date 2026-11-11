@@ -5,8 +5,8 @@ export const PiAskUserQuestionTimeoutMs = 600_000;
 export const PiAskUserQuestionSystemPrompt = [
   '## User Interaction',
   '',
-  '- Before deleting files or directories, call AskUserQuestion and wait for the user response.',
-  '- Use AskUserQuestion for user choices whenever it is available; do not replace it with a plain-text question.',
+  '- Use AskUserQuestion when missing information or a meaningful user choice is needed to continue.',
+  '- Honor existing authorization. Do not ask again merely to confirm an already-authorized action; tool approval is enforced separately.',
 ].join('\n');
 
 const QuestionOptionSchema = Type.Object({
@@ -52,9 +52,8 @@ export const createPiAskUserQuestionTool = (
   name: PiAskUserQuestionToolName,
   label: 'Ask User Question',
   description:
-    'Ask the user a structured question and wait for a choice. ' +
-    'You MUST use this before any delete operation, including rm, del, rmdir, unlink, trash, or git clean.',
-  promptSnippet: 'Ask the user a structured question before destructive actions',
+    'Ask the user for missing information or a meaningful choice needed to continue. Do not repeat existing authorization.',
+  promptSnippet: 'Ask the user for necessary information or a meaningful choice',
   parameters: PiAskUserQuestionParameters,
   executionMode: 'sequential',
   execute: async (toolCallId: string, params: PiAskUserQuestionInput, signal?: AbortSignal) => {

@@ -25,7 +25,7 @@ test('chat completion requires a non-empty final response and clean stream close
   expect(failed.outcome).toBe(WorkbenchVerificationOutcome.Failed);
 });
 
-test('controlled workflow fails when any completion gate remains', () => {
+test('work does not require an obsolete domain completion signal', () => {
   const result = verifyWorkbenchRun({
     contract: {
       kind: WorkbenchContractKind.Shortcut,
@@ -33,10 +33,8 @@ test('controlled workflow fails when any completion gate remains', () => {
     },
     finalAnswer: 'Generated report',
     streamClosedCleanly: true,
-    workflowCompleted: true,
-    workflowSnapshot: { completionFailures: ['Preview is missing'] },
   });
-  expect(result.outcome).toBe(WorkbenchVerificationOutcome.Failed);
+  expect(result.outcome).toBe(WorkbenchVerificationOutcome.Passed);
 });
 
 test('generic work falls back to explicit acceptance', () => {
@@ -51,7 +49,7 @@ test('generic work falls back to explicit acceptance', () => {
   expect(result.outcome).toBe(WorkbenchVerificationOutcome.AcceptanceRequired);
 });
 
-test('generic workflow snapshots cannot bypass Workbench acceptance', () => {
+test('explicit Workbench acceptance is still required when requested', () => {
   const result = verifyWorkbenchRun({
     contract: {
       kind: WorkbenchContractKind.GenericWork,
@@ -59,8 +57,6 @@ test('generic workflow snapshots cannot bypass Workbench acceptance', () => {
     },
     finalAnswer: 'Implementation finished',
     streamClosedCleanly: true,
-    workflowCompleted: true,
-    workflowSnapshot: { accepted: true, status: 'ready_to_deliver' },
   });
   expect(result.outcome).toBe(WorkbenchVerificationOutcome.AcceptanceRequired);
 });

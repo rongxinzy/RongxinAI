@@ -7,21 +7,15 @@
  * the Pi SDK mocks are registered before any module under test loads).
  */
 
-import {
-  adapter,
-  mockCreateAgentSession,
-  mockSession,
-  setupPiRuntimeAdapterSuite,
-} from './piRuntimeAdapter.testHarness';
+import { adapter, mockSession, setupPiRuntimeAdapterSuite } from './piRuntimeAdapter.testHarness';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
 import type { CoworkStore } from '../../coworkStore';
 import {
   PiAssistantStopReason,
   PiBuiltinFileToolName,
   PiContentBlockType,
-} from './piWriteTokenLimit';
+} from './piToolConstants';
 
 describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
@@ -149,7 +143,7 @@ describe('PiRuntimeAdapter', () => {
       expect(updates.some(c => c.includes('HelHello') || c.includes('HelloHello'))).toBe(false);
     });
 
-    it('should steer a truncated built-in write into the chunked workflow', async () => {
+    it('leaves truncated write recovery to Pi without injecting another prompt', async () => {
       await adapter.startSession('test', 'Write a large file');
 
       listener!({
@@ -168,9 +162,7 @@ describe('PiRuntimeAdapter', () => {
         },
       });
 
-      expect(mockSession.prompt).toHaveBeenCalledWith(expect.stringContaining('2000 characters'), {
-        streamingBehavior: 'followUp',
-      });
+      expect(mockSession.prompt).toHaveBeenCalledOnce();
       expect(mockSession.steer).not.toHaveBeenCalled();
     });
 
@@ -301,7 +293,7 @@ describe('PiRuntimeAdapter', () => {
       });
     });
 
-    it('does not mark intermediate loop answers as final', async () => {
+    it('marks only the final answer after native continuation settles', async () => {
       const updates: Array<{
         messageId: string;
         content: string;
@@ -315,24 +307,7 @@ describe('PiRuntimeAdapter', () => {
         goalMode: true,
         sessionMode: 'work',
       });
-      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        customTools?: Array<{
-          name: string;
-          execute: (toolCallId: string, params: Record<string, unknown>) => Promise<unknown>;
-        }>;
-      };
-      const loopTool = sessionOptions.customTools?.find(tool => tool.name === PiAgentLoopToolName);
-      await loopTool!.execute('loop-start', {
-        action: PiAgentLoopAction.Start,
-        mode: PiAgentLoopMode.Passes,
-        passes: 2,
-      });
-
       driveAssistantTurn('First iteration answer');
-      await loopTool!.execute('loop-next-1', {
-        action: PiAgentLoopAction.Next,
-        summary: 'First iteration complete',
-      });
       listener!({ type: 'agent_end' });
 
       expect(
@@ -343,10 +318,6 @@ describe('PiRuntimeAdapter', () => {
       ).toBe(false);
 
       driveAssistantTurn('Second iteration answer');
-      await loopTool!.execute('loop-next-2', {
-        action: PiAgentLoopAction.Next,
-        summary: 'Second iteration complete',
-      });
       listener!({ type: 'agent_end' });
       listener!({ type: 'agent_settled' });
 

@@ -2,13 +2,25 @@ import { createHash } from 'crypto';
 
 import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
 
-const readOnlyTools = new Set(['read', 'grep', 'find', 'ls', 'skill_runtime_capabilities']);
+const readOnlyTools = new Set([
+  'read',
+  'grep',
+  'find',
+  'ls',
+  'skill_runtime_capabilities',
+  'read_document',
+  'conversation_history',
+  'ocr',
+  'web_search',
+]);
 const internalControlTools = new Set([
   'askuserquestion',
-  'agent_loop',
-  'workflow_state',
-  'research_state',
   'declare_artifact',
+  'session_summary',
+  'plan_write',
+  // Delegation itself is internal; every child tool retains its own authorization.
+  'subagent',
+  'codemode',
 ]);
 const reversibleTools = new Set(['write', 'edit']);
 const irreversibleShellPattern =

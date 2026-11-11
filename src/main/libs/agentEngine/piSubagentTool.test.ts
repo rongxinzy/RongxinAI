@@ -107,7 +107,11 @@ interface ToolResult {
 interface SubagentTool {
   name: string;
   description: string;
-  execute(toolCallId: string, params: Record<string, unknown>): Promise<ToolResult>;
+  execute(
+    toolCallId: string,
+    params: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<ToolResult>;
 }
 
 function buildTool(depsOverride: Partial<PiSubagentToolDeps> = {}): {
@@ -141,6 +145,47 @@ describe('buildPiSubagentTool', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('cancels active parallel sessions and does not launch queued work', async () => {
+    const sessions: MockSubSession[] = [];
+    hoisted.mockCreateAgentSession.mockImplementation(async () => {
+      const session = createManualSession();
+      sessions.push(session);
+      return { session };
+    });
+    const { tool } = buildTool();
+    const controller = new AbortController();
+    const cancelled = new Error('parent stopped');
+    const output = tool.execute(
+      'parallel-cancel',
+      {
+        parallel: Array.from({ length: 8 }, () => ({ agent: 'scout', task: 'long task' })),
+      },
+      controller.signal,
+    );
+    const assertion = expect(output).rejects.toBe(cancelled);
+    await vi.waitFor(() => expect(sessions).toHaveLength(SUBAGENT_PARALLEL_LIMIT));
+    controller.abort(cancelled);
+    await assertion;
+    expect(hoisted.mockCreateAgentSession).toHaveBeenCalledTimes(SUBAGENT_PARALLEL_LIMIT);
+    for (const session of sessions) expect(session.abort).toHaveBeenCalledOnce();
+  });
+
+  it('configures compaction for the child model window before creating its session', async () => {
+    const applyOverrides = vi.fn();
+    const { tool } = buildTool({
+      resolvedModel: {
+        model: { provider: 'test', id: 'small', contextWindow: 16384 },
+        modelRuntime: null,
+        maxOutputTokens: 4096,
+      },
+      createPiResourceLoader: async () => ({ settingsManager: { applyOverrides } }),
+    });
+    await tool.execute('small', { agent: 'scout', task: 'inspect' });
+    expect(applyOverrides).toHaveBeenCalledWith({
+      compaction: { enabled: true, reserveTokens: 4096, keepRecentTokens: 8192 },
+    });
   });
 
   // ── Parameter validation ──
@@ -310,7 +355,6 @@ describe('buildPiSubagentTool', () => {
           terminationReason: 'settled',
           assistantTurns: 1,
           toolCalls: 0,
-          steerRequested: false,
         },
       });
       expect(hoisted.mockCreateAgentSession).toHaveBeenCalledTimes(1);

@@ -14,7 +14,7 @@
  * Sub-session constraints:
  *   - no customTools (subagents cannot spawn sub-subagents)
  *   - no AskUserQuestion tool
- *   - per-run timeout (SUBAGENT_TIMEOUT_MS), aborted on completion
+ *   - cancellation inherited from the parent, aborted on completion
  */
 
 import * as fs from 'fs';
@@ -33,17 +33,12 @@ import {
   type PiSubagentSession,
 } from './piSubagentExecution';
 import type { PiExtensionFactory } from './piExtensionTypes';
+import { applyPiCompactionOverrides } from './piRuntimeSettingsOverrides';
+import type { PiSettingsManager } from './piRuntimeSessionState';
 
 // ── Constants ──
 
 export { PiSubagentToolName } from './piSubagentConstants';
-
-/**
- * Per-subagent run timeout. Long-running delegation (research sweeps, multi-file
- * recon on slow local models) routinely exceeds ten minutes, so the budget
- * matches a long Work turn rather than a single tool call.
- */
-const SUBAGENT_TIMEOUT_MS = 1_800_000;
 
 /** Maximum number of subagent sessions running at once in parallel mode. */
 export const SUBAGENT_PARALLEL_LIMIT = 4;
@@ -82,7 +77,7 @@ interface PiSubagentResolvedModel {
   model: Record<string, unknown>;
   /** Opaque model runtime handle, forwarded to sub-session options when set. */
   modelRuntime: unknown;
-  /** Output token budget of the resolved model; drives write-token-limit recovery. */
+  /** Output token budget of the resolved model. */
   maxOutputTokens: number;
 }
 
@@ -100,6 +95,8 @@ export interface PiSubagentToolDeps {
    */
   loadBundledMembers?: (presetId: string) => SubagentProfile[] | null;
   resolvedModel: PiSubagentResolvedModel;
+  getResolvedModel?: () => PiSubagentResolvedModel;
+  signal?: AbortSignal;
   workspaceRoot?: string;
   /** Absolute bundled web-search skill directory for researcher subagents. */
   webSearchSkillPath?: string;
@@ -265,14 +262,18 @@ async function runSubagent(
   deps: PiSubagentToolDeps,
   profile: SubagentProfile,
   task: string,
+  signal?: AbortSignal,
 ): Promise<SubagentRunResult> {
   const startedAt = Date.now();
   let subSession: PiSubagentSubSession | null = null;
   try {
+    signal?.throwIfAborted();
     const pi = await getPiSubagentModules();
+    signal?.throwIfAborted();
     const cwd = deps.workspaceRoot || process.cwd();
-    const maxOutputTokens = deps.resolvedModel.maxOutputTokens;
-    const model = deps.resolvedModel.model;
+    const resolvedModel = deps.getResolvedModel?.() ?? deps.resolvedModel;
+    const maxOutputTokens = resolvedModel.maxOutputTokens;
+    const model = resolvedModel.model;
     const subOptions: Record<string, unknown> = {
       cwd,
       model,
@@ -305,17 +306,23 @@ async function runSubagent(
       'settingsManager' in resourceLoader &&
       (resourceLoader as { settingsManager?: unknown }).settingsManager
     ) {
-      subOptions.settingsManager = (resourceLoader as { settingsManager: unknown }).settingsManager;
+      const settingsManager = (resourceLoader as { settingsManager: PiSettingsManager })
+        .settingsManager;
+      applyPiCompactionOverrides(
+        settingsManager,
+        typeof model.contextWindow === 'number' ? model.contextWindow : undefined,
+      );
+      subOptions.settingsManager = settingsManager;
     }
-    if (deps.resolvedModel.modelRuntime) {
-      subOptions.modelRuntime = deps.resolvedModel.modelRuntime;
+    if (resolvedModel.modelRuntime) {
+      subOptions.modelRuntime = resolvedModel.modelRuntime;
     }
 
     const { session } = await pi.createAgentSession(subOptions);
     subSession = session;
+    signal?.throwIfAborted();
     const result = await runPiSubagent(session, task, {
-      maxOutputTokens,
-      hardTimeoutMs: SUBAGENT_TIMEOUT_MS,
+      signal,
     });
     const { output, ...execution } = result;
     return {
@@ -332,7 +339,6 @@ async function runSubagent(
         durationMs: Math.max(0, Date.now() - startedAt),
         assistantTurns: 0,
         toolCalls: 0,
-        steerRequested: false,
       },
     };
   } finally {
@@ -443,25 +449,39 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
   const findProfile = (agentId: string): SubagentProfile | undefined =>
     profiles.find(profile => profile.id === agentId);
 
-  const runSpec = async (spec: SubagentTaskSpec, taskText?: string): Promise<SubagentRunResult> => {
+  const runSpec = async (
+    spec: SubagentTaskSpec,
+    taskText?: string,
+    signal?: AbortSignal,
+  ): Promise<SubagentRunResult> => {
     const profile = findProfile(spec.agent);
     if (!profile) {
       return { ok: false, output: unknownAgentMessage(spec.agent) };
     }
-    return runSubagent(deps, profile, taskText ?? spec.task);
+    return runSubagent(deps, profile, taskText ?? spec.task, signal);
   };
 
-  const executeSingle = async (spec: SubagentTaskSpec): Promise<SubagentToolResult> => {
+  const executeSingle = async (
+    spec: SubagentTaskSpec,
+    signal?: AbortSignal,
+  ): Promise<SubagentToolResult> => {
     const profile = findProfile(spec.agent);
     if (!profile) {
       return textResult(unknownAgentMessage(spec.agent));
     }
-    const result = await runSubagent(deps, profile, spec.task);
+    const result = await runSubagent(deps, profile, spec.task, signal);
+    signal?.throwIfAborted();
     return textResult(result.output, { agentId: spec.agent, execution: result.execution });
   };
 
-  const executeParallel = async (specs: SubagentTaskSpec[]): Promise<SubagentToolResult> => {
-    const results = await runWithConcurrency(specs, SUBAGENT_PARALLEL_LIMIT, spec => runSpec(spec));
+  const executeParallel = async (
+    specs: SubagentTaskSpec[],
+    signal?: AbortSignal,
+  ): Promise<SubagentToolResult> => {
+    const results = await runWithConcurrency(specs, SUBAGENT_PARALLEL_LIMIT, spec =>
+      runSpec(spec, undefined, signal),
+    );
+    signal?.throwIfAborted();
     const succeeded = results.filter(result => result.ok).length;
     const summary = results
       .map(
@@ -475,7 +495,10 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
     });
   };
 
-  const executeChain = async (specs: SubagentTaskSpec[]): Promise<SubagentToolResult> => {
+  const executeChain = async (
+    specs: SubagentTaskSpec[],
+    signal?: AbortSignal,
+  ): Promise<SubagentToolResult> => {
     const sections: string[] = [];
     let previousOutput = '';
     for (let index = 0; index < specs.length; index++) {
@@ -484,7 +507,8 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
       const taskText = previousOutput
         ? spec.task.split(CHAIN_PREVIOUS_PLACEHOLDER).join(previousOutput)
         : spec.task;
-      const result = await runSpec(spec, taskText);
+      const result = await runSpec(spec, taskText, signal);
+      signal?.throwIfAborted();
       if (!result.ok) {
         sections.push(`Chain stopped at step ${index + 1} (${spec.agent}): ${result.output}`);
         return textResult(sections.join('\n\n'), {
@@ -511,8 +535,7 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
       '\n\nModes (mutually exclusive):\n' +
       '- Single: {agent, task} — delegate one task to one agent.\n' +
       `- Parallel: {parallel: [{agent, task}, ...]} — run agents concurrently (max ${SUBAGENT_PARALLEL_LIMIT} at once).\n` +
-      `- Chain: {chain: [{agent, task}, ...]} — run agents sequentially; use ${CHAIN_PREVIOUS_PLACEHOLDER} in a task to inject the previous step's output.\n` +
-      `Each subagent run times out after ${Math.round(SUBAGENT_TIMEOUT_MS / 1000)} seconds.`,
+      `- Chain: {chain: [{agent, task}, ...]} — run agents sequentially; use ${CHAIN_PREVIOUS_PLACEHOLDER} in a task to inject the previous step's output.`,
 
     parameters: {
       type: 'object',
@@ -569,7 +592,11 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
     execute: async (
       _toolCallId: string,
       params: Record<string, unknown>,
+      signal?: AbortSignal,
     ): Promise<SubagentToolResult> => {
+      signal =
+        deps.signal && signal ? AbortSignal.any([deps.signal, signal]) : (signal ?? deps.signal);
+      signal?.throwIfAborted();
       const hasSingleParams = 'agent' in params || 'task' in params;
       const hasParallel = Array.isArray(params.parallel);
       const hasChain = Array.isArray(params.chain);
@@ -592,7 +619,7 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
         if (!agent || !task) {
           return textResult('Both "agent" and "task" parameters are required.');
         }
-        return executeSingle({ agent, task });
+        return executeSingle({ agent, task }, signal);
       }
 
       if (hasParallel) {
@@ -600,14 +627,14 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
         if (typeof specs === 'string') {
           return textResult(specs);
         }
-        return executeParallel(specs);
+        return executeParallel(specs, signal);
       }
 
       const specs = parseTaskList(params.chain, 'chain');
       if (typeof specs === 'string') {
         return textResult(specs);
       }
-      return executeChain(specs);
+      return executeChain(specs, signal);
     },
   };
 }

@@ -5,16 +5,16 @@
  * Regression covered: locally enabled skills were filtered out of Chat even
  * though the same skills were available in Work.
  */
-import { AcademicResearchSkillIds, CoreSkillId, isCoreSkill } from '@shared/skills/constants';
+import { AcademicResearchSkillIds, isCoreSkill } from '@shared/skills/constants';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { isAcademicResearchSkillSet } from '../../../main/libs/agentEngine/piResearchRun';
-import { resolvePiShortcutWorkflowKind } from '../../../main/libs/agentEngine/piRuntimeWorkbenchContract';
+import { createPiWorkbenchContract } from '../../../main/libs/agentEngine/piRuntimeWorkbenchContract';
 
 import { expect, test } from 'vitest';
 
-import { CoworkPermissionMode } from '../../../shared/cowork/constants';
+import { WorkbenchContractKind } from '../../../shared/workbenchTask';
+import { CoworkSessionMode, CoworkPermissionMode } from '../../../shared/cowork/constants';
 import {
   CHAT_SKILL_SHORTCUTS,
   isChatSkillShortcutActive,
@@ -105,20 +105,13 @@ test('quick skill selections automatically allow tools for their chat session on
   );
 });
 
-test('Office uses native completion while other sidebar shortcuts retain their controllers', () => {
-  const nativeCompletionSkills = new Set<string>([
-    CoreSkillId.PresentationStudio,
-    CoreSkillId.Docx,
-    CoreSkillId.Xlsx,
-  ]);
+test('all shortcuts use native completion without a skill-specific runtime gate', () => {
   for (const shortcut of CHAT_SKILL_SHORTCUTS) {
-    const selectedIds = [...(shortcut.skillIds || [shortcut.skillId])];
-    const protectedByAcademicHarness = isAcademicResearchSkillSet(selectedIds);
-    const protectedByShortcutHarness = resolvePiShortcutWorkflowKind(selectedIds) !== null;
     expect(
-      protectedByAcademicHarness || protectedByShortcutHarness,
-      `shortcut ${shortcut.id} completion policy does not match its skill`,
-    ).toBe(!nativeCompletionSkills.has(shortcut.skillId));
+      createPiWorkbenchContract(CoworkSessionMode.Work, [
+        ...(shortcut.skillIds || [shortcut.skillId]),
+      ]).kind,
+    ).toBe(WorkbenchContractKind.GenericWork);
   }
 });
 

@@ -8,37 +8,20 @@
 
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { WorkbenchContractKind, type WorkbenchTaskContract } from '../../../shared/workbenchTask';
-import { isAcademicResearchSkillSet } from './piResearchRun';
-import { resolveShortcutWorkflowKind, ShortcutWorkflowKind } from './piShortcutWorkflow';
-
-export function resolvePiShortcutWorkflowKind(
-  skillIds: string[] | undefined,
-): ShortcutWorkflowKind | null {
-  // Office skills export directly and use Pi's native completion.
-  const kind = resolveShortcutWorkflowKind(skillIds);
-  if (
-    kind === ShortcutWorkflowKind.Ppt ||
-    kind === ShortcutWorkflowKind.Docs ||
-    kind === ShortcutWorkflowKind.Sheets
-  )
-    return null;
-  return kind;
-}
+/** Goal mode expresses intent; Pi owns tool turns, compaction and completion. */
+export const PiGoalModePrompt =
+  'Continue working toward the requested goal until the result is complete and verified, ' +
+  'or a concrete blocker requires user input. Preserve progress across compaction. ' +
+  'Report remaining work honestly if blocked; respect cancellation and explicit budgets.';
 
 export function createPiWorkbenchContract(
   sessionMode: CoworkSessionMode | undefined,
   skillIds: string[] | undefined,
 ): WorkbenchTaskContract {
-  const research = isAcademicResearchSkillSet(skillIds);
-  const shortcut = research ? null : resolvePiShortcutWorkflowKind(skillIds);
   const kind =
     sessionMode === CoworkSessionMode.Chat
       ? WorkbenchContractKind.Chat
-      : research
-        ? WorkbenchContractKind.Research
-        : shortcut
-          ? WorkbenchContractKind.Shortcut
-          : WorkbenchContractKind.GenericWork;
+      : WorkbenchContractKind.GenericWork;
   return {
     kind,
     requiresUserAcceptance: false,

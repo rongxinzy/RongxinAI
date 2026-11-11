@@ -1,8 +1,7 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index 0000000..1111111 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -1914,6 +1914,9 @@ export class AgentSession {
+@@ -1914,6 +1914,9 @@
          if (typeof content === "string") {
              text = content;
          }
@@ -12,7 +11,39 @@ index 0000000..1111111 100644
          else {
              const textParts = [];
              images = [];
-@@ -3597,11 +3600,13 @@ export class AgentSession {
+@@ -2406,8 +2409,16 @@
+         // Skip compaction checks if this assistant message is older than the latest
+         // compaction boundary. This prevents a stale pre-compaction usage/error
+         // from retriggering compaction on the first prompt after compaction.
+-        const compactionEntry = getLatestCompactionEntry(this.sessionManager.getBranch());
+-        const assistantIsFromBeforeCompaction = compactionEntry !== null && assistantMessage.timestamp <= new Date(compactionEntry.timestamp).getTime();
++        const branch = this.sessionManager.getBranch();
++        const compactionEntry = getLatestCompactionEntry(branch);
++        const assistantEntryId = this._findPersistedMessageEntryId(assistantMessage);
++        const assistantIndex = assistantEntryId ? branch.findIndex((entry) => entry.id === assistantEntryId) : -1;
++        const compactionIndex = compactionEntry ? branch.findIndex((entry) => entry.id === compactionEntry.id) : -1;
++        // Persisted order distinguishes new messages from retained history even
++        // when compaction and the next response share a millisecond timestamp.
++        const assistantIsFromBeforeCompaction = compactionEntry !== null && (assistantIndex >= 0 && compactionIndex >= 0
++            ? assistantIndex < compactionIndex
++            : assistantMessage.timestamp < new Date(compactionEntry.timestamp).getTime());
+         if (assistantIsFromBeforeCompaction) {
+             return false;
+         }
+@@ -2415,12 +2426,9 @@
+         // A length stop is recoverable when output ended below the model's original desired limit,
+         // independent of the configured context size or any context-clamped provider request limit.
+         const currentProjection = this.sessionManager.buildSessionProjection();
+-        const assistantEntryId = this._findPersistedMessageEntryId(assistantMessage);
+         const assistantIsProjected = assistantEntryId === undefined ||
+             currentProjection.entries.some((entry) => entry.sourceEntry.id === assistantEntryId &&
+                 entry.messages.some((message) => message.role === "assistant"));
+-        const branch = this.sessionManager.getBranch();
+-        const assistantIndex = assistantEntryId ? branch.findIndex((entry) => entry.id === assistantEntryId) : -1;
+         const entriesAfterAssistant = assistantIndex >= 0 ? branch.slice(assistantIndex + 1) : [];
+         const hasPostAssistantContextEdit = entriesAfterAssistant.some((entry) => entry.type === "context_edit");
+         const latestAssistantEdit = entriesAfterAssistant
+@@ -3597,11 +3605,13 @@
                  return false;
              const msg = m;
              // Skip aborted messages with no content
@@ -28,10 +59,9 @@ index 0000000..1111111 100644
          let text = "";
          for (const content of lastAssistant.content) {
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
-index 0000000..1111111 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
-@@ -183,6 +183,9 @@ function estimateTextAndImageContentChars(content) {
+@@ -183,6 +183,9 @@
      if (typeof content === "string") {
          return content.length;
      }
@@ -41,7 +71,7 @@ index 0000000..1111111 100644
      let chars = 0;
      for (const block of content) {
          if (block.type === "text" && block.text) {
-@@ -220,6 +223,8 @@ export function estimateTokens(message) {
+@@ -220,6 +223,8 @@
          }
          case "assistant": {
              const assistant = message;
@@ -51,10 +81,9 @@ index 0000000..1111111 100644
                  if (block.type === "text") {
                      chars += block.text.length;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
-index 0000000..1111111 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
-@@ -113,6 +113,8 @@ export function serializeConversation(messages) {
+@@ -113,6 +113,8 @@
                  parts.push(`[User]: ${content}`);
          }
          else if (msg.role === "assistant") {

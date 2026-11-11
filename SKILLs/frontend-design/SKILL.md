@@ -86,13 +86,6 @@ Remember: you are capable of extraordinary creative work. Don't hold back, show 
 
 Before changing this skill, run the eight prompts in [the evaluation suite](examples/evaluation/README.md). For each, retain the brief, direction cards, desktop/mobile previews, build result, and rubric score. A build passing is a delivery prerequisite, not visual evidence.
 
-## Delivery Gate
+## Delivery verification
 
-Build or otherwise run the finished interface, inspect the rendered result,
-and save a nonempty `.md`, `.txt`, or `.json` validation report in the
-workspace. Capture at least one inspected `.png`, `.jpg`, or `.jpeg`
-rendered preview. The controlled Website shortcut completes only after
-`workflow_state` records an existing HTML deliverable (role `deliverable`),
-then that validation report (role `validation`, with `deliverablePath` set to
-the HTML file), and the preview (role `preview`, with the same
-`deliverablePath`). Never end after a design explanation or code sketch.
+Build or run the finished interface and inspect the rendered result when tools allow. Verify relevant interactions, responsive layouts and accessibility. Deliver the requested artifact format: an HTML file, React component, application project or another explicitly requested output. Include useful preview and validation evidence, and describe any checks that could not be completed. Do not create extra files solely to satisfy a runtime registration protocol.

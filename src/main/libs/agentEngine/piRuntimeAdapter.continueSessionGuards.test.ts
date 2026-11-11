@@ -157,36 +157,29 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
-    it('starts the Goal loop only when Work explicitly enables goal mode', async () => {
+    it('expresses Goal intent without a loop protocol', async () => {
       await adapter.startSession('goal-work', 'Finish the requested task', {
         sessionMode: 'work',
         goalMode: true,
       });
 
       expect(mockSession.prompt).toHaveBeenCalledWith(
-        expect.stringContaining('Loop started. Iteration 1. Goal: Finish the requested task'),
+        expect.stringContaining('Continue working toward the requested goal'),
       );
     });
 
-    it('restarts a completed Goal loop with the full loop protocol prompt', async () => {
+    it('preserves Goal intent across native follow-ups', async () => {
       await adapter.startSession('goal-restart', 'First goal', {
         sessionMode: 'work',
         goalMode: true,
       });
-      const activeSessions = (
-        adapter as unknown as {
-          activeSessions: Map<string, { agentLoop: { stop(): void } }>;
-        }
-      ).activeSessions;
-      activeSessions.get('goal-restart')?.agentLoop.stop();
-
       await adapter.continueSession('goal-restart', 'Second goal', {
         sessionMode: 'work',
         goalMode: true,
       });
 
       expect(mockSession.prompt).toHaveBeenLastCalledWith(
-        expect.stringContaining('Loop started. Iteration 1. Goal: Second goal'),
+        expect.stringContaining('Continue working toward the requested goal'),
       );
     });
 
@@ -333,13 +326,6 @@ describe('PiRuntimeAdapter', () => {
         sessionMode: 'work',
         workspaceRoot,
       });
-      const activeSessions = (
-        adapter as unknown as {
-          activeSessions: Map<string, { agentLoop: { stop(): void } }>;
-        }
-      ).activeSessions;
-      activeSessions.get('production-to-greeting')?.agentLoop.stop();
-
       await adapter.continueSession('production-to-greeting', '你好', {
         skillIds: ['presentation-studio'],
         sessionMode: 'work',

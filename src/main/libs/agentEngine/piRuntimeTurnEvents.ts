@@ -20,7 +20,6 @@ import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { cancelPiRetry } from './piRetryCancellation';
 import { PiAssistantEventType } from './piStreamConstants';
-import { PiSubagentToolName } from './piSubagentTool';
 import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
 import { settlePiWorkbenchCompletion } from './piWorkbenchCompletion';
 import {
@@ -381,7 +380,6 @@ export class PiRuntimeTurnEvents {
       case 'message_end': {
         if (event.message?.role === 'assistant') {
           active.lastAssistantMessage = event.message;
-          active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
           if (event.message.stopReason === 'error') {
             // The turn was already reported as failed (non-retryable error).
             if (active.errorSurfaced) return;
@@ -561,10 +559,6 @@ export class PiRuntimeTurnEvents {
         );
         active.toolStartedAtByCallId.set(event.toolCallId, Date.now());
         if (runningActivity) this.host.emit('toolActivity', sessionId, runningActivity);
-        if (event.toolName === PiSubagentToolName) {
-          active.researchRun?.recordSubagentStart(event.toolCallId, event.args);
-          active.shortcutWorkflow?.recordSubagentStart(event.toolCallId, event.args);
-        }
         const toolUseMsg: CoworkMessage = {
           id: randomUUID(),
           type: 'tool_use',
@@ -605,16 +599,6 @@ export class PiRuntimeTurnEvents {
               resultIsError,
             );
         }
-        if (event.toolName === PiSubagentToolName) {
-          active.researchRun?.recordSubagentResult(event.toolCallId, resultText, resultIsError);
-          active.shortcutWorkflow?.recordSubagentResult(
-            event.toolCallId,
-            resultText,
-            resultIsError,
-          );
-        }
-        // Keep the result only on `content` — duplicating into metadata.toolResult
-        // doubles the largest strings in SQLite, IPC, and the renderer heap.
         const toolResultMsg: CoworkMessage = {
           id: randomUUID(),
           type: 'tool_result',
@@ -692,31 +676,6 @@ export class PiRuntimeTurnEvents {
             false,
             CoworkInterruptionCause.RuntimePaused,
           );
-          break;
-        }
-        // Agent loop: when the finished iteration signaled "next", continue
-        // the session with the next iteration prompt instead of completing.
-        const loopDecision = active.agentLoop.handleAgentEnd();
-        if (loopDecision.shouldContinue && loopDecision.nextPrompt) {
-          // Reset turn state (same as continueSession).
-          active.answerText = '';
-          active.thinkingText = '';
-          active.assistantMessageId = null;
-          active.thinkingMessageId = null;
-          active.thinkingLifecycle.reset();
-          active.lastCompletedAnswerMessageId = null;
-          active.lastCompletedAnswerText = '';
-          active.errorSurfaced = false;
-          active.retryNoticeEmitted = false;
-          active.retryAttempts = 0;
-          active.toolResultMessageIdByCallId.clear();
-          active.toolStartedAtByCallId.clear();
-          active.piSession
-            .prompt(loopDecision.nextPrompt, { streamingBehavior: 'followUp' })
-            .catch(error => {
-              const message = error instanceof Error ? error.message : String(error);
-              this.host.emit('error', sessionId, classifyCoworkError(message));
-            });
           break;
         }
         // agent_end is not the terminal signal: the SDK may follow it with an
@@ -831,11 +790,6 @@ export class PiRuntimeTurnEvents {
     let verification: Promise<unknown> | undefined;
     const completingWorkbench = this.host.getWorkbench();
     if (active.workbenchRunId && completingWorkbench) {
-      const domainWorkflowSnapshot = active.researchRun
-        ? active.researchRun.getSnapshot()
-        : active.shortcutWorkflow
-          ? active.shortcutWorkflow.getSnapshot()
-          : null;
       verification = completingWorkbench.completeRun({
         sessionId,
         runId: active.workbenchRunId,
@@ -844,11 +798,6 @@ export class PiRuntimeTurnEvents {
         finalAnswer: active.lastCompletedAnswerText,
         finalMessageId: active.lastCompletedAnswerMessageId,
         artifactsSettled: active.artifactRecorder?.settled(),
-        workflowCompleted:
-          active.researchRun || active.shortcutWorkflow
-            ? active.agentLoop.getState().done
-            : undefined,
-        workflowSnapshot: domainWorkflowSnapshot,
       });
     }
     void settlePiWorkbenchCompletion(

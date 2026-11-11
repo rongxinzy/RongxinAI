@@ -19,6 +19,7 @@ import {
   MemoryOutboxOperation,
   PERSONAL_MEMORY_SESSION_PREFIX,
   SESSION_SUMMARY_TTL_DAYS,
+  MEMORY_PROMPT_RECALL_TIMEOUT_MS,
 } from './constants';
 import {
   assertCanPromote,
@@ -125,21 +126,28 @@ export class ProjectMemoryService {
     return this.requireCandidateOrLink(replacementId);
   }
 
-  async recallProject(input: { workingDirectory: string; query: string; limit?: number }) {
+  async recallProject(input: {
+    workingDirectory: string;
+    query: string;
+    limit?: number;
+    signal?: AbortSignal;
+  }) {
     const project = this.resolveIdentity(input.workingDirectory);
     return await this.recallScope({
       query: input.query,
       projectId: project.id,
       scope: MemoryScope.Project,
+      signal: input.signal,
       limit: input.limit,
     });
   }
 
-  async recallPersonal(input: { query: string; limit?: number }) {
+  async recallPersonal(input: { query: string; limit?: number; signal?: AbortSignal }) {
     return await this.recallScope({
       query: input.query,
       projectId: PERSONAL_MEMORY_PROJECT_ID,
       scope: MemoryScope.Personal,
+      signal: input.signal,
       limit: input.limit,
     });
   }
@@ -149,12 +157,14 @@ export class ProjectMemoryService {
     sessionId: string;
     query: string;
     limit?: number;
+    signal?: AbortSignal;
   }) {
     const project = this.resolveIdentity(input.workingDirectory);
     return await this.recallScope({
       query: input.query,
       projectId: project.id,
       scope: MemoryScope.Session,
+      signal: input.signal,
       sessionId: input.sessionId,
       limit: input.limit,
     });
@@ -229,10 +239,11 @@ export class ProjectMemoryService {
     sessionId: string;
     query: string;
     tokenBudget?: number;
+    signal?: AbortSignal;
   }): Promise<string> {
     const [project, personal, session] = await Promise.all([
       this.recallProject(input),
-      this.recallPersonal({ query: input.query }),
+      this.recallPersonal({ query: input.query, signal: input.signal }),
       this.recallSession(input),
     ]);
     const projectLines = fitObservations(
@@ -636,6 +647,7 @@ export class ProjectMemoryService {
     scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
     sessionId?: string;
     limit?: number;
+    signal?: AbortSignal;
   }) {
     return await recallMemoryScope(this.repository, this.adapter, input);
   }
@@ -684,12 +696,29 @@ export async function buildProjectMemoryContextSafe(
   workingDirectory: string,
   sessionId: string,
   query: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   if (!service) return '';
+  const timeout = new AbortController();
+  const boundedSignal = signal ? AbortSignal.any([signal, timeout.signal]) : timeout.signal;
+  if (boundedSignal.aborted) return '';
+  let onAbort = (): void => {};
+  const timer = setTimeout(() => timeout.abort(), MEMORY_PROMPT_RECALL_TIMEOUT_MS);
   try {
-    return await service.buildProjectContext({ workingDirectory, sessionId, query });
+    return await Promise.race([
+      service.buildProjectContext({ workingDirectory, sessionId, query, signal: boundedSignal }),
+      new Promise<string>(resolve => {
+        onAbort = () => resolve('');
+        boundedSignal.addEventListener('abort', onAbort, { once: true });
+        if (boundedSignal.aborted) onAbort();
+      }),
+    ]);
   } catch (error) {
-    console.warn('[ProjectMemory] Failed to recall project context:', error);
+    if (!boundedSignal.aborted)
+      console.warn('[ProjectMemory] Failed to recall project context:', error);
     return '';
+  } finally {
+    clearTimeout(timer);
+    boundedSignal.removeEventListener('abort', onAbort);
   }
 }

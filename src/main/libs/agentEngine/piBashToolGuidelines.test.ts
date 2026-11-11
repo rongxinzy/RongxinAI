@@ -4,19 +4,13 @@ import {
   createPiBashToolSystemPrompt,
   getPiBashCommandViolation,
   getPiBashPythonEnvViolation,
-  normalizePiBashTimeoutSeconds,
-  PI_BASH_DEFAULT_TIMEOUT_SECONDS,
-  PI_BASH_MAX_TIMEOUT_SECONDS,
   PiBashToolSystemPrompt,
 } from './piBashToolGuidelines';
 
 describe('piBashToolGuidelines', () => {
   it('adds the shell contract and timeout policy for every platform', () => {
     expect(createPiBashToolSystemPrompt('win32')).toContain(PiBashToolSystemPrompt);
-    expect(createPiBashToolSystemPrompt('linux')).toContain('default timeout');
-    expect(createPiBashToolSystemPrompt('linux')).toContain(
-      `clamped to ${PI_BASH_MAX_TIMEOUT_SECONDS} seconds`,
-    );
+    expect(createPiBashToolSystemPrompt('linux')).toBe('');
   });
 
   it('blocks high-confidence Windows command dialects on Git Bash', () => {
@@ -33,16 +27,6 @@ describe('piBashToolGuidelines', () => {
       getPiBashCommandViolation('powershell.exe -NoProfile -Command "Get-ChildItem"', 'win32'),
     ).toBeUndefined();
     expect(getPiBashCommandViolation('dir /s', 'linux')).toBeUndefined();
-  });
-
-  it('bounds missing, invalid, and excessive Bash timeouts', () => {
-    expect(normalizePiBashTimeoutSeconds(undefined)).toBe(PI_BASH_DEFAULT_TIMEOUT_SECONDS);
-    expect(normalizePiBashTimeoutSeconds('300')).toBe(PI_BASH_DEFAULT_TIMEOUT_SECONDS);
-    expect(normalizePiBashTimeoutSeconds(0)).toBe(PI_BASH_DEFAULT_TIMEOUT_SECONDS);
-    expect(normalizePiBashTimeoutSeconds(30)).toBe(30);
-    expect(normalizePiBashTimeoutSeconds(PI_BASH_MAX_TIMEOUT_SECONDS + 1)).toBe(
-      PI_BASH_MAX_TIMEOUT_SECONDS,
-    );
   });
 
   it('does not block pip or uv commands in bash', () => {

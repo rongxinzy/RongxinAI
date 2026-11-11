@@ -7,8 +7,6 @@ import {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
-  WorkbenchArtifactCandidateSource,
-  WorkbenchArtifactVerificationStatus,
   WorkbenchRunEventType,
   WorkbenchRunStatus,
   WorkbenchRunTrigger,
@@ -121,7 +119,7 @@ export class WorkbenchTaskService extends EventEmitter {
     if (task.sessionId !== input.sessionId || task.activeRunId !== run.id) {
       throw new Error('The artifact does not belong to the active task run.');
     }
-    if (run.status !== WorkbenchRunStatus.Running) {
+    if (!this.isRunRunning(run.id)) {
       throw new Error('Artifacts can only be registered while the task run is active.');
     }
     const [artifact] = await collectWorkbenchArtifactsAsync(
@@ -254,8 +252,6 @@ export class WorkbenchTaskService extends EventEmitter {
     workspaceRoot: string;
     finalAnswer: string;
     finalMessageId?: string | null;
-    workflowCompleted?: boolean;
-    workflowSnapshot?: Record<string, unknown> | null;
     artifactCandidates?: WorkbenchArtifactCandidate[];
     /** Ledger scope holding the run's files: the session, or a coding lane. */
     artifactScopeId?: string;
@@ -277,8 +273,6 @@ export class WorkbenchTaskService extends EventEmitter {
       contract: task.contract,
       finalAnswer: input.finalAnswer,
       streamClosedCleanly: input.streamClosedCleanly !== false,
-      workflowCompleted: input.workflowCompleted,
-      workflowSnapshot: input.workflowSnapshot,
     };
     const result = verifyWorkbenchRun(verificationContext);
     // Files the run produced come from the event-time artifact ledger; wait
@@ -308,7 +302,6 @@ export class WorkbenchTaskService extends EventEmitter {
           workspaceRoot: input.workspaceRoot,
           finalAnswer: input.finalAnswer,
           finalMessageId: input.finalMessageId,
-          workflowSnapshot: input.workflowSnapshot,
           artifactCandidates,
         },
         input.signal,
@@ -524,7 +517,7 @@ export class WorkbenchTaskService extends EventEmitter {
     if (task.sessionId !== input.sessionId) {
       return { allow: false, reason: 'The tool call does not belong to this session.' };
     }
-    if (task.activeRunId !== run.id || run.status !== WorkbenchRunStatus.Running) {
+    if (task.activeRunId !== run.id || !this.isRunRunning(run.id)) {
       // The run is already over (failed, paused, cancelled or superseded), so
       // every further tool call fails. End the turn instead of letting the model
       // keep asking.
@@ -611,6 +604,7 @@ export class WorkbenchTaskService extends EventEmitter {
     if (!pending) {
       throw new Error('This approval belongs to an interrupted run. Resume the task to try again.');
     }
+    const task = this.requireTask(approval.taskId);
     const updated = this.repository.transaction(() => {
       const next = this.repository.updateApproval(approval.id, {
         decision: input.approved
@@ -624,7 +618,13 @@ export class WorkbenchTaskService extends EventEmitter {
       });
       this.repository.updateRunStatus(
         approval.runId,
-        input.approved ? WorkbenchRunStatus.Running : WorkbenchRunStatus.Paused,
+        input.approved
+          ? this.repository
+              .listPendingApprovalsForSession(task.sessionId)
+              .some(candidate => candidate.runId === approval.runId)
+            ? WorkbenchRunStatus.WaitingApproval
+            : WorkbenchRunStatus.Running
+          : WorkbenchRunStatus.Paused,
       );
       if (!input.approved) {
         this.repository.updateTaskStatus(
@@ -645,6 +645,12 @@ export class WorkbenchTaskService extends EventEmitter {
       return next;
     });
     this.pendingApprovals.delete(approval.id);
+    if (!input.approved) {
+      this.cancelPendingApprovalsForSession(
+        task.sessionId,
+        input.reason || 'The user denied this action.',
+      );
+    }
     pending.resolve(
       input.approved
         ? { allow: true }
@@ -655,7 +661,8 @@ export class WorkbenchTaskService extends EventEmitter {
   }
 
   isRunRunning(runId: string): boolean {
-    return this.repository.getRun(runId)?.status === WorkbenchRunStatus.Running;
+    const status = this.repository.getRun(runId)?.status;
+    return status === WorkbenchRunStatus.Running || status === WorkbenchRunStatus.WaitingApproval;
   }
 
   recordToolResult(runId: string, toolCallId: string, result: unknown, isError: boolean): void {

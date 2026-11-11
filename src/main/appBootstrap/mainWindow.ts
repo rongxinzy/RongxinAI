@@ -93,7 +93,6 @@ export const createMainWindow = (): void => {
         preload: PRELOAD_PATH,
         // 2026/09/21 lixiang  恢复 Chromium 默认节流：窗口隐藏/最小化后暂停渲染进程定时器与动画，
         // 降低常驻内存与 CPU（下载、流式对话均在主进程完成，不受影响）。
-        // officePreviewRenderer 的隐藏截图窗口仍单独关闭节流，勿在此全局放开。
         backgroundThrottling: true,
         devTools: isDev,
         spellcheck: false,

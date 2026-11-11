@@ -10,20 +10,16 @@
 import {
   adapter,
   applyTestResolution,
-  mockCreateAgentSession,
   mockSession,
   setupPiRuntimeAdapterSuite,
   VISION_MODEL_RESOLUTION,
 } from './piRuntimeAdapter.testHarness';
-
-import path from 'path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TEST_MAGPIE_GATEWAY } from '../../../../tests/helpers/installTestMagpie';
 import { ModelCapabilityStatus } from '../../../shared/providers';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { imageCapabilityFingerprint, isImageInputRejected } from './piImageInputFallback';
-import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
 
@@ -364,24 +360,8 @@ describe('PiRuntimeAdapter', () => {
       expect(emittedMessages.map(message => message.type)).toEqual(['user', 'assistant', 'system']);
     });
 
-    it('does not complete or continue the agent loop on a failed turn', async () => {
+    it('does not complete or inject a continuation on a failed Goal turn', async () => {
       await adapter.startSession('test', 'Hi', { goalMode: true, sessionMode: 'work' });
-      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        customTools?: Array<{
-          name: string;
-          execute: (toolCallId: string, params: Record<string, unknown>) => Promise<unknown>;
-        }>;
-      };
-      const loopTool = sessionOptions.customTools?.find(tool => tool.name === PiAgentLoopToolName);
-      expect(loopTool).toBeDefined();
-      // Arm the loop so agent_end would normally continue with iteration 2.
-      await loopTool!.execute('call-1', {
-        action: PiAgentLoopAction.Start,
-        mode: PiAgentLoopMode.Passes,
-        passes: 3,
-      });
-      await loopTool!.execute('call-2', { action: PiAgentLoopAction.Next, summary: 'iter 1 done' });
-
       listener!({ type: 'turn_start' });
       failedAttempt('429 Too Many Requests: overloaded');
       listener!({

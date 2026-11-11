@@ -12,6 +12,7 @@ export interface MemoryRecallScopeInput {
   scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
   sessionId?: string;
   limit?: number;
+  signal?: AbortSignal;
 }
 
 export async function recallMemoryScope(
@@ -36,6 +37,7 @@ export async function recallMemoryScope(
         scope: input.scope,
         limit: retrievalLimit,
         matchMode: EngramSearchMatchMode.All,
+        signal: input.signal,
       }),
     );
     if (observations.length === 0 && plan.broadQuery) {
@@ -48,6 +50,7 @@ export async function recallMemoryScope(
           scope: input.scope,
           limit: retrievalLimit,
           matchMode: EngramSearchMatchMode.Any,
+          signal: input.signal,
         }),
       );
     }
@@ -59,6 +62,7 @@ export async function recallMemoryScope(
           project: input.projectId,
           scope: input.scope,
           limit: retrievalLimit,
+          signal: input.signal,
         }),
       );
     }
@@ -109,7 +113,15 @@ export function fitObservations(
   let usedTokens = 0;
   const lines: string[] = [];
   for (const observation of observations) {
-    const line = `- [memory:${observation.id}] ${observation.title}: ${observation.content}`;
+    // Even ASCII cannot fit above this size under the estimator below. Avoid
+    // formatting or scanning oversized stored notes on the request path.
+    if (observation.title.length + observation.content.length > budget * 4) continue;
+    // Continuation lines remain data, never scope headers or other records.
+    const line =
+      `- [memory:${observation.id}] ${observation.title}: ${observation.content}`.replace(
+        /\r?\n/g,
+        '\n  ',
+      );
     const estimatedTokens = estimateMemoryTokens(line);
     if (usedTokens + estimatedTokens > budget) continue;
     lines.push(line);
