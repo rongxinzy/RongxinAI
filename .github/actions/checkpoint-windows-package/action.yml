@@ -13,6 +13,11 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Measure disk before checkpoint
+      shell: pwsh
+      run: |
+        $drive = Get-PSDrive -Name ([System.IO.Path]::GetPathRoot($env:GITHUB_WORKSPACE).Substring(0, 1))
+        Write-Output "Checkpoint ${{ inputs.edition }} before: free=$($drive.Free) bytes"
     - name: Export public signing certificate only
       shell: pwsh
       env:
@@ -34,3 +39,9 @@ runs:
           package.json release build-tar/windows-components resources/skill-python \
           scripts/installer-shell/out/ZhiYuanUninstall.exe \
           scripts/installer-shell/out/ZhiYuanUninstall.exe.manifest.json
+    - name: Measure checkpoint and remaining disk
+      shell: pwsh
+      run: |
+        $drive = Get-PSDrive -Name ([System.IO.Path]::GetPathRoot($env:GITHUB_WORKSPACE).Substring(0, 1))
+        $archive = Get-Item -LiteralPath 'checkpoint-win32-x64-${{ inputs.edition }}/payload.tar'
+        Write-Output "Checkpoint ${{ inputs.edition }} after: archive=$($archive.Length) bytes free=$($drive.Free) bytes"
