@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "repository": "rongxinzy/RongxinAI",
+  "workflowPath": ".github/workflows/release-preflight.yml",
+  "workflowRunId": 42340332484,
+  "workflowRunAttempt": 1,
+  "dispatchRef": "refs/heads/release/validation-ci-gates-1778",
+  "workflowHeadSha": "977abbf023dfb8cbb3cf998b1d4e09e66ec86655",
+  "sourceCommit": "977abbf023dfb8cbb3cf998b1d4e09e66ec86655",
+  "includePackaging": true,
+  "issuedAt": "2026-11-07T04:52:57.865Z"
+}

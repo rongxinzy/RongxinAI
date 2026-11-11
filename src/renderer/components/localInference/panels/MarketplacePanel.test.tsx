@@ -89,6 +89,49 @@ const lastSearchCall = (onSearch: ReturnType<typeof vi.fn>) =>
   onSearch.mock.calls.at(-1)?.[0] as MarketplaceSearchParams;
 
 describe('MarketplacePanel result grid', () => {
+  test('the Strata catalog reads local variant specifications without a general search or install', async () => {
+    const catalog = vi.fn(async () => [
+      {
+        id: 'strata-qwen-flash-next',
+        displayName: 'Qwen3.8-Flash-Next',
+        marketplaceVariants: [
+          {
+            label: 'Gyro-S',
+            launchId: 'Gyro-S',
+            files: [{ bytes: 58_487_015_808, repoId: 'agentionai/Qwen3.8-Flash-Next-Gyro-GGUF' }],
+          },
+        ],
+      },
+    ]);
+    const install = vi.fn(async () => {});
+    vi.stubGlobal('electron', {
+      strata: {
+        catalog,
+        install,
+        isBundled: async () => true,
+        installState: async () => ({ installed: [] }),
+        status: async () => ({ status: 'stopped' }),
+        onStatusChanged: () => () => {},
+      },
+    });
+    try {
+      const { props } = renderPanel();
+      expect(catalog).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole('tab', { name: 'Strata 适配模型' }));
+      expect(await screen.findByText('Gyro-S')).toBeVisible();
+      expect(catalog).toHaveBeenCalledOnce();
+      await userEvent.click(await screen.findByRole('button', { name: '安装' }));
+      expect(install).toHaveBeenCalledWith({
+        catalogId: 'strata-qwen-flash-next',
+        launchId: 'Gyro-S',
+      });
+      expect(props.onSearch).not.toHaveBeenCalled();
+      expect(props.onInstall).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   test('first visit does not auto-search (delegated to the recommendations hook)', () => {
     // The panel is presentation-only; the parent's useMarketplaceRecommendations
     // owns the first featured load. The panel must not fire its own request,

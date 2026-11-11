@@ -12,6 +12,9 @@ export const strataContractChannels: IpcContractChannels<typeof strataContract> 
   status: StrataIpcChannel.Status,
   start: StrataIpcChannel.Start,
   stop: StrataIpcChannel.Stop,
+  install: StrataIpcChannel.Install,
+  installState: StrataIpcChannel.InstallState,
+  cancelInstall: StrataIpcChannel.CancelInstall,
   getServiceConfig: StrataIpcChannel.ServiceConfigGet,
   setServiceConfig: StrataIpcChannel.ServiceConfigSet,
 };

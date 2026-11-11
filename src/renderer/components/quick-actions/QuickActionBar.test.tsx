@@ -3,15 +3,37 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import type { LocalizedQuickAction } from '../../types/quickAction';
 import QuickActionBar from './QuickActionBar';
 
 afterEach(cleanup);
 
 const mockActions = [
-  { id: 'slides', label: '制作幻灯片', icon: 'Presentation', prompt: '' },
-  { id: 'data', label: '分析数据', icon: 'ChartColumn', prompt: '' },
-  { id: 'web', label: '搭建网站', icon: 'Globe', prompt: '' },
-];
+  {
+    id: 'slides',
+    label: '制作幻灯片',
+    icon: 'Presentation',
+    color: '#000000',
+    skillMapping: 'presentation-studio',
+    prompts: [],
+  },
+  {
+    id: 'data',
+    label: '分析数据',
+    icon: 'ChartColumn',
+    color: '#000000',
+    skillMapping: 'data-analysis',
+    prompts: [],
+  },
+  {
+    id: 'web',
+    label: '搭建网站',
+    icon: 'Globe',
+    color: '#000000',
+    skillMapping: 'web-development',
+    prompts: [],
+  },
+] satisfies LocalizedQuickAction[];
 
 test('renders quick action buttons and calls onActionSelect', async () => {
   const user = userEvent.setup();

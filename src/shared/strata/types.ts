@@ -1,4 +1,4 @@
-import type { StrataEngineKind, StrataFamilyId } from './constants';
+import type { StrataEngineKind, StrataFamilyId, StrataInstallPhase } from './constants';
 
 export const StrataServiceStatus = {
   Unknown: 'unknown',
@@ -33,6 +33,35 @@ export interface StrataCatalogEntry {
   hardware: StrataHardwareGate;
   /** Strata docs URL section for this family. */
   docUrl: string;
+  marketplaceVariants?: StrataMarketplaceVariant[];
+}
+
+export interface StrataMarketplaceVariant {
+  label: string;
+  launchId: string;
+  files: {
+    repoId: string;
+    revision: string;
+    path: string;
+    bytes: number;
+    sha256: string;
+    shared?: true;
+  }[];
+}
+
+export interface StrataVariantRef {
+  catalogId: string;
+  launchId: string;
+}
+
+export interface StrataInstallState {
+  installed: StrataVariantRef[];
+  job?: StrataVariantRef & {
+    phase: StrataInstallPhase;
+    completed: number;
+    total: number;
+    error?: string;
+  };
 }
 
 export interface StrataServiceConfig {
@@ -45,6 +74,7 @@ export interface StrataStatusSnapshot {
   port?: number;
   baseUrl?: string;
   activeModelId?: string;
+  activeLaunchId?: string;
   managedByApp?: boolean;
   error?: string;
   bundled?: boolean;
@@ -52,4 +82,5 @@ export interface StrataStatusSnapshot {
 
 export interface StrataStartInput {
   catalogId: string;
+  launchId?: string;
 }

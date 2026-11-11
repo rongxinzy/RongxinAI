@@ -56,6 +56,43 @@ describe('ProviderManagerSection', () => {
     expect(screen.getByText(i18nService.t('magpieHostManaged'))).toBeTruthy();
   });
 
+  it('shows the effective window and whether it is manual or automatic', () => {
+    render(
+      <ProviderManagerSection
+        providers={[
+          {
+            ...mockProviders[1],
+            id: 'manual',
+            name: 'Manual',
+            models: ['gpt-4o'],
+            contexts: { '*': 65536 },
+          },
+          {
+            ...mockProviders[1],
+            id: 'auto',
+            name: 'Auto',
+            models: ['gpt-4o'],
+          },
+          {
+            ...mockProviders[1],
+            id: 'unset',
+            name: 'Unset',
+            models: ['unknown-model'],
+          },
+        ]}
+        models={[{ id: 'gpt-4o', context_window: 128000 }]}
+        onRefresh={vi.fn()}
+        onSaveProvider={vi.fn()}
+        onToggleProvider={vi.fn()}
+        onDeleteProvider={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(`上下文：${(65536).toLocaleString()} · 手动`)).toBeTruthy();
+    expect(screen.getByText(`上下文：${(128000).toLocaleString()} · 自动`)).toBeTruthy();
+    expect(screen.getByText(i18nService.t('magpieProviderContextUnset'))).toBeTruthy();
+  });
+
   it('opens add provider dialog when Add button is clicked and submits payload', async () => {
     const onSave = vi.fn().mockResolvedValue(true);
 

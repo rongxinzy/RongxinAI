@@ -1,5 +1,5 @@
 import { type ChildProcess, spawn } from 'child_process';
-import { app, net } from 'electron';
+import { app } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
@@ -106,6 +106,7 @@ import {
 } from '../llamacppServe';
 import { listLlamaCppRuntimeDevices } from '../llamacppRuntimeDeviceProbe';
 import { MarketplaceService } from '../marketplaceService';
+import { getAppLocalModelCatalog } from '../appLocalModelCatalog';
 import {
   getLlamaCppNvidiaSnapshot,
   hasAvailableNvidiaGpu,
@@ -178,8 +179,7 @@ export class LlamaCppManagerCore extends EventEmitter {
     this.marketplaceService =
       marketplaceService ??
       new MarketplaceService(() => this.getModelsDir(), {
-        fetchImpl: net.fetch,
-        cacheDir: path.join(app.getPath('userData'), 'marketplace-cache'),
+        localCatalog: getAppLocalModelCatalog(app.getPath('userData')),
       });
     this.storage = storage;
   }

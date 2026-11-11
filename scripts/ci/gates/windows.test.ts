@@ -1,3 +1,4 @@
+import { readInferenceWorkflow } from '../read-inference-workflow.mjs';
 import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { expect, test } from 'vitest';
@@ -19,7 +20,9 @@ interface Workflow {
 
 function workflow(file: string): Workflow {
   return load(
-    readFileSync(new URL(`../../../.github/workflows/${file}`, import.meta.url), 'utf8'),
+    file === 'build-inference-editions.yml'
+      ? readInferenceWorkflow()
+      : readFileSync(new URL(`../../../.github/workflows/${file}`, import.meta.url), 'utf8'),
   ) as Workflow;
 }
 

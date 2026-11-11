@@ -39,6 +39,7 @@ export const providersContractChannels: IpcContractChannels<typeof providersCont
   magpieDeleteProvider: MagpieIpc.deleteProvider,
   magpieTestProvider: MagpieIpc.testProvider,
   magpieDiagnostics: MagpieIpc.diagnostics,
+  magpieClearDiagnostics: MagpieIpc.clearDiagnostics,
   magpiePreferences: MagpieIpc.preferences,
   magpieUpdatePreferences: MagpieIpc.updatePreferences,
   magpieRoutingGroups: MagpieIpc.routingGroups,

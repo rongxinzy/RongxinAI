@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { StrataEngineKind, StrataFamilyId, StrataIpcChannel } from '../strata/constants';
+import {
+  StrataEngineKind,
+  StrataFamilyId,
+  StrataInstallPhase,
+  StrataIpcChannel,
+} from '../strata/constants';
 import { StrataServiceStatus } from '../strata/types';
 
 const StatusSnapshotSchema = z.object({
@@ -9,6 +14,7 @@ const StatusSnapshotSchema = z.object({
   port: z.number().optional(),
   baseUrl: z.string().optional(),
   activeModelId: z.string().optional(),
+  activeLaunchId: z.string().optional(),
   managedByApp: z.boolean().optional(),
   error: z.string().optional(),
   bundled: z.boolean().optional(),
@@ -27,10 +33,42 @@ const CatalogEntrySchema = z.object({
     docNoteKey: z.string(),
   }),
   docUrl: z.string(),
+  marketplaceVariants: z
+    .array(
+      z.object({
+        label: z.string(),
+        launchId: z.string(),
+        files: z.array(
+          z.object({
+            repoId: z.string(),
+            revision: z.string(),
+            path: z.string(),
+            bytes: z.number(),
+            sha256: z.string(),
+            shared: z.literal(true).optional(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
 });
 
 const ServiceConfigSchema = z.object({
   port: z.string().optional(),
+});
+
+const VariantRefSchema = z.object({
+  catalogId: z.string().max(128),
+  launchId: z.string().max(128),
+});
+const InstallStateSchema = z.object({
+  installed: z.array(VariantRefSchema),
+  job: VariantRefSchema.extend({
+    phase: z.enum(Object.values(StrataInstallPhase)),
+    completed: z.number(),
+    total: z.number(),
+    error: z.string().optional(),
+  }).optional(),
 });
 
 export const strataContract = {
@@ -51,13 +89,28 @@ export const strataContract = {
   },
   start: {
     channel: StrataIpcChannel.Start,
-    args: z.tuple([z.object({ catalogId: z.string() })]),
+    args: z.tuple([VariantRefSchema.partial({ launchId: true })]),
     result: StatusSnapshotSchema,
   },
   stop: {
     channel: StrataIpcChannel.Stop,
     args: z.tuple([]),
     result: StatusSnapshotSchema,
+  },
+  install: {
+    channel: StrataIpcChannel.Install,
+    args: z.tuple([VariantRefSchema]),
+    result: z.void(),
+  },
+  installState: {
+    channel: StrataIpcChannel.InstallState,
+    args: z.tuple([]),
+    result: InstallStateSchema,
+  },
+  cancelInstall: {
+    channel: StrataIpcChannel.CancelInstall,
+    args: z.tuple([VariantRefSchema]),
+    result: z.void(),
   },
   getServiceConfig: {
     channel: StrataIpcChannel.ServiceConfigGet,

@@ -5,6 +5,9 @@ export const StrataIpcChannel = {
   Status: 'strata:status',
   Start: 'strata:start',
   Stop: 'strata:stop',
+  Install: 'strata:install',
+  InstallState: 'strata:install-state',
+  CancelInstall: 'strata:cancel-install',
   ServiceConfigGet: 'strata:service-config:get',
   ServiceConfigSet: 'strata:service-config:set',
 } as const;
@@ -22,9 +25,19 @@ export const StrataEngineKind = {
 export type StrataEngineKind = (typeof StrataEngineKind)[keyof typeof StrataEngineKind];
 
 export const StrataFamilyId = {
-  QwenFlashNext: 'qwen',
+  QwenFlashNext: 'gyro',
   Qwen36: 'qwen36',
   DeepSeek41: 'deepseek41',
 } as const;
 
 export type StrataFamilyId = (typeof StrataFamilyId)[keyof typeof StrataFamilyId];
+
+export const StrataInstallPhase = {
+  Downloading: 'downloading',
+  Verifying: 'verifying',
+  Done: 'done',
+  Failed: 'failed',
+  Cancelled: 'cancelled',
+} as const;
+
+export type StrataInstallPhase = (typeof StrataInstallPhase)[keyof typeof StrataInstallPhase];

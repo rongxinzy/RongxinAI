@@ -197,4 +197,108 @@ describe('ProviderEditDialog', () => {
       );
     });
   });
+
+  it('edits the whole declared context table and blocks invalid values', async () => {
+    const onSave = vi.fn().mockResolvedValue(true);
+    render(
+      <ProviderEditDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        provider={{
+          id: 'relay',
+          name: 'Relay',
+          api: 'openai-completions',
+          baseUrl: 'https://relay.test/v1',
+          models: ['gpt-4o'],
+          off: false,
+          hasKey: true,
+          contexts: { '*': 65536, 'gpt-4o': 131072 },
+        }}
+        onSave={onSave}
+      />,
+    );
+
+    expect(screen.getByDisplayValue('65536')).toBeTruthy();
+    expect(screen.getByDisplayValue('131072')).toBeTruthy();
+
+    // 二进制简写显示解析结果，并以整型提交
+    fireEvent.change(screen.getByDisplayValue('65536'), { target: { value: '64k' } });
+    expect(screen.getByText('解析为 65536 tokens')).toBeTruthy();
+
+    fireEvent.click(screen.getByText(i18nService.t('save')));
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contexts: { '*': 65536, 'gpt-4o': 131072 },
+        }),
+      );
+    });
+
+    // 非法值不提交
+    onSave.mockClear();
+    fireEvent.change(screen.getByDisplayValue('131072'), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByText(i18nService.t('save')));
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('does not send contexts when only the name changes', async () => {
+    const onSave = vi.fn().mockResolvedValue(true);
+    render(
+      <ProviderEditDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        provider={{
+          id: 'relay',
+          name: 'Relay',
+          api: 'openai-completions',
+          baseUrl: 'https://relay.test/v1',
+          models: ['gpt-4o'],
+          off: false,
+          hasKey: true,
+          contexts: { '*': 65536, 'gpt-4o': 131072 },
+        }}
+        onSave={onSave}
+      />,
+    );
+
+    expect(screen.getByDisplayValue('65536')).toBeTruthy();
+    expect(screen.getByDisplayValue('131072')).toBeTruthy();
+    fireEvent.change(screen.getByDisplayValue('Relay'), { target: { value: 'Relay Renamed' } });
+    fireEvent.click(screen.getByText(i18nService.t('save')));
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalled();
+    });
+    expect(onSave.mock.calls[0][0]).not.toHaveProperty('contexts');
+  });
+
+  it('does not send contexts when only the key changes', async () => {
+    const onSave = vi.fn().mockResolvedValue(true);
+    render(
+      <ProviderEditDialog
+        open={true}
+        onOpenChange={vi.fn()}
+        provider={{
+          id: 'relay',
+          name: 'Relay',
+          api: 'openai-completions',
+          baseUrl: 'https://relay.test/v1',
+          models: ['gpt-4o'],
+          off: false,
+          hasKey: true,
+          contexts: { '*': 65536, 'gpt-4o': 131072 },
+        }}
+        onSave={onSave}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText(i18nService.t('magpieProviderKey')), {
+      target: { value: 'sk-new' },
+    });
+    fireEvent.click(screen.getByText(i18nService.t('save')));
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalled();
+    });
+    expect(onSave.mock.calls[0][0]).toMatchObject({ key: 'sk-new' });
+    expect(onSave.mock.calls[0][0]).not.toHaveProperty('contexts');
+  });
 });

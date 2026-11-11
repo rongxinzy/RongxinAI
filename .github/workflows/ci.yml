@@ -63,6 +63,17 @@ jobs:
       - name: Fail on dead Python under scripts/
         run: bun run check:python-dead-code
 
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun-workspace
+        with:
+          save-cache: 'true'
+      - name: Typecheck application and unit test sources
+        run: bun run build:tsc
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -85,7 +96,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [lint, test]
+    needs: [lint, typecheck, test]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -98,7 +109,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           check-latest: true
-      - name: Require lint and every unit test shard to succeed
+      - name: Require lint, typecheck, and every unit test shard to succeed
         run: node scripts/ci/gates/verify.ts
         env:
           GATE_RESULTS: ${{ toJSON(needs) }}

@@ -265,6 +265,18 @@ export default defineConfig(async ({ command }) => {
                 onstart() {},
               },
               {
+                entry: 'src/main/libs/modelCatalogUpdateWorker.ts',
+                vite: {
+                  build: {
+                    watch: command === 'serve' ? {} : null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // Stream SHA-256 file digests without blocking the main process.
                 entry: 'src/main/libs/hashWorker.ts',
                 vite: {

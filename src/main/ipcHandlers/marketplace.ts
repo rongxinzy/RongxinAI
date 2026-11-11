@@ -1,11 +1,12 @@
-import path from 'path';
-
 import { net } from 'electron';
 
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { marketplaceContract } from '../../shared/marketplace/contract';
 import type { MarketplaceSearchParams } from '../../shared/marketplace';
 import { MarketplaceService } from '../libs/marketplaceService';
+import { getAppLocalModelCatalog } from '../libs/appLocalModelCatalog';
+import { createModelCatalogUpdateCheck } from '../libs/modelCatalogSync';
+import { resolveModelCatalogUrl } from '../libs/modelCatalogClient';
 
 function searchKey(senderId: number, requestId: string): string {
   return `${senderId}:${requestId}`;
@@ -15,11 +16,15 @@ export function registerMarketplaceIpcHandlers(options: {
   getModelsDir: () => string;
   userDataPath: string;
 }): void {
-  const service = new MarketplaceService(options.getModelsDir, {
-    catalogApiUrl: process.env.ZHIYUAN_MODEL_CATALOG_URL?.trim() || undefined,
-    fetchImpl: net.fetch,
-    cacheDir: path.join(options.userDataPath, 'marketplace-cache'),
-  });
+  const localCatalog = getAppLocalModelCatalog(options.userDataPath);
+  const service = new MarketplaceService(options.getModelsDir, { localCatalog });
+  const catalogUrl = resolveModelCatalogUrl();
+  const feedUrl =
+    process.env.ZHIYUAN_MODEL_CATALOG_FEED_URL?.trim() ||
+    (catalogUrl ? `${catalogUrl}/v1/catalog/feed` : undefined);
+  const checkForUpdate = feedUrl
+    ? createModelCatalogUpdateCheck(localCatalog, feedUrl, net.fetch)
+    : undefined;
   const activeSearches = new Map<string, AbortController>();
 
   handleIpcContract(marketplaceContract, {
@@ -35,21 +40,26 @@ export function registerMarketplaceIpcHandlers(options: {
       const controller = new AbortController();
       activeSearches.set(key, controller);
       try {
-        return await service.search(request.params as MarketplaceSearchParams, controller.signal);
+        const result = await service.search(
+          request.params as MarketplaceSearchParams,
+          controller.signal,
+        );
+        checkForUpdate?.();
+        return result;
       } catch (error) {
         if (controller.signal.aborted) {
           return {
             models: [],
             totalCount: 0,
-            source: 'cloud-catalog' as const,
+            source: 'local-sqlite' as const,
           };
         }
         console.warn('[Marketplace] catalog search failed:', error);
         return {
           models: [],
           totalCount: 0,
-          source: 'cloud-catalog' as const,
-          warning: '云端 GGUF 目录暂时不可用。',
+          source: 'local-sqlite' as const,
+          warning: '本地模型目录暂时不可用。',
         };
       } finally {
         if (activeSearches.get(key) === controller) activeSearches.delete(key);
