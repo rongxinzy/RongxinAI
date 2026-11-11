@@ -15,7 +15,7 @@ test('selected pull requests install and start the generated Ubuntu package', ()
   assert.match(workflow, /workflow_call:/);
   assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /paths:/);
-  assert.match(workflow, /runs-on: ubuntu-latest/);
+  assert.match(workflow, /runs-on: ubuntu-24\.04/);
   assert.match(workflow, /bun run dist:linux/);
 
   const packageJson = readFileSync(path.join(root, 'package.json'), 'utf8');
