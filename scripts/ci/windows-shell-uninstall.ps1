@@ -156,13 +156,28 @@ function Update-OwnedUninstallProcesses {
   do {
     $added = $false
     foreach ($process in $all) {
-      if ($owned.ContainsKey([int]$process.ParentProcessId) -and -not $owned.ContainsKey([int]$process.ProcessId)) {
-        $owned[[int]$process.ProcessId] = $process.CreationDate
+      if ($owned.ContainsKey([int]$process.ProcessId) -or
+          -not $owned.ContainsKey([int]$process.ParentProcessId)) { continue }
+      $parent = $owned[[int]$process.ParentProcessId]
+      if (-not (Test-AcceptanceChildLifetime $parent $process.CreationDate)) { continue }
+      $child = $null
+      try {
+        $child = [Diagnostics.Process]::GetProcessById([int]$process.ProcessId)
+        $null = $child.Handle
+        if ([Math]::Abs(($child.StartTime - $process.CreationDate).TotalMilliseconds) -ge 1) { continue }
+        $owned[[int]$process.ProcessId] = $child
+        $child = $null
         $added = $true
+      } catch [ArgumentException] {
+        # The snapshot process exited before its handle could be pinned.
+      } catch [InvalidOperationException] {
+        # StartTime is unavailable if the pinned process has already exited.
+      } finally {
+        if ($null -ne $child) { $child.Dispose() }
       }
     }
   } while ($added)
-  return @($all | Where-Object { $owned.ContainsKey([int]$_.ProcessId) -and $owned[[int]$_.ProcessId] -eq $_.CreationDate })
+  return @($owned.Values | Where-Object { -not $_.HasExited })
 }
 try {
   if (Test-Path -LiteralPath $runtimeRoot) {
@@ -185,14 +200,19 @@ try {
   $nativeStarted = $native.Start()
   if (-not $nativeStarted) { throw 'Registered native uninstaller did not start' }
   $null = $native.Handle
-  $owned[$native.Id] = $native.StartTime
+  $owned[$native.Id] = $native
   $deadline = (Get-Date).AddMinutes(10)
   do {
     $active = @(Update-OwnedUninstallProcesses)
     $removed = -not (Test-Path -LiteralPath $installRoot) -and
       @($registrationKeys | Where-Object { Test-Path -LiteralPath $_ }).Count -eq 0
     if ($native.HasExited -and $active.Count -eq 0 -and $removed) { break }
-    if ((Get-Date) -ge $deadline) { throw 'Native uninstall did not remove app and registration or finish its own process tree within ten minutes' }
+    if ((Get-Date) -ge $deadline) {
+      $report.remainingProcesses = @($active | ForEach-Object { [ordered]@{ id = $_.Id; name = $_.ProcessName; started = $_.StartTime } })
+      $report.installRootRemaining = Test-Path -LiteralPath $installRoot
+      $report.registrationRemaining = @($registrationKeys | Where-Object { Test-Path -LiteralPath $_ })
+      throw 'Native uninstall did not remove app and registration or finish its own process tree within ten minutes'
+    }
     Start-Sleep -Milliseconds 200
   } while ($true)
   $report.nativeExitCode = $native.get_ExitCode()
@@ -214,7 +234,8 @@ try {
 } finally {
   try {
     foreach ($process in @(Update-OwnedUninstallProcesses)) {
-      Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+      $process.Kill()
+      $null = $process.WaitForExit(5000)
     }
     if ($nativeStarted -and -not $native.HasExited) { $native.Kill(); $null = $native.WaitForExit(5000) }
     if (@(Update-OwnedUninstallProcesses).Count -gt 0) { throw 'Owned uninstall processes remain active; runtime quarantine retained for safety' }
@@ -227,7 +248,8 @@ try {
     $report.passed = $false
     $report.errors += $_.Exception.ToString()
   }
-  $native.Dispose()
+  foreach ($process in $owned.Values) { $process.Dispose() }
+  if (-not $nativeStarted) { $native.Dispose() }
   $report | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $evidence 'report.json') -Encoding UTF8
 }
 if (-not $report.passed) { throw ($report.errors -join "`n") }

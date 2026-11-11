@@ -102,6 +102,15 @@ foreach ($file in @(${quote(scriptPath)}, ${quote(helperPath)})) {
   if ($errors.Count) { throw ($errors | Out-String) }
 }
 . ${quote(helperPath)}
+$started = [datetime]'2026-01-01T00:00:00Z'
+$exited = $started.AddSeconds(1)
+$parent = [pscustomobject]@{ StartTime=$started; HasExited=$true; ExitTime=$exited }
+if (-not (Test-AcceptanceChildLifetime $parent $started.AddMilliseconds(500))) { throw 'A real child created before parent exit was rejected' }
+if (Test-AcceptanceChildLifetime $parent $started.AddSeconds(2)) { throw 'A reused parent PID adopted an unrelated later process' }
+if (Test-AcceptanceChildLifetime $parent $started.AddSeconds(-1)) { throw 'An older unrelated process was adopted' }
+$parent.HasExited = $false
+if (-not (Test-AcceptanceChildLifetime $parent $started.AddSeconds(2))) { throw 'A live pinned parent could not adopt its child' }
+Write-Output 'PASS: process ownership is bounded by the pinned parent lifetime'
 $root = ${quote(fixture)}
 $sandbox = Join-Path $root 'zhiyuan-shell-acceptance'
 $ProjectRoot = ${quote(path.resolve(__dirname, '../..'))}
@@ -184,6 +193,9 @@ Write-Output 'PASS: actual leases, literal paths, host identity and non-destruct
       );
       expect(result.stdout).toContain(
         'PASS: standard SHA256 vectors and real Security/CIM modules with no module search path',
+      );
+      expect(result.stdout).toContain(
+        'PASS: process ownership is bounded by the pinned parent lifetime',
       );
       expect(fs.readFileSync(path.join(fixture, 'installed-path.txt'), 'utf8')).toBe(
         path.join(fixture, 'zhiyuan-shell-acceptance/安装路径/知远.exe'),

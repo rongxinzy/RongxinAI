@@ -1,4 +1,11 @@
 # Side-effect-free definitions used by the disposable-runner acceptance driver.
+function Test-AcceptanceChildLifetime([object]$Parent, [datetime]$Created) {
+  # CIM timestamps have microsecond precision; Process.StartTime has 100ns
+  # precision. A child must have been created during this pinned parent instance.
+  return $Created -ge $Parent.StartTime.AddMilliseconds(-1) -and
+    (-not $Parent.HasExited -or $Created -le $Parent.ExitTime)
+}
+
 function Initialize-AcceptanceModules {
   # A pwsh parent can pass its incompatible PSModulePath to powershell.exe.
   # Resolve only the current host's inbox modules, never a caller search path.
