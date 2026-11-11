@@ -32,6 +32,70 @@ const chatContract = {
   requiresUserAcceptance: false,
 };
 
+test('parallel tools retain a live run while each approval settles independently', async () => {
+  const { db, service } = createService();
+  try {
+    const { run } = service.beginRun({
+      sessionId: 'parallel',
+      goal: 'work',
+      contract: chatContract,
+    });
+    const authorize = (id: string, toolName = 'write') =>
+      service.authorizeToolCall({
+        sessionId: 'parallel',
+        runId: run.id,
+        toolCallId: id,
+        toolName,
+        toolInput: { path: `${id}.txt` },
+        approvalMode: WorkbenchApprovalMode.Ask,
+      });
+    const first = authorize('first');
+    const second = authorize('second');
+    await expect(authorize('read', 'read')).resolves.toEqual({ allow: true });
+    const approvals = service.repository.listPendingApprovalsForSession('parallel');
+    expect(approvals).toHaveLength(2);
+    expect(service.isRunRunning(run.id)).toBe(true);
+    service.respondToApproval({ approvalId: approvals[0].id, approved: true });
+    expect(service.repository.getRun(run.id)?.status).toBe(WorkbenchRunStatus.WaitingApproval);
+    service.respondToApproval({ approvalId: approvals[1].id, approved: true });
+    await expect(Promise.all([first, second])).resolves.toEqual([{ allow: true }, { allow: true }]);
+    expect(service.repository.getRun(run.id)?.status).toBe(WorkbenchRunStatus.Running);
+  } finally {
+    db.close();
+  }
+});
+
+test('denying one parallel approval expires its siblings and cannot revive the run', async () => {
+  const { db, service } = createService();
+  try {
+    const { run } = service.beginRun({
+      sessionId: 'parallel',
+      goal: 'work',
+      contract: chatContract,
+    });
+    const calls = ['first', 'second'].map(id =>
+      service.authorizeToolCall({
+        sessionId: 'parallel',
+        runId: run.id,
+        toolCallId: id,
+        toolName: 'write',
+        toolInput: { path: `${id}.txt` },
+        approvalMode: WorkbenchApprovalMode.Ask,
+      }),
+    );
+    const approvals = service.repository.listPendingApprovalsForSession('parallel');
+    service.respondToApproval({ approvalId: approvals[0].id, approved: false });
+    const results = await Promise.all(calls);
+    expect(results.every(result => !result.allow)).toBe(true);
+    expect(
+      service.respondToApproval({ approvalId: approvals[1].id, approved: true }).decision,
+    ).toBe(WorkbenchApprovalDecision.Expired);
+    expect(service.repository.getRun(run.id)?.status).toBe(WorkbenchRunStatus.Paused);
+  } finally {
+    db.close();
+  }
+});
+
 test('expires pending approvals when a new message supersedes the task', async () => {
   const { db, service } = createService();
   try {

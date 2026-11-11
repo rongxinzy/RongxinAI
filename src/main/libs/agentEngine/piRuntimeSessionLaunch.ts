@@ -34,15 +34,13 @@ import {
   assertWorkModeContextWindow,
 } from '../llamacppWorkModeContextGuard';
 import { PiPlanModePrompt } from './piPlanTool';
-import { resolvePiTurnWorkflowSkills } from './piTurnWorkflow';
-import { isAcademicResearchSkillSet } from './piResearchRun';
+import { PiAgentEventType } from './piStreamConstants';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { createPiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
 import { PiEventProjectionQueue } from './piEventProjectionQueue';
 import { ToolActivityTracker } from './toolActivity';
-import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
 import {
@@ -51,10 +49,7 @@ import {
   resolvePiSessionModel,
 } from './piRuntimeSettingsOverrides';
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
-import {
-  createPiWorkbenchContract,
-  resolvePiShortcutWorkflowKind,
-} from './piRuntimeWorkbenchContract';
+import { createPiWorkbenchContract, PiGoalModePrompt } from './piRuntimeWorkbenchContract';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
 import { openPersistentPiSessionManager } from './piSessionStore';
 import { buildPiSessionCustomTools } from './piRuntimeSessionCustomTools';
@@ -218,15 +213,10 @@ export async function startPiRuntimeSession(
       resourceState.expertSkillDirs,
     );
 
-    const workflowSkillIds = resolvePiTurnWorkflowSkills({
-      attachedSkillIds: options.attachedSkillIds,
-      previousWorkflowSkillIds: options._workflowSkillIdsOverride,
-      availableSkillIds: resourceState.skillIds,
-    });
-    const shortcutKindForContract = isAcademicResearchSkillSet(workflowSkillIds)
-      ? null
-      : resolvePiShortcutWorkflowKind(workflowSkillIds);
-    const workbenchContract = createPiWorkbenchContract(options.sessionMode, workflowSkillIds);
+    const workbenchContract = createPiWorkbenchContract(
+      options.sessionMode,
+      resourceState.skillIds,
+    );
     const workbenchTaskService = host.getWorkbenchTaskService();
     if (workbenchTaskService && !chatMode) {
       const workbench = workbenchTaskService.beginRun({
@@ -371,25 +361,15 @@ export async function startPiRuntimeSession(
       sessionOptions.settingsManager = settingsManager;
     }
 
-    const {
-      customTools,
-      researchRun,
-      shortcutWorkflow,
-      agentLoop,
-      workLoopPrompt,
-      shouldRunGoalLoop,
-    } = buildPiSessionCustomTools(host, {
+    const { customTools } = buildPiSessionCustomTools(host, {
       pi,
       sessionId,
-      prompt,
       options,
       resourceState,
       resolvedModel,
       workspaceRoot,
       workbenchRunId,
       expertIds,
-      workflowSkillIds,
-      shortcutKindForContract,
       mcpNativeBridge,
       abortSignal: abortController.signal,
       recordActivation,
@@ -444,7 +424,6 @@ export async function startPiRuntimeSession(
       requestedSystemPrompt: basePrompt,
       requestedModelOverride: options.modelOverride,
       requestedSkillIds: resourceState.skillIds,
-      requestedWorkflowSkillIds: workflowSkillIds,
       requestedExpertIds: expertIds,
       turnExperts: (
         host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.experts ?? []
@@ -478,12 +457,8 @@ export async function startPiRuntimeSession(
       toolStartedAtByCallId: new Map(),
       preparingToolCallIdByContentIndex: new Map(),
       toolActivityTracker: new ToolActivityTracker(),
-      agentLoop,
-      researchRun,
-      shortcutWorkflow,
       goalMode: options.goalMode === true,
       planMode: options.planMode === true,
-      writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resourceState.maxOutputTokens),
       pendingError: null,
       errorSurfaced: false,
       retryNoticeEmitted: false,
@@ -528,6 +503,8 @@ export async function startPiRuntimeSession(
       if (abortController.signal.aborted || host.activeSessions.get(sessionId) !== active) {
         return;
       }
+      if (event.type === PiAgentEventType.CompactionEnd && event.result)
+        host.memoryInjectionDedup.reset(sessionId);
       host.emit('executionEvent', sessionId, event);
       active.eventProjection?.push(event);
     });
@@ -557,14 +534,8 @@ export async function startPiRuntimeSession(
     // history restore only when no persisted Pi session file exists; when the
     // session manager above reopened one, Pi already holds the prior turns as
     // structured messages and the override is just the new user prompt.
-    let initialPrompt = researchRun
-      ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
-      : shortcutWorkflow
-        ? shortcutWorkflow.buildInitialPrompt(options._piPromptOverride || prompt)
-        : options._piPromptOverride || prompt;
-    if (shouldRunGoalLoop) {
-      initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
-    }
+    let initialPrompt = options._piPromptOverride || prompt;
+    if (options.goalMode === true) initialPrompt = `${PiGoalModePrompt}\n\n${initialPrompt}`;
     if (options.planMode === true) {
       initialPrompt = `${PiPlanModePrompt}\n\n${initialPrompt}`;
     }
@@ -578,6 +549,7 @@ export async function startPiRuntimeSession(
       workspaceRoot,
       sessionId,
       userPrompt: prompt,
+      signal: abortController.signal,
     });
     if (host.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
     initialPrompt = finalizePiPromptWithProjectMemory({

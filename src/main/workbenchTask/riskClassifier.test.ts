@@ -18,10 +18,23 @@ test('classifies known reads, reversible writes, and destructive shell commands'
     WorkbenchApprovalRiskLevel.Irreversible,
   );
   expect(classifyWorkbenchToolRisk('mcp_proxy', {})).toBe(WorkbenchApprovalRiskLevel.Unknown);
-  expect(classifyWorkbenchToolRisk('subagent', {})).toBe(WorkbenchApprovalRiskLevel.Unknown);
+  expect(classifyWorkbenchToolRisk('subagent', {})).toBe(WorkbenchApprovalRiskLevel.ReadOnly);
   expect(classifyWorkbenchToolRisk('skill_runtime_capabilities', {})).toBe(
     WorkbenchApprovalRiskLevel.ReadOnly,
   );
+});
+
+test.each([
+  'read_document',
+  'conversation_history',
+  'ocr',
+  'session_summary',
+  'plan_write',
+  'codemode',
+])('does not ask for approval of %s while actual mutations remain protected', name => {
+  expect(classifyWorkbenchToolRisk(name, {})).toBe(WorkbenchApprovalRiskLevel.ReadOnly);
+  expect(classifyWorkbenchToolRisk('write', {})).toBe(WorkbenchApprovalRiskLevel.Reversible);
+  expect(classifyWorkbenchToolRisk('mcp', {})).toBe(WorkbenchApprovalRiskLevel.Unknown);
 });
 
 test('idempotency hashing is stable across object key order', () => {

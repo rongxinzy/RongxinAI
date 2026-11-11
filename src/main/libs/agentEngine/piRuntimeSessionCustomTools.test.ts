@@ -37,7 +37,6 @@ test('a reused summary tool reads the current run and turn for content and metri
   const { customTools } = buildPiSessionCustomTools(host as never, {
     pi: {} as never,
     sessionId: 'session-1',
-    prompt: 'task',
     options: { sessionMode: CoworkSessionMode.Work },
     resourceState: {
       chatMode: false,
@@ -50,8 +49,6 @@ test('a reused summary tool reads the current run and turn for content and metri
     workspaceRoot: '/work',
     workbenchRunId: 'run-1',
     expertIds: [],
-    workflowSkillIds: undefined,
-    shortcutKindForContract: null,
     mcpNativeBridge: true,
     abortSignal: new AbortController().signal,
     recordActivation,

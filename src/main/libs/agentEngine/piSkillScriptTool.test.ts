@@ -11,7 +11,7 @@ import { runManagedSkillScript, type SkillScriptRunResult } from '../skillRuntim
 import { buildPiSkillScriptTool, PiSkillScriptToolName } from './piSkillScriptTool';
 import { PiToolEventType } from './constants';
 import { PiMessageRole } from './piSubagentExecution';
-import { PiAssistantStopReason, PiContentBlockType } from './piWriteTokenLimit';
+import { PiAssistantStopReason, PiContentBlockType } from './piToolConstants';
 
 const model: Model<'openai-completions'> = {
   id: 'test',
@@ -150,5 +150,35 @@ test('passes the trusted root for nested expert skills to the runner', async () 
   await runTool(['pdf'], { pdf: '/skills' });
   expect(runManagedSkillScript).toHaveBeenCalledWith(
     expect.objectContaining({ skillsRoot: '/skills' }),
+  );
+});
+
+test('reads the current selection and root when a skill is added during execution', async () => {
+  let selection: { skillIds: string[]; skillRoots: Record<string, string> } = {
+    skillIds: [],
+    skillRoots: {},
+  };
+  const tool = buildPiSkillScriptTool({
+    workspaceRoot: '/workspace',
+    allowedSkillIds: [],
+    getSkillSelection: () => selection,
+  }) as unknown as AgentTool;
+  await expect(tool.execute('before', { skillId: 'pdf', script: 'check.py' })).rejects.toThrow(
+    'SKILL_NOT_SELECTED',
+  );
+  selection = { skillIds: ['pdf'], skillRoots: { pdf: '/expert' } };
+  vi.mocked(runManagedSkillScript).mockResolvedValue({
+    ...result,
+    ok: true,
+    status: 'completed',
+    exitCode: 0,
+  });
+  await tool.execute('after', { skillId: 'pdf', script: 'check.py' });
+  expect(runManagedSkillScript).toHaveBeenCalledWith(
+    expect.objectContaining({ skillsRoot: '/expert' }),
+  );
+  selection = { skillIds: [], skillRoots: {} };
+  await expect(tool.execute('removed', { skillId: 'pdf', script: 'check.py' })).rejects.toThrow(
+    'SKILL_NOT_SELECTED',
   );
 });

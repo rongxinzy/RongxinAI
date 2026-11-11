@@ -34,9 +34,9 @@ This skill contains no search scripts. Use whatever retrieval tools are availabl
 
 Never claim to have searched or read a page unless a retrieval tool was actually invoked. If no retrieval tool is available in the current mode, say so plainly and produce the best report you can from prior knowledge, clearly marked as unverified.
 
-## Delegation Protocol (mandatory)
+## Research method
 
-Deep research is **not** a solo 2–3 round search. When the `subagent` tool is available, you MUST fan the work out and drive it in loops. Stopping after a couple of quick search rounds is a protocol violation.
+Scale the research to the requested depth. Use isolated subagents when independent retrieval or critique will improve the result; a tool protocol or a minimum round count is not a completion condition.
 
 ### 1. Clarify the Research Question
 
@@ -50,27 +50,23 @@ State your interpretation at the top of the work so the user can correct course 
 
 ### 2. Plan Angles, Then Fan Out in Parallel
 
-Decompose the question into 3–5 **meaningfully different** angles (definitions/background, current landscape and key players, recent developments, primary data and statistics, contrarian views and limitations). Then launch **one `researcher` subagent per angle in a single `subagent` parallel call** — do not research the angles one by one yourself.
+Identify meaningfully different angles, such as background, current evidence, competing explanations and limitations. Investigate them directly or delegate independent angles to researcher subagents when useful.
 
 Each delegation task must be self-contained: the angle, the core question for context, the time range, the languages to search in, and the required output — a list of findings where each finding carries a source URL, publisher, date, and a one-line takeaway.
-
-When the controlled Deep Research shortcut is active, persist the 3–5 angles
-with `workflow_state` action `plan`, and record each source with action
-`source`. Those URLs are fetched by the runtime before they count.
 
 ### 3. Cross-Validate the Returns
 
 When the parallel researchers return:
 
 - Merge their source inventories; deduplicate by URL.
-- Require **at least two independent sources** for any load-bearing claim. Mark single-source claims.
+- Seek independent corroboration for disputed or consequential claims. Clearly identify claims that rely on a single source; one authoritative source can suffice for a narrow fact.
 - Prefer primary sources over aggregators; check publication dates on fast-moving topics.
 - When sources conflict, report the conflict and the credibility of each side — never silently pick one.
 - Read the few most load-bearing pages yourself; do not relay snippet-level claims as verified.
 
 ### 4. Loop on the Gaps
 
-Draft the report outline and audit it for gaps: unsupported claims, missing sub-questions, contradictions left unresolved. If material gaps remain, start an `agent_loop` (goal mode, goal = "all load-bearing claims in the outline are supported by 2+ independent sources") and use each iteration to attack the remaining gaps — with fresh `subagent` delegations where the gap needs new retrieval. Declare `done` only when the goal holds or the iterations stop changing the picture. Respect the loop's iteration cap; if it trips, deliver the report with the gaps explicitly listed. In the controlled shortcut, `done` is only a completion request: it remains active until the recorded angles, researcher delegations, and reachable sources clear the runtime gate.
+Draft the outline and audit it for unsupported claims, unanswered questions and unresolved contradictions. Investigate material gaps with further retrieval or focused delegation. Continue until the requested result is supported or a concrete blocker prevents progress. Native compaction preserves the ongoing task; no loop-control calls are needed. Report remaining uncertainty honestly and respect user cancellation and explicit budgets.
 
 ### 5. Synthesize the Report
 
@@ -113,16 +109,11 @@ Citation rules:
 
 Before delivering, check:
 
-- [ ] The research was fanned out to parallel `researcher` subagents (or, if the tool is unavailable, the report says so and explains the degraded process)
-- [ ] Material gaps were attacked in `agent_loop` iterations, not abandoned after one round
+- [ ] Retrieval and any delegation were appropriate to the question and available tools
+- [ ] Material gaps were investigated or explicitly identified as unresolved
 - [ ] The report answers the question actually asked, in the user's language
-- [ ] Load-bearing claims have 2+ independent sources or are flagged as single-source
+- [ ] Claims have appropriate supporting evidence, with single-source limitations identified
 - [ ] Every citation maps to a real, retrieved URL
 - [ ] Conflicts and uncertainty are surfaced, not hidden
 - [ ] No fabricated quotes, numbers, or links
-- [ ] In the controlled shortcut, save the completed report as a `.md` file
-  inside the selected workspace and record it with `workflow_state` role
-  `deliverable`.
-- [ ] Save a readable `.md`, `.txt`, or `.json` validation report that audits
-  citations, source conflicts, scope, and remaining uncertainty; record it with
-  role `validation`. Research evidence alone never completes the shortcut.
+- [ ] Deliver the report in the user's requested format and location, with the evidence, conflicts and remaining uncertainty clearly explained

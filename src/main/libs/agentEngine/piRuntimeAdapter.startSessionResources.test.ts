@@ -60,9 +60,7 @@ describe('PiRuntimeAdapter', () => {
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         systemPromptOverride: (base: string | undefined) => string | undefined;
       };
-      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBe(
-        'Pi default prompt\n\nYou are the selected expert.',
-      );
+      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBeUndefined();
       expect(mockCreateAgentSession).toHaveBeenCalledWith(
         expect.objectContaining({
           resourceLoader: expect.any(Object),

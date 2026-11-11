@@ -26,9 +26,11 @@ import {
   sendPiPrompt,
   type ActivePiSession,
 } from './piRuntimeSessionState';
-import type { PiContinueOptions, PiStartOptions } from './piRuntimeTypes';
+import type { PiContinueOptions } from './piRuntimeTypes';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import { collectImagePathReferences } from './piImageInputFallback';
+import { resolvePiSkillRoots } from './piSkillRoots';
+import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 
 export class PiRuntimeQueueController {
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
@@ -168,9 +170,15 @@ export class PiRuntimeQueueController {
     // run_skill_script whitelist from the session's skill set, and a skill
     // attached to this queued input is additive exactly like a follow-up's.
     const previousSkillIds = active.resourceState.skillIds;
+    const previousSkillRoots = active.resourceState.skillRoots;
     const steeredSkillIds = mergeSkillIds(previousSkillIds, item.skillIds);
     if (!haveSameStringList(steeredSkillIds, previousSkillIds)) {
       active.resourceState.skillIds = steeredSkillIds;
+      active.resourceState.skillRoots = resolvePiSkillRoots(
+        steeredSkillIds,
+        resolveZhiyuanSkillDirs(),
+        active.resourceState.expertSkillDirs,
+      );
       try {
         // Pi reloads the existing ResourceLoader without replacing transcript
         // state, model, MCP tools, or custom expert tools.
@@ -186,6 +194,7 @@ export class PiRuntimeQueueController {
         active.requestedSkillIds = steeredSkillIds;
       } catch (error) {
         active.resourceState.skillIds = previousSkillIds;
+        active.resourceState.skillRoots = previousSkillRoots;
         throw error;
       }
     }

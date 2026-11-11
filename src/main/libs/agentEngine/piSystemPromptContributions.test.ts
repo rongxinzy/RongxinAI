@@ -10,7 +10,6 @@ import { describe, expect, it } from 'vitest';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
-import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
@@ -18,7 +17,6 @@ import {
   collectPiSystemPromptContributions,
   PiSystemPromptContributions,
 } from './piSystemPromptContributions';
-import { calculatePiWriteChunkCharacterLimit } from './piWriteTokenLimit';
 
 const FULL_CONTEXT = { fileToolsEnabled: true, maxOutputTokens: 8000 } as const;
 const TEXT_CONTEXT = { fileToolsEnabled: false, maxOutputTokens: 8000 } as const;
@@ -47,6 +45,24 @@ const FAILED_MCP_CONTEXT = {
 } as const;
 
 describe('piSystemPromptContributions', () => {
+  it('does not advertise host-only tools to native child sessions or memory tools to Chat', () => {
+    const child = collectPiSystemPromptContributions({
+      ...FULL_CONTEXT,
+      nativeToolsOnly: true,
+    }).join('\n');
+    for (const name of [
+      'session_summary',
+      'AskUserQuestion',
+      'python_execute',
+      'read_document',
+      'declare_artifact',
+    ]) {
+      expect(child).not.toContain(name);
+    }
+    expect(
+      collectPiSystemPromptContributions({ ...FULL_CONTEXT, chatMode: true }).join('\n'),
+    ).not.toContain('session_summary');
+  });
   it('has unique ids', () => {
     const ids = PiSystemPromptContributions.map(contribution => contribution.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -89,7 +105,6 @@ describe('piSystemPromptContributions', () => {
       PiAskUserQuestionSystemPrompt,
       PiUnattendedSystemPrompt,
       PiDocumentReaderSystemPrompt,
-      PiBuiltinFileToolSystemPrompt,
       PiPythonEnvSystemPrompt,
       DeclareArtifactSystemPrompt,
     ]) {
@@ -101,10 +116,8 @@ describe('piSystemPromptContributions', () => {
     const full = collectPiSystemPromptContributions(FULL_CONTEXT);
     const text = collectPiSystemPromptContributions(TEXT_CONTEXT);
     expect(full).toContain(PiDocumentReaderSystemPrompt);
-    expect(full).toContain(PiBuiltinFileToolSystemPrompt);
     expect(full).toContain(PiPythonEnvSystemPrompt);
     expect(text).not.toContain(PiDocumentReaderSystemPrompt);
-    expect(text).not.toContain(PiBuiltinFileToolSystemPrompt);
     expect(text).not.toContain(PiPythonEnvSystemPrompt);
     expect(text.some(prompt => prompt.includes('## Large File Writes'))).toBe(false);
     // Tool-agnostic policies stay present in both modes.
@@ -127,12 +140,10 @@ describe('piSystemPromptContributions', () => {
     expect(unattended).toContain(PiUnattendedSystemPrompt);
   });
 
-  it('renders the large-file-write policy from the session token budget', () => {
-    const full = collectPiSystemPromptContributions({ ...FULL_CONTEXT, maxOutputTokens: 8000 });
-    const expectedLimit = calculatePiWriteChunkCharacterLimit(8000);
-    const policy = full.find(prompt => prompt.includes('## Large File Writes'));
-    expect(policy).toBeDefined();
-    expect(policy).toContain(`${expectedLimit} characters`);
+  it('does not prescribe an extra large-file protocol', () => {
+    expect(collectPiSystemPromptContributions(FULL_CONTEXT).join('\n')).not.toContain(
+      '2000 characters',
+    );
   });
 
   it('adds concrete MCP capabilities only when MCP tools are available', () => {

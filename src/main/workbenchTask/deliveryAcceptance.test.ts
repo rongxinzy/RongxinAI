@@ -42,40 +42,36 @@ afterEach(() => {
   }
 });
 
-test.each([undefined, { productionActive: false }, { skipped: true }])(
-  'a work run without declared deliverables completes without acceptance (%j)',
-  async workflowSnapshot => {
-    const { service, workspace, onVerifiedRun } = createFixture();
-    const { run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'Create a presentation',
-      contract: {
-        kind: WorkbenchContractKind.GenericWork,
-        requiresUserAcceptance: false,
-      },
-    });
-    fs.writeFileSync(path.join(workspace, 'build-slides.py'), 'print("intermediate")');
-    await service.authorizeToolCall({
-      sessionId: 'session',
-      runId: run.id,
-      toolCallId: 'edit',
-      toolName: 'edit',
-      toolInput: { path: 'build-slides.py' },
-      approvalMode: WorkbenchApprovalMode.AllowAll,
-    });
-    service.recordToolResult(run.id, 'edit', { content: [] }, false);
-    const detail = await service.completeRun({
-      sessionId: 'session',
-      runId: run.id,
-      workspaceRoot: workspace,
-      finalAnswer: 'The icon series needs a fill type first.',
-      workflowSnapshot,
-    });
-    expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
-    expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Passed);
-    expect(onVerifiedRun).toHaveBeenCalledOnce();
-  },
-);
+test('a work run without declared deliverables completes without acceptance', async () => {
+  const { service, workspace, onVerifiedRun } = createFixture();
+  const { run } = service.beginRun({
+    sessionId: 'session',
+    goal: 'Create a presentation',
+    contract: {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: false,
+    },
+  });
+  fs.writeFileSync(path.join(workspace, 'build-slides.py'), 'print("intermediate")');
+  await service.authorizeToolCall({
+    sessionId: 'session',
+    runId: run.id,
+    toolCallId: 'edit',
+    toolName: 'edit',
+    toolInput: { path: 'build-slides.py' },
+    approvalMode: WorkbenchApprovalMode.AllowAll,
+  });
+  service.recordToolResult(run.id, 'edit', { content: [] }, false);
+  const detail = await service.completeRun({
+    sessionId: 'session',
+    runId: run.id,
+    workspaceRoot: workspace,
+    finalAnswer: 'The icon series needs a fill type first.',
+  });
+  expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
+  expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Passed);
+  expect(onVerifiedRun).toHaveBeenCalledOnce();
+});
 
 test('declaring only intermediate files does not open the acceptance gate', async () => {
   const { service, workspace } = createFixture();

@@ -10,8 +10,8 @@
 
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
-import { getPiBashCommandViolation, normalizePiBashTimeoutSeconds } from './piBashToolGuidelines';
-import { PiBuiltinFileToolName } from './piWriteTokenLimit';
+import { getPiBashCommandViolation } from './piBashToolGuidelines';
+import { PiBuiltinFileToolName } from './piToolConstants';
 import { McpPiAdapter } from './mcpPiAdapter';
 import { isPlanModeBlockedTool } from './piPlanTool';
 import {
@@ -45,6 +45,8 @@ export interface PiResourceLoaderApprovalContext {
   enableMcpNative?: boolean;
   /** Explicit MCP server IDs bound to the active session expert. */
   expertMcpIds?: string[];
+  /** Isolates provider-issued tool IDs across concurrent child sessions. */
+  toolCallNamespace?: string;
 }
 
 export async function createPiRuntimeResourceLoader(
@@ -93,6 +95,7 @@ export async function createPiRuntimeResourceLoader(
     ...createPiPromptOverrides(resourceState, () =>
       collectPiSystemPromptContributions({
         chatMode: resourceState.chatMode,
+        nativeToolsOnly: resourceState.nativeToolsOnly,
         fileToolsEnabled: resourceState.fileToolsEnabled,
         maxOutputTokens: resourceState.maxOutputTokens,
         platform: process.platform,
@@ -111,6 +114,25 @@ export async function createPiRuntimeResourceLoader(
       ...(approvalContext?.getRunId()
         ? [
             (extensionApi: PiExtensionApi) => {
+              const childRuns = new Map<string, string>();
+              const toolCallId = (id: string): string =>
+                approvalContext.toolCallNamespace
+                  ? `${approvalContext.toolCallNamespace}/${id}`
+                  : id;
+              if (approvalContext.toolCallNamespace)
+                extensionApi.on(PiExtensionEventType.ToolResult, event => {
+                  const runId = childRuns.get(event.toolCallId);
+                  childRuns.delete(event.toolCallId);
+                  if (runId)
+                    host
+                      .getWorkbenchTaskService()
+                      ?.recordToolResult(
+                        runId,
+                        toolCallId(event.toolCallId),
+                        { content: event.content, details: event.details },
+                        event.isError,
+                      );
+                });
               extensionApi.on(PiExtensionEventType.ToolCall, async event => {
                 const runId = approvalContext.getRunId();
                 if (!runId) {
@@ -126,13 +148,16 @@ export async function createPiRuntimeResourceLoader(
                 const authorization = await host.getWorkbenchTaskService()?.authorizeToolCall({
                   sessionId: approvalContext.sessionId,
                   runId,
-                  toolCallId: event.toolCallId,
+                  toolCallId: toolCallId(event.toolCallId),
                   toolName: event.toolName,
                   toolInput,
                   approvalMode: approvalContext.getApprovalMode(),
                 });
                 if (!authorization) return undefined;
-                if (authorization.allow) return undefined;
+                if (authorization.allow) {
+                  if (approvalContext.toolCallNamespace) childRuns.set(event.toolCallId, runId);
+                  return undefined;
+                }
                 if (authorization.terminateRun) {
                   // The run cannot continue: end the turn with a visible error
                   // instead of returning another tool error the model would
@@ -159,8 +184,6 @@ export async function createPiRuntimeResourceLoader(
           ) {
             return undefined;
           }
-          const input = event.input as Record<string, unknown>;
-          input.timeout = normalizePiBashTimeoutSeconds(input.timeout);
           const command = (event.input as Record<string, unknown>).command;
           if (typeof command !== 'string') return undefined;
           const reason = getPiBashCommandViolation(command, process.platform, getSkillsRoot());
@@ -225,7 +248,7 @@ export async function createPiRuntimeResourceLoader(
   // per-process shell override after reload and share the same manager with
   // createAgentSession. This makes bundled PortableGit usable by every Pi
   // session without changing the user's global Pi settings file.
-  applyPiShellOverride(settingsManager);
+  await applyPiShellOverride(settingsManager);
   resourceLoader.settingsManager = settingsManager;
   return resourceLoader;
 }

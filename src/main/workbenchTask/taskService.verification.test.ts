@@ -66,7 +66,7 @@ test('emits a verified run source only after deterministic verification passes',
   }
 });
 
-test('rejects completion when deterministic domain verification fails', async () => {
+test('rejects completion when the final response is missing', async () => {
   const onVerifiedRun = vi.fn();
   const { db, service } = createService({ onVerifiedRun });
   try {
@@ -84,9 +84,7 @@ test('rejects completion when deterministic domain verification fails', async ()
       sessionId: 'session',
       runId: run.id,
       workspaceRoot: process.cwd(),
-      finalAnswer: 'done',
-      workflowCompleted: false,
-      workflowSnapshot: { completionFailures: ['Deliverable missing'] },
+      finalAnswer: '',
     });
 
     expect(detail.task.status).toBe(WorkbenchTaskStatus.NeedsReview);

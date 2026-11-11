@@ -219,3 +219,44 @@ test('reports a directory declaration as not a readable file instead of missing'
     fs.rmSync(outsideDir, { recursive: true, force: true });
   }
 });
+
+test('canonical workspace aliases keep a stable relative reference through recollection', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-root-alias-'));
+  const workspace = path.join(root, 'workspace');
+  const alias = path.join(root, 'alias');
+  fs.mkdirSync(workspace);
+  fs.symlinkSync(workspace, alias, 'junction');
+  fs.writeFileSync(path.join(workspace, 'result.md'), 'verified');
+  try {
+    const collect = (reference: string) =>
+      collectWorkbenchArtifacts({
+        taskId: 'task',
+        runId: 'run',
+        workspaceRoot: alias,
+        finalAnswer: '',
+        artifactCandidates: [
+          {
+            path: reference,
+            role: 'deliverable',
+            source: WorkbenchArtifactCandidateSource.Declaration,
+          },
+        ],
+      })[0];
+    const first = collect(path.join(workspace, 'result.md'));
+    expect(first.reference).toBe('result.md');
+    expect(collect(first.reference).contentHash).toBe(first.contentHash);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a message-only result does not require an existing workspace directory', () => {
+  expect(
+    collectWorkbenchArtifacts({
+      taskId: 'task',
+      runId: 'run',
+      workspaceRoot: '/nonexistent-harness-workspace',
+      finalAnswer: '```html\n<p>result</p>\n```',
+    }),
+  ).toHaveLength(1);
+});

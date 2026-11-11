@@ -12,7 +12,6 @@ import type { CoworkMessageExpertIdentity } from '../../../shared/cowork/session
 import type { HarnessModelProfileInput } from '../../../shared/harness';
 import type { WorkbenchApprovalMode, WorkbenchTaskContract } from '../../../shared/workbenchTask';
 import type { ModelCapabilities, ProviderModelPiCompaction } from '../../../shared/providers';
-import { PiAgentLoopController } from './piAgentLoop';
 import type { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
 import {
   buildPiBackgroundCompletionContext,
@@ -24,13 +23,10 @@ import {
   ImageInputVerdict,
   type ImageInputAttachmentRef,
 } from './piImageInputFallback';
-import { PiResearchRunController } from './piResearchRun';
-import { PiShortcutWorkflowController } from './piShortcutWorkflow';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import type { PiTranslatorState } from './piTranslate/piTranslateUiMessageChunk';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import type { PiStartOptions } from './piRuntimeTypes';
-import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import { ToolActivityTracker } from './toolActivity';
 
 export const PiChatRuntimeLimit = {
@@ -142,7 +138,6 @@ export interface ActivePiSession {
   requestedSystemPrompt: string;
   requestedModelOverride?: string;
   requestedSkillIds: string[] | undefined;
-  requestedWorkflowSkillIds: string[] | undefined;
   requestedExpertIds: string[];
   /** Experts selected for the current turn, retained when messages are persisted. */
   turnExperts: CoworkMessageExpertIdentity[];
@@ -203,16 +198,9 @@ export interface ActivePiSession {
   toolStartedAtByCallId: Map<string, number>;
   preparingToolCallIdByContentIndex: Map<number, string>;
   toolActivityTracker: ToolActivityTracker;
-  /** Long-horizon agent loop controller for this session (agent_loop tool). */
-  agentLoop: PiAgentLoopController;
-  /** Present only for the controlled academic-research workflow. */
-  researchRun: PiResearchRunController | null;
-  /** Present for every other first-class sidebar shortcut workflow. */
-  shortcutWorkflow: PiShortcutWorkflowController | null;
   goalMode: boolean;
   /** Whether the current turn runs in read-only plan mode. */
   planMode: boolean;
-  writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
   /**
    * Error from the latest failed attempt (message_end with stopReason=error).
    * Deferred — not persisted/emitted — because Pi may auto-retry the turn;
@@ -326,6 +314,8 @@ export interface PiResourceState {
   unattended: boolean;
   /** Chat keeps the Pi kernel but opts out of Work resource discovery. */
   chatMode: boolean;
+  /** Child sessions expose native tools, without the host's custom tools. */
+  nativeToolsOnly?: boolean;
   /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
   expertSkillDirs: string[];
   skillRoots: Record<string, string>;

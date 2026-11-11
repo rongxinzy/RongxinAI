@@ -2,7 +2,6 @@ import { randomUUID } from 'crypto';
 
 import {
   EngramMemoryScope,
-  EngramObservationType,
   type EngramSearchMatchMode as EngramSearchMatchModeValue,
   type EngramMemoryScope as EngramMemoryScopeValue,
   type EngramObservationType as EngramObservationTypeValue,
@@ -49,8 +48,10 @@ export class ZhiYuanEngramAdapter {
     scope?: EngramMemoryScopeValue;
     limit?: number;
     matchMode?: EngramSearchMatchModeValue;
+    signal?: AbortSignal;
   }): Promise<EngramObservation[]> {
     const connection = await this.getConnection();
+    input.signal?.throwIfAborted();
     if (!connection) return [];
     const params = new URLSearchParams({
       q: input.query,
@@ -62,6 +63,7 @@ export class ZhiYuanEngramAdapter {
     const observations = await this.request<EngramObservation[] | null>(
       connection,
       `/search?${params.toString()}`,
+      { signal: input.signal },
     );
     return Array.isArray(observations) ? observations : [];
   }
@@ -70,8 +72,10 @@ export class ZhiYuanEngramAdapter {
     project: string;
     scope?: EngramMemoryScopeValue;
     limit?: number;
+    signal?: AbortSignal;
   }): Promise<EngramObservation[]> {
     const connection = await this.getConnection();
+    input.signal?.throwIfAborted();
     if (!connection) return [];
     const params = new URLSearchParams({
       project: input.project,
@@ -81,6 +85,7 @@ export class ZhiYuanEngramAdapter {
     const observations = await this.request<EngramObservation[] | null>(
       connection,
       `/observations/recent?${params.toString()}`,
+      { signal: input.signal },
     );
     return Array.isArray(observations) ? observations : [];
   }
@@ -316,7 +321,9 @@ export class ZhiYuanEngramAdapter {
         'Content-Type': 'application/json',
         ...init.headers,
       },
-      signal: AbortSignal.timeout(5_000),
+      signal: init.signal
+        ? AbortSignal.any([init.signal, AbortSignal.timeout(5_000)])
+        : AbortSignal.timeout(5_000),
     });
     if (!response.ok) {
       const method = init.method ?? 'GET';

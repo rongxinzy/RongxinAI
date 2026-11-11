@@ -14,6 +14,8 @@ interface PiToolResultEvent {
   toolName: string;
   input?: unknown;
   isError: boolean;
+  content?: unknown;
+  details?: unknown;
 }
 
 interface PiToolCallEventResult {

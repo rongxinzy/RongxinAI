@@ -46,5 +46,6 @@ test('returns a denial as a Pi tool result', async () => {
 test('defines a ten-minute timeout and a system-level AskUserQuestion policy', () => {
   expect(PiAskUserQuestionTimeoutMs).toBe(600_000);
   expect(PiAskUserQuestionSystemPrompt).toContain('AskUserQuestion');
-  expect(PiAskUserQuestionSystemPrompt).toContain('Before deleting files or directories');
+  expect(PiAskUserQuestionSystemPrompt).toContain('Do not ask again');
+  expect(PiAskUserQuestionSystemPrompt).not.toContain('Before deleting');
 });

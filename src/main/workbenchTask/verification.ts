@@ -10,16 +10,7 @@ export interface WorkbenchVerificationContext {
   contract: WorkbenchTaskContract;
   finalAnswer: string;
   streamClosedCleanly: boolean;
-  workflowCompleted?: boolean;
-  workflowSnapshot?: Record<string, unknown> | null;
 }
-
-const completionFailures = (snapshot: Record<string, unknown> | null | undefined): string[] => {
-  const raw = snapshot?.completionFailures;
-  return Array.isArray(raw)
-    ? raw.filter((value): value is string => typeof value === 'string')
-    : [];
-};
 
 export function verifyWorkbenchRun(
   context: WorkbenchVerificationContext,
@@ -54,36 +45,11 @@ export function verifyWorkbenchRun(
     };
   }
 
-  if (
-    context.contract.kind === WorkbenchContractKind.Research ||
-    context.contract.kind === WorkbenchContractKind.Shortcut
-  ) {
-    const failures = completionFailures(context.workflowSnapshot);
-    const passed = baselinePassed && context.workflowCompleted === true && failures.length === 0;
-    return {
-      outcome: passed ? WorkbenchVerificationOutcome.Passed : WorkbenchVerificationOutcome.Failed,
-      checks: [
-        ...baselineChecks,
-        {
-          name: 'workflow_completion_gate',
-          status: passed
-            ? WorkbenchVerificationCheckStatus.Passed
-            : WorkbenchVerificationCheckStatus.Failed,
-          detail: failures.join('; ') || (passed ? undefined : 'The workflow did not complete.'),
-        },
-      ],
-      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
-      summary: passed
-        ? 'The deterministic workflow contract passed.'
-        : 'The deterministic workflow contract requires review.',
-    };
-  }
-
   if (!baselinePassed) {
     return {
       outcome: WorkbenchVerificationOutcome.Failed,
       checks: baselineChecks,
-      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+      evidence: [],
       summary: 'The work result failed the baseline completeness checks.',
     };
   }
@@ -99,7 +65,7 @@ export function verifyWorkbenchRun(
         },
         ...baselineChecks,
       ],
-      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+      evidence: [],
       summary: 'The work result passed the baseline completeness checks.',
     };
   }
@@ -114,7 +80,7 @@ export function verifyWorkbenchRun(
       },
       ...baselineChecks,
     ],
-    evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+    evidence: [],
     summary: 'The result requires explicit user acceptance.',
   };
 }

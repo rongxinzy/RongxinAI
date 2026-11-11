@@ -6,6 +6,9 @@ export const EngramManagerPhase = {
   Stopping: 'stopping',
 } as const;
 
+/** Optional context must never hold up an agent request for service startup. */
+export const MEMORY_PROMPT_RECALL_TIMEOUT_MS = 500;
+
 export type EngramManagerPhase = (typeof EngramManagerPhase)[keyof typeof EngramManagerPhase];
 
 import {

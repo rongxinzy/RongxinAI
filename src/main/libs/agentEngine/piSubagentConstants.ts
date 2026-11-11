@@ -12,7 +12,6 @@ export const PiSubagentToolName = 'subagent';
 export const PiSubagentTerminationReason = {
   Settled: 'settled',
   Error: 'error',
-  HardTimeout: 'hard_timeout',
 } as const;
 export type PiSubagentTerminationReason =
   (typeof PiSubagentTerminationReason)[keyof typeof PiSubagentTerminationReason];

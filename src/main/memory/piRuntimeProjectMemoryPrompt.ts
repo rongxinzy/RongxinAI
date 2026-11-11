@@ -7,10 +7,11 @@ import { buildProjectMemoryContextSafe, type ProjectMemoryService } from './proj
 export async function resolveProjectMemoryContextForPiPrompt(input: {
   chatMode: boolean;
   memoryInjectionDedup: MemoryInjectionDedup;
-  projectMemoryService: ProjectMemoryService;
+  projectMemoryService: ProjectMemoryService | null;
   workspaceRoot: string;
   sessionId: string;
   userPrompt: string;
+  signal?: AbortSignal;
 }): Promise<string | null> {
   if (input.chatMode) return null;
   return input.memoryInjectionDedup.take(
@@ -20,6 +21,7 @@ export async function resolveProjectMemoryContextForPiPrompt(input: {
       input.workspaceRoot,
       input.sessionId,
       input.userPrompt,
+      input.signal,
     ),
   );
 }

@@ -15,8 +15,6 @@ import {
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
-import path from 'path';
-
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
@@ -108,8 +106,6 @@ describe('PiRuntimeAdapter', () => {
           'existing Pi append',
           PiAskUserQuestionSystemPrompt,
           expect.stringContaining('## Local document reading'),
-          expect.stringContaining('## File tool usage'),
-          expect.stringContaining('## Large File Writes'),
           DeclareArtifactSystemPrompt,
         ]),
       );

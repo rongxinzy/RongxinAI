@@ -3,12 +3,12 @@
  *
  * Extracted from PiRuntimeAdapter.startSession: assembles the per-session
  * custom tool set (web search, plan, elicitations, memory, history, scheduled
- * tasks, document/python/artifact tools, MCP gateway, research/shortcut
- * workflow state, skill runtime tools, subagent, agent loop) together with
- * the workflow controllers and loop prompt the turn needs.
+ * tasks, document/python/artifact tools, MCP gateway, skill runtime tools,
+ * and cancellable subagents). Pi owns execution and completion.
  */
 
 import path from 'path';
+import { randomUUID } from 'node:crypto';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
@@ -23,14 +23,9 @@ import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import { getPythonRuntimeService } from '../../pythonRuntime/host';
 import { getSkillsRoot } from '../coworkUtil';
-import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
 import { createPiAskUserQuestionTool } from './piAskUserQuestion';
 import { createPiCodingElicitationTool } from './piCodingElicitation';
 import { createPiPlanTool } from './piPlanTool';
-import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
-import { buildPiResearchStateTool } from './piResearchStateTool';
-import { PiShortcutWorkflowController, ShortcutWorkflowKind } from './piShortcutWorkflow';
-import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
 import { buildPiSubagentTool } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { resolvePiSkillRoots } from './piSkillRoots';
@@ -44,7 +39,6 @@ import { isOcrSupported } from '../../ocr/ocrEngine';
 import { buildPiPythonTools } from './piPythonTools';
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
-import { createPiWorkLoop } from './piWorkLoop';
 import { buildPiWebSearchTool } from './piWebSearchTool';
 import { buildPiMcpProxyTool, createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
 import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
@@ -55,15 +49,12 @@ import type { PiStartOptions } from './piRuntimeTypes';
 interface PiSessionCustomToolsParams {
   pi: PiModules;
   sessionId: string;
-  prompt: string;
   options: PiStartOptions;
   resourceState: PiResourceState;
   resolvedModel: PiResolvedModel;
   workspaceRoot: string;
   workbenchRunId: string | null;
   expertIds: string[];
-  workflowSkillIds: string[] | undefined;
-  shortcutKindForContract: ShortcutWorkflowKind | null;
   mcpNativeBridge: boolean;
   abortSignal: AbortSignal;
   recordActivation: (event: HarnessActivationEvent) => void;
@@ -74,24 +65,16 @@ export function buildPiSessionCustomTools(
   params: PiSessionCustomToolsParams,
 ): {
   customTools: Record<string, unknown>[];
-  researchRun: PiResearchRunController | null;
-  shortcutWorkflow: PiShortcutWorkflowController | null;
-  agentLoop: ReturnType<typeof createPiWorkLoop>['controller'];
-  workLoopPrompt: string;
-  shouldRunGoalLoop: boolean;
 } {
   const {
     pi,
     sessionId,
-    prompt,
     options,
     resourceState,
     resolvedModel,
     workspaceRoot,
     workbenchRunId,
     expertIds,
-    workflowSkillIds,
-    shortcutKindForContract,
     mcpNativeBridge,
     abortSignal,
     recordActivation,
@@ -125,40 +108,41 @@ export function buildPiSessionCustomTools(
       ),
     );
   }
-  customTools.push(
-    buildSessionSummaryTool({
-      getProjectMemoryService: () => {
-        const service = host.getProjectMemoryService();
-        if (!service) throw new Error('Project memory service is unavailable.');
-        return service;
-      },
-      sessionId,
-      workingDirectory: workspaceRoot,
-      runId: workbenchRunId,
-      getExecutionIdentity: toolCallId => {
-        const active = host.activeSessions.get(sessionId);
-        return {
-          runId: active?.workbenchRunId ?? workbenchRunId,
-          turnId: active?.assistantMessageId ?? toolCallId,
-        };
-      },
-      onOutcome: (outcome, reason) => {
-        const active = host.activeSessions.get(sessionId);
-        if (!active) return;
-        if (outcome === 'written') active.summaryCheckpointWritten = true;
-        if (outcome === 'skipped') active.summaryCheckpointSkipped = reason ?? true;
-        active.summaryCheckpointWorkVersion = active.artifactRecorder?.recordedWorkVersion() ?? 0;
-        recordActivation({
-          activation:
-            outcome === 'written'
-              ? HarnessActivationType.SummaryWritten
-              : HarnessActivationType.SummarySkipped,
-          mechanism: 'session_checkpoint',
-          ...(reason ? { evidence: { reason } } : {}),
-        });
-      },
-    }),
-  );
+  if (!resourceState.chatMode)
+    customTools.push(
+      buildSessionSummaryTool({
+        getProjectMemoryService: () => {
+          const service = host.getProjectMemoryService();
+          if (!service) throw new Error('Project memory service is unavailable.');
+          return service;
+        },
+        sessionId,
+        workingDirectory: workspaceRoot,
+        runId: workbenchRunId,
+        getExecutionIdentity: toolCallId => {
+          const active = host.activeSessions.get(sessionId);
+          return {
+            runId: active?.workbenchRunId ?? workbenchRunId,
+            turnId: active?.assistantMessageId ?? toolCallId,
+          };
+        },
+        onOutcome: (outcome, reason) => {
+          const active = host.activeSessions.get(sessionId);
+          if (!active) return;
+          if (outcome === 'written') active.summaryCheckpointWritten = true;
+          if (outcome === 'skipped') active.summaryCheckpointSkipped = reason ?? true;
+          active.summaryCheckpointWorkVersion = active.artifactRecorder?.recordedWorkVersion() ?? 0;
+          recordActivation({
+            activation:
+              outcome === 'written'
+                ? HarnessActivationType.SummaryWritten
+                : HarnessActivationType.SummarySkipped,
+            mechanism: 'session_checkpoint',
+            ...(reason ? { evidence: { reason } } : {}),
+          });
+        },
+      }),
+    );
   const projectMemoryService = host.getProjectMemoryService();
   if (!resourceState.chatMode && projectMemoryService) {
     customTools.push(
@@ -246,47 +230,17 @@ export function buildPiSessionCustomTools(
     }
   }
 
-  // Academic research is a controlled workflow, not a prompt-only label.
-  // It owns durable state and completion gates for the lifetime of this
-  // session (and reloads the same state directory after a session restart).
-  const researchRun =
-    options.sessionMode !== CoworkSessionMode.Chat && isAcademicResearchSkillSet(workflowSkillIds)
-      ? new PiResearchRunController({
-          sessionId,
-          workspaceRoot,
-          task: prompt,
-          onActivation: recordActivation,
-        })
-      : null;
-  if (researchRun) {
-    researchRun.resumeForPrompt(prompt);
-    customTools.push(buildPiResearchStateTool(researchRun));
-  }
-  const shortcutKind = researchRun ? null : shortcutKindForContract;
-  const shortcutWorkflow =
-    shortcutKind && options.sessionMode !== CoworkSessionMode.Chat
-      ? new PiShortcutWorkflowController({
-          sessionId,
-          workspaceRoot,
-          task: prompt,
-          kind: shortcutKind,
-          validateRasterPreview: isRasterPreviewDecodable,
-          renderOfficePreview,
-          onActivation: recordActivation,
-        })
-      : null;
-  if (shortcutWorkflow) {
-    shortcutWorkflow.resumeForPrompt(prompt);
-    customTools.push(buildPiShortcutWorkflowStateTool(shortcutWorkflow));
-  }
-
-  if (options.sessionMode === CoworkSessionMode.Work && resourceState.skillIds?.length) {
+  if (options.sessionMode === CoworkSessionMode.Work && resourceState.fileToolsEnabled) {
     customTools.push(buildPiSkillRuntimeCapabilitiesTool());
     customTools.push(
       buildPiSkillScriptTool({
         workspaceRoot,
-        allowedSkillIds: resourceState.skillIds,
+        allowedSkillIds: resourceState.skillIds ?? [],
         skillRoots: resourceState.skillRoots,
+        getSkillSelection: () => ({
+          skillIds: resourceState.skillIds,
+          skillRoots: resourceState.skillRoots,
+        }),
       }),
     );
     const cadSkillRoot = resourceState.skillRoots['text-to-cad'];
@@ -332,13 +286,19 @@ export function buildPiSessionCustomTools(
               })) ?? null
           : undefined,
         resolvedModel,
+        getResolvedModel: () => {
+          const active = host.activeSessions.get(sessionId);
+          return active
+            ? {
+                model: active.model,
+                modelRuntime: active.modelRuntime,
+                maxOutputTokens: active.resourceState.maxOutputTokens,
+              }
+            : resolvedModel;
+        },
+        signal: abortSignal,
         workspaceRoot,
-        webSearchSkillPath:
-          researchRun ||
-          (options.sessionMode !== CoworkSessionMode.Chat &&
-            shortcutKind === ShortcutWorkflowKind.DeepResearch)
-            ? path.join(getSkillsRoot(), 'web-search')
-            : undefined,
+        webSearchSkillPath: path.join(getSkillsRoot(), 'web-search'),
         createPiResourceLoader: (
           cwd,
           systemPrompt,
@@ -357,11 +317,13 @@ export function buildPiSessionCustomTools(
               fileToolsEnabled: true,
               unattended: resourceState.unattended,
               chatMode: resourceState.chatMode,
+              nativeToolsOnly: true,
               expertSkillDirs: [],
               skillRoots: resolvePiSkillRoots(skillIds, resolveZhiyuanSkillDirs(), []),
             },
             {
               sessionId,
+              toolCallNamespace: randomUUID(),
               getRunId: () => host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
               getApprovalMode: () =>
                 host.activeSessions.get(sessionId)?.approvalMode ??
@@ -375,27 +337,5 @@ export function buildPiSessionCustomTools(
     customTools.push(subagentTool);
   }
 
-  // Agent loop tool: lets the LLM drive multi-iteration long-horizon
-  // loops; the controller continues the session on agent_end.
-  const completionWorkflow = researchRun || shortcutWorkflow;
-  const shouldRunGoalLoop =
-    options.goalMode === true && options.sessionMode === CoworkSessionMode.Work;
-  const workLoop = createPiWorkLoop({
-    goal: completionWorkflow?.goal || prompt,
-    completionWorkflow: completionWorkflow || undefined,
-    onActivation: recordActivation,
-    start: Boolean(completionWorkflow || shouldRunGoalLoop),
-  });
-  const agentLoop = workLoop.controller;
-  const workLoopPrompt = shouldRunGoalLoop ? workLoop.initialPrompt : '';
-  if (completionWorkflow || shouldRunGoalLoop) customTools.push(workLoop.tool);
-
-  return {
-    customTools,
-    researchRun,
-    shortcutWorkflow,
-    agentLoop,
-    workLoopPrompt,
-    shouldRunGoalLoop,
-  };
+  return { customTools };
 }

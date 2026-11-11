@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
-import { PiAssistantStopReason, PiContentBlockType } from './piWriteTokenLimit';
+import { PiAssistantStopReason, PiContentBlockType } from './piToolConstants';
 
 test('tool-call preambles are not final answers even if the provider reports stop', () => {
   expect(

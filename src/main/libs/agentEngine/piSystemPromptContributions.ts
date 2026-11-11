@@ -1,9 +1,9 @@
 /**
  * Unified registry for tool-usage system-prompt contributions.
  *
- * Pi drops every tool's `promptGuidelines` whenever a custom system prompt is
- * supplied, as Work sessions may do. Chat preserves Pi's default prompt.
- * Each tool module exports its own
+ * Both Work and Chat preserve Pi's native prompt. Host-only tools append their
+ * application-specific guidance without copying native tool policies.
+ * Each host tool module exports its own
  * `*SystemPrompt` policy; this registry is the single place that collects them
  * into the session's appendSystemPromptOverride. Adding a tool policy without
  * registering it here means the model never sees it — piRuntimeAdapter and its
@@ -14,21 +14,20 @@ import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
 import type { McpServerRuntimeStatus, McpToolManifestEntry } from '../mcpServerManager';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
-import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { PiOcrSystemPrompt } from './piOcrTool';
 import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
-import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
 import { PiWebSearchSystemPrompt } from './piWebSearchTool';
 
 export interface PiSystemPromptContext {
   /** Whether the session is a direct Chat lane without Work orchestration. */
   chatMode?: boolean;
+  nativeToolsOnly?: boolean;
   /** Whether file tools (read/write/edit/read_document) are active. */
   fileToolsEnabled: boolean;
-  /** Current per-session output token budget, used by the large-write policy. */
+  /** Resolved session output budget. */
   maxOutputTokens: number;
   /** Runtime platform, used for platform-specific tool contracts. */
   platform?: NodeJS.Platform;
@@ -49,6 +48,7 @@ export interface PiSystemPromptContribution {
   id: string;
   /** Only included when the session has file tools enabled. */
   requiresFileTools?: boolean;
+  requiresHostTools?: boolean;
   /** Static text or a factory for context-dependent policies. */
   prompt: string | ((context: PiSystemPromptContext) => string);
   /** Optional runtime predicate for capabilities that are not always present. */
@@ -64,6 +64,7 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
   },
   {
     id: 'ask-user-question',
+    requiresHostTools: true,
     enabled: context => context.unattended !== true,
     prompt: PiAskUserQuestionSystemPrompt,
   },
@@ -79,26 +80,24 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
   },
   {
     id: 'python-runtime',
+    requiresHostTools: true,
     requiresFileTools: true,
     prompt: PiPythonEnvSystemPrompt,
   },
   {
     id: 'document-reader',
+    requiresHostTools: true,
     requiresFileTools: true,
     enabled: context => context.chatMode !== true,
     prompt: PiDocumentReaderSystemPrompt,
   },
   {
     id: 'ocr',
+    requiresHostTools: true,
     requiresFileTools: true,
     enabled: context =>
       context.chatMode !== true && (context.platform ?? process.platform) === 'win32',
     prompt: PiOcrSystemPrompt,
-  },
-  {
-    id: 'builtin-file-tools',
-    requiresFileTools: true,
-    prompt: PiBuiltinFileToolSystemPrompt,
   },
   {
     id: 'codemode',
@@ -115,6 +114,7 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
   },
   {
     id: 'mcp-capability-preflight',
+    requiresHostTools: true,
     requiresFileTools: true,
     enabled: context =>
       context.mcpNativeBridge !== true &&
@@ -126,17 +126,15 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
       )[0] ?? '',
   },
   {
-    id: 'large-file-write',
-    requiresFileTools: true,
-    prompt: context => createPiLargeFileWriteSystemPrompt(context.maxOutputTokens),
-  },
-  {
     id: 'declare-artifact',
+    requiresHostTools: true,
     enabled: context => context.chatMode !== true,
     prompt: DeclareArtifactSystemPrompt,
   },
   {
     id: 'session-summary',
+    requiresHostTools: true,
+    enabled: context => context.chatMode !== true,
     prompt: SessionSummarySystemPrompt,
   },
 ];
@@ -145,6 +143,7 @@ export function collectPiSystemPromptContributions(context: PiSystemPromptContex
   return PiSystemPromptContributions.filter(
     contribution =>
       (!contribution.requiresFileTools || context.fileToolsEnabled) &&
+      (!contribution.requiresHostTools || context.nativeToolsOnly !== true) &&
       (!contribution.enabled || contribution.enabled(context)),
   )
     .map(contribution =>

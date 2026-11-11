@@ -52,12 +52,7 @@ export class WorkbenchArtifactWorkerPool {
 
   collect(input: Input, signal?: AbortSignal): Promise<Artifacts> {
     if (signal?.aborted) return Promise.reject(new Error('Artifact collection cancelled.'));
-    const candidates =
-      (input.artifactCandidates?.length ?? 0) +
-      (Array.isArray(input.workflowSnapshot?.files) ? input.workflowSnapshot.files.length : 0) +
-      (Array.isArray(input.workflowSnapshot?.artifacts)
-        ? input.workflowSnapshot.artifacts.length
-        : 0);
+    const candidates = input.artifactCandidates?.length ?? 0;
     if (candidates > ArtifactWorkerLimit.Candidates)
       return Promise.reject(new Error('Artifact collection input limit exceeded.'));
     try {

@@ -258,6 +258,18 @@ describe('PiRuntimeAdapter', () => {
   });
 
   describe('run completion on agent_settled', () => {
+    it('resets memory dedup only after successful native compaction', async () => {
+      await adapter.startSession('memory-compaction', 'Work', { sessionMode: 'work' });
+      const block = 'Workspace:\n- [memory:1] Remember the verified decision';
+      const listener = mockSession.subscribe.mock.calls.at(-1)![0];
+      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeTruthy();
+      listener({ type: 'compaction_end', aborted: false, errorMessage: 'failed' });
+      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeNull();
+      listener({ type: 'compaction_end', aborted: false, result: { summary: 'checkpoint' } });
+      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeTruthy();
+      expect(mockSession.prompt).toHaveBeenCalledOnce();
+    });
+
     const assistantTurn = (
       listener: (event: {
         type: string;

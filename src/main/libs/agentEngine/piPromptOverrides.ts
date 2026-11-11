@@ -7,23 +7,19 @@ function getChatIdentityPrompt(): string {
 
 export const CHAT_IDENTITY_PROMPT = getChatIdentityPrompt();
 
-/** Read mutable session resources on every reload, without replacing Pi's Chat prompt. */
+/** Preserve Pi's native tool descriptions and guidelines in every session. */
 export function createPiPromptOverrides(
   state: { chatMode: boolean; systemPrompt: string },
   contributions: () => string[],
 ) {
   return {
-    systemPromptOverride: (base: string | undefined): string | undefined => {
-      if (state.chatMode) return undefined;
-      const custom = state.systemPrompt.trim();
-      if (!custom) return base;
-      if (!base?.trim()) return custom;
-      return `${base.trim()}\n\n${custom}`;
-    },
+    systemPromptOverride: (_base: string | undefined): undefined => undefined,
     appendSystemPromptOverride: (base: string[] = []): string[] => [
       ...base,
       ...contributions(),
-      ...(state.chatMode ? [state.systemPrompt.trim(), CHAT_IDENTITY_PROMPT].filter(Boolean) : []),
+      ...[state.systemPrompt.trim(), ...(state.chatMode ? [CHAT_IDENTITY_PROMPT] : [])].filter(
+        Boolean,
+      ),
     ],
   };
 }

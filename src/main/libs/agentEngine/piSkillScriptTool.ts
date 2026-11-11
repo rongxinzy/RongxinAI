@@ -34,11 +34,11 @@ export function buildPiSkillScriptTool(options: {
   workspaceRoot: string;
   allowedSkillIds: string[];
   skillRoots?: Readonly<Record<string, string>>;
+  getSkillSelection?: () => {
+    skillIds: readonly string[] | undefined;
+    skillRoots: Readonly<Record<string, string>>;
+  };
 }): Record<string, unknown> {
-  const allowedSkillIds = new Set(
-    options.allowedSkillIds.map(value => value.trim()).filter(Boolean),
-  );
-
   return {
     name: PiSkillScriptToolName,
     label: 'Run Skill Script',
@@ -80,11 +80,13 @@ export function buildPiSkillScriptTool(options: {
       signal?: AbortSignal,
     ): Promise<SkillScriptToolResult> => {
       const skillId = text(params.skillId);
+      const selection = options.getSkillSelection?.();
+      const allowedSkillIds = selection?.skillIds ?? options.allowedSkillIds;
       const script = text(params.script);
       const args = Array.isArray(params.args)
         ? params.args.filter((value): value is string => typeof value === 'string')
         : [];
-      if (!allowedSkillIds.has(skillId)) {
+      if (!allowedSkillIds.some(value => value.trim() === skillId)) {
         throw new Error(
           `Skill script denied [SKILL_NOT_SELECTED]: ${skillId || '(missing skillId)'}.`,
         );
@@ -95,7 +97,7 @@ export function buildPiSkillScriptTool(options: {
         script,
         args,
         workspaceRoot: options.workspaceRoot,
-        skillsRoot: options.skillRoots?.[skillId],
+        skillsRoot: (selection?.skillRoots ?? options.skillRoots)?.[skillId],
         timeoutMs: typeof params.timeoutMs === 'number' ? params.timeoutMs : undefined,
         confirmDependencyInstall: params.confirmDependencyInstall === true,
         signal,
