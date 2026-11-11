@@ -2,7 +2,7 @@ name: Windows release contract fixtures
 
 on:
   push:
-    branches: [fix/windows-release-acceptance-20261109]
+    branches: [codex/windows-final-release-acceptance]
 
 permissions:
   contents: read
