@@ -17,10 +17,11 @@ const identity = {
   commit: 'a'.repeat(40),
   version: '1.2.3',
   runId: '123',
+  runAttempt: '1',
   target: 'win32-x64-lite',
 };
 function fixture() {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'checkpoint-'));
+  const root = mkdtempSync(path.join(os.tmpdir(), 'checkpoint 中文 空格-'));
   temporary.push(root);
   mkdirSync(path.join(root, 'release'));
   writeFileSync(path.join(root, 'release/app'), 'final signed bytes');
@@ -41,7 +42,18 @@ test('acceptance restores exact bytes without rebuilding and preserves executabl
     expect(statSync(path.join(root, 'release/app')).mode & 0o111).toBe(0o111);
 });
 
-test.each(['commit', 'version', 'runId', 'target'])(
+test('restores Chinese and spaced directory and file names with exact bytes', async () => {
+  const { root, archive } = fixture();
+  const filename = path.join(root, 'release', '安装 目录', '知远.exe');
+  mkdirSync(path.dirname(filename));
+  writeFileSync(filename, Buffer.from([0, 1, 127, 128, 255]));
+  await checkpoint('create', archive, identity, ['release'], root);
+  rmSync(path.join(root, 'release'), { recursive: true });
+  await checkpoint('restore', archive, identity, [], root);
+  expect(readFileSync(filename)).toEqual(Buffer.from([0, 1, 127, 128, 255]));
+});
+
+test.each(['commit', 'version', 'runId', 'runAttempt', 'target'])(
   'rejects mismatched %s before extraction',
   async key => {
     const { root, archive } = fixture();
@@ -72,4 +84,16 @@ test('a fresh acceptance checkout restores the exact release version and edition
   await checkpoint('restore', archive, identity, [], fresh);
   expect(JSON.parse(readFileSync(path.join(fresh, 'package.json'), 'utf8'))).toEqual(builtPackage);
   expect(readFileSync(path.join(fresh, 'release/app'), 'utf8')).toBe('final signed bytes');
+});
+
+test('legacy checkpoints without an attempt require regeneration before extraction', async () => {
+  const { root, archive } = fixture();
+  await checkpoint('create', archive, identity, ['release'], root);
+  const filename = path.join(archive, 'identity.json');
+  const saved = JSON.parse(readFileSync(filename, 'utf8'));
+  delete saved.runAttempt;
+  writeFileSync(filename, JSON.stringify(saved));
+  await expect(checkpoint('restore', archive, identity, [], root)).rejects.toThrow(
+    'recreate inputs with a full workflow rerun',
+  );
 });

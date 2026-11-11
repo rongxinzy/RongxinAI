@@ -1,0 +1,47 @@
+name: Checkpoint Windows package
+description: Seal exact public acceptance inputs before another edition changes the build output
+inputs:
+  edition:
+    required: true
+    description: Windows edition
+  version:
+    required: true
+    description: Release version
+  certificate-thumbprint:
+    required: true
+    description: Public signer identity
+runs:
+  using: composite
+  steps:
+    - name: Measure disk before checkpoint
+      shell: pwsh
+      run: |
+        $drive = Get-PSDrive -Name ([System.IO.Path]::GetPathRoot($env:GITHUB_WORKSPACE).Substring(0, 1))
+        Write-Output "Checkpoint ${{ inputs.edition }} before: free=$($drive.Free) bytes"
+    - name: Export public signing certificate only
+      shell: pwsh
+      env:
+        THUMBPRINT: ${{ inputs.certificate-thumbprint }}
+      run: |
+        $thumbprint = ($env:THUMBPRINT -replace '[^a-fA-F0-9]', '').ToUpperInvariant()
+        if ($thumbprint -notmatch '^[A-F0-9]{40}$') { throw 'Invalid public certificate thumbprint' }
+        $certificate = Get-Item -LiteralPath "Cert:\CurrentUser\My\$thumbprint"
+        if ($certificate.Thumbprint -ne $thumbprint) { throw 'Signing certificate identity mismatch' }
+        Export-Certificate -Cert $certificate -FilePath release/signing-certificate.cer -Type CERT | Out-Null
+    - name: Seal exact acceptance inputs
+      shell: bash
+      env:
+        APP_BUILD_VERSION: ${{ inputs.version }}
+        EDITION: ${{ inputs.edition }}
+      run: |
+        set -euo pipefail
+        node scripts/ci/build-checkpoint.mjs create "checkpoint-win32-x64-${EDITION}" "win32-x64-${EDITION}" \
+          package.json release build-tar/windows-components resources/skill-python \
+          scripts/installer-shell/out/ZhiYuanUninstall.exe \
+          scripts/installer-shell/out/ZhiYuanUninstall.exe.manifest.json
+    - name: Measure checkpoint and remaining disk
+      shell: pwsh
+      run: |
+        $drive = Get-PSDrive -Name ([System.IO.Path]::GetPathRoot($env:GITHUB_WORKSPACE).Substring(0, 1))
+        $archive = Get-Item -LiteralPath 'checkpoint-win32-x64-${{ inputs.edition }}/payload.tar'
+        Write-Output "Checkpoint ${{ inputs.edition }} after: archive=$($archive.Length) bytes free=$($drive.Free) bytes"
