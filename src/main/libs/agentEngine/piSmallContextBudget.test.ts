@@ -75,3 +75,20 @@ test.each([1024, 4096, 8192])(
     expect(result.content).toEqual(response.content);
   },
 );
+
+test('oversized summary keeps a midpoint identifier together when a word boundary exists', async () => {
+  const inputs: string[] = [];
+  const source = `${'a'.repeat(2000)} MARKER_ABCDEF ${'b'.repeat(2000)}`;
+  await completeBoundedSummary(
+    model(1024),
+    source,
+    (text: string) => context(text),
+    async (request: TranscriptContext) => {
+      const message = request.messages[0];
+      if (message.role === 'user' && typeof message.content === 'string')
+        inputs.push(message.content);
+      return response;
+    },
+  );
+  expect(inputs.some(input => input.includes('MARKER_ABCDEF'))).toBe(true);
+});
