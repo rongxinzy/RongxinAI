@@ -48,10 +48,10 @@ jobs:
             ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
             vendor/channel-runtime
-          key: windows-installer-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: copy-v2-windows-installer-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
-            windows-installer-node24-bun1.4.0-
-      - run: bun install --frozen-lockfile --ignore-scripts
+            copy-v2-windows-installer-node24-bun1.4.0-
+      - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
       - run: bun run apply:patches
       - name: Read pinned Magpie Go toolchain
         id: magpie-toolchain

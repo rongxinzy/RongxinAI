@@ -47,9 +47,9 @@ jobs:
           path: |
             ~/.bun/install/cache
             ~/.cache/electron
-          key: memory-leak-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+          key: copy-v2-memory-leak-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            memory-leak-${{ runner.os }}-1.4.0-
+            copy-v2-memory-leak-${{ runner.os }}-1.4.0-
       - name: Restore Electron TypeScript cache
         uses: actions/cache/restore@v5
         with:
@@ -74,7 +74,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0 xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
       - run: bun run apply:patches
       - name: Install Electron runtime
         run: node node_modules/electron/install.js

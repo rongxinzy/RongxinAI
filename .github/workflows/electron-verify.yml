@@ -25,16 +25,16 @@ jobs:
             ~/.bun/install/cache
             ~/.cache/electron
             ~/.cache/electron-builder
-          key: electron-verify-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+          key: copy-v2-electron-verify-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            electron-verify-${{ runner.os }}-1.4.0-
+            copy-v2-electron-verify-${{ runner.os }}-1.4.0-
 
       - name: Install Electron Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0
 
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
       - run: bun run build
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'

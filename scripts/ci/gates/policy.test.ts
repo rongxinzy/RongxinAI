@@ -21,6 +21,21 @@ const workflow = (name: string) =>
 const resultsFor = (names: string[]) =>
   Object.fromEntries(names.map(name => [name, { result: JobResult.Success as string }]));
 
+test('workflow dependency installs do not hardlink packages into the Bun cache', () => {
+  const files = [
+    ...readdirSync('.github/workflows')
+      .filter(name => name.endsWith('.yml'))
+      .map(name => `.github/workflows/${name}`),
+    ...readdirSync('.github/actions').map(name => `.github/actions/${name}/action.yml`),
+  ];
+  for (const file of files) {
+    const source = readFileSync(file, 'utf8');
+    for (const line of source.split('\n').filter(line => /\brun: bun install\b/.test(line))) {
+      expect(line, file).toContain('--backend copyfile');
+    }
+  }
+});
+
 test('daily feature CI runs lint, typecheck, and parallel unit tests before its gate', () => {
   const ci = workflow('ci.yml');
   expect(Object.keys(ci.jobs).sort()).toEqual(['ci-gate', 'lint', 'test', 'typecheck']);
