@@ -21,6 +21,7 @@ import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { cancelPiRetry } from './piRetryCancellation';
+import { handlePiCompactionEvent } from './piCompactionEvents';
 import { PiAssistantEventType } from './piStreamConstants';
 import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
 import { settlePiWorkbenchCompletion } from './piWorkbenchCompletion';
@@ -139,6 +140,7 @@ export class PiRuntimeTurnEvents {
   handlePiEvent(sessionId: string, active: ActivePiSession, event: PiEvent): void {
     // Late events from an aborted turn must not touch state.
     if (active.aborted) return;
+    if (handlePiCompactionEvent(sessionId, active, event)) return;
     switch (event.type) {
       case 'agent_start':
         active.isRunning = true;

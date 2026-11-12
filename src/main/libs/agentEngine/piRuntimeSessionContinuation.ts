@@ -77,14 +77,7 @@ const restorePiSessionHistory = (
 ): PiSessionHistoryRestore => {
   const piSessionStoreRoot = host.getPiSessionStoreRoot();
   if (piSessionStoreRoot && hasPersistedPiSession(piSessionStoreRoot, sessionId)) {
-    agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
-      source: 'jsonl',
-      messageCount: 0,
-      contentBytes: 0,
-      metadataBytes: 0,
-      promptChars: prompt.length,
-      restoreMs: 0,
-    });
+    // Launch records the actual native message count after reopening the file.
     return { prompt };
   }
   const historyLoadStartedAt = Date.now();

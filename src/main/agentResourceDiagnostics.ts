@@ -221,11 +221,13 @@ export class AgentResourceDiagnostics {
     sessionId: string,
     details: {
       source: string;
-      messageCount: number;
-      contentBytes: number;
-      metadataBytes: number;
+      messageCount?: number;
+      contentBytes?: number;
+      metadataBytes?: number;
       promptChars: number;
       restoreMs: number;
+      contextWindow?: number;
+      model?: string;
     },
   ): void {
     this.write(AgentResourceDiagnosticTrigger.PiHistoryRestored, { sessionId, ...details });
