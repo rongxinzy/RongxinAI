@@ -63,7 +63,9 @@ test('PRs restore without saving; verified main runs publish the same cache grap
   expect(saveIndex).toBeGreaterThan(
     steps.findIndex(step => step.run?.includes('windows-installer-smoke.ps1')),
   );
-  const install = steps.find(step => step.run === 'bun install --frozen-lockfile --ignore-scripts');
+  const install = steps.find(
+    step => step.run === 'bun install --frozen-lockfile --ignore-scripts --backend copyfile',
+  );
   expect(install).toBeDefined();
   expect(install?.if).toBeUndefined();
 });

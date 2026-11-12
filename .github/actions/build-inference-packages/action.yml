@@ -106,9 +106,9 @@ runs:
           resources/skill-python
           vendor/engram-runtime
           vendor/channel-runtime
-        key: packaging-${{ runner.os }}-${{ inputs.runtime-target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js') }}
+        key: copy-v2-packaging-${{ runner.os }}-${{ inputs.runtime-target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js') }}
         restore-keys: |
-          packaging-${{ runner.os }}-${{ inputs.runtime-target }}-node24-bun1.4.0-
+          copy-v2-packaging-${{ runner.os }}-${{ inputs.runtime-target }}-node24-bun1.4.0-
     - name: Install Electron system dependencies
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
       if: ${{ inputs.platform == 'linux' }}
@@ -117,7 +117,7 @@ runs:
         sudo apt-get install -y \
           libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
           libxss1 libxtst6 libuuid1 xdg-utils xvfb libfuse2t64
-    - run: bun install --frozen-lockfile --ignore-scripts
+    - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
     - run: bun run apply:patches
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}

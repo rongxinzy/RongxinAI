@@ -72,7 +72,7 @@ jobs:
           bun-version: '1.4.0'
 
       - name: Install Bun dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
+        run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
 
       - name: Apply project patches
         run: bun run apply:patches

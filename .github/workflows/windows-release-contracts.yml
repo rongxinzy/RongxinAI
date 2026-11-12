@@ -27,7 +27,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.0'
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
       - run: bun run apply:patches
       - name: Run Windows certificate and package contract fixtures
         shell: pwsh

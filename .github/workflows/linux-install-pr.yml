@@ -48,16 +48,16 @@ jobs:
             ~/.cache/electron-builder
             vendor/engram-runtime
             vendor/channel-runtime
-          key: linux-install-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: copy-v2-linux-install-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
-            linux-install-node24-bun1.4.0-
+            copy-v2-linux-install-node24-bun1.4.0-
       - name: Install Electron and virtual desktop dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
       - run: bun run apply:patches
       - name: Read pinned Magpie Go toolchain
         id: magpie-toolchain
