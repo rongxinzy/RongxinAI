@@ -29,9 +29,18 @@ test('workflow dependency installs do not hardlink packages into the Bun cache',
     ...readdirSync('.github/actions').map(name => `.github/actions/${name}/action.yml`),
   ];
   for (const file of files) {
-    const source = readFileSync(file, 'utf8');
-    for (const line of source.split('\n').filter(line => /\brun: bun install\b/.test(line))) {
-      expect(line, file).toContain('--backend copyfile');
+    const parsed = load(readFileSync(file, 'utf8')) as {
+      jobs?: Record<string, Job>;
+      runs?: { steps?: Step[] };
+    };
+    const steps =
+      parsed.runs?.steps ?? Object.values(parsed.jobs ?? {}).flatMap(job => job.steps ?? []);
+    for (const step of steps) {
+      for (const line of (step.run ?? '')
+        .split('\n')
+        .filter(line => /\bbun install\b/.test(line))) {
+        expect(line, file).toContain('--backend copyfile');
+      }
     }
   }
 });
