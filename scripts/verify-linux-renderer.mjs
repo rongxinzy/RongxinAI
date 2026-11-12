@@ -51,6 +51,13 @@ const profilePath = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-linux-smoke
 const nonce = randomUUID();
 let applicationOutput = '';
 let launchError;
+let devTools;
+let browserDevTools;
+const cleanup = installSmokeCleanup(async () => {
+  devTools?.close();
+  browserDevTools?.close();
+  await stopApplication();
+});
 
 const application = spawn(
   'xvfb-run',
@@ -78,14 +85,6 @@ const application = spawn(
 application.on('error', error => {
   launchError = error;
 });
-let devTools;
-let browserDevTools;
-const cleanup = installSmokeCleanup(async () => {
-  devTools?.close();
-  browserDevTools?.close();
-  await stopApplication();
-});
-
 for (const stream of [application.stdout, application.stderr]) {
   stream?.on('data', chunk => {
     applicationOutput = `${applicationOutput}${chunk.toString()}`.slice(-20_000);

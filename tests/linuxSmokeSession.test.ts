@@ -94,6 +94,10 @@ test('renderer binds the browser identity before requesting a rendered page', as
   );
   assert.ok(source.includes('await stopProcessGroup(application.pid)'));
   assert.ok(source.includes('const cleanup = installSmokeCleanup('));
+  assert.ok(
+    source.indexOf('const cleanup = installSmokeCleanup(') <
+      source.indexOf('const application = spawn('),
+  );
   assert.ok(source.includes('await cleanup();'));
 });
 
