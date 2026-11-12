@@ -162,13 +162,17 @@ export async function startPiRuntimeSession(
     // reopen that file and continue with structured history; only a legacy
     // session without a file falls back to the flattened text restore.
     const piSessionStoreRoot = host.getPiSessionStoreRoot();
+    const historyRestoreStartedAt = Date.now();
+    let restoredNativeHistory = false;
     if (piSessionStoreRoot && pi.SessionManager?.create && pi.SessionManager?.open) {
-      sessionOptions.sessionManager = openPersistentPiSessionManager(
+      const persisted = openPersistentPiSessionManager(
         pi.SessionManager,
         piSessionStoreRoot,
         sessionId,
         workspaceRoot,
-      ).manager;
+      );
+      sessionOptions.sessionManager = persisted.manager;
+      restoredNativeHistory = persisted.reusedFile;
     } else if (pi.SessionManager?.inMemory) {
       sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
     }
@@ -375,6 +379,17 @@ export async function startPiRuntimeSession(
     console.debug(`[PiRuntime] creating agent session for ${sessionId}`);
     const result = await pi.createAgentSession(sessionOptions);
     const session = result.session;
+    if (restoredNativeHistory) {
+      agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
+        source: 'jsonl',
+        messageCount: session.messages?.length,
+        promptChars: (options._piPromptOverride || prompt).length,
+        restoreMs: Date.now() - historyRestoreStartedAt,
+        contextWindow:
+          typeof sessionModel.contextWindow === 'number' ? sessionModel.contextWindow : undefined,
+        model: modelId,
+      });
+    }
     if (mcpNativeBridge && typeof session.bindExtensions === 'function') {
       // The MCP extension connects its servers on session start; without an
       // explicit bind, SDK sessions never emit it (verified against pi's SDK

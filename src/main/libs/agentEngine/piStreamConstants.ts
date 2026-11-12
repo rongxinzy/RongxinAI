@@ -32,3 +32,9 @@ export const PiAgentEventType = {
 } as const;
 
 export type PiAgentEventType = (typeof PiAgentEventType)[keyof typeof PiAgentEventType];
+
+export const PiCompactionReason = {
+  Manual: 'manual',
+  Threshold: 'threshold',
+  Overflow: 'overflow',
+} as const;

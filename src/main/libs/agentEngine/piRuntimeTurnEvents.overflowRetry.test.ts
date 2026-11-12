@@ -13,6 +13,8 @@ vi.mock('./piRetryCancellation', () => ({
 
 import { PiRuntimeTurnEvents, type PiRuntimeTurnHost } from './piRuntimeTurnEvents';
 import type { ActivePiSession } from './piRuntimeSessionState';
+import { PiAgentEventType, PiCompactionReason } from './piStreamConstants';
+import { PiAssistantStopReason } from './piToolConstants';
 
 describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
   let mockHost: PiRuntimeTurnHost;
@@ -163,5 +165,69 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
 
     // 3. cancelPiRetry MUST be called to stop hopeless retry loop
     expect(hoisted.mockCancelPiRetry).toHaveBeenCalledOnce();
+  });
+
+  it('surfaces the summary failure at settlement without completing or cancelling native recovery', () => {
+    turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
+      type: PiAgentEventType.CompactionEnd,
+      reason: PiCompactionReason.Overflow,
+      errorMessage: 'Auto-compaction failed: summary unavailable',
+    });
+    expect(activeSession.pendingError?.message).toContain('summary unavailable');
+    expect(activeSession.pendingError?.sticky).toBeFalsy();
+    expect(mockHost.flushPendingError).not.toHaveBeenCalled();
+    expect(hoisted.mockCancelPiRetry).not.toHaveBeenCalled();
+    turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
+      type: PiAgentEventType.AgentSettled,
+    });
+    expect(mockHost.flushPendingError).toHaveBeenCalledOnce();
+    expect(mockHost.emit).not.toHaveBeenCalledWith('complete', expect.anything());
+  });
+
+  it('does not turn completed work into failure because subsequent maintenance failed', () => {
+    activeSession.lastAssistantMessage = {
+      role: 'assistant',
+      stopReason: PiAssistantStopReason.Stop,
+    };
+    turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
+      type: PiAgentEventType.CompactionEnd,
+      reason: PiCompactionReason.Threshold,
+      errorMessage: 'Auto-compaction failed: summary unavailable',
+    });
+    expect(activeSession.pendingError).toBeNull();
+    expect(activeSession.turnFailed).toBe(false);
+  });
+
+  it('preserves an existing fatal error when compaction also fails', () => {
+    turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
+      type: PiAgentEventType.MessageEnd,
+      message: {
+        role: 'assistant',
+        stopReason: PiAssistantStopReason.Error,
+        errorMessage: 'Unauthorized: invalid api key provided',
+      },
+    });
+    const original = activeSession.pendingError;
+    expect(original?.sticky).toBe(true);
+    turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
+      type: PiAgentEventType.CompactionEnd,
+      reason: PiCompactionReason.Threshold,
+      errorMessage: 'Auto-compaction failed: summary unavailable',
+    });
+    expect(activeSession.pendingError).toBe(original);
+  });
+
+  it.each([
+    { reason: PiCompactionReason.Manual, aborted: false },
+    { reason: PiCompactionReason.Overflow, aborted: true },
+  ])('does not poison the turn for manual compaction or cancellation: %j', event => {
+    turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
+      type: PiAgentEventType.CompactionEnd,
+      ...event,
+      errorMessage: 'Compaction cancelled',
+    });
+    expect(activeSession.pendingError).toBeNull();
+    expect(activeSession.turnFailed).toBe(false);
+    expect(hoisted.mockCancelPiRetry).not.toHaveBeenCalled();
   });
 });

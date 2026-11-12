@@ -36,6 +36,7 @@ export const PiChatRuntimeLimit = {
 
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 export interface PiSession {
+  readonly messages?: readonly unknown[];
   prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
   sendUserMessage?(
     content:
@@ -87,6 +88,9 @@ export interface PiEvent {
   success?: boolean;
   attempt?: number;
   finalError?: string;
+  reason?: string;
+  aborted?: boolean;
+  errorMessage?: string;
   message?: {
     id?: string;
     role: string;
