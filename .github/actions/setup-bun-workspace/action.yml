@@ -47,7 +47,7 @@ runs:
       run: |
         find ~/.bun/install/cache -path '*/@earendil-works/pi-ai*/dist/api/simple-options.js' -exec stat -c '%i %h %n' {} \;
         stat -c '%i %h %n' node_modules/@earendil-works/pi-ai/dist/api/simple-options.js
-        rg -n 'leaves no output budget|fixedMargin' node_modules/@earendil-works/pi-ai/dist/api/simple-options.js || true
+        grep -nE 'leaves no output budget|fixedMargin' node_modules/@earendil-works/pi-ai/dist/api/simple-options.js || true
       if: runner.os == 'Linux'
     - shell: bash
       run: bun run apply:patches
