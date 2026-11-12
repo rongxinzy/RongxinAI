@@ -26,9 +26,7 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ~/.bun/install/cache
-        key: bun-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-        restore-keys: |
-          bun-${{ runner.os }}-1.4.0-
+        key: bun-copy-v2-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
     - name: Share Electron download cache
       if: inputs.include-electron == 'true'
       uses: actions/cache@v5
@@ -42,7 +40,7 @@ runs:
         restore-keys: |
           electron-downloads-v1-${{ runner.os }}-${{ runner.arch }}-
     - shell: bash
-      run: bun install --frozen-lockfile --ignore-scripts
+      run: bun install --frozen-lockfile --ignore-scripts --backend copyfile
     - shell: bash
       run: bun run apply:patches
     - name: Save Bun package cache

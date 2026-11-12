@@ -146,7 +146,7 @@ diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/b
 new file mode 100644
 --- /dev/null
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/bounded-summary.js
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,79 @@
 +/** Summarize oversized history in bounded requests without dropping source text. */
 +import { contentText } from "@earendil-works/pi-ai";
 +import { clampMaxTokensToContext } from "@earendil-works/pi-ai/api/simple-options";
@@ -159,14 +159,24 @@ new file mode 100644
 +    // must never replace the original transcript, even when it contains usable text.
 +    const summarize = async (text, part = false) => {
 +        signal?.throwIfAborted();
-+        const context = buildContext(part
-+            ? `This is a contiguous excerpt or ordered partial summaries. It may start or end inside a message. Summarize only the information present.\n\n${text}`
-+            : text);
++        const prefix = part
++            ? "This is a contiguous excerpt or ordered partial summaries. It may start or end inside a message. Summarize only the information present.\n\n"
++            : "";
++        const context = buildContext(`${prefix}${text}`);
++        let available;
++        try {
++            available = clampMaxTokensToContext(model, buildContext(prefix), Number.MAX_SAFE_INTEGER);
++        }
++        catch {
++            throw new Error("Summary instructions leave no room for source text in the model context");
++        }
 +        let fits = true;
 +        try {
 +            // Reuse the transport's estimate and safety margin. Leave room for a useful
-+            // summary rather than requesting a nearly empty, context-clamped answer.
-+            fits = clampMaxTokensToContext(model, context, model.maxTokens) >= Math.min(model.maxTokens, 4096);
++            // summary, but account for fixed instructions before dividing the remaining
++            // space between source text and output on small windows.
++            const minimumOutput = Math.min(model.maxTokens, 4096, Math.max(1, Math.floor(available / 2)));
++            fits = clampMaxTokensToContext(model, context, model.maxTokens) >= minimumOutput;
 +        }
 +        catch {
 +            fits = false;
@@ -193,6 +203,11 @@ new file mode 100644
 +            // Split this rejected input instead of retrying the same oversized request.
 +        }
 +        let middle = Math.floor(text.length / 2);
++        // Prefer a nearby record or word boundary so identifiers are not needlessly
++        // split between summaries. Keep both halves substantial for bounded recursion.
++        let boundary = text.lastIndexOf("\n", middle - 1);
++        if (boundary < Math.floor(middle / 2)) boundary = text.lastIndexOf(" ", middle - 1);
++        if (boundary >= Math.floor(middle / 2)) middle = boundary + 1;
 +        // Do not split a UTF-16 surrogate pair, including when text is a single code point.
 +        const before = text.charCodeAt(middle - 1);
 +        const after = text.charCodeAt(middle);
