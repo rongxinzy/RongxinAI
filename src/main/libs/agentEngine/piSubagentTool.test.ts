@@ -14,10 +14,14 @@ import { CoreSkillId } from '../../../shared/skills/constants';
 
 const hoisted = vi.hoisted(() => ({
   mockCreateAgentSession: vi.fn(),
+  mockSessionManagerInMemory: vi.fn((cwd?: string) => ({ cwd, inMemory: true })),
 }));
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
+  SessionManager: {
+    inMemory: hoisted.mockSessionManagerInMemory,
+  },
 }));
 
 import {
@@ -34,6 +38,7 @@ interface MockSubSession {
   prompt: ReturnType<typeof vi.fn>;
   steer: ReturnType<typeof vi.fn>;
   abort: ReturnType<typeof vi.fn>;
+  dispose: ReturnType<typeof vi.fn>;
   subscribe: ReturnType<typeof vi.fn>;
   emit(event: unknown): void;
 }
@@ -65,6 +70,7 @@ function createAutoSession(output: string): MockSubSession {
     }),
     steer: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
+    dispose: vi.fn(),
     subscribe: vi.fn((listener: (event: unknown) => void) => {
       listeners.push(listener);
       return () => {};
@@ -85,6 +91,7 @@ function createManualSession(): MockSubSession {
     prompt: vi.fn(() => new Promise<void>(() => {})),
     steer: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
+    dispose: vi.fn(),
     subscribe: vi.fn((listener: (event: unknown) => void) => {
       listeners.push(listener);
       return () => {};
@@ -490,6 +497,24 @@ describe('buildPiSubagentTool', () => {
       expect(result.content[0].text).toContain(
         `[Subagent output truncated to 30,000 characters (total: ${boundaryText.length.toLocaleString()} characters)]`,
       );
+    });
+
+    it('creates ephemeral in-memory sessions and disposes sub-sessions in finally', async () => {
+      const subSession = createAutoSession('disposed ok');
+      hoisted.mockCreateAgentSession.mockResolvedValueOnce({ session: subSession });
+
+      const { tool } = buildTool();
+      const result = await tool.execute('call-dispose', { agent: 'scout', task: 'check files' });
+
+      expect(result.content[0].text).toContain('disposed ok');
+      expect(hoisted.mockSessionManagerInMemory).toHaveBeenCalled();
+      expect(hoisted.mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionManager: expect.objectContaining({ inMemory: true }),
+        }),
+      );
+      expect(subSession.abort).toHaveBeenCalledOnce();
+      expect(subSession.dispose).toHaveBeenCalledOnce();
     });
   });
 });

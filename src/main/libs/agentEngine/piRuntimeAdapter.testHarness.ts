@@ -34,6 +34,8 @@ const hoisted = vi.hoisted(() => {
     steer: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
     abortBash: vi.fn(),
+    dispose: vi.fn(),
+    clearQueue: vi.fn(() => ({ steering: [], followUp: [] })),
     reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     setThinkingLevel: vi.fn().mockResolvedValue(undefined),

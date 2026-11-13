@@ -227,7 +227,7 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
     });
 
-    it('cancels a non-retryable SDK retry and reports failure only after it settles', async () => {
+    it('defers retry eligibility to Pi and reports failure after exhaustion', async () => {
       const notices: Array<{ kind: string; attempt: number }> = [];
       adapter.on('retryNotice', (_sid, notice) =>
         notices.push({ kind: notice.kind, attempt: notice.attempt }),
@@ -243,21 +243,19 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
       expect(mockSession.abort).not.toHaveBeenCalled();
 
-      // Cancelling the SDK retry must retain the original error until idle.
+      // Pi decides whether to retry; runtime surfaces failure once retry settles.
       listener!({ type: 'auto_retry_start', attempt: 1 });
       await Promise.resolve();
-      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockSession.abort).not.toHaveBeenCalled();
+      expect(notices).toEqual([{ kind: CoworkErrorKind.AuthExpired, attempt: 1 }]);
       listener!({
         type: 'auto_retry_end',
         success: false,
         attempt: 1,
-        finalError: 'Retry cancelled',
+        finalError: '502 invalid api key',
       });
-      expect(errors).toHaveLength(0);
-      expect(adapter.isSessionRunning('test')).toBe(true);
       listener!({ type: 'agent_settled' });
 
-      expect(notices).toEqual([]);
       expect(errors).toHaveLength(1);
       expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
       expect(systemErrorMessages()).toHaveLength(1);
@@ -282,11 +280,11 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.abort).not.toHaveBeenCalled();
     });
 
-    it('retains a non-retryable failure if the SDK emits a successful-looking cancellation', async () => {
+    it('retains an image capability failure if the SDK emits a successful-looking cancellation', async () => {
       await adapter.startSession('test', 'Hi');
 
       listener!({ type: 'turn_start' });
-      failedAttempt('401 Unauthorized: invalid api key');
+      failedAttempt('400 image input is not supported');
       expect(errors).toHaveLength(0);
       expect(completes).toEqual([]);
 
@@ -295,14 +293,14 @@ describe('PiRuntimeAdapter', () => {
 
       expect(completes).toEqual([]);
       expect(errors).toHaveLength(1);
-      expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
+      expect(errors[0].kind).toBe(CoworkErrorKind.ModelCapabilityUnsupported);
     });
 
-    it('runs the next turn in the same session after a non-retryable failure', async () => {
+    it('runs the next turn in the same session after a sticky failure', async () => {
       await adapter.startSession('test', 'Hi');
 
       listener!({ type: 'turn_start' });
-      failedAttempt('502 invalid api key');
+      failedAttempt('400 image input is not supported');
       let finishAbort: (() => void) | undefined;
       mockSession.abort.mockImplementationOnce(
         () =>

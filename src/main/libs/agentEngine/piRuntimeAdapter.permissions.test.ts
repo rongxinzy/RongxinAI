@@ -17,7 +17,6 @@ import {
 
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
-import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalMode,
@@ -39,7 +38,7 @@ describe('PiRuntimeAdapter', () => {
       ).not.toThrow();
     });
 
-    it('aborts the active Pi turn when a Pi permission check is denied and logs passively', async () => {
+    it('blocks only the denied Pi tool call and keeps the Pi turn running', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
@@ -90,19 +89,13 @@ describe('PiRuntimeAdapter', () => {
           block: true,
           reason: 'Do not write this file.',
         });
-        expect(mockSession.abortBash).toHaveBeenCalledOnce();
-        expect(mockSession.abort).toHaveBeenCalledOnce();
-        expect(adapter.isSessionRunning('denied-workbench')).toBe(false);
+        expect(mockSession.abortBash).not.toHaveBeenCalled();
+        expect(mockSession.abort).not.toHaveBeenCalled();
+        expect(adapter.isSessionRunning('denied-workbench')).toBe(true);
         const current = service.getCurrent('denied-workbench');
-        expect(current?.runs[0].status).toBe(WorkbenchRunStatus.Cancelled);
+        expect(current?.runs[0].status).toBe(WorkbenchRunStatus.Running);
         expect(current?.approvals[0].decision).toBe(WorkbenchApprovalDecision.Denied);
-        expect(interruptions).toEqual([
-          expect.objectContaining({
-            cause: CoworkInterruptionCause.ApprovalDenied,
-            taskId: null,
-            recoverable: false,
-          }),
-        ]);
+        expect(interruptions).toEqual([]);
       } finally {
         db.close();
       }

@@ -9,11 +9,7 @@ import { WorkbenchRunStatus } from '../../../shared/workbenchTask';
 
 setupPiRuntimeAdapterSuite();
 
-test.each([
-  PiAssistantStopReason.Length,
-  PiAssistantStopReason.Aborted,
-  PiAssistantStopReason.ToolUse,
-])(
+test.each([PiAssistantStopReason.Aborted, PiAssistantStopReason.ToolUse])(
   'settling with %s reports interruption without harness continuation or completion',
   async stopReason => {
     const complete = vi.fn();
@@ -22,7 +18,7 @@ test.each([
     adapter.on('error', error);
     await adapter.startSession('terminal-failure', 'Finish the task', { sessionMode: 'work' });
     const listener = mockSession.subscribe.mock.calls.at(-1)![0];
-    // An earlier normal answer cannot make a later truncated turn successful.
+    // An earlier normal answer cannot make a later interrupted turn successful.
     for (const reason of [PiAssistantStopReason.Stop, stopReason]) {
       listener({ type: 'turn_start' });
       listener({
@@ -43,6 +39,28 @@ test.each([
     expect(mockSession.prompt).toHaveBeenCalledOnce();
   },
 );
+
+test('settling with length completes without StreamInterrupted when output is truncated at maxTokens', async () => {
+  const complete = vi.fn();
+  const error = vi.fn();
+  adapter.on('complete', complete);
+  adapter.on('error', error);
+  await adapter.startSession('terminal-length', 'Finish the task', { sessionMode: 'work' });
+  const listener = mockSession.subscribe.mock.calls.at(-1)![0];
+  listener({ type: 'turn_start' });
+  listener({
+    type: 'message_end',
+    message: {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Truncated result' }],
+      stopReason: PiAssistantStopReason.Length,
+    },
+  });
+  listener({ type: 'agent_end' });
+  listener({ type: 'agent_settled' });
+  await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
+  expect(error).not.toHaveBeenCalled();
+});
 
 test('a native continuation can recover length before settlement', async () => {
   const complete = vi.fn();

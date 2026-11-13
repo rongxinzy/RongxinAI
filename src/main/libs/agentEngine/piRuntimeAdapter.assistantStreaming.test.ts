@@ -333,7 +333,7 @@ describe('PiRuntimeAdapter', () => {
       ).toBe(2);
     });
 
-    it.each([PiAssistantStopReason.Stop, PiAssistantStopReason.Length])(
+    it.each([PiAssistantStopReason.Stop, PiAssistantStopReason.Aborted])(
       'preserves the latest answer only when trailing thinking ends normally (%s)',
       async stopReason => {
         const error = vi.fn();

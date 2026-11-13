@@ -29,11 +29,6 @@ import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import type { PiStartOptions } from './piRuntimeTypes';
 import { ToolActivityTracker } from './toolActivity';
 
-export const PiChatRuntimeLimit = {
-  HistoryChars: 16_000,
-  MaxOutputTokens: 8_192,
-} as const;
-
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 export interface PiSession {
   readonly messages?: readonly unknown[];
@@ -46,8 +41,10 @@ export interface PiSession {
   ): Promise<void>;
   steer(text: string): Promise<void>;
   followUp?(text: string): Promise<void>;
+  clearQueue?(): { steering: string[]; followUp: string[] };
   abort(): Promise<void>;
   abortBash(): void;
+  dispose?(): void;
   reload(): Promise<void>;
   setModel(model: unknown): Promise<void>;
   setThinkingLevel?(level: string): unknown;
@@ -226,6 +223,15 @@ export interface ActivePiSession {
   lastUsedAt: number;
   /** True when the current turn settled with an unrecoverable Pi error. */
   turnFailed: boolean;
+  /**
+   * True when skills changed mid-stream (via steer/followUp) and Pi should
+   * reload its ResourceLoader once idle before starting another turn.
+   */
+  pendingSkillReload?: boolean;
+  /** Newly recalled memory block staged for injection in `before_agent_start`. */
+  pendingTurnMemoryContext?: string | null;
+  /** Deduped memory blocks currently active in this compaction window's system prompt. */
+  injectedProjectMemorySections?: string[];
   /**
    * Image attachments of the turn currently in flight. Kept so an image-payload
    * rejection can be retried as text and explained to the user; cleared on every

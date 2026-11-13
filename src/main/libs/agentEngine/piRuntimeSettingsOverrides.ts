@@ -7,11 +7,7 @@
  */
 
 import { applyPiEmbeddedHttpIdleTimeout } from './piHttpIdleTimeout';
-import {
-  PiChatRuntimeLimit,
-  type PiModules,
-  type PiSettingsManager,
-} from './piRuntimeSessionState';
+import { type PiModules, type PiSettingsManager } from './piRuntimeSessionState';
 
 export function applyPiPlatformToolOverrides(
   settingsManager: PiSettingsManager | null,
@@ -37,13 +33,7 @@ export function createPiSettingsManager(pi: PiModules, cwd: string): PiSettingsM
 
 export function resolvePiSessionModel(
   model: Record<string, unknown>,
-  chatMode: boolean,
+  _chatMode: boolean,
 ): Record<string, unknown> {
-  if (!chatMode) return model;
-  return {
-    ...model,
-    ...(typeof model.maxTokens === 'number'
-      ? { maxTokens: Math.min(model.maxTokens, PiChatRuntimeLimit.MaxOutputTokens) }
-      : {}),
-  };
+  return model;
 }

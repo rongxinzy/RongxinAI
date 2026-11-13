@@ -28,16 +28,13 @@ import { isLocalProviderName, ModelCapabilityStatus } from '../../../shared/prov
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
-import {
-  finalizePiPromptWithProjectMemory,
-  resolveProjectMemoryContextForPiPrompt,
-} from '../../memory/piRuntimeProjectMemoryPrompt';
+import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
+import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { applyApplicationRuntimeEnv } from '../coworkUtil';
 import {
   assertLlamaCppWorkModeContext,
   assertWorkModeContextWindow,
 } from '../llamacppWorkModeContextGuard';
-import { PiPlanModePrompt } from './piPlanTool';
 import { PiAgentEventType } from './piStreamConstants';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
@@ -57,7 +54,6 @@ import {
   normalizeSkillIds,
   preparePiPrompt,
   sendPiPrompt,
-  PiChatRuntimeLimit,
   type ActivePiSession,
   type InitializingPiSession,
   type PiEvent,
@@ -296,12 +292,6 @@ export async function startPiRuntimeSession(
     }
     resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
     const sessionModel = resolvePiSessionModel(resolvedModel.model, resourceState.chatMode);
-    if (resourceState.chatMode) {
-      resourceState.maxOutputTokens = Math.min(
-        resourceState.maxOutputTokens,
-        PiChatRuntimeLimit.MaxOutputTokens,
-      );
-    }
     sessionOptions.model = sessionModel;
     if (options.thinkingLevel) {
       // Pi clamps the level to what the resolved model actually supports.
@@ -391,6 +381,7 @@ export async function startPiRuntimeSession(
     const piSessionCreatedAt = Date.now();
     if (!isCurrentInitialization()) {
       void session.abort();
+      session.dispose?.();
       return;
     }
 
@@ -451,6 +442,9 @@ export async function startPiRuntimeSession(
       toolActivityTracker: new ToolActivityTracker(),
       goalMode: options.goalMode === true,
       planMode: options.planMode === true,
+      pendingSkillReload: false,
+      pendingTurnMemoryContext: null,
+      injectedProjectMemorySections: [],
       pendingError: null,
       errorSurfaced: false,
       retryNoticeEmitted: false,
@@ -494,8 +488,10 @@ export async function startPiRuntimeSession(
       if (abortController.signal.aborted || host.activeSessions.get(sessionId) !== active) {
         return;
       }
-      if (event.type === PiAgentEventType.CompactionEnd && event.result)
+      if (event.type === PiAgentEventType.CompactionEnd && event.result) {
         host.memoryInjectionDedup.reset(sessionId);
+        active.injectedProjectMemorySections = [];
+      }
       host.emit('executionEvent', sessionId, event);
       active.eventProjection?.push(event);
     });
@@ -503,6 +499,7 @@ export async function startPiRuntimeSession(
     if (!isCurrentInitialization()) {
       active.unsubscribe();
       void session.abort();
+      session.dispose?.();
       return;
     }
     host.activeSessions.set(sessionId, active);
@@ -521,10 +518,6 @@ export async function startPiRuntimeSession(
     // A live Pi session replaces the lightweight IM retention marker.
     host.retainedSessionIds.delete(sessionId);
 
-    let initialPrompt = prompt;
-    if (options.planMode === true) {
-      initialPrompt = `${PiPlanModePrompt}\n\n${initialPrompt}`;
-    }
     // A fresh Pi transcript never contains an earlier memory block, so the
     // per-session dedup fingerprint must restart with it.
     host.memoryInjectionDedup.reset(sessionId);
@@ -538,11 +531,12 @@ export async function startPiRuntimeSession(
       signal: abortController.signal,
     });
     if (host.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
-    initialPrompt = finalizePiPromptWithProjectMemory({
+    active.pendingTurnMemoryContext = projectMemoryContext;
+    captureMemoryPromptForE2e({
       sessionId,
       userPrompt: prompt,
-      prompt: initialPrompt,
-      projectMemoryContext,
+      memoryContext: projectMemoryContext,
+      initialPrompt: prompt,
     });
 
     // The user may stop the session while the execution-mode question is
@@ -551,7 +545,7 @@ export async function startPiRuntimeSession(
 
     console.debug(`[PiRuntime] dispatching initial prompt for session ${sessionId}`);
     const initialImagePrompt = preparePiPrompt(
-      initialPrompt,
+      prompt,
       options.imageAttachments,
       host.recovery.imageInputVerdictForActive(active),
       host.getOcrCommandFor(),
@@ -559,8 +553,14 @@ export async function startPiRuntimeSession(
     );
     // Recorded before the request leaves: the SDK can report the rejection
     // through events that arrive before the send promise settles.
-    host.recovery.recordImagePrompt(sessionId, active, initialPrompt, initialImagePrompt);
-    await sendPiPrompt(session, initialImagePrompt, undefined);
+    host.recovery.recordImagePrompt(sessionId, active, prompt, initialImagePrompt);
+    host.queue.expectDirectUserPrompt(sessionId);
+    try {
+      await sendPiPrompt(session, initialImagePrompt, undefined);
+    } catch (sendError) {
+      host.queue.cancelDirectUserPrompt(sessionId);
+      throw sendError;
+    }
     await active.eventProjection?.drain();
   } catch (error) {
     // A stopped turn can immediately restart from the first queued follow-up.

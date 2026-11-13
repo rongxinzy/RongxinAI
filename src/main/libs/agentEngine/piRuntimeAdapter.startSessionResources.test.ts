@@ -11,6 +11,7 @@
 import {
   adapter,
   applyTestResolution,
+  createTemporaryWorkspace,
   mockCreateAgentSession,
   mockCodemodeExtensionFactory,
   mockCreateMcpExtension,
@@ -446,6 +447,72 @@ describe('PiRuntimeAdapter', () => {
 
       expect(adapter.isSessionRunning('test')).toBe(true);
       expect(mockSession.abort).toHaveBeenCalledTimes(1);
+      expect(mockSession.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not clamp Chat maxTokens below the resolved model limit and calls dispose on stopSession', async () => {
+      applyTestResolution({
+        config: {
+          apiKey: 'sk-test',
+          baseURL: 'https://api.openai.com/v1',
+          model: 'gpt-5.4',
+          apiType: 'openai',
+        },
+        providerMetadata: {
+          providerName: 'openai',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          contextWindow: 128_000,
+          maxTokens: 32_768,
+        },
+      });
+
+      await adapter.startSession('chat-unclamped', 'Hello Pi', { sessionMode: 'chat' });
+
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            maxTokens: 32_768,
+          }),
+        }),
+      );
+
+      adapter.stopSession('chat-unclamped');
+      expect(mockSession.dispose).toHaveBeenCalledOnce();
+    });
+
+    it('injects project memory through before_agent_start sections instead of user prompt text', async () => {
+      adapter.setProjectMemoryService({
+        buildProjectContext: vi
+          .fn()
+          .mockResolvedValue('<project_memory>\nRemember convention X\n</project_memory>'),
+        registerSession: vi.fn().mockResolvedValue(undefined),
+      } as never);
+
+      await adapter.startSession('memory-section', 'Inspect repository', {
+        sessionMode: 'work',
+        workspaceRoot: createTemporaryWorkspace(),
+      });
+
+      expect(mockSession.prompt).toHaveBeenCalledWith('Inspect repository');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
+        >;
+      };
+      const beforeHandlers: Array<(event: unknown) => unknown> = [];
+      for (const factory of loaderOptions.extensionFactories ?? []) {
+        factory({
+          on: (event, handler) => {
+            if (event === 'before_agent_start') beforeHandlers.push(handler);
+          },
+        });
+      }
+      const sections: Record<string, string> = {};
+      for (const handler of beforeHandlers) {
+        await handler({ prompt: 'Inspect repository', systemPromptOptions: { sections } });
+      }
+      expect(sections.project_memory).toContain('Remember convention X');
     });
   });
 });

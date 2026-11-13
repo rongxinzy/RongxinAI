@@ -6,7 +6,6 @@ import path from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { app } from 'electron';
 import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
-import { CoworkErrorKind } from '../../src/common/coworkError';
 import { CoworkStore } from '../../src/main/coworkStore';
 import { SqliteStore } from '../../src/main/sqliteStore';
 import { PiRuntimeAdapter } from '../../src/main/libs/agentEngine/piRuntimeAdapter';
@@ -63,15 +62,9 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
         workspaceRoot: directory,
         sessionMode: 'work',
       });
-      if (finishReason === PiAssistantStopReason.Length) {
-        expect(complete).not.toHaveBeenCalled();
-        expect(error).toHaveBeenCalledOnce();
-        expect(error.mock.calls[0][1].kind).toBe(CoworkErrorKind.StreamInterrupted);
-      } else {
-        expect(error).not.toHaveBeenCalled();
-        expect(complete).toHaveBeenCalledOnce();
-        expect(complete).toHaveBeenCalledWith(session.id, {});
-      }
+      expect(error).not.toHaveBeenCalled();
+      expect(complete).toHaveBeenCalledOnce();
+      expect(complete).toHaveBeenCalledWith(session.id, {});
       expect(requests).toBe(1);
     } finally {
       // Context-usage metadata is intentionally persisted on the next timer tick.

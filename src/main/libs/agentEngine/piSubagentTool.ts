@@ -57,6 +57,7 @@ export const PI_SUBAGENT_MAX_OUTPUT_CHARS = 30_000;
  */
 interface PiSubagentSubSession extends PiSubagentSession {
   abort(): Promise<void>;
+  dispose?(): void;
 }
 
 /**
@@ -68,6 +69,9 @@ interface PiSubagentModules {
   createAgentSession: (options: Record<string, unknown>) => Promise<{
     session: PiSubagentSubSession;
   }>;
+  SessionManager?: {
+    inMemory(cwd?: string): unknown;
+  };
 }
 
 interface PiSubagentResolvedModel {
@@ -184,6 +188,13 @@ function getPiSubagentModules(): Promise<PiSubagentModules> {
     _piSubagentModules = import('@earendil-works/pi-coding-agent').then(codingAgent => ({
       createAgentSession:
         codingAgent.createAgentSession as unknown as PiSubagentModules['createAgentSession'],
+      ...(Object.prototype.hasOwnProperty.call(codingAgent, 'SessionManager') &&
+      codingAgent.SessionManager
+        ? {
+            SessionManager:
+              codingAgent.SessionManager as unknown as PiSubagentModules['SessionManager'],
+          }
+        : {}),
     }));
   }
   return _piSubagentModules;
@@ -274,6 +285,8 @@ async function runSubagent(
     const subOptions: Record<string, unknown> = {
       cwd,
       model,
+      // Subagent sessions are ephemeral and must never persist throwaway JSONL files.
+      ...(pi.SessionManager ? { sessionManager: pi.SessionManager.inMemory(cwd) } : {}),
       // No customTools: subagents must not recursively spawn sub-subagents,
       // and AskUserQuestion is reserved for the parent session.
     };
@@ -338,6 +351,11 @@ async function runSubagent(
     if (subSession) {
       try {
         await subSession.abort();
+      } catch {
+        // Ignore cleanup errors.
+      }
+      try {
+        subSession.dispose?.();
       } catch {
         // Ignore cleanup errors.
       }

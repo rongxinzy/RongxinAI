@@ -7,12 +7,7 @@
 
 import { randomUUID } from 'crypto';
 
-import {
-  classifyCoworkError,
-  CoworkErrorKind,
-  isTransient,
-  makeCoworkError,
-} from '../../../common/coworkError';
+import { classifyCoworkError, CoworkErrorKind, makeCoworkError } from '../../../common/coworkError';
 import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
@@ -66,6 +61,8 @@ export interface PiRuntimeTurnHost {
     cause?: CoworkInterruptionCause,
   ): void;
   flushFollowUpQueue(sessionId: string, active: ActivePiSession): Promise<void>;
+  onPiUserMessageStart?: (sessionId: string, active: ActivePiSession) => void;
+  resetNativeQueueDispatch?: (sessionId: string) => void;
   flushPendingError(sessionId: string, active: ActivePiSession): boolean;
   imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration;
   syncImageInputCapability(sessionIds?: Iterable<string>): Promise<void>;
@@ -190,6 +187,9 @@ export class PiRuntimeTurnEvents {
         break;
 
       case 'message_start':
+        if ((event.message as { role?: unknown } | undefined)?.role === 'user') {
+          this.host.onPiUserMessageStart?.(sessionId, active);
+        }
         active.requestStartedAt = Date.now();
         active.firstVisibleTextAt = null;
         this.emitTranslatedPiEvent(sessionId, active, event);
@@ -435,18 +435,6 @@ export class PiRuntimeTurnEvents {
             this.host.transcript.closeIdlePlaceholders(sessionId, active, {
               finalize: true,
             });
-            if (
-              !active.errorSurfaced &&
-              active.pendingError.classified.kind !== CoworkErrorKind.Unknown &&
-              !isTransient(active.pendingError.classified.kind) &&
-              active.pendingError.classified.kind !== CoworkErrorKind.InputTooLong
-            ) {
-              // Keep the original failure until Pi settles. If the SDK retries,
-              // auto_retry_start cancels its newly installed backoff controller.
-              // Note: InputTooLong context overflows are self-healing via Pi's auto-compaction
-              // retry (_runAutoCompaction("overflow")), so do not mark them sticky.
-              active.pendingError.sticky = true;
-            }
             if (imageRejection) {
               // Keep the rejection as a runtime observation instead of rewriting
               // the user's capability configuration: following turns simply stop
@@ -460,6 +448,7 @@ export class PiRuntimeTurnEvents {
               // Pi snapshot still advertises image input, so their own `read`
               // would send the payload this server just refused.
               void this.host.syncImageInputCapability();
+              active.pendingError.sticky = true;
               if (carriedImages) {
                 active.imageRetryPending = true;
                 active.imageRejectionHandled = true;
@@ -676,10 +665,10 @@ export class PiRuntimeTurnEvents {
       }
 
       case 'auto_retry_start':
-        if (
-          active.pendingError?.sticky &&
-          active.pendingError.classified.kind !== CoworkErrorKind.InputTooLong
-        ) {
+        // Cancel Pi's own backoff only when switching to an immediate image-less
+        // retry or when the server rejected image input for this model; otherwise
+        // Pi's native `_isRetryableError` governs retry eligibility.
+        if (active.imageRetryPending || active.pendingError?.sticky) {
           void cancelPiRetry(active.piSession).catch(error => {
             console.error(`[PiRuntime] failed to cancel retry for session ${sessionId}:`, error);
           });
@@ -759,6 +748,7 @@ export class PiRuntimeTurnEvents {
    */
   private handleTurnSettled(sessionId: string, active: ActivePiSession): void {
     active.isRunning = false;
+    this.host.resetNativeQueueDispatch?.(sessionId);
     // Flush artifact capture before completion: the final diff anchors to the
     // last completed answer message.
     active.artifactRecorder?.onRunSettled(active.lastCompletedAnswerMessageId);
