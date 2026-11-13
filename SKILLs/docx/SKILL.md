@@ -29,9 +29,9 @@ Create, edit, and format DOCX documents via CLI tools or direct C# scripts built
 ## ZhiYuan/Pi execution
 
 When this skill is run inside ZhiYuan, use the `run_skill_script` tool for every bundled
-`.sh`, `.py`, `.mjs`, or `.ps1` script. Do not invoke `bash`, `python3`, or `node`
-through a hand-built shell command. The application resolves the packaged Git Bash,
-Python, and Node runtimes and reports the exact unavailable runtime when one is missing.
+`.py`, `.mjs`, or `.ps1` script. Do not invoke `bash`, `powershell`, `python3`, or `node`
+through a hand-built shell command. The application resolves the packaged Python, PowerShell,
+and Node runtimes and reports the exact unavailable runtime when one is missing.
 Markdown remains the source/intermediate format: create or edit the `.md` with Pi's file tools,
 then run the conversion script through the same tool.
 
@@ -45,9 +45,9 @@ Example:
 }
 ```
 
-**First time (CLI reference):** `bash scripts/setup.sh` (or `powershell scripts/setup.ps1` on Windows, `--minimal` to skip optional deps). Inside ZhiYuan, run the corresponding setup script with `run_skill_script`.
+**First time (CLI reference):** `python3 scripts/setup.py` (or `powershell scripts/setup.ps1` on Windows, `--minimal` to skip optional deps). Inside ZhiYuan, run the corresponding setup script with `run_skill_script`.
 
-**First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. `LIMITED` means that the bundled local Markdown converter can create a simple DOCX without downloads, but structural editing and template operations still require .NET 8+. (Skip on subsequent operations within the same session.)
+**First operation in session:** `python3 scripts/env_check.py`. Do not proceed if `NOT READY`. `LIMITED` means that the bundled local Markdown converter can create a simple DOCX without downloads, but structural editing and template operations still require .NET 8+. (Skip on subsequent operations within the same session.)
 
 ## Capability routing
 
@@ -82,10 +82,10 @@ mainPart.Document = new Document(new Body());
 
 All CLI commands below use `$CLI` as shorthand for:
 ```bash
-bash scripts/cli.sh
+python3 scripts/cli.py
 ```
 
-`cli.sh` prefers the bundled self-contained runtime (`runtime/MiniMaxAIDocx.Cli.exe`, needs no
+`cli.py` prefers the bundled self-contained runtime (`runtime/MiniMaxAIDocx.Cli.exe`, needs no
 .NET installed) and falls back to `dotnet run` on developer machines. Inside ZhiYuan, run it
 through `run_skill_script` like any other bundled script.
 
@@ -116,9 +116,9 @@ If the request spans multiple pipelines, run them sequentially (e.g., Create the
 
 ## Pre-processing
 
-Convert `.doc` → `.docx` if needed: `bash scripts/doc_to_docx.sh input.doc output_dir/`
+Convert `.doc` → `.docx` if needed: `python3 scripts/doc_to_docx.py input.doc output_dir/`
 
-Preview before editing (avoids reading raw XML): `bash scripts/docx_preview.sh document.docx`
+Preview before editing (avoids reading raw XML): `node scripts/docx_preview.mjs document.docx`
 
 Analyze structure for editing scenarios: `$CLI analyze --input document.docx`
 

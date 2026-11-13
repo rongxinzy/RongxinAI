@@ -80,27 +80,6 @@ const resolveWindowsGitExecutable = async (): Promise<string | null> => {
     }
   }
 
-  const bundledRoots = app.isPackaged
-    ? [path.join(process.resourcesPath, 'mingit')]
-    : [
-        path.join(__dirname, '..', '..', 'resources', 'mingit'),
-        path.join(process.cwd(), 'resources', 'mingit'),
-      ];
-
-  for (const root of bundledRoots) {
-    const bundledCandidates = [
-      path.join(root, 'cmd', 'git.exe'),
-      path.join(root, 'bin', 'git.exe'),
-      path.join(root, 'mingw64', 'bin', 'git.exe'),
-      path.join(root, 'usr', 'bin', 'git.exe'),
-    ];
-    for (const candidate of bundledCandidates) {
-      if (fs.existsSync(candidate)) {
-        return candidate;
-      }
-    }
-  }
-
   return null;
 };
 

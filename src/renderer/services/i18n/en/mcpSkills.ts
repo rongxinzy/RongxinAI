@@ -47,15 +47,11 @@ export const enMcpSkills: Record<string, string> = {
   codemodeEnabled: 'Batch tool acceleration (Codemode)',
   codemodeEnabledDescription:
     'Lets the agent combine multiple tool calls in a sandboxed script, reducing waiting on long tasks and batch file operations. Default off.',
-  mcpNativeBridge: 'MCP native bridge',
-  mcpNativeBridgeDescription:
-    'Work sessions connect MCP servers through the builtin extension with per-server progressive tool exposure; off keeps the single gateway tool',
   mcpExposure: 'Tool exposure',
   mcpExposureCodemode: 'codemode (sandbox scripts only)',
   mcpExposureDeferred: 'deferred (loaded via tool_search)',
   mcpExposureDirect: 'direct (declared upfront)',
   mcpExposureHidden: 'hidden (unreachable)',
-  mcpExposureHint: 'Effective when the MCP native bridge is on',
   // Skills
   skills: 'Skills',
   remoteImport: 'Remote Import',

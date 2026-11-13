@@ -150,7 +150,6 @@ export const mockCoworkConfig: MockCoworkConfig = {
   embeddingRemoteBaseUrl: '',
   embeddingRemoteApiKey: '',
   codemodeEnabled: false,
-  mcpNativeBridge: false,
 };
 
 export const mockSkills: Skill[] = [

@@ -75,7 +75,6 @@ test('setConfig loads Pi-owned cowork configuration', () => {
       embeddingRemoteBaseUrl: '',
       embeddingRemoteApiKey: '',
       codemodeEnabled: false,
-      mcpNativeBridge: false,
     }),
   );
 

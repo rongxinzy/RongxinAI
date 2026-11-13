@@ -3,80 +3,64 @@ import {
   mockDefaultResourceLoader,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
-import Database from 'better-sqlite3';
 import { describe, expect, test } from 'vitest';
-import {
-  WorkbenchApprovalEffectStatus,
-  WorkbenchApprovalMode,
-} from '../../../shared/workbenchTask';
-import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
-import { WorkbenchTaskService } from '../../workbenchTask/taskService';
+import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
 import { getPiModules } from './piRuntimeSessionState';
 import { PiExtensionEventType, type PiExtensionFactory } from './piExtensionTypes';
 
 describe('child tool authorization', () => {
   setupPiRuntimeAdapterSuite();
-  test('isolates duplicate provider IDs and records each child effect against its original run', async () => {
-    const db = new Database(':memory:');
-    initializeWorkbenchTaskSchema(db);
-    const service = new WorkbenchTaskService(db);
-    adapter.setWorkbenchTaskService(service);
+  test('authorizes concurrent child sessions independently without provider ID namespaces', async () => {
+    await adapter.startSession('parent', 'work', {
+      sessionMode: 'work',
+      approvalMode: WorkbenchApprovalMode.Ask,
+    });
+    const active = adapter.activeSessions.get('parent')!;
+    const pi = await getPiModules();
+    const pendingRequests: Array<{ requestId: string; toolName: string }> = [];
+    adapter.on('permissionRequest', (_sid, request) => {
+      pendingRequests.push({ requestId: request.requestId, toolName: request.toolName });
+      adapter.respondToPermission(request.requestId, { behavior: 'allow' });
+    });
+
     try {
-      await adapter.startSession('parent', 'work', { sessionMode: 'work' });
-      const active = adapter.activeSessions.get('parent')!;
-      const runId = active.workbenchRunId!;
-      const pi = await getPiModules();
-      for (const namespace of ['child-1', 'child-2']) {
-        await createPiRuntimeResourceLoader(
-          adapter,
-          pi,
-          process.cwd(),
-          { ...active.resourceState, nativeToolsOnly: true },
-          {
-            sessionId: 'parent',
-            getRunId: () => runId,
-            getApprovalMode: () => WorkbenchApprovalMode.AllowAll,
-            toolCallNamespace: namespace,
-          },
-        );
-        const options = mockDefaultResourceLoader.mock.calls.at(-1)![0] as {
-          extensionFactories: PiExtensionFactory[];
-        };
-        const handlers = new Map<string, (event: never) => unknown>();
-        for (const factory of options.extensionFactories) {
-          factory({
-            on: (event: string, handler: (event: never) => unknown) => {
-              handlers.set(event, handler);
+      const results = await Promise.all(
+        ['child-1', 'child-2'].map(async () => {
+          await createPiRuntimeResourceLoader(
+            adapter,
+            pi,
+            process.cwd(),
+            { ...active.resourceState, nativeToolsOnly: true },
+            {
+              sessionId: 'parent',
+              getRunId: () => active.workbenchRunId,
+              getApprovalMode: () => WorkbenchApprovalMode.Ask,
             },
+          );
+          const options = mockDefaultResourceLoader.mock.calls.at(-1)![0] as {
+            extensionFactories: PiExtensionFactory[];
+          };
+          const handlers = new Map<string, (event: never) => Promise<unknown>>();
+          for (const factory of options.extensionFactories) {
+            factory({
+              on: (event: string, handler: (event: never) => Promise<unknown>) => {
+                handlers.set(event, handler);
+              },
+            } as never);
+          }
+          return await handlers.get(PiExtensionEventType.ToolCall)!({
+            toolCallId: 'provider-call-1',
+            toolName: 'write',
+            input: { path: 'result.md', content: 'verified' },
           } as never);
-        }
-        const call = {
-          toolCallId: 'provider-call-1',
-          toolName: 'write',
-          input: { path: 'result.md', content: 'verified' },
-        };
-        expect(await handlers.get(PiExtensionEventType.ToolCall)!(call as never)).toBeUndefined();
-        await handlers.get(PiExtensionEventType.ToolResult)!({
-          ...call,
-          isError: false,
-          content: [{ type: 'text', text: 'done' }],
-        } as never);
-      }
-      const approvals = service.getCurrent('parent')!.approvals;
-      expect(approvals.map(approval => approval.toolCallId).sort()).toEqual([
-        'child-1/provider-call-1',
-        'child-2/provider-call-1',
-      ]);
-      expect(
-        approvals.every(
-          approval => approval.effectStatus === WorkbenchApprovalEffectStatus.Succeeded,
-        ),
-      ).toBe(true);
-      expect(approvals.every(approval => approval.runId === runId)).toBe(true);
+        }),
+      );
+      expect(results).toEqual([undefined, undefined]);
+      expect(pendingRequests).toHaveLength(2);
+      expect(new Set(pendingRequests.map(item => item.requestId)).size).toBe(2);
     } finally {
       await adapter.stopAllSessions();
-      db.close();
     }
   });
 });

@@ -261,7 +261,7 @@ test('llama.cpp editions require the fixed set, verify and count extra component
 });
 
 test.each(['cpu', 'cuda'])(
-  '%s rejects an absent bundled runtime even with all seven base components',
+  '%s rejects an absent bundled runtime even with all six base components',
   edition => {
     const { dir } = componentsFixture();
     expect(() => readComponentArchiveBytes(dir, edition)).toThrow(/every bundled/);

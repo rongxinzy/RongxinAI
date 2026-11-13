@@ -64,7 +64,6 @@ describe('summary fallback goal', () => {
         await adapter.startSession(session.id, 'Create a workbook', {
           workspaceRoot: root,
           sessionMode: CoworkSessionMode.Work,
-          _piPromptOverride: 'Restored transcript followed by the task',
         });
         await checkGoal('Create a workbook');
         await adapter.continueSession(session.id, 'Correct the workbook totals');

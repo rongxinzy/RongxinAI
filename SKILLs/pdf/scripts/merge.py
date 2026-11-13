@@ -17,7 +17,7 @@ import sys
 try:
     from pypdf import PdfWriter, PdfReader
 except ImportError:
-    print("Missing pypdf. Run this script through make.sh or: uv run --with pypdf python merge.py ...", file=sys.stderr)
+    print("Missing pypdf. Run this script through make.py or: uv run --with pypdf python merge.py ...", file=sys.stderr)
     raise SystemExit(2)
 
 

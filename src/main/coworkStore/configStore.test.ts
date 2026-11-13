@@ -75,7 +75,6 @@ test('getConfig returns built-in defaults when no config rows exist', () => {
     embeddingRemoteBaseUrl: '',
     embeddingRemoteApiKey: '',
     codemodeEnabled: false,
-    mcpNativeBridge: false,
   });
 });
 
@@ -103,14 +102,14 @@ test('setConfig round-trips embedding options with the weight clamped to [0, 1]'
   });
 });
 
-test('setConfig round-trips codemode and mcp bridge flags', () => {
+test('setConfig round-trips codemode flag', () => {
   const { store } = harness;
 
-  store.setConfig({ codemodeEnabled: true, mcpNativeBridge: true });
-  expect(store.getConfig()).toMatchObject({ codemodeEnabled: true, mcpNativeBridge: true });
+  store.setConfig({ codemodeEnabled: true });
+  expect(store.getConfig()).toMatchObject({ codemodeEnabled: true });
 
-  store.setConfig({ codemodeEnabled: false, mcpNativeBridge: false });
-  expect(store.getConfig()).toMatchObject({ codemodeEnabled: false, mcpNativeBridge: false });
+  store.setConfig({ codemodeEnabled: false });
+  expect(store.getConfig()).toMatchObject({ codemodeEnabled: false });
 });
 
 test('getConfig drops per-session permission modes outside the known set', () => {

@@ -58,7 +58,7 @@ test('Windows release workflow runs the clean-path bundled runtime gate', () => 
   assert.match(smoke, /generated DOCX validation/);
   assert.doesNotMatch(smoke, /Invoke-Checked \$electron/);
   assert.match(smoke, /External command unexpectedly remains discoverable/);
-  assert.match(smoke, /mingit\\usr\\bin\\bash\.exe/);
+  assert.doesNotMatch(smoke, /mingit/);
   assert.match(smoke, /PATH = "\$env:SystemRoot\\System32;\$env:SystemRoot"/);
   const packageScript = readFileSync(
     path.join(root, 'scripts', 'ci', 'package-windows.ps1'),

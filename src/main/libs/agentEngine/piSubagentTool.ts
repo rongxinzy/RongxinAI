@@ -9,7 +9,6 @@
  * Modes (mutually exclusive):
  *   single   — {agent, task}
  *   parallel — {parallel: [{agent, task}, ...]} with a concurrency cap
- *   chain    — {chain: [{agent, task}, ...]} with {previous} injection
  *
  * Sub-session constraints:
  *   - no customTools (subagents cannot spawn sub-subagents)
@@ -45,8 +44,7 @@ export const SUBAGENT_PARALLEL_LIMIT = 4;
 /** Separator between presetId and agentId in team member definition filenames. */
 const MEMBER_FILE_SEPARATOR = '--';
 
-/** Placeholder replaced with the previous step's output in chain mode. */
-const CHAIN_PREVIOUS_PLACEHOLDER = '{previous}';
+/** Placeholder for single and parallel subagent execution. */
 
 /** Maximum characters returned by subagent execution to prevent context overflow (clamped to 30,000 for CJK token safety). */
 export const PI_SUBAGENT_MAX_OUTPUT_CHARS = 30_000;
@@ -289,8 +287,8 @@ async function runSubagent(
     const researcherUsesWebSearch =
       profile.id === PiSubagentProfileId.Researcher && Boolean(deps.webSearchSkillPath);
     const systemPrompt = researcherUsesWebSearch
-      ? `${profile.systemPrompt}\n\nYou have an explicit retrieval capability. Before reporting a web claim, run the bundled web-search skill with Bash:\n` +
-        `bash "${path.join(deps.webSearchSkillPath || '', 'scripts/search.sh')}" "<query>" 10\n` +
+      ? `${profile.systemPrompt}\n\nYou have an explicit retrieval capability. Before reporting a web claim, run the bundled web-search skill:\n` +
+        `node "${path.join(deps.webSearchSkillPath || '', 'scripts', 'search.mjs')}" "<query>" 10\n` +
         'Open the returned primary sources where possible. Never substitute model memory for a retrieved citation.'
       : profile.systemPrompt;
     const resourceLoader = researcherUsesWebSearch
@@ -446,14 +444,13 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
 
   const runSpec = async (
     spec: SubagentTaskSpec,
-    taskText?: string,
     signal?: AbortSignal,
   ): Promise<SubagentRunResult> => {
     const profile = findProfile(spec.agent);
     if (!profile) {
       return { ok: false, output: unknownAgentMessage(spec.agent) };
     }
-    return runSubagent(deps, profile, taskText ?? spec.task, signal);
+    return runSubagent(deps, profile, spec.task, signal);
   };
 
   const executeSingle = async (
@@ -474,7 +471,7 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
     signal?: AbortSignal,
   ): Promise<SubagentToolResult> => {
     const results = await runWithConcurrency(specs, SUBAGENT_PARALLEL_LIMIT, spec =>
-      runSpec(spec, undefined, signal),
+      runSpec(spec, signal),
     );
     signal?.throwIfAborted();
     const succeeded = results.filter(result => result.ok).length;
@@ -490,36 +487,6 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
     });
   };
 
-  const executeChain = async (
-    specs: SubagentTaskSpec[],
-    signal?: AbortSignal,
-  ): Promise<SubagentToolResult> => {
-    const sections: string[] = [];
-    let previousOutput = '';
-    for (let index = 0; index < specs.length; index++) {
-      const spec = specs[index];
-      // The first step has no previous output, so no replacement happens.
-      const taskText = previousOutput
-        ? spec.task.split(CHAIN_PREVIOUS_PLACEHOLDER).join(previousOutput)
-        : spec.task;
-      const result = await runSpec(spec, taskText, signal);
-      signal?.throwIfAborted();
-      if (!result.ok) {
-        sections.push(`Chain stopped at step ${index + 1} (${spec.agent}): ${result.output}`);
-        return textResult(sections.join('\n\n'), {
-          mode: 'chain',
-          agentIds: specs.map(item => item.agent),
-        });
-      }
-      sections.push(`## Step ${index + 1}: ${spec.agent}\n${result.output}`);
-      previousOutput = result.output;
-    }
-    return textResult(sections.join('\n\n'), {
-      mode: 'chain',
-      agentIds: specs.map(item => item.agent),
-    });
-  };
-
   return {
     name: PiSubagentToolName,
     label: 'Subagent',
@@ -529,8 +496,7 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
       agentList +
       '\n\nModes (mutually exclusive):\n' +
       '- Single: {agent, task} — delegate one task to one agent.\n' +
-      `- Parallel: {parallel: [{agent, task}, ...]} — run agents concurrently (max ${SUBAGENT_PARALLEL_LIMIT} at once).\n` +
-      `- Chain: {chain: [{agent, task}, ...]} — run agents sequentially; use ${CHAIN_PREVIOUS_PLACEHOLDER} in a task to inject the previous step's output.`,
+      `- Parallel: {parallel: [{agent, task}, ...]} — run agents concurrently (max ${SUBAGENT_PARALLEL_LIMIT} at once).`,
 
     parameters: {
       type: 'object',
@@ -562,24 +528,6 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
             additionalProperties: false,
           },
         },
-        chain: {
-          type: 'array',
-          description:
-            'Chain mode: {agent, task} entries run sequentially. ' +
-            `Use ${CHAIN_PREVIOUS_PLACEHOLDER} inside a task to inject the previous step's output.`,
-          items: {
-            type: 'object',
-            properties: {
-              agent: {
-                type: 'string',
-                description: `Agent to delegate to. Available: ${availableAgentIds}`,
-              },
-              task: { type: 'string', description: 'Complete, self-contained task description.' },
-            },
-            required: ['agent', 'task'],
-            additionalProperties: false,
-          },
-        },
       },
       additionalProperties: false,
     },
@@ -594,17 +542,14 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
       signal?.throwIfAborted();
       const hasSingleParams = 'agent' in params || 'task' in params;
       const hasParallel = Array.isArray(params.parallel);
-      const hasChain = Array.isArray(params.chain);
-      const modeCount = [hasSingleParams, hasParallel, hasChain].filter(Boolean).length;
+      const modeCount = [hasSingleParams, hasParallel].filter(Boolean).length;
 
       if (modeCount === 0) {
-        return textResult(
-          'Provide exactly one mode: {agent, task}, {parallel: [...]}, or {chain: [...]}.',
-        );
+        return textResult('Provide exactly one mode: {agent, task} or {parallel: [...]}.');
       }
       if (modeCount > 1) {
         return textResult(
-          'Subagent modes are mutually exclusive: use only one of {agent, task}, {parallel}, or {chain}.',
+          'Subagent modes are mutually exclusive: use only one of {agent, task} or {parallel}.',
         );
       }
 
@@ -617,19 +562,11 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
         return executeSingle({ agent, task }, signal);
       }
 
-      if (hasParallel) {
-        const specs = parseTaskList(params.parallel, 'parallel');
-        if (typeof specs === 'string') {
-          return textResult(specs);
-        }
-        return executeParallel(specs, signal);
-      }
-
-      const specs = parseTaskList(params.chain, 'chain');
+      const specs = parseTaskList(params.parallel, 'parallel');
       if (typeof specs === 'string') {
         return textResult(specs);
       }
-      return executeChain(specs, signal);
+      return executeParallel(specs, signal);
     },
   };
 }

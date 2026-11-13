@@ -46,15 +46,11 @@ export const zhMcpSkills: Record<string, string> = {
   codemodeEnabled: '复杂任务批处理加速 (Codemode)',
   codemodeEnabledDescription:
     '允许智能体在沙箱脚本中组合多次工具调用，减少长任务和批量文件操作的等待时间。默认关闭。',
-  mcpNativeBridge: 'MCP 原生桥接',
-  mcpNativeBridgeDescription:
-    '工作会话改用内置 MCP 扩展连接服务器，按服务器暴露级别渐进展示工具；关闭时沿用单网关工具',
   mcpExposure: '工具暴露级别',
   mcpExposureCodemode: 'codemode（仅编排脚本可见）',
   mcpExposureDeferred: 'deferred（按需经 tool_search 加载）',
   mcpExposureDirect: 'direct（直接声明给模型）',
   mcpExposureHidden: 'hidden（不可达）',
-  mcpExposureHint: '仅 MCP 原生桥接开启时生效',
   // Skills
   skills: '技能',
   remoteImport: '远程导入',

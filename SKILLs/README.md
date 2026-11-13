@@ -18,7 +18,7 @@ SKILLs/
     ├── SKILL.md
     ├── LICENSE
     ├── scripts/
-    │   ├── env_check.sh
+    │   ├── env_check.py
     │   └── markdown_to_docx.mjs
     ├── references/
     │   └── scenario_a_create.md

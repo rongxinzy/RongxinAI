@@ -24,29 +24,19 @@ test('classifies known reads, reversible writes, and destructive shell commands'
   );
 });
 
-test.each([
-  'read_document',
-  'conversation_history',
-  'ocr',
-  'session_summary',
-  'plan_write',
-  'codemode',
-])('does not ask for approval of %s while actual mutations remain protected', name => {
-  expect(classifyWorkbenchToolRisk(name, {})).toBe(WorkbenchApprovalRiskLevel.ReadOnly);
-  expect(classifyWorkbenchToolRisk('write', {})).toBe(WorkbenchApprovalRiskLevel.Reversible);
-  expect(classifyWorkbenchToolRisk('mcp', {})).toBe(WorkbenchApprovalRiskLevel.Unknown);
-});
+test.each(['read_document', 'conversation_history', 'session_summary', 'plan_write', 'codemode'])(
+  'does not ask for approval of %s while actual mutations remain protected',
+  name => {
+    expect(classifyWorkbenchToolRisk(name, {})).toBe(WorkbenchApprovalRiskLevel.ReadOnly);
+    expect(classifyWorkbenchToolRisk('write', {})).toBe(WorkbenchApprovalRiskLevel.Reversible);
+    expect(classifyWorkbenchToolRisk('mcp', {})).toBe(WorkbenchApprovalRiskLevel.Unknown);
+  },
+);
 
 test('idempotency hashing is stable across object key order', () => {
   expect(createToolIdempotencyKey('run', 'call', { a: 1, b: 2 })).toBe(
     createToolIdempotencyKey('run', 'call', { b: 2, a: 1 }),
   );
-});
-
-test('artifact declarations bypass user approval', () => {
-  expect(
-    classifyWorkbenchToolRisk('declare_artifact', { filePath: 'D:/workspace/report.md' }),
-  ).toBe(WorkbenchApprovalRiskLevel.ReadOnly);
 });
 
 test('only explicitly read-only shell commands qualify for allow-all auto approval', () => {
@@ -89,5 +79,11 @@ test('read-only shell commands classify as ReadOnly without approval', () => {
   );
   expect(classifyWorkbenchToolRisk('bash', { command: 'git push origin main' })).toBe(
     WorkbenchApprovalRiskLevel.Irreversible,
+  );
+  expect(classifyWorkbenchToolRisk('powershell', { command: 'Remove-Item -Recurse dist' })).toBe(
+    WorkbenchApprovalRiskLevel.Irreversible,
+  );
+  expect(classifyWorkbenchToolRisk('powershell', { command: 'Get-ChildItem' })).toBe(
+    WorkbenchApprovalRiskLevel.Unknown,
   );
 });

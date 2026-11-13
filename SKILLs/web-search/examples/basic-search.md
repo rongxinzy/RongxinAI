@@ -7,7 +7,7 @@ This document provides practical examples of using the Web Search skill.
 ### 1. Start the Bridge Server
 
 ```bash
-bash SKILLs/web-search/scripts/start-server.sh
+node SKILLs/web-search/scripts/start-server.mjs
 ```
 
 Expected output:
@@ -21,7 +21,7 @@ Expected output:
 ### 2. Perform a Simple Search
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "TypeScript tutorial" 5
+node SKILLs/web-search/scripts/search.mjs "TypeScript tutorial" 5
 ```
 
 Expected output:
@@ -46,7 +46,7 @@ Expected output:
 ### 3. Stop the Server
 
 ```bash
-bash SKILLs/web-search/scripts/stop-server.sh
+node SKILLs/web-search/scripts/stop-server.mjs
 ```
 
 ## Common Use Cases
@@ -56,7 +56,7 @@ bash SKILLs/web-search/scripts/stop-server.sh
 **Scenario:** Find the latest React 19 features
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "React 19 new features" 10
+node SKILLs/web-search/scripts/search.mjs "React 19 new features" 10
 ```
 
 **Use Case:** When you need up-to-date information beyond Claude's knowledge cutoff.
@@ -66,7 +66,7 @@ bash SKILLs/web-search/scripts/search.sh "React 19 new features" 10
 **Scenario:** Search for Next.js App Router documentation
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "Next.js App Router documentation" 5
+node SKILLs/web-search/scripts/search.mjs "Next.js App Router documentation" 5
 ```
 
 **Use Case:** Find official documentation for specific frameworks or libraries.
@@ -76,7 +76,7 @@ bash SKILLs/web-search/scripts/search.sh "Next.js App Router documentation" 5
 **Scenario:** Find recent AI news
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "AI news 2026" 10
+node SKILLs/web-search/scripts/search.mjs "AI news 2026" 10
 ```
 
 **Use Case:** Get real-time information about current events.
@@ -86,7 +86,7 @@ bash SKILLs/web-search/scripts/search.sh "AI news 2026" 10
 **Scenario:** Search for error solutions
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "TypeError: Cannot read property of undefined" 5
+node SKILLs/web-search/scripts/search.mjs "TypeError: Cannot read property of undefined" 5
 ```
 
 **Use Case:** Find solutions to specific error messages.
@@ -96,7 +96,7 @@ bash SKILLs/web-search/scripts/search.sh "TypeError: Cannot read property of und
 **Scenario:** Compare technologies
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "Vue vs React 2026 comparison" 8
+node SKILLs/web-search/scripts/search.mjs "Vue vs React 2026 comparison" 8
 ```
 
 **Use Case:** Gather information for comparative analysis.
@@ -261,19 +261,19 @@ curl -X POST http://127.0.0.1:8923/api/browser/disconnect \
 
 ```bash
 # 1. Start server
-bash SKILLs/web-search/scripts/start-server.sh
+node SKILLs/web-search/scripts/start-server.mjs
 
 # 2. Search for topic
-bash SKILLs/web-search/scripts/search.sh "React Server Components" 5
+node SKILLs/web-search/scripts/search.mjs "React Server Components" 5
 
 # 3. Search for related topic
-bash SKILLs/web-search/scripts/search.sh "Next.js 14 features" 5
+node SKILLs/web-search/scripts/search.mjs "Next.js 14 features" 5
 
 # 4. Search for comparisons
-bash SKILLs/web-search/scripts/search.sh "RSC vs traditional React" 3
+node SKILLs/web-search/scripts/search.mjs "RSC vs traditional React" 3
 
 # 5. Stop server when done
-bash SKILLs/web-search/scripts/stop-server.sh
+node SKILLs/web-search/scripts/stop-server.mjs
 ```
 
 ## Integration with Cowork Sessions
@@ -292,7 +292,7 @@ Example Cowork interaction:
 User: What are the new features in React 19?
 
 Claude: Let me search for the latest information about React 19.
-        [Calls: bash SKILLs/web-search/scripts/search.sh "React 19 new features" 5]
+        [Calls: node SKILLs/web-search/scripts/search.mjs "React 19 new features" 5]
 
         Based on the search results, React 19 introduces several key features:
         1. React Compiler - automatic optimization
@@ -341,14 +341,14 @@ bun run build
 
 ```bash
 # Stop the server
-bash SKILLs/web-search/scripts/stop-server.sh
+node SKILLs/web-search/scripts/stop-server.mjs
 
 # Clear cache
 rm SKILLs/web-search/.connection
 rm SKILLs/web-search/.server.pid
 
 # Restart
-bash SKILLs/web-search/scripts/start-server.sh
+node SKILLs/web-search/scripts/start-server.mjs
 ```
 
 ### Search Timeout

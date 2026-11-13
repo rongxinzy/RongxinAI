@@ -32,7 +32,7 @@ import sys
 try:
     from pypdf import PdfReader, PdfWriter
 except ImportError:
-    print("Missing pypdf. Run this script through make.sh or: uv run --with pypdf python fill_write.py ...", file=sys.stderr)
+    print("Missing pypdf. Run this script through make.py or: uv run --with pypdf python fill_write.py ...", file=sys.stderr)
     raise SystemExit(2)
 from pypdf.generic import NameObject, TextStringObject, BooleanObject
 

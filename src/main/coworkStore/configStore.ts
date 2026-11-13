@@ -33,7 +33,6 @@ export class CoworkConfigStore extends CoworkSessionStore {
       'embeddingRemoteBaseUrl',
       'embeddingRemoteApiKey',
       'codemodeEnabled',
-      'mcpNativeBridge',
     ] as const;
     const configRows = this.getAll<{ key: string; value: string }>(
       `SELECT key, value FROM cowork_config WHERE key IN (${configKeys.map(() => '?').join(', ')})`,
@@ -70,7 +69,6 @@ export class CoworkConfigStore extends CoworkSessionStore {
         cfg.get('embeddingRemoteBaseUrl') || DEFAULT_EMBEDDING_REMOTE_BASE_URL,
       embeddingRemoteApiKey: cfg.get('embeddingRemoteApiKey') || DEFAULT_EMBEDDING_REMOTE_API_KEY,
       codemodeEnabled: cfg.get('codemodeEnabled') === '1',
-      mcpNativeBridge: cfg.get('mcpNativeBridge') === '1',
     };
   }
 
@@ -120,9 +118,6 @@ export class CoworkConfigStore extends CoworkSessionStore {
     }
     if (config.codemodeEnabled !== undefined) {
       this.upsertConfig('codemodeEnabled', config.codemodeEnabled ? '1' : '0', now);
-    }
-    if (config.mcpNativeBridge !== undefined) {
-      this.upsertConfig('mcpNativeBridge', config.mcpNativeBridge ? '1' : '0', now);
     }
   }
 

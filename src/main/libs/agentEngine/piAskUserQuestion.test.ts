@@ -1,10 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
-import {
-  createPiAskUserQuestionTool,
-  PiAskUserQuestionSystemPrompt,
-  PiAskUserQuestionTimeoutMs,
-} from './piAskUserQuestion';
+import { createPiAskUserQuestionTool, PiAskUserQuestionTimeoutMs } from './piAskUserQuestion';
 
 const input = {
   questions: [
@@ -43,9 +39,11 @@ test('returns a denial as a Pi tool result', async () => {
   expect(result.content[0]?.text).toBe('The user denied the operation.');
 });
 
-test('defines a ten-minute timeout and a system-level AskUserQuestion policy', () => {
+test('defines a ten-minute timeout and carries authorization guidance on tool description', () => {
   expect(PiAskUserQuestionTimeoutMs).toBe(600_000);
-  expect(PiAskUserQuestionSystemPrompt).toContain('AskUserQuestion');
-  expect(PiAskUserQuestionSystemPrompt).toContain('Do not ask again');
-  expect(PiAskUserQuestionSystemPrompt).not.toContain('Before deleting');
+  const tool = createPiAskUserQuestionTool(async () => ({ behavior: 'allow' as const })) as {
+    description: string;
+  };
+  expect(tool.description).toContain('Do not repeat existing authorization');
+  expect(tool.description).toContain('tool approval is enforced separately');
 });

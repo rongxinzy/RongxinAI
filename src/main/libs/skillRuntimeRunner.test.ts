@@ -188,7 +188,7 @@ describe('skillRuntimeRunner', () => {
     const preview = await runManagedSkillScript({
       skillsRoot,
       skillId: 'docx',
-      script: 'scripts/docx_preview.sh',
+      script: 'scripts/docx_preview.mjs',
       args: [outputPath],
       workspaceRoot: root,
       timeoutMs: 30_000,

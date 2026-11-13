@@ -527,7 +527,6 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
                 <SelectItem value="hidden">{i18nService.t('mcpExposureHidden')}</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-sm text-muted-foreground">{i18nService.t('mcpExposureHint')}</p>
           </Field>
 
           <Field>

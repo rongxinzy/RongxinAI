@@ -12,13 +12,16 @@ import {
   adapter,
   applyTestResolution,
   mockCreateAgentSession,
+  mockCodemodeExtensionFactory,
   mockCreateMcpExtension,
   mockDefaultResourceLoader,
   mockGetModel,
+  mockMcpExtensionFactory,
   mockModelRuntime,
   mockSession,
   mockSettingsManagerCreate,
   mockSettingsManagerInMemory,
+  mockToolSearchExtensionFactory,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
@@ -28,12 +31,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { PiWebSearchToolName } from './constants';
 import { TEST_MAGPIE_GATEWAY } from '../../../../tests/helpers/installTestMagpie';
 import { ModelCapabilityStatus } from '../../../shared/providers';
-import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { resolveBundledOcrHelper } from '../ocrHelper';
-import { PiDocumentReaderSystemPrompt, PiDocumentReaderToolName } from './piDocumentReaderTool';
-import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
+import { PiDocumentReaderToolName } from './piDocumentReaderTool';
 import { PiSubagentToolName } from './piSubagentTool';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
+import { applyPiPlatformToolOverrides } from './piRuntimeSettingsOverrides';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 
 describe('PiRuntimeAdapter', () => {
@@ -90,27 +92,26 @@ describe('PiRuntimeAdapter', () => {
 
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         additionalSkillPaths?: string[];
+        extensionFactories?: unknown[];
         systemPromptOverride: (base: string | undefined) => string | undefined;
         appendSystemPromptOverride: () => string[];
       };
       expect(loaderOptions.additionalSkillPaths).toEqual([]);
+      expect(loaderOptions.extensionFactories ?? []).not.toContain(mockMcpExtensionFactory);
+      expect(loaderOptions.extensionFactories ?? []).not.toContain(mockCodemodeExtensionFactory);
+      expect(mockSession.bindExtensions).not.toHaveBeenCalled();
       expect(loaderOptions.systemPromptOverride('Discovered custom prompt')).toBeUndefined();
       expect(loaderOptions.appendSystemPromptOverride()).toContain(
         'Only the explicitly selected chat prompt.',
       );
       expect(loaderOptions.appendSystemPromptOverride().join('\n')).toContain('知远智能体');
       expect(loaderOptions.appendSystemPromptOverride().join('\n')).not.toContain('Supabase');
-      expect(loaderOptions.appendSystemPromptOverride()).not.toContain(
-        PiDocumentReaderSystemPrompt,
-      );
-      expect(loaderOptions.appendSystemPromptOverride()).not.toContain(DeclareArtifactSystemPrompt);
 
       const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{ name?: string }>;
       };
       const customToolNames = sessionOptions.customTools?.map(tool => tool.name) ?? [];
       expect(customToolNames).toContain(PiWebSearchToolName);
-      expect(customToolNames).not.toContain(PiMcpTool.Name);
       expect(customToolNames).not.toContain(CONVERSATION_HISTORY_TOOL_NAME);
       expect(customToolNames).not.toContain(PiDocumentReaderToolName);
       expect(customToolNames).not.toContain(PiSubagentToolName);
@@ -165,54 +166,58 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
-    it('keeps codemode extensions off the default session wiring', async () => {
+    it('registers codemode and tool_search dormantly on work sessions unless codemode is activated', async () => {
       await adapter.startSession('codemode-off', 'Hello Pi');
 
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         extensionFactories?: unknown[];
       };
       const factories = loaderOptions?.extensionFactories ?? [];
-      expect(factories).not.toContain('codemode-extension-factory');
-      expect(factories).not.toContain('tool-search-extension-factory');
+      expect(factories).toContain(mockCodemodeExtensionFactory);
+      expect(factories).toContain(mockToolSearchExtensionFactory);
       const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
       expect(settingsManager.applyOverrides).not.toHaveBeenCalledWith(
-        expect.objectContaining({ defaultTools: expect.any(Array) }),
+        expect.objectContaining({ defaultTools: expect.arrayContaining(['+codemode']) }),
       );
     });
 
-    it('registers codemode extensions and activates the tool when requested', async () => {
+    it('activates codemode when requested on work sessions', async () => {
       await adapter.startSession('codemode-on', 'Hello Pi', { codemode: true });
 
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         extensionFactories?: unknown[];
       };
       const factories = loaderOptions?.extensionFactories ?? [];
-      expect(factories).toContain('codemode-extension-factory');
-      expect(factories).toContain('tool-search-extension-factory');
+      expect(factories).toContain(mockCodemodeExtensionFactory);
+      expect(factories).toContain(mockToolSearchExtensionFactory);
       const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
       expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
         defaultTools: ['+codemode'],
       });
     });
 
-    it('routes work sessions through the native MCP extension when enabled', async () => {
+    it('switches default shell tool to native powershell on win32 only', () => {
+      const applyOverrides = vi.fn();
+      applyPiPlatformToolOverrides({ applyOverrides } as never, 'darwin');
+      expect(applyOverrides).not.toHaveBeenCalled();
+
+      applyPiPlatformToolOverrides({ applyOverrides } as never, 'win32');
+      expect(applyOverrides).toHaveBeenCalledWith({
+        defaultTools: ['read', 'powershell', 'edit', 'write'],
+      });
+    });
+
+    it('always routes work sessions through Pi builtin MCP extension', async () => {
       adapter.setMcpServerManager({
-        toolManifest: [
-          {
-            server: 'Supabase',
-            name: 'list_projects',
-            description: 'List projects',
-            inputSchema: { type: 'object' },
-          },
-        ],
+        toolManifest: [],
         lastEnabledRecords: [],
       } as never);
-      await adapter.startSession('mcp-native', 'Hello Pi', { mcpNativeBridge: true });
+      await adapter.startSession('mcp-native', 'Hello Pi');
 
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         extensionFactories?: unknown[];
       };
-      expect(loaderOptions?.extensionFactories).toContain('mcp-extension-factory');
+      expect(loaderOptions?.extensionFactories).toContain(mockMcpExtensionFactory);
       expect(mockCreateMcpExtension).toHaveBeenCalledWith(
         expect.objectContaining({
           loadConfig: expect.any(Function),
@@ -220,34 +225,6 @@ describe('PiRuntimeAdapter', () => {
         }),
       );
       expect(mockSession.bindExtensions).toHaveBeenCalled();
-      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        customTools?: Array<{ name: string }>;
-      };
-      expect(sessionOptions?.customTools?.map(tool => tool.name)).not.toContain(PiMcpTool.Name);
-    });
-
-    it('keeps the gateway tool when the native bridge is off', async () => {
-      adapter.setMcpServerManager({
-        toolManifest: [
-          {
-            server: 'Supabase',
-            name: 'list_projects',
-            description: 'List projects',
-            inputSchema: { type: 'object' },
-          },
-        ],
-      } as never);
-      await adapter.startSession('mcp-gateway', 'Hello Pi');
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: unknown[];
-      };
-      expect(loaderOptions?.extensionFactories ?? []).not.toContain('mcp-extension-factory');
-      expect(mockSession.bindExtensions).not.toHaveBeenCalled();
-      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        customTools?: Array<{ name: string }>;
-      };
-      expect(sessionOptions?.customTools?.map(tool => tool.name)).toContain(PiMcpTool.Name);
     });
 
     it('excludes codemode from chat sessions even when requested', async () => {

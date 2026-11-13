@@ -14,24 +14,6 @@ describe('Windows resource archive compression', () => {
   const compressionFor = (key: string) =>
     getWindowsResourceArchiveCompression(components.find(component => component.key === key));
 
-  test('uses BCJ2 with independent LZMA streams for PortableGit', () => {
-    expect(compressionFor('portable-git')).toEqual({
-      id: 'lzma-bcj2-d128m-mx9-solid-v1',
-      sevenZipArgs: [
-        '-mx=9',
-        '-m0=BCJ2',
-        '-m1=LZMA:d=128m',
-        '-m2=LZMA:d=128m',
-        '-m3=LZMA:d=128m',
-        '-mb0:1',
-        '-mb0s1:2',
-        '-mb0s2:3',
-        '-ms=on',
-        '-mmt=on',
-      ],
-    });
-  });
-
   test.each(['skills', 'mcps', 'python', 'skill-python'])('uses solid LZMA2 for %s', key => {
     expect(compressionFor(key)).toBe(WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.Solid);
   });

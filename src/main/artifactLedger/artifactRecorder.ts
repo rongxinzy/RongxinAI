@@ -3,12 +3,8 @@
  *
  * Driven from the Pi event projection (tool start/end, run start/settled):
  * - write/edit tools record their target file on success;
- * - declare_artifact results annotate the ledger row;
  * - other tools schedule a debounced workspace-diff rescan;
  * - run settle runs a final diff anchored to the final answer message.
- *
- * Also owns the pending-write registry that `declare_artifact` awaits, so a
- * declaration racing a parallel write resolves once the write settles.
  */
 import { stat } from 'fs/promises';
 
@@ -37,7 +33,6 @@ import {
   type WorkspaceSnapshotOptions,
 } from './workspaceSnapshot';
 
-const DECLARE_ARTIFACT_TOOL_NAME = normalizeToolName('declare_artifact');
 const EDIT_TOOL_NAME = normalizeToolName('edit');
 /** Debounce for the post-tool workspace rescan; trades latency for fewer walks. */
 const DIFF_DEBOUNCE_MS = 400;
@@ -51,11 +46,6 @@ export interface ArtifactRecorderOptions {
   ledger: ArtifactLedger;
   /** Snapshot overrides (tests); production uses the default caps. */
   snapshotOptions?: WorkspaceSnapshotOptions;
-}
-
-interface PendingWrite {
-  settled: boolean | null;
-  resolvers: Array<(succeeded: boolean) => void>;
 }
 
 interface ToolStartInfo {
@@ -78,7 +68,6 @@ export class ArtifactRecorder {
   private readonly ledger: ArtifactLedger;
   private readonly snapshotOptions: WorkspaceSnapshotOptions | undefined;
   private readonly lifecycle = new AbortController();
-  private readonly pendingWrites = new Map<string, PendingWrite>();
   private readonly toolStartInfo = new Map<string, ToolStartInfo>();
 
   private runId: string | null = null;
@@ -126,25 +115,14 @@ export class ArtifactRecorder {
     });
   }
 
-  /** Tool execution begins: register pending writes the declaration gate waits on. */
+  /** Tool execution begins: cache tool inputs so tool_execution_end has full context. */
   onToolStart(toolCallId: string, toolName: string, args: unknown): void {
     if (this.disposed) return;
     const input = asToolInput(args);
     this.toolStartInfo.set(toolCallId, { toolName, args: input });
-    if (!isWriteOrEditToolName(normalizeToolName(toolName))) return;
-    const rawPath = extractFilePath(input);
-    if (!rawPath) return;
-    const key = artifactKeyForPath(resolveArtifactInputPath(rawPath, this.workspaceRoot));
-    const existing = this.pendingWrites.get(key);
-    // A settled entry from an earlier write of the same path must not satisfy
-    // a declaration racing this new write; an in-flight entry keeps its
-    // waiters (they belong to this write).
-    if (!existing || existing.settled !== null) {
-      this.pendingWrites.set(key, { settled: null, resolvers: [] });
-    }
   }
 
-  /** Tool execution ends: record, annotate, settle pending, or schedule a diff. */
+  /** Tool execution ends: record write/edit outputs or schedule a diff. */
   onToolEnd(input: RecorderToolEndInput): void {
     if (this.disposed) return;
     const startInfo = this.toolStartInfo.get(input.toolCallId);
@@ -153,18 +131,10 @@ export class ArtifactRecorder {
     const normalized = normalizeToolName(toolName);
     const args = asToolInput(input.args ?? startInfo?.args);
 
-    if (normalized === DECLARE_ARTIFACT_TOOL_NAME) {
-      if (!input.isError) this.annotateDeclare(input);
-      return;
-    }
-
     const rawPath = extractFilePath(args);
     if (rawPath && isWriteOrEditToolName(normalized)) {
       const absolutePath = resolveArtifactInputPath(rawPath, this.workspaceRoot);
-      if (input.isError) {
-        this.settlePending(absolutePath, false);
-        return;
-      }
+      if (input.isError) return;
       // Anchored to the persisted tool_result message, like the diff path.
       this.recordWrite({
         absolutePath,
@@ -175,7 +145,6 @@ export class ArtifactRecorder {
             ? args.content
             : '',
       });
-      this.settlePending(absolutePath, true);
       return;
     }
 
@@ -219,20 +188,6 @@ export class ArtifactRecorder {
     await this.lastDiff;
   }
 
-  /**
-   * Wait for the in-flight write/edit that targets `rawPath`. Resolves true
-   * only when that write exists, has settled, and succeeded.
-   */
-  awaitPendingWrite(rawPath: string): Promise<boolean> {
-    const key = artifactKeyForPath(resolveArtifactInputPath(rawPath, this.workspaceRoot));
-    const pending = this.pendingWrites.get(key);
-    if (!pending) return Promise.resolve(false);
-    if (pending.settled !== null) return Promise.resolve(pending.settled);
-    return new Promise<boolean>(resolve => {
-      pending.resolvers.push(resolve);
-    });
-  }
-
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -241,12 +196,6 @@ export class ArtifactRecorder {
       clearTimeout(this.diffTimer);
       this.diffTimer = null;
     }
-    for (const pending of this.pendingWrites.values()) {
-      for (const resolve of pending.resolvers) resolve(false);
-      pending.resolvers = [];
-      pending.settled = false;
-    }
-    this.pendingWrites.clear();
     this.toolStartInfo.clear();
   }
 
@@ -257,8 +206,6 @@ export class ArtifactRecorder {
     content: string;
   }): void {
     const type = getArtifactTypeByExtension(input.absolutePath);
-    // Unknown extensions cannot be previewed; declare_artifact can still
-    // promote them later through its own kind resolution.
     if (!type) return;
     this.record({
       filePath: input.absolutePath,
@@ -282,39 +229,6 @@ export class ArtifactRecorder {
 
   recordedWorkVersion(): number {
     return this.workVersion;
-  }
-
-  private annotateDeclare(input: RecorderToolEndInput): void {
-    const details = asToolInput((input.result as { details?: unknown } | undefined)?.details);
-    const rawPath = typeof details.filePath === 'string' ? details.filePath.trim() : '';
-    if (!rawPath) return;
-    const absolutePath = resolveArtifactInputPath(rawPath, this.workspaceRoot);
-    const role =
-      details.role === 'intermediate' ? ArtifactRole.Intermediate : ArtifactRole.Deliverable;
-    const title =
-      typeof details.title === 'string' && details.title.trim() ? details.title.trim() : undefined;
-    const kind =
-      typeof details.kind === 'string' && details.kind.trim() ? details.kind.trim() : undefined;
-    try {
-      const artifact = this.ledger.annotate(this.sessionId, {
-        filePath: absolutePath,
-        role,
-        title,
-        kind,
-        messageId: input.resultMessageId,
-        toolCallId: input.toolCallId,
-        runId: this.runId,
-      });
-      if (!isInternalWorkflowStatePath(absolutePath, this.workspaceRoot)) this.workVersion += 1;
-      this.recordedKeys.add(artifactKeyForPath(absolutePath));
-      publishArtifactUpsert(this.sessionId, artifact);
-      this.rememberRecordedMtime(absolutePath);
-    } catch (error) {
-      console.warn(
-        `[ArtifactRecorder] failed to annotate artifact for session ${this.sessionId}:`,
-        error,
-      );
-    }
   }
 
   private record(input: {
@@ -356,15 +270,6 @@ export class ArtifactRecorder {
         error,
       );
     }
-  }
-
-  private settlePending(absolutePath: string, succeeded: boolean): void {
-    const key = artifactKeyForPath(absolutePath);
-    const pending = this.pendingWrites.get(key);
-    if (!pending) return;
-    pending.settled = succeeded;
-    for (const resolve of pending.resolvers) resolve(succeeded);
-    pending.resolvers = [];
   }
 
   private rememberRecordedMtime(filePath: string): void {

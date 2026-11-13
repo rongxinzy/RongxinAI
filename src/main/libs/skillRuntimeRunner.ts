@@ -3,13 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { StringDecoder } from 'string_decoder';
 
-import {
-  getElectronNodeRuntimePath,
-  getEnhancedEnv,
-  getSkillsRoot,
-  getGitBashResolutionErrorForPi,
-  resolveGitBashPathForPi,
-} from './coworkUtil';
+import { getElectronNodeRuntimePath, getEnhancedEnv, getSkillsRoot } from './coworkUtil';
 import { appendPythonRuntimeToEnv, getManagedPythonExecutable } from './pythonRuntime';
 import { installSkillPythonDependencies } from './skillPythonDependencies';
 import { findSkillPythonExecutable, resolveSkillPython } from './skillPythonRuntime';
@@ -339,21 +333,13 @@ async function resolveRuntime(
   }
 
   if (extension === '.sh') {
-    const command =
-      process.platform === 'win32'
-        ? await resolveGitBashPathForPi()
-        : fs.existsSync('/bin/bash')
-          ? '/bin/bash'
-          : process.env.SHELL || 'bash';
-    if (!command) {
-      const resolutionError = await getGitBashResolutionErrorForPi().catch((): null => null);
+    if (process.platform === 'win32') {
       return {
         errorCode: 'SKILL_RUNTIME_UNAVAILABLE',
-        error:
-          'No healthy Git Bash runtime is available for this Skill script.' +
-          (resolutionError ? ` ${resolutionError}` : ''),
+        error: 'Shell (.sh) Skill scripts are not supported on Windows; use .py, .mjs, or .ps1.',
       };
     }
+    const command = fs.existsSync('/bin/bash') ? '/bin/bash' : process.env.SHELL || 'bash';
     const requirementsPath = path.join(skillDir, 'requirements.txt');
     const skillPythonExecutable = fs.existsSync(requirementsPath)
       ? findSkillPythonExecutable(path.basename(skillDir), requirementsPath)

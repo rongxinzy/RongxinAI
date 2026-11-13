@@ -224,11 +224,6 @@ describe('NSIS offline resource and local inference flow', () => {
         sentinel: 'MCPs\\compatibility-review.md',
       },
       {
-        key: 'portable-git',
-        prefix: 'mingit',
-        sentinel: 'mingit\\usr\\bin\\bash.exe',
-      },
-      {
         key: 'python',
         prefix: 'python-win',
         sentinel: 'python-win\\python.exe',

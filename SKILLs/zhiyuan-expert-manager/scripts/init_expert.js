@@ -328,7 +328,7 @@ maxTurns: 150
 调用 \`subagent\` 工具时，使用以下参数：
 - \`name\`: 成员 Agent ID（团队成员表中的 Agent ID）
 - \`task\`: 完整、独立的任务描述，包含所有必要上下文
-- \`mode\`: single（单个）/ parallel（并行，最多4个）/ chain（串行，用 \`{previous}\` 传递前一步结果）
+- \`mode\`: single（单个）/ parallel（并行，最多4个）
 
 ### 成员调度命名（CRITICAL）
 调度每位成员时，**必须**在 \`name\` 参数中传入该成员的 **Agent ID**。**禁止**省略或使用自创名称。

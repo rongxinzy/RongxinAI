@@ -25,19 +25,13 @@ function fixture() {
   const manifestPath = path.join(root, 'manifest.json');
   const markerPath = path.join(root, 'old-install-path.txt');
   writeSentinel(installDir);
-  fs.mkdirSync(path.join(runtimeRoot, 'portable-git', currentId), { recursive: true });
+  fs.mkdirSync(path.join(runtimeRoot, 'python', currentId), { recursive: true });
   fs.writeFileSync(
     manifestPath,
     JSON.stringify({
-      components: [
-        'channel-runtime',
-        'skills',
-        'mcps',
-        'portable-git',
-        'python',
-        'skill-python',
-        'uv',
-      ].map(key => ({ key, contentId: currentId })),
+      components: ['channel-runtime', 'skills', 'mcps', 'python', 'skill-python', 'uv'].map(
+        key => ({ key, contentId: currentId }),
+      ),
     }),
   );
   return { root, installDir, runtimeRoot, manifestPath, markerPath };
@@ -253,7 +247,7 @@ describe.skipIf(process.platform !== 'win32')('post-install cleanup on Windows',
 
   test('retains retired runtime data and unowned component folders', () => {
     const data = fixture();
-    const component = path.join(data.runtimeRoot, 'portable-git');
+    const component = path.join(data.runtimeRoot, 'python');
     const oldId = 'b'.repeat(64);
     const oldVersion = path.join(component, oldId);
     writeSentinel(oldVersion);

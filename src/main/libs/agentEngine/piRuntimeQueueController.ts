@@ -17,7 +17,6 @@ import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { hasVisiblePromptContent } from '../../../shared/cowork/submissionContent';
 import type { CoworkMessage } from '../../coworkStore';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
-import { applyPiShellOverride } from './piRuntimeSettingsOverrides';
 import {
   haveSameStringList,
   mergeSkillIds,
@@ -182,9 +181,6 @@ export class PiRuntimeQueueController {
         // Pi reloads the existing ResourceLoader without replacing transcript
         // state, model, MCP tools, or custom expert tools.
         await active.piSession.reload();
-        // AgentSession.reload() reloads SettingsManager from disk, so restore
-        // the per-process bundled PortableGit override after every reload.
-        await applyPiShellOverride(active.settingsManager);
         active.requestedSkillIds = steeredSkillIds;
       } catch (error) {
         active.resourceState.skillIds = previousSkillIds;

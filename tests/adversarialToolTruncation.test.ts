@@ -15,11 +15,6 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 
 import { safeSlice } from '../src/shared/lib/safeSlice';
 import {
-  truncateMcpContent,
-  MCP_MAX_OUTPUT_CHARS,
-  McpPiAdapter,
-} from '../src/main/libs/agentEngine/mcpPiAdapter';
-import {
   buildPiDocumentReaderTool,
   PI_DOCUMENT_READER_MAX_CHARS,
 } from '../src/main/libs/agentEngine/piDocumentReaderTool';
@@ -42,83 +37,6 @@ describe('Adversarial Challenger Suite: Tool Truncation Bounds', () => {
       `Dangling high surrogate (0x${lastCode.toString(16)}) found at end of string: ${contextMsg}`,
     ).toBe(false);
   };
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // 2. Tool Truncation Stress Testing: 100KB, 500KB, 2MB inputs
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  describe('mcpPiAdapter Truncation Stress Testing (100KB, 500KB, 2MB)', () => {
-    const sizes = [
-      { name: '100KB', chars: 100_000 },
-      { name: '500KB', chars: 500_000 },
-      { name: '2MB', chars: 2_000_000 },
-    ];
-
-    for (const { name, chars } of sizes) {
-      it(`truncates ${name} CJK text cleanly without exceeding bound or surrogate issues`, () => {
-        // CJK text: "知远智能体上下文窗口排查测试" repeated
-        const cjkChunk = '知远智能体上下文窗口排查测试';
-        const rawText = cjkChunk.repeat(Math.ceil(chars / cjkChunk.length)).slice(0, chars);
-        expect(rawText.length).toBe(chars);
-
-        const result = truncateMcpContent([{ type: 'text', text: rawText }]);
-        expect(result.truncated).toBe(true);
-        expect(result.content).toHaveLength(1);
-
-        const text = result.content[0].text!;
-        assertNoDanglingHighSurrogate(text, `MCP ${name} CJK`);
-        expect(text).toContain(
-          `[MCP tool output truncated to ${MCP_MAX_OUTPUT_CHARS.toLocaleString()} characters`,
-        );
-        expect(text).toContain(`(total: ${chars.toLocaleString()} characters)`);
-        expect(text.length).toBeLessThan(MCP_MAX_OUTPUT_CHARS + 200);
-      });
-
-      it(`truncates ${name} Astral Plane emojis with surrogate boundary right at limit`, () => {
-        // Build string where character right at index MCP_MAX_OUTPUT_CHARS - 1 is a high surrogate
-        const prefix = 'A'.repeat(MCP_MAX_OUTPUT_CHARS - 1);
-        const emojiTail = '🚀'.repeat(Math.ceil((chars - prefix.length) / 2));
-        const rawText = (prefix + emojiTail).slice(0, chars);
-
-        // Index MCP_MAX_OUTPUT_CHARS - 1 is \uD83D (high surrogate of 🚀)
-        expect(rawText.charCodeAt(MCP_MAX_OUTPUT_CHARS - 1)).toBeGreaterThanOrEqual(0xd800);
-        expect(rawText.charCodeAt(MCP_MAX_OUTPUT_CHARS - 1)).toBeLessThanOrEqual(0xdbff);
-
-        const result = truncateMcpContent([{ type: 'text', text: rawText }]);
-        expect(result.truncated).toBe(true);
-
-        const text = result.content[0].text!;
-        assertNoDanglingHighSurrogate(text, `MCP ${name} Astral boundary`);
-        // The sliced prefix should have dropped the dangling surrogate
-        expect(text.startsWith(prefix)).toBe(true);
-        expect(text.length).toBeLessThan(MCP_MAX_OUTPUT_CHARS + 200);
-      });
-    }
-
-    it('stress-tests multi-item heterogeneous payload totaling 2MB', () => {
-      const items: Array<{ type: string; text?: string; data?: string }> = [];
-      // 20 items of 100KB each = 2MB
-      for (let i = 0; i < 20; i++) {
-        items.push({ type: 'text', text: `Item-${i}: `.padEnd(100_000, `x${i}`) });
-      }
-
-      const result = truncateMcpContent(items);
-      expect(result.truncated).toBe(true);
-      expect(result.content).toHaveLength(20);
-
-      // Total characters across all text items must be strictly bounded
-      let totalTextChars = 0;
-      for (const item of result.content) {
-        if (item.text) {
-          totalTextChars += item.text.length;
-          assertNoDanglingHighSurrogate(item.text, 'multi-item MCP text');
-        }
-      }
-      // First item truncated to 30,000 + notice (~100), remaining 19 items have 0 + notice (~100 each)
-      // Total text chars should not blow up
-      expect(totalTextChars).toBeLessThan(MCP_MAX_OUTPUT_CHARS + 20 * 200);
-    });
-  });
 
   describe('piDocumentReaderTool Truncation Stress Testing (100KB, 500KB, 2MB)', () => {
     let tempDir: string;
@@ -302,29 +220,6 @@ describe('Adversarial Challenger Suite: Tool Truncation Bounds', () => {
       expect(result.details.truncated).toBe(true);
       const text = result.content[0].text;
       assertNoDanglingHighSurrogate(text, 'Subagent parallel aggregate');
-      expect(text.length).toBeLessThan(PI_SUBAGENT_MAX_OUTPUT_CHARS + 200);
-      expect(text).toContain(
-        `[Subagent output truncated to ${PI_SUBAGENT_MAX_OUTPUT_CHARS.toLocaleString()} characters`,
-      );
-    });
-
-    it('chain mode: handles 2MB output from chain steps and strictly bounds final returned text', async () => {
-      const payload2m = 'C'.repeat(2_000_000);
-      hoisted.mockCreateAgentSession.mockImplementation(async () => ({
-        session: createMockSession(payload2m),
-      }));
-
-      const tool = buildSubagentTool();
-      const result = await tool.execute('call-chain', {
-        chain: [
-          { agent: 'scout', task: 'Step 1: produce massive logs' },
-          { agent: 'planner', task: 'Step 2: summarize {previous}' },
-        ],
-      });
-
-      expect(result.details.truncated).toBe(true);
-      const text = result.content[0].text;
-      assertNoDanglingHighSurrogate(text, 'Subagent chain aggregate');
       expect(text.length).toBeLessThan(PI_SUBAGENT_MAX_OUTPUT_CHARS + 200);
       expect(text).toContain(
         `[Subagent output truncated to ${PI_SUBAGENT_MAX_OUTPUT_CHARS.toLocaleString()} characters`,

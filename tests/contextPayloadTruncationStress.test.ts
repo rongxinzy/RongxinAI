@@ -14,15 +14,6 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 }));
 
 import {
-  calculatePiConversationHistoryCharLimit,
-  buildPiConversationPrompt,
-} from '../src/main/libs/agentEngine/piConversationContext';
-import {
-  truncateMcpContent,
-  MCP_MAX_OUTPUT_CHARS,
-  McpPiAdapter,
-} from '../src/main/libs/agentEngine/mcpPiAdapter';
-import {
   buildPiDocumentReaderTool,
   PI_DOCUMENT_READER_MAX_CHARS,
 } from '../src/main/libs/agentEngine/piDocumentReaderTool';
@@ -36,121 +27,10 @@ import {
   PiMessageRole,
   PiSubagentEventType,
 } from '../src/main/libs/agentEngine/piSubagentExecution';
-import type { CoworkMessage } from '../src/main/coworkStore';
-import type { McpServerManager } from '../src/main/libs/mcpServerManager';
 
 describe('Adversarial Stress Harness: Payload Truncation Bounds', () => {
   // 2. Truncation Stress Harness on Large Payloads (100KB, 500KB, 2MB)
   // ─────────────────────────────────────────────────────────────────────────────
-
-  describe('mcpPiAdapter truncateMcpContent Stress Tests (100KB, 500KB, 2MB)', () => {
-    const payloads = [
-      { label: '100KB payload', size: 102_400 },
-      { label: '500KB payload', size: 512_000 },
-      { label: '2MB payload', size: 2_097_152 },
-    ];
-
-    for (const { label, size } of payloads) {
-      it(`strictly truncates single ${label} to MCP_MAX_OUTPUT_CHARS (${MCP_MAX_OUTPUT_CHARS})`, () => {
-        const rawString = 'M'.repeat(size);
-        const input = [{ type: 'text', text: rawString }];
-
-        const result = truncateMcpContent(input);
-
-        // 1. Flag must be true
-        expect(result.truncated).toBe(true);
-
-        // 2. Content array preserved
-        expect(result.content).toHaveLength(1);
-        const itemText = result.content[0].text!;
-
-        // 3. Notice must be present with accurate total
-        expect(itemText).toContain(
-          `[MCP tool output truncated to ${MCP_MAX_OUTPUT_CHARS.toLocaleString()} characters (total: ${size.toLocaleString()} characters)]`,
-        );
-
-        // 4. Exact prefix preserved
-        expect(itemText.startsWith('M'.repeat(MCP_MAX_OUTPUT_CHARS))).toBe(true);
-
-        // 5. Total text length strictly capped at MCP_MAX_OUTPUT_CHARS + notice length
-        expect(itemText.length).toBeLessThan(MCP_MAX_OUTPUT_CHARS + 200);
-      });
-    }
-
-    it('handles multi-item payloads totaling 2MB across heterogeneous blocks', () => {
-      const part1 = 'A'.repeat(10_000);
-      const part2 = 'B'.repeat(40_000); // Exceeds remaining 20,000 budget
-      const part3 = 'C'.repeat(2_000_000); // 2MB block when budget is already 0
-
-      const input = [
-        { type: 'text', text: part1 },
-        { type: 'image', data: 'binary_data_preserved' },
-        { type: 'text', text: part2 },
-        { type: 'text', text: part3 },
-      ];
-
-      const result = truncateMcpContent(input);
-
-      expect(result.truncated).toBe(true);
-      expect(result.content).toHaveLength(4);
-
-      // Part 1: intact
-      expect(result.content[0].text).toBe(part1);
-
-      // Non-text: intact
-      expect(result.content[1]).toEqual({ type: 'image', data: 'binary_data_preserved' });
-
-      // Part 2: sliced to remaining 20,000 + notice
-      const text2 = result.content[2].text!;
-      expect(text2.startsWith('B'.repeat(20_000))).toBe(true);
-      expect(text2).toContain(`(total: 40,000 characters)`);
-
-      // Part 3: sliced to 0 + notice
-      const text3 = result.content[3].text!;
-      expect(text3.startsWith('\n\n[MCP tool output truncated')).toBe(true);
-      expect(text3).toContain(`(total: 2,000,000 characters)`);
-    });
-
-    it('end-to-end McpPiAdapter.buildGatewayTool executes and truncates 2MB result', async () => {
-      const twoMegString = 'X'.repeat(2_097_152);
-      const mockManager = {
-        toolManifest: [
-          {
-            server: 'bigdata',
-            name: 'query_logs',
-            description: 'Returns huge log dump',
-            inputSchema: { type: 'object' },
-          },
-        ],
-        serverStatuses: [{ name: 'bigdata', connected: true, toolCount: 1 }],
-        callTool: vi.fn(async () => ({
-          content: [{ type: 'text', text: twoMegString }],
-          isError: false,
-        })),
-      } as unknown as McpServerManager;
-
-      const tool = new McpPiAdapter(mockManager).buildGatewayTool();
-      expect(tool).not.toBeNull();
-
-      const result = await (
-        tool as {
-          execute: (
-            id: string,
-            params: Record<string, unknown>,
-          ) => Promise<{
-            content: Array<{ type: string; text?: string }>;
-            details: { truncated?: boolean; isError?: boolean };
-          }>;
-        }
-      ).execute('call-1', { tool: 'query_logs' });
-
-      expect(result.details.truncated).toBe(true);
-      expect(result.content[0].text).toContain(
-        `[MCP tool output truncated to ${MCP_MAX_OUTPUT_CHARS.toLocaleString()} characters (total: 2,097,152 characters)]`,
-      );
-      expect(result.content[0].text!.length).toBeLessThan(MCP_MAX_OUTPUT_CHARS + 200);
-    });
-  });
 
   describe('piDocumentReaderTool Stress Tests (100KB, 500KB, 2MB DOCX files)', () => {
     let tempDir: string;
@@ -318,82 +198,5 @@ describe('Adversarial Stress Harness: Payload Truncation Bounds', () => {
         expect(text.length).toBeLessThan(PI_SUBAGENT_MAX_OUTPUT_CHARS + 200);
       });
     }
-
-    it('empirically characterizes chain execution output cap under 300KB intermediate step', async () => {
-      const step1Oversized = 'C'.repeat(300_000);
-      const step2Output = 'Final synthesis complete.';
-
-      let promptCounter = 0;
-      let step2ReceivedTask = '';
-
-      const session1 = {
-        prompt: vi.fn(async () => {
-          session1.emit({
-            type: PiSubagentEventType.MessageEnd,
-            message: { role: PiMessageRole.Assistant, content: step1Oversized, stopReason: 'stop' },
-          });
-          session1.emit({ type: PiSubagentEventType.AgentSettled });
-        }),
-        abort: vi.fn().mockResolvedValue(undefined),
-        subscribe: vi.fn((listener: (event: unknown) => void) => {
-          session1.listeners.push(listener);
-          return () => {};
-        }),
-        listeners: [] as Array<(event: unknown) => void>,
-        emit: (event: unknown) => {
-          for (const l of session1.listeners) l(event);
-        },
-      };
-
-      const session2 = {
-        prompt: vi.fn(async (taskText: string) => {
-          step2ReceivedTask = taskText || '';
-          session2.emit({
-            type: PiSubagentEventType.MessageEnd,
-            message: { role: PiMessageRole.Assistant, content: step2Output, stopReason: 'stop' },
-          });
-          session2.emit({ type: PiSubagentEventType.AgentSettled });
-        }),
-        abort: vi.fn().mockResolvedValue(undefined),
-        subscribe: vi.fn((listener: (event: unknown) => void) => {
-          session2.listeners.push(listener);
-          return () => {};
-        }),
-        listeners: [] as Array<(event: unknown) => void>,
-        emit: (event: unknown) => {
-          for (const l of session2.listeners) l(event);
-        },
-      };
-
-      hoisted.mockCreateAgentSession.mockImplementation(async () => {
-        promptCounter++;
-        if (promptCounter === 1) return { session: session1 };
-        return { session: session2 };
-      });
-
-      const tool = buildSubagentTool();
-      const result = await tool.execute('call-chain', {
-        chain: [
-          { agent: 'scout', task: 'Generate huge data' },
-          { agent: 'planner', task: 'Summarize {previous}' },
-        ],
-      });
-
-      // Verification of chain-level bounds:
-      // 1. Both subagent sessions were invoked in sequence
-      expect(promptCounter).toBe(2);
-
-      // 2. The final result returned by subagent tool is strictly capped at PI_SUBAGENT_MAX_OUTPUT_CHARS
-      expect(result.details.truncated).toBe(true);
-      expect(result.content[0].text.length).toBeLessThan(PI_SUBAGENT_MAX_OUTPUT_CHARS + 200);
-      expect(result.content[0].text).toContain(
-        `[Subagent output truncated to ${PI_SUBAGENT_MAX_OUTPUT_CHARS.toLocaleString()} characters`,
-      );
-
-      // 3. Empirical behavior observation:
-      // Note that in chain mode, Step 1's 300,000 raw output was passed into Step 2 via {previous}
-      // and sections.join() total length reached 300,063 before being sliced by textResult to 50,000.
-      expect(step2ReceivedTask.length).toBeGreaterThan(250_000);
-    });
   });
 });

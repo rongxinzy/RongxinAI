@@ -44,7 +44,7 @@ describe('Windows offline component identity', () => {
     const components = getWindowsResourceComponents(process.cwd());
     if (previous === undefined) delete process.env.ZHIYUAN_UPDATE_VARIANT;
     else process.env.ZHIYUAN_UPDATE_VARIANT = previous;
-    expect(components).toHaveLength(7);
+    expect(components).toHaveLength(6);
     expect(components[0]).toMatchObject({
       key: 'channel-runtime',
       prefix: 'channel-runtime',
@@ -70,7 +70,6 @@ describe('Windows offline component identity', () => {
       'channel-runtime': 'lzma2-mx5-nonsolid-v1',
       skills: 'lzma2-mx5-solid-v1',
       mcps: 'lzma2-mx5-solid-v1',
-      'portable-git': 'lzma-bcj2-d128m-mx9-solid-v1',
       python: 'lzma2-mx5-solid-v1',
       'skill-python': 'lzma2-mx5-solid-v1',
       uv: 'lzma2-mx5-nonsolid-v1',
@@ -153,9 +152,9 @@ describe('Windows offline component identity', () => {
   });
 
   test('does not reuse an archive created with a different compression profile', () => {
-    const component = createComponent('portable-git');
+    const component = createComponent('skills');
     const contentId = computeWindowsResourceComponentId(component);
-    const archivePath = path.join(component.dir, 'portable-git.7z');
+    const archivePath = path.join(component.dir, 'skills.7z');
     const manifestPath = path.join(component.dir, 'manifest.json');
     fs.writeFileSync(archivePath, 'archive-v1');
     const manifest = buildWindowsResourceComponentManifest(

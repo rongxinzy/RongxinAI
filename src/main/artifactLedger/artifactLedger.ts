@@ -188,7 +188,7 @@ export class ArtifactLedger {
   }
 
   /**
-   * Apply a declare_artifact annotation: set declared=1, the role and the
+   * Apply an explicit artifact annotation: set declared=1, the role and the
    * type resolved from `kind`, and the title when given. Creates the row when
    * the file was never observed. Returns the resulting row for publishing.
    */

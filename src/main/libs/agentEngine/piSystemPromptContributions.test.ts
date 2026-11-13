@@ -7,10 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
-import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
-import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
-import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
+import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
 import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import {
@@ -21,28 +18,6 @@ import {
 const FULL_CONTEXT = { fileToolsEnabled: true, maxOutputTokens: 8000 } as const;
 const TEXT_CONTEXT = { fileToolsEnabled: false, maxOutputTokens: 8000 } as const;
 const UNATTENDED_CONTEXT = { ...FULL_CONTEXT, unattended: true } as const;
-const MCP_CONTEXT = {
-  ...FULL_CONTEXT,
-  mcpToolManifest: [
-    {
-      server: 'Blender MCP',
-      name: 'create_cube',
-      description: 'Create a cube in the active scene.',
-      inputSchema: { type: 'object' },
-    },
-  ],
-} as const;
-const FAILED_MCP_CONTEXT = {
-  ...FULL_CONTEXT,
-  mcpServerStatuses: [
-    {
-      name: 'Blender MCP',
-      connected: false,
-      toolCount: 0,
-      error: 'Connection closed',
-    },
-  ],
-} as const;
 
 describe('piSystemPromptContributions', () => {
   it('does not advertise host-only tools to native child sessions or memory tools to Chat', () => {
@@ -50,13 +25,7 @@ describe('piSystemPromptContributions', () => {
       ...FULL_CONTEXT,
       nativeToolsOnly: true,
     }).join('\n');
-    for (const name of [
-      'session_summary',
-      'AskUserQuestion',
-      'python_execute',
-      'read_document',
-      'declare_artifact',
-    ]) {
+    for (const name of ['session_summary', 'AskUserQuestion', 'python_execute', 'read_document']) {
       expect(child).not.toContain(name);
     }
     expect(
@@ -70,13 +39,7 @@ describe('piSystemPromptContributions', () => {
 
   it('produces a non-empty prompt for every contribution in both tool modes', () => {
     for (const contribution of PiSystemPromptContributions) {
-      for (const context of [
-        FULL_CONTEXT,
-        TEXT_CONTEXT,
-        UNATTENDED_CONTEXT,
-        MCP_CONTEXT,
-        FAILED_MCP_CONTEXT,
-      ]) {
+      for (const context of [FULL_CONTEXT, TEXT_CONTEXT, UNATTENDED_CONTEXT]) {
         if (contribution.enabled && !contribution.enabled(context)) continue;
         const prompt =
           typeof contribution.prompt === 'function'
@@ -88,25 +51,19 @@ describe('piSystemPromptContributions', () => {
     }
   });
 
-  it('includes the Windows Bash contract without adding it to Unix sessions', () => {
-    expect(collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'win32' })).toContain(
-      createPiBashToolSystemPrompt('win32'),
-    );
-    expect(
-      collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'linux' }),
-    ).not.toContain(createPiBashToolSystemPrompt('win32'));
-  });
-
-  it('registers every exported tool policy constant', () => {
+  it('registers only non-duplicative cross-tool and run-mode policies', () => {
     const registeredPrompts = PiSystemPromptContributions.map(contribution =>
       typeof contribution.prompt === 'string' ? contribution.prompt : null,
     );
+    expect(PiSystemPromptContributions.map(c => c.id)).toEqual([
+      'unattended-execution',
+      'python-runtime',
+      'session-summary',
+    ]);
     for (const policy of [
-      PiAskUserQuestionSystemPrompt,
       PiUnattendedSystemPrompt,
-      PiDocumentReaderSystemPrompt,
       PiPythonEnvSystemPrompt,
-      DeclareArtifactSystemPrompt,
+      SessionSummarySystemPrompt,
     ]) {
       expect(registeredPrompts).toContain(policy);
     }
@@ -115,28 +72,18 @@ describe('piSystemPromptContributions', () => {
   it('gates file-tool policies off when file tools are disabled', () => {
     const full = collectPiSystemPromptContributions(FULL_CONTEXT);
     const text = collectPiSystemPromptContributions(TEXT_CONTEXT);
-    expect(full).toContain(PiDocumentReaderSystemPrompt);
     expect(full).toContain(PiPythonEnvSystemPrompt);
-    expect(text).not.toContain(PiDocumentReaderSystemPrompt);
     expect(text).not.toContain(PiPythonEnvSystemPrompt);
     expect(text.some(prompt => prompt.includes('## Large File Writes'))).toBe(false);
     // Tool-agnostic policies stay present in both modes.
-    expect(text).toContain(PiAskUserQuestionSystemPrompt);
-    expect(text).toContain(DeclareArtifactSystemPrompt);
+    expect(text).toContain(SessionSummarySystemPrompt);
   });
 
-  it('keeps the managed Python policy adjacent to the Bash contract', () => {
-    const ids = PiSystemPromptContributions.map(contribution => contribution.id);
-    expect(ids.indexOf('python-runtime')).toBe(ids.indexOf('bash-tool') + 1);
-  });
-
-  it('replaces the user-question policy with autonomous guidance when unattended', () => {
+  it('adds autonomous guidance only when unattended', () => {
     const attended = collectPiSystemPromptContributions(FULL_CONTEXT);
     const unattended = collectPiSystemPromptContributions(UNATTENDED_CONTEXT);
 
-    expect(attended).toContain(PiAskUserQuestionSystemPrompt);
     expect(attended).not.toContain(PiUnattendedSystemPrompt);
-    expect(unattended).not.toContain(PiAskUserQuestionSystemPrompt);
     expect(unattended).toContain(PiUnattendedSystemPrompt);
   });
 
@@ -144,46 +91,5 @@ describe('piSystemPromptContributions', () => {
     expect(collectPiSystemPromptContributions(FULL_CONTEXT).join('\n')).not.toContain(
       '2000 characters',
     );
-  });
-
-  it('adds concrete MCP capabilities only when MCP tools are available', () => {
-    const withoutMcp = collectPiSystemPromptContributions(FULL_CONTEXT);
-    const withMcp = collectPiSystemPromptContributions(MCP_CONTEXT);
-
-    expect(withoutMcp.some(prompt => prompt.includes('MCP capability preflight'))).toBe(false);
-    expect(withMcp.some(prompt => prompt.includes('[Blender MCP] create_cube'))).toBe(true);
-  });
-
-  it('suppresses the legacy MCP preflight when the native bridge renders its own section', () => {
-    const legacy = collectPiSystemPromptContributions(MCP_CONTEXT);
-    const native = collectPiSystemPromptContributions({
-      ...MCP_CONTEXT,
-      mcpNativeBridge: true,
-    });
-
-    expect(legacy.some(prompt => prompt.includes('MCP capability preflight'))).toBe(true);
-    expect(native.some(prompt => prompt.includes('MCP capability preflight'))).toBe(false);
-  });
-
-  it('adds the codemode orchestration policy only for enabled work sessions', () => {
-    const enabled = collectPiSystemPromptContributions({ ...FULL_CONTEXT, codemodeEnabled: true });
-    const chatEnabled = collectPiSystemPromptContributions({
-      ...FULL_CONTEXT,
-      codemodeEnabled: true,
-      chatMode: true,
-    });
-    const disabled = collectPiSystemPromptContributions(FULL_CONTEXT);
-
-    expect(enabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(true);
-    expect(chatEnabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(
-      false,
-    );
-    expect(disabled.some(prompt => prompt.includes('## Parallel tool orchestration'))).toBe(false);
-  });
-
-  it('adds MCP connection diagnostics when configured servers expose no tools', () => {
-    const prompts = collectPiSystemPromptContributions(FAILED_MCP_CONTEXT);
-
-    expect(prompts.some(prompt => prompt.includes('[Blender MCP] unavailable'))).toBe(true);
   });
 });

@@ -15,11 +15,6 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 
 import { safeSlice } from '../src/shared/lib/safeSlice';
 import {
-  truncateMcpContent,
-  MCP_MAX_OUTPUT_CHARS,
-  McpPiAdapter,
-} from '../src/main/libs/agentEngine/mcpPiAdapter';
-import {
   buildPiDocumentReaderTool,
   PI_DOCUMENT_READER_MAX_CHARS,
 } from '../src/main/libs/agentEngine/piDocumentReaderTool';

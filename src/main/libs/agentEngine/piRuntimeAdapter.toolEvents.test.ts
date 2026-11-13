@@ -182,7 +182,7 @@ describe('PiRuntimeAdapter', () => {
       listener!({
         type: 'tool_execution_end',
         toolCallId: 'call-details-err',
-        toolName: 'declare_artifact',
+        toolName: 'read_document',
         result: {
           content: [{ type: 'text', text: 'file does not exist' }],
           details: { isError: true, error: 'file does not exist' },

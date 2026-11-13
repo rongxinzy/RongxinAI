@@ -85,7 +85,6 @@ const initialState: CoworkState = {
     embeddingRemoteBaseUrl: '',
     embeddingRemoteApiKey: '',
     codemodeEnabled: false,
-    mcpNativeBridge: false,
   },
 };
 

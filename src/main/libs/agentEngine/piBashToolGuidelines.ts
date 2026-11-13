@@ -1,33 +1,13 @@
-const WINDOWS_PLATFORM = 'win32';
+const PYTHON_INVOCATION = /(?:^|[;&|(\s"'])python3?(?:\.exe)?["']?\s/i;
+const SKILLS_ROOT_VARIABLE = /\$(?:env:)?\{?SKILLS_ROOT\}?/i;
 
-const EXPLICIT_WINDOWS_SHELL = /(?:^|[\s;&|])(?:powershell(?:\.exe)?|pwsh|cmd(?:\.exe)?)(?:\s|$)/i;
-const POWERSHELL_CMDLET =
-  /(?:^|[\s;&|])(?:Get|Set|Remove|Copy|Move|New|Select|Write|Test)-[A-Za-z]+\b/;
-const WINDOWS_DIR_SWITCH = /(?:^|[\s;&|])dir\b[^\n]*\/(?:s|b|a|o)(?:\s|$)/i;
-const WINDOWS_BACKSLASH_PATH = /(?:^|[\s"'(])[A-Za-z]:\\[^\n]*/;
-
-const PYTHON_INVOCATION = /(?:^|[;&|(\s])python3?(?:\.exe)?\s/;
-const SKILLS_ROOT_VARIABLE = /\$\{?SKILLS_ROOT\}?/;
-
-export const PiBashToolSystemPrompt = [
-  '## Bash execution contract',
-  '',
-  '- The bash tool runs the configured Bash shell; on Windows this is bundled Git Bash, not cmd.exe or PowerShell.',
-  '- Use POSIX shell syntax and commands such as ls, rg, find, sed, cp, and mv.',
-  '- On Windows, write paths as C:/path or /c/path, use forward slashes, and quote paths containing spaces.',
-  '- Do not use dir /s, PowerShell cmdlets, or unescaped C:\\ paths directly in Bash.',
-  '- Invoke powershell.exe -NoProfile -Command explicitly when PowerShell syntax is required.',
-].join('\n');
-
-export const createPiBashToolSystemPrompt = (
-  platform: NodeJS.Platform = process.platform,
-): string => (platform === WINDOWS_PLATFORM ? PiBashToolSystemPrompt : '');
+const normalizePathSeparators = (value: string): string => value.replace(/\\/g, '/').toLowerCase();
 
 /**
  * Redirect direct shell invocations of bundled Skill scripts to the
  * run_skill_script tool so the per-Skill dependency gate applies.
  * Workspace Python execution and package installation use python_execute
- * and python_install, so bash no longer intercepts pip/uv commands.
+ * and python_install, so shell tools no longer intercept pip/uv commands.
  *
  * Work-package G re-evaluation (2026-10): KEEP this gate. It is narrow —
  * only a `python`/`python3` invocation referencing the Skills root is
@@ -46,7 +26,8 @@ export const getPiBashPythonEnvViolation = (
     const referencesSkillsRoot =
       SKILLS_ROOT_VARIABLE.test(command) ||
       Boolean(
-        skillsRoot && command.toLowerCase().includes(skillsRoot.replace(/\\/g, '/').toLowerCase()),
+        skillsRoot &&
+        normalizePathSeparators(command).includes(normalizePathSeparators(skillsRoot)),
       );
     if (referencesSkillsRoot) {
       return (
@@ -54,37 +35,6 @@ export const getPiBashPythonEnvViolation = (
         'runtime and the Skill dependency set are used; do not invoke them with python/python3.'
       );
     }
-  }
-
-  return undefined;
-};
-
-/**
- * Return an actionable block reason for command dialects that are certainly
- * wrong for the configured Windows Git Bash shell. Deliberate cmd/PowerShell
- * invocations remain valid because they name their intended interpreter.
- * Python environment violations are evaluated first on every platform.
- */
-export const getPiBashCommandViolation = (
-  command: string,
-  platform: NodeJS.Platform = process.platform,
-  skillsRoot?: string,
-): string | undefined => {
-  const pythonEnvViolation = getPiBashPythonEnvViolation(command, skillsRoot);
-  if (pythonEnvViolation) return pythonEnvViolation;
-
-  if (platform !== WINDOWS_PLATFORM || EXPLICIT_WINDOWS_SHELL.test(command)) return undefined;
-
-  if (POWERSHELL_CMDLET.test(command) || /\$env:[A-Za-z_][A-Za-z0-9_]*/.test(command)) {
-    return 'This bash tool runs Git Bash on Windows. Use POSIX shell syntax, or invoke powershell.exe -NoProfile -Command explicitly for PowerShell commands.';
-  }
-
-  if (WINDOWS_DIR_SWITCH.test(command)) {
-    return 'This bash tool runs Git Bash on Windows. Replace dir switches such as /s with POSIX commands, for example find . -type f.';
-  }
-
-  if (WINDOWS_BACKSLASH_PATH.test(command)) {
-    return 'This bash tool runs Git Bash on Windows. Use C:/path or /c/path with forward slashes instead of a C:\\path argument.';
   }
 
   return undefined;

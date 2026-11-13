@@ -130,8 +130,6 @@ export interface ActivePiSession {
   modelRequestOptions?: { apiKey?: string };
   /** Whether this session runs with the pi 1.0 codemode tool active. */
   codemodeEnabled: boolean;
-  /** Whether pi's builtin MCP extension owns this session's MCP tools. */
-  mcpNativeBridge: boolean;
   capabilities: ModelCapabilities;
   /** Endpoint identity behind the current model; scopes image observations. */
   imageEndpointKey?: string;

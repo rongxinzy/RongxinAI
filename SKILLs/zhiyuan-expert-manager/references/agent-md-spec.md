@@ -229,7 +229,7 @@ maxTurns: {turns, 建议150-200}
 调用 subagent 工具时：
 - name: 成员 Agent ID
 - task: 完整任务描述
-- mode: single / parallel / chain
+- mode: single / parallel
 
 ### 成员调度命名（CRITICAL）
 name 参数必须使用成员的 Agent ID，禁止省略或自创名称。

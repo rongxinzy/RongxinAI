@@ -64,7 +64,6 @@ function writeNsisOfflineComponentRouting(
     'channel-runtime': '频道运行环境',
     skills: '内置 Skills',
     mcps: '内置 MCPs',
-    'portable-git': 'PortableGit',
     python: 'Python 离线运行环境',
     'skill-python': 'Skill Python dependency layer',
     uv: 'uv 离线运行环境',

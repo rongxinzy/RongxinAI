@@ -104,8 +104,6 @@ export const registerCoworkConfigIpc = (deps: CoworkConfigIpcDeps): void => {
           permissionModeBySession: normalizedPermissionModeBySession,
           codemodeEnabled:
             typeof config.codemodeEnabled === 'boolean' ? config.codemodeEnabled : undefined,
-          mcpNativeBridge:
-            typeof config.mcpNativeBridge === 'boolean' ? config.mcpNativeBridge : undefined,
           ...normalizedEmbedding,
         };
         const previousConfig = deps.getCoworkStore().getConfig();

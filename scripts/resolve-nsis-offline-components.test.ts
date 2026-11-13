@@ -75,14 +75,14 @@ test('packaging and NSIS consume generated edition routing in all component phas
 test('lite targets exclude llamacpp-bundled component', () => {
   process.env.ZHIYUAN_UPDATE_VARIANT = 'lite';
   expect(shouldIncludeLlamaCppBundledComponent()).toBe(false);
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(7);
+  expect(resolveNsisOfflineComponentTargets()).toHaveLength(6);
 });
 
 test('cpu and cuda targets include llamacpp-bundled component', () => {
   process.env.ZHIYUAN_UPDATE_VARIANT = 'cpu';
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(8);
+  expect(resolveNsisOfflineComponentTargets()).toHaveLength(7);
   expect(shouldIncludeStrataBundledComponent()).toBe(false);
   process.env.ZHIYUAN_UPDATE_VARIANT = 'cuda';
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(9);
+  expect(resolveNsisOfflineComponentTargets()).toHaveLength(8);
   expect(shouldIncludeStrataBundledComponent()).toBe(true);
 });

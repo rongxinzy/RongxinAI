@@ -8,7 +8,6 @@ import { ArtifactLedger, normalizeArtifactKeyPath } from './artifactLedger';
 import { initializeArtifactLedgerSchema } from './schema';
 import { ArtifactRecorder } from './artifactRecorder';
 import { setArtifactUpsertPublisher, type ArtifactUpsertEvent } from './publisher';
-import { buildDeclareArtifactTool } from '../declareArtifact/tool';
 import { takeWorkspaceSnapshot } from './workspaceSnapshot';
 import { recordCodingLaneArtifact } from './codingLaneArtifacts';
 import { CodingEventKind } from '../../shared/codingAgent';
@@ -148,9 +147,9 @@ test('a bash-made document is caught by the debounced workspace diff', async () 
   recorder.dispose();
 });
 
-// ── Scenario 4: write + declare outside the workspace ───────────────────────
+// ── Scenario 4: write outside the workspace ────────────────────────────────
 
-test('an outside-workspace write plus declaration is recorded and promoted', async () => {
+test('an outside-workspace write is recorded', async () => {
   const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'recorder-out-'));
   workspaces.push(outside);
   const { ledger, recorder } = await createWorkspace();
@@ -166,31 +165,22 @@ test('an outside-workspace write plus declaration is recorded and promoted', asy
     isError: false,
     resultMessageId: 'm-result-1',
   });
-  recorder.onToolEnd({
-    toolCallId: 'call-2',
-    toolName: 'declare_artifact',
-    args: { filePath: outsideFile, role: 'deliverable', title: 'Deliverable' },
-    result: { details: { filePath: outsideFile, role: 'deliverable', title: 'Deliverable' } },
-    isError: false,
-    resultMessageId: 'm-result-2',
-  });
 
   const artifacts = ledger.list('session-1');
   expect(artifacts).toHaveLength(1);
   expect(artifacts[0]).toMatchObject({
     filePath: outsideFile,
-    declared: true,
-    role: 'deliverable',
-    title: 'Deliverable',
+    role: 'intermediate',
+    title: 'deliverable.html',
     content: '<h1>hi</h1>',
   });
   recorder.dispose();
 });
 
-// ── Scenario 5: failed write + failed declaration ───────────────────────────
+// ── Scenario 5: failed write ───────────────────────────────────────────────
 
-test('a failed write records nothing and the failed declaration records nothing', async () => {
-  const { root, ledger, recorder } = await createWorkspace();
+test('a failed write records nothing', async () => {
+  const { ledger, recorder } = await createWorkspace();
 
   recorder.onRunStart('run-1');
   recorder.onToolStart('call-1', 'write', { file_path: 'missing/report.md', content: 'x' });
@@ -202,83 +192,8 @@ test('a failed write records nothing and the failed declaration records nothing'
     result: 'write failed',
     resultMessageId: 'm-result-1',
   });
-  recorder.onToolEnd({
-    toolCallId: 'call-2',
-    toolName: 'declare_artifact',
-    args: { filePath: path.join(root, 'missing/report.md') },
-    result: { details: { isError: true, error: 'file does not exist' } },
-    isError: true,
-    resultMessageId: 'm-result-2',
-  });
 
   expect(ledger.list('session-1')).toEqual([]);
-  recorder.dispose();
-});
-
-// ── Scenario 6: parallel write + declare awaits the pending write ──────────
-
-test('a parallel declare waits for the in-flight write and then succeeds', async () => {
-  const { root, ledger, recorder } = await createWorkspace();
-  const target = path.join(root, 'report.md');
-
-  recorder.onRunStart('run-1');
-  recorder.onToolStart('call-1', 'write', { file_path: 'report.md', content: 'done' });
-
-  const tool = buildDeclareArtifactTool({
-    fileExists: async filePath =>
-      fs
-        .stat(filePath)
-        .then(() => true)
-        .catch(() => false),
-    awaitPendingWrite: filePath => recorder.awaitPendingWrite(filePath),
-    onDeclare: () => {},
-  });
-  const execute = tool.execute as (
-    id: string,
-    params: Record<string, unknown>,
-  ) => Promise<{ details: Record<string, unknown> }>;
-  const pendingDeclare = execute('call-2', {
-    filePath: target,
-    role: 'deliverable',
-    title: 'Parallel Report',
-  });
-
-  // While the write is still in flight, the recorder sees the declaration.
-  recorder.onToolEnd({
-    toolCallId: 'call-2',
-    toolName: 'declare_artifact',
-    args: { filePath: target, role: 'deliverable', title: 'Parallel Report' },
-    result: {
-      details: { filePath: target, role: 'deliverable', title: 'Parallel Report' },
-    },
-    isError: false,
-    resultMessageId: 'm-result-2',
-  });
-  await fs.writeFile(target, 'done', 'utf8');
-  recorder.onToolEnd({
-    toolCallId: 'call-1',
-    toolName: 'write',
-    args: { file_path: 'report.md', content: 'done' },
-    isError: false,
-    resultMessageId: 'm-result-1',
-  });
-
-  const declareResult = await pendingDeclare;
-  expect(declareResult.details.isError).toBeUndefined();
-  expect(ledger.list('session-1')).toHaveLength(1);
-  expect(ledger.list('session-1')[0]).toMatchObject({
-    filePath: target,
-    declared: true,
-    role: 'deliverable',
-    title: 'Parallel Report',
-  });
-
-  // A declaration for a never-written file fails instead of hanging.
-  const failing = await execute('call-3', {
-    filePath: path.join(root, 'nope.md'),
-    role: 'deliverable',
-  });
-  expect(failing.details.isError).toBe(true);
   recorder.dispose();
 });
 
@@ -450,14 +365,12 @@ function recordCodingLaneArtifactsForTest(db: Database.Database): void {
 
 // ── Recorder lifecycle ──────────────────────────────────────────────────────
 
-test('dispose settles parked declarations as failed and ignores later events', async () => {
-  const { root, ledger, recorder } = await createWorkspace();
+test('dispose ignores later events', async () => {
+  const { ledger, recorder } = await createWorkspace();
   recorder.onRunStart('run-1');
   recorder.onToolStart('call-1', 'write', { file_path: 'report.md', content: 'x' });
 
-  const parked = recorder.awaitPendingWrite(path.join(root, 'report.md'));
   recorder.dispose();
-  await expect(parked).resolves.toBe(false);
 
   recorder.onToolEnd({
     toolCallId: 'call-1',

@@ -124,7 +124,6 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
             sessionMode,
             goalMode: options.goalMode,
             codemode: localStore.getConfig().codemodeEnabled === true,
-            mcpNativeBridge: localStore.getConfig().mcpNativeBridge === true,
             imageAttachments: storedImages,
             fileAttachments: options.fileAttachments,
             workspaceRoot: existingSession?.cwd,

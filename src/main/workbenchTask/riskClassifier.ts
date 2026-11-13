@@ -10,12 +10,10 @@ const readOnlyTools = new Set([
   'skill_runtime_capabilities',
   'read_document',
   'conversation_history',
-  'ocr',
   'web_search',
 ]);
 const internalControlTools = new Set([
   'askuserquestion',
-  'declare_artifact',
   'session_summary',
   'plan_write',
   // Delegation itself is internal; every child tool retains its own authorization.
@@ -84,7 +82,7 @@ export function classifyWorkbenchToolRisk(
     return WorkbenchApprovalRiskLevel.ReadOnly;
   }
   if (reversibleTools.has(normalizedName)) return WorkbenchApprovalRiskLevel.Reversible;
-  if (normalizedName === 'bash' || normalizedName === 'shell') {
+  if (normalizedName === 'bash' || normalizedName === 'powershell' || normalizedName === 'shell') {
     const command = typeof input.command === 'string' ? input.command : JSON.stringify(input);
     if (isSafeShellCommand(command)) return WorkbenchApprovalRiskLevel.ReadOnly;
     return irreversibleShellPattern.test(command)

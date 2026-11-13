@@ -8,28 +8,10 @@ import { getFeishuCliBinDirectory } from '../feishuConnectorPaths';
 import { applyUvPackageIndexDefaults, PythonPackageIndexUrl } from '../pythonPackageIndexes';
 import { coworkLog } from '../coworkLogger';
 import { getElectronNodeRuntimePath } from './electronNodeRuntime';
-import {
-  checkWindowsGitBashHealth,
-  getGitBashResolutionErrorForPi,
-  getWindowsGitToolDirs,
-  resolveWindowsGitBashPath,
-} from './gitBash';
-import {
-  appendEnvPath,
-  hasCommandInEnv,
-  normalizeWindowsPath,
-  singleWindowsPathToPosix,
-  truncateDiagnostic,
-} from './pathUtils';
+import { appendEnvPath, hasCommandInEnv } from './pathUtils';
 import { ensureElectronNodeShim } from './nodeShims';
 import { resolveUserShellPath } from './userShellPath';
-import {
-  ensureWindowsBashBootstrapPath,
-  ensureWindowsBashUtf8InitScript,
-  ensureWindowsOriginalPath,
-  ensureWindowsSystemEnvVars,
-  ensureWindowsSystemPathEntries,
-} from './windowsSystemEnv';
+import { ensureWindowsSystemEnvVars, ensureWindowsSystemPathEntries } from './windowsSystemEnv';
 import { ensureWindowsRegistryPathEntries } from './windowsRegistryPath';
 
 const DOMESTIC_NPM_REGISTRY_URL = 'https://registry.npmmirror.com';
@@ -55,7 +37,7 @@ function applyDomesticPackageMirrorDefaults(env: Record<string, string | undefin
  * Add application-managed command runtimes to a subprocess environment.
  *
  * This deliberately does not add provider credentials. Callers that need the
- * app's Node/npm shim, managed Python, uv, and Windows Git Bash PATH handling
+ * app's Node/npm shim, managed Python, uv, and Windows system PATH handling
  * can use it without exposing a session's API configuration globally.
  */
 export async function applyApplicationRuntimeEnv(
@@ -73,20 +55,10 @@ export async function applyApplicationRuntimeEnv(
     applyDomesticPackageMirrorDefaults(env);
   }
 
-  // On Windows, resolve git-bash and ensure Git toolchain directories are available in PATH.
+  // On Windows, normalize UTF-8 settings and ensure system/registry PATH entries are available.
   if (process.platform === 'win32') {
     env.ZHIYUAN_ELECTRON_PATH = electronNodeRuntimePath;
 
-    // Force UTF-8 encoding for MSYS2/git-bash.
-    //
-    // On Chinese (and other non-Latin) Windows systems, the default system locale
-    // uses GBK (code page 936) or similar legacy encodings. Without explicit locale
-    // settings, MSYS2 tools and the git-bash environment may output text in the
-    // system's legacy encoding, which the Claude Agent SDK misinterprets as UTF-8,
-    // producing garbled characters.
-    //
-    // Setting LANG and LC_ALL to C.UTF-8 tells the MSYS2 runtime to use UTF-8 for
-    // all text I/O, including output from coreutils (ls, cat, grep, etc.).
     if (!env.LANG) {
       env.LANG = 'C.UTF-8';
     }
@@ -95,8 +67,6 @@ export async function applyApplicationRuntimeEnv(
     }
 
     // Force Python to use UTF-8 mode (PEP 540, Python 3.7+).
-    // Without this, Python on Chinese Windows defaults to GBK for stdin/stdout/stderr
-    // and file I/O, causing garbled output when the SDK reads it as UTF-8.
     if (!env.PYTHONUTF8) {
       env.PYTHONUTF8 = '1';
     }
@@ -104,41 +74,14 @@ export async function applyApplicationRuntimeEnv(
       env.PYTHONIOENCODING = 'utf-8';
     }
 
-    // Force `less` and `git` pager output to use UTF-8.
     if (!env.LESSCHARSET) {
       env.LESSCHARSET = 'utf-8';
     }
 
-    // Create a bash init script that switches the Windows console code page to
-    // UTF-8 (65001). By setting BASH_ENV, every non-interactive bash session
-    // spawned by the Claude Agent SDK will source this script before executing
-    // commands, ensuring Windows native commands (dir, ipconfig, systeminfo,
-    // type, etc.) output UTF-8 instead of GBK.
-    if (!env.BASH_ENV) {
-      const initScript = ensureWindowsBashUtf8InitScript();
-      if (initScript) {
-        // Convert to MSYS2 POSIX format to avoid encoding issues when the
-        // path contains non-ASCII characters (e.g. Chinese Windows username).
-        // MSYS2's automatic Windows→POSIX conversion can corrupt non-ASCII
-        // chars if it runs before LANG=C.UTF-8 takes effect during DLL init.
-        env.BASH_ENV = singleWindowsPathToPosix(initScript);
-        coworkLog(
-          'INFO',
-          'applyPackagedEnvOverrides',
-          `Set BASH_ENV for UTF-8 console code page: ${env.BASH_ENV}`,
-        );
-      }
-    }
-
     // Ensure critical Windows system environment variables are always present.
-    // Packaged Electron apps or certain launch contexts may lack these variables,
-    // which causes Windows built-in commands (ipconfig, systeminfo, netstat, etc.)
-    // to fail when executed inside git-bash via the Claude Agent SDK.
     ensureWindowsSystemEnvVars(env);
 
-    // Ensure Windows system directories (System32, etc.) are always in PATH.
-    // The Claude Agent SDK's shell snapshot mechanism captures PATH and may lose
-    // system directories if they were missing from the inherited environment.
+    // Ensure Windows system directories (System32, PowerShell, OpenSSH, etc.) are in PATH.
     ensureWindowsSystemPathEntries(env);
 
     // Merge the latest PATH entries from the Windows registry (Machine + User).
@@ -148,82 +91,7 @@ export async function applyApplicationRuntimeEnv(
     // similar to how a freshly opened terminal would.
     await ensureWindowsRegistryPathEntries(env);
 
-    const configuredBashPath = normalizeWindowsPath(env.CLAUDE_CODE_GIT_BASH_PATH);
-    let bashPath =
-      configuredBashPath && existsSync(configuredBashPath)
-        ? configuredBashPath
-        : await resolveWindowsGitBashPath();
-
-    if (configuredBashPath && bashPath === configuredBashPath) {
-      const configuredHealth = await checkWindowsGitBashHealth(configuredBashPath);
-      if (!configuredHealth.ok) {
-        const fallbackPath = await resolveWindowsGitBashPath();
-        if (fallbackPath && fallbackPath !== configuredBashPath) {
-          coworkLog(
-            'WARN',
-            'resolveGitBash',
-            `Configured bash is unhealthy (${configuredBashPath}): ${configuredHealth.reason || 'unknown reason'}. Falling back to: ${fallbackPath}`,
-          );
-          bashPath = fallbackPath;
-        } else {
-          const diagnostic = truncateDiagnostic(
-            `Configured bash is unhealthy (${configuredBashPath}): ${configuredHealth.reason || 'unknown reason'}`,
-          );
-          env.ZHIYUAN_GIT_BASH_RESOLUTION_ERROR = diagnostic;
-          coworkLog('WARN', 'resolveGitBash', diagnostic);
-          bashPath = null;
-        }
-      }
-    }
-
-    if (bashPath) {
-      env.CLAUDE_CODE_GIT_BASH_PATH = bashPath;
-      delete env.ZHIYUAN_GIT_BASH_RESOLUTION_ERROR;
-      coworkLog('INFO', 'resolveGitBash', `Using Windows git-bash: ${bashPath}`);
-      const gitToolDirs = getWindowsGitToolDirs(bashPath);
-      env.PATH = appendEnvPath(env.PATH, gitToolDirs);
-      coworkLog(
-        'INFO',
-        'resolveGitBash',
-        `Injected Windows Git toolchain PATH entries: ${gitToolDirs.join(', ')}`,
-      );
-      ensureWindowsBashBootstrapPath(env);
-    } else {
-      const diagnostic =
-        (await getGitBashResolutionErrorForPi()) || 'git-bash not found or failed health checks';
-      env.ZHIYUAN_GIT_BASH_RESOLUTION_ERROR = truncateDiagnostic(diagnostic);
-    }
-
     applyManagedPythonEnv(env);
-
-    // Tell git-bash to inherit the PATH from the parent process instead of
-    // rebuilding it from scratch. Without this, git-bash's /etc/profile (login
-    // shell) defaults to constructing a minimal PATH containing only Windows
-    // system directories + MSYS2 tools, discarding user-installed tool paths
-    // like Python, Node.js, npm, pip, etc. Setting MSYS2_PATH_TYPE=inherit
-    // makes git-bash preserve the full PATH we've carefully constructed above.
-    if (!env.MSYS2_PATH_TYPE) {
-      env.MSYS2_PATH_TYPE = 'inherit';
-      coworkLog(
-        'INFO',
-        'applyPackagedEnvOverrides',
-        'Set MSYS2_PATH_TYPE=inherit to preserve PATH in git-bash',
-      );
-    }
-
-    // Pre-set ORIGINAL_PATH in POSIX format so git-bash's /etc/profile can use it.
-    //
-    // ROOT CAUSE: Node.js env PATH on Windows uses semicolons (;) and backslash
-    // paths (C:\...). When the Claude Agent SDK's CLI spawns git-bash with this env,
-    // /etc/profile reads ORIGINAL_PATH="${ORIGINAL_PATH:-${PATH}}" and appends it
-    // with a colon. But the semicolons in the Windows PATH are NOT converted to
-    // colons, so "C:\nodejs;C:\python" becomes one giant invalid entry instead of
-    // two separate paths. This causes `npm`, `python`, `pip` etc. to be unfindable.
-    //
-    // By pre-setting ORIGINAL_PATH to the POSIX-converted version (/c/nodejs:/c/python),
-    // /etc/profile uses it directly and bash can correctly parse all PATH entries.
-    // This MUST be done AFTER all PATH modifications above so the full PATH is captured.
-    ensureWindowsOriginalPath(env);
   }
 
   if (!app.isPackaged) {
@@ -243,7 +111,6 @@ export async function applyApplicationRuntimeEnv(
     const feishuCliBinDirectory = getFeishuCliBinDirectory(app.getPath('userData'));
     if (existsSync(feishuCliBinDirectory)) {
       env.PATH = [feishuCliBinDirectory, env.PATH].filter(Boolean).join(delimiter);
-      if (process.platform === 'win32') ensureWindowsOriginalPath(env);
     }
 
     return;
@@ -332,12 +199,6 @@ export async function applyApplicationRuntimeEnv(
           'Packaged macOS build: forcing bundled Electron node/npx/npm shims to avoid stale system Node versions',
         );
       }
-
-      // Re-compute ORIGINAL_PATH after shim injection so that git-bash
-      // also sees the bundled node/npx/npm in its PATH.
-      if (process.platform === 'win32') {
-        ensureWindowsOriginalPath(env);
-      }
     }
   } else {
     delete env.ZHIYUAN_NODE_SHIM_ACTIVE;
@@ -371,7 +232,6 @@ export async function applyApplicationRuntimeEnv(
   const feishuCliBinDirectory = getFeishuCliBinDirectory(app.getPath('userData'));
   if (existsSync(feishuCliBinDirectory)) {
     env.PATH = [feishuCliBinDirectory, env.PATH].filter(Boolean).join(delimiter);
-    if (process.platform === 'win32') ensureWindowsOriginalPath(env);
   }
 
   // Verify node/npx/npm resolution in the constructed environment
