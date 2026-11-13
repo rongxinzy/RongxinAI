@@ -64,7 +64,8 @@ $targets += @($shell[0].FullName, $updater[0].FullName,
   (Join-Path $ProjectRoot 'scripts\installer-shell\out\ZhiYuanUninstall.exe'))
 $magpieDirectory = Join-Path $ProjectRoot 'release\win-unpacked\resources\magpie\win32-x64'
 $magpieExecutable = Join-Path $magpieDirectory 'magpie.exe'
-$targets += $magpieExecutable
+$jobRunnerExecutable = Join-Path $ProjectRoot 'release\win-unpacked\resources\python-runtime\job-runner.exe'
+$targets += @($magpieExecutable, $jobRunnerExecutable)
 foreach ($target in $targets) {
   if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
     throw "Signed Windows target was not found: $target"

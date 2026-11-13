@@ -391,4 +391,72 @@ describe('pinned Magpie runtime build', () => {
     expect(shouldIgnoreNonMachOResource(app, mainExec)).toBe(false);
     expect(shouldIgnoreNonMachOResource(app, magpieHelper)).toBe(false);
   });
+
+  test('retries transient Windows signing failures, rejects tampered pre-sign bytes, and enforces verifySignature', () => {
+    const app = path.join(temporaryRoot(), 'win-unpacked');
+    const root = path.join(app, 'resources', 'magpie');
+    const { binary } = fixture(root, 'win32-x64');
+    const context = { electronPlatformName: 'win32', arch: 1, appOutDir: app };
+    const env = { CERTUM_CERT_THUMBPRINT: 'ab'.repeat(20) };
+
+    let attempts = 0;
+    const verifiedPaths: string[] = [];
+    signPackagedWindowsMagpie(context, {
+      env,
+      spawn: () => {
+        attempts += 1;
+        if (attempts < 2) return { status: 1 };
+        fs.appendFileSync(binary, 'authenticode');
+        return { status: 0 };
+      },
+      verifySignature: signedPath => {
+        verifiedPaths.push(signedPath);
+      },
+    });
+    expect(attempts).toBe(2);
+    expect(verifiedPaths).toEqual([binary]);
+
+    // Fails closed if Authenticode signature verification fails on second pass.
+    expect(() =>
+      signPackagedWindowsMagpie(context, {
+        env,
+        spawn: () => {
+          throw new Error('must not re-sign');
+        },
+        verifySignature: () => {
+          throw new Error('Magpie Authenticode verification failed');
+        },
+      }),
+    ).toThrow('Authenticode verification failed');
+
+    // Rejects a tampered binary whose sha256 does not match manifest even with signing enabled.
+    fs.appendFileSync(binary, 'tampered');
+    expect(() =>
+      signPackagedWindowsMagpie(context, {
+        env,
+        spawn: () => ({ status: 0 }),
+      }),
+    ).toThrow('Magpie binary changed before Windows signing');
+  });
+
+  test('rejects signed runtime digests missing manifest signing metadata', () => {
+    const root = path.join(temporaryRoot(), 'magpie');
+    const { binary, manifest } = fixture(root, 'win32-x64');
+    fs.appendFileSync(binary, 'modified');
+    fs.writeFileSync(
+      path.join(path.dirname(binary), 'manifest.json'),
+      JSON.stringify(
+        {
+          ...manifest,
+          sha256: sha256File(binary),
+          sizeBytes: fs.statSync(binary).size,
+        },
+        null,
+        2,
+      ),
+    );
+    expect(() => verifyRuntime(root, 'win32-x64', { allowSigned: true })).toThrow(
+      'missing manifest signing metadata',
+    );
+  });
 });

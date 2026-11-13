@@ -48,4 +48,19 @@ describe('resolveMagpieGatewayPort', () => {
       await release();
     }
   });
+
+  it('skips excluded ports and supports LAN bind checks', async () => {
+    let stored = 39111;
+    const port = await resolveMagpieGatewayPort(
+      {
+        read: () => stored,
+        write: value => {
+          stored = value;
+        },
+      },
+      { lanAccess: true, excludePorts: [39111] },
+    );
+    expect(port).not.toBe(39111);
+    expect(stored).toBe(port);
+  });
 });

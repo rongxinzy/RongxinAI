@@ -14,6 +14,10 @@ export interface MagpieManagerOptions {
   port?: () => Promise<number>;
   gatewayPort?: MagpieGatewayPortStore;
   startupTimeoutMs?: number;
+  recoveryRetryDelayMs?: number;
+  platform?: NodeJS.Platform;
+  jobRunnerPath?: string | false;
+  killProcessTree?: (pid: number) => Promise<void>;
   parseCatalog?: typeof parseMagpieCatalog;
   serviceEnabled?: { read(): boolean; write(enabled: boolean): void };
   subscriptionAccounts?: { read(): boolean; write(enabled: boolean): void | Promise<void> };
