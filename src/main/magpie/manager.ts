@@ -46,6 +46,7 @@ export class MagpieManager implements MagpieRoutingGateway {
   private deniedAfterPersistenceFailure = false;
   private subscriptionChange?: Promise<MagpieStatus>;
   private lanAccessChange?: Promise<MagpieStatus>;
+  private recovering?: Promise<MagpieStatus>;
   private readonly providerOperations: MagpieManagerProviders;
   private readonly agentOperations: MagpieManagerAgents;
   private readonly managementOperations: MagpieManagerManagement;
@@ -122,16 +123,33 @@ export class MagpieManager implements MagpieRoutingGateway {
     });
     return this.pending;
   }
+  private sanitizeDiagnosticText(text: string): string {
+    const trimmed = text.trim();
+    if (!trimmed) return '';
+    const redacted = trimmed.replace(
+      /(bearer\s+|sk-|magpie_web_[^=]*=)[A-Za-z0-9._-]+/gi,
+      '$1[REDACTED]',
+    );
+    return redacted.length > 2048 ? redacted.slice(-2048) : redacted;
+  }
+
   private async launch(signal: AbortSignal): Promise<MagpieStatus> {
+    let phase: 'verify' | 'prepare-home' | 'resolve-port' | 'spawn' | 'probe' = 'verify';
+    let stderrTail = '';
+    let spawnError: unknown;
+    let exitCode: number | null = null;
+    let exitSignal: NodeJS.Signals | null = null;
     try {
       const binary = await (this.options.verify ?? verifyMagpieBinary)(
         this.options.resourcesRoot,
         signal,
       );
+      phase = 'prepare-home';
       await prepareMagpieHome(
         this.options.privateHome,
         this.options.subscriptionAccounts?.read() === true,
       );
+      phase = 'resolve-port';
       const port = this.options.port ?? freePort;
       const gatewayPort =
         this.options.gatewayPort !== undefined
@@ -142,6 +160,7 @@ export class MagpieManager implements MagpieRoutingGateway {
       this.webKey = randomBytes(32).toString('hex');
       const lanAccessEnabled = this.isLanAccessEnabled();
       signal.throwIfAborted();
+      phase = 'spawn';
       const child = (this.options.spawn ?? spawn)(
         binary,
         ['web', '--addr', `127.0.0.1:${this.webPort}`, '--no-open'],
@@ -149,7 +168,7 @@ export class MagpieManager implements MagpieRoutingGateway {
           cwd: this.options.privateHome,
           shell: false,
           windowsHide: true,
-          stdio: 'ignore',
+          stdio: ['ignore', 'ignore', 'pipe'],
           env: isolatedMagpieEnvironment(
             this.options.privateHome,
             gatewayPort,
@@ -162,24 +181,44 @@ export class MagpieManager implements MagpieRoutingGateway {
       );
       this.child = child;
       let exited = false;
-      child.once('error', () => {
+      const appendStderr = (chunk: Buffer | string): void => {
+        const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+        stderrTail = `${stderrTail}${text}`;
+        if (stderrTail.length > 4096) stderrTail = stderrTail.slice(-4096);
+      };
+      if (child.stderr && typeof child.stderr.on === 'function') {
+        child.stderr.on('data', appendStderr);
+        child.stderr.on('error', () => {});
+      }
+      child.once('error', error => {
         exited = true;
+        spawnError = error;
       });
-      child.once('exit', () => {
+      child.once('exit', (code, sig) => {
         exited = true;
+        exitCode = code;
+        exitSignal = sig;
         if (this.child === child) {
           this.child = undefined;
           this.providerOperations.clearHostSignatures();
           this.webKey = undefined;
           this.webPort = undefined;
-          if (this.state.state === 'running')
+          if (this.state.state === 'running') {
+            const stderr = this.sanitizeDiagnosticText(stderrTail);
+            console.warn('[Magpie] Owned model service exited unexpectedly:', {
+              code,
+              signal: sig,
+              ...(stderr ? { stderr } : {}),
+            });
             this.state = {
               state: 'failed',
               version: MAGPIE_VERSION,
               error: 'Local model service exited',
             };
+          }
         }
       });
+      phase = 'probe';
       const gatewayUrl = `http://127.0.0.1:${gatewayPort}`;
       const deadline = Date.now() + (this.options.startupTimeoutMs ?? 30_000);
       while (Date.now() < deadline) {
@@ -201,7 +240,20 @@ export class MagpieManager implements MagpieRoutingGateway {
         await delay(100);
       }
       throw new Error('Magpie startup timed out');
-    } catch {
+    } catch (error) {
+      if (!signal.aborted) {
+        const stderr = this.sanitizeDiagnosticText(stderrTail);
+        console.warn('[Magpie] Launch failed:', {
+          phase,
+          error: error instanceof Error ? error.message : String(error),
+          ...(exitCode !== null ? { exitCode } : {}),
+          ...(exitSignal ? { exitSignal } : {}),
+          ...(spawnError
+            ? { spawnError: spawnError instanceof Error ? spawnError.message : String(spawnError) }
+            : {}),
+          ...(stderr ? { stderr } : {}),
+        });
+      }
       await this.terminate();
       this.state = {
         state: signal.aborted ? 'stopped' : 'failed',
@@ -261,6 +313,32 @@ export class MagpieManager implements MagpieRoutingGateway {
         status.error || 'The model service could not start. Retry in model settings.',
       );
     return status;
+  }
+
+  /** Probes a reportedly running gateway (e.g. after sleep/wake) and restarts it if dead. */
+  async recoverIfNeeded(): Promise<MagpieStatus> {
+    if (this.recovering) return this.recovering;
+    const run = (async (): Promise<MagpieStatus> => {
+      if (!this.shouldRun()) return this.status();
+      if (this.state.state === 'starting') return (await this.pending) ?? this.status();
+      if (this.state.state === 'running' && this.state.gatewayUrl) {
+        try {
+          const hello = await this.request(`${this.state.gatewayUrl}/api/hello`, {}, 1_500);
+          const data = (await hello.json()) as { name?: string };
+          if (hello.ok && data.name === 'magpie') return this.status();
+        } catch {
+          /* fall through to restart */
+        }
+        console.warn('[Magpie] Gateway health check failed; restarting owned model service.');
+        await this.stopOwned();
+        if (!this.shouldRun()) return this.status();
+      }
+      return await this.startOwned();
+    })().finally(() => {
+      this.recovering = undefined;
+    });
+    this.recovering = run;
+    return run;
   }
 
   /**

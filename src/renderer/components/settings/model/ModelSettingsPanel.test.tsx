@@ -54,10 +54,25 @@ test('failed start remains stopped and does not load or claim a model', async ()
     ).toBe(false),
   );
   fireEvent.click(screen.getByRole('button', { name: 'magpieCatalogEnable' }));
-  await screen.findByRole('alert');
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('magpieGatewayStartFailedTitle');
+  expect(alert.textContent).toContain('magpieGatewayStartFailedHint');
   expect(screen.getByText('magpieState_failed')).toBeTruthy();
   expect(api.catalog).toHaveBeenCalledTimes(1);
   expect(screen.queryByRole('searchbox')).toBeNull();
+});
+
+test('opening settings with failed gateway status immediately alerts and recommends restart', async () => {
+  api.catalog.mockResolvedValue({
+    status: { state: 'failed', version: '1', error: 'Unable to start' },
+    models: [],
+    defaultModelId: null,
+  });
+  render(<ModelSettingsPanel />);
+  const alert = await screen.findByRole('alert');
+  expect(alert.textContent).toContain('magpieGatewayStartFailedTitle');
+  expect(alert.textContent).toContain('magpieGatewayStartFailedHint');
+  expect(screen.getByText('magpieState_failed')).toBeTruthy();
 });
 
 test('explicit enable displays starting immediately and failed immediately without polling', async () => {

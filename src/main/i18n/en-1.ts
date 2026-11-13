@@ -174,6 +174,7 @@ export const enMain1 = {
   coworkErrorInputTooLong: 'Input too long, exceeding model context limit.',
   coworkErrorCouldNotProcessPdf: 'Unable to process the PDF file.',
   coworkErrorModelNotFound: 'The requested model does not exist or is unavailable.',
+  coworkErrorGatewayStartFailed: 'Gateway failed to start. Please restart the app and try again.',
   coworkErrorGatewayDisconnected: 'AI engine connection lost. Please retry.',
   coworkErrorServiceRestart: 'AI engine is restarting. Please try again later.',
 };

@@ -645,6 +645,11 @@ export const initApp = async (): Promise<void> => {
 
     powerMonitor.on('resume', () => {
       projectMemoryService.resumeOutboxDrain();
+      if (inferenceRuntime.magpieManager) {
+        void inferenceRuntime.magpieManager.recoverIfNeeded().catch(error => {
+          console.warn('[Magpie] Model service recovery after system resume failed:', error);
+        });
+      }
       if (
         Date.now() - lifecycleRuntime.lastSuccessfulAppUpdateCheckAt >=
         APP_UPDATE_POLL_INTERVAL_MS

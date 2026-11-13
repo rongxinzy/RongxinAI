@@ -701,6 +701,22 @@ export class PiRuntimeTurnEvents {
         if (active.assistantMessageId || active.thinkingMessageId) {
           active.retryStreamReusePending = true;
         }
+        // If a loopback Magpie request hit ECONNREFUSED (e.g. after system sleep),
+        // kick recovery now so Pi's retry backoff can connect to the restarted gateway.
+        if (
+          active.pendingError?.classified.kind === CoworkErrorKind.NetworkError &&
+          active.harnessModelProfile?.provider === ProviderName.Magpie &&
+          hasMagpieModelService()
+        ) {
+          void getMagpieModelService()
+            .recoverIfNeeded()
+            .catch(error => {
+              console.warn(
+                `[PiRuntime] Magpie recovery during retry failed for ${sessionId}:`,
+                error,
+              );
+            });
+        }
         // Pi is retrying after an error. Retrying is invisible otherwise — the
         // failed attempt is deferred until the run settles — so the user is told
         // once per turn that the model answered with an error.

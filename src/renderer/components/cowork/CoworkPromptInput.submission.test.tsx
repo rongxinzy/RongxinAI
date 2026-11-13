@@ -33,6 +33,7 @@ const fixture = vi.hoisted(() => ({
       availableModels: [],
       defaultSelectedModel: { id: 'test-model', name: 'Test Model', providerKey: 'test' },
       selectedModelByAgent: {},
+      serviceState: 'stopped' as 'stopped' | 'failed',
     },
     skill: { activeSkillIds: [], skills: [] },
     quickAction: { actions: [], selectedActionId: null },
@@ -69,6 +70,7 @@ beforeEach(() => {
   fixture.dispatch.mockClear();
   fixture.state.cowork.draftPrompts.__home__ = '';
   fixture.state.cowork.draftAttachments = {};
+  fixture.state.model.serviceState = 'stopped';
   fixture.state.workMode.mode = WorkMode.Chat;
 });
 afterEach(() => {
@@ -257,4 +259,12 @@ test('keeps the explicit task-resume action available without an amendment', asy
   await submit(view.container.querySelector('form')!, 2);
   expect(onSubmit).toHaveBeenCalledOnce();
   expect(onSubmit.mock.calls[0]?.[0]).toBe('');
+});
+
+test('shows gateway start failure and restart hint when model service state is failed', () => {
+  fixture.state.model.serviceState = 'failed';
+  const view = render(<CoworkPromptInput onSubmit={vi.fn()} />);
+  const alert = view.getByRole('alert');
+  expect(alert.textContent).toContain(i18nService.t('magpieGatewayStartFailedTitle'));
+  expect(alert.textContent).toContain(i18nService.t('magpieGatewayStartFailedHint'));
 });

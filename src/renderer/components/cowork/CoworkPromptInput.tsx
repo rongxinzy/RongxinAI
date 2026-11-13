@@ -7,6 +7,7 @@ import {
   PromptInputSubmit,
   PromptInputTools,
 } from '@shared/components/ai-elements/prompt-input';
+import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
 import {
   Tooltip,
@@ -117,6 +118,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const agents = useSelector((state: RootState) => state.agent.agents);
     const currentAgent = agents.find(agent => agent.id === currentAgentId);
     const availableModels = useSelector((state: RootState) => state.model.availableModels);
+    const modelServiceState = useSelector((state: RootState) => state.model.serviceState);
     const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
     const contextMessage = useMemo(
       () =>
@@ -402,6 +404,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const showEmptySubmitHint = isSubmitEmpty && !isStreaming;
     return (
       <div ref={promptRootRef} className="relative">
+        {modelServiceState === 'failed' && (
+          <Alert variant="destructive" className="mb-2">
+            <TriangleAlert />
+            <AlertTitle>{i18nService.t('magpieGatewayStartFailedTitle')}</AlertTitle>
+            <AlertDescription>{i18nService.t('magpieGatewayStartFailedHint')}</AlertDescription>
+          </Alert>
+        )}
         {imageVisionHint && (
           <div className="mb-2 flex items-start gap-1.5 rounded-md border border-border bg-surface-raised px-2.5 py-1.5 text-xs text-muted-foreground">
             <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5 text-warning" />

@@ -32,12 +32,18 @@ const PowerSaveBlockerType = {
   PreventAppSuspension: 'prevent-app-suspension',
 } as const;
 
-export function setPreventSleepBlockerEnabled(enabled: boolean): void {
-  if (enabled) {
-    if (
-      lifecycleRuntime.preventSleepBlockerId === null ||
-      !powerSaveBlocker.isStarted(lifecycleRuntime.preventSleepBlockerId)
-    ) {
+const activeRunSleepBlockerIds = new Set<string>();
+let manualPreventSleepEnabled = false;
+
+function isSleepBlockerActive(id: number | null): boolean {
+  if (id === null) return false;
+  return typeof powerSaveBlocker.isStarted === 'function' ? powerSaveBlocker.isStarted(id) : true;
+}
+
+function syncPreventSleepBlocker(): void {
+  const shouldBlock = manualPreventSleepEnabled || activeRunSleepBlockerIds.size > 0;
+  if (shouldBlock) {
+    if (!isSleepBlockerActive(lifecycleRuntime.preventSleepBlockerId)) {
       lifecycleRuntime.preventSleepBlockerId = powerSaveBlocker.start(
         PowerSaveBlockerType.PreventAppSuspension,
       );
@@ -47,11 +53,31 @@ export function setPreventSleepBlockerEnabled(enabled: boolean): void {
 
   if (
     lifecycleRuntime.preventSleepBlockerId !== null &&
-    powerSaveBlocker.isStarted(lifecycleRuntime.preventSleepBlockerId)
+    isSleepBlockerActive(lifecycleRuntime.preventSleepBlockerId)
   ) {
     powerSaveBlocker.stop(lifecycleRuntime.preventSleepBlockerId);
   }
   lifecycleRuntime.preventSleepBlockerId = null;
+}
+
+export function setPreventSleepBlockerEnabled(enabled: boolean): void {
+  manualPreventSleepEnabled = enabled;
+  syncPreventSleepBlocker();
+}
+
+export function setActiveRunSleepBlocker(sessionId: string, active: boolean): void {
+  if (active) {
+    activeRunSleepBlockerIds.add(sessionId);
+  } else {
+    activeRunSleepBlockerIds.delete(sessionId);
+  }
+  syncPreventSleepBlocker();
+}
+
+export function clearActiveRunSleepBlockers(): void {
+  activeRunSleepBlockerIds.clear();
+  manualPreventSleepEnabled = false;
+  syncPreventSleepBlocker();
 }
 
 export const initStore = async (): Promise<SqliteStore> => {

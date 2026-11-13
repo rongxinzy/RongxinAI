@@ -17,6 +17,7 @@
  * Architecture: docs/architecture/streaming.md
  */
 import type { UnknownAction } from '@reduxjs/toolkit';
+import { CoworkErrorKind } from '../../common/coworkError';
 import { CoworkPermissionOrigin } from '../../shared/cowork/constants';
 import {
   PiUiEventSequenceTracker,
@@ -34,6 +35,7 @@ import coworkReducer, {
   updateSessionStatus,
   updateToolActivity,
 } from '../store/slices/coworkSlice';
+import { setModelServiceState } from '../store/slices/modelSlice';
 import { CoworkContentBuffer } from './coworkContentBuffer';
 import {
   createCoworkTerminalErrorMessage,
@@ -302,6 +304,9 @@ export function createCoworkStreamPipeline(deps: CoworkStreamPipelineDeps): Cowo
             event.error,
           );
           deps.dispatch(updateSessionStatus({ sessionId: event.sessionId, status: 'error' }));
+          if (event.error.kind === CoworkErrorKind.GatewayStartFailed) {
+            deps.dispatch(setModelServiceState('failed'));
+          }
           if (event.error.message && !terminalMessageAlreadyReceived) {
             deps.dispatch(
               addMessage({

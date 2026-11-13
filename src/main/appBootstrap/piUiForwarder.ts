@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { BrowserWindow } from 'electron';
 
 import { agentRuntime } from './agentRuntimeState';
-import { getCoworkStore, getStore } from './runtimeServices';
+import { getCoworkStore, getStore, setActiveRunSleepBlocker } from './runtimeServices';
 import { getPiRuntimeAdapter } from './sessionServices';
 import { sanitizeCoworkMessageForIpc, sanitizePermissionRequestForIpc } from './ipcPayloadSanitize';
 import { CoworkStreamIpc } from '../../shared/ipc/channels';
@@ -391,9 +391,24 @@ export const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): 
   );
 };
 
+const bindRunSleepBlocker = (runtime: PiRuntimeAdapter): void => {
+  runtime.on('started', (sessionId: string) => {
+    setActiveRunSleepBlocker(sessionId, true);
+  });
+  const release = (sessionId: string): void => {
+    setActiveRunSleepBlocker(sessionId, false);
+  };
+  runtime.on('complete', release);
+  runtime.on('sessionStopped', release);
+  runtime.on('error', release);
+  runtime.on('sessionInterrupted', interruption => release(interruption.sessionId));
+};
+
 export const bindPiWorkbenchRuntimeForwarder = (): void => {
   if (agentRuntime.piWorkbenchRuntimeForwarderBound) return;
 
-  forwardPiWorkbenchRuntimeToRenderer(getPiRuntimeAdapter());
+  const runtime = getPiRuntimeAdapter();
+  forwardPiWorkbenchRuntimeToRenderer(runtime);
+  bindRunSleepBlocker(runtime);
   agentRuntime.piWorkbenchRuntimeForwarderBound = true;
 };

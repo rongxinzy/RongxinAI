@@ -248,6 +248,7 @@ export const zhCowork: Record<string, string> = {
     '当前模型不支持图像输入（服务端缺少视觉组件）。系统已尝试自动关闭该模型的图像输入能力，请重试；若仍失败请检查模型配置。',
   coworkErrorProviderUnavailable:
     '该会话使用的模型供应商已停用或模型已被移除。请到设置中重新启用供应商或切换其他模型后重试。',
+  coworkErrorGatewayStartFailed: '网关启动失败，建议重启应用后再试。',
   coworkErrorGatewayDisconnected: '模型服务连接中断，请重试。仍无法连接时可重启应用。',
   coworkErrorServiceRestart: '模型服务正在重启，请稍后重试。',
   coworkErrorGatewayDraining: '模型服务正在重启，请稍后重试。',

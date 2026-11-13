@@ -90,6 +90,8 @@ export const magpieTranslationsZh = {
   magpieState_running: '运行中',
   magpieState_stopping: '停止中',
   magpieState_failed: '启动失败',
+  magpieGatewayStartFailedTitle: '网关启动失败',
+  magpieGatewayStartFailedHint: '本地模型网关启动失败，建议重启应用后再试。',
 
   magpieActionFailed: '模型管理操作未完成。请检查运行时是否可用，或稍后重试。',
 

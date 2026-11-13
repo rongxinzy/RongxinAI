@@ -105,6 +105,9 @@ describe('formatIMErrorReply', () => {
     expect(formatIMErrorReply({ kind: CoworkErrorKind.AuthExpired } as never)).toBe(
       t('imErrorAuthExpired'),
     );
+    expect(formatIMErrorReply({ kind: CoworkErrorKind.GatewayStartFailed } as never)).toBe(
+      t('imErrorGatewayStartFailed'),
+    );
     expect(
       formatIMErrorReply({ kind: CoworkErrorKind.NetworkError, message: 'boom' } as never),
     ).toBe(t('imErrorTransient', { error: 'boom' }));
