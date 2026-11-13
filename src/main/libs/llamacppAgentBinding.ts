@@ -3,7 +3,7 @@ import {
   type LlamaCppAgentEligibility,
   type LlamaCppRunningModel,
 } from '../../shared/llamacpp';
-import type { ModelCapabilities } from '../../shared/providers';
+import { ModelCapabilityStatus, type ModelCapabilities } from '../../shared/providers';
 
 export type { LlamaCppAgentEligibility } from '../../shared/llamacpp';
 export {
@@ -19,7 +19,7 @@ const LLAMACPP_OUTPUT_TOKEN_RATIO = 0.25;
 export type LlamaCppRunningModelBinding = {
   id: string;
   name: string;
-  supportsImage: false;
+  supportsImage: boolean;
   contextWindow?: number;
   contextTokens?: number;
   maxTokens?: number;
@@ -36,6 +36,7 @@ export function buildLlamaCppRunningModelBinding(
     LlamaCppRunningModel,
     'name' | 'model' | 'id' | 'runtime_context_length' | 'trained_context_length' | 'details'
   >,
+  options: { capabilities?: Partial<ModelCapabilities> } = {},
 ): LlamaCppRunningModelBinding | null {
   const modelName = model.name?.trim() || model.model?.trim() || model.id?.trim() || '';
   if (!modelName) {
@@ -50,10 +51,12 @@ export function buildLlamaCppRunningModelBinding(
     trainedContextWindow: trainedContextLength,
   });
 
+  const supportsImage = options.capabilities?.imageInput === ModelCapabilityStatus.Supported;
+
   return {
     id: modelName,
     name: modelName,
-    supportsImage: false,
+    supportsImage,
     ...(runtimeContextLength
       ? {
           contextWindow: runtimeContextLength,

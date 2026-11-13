@@ -187,6 +187,7 @@ export function createLlamacpp(runtime: BrowserMockRuntime): Window['electron'][
         backendKinds: [],
         gpuDeviceCount: 0,
         supports: {},
+        kvCacheTypes: [],
       };
     },
     importRuntime: async () => {

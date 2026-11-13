@@ -159,8 +159,10 @@ export function registerLlamaCppIpcHandlers(
               : {}),
             ...(preferenceCapabilities ?? {}),
           };
+          const supportsImage = capabilities.imageInput === ModelCapabilityStatus.Supported;
           return {
             ...model,
+            supportsImage,
             ...(preference?.ctxSize ? { contextWindow: preference.ctxSize } : {}),
             ...(preference?.maxTokens ? { maxTokens: preference.maxTokens } : {}),
             ...(Object.keys(capabilities).length ? { capabilities } : {}),

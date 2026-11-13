@@ -198,6 +198,8 @@ export type LlamaCppRuntimeCapabilities = {
   backendKinds: string[];
   gpuDeviceCount: number;
   supports: Partial<Record<LlamaCppServiceConfigFieldKey, boolean>>;
+  /** Parsed from `llama-server --help` when the probe succeeds. */
+  kvCacheTypes?: readonly string[];
   error?: string;
 };
 

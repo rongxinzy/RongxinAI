@@ -1,41 +1,44 @@
 {
   "schemaVersion": 1,
-  "defaultVersion": "b9244",
-  "releaseBaseUrl": "https://rongxinai.krli.org/llamacpp/b9244",
-  "generatedAt": "2026-10-16T12:30:00.000000+00:00",
+  "defaultVersion": "b12359",
+  "runtimeSemanticVersion": "1.0.0",
+  "releaseBaseUrl": "https://rongxinai.krli.org/llamacpp/b12359",
+  "mirrorStatus": "pending-sync-external-deployment",
+  "officialReleaseUrl": "https://github.com/ggml-org/llama.cpp/releases/tag/b12359",
+  "generatedAt": "2026-11-13T17:05:00.000000+00:00",
   "backends": [
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "win-arm64",
       "platform": "win32",
       "arch": "arm64",
       "accelerator": "cpu",
       "archive": {
-        "assetName": "llama-b9244-bin-win-cpu-arm64.zip",
-        "sha256": "26200a2830f63c6aa363809512f43028a9cf83d990ffd032ada8b51eea0f445e"
+        "assetName": "llama-b12359-bin-win-cpu-arm64.zip",
+        "sha256": "d27564c754478d2832789dfcebfc5ace018e36a224c41d810b7cbc1ba8243ec0"
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "win-x64",
       "platform": "win32",
       "arch": "x64",
       "accelerator": "cpu",
       "archive": {
-        "assetName": "llama-b9244-bin-win-cpu-x64.zip",
-        "sha256": "e60c6f089316dfa38e3c6f612ae42d39cde240777e129ab865229ef5796ee1bf"
+        "assetName": "llama-b12359-bin-win-cpu-x64.zip",
+        "sha256": "837c1655e87df3b66989f4be33a792a1399c785bf259038dc75c900096683e69"
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "win-x64-cuda-12",
       "platform": "win32",
       "arch": "x64",
       "accelerator": "cuda",
       "cudaMajor": "12",
       "archive": {
-        "assetName": "llama-b9244-bin-win-cuda-12.4-x64.zip",
-        "sha256": "c51dbbc1c55fdb3a1bcf25eefcdac4e4829e5d165438a2f2516bb78455c4483a"
+        "assetName": "llama-b12359-bin-win-cuda-12.4-x64.zip",
+        "sha256": "e9c0abf442e8339c06728366c1ad2c711332f9939c0c00603fb75d85fd44c914"
       },
       "cudaRuntimeArchive": {
         "assetName": "cudart-llama-bin-win-cuda-12.4-x64.zip",
@@ -43,76 +46,87 @@
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "win-x64-cuda-13",
       "platform": "win32",
       "arch": "x64",
       "accelerator": "cuda",
       "cudaMajor": "13",
       "archive": {
-        "assetName": "llama-b9244-bin-win-cuda-13.3-x64.zip"
+        "assetName": "llama-b12359-bin-win-cuda-13.5-x64.zip",
+        "sha256": "1de9ca1ff408d6e348ea0007c6880ad2393311a02e7799bcde26dc16daef03dd"
+      },
+      "cudaRuntimeArchive": {
+        "assetName": "cudart-llama-bin-win-cuda-13.5-x64.zip",
+        "sha256": "c2bf4cc202bfbaaa7a0b75f5082457c3811326947bb216059b72839d844e9cba"
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "linux-x64",
       "platform": "linux",
       "arch": "x64",
       "accelerator": "cpu",
       "archive": {
-        "assetName": "llama-b9244-bin-ubuntu-x64.tar.gz"
+        "assetName": "llama-b12359-bin-ubuntu-x64.tar.gz",
+        "sha256": "0bc1f091e8916102b6d8f2cf944233a620e90a0f856c72d0ce41150c65c2e72e"
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "linux-x64-cuda-12",
       "platform": "linux",
       "arch": "x64",
       "accelerator": "cuda",
       "cudaMajor": "12",
       "archive": {
-        "assetName": "llama-b9244-bin-ubuntu-cuda-12.4-x64.tar.gz"
+        "assetName": "llama-b12359-bin-ubuntu-cuda-12.8-x64.tar.gz",
+        "sha256": "50c937bec5bbd9f74c99138034f7403283ee21f1943f2429d7b1e4c079eafc11"
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "linux-x64-cuda-13",
       "platform": "linux",
       "arch": "x64",
       "accelerator": "cuda",
       "cudaMajor": "13",
       "archive": {
-        "assetName": "llama-b9244-bin-ubuntu-cuda-13.3-x64.tar.gz"
+        "assetName": "llama-b12359-bin-ubuntu-cuda-13.5-x64.tar.gz",
+        "sha256": "9440f417615bed0e191acef03bff0249117d2be74335358265a6d28475a9baf0"
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "linux-arm64",
       "platform": "linux",
       "arch": "arm64",
       "accelerator": "cpu",
       "archive": {
-        "assetName": "llama-b9244-bin-ubuntu-arm64.tar.gz"
+        "assetName": "llama-b12359-bin-ubuntu-arm64.tar.gz",
+        "sha256": "dc7aa17a67884619b7223870aca9fd6addbc01717713b04a714add1c31137359"
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "mac-arm64",
       "platform": "darwin",
       "arch": "arm64",
       "accelerator": "metal",
       "archive": {
-        "assetName": "llama-b9244-bin-macos-arm64.tar.gz"
+        "assetName": "llama-b12359-bin-macos-arm64.tar.gz",
+        "sha256": "82b00abc740160e1b9980e6cc79c117345fa34af058c80e6c0a69aa8ddccde75"
       }
     },
     {
-      "version": "b9244",
+      "version": "b12359",
       "backend": "mac-x64",
       "platform": "darwin",
       "arch": "x64",
       "accelerator": "metal",
       "archive": {
-        "assetName": "llama-b9244-bin-macos-x64.tar.gz"
+        "assetName": "llama-b12359-bin-macos-x64.tar.gz",
+        "sha256": "25320d529077ef5a3d16e7b5da26438f221d88c8c0930a32b0c79457f5eede56"
       }
     }
   ]

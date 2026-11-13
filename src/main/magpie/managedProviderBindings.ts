@@ -3,6 +3,7 @@ import type { StrataProviderSnapshot } from './strataProviderBinding';
 import type { MagpieHostProvider } from './hostProviders';
 import type { ZhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
 import type { LlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
+import { ModelCapabilityStatus } from '../../shared/providers';
 import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
 import { STRATA_MAGPIE_PROVIDER_ID } from '../../shared/strata/constants';
 const OLLAMA_MAGPIE_PROVIDER_ID = 'zhiyuan-host-ollama';
@@ -51,13 +52,17 @@ export class ManagedMagpieProviderBindings {
       name: '本地 GPU',
       api: 'openai-completions',
       baseUrl,
-      models: models.map(model => ({
-        id: model.id,
-        name: model.name,
-        contextWindow: model.contextWindow ?? model.contextTokens,
-        maxTokens: model.maxTokens,
-        input: ['text'],
-      })),
+      models: models.map(model => {
+        const visionSupported =
+          model.supportsImage || model.capabilities?.imageInput === ModelCapabilityStatus.Supported;
+        return {
+          id: model.id,
+          name: model.name,
+          contextWindow: model.contextWindow ?? model.contextTokens,
+          maxTokens: model.maxTokens,
+          input: visionSupported ? (['text', 'image'] as const) : (['text'] as const),
+        };
+      }),
     };
   }
   setOllamaReader(reader: () => Promise<OllamaProviderSnapshot>): void {

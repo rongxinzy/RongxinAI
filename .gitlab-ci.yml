@@ -185,7 +185,7 @@ build-windows-lite:
       paths:
         - vendor/channel-runtime/
         - build-tar/
-    - key: 'win-llamacpp-backends-b9244'
+    - key: 'win-llamacpp-backends-b12359'
       paths:
         - build/win-lite/
         - build/win-full/
@@ -219,7 +219,7 @@ build-windows-full:
       paths:
         - vendor/channel-runtime/
         - build-tar/
-    - key: 'win-llamacpp-backends-b9244'
+    - key: 'win-llamacpp-backends-b12359'
       paths:
         - build/win-lite/
         - build/win-full/

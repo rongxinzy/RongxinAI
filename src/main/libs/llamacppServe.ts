@@ -232,6 +232,17 @@ export function filterLlamaCppServiceConfigByRuntimeCapabilities(
     delete next.mainGpu;
   }
 
+  const allowedKvTypes = runtimeCapabilities.kvCacheTypes;
+  if (allowedKvTypes && allowedKvTypes.length > 0) {
+    const normalizeKv = (value: string | undefined) => value?.trim().toLowerCase();
+    if (normalizeKv(next.cacheTypeK) && !allowedKvTypes.includes(normalizeKv(next.cacheTypeK)!)) {
+      delete next.cacheTypeK;
+    }
+    if (normalizeKv(next.cacheTypeV) && !allowedKvTypes.includes(normalizeKv(next.cacheTypeV)!)) {
+      delete next.cacheTypeV;
+    }
+  }
+
   return next;
 }
 
@@ -305,6 +316,29 @@ export function parseLlamaCppHelpFlags(output: string): string[] {
     matches.forEach(flag => flags.add(flag.toLowerCase()));
   }
   return Array.from(flags).sort();
+}
+
+export function parseLlamaCppKvCacheTypesFromHelp(output: string): string[] {
+  const lines = output.split(/\r?\n/);
+  const types = new Set<string>();
+  for (let index = 0; index < lines.length; index++) {
+    if (!/--cache-type-k\b/i.test(lines[index])) continue;
+    const block: string[] = [];
+    for (let offset = index; offset < lines.length; offset++) {
+      const line = lines[offset].trim();
+      if (block.length > 0 && line.startsWith('-')) break;
+      if (line) block.push(line);
+      if (/q5_1\b/i.test(line)) break;
+    }
+    const match = block.join(' ').match(/allowed values:\s*([^\n]+)/i);
+    if (!match) break;
+    for (const part of match[1].split(',')) {
+      const type = part.trim().toLowerCase();
+      if (type) types.add(type);
+    }
+    break;
+  }
+  return Array.from(types).sort();
 }
 
 export function parseLlamaCppListDevicesOutput(output: string): LlamaCppRuntimeDevice[] {

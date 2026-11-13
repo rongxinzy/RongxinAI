@@ -12,7 +12,10 @@
   "version": "2026.7.16",
   "llamacpp": {
     "runtimeRepo": "https://github.com/ggml-org/llama.cpp.git",
-    "runtimeReleaseTag": "b9244",
+    "runtimeSemanticVersion": "1.0.0",
+    "runtimeReleaseTag": "b12359",
+    "runtimeSourceCommit": "b1b770d90d94cad9e9ea5b993bdbc383a522fb28",
+    "runtimeV1TagCommit": "2d8a32502909ca065c41c4cf5f2fb1c427c047fc",
     "runtimeAssets": {
       "mac-arm64": "llama-{tag}-bin-macos-arm64.tar.gz",
       "mac-x64": "llama-{tag}-bin-macos-x64.tar.gz",
@@ -22,8 +25,8 @@
       "win-arm64": "llama-{tag}-bin-win-cpu-arm64.zip",
       "linux-x64": "llama-{tag}-bin-ubuntu-x64.tar.gz",
       "linux-x64-vulkan": "llama-{tag}-bin-ubuntu-vulkan-x64.tar.gz",
-      "linux-x64-cuda-12": "llama-{tag}-bin-ubuntu-cuda-12.4-x64.tar.gz",
-      "linux-x64-cuda-13": "llama-{tag}-bin-ubuntu-cuda-13.3-x64.tar.gz",
+      "linux-x64-cuda-12": "llama-{tag}-bin-ubuntu-cuda-12.8-x64.tar.gz",
+      "linux-x64-cuda-13": "llama-{tag}-bin-ubuntu-cuda-13.5-x64.tar.gz",
       "linux-arm64": "llama-{tag}-bin-ubuntu-arm64.tar.gz"
     },
     "runtimeCompanionAssets": {
@@ -105,7 +108,7 @@
     "build:vite": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build",
     "build:eval-policy": "node scripts/build-zhiyuan-evaluation-policy.mjs",
     "build:enterprise": "tsup --config enterprise/tsup.config.ts && vite build --config enterprise/vite.ui.config.ts",
-    "lint": "oxlint src/ enterprise/ && node scripts/ci/check-app-show-toast-dispatch.mjs && bun run theme:check && bun run theme:audit",
+    "lint": "oxlint src/ enterprise/ && node scripts/ci/check-app-show-toast-dispatch.mjs && node scripts/ci/check-llamacpp-runtime-pin.mjs && bun run theme:check && bun run theme:audit",
     "knip": "knip --no-progress",
     "knip:production": "knip --config knip.production.ts --production --include files --no-progress",
     "check:python-dead-code": "node scripts/ci/check-python-dead-code.mjs",

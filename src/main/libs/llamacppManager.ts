@@ -33,6 +33,7 @@ export {
   filterLlamaCppServiceConfigByRuntimeCapabilities,
   listLlamaCppRuntimeHelpFlags,
   parseLlamaCppHelpFlags,
+  parseLlamaCppKvCacheTypesFromHelp,
   parseLlamaCppListDevicesOutput,
   resolveLlamaCppDeviceSelection,
   shouldEnableLlamaCppModelsAutoload,

@@ -26,6 +26,14 @@ test('estimates VRAM with KV cache scaling from context and quantization', () =>
   expect(q8).toBeDefined();
   expect(q8!.estimatedVramMiB).toBeLessThan(f16!.estimatedVramMiB);
   expect(q8!.estimatedVramMiB).toBeGreaterThan(3_400);
+
+  const f8 = estimateLlamaCppModelMemory({
+    modelSizeBytes,
+    contextSize: 32_768,
+    cacheTypeK: LlamaCppKvCacheType.F8_E4M3,
+    cacheTypeV: LlamaCppKvCacheType.F8_E4M3,
+  });
+  expect(f8!.estimatedVramMiB).toBeLessThan(f16!.estimatedVramMiB);
 });
 
 test('estimateRequiredLlamaCppModelVramMiB grows with context length', () => {
