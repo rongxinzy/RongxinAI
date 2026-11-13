@@ -54,6 +54,8 @@ const config: KnipConfig = {
         // Invoked by the shared composite Windows acceptance action.
         'scripts/ci/verify-packaged-app-version.mjs',
         'scripts/ci/measure-llamacpp-bundled.cjs',
+        'scripts/llamacpp/download-smoke-fixtures.mjs',
+        'scripts/llamacpp/run-product-path-smoke.mjs',
         'scripts/ci/build-checkpoint.mjs',
         // Invoked from release.yml and publish workflows, not static imports.
         'scripts/release/print-electron-updater-verify-specs.mjs',

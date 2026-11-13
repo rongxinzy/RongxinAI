@@ -224,6 +224,8 @@
     "llamacpp:runtime:download:linux-x64-cuda-12": "node scripts/download-llamacpp-runtime.cjs linux-x64-cuda-12",
     "llamacpp:runtime:download:linux-x64-cuda-13": "node scripts/download-llamacpp-runtime.cjs linux-x64-cuda-13",
     "llamacpp:runtime:download:linux-arm64": "node scripts/download-llamacpp-runtime.cjs linux-arm64",
+    "llamacpp:smoke:fixtures": "node scripts/llamacpp/download-smoke-fixtures.mjs",
+    "llamacpp:smoke:product-path": "node scripts/llamacpp/run-product-path-smoke.mjs",
     "llamacpp:runtime:mac-arm64": "node scripts/run-build-llamacpp-runtime.cjs mac-arm64 && node scripts/sync-llamacpp-runtime-current.cjs mac-arm64",
     "llamacpp:runtime:mac-x64": "node scripts/run-build-llamacpp-runtime.cjs mac-x64 && node scripts/sync-llamacpp-runtime-current.cjs mac-x64",
     "llamacpp:runtime:win-x64": "node scripts/run-build-llamacpp-runtime.cjs win-x64 && node scripts/sync-llamacpp-runtime-current.cjs win-x64",
