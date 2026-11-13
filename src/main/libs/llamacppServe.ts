@@ -277,6 +277,7 @@ export async function listLlamaCppRuntimeHelpFlags(input: {
 }): Promise<{
   success: boolean;
   flags: string[];
+  kvCacheTypes: string[];
   rawOutput?: string;
   error?: string;
 }> {
@@ -297,12 +298,14 @@ export async function listLlamaCppRuntimeHelpFlags(input: {
     return {
       success: true,
       flags: parseLlamaCppHelpFlags(rawOutput),
+      kvCacheTypes: parseLlamaCppKvCacheTypesFromHelp(rawOutput),
       rawOutput,
     };
   } catch (error) {
     return {
       success: false,
       flags: [],
+      kvCacheTypes: [],
       error: error instanceof Error ? error.message : String(error),
     };
   }

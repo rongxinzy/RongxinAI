@@ -101,7 +101,6 @@ import {
   filterLlamaCppServiceConfigByRuntimeCapabilities,
   isGpuLikeRuntimeDevice,
   listLlamaCppRuntimeHelpFlags,
-  parseLlamaCppKvCacheTypesFromHelp,
   resolveLlamaCppDeviceSelection,
   shouldEnableLlamaCppModelsAutoload,
 } from '../llamacppServe';
@@ -630,10 +629,6 @@ export class LlamaCppManagerCore extends EventEmitter {
     const devices = devicesResult.success ? devicesResult.devices : [];
     const backendKinds = Array.from(new Set(devices.map(device => device.backend).filter(Boolean)));
     const gpuDeviceCount = devices.filter(device => isGpuLikeRuntimeDevice(device)).length;
-    const kvCacheTypes = helpFlagsResult.success
-      ? parseLlamaCppKvCacheTypesFromHelp(helpFlagsResult.rawOutput ?? '')
-      : undefined;
-
     return {
       success: helpFlagsResult.success || devicesResult.success,
       executablePath: this.executablePath,
@@ -644,7 +639,7 @@ export class LlamaCppManagerCore extends EventEmitter {
       devices,
       backendKinds,
       gpuDeviceCount,
-      ...(kvCacheTypes?.length ? { kvCacheTypes } : {}),
+      ...(helpFlagsResult.kvCacheTypes.length ? { kvCacheTypes: helpFlagsResult.kvCacheTypes } : {}),
       supports: buildLlamaCppServiceConfigFieldSupport({
         helpProbeSucceeded: helpFlagsResult.success,
         flags: helpFlagsResult.flags,
