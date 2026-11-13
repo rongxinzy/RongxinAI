@@ -515,12 +515,12 @@ export class WorkbenchTaskRepository {
       | 'effectStatus'
       | 'idempotencyKey'
       | 'request'
-    >,
+    > & { id?: string },
   ): WorkbenchApproval {
     const existing = this.getApprovalByIdempotencyKey(input.idempotencyKey);
     if (existing) return existing;
     const now = Date.now();
-    const id = randomUUID();
+    const id = input.id ?? randomUUID();
     this.db
       .prepare(
         `INSERT INTO workbench_approvals

@@ -14,17 +14,14 @@ import { CoworkStore } from '../../coworkStore';
 import { SqliteStore } from '../../sqliteStore';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
-import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
 import { runTextWorkerOperation } from '../../workbenchTask/textWorkerOperations';
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { piSessionDirFor } from './piSessionStore';
 import { PiAssistantStopReason } from './piToolConstants';
 
 // Only Electron's unbuilt worker transport is replaced. The adapter, SDK,
-// provider HTTP parser, tools, artifact collection, SQLite and JSONL are real.
+// provider HTTP parser, tools, SQLite and JSONL are real.
 vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
-  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
-    collectWorkbenchArtifacts(input),
   transformCoworkTextAsync: async (input: Parameters<typeof runTextWorkerOperation>[0]) =>
     runTextWorkerOperation(input),
 }));

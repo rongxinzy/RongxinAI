@@ -4,7 +4,6 @@ import type {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalRiskLevel,
   WorkbenchArtifactKind,
-  WorkbenchArtifactCandidateSource,
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
@@ -96,16 +95,6 @@ export interface WorkbenchArtifact {
   updatedAt: number;
 }
 
-export interface WorkbenchArtifactCandidate {
-  path: string;
-  source: WorkbenchArtifactCandidateSource;
-  title?: string;
-  kind?: string;
-  role?: string;
-  sha256?: string;
-  verificationStatus?: WorkbenchArtifactVerificationStatus;
-}
-
 export interface WorkbenchApproval {
   id: string;
   taskId: string;
@@ -154,28 +143,4 @@ export interface WorkbenchTaskExportResult {
   path?: string;
   canceled?: boolean;
   error?: string;
-}
-
-export interface WorkbenchTaskResumeInput {
-  taskId: string;
-  amendment?: string;
-  skillIds?: string[];
-  expertIds?: string[];
-  goalMode?: boolean;
-  imageAttachments?: Array<{
-    name: string;
-    mimeType: string;
-    base64Data: string;
-  }>;
-  fileAttachments?: Array<{
-    name: string;
-    path: string;
-    extension: string;
-  }>;
-}
-
-export interface WorkbenchApprovalResponseInput {
-  approvalId: string;
-  approved: boolean;
-  reason?: string;
 }

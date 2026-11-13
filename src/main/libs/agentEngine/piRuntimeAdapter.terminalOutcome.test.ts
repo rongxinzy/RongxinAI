@@ -5,7 +5,7 @@ import { PiAssistantStopReason } from './piToolConstants';
 import Database from 'better-sqlite3';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
-import { WorkbenchVerificationOutcome } from '../../../shared/workbenchTask';
+import { WorkbenchRunStatus } from '../../../shared/workbenchTask';
 
 setupPiRuntimeAdapterSuite();
 
@@ -67,7 +67,7 @@ test('a native continuation can recover length before settlement', async () => {
   expect(mockSession.prompt).toHaveBeenCalledOnce();
 });
 
-test('a settled response that fails workbench verification cannot emit complete', async () => {
+test('a settled response completes directly without a workbench verification gate', async () => {
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
   const service = new WorkbenchTaskService(db);
@@ -77,7 +77,7 @@ test('a settled response that fails workbench verification cannot emit complete'
   adapter.on('complete', complete);
   adapter.on('error', error);
   try {
-    await adapter.startSession('verification-failed', 'Finish the task', { sessionMode: 'work' });
+    await adapter.startSession('direct-completion', 'Finish the task', { sessionMode: 'work' });
     const listener = mockSession.subscribe.mock.calls.at(-1)![0];
     listener({ type: 'turn_start' });
     listener({
@@ -85,10 +85,10 @@ test('a settled response that fails workbench verification cannot emit complete'
       message: { role: 'assistant', content: [], stopReason: PiAssistantStopReason.Stop },
     });
     listener({ type: 'agent_settled' });
-    await vi.waitFor(() => expect(error).toHaveBeenCalledOnce());
-    expect(complete).not.toHaveBeenCalled();
-    expect(service.getCurrent('verification-failed')!.runs[0].verificationResult?.outcome).toBe(
-      WorkbenchVerificationOutcome.Failed,
+    await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
+    expect(error).not.toHaveBeenCalled();
+    expect(service.getCurrent('direct-completion')!.runs[0].status).toBe(
+      WorkbenchRunStatus.Succeeded,
     );
   } finally {
     adapter.stopAllSessions();

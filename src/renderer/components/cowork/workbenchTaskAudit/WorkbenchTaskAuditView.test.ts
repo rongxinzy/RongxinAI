@@ -138,10 +138,8 @@ test('renders the selected task summary instead of its id in the history trigger
     createElement(WorkbenchTaskAuditView, {
       detail,
       tasks: [currentTask, previousTask],
-      busy: false,
       loading: false,
       onSelectTask: vi.fn(),
-      onRespondToApproval: vi.fn(),
     }),
   );
 
@@ -181,10 +179,8 @@ test('renders runs, events, approvals, and artifacts as a single timeline', () =
     createElement(WorkbenchTaskAuditView, {
       detail,
       tasks: [task],
-      busy: false,
       loading: false,
       onSelectTask: vi.fn(),
-      onRespondToApproval: vi.fn(),
     }),
   );
 
@@ -196,11 +192,12 @@ test('renders runs, events, approvals, and artifacts as a single timeline', () =
     screen.getByText(i18nService.t('workbenchTaskRunAttempt').replace('{attempt}', '2')),
   ).toBeTruthy();
 
-  // The active run chapter is expanded: events, the read cluster, the pending
-  // approval card, and the artifact row are all visible.
+  // The active run chapter is expanded: events, the read cluster, the read-only
+  // approval record, and the artifact row are all visible without interactive controls.
   expect(screen.getByText(i18nService.t('workbenchTaskEventRunStarted'))).toBeTruthy();
   expect(screen.getByText('×3')).toBeTruthy();
-  expect(screen.getByRole('button', { name: i18nService.t('workbenchTaskApprove') })).toBeTruthy();
-  expect(screen.getByRole('button', { name: i18nService.t('workbenchTaskDeny') })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: i18nService.t('workbenchTaskApprove') })).toBeNull();
+  expect(screen.queryByRole('button', { name: i18nService.t('workbenchTaskDeny') })).toBeNull();
+  expect(screen.getByText(i18nService.t('workbenchTaskDecisionPending'))).toBeTruthy();
   expect(screen.getByText('output/report.txt')).toBeTruthy();
 });

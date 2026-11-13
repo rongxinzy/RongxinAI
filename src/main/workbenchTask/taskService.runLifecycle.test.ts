@@ -1,8 +1,10 @@
 import Database from 'better-sqlite3';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 
 import {
-  WorkbenchApprovalMode,
+  WorkbenchApprovalDecision,
+  WorkbenchApprovalDecisionSource,
+  WorkbenchApprovalRiskLevel,
   WorkbenchContractKind,
   WorkbenchRunEventType,
   WorkbenchRunTrigger,
@@ -10,14 +12,7 @@ import {
   WorkbenchTaskStatus,
 } from '../../shared/workbenchTask';
 import { initializeWorkbenchTaskSchema } from './schema';
-import { WorkbenchTaskService } from './taskService';
-import { collectWorkbenchArtifacts } from './artifactCollector';
-import type { WorkbenchTaskServiceOptions } from './taskService';
-
-vi.mock('./artifactWorkerPool', () => ({
-  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
-    collectWorkbenchArtifacts(input),
-}));
+import { WorkbenchTaskService, type WorkbenchTaskServiceOptions } from './taskService';
 
 const createService = (options: WorkbenchTaskServiceOptions = {}) => {
   const db = new Database(':memory:');
@@ -30,7 +25,7 @@ const chatContract = {
   requiresUserAcceptance: false,
 };
 
-test('creates a new task for each ordinary user message', async () => {
+test('creates a new task for each ordinary user message and supersedes active runs', () => {
   const { db, service } = createService();
   try {
     const first = service.beginRun({ sessionId: 'session', goal: 'first', contract: chatContract });
@@ -54,7 +49,7 @@ test('creates a new task for each ordinary user message', async () => {
   }
 });
 
-test('supersedes a paused task instead of reusing its contract', async () => {
+test('always sets requiresUserAcceptance to false on passive task creation', () => {
   const { db, service } = createService();
   try {
     const first = service.beginRun({
@@ -62,64 +57,23 @@ test('supersedes a paused task instead of reusing its contract', async () => {
       goal: 'create a presentation',
       contract: {
         kind: WorkbenchContractKind.Shortcut,
-        requiresUserAcceptance: false,
-      },
-    });
-    const authorization = service.authorizeToolCall({
-      sessionId: 'session',
-      runId: first.run.id,
-      toolCallId: 'write-call',
-      toolName: 'write',
-      toolInput: { path: 'slides.md', content: 'draft' },
-      approvalMode: WorkbenchApprovalMode.Ask,
-    });
-    const approval = service.getDetail(first.task.id)?.approvals[0];
-    service.respondToApproval({ approvalId: approval!.id, approved: false });
-    await authorization;
-
-    const second = service.beginRun({
-      sessionId: 'session',
-      goal: 'hello',
-      contract: {
-        kind: WorkbenchContractKind.GenericWork,
         requiresUserAcceptance: true,
       },
     });
-
-    expect(second.task.id).not.toBe(first.task.id);
-    expect(second.task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
-    expect(service.getDetail(first.task.id)?.task.status).toBe(WorkbenchTaskStatus.Cancelled);
-    expect(service.getDetail(first.task.id)?.runs[0].status).toBe(WorkbenchRunStatus.Paused);
-  } finally {
-    db.close();
-  }
-});
-
-test('explicit retry creates an incremented run under the same completed task', async () => {
-  const { db, service } = createService();
-  try {
-    const first = service.beginRun({ sessionId: 'session', goal: 'first', contract: chatContract });
-    await service.completeRun({
+    expect(first.task.contract.requiresUserAcceptance).toBe(false);
+    const completed = service.completeObservedRun({
       sessionId: 'session',
       runId: first.run.id,
-      workspaceRoot: process.cwd(),
       finalAnswer: 'done',
     });
-    const prepared = service.prepareRun(first.task.id, WorkbenchRunTrigger.Retry);
-    const retried = service.beginRun({
-      sessionId: 'session',
-      goal: 'first',
-      contract: chatContract,
-      preparedRunId: prepared.run.id,
-    });
-    expect(retried.task.id).toBe(first.task.id);
-    expect(retried.run.attempt).toBe(2);
+    expect(completed?.task.status).toBe(WorkbenchTaskStatus.Completed);
+    expect(completed?.runs[0].status).toBe(WorkbenchRunStatus.Succeeded);
   } finally {
     db.close();
   }
 });
 
-test('reports only running workbench runs as eligible for continuation', async () => {
+test('deleting a session expires pending observed approvals and removes all task records', () => {
   const { db, service } = createService();
   try {
     const { run } = service.beginRun({
@@ -127,40 +81,53 @@ test('reports only running workbench runs as eligible for continuation', async (
       goal: 'write',
       contract: chatContract,
     });
-
-    expect(service.isRunRunning(run.id)).toBe(true);
-    service.pauseRun('session', 'Paused for test.');
-    expect(service.isRunRunning(run.id)).toBe(false);
-    expect(service.isRunRunning('missing-run')).toBe(false);
-  } finally {
-    db.close();
-  }
-});
-
-test('deleting a session resolves pending approvals before removing their records', async () => {
-  const { db, service } = createService();
-  try {
-    const { run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'write',
-      contract: chatContract,
-    });
-    const authorization = service.authorizeToolCall({
-      sessionId: 'session',
+    service.recordToolCallObserved({
       runId: run.id,
+      approvalId: 'approval-1',
       toolCallId: 'call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'ok' },
-      approvalMode: WorkbenchApprovalMode.Ask,
+      riskLevel: WorkbenchApprovalRiskLevel.Reversible,
+      idempotencyKey: 'idem-1',
+      autoApproved: false,
     });
-
     service.deleteSession('session');
-
-    await expect(authorization).resolves.toEqual({
-      allow: false,
-      reason: 'The session was deleted.',
-    });
     expect(service.getCurrent('session')).toBeNull();
+    expect(service.listForSession('session')).toEqual([]);
+    expect(service.repository.listPendingApprovalsForSession('session')).toEqual([]);
+  } finally {
+    db.close();
+  }
+});
+
+test('records passive approval resolution and tool results cleanly', () => {
+  const { db, service } = createService();
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'edit',
+      contract: chatContract,
+      trigger: WorkbenchRunTrigger.Message,
+    });
+    service.recordToolCallObserved({
+      runId: run.id,
+      approvalId: 'approval-1',
+      toolCallId: 'call-1',
+      toolName: 'write',
+      toolInput: { path: 'a.txt' },
+      riskLevel: WorkbenchApprovalRiskLevel.Reversible,
+      idempotencyKey: 'idem-1',
+      autoApproved: false,
+    });
+    service.recordToolApprovalDecision({
+      approvalId: 'approval-1',
+      decision: WorkbenchApprovalDecision.Approved,
+      decisionSource: WorkbenchApprovalDecisionSource.User,
+    });
+    service.recordToolResult(run.id, 'call-1', { ok: true }, false);
+    const detail = service.getDetail(task.id);
+    expect(detail?.approvals[0].decision).toBe(WorkbenchApprovalDecision.Approved);
+    expect(detail?.events.map(e => e.type)).toContain(WorkbenchRunEventType.ToolEffectFinished);
   } finally {
     db.close();
   }

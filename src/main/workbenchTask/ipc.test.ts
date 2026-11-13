@@ -1,66 +1,13 @@
-import { EventEmitter } from 'node:events';
-
 import { expect, test, vi } from 'vitest';
 
-import {
-  WorkbenchRunTrigger,
-  WorkbenchTaskIpc,
-  type WorkbenchRun,
-  type WorkbenchTask,
-  type WorkbenchTaskResumeInput,
-} from '../../shared/workbenchTask';
+import { WorkbenchTaskIpc, type WorkbenchTask } from '../../shared/workbenchTask';
 import { registerWorkbenchTaskIpcHandlers } from './ipc';
 import type { WorkbenchTaskService } from './taskService';
-import { observePreparedRun } from './preparedRunFailure';
 
 const electronMocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   showSaveDialog: vi.fn(),
 }));
-
-test('retry returns promptly but a later initialization rejection updates the task and reports the error', async () => {
-  const task = { id: 'task-1', sessionId: 'session-1', activeRunId: 'run-2' } as WorkbenchTask;
-  const run = { id: 'run-2', taskId: task.id, trigger: WorkbenchRunTrigger.Retry } as WorkbenchRun;
-  const service = {
-    on: vi.fn(),
-    repository: { getActiveTaskForSession: () => task },
-    prepareRun: () => ({ task, run }),
-    getDetail: () => ({ task }),
-    pauseRun: vi.fn(),
-    failRun: vi.fn(),
-  } as unknown as WorkbenchTaskService;
-  const runtime = new EventEmitter();
-  const onError = vi.fn();
-  runtime.on('error', onError);
-  let reject!: (error: Error) => void;
-  const pending = new Promise<void>((_resolve, fail) => {
-    reject = fail;
-  });
-  registerWorkbenchTaskIpcHandlers({
-    getService: () => service,
-    startPreparedRun: async (preparedTask, preparedRun) => {
-      observePreparedRun(() => pending, preparedTask, preparedRun, { service, runtime });
-    },
-  });
-  const handler = electronMocks.handlers.get(WorkbenchTaskIpc.Retry);
-  await expect(handler?.(undefined, task.id)).resolves.toMatchObject({ success: true });
-  expect(service.failRun).not.toHaveBeenCalled();
-  const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-  try {
-    reject(new Error('Runtime initialization failed'));
-    await new Promise<void>(resolve => setImmediate(resolve));
-    expect(service.failRun).toHaveBeenCalledWith(task.sessionId, {
-      message: 'Runtime initialization failed',
-    });
-    expect(onError).toHaveBeenCalledWith(
-      task.sessionId,
-      expect.objectContaining({ message: 'Runtime initialization failed' }),
-    );
-    expect(runtime.listenerCount('error')).toBe(1);
-  } finally {
-    log.mockRestore();
-  }
-});
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: () => [], fromWebContents: () => null },
@@ -71,6 +18,25 @@ vi.mock('electron', () => ({
     }),
   },
 }));
+
+test('registers only read-only projection and audit export IPC handlers', () => {
+  electronMocks.handlers.clear();
+  const service = {
+    on: vi.fn(),
+    getCurrent: vi.fn(() => null),
+    getDetail: vi.fn(() => null),
+    listForSession: vi.fn(() => []),
+  } as unknown as WorkbenchTaskService;
+
+  registerWorkbenchTaskIpcHandlers({ getService: () => service });
+
+  expect([...electronMocks.handlers.keys()]).toEqual([
+    WorkbenchTaskIpc.GetCurrent,
+    WorkbenchTaskIpc.GetDetail,
+    WorkbenchTaskIpc.ListForSession,
+    WorkbenchTaskIpc.ExportAudit,
+  ]);
+});
 
 test('export audit returns a clean cancellation result from the save dialog', async () => {
   electronMocks.handlers.clear();
@@ -86,10 +52,7 @@ test('export audit returns a clean cancellation result from the save dialog', as
       approvals: [],
     })),
   } as unknown as WorkbenchTaskService;
-  registerWorkbenchTaskIpcHandlers({
-    getService: () => service,
-    startPreparedRun: vi.fn(async () => undefined),
-  });
+  registerWorkbenchTaskIpcHandlers({ getService: () => service });
 
   const handler = electronMocks.handlers.get(WorkbenchTaskIpc.ExportAudit);
   await expect(handler?.({ sender: {} }, task.id)).resolves.toEqual({
@@ -99,61 +62,4 @@ test('export audit returns a clean cancellation result from the save dialog', as
   expect(electronMocks.showSaveDialog).toHaveBeenCalledWith(
     expect.objectContaining({ defaultPath: `workbench-task-audit-${task.id}.json` }),
   );
-});
-
-test('resume forwards the amendment and execution context to the prepared run starter', async () => {
-  electronMocks.handlers.clear();
-  const task = { id: 'task-1', sessionId: 'session-1' } as WorkbenchTask;
-  const run = { id: 'run-2', taskId: task.id } as WorkbenchRun;
-  const service = {
-    on: vi.fn(),
-    prepareRun: vi.fn(() => ({ task, run })),
-    getDetail: vi.fn(() => null),
-  } as unknown as WorkbenchTaskService;
-  const startPreparedRun = vi.fn(async () => undefined);
-  registerWorkbenchTaskIpcHandlers({ getService: () => service, startPreparedRun });
-  const input: WorkbenchTaskResumeInput = {
-    taskId: task.id,
-    amendment: 'Use the revised source file.',
-    skillIds: ['documents'],
-    expertIds: ['reviewer'],
-    goalMode: true,
-    imageAttachments: [{ name: 'reference.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' }],
-    fileAttachments: [{ name: 'notes.txt', path: 'D:/notes.txt', extension: '.txt' }],
-  };
-
-  const handler = electronMocks.handlers.get(WorkbenchTaskIpc.Resume);
-  expect(handler).toBeDefined();
-  await expect(handler?.(undefined, input)).resolves.toEqual({ success: true, detail: undefined });
-  expect(service.prepareRun).toHaveBeenCalledWith(task.id, WorkbenchRunTrigger.Resume);
-  expect(startPreparedRun).toHaveBeenCalledWith(task, run, input);
-});
-
-test('resume startup failure returns the same task to paused instead of failing it', async () => {
-  electronMocks.handlers.clear();
-  const task = { id: 'task-1', sessionId: 'session-1' } as WorkbenchTask;
-  const run = { id: 'run-2', taskId: task.id } as WorkbenchRun;
-  const pauseRun = vi.fn();
-  const failRun = vi.fn();
-  const service = {
-    on: vi.fn(),
-    prepareRun: vi.fn(() => ({ task, run })),
-    getDetail: vi.fn(() => ({ task })),
-    pauseRun,
-    failRun,
-  } as unknown as WorkbenchTaskService;
-  registerWorkbenchTaskIpcHandlers({
-    getService: () => service,
-    startPreparedRun: vi.fn(async () => {
-      throw new Error('runtime unavailable');
-    }),
-  });
-
-  const handler = electronMocks.handlers.get(WorkbenchTaskIpc.Resume);
-  await expect(handler?.(undefined, { taskId: task.id })).resolves.toEqual({
-    success: false,
-    error: 'runtime unavailable',
-  });
-  expect(pauseRun).toHaveBeenCalledWith(task.sessionId, 'runtime unavailable');
-  expect(failRun).not.toHaveBeenCalled();
 });

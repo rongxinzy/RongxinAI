@@ -44,11 +44,13 @@ describe('child tool authorization', () => {
           extensionFactories: PiExtensionFactory[];
         };
         const handlers = new Map<string, (event: never) => unknown>();
-        options.extensionFactories[0]({
-          on: (event: string, handler: (event: never) => unknown) => {
-            handlers.set(event, handler);
-          },
-        } as never);
+        for (const factory of options.extensionFactories) {
+          factory({
+            on: (event: string, handler: (event: never) => unknown) => {
+              handlers.set(event, handler);
+            },
+          } as never);
+        }
         const call = {
           toolCallId: 'provider-call-1',
           toolName: 'write',

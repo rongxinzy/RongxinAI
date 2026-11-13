@@ -4,13 +4,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import {
-  WorkbenchArtifactCandidateSource,
-  WorkbenchArtifactProvenance,
-} from '../../shared/workbenchTask';
-import { CoworkArtifactRole } from '../../shared/cowork/artifacts';
-import { buildDeclareArtifactTool } from '../declareArtifact/tool';
-import { collectWorkbenchArtifacts } from './artifactCollector';
 import { WorkbenchArtifactWorkerPool } from './artifactWorkerPool';
 import { ArtifactWorkerLimit } from './artifactWorkerConstants';
 import { TextWorkerKind } from './textWorkerOperations';
@@ -20,13 +13,6 @@ import { imageSize } from 'image-size';
 const fixture = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-worker-test-')));
 const compiled = path.join(fixture, 'compiled');
 let pool: WorkbenchArtifactWorkerPool;
-const input = {
-  taskId: 'task',
-  runId: 'run',
-  workspaceRoot: fixture,
-  finalAnswer: '',
-  artifactCandidates: [{ path: 'result.txt', source: WorkbenchArtifactCandidateSource.ToolEffect }],
-};
 beforeAll(() => {
   fs.symlinkSync(path.resolve('node_modules'), path.join(fixture, 'node_modules'), 'junction');
   execFileSync(
@@ -59,94 +45,10 @@ beforeAll(() => {
     path.resolve('node_modules/@silvia-odwyer/photon/photon_rs_bg.wasm'),
     path.join(compiled, 'main/workbenchTask/companion-photon.wasm'),
   );
-  fs.writeFileSync(path.join(fixture, 'result.txt'), 'final output');
 });
 afterAll(() => {
   pool?.dispose();
   fs.rmSync(fixture, { recursive: true, force: true });
-});
-
-test('the worker returns the same hashes and rejects paths outside the workspace', async () => {
-  expect(await pool.collect(input)).toEqual(collectWorkbenchArtifacts(input));
-  expect(
-    await pool.collect({
-      ...input,
-      artifactCandidates: [
-        { path: '../outside.txt', source: WorkbenchArtifactCandidateSource.ToolEffect },
-      ],
-    }),
-  ).toEqual([]);
-});
-
-test('declarations accept external deliverables with minimal or complete parameters', async () => {
-  const workspaceRoot = path.join(fixture, 'workspace');
-  const filePath = path.join(fixture, 'external', '项目', 'output', 'presentation.pptx');
-  fs.mkdirSync(workspaceRoot, { recursive: true });
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, 'presentation fixture');
-  const tool = buildDeclareArtifactTool({
-    onDeclare: async artifact => {
-      const artifacts = await pool.collect({
-        ...input,
-        workspaceRoot,
-        artifactCandidates: [
-          {
-            path: artifact.filePath,
-            source: WorkbenchArtifactCandidateSource.Declaration,
-            role: artifact.role,
-            title: artifact.title,
-            kind: artifact.kind,
-          },
-        ],
-      });
-      expect(artifacts).toHaveLength(1);
-      expect(artifacts[0]).toMatchObject({
-        reference: fs.realpathSync(filePath),
-        provenance: WorkbenchArtifactProvenance.External,
-        metadata: { outsideWorkspace: true, role: CoworkArtifactRole.Deliverable },
-      });
-    },
-  }) as unknown as {
-    execute: (
-      id: string,
-      params: Record<string, unknown>,
-    ) => Promise<{ details: Record<string, unknown> }>;
-  };
-  for (const params of [
-    { filePath },
-    { filePath, title: '课程大纲', kind: 'document', role: CoworkArtifactRole.Deliverable },
-  ]) {
-    expect((await tool.execute('external-declaration', params)).details.error).toBeUndefined();
-  }
-});
-test('collection enforces input limits and supports cancellation', async () => {
-  await expect(
-    pool.collect({
-      ...input,
-      artifactCandidates: Array.from(
-        { length: ArtifactWorkerLimit.Candidates + 1 },
-        () => input.artifactCandidates[0],
-      ),
-    }),
-  ).rejects.toThrow('input limit');
-  const cancellation = new AbortController();
-  const pending = pool.collect(input, cancellation.signal);
-  cancellation.abort();
-  await expect(pending).rejects.toThrow('cancelled');
-  expect(await pool.collect(input)).toHaveLength(1);
-});
-test('oversized files fail with a structured worker error', async () => {
-  const largePath = path.join(fixture, 'large.txt');
-  fs.closeSync(fs.openSync(largePath, 'w'));
-  fs.truncateSync(largePath, ArtifactWorkerLimit.FileBytes + 1);
-  await expect(
-    pool.collect({
-      ...input,
-      artifactCandidates: [
-        { path: largePath, source: WorkbenchArtifactCandidateSource.ToolEffect },
-      ],
-    }),
-  ).rejects.toThrow('file size limit');
 });
 
 test('workspace content hashing and decoding stay within the shared worker boundary', async () => {
@@ -187,38 +89,6 @@ test('workspace content hashing and decoding stay within the shared worker bound
   const pending = pool.inspectContent(Uint8Array.from(bytes).buffer, cancellation.signal);
   cancellation.abort();
   await expect(pending).rejects.toThrow('cancelled');
-  expect((await pool.collect(input)).length).toBe(1);
-});
-test('file hashing leaves the main event loop responsive compared with the synchronous baseline', async () => {
-  const filePath = path.join(fixture, 'timing.txt');
-  fs.writeFileSync(filePath, Buffer.alloc(32 * 1024 * 1024, 65));
-  const timingInput = {
-    ...input,
-    artifactCandidates: Array.from({ length: 8 }, () => ({
-      path: filePath,
-      source: WorkbenchArtifactCandidateSource.ToolEffect,
-    })),
-  };
-  let ticks = 0;
-  const interval = setInterval(() => {
-    ticks += 1;
-  }, 1);
-  try {
-    const syncStarted = performance.now();
-    const baseline = collectWorkbenchArtifacts(timingInput);
-    const syncMs = performance.now() - syncStarted;
-    expect(ticks).toBe(0);
-    const workerStarted = performance.now();
-    const result = await pool.collect(timingInput);
-    const workerMs = performance.now() - workerStarted;
-    expect(result).toEqual(baseline);
-    expect(ticks).toBeGreaterThan(0);
-    console.log(
-      `[WorkbenchArtifactTest] synchronous collection blocked for ${Math.round(syncMs)} ms; worker collection took ${Math.round(workerMs)} ms with ${ticks} main-thread timer ticks`,
-    );
-  } finally {
-    clearInterval(interval);
-  }
 });
 
 test('tool display transforms share the bounded worker pool and support cancellation', async () => {
@@ -312,5 +182,4 @@ test('a real large bitmap is resized and converted by Photon without blocking th
   } finally {
     clearInterval(interval);
   }
-  expect(await pool.collect(input)).toHaveLength(1);
 });

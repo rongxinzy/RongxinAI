@@ -111,70 +111,6 @@ export async function createPiRuntimeResourceLoader(
       }),
     ),
     extensionFactories: [
-      ...(approvalContext?.getRunId()
-        ? [
-            (extensionApi: PiExtensionApi) => {
-              const childRuns = new Map<string, string>();
-              const toolCallId = (id: string): string =>
-                approvalContext.toolCallNamespace
-                  ? `${approvalContext.toolCallNamespace}/${id}`
-                  : id;
-              if (approvalContext.toolCallNamespace)
-                extensionApi.on(PiExtensionEventType.ToolResult, event => {
-                  const runId = childRuns.get(event.toolCallId);
-                  childRuns.delete(event.toolCallId);
-                  if (runId)
-                    host
-                      .getWorkbenchTaskService()
-                      ?.recordToolResult(
-                        runId,
-                        toolCallId(event.toolCallId),
-                        { content: event.content, details: event.details },
-                        event.isError,
-                      );
-                });
-              extensionApi.on(PiExtensionEventType.ToolCall, async event => {
-                const runId = approvalContext.getRunId();
-                if (!runId) {
-                  return {
-                    block: true as const,
-                    reason: 'No active workbench run is available.',
-                  };
-                }
-                const toolInput =
-                  event.input && typeof event.input === 'object'
-                    ? (event.input as Record<string, unknown>)
-                    : {};
-                const authorization = await host.getWorkbenchTaskService()?.authorizeToolCall({
-                  sessionId: approvalContext.sessionId,
-                  runId,
-                  toolCallId: toolCallId(event.toolCallId),
-                  toolName: event.toolName,
-                  toolInput,
-                  approvalMode: approvalContext.getApprovalMode(),
-                });
-                if (!authorization) return undefined;
-                if (authorization.allow) {
-                  if (approvalContext.toolCallNamespace) childRuns.set(event.toolCallId, runId);
-                  return undefined;
-                }
-                if (authorization.terminateRun) {
-                  // The run cannot continue: end the turn with a visible error
-                  // instead of returning another tool error the model would
-                  // answer with yet another tool call.
-                  host.recovery.endTerminatedWorkbenchTurn(
-                    approvalContext.sessionId,
-                    authorization.reason ?? 'The workbench run can no longer continue.',
-                  );
-                }
-                return {
-                  block: true as const,
-                  reason: authorization.reason || 'The action was not approved.',
-                };
-              });
-            },
-          ]
-        : []),
       (extensionApi: PiExtensionApi) => {
         extensionApi.on(PiExtensionEventType.ToolCall, event => {
           if (
@@ -213,6 +149,55 @@ export async function createPiRuntimeResourceLoader(
             : undefined;
         });
       },
+      ...(approvalContext
+        ? [
+            (extensionApi: PiExtensionApi) => {
+              const childRuns = new Map<string, string>();
+              const toolCallId = (id: string): string =>
+                approvalContext.toolCallNamespace
+                  ? `${approvalContext.toolCallNamespace}/${id}`
+                  : id;
+              if (approvalContext.toolCallNamespace)
+                extensionApi.on(PiExtensionEventType.ToolResult, event => {
+                  const runId = childRuns.get(event.toolCallId);
+                  childRuns.delete(event.toolCallId);
+                  if (runId)
+                    host
+                      .getWorkbenchTaskService()
+                      ?.recordToolResult(
+                        runId,
+                        toolCallId(event.toolCallId),
+                        { content: event.content, details: event.details },
+                        event.isError,
+                      );
+                });
+              extensionApi.on(PiExtensionEventType.ToolCall, async event => {
+                const runId = approvalContext.getRunId();
+                const toolInput =
+                  event.input && typeof event.input === 'object'
+                    ? (event.input as Record<string, unknown>)
+                    : {};
+                const authorization = await host.authorizeToolCall({
+                  sessionId: approvalContext.sessionId,
+                  runId,
+                  toolCallId: toolCallId(event.toolCallId),
+                  toolName: event.toolName,
+                  toolInput,
+                  approvalMode: approvalContext.getApprovalMode(),
+                });
+                if (authorization.allow) {
+                  if (approvalContext.toolCallNamespace && runId)
+                    childRuns.set(event.toolCallId, runId);
+                  return undefined;
+                }
+                return {
+                  block: true as const,
+                  reason: authorization.reason || 'The action was not approved.',
+                };
+              });
+            },
+          ]
+        : []),
       // Codemode lets the model orchestrate parallel tool calls from a
       // QuickJS sandbox; both extensions register inactive and are activated
       // through the defaultTools override next to the compaction settings.

@@ -1,25 +1,16 @@
 import Database from 'better-sqlite3';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalDecisionSource,
-  WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
   WorkbenchContractKind,
-  WorkbenchRunTrigger,
+  WorkbenchRunEventType,
   WorkbenchRunStatus,
-  WorkbenchTaskStatus,
 } from '../../shared/workbenchTask';
 import { initializeWorkbenchTaskSchema } from './schema';
-import { WorkbenchTaskService } from './taskService';
-import { collectWorkbenchArtifacts } from './artifactCollector';
-import type { WorkbenchTaskServiceOptions } from './taskService';
-
-vi.mock('./artifactWorkerPool', () => ({
-  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
-    collectWorkbenchArtifacts(input),
-}));
+import { WorkbenchTaskService, type WorkbenchTaskServiceOptions } from './taskService';
 
 const createService = (options: WorkbenchTaskServiceOptions = {}) => {
   const db = new Database(':memory:');
@@ -32,378 +23,106 @@ const chatContract = {
   requiresUserAcceptance: false,
 };
 
-test('parallel tools retain a live run while each approval settles independently', async () => {
+test('passive observer records repeated identical tool calls without idempotency collisions', () => {
   const { db, service } = createService();
   try {
-    const { run } = service.beginRun({
-      sessionId: 'parallel',
+    const { task, run } = service.beginRun({
+      sessionId: 'repeated',
       goal: 'work',
       contract: chatContract,
     });
-    const authorize = (id: string, toolName = 'write') =>
-      service.authorizeToolCall({
-        sessionId: 'parallel',
-        runId: run.id,
-        toolCallId: id,
-        toolName,
-        toolInput: { path: `${id}.txt` },
-        approvalMode: WorkbenchApprovalMode.Ask,
-      });
-    const first = authorize('first');
-    const second = authorize('second');
-    await expect(authorize('read', 'read')).resolves.toEqual({ allow: true });
-    const approvals = service.repository.listPendingApprovalsForSession('parallel');
-    expect(approvals).toHaveLength(2);
-    expect(service.isRunRunning(run.id)).toBe(true);
-    service.respondToApproval({ approvalId: approvals[0].id, approved: true });
-    expect(service.repository.getRun(run.id)?.status).toBe(WorkbenchRunStatus.WaitingApproval);
-    service.respondToApproval({ approvalId: approvals[1].id, approved: true });
-    await expect(Promise.all([first, second])).resolves.toEqual([{ allow: true }, { allow: true }]);
-    expect(service.repository.getRun(run.id)?.status).toBe(WorkbenchRunStatus.Running);
-  } finally {
-    db.close();
-  }
-});
-
-test('denying one parallel approval expires its siblings and cannot revive the run', async () => {
-  const { db, service } = createService();
-  try {
-    const { run } = service.beginRun({
-      sessionId: 'parallel',
-      goal: 'work',
-      contract: chatContract,
-    });
-    const calls = ['first', 'second'].map(id =>
-      service.authorizeToolCall({
-        sessionId: 'parallel',
-        runId: run.id,
-        toolCallId: id,
-        toolName: 'write',
-        toolInput: { path: `${id}.txt` },
-        approvalMode: WorkbenchApprovalMode.Ask,
-      }),
-    );
-    const approvals = service.repository.listPendingApprovalsForSession('parallel');
-    service.respondToApproval({ approvalId: approvals[0].id, approved: false });
-    const results = await Promise.all(calls);
-    expect(results.every(result => !result.allow)).toBe(true);
-    expect(
-      service.respondToApproval({ approvalId: approvals[1].id, approved: true }).decision,
-    ).toBe(WorkbenchApprovalDecision.Expired);
-    expect(service.repository.getRun(run.id)?.status).toBe(WorkbenchRunStatus.Paused);
-  } finally {
-    db.close();
-  }
-});
-
-test('expires pending approvals when a new message supersedes the task', async () => {
-  const { db, service } = createService();
-  try {
-    const first = service.beginRun({
-      sessionId: 'session',
-      goal: 'write',
-      contract: chatContract,
-    });
-    const authorization = service.authorizeToolCall({
-      sessionId: 'session',
-      runId: first.run.id,
-      toolCallId: 'write-call',
-      toolName: 'write',
-      toolInput: { path: 'result.txt', content: 'draft' },
-      approvalMode: WorkbenchApprovalMode.Ask,
-    });
-
-    service.beginRun({ sessionId: 'session', goal: 'new request', contract: chatContract });
-
-    await expect(authorization).resolves.toEqual({
-      allow: false,
-      reason: 'Superseded by a new user message.',
-    });
-    const superseded = service.getDetail(first.task.id);
-    expect(superseded?.approvals[0].decision).toBe(WorkbenchApprovalDecision.Expired);
-    expect(superseded?.runs[0].status).toBe(WorkbenchRunStatus.Cancelled);
-    expect(superseded?.task.status).toBe(WorkbenchTaskStatus.Cancelled);
-  } finally {
-    db.close();
-  }
-});
-
-test('accepts a synchronous approval response from an approvalRequested listener', async () => {
-  const { db, service } = createService();
-  try {
-    const run = service.beginRun({
-      sessionId: 'session',
-      goal: 'write',
-      contract: chatContract,
-    });
-    // In-process auto-approval answers inside the emit stack, before
-    // authorizeToolCall returns — the pending entry must already exist.
-    service.on('approvalRequested', ({ approval }) => {
-      service.respondToApproval({ approvalId: approval.id, approved: true });
-    });
-    const authorization = await service.authorizeToolCall({
-      sessionId: 'session',
-      runId: run.run.id,
-      toolCallId: 'write-call',
-      toolName: 'write',
-      toolInput: { path: 'result.txt', content: 'draft' },
-      approvalMode: WorkbenchApprovalMode.Ask,
-    });
-    expect(authorization).toEqual({ allow: true });
-  } finally {
-    db.close();
-  }
-});
-
-test('successful side effects are not authorized twice', async () => {
-  const { db, service } = createService();
-  try {
-    const { run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'write',
-      contract: {
-        kind: WorkbenchContractKind.GenericWork,
-        requiresUserAcceptance: true,
-      },
-    });
-    const input = {
-      sessionId: 'session',
+    service.recordToolCallObserved({
       runId: run.id,
-      toolCallId: 'call',
-      toolName: 'write',
-      toolInput: { path: 'result.txt', content: 'ok' },
-      approvalMode: WorkbenchApprovalMode.AllowAll,
-    };
-    expect((await service.authorizeToolCall(input)).allow).toBe(true);
-    service.recordToolResult(run.id, 'call', { ok: true }, false);
-    const duplicate = await service.authorizeToolCall(input);
-    expect(duplicate.allow).toBe(false);
-    expect(duplicate.reason).toContain('Reuse the persisted result: {"ok":true}');
-  } finally {
-    db.close();
-  }
-});
-
-test('pending, denied, and failed side effects cannot be authorized again', async () => {
-  const { db, service } = createService();
-  try {
-    const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'write',
-      contract: {
-        kind: WorkbenchContractKind.GenericWork,
-        requiresUserAcceptance: true,
-      },
-    });
-    const pendingInput = {
-      sessionId: 'session',
-      runId: run.id,
-      toolCallId: 'pending-call',
-      toolName: 'write',
-      toolInput: { path: 'pending.txt', content: 'ok' },
-      approvalMode: WorkbenchApprovalMode.Ask,
-    };
-    const pendingAuthorization = service.authorizeToolCall(pendingInput);
-    expect((await service.authorizeToolCall(pendingInput)).allow).toBe(false);
-    const pendingApproval = service.getDetail(task.id)?.approvals[0];
-    expect(pendingApproval).toBeDefined();
-    service.respondToApproval({ approvalId: pendingApproval!.id, approved: false });
-    expect((await pendingAuthorization).allow).toBe(false);
-    expect((await service.authorizeToolCall(pendingInput)).allow).toBe(false);
-
-    const next = service.prepareRun(task.id, WorkbenchRunTrigger.Resume);
-    service.beginRun({
-      sessionId: 'session',
-      goal: 'write',
-      contract: task.contract,
-      preparedRunId: next.run.id,
-    });
-    const failedInput = {
-      ...pendingInput,
-      runId: next.run.id,
-      toolCallId: 'failed-call',
-      approvalMode: WorkbenchApprovalMode.AllowAll,
-    };
-    expect((await service.authorizeToolCall(failedInput)).allow).toBe(true);
-    service.recordToolResult(next.run.id, failedInput.toolCallId, new Error('failed'), true);
-    expect((await service.authorizeToolCall(failedInput)).allow).toBe(false);
-  } finally {
-    db.close();
-  }
-});
-
-test('allow-all auto-approves irreversible effects', async () => {
-  const { db, service } = createService();
-  try {
-    const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'publish',
-      contract: chatContract,
-    });
-    const authorization = service.authorizeToolCall({
-      sessionId: 'session',
-      runId: run.id,
-      toolCallId: 'call',
+      approvalId: 'appr-1',
+      toolCallId: 'call-1',
       toolName: 'bash',
-      toolInput: { command: 'git push origin main' },
-      approvalMode: WorkbenchApprovalMode.AllowAll,
+      toolInput: { command: 'echo hi' },
+      riskLevel: WorkbenchApprovalRiskLevel.Unknown,
+      idempotencyKey: 'shared-idem',
+      autoApproved: true,
     });
-    const approval = service.getDetail(task.id)?.approvals[0];
-    expect(approval?.riskLevel).toBe(WorkbenchApprovalRiskLevel.Irreversible);
-    expect(approval?.decision).toBe(WorkbenchApprovalDecision.Approved);
-    expect((await authorization).allow).toBe(true);
-  } finally {
-    db.close();
-  }
-});
-
-test('auto mode approves reversible effects but still prompts for irreversible ones', async () => {
-  const { db, service } = createService();
-  try {
-    const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'write then delete',
-      contract: chatContract,
-    });
-    const writeAuthorization = await service.authorizeToolCall({
-      sessionId: 'session',
+    service.recordToolCallObserved({
       runId: run.id,
-      toolCallId: 'write-call',
-      toolName: 'write',
-      toolInput: { path: 'result.txt', content: 'ok' },
-      approvalMode: WorkbenchApprovalMode.Auto,
-    });
-    const writeApproval = service
-      .getDetail(task.id)
-      ?.approvals.find(candidate => candidate.toolCallId === 'write-call');
-    expect(writeAuthorization.allow).toBe(true);
-    expect(writeApproval?.riskLevel).toBe(WorkbenchApprovalRiskLevel.Reversible);
-    expect(writeApproval?.decision).toBe(WorkbenchApprovalDecision.Approved);
-
-    const rmAuthorization = service.authorizeToolCall({
-      sessionId: 'session',
-      runId: run.id,
-      toolCallId: 'rm-call',
+      approvalId: 'appr-2',
+      toolCallId: 'call-2',
       toolName: 'bash',
-      toolInput: { command: 'rm result.txt' },
-      approvalMode: WorkbenchApprovalMode.Auto,
-    });
-    const rmApproval = service
-      .getDetail(task.id)
-      ?.approvals.find(candidate => candidate.toolCallId === 'rm-call');
-    expect(rmApproval?.riskLevel).toBe(WorkbenchApprovalRiskLevel.Irreversible);
-    expect(rmApproval?.decision).toBe(WorkbenchApprovalDecision.Pending);
-    service.respondToApproval({ approvalId: rmApproval!.id, approved: false });
-    expect((await rmAuthorization).allow).toBe(false);
-  } finally {
-    db.close();
-  }
-});
-
-test('rejects tool calls from another session or an inactive run', async () => {
-  const { db, service } = createService();
-  try {
-    const first = service.beginRun({
-      sessionId: 'session',
-      goal: 'first',
-      contract: chatContract,
-    });
-    await service.completeRun({
-      sessionId: 'session',
-      runId: first.run.id,
-      workspaceRoot: process.cwd(),
-      finalAnswer: 'done',
-    });
-    const second = service.beginRun({
-      sessionId: 'session',
-      goal: 'second',
-      contract: chatContract,
-    });
-
-    await expect(
-      service.authorizeToolCall({
-        sessionId: 'session',
-        runId: first.run.id,
-        toolCallId: 'stale-call',
-        toolName: 'write',
-        toolInput: { path: 'stale.txt' },
-        approvalMode: WorkbenchApprovalMode.AllowAll,
-      }),
-    ).resolves.toMatchObject({ allow: false, reason: expect.stringContaining('active run') });
-    await expect(
-      service.authorizeToolCall({
-        sessionId: 'another-session',
-        runId: second.run.id,
-        toolCallId: 'foreign-call',
-        toolName: 'write',
-        toolInput: { path: 'foreign.txt' },
-        approvalMode: WorkbenchApprovalMode.AllowAll,
-      }),
-    ).resolves.toMatchObject({ allow: false, reason: expect.stringContaining('session') });
-    expect(service.repository.listApprovalsForRun(first.run.id)).toHaveLength(0);
-    expect(service.repository.listApprovalsForRun(second.run.id)).toHaveLength(0);
-  } finally {
-    db.close();
-  }
-});
-
-test('pausing a run expires and resolves its pending approval', async () => {
-  const { db, service } = createService();
-  try {
-    const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'write',
-      contract: chatContract,
-    });
-    const authorization = service.authorizeToolCall({
-      sessionId: 'session',
-      runId: run.id,
-      toolCallId: 'call',
-      toolName: 'write',
-      toolInput: { path: 'result.txt', content: 'ok' },
-      approvalMode: WorkbenchApprovalMode.Ask,
-    });
-
-    service.pauseRun('session', 'The user stopped this run.');
-
-    await expect(authorization).resolves.toEqual({
-      allow: false,
-      reason: 'The user stopped this run.',
+      toolInput: { command: 'echo hi' },
+      riskLevel: WorkbenchApprovalRiskLevel.Unknown,
+      idempotencyKey: 'shared-idem',
+      autoApproved: true,
     });
     const detail = service.getDetail(task.id);
-    expect(detail?.task.status).toBe(WorkbenchTaskStatus.Paused);
-    expect(detail?.runs[0].status).toBe(WorkbenchRunStatus.Paused);
-    expect(detail?.approvals[0].decision).toBe(WorkbenchApprovalDecision.Expired);
-    expect(detail?.approvals[0].decisionSource).toBe(WorkbenchApprovalDecisionSource.Recovery);
+    expect(detail?.approvals).toHaveLength(2);
+    expect(detail?.approvals.every(a => a.decision === WorkbenchApprovalDecision.Approved)).toBe(
+      true,
+    );
   } finally {
     db.close();
   }
 });
 
-test('tool results are persisted as bounded circular-safe JSON', async () => {
+test('passive approval observation records user approval, denial, and completion expiry', () => {
   const { db, service } = createService();
   try {
     const { task, run } = service.beginRun({
-      sessionId: 'session',
-      goal: 'write',
+      sessionId: 'approvals',
+      goal: 'work',
       contract: chatContract,
     });
-    await service.authorizeToolCall({
-      sessionId: 'session',
+    service.recordToolCallObserved({
       runId: run.id,
-      toolCallId: 'call',
+      approvalId: 'appr-approve',
+      toolCallId: 'call-1',
       toolName: 'write',
-      toolInput: { path: 'result.txt', content: 'ok' },
-      approvalMode: WorkbenchApprovalMode.AllowAll,
+      toolInput: { path: 'a.txt' },
+      riskLevel: WorkbenchApprovalRiskLevel.Reversible,
+      idempotencyKey: 'k1',
+      autoApproved: false,
     });
-    const result: Record<string, unknown> = { payload: 'x'.repeat(100_000) };
-    result.self = result;
-    service.recordToolResult(run.id, 'call', result, false);
+    service.recordToolCallObserved({
+      runId: run.id,
+      approvalId: 'appr-deny',
+      toolCallId: 'call-2',
+      toolName: 'bash',
+      toolInput: { command: 'rm -rf tmp' },
+      riskLevel: WorkbenchApprovalRiskLevel.Irreversible,
+      idempotencyKey: 'k2',
+      autoApproved: false,
+    });
+    service.recordToolCallObserved({
+      runId: run.id,
+      approvalId: 'appr-stale',
+      toolCallId: 'call-3',
+      toolName: 'write',
+      toolInput: { path: 'c.txt' },
+      riskLevel: WorkbenchApprovalRiskLevel.Reversible,
+      idempotencyKey: 'k3',
+      autoApproved: false,
+    });
 
-    const persisted = service.getDetail(task.id)?.approvals[0].result;
-    expect(persisted).not.toBeNull();
-    expect(JSON.stringify(persisted).length).toBeLessThan(70_000);
-    expect(JSON.stringify(persisted)).toContain('[Circular]');
+    service.recordToolApprovalDecision({
+      approvalId: 'appr-approve',
+      decision: WorkbenchApprovalDecision.Approved,
+      decisionSource: WorkbenchApprovalDecisionSource.User,
+    });
+    service.recordToolApprovalDecision({
+      approvalId: 'appr-deny',
+      decision: WorkbenchApprovalDecision.Denied,
+      decisionSource: WorkbenchApprovalDecisionSource.User,
+      reason: 'not allowed',
+    });
+    const completed = service.completeObservedRun({
+      sessionId: 'approvals',
+      runId: run.id,
+      finalAnswer: 'done',
+    });
+
+    const byId = new Map(completed!.approvals.map(a => [a.id, a]));
+    expect(byId.get('appr-approve')?.decision).toBe(WorkbenchApprovalDecision.Approved);
+    expect(byId.get('appr-deny')?.decision).toBe(WorkbenchApprovalDecision.Denied);
+    expect(byId.get('appr-stale')?.decision).toBe(WorkbenchApprovalDecision.Expired);
+    expect(completed!.runs[0].status).toBe(WorkbenchRunStatus.Succeeded);
+    expect(completed!.events.map(e => e.type)).toContain(WorkbenchRunEventType.RunSucceeded);
   } finally {
     db.close();
   }

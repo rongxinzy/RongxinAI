@@ -53,15 +53,14 @@ describe('coworkApi contract invokers', () => {
     await coworkApi.workbenchTask.getCurrent('session-1');
     expect(invoke).toHaveBeenCalledWith(WorkbenchTaskIpc.GetCurrent, 'session-1');
 
-    const resume = { taskId: 'task-1', amendment: 'keep going' };
-    await coworkApi.workbenchTask.resume(resume);
-    expect(invoke).toHaveBeenLastCalledWith(WorkbenchTaskIpc.Resume, resume);
+    await coworkApi.workbenchTask.getDetail('task-1');
+    expect(invoke).toHaveBeenLastCalledWith(WorkbenchTaskIpc.GetDetail, 'task-1');
 
-    await coworkApi.workbenchTask.respondToApproval({ approvalId: 'appr-1', approved: true });
-    expect(invoke).toHaveBeenLastCalledWith(WorkbenchTaskIpc.RespondToApproval, {
-      approvalId: 'appr-1',
-      approved: true,
-    });
+    await coworkApi.workbenchTask.listForSession('session-1');
+    expect(invoke).toHaveBeenLastCalledWith(WorkbenchTaskIpc.ListForSession, 'session-1');
+
+    await coworkApi.workbenchTask.exportAudit('task-1');
+    expect(invoke).toHaveBeenLastCalledWith(WorkbenchTaskIpc.ExportAudit, 'task-1');
   });
 
   test('todo invoke methods forward to the contract channels', async () => {

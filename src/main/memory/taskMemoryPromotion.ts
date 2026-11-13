@@ -1,44 +1,37 @@
 import { MemoryScope } from '../../shared/memory';
 import {
   WorkbenchApprovalEffectStatus,
-  WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
-  WorkbenchVerificationOutcome,
+  WorkbenchRunStatus,
   type WorkbenchApproval,
   type WorkbenchArtifact,
   type WorkbenchRun,
   type WorkbenchTask,
-  type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 import { AtomicMemoryExtractor } from './atomicMemoryExtractor';
 import { AtomicMemorySourceKind } from './constants';
 import type { ProjectMemoryService } from './projectMemoryService';
 import type { SessionMemoryCompletion } from './sessionMemoryExtractor';
 
-export interface VerifiedWorkbenchRunMemorySource {
+export interface CompletedWorkbenchRunMemorySource {
   task: WorkbenchTask;
   run: WorkbenchRun;
   artifacts: WorkbenchArtifact[];
   approvals: WorkbenchApproval[];
-  verificationResult: WorkbenchVerificationResult;
   workspaceRoot: string;
   finalAnswer: string;
 }
 
-export async function promoteVerifiedWorkbenchRun(
+export async function promoteCompletedWorkbenchRun(
   service: ProjectMemoryService,
-  source: VerifiedWorkbenchRunMemorySource,
+  source: CompletedWorkbenchRunMemorySource,
   complete: SessionMemoryCompletion,
   extractor = new AtomicMemoryExtractor(),
 ): Promise<string[]> {
-  if (source.verificationResult.outcome !== WorkbenchVerificationOutcome.Passed) return [];
+  if (source.run.status !== WorkbenchRunStatus.Succeeded) return [];
   if (source.task.contract.kind === WorkbenchContractKind.Chat) return [];
   if (!source.finalAnswer.trim()) return [];
-  const artifacts = source.artifacts.filter(
-    artifact =>
-      artifact.runId === source.run.id &&
-      artifact.verificationStatus === WorkbenchArtifactVerificationStatus.Verified,
-  );
+  const artifacts = source.artifacts.filter(artifact => artifact.runId === source.run.id);
   const approvals = source.approvals.filter(
     approval =>
       approval.runId === source.run.id &&
@@ -58,15 +51,6 @@ export async function promoteVerifiedWorkbenchRun(
         id: `run:${source.run.id}:final-answer`,
         kind: AtomicMemorySourceKind.FinalAnswer,
         content: source.finalAnswer,
-      },
-      {
-        id: `run:${source.run.id}:verification`,
-        kind: AtomicMemorySourceKind.Verification,
-        content: JSON.stringify({
-          summary: source.verificationResult.summary,
-          checks: source.verificationResult.checks,
-          evidence: source.verificationResult.evidence,
-        }),
       },
       ...artifacts.map(artifact => ({
         id: `artifact:${artifact.id}`,
@@ -114,7 +98,6 @@ export async function promoteVerifiedWorkbenchRun(
       metadata: {
         artifactIds: artifacts.map(item => item.id),
         approvalIds: approvals.map(item => item.id),
-        verificationSummary: source.verificationResult.summary,
         extraction: extracted.metadataFor(memory),
       },
     });

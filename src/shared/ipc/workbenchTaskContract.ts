@@ -1,19 +1,10 @@
 /**
- * Workbench task IPC contracts (channel + args + result), single source of
- * truth for `src/main/workbenchTask/ipc.ts` handlers, the `workbenchTask`
- * preload namespace, and the renderer `WorkbenchTaskApi` types.
- *
- * Results are main-owned `WorkbenchTaskDetail` projections; the schemas pin
- * only the envelope fields, with the detail cast to the shared type.
+ * Read-only workbench task projection IPC contracts (channel + args + result).
  */
 import { z } from 'zod';
 
 import { defineIpcContract } from './contract';
 import { WorkbenchTaskIpc } from '../workbenchTask';
-import {
-  WorkbenchApprovalResponseInputSchema,
-  WorkbenchTaskResumeInputSchema,
-} from './workbenchTaskSchemas';
 
 /** Detail rows are owned by the task service; the result only pins the envelope. */
 const ActionResultSchema = z.object({
@@ -51,25 +42,5 @@ export const workbenchTaskContract = defineIpcContract({
       path: z.string().optional(),
       error: z.string().optional(),
     }),
-  },
-  resume: {
-    channel: WorkbenchTaskIpc.Resume,
-    args: z.tuple([WorkbenchTaskResumeInputSchema]),
-    result: ActionResultSchema,
-  },
-  retry: {
-    channel: WorkbenchTaskIpc.Retry,
-    args: z.tuple([z.string()]),
-    result: ActionResultSchema,
-  },
-  accept: {
-    channel: WorkbenchTaskIpc.Accept,
-    args: z.tuple([z.string()]),
-    result: ActionResultSchema,
-  },
-  respondToApproval: {
-    channel: WorkbenchTaskIpc.RespondToApproval,
-    args: z.tuple([WorkbenchApprovalResponseInputSchema]),
-    result: ActionResultSchema,
   },
 });

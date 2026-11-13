@@ -44,6 +44,7 @@ export interface PiRuntimeRecoveryHost {
   emit(event: string, ...args: unknown[]): void;
   continueSession(sessionId: string, prompt: string, options?: PiContinueOptions): Promise<void>;
   ocrCommandFor(): ((imagePath: string) => string) | undefined;
+  clearToolPermissionsBySession(sessionId: string): void;
   approvalSessionMap: Map<string, string>;
   pendingAskUserQuestions: Map<
     string,
@@ -345,34 +346,8 @@ export class PiRuntimeTurnRecovery {
     this.host.emit('error', sessionId, classified);
   }
 
-  /**
-   * Ends the turn when a workbench run can no longer execute tools. The run is
-   * already failed, so every further tool call is denied: without ending the
-   * turn the model answers each denial with another tool call.
-   *
-   * The error is flushed immediately so the user sees the concrete reason
-   * instead of a turn that silently stops producing output.
-   */
-  endTerminatedWorkbenchTurn(sessionId: string, message: string): void {
-    const active = this.host.getActiveSession(sessionId);
-    if (!active || active.aborted || active.turnFailed) return;
-    if (active.harnessModelProfile?.provider === ProviderName.Magpie && hasMagpieModelService()) {
-      try {
-        getMagpieModelService().recordError(message);
-      } catch {
-        /* ignore */
-      }
-    }
-    console.warn(`[PiRuntime] ending the turn of session ${sessionId}: ${message}`);
-    active.pendingError = { message, classified: classifyCoworkError(message) };
-    active.piSession.abortBash();
-    void active.piSession.abort().catch((error: unknown) => {
-      console.warn('[PiRuntime] failed to abort a terminated workbench run:', error);
-    });
-    this.flushPendingError(sessionId, active);
-  }
-
   clearApprovalsBySession(sessionId: string): void {
+    this.host.clearToolPermissionsBySession(sessionId);
     for (const [requestId, sid] of this.host.approvalSessionMap.entries()) {
       if (sid !== sessionId) continue;
       this.host.approvalSessionMap.delete(requestId);

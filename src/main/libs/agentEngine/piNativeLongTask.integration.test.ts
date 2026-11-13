@@ -11,7 +11,6 @@ import { DefaultResourceLoader } from '../../../../node_modules/@earendil-works/
 import { SessionManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js';
 import { SettingsManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js';
 import { createPiPromptOverrides } from './piPromptOverrides';
-import { PiGoalModePrompt } from './piRuntimeWorkbenchContract';
 
 test.each(['threshold', 'overflow'] as const)(
   'native SDK finishes 32 tool steps across %s compaction without harness continuation',
@@ -148,7 +147,7 @@ test.each(['threshold', 'overflow'] as const)(
     // advancing between a summary and the next provider response.
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
-      await session.prompt(`${PiGoalModePrompt}\nCreate and verify 32 files.`);
+      await session.prompt('Create and verify 32 files.');
       expect(session.agent.state.systemPrompt).toContain(
         'You are a coding assistant running inside pi',
       );

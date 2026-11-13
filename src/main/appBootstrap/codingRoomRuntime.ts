@@ -261,7 +261,7 @@ export const getCodingRoomService = (): CodingRoomService => {
           workspaceRoot,
           finalAnswer,
         }) => {
-          await getWorkbenchTaskService().completeRun({
+          getWorkbenchTaskService().completeObservedRun({
             sessionId,
             artifactScopeId: laneId,
             runId,

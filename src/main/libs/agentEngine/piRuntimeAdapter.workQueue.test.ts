@@ -17,7 +17,8 @@ import {
 
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
-import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
+import { WorkbenchApprovalMode, WorkbenchRunStatus } from '../../../shared/workbenchTask';
+import { PiExtensionEventType } from './piExtensionTypes';
 import { type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -300,14 +301,30 @@ describe('PiRuntimeAdapter', () => {
       try {
         await adapter.startSession('compaction-resume', 'Write a long report', {
           sessionMode: 'work',
+          approvalMode: WorkbenchApprovalMode.AllowAll,
         });
+        const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+          extensionFactories?: Array<
+            (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
+          >;
+        };
+        const toolCallHandlers: Array<(event: unknown) => Promise<unknown>> = [];
+        for (const factory of loaderOptions.extensionFactories ?? []) {
+          factory({
+            on: (event, handler) => {
+              if (event === PiExtensionEventType.ToolCall) {
+                toolCallHandlers.push(handler as (event: unknown) => Promise<unknown>);
+              }
+            },
+          });
+        }
         const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: {
           type: string;
           message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
           reason?: string;
           aborted?: boolean;
         }) => void;
-        const runId = service.getCurrent('compaction-resume')!.task.activeRunId!;
+        const taskId = service.getCurrent('compaction-resume')!.task.id;
 
         listener({ type: 'agent_start' });
         assistantTurn(listener, 'Draft before compaction');
@@ -315,34 +332,29 @@ describe('PiRuntimeAdapter', () => {
 
         // agent_end is not terminal: the SDK compacts and continues on its own,
         // so the run must stay alive and no completion may fire yet.
-        expect(service.isRunRunning(runId)).toBe(true);
+        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchRunStatus.Running);
         expect(completes).toHaveLength(0);
 
         listener({ type: 'compaction_start', reason: 'threshold' });
         listener({ type: 'compaction_end', reason: 'threshold', aborted: false });
         listener({ type: 'turn_start' });
 
-        // The continuation turn's tool calls still see a running run: the gate
-        // must not answer terminateRun the way it does for a completed one.
-        const authorization = await service.authorizeToolCall({
-          sessionId: 'compaction-resume',
-          runId,
+        // The continuation turn's tool calls still proceed normally without aborting Pi.
+        const authorization = await toolCallHandlers.at(-1)!({
           toolCallId: 'post-compaction-call',
           toolName: 'bash',
-          toolInput: { command: 'ls -la' },
-          approvalMode: WorkbenchApprovalMode.AllowAll,
+          input: { command: 'ls -la' },
         });
-        expect(authorization.allow).toBe(true);
-        expect(authorization.terminateRun).toBeUndefined();
+        expect(authorization).toBeUndefined();
 
         assistantTurn(listener, 'Final report after compaction');
         listener({ type: 'agent_end' });
-        expect(service.isRunRunning(runId)).toBe(true);
+        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchRunStatus.Running);
         expect(completes).toHaveLength(0);
 
         listener({ type: 'agent_settled' });
         await vi.waitFor(() => expect(completes).toHaveLength(1));
-        expect(service.isRunRunning(runId)).toBe(false);
+        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchRunStatus.Succeeded);
         expect(errors).toHaveLength(0);
       } finally {
         adapter.stopAllSessions();

@@ -2,7 +2,6 @@ import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalDecisionSource,
   WorkbenchApprovalEffectStatus,
-  WorkbenchApprovalRiskLevel,
   WorkbenchArtifactKind,
   WorkbenchContractKind,
   WorkbenchRunEventType,
@@ -53,13 +52,6 @@ const decisionSourceTranslationKeys: Record<string, string> = {
   [WorkbenchApprovalDecisionSource.Recovery]: 'workbenchTaskDecisionSourceRecovery',
 };
 
-const riskTranslationKeys: Record<string, string> = {
-  [WorkbenchApprovalRiskLevel.ReadOnly]: 'workbenchTaskRiskReadOnly',
-  [WorkbenchApprovalRiskLevel.Reversible]: 'workbenchTaskRiskReversible',
-  [WorkbenchApprovalRiskLevel.Irreversible]: 'workbenchTaskRiskIrreversible',
-  [WorkbenchApprovalRiskLevel.Unknown]: 'workbenchTaskRiskUnknown',
-};
-
 const effectTranslationKeys: Record<string, string> = {
   [WorkbenchApprovalEffectStatus.NotStarted]: 'workbenchTaskEffectNotStarted',
   [WorkbenchApprovalEffectStatus.Executing]: 'workbenchTaskEffectExecuting',
@@ -104,6 +96,7 @@ const eventTranslationKeys: Record<string, string> = {
   [WorkbenchRunEventType.VerificationStarted]: 'workbenchTaskEventVerificationStarted',
   [WorkbenchRunEventType.VerificationFinished]: 'workbenchTaskEventVerificationFinished',
   [WorkbenchRunEventType.RunPaused]: 'workbenchTaskEventRunPaused',
+  [WorkbenchRunEventType.RunSucceeded]: 'workbenchTaskEventRunSucceeded',
   [WorkbenchRunEventType.RunCancelled]: 'workbenchTaskEventRunCancelled',
   [WorkbenchRunEventType.RunFailed]: 'workbenchTaskEventRunFailed',
   [WorkbenchRunEventType.RecoveryRequired]: 'workbenchTaskEventRecoveryRequired',
@@ -121,7 +114,6 @@ export const triggerLabel = (value: string): string => translated(triggerTransla
 export const decisionLabel = (value: string): string => translated(decisionTranslationKeys, value);
 export const decisionSourceLabel = (value: string): string =>
   translated(decisionSourceTranslationKeys, value);
-export const riskLabel = (value: string): string => translated(riskTranslationKeys, value);
 export const effectLabel = (value: string): string => translated(effectTranslationKeys, value);
 export const artifactKindLabel = (value: string): string =>
   translated(artifactKindTranslationKeys, value);

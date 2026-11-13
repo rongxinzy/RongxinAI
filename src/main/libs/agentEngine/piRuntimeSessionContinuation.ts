@@ -35,7 +35,6 @@ import {
   resolveConversationHistoryCharLimit,
   resolvePiSessionModel,
 } from './piRuntimeSettingsOverrides';
-import { createPiWorkbenchContract, PiGoalModePrompt } from './piRuntimeWorkbenchContract';
 import {
   getPiModules,
   haveSameStringList,
@@ -111,7 +110,6 @@ export async function continuePiRuntimeSession(
   const active = host.activeSessions.get(sessionId);
   const retryCancellation = active && waitForPiRetryCancellation(active.piSession);
   if (retryCancellation) await retryCancellation;
-  if (active?.completionPending) await active.completionPending;
   if (!active || active.aborted) {
     if (active?.aborted) {
       host.activeSessions.delete(sessionId);
@@ -152,9 +150,7 @@ export async function continuePiRuntimeSession(
     options.expertIds === undefined ? active.requestedExpertIds : explicitExpertIds;
   const requestedSessionMode =
     options.sessionMode ??
-    (active.workbenchContract.kind === WorkbenchContractKind.Chat
-      ? CoworkSessionMode.Chat
-      : CoworkSessionMode.Work);
+    (active.resourceState.chatMode ? CoworkSessionMode.Chat : CoworkSessionMode.Work);
   const nextGoalMode = options.goalMode ?? active.goalMode;
   const nextCodemode = options.codemode ?? active.codemodeEnabled;
   const nextMcpNativeBridge = options.mcpNativeBridge ?? active.mcpNativeBridge;
@@ -267,19 +263,18 @@ export async function continuePiRuntimeSession(
 
   const workbenchTaskService = host.getWorkbenchTaskService();
   if (workbenchTaskService && !active.resourceState.chatMode) {
-    const workbenchContract = createPiWorkbenchContract(requestedSessionMode, requestedSkillIds);
+    const workflowKind = WorkbenchContractKind.GenericWork;
     const workbench = workbenchTaskService.beginRun({
       sessionId,
       goal: prompt,
-      contract: workbenchContract,
-      trigger: options._workbenchRunId ? WorkbenchRunTrigger.Resume : WorkbenchRunTrigger.Message,
+      contract: { kind: workflowKind, requiresUserAcceptance: false },
+      trigger: WorkbenchRunTrigger.Message,
       preparedRunId: options._workbenchRunId,
     });
     active.workbenchRunId = workbench.run.id;
-    active.workbenchContract = workbenchContract;
     active.harnessModelProfile = {
       ...active.harnessModelProfile,
-      workflowKind: workbenchContract.kind,
+      workflowKind,
     };
     workbenchTaskService.measurement?.recordModelProfile(
       workbench.run.id,
@@ -364,7 +359,6 @@ export async function continuePiRuntimeSession(
   if (nextPlanMode) {
     nextPrompt = `${PiPlanModePrompt}\n\n${nextPrompt}`;
   }
-  if (active.goalMode) nextPrompt = `${PiGoalModePrompt}\n\n${nextPrompt}`;
   try {
     const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
       chatMode: active.resourceState.chatMode,
@@ -377,12 +371,10 @@ export async function continuePiRuntimeSession(
     });
     active.abortController.signal.throwIfAborted();
     nextPrompt = finalizePiPromptWithProjectMemory({
-      chatMode: active.resourceState.chatMode,
       sessionId,
       userPrompt: prompt,
       prompt: nextPrompt,
       projectMemoryContext,
-      workbenchTaskService: host.getWorkbenchTaskService(),
     });
     const continuedImagePrompt = preparePiPrompt(
       nextPrompt,
@@ -394,7 +386,6 @@ export async function continuePiRuntimeSession(
     host.recovery.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
     await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
     await active.eventProjection?.drain();
-    await active.completionPending;
   } catch (error) {
     host.memoryInjectionDedup.reset(sessionId);
     active.isRunning = false;
@@ -431,10 +422,9 @@ export async function patchPiRuntimeSession(
     const pi = await getPiModules();
     const resolvedModel = await resolvePiModel(pi, patch.model, active.modelRuntime, {
       conversationId: sessionId,
-      workload:
-        active.workbenchContract.kind === WorkbenchContractKind.Chat
-          ? ZhiyuanModelPoolWorkload.Chat
-          : ZhiyuanModelPoolWorkload.Work,
+      workload: active.resourceState.chatMode
+        ? ZhiyuanModelPoolWorkload.Chat
+        : ZhiyuanModelPoolWorkload.Work,
     });
     const model = resolvePiSessionModel(resolvedModel.model, active.resourceState.chatMode);
     await active.piSession.setModel(model);
@@ -454,7 +444,9 @@ export async function patchPiRuntimeSession(
         typeof resolvedModel.model.id === 'string' ? resolvedModel.model.id : patch.model.trim(),
       reasoningProfile:
         typeof reasoning === 'string' ? reasoning : reasoning === true ? 'enabled' : 'default',
-      workflowKind: active.workbenchContract.kind,
+      workflowKind: active.resourceState.chatMode
+        ? WorkbenchContractKind.Chat
+        : WorkbenchContractKind.GenericWork,
       harnessVersion: HarnessVersion,
     };
     const maxOutputTokens = active.resourceState.chatMode

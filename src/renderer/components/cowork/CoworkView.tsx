@@ -37,7 +37,6 @@ import {
   shouldClearQuickActionSelection,
 } from '../quick-actions/quickActionSelection';
 import { useUnmanagedWorkingDirectory } from './useUnmanagedWorkingDirectory';
-import { useTaskResumeContext } from './hooks/useTaskResumeContext';
 import { useCoworkSessionActions } from './hooks/useCoworkSessionActions';
 
 export interface CoworkViewProps {
@@ -75,7 +74,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const quickActionActivationRef = useRef<string | null>(null);
 
   const currentSession = useSelector(selectCurrentSession);
-  const taskResume = useTaskResumeContext(currentSession?.id);
   const displayedSessionId = useSelector(selectDisplayedSessionId);
   const workMode = useSelector(selectWorkMode);
   // Clear session when workMode changes and current session mode doesn't match.
@@ -149,7 +147,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     isStreaming,
     config,
     sessionPermissionMode,
-    taskResume,
     clearUnmanagedWorkingDirectory,
     onRequestAppSettings,
   });
@@ -341,10 +338,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           onRespondToInlineQuestion={onRespondToInlineQuestion}
           inlinePermission={inlinePermission}
           onRespondToInlinePermission={onRespondToInlinePermission}
-          resumeTaskId={taskResume.interruption?.taskId}
-          resumeDisabled={taskResume.isResuming} // 2026/09/17 lixiang  恢复中禁用继续执行，避免重复点击
-          onResumeTask={taskResume.select}
-          onCancelTaskResume={taskResume.cancel}
         />
       </div>
     );

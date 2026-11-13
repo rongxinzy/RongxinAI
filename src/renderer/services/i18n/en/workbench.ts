@@ -216,6 +216,7 @@ export const enWorkbench: Record<string, string> = {
   workbenchTaskEventVerificationStarted: 'Verification started',
   workbenchTaskEventVerificationFinished: 'Verification finished',
   workbenchTaskEventRunPaused: 'Run paused',
+  workbenchTaskEventRunSucceeded: 'Run succeeded',
   workbenchTaskEventRunCancelled: 'Run cancelled',
   workbenchTaskEventRunFailed: 'Run failed',
   workbenchTaskEventRecoveryRequired: 'Manual intervention required',

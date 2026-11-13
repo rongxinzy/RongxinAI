@@ -59,7 +59,7 @@ function walk(node, onMatch) {
 const violations = [];
 for (const relative of trackedRendererSources()) {
   const absolute = path.join(ROOT, relative);
-  if (ALLOWED.has(absolute)) continue;
+  if (ALLOWED.has(absolute) || !fs.existsSync(absolute)) continue;
   const text = fs.readFileSync(absolute, 'utf8');
   const { program } = parseSync(relative, text, { sourceType: 'module' });
   walk(program, node => {

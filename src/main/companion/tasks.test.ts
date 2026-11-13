@@ -200,16 +200,15 @@ test('a workbench retry remains the same task and projects the latest run after 
     preparedRunId: receipt!.runId,
   });
   f.tasks.failRun(first.sessionId, { message: 'first attempt failed' });
-  const next = f.tasks.prepareRun(first.id, WorkbenchRunTrigger.Retry);
+  const next = f.tasks.repository.createRun(first.id, WorkbenchRunTrigger.Retry);
+  f.tasks.repository.updateTaskStatus(first.id, WorkbenchTaskStatus.Running, next.id);
   f.tasks.beginRun({
     sessionId: first.sessionId,
     goal: first.goal,
     contract: first.contract,
-    preparedRunId: next.run.id,
+    preparedRunId: next.id,
   });
-  f.tasks.repository.updateRunStatus(next.run.id, WorkbenchRunStatus.Verifying);
-  f.tasks.repository.updateRunStatus(next.run.id, WorkbenchRunStatus.Succeeded);
-  f.tasks.repository.updateTaskStatus(first.id, WorkbenchTaskStatus.Completed, null);
+  f.tasks.completeObservedRun({ sessionId: first.sessionId, runId: next.id, finalAnswer: 'done' });
   const [projection] = f.service.recent(f.profile.petId);
   expect(projection.receipt.taskId).toBe(first.id);
   expect(projection.status).toBe(WorkbenchRunStatus.Succeeded);

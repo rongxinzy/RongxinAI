@@ -148,6 +148,7 @@ export const WorkbenchRunEventType = {
   ToolEffectFinished: 'tool_effect_finished',
   VerificationStarted: 'verification_started',
   VerificationFinished: 'verification_finished',
+  RunSucceeded: 'run_succeeded',
   RunPaused: 'run_paused',
   RunCancelled: 'run_cancelled',
   RunFailed: 'run_failed',
@@ -166,10 +167,6 @@ export const WorkbenchTaskIpc = {
   GetDetail: 'workbenchTask:getDetail',
   ListForSession: 'workbenchTask:listForSession',
   ExportAudit: 'workbenchTask:exportAudit',
-  Resume: 'workbenchTask:resume',
-  Retry: 'workbenchTask:retry',
-  Accept: 'workbenchTask:accept',
-  RespondToApproval: 'workbenchTask:respondToApproval',
   Changed: 'workbenchTask:changed',
 } as const;
 export type WorkbenchTaskIpc = (typeof WorkbenchTaskIpc)[keyof typeof WorkbenchTaskIpc];

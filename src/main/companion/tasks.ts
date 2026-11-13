@@ -12,6 +12,7 @@ import {
 } from '../../shared/companion/tasks';
 import type { CompanionProfile } from '../../shared/companion/types';
 import {
+  WorkbenchContractKind,
   WorkbenchRunStatus,
   WorkbenchRunTrigger,
   WorkbenchTaskStatus,
@@ -19,7 +20,6 @@ import {
 import { prepareCoworkSession, type CoworkSessionIpcDeps } from '../coworkIpc/sessionStart';
 import type { MagpieModelService } from '../magpie/modelService';
 import type { WorkbenchTaskService } from '../workbenchTask/taskService';
-import { createPiWorkbenchContract } from '../libs/agentEngine/piRuntimeWorkbenchContract';
 import { companionInstructions } from './personas';
 import { CompanionAttachments } from './attachments';
 import { initializeCompanionTaskAdmissions } from './taskOwnership';
@@ -126,11 +126,10 @@ export class CompanionTasks {
       if (existing) return this.existing(existing, fingerprint);
       const sessionId = randomUUID();
       const repository = this.options.tasks.repository;
-      const task = repository.createTask(
-        sessionId,
-        request.text,
-        createPiWorkbenchContract(CoworkSessionMode.Work, []),
-      );
+      const task = repository.createTask(sessionId, request.text, {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: false,
+      });
       const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
       repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Planned, run.id);
       repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Running, run.id);

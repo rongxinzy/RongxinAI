@@ -24,6 +24,7 @@ import type { PiRuntimeQueueController } from './piRuntimeQueueController';
 import type { PiRuntimeTurnEvents } from './piRuntimeTurnEvents';
 import type { PiRuntimeTurnRecovery } from './piRuntimeTurnRecovery';
 import type { ActivePiSession, InitializingPiSession } from './piRuntimeSessionState';
+import type { PiToolAuthorizationInput, PiToolAuthorizationResult } from './piToolPermissionGate';
 import type { PiContinueOptions, PiStartOptions } from './piRuntimeTypes';
 
 export interface PiRuntimeAdapterHost {
@@ -94,6 +95,7 @@ export interface PiRuntimeAdapterHost {
   isSessionRunning(sessionId: string): boolean;
   /** Stored-session fallback for queue gates when no live session exists. */
   isStoredSessionWorkMode(sessionId: string): boolean;
+  authorizeToolCall(input: PiToolAuthorizationInput): Promise<PiToolAuthorizationResult>;
 
   emit(event: string, ...args: unknown[]): void;
 }

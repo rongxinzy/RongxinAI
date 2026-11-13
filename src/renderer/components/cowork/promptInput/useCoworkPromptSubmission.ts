@@ -34,7 +34,6 @@ interface UseCoworkPromptSubmissionParams {
   canQueueWhileStreaming: boolean;
   isPatchingModel: boolean;
   hasUnavailableLlamaCppModel: boolean;
-  resumeTaskActive: boolean;
   showFolderSelector: boolean;
   workingDirectory: string;
   setShowFolderRequiredWarning: (value: boolean) => void;
@@ -67,7 +66,6 @@ export function useCoworkPromptSubmission({
   canQueueWhileStreaming,
   isPatchingModel,
   hasUnavailableLlamaCppModel,
-  resumeTaskActive,
   showFolderSelector,
   workingDirectory,
   setShowFolderRequiredWarning,
@@ -144,7 +142,7 @@ export function useCoworkPromptSubmission({
     }
 
     if (
-      (!trimmedValue && attachments.length === 0 && !resumeTaskActive) ||
+      (!trimmedValue && attachments.length === 0) ||
       (isStreaming && !canQueueWhileStreaming) ||
       disabled ||
       sessionContextPending ||
@@ -265,10 +263,7 @@ export function useCoworkPromptSubmission({
         : promptText
       : attachmentLines;
 
-    if (
-      !resumeTaskActive &&
-      !hasCoworkSubmissionContent({ prompt: finalPrompt, imageAttachments: imageAtts })
-    ) {
+    if (!hasCoworkSubmissionContent({ prompt: finalPrompt, imageAttachments: imageAtts })) {
       // 2026/09/28 之前这里是静默 return：按钮看起来可用，点下去却什么都不发生。
       const unusableImage = attachments.some(a => a.isImage || isImagePath(a.path));
       showAppToast({
@@ -342,7 +337,6 @@ export function useCoworkPromptSubmission({
     selectedExpertIds,
     goalMode,
     canQueueWhileStreaming,
-    resumeTaskActive,
     sessionId,
     setImageVisionHint,
     setShowFolderRequiredWarning,

@@ -13,11 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { type HarnessActivationEvent } from '../../../shared/harness';
-import {
-  WorkbenchApprovalMode,
-  WorkbenchArtifactCandidateSource,
-  WorkbenchArtifactVerificationStatus,
-} from '../../../shared/workbenchTask';
+import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
 import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
@@ -193,26 +189,6 @@ export function buildPiSessionCustomTools(
     );
     customTools.push(
       buildDeclareArtifactTool({
-        onDeclare: host.getWorkbenchTaskService()
-          ? async artifact => {
-              const runId = host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
-              if (!runId) throw new Error('No active workbench run is available.');
-              await host.getWorkbenchTaskService()?.registerArtifact({
-                sessionId,
-                runId,
-                workspaceRoot,
-                signal: abortSignal,
-                candidate: {
-                  path: artifact.filePath,
-                  source: WorkbenchArtifactCandidateSource.Declaration,
-                  verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
-                  role: artifact.role,
-                  ...(artifact.title ? { title: artifact.title } : {}),
-                  ...(artifact.kind ? { kind: artifact.kind } : {}),
-                },
-              });
-            }
-          : undefined,
         awaitPendingWrite: filePath =>
           host.activeSessions.get(sessionId)?.artifactRecorder?.awaitPendingWrite(filePath) ??
           Promise.resolve(false),

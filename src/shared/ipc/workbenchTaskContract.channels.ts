@@ -12,8 +12,4 @@ export const workbenchTaskContractChannels: IpcContractChannels<typeof workbench
   getDetail: WorkbenchTaskIpc.GetDetail,
   listForSession: WorkbenchTaskIpc.ListForSession,
   exportAudit: WorkbenchTaskIpc.ExportAudit,
-  resume: WorkbenchTaskIpc.Resume,
-  retry: WorkbenchTaskIpc.Retry,
-  accept: WorkbenchTaskIpc.Accept,
-  respondToApproval: WorkbenchTaskIpc.RespondToApproval,
 } as const;

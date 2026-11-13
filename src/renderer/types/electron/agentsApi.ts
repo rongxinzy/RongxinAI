@@ -15,12 +15,10 @@ import type { IpcContractApi } from '../../../shared/ipc/contract';
 import type { workbenchTaskContract } from '../../../shared/ipc/workbenchTaskContract';
 import type { todoContract } from '../../../shared/ipc/todoContract';
 import type {
-  WorkbenchApprovalResponseInput,
   WorkbenchTaskActionResult,
   WorkbenchTaskChangedEvent,
   WorkbenchTaskExportResult,
   WorkbenchTaskListResult,
-  WorkbenchTaskResumeInput,
 } from '../../../shared/workbenchTask';
 import type {
   TodoActionResult,
@@ -51,24 +49,12 @@ type WorkbenchTaskContractApi = IpcContractApi<typeof workbenchTaskContract>;
  */
 export type WorkbenchTaskApi = Omit<
   WorkbenchTaskContractApi,
-  | 'onChanged'
-  | 'getCurrent'
-  | 'getDetail'
-  | 'listForSession'
-  | 'exportAudit'
-  | 'resume'
-  | 'retry'
-  | 'accept'
-  | 'respondToApproval'
+  'onChanged' | 'getCurrent' | 'getDetail' | 'listForSession' | 'exportAudit'
 > & {
   getCurrent: (sessionId: string) => Promise<WorkbenchTaskActionResult>;
   getDetail: (taskId: string) => Promise<WorkbenchTaskActionResult>;
   listForSession: (sessionId: string) => Promise<WorkbenchTaskListResult>;
   exportAudit: (taskId: string) => Promise<WorkbenchTaskExportResult>;
-  resume: (input: WorkbenchTaskResumeInput) => Promise<WorkbenchTaskActionResult>;
-  retry: (taskId: string) => Promise<WorkbenchTaskActionResult>;
-  accept: (taskId: string) => Promise<WorkbenchTaskActionResult>;
-  respondToApproval: (input: WorkbenchApprovalResponseInput) => Promise<WorkbenchTaskActionResult>;
   onChanged: (callback: (event: WorkbenchTaskChangedEvent) => void) => () => void;
 };
 

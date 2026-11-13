@@ -18,7 +18,11 @@ import {
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
-import { WorkbenchApprovalMode, WorkbenchRunStatus } from '../../../shared/workbenchTask';
+import {
+  WorkbenchApprovalDecision,
+  WorkbenchApprovalMode,
+  WorkbenchRunStatus,
+} from '../../../shared/workbenchTask';
 import { PiExtensionEventType } from './piExtensionTypes';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
@@ -37,7 +41,7 @@ describe('PiRuntimeAdapter', () => {
       ).not.toThrow();
     });
 
-    it('aborts the active Pi turn when a workbench approval is denied', async () => {
+    it('aborts the active Pi turn when a Pi permission check is denied and logs passively', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
@@ -55,15 +59,27 @@ describe('PiRuntimeAdapter', () => {
         await adapter.startSession('denied-workbench', 'Create and validate a release report', {
           sessionMode: 'work',
           workspaceRoot: createTemporaryWorkspace(),
+          approvalMode: WorkbenchApprovalMode.Ask,
         });
-        const detail = service.getCurrent('denied-workbench');
-        const authorization = service.authorizeToolCall({
-          sessionId: 'denied-workbench',
-          runId: detail!.task.activeRunId!,
+        const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+          extensionFactories?: Array<
+            (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
+          >;
+        };
+        const toolCallHandlers: Array<(event: unknown) => Promise<unknown>> = [];
+        for (const factory of loaderOptions.extensionFactories ?? []) {
+          factory({
+            on: (event, handler) => {
+              if (event === PiExtensionEventType.ToolCall) {
+                toolCallHandlers.push(handler as (event: unknown) => Promise<unknown>);
+              }
+            },
+          });
+        }
+        const authorization = toolCallHandlers.at(-1)!({
           toolCallId: 'write-call',
           toolName: 'write',
-          toolInput: { path: 'release.md', content: 'draft' },
-          approvalMode: WorkbenchApprovalMode.Ask,
+          input: { path: 'release.md', content: 'draft' },
         });
         await vi.waitFor(() => expect(requests).toHaveLength(1));
 
@@ -73,20 +89,20 @@ describe('PiRuntimeAdapter', () => {
         });
 
         await expect(authorization).resolves.toEqual({
-          allow: false,
+          block: true,
           reason: 'Do not write this file.',
         });
         expect(mockSession.abortBash).toHaveBeenCalledOnce();
         expect(mockSession.abort).toHaveBeenCalledOnce();
         expect(adapter.isSessionRunning('denied-workbench')).toBe(false);
-        expect(service.getCurrent('denied-workbench')?.runs[0].status).toBe(
-          WorkbenchRunStatus.Paused,
-        );
+        const current = service.getCurrent('denied-workbench');
+        expect(current?.runs[0].status).toBe(WorkbenchRunStatus.Cancelled);
+        expect(current?.approvals[0].decision).toBe(WorkbenchApprovalDecision.Denied);
         expect(interruptions).toEqual([
           expect.objectContaining({
             cause: CoworkInterruptionCause.ApprovalDenied,
-            taskId: detail!.task.id,
-            recoverable: true,
+            taskId: null,
+            recoverable: false,
           }),
         ]);
       } finally {
@@ -168,7 +184,9 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('guards Windows Bash calls against cmd and PowerShell syntax', async () => {
-      await adapter.startSession('bash-guard', 'Inspect the workspace');
+      await adapter.startSession('bash-guard', 'Inspect the workspace', {
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+      });
 
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         extensionFactories?: Array<

@@ -77,12 +77,7 @@ test('reserves conversation viewport above the absolutely positioned composer', 
   expect(userBubbleSource).toContain(
     'className="mx-auto flex w-full max-w-4xl min-w-[320px] flex-col items-end"',
   );
-  // 验收卡改由末轮 TurnBlock.beforeCopySlot 注入，不再挂在对话流底部
-  expect(source).toContain('beforeCopySlot={');
-  expect(source).toContain('<WorkbenchTaskAcceptanceCard sessionId={sessionId} />');
-  expect(source).not.toMatch(
-    /\{sessionId && \(\s*<div className="px-3 pt-3">\s*<WorkbenchTaskAcceptanceCard/,
-  );
+  expect(source).not.toContain('<WorkbenchTaskAcceptanceCard');
   expect(source).toMatch(/<ConversationContent\r?\n\s+className="pt-3"/);
   expect(promptInput).toBeGreaterThan(composerSource.indexOf('ref={overlayRef}'));
 });

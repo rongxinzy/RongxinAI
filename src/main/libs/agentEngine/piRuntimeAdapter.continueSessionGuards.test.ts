@@ -32,20 +32,24 @@ describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
 
   describe('continueSession', () => {
-    it('authorizes follow-up tool calls against the current workbench run', async () => {
+    it('records follow-up tool call observations against the current workbench run', async () => {
       const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
         run: { id: `run-${beginRun.mock.calls.length}` },
       }));
-      const authorizeToolCall = vi.fn().mockResolvedValue({ allow: true });
+      const recordToolCallObserved = vi.fn();
       adapter.setWorkbenchTaskService({
         beginRun,
-        authorizeToolCall,
+        recordToolCallObserved,
+        recordToolApprovalDecision: vi.fn(),
+        recordToolResult: vi.fn(),
         updateRunContext: vi.fn(),
         on: vi.fn(),
         off: vi.fn(),
       } as unknown as WorkbenchTaskService);
 
-      await adapter.startSession('test', 'First');
+      await adapter.startSession('test', 'First', {
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+      });
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         extensionFactories?: Array<
           (api: {
@@ -60,18 +64,21 @@ describe('PiRuntimeAdapter', () => {
           }) => void
         >;
       };
-      let handleToolCall:
-        | ((toolCall: {
-            toolCallId: string;
-            toolName: string;
-            input: Record<string, unknown>;
-          }) => Promise<unknown>)
-        | undefined;
-      loaderOptions.extensionFactories?.[0]({
-        on: (_event, handler) => {
-          handleToolCall = handler;
-        },
-      });
+      const toolCallHandlers: Array<
+        (toolCall: {
+          toolCallId: string;
+          toolName: string;
+          input: Record<string, unknown>;
+        }) => Promise<unknown>
+      > = [];
+      for (const factory of loaderOptions.extensionFactories ?? []) {
+        factory({
+          on: (event, handler) => {
+            if (event === PiExtensionEventType.ToolCall) toolCallHandlers.push(handler);
+          },
+        });
+      }
+      const handleToolCall = toolCallHandlers.at(-1);
 
       await handleToolCall?.({
         toolCallId: 'first-call',
@@ -85,102 +92,30 @@ describe('PiRuntimeAdapter', () => {
         input: { path: 'second.txt' },
       });
 
-      expect(authorizeToolCall).toHaveBeenNthCalledWith(
+      expect(recordToolCallObserved).toHaveBeenNthCalledWith(
         1,
         expect.objectContaining({ runId: 'run-1', toolCallId: 'first-call' }),
       );
-      expect(authorizeToolCall).toHaveBeenNthCalledWith(
+      expect(recordToolCallObserved).toHaveBeenNthCalledWith(
         2,
         expect.objectContaining({ runId: 'run-2', toolCallId: 'second-call' }),
       );
     });
 
-    it('ends the turn with a visible error when the workbench run can no longer execute tools', async () => {
-      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
-        run: { id: `run-${beginRun.mock.calls.length}` },
-      }));
-      const message = 'The workbench run can no longer continue.';
-      const authorizeToolCall = vi
-        .fn()
-        .mockResolvedValue({ allow: false, reason: message, terminateRun: true });
-      adapter.setWorkbenchTaskService({
-        beginRun,
-        authorizeToolCall,
-        updateRunContext: vi.fn(),
-        on: vi.fn(),
-        off: vi.fn(),
-      } as unknown as WorkbenchTaskService);
-      const onError = vi.fn();
-      adapter.on('error', onError);
-
-      await adapter.startSession('test', 'First');
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: {
-            on: (
-              event: 'tool_call',
-              handler: (toolCall: {
-                toolCallId: string;
-                toolName: string;
-                input: Record<string, unknown>;
-              }) => Promise<unknown>,
-            ) => void;
-          }) => void
-        >;
-      };
-      let handleToolCall:
-        | ((toolCall: {
-            toolCallId: string;
-            toolName: string;
-            input: Record<string, unknown>;
-          }) => Promise<unknown>)
-        | undefined;
-      loaderOptions.extensionFactories?.[0]({
-        on: (_event, handler) => {
-          handleToolCall = handler;
-        },
-      });
-
-      const abortsBeforeCall = mockSession.abort.mock.calls.length;
-      const result = await handleToolCall?.({
-        toolCallId: 'terminated-call',
-        toolName: 'bash',
-        input: { command: 'python move_files.py' },
-      });
-
-      expect(result).toMatchObject({ block: true });
-      // The model must not be asked again, and the user must see why.
-      expect(mockSession.abort.mock.calls.length).toBeGreaterThan(abortsBeforeCall);
-      expect(onError).toHaveBeenCalledWith(
-        'test',
-        expect.objectContaining({ message: expect.stringContaining('no longer continue') }),
-      );
-    });
-
-    it('expresses Goal intent without a loop protocol', async () => {
+    it('passes user prompt verbatim without injecting a harness goal prompt', async () => {
       await adapter.startSession('goal-work', 'Finish the requested task', {
         sessionMode: 'work',
         goalMode: true,
       });
 
-      expect(mockSession.prompt).toHaveBeenCalledWith(
-        expect.stringContaining('Continue working toward the requested goal'),
-      );
-    });
+      expect(mockSession.prompt).toHaveBeenCalledWith('Finish the requested task');
 
-    it('preserves Goal intent across native follow-ups', async () => {
-      await adapter.startSession('goal-restart', 'First goal', {
-        sessionMode: 'work',
-        goalMode: true,
-      });
-      await adapter.continueSession('goal-restart', 'Second goal', {
+      await adapter.continueSession('goal-work', 'Second goal', {
         sessionMode: 'work',
         goalMode: true,
       });
 
-      expect(mockSession.prompt).toHaveBeenLastCalledWith(
-        expect.stringContaining('Continue working toward the requested goal'),
-      );
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('Second goal');
     });
 
     it('runs a plan-mode turn read-only and registers the plan tool', async () => {
@@ -247,6 +182,7 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('plan-guard', 'Plan the migration', {
         sessionMode: 'work',
         planMode: true,
+        approvalMode: WorkbenchApprovalMode.AllowAll,
       });
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         extensionFactories?: Array<
@@ -290,7 +226,10 @@ describe('PiRuntimeAdapter', () => {
       });
       expect(allowedRead).toBeUndefined();
 
-      await adapter.continueSession('plan-guard', 'Now implement it', { sessionMode: 'work' });
+      await adapter.continueSession('plan-guard', 'Now implement it', {
+        sessionMode: 'work',
+        approvalMode: WorkbenchApprovalMode.AllowAll,
+      });
       const allowedEdit = await invokeToolCall({
         toolCallId: 'w2',
         toolName: 'edit',
@@ -347,24 +286,41 @@ describe('PiRuntimeAdapter', () => {
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const workspaceRoot = createTemporaryWorkspace();
+      const requests: string[] = [];
+      adapter.on('permissionRequest', (_sessionId, request) => {
+        requests.push(request.requestId);
+      });
 
       try {
         await adapter.startSession('denied-shortcut', 'Create a 10-page presentation', {
           skillIds: ['presentation-studio'],
           sessionMode: 'work',
           workspaceRoot,
-        });
-        const first = service.getCurrent('denied-shortcut')!;
-        const authorization = service.authorizeToolCall({
-          sessionId: 'denied-shortcut',
-          runId: first.task.activeRunId!,
-          toolCallId: 'write-call',
-          toolName: 'write',
-          toolInput: { path: 'slides.md', content: 'draft' },
           approvalMode: WorkbenchApprovalMode.Ask,
         });
-        const approval = service.getDetail(first.task.id)?.approvals[0];
-        service.respondToApproval({ approvalId: approval!.id, approved: false });
+        const first = service.getCurrent('denied-shortcut')!;
+        const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+          extensionFactories?: Array<
+            (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
+          >;
+        };
+        const toolCallHandlers: Array<(event: unknown) => Promise<unknown>> = [];
+        for (const factory of loaderOptions.extensionFactories ?? []) {
+          factory({
+            on: (event, handler) => {
+              if (event === PiExtensionEventType.ToolCall) {
+                toolCallHandlers.push(handler as (event: unknown) => Promise<unknown>);
+              }
+            },
+          });
+        }
+        const authorization = toolCallHandlers.at(-1)!({
+          toolCallId: 'write-call',
+          toolName: 'write',
+          input: { path: 'slides.md', content: 'draft' },
+        });
+        await vi.waitFor(() => expect(requests).toHaveLength(1));
+        adapter.respondToPermission(requests[0], { behavior: 'deny' });
         await authorization;
 
         await adapter.continueSession('denied-shortcut', 'Hello', {
@@ -377,8 +333,8 @@ describe('PiRuntimeAdapter', () => {
         expect(current.task.id).not.toBe(first.task.id);
         expect(current.task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
         expect(service.getDetail(first.task.id)?.task.status).toBe(WorkbenchTaskStatus.Cancelled);
-        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
-        const greetingOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+        const greetingOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
         expect(greetingOptions.customTools?.map(tool => tool.name)).not.toContain(

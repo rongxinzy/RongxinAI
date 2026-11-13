@@ -19,7 +19,11 @@ import {
   type HarnessModelProfileInput,
 } from '../../../shared/harness';
 import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
-import { WorkbenchApprovalMode, WorkbenchRunTrigger } from '../../../shared/workbenchTask';
+import {
+  WorkbenchApprovalMode,
+  WorkbenchContractKind,
+  WorkbenchRunTrigger,
+} from '../../../shared/workbenchTask';
 import { isLocalProviderName, ModelCapabilityStatus } from '../../../shared/providers';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
@@ -45,7 +49,6 @@ import { collectImagePathReferences } from './piImageInputFallback';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
 import { createPiSettingsManager, resolvePiSessionModel } from './piRuntimeSettingsOverrides';
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
-import { createPiWorkbenchContract, PiGoalModePrompt } from './piRuntimeWorkbenchContract';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
 import { openPersistentPiSessionManager } from './piSessionStore';
 import { buildPiSessionCustomTools } from './piRuntimeSessionCustomTools';
@@ -213,17 +216,14 @@ export async function startPiRuntimeSession(
       resourceState.expertSkillDirs,
     );
 
-    const workbenchContract = createPiWorkbenchContract(
-      options.sessionMode,
-      resourceState.skillIds,
-    );
+    const workflowKind = chatMode ? WorkbenchContractKind.Chat : WorkbenchContractKind.GenericWork;
     const workbenchTaskService = host.getWorkbenchTaskService();
     if (workbenchTaskService && !chatMode) {
       const workbench = workbenchTaskService.beginRun({
         sessionId,
         goal: prompt,
-        contract: workbenchContract,
-        trigger: options._workbenchRunId ? WorkbenchRunTrigger.Resume : WorkbenchRunTrigger.Message,
+        contract: { kind: workflowKind, requiresUserAcceptance: false },
+        trigger: WorkbenchRunTrigger.Message,
         preparedRunId: options._workbenchRunId,
       });
       workbenchRunId = workbench.run.id;
@@ -265,7 +265,7 @@ export async function startPiRuntimeSession(
       model: modelId,
       reasoningProfile:
         typeof reasoning === 'string' ? reasoning : reasoning === true ? 'enabled' : 'default',
-      workflowKind: workbenchContract.kind,
+      workflowKind,
       harnessVersion: HarnessVersion,
     };
     const workbenchForContext = host.getWorkbenchTaskService();
@@ -467,7 +467,6 @@ export async function startPiRuntimeSession(
       retryStreamReusePending: false,
       retryPriorAnswer: '',
       workbenchRunId,
-      workbenchContract,
       workspaceRoot,
       artifactRecorder: createArtifactRecorderForSession(
         host,
@@ -536,7 +535,6 @@ export async function startPiRuntimeSession(
     // session manager above reopened one, Pi already holds the prior turns as
     // structured messages and the override is just the new user prompt.
     let initialPrompt = options._piPromptOverride || prompt;
-    if (options.goalMode === true) initialPrompt = `${PiGoalModePrompt}\n\n${initialPrompt}`;
     if (options.planMode === true) {
       initialPrompt = `${PiPlanModePrompt}\n\n${initialPrompt}`;
     }
@@ -554,12 +552,10 @@ export async function startPiRuntimeSession(
     });
     if (host.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
     initialPrompt = finalizePiPromptWithProjectMemory({
-      chatMode: resourceState.chatMode,
       sessionId,
       userPrompt: prompt,
       prompt: initialPrompt,
       projectMemoryContext,
-      workbenchTaskService: host.getWorkbenchTaskService(),
     });
 
     // The user may stop the session while the execution-mode question is
@@ -579,7 +575,6 @@ export async function startPiRuntimeSession(
     host.recovery.recordImagePrompt(sessionId, active, initialPrompt, initialImagePrompt);
     await sendPiPrompt(session, initialImagePrompt, undefined);
     await active.eventProjection?.drain();
-    await active.completionPending;
   } catch (error) {
     // A stopped turn can immediately restart from the first queued follow-up.
     // Its eventual abort rejection must not delete that replacement session.

@@ -1,5 +1,4 @@
 import type { TextWorkerInput } from './textWorkerOperations';
-import type { collectWorkbenchArtifacts } from './artifactCollector';
 import { ArtifactWorkerTask } from './artifactWorkerConstants';
 import type { CompanionImageSource } from '../../shared/companion/images';
 
@@ -14,9 +13,5 @@ export type ArtifactWorkerInput =
   | {
       kind: typeof ArtifactWorkerTask.PrepareCompanionImages;
       input: { sources: CompanionImageSource[] };
-    }
-  | {
-      kind: typeof ArtifactWorkerTask.Collect;
-      input: Parameters<typeof collectWorkbenchArtifacts>[0];
     }
   | { kind: typeof ArtifactWorkerTask.InspectWorkspaceContent; input: { bytes: ArrayBuffer } };

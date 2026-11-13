@@ -7,13 +7,8 @@ import {
 import { CoworkRunPolicy } from '../../shared/cowork/runState';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
-import type { collectWorkbenchArtifacts } from './artifactCollector';
 import { ArtifactWorkerLimit, ArtifactWorkerTask } from './artifactWorkerConstants';
 import type { ArtifactWorkerInput, WorkspaceContentInspection } from './artifactWorkerTypes';
-import {
-  isValidArtifactWorkerResult,
-  resolveDeclaredDeliverablePaths,
-} from './artifactWorkerResult';
 import { COMPANION_MAX_ATTACHMENTS } from '../../shared/companion/attachments';
 import {
   CompanionImageLimit,
@@ -22,11 +17,8 @@ import {
   type CompanionPreparedImage,
 } from '../../shared/companion/images';
 
-type Input = Parameters<typeof collectWorkbenchArtifacts>[0];
-type Artifacts = ReturnType<typeof collectWorkbenchArtifacts>;
-type Result = Artifacts | WorkspaceContentInspection | TextWorkerOutput | CompanionPreparedImage[];
+type Result = WorkspaceContentInspection | TextWorkerOutput | CompanionPreparedImage[];
 type Response = {
-  artifacts?: Artifacts;
   text?: TextWorkerOutput;
   content?: WorkspaceContentInspection;
   images?: CompanionPreparedImage[];
@@ -35,7 +27,6 @@ type Response = {
 };
 type Job = {
   task: ArtifactWorkerInput;
-  declaredDeliverablePaths: readonly string[];
   queuedAt: number;
   resolve: (result: Result) => void;
   reject: (error: Error) => void;
@@ -49,27 +40,6 @@ export class WorkbenchArtifactWorkerPool {
   private readonly queue: Job[] = [];
 
   constructor(private readonly workerPath = path.join(__dirname, 'artifactWorker.js')) {}
-
-  collect(input: Input, signal?: AbortSignal): Promise<Artifacts> {
-    if (signal?.aborted) return Promise.reject(new Error('Artifact collection cancelled.'));
-    const candidates = input.artifactCandidates?.length ?? 0;
-    if (candidates > ArtifactWorkerLimit.Candidates)
-      return Promise.reject(new Error('Artifact collection input limit exceeded.'));
-    try {
-      input = boundWorkerInput(input, {
-        nodes: 4096,
-        depth: 16,
-        characters: ArtifactWorkerLimit.InputBytes,
-      }) as Input;
-    } catch (error) {
-      return Promise.reject(error);
-    }
-    return resolveDeclaredDeliverablePaths(input)
-      .then(declaredPaths =>
-        this.enqueue({ kind: ArtifactWorkerTask.Collect, input }, signal, declaredPaths),
-      )
-      .then(result => result as Artifacts);
-  }
 
   transform(input: TextWorkerInput, signal?: AbortSignal): Promise<TextWorkerOutput> {
     try {
@@ -120,31 +90,26 @@ export class WorkbenchArtifactWorkerPool {
     }
   }
 
-  private enqueue(
-    task: ArtifactWorkerInput,
-    signal?: AbortSignal,
-    declaredDeliverablePaths: readonly string[] = [],
-  ): Promise<Result> {
-    if (signal?.aborted) return Promise.reject(new Error('Artifact collection cancelled.'));
+  private enqueue(task: ArtifactWorkerInput, signal?: AbortSignal): Promise<Result> {
+    if (signal?.aborted) return Promise.reject(new Error('Artifact worker task cancelled.'));
     if (this.queue.length >= ArtifactWorkerLimit.Queue) {
-      return Promise.reject(new Error('Artifact collection queue is full.'));
+      return Promise.reject(new Error('Artifact worker queue is full.'));
     }
     return new Promise((resolve, reject) => {
       const job: Job = {
         task,
-        declaredDeliverablePaths,
         signal,
         resolve,
         reject,
         queuedAt: performance.now(),
         onAbort: () => {
           const slot = this.slots.find(candidate => candidate.job === job);
-          if (slot) this.finish(slot, new Error('Artifact collection cancelled.'), true);
+          if (slot) this.finish(slot, new Error('Artifact worker task cancelled.'), true);
           else {
             const index = this.queue.indexOf(job);
             if (index >= 0) this.queue.splice(index, 1);
             signal?.removeEventListener('abort', job.onAbort);
-            reject(new Error('Artifact collection cancelled.'));
+            reject(new Error('Artifact worker task cancelled.'));
           }
         },
       };
@@ -216,7 +181,7 @@ export class WorkbenchArtifactWorkerPool {
               // image batch instead of retaining a photo-sized heap while idle.
               this.finish(created, undefined, true, images);
             }
-          } else if (job.task.kind === ArtifactWorkerTask.InspectWorkspaceContent) {
+          } else {
             const content = response.content;
             if (
               response.error ||
@@ -233,21 +198,6 @@ export class WorkbenchArtifactWorkerPool {
             } else {
               this.finish(created, undefined, false, content);
             }
-          } else if (
-            response.error ||
-            !Array.isArray(response.artifacts) ||
-            response.artifacts.some(
-              artifact =>
-                !isValidArtifactWorkerResult(
-                  artifact,
-                  job.task.input as Input,
-                  job.declaredDeliverablePaths,
-                ),
-            )
-          ) {
-            this.finish(created, new Error(response.error || 'Invalid artifact worker result.'));
-          } else {
-            this.finish(created, undefined, false, response.artifacts);
           }
         });
         worker.on('error', error => this.finish(created, error, true));
@@ -301,10 +251,6 @@ export const prepareCompanionImagesAsync = (
   sources: CompanionImageSource[],
   signal?: AbortSignal,
 ): Promise<CompanionPreparedImage[]> => pool.prepareImages(sources, signal);
-export const collectWorkbenchArtifactsAsync = (
-  input: Input,
-  signal?: AbortSignal,
-): Promise<Artifacts> => pool.collect(input, signal);
 
 export const inspectWorkspaceContentAsync = (
   content: Uint8Array,

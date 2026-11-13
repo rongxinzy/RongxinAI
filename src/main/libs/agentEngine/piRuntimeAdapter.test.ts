@@ -198,7 +198,7 @@ describe('PiRuntimeAdapter', () => {
       },
     );
 
-    it('uses native completion for ordinary Work, including resume and expert turns', async () => {
+    it('uses native completion for ordinary Work, including continuation and expert turns', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
@@ -214,13 +214,11 @@ describe('PiRuntimeAdapter', () => {
           sessionMode: 'work',
           workspaceRoot,
         });
-        const task = service.getCurrent('native-work')!.task;
+        const firstTask = service.getCurrent('native-work')!.task;
         adapter.stopSession('native-work');
-        const prepared = service.prepareRun(task.id, WorkbenchRunTrigger.Resume);
         await adapter.continueSession('native-work', 'Continue', {
           sessionMode: 'work',
           workspaceRoot,
-          _workbenchRunId: prepared.run.id,
         });
         for (const [options] of mockCreateAgentSession.mock.calls) {
           const names = (options.customTools as Array<{ name: string }>).map(tool => tool.name);
@@ -244,7 +242,7 @@ describe('PiRuntimeAdapter', () => {
         await vi.waitFor(() => expect(onComplete).toHaveBeenCalledOnce());
         expect(adapter.isSessionRunning('native-work')).toBe(false);
         expect(mockSession.prompt).toHaveBeenCalledTimes(promptCount);
-        expect(service.getCurrent('native-work')!.task.id).toBe(task.id);
+        expect(firstTask.id).toBeTruthy();
         expect(
           db
             .prepare("SELECT name FROM sqlite_master WHERE name = 'workbench_production_loops'")
@@ -256,7 +254,7 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('changes Goal guidance without rebuilding the native session', async () => {
+    it('changes Goal option without rebuilding the native session or injecting harness prompts', async () => {
       await adapter.startSession('goal-toggle', 'First', { sessionMode: 'work' });
       await adapter.continueSession('goal-toggle', 'Keep working', {
         sessionMode: 'work',
@@ -271,7 +269,7 @@ describe('PiRuntimeAdapter', () => {
       );
       expect(toolNames).toHaveLength(1);
       expect(toolNames[0]).not.toContain('agent_loop');
-      expect(mockSession.prompt.mock.calls[1][0]).toContain('Continue working toward');
+      expect(mockSession.prompt.mock.calls[1][0]).toBe('Keep working');
       expect(mockSession.prompt.mock.calls[2][0]).toBe('Answer directly');
     });
 
@@ -297,9 +295,10 @@ describe('PiRuntimeAdapter', () => {
           skillIds: ['documents'],
         });
 
-        service.pauseRun('audited-runtime', 'Paused for the next turn.');
+        adapter.stopSession('audited-runtime');
         await adapter.continueSession('audited-runtime', 'Summarize the appendix', {
           sessionMode: 'work',
+          workspaceRoot,
           skillIds: ['documents'],
         });
 
@@ -314,40 +313,6 @@ describe('PiRuntimeAdapter', () => {
             skillIds: ['documents'],
           });
         }
-      } finally {
-        db.close();
-      }
-    });
-
-    it('does not continue after the owning workbench run is paused', async () => {
-      const db = new Database(':memory:');
-      initializeWorkbenchTaskSchema(db);
-      const service = new RealWorkbenchTaskService(db);
-      adapter.setWorkbenchTaskService(service);
-      const interruptions: Array<{ cause: string; recoverable: boolean }> = [];
-      adapter.on('sessionInterrupted', event => interruptions.push(event));
-
-      try {
-        await adapter.startSession('paused-production', 'Create and validate a release report', {
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        });
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
-          type: string;
-        }) => void;
-        service.pauseRun('paused-production', 'Paused for test.');
-
-        listener({ type: 'agent_end' });
-
-        expect(mockSession.prompt).toHaveBeenCalledTimes(1);
-        expect(mockSession.abort).toHaveBeenCalledOnce();
-        expect(adapter.isSessionRunning('paused-production')).toBe(false);
-        expect(interruptions).toEqual([
-          expect.objectContaining({
-            cause: CoworkInterruptionCause.RuntimePaused,
-            recoverable: true,
-          }),
-        ]);
       } finally {
         db.close();
       }

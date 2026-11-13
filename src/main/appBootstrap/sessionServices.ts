@@ -19,23 +19,23 @@ import {
 } from '../libs/anysearchGatewayCredentials';
 import { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
 import { WorkbenchTaskService } from '../workbenchTask/taskService';
-import { promoteVerifiedWorkbenchRun } from '../memory/taskMemoryPromotion';
+import { promoteCompletedWorkbenchRun } from '../memory/taskMemoryPromotion';
 
 export const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!agentRuntime.workbenchTaskService) {
     agentRuntime.workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
       listLedgerArtifacts: scopeId => getArtifactLedger().list(scopeId),
-      onVerifiedRun: event => {
+      onCompletedRun: event => {
         const complete = getPiRuntimeAdapter().getSessionMemoryCompletion(event.task.sessionId);
         if (!complete) {
           console.warn(
-            '[Memory] Skipped verified run extraction because the session model is unavailable.',
+            '[Memory] Skipped completed run extraction because the session model is unavailable.',
           );
           return;
         }
-        void promoteVerifiedWorkbenchRun(getProjectMemoryService(), event, complete).catch(
+        void promoteCompletedWorkbenchRun(getProjectMemoryService(), event, complete).catch(
           error => {
-            console.warn('[Memory] Failed to extract verified run memory:', error);
+            console.warn('[Memory] Failed to extract completed run memory:', error);
           },
         );
       },

@@ -12,12 +12,11 @@ import {
 import { cn } from '@shared/lib/utils';
 import { ChevronRight, Download } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
-import { type ReactNode, useState } from 'react';
+import { useState } from 'react';
 import { normalizeError } from '../../../services/errorNormalization';
 
 import {
   WorkbenchTaskStatus,
-  type WorkbenchApprovalResponseInput,
   type WorkbenchTask,
   type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
@@ -30,21 +29,15 @@ import { contractLabel, formatTimestamp, statusBadgeVariant, statusLabel } from 
 interface WorkbenchTaskAuditViewProps {
   detail: WorkbenchTaskDetail;
   tasks: WorkbenchTask[];
-  busy: boolean;
   loading: boolean;
-  toolbarActions?: ReactNode;
   onSelectTask: (taskId: string) => void;
-  onRespondToApproval: (input: WorkbenchApprovalResponseInput) => void;
 }
 
 export function WorkbenchTaskAuditView({
   detail,
   tasks,
-  busy,
   loading,
-  toolbarActions,
   onSelectTask,
-  onRespondToApproval,
 }: WorkbenchTaskAuditViewProps) {
   const task = detail.task;
   const [exporting, setExporting] = useState(false);
@@ -81,7 +74,6 @@ export function WorkbenchTaskAuditView({
               <Badge variant={statusBadgeVariant(task.status)}>{statusLabel(task.status)}</Badge>
             </span>
             <div className="flex shrink-0 items-center gap-1">
-              {toolbarActions}
               <Button
                 type="button"
                 variant="outline"
@@ -127,7 +119,7 @@ export function WorkbenchTaskAuditView({
           <TaskDetailsDisclosure task={task} />
         </header>
 
-        <WorkbenchTimeline detail={detail} busy={busy} onRespondToApproval={onRespondToApproval} />
+        <WorkbenchTimeline detail={detail} />
       </div>
     </ScrollArea>
   );

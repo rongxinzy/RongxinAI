@@ -64,14 +64,6 @@ import { isAllowedLocalfilePath } from '../localfilePathValidation';
 import { ActivityService } from '../activity/activityService';
 import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 import { registerWorkbenchTaskIpcHandlers } from '../workbenchTask/ipc';
-import { normalizeSingleExpertIds } from '../../shared/cowork/sessionExperts';
-import { observePreparedRun } from '../workbenchTask/preparedRunFailure';
-import { CoworkPermissionMode } from '../../shared/cowork/constants';
-import {
-  WorkbenchApprovalMode,
-  type WorkbenchRun,
-  type WorkbenchTask,
-} from '../../shared/workbenchTask';
 import { registerTodoIpcHandlers } from '../todo/ipc';
 import { TodoReminderScheduler } from '../todo/reminderScheduler';
 import { registerCodingAgentIpcHandlers } from '../ipcHandlers/codingAgent';
@@ -296,50 +288,8 @@ export const initApp = async (): Promise<void> => {
     if (recoveredScheduledRuns > 0) {
       console.warn(`[Scheduler] marked ${recoveredScheduledRuns} interrupted Run(s) as failed`);
     }
-    const recoveredWorkbenchTasks = getWorkbenchTaskService().recoverInterruptedState();
-    if (recoveredWorkbenchTasks > 0) {
-      console.log(
-        `[WorkbenchTask] marked ${recoveredWorkbenchTasks} interrupted task(s) for explicit recovery`,
-      );
-    }
     registerWorkbenchTaskIpcHandlers({
       getService: getWorkbenchTaskService,
-      startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun, resumeInput) => {
-        const session = getCoworkStore().getSession(task.sessionId);
-        if (!session) throw new Error('Cowork session not found.');
-        const config = getCoworkStore().getConfig();
-        const amendment = resumeInput?.amendment?.trim() ?? '';
-        const prompt =
-          amendment || 'Continue the current task from its persisted state and verify the result.';
-        // 2026/09/17 lixiang  resume 不等待整段跑完（对齐 Continue IPC），否则底部无法切到停止
-        observePreparedRun(
-          () =>
-            getPiRuntimeAdapter().continueSession(session.id, prompt, {
-              systemPrompt: session.systemPrompt,
-              skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
-              sessionMode: session.mode,
-              workspaceRoot: session.cwd,
-              agentId: session.agentId,
-              expertIds:
-                resumeInput?.expertIds === undefined
-                  ? session.experts.slice(0, 1).map(expert => expert.expertId)
-                  : normalizeSingleExpertIds(resumeInput.expertIds),
-              modelOverride: session.modelOverride,
-              approvalMode:
-                config.permissionMode === CoworkPermissionMode.AllowAll
-                  ? WorkbenchApprovalMode.AllowAll
-                  : WorkbenchApprovalMode.Ask,
-              goalMode: resumeInput?.goalMode,
-              imageAttachments: resumeInput?.imageAttachments,
-              fileAttachments: resumeInput?.fileAttachments,
-              _workbenchRunId: run.id,
-              _skipUserMessage: !amendment,
-            }),
-          task,
-          run,
-          { service: getWorkbenchTaskService(), runtime: getPiRuntimeAdapter() },
-        );
-      },
     });
     memoryRuntime.todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());
     memoryRuntime.todoReminderScheduler.start();

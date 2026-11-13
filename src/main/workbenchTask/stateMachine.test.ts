@@ -16,10 +16,10 @@ test('allows explicit retry of a completed task while keeping completed runs ter
   ).toThrow(WorkbenchStateTransitionError);
 });
 
-test('rejects completion before a run reaches verification', () => {
+test('allows direct completion of a running run without a verification gate', () => {
   expect(() =>
     assertRunTransition(WorkbenchRunStatus.Running, WorkbenchRunStatus.Succeeded),
-  ).toThrow(WorkbenchStateTransitionError);
+  ).not.toThrow();
 });
 
 test('allows user acceptance to promote a needs-review run', () => {
@@ -79,6 +79,7 @@ test('guards every run status transition', () => {
         WorkbenchRunStatus.Verifying,
         WorkbenchRunStatus.Paused,
         WorkbenchRunStatus.NeedsReview,
+        WorkbenchRunStatus.Succeeded,
         WorkbenchRunStatus.Failed,
         WorkbenchRunStatus.Cancelled,
       ],
