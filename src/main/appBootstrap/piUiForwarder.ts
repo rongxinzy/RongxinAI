@@ -407,8 +407,7 @@ const bindRunSleepBlocker = (runtime: PiRuntimeAdapter): void => {
 export const bindPiWorkbenchRuntimeForwarder = (): void => {
   if (agentRuntime.piWorkbenchRuntimeForwarderBound) return;
 
-  const runtime = getPiRuntimeAdapter();
-  forwardPiWorkbenchRuntimeToRenderer(runtime);
-  bindRunSleepBlocker(runtime);
+  forwardPiWorkbenchRuntimeToRenderer(getPiRuntimeAdapter());
+  bindRunSleepBlocker(getPiRuntimeAdapter());
   agentRuntime.piWorkbenchRuntimeForwarderBound = true;
 };
