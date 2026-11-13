@@ -74,6 +74,36 @@ jobs:
       - name: Typecheck application and unit test sources
         run: bun run build:tsc
 
+  llamacpp-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Install pinned llama.cpp linux-x64 runtime (b12359)
+        run: node scripts/download-llamacpp-runtime.cjs linux-x64
+        env:
+          GITHUB_ACTIONS: 'true'
+          LLAMACPP_RUNTIME_ALLOW_MIRROR_FALLBACK: '1'
+      - name: Download and verify CPU smoke GGUF fixtures
+        run: node scripts/llamacpp/download-smoke-fixtures.mjs
+        env:
+          LLAMACPP_SMOKE_FIXTURES_DIR: ${{ runner.temp }}/llamacpp-smoke-fixtures
+      - name: Product-path smoke (router, gateway, preset, load, stream, cancel, vision)
+        run: >-
+          bunx vitest run src/main/libs/llamacppProductPath.smoke.test.ts
+          --config vitest.config.ts
+        env:
+          LLAMACPP_SMOKE_REQUIRED: '1'
+          LLAMACPP_SMOKE_FIXTURES_DIR: ${{ runner.temp }}/llamacpp-smoke-fixtures
+          LLAMACPP_SMOKE_EXECUTABLE: ${{ github.workspace }}/vendor/llamacpp-runtime/linux-x64/bin/llama-server
+      - name: Assert downloaded runtime reports v1.0.0 / b12359 build
+        run: |
+          "$GITHUB_WORKSPACE/vendor/llamacpp-runtime/linux-x64/bin/llama-server" --version | tee /tmp/llama-server-version.txt
+          rg -q "1\\.0\\.0|12359|b12359" /tmp/llama-server-version.txt
+      - name: Packaging script regression (prepare inference edition, no dist)
+        run: bunx vitest run scripts/prepare-inference-edition-runtime.test.ts
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -96,7 +126,7 @@ jobs:
   ci-gate:
     name: ci-gate
     if: always()
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, llamacpp-smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

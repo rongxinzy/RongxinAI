@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "description": "Pinned public GGUF fixtures for llama.cpp product-path smoke (CPU). Sources are Hugging Face resolve URLs; CI verifies SHA-256 after download.",
+  "runtimeReleaseTag": "b12359",
+  "artifacts": {
+    "textCpu": {
+      "id": "smollm2-135m-instruct-q4_k_m",
+      "revision": "bartowski/SmolLM2-135M-Instruct-GGUF@main",
+      "fileName": "SmolLM2-135M-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-Q4_K_M.gguf",
+      "sha256": "2e8040ceae7815abe0dcb3540b9995eaa1fa0d2ca9e797d0a635ae4433c68c2d",
+      "sizeBytes": 105454432
+    },
+    "visionCpu": {
+      "id": "smolvlm-256m-instruct-q4_k_m",
+      "revision": "pierretokns/SmolVLM-256M-Instruct-GGUF@main",
+      "fileName": "SmolVLM-256M-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/pierretokns/SmolVLM-256M-Instruct-GGUF/resolve/main/SmolVLM-256M-Instruct-Q4_K_M.gguf",
+      "sha256": "8f19fa336b353f60389efcdcfe75ab52e584193266646fe397e0de7903319e57",
+      "sizeBytes": 125053120,
+      "modalityNote": "Split LLM weights; requires visionMmproj in the same directory. b12359 router does not attach co-located mmproj without preset mmproj= (verified in smoke)."
+    },
+    "visionMmproj": {
+      "id": "smolvlm-256m-instruct-mmproj-f16",
+      "revision": "pierretokns/SmolVLM-256M-Instruct-GGUF@main",
+      "fileName": "mmproj-SmolVLM-256M-Instruct-f16.gguf",
+      "url": "https://huggingface.co/pierretokns/SmolVLM-256M-Instruct-GGUF/resolve/main/mmproj-SmolVLM-256M-Instruct-f16.gguf",
+      "sha256": "27dbc570ebfbf40b92ad8175311c21c1cac8c6347a5aa045eacaef98b6afab2d",
+      "sizeBytes": 190031680
+    }
+  }
+}

@@ -11,6 +11,7 @@ import {
   replaceIniSectionKeys,
   upsertIniSection,
 } from './llamacppManager';
+import { resolveSiblingMmprojPath } from './llamacppModelInstallation';
 
 /** The router always binds loopback; the gateway owns the user-facing port. */
 export const LLAMACPP_ROUTER_LOOPBACK_HOST = '127.0.0.1';
@@ -72,10 +73,13 @@ export function upsertLlamaCppRouterModelPresetSection(input: {
   modelName: string;
   modelPath: string;
   options?: LlamaCppModelLaunchInput['options'];
+  mmprojPath?: string;
 }): void {
+  const mmprojPath = input.mmprojPath?.trim() || resolveSiblingMmprojPath(input.modelPath);
   const next = upsertIniSection(readPresetSource(input.presetPath), input.modelName.trim(), {
     model: input.modelPath,
     ...modelLaunchOptionsToPreset(input.options ?? {}),
+    ...(mmprojPath ? { mmproj: mmprojPath } : {}),
   });
   writePresetSource(input.presetPath, next);
 }

@@ -392,6 +392,23 @@ export function chooseModelScopeMmprojFile(files: string[]): string | undefined 
   return preferred ?? mmprojFiles.sort((a, b) => a.localeCompare(b))[0];
 }
 
+/** Resolves a co-located mmproj GGUF next to the main model file (ModelScope layout). */
+export function resolveSiblingMmprojPath(modelPath: string): string | undefined {
+  const normalized = modelPath.trim();
+  if (!normalized || !fs.existsSync(normalized)) return undefined;
+  const dir = path.dirname(normalized);
+  let files: string[];
+  try {
+    files = fs.readdirSync(dir);
+  } catch {
+    return undefined;
+  }
+  const mmprojFileName = chooseModelScopeMmprojFile(files);
+  if (!mmprojFileName) return undefined;
+  const mmprojPath = path.join(dir, mmprojFileName);
+  return fs.existsSync(mmprojPath) ? mmprojPath : undefined;
+}
+
 function extractRecords(payload: unknown): Record<string, unknown>[] {
   if (Array.isArray(payload)) return payload.filter(isRecord);
   if (!isRecord(payload)) return [];
