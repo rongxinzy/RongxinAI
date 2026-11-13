@@ -93,6 +93,8 @@ export const enMain2 = {
     'The current model does not support this input modality (e.g. images). Please switch models or check the model configuration, then try again.',
   imErrorProviderUnavailable:
     'The model service used by this session is disabled or unavailable. Please check the model configuration in the app and try again.',
+  imErrorGatewayStartFailed:
+    'The local model gateway failed to start. Please restart the desktop app and try again.',
   imErrorStreamInterrupted:
     'The connection to the model was interrupted and this task was stopped. Please send your message again.',
   imErrorUnknown: 'Error processing message: {error}. Please try again.',

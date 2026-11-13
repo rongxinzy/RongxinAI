@@ -138,6 +138,28 @@ test('gateway: draining', () => {
   expect(classifyError('gateway draining for restart')).toBe('coworkErrorGatewayDraining');
 });
 
+test('gateway: local model service startup and exit classify as GatewayStartFailed', () => {
+  expect(classifyError('Unable to start the verified local model service')).toBe(
+    'coworkErrorGatewayStartFailed',
+  );
+  expect(classifyError('Local model service exited')).toBe('coworkErrorGatewayStartFailed');
+  expect(classifyError('The model service could not start. Retry in model settings.')).toBe(
+    'coworkErrorGatewayStartFailed',
+  );
+  expect(isTransient(CoworkErrorKind.GatewayStartFailed)).toBe(false);
+});
+
+test('provider: disabled or missing model management errors classify as ProviderUnavailable', () => {
+  expect(
+    classifyError('Enable the unified model service in model settings before starting a task.'),
+  ).toBe('coworkErrorProviderUnavailable');
+  expect(
+    classifyError(
+      'The selected model is no longer available or is restricted. Choose a model in model settings.',
+    ),
+  ).toBe('coworkErrorProviderUnavailable');
+});
+
 // ==================== Content moderation ====================
 
 test('content: Qwen DataInspectionFailed', () => {

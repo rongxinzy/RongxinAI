@@ -24,6 +24,7 @@ import path from 'path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModelCapabilityStatus } from '../../../shared/providers';
+import { getMagpieModelService } from '../../magpie/modelService';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
 
@@ -274,6 +275,33 @@ describe('PiRuntimeAdapter', () => {
       expect(systemErrorMessages()).toHaveLength(1);
       expect(emittedMessages.filter(message => message.type === 'system')).toHaveLength(1);
       expect(completes).toHaveLength(0);
+    });
+
+    it('kicks Magpie recovery when auto_retry_start runs after a loopback NetworkError', async () => {
+      const recoverSpy = vi.spyOn(getMagpieModelService(), 'recoverIfNeeded').mockResolvedValue({
+        state: 'running',
+        version: 'test',
+        gatewayUrl: 'http://127.0.0.1:1234',
+      });
+      try {
+        await adapter.startSession('test', 'Hi');
+
+        listener!({ type: 'turn_start' });
+        failedAttempt('Connection error.: connect ECONNREFUSED 127.0.0.1:18425');
+        listener!({ type: 'auto_retry_start', attempt: 1 });
+        expect(recoverSpy).toHaveBeenCalledTimes(1);
+
+        successfulTurn('Recovered after gateway restart');
+        listener!({
+          type: 'auto_retry_end',
+          success: true,
+          attempt: 1,
+        });
+        listener!({ type: 'agent_settled' });
+        expect(completes).toEqual(['test']);
+      } finally {
+        recoverSpy.mockRestore();
+      }
     });
 
     it('classifies an image capability mismatch and cancels the SDK retry', async () => {

@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { LlamaCppAgentEligibility } from '../../../shared/llamacpp';
+import type { MagpieStatus } from '../../../shared/magpie/types';
 import type { ModelCapabilities } from '../../../shared/providers';
 
 export interface Model {
@@ -27,6 +28,7 @@ interface ModelState {
   defaultSelectedModel: Model;
   selectedModelByAgent: Record<string, Model>;
   availableModels: Model[];
+  serviceState?: MagpieStatus['state'];
 }
 export function selectAgentSelectedModel(state: ModelState, agentId: string, ref: string): Model {
   const id = state.selectedModelByAgent[agentId]?.id || ref.trim();
@@ -49,9 +51,16 @@ const modelSlice = createSlice({
     },
     setModelCatalog(
       state,
-      action: PayloadAction<{ models: Model[]; defaultModelId: string | null }>,
+      action: PayloadAction<{
+        models: Model[];
+        defaultModelId: string | null;
+        serviceState?: MagpieStatus['state'];
+      }>,
     ) {
       state.availableModels = action.payload.models;
+      if (action.payload.serviceState !== undefined) {
+        state.serviceState = action.payload.serviceState;
+      }
       state.defaultSelectedModel =
         action.payload.models.find(model => model.id === action.payload.defaultModelId) ??
         EMPTY_MODEL;
@@ -61,7 +70,11 @@ const modelSlice = createSlice({
         else delete state.selectedModelByAgent[agentId];
       }
     },
+    setModelServiceState(state, action: PayloadAction<MagpieStatus['state']>) {
+      state.serviceState = action.payload;
+    },
   },
 });
-export const { setSelectedModel, clearAgentSelectedModel, setModelCatalog } = modelSlice.actions;
+export const { setSelectedModel, clearAgentSelectedModel, setModelCatalog, setModelServiceState } =
+  modelSlice.actions;
 export default modelSlice.reducer;

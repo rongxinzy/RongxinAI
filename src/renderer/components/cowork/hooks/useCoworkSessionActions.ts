@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { useDispatch } from 'react-redux';
+import { classifyErrorKey } from '../../../../common/coworkErrorClassify';
 import { buildSessionTitleFromInput } from '../../../../common/sessionTitle';
 import {
   CoworkExecutionMode,
@@ -287,6 +288,7 @@ export function useCoworkSessionActions({
       );
 
       if (!startedSession && startError) {
+        const errorKey = classifyErrorKey(startError);
         // Show the error as a system message in the temp session
         dispatch(
           addMessage({
@@ -294,9 +296,9 @@ export function useCoworkSessionActions({
             message: {
               id: `error-${Date.now()}`,
               type: 'system',
-              content: i18nService
-                .t('coworkErrorSessionStartFailed')
-                .replace('{error}', startError),
+              content: errorKey
+                ? i18nService.t(errorKey)
+                : i18nService.t('coworkErrorSessionStartFailed').replace('{error}', startError),
               timestamp: Date.now(),
             },
           }),

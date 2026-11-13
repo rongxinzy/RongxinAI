@@ -14,6 +14,7 @@ export const MAGPIE_RUNTIME_API_KEY = 'magpie-zhiyuan';
 export interface MagpieModelBackend {
   status(): MagpieStatus;
   ensureRunning?(): Promise<MagpieStatus>;
+  recoverIfNeeded?(): Promise<MagpieStatus>;
   models(): Promise<MagpieModel[]>;
   providers?(): Promise<MagpieProviderSummary[]>;
   recordError?(message: string, providerId?: string): void;
@@ -36,6 +37,9 @@ export class MagpieModelService {
   ) {}
   recordError(message: string, providerId?: string): void {
     this.backend.recordError?.(message, providerId);
+  }
+  recoverIfNeeded(): Promise<MagpieStatus | undefined> {
+    return this.backend.recoverIfNeeded?.() ?? Promise.resolve(undefined);
   }
 
   /** Last catalog projection, for synchronous capability reads between turns. */

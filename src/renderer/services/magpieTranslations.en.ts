@@ -271,4 +271,7 @@ export const magpieTranslationsEn = {
   magpieState_running: 'Running',
   magpieState_stopping: 'Stopping',
   magpieState_failed: 'Failed',
+  magpieGatewayStartFailedTitle: 'Gateway failed to start',
+  magpieGatewayStartFailedHint:
+    'The local model gateway failed to start. Please restart the app and try again.',
 };

@@ -643,8 +643,33 @@ export const initApp = async (): Promise<void> => {
       handleDeepLink(coldStartDeepLink);
     }
 
+    let magpieResumeTimer: NodeJS.Timeout | undefined;
+    powerMonitor.on('suspend', () => {
+      if (magpieResumeTimer) {
+        clearTimeout(magpieResumeTimer);
+        magpieResumeTimer = undefined;
+      }
+      inferenceRuntime.magpieManager?.onSuspend();
+    });
+
     powerMonitor.on('resume', () => {
       projectMemoryService.resumeOutboxDrain();
+      if (inferenceRuntime.magpieManager) {
+        const recoverMagpie = () => {
+          void inferenceRuntime.magpieManager?.recoverIfNeeded().catch(error => {
+            console.warn('[Magpie] Model service recovery after system resume failed:', error);
+          });
+        };
+        if (process.platform === 'win32') {
+          if (magpieResumeTimer) clearTimeout(magpieResumeTimer);
+          magpieResumeTimer = setTimeout(() => {
+            magpieResumeTimer = undefined;
+            recoverMagpie();
+          }, 500);
+        } else {
+          recoverMagpie();
+        }
+      }
       if (
         Date.now() - lifecycleRuntime.lastSuccessfulAppUpdateCheckAt >=
         APP_UPDATE_POLL_INTERVAL_MS

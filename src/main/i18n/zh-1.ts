@@ -152,6 +152,7 @@ export const zhMain1 = {
   coworkErrorInputTooLong: '输入内容过长，超出模型上下文限制。',
   coworkErrorCouldNotProcessPdf: '无法处理 PDF 文件。',
   coworkErrorModelNotFound: '请求的模型不存在或不可用。',
+  coworkErrorGatewayStartFailed: '网关启动失败，建议重启应用后再试。',
   coworkErrorGatewayDisconnected: 'AI 引擎连接中断，请重试。',
   coworkErrorServiceRestart: 'AI 引擎正在重启，请稍后重试。',
   coworkErrorGatewayDraining: 'AI 引擎正在重启中，请稍等片刻后重试。',

@@ -68,6 +68,28 @@ function verifyRuntime(root, key, { allowSigned = false } = {}) {
     if (!allowSigned && manifest.sha256 !== manifest.buildSha256) {
       throw new Error('Expected the unmodified compiler output before packaging');
     }
+    if (manifest.signing !== undefined) {
+      const expectedFormat =
+        target.platform === 'win32'
+          ? 'authenticode'
+          : target.platform === 'darwin'
+            ? 'codesign'
+            : null;
+      if (
+        !allowSigned ||
+        !expectedFormat ||
+        typeof manifest.signing !== 'object' ||
+        manifest.signing === null ||
+        manifest.signing.platform !== target.platform ||
+        manifest.signing.format !== expectedFormat ||
+        manifest.sha256 === manifest.buildSha256
+      ) {
+        throw new Error('Invalid or unexpected Magpie signing metadata');
+      }
+    }
+    if (manifest.sha256 !== manifest.buildSha256 && !manifest.signing) {
+      throw new Error('Signed Magpie binary is missing manifest signing metadata');
+    }
     const binary = readRegularFile(path.join(directory, expectedBinary));
     if (crypto.createHash('sha256').update(binary).digest('hex') !== manifest.sha256) {
       throw new Error('Binary SHA-256 mismatch');
@@ -175,12 +197,47 @@ function windowsPowerShellEnv(env) {
   );
 }
 
+function verifyWindowsAuthenticodeSignature(binary, thumbprint, env, spawn = spawnSync) {
+  const command = [
+    "$ErrorActionPreference = 'Stop'",
+    "Import-Module (Join-Path $PSHOME 'Modules\\Microsoft.PowerShell.Security\\Microsoft.PowerShell.Security.psd1') -ErrorAction Stop",
+    '$s = Get-AuthenticodeSignature -LiteralPath $env:ZHIYUAN_MAGPIE_BIN',
+    'if ($null -eq $s -or $s.Status -ne "Valid" -or $null -eq $s.TimeStamperCertificate -or $null -eq $s.SignerCertificate) {',
+    '  throw "Magpie Authenticode signature is invalid: $($s.Status)"',
+    '}',
+    'if ($s.SignerCertificate.Thumbprint.ToUpperInvariant() -ne $env:ZHIYUAN_EXPECTED_THUMBPRINT) {',
+    '  throw "Magpie Authenticode signer thumbprint mismatch"',
+    '}',
+  ].join('; ');
+  const result = spawn('powershell.exe', ['-NoProfile', '-Command', command], {
+    stdio: 'inherit',
+    windowsHide: true,
+    env: {
+      ...windowsPowerShellEnv(env),
+      ZHIYUAN_MAGPIE_BIN: binary,
+      ZHIYUAN_EXPECTED_THUMBPRINT: thumbprint,
+    },
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`Magpie Authenticode verification failed with exit code ${result.status}`);
+  }
+}
+
 function signPackagedWindowsMagpie(context, deps = {}) {
   if (context.electronPlatformName !== 'win32') return;
   const spawn = deps.spawn || spawnSync;
   const env = deps.env || process.env;
   const root = packagedRoot(context);
-  const signingEnabled = /^[0-9A-F]{40}$/.test(certumThumbprint(env));
+  const thumbprint = certumThumbprint(env);
+  const signingEnabled = /^[0-9A-F]{40}$/.test(thumbprint);
+  const maxAttempts = deps.maxAttempts ?? 3;
+  const verifySignature =
+    deps.verifySignature ||
+    (deps.spawn
+      ? null
+      : (binary, expectedThumbprint) =>
+          verifyWindowsAuthenticodeSignature(binary, expectedThumbprint, env, spawn));
   const script = path.join(__dirname, 'runtime-signing', 'sign-runtime.ps1');
   for (const key of contextTargets(context)) {
     const directory = path.join(root, key);
@@ -188,7 +245,10 @@ function signPackagedWindowsMagpie(context, deps = {}) {
     const manifestPath = path.join(directory, 'manifest.json');
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     const before = sha256File(binary);
-    if (before === manifest.sha256 && before === manifest.buildSha256) {
+    if (before !== manifest.sha256) {
+      throw new Error('Magpie binary changed before Windows signing');
+    }
+    if (before === manifest.buildSha256) {
       if (!signingEnabled) {
         verifyRuntime(root, key);
         continue;
@@ -197,22 +257,40 @@ function signPackagedWindowsMagpie(context, deps = {}) {
       // sign walk (win.signExts) so the bytes still match the sealed manifest
       // at afterPack. Sign here with the same Certum signtool script the
       // release environment already uses, then reseal the manifest below.
-      const result = spawn(
-        'powershell.exe',
-        ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', binary],
-        { stdio: 'inherit', windowsHide: true, env: windowsPowerShellEnv(env) },
-      );
+      let result;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        result = spawn(
+          'powershell.exe',
+          ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Path', binary],
+          { stdio: 'inherit', windowsHide: true, env: windowsPowerShellEnv(env) },
+        );
+        if (!result.error && result.status === 0) break;
+        if (attempt < maxAttempts) {
+          console.warn(
+            `[magpie-runtime] Windows Authenticode signing attempt ${attempt}/${maxAttempts} failed; retrying...`,
+          );
+        }
+      }
       if (result.error) throw result.error;
       if (result.status !== 0) {
         throw new Error(`Magpie Authenticode signing failed with exit code ${result.status}`);
       }
-    } else if (!signingEnabled) {
-      throw new Error('Magpie binary changed before Windows signing');
+    } else {
+      if (!signingEnabled) {
+        throw new Error('Magpie binary changed before Windows signing');
+      }
+      if (manifest.signing?.platform !== 'win32' || manifest.signing?.format !== 'authenticode') {
+        throw new Error('Magpie binary changed before Windows signing without a valid seal');
+      }
+      if (verifySignature) verifySignature(binary, thumbprint);
+      verifyRuntime(root, key, { allowSigned: true });
+      continue;
     }
     const sha256 = sha256File(binary);
     if (sha256 === manifest.buildSha256) {
       throw new Error('Windows signing left the Magpie compiler bytes unchanged');
     }
+    if (verifySignature) verifySignature(binary, thumbprint);
     const signed = {
       ...manifest,
       sha256,

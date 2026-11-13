@@ -6,7 +6,7 @@ import { agentRuntime } from './agentRuntimeState';
 import { storageRuntime } from './storageRuntimeState';
 import { inferenceRuntime } from './inferenceRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
-import { getStore } from './runtimeServices';
+import { clearActiveRunSleepBlockers, getStore } from './runtimeServices';
 import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { destroyTray } from '../trayManager';
 import { disposeDesktopPet } from '../desktopPet/controller';
@@ -71,6 +71,7 @@ const runAppCleanup = async (): Promise<void> => {
 
   // Stop all active Pi sessions without blocking shutdown.
   if (agentRuntime.piRuntimeAdapter) agentRuntime.piRuntimeAdapter.stopAllSessions();
+  clearActiveRunSleepBlockers();
 
   storageRuntime.sqliteBackupManager?.stopPeriodicBackupLoop();
   memoryRuntime.todoReminderScheduler?.stop();

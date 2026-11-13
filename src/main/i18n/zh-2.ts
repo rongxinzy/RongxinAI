@@ -69,6 +69,7 @@ export const zhMain2 = {
     '当前模型不支持该输入模态（如图像），请更换模型或检查模型配置后重试。',
   imErrorProviderUnavailable:
     '当前会话使用的模型服务已停用或不可用，请检查应用内的模型配置后重试。',
+  imErrorGatewayStartFailed: '本地模型网关启动失败，建议重启桌面应用后再试。',
   imErrorStreamInterrupted: '与模型的连接中断，本次任务已停止。请重新发送消息。',
   imErrorUnknown: '处理消息时遇到错误: {error}。请稍后重试。',
 

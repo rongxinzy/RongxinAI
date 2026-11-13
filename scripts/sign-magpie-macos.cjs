@@ -105,9 +105,13 @@ async function signWithRuntimeManifest(options, signer = signAsyncWithTimestampR
         for (const [key, original] of manifests) {
           const directory = path.join(root, key);
           const binary = path.join(directory, binaryName(key));
+          const sha256 = sha256File(binary);
+          if (sha256 === original.buildSha256) {
+            throw new Error('macOS signing left the Magpie compiler bytes unchanged');
+          }
           const manifest = {
             ...original,
-            sha256: sha256File(binary),
+            sha256,
             sizeBytes: fs.statSync(binary).size,
             signing: { platform: 'darwin', format: 'codesign' },
           };

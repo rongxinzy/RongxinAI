@@ -1,3 +1,4 @@
+import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
@@ -8,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
+import { TriangleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   MagpieDiagnosticSummary,
@@ -22,6 +24,7 @@ import {
 } from '../../../services/availableModels';
 import { i18nService } from '../../../services/i18n';
 import { showAppError } from '../../../services/appToast';
+import { showAppErrorToast } from '../../../services/toastNotification';
 import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
 import { extractRuntimeErrorMessage } from '../../../../shared/magpie/runtimeErrorMessage';
 import { isHtmlEndpointRuntimeError } from './magpieRuntimeError';
@@ -303,7 +306,12 @@ export default function ModelSettingsPanel() {
                         const next = { status, models: [], defaultModelId: null };
                         applyMagpieCatalog(next);
                         apply(next);
-                        if (status.state !== 'running') throw new Error('Not running');
+                        if (status.state !== 'running') {
+                          if (status.state === 'failed') {
+                            showAppErrorToast(i18nService.t('magpieGatewayStartFailedHint'));
+                          }
+                          throw new Error('Not running');
+                        }
                         apply(await refreshMagpieModels());
                         await loadProviders();
                       } finally {
@@ -335,11 +343,17 @@ export default function ModelSettingsPanel() {
               </p>
             )}
             {busy && !catalog && <p role="status">{i18nService.t('modelBrowseLoading')}</p>}
-            {error && (
+            {!running && !starting && catalog?.status.state === 'failed' ? (
+              <Alert variant="destructive">
+                <TriangleAlert />
+                <AlertTitle>{i18nService.t('magpieGatewayStartFailedTitle')}</AlertTitle>
+                <AlertDescription>{i18nService.t('magpieGatewayStartFailedHint')}</AlertDescription>
+              </Alert>
+            ) : error ? (
               <p role="alert" className="text-sm text-destructive">
                 {i18nService.t('magpieActionFailed')}
               </p>
-            )}
+            ) : null}
           </section>
 
           {running && diagnostics && (

@@ -311,6 +311,7 @@ export const enCowork: Record<string, string> = {
     'The current model does not support image input (the server is missing the vision component). Image input has been automatically disabled for this model — please try again; if it still fails, check the model configuration.',
   coworkErrorProviderUnavailable:
     'The model provider used by this session is disabled or the model has been removed. Re-enable the provider or switch to another model in Settings, then try again.',
+  coworkErrorGatewayStartFailed: 'Gateway failed to start. Please restart the app and try again.',
   coworkErrorGatewayDisconnected:
     'The model service disconnected. Try again, or restart the app if it stays disconnected.',
   coworkErrorServiceRestart: 'The model service is restarting. Try again shortly.',

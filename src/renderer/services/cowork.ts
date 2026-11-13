@@ -1,6 +1,8 @@
 import { expectRunStart } from '../store/slices/coworkRunSlice';
 import {
+  classifyCoworkError,
   type CoworkError,
+  CoworkErrorKind,
   ENGINE_NOT_READY_CODE,
   getUserErrorI18nKey,
 } from '../../common/coworkError';
@@ -14,6 +16,7 @@ import {
 import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import { store } from '../store';
 import { setCurrentAgentId } from '../store/slices/agentSlice';
+import { setModelServiceState } from '../store/slices/modelSlice';
 import { clearSessionArtifacts, addArtifact } from '../store/slices/artifactSlice';
 import {
   addMessage,
@@ -390,6 +393,9 @@ class CoworkService {
 
     // Show a user-visible error when session start fails
     if (result.error) {
+      if (classifyCoworkError(result.error).kind === CoworkErrorKind.GatewayStartFailed) {
+        store.dispatch(setModelServiceState('failed'));
+      }
       const errorContent =
         result.code === ENGINE_NOT_READY_CODE
           ? i18nService.t('coworkErrorEngineNotReady')
@@ -429,6 +435,9 @@ class CoworkService {
       // surfaced as a terminal message, but cannot synthesize an execution
       // state that Pi never emitted.
       if (terminalError) {
+        if (terminalError.kind === CoworkErrorKind.GatewayStartFailed) {
+          store.dispatch(setModelServiceState('failed'));
+        }
         const state = store.getState().cowork;
         const alreadyReceived = hasMatchingLatestTerminalError(
           [state.currentSession, state.streamingSessions[options.sessionId]],

@@ -74,6 +74,7 @@ export function applyMagpieCatalog(
           ? catalog.models.map(model => toCatalogModel(model, providers))
           : [],
       defaultModelId: catalog.defaultModelId,
+      serviceState: catalog.status.state,
     }),
   );
 }

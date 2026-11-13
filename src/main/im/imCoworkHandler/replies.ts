@@ -62,6 +62,8 @@ export function formatIMErrorReply(error: CoworkError): string {
       return t('imErrorBudgetExceeded');
     case CoworkErrorKind.EngineNotReady:
       return t('imErrorEngineNotReady');
+    case CoworkErrorKind.GatewayStartFailed:
+      return t('imErrorGatewayStartFailed');
     case CoworkErrorKind.NetworkError:
     case CoworkErrorKind.ServerError:
     case CoworkErrorKind.GatewayDisconnected:

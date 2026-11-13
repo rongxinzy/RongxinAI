@@ -43,7 +43,7 @@ import { ZhiyuanModelPoolEvent } from '../shared/modelPool/constants';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
-import { showAppToast } from './services/toastNotification';
+import { showAppErrorToast, showAppToast } from './services/toastNotification';
 import { workspaceService } from './services/workspace';
 import { RootState, store } from './store';
 import {
@@ -90,6 +90,8 @@ const App: React.FC = () => {
   const appShellRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const currentSessionId = useSelector(selectCurrentSessionId);
+  const modelServiceState = useSelector((state: RootState) => state.model.serviceState);
+  const lastNotifiedGatewayFailureRef = useRef(false);
   const currentWorkspaceIsHidden = useSelector((state: RootState) => {
     const currentWorkspaceId = state.workspace.currentWorkspaceId;
     return state.workspace.workspaces.some(
@@ -120,6 +122,18 @@ const App: React.FC = () => {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [initError, isInitialized]);
+
+  useEffect(() => {
+    if (!isInitialized || initError || bootScreenVisible) return;
+    if (modelServiceState === 'failed') {
+      if (!lastNotifiedGatewayFailureRef.current) {
+        lastNotifiedGatewayFailureRef.current = true;
+        showAppErrorToast(i18nService.t('coworkErrorGatewayStartFailed'));
+      }
+      return;
+    }
+    lastNotifiedGatewayFailureRef.current = false;
+  }, [bootScreenVisible, initError, isInitialized, modelServiceState]);
 
   const availableModelsRefreshRequestIdRef = useRef(0);
 

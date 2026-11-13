@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 
+import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
+import { PassThrough } from 'node:stream';
 
 import { projectMagpieCatalog } from './catalog';
 import { MagpieManager } from './manager';
@@ -212,6 +214,189 @@ describe('Magpie owned lifecycle', () => {
       expect(callerKeys).toEqual([
         { id: 'lan-2', name: MAGPIE_LAN_KEY_NAME, secret: 'sk-lan-second' },
       ]);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('logs sanitized startup stderr and exit phase when launch fails while keeping status error sanitized', async () => {
+    const root = await temporary();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const manager = new MagpieManager({
+      privateHome: root,
+      resourcesRoot: root,
+      serviceEnabled: { read: () => true, write: () => {} },
+      verify: async () => '/fake/magpie.exe',
+      spawn: (() => {
+        const stderr = new PassThrough();
+        const child = Object.assign(new EventEmitter(), {
+          exitCode: null as number | null,
+          signalCode: null as string | null,
+          stderr,
+          kill: vi.fn(() => true),
+        });
+        queueMicrotask(() => {
+          stderr.write('listen tcp 127.0.0.1:18425: bind failed bearer secret123');
+          stderr.end();
+          child.exitCode = 1;
+          child.emit('exit', 1, null);
+        });
+        return child;
+      }) as never,
+    });
+    try {
+      await expect(manager.ensureRunning()).rejects.toThrow(
+        'Unable to start the verified local model service',
+      );
+      expect(manager.status()).toMatchObject({
+        state: 'failed',
+        error: 'Unable to start the verified local model service',
+      });
+      const launchWarn = warnSpy.mock.calls.find(([msg]) =>
+        String(msg).includes('[Magpie] Launch failed:'),
+      );
+      expect(launchWarn?.[1]).toMatchObject({
+        phase: 'probe',
+        exitCode: 1,
+        stderr: expect.stringContaining('listen tcp 127.0.0.1:18425: bind failed'),
+      });
+      expect(JSON.stringify(launchWarn?.[1])).not.toContain('secret123');
+    } finally {
+      warnSpy.mockRestore();
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('recoverIfNeeded skips restart when healthy and restarts when gateway probe fails', async () => {
+    const { manager, root, spawn, fetcher } = await setup({ read: () => true, write: () => {} });
+    try {
+      await manager.start();
+      expect(spawn).toHaveBeenCalledTimes(1);
+
+      const healthy = await manager.recoverIfNeeded();
+      expect(healthy.state).toBe('running');
+      expect(spawn).toHaveBeenCalledTimes(1);
+
+      const originalFetch = fetcher.getMockImplementation()!;
+      let failNextHello = true;
+      fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url.endsWith('/api/hello') && failNextHello) {
+          failNextHello = false;
+          throw new Error('connect ECONNREFUSED 127.0.0.1:18425');
+        }
+        return originalFetch(url, init);
+      });
+
+      const recovered = await manager.recoverIfNeeded();
+      expect(recovered.state).toBe('running');
+      expect(spawn).toHaveBeenCalledTimes(2);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('retries once inside recoverIfNeeded when the first post-wake restart fails', async () => {
+    const { manager, root, spawn, fetcher } = await setup(
+      { read: () => true, write: () => {} },
+      undefined,
+      undefined,
+      { managerOptions: { recoveryRetryDelayMs: 0 } },
+    );
+    try {
+      await manager.start();
+      expect(spawn).toHaveBeenCalledTimes(1);
+
+      const originalFetch = fetcher.getMockImplementation()!;
+      let failHelloProbe = true;
+      fetcher.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (url.endsWith('/api/hello') && failHelloProbe) {
+          failHelloProbe = false;
+          throw new Error('connect ECONNREFUSED 127.0.0.1:18425');
+        }
+        return originalFetch(url, init);
+      });
+      // First restart's child (1st call after mock swap) exits before probe succeeds; retry succeeds.
+      let restartSpawnCount = 0;
+      const originalSpawnImpl = spawn.getMockImplementation()!;
+      spawn.mockImplementation(((...args: Parameters<typeof originalSpawnImpl>) => {
+        restartSpawnCount += 1;
+        if (restartSpawnCount === 1) {
+          const deadChild = Object.assign(new EventEmitter(), {
+            exitCode: 1 as number | null,
+            signalCode: null as string | null,
+            kill: vi.fn(() => true),
+          });
+          queueMicrotask(() => {
+            deadChild.emit('exit', 1, null);
+          });
+          return deadChild as never;
+        }
+        return originalSpawnImpl(...args);
+      }) as typeof originalSpawnImpl);
+
+      manager.onSuspend();
+      const recovered = await manager.recoverIfNeeded();
+      expect(recovered.state).toBe('running');
+      expect(spawn).toHaveBeenCalledTimes(3);
+    } finally {
+      await manager.shutdown();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('wraps Magpie with job-runner.exe and invokes Windows process-tree kill when SIGTERM stalls', async () => {
+    const killProcessTree = vi.fn(async () => {});
+    const { manager, root, spawn } = await setup(
+      { read: () => true, write: () => {} },
+      undefined,
+      undefined,
+      {
+        managerOptions: {
+          platform: 'win32',
+          jobRunnerPath: 'C:\\Program Files\\ZhiYuan\\resources\\python-runtime\\job-runner.exe',
+          killProcessTree,
+        },
+      },
+    );
+    const originalSpawnImpl = spawn.getMockImplementation()!;
+    let spawnedChild: ReturnType<typeof originalSpawnImpl> | undefined;
+    spawn.mockImplementation(((...args: Parameters<typeof originalSpawnImpl>) => {
+      const child = originalSpawnImpl(...args);
+      spawnedChild = child;
+      (child as { pid?: number }).pid = 43210;
+      // Ignore SIGTERM once so terminate() exercises Windows taskkill tree cleanup, then exit.
+      const origKill = child.kill.bind(child);
+      child.kill = ((sig?: NodeJS.Signals | number) => {
+        if (sig === 'SIGTERM') return true;
+        return origKill(sig);
+      }) as typeof child.kill;
+      killProcessTree.mockImplementationOnce(async () => {
+        origKill('SIGTERM');
+      });
+      return child;
+    }) as typeof originalSpawnImpl);
+
+    try {
+      const started = await manager.start();
+      expect(started.state).toBe('running');
+      expect(spawn).toHaveBeenCalledWith(
+        'C:\\Program Files\\ZhiYuan\\resources\\python-runtime\\job-runner.exe',
+        [
+          String(process.pid),
+          expect.stringContaining('magpie'),
+          'web',
+          '--addr',
+          expect.any(String),
+          '--no-open',
+        ],
+        expect.objectContaining({ windowsHide: true, shell: false }),
+      );
+      expect(spawnedChild).toBeDefined();
+      await manager.shutdown();
+      expect(killProcessTree).toHaveBeenCalledWith(43210);
     } finally {
       await manager.shutdown();
       await fs.rm(root, { recursive: true, force: true });

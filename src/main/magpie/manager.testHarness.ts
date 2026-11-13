@@ -5,7 +5,7 @@ import path from 'node:path';
 import { vi } from 'vitest';
 import { projectMagpieCatalog } from './catalog';
 import { MAGPIE_VERSION } from './integrity';
-import { MagpieManager } from './manager';
+import { MagpieManager, type MagpieManagerOptions } from './manager';
 
 export async function temporary() {
   return fs.mkdtemp(path.join(os.tmpdir(), 'magpie-host-test-'));
@@ -20,6 +20,7 @@ export async function setup(
     onReapply?: (agentId: string) => Promise<void> | void;
     failReapply?: string[];
     failAgentsTimes?: number;
+    managerOptions?: Partial<MagpieManagerOptions>;
   },
 ) {
   const root = await temporary();
@@ -191,6 +192,7 @@ export async function setup(
     fetch: fetcher as never,
     port: async () => ++port,
     ...(gatewayPort ? { gatewayPort } : {}),
+    ...options?.managerOptions,
   });
   return { root, child, spawn, fetcher, manager, callerKeys };
 }

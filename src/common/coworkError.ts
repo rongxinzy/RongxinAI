@@ -34,6 +34,8 @@ export const CoworkErrorKind = {
   ProviderUnavailable: 'provider_unavailable',
   /** Content filtered by moderation */
   ContentFiltered: 'content_filtered',
+  /** Local model gateway failed to start or exited unexpectedly */
+  GatewayStartFailed: 'gateway_start_failed',
   /** Gateway disconnected unexpectedly */
   GatewayDisconnected: 'gateway_disconnected',
   /** Gateway draining for restart */
@@ -147,7 +149,8 @@ const RULES: ErrorRule[] = [
   // ── Provider unavailable (disabled or model removed since the session ran) ──
   {
     kind: CoworkErrorKind.ProviderUnavailable,
-    pattern: /provider\s+\S.*\bis not enabled\b|no enabled provider found/i,
+    pattern:
+      /provider\s+\S.*\bis not enabled\b|no enabled provider found|enable (?:the )?unified model (?:management|service)|choose a default model in model settings|selected model is no longer available or is restricted/i,
   },
 
   // ── Content filtered ────────────────────────────────────────────────────
@@ -162,6 +165,13 @@ const RULES: ErrorRule[] = [
   {
     kind: CoworkErrorKind.GatewayDraining,
     pattern: /gateway.*draining|draining.*restart/i,
+  },
+
+  // ── Gateway startup / exit failure ──────────────────────────────────────
+  {
+    kind: CoworkErrorKind.GatewayStartFailed,
+    pattern:
+      /unable to start the verified local model service|local model service exited|model service could not start|unable to stop the local model service/i,
   },
 
   // ── Gateway disconnected ────────────────────────────────────────────────
@@ -339,6 +349,7 @@ export function getErrorLogLevel(kind: CoworkErrorKind): ErrorLogLevel {
     case CoworkErrorKind.ModelCapabilityUnsupported:
     case CoworkErrorKind.ProviderUnavailable:
     case CoworkErrorKind.ContentFiltered:
+    case CoworkErrorKind.GatewayStartFailed:
     case CoworkErrorKind.CouldNotProcessPdf:
       return 'error';
 
@@ -407,6 +418,8 @@ export function getUserErrorI18nKey(kind: CoworkErrorKind): string {
       return 'coworkErrorProviderUnavailable';
     case CoworkErrorKind.ContentFiltered:
       return 'coworkErrorContentFiltered';
+    case CoworkErrorKind.GatewayStartFailed:
+      return 'coworkErrorGatewayStartFailed';
     case CoworkErrorKind.GatewayDisconnected:
       return 'coworkErrorGatewayDisconnected';
     case CoworkErrorKind.GatewayDraining:
