@@ -20,22 +20,20 @@ import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/workbenchTask';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
-import { PiPlanModePrompt } from './piPlanTool';
-import {
-  finalizePiPromptWithProjectMemory,
-  resolveProjectMemoryContextForPiPrompt,
-} from '../../memory/piRuntimeProjectMemoryPrompt';
+import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
+import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { waitForPiRetryCancellation } from './piRetryCancellation';
 import { resolvePiModel } from './piMagpiePiModel';
 import { resolvePiSessionModel } from './piRuntimeSettingsOverrides';
+import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
+import { resolvePiSkillRoots } from './piSkillRoots';
 import {
   getPiModules,
   haveSameStringList,
   normalizeSkillIds,
   preparePiPrompt,
   sendPiPrompt,
-  PiChatRuntimeLimit,
 } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import type { PiContinueOptions, PiSessionPatch } from './piRuntimeTypes';
@@ -133,7 +131,21 @@ export async function continuePiRuntimeSession(
   const nextSystemPrompt = requestedSystemPrompt ?? active.requestedSystemPrompt;
   const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
   const skillsChanged = !haveSameStringList(requestedSkillIds, active.requestedSkillIds);
-  if (skillsChanged) {
+  const nextSkillRoots = skillsChanged
+    ? resolvePiSkillRoots(
+        requestedSkillIds,
+        resolveZhiyuanSkillDirs(),
+        active.resourceState.expertSkillDirs,
+      )
+    : active.resourceState.skillRoots;
+  const cadToolChanged =
+    Boolean(nextSkillRoots['text-to-cad']) !==
+    Boolean(active.resourceState.skillRoots['text-to-cad']);
+
+  // Chat sessions filter `additionalSkillPaths` at ResourceLoader creation and
+  // CAD custom tool registration is decided once at createAgentSession. Work-mode
+  // skill changes reload in place without tearing down the Pi session or MCPs.
+  if (skillsChanged && (active.resourceState.chatMode || cadToolChanged)) {
     host.disposeSessionForRecreation(sessionId, active);
     return await host.startSession(sessionId, prompt, {
       ...options,
@@ -150,21 +162,25 @@ export async function continuePiRuntimeSession(
   active.goalMode = nextGoalMode;
   active.planMode = nextPlanMode;
 
-  if (promptChanged) {
+  if (promptChanged || skillsChanged || active.pendingSkillReload === true) {
     const previousSystemPrompt = active.resourceState.systemPrompt;
     const previousSkillIds = active.resourceState.skillIds;
+    const previousSkillRoots = active.resourceState.skillRoots;
     active.resourceState.systemPrompt = nextSystemPrompt;
     active.resourceState.skillIds = requestedSkillIds;
+    active.resourceState.skillRoots = nextSkillRoots;
     try {
       // Pi reloads the existing ResourceLoader without replacing transcript
       // state, model, MCP tools, or custom expert tools.
       await active.piSession.reload();
       active.requestedSystemPrompt = nextSystemPrompt;
       active.requestedSkillIds = requestedSkillIds;
-      console.debug('[PiRuntime] reloaded session resources after prompt change');
+      active.pendingSkillReload = false;
+      console.debug('[PiRuntime] reloaded session resources after prompt or skill change');
     } catch (error) {
       active.resourceState.systemPrompt = previousSystemPrompt;
       active.resourceState.skillIds = previousSkillIds;
+      active.resourceState.skillRoots = previousSkillRoots;
       active.isRunning = false;
       const message = error instanceof Error ? error.message : String(error);
       host.emit('error', sessionId, classifyCoworkError(message));
@@ -266,10 +282,6 @@ export async function continuePiRuntimeSession(
     host.emit('message', sessionId, persisted);
   }
 
-  let nextPrompt = prompt;
-  if (nextPlanMode) {
-    nextPrompt = `${PiPlanModePrompt}\n\n${nextPrompt}`;
-  }
   try {
     const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
       chatMode: active.resourceState.chatMode,
@@ -281,21 +293,28 @@ export async function continuePiRuntimeSession(
       signal: active.abortController.signal,
     });
     active.abortController.signal.throwIfAborted();
-    nextPrompt = finalizePiPromptWithProjectMemory({
+    active.pendingTurnMemoryContext = projectMemoryContext;
+    captureMemoryPromptForE2e({
       sessionId,
       userPrompt: prompt,
-      prompt: nextPrompt,
-      projectMemoryContext,
+      memoryContext: projectMemoryContext,
+      initialPrompt: prompt,
     });
     const continuedImagePrompt = preparePiPrompt(
-      nextPrompt,
+      prompt,
       options.imageAttachments,
       host.recovery.imageInputVerdictForActive(active),
       host.getOcrCommandFor(),
       collectImagePathReferences(options.fileAttachments),
     );
-    host.recovery.recordImagePrompt(sessionId, active, nextPrompt, continuedImagePrompt);
-    await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
+    host.recovery.recordImagePrompt(sessionId, active, prompt, continuedImagePrompt);
+    host.queue.expectDirectUserPrompt(sessionId);
+    try {
+      await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
+    } catch (sendError) {
+      host.queue.cancelDirectUserPrompt(sessionId);
+      throw sendError;
+    }
     await active.eventProjection?.drain();
   } catch (error) {
     host.memoryInjectionDedup.reset(sessionId);
@@ -360,9 +379,7 @@ export async function patchPiRuntimeSession(
         : WorkbenchContractKind.GenericWork,
       harnessVersion: HarnessVersion,
     };
-    const maxOutputTokens = active.resourceState.chatMode
-      ? Math.min(resolvedModel.maxOutputTokens, PiChatRuntimeLimit.MaxOutputTokens)
-      : resolvedModel.maxOutputTokens;
+    const maxOutputTokens = resolvedModel.maxOutputTokens;
     if (active.resourceState.maxOutputTokens !== maxOutputTokens) {
       active.resourceState.maxOutputTokens = maxOutputTokens;
       await active.piSession.reload();

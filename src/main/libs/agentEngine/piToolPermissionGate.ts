@@ -151,15 +151,6 @@ export class PiToolPermissionGate {
     });
 
     pending.resolve(denied ? { allow: false, reason } : { allow: true });
-
-    if (denied) {
-      this.host.stopActiveSession(
-        pending.sessionId,
-        reason!,
-        false,
-        CoworkInterruptionCause.ApprovalDenied,
-      );
-    }
     return true;
   }
 

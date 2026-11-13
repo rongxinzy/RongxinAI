@@ -73,6 +73,19 @@ test('responds to builtin coding permissions through the in-process runtime', as
       permissionOutcome: CodingPermissionOutcome.Selected,
     },
   });
+
+  service.recordBuiltinEvent(lane.localSessionId, CodingEventKind.Permission, {
+    requestId: 'approval-deny',
+  });
+  const denied = await service.respondToPermission(workspaceRoot, {
+    requestId: 'approval-deny',
+    outcome: CodingPermissionOutcome.Cancelled,
+  });
+
+  expect(respondBuiltinPermission).toHaveBeenCalledWith('approval-deny', false);
+  expect(denied.lanes[0].status).toBe(CodingLaneStatus.Running);
+  expect(denied.missions[0].status).toBe(CodingMissionStatus.Running);
+  expect(denied.assignments[0].status).toBe(CodingAssignmentStatus.Running);
 });
 
 test('pauses a builtin lane when its runtime reports a recoverable interruption', async () => {

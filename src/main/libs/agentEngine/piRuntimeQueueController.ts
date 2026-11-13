@@ -34,8 +34,61 @@ export class PiRuntimeQueueController {
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
   /** Opaque application actions that run after queued Work prompts settle. */
   private readonly queuedControlActions = new Map<string, Array<() => Promise<void>>>();
+  /** Counts direct/steer prompts whose native `message_start { role: 'user' }` is expected. */
+  private readonly pendingDirectUserPrompts = new Map<string, number>();
+  /** Ordered queued item IDs already pushed into Pi's native `followUp` queue. */
+  private readonly dispatchedNativeFollowUpIds = new Map<string, string[]>();
 
   constructor(private readonly host: PiRuntimeAdapterHost) {}
+
+  expectDirectUserPrompt(sessionId: string): void {
+    this.pendingDirectUserPrompts.set(
+      sessionId,
+      (this.pendingDirectUserPrompts.get(sessionId) ?? 0) + 1,
+    );
+  }
+
+  cancelDirectUserPrompt(sessionId: string): void {
+    const count = this.pendingDirectUserPrompts.get(sessionId) ?? 0;
+    if (count <= 1) {
+      this.pendingDirectUserPrompts.delete(sessionId);
+    } else {
+      this.pendingDirectUserPrompts.set(sessionId, count - 1);
+    }
+  }
+
+  resetNativeDispatch(sessionId: string): void {
+    this.pendingDirectUserPrompts.delete(sessionId);
+    this.dispatchedNativeFollowUpIds.delete(sessionId);
+    try {
+      this.host.activeSessions.get(sessionId)?.piSession.clearQueue?.();
+    } catch {
+      // Ignore cleanup errors when clearing Pi queue state.
+    }
+  }
+
+  onNativeUserMessageStart(sessionId: string, active: ActivePiSession): void {
+    const pendingDirect = this.pendingDirectUserPrompts.get(sessionId) ?? 0;
+    if (pendingDirect > 0) {
+      this.cancelDirectUserPrompt(sessionId);
+      return;
+    }
+    const dispatched = this.dispatchedNativeFollowUpIds.get(sessionId);
+    if (!dispatched?.length) return;
+    const nextId = dispatched.shift();
+    if (dispatched.length === 0) {
+      this.dispatchedNativeFollowUpIds.delete(sessionId);
+    }
+    if (!nextId) return;
+    const item = this.pendingMessageQueue.take(sessionId, nextId, CoworkQueueDelivery.FollowUp);
+    if (!item) return;
+    this.emitQueueUpdated(sessionId);
+    active.summaryCheckpointGoal = item.text;
+    const payload = this.buildQueuedPromptPayload(active, item);
+    this.host.recovery.recordImagePrompt(sessionId, active, item.text, payload);
+    this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.FollowUp);
+    this.pendingMessageQueue.finishDelivery(item.id);
+  }
 
   hasPendingFollowUp(sessionId: string): boolean {
     return this.pendingMessageQueue.hasPendingFollowUp(sessionId);
@@ -55,6 +108,7 @@ export class PiRuntimeQueueController {
 
   /** Clear a deleted session's queue, emitting queueUpdated when it had items. */
   clear(sessionId: string): boolean {
+    this.resetNativeDispatch(sessionId);
     const cleared = this.pendingMessageQueue.clear(sessionId);
     if (cleared) this.emitQueueUpdated(sessionId);
     return cleared;
@@ -116,6 +170,8 @@ export class PiRuntimeQueueController {
       skillIds,
     );
     this.emitQueueUpdated(sessionId);
+    this.applyQueuedSkillIds(active, item.skillIds);
+    this.dispatchNativeFollowUpItem(sessionId, active, item);
     return { success: true, item };
   }
 
@@ -124,7 +180,8 @@ export class PiRuntimeQueueController {
     itemId: string,
     text: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
-    if (!this.isWorkSession(sessionId, this.host.activeSessions.get(sessionId))) {
+    const active = this.host.activeSessions.get(sessionId);
+    if (!this.isWorkSession(sessionId, active)) {
       return { success: false, error: 'Pending message queue is only available in Work sessions.' };
     }
     const normalizedText = text.trim();
@@ -133,17 +190,20 @@ export class PiRuntimeQueueController {
     const item = this.pendingMessageQueue.update(sessionId, itemId, normalizedText);
     if (!item) return { success: false, error: 'Pending message was not found.' };
     this.emitQueueUpdated(sessionId);
+    this.syncNativeFollowUpQueue(sessionId, active);
     return { success: true, item };
   }
 
   deletePendingMessage(sessionId: string, itemId: string): { success: boolean; error?: string } {
-    if (!this.isWorkSession(sessionId, this.host.activeSessions.get(sessionId))) {
+    const active = this.host.activeSessions.get(sessionId);
+    if (!this.isWorkSession(sessionId, active)) {
       return { success: false, error: 'Pending message queue is only available in Work sessions.' };
     }
     if (!this.pendingMessageQueue.remove(sessionId, itemId)) {
       return { success: false, error: 'Pending message was not found.' };
     }
     this.emitQueueUpdated(sessionId);
+    this.syncNativeFollowUpQueue(sessionId, active);
     return { success: true };
   }
 
@@ -163,41 +223,20 @@ export class PiRuntimeQueueController {
     const item = this.pendingMessageQueue.take(sessionId, itemId);
     if (!item) return { success: false, error: 'Pending message was not found.' };
     this.emitQueueUpdated(sessionId);
-    // A steer lands in the running session, so its picks must be loaded before
-    // the prompt is sent: Pi filters both <available_skills> and the
-    // run_skill_script whitelist from the session's skill set, and a skill
-    // attached to this queued input is additive exactly like a follow-up's.
-    const previousSkillIds = active.resourceState.skillIds;
-    const previousSkillRoots = active.resourceState.skillRoots;
-    const steeredSkillIds = mergeSkillIds(previousSkillIds, item.skillIds);
-    if (!haveSameStringList(steeredSkillIds, previousSkillIds)) {
-      active.resourceState.skillIds = steeredSkillIds;
-      active.resourceState.skillRoots = resolvePiSkillRoots(
-        steeredSkillIds,
-        resolveZhiyuanSkillDirs(),
-        active.resourceState.expertSkillDirs,
-      );
-      try {
-        // Pi reloads the existing ResourceLoader without replacing transcript
-        // state, model, MCP tools, or custom expert tools.
-        await active.piSession.reload();
-        active.requestedSkillIds = steeredSkillIds;
-      } catch (error) {
-        active.resourceState.skillIds = previousSkillIds;
-        active.resourceState.skillRoots = previousSkillRoots;
-        throw error;
-      }
-    }
+    this.syncNativeFollowUpQueue(sessionId, active);
+    // Keep resourceState.skillIds/skillRoots up to date so run_skill_script works
+    // immediately; never call piSession.reload() while streaming (Pi throws).
+    this.applyQueuedSkillIds(active, item.skillIds);
     try {
-      const queuedImagePrompt = preparePiPrompt(
-        item.text,
-        item.imageAttachments,
-        this.host.recovery.imageInputVerdictForActive(active),
-        this.host.getOcrCommandFor(),
-        collectImagePathReferences(item.fileAttachments),
-      );
+      const queuedImagePrompt = this.buildQueuedPromptPayload(active, item);
       this.host.recovery.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
-      await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
+      this.expectDirectUserPrompt(sessionId);
+      try {
+        await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
+      } catch (sendError) {
+        this.cancelDirectUserPrompt(sessionId);
+        throw sendError;
+      }
       this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.Steer);
       active.isRunning = true;
       this.pendingMessageQueue.finishDelivery(item.id);
@@ -319,6 +358,113 @@ export class PiRuntimeQueueController {
   private isWorkSession(sessionId: string, active: ActivePiSession | undefined): boolean {
     if (active) return !active.resourceState.chatMode;
     return this.host.isStoredSessionWorkMode(sessionId);
+  }
+
+  private buildQueuedPromptPayload(active: ActivePiSession, item: CoworkPendingMessage) {
+    return preparePiPrompt(
+      item.text,
+      item.imageAttachments,
+      this.host.recovery.imageInputVerdictForActive(active),
+      this.host.getOcrCommandFor(),
+      collectImagePathReferences(item.fileAttachments),
+    );
+  }
+
+  private applyQueuedSkillIds(active: ActivePiSession, skillIds?: string[]): void {
+    const mergedSkillIds = mergeSkillIds(active.resourceState.skillIds, skillIds);
+    if (haveSameStringList(mergedSkillIds, active.resourceState.skillIds)) return;
+    active.resourceState.skillIds = mergedSkillIds;
+    active.resourceState.skillRoots = resolvePiSkillRoots(
+      mergedSkillIds,
+      resolveZhiyuanSkillDirs(),
+      active.resourceState.expertSkillDirs,
+    );
+    active.requestedSkillIds = mergedSkillIds;
+    // Defer `piSession.reload()` until idle; Pi refuses reload() while streaming.
+    active.pendingSkillReload = true;
+  }
+
+  private pushDispatchedFollowUpId(sessionId: string, itemId: string): void {
+    const dispatched = this.dispatchedNativeFollowUpIds.get(sessionId) ?? [];
+    dispatched.push(itemId);
+    this.dispatchedNativeFollowUpIds.set(sessionId, dispatched);
+  }
+
+  private removeDispatchedFollowUpId(sessionId: string, itemId: string): void {
+    const dispatched = this.dispatchedNativeFollowUpIds.get(sessionId);
+    if (!dispatched?.length) return;
+    const filtered = dispatched.filter(id => id !== itemId);
+    if (filtered.length > 0) {
+      this.dispatchedNativeFollowUpIds.set(sessionId, filtered);
+    } else {
+      this.dispatchedNativeFollowUpIds.delete(sessionId);
+    }
+  }
+
+  private dispatchNativeFollowUpItem(
+    sessionId: string,
+    active: ActivePiSession,
+    item: CoworkPendingMessage,
+  ): void {
+    this.pushDispatchedFollowUpId(sessionId, item.id);
+    const payload = this.buildQueuedPromptPayload(active, item);
+    void sendPiPrompt(active.piSession, payload, 'followUp').catch(error => {
+      this.removeDispatchedFollowUpId(sessionId, item.id);
+      if (
+        this.host.activeSessions.get(sessionId) !== active ||
+        active.aborted ||
+        active.abortController.signal.aborted
+      ) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      const taken = this.pendingMessageQueue.take(sessionId, item.id, CoworkQueueDelivery.FollowUp);
+      if (!taken) return;
+      this.pendingMessageQueue.restore(sessionId, { ...taken, error: message });
+      this.emitQueueUpdated(sessionId);
+    });
+  }
+
+  private syncNativeFollowUpQueue(sessionId: string, active: ActivePiSession | undefined): void {
+    if (!active || !this.host.isSessionRunning(sessionId)) return;
+    if (typeof active.piSession.clearQueue !== 'function') {
+      const pendingIds = new Set(
+        this.pendingMessageQueue
+          .list(sessionId)
+          .filter(entry => entry.delivery === CoworkQueueDelivery.FollowUp)
+          .map(entry => entry.id),
+      );
+      const remaining = (this.dispatchedNativeFollowUpIds.get(sessionId) ?? []).filter(id =>
+        pendingIds.has(id),
+      );
+      if (remaining.length > 0) {
+        this.dispatchedNativeFollowUpIds.set(sessionId, remaining);
+      } else {
+        this.dispatchedNativeFollowUpIds.delete(sessionId);
+      }
+      return;
+    }
+    const cleared = active.piSession.clearQueue();
+    this.dispatchedNativeFollowUpIds.delete(sessionId);
+    for (const steeringPrompt of cleared.steering ?? []) {
+      void sendPiPrompt(
+        active.piSession,
+        {
+          content: steeringPrompt,
+          hasImages: false,
+          sentImages: [],
+          omittedImages: [],
+        },
+        'steer',
+      ).catch(error => {
+        console.warn(`[PiRuntime] failed to restore native steer for ${sessionId}:`, error);
+      });
+    }
+    for (const pending of this.pendingMessageQueue.list(sessionId)) {
+      if (pending.delivery === CoworkQueueDelivery.FollowUp) {
+        this.dispatchNativeFollowUpItem(sessionId, active, pending);
+      }
+    }
   }
 
   private persistQueuedUserMessage(

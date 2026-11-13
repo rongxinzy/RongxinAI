@@ -135,8 +135,7 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
     expect(activeSession.retryAttempts).toBe(1);
   });
 
-  it('cancels Pi retry for non-transient unrecoverable errors like invalid API key', () => {
-    // 1. Simulate fatal auth error
+  it('defers to Pi native retry policy for non-image errors like invalid API key', () => {
     const authErrorMessage = 'Unauthorized: invalid api key provided';
     turnEvents.handlePiEvent(
       'test-session',
@@ -151,9 +150,8 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
       } as never,
     );
 
-    expect(activeSession.pendingError?.sticky).toBe(true);
+    expect(activeSession.pendingError?.sticky).toBeFalsy();
 
-    // 2. If SDK attempts retry
     turnEvents.handlePiEvent(
       'test-session',
       activeSession as ActivePiSession,
@@ -163,7 +161,34 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
       } as never,
     );
 
-    // 3. cancelPiRetry MUST be called to stop hopeless retry loop
+    expect(hoisted.mockCancelPiRetry).not.toHaveBeenCalled();
+  });
+
+  it('cancels Pi retry for image capability rejection', () => {
+    turnEvents.handlePiEvent(
+      'test-session',
+      activeSession as ActivePiSession,
+      {
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          stopReason: 'error',
+          errorMessage: 'image input is not supported for this model',
+        },
+      } as never,
+    );
+
+    expect(activeSession.pendingError?.sticky).toBe(true);
+
+    turnEvents.handlePiEvent(
+      'test-session',
+      activeSession as ActivePiSession,
+      {
+        type: 'auto_retry_start',
+        attempt: 1,
+      } as never,
+    );
+
     expect(hoisted.mockCancelPiRetry).toHaveBeenCalledOnce();
   });
 
@@ -198,13 +223,13 @@ describe('PiRuntimeTurnEvents - context overflow auto_retry handling', () => {
     expect(activeSession.turnFailed).toBe(false);
   });
 
-  it('preserves an existing fatal error when compaction also fails', () => {
+  it('preserves an existing sticky image capability error when compaction also fails', () => {
     turnEvents.handlePiEvent('test-session', activeSession as ActivePiSession, {
       type: PiAgentEventType.MessageEnd,
       message: {
         role: 'assistant',
         stopReason: PiAssistantStopReason.Error,
-        errorMessage: 'Unauthorized: invalid api key provided',
+        errorMessage: 'image input is not supported for this model',
       },
     });
     const original = activeSession.pendingError;

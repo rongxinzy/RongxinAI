@@ -20,7 +20,7 @@ import {
 import { ImageInputVerdict, imageInputVerdict } from './piImageInputFallback';
 import type { PiModelRuntime, PiModules, PiResolvedModel } from './piRuntimeSessionState';
 
-export const DEFAULT_PI_LOCAL_MAX_TOKENS = 4096;
+export const DEFAULT_PI_LOCAL_MAX_TOKENS = 8192;
 type MagpieNativeApi = 'openai-responses' | 'anthropic-messages' | 'openai-completions';
 
 export interface ModelPoolRequestContext {
@@ -77,7 +77,7 @@ export function buildMagpiePiModel(
       )
     : undefined;
   const contextWindow = selected.context_window ?? 32768;
-  const defaultOutputTokens = selected.reasoning === true ? 8192 : 4096;
+  const defaultOutputTokens = selected.reasoning === true ? 16384 : DEFAULT_PI_LOCAL_MAX_TOKENS;
   const maxTokens = Math.min(selected.max_output_tokens ?? defaultOutputTokens, contextWindow);
   const baseUrl = api === 'anthropic-messages' ? url.origin : `${url.origin}/v1`;
   const imageInput = magpieImageInput(selected);

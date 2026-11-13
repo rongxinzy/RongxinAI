@@ -118,7 +118,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenLastCalledWith('Second goal');
     });
 
-    it('runs a plan-mode turn read-only and registers the plan tool', async () => {
+    it('runs a plan-mode turn read-only, registers plan_write, and injects plan_mode via before_agent_start', async () => {
       await adapter.startSession('plan-mode', 'Plan the migration', {
         sessionMode: 'work',
         planMode: true,
@@ -128,13 +128,30 @@ describe('PiRuntimeAdapter', () => {
         customTools?: Array<{ name: string }>;
       };
       expect(sessionOptions.customTools?.map(tool => tool.name)).toContain('plan_write');
-      const initialPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-      expect(initialPrompt).toContain('## Plan Mode');
-      expect(initialPrompt).toContain('This turn is read-only planning');
-      expect(initialPrompt.endsWith('Plan the migration')).toBe(true);
+      expect(mockSession.prompt).toHaveBeenCalledWith('Plan the migration');
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
+        >;
+      };
+      const beforeAgentHandlers: Array<(event: unknown) => unknown> = [];
+      for (const factory of loaderOptions.extensionFactories ?? []) {
+        factory({
+          on: (event, handler) => {
+            if (event === PiExtensionEventType.BeforeAgentStart) beforeAgentHandlers.push(handler);
+          },
+        });
+      }
+      const sections: Record<string, string> = {};
+      for (const handler of beforeAgentHandlers) {
+        await handler({ prompt: 'Plan the migration', systemPromptOptions: { sections } });
+      }
+      expect(sections.plan_mode).toContain('## Plan Mode');
+      expect(sections.plan_mode).toContain('This turn is read-only planning');
     });
 
-    it('prepends the plan-mode instruction when a live session plans again', async () => {
+    it('injects plan_mode into systemPromptOptions when a live session plans again without polluting user prompt', async () => {
       const published: unknown[] = [];
       adapter.on('plan', (_sessionId, plan) => published.push(plan));
       await adapter.startSession('plan-live', 'First task', {
@@ -163,10 +180,27 @@ describe('PiRuntimeAdapter', () => {
         planMode: true,
       });
 
-      const continuedPrompt = mockSession.prompt.mock.calls[1]?.[0] as string;
-      expect(continuedPrompt).toContain('## Plan Mode');
-      expect(continuedPrompt.endsWith('Plan the next step')).toBe(true);
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('Plan the next step');
       expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
+        >;
+      };
+      const beforeAgentHandlers: Array<(event: unknown) => unknown> = [];
+      for (const factory of loaderOptions.extensionFactories ?? []) {
+        factory({
+          on: (event, handler) => {
+            if (event === PiExtensionEventType.BeforeAgentStart) beforeAgentHandlers.push(handler);
+          },
+        });
+      }
+      const sections: Record<string, string> = {};
+      for (const handler of beforeAgentHandlers) {
+        await handler({ prompt: 'Plan the next step', systemPromptOptions: { sections } });
+      }
+      expect(sections.plan_mode).toContain('## Plan Mode');
     });
 
     it('keeps workspace mutations available outside plan mode', async () => {
@@ -238,7 +272,7 @@ describe('PiRuntimeAdapter', () => {
       expect(allowedEdit).toBeUndefined();
     });
 
-    it('keeps skill execution controls when a skill is added to Work', async () => {
+    it('reloads skills in place when a skill is added to Work', async () => {
       const workspaceRoot = createTemporaryWorkspace();
       await adapter.startSession('dynamic-skill', 'First', { sessionMode: 'work', workspaceRoot });
 
@@ -247,13 +281,14 @@ describe('PiRuntimeAdapter', () => {
         sessionMode: 'work',
         workspaceRoot,
       });
-      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
-      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+      expect(mockSession.abort).not.toHaveBeenCalled();
+      expect(mockSession.reload).toHaveBeenCalledOnce();
       expect(mockSession.prompt).toHaveBeenLastCalledWith('Read package.json');
-      const recreatedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+      const initialOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{ name: string }>;
       };
-      const toolNames = recreatedOptions.customTools?.map(tool => tool.name);
+      const toolNames = initialOptions.customTools?.map(tool => tool.name);
       expect(toolNames).toContain('run_skill_script');
       expect(toolNames).not.toContain('work_acceptance');
     });
@@ -280,7 +315,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenLastCalledWith('你好');
     });
 
-    it('starts a fresh model-decided task after a shortcut approval is denied', async () => {
+    it('blocks only the denied tool call and lets Pi settle cleanly without tearing down the session', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       const service = new RealWorkbenchTaskService(db);
@@ -298,6 +333,7 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot,
           approvalMode: WorkbenchApprovalMode.Ask,
         });
+        const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: unknown) => void;
         const first = service.getCurrent('denied-shortcut')!;
         const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
           extensionFactories?: Array<
@@ -321,7 +357,21 @@ describe('PiRuntimeAdapter', () => {
         });
         await vi.waitFor(() => expect(requests).toHaveLength(1));
         adapter.respondToPermission(requests[0], { behavior: 'deny' });
-        await authorization;
+        await expect(authorization).resolves.toMatchObject({ block: true });
+        expect(mockSession.abort).not.toHaveBeenCalled();
+
+        // Pi receives the block result and settles the turn normally.
+        listener({ type: 'turn_start' });
+        listener({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Understood, I will not write that file.' }],
+            stopReason: 'stop',
+          },
+        });
+        listener({ type: 'agent_end' });
+        listener({ type: 'agent_settled' });
 
         await adapter.continueSession('denied-shortcut', 'Hello', {
           skillIds: ['presentation-studio'],
@@ -332,14 +382,8 @@ describe('PiRuntimeAdapter', () => {
         const current = service.getCurrent('denied-shortcut')!;
         expect(current.task.id).not.toBe(first.task.id);
         expect(current.task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
-        expect(service.getDetail(first.task.id)?.task.status).toBe(WorkbenchTaskStatus.Cancelled);
-        expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
-        const greetingOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(greetingOptions.customTools?.map(tool => tool.name)).not.toContain(
-          'production_loop',
-        );
+        expect(service.getDetail(first.task.id)?.task.status).toBe(WorkbenchTaskStatus.Completed);
+        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
       } finally {
         db.close();
       }

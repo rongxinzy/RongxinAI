@@ -30,6 +30,7 @@ export function disposePiSessionForRecreation(
   // A queued control action belongs to the turn that queued it; replaying it
   // after a resource-driven recreation would be an unexpected side effect.
   host.queue.dropControlActions(sessionId);
+  host.queue.resetNativeDispatch(sessionId);
   host.recovery.dismissAskUserQuestionsBySession(sessionId);
   host.recovery.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
   active.artifactRecorder?.dispose();
@@ -41,6 +42,7 @@ export function disposePiSessionForRecreation(
   active.abortController.abort();
   active.unsubscribe();
   void active.piSession.abort();
+  active.piSession.dispose?.();
   host
     .getWorkbenchTaskService()
     ?.cancelRun?.(
@@ -108,6 +110,8 @@ export function stopActivePiRuntimeSession(
   active.abortController.abort();
   active.unsubscribe();
   void active.piSession.abort();
+  active.piSession.dispose?.();
+  host.queue.resetNativeDispatch(sessionId);
   host.getWorkbenchTaskService()?.cancelRun?.(sessionId, active.workbenchRunId, reason);
   host.recovery.clearApprovalsBySession(sessionId);
   host.emit('sessionStopped', sessionId);
@@ -267,6 +271,8 @@ export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Dat
     session.unsubscribe();
     session.piSession.abortBash();
     void session.piSession.abort();
+    session.piSession.dispose?.();
+    host.queue.resetNativeDispatch(session.sessionId);
     host.memoryInjectionDedup.reset(session.sessionId);
     host.activeSessions.delete(session.sessionId);
     host.retainedSessionIds.add(session.sessionId);

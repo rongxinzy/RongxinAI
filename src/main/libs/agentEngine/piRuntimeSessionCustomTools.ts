@@ -263,14 +263,14 @@ export function buildPiSessionCustomTools(
             cwd,
             {
               systemPrompt,
-              skillIds,
+              skillIds: skillIds ?? [],
               maxOutputTokens,
               fileToolsEnabled: true,
               unattended: resourceState.unattended,
               chatMode: resourceState.chatMode,
               nativeToolsOnly: true,
               expertSkillDirs: [],
-              skillRoots: resolvePiSkillRoots(skillIds, resolveZhiyuanSkillDirs(), []),
+              skillRoots: resolvePiSkillRoots(skillIds ?? [], resolveZhiyuanSkillDirs(), []),
             },
             {
               sessionId,

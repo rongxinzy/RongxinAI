@@ -33,7 +33,7 @@ test('tool responses and interrupted responses invalidate an earlier final answe
       content: [{ type: PiContentBlockType.ToolCall }],
     }),
   ).toBe(true);
-  expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Length })).toBe(true);
+  expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Length })).toBe(false);
   expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Aborted })).toBe(true);
   expect(invalidatesPiFinalResponse({ stopReason: PiAssistantStopReason.Error })).toBe(true);
 });

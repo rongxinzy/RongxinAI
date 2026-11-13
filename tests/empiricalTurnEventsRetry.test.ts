@@ -146,29 +146,30 @@ describe('Empirical Verification Harness — Context Window Guard, Sizing & Auto
         expectCancelledOnRetry: false,
       },
 
-      // 2. Fatal non-transient errors (MUST be sticky, MUST be cancelled on auto_retry_start)
+      // 2. Client-side error classification leaves non-image retry eligibility to Pi
       {
         name: 'Invalid API Key (AuthExpired)',
         rawError: 'Unauthorized: invalid api key provided',
         expectedKind: CoworkErrorKind.AuthExpired,
-        expectSticky: true,
-        expectCancelledOnRetry: true,
+        expectSticky: false,
+        expectCancelledOnRetry: false,
       },
       {
         name: 'Model Not Found (ModelNotFound)',
         rawError: 'The model `deepseek-chat-nonexistent` does not exist',
         expectedKind: CoworkErrorKind.ModelNotFound,
-        expectSticky: true,
-        expectCancelledOnRetry: true,
+        expectSticky: false,
+        expectCancelledOnRetry: false,
       },
       {
         name: 'Quota / Budget Exceeded (BudgetExceeded)',
         rawError:
           'You have exceeded your current quota, please check your plan and billing details',
         expectedKind: CoworkErrorKind.BudgetExceeded,
-        expectSticky: true,
-        expectCancelledOnRetry: true,
+        expectSticky: false,
+        expectCancelledOnRetry: false,
       },
+      // 3. Image capability rejections stay sticky and cancel SDK retries
       {
         name: 'Model Capability Unsupported',
         rawError: 'image input is not supported for this model',

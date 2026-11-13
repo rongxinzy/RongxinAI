@@ -63,35 +63,42 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
-    it('delivers queued follow-ups in order after Pi settles', async () => {
-      let listener: ((event: { type: string }) => void) | null = null;
-      mockSession.subscribe.mockImplementation((callback: (event: { type: string }) => void) => {
-        listener = callback;
-        return () => {};
-      });
+    it('dispatches queued follow-ups natively and consumes them on Pi message_start before agent_settled', async () => {
+      let listener: ((event: { type: string; message?: { role: string } }) => void) | null = null;
+      mockSession.subscribe.mockImplementation(
+        (callback: (event: { type: string; message?: { role: string } }) => void) => {
+          listener = callback;
+          return () => {};
+        },
+      );
+      const completes: string[] = [];
+      adapter.on('complete', sid => completes.push(sid));
       await adapter.startSession('queue-session', 'Start work', { sessionMode: 'work' });
+      // Pi emits user message_start for the initial prompt first.
+      listener!({ type: 'message_start', message: { role: 'user' } });
+
       const first = adapter.enqueuePendingMessage('queue-session', 'First follow-up');
       adapter.enqueuePendingMessage('queue-session', 'Second follow-up');
 
-      listener!({ type: 'agent_end' });
-      listener!({ type: 'agent_settled' });
-      await vi.waitFor(() => {
-        expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up', {
-          streamingBehavior: 'followUp',
-        });
-      });
-      // Each follow-up turn ends with its own agent_end + agent_settled pair,
-      // which releases the next queued item.
-      listener!({ type: 'agent_end' });
-      listener!({ type: 'agent_settled' });
-      await vi.waitFor(() => {
-        expect(mockSession.prompt).toHaveBeenCalledTimes(3);
-      });
+      // Both follow-ups are dispatched immediately into Pi's native followUp queue.
+      expect(mockSession.prompt).toHaveBeenCalledTimes(3);
       expect(mockSession.prompt.mock.calls.slice(1)).toEqual([
         ['First follow-up', { streamingBehavior: 'followUp' }],
         ['Second follow-up', { streamingBehavior: 'followUp' }],
       ]);
+      expect(adapter.listPendingMessages('queue-session')).toHaveLength(2);
+
+      // Pi begins each queued follow-up natively with user message_start.
+      listener!({ type: 'message_start', message: { role: 'user' } });
+      expect(adapter.listPendingMessages('queue-session')).toHaveLength(1);
+      listener!({ type: 'message_start', message: { role: 'user' } });
       expect(adapter.listPendingMessages('queue-session')).toEqual([]);
+
+      // Pi emits agent_settled once after all native follow-ups complete.
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
+      await vi.waitFor(() => expect(completes).toEqual(['queue-session']));
+      expect(mockSession.prompt).toHaveBeenCalledTimes(3);
       expect(first.success).toBe(true);
     });
 
@@ -214,7 +221,14 @@ describe('PiRuntimeAdapter', () => {
       expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
     });
 
-    it('loads a steered turn picks into the running session before sending', async () => {
+    it('updates resourceState skillIds on steer without mid-stream reload, and reloads once idle', async () => {
+      let listener: ((event: { type: string; message?: { role: string } }) => void) | null = null;
+      mockSession.subscribe.mockImplementation(
+        (callback: (event: { type: string; message?: { role: string } }) => void) => {
+          listener = callback;
+          return () => {};
+        },
+      );
       await adapter.startSession('steer-skills', 'Start work', {
         sessionMode: 'work',
         skillIds: ['alpha-skill'],
@@ -231,9 +245,9 @@ describe('PiRuntimeAdapter', () => {
       const result = await adapter.steerPendingMessage('steer-skills', queued.item!.id);
 
       expect(result.success).toBe(true);
-      // The steer text goes in raw — no inlined skill body — and the session's
-      // resources were reloaded so the model can see the newly attached skill.
-      expect(mockSession.reload).toHaveBeenCalled();
+      // Never call Pi's reload() while streaming (it throws); defer until idle.
+      expect(mockSession.reload).not.toHaveBeenCalled();
+      expect(mockSession.clearQueue).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenLastCalledWith('Change direction', {
         streamingBehavior: 'steer',
       });
@@ -247,6 +261,12 @@ describe('PiRuntimeAdapter', () => {
         diagnostics: [],
       });
       expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
+
+      // Once settled and idle, the next continueSession flushes the deferred reload.
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
+      await adapter.continueSession('steer-skills', 'Follow up', { sessionMode: 'work' });
+      expect(mockSession.reload).toHaveBeenCalledOnce();
     });
 
     it('rejects queue controls for Chat sessions', async () => {
@@ -360,6 +380,33 @@ describe('PiRuntimeAdapter', () => {
         adapter.stopAllSessions();
         db.close();
       }
+    });
+
+    it('re-syncs Pi native followUp queue on edit and delete', async () => {
+      await adapter.startSession('sync-queue', 'Start work', { sessionMode: 'work' });
+      const first = adapter.enqueuePendingMessage('sync-queue', 'Draft one');
+      const second = adapter.enqueuePendingMessage('sync-queue', 'Draft two');
+      expect(first.success && second.success).toBe(true);
+
+      mockSession.prompt.mockClear();
+      mockSession.clearQueue.mockClear();
+
+      expect(
+        adapter.updatePendingMessage('sync-queue', first.item!.id, 'Updated one').success,
+      ).toBe(true);
+      expect(mockSession.clearQueue).toHaveBeenCalledTimes(1);
+      expect(mockSession.prompt.mock.calls).toEqual([
+        ['Updated one', { streamingBehavior: 'followUp' }],
+        ['Draft two', { streamingBehavior: 'followUp' }],
+      ]);
+
+      mockSession.prompt.mockClear();
+      mockSession.clearQueue.mockClear();
+      expect(adapter.deletePendingMessage('sync-queue', second.item!.id).success).toBe(true);
+      expect(mockSession.clearQueue).toHaveBeenCalledTimes(1);
+      expect(mockSession.prompt.mock.calls).toEqual([
+        ['Updated one', { streamingBehavior: 'followUp' }],
+      ]);
     });
   });
 });

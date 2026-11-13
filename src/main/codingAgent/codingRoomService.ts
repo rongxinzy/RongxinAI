@@ -314,11 +314,9 @@ export class CodingRoomService extends CodingRoomServiceTurnExecution {
         response.requestId,
         response.outcome === CodingPermissionOutcome.Selected,
       );
-      if (response.outcome === CodingPermissionOutcome.Selected) {
-        this.repository.updateLaneStatus(lane.id, CodingLaneStatus.Running);
-        this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.Running);
-        this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.Running);
-      }
+      this.repository.updateLaneStatus(lane.id, CodingLaneStatus.Running);
+      this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.Running);
+      this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.Running);
       this.repository.appendEvent(lane.id, CodingEventKind.ToolCall, {
         permissionRequestId: response.requestId,
         permissionOutcome: response.outcome,

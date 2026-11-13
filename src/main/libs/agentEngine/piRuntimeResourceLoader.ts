@@ -10,7 +10,7 @@ import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
 import { getPiBashPythonEnvViolation } from './piBashToolGuidelines';
 import { PiBuiltinFileToolName } from './piToolConstants';
-import { isPlanModeBlockedTool } from './piPlanTool';
+import { PiPlanModePrompt, isPlanModeBlockedTool } from './piPlanTool';
 import {
   PiExtensionEventType,
   type PiExtensionApi,
@@ -61,11 +61,11 @@ export async function createPiRuntimeResourceLoader(
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
-    // Work discovers the app-managed skill roots. Chat only loads explicitly
-    // selected skills and expert preset roots, so a plain conversation does
-    // not scan the full bundled Skill tree during startup.
+    // Work discovers the app-managed skill roots. Chat and isolated subagents
+    // (`nativeToolsOnly`) only load explicitly selected skills and expert preset
+    // roots, avoiding full bundled Skill enumeration and `<available_skills>` bloat.
     additionalSkillPaths: [
-      ...(resourceState.chatMode
+      ...(resourceState.chatMode || resourceState.nativeToolsOnly
         ? resolveSelectedSkillDirs(resourceState.skillIds)
         : resolveZhiyuanSkillDirs()),
       ...resourceState.expertSkillDirs,
@@ -139,6 +139,29 @@ export async function createPiRuntimeResourceLoader(
       ...(approvalContext
         ? [
             (extensionApi: PiExtensionApi) => {
+              extensionApi.on(PiExtensionEventType.BeforeAgentStart, event => {
+                const active = host.activeSessions.get(approvalContext.sessionId);
+                if (!active) return;
+
+                if (active.planMode === true) {
+                  event.systemPromptOptions.sections.plan_mode = PiPlanModePrompt;
+                } else {
+                  delete event.systemPromptOptions.sections.plan_mode;
+                }
+
+                const turnMemory = active.pendingTurnMemoryContext?.trim();
+                active.pendingTurnMemoryContext = null;
+                if (turnMemory) {
+                  (active.injectedProjectMemorySections ??= []).push(turnMemory);
+                }
+                if (active.injectedProjectMemorySections?.length) {
+                  event.systemPromptOptions.sections.project_memory =
+                    active.injectedProjectMemorySections.join('\n\n');
+                } else {
+                  delete event.systemPromptOptions.sections.project_memory;
+                }
+              });
+
               extensionApi.on(PiExtensionEventType.ToolCall, async event => {
                 const runId = approvalContext.getRunId();
                 const toolInput =

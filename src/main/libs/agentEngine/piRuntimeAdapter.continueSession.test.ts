@@ -15,8 +15,6 @@ import {
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
-import path from 'path';
-
 import { describe, expect, it, vi } from 'vitest';
 import type { CoworkStore } from '../../coworkStore';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -250,12 +248,42 @@ describe('PiRuntimeAdapter', () => {
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
     });
 
-    it('should recreate the session when skill tool topology changes', async () => {
-      await adapter.startSession('test', 'First', { skillIds: ['skill-a'] });
-      await adapter.continueSession('test', 'Second', { skillIds: ['skill-b'] });
+    it('reloads an idle Work session in place when skills change without CAD topology change', async () => {
+      await adapter.startSession('test', 'First', { sessionMode: 'work', skillIds: ['skill-a'] });
+      await adapter.continueSession('test', 'Second', {
+        sessionMode: 'work',
+        skillIds: ['skill-b'],
+      });
+
+      expect(mockSession.reload).toHaveBeenCalledOnce();
+      expect(mockSession.abort).not.toHaveBeenCalled();
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+      const loader = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
+          skills: Array<{ id: string }>;
+        };
+      };
+      expect(
+        loader.skillsOverride({
+          skills: [{ id: 'skill-a' }, { id: 'skill-b' }],
+          diagnostics: [],
+        }).skills,
+      ).toEqual([{ id: 'skill-b' }]);
+    });
+
+    it('recreates a Chat session when its selected skills change', async () => {
+      await adapter.startSession('chat-skills', 'First', {
+        sessionMode: 'chat',
+        skillIds: ['skill-a'],
+      });
+      await adapter.continueSession('chat-skills', 'Second', {
+        sessionMode: 'chat',
+        skillIds: ['skill-b'],
+      });
 
       expect(mockSession.reload).not.toHaveBeenCalled();
       expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockSession.dispose).toHaveBeenCalledOnce();
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
       const replacementLoader = mockDefaultResourceLoader.mock.calls[1]?.[0] as {
         skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
@@ -270,7 +298,7 @@ describe('PiRuntimeAdapter', () => {
       ).toEqual([{ id: 'skill-b' }]);
     });
 
-    it('creates only one workbench run when skill topology changes', async () => {
+    it('reloads without creating an extra workbench run when Work skillIds change', async () => {
       const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
         run: { id: `run-${beginRun.mock.calls.length}` },
       }));
@@ -281,9 +309,13 @@ describe('PiRuntimeAdapter', () => {
         off: vi.fn(),
       } as unknown as WorkbenchTaskService);
 
-      await adapter.startSession('test', 'First', { skillIds: ['skill-a'] });
-      await adapter.continueSession('test', 'Second', { skillIds: ['skill-b'] });
+      await adapter.startSession('test', 'First', { sessionMode: 'work', skillIds: ['skill-a'] });
+      await adapter.continueSession('test', 'Second', {
+        sessionMode: 'work',
+        skillIds: ['skill-b'],
+      });
 
+      expect(mockSession.reload).toHaveBeenCalledOnce();
       expect(beginRun).toHaveBeenCalledTimes(2);
     });
   });

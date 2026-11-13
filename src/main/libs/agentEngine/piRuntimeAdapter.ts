@@ -146,6 +146,9 @@ export class PiRuntimeAdapter
       this.stopActiveSession(sessionId, reason, drainQueuedFollowUp, cause);
     },
     flushFollowUpQueue: (sessionId, active) => this.queue.flushFollowUpQueue(sessionId, active),
+    onPiUserMessageStart: (sessionId, active) =>
+      this.queue.onNativeUserMessageStart(sessionId, active),
+    resetNativeQueueDispatch: sessionId => this.queue.resetNativeDispatch(sessionId),
     flushPendingError: (sessionId, active) => this.recovery.flushPendingError(sessionId, active),
     imageCapabilityConfiguration: active => this.recovery.imageCapabilityConfiguration(active),
     syncImageInputCapability: sessionIds => this.recovery.syncImageInputCapability(sessionIds),
@@ -334,18 +337,9 @@ export class PiRuntimeAdapter
       return;
     }
 
-    const sessionId = this.approvalSessionMap.get(requestId);
-    if (!sessionId) return;
+    // Legacy fallback: permission requests resolved before the permissionGate
+    // hook handles `{ block: true, reason }` directly in `tool_call`.
     this.approvalSessionMap.delete(requestId);
-
-    // Pi has no built-in permission system.
-    // For deny: abort the current turn so the model stops.
-    if (result.behavior === 'deny') {
-      const active = this.activeSessions.get(sessionId);
-      if (active) {
-        void active.piSession.abort();
-      }
-    }
   }
 
   isSessionActive(sessionId: string): boolean {
