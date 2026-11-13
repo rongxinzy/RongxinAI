@@ -1,12 +1,7 @@
 import { spawn, type ChildProcess } from 'child_process';
 import path from 'path';
 
-import {
-  getElectronNodeRuntimePath,
-  getGitBashResolutionErrorForPi,
-  getSkillsRoot,
-  resolveGitBashPathForPi,
-} from './coworkUtil';
+import { getElectronNodeRuntimePath, getSkillsRoot } from './coworkUtil';
 import { getManagedPythonExecutable } from './pythonRuntime';
 import { findSkillPythonExecutable } from './skillPythonRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
@@ -173,10 +168,7 @@ export async function probeSkillRuntimeCapabilities(): Promise<SkillRuntimeCapab
     findBundledUvExecutable(process.platform === 'win32' ? 'uv.exe' : 'uv'),
   );
   const node = resolveOptional(() => getElectronNodeRuntimePath());
-  const bash =
-    process.platform === 'win32'
-      ? await resolveGitBashPathForPi().catch((): null => null)
-      : '/bin/bash';
+  const bash = process.platform === 'win32' ? null : '/bin/bash';
   const powershell = process.platform === 'win32' ? 'powershell.exe' : null;
 
   const [
@@ -195,8 +187,7 @@ export async function probeSkillRuntimeCapabilities(): Promise<SkillRuntimeCapab
     skillPythonCapabilities(),
   ]);
   if (!bashCapability.available && process.platform === 'win32') {
-    const resolutionError = await getGitBashResolutionErrorForPi().catch((): null => null);
-    if (resolutionError) bashCapability.error = resolutionError;
+    bashCapability.error = '.sh scripts are not supported on Windows; use .py, .mjs, or .ps1.';
   }
 
   return {

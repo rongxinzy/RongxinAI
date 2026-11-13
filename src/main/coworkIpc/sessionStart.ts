@@ -162,7 +162,6 @@ export function prepareCoworkSession(
         sessionMode: options.mode ?? CoworkSessionMode.Work,
         goalMode: options.goalMode,
         codemode: config.codemodeEnabled === true,
-        mcpNativeBridge: config.mcpNativeBridge === true,
         approvalMode:
           (options.permissionMode ?? config.permissionMode) === CoworkPermissionMode.AllowAll
             ? WorkbenchApprovalMode.AllowAll

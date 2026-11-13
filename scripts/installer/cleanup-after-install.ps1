@@ -30,10 +30,10 @@ function Assert-PhysicalDirectoryPath([string]$Path) {
 # and malformed content IDs must never turn a manifest into arbitrary paths.
 $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
 $rows = @($manifest.components)
-# Component contract: the seven fixed application components are always
+# Component contract: the six fixed application components are always
 # required. CPU adds the bundled local runtime; CUDA also adds Strata.
-# No other key is accepted (lite 7, cpu 8, cuda 9).
-$requiredKeys = @('channel-runtime', 'mcps', 'portable-git', 'python', 'skill-python', 'skills', 'uv')
+# No other key is accepted (lite 6, cpu 7, cuda 8).
+$requiredKeys = @('channel-runtime', 'mcps', 'python', 'skill-python', 'skills', 'uv')
 $optionalKeys = @('llamacpp-bundled', 'strata-bundled')
 $rowKeys = @($rows | ForEach-Object { [string]$_.key })
 if (@($requiredKeys | Where-Object { $rowKeys -cnotcontains $_ }).Count -gt 0 -or

@@ -14,7 +14,7 @@ test('PDF skill exposes optional rendering through the managed uv runtime', () =
   const python = process.platform === 'win32' ? 'python' : 'python3';
   execFileSync(python, [preview, '--help'], { stdio: 'pipe' });
 
-  const pipeline = readFileSync(path.join(skillRoot, 'scripts', 'make.sh'), 'utf8');
+  const pipeline = readFileSync(path.join(skillRoot, 'scripts', 'make.py'), 'utf8');
   assert.match(pipeline, /run --quiet --no-project --python/);
   assert.doesNotMatch(pipeline, /--break-system-packages/);
 

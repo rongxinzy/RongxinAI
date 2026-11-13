@@ -51,7 +51,7 @@ test('each desktop target keeps the private document and Python toolchain resour
     path.join(root, 'scripts', 'windows-resource-pack.cjs'),
     'utf8',
   );
-  for (const resource of ['mingit', 'python-win', 'skill-python', 'uv-win']) {
+  for (const resource of ['python-win', 'skill-python', 'uv-win']) {
     assert.match(windowsResourcePack, new RegExp(`prefix: ["']${resource}["']`));
   }
 });

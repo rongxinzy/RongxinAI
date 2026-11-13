@@ -6,9 +6,9 @@ Three routes. One design system. Tokens flow from content analysis through every
 ## Quick start
 
 ```bash
-bash scripts/make.sh check   # verify deps
-bash scripts/make.sh fix     # auto-install missing deps
-bash scripts/make.sh demo    # → demo.pdf
+python3 scripts/make.py check   # verify deps
+python3 scripts/make.py fix     # auto-install missing deps
+python3 scripts/make.py demo    # → demo.pdf
 ```
 
 ---
@@ -16,7 +16,7 @@ bash scripts/make.sh demo    # → demo.pdf
 ## Route A: CREATE — generate a new PDF
 
 ```bash
-bash scripts/make.sh run \
+python3 scripts/make.py run \
   --title   "Q3 Strategy Review" \
   --type    "proposal" \
   --author  "Strategy Team" \
@@ -76,16 +76,16 @@ bash scripts/make.sh run \
 
 ```bash
 # See what fields the PDF has
-bash scripts/make.sh fill --input form.pdf --inspect
+python3 scripts/make.py fill --input form.pdf --inspect
 
 # Fill fields
-bash scripts/make.sh fill \
+python3 scripts/make.py fill \
   --input  form.pdf \
   --out    filled.pdf \
   --values '{"FirstName": "Jane", "Agree": "true", "Country": "US"}'
 
 # Or from a JSON file
-bash scripts/make.sh fill --input form.pdf --out filled.pdf --data values.json
+python3 scripts/make.py fill --input form.pdf --out filled.pdf --data values.json
 ```
 
 Field value rules:
@@ -99,7 +99,7 @@ Field value rules:
 ## Route C: REFORMAT — apply design to an existing document
 
 ```bash
-bash scripts/make.sh reformat \
+python3 scripts/make.py reformat \
   --input  source.md \
   --title  "Annual Report" \
   --type   "report" \
@@ -117,7 +117,7 @@ Supported input: `.md` `.txt` `.pdf` `.json`
 SKILL.md                      ← Claude entry point, route table
 design/design.md              ← Aesthetic system (read before CREATE/REFORMAT)
 scripts/
-  make.sh                     ← Unified CLI
+  make.py                     ← Unified CLI
   palette.py                  ← metadata → tokens.json       [CREATE, REFORMAT]
   cover.py                    ← tokens.json → cover.html     [CREATE, REFORMAT]
   render_cover.js             ← cover.html → cover.pdf       [CREATE, REFORMAT]
@@ -196,7 +196,7 @@ Body pages always use system fonts (Times / Helvetica) via ReportLab.
 SKILL.md                  ← Claude entry point, routing only
 design/design.md          ← Aesthetic system (read before any script)
 scripts/
-  make.sh                 ← Unified CLI: check / fix / run / demo
+  make.py                 ← Unified CLI: check / fix / run / demo
   palette.py              ← content metadata → tokens.json
   cover.py                ← tokens.json → cover.html
   render_cover.js         ← cover.html → cover.pdf  (Playwright)
@@ -216,8 +216,8 @@ Design tokens (color, typography, spacing) are written once by `palette.py` and 
 | Node.js 18+ | Cover rendering | system |
 | `playwright` | Headless Chromium for cover | `npm install -g playwright && npx playwright install chromium` |
 
-Run `bash scripts/make.sh check` to verify everything at once.  
-Run `bash scripts/make.sh fix` to auto-install what is missing.
+Run `python3 scripts/make.py check` to verify everything at once.  
+Run `python3 scripts/make.py fix` to auto-install what is missing.
 
 ## License
 

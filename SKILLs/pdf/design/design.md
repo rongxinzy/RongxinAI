@@ -325,7 +325,7 @@ All body blocks use the same token system — colors and fonts come from `tokens
 
 **Limitations:** matplotlib mathtext covers most common expressions but not advanced LaTeX environments (`align`, `cases`, `matrix`). Split complex multi-line proofs into multiple `math` blocks.
 
-**Fallback:** if matplotlib is not installed, renders as `expression` in code style. Run `make.sh fix` to install.
+**Fallback:** if matplotlib is not installed, renders as `expression` in code style. Run `python3 scripts/make.py fix` to install.
 
 **Equation labels:** `"label": "(1)"` — rendered right-aligned beside the formula.
 

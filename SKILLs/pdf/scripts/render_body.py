@@ -55,7 +55,7 @@ try:
         _RESETS_NUMBERED, build_story,
     )
 except ImportError:
-    print("Missing reportlab. Run through make.sh or: uv run --with reportlab python render_body.py ...", file=sys.stderr)
+    print("Missing reportlab. Run through make.py or: uv run --with reportlab python render_body.py ...", file=sys.stderr)
     raise SystemExit(2)
 
 __all__ = [

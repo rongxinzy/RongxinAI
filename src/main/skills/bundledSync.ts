@@ -8,8 +8,8 @@ import { compareVersions, hasMatchingBundledRequirements, parseFrontmatter } fro
 import type { SkillsConfig } from './types';
 
 const isWebSearchSkillBroken = (skillRoot: string): boolean => {
-  const startServerScript = path.join(skillRoot, 'scripts', 'start-server.sh');
-  const searchScript = path.join(skillRoot, 'scripts', 'search.sh');
+  const startServerScript = path.join(skillRoot, 'scripts', 'start-server.mjs');
+  const searchScript = path.join(skillRoot, 'scripts', 'search.mjs');
   const serverEntry = path.join(skillRoot, 'dist', 'server', 'index.js');
   const requiredPaths = [
     startServerScript,
@@ -29,16 +29,16 @@ const isWebSearchSkillBroken = (skillRoot: string): boolean => {
     if (!startScript.includes('WEB_SEARCH_FORCE_REPAIR')) {
       return true;
     }
-    if (!startScript.includes('detect_healthy_bridge_server')) {
+    if (!startScript.includes('detectHealthyBridgeServer')) {
       return true;
     }
     if (!searchScriptContent.includes('ACTIVE_SERVER_URL')) {
       return true;
     }
-    if (!searchScriptContent.includes('try_switch_to_local_server')) {
+    if (!searchScriptContent.includes('trySwitchToLocalServer')) {
       return true;
     }
-    if (!searchScriptContent.includes('build_search_payload')) {
+    if (!searchScriptContent.includes('buildSearchPayload')) {
       return true;
     }
     if (!searchScriptContent.includes('@query_file')) {

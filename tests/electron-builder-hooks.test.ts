@@ -60,7 +60,7 @@ describe.skipIf(process.platform !== 'win32')('Windows component archive creatio
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-component-pack-test-'));
     temporaryDirectories.push(root);
     const componentRoot = path.join(root, 'component-source');
-    const archivePath = path.join(root, 'portable-git.7z');
+    const archivePath = path.join(root, 'skills.7z');
     const sevenZipPath = require.resolve('7zip-bin/win/x64/7za.exe');
     fs.mkdirSync(componentRoot);
     fs.writeFileSync(path.join(componentRoot, 'current.txt'), 'current');
@@ -78,11 +78,11 @@ describe.skipIf(process.platform !== 'win32')('Windows component archive creatio
 
     packWindowsResourceComponent7z(
       {
-        key: 'portable-git',
-        label: 'PortableGit runtime',
+        key: 'skills',
+        label: 'Built-in Skills',
         dir: componentRoot,
-        prefix: 'mingit',
-        sentinel: 'mingit/current.txt',
+        prefix: 'SKILLs',
+        sentinel: 'SKILLs/current.txt',
       },
       archivePath,
       sevenZipPath,
@@ -91,7 +91,7 @@ describe.skipIf(process.platform !== 'win32')('Windows component archive creatio
     const listing = spawnSync(sevenZipPath, ['l', '-slt', archivePath], { encoding: 'utf8' });
     expect(listing.status).toBe(0);
     expect(listing.stdout).toContain('Solid = +');
-    expect(listing.stdout).toContain('Path = mingit\\current.txt');
+    expect(listing.stdout).toContain('Path = SKILLs\\current.txt');
     expect(listing.stdout).not.toContain('stale.txt');
   });
 });

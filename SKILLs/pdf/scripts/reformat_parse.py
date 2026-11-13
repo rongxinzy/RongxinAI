@@ -16,8 +16,8 @@ Usage:
 Then pipe into the CREATE pipeline:
     python3 render_body.py --tokens tokens.json --content content.json --out body.pdf
 
-Or use make.sh reformat which does both steps:
-    bash make.sh reformat --input doc.md --type report --title "My Report" --out output.pdf
+Or use make.py reformat which does both steps:
+    python3 make.py reformat --input doc.md --type report --title "My Report" --out output.pdf
 
 Exit codes: 0 success, 1 bad args / unsupported format, 2 dep missing, 3 parse error
 """
@@ -203,7 +203,7 @@ def parse_pdf(pdf_path: str) -> list:
         from pypdf import PdfReader
     except ImportError as error:
         raise RuntimeError(
-            "Missing pypdf. Run through make.sh or: uv run --with pypdf python reformat_parse.py ..."
+            "Missing pypdf. Run through make.py or: uv run --with pypdf python reformat_parse.py ..."
         ) from error
 
     reader = PdfReader(pdf_path)
@@ -356,7 +356,7 @@ def main():
         print(f"  Warnings:", file=sys.stderr)
         for w in warnings:
             print(f"    ⚠  {w}", file=sys.stderr)
-    print(f"\n  Next: bash make.sh run --content {args.out} --title '...' --type ...",
+    print(f"\n  Next: python3 make.py run --content {args.out} --title '...' --type ...",
           file=sys.stderr)
     print("", file=sys.stderr)
 

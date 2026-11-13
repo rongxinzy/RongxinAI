@@ -1,7 +1,7 @@
 /**
  * PiSubagentTool unit tests.
  *
- * Verifies the multi-mode subagent tool (single / parallel / chain) using a
+ * Verifies the subagent tool (single / parallel) using a
  * mocked Pi SDK createAgentSession.
  */
 
@@ -225,14 +225,6 @@ describe('buildPiSubagentTool', () => {
       const result = await tool.execute('call-1', { parallel: [] });
       expect(result.content[0].text).toContain('"parallel" must be a non-empty array');
     });
-
-    it('rejects chain entries missing agent or task', async () => {
-      const { tool } = buildTool();
-      const result = await tool.execute('call-1', { chain: [{ agent: 'scout' }] });
-      expect(result.content[0].text).toContain(
-        '"chain" entry 1 requires non-empty "agent" and "task"',
-      );
-    });
   });
 
   // ── Agent resolution ──
@@ -265,7 +257,7 @@ describe('buildPiSubagentTool', () => {
       await tool.execute('call-1', { agent: 'researcher', task: 'find primary sources' });
       expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
         '/tmp/workspace',
-        expect.stringContaining(path.join('/tmp/web-search', 'scripts', 'search.sh')),
+        expect.stringContaining(path.join('/tmp/web-search', 'scripts', 'search.mjs')),
         4096,
         [CoreSkillId.WebSearch],
       );
@@ -466,79 +458,6 @@ describe('buildPiSubagentTool', () => {
       expect(result.content[0].text).toContain('## reviewer (failed)');
       expect(result.content[0].text).toContain('Error: boom');
       expect(result.content[0].text).toContain('## planner (ok)');
-    });
-  });
-
-  // ── Chain mode ──
-
-  describe('chain mode', () => {
-    it('injects the previous step output into {previous} placeholders', async () => {
-      const promptedTasks: string[] = [];
-      const outputs = ['gathered context', 'final plan'];
-      let callIndex = 0;
-      hoisted.mockCreateAgentSession.mockImplementation(async () => {
-        const output = outputs[callIndex];
-        callIndex += 1;
-        const session = createManualSession();
-        session.prompt.mockImplementation(async (task: string) => {
-          promptedTasks.push(task);
-          emitCompletion(session, output);
-        });
-        return { session };
-      });
-
-      const { tool } = buildTool();
-      const result = await tool.execute('call-1', {
-        chain: [
-          { agent: 'scout', task: 'Gather context for the auth refactor' },
-          { agent: 'planner', task: 'Plan based on: {previous}' },
-        ],
-      });
-
-      expect(promptedTasks).toEqual([
-        'Gather context for the auth refactor',
-        'Plan based on: gathered context',
-      ]);
-      expect(result.content[0].text).toContain('## Step 1: scout');
-      expect(result.content[0].text).toContain('## Step 2: planner');
-      expect(result.content[0].text).toContain('final plan');
-    });
-
-    it('leaves the first step task untouched even with a {previous} placeholder', async () => {
-      const promptedTasks: string[] = [];
-      hoisted.mockCreateAgentSession.mockImplementation(async () => {
-        const session = createManualSession();
-        session.prompt.mockImplementation(async (task: string) => {
-          promptedTasks.push(task);
-          emitCompletion(session, 'done');
-        });
-        return { session };
-      });
-
-      const { tool } = buildTool();
-      await tool.execute('call-1', { chain: [{ agent: 'scout', task: 'start {previous}' }] });
-      expect(promptedTasks).toEqual(['start {previous}']);
-    });
-
-    it('stops the chain when a step fails', async () => {
-      hoisted.mockCreateAgentSession.mockImplementation(async () => {
-        const session = createManualSession();
-        session.prompt.mockImplementation(async () => {
-          session.emit(errorEvent('step failed'));
-        });
-        return { session };
-      });
-
-      const { tool } = buildTool();
-      const result = await tool.execute('call-1', {
-        chain: [
-          { agent: 'scout', task: 'first' },
-          { agent: 'planner', task: 'second' },
-        ],
-      });
-
-      expect(result.content[0].text).toContain('Chain stopped at step 1 (scout)');
-      expect(hoisted.mockCreateAgentSession).toHaveBeenCalledTimes(1);
     });
 
     it('truncates oversized subagent output beyond PI_SUBAGENT_MAX_OUTPUT_CHARS', async () => {

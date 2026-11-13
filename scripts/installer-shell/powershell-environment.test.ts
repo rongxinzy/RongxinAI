@@ -31,7 +31,7 @@ test('all production shell PowerShell children use one child-only inbox environm
 });
 
 test.skipIf(process.platform !== 'win32')(
-  'real engine subprocesses expand and activate all seven components with empty or poisoned module paths',
+  'real engine subprocesses expand and activate all six components with empty or poisoned module paths',
   () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zy-shell-ps-environment-'));
     const originalModulePath = process.env.PSModulePath;
@@ -121,7 +121,7 @@ $null = @{ checked = $true } | ConvertTo-Json
         prefix: string;
         sentinel: string;
       }>;
-      expect(targets).toHaveLength(7);
+      expect(targets).toHaveLength(6);
       for (const [index, modulePath] of ['', poisonRoot].entries()) {
         const childEnvironment = Object.fromEntries(
           Object.entries(process.env).filter(([name]) => name.toLowerCase() !== 'psmodulepath'),

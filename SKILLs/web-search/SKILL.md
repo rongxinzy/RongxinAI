@@ -29,10 +29,10 @@ Use the web-search skill when you need:
 ## How It Works
 
 ```
-┌──────────┐    Bash    ┌─────────┐    HTTP    ┌──────────────┐    CDP    ┌────────┐
-│  Claude  │───────────▶│ CLI.sh  │───────────▶│ Bridge Server│──────────▶│ Chrome │
-│          │            │         │            │ (localhost)  │ Playwright│        │
-└──────────┘            └─────────┘            └──────────────┘            └────────┘
+┌──────────┐    Node    ┌──────────┐    HTTP    ┌──────────────┐    CDP    ┌────────┐
+│  Claude  │───────────▶│search.mjs│───────────▶│ Bridge Server│──────────▶│ Chrome │
+│          │            │          │            │ (localhost)  │ Playwright│        │
+└──────────┘            └──────────┘            └──────────────┘            └────────┘
                                                       │
                                                   ▼
                                              Google/Bing Search
@@ -41,7 +41,7 @@ Use the web-search skill when you need:
 
 **Architecture:**
 
-1. **CLI Script** - Simple bash interface for Claude
+1. **CLI Script** - Cross-platform Node.js CLI for Claude
 2. **Bridge Server** - Express HTTP API (auto-started by Electron)
 3. **Playwright Manager** - Browser connection and session management
 4. **Search Engine Layer** - Google primary, Bing fallback
@@ -50,13 +50,13 @@ Use the web-search skill when you need:
 ## ZhiYuan/Pi execution
 
 Inside ZhiYuan, invoke the bundled search script with `run_skill_script` and pass the query as
-an argv item. Do not build a Bash command string. The app starts the service through the managed
-runtime and reports Git Bash/runtime failures separately from search failures.
+an argv item. Do not build a shell command string. The app starts the service through the managed
+runtime and reports runtime failures separately from search failures.
 
 ```json
 {
   "skillId": "web-search",
-  "script": "scripts/search.sh",
+  "script": "scripts/search.mjs",
   "args": ["React Server Components guide", "5"]
 }
 ```
@@ -68,7 +68,7 @@ runtime and reports Git Bash/runtime failures separately from search failures.
 **IMPORTANT:** Always use the `$SKILLS_ROOT` environment variable to locate the skill scripts. This ensures the skill works in both development and production environments.
 
 ```bash
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "search query" [max_results]
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "search query" [max_results]
 ```
 
 For non-ASCII queries (Chinese/Japanese/etc.), prefer UTF-8 file input to avoid shell encoding issues on Windows:
@@ -78,20 +78,20 @@ cat > /tmp/web-query.txt <<'TXT'
 苹果 Siri AI 2026 发布计划
 TXT
 
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" @/tmp/web-query.txt 10
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" @/tmp/web-query.txt 10
 ```
 
 **Examples:**
 
 ```bash
 # Search with default 10 results
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "TypeScript 5.0 new features"
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "TypeScript 5.0 new features"
 
 # Limit to 5 results
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "React Server Components guide" 5
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "React Server Components guide" 5
 
 # Search for recent news
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "AI news January 2026" 10
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "AI news January 2026" 10
 ```
 
 **Output Format:**
@@ -122,12 +122,12 @@ TypeScript 5.0 introduces decorators, const type parameters...
 
 ```bash
 # 1. Search for topic
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Next.js 14 features" 5
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "Next.js 14 features" 5
 
 # 2. Analyze results and answer user
 
 # 3. Follow-up search if needed
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Next.js Server Actions tutorial" 3
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "Next.js Server Actions tutorial" 3
 ```
 
 ## Advanced Usage
@@ -140,13 +140,13 @@ However, for manual control:
 
 ```bash
 # Start server (if not already running)
-bash "$SKILLS_ROOT/web-search/scripts/start-server.sh"
+node "$SKILLS_ROOT/web-search/scripts/start-server.mjs"
 
 # Stop server
-bash "$SKILLS_ROOT/web-search/scripts/stop-server.sh"
+node "$SKILLS_ROOT/web-search/scripts/stop-server.mjs"
 
 # Check health (start script will print endpoint status)
-bash "$SKILLS_ROOT/web-search/scripts/start-server.sh"
+node "$SKILLS_ROOT/web-search/scripts/start-server.mjs"
 ```
 
 ### Direct API Calls
@@ -189,8 +189,8 @@ curl -X POST http://127.0.0.1:8923/api/page/screenshot \
 
 ### 1. Use Specific Queries
 
-❌ Bad: `bash scripts/search.sh "react"`
-✅ Good: `bash scripts/search.sh "React 19 new features and breaking changes"`
+❌ Bad: `node scripts/search.mjs "react"`
+✅ Good: `node scripts/search.mjs "React 19 new features and breaking changes"`
 
 ### 2. Limit Results Appropriately
 
@@ -203,7 +203,7 @@ curl -X POST http://127.0.0.1:8923/api/page/screenshot \
 If search fails, verify the server is running:
 
 ```bash
-bash "$SKILLS_ROOT/web-search/scripts/start-server.sh" || echo "Server not running"
+node "$SKILLS_ROOT/web-search/scripts/start-server.mjs" || echo "Server not running"
 ```
 
 ### 4. Reuse Connections
@@ -220,7 +220,7 @@ Parse the Markdown output to extract key information for the user. Don't just du
 
 ```bash
 # User asks about latest framework features
-bash SKILLs/web-search/scripts/search.sh "Next.js 15 documentation" 5
+node SKILLs/web-search/scripts/search.mjs "Next.js 15 documentation" 5
 
 # Parse results, find official docs, summarize features
 ```
@@ -229,7 +229,7 @@ bash SKILLs/web-search/scripts/search.sh "Next.js 15 documentation" 5
 
 ```bash
 # User reports an error
-bash SKILLs/web-search/scripts/search.sh "TypeError: Cannot read property of undefined React" 5
+node SKILLs/web-search/scripts/search.mjs "TypeError: Cannot read property of undefined React" 5
 
 # Find Stack Overflow answers and GitHub issues, provide solution
 ```
@@ -238,7 +238,7 @@ bash SKILLs/web-search/scripts/search.sh "TypeError: Cannot read property of und
 
 ```bash
 # User asks about recent news
-bash SKILLs/web-search/scripts/search.sh "AI developments January 2026" 10
+node SKILLs/web-search/scripts/search.mjs "AI developments January 2026" 10
 
 # Summarize key news items from results
 ```
@@ -247,7 +247,7 @@ bash SKILLs/web-search/scripts/search.sh "AI developments January 2026" 10
 
 ```bash
 # User wants to compare technologies
-bash SKILLs/web-search/scripts/search.sh "Vue 3 vs React 18 performance 2026" 5
+node SKILLs/web-search/scripts/search.mjs "Vue 3 vs React 18 performance 2026" 5
 
 # Synthesize comparison from multiple sources
 ```
@@ -256,7 +256,7 @@ bash SKILLs/web-search/scripts/search.sh "Vue 3 vs React 18 performance 2026" 5
 
 ```bash
 # User needs specific API documentation
-bash SKILLs/web-search/scripts/search.sh "Playwright page.evaluate examples" 5
+node SKILLs/web-search/scripts/search.mjs "Playwright page.evaluate examples" 5
 
 # Extract code examples and usage patterns
 ```
@@ -270,7 +270,7 @@ bash SKILLs/web-search/scripts/search.sh "Playwright page.evaluate examples" 5
 **Solution:**
 
 - The server should auto-start with Electron
-- If manual start needed: `bash SKILLs/web-search/scripts/start-server.sh`
+- If manual start needed: `node SKILLs/web-search/scripts/start-server.mjs`
 - Check logs: `cat SKILLs/web-search/.server.log`
 
 ### Browser Launch Failed
@@ -293,13 +293,13 @@ bash SKILLs/web-search/scripts/search.sh "Playwright page.evaluate examples" 5
 
 ```bash
 # Stop server
-bash SKILLs/web-search/scripts/stop-server.sh
+node SKILLs/web-search/scripts/stop-server.mjs
 
 # Clear cache
 rm SKILLs/web-search/.connection
 
 # Restart
-bash SKILLs/web-search/scripts/start-server.sh
+node SKILLs/web-search/scripts/start-server.mjs
 ```
 
 ### No Search Results
@@ -427,7 +427,7 @@ curl http://127.0.0.1:8923/api/health
 cat SKILLs/web-search/.server.log | tail -50
 
 # 3. Test basic search
-bash SKILLs/web-search/scripts/search.sh "test" 1
+node SKILLs/web-search/scripts/search.mjs "test" 1
 
 # 4. Check Chrome installation
 which google-chrome || which chromium || which chromium-browser
@@ -451,7 +451,7 @@ If all else fails, full reset:
 cd SKILLs/web-search
 
 # Stop server
-bash scripts/stop-server.sh
+node scripts/stop-server.mjs
 
 # Clean cache and state
 rm -f .connection .server.pid .server.log
@@ -460,10 +460,10 @@ rm -f .connection .server.pid .server.log
 bun run build
 
 # Restart
-bash scripts/start-server.sh
+node scripts/start-server.mjs
 
 # Test
-bash scripts/search.sh "test" 1
+node scripts/search.mjs "test" 1
 ```
 
 ## Examples for Claude
@@ -476,7 +476,7 @@ bash scripts/search.sh "test" 1
 
 ```bash
 # Search for Next.js 15 features
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Next.js 15 new features" 5
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "Next.js 15 new features" 5
 ```
 
 **Then:** Parse results, identify official Next.js blog/docs, summarize key features for user.
@@ -489,7 +489,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Next.js 15 new features" 5
 
 ```bash
 # Search for the specific error
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "TypeScript Cannot find module error solution" 5
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "TypeScript Cannot find module error solution" 5
 ```
 
 **Then:** Extract solutions from Stack Overflow results, provide step-by-step fix.
@@ -502,7 +502,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "TypeScript Cannot find module 
 
 ```bash
 # Search for recent AI news
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "AI news January 2026" 10
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "AI news January 2026" 10
 ```
 
 **Then:** Synthesize news from multiple sources, provide summary of key events.
@@ -515,7 +515,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "AI news January 2026" 10
 
 ```bash
 # Search for RSC documentation and tutorials
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "React Server Components guide tutorial" 5
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "React Server Components guide tutorial" 5
 ```
 
 **Then:** Find official React docs and good tutorials, explain with examples.
@@ -528,7 +528,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "React Server Components guide 
 
 ```bash
 # Search for recent comparisons
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Vite vs webpack 2026 comparison" 5
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "Vite vs webpack 2026 comparison" 5
 ```
 
 **Then:** Analyze multiple perspectives, provide balanced recommendation.

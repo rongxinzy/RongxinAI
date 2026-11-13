@@ -8,6 +8,7 @@ export const PiAssistantStopReason = {
 
 export const PiBuiltinFileToolName = {
   Bash: 'bash',
+  PowerShell: 'powershell',
   Write: 'write',
   Edit: 'edit',
 } as const;

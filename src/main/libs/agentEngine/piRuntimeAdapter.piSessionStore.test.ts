@@ -117,7 +117,7 @@ describe('PiRuntimeAdapter', () => {
       expect(String(mockSession.prompt.mock.calls[0]?.[0])).not.toContain('PREVIOUS CONVERSATION');
     });
 
-    it('uses the text fallback exactly once for a legacy session, then the file', async () => {
+    it('starts a clean session without flattened history when no persisted JSONL file exists', async () => {
       const root = createTemporaryPiSessionRoot();
       const workspaceRoot = createTemporaryWorkspace();
       adapter.setPiSessionStoreRoot(root);
@@ -127,25 +127,20 @@ describe('PiRuntimeAdapter', () => {
       ]);
       adapter.setCoworkStore(store);
 
-      // No seeded file: this session predates file persistence, so after an
-      // app restart its follow-up arrives on a session that is not active.
+      // Without a seeded JSONL file, continuation creates a new persisted session
+      // directly with the new prompt rather than synthesizing flat-text history.
       await adapter.continueSession('persist-legacy', 'Next question', { workspaceRoot });
       expect(mockSessionManagerOpen).not.toHaveBeenCalled();
       expect(mockSessionManagerCreate).toHaveBeenCalledTimes(1);
       const firstPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-      expect(firstPrompt).toContain('PREVIOUS CONVERSATION');
-      expect(firstPrompt).toContain('Legacy answer');
-      expect(firstPrompt).toContain('Next question');
-      // The fallback turn itself runs on the persistent manager targeting
-      // this session's directory, so the turn writes the file.
+      expect(firstPrompt).toBe('Next question');
+      expect(firstPrompt).not.toContain('PREVIOUS CONVERSATION');
       expect(mockSessionManagerCreate).toHaveBeenCalledWith(
         workspaceRoot,
         piSessionDirFor(root, 'persist-legacy'),
       );
 
-      // Next rebuild: the file exists, so only the new prompt travels. A
-      // stopped session always rebuilds (the live Pi session is dropped), the
-      // same path an idle eviction or app restart takes.
+      // Once the file exists on disk, later rebuilds reopen it.
       seedPersistedPiSession(root, 'persist-legacy');
       adapter.stopSession('persist-legacy');
       mockSession.prompt.mockClear();
@@ -155,7 +150,7 @@ describe('PiRuntimeAdapter', () => {
       expect(secondPrompt).toBe('Later question');
     });
 
-    it('invalidates the directory and returns to the fallback after a divergence', async () => {
+    it('invalidates a corrupted persisted directory and recreates it cleanly', async () => {
       const root = createTemporaryPiSessionRoot();
       adapter.setPiSessionStoreRoot(root);
       const { store } = createStoreWithHistory([
@@ -171,8 +166,7 @@ describe('PiRuntimeAdapter', () => {
       await adapter.continueSession('persist-diverge', 'After import');
       expect(mockSessionManagerOpen).not.toHaveBeenCalled();
       const prompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-      expect(prompt).toContain('PREVIOUS CONVERSATION');
-      expect(prompt).toContain('Imported turn');
+      expect(prompt).toBe('After import');
     });
 
     it('removes the directory when the cowork session is deleted', async () => {

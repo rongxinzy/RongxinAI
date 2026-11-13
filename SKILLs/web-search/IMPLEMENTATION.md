@@ -96,9 +96,9 @@ SKILLs/web-search/
 │       ├── types.ts             # Type definitions
 │       └── bing.ts              # Search engine (150+ lines)
 ├── scripts/                     # CLI Tools (500+ lines)
-│   ├── start-server.sh          # Server startup
-│   ├── stop-server.sh           # Server shutdown
-│   ├── search.sh                # Search CLI (150+ lines)
+│   ├── start-server.mjs         # Server startup
+│   ├── stop-server.mjs          # Server shutdown
+│   ├── search.mjs               # Search CLI
 │   ├── test-basic.js            # Basic tests
 │   └── test-search.js           # Integration tests
 ├── examples/
@@ -182,7 +182,7 @@ Total: ~3500 lines of code + ~2000 lines of documentation
 ### Simple Search (Recommended for Claude)
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "TypeScript tutorial" 5
+node SKILLs/web-search/scripts/search.mjs "TypeScript tutorial" 5
 ```
 
 Output:
@@ -221,7 +221,7 @@ curl -X POST http://127.0.0.1:8923/api/search \
 User: What are the new features in React 19?
 
 Claude: [Automatically detects need for real-time info]
-        [Executes: bash SKILLs/web-search/scripts/search.sh "React 19 new features" 5]
+        [Executes: node SKILLs/web-search/scripts/search.mjs "React 19 new features" 5]
         [Parses results, synthesizes information]
 
         Based on the latest search results, React 19 introduces:
@@ -352,9 +352,9 @@ kill -9 <PID>
 rm SKILLs/web-search/.connection
 
 # Full reset
-bash SKILLs/web-search/scripts/stop-server.sh
+node SKILLs/web-search/scripts/stop-server.mjs
 rm SKILLs/web-search/{.connection,.server.pid,.server.log}
-bash SKILLs/web-search/scripts/start-server.sh
+node SKILLs/web-search/scripts/start-server.mjs
 ```
 
 ## 📝 Commit Message

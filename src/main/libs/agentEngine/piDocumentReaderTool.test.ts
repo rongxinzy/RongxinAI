@@ -3,9 +3,38 @@ import * as os from 'os';
 import path from 'path';
 
 import JSZip from 'jszip';
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 
-import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
+const ocrState = vi.hoisted(() => ({
+  supported: false,
+  ready: true,
+}));
+
+vi.mock('../../ocr/ocrEngine', () => ({
+  isOcrSupported: () => ocrState.supported,
+  getOcrStatus: async () => ({
+    ready: ocrState.ready,
+    engine: 'windows-media-ocr',
+    languages: ['zh-Hans-CN'],
+    requested: 'zh-Hans-CN',
+  }),
+  readOcrText: async () => ({
+    text: '季度经营分析报告',
+    images: [{ path: 'shot.png', lines: [{ text: '季度经营分析报告' }] }],
+    empty: false,
+  }),
+}));
+
+vi.mock('../../ocr/pdfOcr', () => ({
+  ocrPdf: async () => ({
+    pages: [{ page: 1, text: '第一页正文', lines: [] }],
+    pageCount: 1,
+    renderedCount: 1,
+    truncated: false,
+  }),
+}));
+
+import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
 
 const roots: string[] = [];
 
@@ -44,6 +73,8 @@ const writeDocxFixture = async (filePath: string, paragraph: string): Promise<vo
 };
 
 afterEach(() => {
+  ocrState.supported = false;
+  ocrState.ready = true;
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
@@ -96,9 +127,52 @@ test('does not allow paths outside the workspace', async () => {
   expect(result.content[0]?.text).toContain('path must be a file inside the workspace');
 });
 
-test('publishes the harness document-reading policy', () => {
-  expect(PiDocumentReaderSystemPrompt).toContain('read_document');
-  expect(PiDocumentReaderSystemPrompt).toContain('local OCR');
+test('publishes routing and OCR boundaries directly via promptGuidelines', () => {
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: createRoot() }) as {
+    description: string;
+    promptGuidelines: string[];
+  };
+  expect(tool.description).toContain('local OCR');
+  expect(tool.promptGuidelines.join('\n')).toContain('read_document');
+  expect(tool.promptGuidelines.join('\n')).toContain('Local OCR');
+});
+
+test('reads an image through local OCR when supported and reports Windows-only otherwise', async () => {
+  const root = createRoot();
+  fs.writeFileSync(path.join(root, 'shot.png'), 'png');
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root }) as {
+    execute: (
+      id: string,
+      params: { path: string },
+    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>;
+  };
+
+  const unsupported = await tool.execute('tool-1', { path: 'shot.png' });
+  expect(unsupported.details.errorCode).toBe('OCR_UNSUPPORTED_PLATFORM');
+  expect(unsupported.content[0]?.text).toContain('Windows only');
+
+  ocrState.supported = true;
+  const recognized = await tool.execute('tool-2', { path: 'shot.png' });
+  expect(recognized.content[0]?.text).toContain('季度经营分析报告');
+  expect(recognized.details.source).toBe('ocr');
+  expect(recognized.details.engine).toBe('windows-media-ocr');
+});
+
+test('pages a scanned PDF through local OCR when pages is supplied', async () => {
+  ocrState.supported = true;
+  const root = createRoot();
+  fs.writeFileSync(path.join(root, 'scan.pdf'), '%PDF-1.4');
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root }) as {
+    execute: (
+      id: string,
+      params: { path: string; pages?: string },
+    ) => Promise<{ content: Array<{ text: string }>; details: Record<string, unknown> }>;
+  };
+
+  const result = await tool.execute('tool-1', { path: 'scan.pdf', pages: '1' });
+  expect(result.content[0]?.text).toContain('第一页正文');
+  expect(result.details.source).toBe('ocr');
+  expect(result.details.pages).toBe(1);
 });
 
 test('truncates documents exceeding PI_DOCUMENT_READER_MAX_CHARS', async () => {

@@ -24,9 +24,7 @@ import {
   WorkbenchRunStatus,
 } from '../../../shared/workbenchTask';
 import { PiExtensionEventType } from './piExtensionTypes';
-import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
-import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 
@@ -117,14 +115,7 @@ describe('PiRuntimeAdapter', () => {
         appendSystemPromptOverride: () => string[];
       };
       const appended = loaderOptions.appendSystemPromptOverride(['existing Pi append']);
-      expect(appended).toEqual(
-        expect.arrayContaining([
-          'existing Pi append',
-          PiAskUserQuestionSystemPrompt,
-          expect.stringContaining('## Local document reading'),
-          DeclareArtifactSystemPrompt,
-        ]),
-      );
+      expect(appended).toEqual(expect.arrayContaining(['existing Pi append']));
       if (process.platform === 'win32') {
         expect(appended.some(entry => entry.includes('## Bash execution contract'))).toBe(true);
       }
@@ -144,7 +135,6 @@ describe('PiRuntimeAdapter', () => {
         appendSystemPromptOverride: () => string[];
       };
       const appended = loaderOptions.appendSystemPromptOverride();
-      expect(appended).not.toContain(PiAskUserQuestionSystemPrompt);
       expect(appended).toContain(PiUnattendedSystemPrompt);
     });
 
@@ -179,11 +169,10 @@ describe('PiRuntimeAdapter', () => {
         appendSystemPromptOverride: () => string[];
       };
       const attendedPrompt = attendedLoaderOptions.appendSystemPromptOverride();
-      expect(attendedPrompt).toContain(PiAskUserQuestionSystemPrompt);
       expect(attendedPrompt).not.toContain(PiUnattendedSystemPrompt);
     });
 
-    it('guards Windows Bash calls against cmd and PowerShell syntax', async () => {
+    it('blocks direct Python Skill script calls across bash and powershell tools before execution', async () => {
       await adapter.startSession('bash-guard', 'Inspect the workspace', {
         approvalMode: WorkbenchApprovalMode.AllowAll,
       });
@@ -202,24 +191,39 @@ describe('PiRuntimeAdapter', () => {
         });
       }
 
-      const results = await Promise.all(
-        toolCallHandlers.map(handler =>
-          handler({
-            toolCallId: 'bash-guard-call',
-            toolName: 'bash',
-            input: { command: 'dir "C:\\workspace" /s' },
-          }),
+      const [bashResults, psResults] = await Promise.all([
+        Promise.all(
+          toolCallHandlers.map(handler =>
+            handler({
+              toolCallId: 'bash-guard-call',
+              toolName: 'bash',
+              input: { command: 'python3 "$SKILLS_ROOT/pdf/scripts/render.py"' },
+            }),
+          ),
         ),
-      );
-      const result = results.find(value => value !== undefined);
+        Promise.all(
+          toolCallHandlers.map(handler =>
+            handler({
+              toolCallId: 'ps-guard-call',
+              toolName: 'powershell',
+              input: { command: 'python.exe "$env:SKILLS_ROOT\\pdf\\scripts\\render.py"' },
+            }),
+          ),
+        ),
+      ]);
       expect(toolCallHandlers.length).toBeGreaterThan(0);
-      if (process.platform === 'win32') {
-        expect(result).toEqual(
-          expect.objectContaining({ block: true, reason: expect.stringContaining('Git Bash') }),
-        );
-      } else {
-        expect(result).toBeUndefined();
-      }
+      expect(bashResults.find(value => value !== undefined)).toEqual(
+        expect.objectContaining({
+          block: true,
+          reason: expect.stringContaining('run_skill_script'),
+        }),
+      );
+      expect(psResults.find(value => value !== undefined)).toEqual(
+        expect.objectContaining({
+          block: true,
+          reason: expect.stringContaining('run_skill_script'),
+        }),
+      );
     });
 
     it('resolves a Pi AskUserQuestion tool call with the renderer response', async () => {

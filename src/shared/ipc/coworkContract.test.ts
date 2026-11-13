@@ -354,7 +354,6 @@ test('setConfig accepts every field the renderer sends', () => {
         embeddingRemoteBaseUrl: 'https://api.example.com/v1',
         embeddingRemoteApiKey: 'sk-...',
         codemodeEnabled: true,
-        mcpNativeBridge: false,
       },
     ]).success,
   ).toBe(true);
@@ -382,7 +381,6 @@ test('getConfig result requires the full config row main always returns', () => 
     embeddingRemoteBaseUrl: '',
     embeddingRemoteApiKey: '',
     codemodeEnabled: false,
-    mcpNativeBridge: false,
   };
   expect(coworkConfigContract.getConfig.result.safeParse({ success: true, config }).success).toBe(
     true,

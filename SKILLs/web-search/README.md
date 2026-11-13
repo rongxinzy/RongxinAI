@@ -50,19 +50,19 @@ bun run build
 ### 3. Start Server
 
 ```bash
-bash scripts/start-server.sh
+node scripts/start-server.mjs
 ```
 
 ### 4. Perform Search
 
 ```bash
-bash scripts/search.sh "TypeScript tutorial" 5
+node scripts/search.mjs "TypeScript tutorial" 5
 ```
 
 ### 5. Stop Server
 
 ```bash
-bash scripts/stop-server.sh
+node scripts/stop-server.mjs
 ```
 
 ## Usage
@@ -70,20 +70,20 @@ bash scripts/stop-server.sh
 ### Simple Search
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "search query" [max_results]
+node SKILLs/web-search/scripts/search.mjs "search query" [max_results]
 ```
 
 **Examples:**
 
 ```bash
 # Search for React 19 features (default 10 results)
-bash scripts/search.sh "React 19 new features"
+node scripts/search.mjs "React 19 new features"
 
 # Search for TypeScript tutorials (limit to 5 results)
-bash scripts/search.sh "TypeScript tutorial" 5
+node scripts/search.mjs "TypeScript tutorial" 5
 
 # Search for current news
-bash scripts/search.sh "AI news 2026" 10
+node scripts/search.mjs "AI news 2026" 10
 ```
 
 ### API Usage
@@ -136,7 +136,7 @@ When Claude needs real-time information, it will:
 
 1. **Recognize the need** - Questions about current events, latest docs, etc.
 2. **Check server** - Verify Bridge Server is running
-3. **Execute search** - Run `bash scripts/search.sh "query" N`
+3. **Execute search** - Run `node scripts/search.mjs "query" N`
 4. **Parse results** - Extract relevant information from Markdown output
 5. **Answer user** - Provide response based on search results
 
@@ -145,7 +145,7 @@ When Claude needs real-time information, it will:
 ```
 User: What are the new features in Next.js 14?
 
-Claude: [Calls: bash SKILLs/web-search/scripts/search.sh "Next.js 14 features" 5]
+Claude: [Calls: node SKILLs/web-search/scripts/search.mjs "Next.js 14 features" 5]
 
         Based on the latest search results, Next.js 14 introduces:
         1. Turbopack - 5000x faster than Webpack
@@ -201,9 +201,9 @@ SKILLs/web-search/
 │       ├── google.ts            # Google search engine
 │       └── bing.ts              # Bing fallback engine
 ├── scripts/                     # CLI tools
-│   ├── start-server.sh          # Start Bridge Server
-│   ├── stop-server.sh           # Stop Bridge Server
-│   ├── search.sh                # Search CLI
+│   ├── start-server.mjs         # Start Bridge Server
+│   ├── stop-server.mjs          # Stop Bridge Server
+│   ├── search.mjs               # Search CLI
 │   ├── test-basic.js            # Basic functionality test
 │   └── test-search.js           # Integration test
 ├── examples/                    # Usage examples
@@ -271,11 +271,11 @@ Install Chrome:
 
 ```bash
 # Clean up
-bash scripts/stop-server.sh
+node scripts/stop-server.mjs
 rm .connection .server.pid
 
 # Restart
-bash scripts/start-server.sh
+node scripts/start-server.mjs
 ```
 
 ## Security

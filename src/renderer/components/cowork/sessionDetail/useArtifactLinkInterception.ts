@@ -72,8 +72,7 @@ export const useArtifactLinkInterception = ({
           isCurrent: () => artifactListenerSessionIdRef.current === sessionId,
         });
       }
-      // No fallback creation — artifacts are now declared via declare_artifact tool,
-      // not created from ad-hoc link clicks or regex parsing.
+      // No fallback creation — only artifacts already captured in the ledger can be opened.
     };
 
     container.addEventListener('click', handleLinkClick, true);

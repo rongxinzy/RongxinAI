@@ -9,17 +9,9 @@
  * registering it here means the model never sees it — piRuntimeAdapter and its
  * tests read exclusively from this registry.
  */
-import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
-import type { McpServerRuntimeStatus, McpToolManifestEntry } from '../mcpServerManager';
-import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
-import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
-import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
-import { PiOcrSystemPrompt } from './piOcrTool';
-import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
-import { PiWebSearchSystemPrompt } from './piWebSearchTool';
 
 export interface PiSystemPromptContext {
   /** Whether the session is a direct Chat lane without Work orchestration. */
@@ -33,14 +25,6 @@ export interface PiSystemPromptContext {
   platform?: NodeJS.Platform;
   /** Whether the current run has no foreground user interaction. */
   unattended?: boolean;
-  /** Concrete MCP capabilities discovered before this session was created. */
-  mcpToolManifest?: McpToolManifestEntry[];
-  /** Configured MCP servers, including connection and discovery failures. */
-  mcpServerStatuses?: McpServerRuntimeStatus[];
-  /** The pi 1.0 codemode sandbox tool is active for this work session. */
-  codemodeEnabled?: boolean;
-  /** pi's builtin MCP extension renders its own servers section this session. */
-  mcpNativeBridge?: boolean;
 }
 
 export interface PiSystemPromptContribution {
@@ -58,78 +42,15 @@ export interface PiSystemPromptContribution {
 // Order matters: entries are appended to the system prompt in this sequence.
 export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContribution> = [
   {
-    id: 'web-search',
-    enabled: context => context.chatMode === true,
-    prompt: PiWebSearchSystemPrompt,
-  },
-  {
-    id: 'ask-user-question',
-    requiresHostTools: true,
-    enabled: context => context.unattended !== true,
-    prompt: PiAskUserQuestionSystemPrompt,
-  },
-  {
     id: 'unattended-execution',
     enabled: context => context.unattended === true,
     prompt: PiUnattendedSystemPrompt,
-  },
-  {
-    id: 'bash-tool',
-    requiresFileTools: true,
-    prompt: context => createPiBashToolSystemPrompt(context.platform),
   },
   {
     id: 'python-runtime',
     requiresHostTools: true,
     requiresFileTools: true,
     prompt: PiPythonEnvSystemPrompt,
-  },
-  {
-    id: 'document-reader',
-    requiresHostTools: true,
-    requiresFileTools: true,
-    enabled: context => context.chatMode !== true,
-    prompt: PiDocumentReaderSystemPrompt,
-  },
-  {
-    id: 'ocr',
-    requiresHostTools: true,
-    requiresFileTools: true,
-    enabled: context =>
-      context.chatMode !== true && (context.platform ?? process.platform) === 'win32',
-    prompt: PiOcrSystemPrompt,
-  },
-  {
-    id: 'codemode',
-    enabled: context => context.codemodeEnabled === true && context.chatMode !== true,
-    prompt: [
-      '## Parallel tool orchestration (codemode)',
-      '',
-      "- The `codemode` tool runs a JavaScript sandbox that can call this session's tools (`tools.read`, `tools.bash`, `tools.edit`, `tools.write`, plus registered workspace tools and the MCP gateway).",
-      '- Prefer `codemode` when one step needs many independent tool calls: batch them inside the script with `await Promise.all(...)` instead of spending one reply per call.',
-      '- Filter and reduce large outputs inside the script; return only the distilled result so the conversation stays small.',
-      '- Every nested call still passes the session approval gate; a blocked call returns an error result inside the sandbox.',
-      '- Keep single tool calls, user interaction, and isolated multi-turn delegation on the normal tools (`subagent` for multi-turn work).',
-    ].join('\n'),
-  },
-  {
-    id: 'mcp-capability-preflight',
-    requiresHostTools: true,
-    requiresFileTools: true,
-    enabled: context =>
-      context.mcpNativeBridge !== true &&
-      Boolean(context.mcpToolManifest?.length || context.mcpServerStatuses?.length),
-    prompt: context =>
-      buildPiMcpCapabilityPrompt(
-        context.mcpToolManifest ?? [],
-        context.mcpServerStatuses ?? [],
-      )[0] ?? '',
-  },
-  {
-    id: 'declare-artifact',
-    requiresHostTools: true,
-    enabled: context => context.chatMode !== true,
-    prompt: DeclareArtifactSystemPrompt,
   },
   {
     id: 'session-summary',

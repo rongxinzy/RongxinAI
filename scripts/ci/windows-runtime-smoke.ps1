@@ -132,10 +132,6 @@ try {
   $resourcesRoot = $smokeRoot
   Assert-Path (Join-Path $resourcesRoot 'channel-runtime\cc-connect-sidecar.exe') 'bundled channel runtime'
   Assert-Path (Join-Path $ProjectRoot 'release\win-unpacked\resources\memory\engram.exe') 'bundled memory runtime'
-  $bash = Join-Path $resourcesRoot 'mingit\usr\bin\bash.exe'
-  if (-not (Test-Path -LiteralPath $bash)) {
-    $bash = Join-Path $resourcesRoot 'mingit\bin\bash.exe'
-  }
   $python = Join-Path $resourcesRoot 'python-win\python.exe'
   $skillPython = Join-Path $resourcesRoot 'skill-python\layers\shared\Scripts\python.exe'
   $appExecutableName = $env:ZHIYUAN_ELECTRON_EXECUTABLE_NAME
@@ -157,7 +153,6 @@ try {
   $docxValidator = Join-Path $ProjectRoot 'scripts\ci\validate-docx-smoke.mjs'
   $skillsRoot = Join-Path $resourcesRoot 'SKILLs'
 
-  Assert-Path $bash 'bundled PortableGit Bash'
   Assert-Path $python 'bundled application Python'
   Assert-Path $skillPython 'bundled shared Skill Python'
   Assert-Path $electron 'packaged Electron Node runtime'
@@ -208,7 +203,6 @@ try {
   # Keep these probes quote-free so the Python code is identical on clean CI hosts.
   Invoke-Checked $skillPython @('-c', 'import pandas, openpyxl; print(1)') 'bundled XLSX dependency probe'
   Invoke-Checked $skillPython @('-c', 'import reportlab, pypdfium2, PIL; print(1)') 'bundled PDF dependency probe'
-  Invoke-Checked $bash @('-lc', 'printf "portable-git-bash-ok\n"') 'bundled Bash probe'
   $markdown = Join-Path $smokeRoot 'smoke.md'
   $docx = Join-Path $smokeRoot 'smoke.docx'
   $converter = Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs'

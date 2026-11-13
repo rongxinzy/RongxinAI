@@ -59,7 +59,7 @@ Run `$CLI analyze --input template.docx` or manually inspect:
 
 ```bash
 # Quick structure scan
-scripts/docx_preview.sh template.docx
+node scripts/docx_preview.mjs template.docx
 ```
 
 Identify these zones in the template:

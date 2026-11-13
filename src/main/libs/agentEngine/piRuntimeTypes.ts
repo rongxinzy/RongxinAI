@@ -103,11 +103,6 @@ type PiImageAttachment = {
   path?: string;
 };
 
-type PiConversationHistoryMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
-
 export type PiStartOptions = {
   skipInitialUserMessage?: boolean;
   /** Execution skill set for this session (user selection plus expert preset). */
@@ -132,8 +127,6 @@ export type PiStartOptions = {
   goalMode?: boolean;
   /** pi 1.0 codemode sandbox tool orchestration (work sessions, default off). */
   codemode?: boolean;
-  /** pi 1.0 builtin MCP extension replaces the gateway tool (default off). */
-  mcpNativeBridge?: boolean;
   /** Read-only planning turn: excludes workspace-mutating tools and requires plan_write. */
   planMode?: boolean;
   /** Registers plan_write for the whole session, so plan mode also works on a live session. */
@@ -145,10 +138,6 @@ export type PiStartOptions = {
   modelOverride?: string;
   /** Pi thinking level applied when the session is (re)created. */
   thinkingLevel?: PiThinkingLevel;
-  /** Previous conversation to restore (user/assistant pairs), injected into PI session state */
-  conversationHistory?: PiConversationHistoryMessage[];
-  /** Internal: override prompt text sent to PI, while UI shows original prompt */
-  _piPromptOverride?: string;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
 };
@@ -169,8 +158,6 @@ export type PiContinueOptions = {
   goalMode?: boolean;
   /** pi 1.0 codemode sandbox orchestration, forwarded when the runtime recreates the session. */
   codemode?: boolean;
-  /** pi 1.0 native MCP bridge, forwarded when the runtime recreates the session. */
-  mcpNativeBridge?: boolean;
   /** Read-only planning turn, forwarded when the runtime recreates the session. */
   planMode?: boolean;
   /** Registers plan_write when the runtime has to recreate the session. */

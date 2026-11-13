@@ -49,7 +49,6 @@ test('a reused summary tool reads the current run and turn for content and metri
     workspaceRoot: '/work',
     workbenchRunId: 'run-1',
     expertIds: [],
-    mcpNativeBridge: true,
     abortSignal: new AbortController().signal,
     recordActivation,
   });

@@ -34,13 +34,6 @@ function resolveBashExecutable(rootDir) {
     }
   } catch {}
 
-  const candidates = [
-    path.join(rootDir, 'resources', 'mingit', 'bin', 'bash.exe'),
-    path.join(rootDir, 'resources', 'mingit', 'usr', 'bin', 'bash.exe'),
-  ];
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
   return null;
 }
 

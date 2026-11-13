@@ -3,16 +3,13 @@
  *
  * Extracted from PiRuntimeAdapter: builds the per-session DefaultResourceLoader
  * with ZhiYuanAgent-owned skill roots, prompt overrides, and the tool-call
- * extensions (workbench authorization, bash guardrails, plan mode, codemode,
- * native MCP). Also exposes the single MCP gateway proxy tool used when the
- * native MCP extension is disabled.
+ * extensions (authorization, bash guardrails, plan mode, codemode, native MCP).
  */
 
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
-import { getPiBashCommandViolation } from './piBashToolGuidelines';
+import { getPiBashPythonEnvViolation } from './piBashToolGuidelines';
 import { PiBuiltinFileToolName } from './piToolConstants';
-import { McpPiAdapter } from './mcpPiAdapter';
 import { isPlanModeBlockedTool } from './piPlanTool';
 import {
   PiExtensionEventType,
@@ -20,8 +17,7 @@ import {
   type PiExtensionFactory,
 } from './piExtensionTypes';
 import { getSkillsRoot } from '../coworkUtil';
-import type { McpServerManager } from '../mcpServerManager';
-import { createPiSettingsManager, applyPiShellOverride } from './piRuntimeSettingsOverrides';
+import { createPiSettingsManager } from './piRuntimeSettingsOverrides';
 import { resolveSelectedSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 import { createPiPromptOverrides } from './piPromptOverrides';
@@ -41,12 +37,8 @@ export interface PiResourceLoaderApprovalContext {
   getApprovalMode: () => WorkbenchApprovalMode;
   /** Register the pi 1.0 codemode + tool_search extensions (work sessions). */
   enableCodemode?: boolean;
-  /** Register pi's builtin MCP extension, replacing the gateway tool. */
-  enableMcpNative?: boolean;
   /** Explicit MCP server IDs bound to the active session expert. */
   expertMcpIds?: string[];
-  /** Isolates provider-issued tool IDs across concurrent child sessions. */
-  toolCallNamespace?: string;
 }
 
 export async function createPiRuntimeResourceLoader(
@@ -98,23 +90,15 @@ export async function createPiRuntimeResourceLoader(
         nativeToolsOnly: resourceState.nativeToolsOnly,
         fileToolsEnabled: resourceState.fileToolsEnabled,
         maxOutputTokens: resourceState.maxOutputTokens,
-        platform: process.platform,
         unattended: resourceState.unattended,
-        mcpToolManifest: resourceState.chatMode
-          ? []
-          : (host.getMcpServerManager()?.toolManifest ?? []),
-        mcpServerStatuses: resourceState.chatMode
-          ? []
-          : (host.getMcpServerManager()?.serverStatuses ?? []),
-        codemodeEnabled: approvalContext?.enableCodemode === true,
-        mcpNativeBridge: approvalContext?.enableMcpNative === true,
       }),
     ),
     extensionFactories: [
       (extensionApi: PiExtensionApi) => {
         extensionApi.on(PiExtensionEventType.ToolCall, event => {
           if (
-            event.toolName !== PiBuiltinFileToolName.Bash ||
+            (event.toolName !== PiBuiltinFileToolName.Bash &&
+              event.toolName !== PiBuiltinFileToolName.PowerShell) ||
             !event.input ||
             typeof event.input !== 'object'
           ) {
@@ -122,7 +106,7 @@ export async function createPiRuntimeResourceLoader(
           }
           const command = (event.input as Record<string, unknown>).command;
           if (typeof command !== 'string') return undefined;
-          const reason = getPiBashCommandViolation(command, process.platform, getSkillsRoot());
+          const reason = getPiBashPythonEnvViolation(command, getSkillsRoot());
           return reason ? { block: true as const, reason } : undefined;
         });
       },
@@ -131,11 +115,14 @@ export async function createPiRuntimeResourceLoader(
           const planSessionId = approvalContext?.sessionId;
           if (!planSessionId) return undefined;
           if (host.activeSessions.get(planSessionId)?.planMode !== true) return undefined;
-          if (event.toolName === PiBuiltinFileToolName.Bash) {
+          if (
+            event.toolName === PiBuiltinFileToolName.Bash ||
+            event.toolName === PiBuiltinFileToolName.PowerShell
+          ) {
             return {
               block: true as const,
               reason:
-                'Plan mode is read-only: bash is refused because shell commands can modify the workspace. ' +
+                'Plan mode is read-only: shell commands (bash/powershell) are refused because they can modify the workspace. ' +
                 'Use read-only tools, publish the plan with plan_write, and end the turn before implementing.',
             };
           }
@@ -152,25 +139,6 @@ export async function createPiRuntimeResourceLoader(
       ...(approvalContext
         ? [
             (extensionApi: PiExtensionApi) => {
-              const childRuns = new Map<string, string>();
-              const toolCallId = (id: string): string =>
-                approvalContext.toolCallNamespace
-                  ? `${approvalContext.toolCallNamespace}/${id}`
-                  : id;
-              if (approvalContext.toolCallNamespace)
-                extensionApi.on(PiExtensionEventType.ToolResult, event => {
-                  const runId = childRuns.get(event.toolCallId);
-                  childRuns.delete(event.toolCallId);
-                  if (runId)
-                    host
-                      .getWorkbenchTaskService()
-                      ?.recordToolResult(
-                        runId,
-                        toolCallId(event.toolCallId),
-                        { content: event.content, details: event.details },
-                        event.isError,
-                      );
-                });
               extensionApi.on(PiExtensionEventType.ToolCall, async event => {
                 const runId = approvalContext.getRunId();
                 const toolInput =
@@ -180,16 +148,12 @@ export async function createPiRuntimeResourceLoader(
                 const authorization = await host.authorizeToolCall({
                   sessionId: approvalContext.sessionId,
                   runId,
-                  toolCallId: toolCallId(event.toolCallId),
+                  toolCallId: event.toolCallId,
                   toolName: event.toolName,
                   toolInput,
                   approvalMode: approvalContext.getApprovalMode(),
                 });
-                if (authorization.allow) {
-                  if (approvalContext.toolCallNamespace && runId)
-                    childRuns.set(event.toolCallId, runId);
-                  return undefined;
-                }
+                if (authorization.allow) return undefined;
                 return {
                   block: true as const,
                   reason: authorization.reason || 'The action was not approved.',
@@ -198,15 +162,18 @@ export async function createPiRuntimeResourceLoader(
             },
           ]
         : []),
-      // Codemode lets the model orchestrate parallel tool calls from a
-      // QuickJS sandbox; both extensions register inactive and are activated
-      // through the defaultTools override next to the compaction settings.
-      ...(approvalContext?.enableCodemode &&
+      // Work sessions register codemode + tool_search dormantly so both explicit
+      // codemode activation (`+codemode`) and Pi's native MCP exposures can use them.
+      ...(!resourceState.chatMode &&
+      resourceState.nativeToolsOnly !== true &&
       pi.createCodemodeExtension &&
       pi.createToolSearchExtension
         ? [pi.createCodemodeExtension(), pi.createToolSearchExtension()]
         : []),
-      ...(approvalContext?.enableMcpNative && pi.createMcpExtension && host.getMcpServerManager()
+      ...(!resourceState.chatMode &&
+      resourceState.nativeToolsOnly !== true &&
+      pi.createMcpExtension &&
+      host.getMcpServerManager()
         ? [
             pi.createMcpExtension({
               loadConfig: () =>
@@ -229,27 +196,8 @@ export async function createPiRuntimeResourceLoader(
     ],
   });
   await resourceLoader.reload();
-  // Pi's resource reload refreshes settings from disk, so apply the resolved
-  // per-process shell override after reload and share the same manager with
-  // createAgentSession. This makes bundled PortableGit usable by every Pi
-  // session without changing the user's global Pi settings file.
-  await applyPiShellOverride(settingsManager);
-  resourceLoader.settingsManager = settingsManager;
+  if (settingsManager) {
+    resourceLoader.settingsManager = settingsManager;
+  }
   return resourceLoader;
-}
-
-/**
- * Build a single MCP proxy tool (pi-mcp-adapter pattern) instead of
- * registering every MCP tool as an individual customTool.
- *
- * One proxy tool costs ~200 system-prompt tokens regardless of how many
- * MCP servers/tools are configured, vs N × ~200 tokens for per-tool
- * registration. Uses ZhiYuanAgent's McpServerManager for tool execution
- * rather than creating duplicate MCP connections.
- */
-export function buildPiMcpProxyTool(
-  mcpServerManager: McpServerManager | null,
-): Record<string, unknown> | null {
-  if (!mcpServerManager) return null;
-  return new McpPiAdapter(mcpServerManager).buildGatewayTool();
 }

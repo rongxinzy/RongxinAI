@@ -2,12 +2,6 @@ import { Type } from 'typebox';
 
 export const PiAskUserQuestionToolName = 'AskUserQuestion' as const;
 export const PiAskUserQuestionTimeoutMs = 600_000;
-export const PiAskUserQuestionSystemPrompt = [
-  '## User Interaction',
-  '',
-  '- Use AskUserQuestion when missing information or a meaningful user choice is needed to continue.',
-  '- Honor existing authorization. Do not ask again merely to confirm an already-authorized action; tool approval is enforced separately.',
-].join('\n');
 
 const QuestionOptionSchema = Type.Object({
   label: Type.String(),
@@ -52,7 +46,7 @@ export const createPiAskUserQuestionTool = (
   name: PiAskUserQuestionToolName,
   label: 'Ask User Question',
   description:
-    'Ask the user for missing information or a meaningful choice needed to continue. Do not repeat existing authorization.',
+    'Ask the user for missing information or a meaningful choice needed to continue. Do not repeat existing authorization; tool approval is enforced separately.',
   promptSnippet: 'Ask the user for necessary information or a meaningful choice',
   parameters: PiAskUserQuestionParameters,
   executionMode: 'sequential',

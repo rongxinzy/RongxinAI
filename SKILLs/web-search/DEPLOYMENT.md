@@ -5,7 +5,7 @@
 When using the web-search skill in Cowork sessions, Claude needs to call bash scripts like:
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "query" 10
+node SKILLs/web-search/scripts/search.mjs "query" 10
 ```
 
 However, this relative path approach has two critical issues:
@@ -60,13 +60,13 @@ export async function getEnhancedEnv(): Promise<Record<string, string | undefine
 Changed all script invocations from:
 
 ```bash
-bash SKILLs/web-search/scripts/search.sh "query" 10
+node SKILLs/web-search/scripts/search.mjs "query" 10
 ```
 
 To:
 
 ```bash
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "query" 10
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "query" 10
 ```
 
 ### How It Works
@@ -93,7 +93,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "query" 10
 export SKILLS_ROOT="/xxx/SKILLs"
 
 # Test search
-bash "$SKILLS_ROOT/web-search/scripts/search.sh" "test query" 5
+node "$SKILLS_ROOT/web-search/scripts/search.mjs" "test query" 5
 ```
 
 ### Packaging Considerations

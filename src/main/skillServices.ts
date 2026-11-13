@@ -92,8 +92,8 @@ export class SkillServiceManager {
   private skillEnv: Record<string, string | undefined> | null = null;
 
   private hasWebSearchRuntimeScriptSupport(skillPath: string): boolean {
-    const startServerScript = path.join(skillPath, 'scripts', 'start-server.sh');
-    const searchScript = path.join(skillPath, 'scripts', 'search.sh');
+    const startServerScript = path.join(skillPath, 'scripts', 'start-server.mjs');
+    const searchScript = path.join(skillPath, 'scripts', 'search.mjs');
     if (!fs.existsSync(startServerScript)) {
       return false;
     }
@@ -105,9 +105,9 @@ export class SkillServiceManager {
       const searchScriptContent = fs.readFileSync(searchScript, 'utf-8');
       return (
         startScript.includes('WEB_SEARCH_FORCE_REPAIR') &&
-        startScript.includes('detect_healthy_bridge_server') &&
+        startScript.includes('detectHealthyBridgeServer') &&
         searchScriptContent.includes('ACTIVE_SERVER_URL') &&
-        searchScriptContent.includes('try_switch_to_local_server')
+        searchScriptContent.includes('trySwitchToLocalServer')
       );
     } catch {
       return false;
@@ -186,8 +186,8 @@ export class SkillServiceManager {
 
   private isWebSearchRuntimeHealthy(skillPath: string): boolean {
     const requiredPaths = [
-      path.join(skillPath, 'scripts', 'start-server.sh'),
-      path.join(skillPath, 'scripts', 'search.sh'),
+      path.join(skillPath, 'scripts', 'start-server.mjs'),
+      path.join(skillPath, 'scripts', 'search.mjs'),
       path.join(skillPath, 'dist', 'server', 'index.js'),
       path.join(skillPath, 'node_modules', 'iconv-lite', 'encodings', 'index.js'),
     ];

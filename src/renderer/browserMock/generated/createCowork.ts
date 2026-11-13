@@ -464,7 +464,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
           embeddingRemoteBaseUrl: '',
           embeddingRemoteApiKey: '',
           codemodeEnabled: false,
-          mcpNativeBridge: false,
         },
       };
     },

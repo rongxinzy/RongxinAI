@@ -23,7 +23,7 @@ import os
 try:
     from pypdf import PdfReader
 except ImportError:
-    print("Missing pypdf. Run this script through make.sh or: uv run --with pypdf python fill_inspect.py ...", file=sys.stderr)
+    print("Missing pypdf. Run this script through make.py or: uv run --with pypdf python fill_inspect.py ...", file=sys.stderr)
     raise SystemExit(2)
 from pypdf.generic import ArrayObject, DictionaryObject, NameObject, TextStringObject
 

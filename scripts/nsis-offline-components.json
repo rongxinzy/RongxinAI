@@ -6,7 +6,6 @@
   },
   { "key": "skills", "prefix": "SKILLs", "sentinel": "SKILLs\\skills.config.json" },
   { "key": "mcps", "prefix": "MCPs", "sentinel": "MCPs\\compatibility-review.md" },
-  { "key": "portable-git", "prefix": "mingit", "sentinel": "mingit\\usr\\bin\\bash.exe" },
   { "key": "python", "prefix": "python-win", "sentinel": "python-win\\python.exe" },
   {
     "key": "skill-python",

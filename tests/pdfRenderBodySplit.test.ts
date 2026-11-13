@@ -271,6 +271,6 @@ test('render_body.py keeps the missing-reportlab guard (exit 2) when the dep is 
     assert.equal(run.status, 0);
   } else {
     assert.equal(run.status, 2);
-    assert.match(run.stderr, /Missing reportlab\. Run through make\.sh/);
+    assert.match(run.stderr, /Missing reportlab\. Run through make\.py/);
   }
 });

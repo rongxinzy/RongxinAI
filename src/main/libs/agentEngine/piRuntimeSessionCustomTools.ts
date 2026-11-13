@@ -8,14 +8,12 @@
  */
 
 import path from 'path';
-import { randomUUID } from 'node:crypto';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { type HarnessActivationEvent } from '../../../shared/harness';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
-import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import { getPythonRuntimeService } from '../../pythonRuntime/host';
 import { getSkillsRoot } from '../coworkUtil';
@@ -30,13 +28,11 @@ import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitie
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
 import { buildSessionSummaryTool } from '../../sessionSummary/tool';
 import { HarnessActivationType } from '../../../shared/harness/constants';
-import { buildPiOcrTool } from './piOcrTool';
-import { isOcrSupported } from '../../ocr/ocrEngine';
 import { buildPiPythonTools } from './piPythonTools';
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { buildPiWebSearchTool } from './piWebSearchTool';
-import { buildPiMcpProxyTool, createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
+import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
 import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import type { PiModules, PiResolvedModel, PiResourceState } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
@@ -51,7 +47,6 @@ interface PiSessionCustomToolsParams {
   workspaceRoot: string;
   workbenchRunId: string | null;
   expertIds: string[];
-  mcpNativeBridge: boolean;
   abortSignal: AbortSignal;
   recordActivation: (event: HarnessActivationEvent) => void;
 }
@@ -71,13 +66,11 @@ export function buildPiSessionCustomTools(
     workspaceRoot,
     workbenchRunId,
     expertIds,
-    mcpNativeBridge,
     abortSignal,
     recordActivation,
   } = params;
-  // Build custom tools: MCP proxy + optional subagent for Team Leads.
-  // Each call creates a distinct tool instance for this Pi session, so its
-  // sequential execution mode cannot block another session.
+  // Build custom tools for this Pi session.
+  // Each call creates a distinct tool instance so sequential execution mode cannot block another session.
   const customTools: Record<string, unknown>[] = [];
   if (resourceState.chatMode) customTools.push(buildPiWebSearchTool());
 
@@ -180,30 +173,12 @@ export function buildPiSessionCustomTools(
   }
   if (!resourceState.chatMode && resourceState.fileToolsEnabled) {
     customTools.push(buildPiDocumentReaderTool({ workspaceRoot }));
-    if (isOcrSupported()) customTools.push(buildPiOcrTool({ workspaceRoot }));
     customTools.push(
       ...buildPiPythonTools({
         service: getPythonRuntimeService(),
         workspace: workspaceRoot,
       }),
     );
-    customTools.push(
-      buildDeclareArtifactTool({
-        awaitPendingWrite: filePath =>
-          host.activeSessions.get(sessionId)?.artifactRecorder?.awaitPendingWrite(filePath) ??
-          Promise.resolve(false),
-      }),
-    );
-  }
-
-  // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
-  if (!resourceState.chatMode) {
-    // The native bridge owns MCP tools when enabled; the gateway tool
-    // would expose the same servers a second time.
-    const mcpProxyTool = mcpNativeBridge ? null : buildPiMcpProxyTool(host.getMcpServerManager());
-    if (mcpProxyTool) {
-      customTools.push(mcpProxyTool);
-    }
   }
 
   if (options.sessionMode === CoworkSessionMode.Work && resourceState.fileToolsEnabled) {
@@ -299,7 +274,6 @@ export function buildPiSessionCustomTools(
             },
             {
               sessionId,
-              toolCallNamespace: randomUUID(),
               getRunId: () => host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
               getApprovalMode: () =>
                 host.activeSessions.get(sessionId)?.approvalMode ??

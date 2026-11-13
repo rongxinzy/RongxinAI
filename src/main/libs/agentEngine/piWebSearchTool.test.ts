@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { buildPiWebSearchTool, PiWebSearchSystemPrompt } from './piWebSearchTool';
+import { buildPiWebSearchTool } from './piWebSearchTool';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 
 vi.mock('../anysearchGatewayCredentials', () => ({
@@ -84,12 +84,8 @@ test('rejects invalid input before sending a request', async () => {
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test('adds the search policy to Chat only', () => {
-  const context = { fileToolsEnabled: true, maxOutputTokens: 8000 };
-  expect(collectPiSystemPromptContributions({ ...context, chatMode: true })).toContain(
-    PiWebSearchSystemPrompt,
-  );
-  expect(collectPiSystemPromptContributions({ ...context, chatMode: false })).not.toContain(
-    PiWebSearchSystemPrompt,
-  );
+test('carries source citation guidance directly on the tool description', () => {
+  const tool = buildPiWebSearchTool();
+  expect(tool.description).toContain('Cite returned source URLs');
+  expect(tool.description).toContain('rather than inventing sources');
 });

@@ -489,5 +489,5 @@ When a document has multiple problems, fix them in this priority order:
 # Full recovery pipeline
 $CLI unpack --input broken.docx --output unpacked/
 $CLI fix-order --input broken.docx                                   # fix element ordering
-scripts/docx_preview.sh broken.docx                                  # visual check
+node scripts/docx_preview.mjs broken.docx                            # visual check
 ```

@@ -1,35 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  createPiBashToolSystemPrompt,
-  getPiBashCommandViolation,
-  getPiBashPythonEnvViolation,
-  PiBashToolSystemPrompt,
-} from './piBashToolGuidelines';
+import { getPiBashPythonEnvViolation } from './piBashToolGuidelines';
 
 describe('piBashToolGuidelines', () => {
-  it('adds the shell contract and timeout policy for every platform', () => {
-    expect(createPiBashToolSystemPrompt('win32')).toContain(PiBashToolSystemPrompt);
-    expect(createPiBashToolSystemPrompt('linux')).toBe('');
-  });
-
-  it('blocks high-confidence Windows command dialects on Git Bash', () => {
-    expect(getPiBashCommandViolation('dir "C:\\work" /s', 'win32')).toContain('Git Bash');
-    expect(getPiBashCommandViolation('Get-ChildItem -Recurse', 'win32')).toContain('PowerShell');
-    expect(getPiBashCommandViolation('tar -xzf "C:\\work\\archive.tgz"', 'win32')).toContain(
-      'forward slashes',
-    );
-  });
-
-  it('allows POSIX commands and explicit native shell invocations', () => {
-    expect(getPiBashCommandViolation('find . -type f', 'win32')).toBeUndefined();
-    expect(
-      getPiBashCommandViolation('powershell.exe -NoProfile -Command "Get-ChildItem"', 'win32'),
-    ).toBeUndefined();
-    expect(getPiBashCommandViolation('dir /s', 'linux')).toBeUndefined();
-  });
-
-  it('does not block pip or uv commands in bash', () => {
+  it('does not block pip or uv commands in shell tools', () => {
     expect(getPiBashPythonEnvViolation('pip install pandas')).toBeUndefined();
     expect(getPiBashPythonEnvViolation('pip3 install --user requests')).toBeUndefined();
     expect(getPiBashPythonEnvViolation('python3 -m pip install openpyxl')).toBeUndefined();
@@ -38,29 +12,28 @@ describe('piBashToolGuidelines', () => {
     expect(getPiBashPythonEnvViolation('pip list')).toBeUndefined();
   });
 
-  it('redirects direct python invocations of bundled Skill scripts', () => {
-    const skillsRoot = '/home/user/app/SKILLs';
+  it('redirects direct python invocations of bundled Skill scripts across bash and PowerShell', () => {
+    const posixSkillsRoot = '/home/user/app/SKILLs';
     expect(
       getPiBashPythonEnvViolation(
-        `python3 ${skillsRoot}/xlsx/scripts/xlsx_reader.py in.xlsx`,
-        skillsRoot,
+        `python3 ${posixSkillsRoot}/xlsx/scripts/xlsx_reader.py in.xlsx`,
+        posixSkillsRoot,
       ),
     ).toContain('run_skill_script');
     expect(getPiBashPythonEnvViolation('python "$SKILLS_ROOT/pdf/scripts/render.py"')).toContain(
       'run_skill_script',
     );
     expect(
-      getPiBashPythonEnvViolation('python3 /tmp/adhoc/analyze.py', skillsRoot),
+      getPiBashPythonEnvViolation('& python.exe "$env:SKILLS_ROOT\\pdf\\scripts\\render.py"'),
+    ).toContain('run_skill_script');
+    expect(
+      getPiBashPythonEnvViolation(
+        'python.exe C:\\app\\SKILLs\\docx\\scripts\\cli.py inspect.docx',
+        'C:\\app\\SKILLs',
+      ),
+    ).toContain('run_skill_script');
+    expect(
+      getPiBashPythonEnvViolation('python3 /tmp/adhoc/analyze.py', posixSkillsRoot),
     ).toBeUndefined();
-  });
-
-  it('evaluates bundled Skill script violations on every platform', () => {
-    expect(
-      getPiBashCommandViolation('python "$SKILLS_ROOT/pdf/scripts/render.py"', 'linux'),
-    ).toContain('run_skill_script');
-    expect(
-      getPiBashCommandViolation('python "$SKILLS_ROOT/pdf/scripts/render.py"', 'win32'),
-    ).toContain('run_skill_script');
-    expect(getPiBashCommandViolation('ls -la', 'win32')).toBeUndefined();
   });
 });

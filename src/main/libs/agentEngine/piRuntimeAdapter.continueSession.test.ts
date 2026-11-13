@@ -10,6 +10,7 @@ import {
   adapter,
   mockCreateAgentSession,
   mockDefaultResourceLoader,
+  mockMcpExtensionFactory,
   mockSession,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
@@ -17,7 +18,6 @@ import {
 import path from 'path';
 
 import { describe, expect, it, vi } from 'vitest';
-import { PiMcpTool } from './piMcpCapabilityPrompt';
 import type { CoworkStore } from '../../coworkStore';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 
@@ -158,6 +158,7 @@ describe('PiRuntimeAdapter', () => {
             inputSchema: { type: 'object' },
           },
         ],
+        lastEnabledRecords: [],
       } as never);
       await adapter.startSession('test', 'First');
 
@@ -166,55 +167,11 @@ describe('PiRuntimeAdapter', () => {
 
       expect(mockSession.abort).toHaveBeenCalledOnce();
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
-      const replacementOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-        customTools?: Array<{ name: string }>;
-      };
-      expect(replacementOptions.customTools?.map(tool => tool.name)).toContain(PiMcpTool.Name);
       const replacementLoaderOptions = mockDefaultResourceLoader.mock.calls[1]?.[0] as {
-        appendSystemPromptOverride: () => string[];
+        extensionFactories?: unknown[];
       };
-      expect(replacementLoaderOptions.appendSystemPromptOverride().join('\n')).toContain(
-        '[Supabase] list_projects: List projects',
-      );
-    });
-
-    it('keeps MCP status available when every configured server failed to connect', async () => {
-      adapter.setMcpServerManager({
-        toolManifest: [],
-        serverStatuses: [
-          {
-            name: 'Blender MCP',
-            connected: false,
-            toolCount: 0,
-            error: 'MCP error -32000: Connection closed',
-          },
-        ],
-      } as never);
-
-      await adapter.startSession('test', 'Can you control Blender through MCP?');
-
-      const options = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        customTools?: Array<{
-          name: string;
-          execute: (
-            toolCallId: string,
-            params: Record<string, unknown>,
-          ) => Promise<{
-            content: Array<{ type: string; text: string }>;
-          }>;
-        }>;
-      };
-      const mcpTool = options.customTools?.find(tool => tool.name === PiMcpTool.Name);
-      expect(mcpTool).toBeDefined();
-      const status = await mcpTool?.execute('status-call', {});
-      expect(status?.content[0].text).toContain('Blender MCP: unavailable');
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        appendSystemPromptOverride: () => string[];
-      };
-      expect(loaderOptions.appendSystemPromptOverride().join('\n')).toContain(
-        '[Blender MCP] unavailable: MCP error -32000: Connection closed',
-      );
+      expect(replacementLoaderOptions.extensionFactories).toContain(mockMcpExtensionFactory);
+      expect(mockSession.bindExtensions).toHaveBeenCalledTimes(2);
     });
 
     it('persists the selected expert on a continuation user message', async () => {

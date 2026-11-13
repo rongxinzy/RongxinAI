@@ -152,8 +152,8 @@ export async function startPiRuntimeSession(
 
   try {
     const workspaceRoot = options.workspaceRoot || process.cwd();
-    // Pi's built-in bash tool snapshots process.env when it executes. Give
-    // that snapshot the same app-managed Node/npm, Python, uv, and Git Bash
+    // Pi's built-in shell tools snapshot process.env when they execute. Give
+    // that snapshot the same app-managed Node/npm, Python, and uv
     // PATH configuration used by direct Skill execution.
     if (!hasAppliedApplicationRuntimeEnv) {
       await applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
@@ -162,8 +162,7 @@ export async function startPiRuntimeSession(
     const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
     // Pi's session manager keeps the structured transcript (tool calls,
     // results, images, thinking) in a per-Cowork-session JSONL. Rebuilds
-    // reopen that file and continue with structured history; only a legacy
-    // session without a file falls back to the flattened text restore.
+    // Reopen any persisted Pi JSONL session file so Pi owns structured history.
     const piSessionStoreRoot = host.getPiSessionStoreRoot();
     const historyRestoreStartedAt = Date.now();
     let restoredNativeHistory = false;
@@ -319,10 +318,6 @@ export async function startPiRuntimeSession(
     const expertMcpIds = Array.isArray(expertSession?.capabilityPolicy?.mcpIds)
       ? (expertSession.capabilityPolicy.mcpIds as string[])
       : [];
-    const mcpNativeBridge =
-      (options.mcpNativeBridge === true || expertMcpIds.length > 0) &&
-      !resourceState.chatMode &&
-      Boolean(host.getMcpServerManager());
     const resourceLoader = await createPiRuntimeResourceLoader(
       host,
       pi,
@@ -337,7 +332,6 @@ export async function startPiRuntimeSession(
           options.approvalMode ??
           WorkbenchApprovalMode.Ask,
         enableCodemode: codemodeEnabled,
-        enableMcpNative: mcpNativeBridge,
         expertMcpIds,
       },
     );
@@ -361,7 +355,6 @@ export async function startPiRuntimeSession(
       workspaceRoot,
       workbenchRunId,
       expertIds,
-      mcpNativeBridge,
       abortSignal: abortController.signal,
       recordActivation,
     });
@@ -383,17 +376,16 @@ export async function startPiRuntimeSession(
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
         source: 'jsonl',
         messageCount: session.messages?.length,
-        promptChars: (options._piPromptOverride || prompt).length,
+        promptChars: prompt.length,
         restoreMs: Date.now() - historyRestoreStartedAt,
         contextWindow:
           typeof sessionModel.contextWindow === 'number' ? sessionModel.contextWindow : undefined,
         model: modelId,
       });
     }
-    if (mcpNativeBridge && typeof session.bindExtensions === 'function') {
-      // The MCP extension connects its servers on session start; without an
-      // explicit bind, SDK sessions never emit it (verified against pi's SDK
-      // docs and examples/sdk/14-codemode-mcp.ts).
+    if (!resourceState.chatMode && typeof session.bindExtensions === 'function') {
+      // Pi's builtin MCP extension connects servers on session_start; without
+      // an explicit bind, SDK sessions never emit it.
       await session.bindExtensions({});
     }
     const piSessionCreatedAt = Date.now();
@@ -410,7 +402,6 @@ export async function startPiRuntimeSession(
       modelRuntime: resolvedModel.modelRuntime,
       modelRequestOptions: resolvedModel.requestOptions,
       codemodeEnabled,
-      mcpNativeBridge,
       imageEndpointKey: resolvedModel.endpointKey,
       capabilities: {
         toolCalling: ModelCapabilityStatus.Unknown,
@@ -530,11 +521,7 @@ export async function startPiRuntimeSession(
     // A live Pi session replaces the lightweight IM retention marker.
     host.retainedSessionIds.delete(sessionId);
 
-    // Send the prompt. `options._piPromptOverride` carries the flattened
-    // history restore only when no persisted Pi session file exists; when the
-    // session manager above reopened one, Pi already holds the prior turns as
-    // structured messages and the override is just the new user prompt.
-    let initialPrompt = options._piPromptOverride || prompt;
+    let initialPrompt = prompt;
     if (options.planMode === true) {
       initialPrompt = `${PiPlanModePrompt}\n\n${initialPrompt}`;
     }

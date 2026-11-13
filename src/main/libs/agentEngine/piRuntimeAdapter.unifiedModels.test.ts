@@ -39,7 +39,6 @@ vi.mock('@earendil-works/pi-ai/compat', () => ({
 vi.mock('../coworkUtil', async importOriginal => ({
   ...(await importOriginal<typeof import('../coworkUtil')>()),
   applyApplicationRuntimeEnv: vi.fn(),
-  resolveGitBashPathForPi: vi.fn(),
 }));
 
 describe('unified model readiness and actual inference', () => {

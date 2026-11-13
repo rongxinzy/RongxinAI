@@ -72,6 +72,10 @@ const hoisted = vi.hoisted(() => {
     stopReason: 'stop',
   });
 
+  const mockCodemodeExtensionFactory = vi.fn();
+  const mockMcpExtensionFactory = vi.fn();
+  const mockToolSearchExtensionFactory = vi.fn();
+
   return {
     mockSession,
     mockSettingsManagerCreate,
@@ -84,9 +88,12 @@ const hoisted = vi.hoisted(() => {
       this.reload = vi.fn().mockResolvedValue(undefined);
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
-    mockCreateCodemodeExtension: vi.fn(() => 'codemode-extension-factory'),
-    mockCreateMcpExtension: vi.fn(() => 'mcp-extension-factory'),
-    mockCreateToolSearchExtension: vi.fn(() => 'tool-search-extension-factory'),
+    mockCodemodeExtensionFactory,
+    mockMcpExtensionFactory,
+    mockToolSearchExtensionFactory,
+    mockCreateCodemodeExtension: vi.fn(() => mockCodemodeExtensionFactory),
+    mockCreateMcpExtension: vi.fn(() => mockMcpExtensionFactory),
+    mockCreateToolSearchExtension: vi.fn(() => mockToolSearchExtensionFactory),
     mockApplyApplicationRuntimeEnv: vi.fn(),
     mockCompleteSimple,
     mockGetModel: vi.fn((provider: string, modelId: string) => ({
@@ -205,6 +212,9 @@ export const mockGetModel = hoisted.mockGetModel;
 export const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
 export const mockCreateMcpExtension = hoisted.mockCreateMcpExtension;
+export const mockCodemodeExtensionFactory = hoisted.mockCodemodeExtensionFactory;
+export const mockMcpExtensionFactory = hoisted.mockMcpExtensionFactory;
+export const mockToolSearchExtensionFactory = hoisted.mockToolSearchExtensionFactory;
 export const mockApplyApplicationRuntimeEnv = hoisted.mockApplyApplicationRuntimeEnv;
 export const mockCompleteSimple = hoisted.mockCompleteSimple;
 
@@ -239,7 +249,6 @@ vi.mock('../coworkUtil', async importOriginal => {
   return {
     ...actual,
     applyApplicationRuntimeEnv: hoisted.mockApplyApplicationRuntimeEnv,
-    resolveGitBashPathForPi: vi.fn(() => undefined),
   };
 });
 

@@ -100,7 +100,7 @@ test('state-only scans do not create a summary obligation', async () => {
   expect(recorder.recordedWorkVersion()).toBe(0);
 });
 
-test.each(['write', 'edit', 'declare_artifact'])(
+test.each(['write', 'edit'])(
   'state-only %s keeps evidence without changing summary work',
   async toolName => {
     const { root, ledger, recorder } = await createRecorder();

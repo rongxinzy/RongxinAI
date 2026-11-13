@@ -644,7 +644,6 @@ const CoworkConfigSchema = z.object({
   embeddingRemoteBaseUrl: z.string(),
   embeddingRemoteApiKey: z.string(),
   codemodeEnabled: z.boolean(),
-  mcpNativeBridge: z.boolean(),
 });
 
 /** Registered by `coworkConfigIpc.ts`. */

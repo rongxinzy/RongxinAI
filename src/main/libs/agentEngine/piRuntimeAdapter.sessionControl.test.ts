@@ -20,8 +20,6 @@ import {
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
-import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
-import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
 import type { CoworkStore } from '../../coworkStore';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -330,11 +328,7 @@ describe('PiRuntimeAdapter', () => {
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         appendSystemPromptOverride: () => string[];
       };
-      expect(loaderOptions.appendSystemPromptOverride()).toEqual([
-        PiAskUserQuestionSystemPrompt,
-        DeclareArtifactSystemPrompt,
-        SessionSummarySystemPrompt,
-      ]);
+      expect(loaderOptions.appendSystemPromptOverride()).toEqual([SessionSummarySystemPrompt]);
     });
   });
 

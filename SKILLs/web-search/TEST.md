@@ -62,7 +62,7 @@ This guide walks through testing the entire Web Search Skill integration with Zh
 2. Execute a search:
 
    ```bash
-   bash SKILLs/web-search/scripts/search.sh "React 19 features" 5
+   node SKILLs/web-search/scripts/search.mjs "React 19 features" 5
    ```
 
 3. Verify output contains:
@@ -89,7 +89,7 @@ This guide walks through testing the entire Web Search Skill integration with Zh
 
 4. Observe:
    - Claude should recognize the need for real-time information
-   - Claude should execute: `bash SKILLs/web-search/scripts/search.sh "Next.js 14 new features" 5`
+   - Claude should execute: `node SKILLs/web-search/scripts/search.mjs "Next.js 14 new features" 5`
    - Search results should appear in the tool execution output
    - Claude should synthesize information from the results
    - Claude should provide a summary with source citations
@@ -157,7 +157,7 @@ This guide walks through testing the entire Web Search Skill integration with Zh
 2. Manually stop the Bridge Server:
 
    ```bash
-   bash SKILLs/web-search/scripts/stop-server.sh
+   node SKILLs/web-search/scripts/stop-server.mjs
    ```
 
 3. In Cowork session, ask Claude to search
@@ -166,13 +166,13 @@ This guide walks through testing the entire Web Search Skill integration with Zh
    ```
    ✗ Bridge Server is not running
      Please start the server first:
-     bash SKILLs/web-search/scripts/start-server.sh
+     node SKILLs/web-search/scripts/start-server.mjs
    ```
 
 5. Manually restart:
 
    ```bash
-   bash SKILLs/web-search/scripts/start-server.sh
+   node SKILLs/web-search/scripts/start-server.mjs
    ```
 
 6. Retry search
@@ -205,7 +205,7 @@ This guide walks through testing the entire Web Search Skill integration with Zh
 
 ```bash
 # Verify Chrome path detection
-bash SKILLs/web-search/scripts/search.sh "test" 1
+node SKILLs/web-search/scripts/search.mjs "test" 1
 
 # Should find Chrome at: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 ```
@@ -214,7 +214,7 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 
 ```bash
 # Verify Chrome/Chromium detection
-bash SKILLs/web-search/scripts/search.sh "test" 1
+node SKILLs/web-search/scripts/search.mjs "test" 1
 
 # Should find at: /usr/bin/google-chrome or /usr/bin/chromium
 ```
@@ -223,7 +223,7 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 
 ```bash
 # Verify Chrome detection
-bash SKILLs/web-search/scripts/search.sh "test" 1
+node SKILLs/web-search/scripts/search.mjs "test" 1
 
 # Should find at: C:\Program Files\Google\Chrome\Application\chrome.exe
 ```
@@ -238,8 +238,8 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 
 1. Open two terminal windows
 2. Execute searches simultaneously:
-   - Terminal 1: `bash scripts/search.sh "React" 3`
-   - Terminal 2: `bash scripts/search.sh "Vue" 3`
+   - Terminal 1: `node scripts/search.mjs "React" 3`
+   - Terminal 2: `node scripts/search.mjs "Vue" 3`
 
 3. Both should complete successfully
 
@@ -254,7 +254,7 @@ bash SKILLs/web-search/scripts/search.sh "test" 1
 1. Search for a specific topic:
 
    ```bash
-   bash SKILLs/web-search/scripts/search.sh "Playwright documentation" 5
+   node SKILLs/web-search/scripts/search.mjs "Playwright documentation" 5
    ```
 
 2. Verify results include:
@@ -311,7 +311,7 @@ bun --cwd SKILLs/web-search run build
 ```bash
 lsof -i :8923
 kill -9 <PID>
-bash SKILLs/web-search/scripts/start-server.sh
+node SKILLs/web-search/scripts/start-server.mjs
 ```
 
 ### Issue 4: Stale Connection

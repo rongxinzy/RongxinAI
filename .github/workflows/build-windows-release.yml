@@ -78,7 +78,6 @@ jobs:
             ~/.cache/electron-builder
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
-            resources/mingit
             resources/uv-win
             resources/python-win
             resources/skill-python

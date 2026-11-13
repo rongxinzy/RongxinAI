@@ -188,7 +188,6 @@
     "generate:nsis-assets": "node scripts/generate-nsis-brand-assets.cjs",
     "generate:case-previews": "node scripts/generate-case-previews.mjs",
     "generate:quick-case-sites": "node scripts/generate-quick-case-sites.mjs",
-    "setup:mingit": "node scripts/setup-mingit.js",
     "setup:python-runtime": "bun scripts/setup-python-runtime.js",
     "setup:uv-runtime": "bun scripts/setup-uv-runtime.js",
     "setup:posix-uv-runtime": "bun scripts/setup-mac-uv-runtime.js",

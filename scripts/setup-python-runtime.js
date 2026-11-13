@@ -2,7 +2,6 @@
 /**
  * Prepare the uv-managed Windows Python runtime (3.14.6) under resources/python-win.
  *
- * This script mirrors setup-mingit.js behavior:
  * - Uses the application's bundled uv executable to install the interpreter
  * - Can run cross-platform for Windows packaging
  * - Bundles interpreter runtime only (uv creates Skill environments on demand)

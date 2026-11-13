@@ -60,7 +60,7 @@ Example:
 Full pipeline — content → design tokens → cover → body → merged PDF.
 
 ```bash
-bash scripts/make.sh run \
+python3 scripts/make.py run \
   --title "Q3 Strategy Review" --type proposal \
   --author "Strategy Team" --date "October 2025" \
   --accent "#2D5F8A" \
@@ -197,7 +197,7 @@ Always run `fill_inspect.py` first to get exact field names.
 Parse an existing document → content.json → CREATE pipeline.
 
 ```bash
-bash scripts/make.sh reformat \
+python3 scripts/make.py reformat \
   --input source.md --title "My Report" --type report --out output.pdf
 ```
 
@@ -208,9 +208,9 @@ bash scripts/make.sh reformat \
 ## Environment
 
 ```bash
-bash scripts/make.sh check   # verify all deps
-bash scripts/make.sh fix     # auto-install missing deps
-bash scripts/make.sh demo    # build a sample PDF
+python3 scripts/make.py check   # verify all deps
+python3 scripts/make.py fix     # auto-install missing deps
+python3 scripts/make.py demo    # build a sample PDF
 ```
 
 | Tool | Used by | Install |

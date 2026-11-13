@@ -119,7 +119,6 @@ vi.mock('../coworkUtil', async importOriginal => {
   return {
     ...actual,
     applyApplicationRuntimeEnv: vi.fn(),
-    resolveGitBashPathForPi: vi.fn(() => undefined),
   };
 });
 

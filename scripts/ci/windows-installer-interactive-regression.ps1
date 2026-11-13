@@ -33,7 +33,7 @@ $newBackup = "$installRoot.old.2"
 $heldBackup = "$installRoot.cancel-test-held-backup"
 $detachedRoot = "$installRoot.cancel-test-detached"
 $runtimeFixture = "$installRoot.runtime-completion"
-$componentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv', 'llamacpp-bundled', 'strata-bundled')
+$componentKeys = @('channel-runtime', 'skills', 'mcps', 'python', 'skill-python', 'uv', 'llamacpp-bundled', 'strata-bundled')
 $sleeper = $null
 Add-Type -AssemblyName System.Drawing
 Add-Type -Path (Join-Path (Split-Path $DriverPath) 'windows-installer-ui.cs') -ReferencedAssemblies System,System.Core,System.Drawing

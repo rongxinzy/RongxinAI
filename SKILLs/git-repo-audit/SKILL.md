@@ -13,7 +13,7 @@ metadata:
 
 ## 功能概览
 
-### 1. 热点文件分析 (`scripts/hotfiles.sh`)
+### 1. 热点文件分析 (`scripts/hotfiles.py`)
 
 找出仓库中变更最频繁的文件，帮助识别：
 - 高风险代码区域（频繁修改 = 潜在不稳定）
@@ -22,7 +22,7 @@ metadata:
 
 **用法：**
 ```bash
-bash scripts/hotfiles.sh [选项]
+python3 scripts/hotfiles.py [选项]
 ```
 
 | 选项 | 说明 | 默认值 |
@@ -34,7 +34,7 @@ bash scripts/hotfiles.sh [选项]
 | `--author AUTHOR` | 按作者过滤 | 不限 |
 | `--format FORMAT` | 输出格式：`table` / `csv` / `json` | table |
 
-### 2. 代码归属分析 (`scripts/ownership.sh`)
+### 2. 代码归属分析 (`scripts/ownership.py`)
 
 分析代码的实际归属关系，输出每位贡献者在指定范围内的：
 - 提交次数与占比
@@ -43,7 +43,7 @@ bash scripts/hotfiles.sh [选项]
 
 **用法：**
 ```bash
-bash scripts/ownership.sh [选项]
+python3 scripts/ownership.py [选项]
 ```
 
 | 选项 | 说明 | 默认值 |
@@ -54,7 +54,7 @@ bash scripts/ownership.sh [选项]
 | `--since DATE` | 起始日期 | 不限 |
 | `--format FORMAT` | 输出格式：`table` / `csv` / `json` | table |
 
-### 3. 密钥泄露扫描 (`scripts/secret-scan.sh`)
+### 3. 密钥泄露扫描 (`scripts/secret-scan.py`)
 
 扫描 Git 全量历史（包括已删除的 commit），检测常见的密钥和敏感信息泄露：
 - AWS Access Key / Secret Key
@@ -64,7 +64,7 @@ bash scripts/ownership.sh [选项]
 
 **用法：**
 ```bash
-bash scripts/secret-scan.sh [选项]
+python3 scripts/secret-scan.py [选项]
 ```
 
 | 选项 | 说明 | 默认值 |
@@ -85,7 +85,6 @@ bash scripts/secret-scan.sh [选项]
 ## 依赖
 
 - `git`（>= 2.20）
-- `bash`（>= 4.0）
-- 标准 Unix 工具：`awk`、`sort`、`head`、`grep`
+- `python`（>= 3.8）
 
 无需安装任何额外依赖或付费 API。

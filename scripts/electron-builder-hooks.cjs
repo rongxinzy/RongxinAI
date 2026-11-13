@@ -33,7 +33,6 @@ const {
   ensurePosixPythonRuntime,
   checkRuntimeHealth: checkMacPythonRuntimeHealth,
 } = require('./setup-mac-python-runtime.js');
-const { ensurePortableGit } = require('./setup-mingit.js');
 const {
   ensureSkillPythonRuntimes,
   checkSkillPythonRuntimeHealth,
@@ -208,54 +207,6 @@ function ensureBundledChannelRuntime(context) {
   } finally {
     rmSync(stagedCurrentDirectory, { recursive: true, force: true });
   }
-}
-
-function findPackagedBash(appOutDir) {
-  const candidates = [
-    path.join(appOutDir, 'resources', 'mingit', 'bin', 'bash.exe'),
-    path.join(appOutDir, 'resources', 'mingit', 'usr', 'bin', 'bash.exe'),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
-function verifyPackagedPortableGitRuntimeDirs(appOutDir) {
-  const requiredDirs = [
-    path.join(appOutDir, 'resources', 'mingit', 'dev', 'shm'),
-    path.join(appOutDir, 'resources', 'mingit', 'dev', 'mqueue'),
-  ];
-  const createdDirs = [];
-
-  for (const dir of requiredDirs) {
-    if (existsSync(dir)) continue;
-    mkdirSync(dir, { recursive: true });
-    createdDirs.push(dir);
-  }
-
-  const missingDirs = requiredDirs.filter(dir => !existsSync(dir));
-  if (missingDirs.length > 0) {
-    throw new Error(
-      'Windows package is missing required PortableGit runtime directories. ' +
-        `Missing: ${missingDirs.join(', ')}`,
-    );
-  }
-
-  if (createdDirs.length > 0) {
-    console.log(
-      '[electron-builder-hooks] Created missing PortableGit runtime directories: ' +
-        createdDirs.join(', '),
-    );
-  }
-
-  console.log(
-    '[electron-builder-hooks] Verified PortableGit runtime directories: ' + requiredDirs.join(', '),
-  );
 }
 
 function findPackagedPythonExecutable(appOutDir) {
@@ -555,19 +506,6 @@ async function beforePack(context) {
   installSkillDependencies();
 
   if (isWindowsTarget(context)) {
-    console.log(
-      '[electron-builder-hooks] Windows target detected, ensuring bundled PortableGit...',
-    );
-    await ensurePortableGit({ required: true });
-    const portableGitRoot = path.join(__dirname, '..', 'resources', 'mingit');
-    const portableGitBash = [
-      path.join(portableGitRoot, 'bin', 'bash.exe'),
-      path.join(portableGitRoot, 'usr', 'bin', 'bash.exe'),
-    ].find(candidate => existsSync(candidate));
-    if (!portableGitBash) {
-      throw new Error('Bundled PortableGit health check failed before pack: bash.exe is missing.');
-    }
-
     console.log(
       '[electron-builder-hooks] Windows target detected, ensuring portable uv runtime is prepared...',
     );

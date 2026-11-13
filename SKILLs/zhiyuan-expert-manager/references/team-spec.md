@@ -45,7 +45,7 @@ Team 型专家团中，每个成员有三个外露字段：`name`（名字）、
 ### 并行 vs 串行
 
 - **并行 Phase**：同一条消息中 spawn 多个成员（使用 `subagent` parallel 模式），适用于成员间无数据依赖
-- **串行 Phase**：等前一 Phase 全部回传后，将结论传入下一 Phase 的成员 prompt（使用 `subagent` chain 模式）
+- **串行 Phase**：等前一 Phase 全部回传后，将结论传入下一 Phase 的成员 prompt（使用 `subagent` single 模式逐步委派）
 
 ### 示例 SOP
 
