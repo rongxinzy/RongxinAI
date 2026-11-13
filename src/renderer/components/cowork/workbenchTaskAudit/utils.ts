@@ -2,7 +2,6 @@ import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalDecisionSource,
   WorkbenchApprovalEffectStatus,
-  WorkbenchApprovalRiskLevel,
   WorkbenchArtifactKind,
   WorkbenchContractKind,
   WorkbenchRunEventType,
@@ -51,13 +50,6 @@ const decisionSourceTranslationKeys: Record<string, string> = {
   [WorkbenchApprovalDecisionSource.User]: 'workbenchTaskDecisionSourceUser',
   [WorkbenchApprovalDecisionSource.Policy]: 'workbenchTaskDecisionSourcePolicy',
   [WorkbenchApprovalDecisionSource.Recovery]: 'workbenchTaskDecisionSourceRecovery',
-};
-
-const riskTranslationKeys: Record<string, string> = {
-  [WorkbenchApprovalRiskLevel.ReadOnly]: 'workbenchTaskRiskReadOnly',
-  [WorkbenchApprovalRiskLevel.Reversible]: 'workbenchTaskRiskReversible',
-  [WorkbenchApprovalRiskLevel.Irreversible]: 'workbenchTaskRiskIrreversible',
-  [WorkbenchApprovalRiskLevel.Unknown]: 'workbenchTaskRiskUnknown',
 };
 
 const effectTranslationKeys: Record<string, string> = {
@@ -122,7 +114,6 @@ export const triggerLabel = (value: string): string => translated(triggerTransla
 export const decisionLabel = (value: string): string => translated(decisionTranslationKeys, value);
 export const decisionSourceLabel = (value: string): string =>
   translated(decisionSourceTranslationKeys, value);
-export const riskLabel = (value: string): string => translated(riskTranslationKeys, value);
 export const effectLabel = (value: string): string => translated(effectTranslationKeys, value);
 export const artifactKindLabel = (value: string): string =>
   translated(artifactKindTranslationKeys, value);

@@ -28,7 +28,7 @@ import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import { HarnessMeasurementService } from '../harness/measurementService';
 import { WorkbenchTaskRepository } from './repository';
 
-export interface CompletedWorkbenchRunEvent {
+interface CompletedWorkbenchRunEvent {
   task: WorkbenchTask;
   run: WorkbenchRun;
   artifacts: WorkbenchTaskDetail['artifacts'];

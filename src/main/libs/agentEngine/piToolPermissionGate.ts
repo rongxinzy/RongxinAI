@@ -57,7 +57,7 @@ type PendingToolApproval = {
   resolve: (result: PiToolAuthorizationResult) => void;
 };
 
-export function requiresToolPermissionPrompt(
+function requiresToolPermissionPrompt(
   approvalMode: WorkbenchApprovalMode,
   riskLevel: WorkbenchApprovalRiskLevel,
 ): boolean {
