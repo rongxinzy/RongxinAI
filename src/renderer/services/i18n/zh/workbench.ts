@@ -214,6 +214,7 @@ export const zhWorkbench: Record<string, string> = {
   workbenchTaskEventVerificationStarted: '开始验证',
   workbenchTaskEventVerificationFinished: '验证完成',
   workbenchTaskEventRunPaused: '执行已暂停',
+  workbenchTaskEventRunSucceeded: '执行成功',
   workbenchTaskEventRunCancelled: '执行已取消',
   workbenchTaskEventRunFailed: '执行失败',
   workbenchTaskEventRecoveryRequired: '需要人工介入',

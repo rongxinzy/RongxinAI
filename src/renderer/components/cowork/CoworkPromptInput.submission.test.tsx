@@ -63,7 +63,6 @@ vi.mock('./CoworkModelPicker', () => ({ CoworkModelPicker: () => null }));
 vi.mock('./FolderSelectorPopover', () => ({ default: () => null }));
 vi.mock('./PermissionModeMenu', () => ({ default: () => null }));
 vi.mock('./PromptPlusMenu', () => ({ default: () => null }));
-vi.mock('./ResumeTaskContextBadge', () => ({ ResumeTaskContextBadge: () => null }));
 
 beforeEach(() => {
   resetAppToastDedupeForTests();
@@ -252,14 +251,6 @@ test.each(['', ' \t', '\u200b'])(
     });
   },
 );
-
-test('keeps the explicit task-resume action available without an amendment', async () => {
-  const onSubmit = vi.fn();
-  const view = render(<CoworkPromptInput onSubmit={onSubmit} resumeTaskActive />);
-  await submit(view.container.querySelector('form')!, 2);
-  expect(onSubmit).toHaveBeenCalledOnce();
-  expect(onSubmit.mock.calls[0]?.[0]).toBe('');
-});
 
 test('shows gateway start failure and restart hint when model service state is failed', () => {
   fixture.state.model.serviceState = 'failed';

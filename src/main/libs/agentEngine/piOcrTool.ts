@@ -9,7 +9,7 @@
 import * as fs from 'fs';
 import path from 'path';
 
-import { resolveWorkspaceFile } from '../../workbenchTask/artifactCollector';
+import { resolveWorkspaceFile } from './workspaceFile';
 import { getOcrStatus, isOcrSupported, readOcrText } from '../../ocr/ocrEngine';
 import { ocrPdf } from '../../ocr/pdfOcr';
 

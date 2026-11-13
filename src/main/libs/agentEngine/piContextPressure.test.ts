@@ -13,16 +13,13 @@ import { CoworkStore } from '../../coworkStore';
 import { SqliteStore } from '../../sqliteStore';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
-import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
 import { runTextWorkerOperation } from '../../workbenchTask/textWorkerOperations';
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { piSessionDirFor } from './piSessionStore';
 
-// Vitest does not build the Electron worker bundle. Keep the real collector;
+// Vitest does not build the Electron worker bundle. Keep the real text worker operation;
 // the session, provider transport, tools, SQLite and JSONL are all exercised.
 vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
-  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
-    collectWorkbenchArtifacts(input),
   transformCoworkTextAsync: async (input: Parameters<typeof runTextWorkerOperation>[0]) =>
     runTextWorkerOperation(input),
 }));

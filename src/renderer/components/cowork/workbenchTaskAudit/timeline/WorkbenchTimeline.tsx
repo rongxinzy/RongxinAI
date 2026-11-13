@@ -1,10 +1,7 @@
 import { motion, useReducedMotion, type Variants } from 'motion/react';
 import { useMemo } from 'react';
 
-import type {
-  WorkbenchApprovalResponseInput,
-  WorkbenchTaskDetail,
-} from '../../../../../shared/workbenchTask';
+import type { WorkbenchTaskDetail } from '../../../../../shared/workbenchTask';
 import { i18nService } from '../../../../services/i18n';
 import { TIMELINE_EASE } from '../constants';
 import { TimelineChapter } from './TimelineChapter';
@@ -21,11 +18,9 @@ const chapterItemVariants: Variants = {
 
 interface WorkbenchTimelineProps {
   detail: WorkbenchTaskDetail;
-  busy: boolean;
-  onRespondToApproval: (input: WorkbenchApprovalResponseInput) => void;
 }
 
-export function WorkbenchTimeline({ detail, busy, onRespondToApproval }: WorkbenchTimelineProps) {
+export function WorkbenchTimeline({ detail }: WorkbenchTimelineProps) {
   const reducedMotion = useReducedMotion();
   const chapters = useMemo(() => buildTimelineChapters(detail), [detail]);
   const defaultOpenRunId = useMemo(() => {
@@ -82,8 +77,6 @@ export function WorkbenchTimeline({ detail, busy, onRespondToApproval }: Workben
                 chapter={chapter}
                 runs={detail.runs}
                 defaultOpen={chapter.run.id === defaultOpenRunId}
-                busy={busy}
-                onRespondToApproval={onRespondToApproval}
               />
             </motion.li>
           );

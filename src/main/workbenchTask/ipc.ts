@@ -2,25 +2,13 @@ import { writeFile } from 'fs/promises';
 
 import { BrowserWindow, dialog } from 'electron';
 
-import {
-  WorkbenchRunTrigger,
-  WorkbenchTaskIpc,
-  type WorkbenchTaskResumeInput,
-  type WorkbenchTask,
-  type WorkbenchTaskChangedEvent,
-  type WorkbenchRun,
-} from '../../shared/workbenchTask';
+import { WorkbenchTaskIpc, type WorkbenchTaskChangedEvent } from '../../shared/workbenchTask';
 import { handleIpcContract } from '../ipc/handleIpcContract';
 import { workbenchTaskContract } from '../../shared/ipc/workbenchTaskContract';
 import type { WorkbenchTaskService } from './taskService';
 
 export function registerWorkbenchTaskIpcHandlers(options: {
   getService: () => WorkbenchTaskService;
-  startPreparedRun: (
-    task: WorkbenchTask,
-    run: WorkbenchRun,
-    resumeInput?: WorkbenchTaskResumeInput,
-  ) => Promise<void>;
 }): void {
   const service = options.getService();
   service.on('changed', (event: WorkbenchTaskChangedEvent) => {
@@ -28,32 +16,6 @@ export function registerWorkbenchTaskIpcHandlers(options: {
       if (!window.isDestroyed()) window.webContents.send(WorkbenchTaskIpc.Changed, event);
     }
   });
-
-  const startRun = async (
-    taskId: string,
-    trigger: WorkbenchRunTrigger,
-    resumeInput?: WorkbenchTaskResumeInput,
-  ) => {
-    try {
-      const prepared = service.prepareRun(taskId, trigger);
-      await options.startPreparedRun(prepared.task, prepared.run, resumeInput);
-      return { success: true, detail: service.getDetail(taskId) ?? undefined };
-    } catch (error) {
-      const task = service.getDetail(taskId)?.task;
-      if (task) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (trigger === WorkbenchRunTrigger.Resume) {
-          service.pauseRun(task.sessionId, message);
-        } else {
-          service.failRun(task.sessionId, { message });
-        }
-      }
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  };
 
   handleIpcContract(workbenchTaskContract, {
     getCurrent: (_event, sessionId) => ({
@@ -102,37 +64,6 @@ export function registerWorkbenchTaskIpcHandlers(options: {
           'utf8',
         );
         return { success: true, path: selection.filePath };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    },
-
-    resume: (_event, input) => startRun(input.taskId, WorkbenchRunTrigger.Resume, input),
-
-    retry: (_event, taskId) => startRun(taskId, WorkbenchRunTrigger.Retry),
-
-    accept: (_event, taskId) => {
-      try {
-        return { success: true, detail: service.acceptTask(taskId) };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    },
-
-    respondToApproval: (_event, input) => {
-      try {
-        service.respondToApproval(input);
-        const approval = service.repository.getApproval(input.approvalId);
-        return {
-          success: true,
-          detail: approval ? (service.getDetail(approval.taskId) ?? undefined) : undefined,
-        };
       } catch (error) {
         return {
           success: false,

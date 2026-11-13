@@ -143,39 +143,6 @@ test('keeps a preparation status visible without an empty collapsible', () => {
   expect(screen.queryByRole('button')).toBeNull();
 });
 
-test('only exposes resume for the recoverable task and honors disabled state', () => {
-  const onResumeTask = vi.fn();
-  const interruption = {
-    sessionId: 'session',
-    interruptionId: 'interruption',
-    cause: CoworkInterruptionCause.RuntimePaused,
-    taskId: 'task',
-    recoverable: true,
-  };
-  const item: AssistantTurnItem = {
-    type: CoworkMessageType.System,
-    message: message(CoworkMessageType.System, '', { interruption }),
-  };
-  const { rerender } = renderTurn([item], {
-    recoverableTaskId: 'task',
-    onResumeTask,
-    resumeDisabled: true,
-  });
-  expect(
-    screen.getByRole('button', { name: i18nService.t('coworkResumeTaskAction') }),
-  ).toBeDisabled();
-  rerender(
-    createElement(TurnBlock, {
-      turn: { id: 'resumed', userMessage: null, assistantItems: [item] },
-      recoverableTaskId: 'task',
-      onResumeTask,
-      showCopyButtons: false,
-    }),
-  );
-  fireEvent.click(screen.getByRole('button', { name: i18nService.t('coworkResumeTaskAction') }));
-  expect(onResumeTask).toHaveBeenCalledWith(interruption);
-});
-
 const expert = { expertId: 'expert-a', expertName: 'Draft Expert', presetId: 'draft' };
 
 describe('getTurnPrimaryExpert', () => {

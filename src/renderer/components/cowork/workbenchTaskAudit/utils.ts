@@ -104,6 +104,7 @@ const eventTranslationKeys: Record<string, string> = {
   [WorkbenchRunEventType.VerificationStarted]: 'workbenchTaskEventVerificationStarted',
   [WorkbenchRunEventType.VerificationFinished]: 'workbenchTaskEventVerificationFinished',
   [WorkbenchRunEventType.RunPaused]: 'workbenchTaskEventRunPaused',
+  [WorkbenchRunEventType.RunSucceeded]: 'workbenchTaskEventRunSucceeded',
   [WorkbenchRunEventType.RunCancelled]: 'workbenchTaskEventRunCancelled',
   [WorkbenchRunEventType.RunFailed]: 'workbenchTaskEventRunFailed',
   [WorkbenchRunEventType.RecoveryRequired]: 'workbenchTaskEventRecoveryRequired',

@@ -51,7 +51,6 @@ import { PromptWorkspaceSelector } from './PromptWorkspaceSelector';
 import InlineSkillPromptEditor from './InlineSkillPromptEditor';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
-import { ResumeTaskContextBadge } from './ResumeTaskContextBadge';
 import { usePromptSubmissionLock } from './usePromptSubmissionLock';
 import { resolveInitialSelectedExpertIds } from './resolveInitialSelectedExpertIds';
 import GoalModeChip from './promptInput/GoalModeChip';
@@ -101,8 +100,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       sessionId,
       remoteManaged = false,
       topAccessory,
-      resumeTaskActive = false,
-      onCancelTaskResume,
     } = props;
     const dispatch = useDispatch();
 
@@ -319,7 +316,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       canQueueWhileStreaming,
       isPatchingModel,
       hasUnavailableLlamaCppModel,
-      resumeTaskActive,
       showFolderSelector,
       workingDirectory,
       setShowFolderRequiredWarning,
@@ -399,8 +395,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const isPlusToolbar = !remoteManaged;
     const isWorkVariant = showFolderSelector || showPermissionModeSelector;
     // 2026/09/15 lixiang  Empty prompt: dim submit, not-allowed cursor, and ask-user tip
-    const isSubmitEmpty =
-      !hasVisiblePromptContent(value) && attachments.length === 0 && !resumeTaskActive;
+    const isSubmitEmpty = !hasVisiblePromptContent(value) && attachments.length === 0;
     const showEmptySubmitHint = isSubmitEmpty && !isStreaming;
     return (
       <div ref={promptRootRef} className="relative">
@@ -453,11 +448,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               {i18nService.t('coworkDropFileHint')}
             </div>
           )}
-          {(resumeTaskActive || attachments.length > 0) && (
+          {attachments.length > 0 && (
             <PromptInputHeader className="max-h-[136px] items-start gap-2 overflow-y-auto px-2.5 pt-2">
-              {resumeTaskActive && onCancelTaskResume && (
-                <ResumeTaskContextBadge onCancel={onCancelTaskResume} />
-              )}
               <CoworkInlineAttachments
                 attachments={attachments}
                 className="max-w-full"

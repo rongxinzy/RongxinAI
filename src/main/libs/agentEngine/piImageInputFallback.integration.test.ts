@@ -107,12 +107,8 @@ const writeImage = (name: string): string => {
 };
 
 vi.mock('../../workbenchTask/artifactWorkerPool', async () => {
-  const { runTextWorkerOperation, collectWorkbenchArtifacts } =
-    await import('../../workbenchTask/textWorkerOperations');
+  const { runTextWorkerOperation } = await import('../../workbenchTask/textWorkerOperations');
   return {
-    collectWorkbenchArtifactsAsync: async (
-      input: Parameters<typeof collectWorkbenchArtifacts>[0],
-    ) => collectWorkbenchArtifacts(input),
     transformCoworkTextAsync: async (input: Parameters<typeof runTextWorkerOperation>[0]) =>
       runTextWorkerOperation(input),
   };

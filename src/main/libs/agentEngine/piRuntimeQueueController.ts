@@ -15,7 +15,6 @@ import {
 } from '../../../shared/cowork/pendingMessageQueue';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { hasVisiblePromptContent } from '../../../shared/cowork/submissionContent';
-import { WorkbenchContractKind } from '../../../shared/workbenchTask';
 import type { CoworkMessage } from '../../coworkStore';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { applyPiShellOverride } from './piRuntimeSettingsOverrides';
@@ -265,7 +264,7 @@ export class PiRuntimeQueueController {
       }
       return;
     }
-    if (active.workbenchContract.kind === WorkbenchContractKind.Chat) return;
+    if (active.resourceState.chatMode) return;
     active.queueFlushInFlight = true;
     let retryAfterFailure = false;
     try {
@@ -322,7 +321,7 @@ export class PiRuntimeQueueController {
   }
 
   private isWorkSession(sessionId: string, active: ActivePiSession | undefined): boolean {
-    if (active) return active.workbenchContract.kind !== WorkbenchContractKind.Chat;
+    if (active) return !active.resourceState.chatMode;
     return this.host.isStoredSessionWorkMode(sessionId);
   }
 

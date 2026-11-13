@@ -18,7 +18,6 @@ import {
   WorkbenchRunStatus,
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationOutcome,
-  type WorkbenchApprovalResponseInput,
   type WorkbenchRun,
   type WorkbenchVerificationCheck,
 } from '../../../../../shared/workbenchTask';
@@ -42,8 +41,6 @@ interface TimelineChapterProps {
   chapter: TimelineChapterModel;
   runs: WorkbenchRun[];
   defaultOpen: boolean;
-  busy: boolean;
-  onRespondToApproval: (input: WorkbenchApprovalResponseInput) => void;
 }
 
 const chapterStatusIcon = (status: WorkbenchRun['status']): LucideIcon => {
@@ -64,13 +61,7 @@ const chapterStatusIcon = (status: WorkbenchRun['status']): LucideIcon => {
   }
 };
 
-export function TimelineChapter({
-  chapter,
-  runs,
-  defaultOpen,
-  busy,
-  onRespondToApproval,
-}: TimelineChapterProps) {
+export function TimelineChapter({ chapter, runs, defaultOpen }: TimelineChapterProps) {
   const reducedMotion = useReducedMotion();
   const [open, setOpen] = useState(defaultOpen);
   const { run, entries } = chapter;
@@ -90,13 +81,7 @@ export function TimelineChapter({
           <RunSummary run={run} />
         </div>
         {entries.length > 0 ? (
-          <TimelineEntryList
-            entries={entries}
-            run={run}
-            runs={runs}
-            busy={busy}
-            onRespondToApproval={onRespondToApproval}
-          />
+          <TimelineEntryList entries={entries} runs={runs} />
         ) : (
           <p className="pl-10 text-sm text-muted-foreground">
             {i18nService.t('workbenchTaskNoEvents')}

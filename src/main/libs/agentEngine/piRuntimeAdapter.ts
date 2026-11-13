@@ -21,7 +21,7 @@
  *   piRuntimeResourceLoader        — DefaultResourceLoader + MCP gateway tool
  *   piRuntimeSettingsOverrides     — Pi settings/model budget overrides
  *   piRuntimeSkillDirs             — app-managed SKILLs directory resolution
- *   piRuntimeWorkbenchContract     — workbench contract derivation
+ *   piToolPermissionGate           — Pi-native tool permission checks
  *
  * Packages:
  *   @earendil-works/pi-coding-agent — AgentSession, createAgentSession
@@ -37,10 +37,12 @@ import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtractor';
-import type {
-  WorkbenchApprovalRequestedEvent,
-  WorkbenchTaskService,
-} from '../../workbenchTask/taskService';
+import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
+import {
+  PiToolPermissionGate,
+  type PiToolAuthorizationInput,
+  type PiToolAuthorizationResult,
+} from './piToolPermissionGate';
 import { PiAssistantTranscript } from './piAssistantTranscript';
 import {
   buildPiBackgroundCompletionContext,
@@ -182,8 +184,7 @@ export class PiRuntimeAdapter
 
   readonly initializingSessions = new Map<string, InitializingPiSession>();
   readonly memoryInjectionDedup = new MemoryInjectionDedup();
-  private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
-    null;
+  private readonly permissionGate = new PiToolPermissionGate(this);
 
   readonly recovery = new PiRuntimeTurnRecovery({
     getStore: () => this.store,
@@ -200,6 +201,7 @@ export class PiRuntimeAdapter
     continueSession: (sessionId, prompt, options) =>
       this.continueSession(sessionId, prompt, options),
     ocrCommandFor: () => this.bundledOcrHelper?.commandFor,
+    clearToolPermissionsBySession: sessionId => this.permissionGate.clearBySession(sessionId),
     approvalSessionMap: this.approvalSessionMap,
     pendingAskUserQuestions: this.pendingAskUserQuestions,
     pendingCodingElicitations: this.pendingCodingElicitations,
@@ -210,20 +212,11 @@ export class PiRuntimeAdapter
   }
 
   setWorkbenchTaskService(service: WorkbenchTaskService): void {
-    if (this.workbenchTaskService && this.workbenchApprovalListener) {
-      this.workbenchTaskService.off('approvalRequested', this.workbenchApprovalListener);
-    }
     this.workbenchTaskService = service;
-    this.workbenchApprovalListener = ({ sessionId, approval }) => {
-      this.approvalSessionMap.set(approval.id, sessionId);
-      this.emit('permissionRequest', sessionId, {
-        requestId: approval.id,
-        toolName: approval.toolName,
-        toolInput: approval.request,
-        toolUseId: approval.toolCallId,
-      });
-    };
-    service.on('approvalRequested', this.workbenchApprovalListener);
+  }
+
+  async authorizeToolCall(input: PiToolAuthorizationInput): Promise<PiToolAuthorizationResult> {
+    return await this.permissionGate.authorizeToolCall(input);
   }
 
   // ── Host contract: late-bound services ──
@@ -337,27 +330,13 @@ export class PiRuntimeAdapter
       return;
     }
 
+    if (this.permissionGate.resolvePermission(requestId, result)) {
+      return;
+    }
+
     const sessionId = this.approvalSessionMap.get(requestId);
     if (!sessionId) return;
     this.approvalSessionMap.delete(requestId);
-
-    if (this.workbenchTaskService?.repository.getApproval(requestId)) {
-      const denied = result.behavior === 'deny';
-      this.workbenchTaskService.respondToApproval({
-        approvalId: requestId,
-        approved: !denied,
-        reason: denied ? result.message : undefined,
-      });
-      if (denied) {
-        this.stopActiveSession(
-          sessionId,
-          result.message || 'The user denied this action.',
-          false,
-          CoworkInterruptionCause.ApprovalDenied,
-        );
-      }
-      return;
-    }
 
     // Pi has no built-in permission system.
     // For deny: abort the current turn so the model stops.

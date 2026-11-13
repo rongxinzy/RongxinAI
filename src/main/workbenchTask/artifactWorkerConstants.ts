@@ -9,7 +9,6 @@ export const ArtifactWorkerLimit = {
 } as const;
 
 export const ArtifactWorkerTask = {
-  Collect: 'collect',
   TransformText: 'transform-text',
   InspectWorkspaceContent: 'inspect-workspace-content',
   PrepareCompanionImages: 'prepare-companion-images',

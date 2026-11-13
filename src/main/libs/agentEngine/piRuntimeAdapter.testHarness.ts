@@ -18,15 +18,12 @@ import {
   type TestMagpieGateway,
 } from '../../../../tests/helpers/installTestMagpie';
 import { ModelCapabilityStatus } from '../../../shared/providers';
-import { collectWorkbenchArtifacts } from '../../workbenchTask/artifactCollector';
 import {
   runTextWorkerOperation,
   type TextWorkerInput,
 } from '../../workbenchTask/textWorkerOperations';
 
 vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
-  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
-    collectWorkbenchArtifacts(input),
   transformCoworkTextAsync: async (input: TextWorkerInput) => runTextWorkerOperation(input),
 }));
 

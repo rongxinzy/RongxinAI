@@ -13,7 +13,6 @@ import {
   CoworkInterruptionCause,
   type CoworkSessionInterruption,
 } from '../../../shared/cowork/interruption';
-import { WorkbenchContractKind, WorkbenchTaskStatus } from '../../../shared/workbenchTask';
 import type { CoworkMessage } from '../../coworkStore';
 import type { ActivePiSession } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
@@ -44,7 +43,11 @@ export function disposePiSessionForRecreation(
   void active.piSession.abort();
   host
     .getWorkbenchTaskService()
-    ?.pauseRun?.(sessionId, 'The session resources changed before the approval was resolved.');
+    ?.cancelRun?.(
+      sessionId,
+      active.workbenchRunId,
+      'The session resources changed before completion.',
+    );
   host.recovery.clearApprovalsBySession(sessionId);
   host.memoryInjectionDedup.reset(sessionId);
   host.activeSessions.delete(sessionId);
@@ -70,7 +73,7 @@ export function stopActivePiRuntimeSession(
   const active = host.activeSessions.get(sessionId);
   if (!active) {
     closeInterruptedToolUses(host, sessionId);
-    host.getWorkbenchTaskService()?.pauseRun?.(sessionId, reason);
+    host.getWorkbenchTaskService()?.cancelRun?.(sessionId, undefined, reason);
     host.recovery.clearApprovalsBySession(sessionId);
     if (cause && !host.retainedSessionIds.has(sessionId)) {
       recordSessionInterruption(host, sessionId, cause);
@@ -105,7 +108,7 @@ export function stopActivePiRuntimeSession(
   active.abortController.abort();
   active.unsubscribe();
   void active.piSession.abort();
-  host.getWorkbenchTaskService()?.pauseRun?.(sessionId, reason);
+  host.getWorkbenchTaskService()?.cancelRun?.(sessionId, active.workbenchRunId, reason);
   host.recovery.clearApprovalsBySession(sessionId);
   host.emit('sessionStopped', sessionId);
   if (cause) recordSessionInterruption(host, sessionId, cause);
@@ -113,7 +116,7 @@ export function stopActivePiRuntimeSession(
   const shouldDrainFollowUp =
     wasRunning &&
     drainQueuedFollowUp &&
-    active.workbenchContract.kind !== WorkbenchContractKind.Chat &&
+    !active.resourceState.chatMode &&
     host.queue.hasPendingFollowUp(sessionId);
   releaseStoppedSession(host, sessionId);
   // Stopping closes idle placeholders so a partial answer bubble with
@@ -186,14 +189,12 @@ function recordSessionInterruption(
   sessionId: string,
   cause: CoworkInterruptionCause,
 ): CoworkSessionInterruption {
-  const task = host.getWorkbenchTaskService()?.getCurrent(sessionId)?.task ?? null;
-  const resumableTask = task?.contract.kind === WorkbenchContractKind.Chat ? null : task;
   const interruption: CoworkSessionInterruption = {
     sessionId,
     interruptionId: randomUUID(),
     cause,
-    taskId: resumableTask?.id ?? null,
-    recoverable: resumableTask?.status === WorkbenchTaskStatus.Paused,
+    taskId: null,
+    recoverable: false,
   };
   const seed: CoworkMessage = {
     id: randomUUID(),
@@ -245,17 +246,14 @@ export function onPiSessionDeleted(host: PiRuntimeAdapterHost, sessionId: string
 export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Date.now()): void {
   const idle = [...host.activeSessions.values()]
     .filter(session => {
-      if (session.isRunning || session.completionPending) return false;
+      if (session.isRunning) return false;
       if (host.queue.hasPendingFollowUp(session.sessionId)) return false;
       if (host.queue.hasQueuedControlActions(session.sessionId)) return false;
       return now - session.lastUsedAt >= IDLE_SESSION_TTL_MS;
     })
     .sort((left, right) => left.lastUsedAt - right.lastUsedAt);
   const residentIdle = [...host.activeSessions.values()].filter(
-    session =>
-      !session.isRunning &&
-      !session.completionPending &&
-      !host.queue.hasPendingFollowUp(session.sessionId),
+    session => !session.isRunning && !host.queue.hasPendingFollowUp(session.sessionId),
   ).length;
   const excessCount = Math.max(0, residentIdle - MAX_RESIDENT_IDLE_SESSIONS);
   const expired = idle.filter(session => now - session.lastUsedAt >= IDLE_SESSION_TTL_MS);

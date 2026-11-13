@@ -15,7 +15,6 @@ import {
 } from '../../../common/coworkError';
 import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
-import type { WorkbenchVerificationResult } from '../../../shared/workbenchTask';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
@@ -24,7 +23,6 @@ import { cancelPiRetry } from './piRetryCancellation';
 import { handlePiCompactionEvent } from './piCompactionEvents';
 import { PiAssistantEventType } from './piStreamConstants';
 import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
-import { settlePiWorkbenchCompletion } from './piWorkbenchCompletion';
 import {
   imageCapabilityFingerprint,
   isImageCapabilityError,
@@ -650,7 +648,6 @@ export class PiRuntimeTurnEvents {
         break;
 
       case 'agent_end': {
-        if (active.completionPending) break;
         this.host.transcript.finalizeActiveThinking(sessionId, active);
         active.toolStartedAtByCallId.clear();
         const clearActivity = active.toolActivityTracker.clear();
@@ -672,16 +669,6 @@ export class PiRuntimeTurnEvents {
         // A non-retryable error is flushed the moment it is seen, so the turn
         // is already reported as failed by the time agent_end arrives.
         if (active.pendingError || active.errorSurfaced) break;
-        const workbench = this.host.getWorkbench();
-        if (active.workbenchRunId && workbench && !workbench.isRunRunning(active.workbenchRunId)) {
-          this.host.stopActiveSession(
-            sessionId,
-            'The workbench run is no longer active.',
-            false,
-            CoworkInterruptionCause.RuntimePaused,
-          );
-          break;
-        }
         // agent_end is not the terminal signal: the SDK may follow it with an
         // automatic compaction continuation turn, whose tool calls still need
         // a live run. Completion happens on agent_settled.
@@ -771,10 +758,9 @@ export class PiRuntimeTurnEvents {
    * run.
    */
   private handleTurnSettled(sessionId: string, active: ActivePiSession): void {
-    if (active.completionPending) return;
     active.isRunning = false;
-    // Flush artifact capture before completion decides the run's fate: the
-    // final diff anchors to the last completed answer message.
+    // Flush artifact capture before completion: the final diff anchors to the
+    // last completed answer message.
     active.artifactRecorder?.onRunSettled(active.lastCompletedAnswerMessageId);
     // Pi has exhausted its own continuations. A truncated/aborted/tool-only
     // final attempt is an interruption, never a successful task completion.
@@ -797,20 +783,6 @@ export class PiRuntimeTurnEvents {
       if (!retryingWithoutImages) void this.host.flushFollowUpQueue(sessionId, active);
       return;
     }
-    const settledWorkbench = this.host.getWorkbench();
-    if (
-      active.workbenchRunId &&
-      settledWorkbench &&
-      !settledWorkbench.isRunRunning(active.workbenchRunId)
-    ) {
-      this.host.stopActiveSession(
-        sessionId,
-        'The workbench run is no longer active.',
-        false,
-        CoworkInterruptionCause.RuntimePaused,
-      );
-      return;
-    }
     active.retryPriorAnswer = '';
     this.host.transcript.markFinalAnswer(sessionId, active);
     this.host.transcript.flushContextUsageSync(sessionId);
@@ -821,63 +793,38 @@ export class PiRuntimeTurnEvents {
       this.host.sessionCount(),
       this.host.activeSessions().filter(session => session.isRunning).length,
     );
-    let verification: Promise<WorkbenchVerificationResult | undefined> | undefined;
-    const completingWorkbench = this.host.getWorkbench();
-    if (active.workbenchRunId && completingWorkbench) {
-      const runId = active.workbenchRunId;
-      verification = completingWorkbench
-        .completeRun({
+    const workbench = this.host.getWorkbench();
+    if (active.workbenchRunId && workbench) {
+      try {
+        workbench.completeObservedRun({
           sessionId,
           runId: active.workbenchRunId,
-          signal: active.abortController.signal,
           workspaceRoot: active.workspaceRoot,
           finalAnswer: active.lastCompletedAnswerText,
-          finalMessageId: active.lastCompletedAnswerMessageId,
-          artifactsSettled: active.artifactRecorder?.settled(),
-        })
-        .then(detail => detail.runs.find(run => run.id === runId)?.verificationResult ?? undefined);
+        });
+      } catch (error) {
+        console.warn(`[PiRuntimeAdapter] passive run projection failed for ${sessionId}:`, error);
+      }
     }
-    void settlePiWorkbenchCompletion(
-      active,
-      verification,
-      () => this.host.getActiveSession(sessionId) === active && !active.aborted,
-      result => {
-        const store = this.host.getStore();
-        if (store) {
-          store.updateSession(sessionId, { status: 'idle' });
-        }
-        if (!active.resourceState.chatMode) {
-          const obligation = evaluateSummaryObligation({
-            hasRecordedFiles: active.artifactRecorder?.hasRecordedFiles() === true,
-            checkpointWritten: active.summaryCheckpointWritten === true,
-            checkpointSkipped: active.summaryCheckpointSkipped !== undefined,
-            workVersion: active.artifactRecorder?.recordedWorkVersion() ?? 0,
-            coveredWorkVersion: active.summaryCheckpointWorkVersion,
-          });
-          if (obligation === 'fallback') {
-            // Omissions never start another model turn.
-            void this.host.recordSummaryOmission(sessionId, active);
-          }
-        }
-        this.host.emit('complete', sessionId, result);
-        void this.host.flushFollowUpQueue(sessionId, active);
-      },
-      error => {
-        console.error(`[PiRuntimeAdapter] completion failed for session ${sessionId}:`, error);
-        this.host.getWorkbench()?.failRun?.(sessionId, { message: String(error) });
-        if (
-          active.harnessModelProfile?.provider === ProviderName.Magpie &&
-          hasMagpieModelService()
-        ) {
-          try {
-            getMagpieModelService().recordError(String(error));
-          } catch {
-            /* ignore */
-          }
-        }
-        this.host.emit('error', sessionId, classifyCoworkError(String(error)));
-      },
-    );
+    const store = this.host.getStore();
+    if (store) {
+      store.updateSession(sessionId, { status: 'idle' });
+    }
+    if (!active.resourceState.chatMode) {
+      const obligation = evaluateSummaryObligation({
+        hasRecordedFiles: active.artifactRecorder?.hasRecordedFiles() === true,
+        checkpointWritten: active.summaryCheckpointWritten === true,
+        checkpointSkipped: active.summaryCheckpointSkipped !== undefined,
+        workVersion: active.artifactRecorder?.recordedWorkVersion() ?? 0,
+        coveredWorkVersion: active.summaryCheckpointWorkVersion,
+      });
+      if (obligation === 'fallback') {
+        // Omissions never start another model turn.
+        void this.host.recordSummaryOmission(sessionId, active);
+      }
+    }
+    this.host.emit('complete', sessionId, {});
+    void this.host.flushFollowUpQueue(sessionId, active);
   }
 }
 

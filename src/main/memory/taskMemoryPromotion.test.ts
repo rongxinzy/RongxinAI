@@ -13,19 +13,17 @@ import {
   WorkbenchRunStatus,
   WorkbenchRunTrigger,
   WorkbenchTaskStatus,
-  WorkbenchVerificationOutcome,
   type WorkbenchApproval,
   type WorkbenchArtifact,
   type WorkbenchRun,
   type WorkbenchTask,
-  type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 import {
-  promoteVerifiedWorkbenchRun,
-  type VerifiedWorkbenchRunMemorySource,
+  promoteCompletedWorkbenchRun,
+  type CompletedWorkbenchRunMemorySource,
 } from './taskMemoryPromotion';
 
-function source(overrides: Partial<VerifiedWorkbenchRunMemorySource> = {}) {
+function source(overrides: Partial<CompletedWorkbenchRunMemorySource> = {}) {
   const task: WorkbenchTask = {
     id: 'task-1',
     sessionId: 'session-1',
@@ -50,12 +48,6 @@ function source(overrides: Partial<VerifiedWorkbenchRunMemorySource> = {}) {
     failure: null,
     createdAt: 1,
     updatedAt: 2,
-  };
-  const verificationResult: WorkbenchVerificationResult = {
-    outcome: WorkbenchVerificationOutcome.Passed,
-    checks: [],
-    evidence: [],
-    summary: 'All deterministic checks passed.',
   };
   const artifact = {
     id: 'artifact-1',
@@ -93,11 +85,10 @@ function source(overrides: Partial<VerifiedWorkbenchRunMemorySource> = {}) {
     run,
     artifacts: [artifact],
     approvals: [approval],
-    verificationResult,
     workspaceRoot: 'C:/workspace/project',
     finalAnswer: 'The verified result establishes SQLite as the durable project store.',
     ...overrides,
-  } satisfies VerifiedWorkbenchRunMemorySource;
+  } satisfies CompletedWorkbenchRunMemorySource;
 }
 
 test('creates an atomic review candidate with Task, Run, Artifact, and Approval provenance', async () => {
@@ -117,7 +108,7 @@ test('creates an atomic review candidate with Task, Run, Artifact, and Approval 
       metadataFor: vi.fn(() => ({ extractorVersion: 1, sourceIds: memory.evidenceSourceIds })),
     })),
   };
-  const result = await promoteVerifiedWorkbenchRun(
+  const result = await promoteCompletedWorkbenchRun(
     { proposeProjectMemoryCandidate } as never,
     source(),
     vi.fn(),
@@ -152,12 +143,12 @@ test('creates an atomic review candidate with Task, Run, Artifact, and Approval 
   );
 });
 
-test('does not promote failed verification or ordinary chat completion', async () => {
+test('does not promote failed runs or ordinary chat completion', async () => {
   const proposeProjectMemoryCandidate = vi.fn();
   const failed = source({
-    verificationResult: {
-      ...source().verificationResult,
-      outcome: WorkbenchVerificationOutcome.Failed,
+    run: {
+      ...source().run,
+      status: WorkbenchRunStatus.Failed,
     },
   });
   const chat = source({
@@ -168,10 +159,10 @@ test('does not promote failed verification or ordinary chat completion', async (
   });
 
   await expect(
-    promoteVerifiedWorkbenchRun({ proposeProjectMemoryCandidate } as never, failed, vi.fn()),
+    promoteCompletedWorkbenchRun({ proposeProjectMemoryCandidate } as never, failed, vi.fn()),
   ).resolves.toEqual([]);
   await expect(
-    promoteVerifiedWorkbenchRun({ proposeProjectMemoryCandidate } as never, chat, vi.fn()),
+    promoteCompletedWorkbenchRun({ proposeProjectMemoryCandidate } as never, chat, vi.fn()),
   ).resolves.toEqual([]);
   expect(proposeProjectMemoryCandidate).not.toHaveBeenCalled();
 });

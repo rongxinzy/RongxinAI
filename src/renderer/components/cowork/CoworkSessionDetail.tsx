@@ -7,7 +7,6 @@ import React, { useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
-import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
 import { i18nService } from '../../services/i18n';
 import { RootState } from '../../store';
@@ -58,13 +57,11 @@ import { useStableConversationTurns } from './helpers/useStableConversationTurns
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
 import { resolveStableSessionKey, setPersistentToggleNamespace } from './hooks/usePersistentToggle';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
-import { useRecoverableWorkbenchTaskId } from './hooks/useRecoverableWorkbenchTaskId';
 import {
   COWORK_COMPOSER_INSET_VALUE,
   useCoworkComposerInset,
 } from './hooks/useCoworkComposerInset';
 import AskUserQuestionCard from './AskUserQuestionCard';
-import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 import CoworkPermissionModal from './CoworkPermissionModal';
 import { CoworkRunStatus } from './components/CoworkRunStatus';
 import { SessionArtifactPanelRegion } from './sessionDetail/SessionArtifactPanelRegion';
@@ -99,11 +96,6 @@ interface CoworkSessionDetailProps {
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
   inlinePermission?: CoworkPermissionRequest | null;
   onRespondToInlinePermission?: (result: CoworkPermissionResult) => void | Promise<void>;
-  resumeTaskId?: string | null;
-  // 父级传入恢复中禁用；本组件再叠加 isStreaming
-  resumeDisabled?: boolean;
-  onResumeTask?: (interruption: CoworkSessionInterruption) => void;
-  onCancelTaskResume?: () => void;
 }
 
 const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
@@ -124,10 +116,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onRespondToInlineQuestion,
   inlinePermission,
   onRespondToInlinePermission,
-  resumeTaskId,
-  resumeDisabled = false,
-  onResumeTask,
-  onCancelTaskResume,
 }) => {
   const dispatch = useDispatch();
   const currentSession = useSelector(selectCurrentSession);
@@ -141,16 +129,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const composerOverlayRef = useCoworkComposerInset(detailRootRef);
 
   const sessionId = currentSession?.id;
-  const recoverableTaskId = useRecoverableWorkbenchTaskId(sessionId);
-
-  const handleResumeTask = useCallback(
-    (interruption: CoworkSessionInterruption) => {
-      // 点击继续执行只嵌入输入框并聚焦，不直接开跑
-      onResumeTask?.(interruption);
-      requestAnimationFrame(() => promptInputRef.current?.focus());
-    },
-    [onResumeTask],
-  );
 
   const virtualizedTurnListRef = useRef<VirtualizedTurnListHandle>(null);
 
@@ -314,22 +292,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 toolActivities={isLastTurn ? toolActivities : undefined}
                 showCopyButtons={!isStreaming || !isLastTurn}
                 isTurnComplete={!isStreaming || !isLastTurn}
-                recoverableTaskId={recoverableTaskId}
-                resumeTaskId={resumeTaskId}
-                // 流式或恢复中禁用继续执行按钮
-                resumeDisabled={resumeDisabled || isStreaming}
-                onResumeTask={onResumeTask ? handleResumeTask : undefined}
                 hideDefaultAssistantHeader={hideDefaultAssistantHeader}
                 // 仅末轮需要工具授权，避免历史轮次误挂授权按钮
                 pendingPermission={isLastTurn ? inlinePermission : null}
                 onRespondToPermission={isLastTurn ? onRespondToInlinePermission : undefined}
                 expandToolResults={isExportingImage}
-                // 验收卡放在末轮复制按钮上方（issue #805）
-                beforeCopySlot={
-                  isLastTurn && sessionId ? (
-                    <WorkbenchTaskAcceptanceCard sessionId={sessionId} />
-                  ) : null
-                }
               />
             </div>
           )}
@@ -476,8 +443,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             permissionMode={permissionMode}
             onPermissionModeChange={onPermissionModeChange}
             showModelSelector={true}
-            resumeTaskActive={Boolean(resumeTaskId)}
-            onCancelTaskResume={onCancelTaskResume}
             sessionId={displayedSessionId ?? currentSession?.id}
           />
         </div>

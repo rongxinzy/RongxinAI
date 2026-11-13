@@ -22,7 +22,6 @@ import { WorkMode } from '../../../store/workMode/constants';
 import type {
   CoworkConfig,
   CoworkSession,
-  CoworkImageAttachment,
   CoworkOutgoingImageAttachment,
   CoworkFileAttachment,
 } from '../../../types/cowork';
@@ -33,7 +32,6 @@ import {
 } from '../../chat/constants';
 import type { SettingsOpenOptions } from '../../settings/types';
 import type { useAgentSelectedModel } from '../agentModelSelection';
-import type { useTaskResumeContext } from './useTaskResumeContext';
 
 interface Options {
   currentSession: CoworkSession | null;
@@ -47,7 +45,6 @@ interface Options {
   isStreaming: boolean;
   config: CoworkConfig;
   sessionPermissionMode: CoworkPermissionMode;
-  taskResume: ReturnType<typeof useTaskResumeContext>;
   clearUnmanagedWorkingDirectory(): void;
   onRequestAppSettings?(options?: SettingsOpenOptions): void;
 }
@@ -65,7 +62,6 @@ export function useCoworkSessionActions({
   isStreaming,
   config,
   sessionPermissionMode,
-  taskResume,
   clearUnmanagedWorkingDirectory,
   onRequestAppSettings,
 }: Options) {
@@ -341,25 +337,6 @@ export function useCoworkSessionActions({
     goalMode = false,
   ) => {
     if (!currentSession) return;
-    if (taskResume.interruption) {
-      return taskResume.resume({
-        amendment: prompt,
-        skillIds: [...activeSkillIds],
-        expertIds,
-        goalMode,
-        imageAttachments: imageAttachments
-          ?.filter(
-            (image): image is CoworkImageAttachment & { base64Data: string } =>
-              typeof image.base64Data === 'string',
-          )
-          .map(image => ({
-            name: image.name,
-            mimeType: image.mimeType,
-            base64Data: image.base64Data,
-          })),
-        fileAttachments,
-      });
-    }
     if (continuingSessionIdsRef.current.has(currentSession.id)) return;
 
     // Work keeps the prompt editable while Pi is running. Normal input during

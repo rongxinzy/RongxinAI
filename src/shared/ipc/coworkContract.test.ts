@@ -501,41 +501,15 @@ test('workspace methods accept the manager payloads', () => {
 
 // --- Workbench task -------------------------------------------------------------------
 
-/** Resume payload from CoworkView taskResume.resume (attachments filtered to base64). */
-test('workbench resume accepts the interruption resume payload', () => {
-  expect(
-    workbenchTaskContract.resume.args.safeParse([
-      {
-        taskId: 'task-1',
-        amendment: 'Also handle edge cases',
-        skillIds: ['docx'],
-        expertIds: ['expert-1'],
-        goalMode: true,
-        imageAttachments: [{ name: 'err.png', mimeType: 'image/png', base64Data: 'iVBORw0KGgo=' }],
-        fileAttachments: [{ name: 'log.txt', path: '/tmp/log.txt', extension: 'TXT' }],
-      },
-    ]).success,
-  ).toBe(true);
-  expect(workbenchTaskContract.resume.args.safeParse([{ amendment: 'no task' }]).success).toBe(
-    false,
-  );
-});
-
-test('workbench respondToApproval accepts the decision payload', () => {
-  expect(
-    workbenchTaskContract.respondToApproval.args.safeParse([
-      { approvalId: 'appr-1', approved: true },
-    ]).success,
-  ).toBe(true);
-  expect(
-    workbenchTaskContract.respondToApproval.args.safeParse([
-      { approvalId: 'appr-1', approved: false, reason: 'Wrong file' },
-    ]).success,
-  ).toBe(true);
-  expect(
-    workbenchTaskContract.respondToApproval.args.safeParse([{ approvalId: '', approved: true }])
-      .success,
-  ).toBe(false);
+test('workbench contract exposes only read-only projection channels', () => {
+  expect(Object.keys(workbenchTaskContract)).toEqual([
+    'getCurrent',
+    'getDetail',
+    'listForSession',
+    'exportAudit',
+  ]);
+  expect(workbenchTaskContract.getCurrent.args.safeParse(['session-1']).success).toBe(true);
+  expect(workbenchTaskContract.getCurrent.args.safeParse([123]).success).toBe(false);
 });
 
 // --- Todo -------------------------------------------------------------------------------

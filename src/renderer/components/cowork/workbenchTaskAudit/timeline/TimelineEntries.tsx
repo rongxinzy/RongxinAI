@@ -1,7 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Label } from '@shared/components/ui/label';
-import { Textarea } from '@shared/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
@@ -12,6 +10,7 @@ import { cn } from '@shared/lib/utils';
 import {
   Activity,
   BookOpen,
+  Check,
   ChevronRight,
   CircleOff,
   Copy,
@@ -33,16 +32,13 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
 import { memo, useState } from 'react';
 
 import {
   WorkbenchApprovalDecision,
   WorkbenchArtifactKind,
   WorkbenchRunEventType,
-  WorkbenchRunStatus,
   type WorkbenchApproval,
-  type WorkbenchApprovalResponseInput,
   type WorkbenchArtifact,
   type WorkbenchRun,
   type WorkbenchRunEvent,
@@ -57,7 +53,6 @@ import {
   effectLabel,
   eventLabel,
   formatTimestamp,
-  riskLabel,
   artifactKindLabel,
   resolveArtifactFilePath,
 } from '../utils';
@@ -65,21 +60,11 @@ import { formatTimeOfDay, type TimelineEntry } from './timelineModel';
 
 interface TimelineEntryListProps {
   entries: TimelineEntry[];
-  /** The run that owns these entries. */
-  run: WorkbenchRun;
   /** All task runs, used to resolve artifact file paths. */
   runs: WorkbenchRun[];
-  busy: boolean;
-  onRespondToApproval: (input: WorkbenchApprovalResponseInput) => void;
 }
 
-export function TimelineEntryList({
-  entries,
-  run,
-  runs,
-  busy,
-  onRespondToApproval,
-}: TimelineEntryListProps) {
+export function TimelineEntryList({ entries, runs }: TimelineEntryListProps) {
   return (
     <TooltipProvider>
       <ol className="flex flex-col">
@@ -105,12 +90,9 @@ export function TimelineEntryList({
               );
             case 'approval':
               return (
-                <TimelineApprovalItem
+                <ResolvedApprovalEntry
                   key={entry.id}
                   approval={entry.approval}
-                  run={run}
-                  busy={busy}
-                  onRespond={onRespondToApproval}
                   connectToNext={connectToNext}
                 />
               );
@@ -158,6 +140,7 @@ const eventIcons: Partial<Record<WorkbenchRunEventType, LucideIcon>> = {
   [WorkbenchRunEventType.VerificationStarted]: ListChecks,
   [WorkbenchRunEventType.VerificationFinished]: ListChecks,
   [WorkbenchRunEventType.RunPaused]: Pause,
+  [WorkbenchRunEventType.RunSucceeded]: Check,
   [WorkbenchRunEventType.RunCancelled]: CircleOff,
   [WorkbenchRunEventType.RunFailed]: X,
   [WorkbenchRunEventType.RecoveryRequired]: LifeBuoy,
@@ -306,119 +289,6 @@ function ClusterEventRow({ event, hasPayload }: { event: WorkbenchRunEvent; hasP
           />
         </div>
       )}
-    </li>
-  );
-}
-
-const TimelineApprovalItem = memo(function TimelineApprovalItem({
-  approval,
-  run,
-  busy,
-  onRespond,
-  connectToNext,
-}: {
-  approval: WorkbenchApproval;
-  run: WorkbenchRun;
-  busy: boolean;
-  onRespond: (input: WorkbenchApprovalResponseInput) => void;
-  connectToNext: boolean;
-}) {
-  const isPending =
-    approval.decision === WorkbenchApprovalDecision.Pending &&
-    run.status === WorkbenchRunStatus.WaitingApproval;
-
-  if (isPending) {
-    return (
-      <PendingApprovalEntry
-        approval={approval}
-        busy={busy}
-        onRespond={onRespond}
-        connectToNext={connectToNext}
-      />
-    );
-  }
-  return <ResolvedApprovalEntry approval={approval} connectToNext={connectToNext} />;
-});
-
-function PendingApprovalEntry({
-  approval,
-  busy,
-  onRespond,
-  connectToNext,
-}: {
-  approval: WorkbenchApproval;
-  busy: boolean;
-  onRespond: (input: WorkbenchApprovalResponseInput) => void;
-  connectToNext: boolean;
-}) {
-  const reducedMotion = useReducedMotion();
-  const [reason, setReason] = useState('');
-
-  return (
-    <li className="relative isolate pl-10">
-      {connectToNext && <EntryConnector />}
-      <span aria-hidden="true" className="absolute top-2.5 left-2.5 z-10 flex size-2 rounded-full">
-        {!reducedMotion && (
-          <motion.span
-            className="absolute inline-flex size-full rounded-full bg-primary"
-            animate={{ scale: [1, 1.8], opacity: [0.7, 0] }}
-            transition={{ duration: 1.6, repeat: Number.POSITIVE_INFINITY, ease: 'easeOut' }}
-          />
-        )}
-        <span className="relative inline-flex size-2 rounded-full bg-primary" />
-      </span>
-      <div className="my-2 flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <ShieldQuestion className="size-3.5 shrink-0 text-primary" />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-            {approval.toolName}
-          </span>
-          <Badge variant="outline">{riskLabel(approval.riskLevel)}</Badge>
-        </div>
-        <AuditJsonDisclosure
-          label={i18nService.t('workbenchTaskRequestDetails')}
-          value={approval.request}
-          defaultOpen
-        />
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={`approval-reason-${approval.id}`}>
-            {i18nService.t('workbenchTaskDenialReason')}
-          </Label>
-          <Textarea
-            id={`approval-reason-${approval.id}`}
-            value={reason}
-            onChange={event => setReason(event.target.value)}
-            placeholder={i18nService.t('workbenchTaskDenialReasonPlaceholder')}
-            disabled={busy}
-            rows={2}
-          />
-        </div>
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={busy}
-            onClick={() =>
-              onRespond({
-                approvalId: approval.id,
-                approved: false,
-                reason: reason.trim() || undefined,
-              })
-            }
-          >
-            {i18nService.t('workbenchTaskDeny')}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            disabled={busy}
-            onClick={() => onRespond({ approvalId: approval.id, approved: true })}
-          >
-            {i18nService.t('workbenchTaskApprove')}
-          </Button>
-        </div>
-      </div>
     </li>
   );
 }

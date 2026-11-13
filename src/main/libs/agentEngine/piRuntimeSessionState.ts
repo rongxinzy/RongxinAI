@@ -10,7 +10,7 @@ import { readCoworkImageBase64 } from '../../coworkImageAttachments';
 import type { CoworkError } from '../../../common/coworkError';
 import type { CoworkMessageExpertIdentity } from '../../../shared/cowork/sessionExperts';
 import type { HarnessModelProfileInput } from '../../../shared/harness';
-import type { WorkbenchApprovalMode, WorkbenchTaskContract } from '../../../shared/workbenchTask';
+import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import type { ModelCapabilities } from '../../../shared/providers';
 import type { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
 import {
@@ -179,7 +179,6 @@ export interface ActivePiSession {
   retryStreamReusePending: boolean;
   /** Last visible answer body before a retry turn_start cleared in-memory stream state. */
   retryPriorAnswer: string;
-  completionPending?: Promise<void>;
   requestStartedAt: number | null;
   firstVisibleTextAt: number | null;
   /** Timestamp when this in-process Pi AgentSession finished creation. */
@@ -216,7 +215,6 @@ export interface ActivePiSession {
    */
   pendingError: { message: string; classified: CoworkError; sticky?: boolean } | null;
   workbenchRunId: string | null;
-  workbenchContract: WorkbenchTaskContract;
   workspaceRoot: string;
   /** Event-time artifact capture for this session (null in chat mode or when
    * the host exposes no ledger). */

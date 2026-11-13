@@ -9,12 +9,9 @@ import { AcademicResearchSkillIds, isCoreSkill } from '@shared/skills/constants'
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { createPiWorkbenchContract } from '../../../main/libs/agentEngine/piRuntimeWorkbenchContract';
-
 import { expect, test } from 'vitest';
 
-import { WorkbenchContractKind } from '../../../shared/workbenchTask';
-import { CoworkSessionMode, CoworkPermissionMode } from '../../../shared/cowork/constants';
+import { CoworkPermissionMode } from '../../../shared/cowork/constants';
 import {
   CHAT_SKILL_SHORTCUTS,
   isChatSkillShortcutActive,
@@ -103,16 +100,6 @@ test('quick skill selections automatically allow tools for their chat session on
   expect(resolveChatSkillShortcutPermissionMode([], CoworkPermissionMode.AllowAll)).toBe(
     CoworkPermissionMode.AllowAll,
   );
-});
-
-test('all shortcuts use native completion without a skill-specific runtime gate', () => {
-  for (const shortcut of CHAT_SKILL_SHORTCUTS) {
-    expect(
-      createPiWorkbenchContract(CoworkSessionMode.Work, [
-        ...(shortcut.skillIds || [shortcut.skillId]),
-      ]).kind,
-    ).toBe(WorkbenchContractKind.GenericWork);
-  }
 });
 
 test('chat uses the complete local skill registry shared with Work', () => {

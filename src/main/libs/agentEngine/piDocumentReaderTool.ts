@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { formatFromPath, toMarkdown } from '@firecrawl/anydoc';
 
 import { safeSlice } from '../../../shared/lib/safeSlice';
-import { resolveWorkspaceFile } from '../../workbenchTask/artifactCollector';
+import { resolveWorkspaceFile } from './workspaceFile';
 import { isOcrSupported } from '../../ocr/ocrEngine';
 import { ocrPdf } from '../../ocr/pdfOcr';
 

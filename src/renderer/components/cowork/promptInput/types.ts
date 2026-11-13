@@ -54,6 +54,4 @@ export interface CoworkPromptInputProps {
   /** When true, hides attachment/skill buttons but keeps the input box visible (disabled) */
   remoteManaged?: boolean;
   topAccessory?: ReactNode;
-  resumeTaskActive?: boolean;
-  onCancelTaskResume?: () => void;
 }

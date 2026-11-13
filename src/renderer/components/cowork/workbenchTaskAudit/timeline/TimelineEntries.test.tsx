@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { beforeEach, expect, test } from 'vitest';
 
 import {
   WorkbenchApprovalDecision,
@@ -79,85 +79,20 @@ test('truncates long artifact references and keeps the copy-hash action', () => 
     { kind: 'artifact', id: 'artifact-1', artifact: createArtifact(reference), createdAt: 1000 },
   ];
 
-  render(
-    <TimelineEntryList
-      entries={entries}
-      run={waitingRun}
-      runs={[waitingRun]}
-      busy={false}
-      onRespondToApproval={vi.fn()}
-    />,
-  );
+  render(<TimelineEntryList entries={entries} runs={[waitingRun]} />);
 
   expect(screen.getByText(reference)).toHaveClass('truncate');
   expect(screen.getByRole('button', { name: i18nService.t('workbenchTaskCopyHash') })).toBeTruthy();
 });
 
-test('approving a pending approval responds with the approval id', () => {
-  const onRespondToApproval = vi.fn();
+test('renders approvals as read-only history without approve or deny controls', () => {
   const entries: TimelineEntry[] = [
     { kind: 'approval', id: 'approval-1', approval: createPendingApproval(), createdAt: 1000 },
   ];
 
-  render(
-    <TimelineEntryList
-      entries={entries}
-      run={waitingRun}
-      runs={[waitingRun]}
-      busy={false}
-      onRespondToApproval={onRespondToApproval}
-    />,
-  );
-
-  fireEvent.click(screen.getByRole('button', { name: i18nService.t('workbenchTaskApprove') }));
-
-  expect(onRespondToApproval).toHaveBeenCalledWith({ approvalId: 'approval-1', approved: true });
-});
-
-test('denying a pending approval forwards the trimmed denial reason', () => {
-  const onRespondToApproval = vi.fn();
-  const entries: TimelineEntry[] = [
-    { kind: 'approval', id: 'approval-1', approval: createPendingApproval(), createdAt: 1000 },
-  ];
-
-  render(
-    <TimelineEntryList
-      entries={entries}
-      run={waitingRun}
-      runs={[waitingRun]}
-      busy={false}
-      onRespondToApproval={onRespondToApproval}
-    />,
-  );
-
-  fireEvent.change(screen.getByLabelText(i18nService.t('workbenchTaskDenialReason')), {
-    target: { value: '  路径不对  ' },
-  });
-  fireEvent.click(screen.getByRole('button', { name: i18nService.t('workbenchTaskDeny') }));
-
-  expect(onRespondToApproval).toHaveBeenCalledWith({
-    approvalId: 'approval-1',
-    approved: false,
-    reason: '路径不对',
-  });
-});
-
-test('a pending approval on a non-waiting run renders as history, not an action card', () => {
-  const resolvedRun: WorkbenchRun = { ...waitingRun, status: WorkbenchRunStatus.Succeeded };
-  const entries: TimelineEntry[] = [
-    { kind: 'approval', id: 'approval-1', approval: createPendingApproval(), createdAt: 1000 },
-  ];
-
-  render(
-    <TimelineEntryList
-      entries={entries}
-      run={resolvedRun}
-      runs={[resolvedRun]}
-      busy={false}
-      onRespondToApproval={vi.fn()}
-    />,
-  );
+  render(<TimelineEntryList entries={entries} runs={[waitingRun]} />);
 
   expect(screen.queryByRole('button', { name: i18nService.t('workbenchTaskApprove') })).toBeNull();
+  expect(screen.queryByRole('button', { name: i18nService.t('workbenchTaskDeny') })).toBeNull();
   expect(screen.getByText(i18nService.t('workbenchTaskDecisionPending'))).toBeTruthy();
 });

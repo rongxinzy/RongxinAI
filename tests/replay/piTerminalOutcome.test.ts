@@ -6,7 +6,6 @@ import path from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { app } from 'electron';
 import { CoworkExecutionMode } from '../../src/shared/cowork/constants';
-import { WorkbenchVerificationOutcome } from '../../src/shared/workbenchTask';
 import { CoworkErrorKind } from '../../src/common/coworkError';
 import { CoworkStore } from '../../src/main/coworkStore';
 import { SqliteStore } from '../../src/main/sqliteStore';
@@ -15,14 +14,6 @@ import { initializeWorkbenchTaskSchema } from '../../src/main/workbenchTask/sche
 import { WorkbenchTaskService } from '../../src/main/workbenchTask/taskService';
 import { installTestMagpie } from '../helpers/installTestMagpie';
 import { PiAssistantStopReason } from '../../src/main/libs/agentEngine/piToolConstants';
-import { collectWorkbenchArtifacts } from '../../src/main/workbenchTask/artifactCollector';
-
-// Unit runs do not compile the worker entrypoint. Use its real collector for
-// this empty workspace; the adapter, SDK, HTTP parser and verification are real.
-vi.mock('../../src/main/workbenchTask/artifactWorkerPool', () => ({
-  collectWorkbenchArtifactsAsync: async (input: Parameters<typeof collectWorkbenchArtifacts>[0]) =>
-    collectWorkbenchArtifacts(input),
-}));
 
 const mutableApp = app as unknown as Record<string, unknown>;
 if (typeof mutableApp.getAppPath !== 'function') mutableApp.getAppPath = () => process.cwd();
@@ -79,7 +70,7 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
       } else {
         expect(error).not.toHaveBeenCalled();
         expect(complete).toHaveBeenCalledOnce();
-        expect(complete.mock.calls[0][1].outcome).toBe(WorkbenchVerificationOutcome.Passed);
+        expect(complete).toHaveBeenCalledWith(session.id, {});
       }
       expect(requests).toBe(1);
     } finally {

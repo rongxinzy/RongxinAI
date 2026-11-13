@@ -45,6 +45,7 @@ const runTransitions: Record<WorkbenchRunStatusType, ReadonlySet<WorkbenchRunSta
   [WorkbenchRunStatus.Running]: new Set([
     WorkbenchRunStatus.WaitingApproval,
     WorkbenchRunStatus.Verifying,
+    WorkbenchRunStatus.Succeeded,
     WorkbenchRunStatus.Paused,
     WorkbenchRunStatus.NeedsReview,
     WorkbenchRunStatus.Failed,
