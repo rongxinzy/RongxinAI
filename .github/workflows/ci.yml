@@ -100,7 +100,7 @@ jobs:
       - name: Assert downloaded runtime reports v1.0.0 / b12359 build
         run: |
           "$GITHUB_WORKSPACE/vendor/llamacpp-runtime/linux-x64/bin/llama-server" --version | tee /tmp/llama-server-version.txt
-          rg -q "1\\.0\\.0|12359|b12359" /tmp/llama-server-version.txt
+          grep -qE '1\.0\.0|12359|b12359' /tmp/llama-server-version.txt
       - name: Packaging script regression (prepare inference edition, no dist)
         run: bunx vitest run scripts/prepare-inference-edition-runtime.test.ts
 

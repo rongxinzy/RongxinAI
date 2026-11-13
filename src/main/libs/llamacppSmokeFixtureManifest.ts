@@ -24,7 +24,9 @@ export type LlamaCppSmokeFixtureManifest = {
 
 const MANIFEST_RELATIVE = 'resources/llamacpp-smoke-fixtures/manifest.json';
 
-export function readLlamaCppSmokeFixtureManifest(rootDir = process.cwd()): LlamaCppSmokeFixtureManifest {
+export function readLlamaCppSmokeFixtureManifest(
+  rootDir = process.cwd(),
+): LlamaCppSmokeFixtureManifest {
   const manifestPath = path.join(rootDir, MANIFEST_RELATIVE);
   const raw = fs.readFileSync(manifestPath, 'utf8');
   return JSON.parse(raw) as LlamaCppSmokeFixtureManifest;
@@ -44,7 +46,10 @@ export function resolveSmokeFixturePath(
   return path.join(resolveLlamaCppSmokeFixturesDir(rootDir), artifact.fileName);
 }
 
-export function assertSmokeFixturesPresent(manifest: LlamaCppSmokeFixtureManifest, rootDir = process.cwd()) {
+export function assertSmokeFixturesPresent(
+  manifest: LlamaCppSmokeFixtureManifest,
+  rootDir = process.cwd(),
+) {
   const missing: string[] = [];
   for (const artifact of Object.values(manifest.artifacts)) {
     const target = resolveSmokeFixturePath(artifact, rootDir);

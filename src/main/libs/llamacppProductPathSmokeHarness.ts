@@ -162,13 +162,17 @@ export async function refreshSmokeRouterClient(context: ProductPathSmokeContext)
   const daemonStatus = await context.orchestrator.reconnect();
   const routerPort = daemonStatus?.modelProcesses?.[0]?.port;
   if (!routerPort) throw new Error('router control status missing port after refresh');
-  context.routerClient = new LlamaCppClient(`http://127.0.0.1:${routerPort}`, { loadTimeoutMs: 600_000 });
+  context.routerClient = new LlamaCppClient(`http://127.0.0.1:${routerPort}`, {
+    loadTimeoutMs: 600_000,
+  });
   const gatewayBaseUrl = context.orchestrator.gatewayBaseUrl();
   if (!gatewayBaseUrl) throw new Error('gateway missing after refresh');
   context.gatewayBaseUrl = gatewayBaseUrl;
 }
 
-export async function destroyProductPathSmokeContext(context: ProductPathSmokeContext): Promise<void> {
+export async function destroyProductPathSmokeContext(
+  context: ProductPathSmokeContext,
+): Promise<void> {
   await context.orchestrator.shutdownForQuit().catch(() => undefined);
   fs.rmSync(context.workDir, { recursive: true, force: true });
 }

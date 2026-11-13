@@ -37,7 +37,13 @@ async function main() {
 
   const vitest = spawnSync(
     'bunx',
-    ['vitest', 'run', 'src/main/libs/llamacppProductPath.smoke.test.ts', '--config', 'vitest.config.ts'],
+    [
+      'vitest',
+      'run',
+      'src/main/libs/llamacppProductPath.smoke.test.ts',
+      '--config',
+      'vitest.config.ts',
+    ],
     {
       cwd: ROOT,
       stdio: 'inherit',

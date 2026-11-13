@@ -25,9 +25,7 @@ function readManifest() {
 async function downloadToFile(url, targetPath) {
   const response = await fetch(url, { redirect: 'follow' });
   if (!response.ok || !response.body) {
-    throw new Error(
-      `[llamacpp-smoke-fixtures] download failed HTTP ${response.status} for ${url}`,
-    );
+    throw new Error(`[llamacpp-smoke-fixtures] download failed HTTP ${response.status} for ${url}`);
   }
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   const tmp = `${targetPath}.part`;
@@ -106,8 +104,7 @@ async function main() {
 import { pathToFileURL } from 'node:url';
 
 const isCli =
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+  process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 
 if (isCli) {
   main().catch(error => {

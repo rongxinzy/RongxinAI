@@ -47,7 +47,7 @@ test('workflow dependency installs do not hardlink packages into the Bun cache',
 
 test('daily feature CI runs lint, typecheck, and parallel unit tests before its gate', () => {
   const ci = workflow('ci.yml');
-  expect(Object.keys(ci.jobs).sort()).toEqual(['ci-gate', 'lint', 'test', 'typecheck']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['ci-gate', ...Object.values(BaselineJob)].sort());
   const typecheckRuns = ci.jobs.typecheck.steps?.map(step => step.run ?? '').join('\n') ?? '';
   expect(typecheckRuns).toContain('bun run build:tsc');
   expect(
