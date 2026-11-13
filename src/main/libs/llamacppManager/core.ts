@@ -639,7 +639,9 @@ export class LlamaCppManagerCore extends EventEmitter {
       devices,
       backendKinds,
       gpuDeviceCount,
-      ...(helpFlagsResult.kvCacheTypes.length ? { kvCacheTypes: helpFlagsResult.kvCacheTypes } : {}),
+      ...(helpFlagsResult.kvCacheTypes.length
+        ? { kvCacheTypes: helpFlagsResult.kvCacheTypes }
+        : {}),
       supports: buildLlamaCppServiceConfigFieldSupport({
         helpProbeSucceeded: helpFlagsResult.success,
         flags: helpFlagsResult.flags,
