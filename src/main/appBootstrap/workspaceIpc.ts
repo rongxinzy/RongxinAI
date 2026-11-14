@@ -223,7 +223,7 @@ export const registerWorkspaceIpc = (): void => {
           };
         }
         for (const sessionId of listAllMatchingSessionIds({ workspaceId: id })) {
-          forgetCoworkSession(sessionId);
+          await forgetCoworkSession(sessionId);
         }
         const deletedSessionIds = localCoworkStore.deleteWorkspace(id);
         console.log(

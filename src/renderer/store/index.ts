@@ -5,7 +5,6 @@ import artifactReducer from './slices/artifactSlice';
 import activityReducer from './slices/activitySlice';
 import coworkReducer from './slices/coworkSlice';
 import coworkRunReducer from './slices/coworkRunSlice';
-import imReducer from './slices/imSlice';
 import mcpReducer from './slices/mcpSlice';
 import modelReducer from './slices/modelSlice';
 import quickActionReducer from './slices/quickActionSlice';
@@ -21,7 +20,6 @@ export const store = configureStore({
     coworkRun: coworkRunReducer,
     skill: skillReducer,
     mcp: mcpReducer,
-    im: imReducer,
     quickAction: quickActionReducer,
     scheduledTask: scheduledTaskReducer,
     agent: agentReducer,

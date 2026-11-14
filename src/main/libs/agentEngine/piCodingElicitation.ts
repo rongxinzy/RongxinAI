@@ -1,3 +1,4 @@
+import type { ToolDefinition } from './durableToolTypes';
 import { Type } from 'typebox';
 
 const PiCodingElicitationToolName = 'RequestCodingInput' as const;
@@ -20,7 +21,7 @@ export type PiCodingElicitationRequester = (
 /** A coding-only free-text pause point. This deliberately is not a permission tool. */
 export const createPiCodingElicitationTool = (
   request: PiCodingElicitationRequester,
-): Record<string, unknown> => ({
+): ToolDefinition<typeof PiCodingElicitationParameters> => ({
   name: PiCodingElicitationToolName,
   label: 'Request coding input',
   description:

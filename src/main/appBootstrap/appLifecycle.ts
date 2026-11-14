@@ -14,7 +14,7 @@ import { disposeCompanionWindow } from '../companion/window';
 import { disposeZhiyuanEnterpriseExtension } from '../enterpriseExtension/host';
 import { shutdownPythonRuntime } from '../pythonRuntime/host';
 import { getSkillServiceManager } from '../skillServices';
-import { channelRuntime } from './channelRuntimeState';
+import { stopAutomations } from './automationRuntime';
 
 let isCleanupFinished = false;
 let isCleanupInProgress = false;
@@ -66,20 +66,19 @@ const runAppCleanup = async (): Promise<void> => {
   disposeCompanionWindow();
   agentRuntime.skillManager?.stopWatching();
 
+  // Pause native schedules and model tasks before their providers and stores close.
+  await stopAutomations().catch(error => console.error('[Automations] shutdown failed:', error));
+  if (agentRuntime.piRuntimeAdapter)
+    await agentRuntime.piRuntimeAdapter
+      .closeSessions()
+      .catch(error => console.error('[DurableRuntime] shutdown failed:', error));
   inferenceRuntime.disposeMagpieModels?.();
   inferenceRuntime.disposeMagpieModels = undefined;
-
-  // Stop all active Pi sessions without blocking shutdown.
-  if (agentRuntime.piRuntimeAdapter) agentRuntime.piRuntimeAdapter.stopAllSessions();
   clearActiveRunSleepBlockers();
 
   storageRuntime.sqliteBackupManager?.stopPeriodicBackupLoop();
   memoryRuntime.todoReminderScheduler?.stop();
   memoryRuntime.todoReminderScheduler = null;
-
-  channelRuntime.stopping = true;
-  if (channelRuntime.restartTimer) clearTimeout(channelRuntime.restartTimer);
-  channelRuntime.restartTimer = null;
 
   let disconnectExternalAgents = false;
   try {
@@ -130,16 +129,8 @@ const runAppCleanup = async (): Promise<void> => {
       },
     },
     {
-      name: 'channelRuntime',
-      run: async () => {
-        await channelRuntime.bridgeServer?.stop().catch(error => {
-          console.error('[cc-connect] Failed to stop bridge on quit:', error);
-        });
-        channelRuntime.bridgeServer = null;
-        await channelRuntime.sidecarManager?.stop();
-        channelRuntime.sidecarManager = null;
-        channelRuntime.controlClient = null;
-      },
+      name: 'automations',
+      run: stopAutomations,
     },
     {
       name: 'ollama',
@@ -182,10 +173,6 @@ const runAppCleanup = async (): Promise<void> => {
       run: async () => {
         await memoryRuntime.projectMemoryService?.stopOutboxScheduler().catch(error => {
           console.error('[MemoryRuntime] Failed to stop outbox delivery:', error);
-        });
-        if (!memoryRuntime.engramManager) return;
-        await memoryRuntime.engramManager.stop().catch(error => {
-          console.error('[MemoryRuntime] Failed to stop local memory service:', error);
         });
       },
     },

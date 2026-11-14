@@ -1,32 +1,5 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import path from 'path';
-
-import JSZip from 'jszip';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-
-const hoisted = vi.hoisted(() => ({
-  mockCreateAgentSession: vi.fn(),
-}));
-
-vi.mock('@earendil-works/pi-coding-agent', () => ({
-  createAgentSession: hoisted.mockCreateAgentSession,
-}));
-
+import { describe, expect, it } from 'vitest';
 import { safeSlice } from '../src/shared/lib/safeSlice';
-import {
-  buildPiDocumentReaderTool,
-  PI_DOCUMENT_READER_MAX_CHARS,
-} from '../src/main/libs/agentEngine/piDocumentReaderTool';
-import {
-  buildPiSubagentTool,
-  PI_SUBAGENT_MAX_OUTPUT_CHARS,
-  type PiSubagentToolDeps,
-} from '../src/main/libs/agentEngine/piSubagentTool';
-import {
-  PiMessageRole,
-  PiSubagentEventType,
-} from '../src/main/libs/agentEngine/piSubagentExecution';
 
 describe('Adversarial Challenger Suite: safeSlice & Tool Truncation Bounds', () => {
   // Helper to assert no dangling high surrogate at end of string

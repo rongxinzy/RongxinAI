@@ -46,8 +46,6 @@ jobs:
             ~/.npm
             ~/.cache/electron
             ~/.cache/electron-builder
-            vendor/engram-runtime
-            vendor/channel-runtime
           key: copy-v2-linux-install-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             copy-v2-linux-install-node24-bun1.4.0-
@@ -74,7 +72,6 @@ jobs:
         run: |
           bun run setup:posix-uv-runtime
           bun run setup:posix-python-runtime
-          bun run engram:runtime:linux-x64
       - name: Build Linux installer artifacts
         timeout-minutes: 65
         run: bun run dist:linux

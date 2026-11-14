@@ -9,7 +9,7 @@
 | Main | `src/main/` | 窗口、持久化、Pi 运行时、llama.cpp 生命周期、Skill/MCP、IPC handler |
 | Preload | `src/main/preload.ts` | `contextBridge` → `window.electron`（contextIsolation 开、nodeIntegration 关、sandbox 开） |
 | Renderer | `src/renderer/` | React UI；业务逻辑在 `src/renderer/services/`，禁止直接访问 Node/Electron |
-| Channel/Cron 传输 | `src/main/libs/ccConnect*`、`src/main/im/` | 只搬运渠道事件与 cron 触发，**不**执行 Agent、不持有任务状态 |
+| 自动化 | `src/main/automations/` | 原生 Durable Tasks、持久化触发点与 `sleepUntil`，共享桌面执行内核 |
 
 主进程在 IPC/agent 热路径上不得做同步整盘扫描、大文件读/哈希、重解析等 CPU 密集工作；可分离部分进 `worker_threads`（池 ≤2、可取消）。详见 [AGENTS.md](../../AGENTS.md)「主进程 / Worker 边界」。
 
@@ -27,7 +27,7 @@
 | `src/main/libs/llamacppBackendManager.ts` | 后端/runtime 安装 barrel（实现于 `llamacppBackendManager/`） |
 | `src/main/skillManager.ts` | 内置 Skill 管理 |
 | `src/main/pythonRuntime/` | 工作区隔离的托管 Python（`python_execute` / `python_install`） |
-| `src/main/memory/` | Engram 投影与 `memory` 工具 |
+| `src/main/memory/` | Durable 生态 Markdown 记忆插件与候选/确认/归档治理 |
 | `src/shared/llamacpp/` | 主/渲染共享的 llama.cpp 类型与常量 |
 
 ### 渲染进程
@@ -54,16 +54,18 @@
 
 ## Pi 运行时（Agent 引擎）
 
-**Pi First：** `src/main/libs/agentEngine/piRuntimeAdapter.ts` 是 Work / Chat / Channel / Cron 的**唯一**执行内核。新能力优先用 Pi 原生机制，不在 harness 层重造。
+**Durable First：** Work / Chat / 自动化与伴随助手都由 `@earendil-works/pi-durable` Harness 执行。`piRuntimeAdapter.ts` 负责产品接线与事件投影；没有第二个 Agent loop。详见 [Durable 内核](durable-core.zh-CN.md)。
 
 | 模块 | 角色 |
 | --- | --- |
 | `piRuntimeAdapter.ts` | 会话启动/续聊、工具与权限、流事件出口 |
-| `piRuntimeAdapterHost.ts` 等 `piRuntime*` | 会话生命周期、资源加载、记忆注入、恢复 |
-| `piWorkLoop.ts` / `piTurnWorkflow.ts` | 轮次与工作流 |
+| `durableSession.mts` / `durableSessionHost.mts` | 原生会话、SQLite、工具/扩展配置与关闭 |
+| `durableEventProjector.mts` | 原生已提交增量映射到 UI 事件 |
+| `durableHostLifecycle.ts` | 恢复原生提交及进程退出暂停 |
+| `piRuntimeAdapterHost.ts` 等 `piRuntime*` | 产品生命周期、权限、队列和 UI 投影 |
 | `piPythonTools.ts` | 托管 Python 工具 |
 | `piSkillScriptTool.ts` | `run_skill_script` |
-| `mcpPiAdapter.ts` | MCP 接入 Pi |
+| `durableMcpTools.ts` / `durableSkills.ts` | 复用应用 MCP 连接、原生扩展与 Skill sections |
 
 Cowork 数据流（不含流式细节）：
 
@@ -127,7 +129,7 @@ startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 
 ### Zod IPC 契约
 
-Skills/MCP/Marketplace、AppSystem/Providers、CodingAgent/IM/自动化（定时任务+Activity）/Memory/Artifacts，以及 Cowork（sessions、queue、config、workspace、导出/权限、run snapshot、stream 恢复）、Workbench Task、Todo 走 `src/shared/ipc/contract.ts` 的 `defineIpcContract`（channel + zod args 元组 + result），单一事实来源。主进程用 `handleIpcContract`（`src/main/ipc/`）注册并运行时校验入参（失败即以含 channel 与 zod 摘要的错误拒绝，不调实现）；渲染层类型与 preload invoker 均从契约派生（`IpcContractApi` / `createIpcInvokers`）。沙箱 preload 不能引 zod，因此每个契约配一个 zod-free 的 `*.channels.ts` 通道映射（`IpcContractChannels` 锁定与契约一致）。新域 IPC 优先套用此模式。
+Skills/MCP/Marketplace、AppSystem/Providers、CodingAgent/自动化（定时任务+Activity）/Memory/Artifacts，以及 Cowork（sessions、queue、config、workspace、导出/权限、run snapshot、stream 恢复）、Workbench Task、Todo 走 `src/shared/ipc/contract.ts` 的 `defineIpcContract`（channel + zod args 元组 + result），单一事实来源。主进程用 `handleIpcContract`（`src/main/ipc/`）注册并运行时校验入参（失败即以含 channel 与 zod 摘要的错误拒绝，不调实现）；渲染层类型与 preload invoker 均从契约派生（`IpcContractApi` / `createIpcInvokers`）。沙箱 preload 不能引 zod，因此每个契约配一个 zod-free 的 `*.channels.ts` 通道映射（`IpcContractChannels` 锁定与契约一致）。新域 IPC 优先套用此模式。
 
 跨多个注册文件的契约（如 appSystem 覆盖 store/dialog/shell/appUpdate 等）按文件用 `handleIpcContractSubset` 注册各自子集；实现收到的 event 是完整 `IpcMainInvokeEvent`（`IpcContractHandlers` 的 event 参数按注册侧绑定）。Cowork 契约则按注册模块拆为多个子契约（`coworkContract.ts` 内 `coworkSession*` / `coworkQueue*` / `coworkConfig*` / `coworkExport*` / `workspaceContract` 等）。无论哪种方式，每个 channel 只能注册一次——重复注册会在启动时抛 "Attempted to register a second handler"。
 

@@ -104,8 +104,6 @@ runs:
           resources/python-mac
           resources/python-linux
           resources/skill-python
-          vendor/engram-runtime
-          vendor/channel-runtime
         key: copy-v2-packaging-${{ runner.os }}-${{ inputs.runtime-target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'SKILLs/**/requirements.txt', 'scripts/setup-*runtime*.js') }}
         restore-keys: |
           copy-v2-packaging-${{ runner.os }}-${{ inputs.runtime-target }}-node24-bun1.4.0-
@@ -156,14 +154,12 @@ runs:
       run: |
         bun run setup:uv-runtime
         bun run setup:python-runtime
-        bun run engram:runtime:${{ inputs.runtime-target }}
     - name: Set up POSIX runtimes
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
       if: ${{ inputs.platform != 'windows' }}
       run: |
         bash scripts/ci/with-download-retries.sh bun run setup:posix-uv-runtime
         bash scripts/ci/with-download-retries.sh bun run setup:posix-python-runtime
-        bun run engram:runtime:${{ inputs.runtime-target }}
     - name: Sync vendor llama.cpp CPU edition
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
       if: ${{ inputs.inference-edition != 'lite' }}

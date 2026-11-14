@@ -114,7 +114,6 @@ export const enWorkbench: Record<string, string> = {
   agentTabBasic: 'Basic Info',
   agentTabSkills: 'Skills',
   agentTabIM: 'IM Channels',
-  agentIMConfigured: 'Configured',
   agentCreateFailed: 'Failed to create project',
   agentNameDuplicate: 'This project name already exists. Please use a different name.',
   agentNameReserved: "Cannot use 'Primary Project' as the project name.",

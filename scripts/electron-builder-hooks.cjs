@@ -1,26 +1,19 @@
 'use strict';
 
 const path = require('path');
-const os = require('os');
-const {
-  existsSync,
-  cpSync,
-  readFileSync,
-  readdirSync,
-  statSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  renameSync,
-  lstatSync,
-  writeFileSync,
-  symlinkSync,
-} = require('fs');
+const { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync } = require('fs');
 const { spawnSync } = require('child_process');
+const {
+  resolveWindows7zaPath,
+  packWindowsResourceComponent7z,
+} = require('./packaging/windows-component-archive.cjs');
 const { writeNsisOfflineComponentRouting } = require('./resolve-nsis-offline-components.cjs');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
 const { configureMagpieResources } = require('./magpie-runtime.cjs');
-const { verifyPackagedDeliverables } = require('./packaging/verify-packaged-runtimes.cjs');
+const {
+  verifyPackagedDeliverables,
+  resolveTargetArch,
+} = require('./packaging/verify-packaged-runtimes.cjs');
 const {
   ensurePortableUvRuntime,
   checkRuntimeHealth: checkUvRuntimeHealth,
@@ -81,149 +74,6 @@ function configureMacAutoUpdateMetadata(context, env = process.env) {
   );
 }
 
-function resolveTargetArch(context) {
-  if (context?.arch === 3) return 'arm64';
-  if (context?.arch === 0) return 'ia32';
-  if (context?.arch === 1) return 'x64';
-  throw new Error(`[electron-builder-hooks] Unknown packaging arch: ${String(context?.arch)}`);
-}
-
-function resolveWindows7zaPath() {
-  const sevenZipPath = path.join(
-    __dirname,
-    '..',
-    'node_modules',
-    '7zip-bin',
-    'win',
-    'x64',
-    '7za.exe',
-  );
-  if (!existsSync(sevenZipPath)) {
-    throw new Error(
-      '[electron-builder-hooks] Missing bundled Windows 7za.exe. Run bun install before packaging.',
-    );
-  }
-  return sevenZipPath;
-}
-
-function packWindowsResourceComponent7z(component, archivePath, sevenZipPath) {
-  const stagingRoot = mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-component-7z-'));
-  const stagedPrefix = path.join(stagingRoot, component.prefix);
-  const temporaryArchivePath = `${archivePath}.${process.pid}.packing`;
-  try {
-    // A junction keeps the archive layout stable without copying a multi-hundred-MB
-    // component into a temporary staging directory.  The archive is created from
-    // the relative prefix only, so it never contains an absolute build-machine path.
-    symlinkSync(component.dir, stagedPrefix, 'junction');
-    const compression = getWindowsResourceArchiveCompression(component);
-    rmSync(temporaryArchivePath, { force: true });
-    const result = spawnSync(
-      sevenZipPath,
-      ['a', '-t7z', ...compression.sevenZipArgs, temporaryArchivePath, component.prefix],
-      {
-        cwd: stagingRoot,
-        encoding: 'utf8',
-      },
-    );
-    if (result.error || result.status !== 0) {
-      throw new Error(
-        '[electron-builder-hooks] Failed to create ' +
-          component.key +
-          ' .7z archive: ' +
-          (result.error?.message || result.stderr || result.stdout || `exit ${result.status}`),
-      );
-    }
-    rmSync(archivePath, { force: true });
-    renameSync(temporaryArchivePath, archivePath);
-  } finally {
-    rmSync(temporaryArchivePath, { force: true });
-    rmSync(stagingRoot, { recursive: true, force: true });
-  }
-}
-
-/** Verify that the prepared channel runtime matches the immutable release pin. */
-function ensureBundledChannelRuntime(context) {
-  const projectRoot = path.join(__dirname, '..');
-  const platform = context?.electronPlatformName;
-  const arch = resolveTargetArch(context);
-  const runtimeBase = path.join(projectRoot, 'vendor', 'channel-runtime');
-  const binaryName = platform === 'win32' ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
-  const targetId = `${platform === 'win32' ? 'win' : platform === 'darwin' ? 'mac' : platform}-${arch}`;
-  const currentDirectory = path.join(runtimeBase, 'current');
-  if (process.env.ZHIYUAN_ALLOW_HOST_CHANNEL_RUNTIME === '1') {
-    const currentBuildInfoPath = path.join(currentDirectory, 'runtime-build-info.json');
-    const currentBuildInfo = existsSync(currentBuildInfoPath)
-      ? JSON.parse(readFileSync(currentBuildInfoPath, 'utf8'))
-      : null;
-    const currentBinary = path.join(
-      currentDirectory,
-      typeof currentBuildInfo?.binary === 'string' ? currentBuildInfo.binary : binaryName,
-    );
-    if (
-      currentBuildInfo?.sourceRepository &&
-      currentBuildInfo?.sourceRevision &&
-      currentBuildInfo?.sha256 &&
-      existsSync(currentBinary) &&
-      sha256File(currentBinary) === currentBuildInfo.sha256
-    ) {
-      console.log('[electron-builder-hooks] Using the verified host-built channel runtime.');
-      return;
-    }
-  }
-  const targetDirectory = path.join(runtimeBase, targetId);
-  const binaryPath = path.join(targetDirectory, binaryName);
-  const buildInfoPath = path.join(targetDirectory, 'runtime-build-info.json');
-  if (!existsSync(binaryPath) || !existsSync(buildInfoPath)) {
-    throw new Error(
-      '[electron-builder-hooks] Missing verified channel runtime. Run the matching channel:runtime:<target> script before packaging.',
-    );
-  }
-  const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
-  const config = packageJson.channelRuntime;
-  const buildInfo = JSON.parse(readFileSync(buildInfoPath, 'utf8'));
-  const checksum = config?.runtimeChecksums?.[targetId];
-  const assetName = config?.runtimeAssets?.[targetId];
-  if (
-    buildInfo?.schemaVersion !== 1 ||
-    buildInfo?.repo !== config?.repo ||
-    buildInfo?.version !== config?.version ||
-    buildInfo?.sourceRevision !== config?.sourceRevision ||
-    buildInfo?.target !== targetId ||
-    buildInfo?.assetName !== assetName ||
-    buildInfo?.checksum !== checksum ||
-    sha256File(binaryPath) !== checksum
-  ) {
-    throw new Error(
-      '[electron-builder-hooks] Channel runtime does not match the pinned release metadata.',
-    );
-  }
-
-  const stagedCurrentDirectory = mkdtempSync(path.join(runtimeBase, '.current.packaging-'));
-  try {
-    rmSync(stagedCurrentDirectory, { recursive: true, force: true });
-    cpSync(targetDirectory, stagedCurrentDirectory, { recursive: true });
-    rmSync(currentDirectory, { recursive: true, force: true });
-    renameSync(stagedCurrentDirectory, currentDirectory);
-  } finally {
-    rmSync(stagedCurrentDirectory, { recursive: true, force: true });
-  }
-}
-
-function findPackagedPythonExecutable(appOutDir) {
-  const candidates = [
-    path.join(appOutDir, 'resources', 'python-win', 'python.exe'),
-    path.join(appOutDir, 'resources', 'python-win', 'python3.exe'),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  return null;
-}
-
 function applyMacIconFix(appPath) {
   console.log('[electron-builder-hooks] Applying macOS Launchpad icon fix...');
 
@@ -281,14 +131,6 @@ function applyMacIconFix(appPath) {
 
   console.log('[electron-builder-hooks] macOS Launchpad icon fix applied');
 }
-
-/**
- * Remove node_modules/.bin directories from bundled dependency trees.
- *
- * macOS codesign rejects symlinks inside app bundles (even valid relative ones).
- * .bin/ directories contain only CLI wrapper symlinks that are never used at
- * runtime, so removing them entirely is safe and fixes signing.
- */
 
 /**
  * Check if a command exists in the system PATH.
@@ -501,7 +343,6 @@ async function beforePack(context) {
   configureMacAutoUpdateMetadata(context);
   configureInferenceEditionPublishUrls(context);
   configureInferenceEditionResources(context);
-  ensureBundledChannelRuntime(context);
   // Install skill dependencies first (for all platforms)
   installSkillDependencies();
 
@@ -705,6 +546,5 @@ module.exports = {
   beforePack,
   afterPack,
   configureMacAutoUpdateMetadata,
-  ensureBundledChannelRuntime,
   packWindowsResourceComponent7z,
 };

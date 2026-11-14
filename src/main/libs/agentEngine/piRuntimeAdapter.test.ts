@@ -10,11 +10,10 @@
 import {
   adapter,
   createTemporaryWorkspace,
-  mockApplyApplicationRuntimeEnv,
-  mockCompleteSimple,
   mockCreateAgentSession,
   mockSession,
-  mockSessionManagerInMemory,
+  mockApplyApplicationRuntimeEnv,
+  mockCompleteSimple,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
 
@@ -25,17 +24,13 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { AcademicResearchSkillIds, CoreSkillId } from '../../../shared/skills/constants';
-import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
-import {
-  WorkbenchContractKind,
-  WorkbenchRunTrigger,
-  WorkbenchTaskStatus,
-} from '../../../shared/workbenchTask';
+import { WorkbenchContractKind, WorkbenchTaskStatus } from '../../../shared/workbenchTask';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
+import { durableSessionFile } from './durableSessionStore';
 
 describe('PiRuntimeAdapter', () => {
   setupPiRuntimeAdapterSuite();
@@ -63,15 +58,14 @@ describe('PiRuntimeAdapter', () => {
       expect(started).toHaveBeenCalledWith('started-session');
     });
 
-    it('uses an in-memory Pi session manager so SQLite remains the only restore source', async () => {
+    it("routes execution to the application's persistent Durable store", async () => {
       await adapter.startSession('memory-session', 'Hello Pi');
-
-      expect(mockSessionManagerInMemory).toHaveBeenCalledWith(process.cwd());
-      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+      expect(mockCreateAgentSession.mock.calls[0][0]).toEqual(
         expect.objectContaining({
-          sessionManager: { cwd: process.cwd() },
+          durableFile: durableSessionFile(adapter.getPiSessionStoreRoot()!, 'memory-session'),
         }),
       );
+      expect(mockCreateAgentSession.mock.calls[0][0]).not.toHaveProperty('sessionManager');
     });
 
     it('registers the agent-authored session_summary tool for new sessions', async () => {

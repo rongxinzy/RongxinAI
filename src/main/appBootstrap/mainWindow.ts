@@ -9,7 +9,6 @@ import { lifecycleRuntime } from './lifecycleRuntimeState';
 import { PRELOAD_PATH, applyWindowsWindowIcon } from './windowBranding';
 import { emitWindowState, schedulePersistAppWindowState } from './windowManagement';
 import { openDevToolsWindow, toggleDevToolsForSender } from '../appIpc';
-import { isWecomAuthUrl } from './windowSecurity';
 import { logAppQuitContextOnce } from './appLifecycle';
 import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import { isAutoLaunched } from '../autoLaunchManager';
@@ -43,11 +42,6 @@ import {
   scheduleReload,
 } from './windowManagement';
 import { getInitialTheme } from './appConfigSettings';
-import {
-  migrateLegacyScheduledTasksToCanonical,
-  migrateLegacyScheduledTaskRunsToCanonical,
-} from '../../scheduledTask/migrate';
-import { SqliteScheduledTaskStore } from '../../scheduledTask/sqliteScheduledTaskStore';
 
 export const createMainWindow = (): void => {
   // 创建主窗口
@@ -125,36 +119,10 @@ export const createMainWindow = (): void => {
     lifecycleRuntime.mainWindow.setMenu(null);
     const unregisterContextMenu = registerContextMenu(lifecycleRuntime.mainWindow);
 
-    // 处理 window.open 请求（企微 SDK 授权弹窗等）
+    // External links use the system browser; the product does not create auth popups.
     lifecycleRuntime.mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-      if (isWecomAuthUrl(url)) {
-        return {
-          action: 'allow',
-          overrideBrowserWindowOptions: {
-            width: 950,
-            height: 640,
-            title: '企业微信授权',
-            autoHideMenuBar: true,
-            webPreferences: {
-              nodeIntegration: false,
-              contextIsolation: true,
-              sandbox: true,
-            },
-          },
-        };
-      }
       shell.openExternal(url);
       return { action: 'deny' };
-    });
-
-    // 监听子窗口创建事件（企微授权弹窗安全限制）
-    lifecycleRuntime.mainWindow.webContents.on('did-create-window', childWindow => {
-      // 限制子窗口只能导航到企微域名，防止被劫持到其他站点
-      childWindow.webContents.on('will-navigate', (event, navUrl) => {
-        if (!isWecomAuthUrl(navUrl)) {
-          event.preventDefault();
-        }
-      });
     });
 
     // 设置窗口的最小尺寸
@@ -346,27 +314,6 @@ export const createMainWindow = (): void => {
         openTask: openDesktopPetSession,
         onProfileChanged: profile => setDesktopPetAppearance(profile.characterId),
       });
-
-      (async () => {
-        // One-time migration: import legacy SQLite task records into the
-        // canonical scheduler. No task is delegated to another runtime.
-        migrateLegacyScheduledTasksToCanonical({
-          db: getStore().getDatabase(),
-          getKv: key => getStore().get(key),
-          setKv: (key, value) => getStore().set(key, value),
-          store: new SqliteScheduledTaskStore(getStore().getDatabase()),
-        }).catch(err => {
-          console.warn('[Main] Canonical scheduled-task migration failed:', err);
-        });
-        migrateLegacyScheduledTaskRunsToCanonical({
-          db: getStore().getDatabase(),
-          getKv: key => getStore().get(key),
-          setKv: (key, value) => getStore().set(key, value),
-          store: new SqliteScheduledTaskStore(getStore().getDatabase()),
-        }).catch(err => {
-          console.warn('[Main] Canonical scheduled-task Run migration failed:', err);
-        });
-      })();
     });
   };
 

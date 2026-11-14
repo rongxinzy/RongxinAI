@@ -42,6 +42,7 @@ import {
 import { CompanionSubmissionActivity } from './submissionActivity.mjs';
 import type { CompanionActivity } from './activity.js';
 import { companionReplyState, latestCompanionReply } from './replyOutcome.mjs';
+import { durableCompactionPolicy } from '../libs/agentEngine/durableModelPolicy.js';
 
 const owners = new Set<string>();
 const requestIdSchema = z.string().trim().min(1).max(128);
@@ -245,7 +246,19 @@ export class PiCompanionRuntime {
     active.availability = resolved.availability;
     const tools =
       active.modelId && this.assignment.permitsTools(active.modelId) ? active.memoryTools : [];
-    await active.conversation.configure({ model: resolved.model, tools }, context);
+    const model = resolved.model
+      ? resolved.models.getModel(resolved.model.provider, resolved.model.modelId)
+      : undefined;
+    await active.conversation.configure(
+      {
+        model: resolved.model,
+        tools,
+        ...(model
+          ? { compaction: durableCompactionPolicy({ contextWindow: model.contextWindow }) }
+          : {}),
+      },
+      context,
+    );
     return resolved.availability;
   }
 

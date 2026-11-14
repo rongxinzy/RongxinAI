@@ -11,11 +11,9 @@ import type { CoworkInterruptionCause } from '../../../shared/cowork/interruptio
 import type { CoworkStore } from '../../coworkStore';
 import type { ArtifactLedger } from '../../artifactLedger/artifactLedger';
 import type { ConversationHistoryService } from '../../conversationHistory/service';
-import type { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
 import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtractor';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
-import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import type { McpServerManager } from '../mcpServerManager';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
@@ -32,10 +30,8 @@ export interface PiRuntimeAdapterHost {
   readonly activeSessions: Map<string, ActivePiSession>;
   /** Sessions still creating their Pi counterpart; abortable by id. */
   readonly initializingSessions: Map<string, InitializingPiSession>;
-  /** Stopped sessions that must still look active to IM routing. */
+  /** Conversation identities retained for a later user continuation. */
   readonly retainedSessionIds: Set<string>;
-  /** Per-session dedup fingerprints for injected project-memory blocks. */
-  readonly memoryInjectionDedup: MemoryInjectionDedup;
   /** Shared CAD viewer backend for the text-to-cad skill tool. */
   readonly cadViewerService: PiCadViewerService;
   /** Deferred-error and ask-user/coding-elicitation coordination. */
@@ -55,16 +51,10 @@ export interface PiRuntimeAdapterHost {
   getProjectMemoryService(): ProjectMemoryService | null;
   getConversationHistoryService(): ConversationHistoryService | null;
   getScheduledTaskService(): ScheduledTaskService | null;
-  /** Delivery a scheduled task created in this session defaults to (IM chats). */
-  getScheduledTaskDeliveryForSession?(sessionId: string): ScheduledTaskDelivery | null;
   getMcpServerManager(): McpServerManager | null;
   getMcpToolManifestGeneration(): number;
   getOcrCommandFor(): ((imagePath: string) => string) | undefined;
-  /**
-   * Root directory (`<userData>/pi-sessions`) holding one Pi session JSONL
-   * directory per Cowork session. Null disables file persistence (tests
-   * without an injected root keep the in-memory session manager).
-   */
+  /** User-data root containing one native SQLite store per conversation. */
   getPiSessionStoreRoot(): string | null;
 
   // Session-scoped helpers implemented by the adapter.
@@ -87,8 +77,8 @@ export interface PiRuntimeAdapterHost {
     cause?: CoworkInterruptionCause,
   ): void;
   disposeSessionForRecreation(sessionId: string, active: ActivePiSession): void;
-  /** Deletes the session's Pi JSONL directory (divergence or session delete). */
-  invalidatePiSessionDir(sessionId: string): void;
+  /** Deletes a closed native execution store after divergence or session deletion. */
+  invalidatePiSessionDir(sessionId: string): Promise<void>;
   startSession(sessionId: string, prompt: string, options?: PiStartOptions): Promise<void>;
   continueSession(sessionId: string, prompt: string, options?: PiContinueOptions): Promise<void>;
   isSessionActive(sessionId: string): boolean;

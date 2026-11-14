@@ -80,17 +80,17 @@ describe('buildTaskInput', () => {
     expect(input.payload).toEqual({ kind: PayloadKind.AgentTurn, message: 'updated prompt' });
   });
 
-  test('detaches an existing session when the binding is not session-based', () => {
+  test('clears the task context when each run gets an independent session', () => {
     const task = taskFixture({
-      sessionKey: 'zhiyuan:session-1',
-      sessionTarget: SessionTarget.Main,
+      sessionKey: null,
+      sessionTarget: SessionTarget.Task,
     });
     const form = {
       ...createFormState(task),
       sessionBinding: SessionBindingStrategy.PerRun,
-      boundSessionId: 'session-1',
     };
     expect(buildTaskInput(form, { mode: 'edit', task }).sessionKey).toBeNull();
+    expect(buildTaskInput(form, { mode: 'edit', task }).sessionTarget).toBe(SessionTarget.Isolated);
   });
 
   test('creates an enabled task with the template description', () => {

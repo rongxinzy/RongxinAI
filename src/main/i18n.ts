@@ -9,7 +9,6 @@
  *   import { t, setLanguage } from './i18n';
  *   setLanguage('en');
  *   const label = t('trayShowWindow'); // "Open 知远"
- *   const msg = t('imMissingCredentials', { fields: 'appId, appSecret' });
  */
 
 export type LanguageType = 'zh' | 'en';
@@ -39,8 +38,6 @@ export function setLanguage(language: LanguageType): void {
  * Look up a translation key and optionally interpolate `{param}` placeholders.
  * Returns the key itself if no translation exists.
  *
- *   t('imMissingCredentials', { fields: 'appId, appSecret' })
- *   // => "缺少必要配置项: appId, appSecret"
  */
 export function t(key: string, params?: Record<string, string | number>): string {
   let text =

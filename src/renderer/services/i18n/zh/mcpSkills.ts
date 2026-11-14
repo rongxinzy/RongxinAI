@@ -1,5 +1,9 @@
 // MCP、Skills 与远程导入
 export const zhMcpSkills: Record<string, string> = {
+  connectors: '连接器',
+  connectorFeishu: '飞书',
+  connectorGitHub: 'GitHub',
+  connectorsDescription: '连接任务需要的服务，按授权范围使用工具。',
   mcpEndpointInvalid: 'MCP endpoint 无效，请检查配置',
   piRuntimeModelOptions: '工作模式兼容选项',
   piRuntimeModelOptionsHint:

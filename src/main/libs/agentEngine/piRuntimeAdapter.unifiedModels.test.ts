@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MagpieModelService, installMagpieModelService } from '../../magpie/modelService';
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 const mocks = vi.hoisted(() => {
   const session = {
@@ -14,24 +17,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('@earendil-works/pi-coding-agent', () => ({
-  createAgentSession: mocks.createAgentSession,
-  DefaultResourceLoader: class {
-    async reload() {}
-  },
-  SessionManager: { inMemory: vi.fn(() => ({})) },
-  SettingsManager: { create: vi.fn(() => ({ applyOverrides: vi.fn() })) },
-  getAgentDir: vi.fn(() => '/tmp/pi-agent'),
-  ModelRuntime: {
-    create: vi.fn(async () => ({
-      registerProvider: vi.fn(),
-      setRuntimeApiKey: vi.fn().mockResolvedValue(undefined),
-    })),
-  },
-  createCodemodeExtension: vi.fn(),
-  createMcpExtension: vi.fn(),
-  createToolSearchExtension: vi.fn(),
-}));
+vi.mock('./durableSession.mjs', () => ({ createDurableSession: mocks.createAgentSession }));
 vi.mock('@earendil-works/pi-ai/compat', () => ({
   getModel: vi.fn(),
   completeSimple: vi.fn(),
@@ -43,15 +29,19 @@ vi.mock('../coworkUtil', async importOriginal => ({
 
 describe('unified model readiness and actual inference', () => {
   let adapter: PiRuntimeAdapter;
+  let directory: string;
   let dispose: (() => void) | undefined;
   beforeEach(() => {
     vi.clearAllMocks();
     adapter = new PiRuntimeAdapter();
+    directory = mkdtempSync(path.join(tmpdir(), 'durable-model-readiness-'));
+    adapter.setPiSessionStoreRoot(directory);
     adapter.on('error', () => {});
   });
   afterEach(() => {
     adapter.stopAllSessions();
     dispose?.();
+    rmSync(directory, { recursive: true, force: true });
   });
 
   it.each(['disabled', 'revoked', 'unselected', 'catalog-failed'] as const)(

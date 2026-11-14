@@ -1,3 +1,4 @@
+import type { ToolDefinition } from './durableToolTypes';
 import {
   runManagedSkillScript,
   startManagedSkillProcess,
@@ -111,7 +112,7 @@ export function buildPiCadViewerTool(options: {
   workspaceRoot: string;
   skillRoot: string;
   service: PiCadViewerService;
-}): Record<string, unknown> {
+}): ToolDefinition {
   return {
     name: PiCadViewerToolName,
     label: 'Start CAD Viewer',
@@ -124,7 +125,7 @@ export function buildPiCadViewerTool(options: {
     },
     execute: async (
       _toolCallId: string,
-      _params: Record<string, unknown>,
+      _params: unknown,
       signal?: AbortSignal,
     ): Promise<CadViewerToolResult> => {
       const result = await options.service.start({

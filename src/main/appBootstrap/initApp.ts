@@ -39,10 +39,10 @@ import {
   setPreventSleepBlockerEnabled,
 } from './runtimeServices';
 import { getCoworkStore } from './runtimeServices';
-import { startCcConnectBridge, reconcileCcConnectChannelSidecars } from './ccConnectRuntime';
+import { getScheduledTaskService } from './automationRuntime';
+import { markNativeResourcesReady } from './nativeRecovery';
 import { refreshEndpointsTestMode } from '../libs/endpoints';
 import {
-  getEngramManager,
   getProjectMemoryService,
   getPiRuntimeAdapter,
   getWorkbenchTaskService,
@@ -54,7 +54,6 @@ import { initMcpServers } from './mcpBootstrap';
 import { resolveDefaultAgentModelRef } from './defaultAgentModel';
 import { ensureEmbeddedPiAgentDir } from '../libs/agentEngine/piAgentDir';
 import { handleDeepLink } from './communityAuth';
-import { getCronJobService } from '../ipcHandlers/scheduledTask';
 import { aisphereService, startAISphereGateway } from '../extensions/aisphere';
 import { getBranding } from '../../shared/branding';
 import { DB_FILENAME } from '../appConstants';
@@ -62,7 +61,6 @@ import { startSqliteDiagnostics } from '../sqliteDiagnostics';
 import { SqliteBackupManager } from '../libs/sqliteBackup/sqliteBackupManager';
 import { isAllowedLocalfilePath } from '../localfilePathValidation';
 import { ActivityService } from '../activity/activityService';
-import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 import { registerWorkbenchTaskIpcHandlers } from '../workbenchTask/ipc';
 import { registerTodoIpcHandlers } from '../todo/ipc';
 import { TodoReminderScheduler } from '../todo/reminderScheduler';
@@ -82,7 +80,6 @@ import { allowEnterpriseRendererOpaqueOrigin } from '../enterpriseExtension/rend
 import { initializeZhiyuanEnterpriseExtension } from '../enterpriseExtension/host';
 import { zhiyuanEnterpriseSessionBridge } from '../enterpriseExtension/sessionBridge';
 import { zhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
-import { SqliteScheduledTaskStore } from '../../scheduledTask/sqliteScheduledTaskStore';
 import { getSkillManager } from './runtimeServices';
 import { getSkillsRoot } from '../libs/coworkUtil';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from '../libs/pythonRuntime';
@@ -91,7 +88,7 @@ import { StartupProfiler } from '../startupProfiler';
 import { setAutoLaunchEnabled } from '../autoLaunchManager';
 import { updateTrayMenu } from '../trayManager';
 import { APP_UPDATE_POLL_INTERVAL_MS } from '../../shared/appUpdate/constants';
-import { channelRuntime } from './channelRuntimeState';
+import { activityRuntime } from './activityRuntimeState';
 
 export const initApp = async (): Promise<void> => {
   // Original bootstrap body, kept as one unit; invoked below so exported
@@ -143,10 +140,6 @@ export const initApp = async (): Promise<void> => {
         `[EnterpriseExtension] Initialized ${enterpriseExtension.extensionId} with API version 1.`,
       );
     }
-
-    void getEngramManager()
-      .start()
-      .catch(error => console.warn('[MemoryRuntime] Failed to start local memory service:', error));
 
     // Note: Calendar permission is checked on-demand when calendar operations are requested
     // We don't trigger permission dialogs at startup to avoid annoying users
@@ -224,20 +217,9 @@ export const initApp = async (): Promise<void> => {
     console.log('[Main] initApp: store initialized');
     const projectMemoryService = getProjectMemoryService();
     projectMemoryService.startOutboxScheduler();
-    void getEngramManager()
-      .start()
-      .then(connection => {
-        if (connection) projectMemoryService.resumeOutboxDrain();
-      })
-      .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
+    projectMemoryService.resumeOutboxDrain();
     refreshEndpointsTestMode(storageRuntime.store);
     storageRuntime.sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
-    await startCcConnectBridge().catch(error =>
-      console.error('[cc-connect] Failed to start local bridge:', error),
-    );
-    await reconcileCcConnectChannelSidecars().catch(error => {
-      console.error('[ChannelRuntime] Failed to start unified runtime:', error);
-    });
     const startSqliteBackupLoop = async (): Promise<void> => {
       if (!storageRuntime.sqliteBackupManager) return;
       await storageRuntime.sqliteBackupManager.startPeriodicBackupLoop(() =>
@@ -262,35 +244,12 @@ export const initApp = async (): Promise<void> => {
     if (resetCount > 0) {
       console.log(`[Main] Reset ${resetCount} stuck cowork session(s) from running -> idle`);
     }
-    channelRuntime.activityService ??= new ActivityService(getStore().getDatabase());
-    const recoveredActivityRuns = channelRuntime.activityService.recoverInterruptedRuns();
-    if (recoveredActivityRuns > 0) {
-      console.warn(
-        `[Activity] marked ${recoveredActivityRuns} interrupted activity run(s) as failed`,
-      );
-    }
-    const prunedActivityRuns = channelRuntime.activityService.pruneExpired();
+    activityRuntime.service ??= new ActivityService(getStore().getDatabase());
+    const prunedActivityRuns = activityRuntime.service.pruneExpired();
     if (prunedActivityRuns > 0) {
       console.log(`[Activity] removed ${prunedActivityRuns} expired activity run(s)`);
     }
-    const recoveredScheduledRuns = new SqliteScheduledTaskStore(
-      getStore().getDatabase(),
-    ).recoverInterruptedRuns(run => {
-      channelRuntime.activityService?.upsertBestEffort({
-        id: run.id,
-        source: ActivitySource.ScheduledTask,
-        status: ActivityStatus.Failed,
-        startedAt: Date.parse(run.startedAt),
-        updatedAt: Date.parse(run.finishedAt ?? run.startedAt),
-        errorMessage: run.error ?? undefined,
-      });
-    });
-    if (recoveredScheduledRuns > 0) {
-      console.warn(`[Scheduler] marked ${recoveredScheduledRuns} interrupted Run(s) as failed`);
-    }
-    registerWorkbenchTaskIpcHandlers({
-      getService: getWorkbenchTaskService,
-    });
+    registerWorkbenchTaskIpcHandlers({ getService: getWorkbenchTaskService });
     memoryRuntime.todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());
     memoryRuntime.todoReminderScheduler.start();
     registerTodoIpcHandlers(() => getStore().getDatabase(), {
@@ -469,19 +428,7 @@ export const initApp = async (): Promise<void> => {
       });
     }
 
-    // Construct the canonical scheduler eagerly. getCanonicalScheduledTaskService
-    // is the only place that injects the service into the Pi adapter
-    // (setScheduledTaskService); without this call it would only be built
-    // lazily by the first scheduled-task IPC request or the cc-connect sidecar
-    // cron attach, and Work sessions started before either (sidecar missing,
-    // in crash backoff, or racing startup) would silently lack the
-    // scheduled_task tool. The old startPolling() call covered this by
-    // accident; the polling itself was a no-op and stays removed.
-    try {
-      getCronJobService();
-    } catch (error) {
-      console.warn('[Main] Canonical scheduler not available after startup:', error);
-    }
+    // Native automation tasks are started after managed resources are ready.
 
     // ── Step 1: Show window ASAP ──────────────────────────────────────
     // CSP + createWindow moved before skill initialisation so the user
@@ -491,6 +438,7 @@ export const initApp = async (): Promise<void> => {
 
     profiler.mark('createWindow');
     console.log('[Main] initApp: creating window');
+    getPiRuntimeAdapter().setScheduledTaskService(getScheduledTaskService());
     createMainWindow();
     profiler.measure('createWindow');
     console.log('[Main] initApp: window created');
@@ -555,6 +503,9 @@ export const initApp = async (): Promise<void> => {
         profiler.measure('pythonRuntime');
       })(),
     ]);
+
+    // Rebind native runs only after model, MCP, managed skills and Python are ready.
+    await markNativeResourcesReady();
 
     // Skill services (web-search bridge) — fire-and-forget (Step 2).
     // No IPC handler or downstream init depends on this completing. The

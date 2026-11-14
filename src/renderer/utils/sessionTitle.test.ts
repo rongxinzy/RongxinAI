@@ -32,9 +32,9 @@ describe('resolveSessionDisplayTitle', () => {
     expect(resolveSessionDisplayTitle({ title: '普通会话' }, 'zh')).toBe('普通会话');
   });
 
-  test('keeps IM sessions untouched', () => {
+  test('keeps ordinary project titles untouched', () => {
     expect(
-      resolveSessionDisplayTitle({ title: 'QQ会话', source: CoworkSessionSource.Im }, 'zh'),
-    ).toBe('QQ会话');
+      resolveSessionDisplayTitle({ title: '项目讨论', source: CoworkSessionSource.Manual }, 'zh'),
+    ).toBe('项目讨论');
   });
 });

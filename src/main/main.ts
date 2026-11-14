@@ -30,7 +30,6 @@ import { registerManagedProvidersIpc } from './appSystemIpc/managedProviders';
 import { registerAppUpdateIpc } from './appUpdateIpc';
 import { registerShellIpc } from './shellIpc';
 import { getCodingRoomService } from './appBootstrap/codingRoomRuntime';
-import { registerIntegrationsIpc } from './integrationsIpc';
 import { registerMcpIpc } from './mcpIpc';
 import { registerProjectIpc } from './projectIpc';
 import { registerPermissionsIpc } from './permissionsIpc';
@@ -52,7 +51,6 @@ import {
 import { getCoworkImageRoot } from './appBootstrap/coworkSessionImages';
 import { getPiRuntimeAdapter } from './appBootstrap/sessionServices';
 import { lifecycleRuntime } from './appBootstrap/lifecycleRuntimeState';
-import { channelRuntime } from './appBootstrap/channelRuntimeState';
 import {
   getActiveMcpAuthorizations,
   setActiveMcpAuthorizations,
@@ -61,32 +59,21 @@ import { getAgentManager, setPreventSleepBlockerEnabled } from './appBootstrap/r
 import {
   getDefaultProjectBaseDir,
   getUnmanagedWorkspaceBaseDir,
-  isInternalWorkspacePath,
   resolveSessionWorkingDirectory,
   resolveTaskWorkingDirectory,
+  isInternalWorkspacePath,
 } from './appBootstrap/workspacePaths';
 import { getDefaultConversationWorkspacePath } from './defaultConversationWorkspace';
 import {
-  getMagpieModelService,
   isMagpieGatewayRunning,
   synchronizeManagedMagpieCatalog,
+  getMagpieModelService,
 } from './appBootstrap/magpieRuntime';
 import { getAppUpdateCoordinator } from './appBootstrap/runtimeServices';
-import {
-  getCanonicalScheduledTaskService,
-  getIMGatewayManager,
-} from './appBootstrap/ccConnectRuntime';
-import {
-  reconcileCcConnectChannelSidecars,
-  refreshCcConnectPlatformStatuses,
-  resolveCcConnectSidecarExecutable,
-} from './appBootstrap/ccConnectRuntime';
-import { resolveCcConnectAccountRuntimeStatus } from './libs/ccConnectAccountRuntimeStatus';
+import { getScheduledTaskService } from './appBootstrap/automationRuntime';
 import { showSystemMenu } from './appBootstrap/windowManagement';
 import { bumpCodingCommandCatalog } from './appBootstrap/codingRoomRuntime';
 import { resolveDefaultAgentModelRef } from './appBootstrap/defaultAgentModel';
-import { registerImGatewayIpc } from './imIpc/gateway';
-import { registerImInstanceIpc } from './imIpc/instance';
 import { registerAppLifecycleHandlers } from './appBootstrap/appLifecycle';
 import { initApp } from './appBootstrap/initApp';
 import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
@@ -116,11 +103,12 @@ if (!gotTheLock) {
     isDev: () => isDev,
     isEnterprise: () => isEnterprise,
     getStore,
+    getCoworkStore,
+    getMagpieModelService,
+    isInternalWorkspacePath,
     setPreventSleepBlockerEnabled,
     showSystemMenu,
-    reconcileCcConnectChannelSidecars,
     getMainWindow: () => lifecycleRuntime.mainWindow,
-    hasIMGatewayManager: () => channelRuntime.gatewayManager !== null,
   });
   registerCommunityAuthIpc();
   registerSkillsIpc({ getSkillManager, getStore });
@@ -153,7 +141,6 @@ if (!gotTheLock) {
   registerCoworkSessionAdminIpc({
     getCoworkStore,
     getPiRuntimeAdapter,
-    getIMGatewayManager,
   });
   registerArtifactIpc();
   registerCoworkExportIpc({ getPiRuntimeAdapter });
@@ -167,38 +154,18 @@ if (!gotTheLock) {
     getCoworkStore,
     getSkillManager,
     getStore,
-    getIMGatewayManager,
     bumpCodingCommandCatalog,
     resolveDefaultAgentModelRef,
   });
   registerScheduledTaskIpc({
     getActivityService,
-    getScheduledTaskService: getCanonicalScheduledTaskService,
-    getIMGatewayManager,
+    getScheduledTaskService,
+    resolveSession: sessionId => {
+      const session = getCoworkStore().getSession(sessionId, 0, { includeArtifacts: false });
+      return session ? { ...session } : null;
+    },
   });
   registerPermissionsIpc();
-  registerImGatewayIpc({
-    getIMGatewayManager,
-    reconcileCcConnectChannelSidecars,
-    refreshCcConnectPlatformStatuses,
-    resolveCcConnectSidecarExecutable,
-    resolveCcConnectAccountRuntimeStatus: accountId =>
-      resolveCcConnectAccountRuntimeStatus(
-        channelRuntime.statuses,
-        accountId,
-        channelRuntime.sidecarManager?.running === true,
-      ),
-  });
-  registerImInstanceIpc({
-    getIMGatewayManager,
-    reconcileCcConnectChannelSidecars,
-  });
-  registerIntegrationsIpc({
-    getIMGatewayManager,
-    getMagpieModelService,
-    isInternalWorkspacePath,
-    getCoworkStore,
-  });
   registerDialogIpc({ getCoworkStore });
   registerShellIpc({
     getCoworkStore,

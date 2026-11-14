@@ -45,22 +45,6 @@ function createBuildOptions(entry, extraBuildOptions = {}) {
   };
 }
 
-function copyPhotonWasm() {
-  const sourceCandidates = [
-    path.join(
-      projectRoot,
-      'node_modules/@earendil-works/pi-coding-agent/node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm',
-    ),
-    path.join(projectRoot, 'node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm'),
-  ];
-  const source = sourceCandidates.find(candidate => fs.existsSync(candidate));
-  if (!source) {
-    console.warn('[ElectronDevBuild] Photon WASM asset was not found.');
-    return;
-  }
-  fs.copyFileSync(source, path.join(outputDirectory, 'photon_rs_bg.wasm'));
-}
-
 fs.mkdirSync(outputDirectory, { recursive: true });
 fs.rmSync(readyPath, { force: true });
 
@@ -93,7 +77,6 @@ await build(
   }),
 );
 
-copyPhotonWasm();
 copyCompanionPhoton(projectRoot, outputDirectory);
 fs.writeFileSync(readyPath, '');
 console.log('[ElectronDevBuild] Main and preload bundles are ready.');

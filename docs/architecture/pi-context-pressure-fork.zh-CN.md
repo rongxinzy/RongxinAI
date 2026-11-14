@@ -1,4 +1,6 @@
-# Pi 上下文压力修复
+# Pi 上下文压力修复（历史记录）
+
+> 2026-11-14：桌面执行已切换到 Durable，本文对 Coding Agent / JSONL / 三段旧补丁的描述仅记录当时实现，不代表当前架构。当前原生压缩补丁、SQLite 恢复及验收边界见 [Durable 内核](durable-core.zh-CN.md)。
 
 ## 来源与接入
 

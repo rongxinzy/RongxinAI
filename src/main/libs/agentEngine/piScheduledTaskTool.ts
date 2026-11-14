@@ -1,3 +1,4 @@
+import type { ToolDefinition, HostToolResult } from './durableToolTypes';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import {
   DeliveryMode,
@@ -6,20 +7,17 @@ import {
   SessionTarget,
   WakeMode,
 } from '../../../scheduledTask/constants';
-import type { ScheduledTaskDelivery, ScheduledTaskInput } from '../../../scheduledTask/types';
+import type { ScheduledTaskInput } from '../../../scheduledTask/types';
 
 export function buildPiScheduledTaskTool(input: {
   service: ScheduledTaskService;
   workspaceId?: string | null;
-  sessionKey?: string | null;
-  /** Delivery used when the model omits it (e.g. back to the IM chat). */
-  defaultDelivery?: ScheduledTaskDelivery | null;
-}): Record<string, unknown> {
+}): ToolDefinition {
   return {
     name: 'scheduled_task',
     label: 'Scheduled Task',
     description:
-      'Create a scheduled task after confirming the task content, schedule, and notification method with the user. Delivery defaults to this conversation when the session has one; pass delivery only to override it.',
+      'Create a scheduled task in the selected workspace. Results appear in the local workbench and task execution records.',
     parameters: {
       type: 'object',
       properties: {
@@ -31,48 +29,34 @@ export function buildPiScheduledTaskTool(input: {
             'Schedule: {kind:"at",at} or {kind:"cron",expr,tz} or {kind:"every",everyMs}.',
         },
         message: { type: 'string', description: 'Prompt executed when the task runs.' },
-        delivery: {
-          type: 'object',
-          description:
-            'Optional delivery: {mode:"none"|"announce"|"webhook",channel,to,accountId}.',
-        },
       },
       required: ['name', 'schedule', 'message'],
       additionalProperties: false,
     },
-    execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+    execute: async (_toolCallId: string, rawParams: unknown) => {
+      const params =
+        rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams)
+          ? (rawParams as Record<string, unknown>)
+          : {};
       const name = typeof params.name === 'string' ? params.name.trim() : '';
       const message = typeof params.message === 'string' ? params.message.trim() : '';
       const schedule = params.schedule;
       if (!name || !message || !schedule || typeof schedule !== 'object') {
-        return {
-          content: [{ type: 'text', text: 'Task name, schedule, and message are required.' }],
-          details: { isError: true },
-        };
+        return failure('Task name, schedule, and message are required.');
       }
       const normalizedSchedule = validateSchedule(schedule);
       if (normalizedSchedule.ok === false) return failure(normalizedSchedule.error);
-      const delivery =
-        params.delivery && typeof params.delivery === 'object'
-          ? (params.delivery as Record<string, unknown>)
-          : undefined;
-      const normalizedDelivery = validateDelivery(delivery);
-      if (normalizedDelivery.ok === false) return failure(normalizedDelivery.error);
-      const effectiveDelivery =
-        delivery === undefined && input.defaultDelivery
-          ? input.defaultDelivery
-          : normalizedDelivery.value;
       const taskInput: ScheduledTaskInput = {
         name,
         description: typeof params.description === 'string' ? params.description.trim() : message,
         enabled: true,
         schedule: normalizedSchedule.value,
-        sessionTarget: SessionTarget.Main,
+        sessionTarget: SessionTarget.Isolated,
         wakeMode: WakeMode.Now,
         payload: { kind: PayloadKind.AgentTurn, message },
-        delivery: effectiveDelivery,
+        delivery: { mode: DeliveryMode.None },
         workspaceId: input.workspaceId ?? null,
-        sessionKey: input.sessionKey ?? null,
+        sessionKey: null,
       };
       try {
         const task = await input.service.addJob(taskInput);
@@ -81,18 +65,16 @@ export function buildPiScheduledTaskTool(input: {
           details: { taskId: task.id },
         };
       } catch (error) {
-        return {
-          content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-          details: { isError: true },
-        };
+        return failure(error instanceof Error ? error.message : String(error));
       }
     },
   };
 }
 
-const failure = (text: string) => ({
+const failure = (text: string): HostToolResult => ({
   content: [{ type: 'text', text }],
   details: { isError: true },
+  isError: true,
 });
 function validateSchedule(
   value: unknown,
@@ -110,38 +92,29 @@ function validateSchedule(
     return { ok: true, value: { kind: ScheduleKind.At, at: s.at } };
   }
   if (s.kind === ScheduleKind.Every) {
-    if (typeof s.everyMs !== 'number' || !Number.isFinite(s.everyMs) || s.everyMs <= 0)
+    if (typeof s.everyMs !== 'number' || !Number.isSafeInteger(s.everyMs) || s.everyMs <= 0)
       return { ok: false, error: 'The interval must be a positive number.' };
-    return { ok: true, value: { kind: ScheduleKind.Every, everyMs: s.everyMs } };
+    return {
+      ok: true,
+      value: {
+        kind: ScheduleKind.Every,
+        everyMs: s.everyMs,
+        ...(typeof s.anchorMs === 'number' ? { anchorMs: s.anchorMs } : {}),
+      },
+    };
   }
   if (s.kind === ScheduleKind.Cron) {
     if (typeof s.expr !== 'string' || s.expr.trim().split(/\s+/).length !== 5)
       return { ok: false, error: 'The cron expression must contain five fields.' };
-    return { ok: true, value: { kind: ScheduleKind.Cron, expr: s.expr.trim() } };
+    return {
+      ok: true,
+      value: {
+        kind: ScheduleKind.Cron,
+        expr: s.expr.trim(),
+        ...(typeof s.tz === 'string' ? { tz: s.tz.trim() } : {}),
+        ...(typeof s.staggerMs === 'number' ? { staggerMs: s.staggerMs } : {}),
+      },
+    };
   }
   return { ok: false, error: 'Schedule kind must be at, every, or cron.' };
-}
-function validateDelivery(
-  value?: Record<string, unknown>,
-): { ok: true; value: NonNullable<ScheduledTaskInput['delivery']> } | { ok: false; error: string } {
-  if (!value) return { ok: true, value: { mode: DeliveryMode.None } };
-  const mode = value.mode;
-  if (mode !== DeliveryMode.None && mode !== DeliveryMode.Announce && mode !== DeliveryMode.Webhook)
-    return { ok: false, error: 'Notification mode is invalid.' };
-  if (
-    mode === DeliveryMode.Announce &&
-    (typeof value.channel !== 'string' ||
-      !value.channel.trim() ||
-      typeof value.to !== 'string' ||
-      !value.to.trim())
-  )
-    return { ok: false, error: 'Announce notifications require channel and recipient.' };
-  return {
-    ok: true,
-    value: {
-      mode,
-      ...(typeof value.channel === 'string' ? { channel: value.channel.trim() } : {}),
-      ...(typeof value.to === 'string' ? { to: value.to.trim() } : {}),
-    },
-  };
 }

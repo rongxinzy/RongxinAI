@@ -7,6 +7,7 @@ import { coworkQueueContract } from '../../shared/ipc/coworkContract';
 import { persistCoworkImageAttachments, slimQueuedMessagesForIpc } from '../coworkImageAttachments';
 import type { CoworkStore } from '../coworkStore';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
+import { assertInteractiveCoworkSession } from './interactiveSession';
 
 export interface CoworkQueueIpcDeps {
   getPiRuntimeAdapter: () => PiRuntimeAdapter;
@@ -34,6 +35,7 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
 
     enqueuePendingMessage: (_event, input) => {
       try {
+        assertInteractiveCoworkSession(deps.getCoworkStore(), input.sessionId);
         const storedImages = input.imageAttachments?.length
           ? persistCoworkImageAttachments(
               deps.getCoworkImageRoot(),
@@ -77,6 +79,7 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
 
     updatePendingMessage: (_event, input) => {
       try {
+        assertInteractiveCoworkSession(deps.getCoworkStore(), input.sessionId);
         return deps
           .getPiRuntimeAdapter()
           .updatePendingMessage(input.sessionId, input.itemId, input.text);
@@ -90,6 +93,7 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
 
     deletePendingMessage: (_event, input) => {
       try {
+        assertInteractiveCoworkSession(deps.getCoworkStore(), input.sessionId);
         return deps.getPiRuntimeAdapter().deletePendingMessage(input.sessionId, input.itemId);
       } catch (error) {
         return {
@@ -101,6 +105,7 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
 
     steerPendingMessage: async (_event, input) => {
       try {
+        assertInteractiveCoworkSession(deps.getCoworkStore(), input.sessionId);
         return await deps.getPiRuntimeAdapter().steerPendingMessage(input.sessionId, input.itemId);
       } catch (error) {
         return {
@@ -112,6 +117,7 @@ export const registerCoworkQueueIpc = (deps: CoworkQueueIpcDeps): void => {
 
     followUpPendingMessage: async (_event, input) => {
       try {
+        assertInteractiveCoworkSession(deps.getCoworkStore(), input.sessionId);
         return await deps
           .getPiRuntimeAdapter()
           .followUpPendingMessage(input.sessionId, input.itemId);

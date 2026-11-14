@@ -11,7 +11,7 @@ export const PreflightJob = {
   Source: 'source',
   Quality: 'quality',
   Enterprise: 'enterprise',
-  ChannelRuntime: 'channel-runtime',
+  NativeRuntime: 'native-runtime',
   PythonLinux: 'python-runtime-linux',
   Browser: 'browser-preview',
   Memory: 'memory-leak',

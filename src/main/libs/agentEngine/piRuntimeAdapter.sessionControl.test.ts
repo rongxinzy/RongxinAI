@@ -11,10 +11,10 @@ import {
   adapter,
   applyTestResolution,
   mockCreateAgentSession,
-  mockDefaultResourceLoader,
   mockModelRuntime,
   mockSession,
   setupPiRuntimeAdapterSuite,
+  createdResources,
 } from './piRuntimeAdapter.testHarness';
 
 import Database from 'better-sqlite3';
@@ -325,10 +325,7 @@ describe('PiRuntimeAdapter', () => {
     it('should return text when Chat mode is set', async () => {
       await adapter.startSession('test', 'Hello', { confirmationMode: 'text' });
       expect(adapter.getSessionConfirmationMode('test')).toBe('text');
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        appendSystemPromptOverride: () => string[];
-      };
-      expect(loaderOptions.appendSystemPromptOverride()).toEqual([SessionSummarySystemPrompt]);
+      expect((await createdResources()).getSystemPrompt()).toContain(SessionSummarySystemPrompt);
     });
   });
 
@@ -341,9 +338,6 @@ describe('PiRuntimeAdapter', () => {
         providerMetadata: { contextWindow: 131072, maxTokens: 4096 },
       });
       await adapter.startSession('shrink-context', 'Work');
-      const active = adapter.activeSessions.get('shrink-context')!;
-      const overrides = vi.spyOn(active.settingsManager!, 'applyOverrides');
-      overrides.mockClear();
       applyTestResolution({
         config: { model: 'small-audit' },
         providerMetadata: { contextWindow: 16384, maxTokens: 4096 },
@@ -352,9 +346,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.setModel).toHaveBeenCalledWith(
         expect.objectContaining({ contextWindow: 16384 }),
       );
-      expect(overrides).not.toHaveBeenCalledWith(
-        expect.objectContaining({ compaction: expect.anything() }),
-      );
+      expect(mockCreateAgentSession.mock.calls[0][0]).not.toHaveProperty('settingsManager');
       expect(mockSession.reload).not.toHaveBeenCalled();
     });
     it('should update the model and reload its write budget when the output limit changes', async () => {
@@ -369,12 +361,7 @@ describe('PiRuntimeAdapter', () => {
       );
       expect(mockSession.reload).toHaveBeenCalledOnce();
 
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        appendSystemPromptOverride: () => string[];
-      };
-      expect(loaderOptions.appendSystemPromptOverride()).toEqual(
-        expect.not.arrayContaining([expect.stringContaining('2000 characters')]),
-      );
+      expect((await createdResources()).getSystemPrompt()).not.toContain('2000 characters');
     });
 
     it('should not call setModel when no model in patch', async () => {

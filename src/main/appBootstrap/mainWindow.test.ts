@@ -44,6 +44,10 @@ const mocks = vi.hoisted(() => {
     appQuit: vi.fn(),
     registerContextMenu: vi.fn(() => unregisterContextMenu),
     shellOpenExternal: vi.fn(),
+    getDatabase: vi.fn(),
+    initializeDesktopPet: vi.fn(),
+    initializeCompanionWindow: vi.fn(),
+    getCompanions: vi.fn(() => []),
   };
 });
 
@@ -127,35 +131,32 @@ vi.mock('../appIpc', () => ({
   openDevToolsWindow: mocks.openDevToolsWindow,
   toggleDevToolsForSender: mocks.toggleDevToolsForSender,
 }));
-vi.mock('./windowSecurity', () => ({
-  isWecomAuthUrl: (url: string) => url.startsWith('https://wecom.example/'),
-}));
 vi.mock('./appLifecycle', () => ({ logAppQuitContextOnce: vi.fn() }));
 vi.mock('../autoLaunchManager', () => ({ isAutoLaunched: mocks.isAutoLaunched }));
 vi.mock('./runtimeServices', () => ({
   getStore: () => ({
     get: (key: string) => (key === 'app_config' ? { language: 'zh' } : undefined),
-    getDatabase: () => ({}),
+    getDatabase: mocks.getDatabase,
   }),
 }));
 vi.mock('../contextMenu', () => ({ registerContextMenu: mocks.registerContextMenu }));
 vi.mock('../trayManager', () => ({ createTray: mocks.createTray, updateTrayMenu: vi.fn() }));
 vi.mock('../desktopPet/controller', () => ({
-  initializeDesktopPet: vi.fn(),
+  initializeDesktopPet: mocks.initializeDesktopPet,
   openDesktopPetSession: vi.fn(),
   getDesktopPetWindow: vi.fn(() => null),
   setDesktopPetBubbleVisible: vi.fn(),
   observeDesktopPetCompanionActivity: vi.fn(),
+  setDesktopPetAppearance: vi.fn(),
 }));
-vi.mock('../companion/window', () => ({ initializeCompanionWindow: vi.fn() }));
+vi.mock('../companion/window', () => ({
+  initializeCompanionWindow: mocks.initializeCompanionWindow,
+}));
+vi.mock('./sessionServices', () => ({
+  getPiRuntimeAdapter: () => ({ getCompanions: mocks.getCompanions }),
+}));
+vi.mock('./companionTasks', () => ({ getCompanionTasks: () => [] }));
 vi.mock('./appConfigSettings', () => ({ getInitialTheme: () => 'light' }));
-vi.mock('../../scheduledTask/migrate', () => ({
-  migrateLegacyScheduledTasksToCanonical: vi.fn(() => Promise.resolve()),
-  migrateLegacyScheduledTaskRunsToCanonical: vi.fn(() => Promise.resolve()),
-}));
-vi.mock('../../scheduledTask/sqliteScheduledTaskStore', () => ({
-  SqliteScheduledTaskStore: vi.fn(),
-}));
 
 import { BrowserWindow } from 'electron';
 
@@ -211,7 +212,7 @@ describe('createMainWindow', () => {
     window.emitWebContents('did-finish-load');
   });
 
-  test('routes window.open through the Wecom-only security policy', () => {
+  test('opens every external link in the system browser without an embedded auth popup', () => {
     createMainWindow();
     const window = currentWindow();
     const handler = window.webContents.setWindowOpenHandler.mock.calls[0][0] as (details: {
@@ -222,13 +223,15 @@ describe('createMainWindow', () => {
     expect(external).toEqual({ action: 'deny' });
     expect(mocks.shellOpenExternal).toHaveBeenCalledWith('https://example.com/');
 
-    const wecom = handler({ url: 'https://wecom.example/oauth' });
-    expect(wecom.action).toBe('allow');
-    expect(mocks.shellOpenExternal).toHaveBeenCalledTimes(1);
+    const formerAuthUrl = 'https://work.weixin.qq.com/oauth';
+    expect(handler({ url: formerAuthUrl })).toEqual({ action: 'deny' });
+    expect(mocks.shellOpenExternal).toHaveBeenCalledWith(formerAuthUrl);
+    expect(mocks.shellOpenExternal).toHaveBeenCalledTimes(2);
+    expect(window.webContentsListeners.has('did-create-window')).toBe(false);
     window.emitWebContents('did-finish-load');
   });
 
-  test('creates the tray and starts cron polling once the window is ready', () => {
+  test('starts native window surfaces without opening or migrating old scheduled-task SQL', () => {
     createMainWindow();
     const window = currentWindow();
 
@@ -236,6 +239,9 @@ describe('createMainWindow', () => {
 
     expect(window.show).toHaveBeenCalled();
     expect(mocks.createTray).toHaveBeenCalledTimes(1);
+    expect(mocks.initializeDesktopPet).toHaveBeenCalledTimes(1);
+    expect(mocks.initializeCompanionWindow).toHaveBeenCalledTimes(1);
+    expect(mocks.getDatabase).not.toHaveBeenCalled();
     const trayWindowProvider = mocks.createTray.mock.calls[0][0] as () => unknown;
     expect(trayWindowProvider()).toBe(window);
     window.emitWebContents('did-finish-load');

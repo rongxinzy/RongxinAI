@@ -34,14 +34,11 @@ import type {
 import type { AgentsApi, TodoApi, WorkbenchTaskApi } from './electron/agentsApi';
 import type { CoworkApi } from './electron/coworkApi';
 import type { CodingAgentApi } from './electron/codingAgentApi';
-import type { ImApi } from './electron/imApi';
 import type { ScheduledTasksApi } from './electron/scheduledTaskApi';
 import type {
   ActivityApi,
   AuthApi,
-  DingTalkApi,
   EnterpriseApi,
-  FeishuApi,
   ManagedProvidersApi,
   ModelPoolApi,
   PermissionsApi,
@@ -96,7 +93,6 @@ export interface IElectronAPI {
     onNotice: (callback: (notice: RuntimeRetryNotice) => void) => () => void;
   };
   log: LogApi;
-  im: ImApi;
   scheduledTasks: ScheduledTasksApi;
   permissions: PermissionsApi;
   auth: AuthApi;
@@ -106,8 +102,6 @@ export interface IElectronAPI {
   networkStatus: {
     send: (status: 'online' | 'offline') => void;
   };
-  feishu: FeishuApi;
-  dingtalk: DingTalkApi;
   activity: ActivityApi;
 }
 

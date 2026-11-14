@@ -15,7 +15,7 @@ type ExecutableTool = {
   description: string;
   parameters: import('typebox').TSchema;
   outputSchema?: import('typebox').TSchema;
-  annotations?: import('@earendil-works/pi-coding-agent').ToolAnnotations;
+  annotations?: import('./durableToolTypes').ToolAnnotations;
   execute: (
     toolCallId: string,
     params: Record<string, unknown>,

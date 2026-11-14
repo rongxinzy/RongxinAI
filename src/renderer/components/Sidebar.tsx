@@ -1,10 +1,7 @@
 import { AgentId } from '@shared/agent';
-import { Button } from '@shared/components/ui/button';
-import { Checkbox } from '@shared/components/ui/checkbox';
 import { cn } from '@shared/lib/utils';
 import { MotionConfig } from 'motion/react';
-import { MessageCircle, PanelLeftClose, Settings, Trash2 } from 'lucide-react';
-import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
+import { MessageCircle, PanelLeftClose } from 'lucide-react';
 import {
   Empty,
   EmptyDescription,
@@ -48,6 +45,8 @@ import {
   type CodingSidebarSelection,
 } from './coding/CodingWorkspaceSidebar';
 import { SidebarSearchTrigger } from './shell/SidebarSearchTrigger';
+import { SidebarFooter } from './shell/SidebarFooter';
+import { useSidebarFrame } from './shell/useSidebarFrame';
 import CoworkSearchModal from './cowork/CoworkSearchModal';
 import { workspaceService } from '../services/workspace';
 import { ShellIconButton } from './shell/ShellIconButton';
@@ -55,7 +54,6 @@ import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSideba
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks } from './agentSidebar/sessionSort';
 import { toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
-import LoginButton from './LoginButton';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import { SidebarNavigationControls, type SidebarActiveView } from './SidebarNavigationControls';
 
@@ -84,9 +82,6 @@ interface SidebarProps {
   onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
 
-const DEFAULT_SIDEBAR_WIDTH = 260;
-const MIN_SIDEBAR_WIDTH = 220;
-const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
 const Sidebar: React.FC<SidebarProps> = ({
   onShowSettings,
@@ -123,9 +118,14 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [recentlyDeletedSessionIds, setRecentlyDeletedSessionIds] = useState<string[]>([]);
   const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
-  const [isResizing, setIsResizing] = useState(false);
-  const [agentScrollEdges, setAgentScrollEdges] = useState({ top: false, bottom: false });
+  const {
+    sidebarWidth,
+    isResizing,
+    agentScrollEdges,
+    agentScrollContainerRef,
+    handleResizeStart,
+    handleAgentScroll,
+  } = useSidebarFrame(isCollapsed, onToggleCollapse);
   const handleWorkModeChange = useCallback(
     (checked: boolean) => {
       const mode = checked ? WorkMode.Chat : WorkMode.Work;
@@ -159,12 +159,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     );
   }, [workMode, sessions, currentSessionId, unreadSessionIdSet, streamingSessionIds]);
 
-  const isResizingRef = useRef(false);
-  const resizeStartXRef = useRef(0);
-  const resizeStartWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
-  const pendingResizeWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
-  const resizeRafRef = useRef<number | null>(null);
-  const agentScrollContainerRef = useRef<HTMLDivElement>(null);
   // 保存侧边栏树中所有可见 session ID（跨所有 Agent 聚合），
   // 供批量模式"全选"使用，避免因 Redux sessions 被限定到单个 Agent 而导致全选范围错误
   const workVisibleSessionIdsRef = useRef<string[]>([]);
@@ -251,35 +245,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     setShowBatchDeleteConfirm(false);
   }, []);
 
-  const updateAgentScrollEdges = useCallback((element: HTMLDivElement | null) => {
-    if (!element) {
-      setAgentScrollEdges(previousEdges =>
-        previousEdges.top || previousEdges.bottom ? { top: false, bottom: false } : previousEdges,
-      );
-      return;
-    }
-
-    const maxScrollTop = Math.max(0, element.scrollHeight - element.clientHeight);
-    const nextEdges = {
-      top: element.scrollTop > 1,
-      bottom: maxScrollTop - element.scrollTop > 1,
-    };
-
-    setAgentScrollEdges(previousEdges => {
-      if (previousEdges.top === nextEdges.top && previousEdges.bottom === nextEdges.bottom) {
-        return previousEdges;
-      }
-      return nextEdges;
-    });
-  }, []);
-
-  const handleAgentScroll = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
-      updateAgentScrollEdges(event.currentTarget);
-    },
-    [updateAgentScrollEdges],
-  );
-
   const handleToggleSelection = useCallback((sessionId: string) => {
     setSelectedIds(prev => toggleBatchSelection(prev, sessionId));
   }, []);
@@ -321,80 +286,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     setRecentlyDeletedSessionIds(ids);
     handleExitBatchMode();
   }, [selectedIds, handleExitBatchMode]);
-
-  const handleResizeStart = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (isCollapsed) return;
-      event.preventDefault();
-      isResizingRef.current = true;
-      setIsResizing(true);
-      resizeStartXRef.current = event.clientX;
-      resizeStartWidthRef.current = sidebarWidth;
-      pendingResizeWidthRef.current = sidebarWidth;
-      document.body.classList.add('select-none');
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        if (!isResizingRef.current) return;
-        const nextWidth = resizeStartWidthRef.current + moveEvent.clientX - resizeStartXRef.current;
-        if (nextWidth < MIN_SIDEBAR_WIDTH) {
-          isResizingRef.current = false;
-          setIsResizing(false);
-          document.body.classList.remove('select-none');
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-          onToggleCollapse();
-          return;
-        }
-        pendingResizeWidthRef.current = Math.min(MAX_SIDEBAR_WIDTH, nextWidth);
-        if (resizeRafRef.current !== null) return;
-        resizeRafRef.current = requestAnimationFrame(() => {
-          resizeRafRef.current = null;
-          if (isResizingRef.current) setSidebarWidth(pendingResizeWidthRef.current);
-        });
-      };
-
-      const handleMouseUp = () => {
-        if (resizeRafRef.current !== null) {
-          cancelAnimationFrame(resizeRafRef.current);
-          resizeRafRef.current = null;
-        }
-        setSidebarWidth(pendingResizeWidthRef.current);
-        isResizingRef.current = false;
-        setIsResizing(false);
-        document.body.classList.remove('select-none');
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    },
-    [isCollapsed, onToggleCollapse, sidebarWidth],
-  );
-
-  useEffect(() => {
-    return () => {
-      if (resizeRafRef.current !== null) cancelAnimationFrame(resizeRafRef.current);
-      document.body.classList.remove('select-none');
-    };
-  }, []);
-
-  useEffect(() => {
-    const element = agentScrollContainerRef.current;
-    if (!element) return;
-
-    updateAgentScrollEdges(element);
-
-    const resizeObserver = new ResizeObserver(() => updateAgentScrollEdges(element));
-    resizeObserver.observe(element);
-    if (element.firstElementChild) {
-      resizeObserver.observe(element.firstElementChild);
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [updateAgentScrollEdges]);
 
   const renderSearchControl = (isChatMode = false) => (
     <div className={cn('shrink-0', !isChatMode && 'px-2')}>
@@ -567,80 +458,22 @@ const Sidebar: React.FC<SidebarProps> = ({
               onMouseDown={handleResizeStart}
             />
           )}
-          {isBatchMode && activeView !== 'coding' ? (
-            <div className="theme-sidebar-footer flex items-center justify-between">
-              <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
-                <Checkbox
-                  checked={
-                    visibleSessionIds.length > 0 &&
-                    visibleSessionIds.every(id => selectedIds.has(id))
-                  }
-                  onCheckedChange={handleSelectAll}
-                />
-                {i18nService.t('batchSelectAll')}
-              </label>
-              <div className="flex items-center justify-start gap-2">
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleBatchDeleteClick}
-                  disabled={selectedIds.size === 0}
-                  className="theme-page-sidebar-button-1 inline-flex items-center"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  {selectedIds.size > 0 ? `${selectedIds.size}` : ''}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExitBatchMode}
-                  className="theme-page-sidebar-button-2"
-                >
-                  {i18nService.t('batchCancel')}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="theme-sidebar-footer space-y-1">
-              {updateEntry}
-              {!hideLogin ? (
-                <LoginButton
-                  settingsActive={activeView === 'settings'}
-                  onShowSettings={() => {
-                    onPrefetchView?.('settings');
-                    onShowSettings();
-                  }}
-                />
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    onPrefetchView?.('settings');
-                    onShowSettings();
-                  }}
-                  data-active={activeView === 'settings' || undefined}
-                  aria-current={activeView === 'settings' ? 'page' : undefined}
-                  className="theme-action-row w-full justify-start gap-2"
-                >
-                  <Settings data-icon="inline-start" />
-                  <span>{i18nService.t('settings')}</span>
-                </Button>
-              )}
-            </div>
-          )}
-          <DestructiveConfirmDialog
-            open={showBatchDeleteConfirm}
-            title={i18nService.t('batchDeleteConfirmTitle')}
-            description={i18nService
-              .t('batchDeleteConfirmMessage')
-              .replace('{count}', String(selectedIds.size))}
-            cancelLabel={i18nService.t('cancel')}
-            confirmLabel={`${i18nService.t('batchDelete')} (${selectedIds.size})`}
-            onCancel={() => setShowBatchDeleteConfirm(false)}
-            onConfirm={handleBatchDelete}
+          <SidebarFooter
+            activeView={activeView}
+            workMode={workMode}
+            isBatchMode={isBatchMode}
+            selectedIds={selectedIds}
+            visibleSessionIds={visibleSessionIds}
+            showBatchDeleteConfirm={showBatchDeleteConfirm}
+            onSelectAll={handleSelectAll}
+            onBatchDeleteClick={handleBatchDeleteClick}
+            onBatchDelete={handleBatchDelete}
+            onExitBatchMode={handleExitBatchMode}
+            onCancelBatchDelete={() => setShowBatchDeleteConfirm(false)}
+            updateEntry={updateEntry}
+            hideLogin={hideLogin}
+            onShowSettings={onShowSettings}
+            onPrefetchView={onPrefetchView}
           />
         </div>
       </aside>

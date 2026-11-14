@@ -1,5 +1,10 @@
 // MCP, skills and remote import
 export const enMcpSkills: Record<string, string> = {
+  connectors: 'Connectors',
+  connectorFeishu: 'Feishu',
+  connectorGitHub: 'GitHub',
+  connectorsDescription:
+    'Connect the services your tasks need and use tools within their permissions.',
   mcpEndpointInvalid: 'The MCP endpoint is invalid. Check your configuration',
   piRuntimeModelOptions: 'Work mode compatibility options',
   piRuntimeModelOptionsHint:

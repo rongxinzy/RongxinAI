@@ -18,7 +18,7 @@ describe('Windows resource archive compression', () => {
     expect(compressionFor(key)).toBe(WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.Solid);
   });
 
-  test.each(['channel-runtime', 'uv'])('uses non-solid LZMA2 for %s', key => {
+  test.each(['uv'])('uses non-solid LZMA2 for %s', key => {
     expect(compressionFor(key)).toBe(WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.NonSolid);
   });
 });

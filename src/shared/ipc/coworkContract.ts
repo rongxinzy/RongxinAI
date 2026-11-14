@@ -467,15 +467,7 @@ export const coworkSessionAdminContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  remoteManaged: {
-    channel: CoworkSessionIpc.RemoteManaged,
-    args: z.tuple([z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      remoteManaged: z.boolean(),
-      error: z.string().optional(),
-    }),
-  },
+
   listSessions: {
     channel: CoworkSessionIpc.List,
     args: z.tuple([

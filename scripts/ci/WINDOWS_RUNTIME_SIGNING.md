@@ -1,35 +1,24 @@
-# Windows runtime signing policy
+# Windows signing policy
 
-Windows runtime executables are signed centrally with the existing Certum
-credentials in `rongxinzy/RongxinAI`, then published in their original runtime
-repositories. Desktop builds do not re-sign these executables.
+Application, installer and Magpie signing use the existing Certum SimplySign
+certificate. The shared SignTool command is [sign-windows-file.ps1](../sign-windows-file.ps1).
+It validates the configured certificate thumbprint, private-key availability
+and expiry, then signs with SHA-256 and an RFC3161 timestamp. A failed signing
+command fails the build.
 
-Runtime publication and desktop download, packaging, cold-install and upgrade
-checks do not perform Authenticode verification. No public
-`RUNTIME_SIGNER_THUMBPRINT` variable is required. This intentionally removes
-publisher identity, trust-chain, EKU and timestamp checks; SHA-256 checks are
-integrity checks, not a substitute for signature verification.
+The installer shell additionally verifies the signer and timestamp in
+[sign-shell.ps1](../installer-shell/sign-shell.ps1). Magpie signing remains in
+the packaging hook: after signing the executable, the hook updates its sealed
+manifest. Signed-release acceptance verifies both the helper's signature and
+its sealed digest.
 
-Frozen runtime release pins, download SHA-256 checks, offline component and
-sentinel hashes, installed-file existence, and clean-PATH execution smoke tests
-remain in place. The builder still excludes `engram.exe` from its own signing
-pass. Application and installer signing and verification are unchanged.
+Long-term memory is stored by the upstream Durable Markdown plugin; SQLite
+retains product governance and checkpoints. No separately downloaded executable,
+binary signing workflow or packaged memory sidecar is required.
+The retired sidecar-runtime signing dispatch and cross-repository artifact
+provenance scripts have been removed.
 
-## Rollout
-
-1. Merge the central and runtime workflow updates. Configure cross-repository
-   `RUNTIME_ARTIFACT_READ_TOKEN` secrets and main-only runtime `release` environments.
-   Do not copy Certum credentials to the runtime or desktop repositories.
-2. Build a new immutable runtime tag, dispatch central signing from main, then
-   dispatch publication in the original runtime repository. Source provenance,
-   returned hashes, and archive integrity remain mandatory.
-3. Update `package.json` runtime pins, source revision and SHA-256 values from
-   the published assets together. Never replace an existing release's assets.
-4. Run desktop CI and Windows package/install/upgrade/uninstall smoke checks.
-
-The central signing command must succeed; there is no unsigned-release
-fallback on signing command failure. No post-sign runtime signature check is
-performed. Policy tests are not proof of real cloud signing.
-
-See the [central operational guide](https://github.com/rongxinzy/RongxinAI/blob/main/scripts/runtime-signing/README.md)
-for the manual sequence, token permissions and artifact expiry handling.
+Offline component archive hashes, sentinel hashes, installed-file checks and
+clean-PATH execution smoke tests remain part of package acceptance. Policy
+tests check the wiring; they do not establish that cloud signing or a native
+Windows installation has been performed.

@@ -17,16 +17,3 @@ export const PiContentBlockType = {
   Text: 'text',
   ToolCall: 'toolCall',
 } as const;
-
-export type PiWriteRecoveryMessage = {
-  stopReason?: string;
-  content:
-    | string
-    | Array<{
-        type: string;
-        text?: string;
-        id?: string;
-        name?: string;
-        arguments?: Record<string, unknown>;
-      }>;
-};

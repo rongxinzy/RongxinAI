@@ -8,8 +8,6 @@
 
 import { adapter, mockSession, setupPiRuntimeAdapterSuite } from './piRuntimeAdapter.testHarness';
 
-import path from 'path';
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CoworkToolActivityEventType,

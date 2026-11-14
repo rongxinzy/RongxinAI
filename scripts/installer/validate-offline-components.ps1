@@ -16,10 +16,10 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# Component contract: the six fixed application components are always
+# Component contract: the five fixed application components are always
 # required. CPU adds the bundled local runtime; CUDA also adds Strata.
-# No other key is accepted (lite 6, cpu 7, cuda 8).
-$RequiredComponentKeys = @('channel-runtime', 'skills', 'mcps', 'python', 'skill-python', 'uv')
+# No other key is accepted (lite 5, cpu 6, cuda 7).
+$RequiredComponentKeys = @('skills', 'mcps', 'python', 'skill-python', 'uv')
 $OptionalComponentKeys = @('llamacpp-bundled', 'strata-bundled')
 # Set before anything can throw: the catch block reports elapsed time.
 $modeStartedAt = Get-Date

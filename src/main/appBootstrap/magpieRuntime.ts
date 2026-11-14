@@ -19,6 +19,7 @@ import { getLlamaCppServiceConfig } from '../ipcHandlers/llamacpp';
 import { registerMagpieIpc } from '../magpie/registerIpc';
 import { registerAcpMagpieModelApply } from '../codingAgent/acpMagpieModel';
 import { zhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
+import { recoverNativeRuntimes } from './nativeRecovery';
 
 let magpieModelService: MagpieModelService | undefined;
 
@@ -38,6 +39,12 @@ export const setupMagpieRuntime = (): void => {
       ? path.join(process.resourcesPath, 'magpie')
       : path.join(app.getAppPath(), 'resources/magpie'),
     privateHome: path.join(app.getPath('userData'), 'magpie'),
+    onReady: () => {
+      if (lifecycleRuntime.isQuitting) return;
+      void recoverNativeRuntimes().catch(error =>
+        console.warn('[DurableRuntime] recovery parked:', error),
+      );
+    },
     gatewayPort: {
       read: () => {
         const value = getStore().get<number>('magpie_gateway_port');

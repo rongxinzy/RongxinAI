@@ -1,6 +1,6 @@
 import { MemorySensitivity } from '../../shared/memory';
-import { EngramObservationType } from './constants';
-import { redactPrivateBlocks } from './zhiyuanEngramAdapter';
+import { MemoryObservationType } from './constants';
+import { redactPrivateBlocks } from './privateBlocks';
 
 export const EXPLICIT_MEMORY_DEFAULT_IMPORTANCE = 0.5;
 export const EXPLICIT_MEMORY_DEFAULT_CONFIDENCE = 0.5;
@@ -15,7 +15,7 @@ const DISALLOWED_SENSITIVE_CONTENT_PATTERN =
 type PreparedExplicitUserMemory = {
   title: string;
   content: string;
-  kind: typeof EngramObservationType.Decision | typeof EngramObservationType.Preference;
+  kind: typeof MemoryObservationType.Decision | typeof MemoryObservationType.Preference;
   importance: number;
   confidence: number;
   sensitivity: typeof MemorySensitivity.Normal | typeof MemorySensitivity.Sensitive;
@@ -29,7 +29,7 @@ export type PrepareExplicitUserRequestedMemoryResult =
 export function prepareExplicitUserRequestedMemory(input: {
   title: string;
   content: string;
-  kind: typeof EngramObservationType.Decision | typeof EngramObservationType.Preference;
+  kind: typeof MemoryObservationType.Decision | typeof MemoryObservationType.Preference;
 }): PrepareExplicitUserRequestedMemoryResult {
   const rawTitle = input.title.trim();
   const rawContent = input.content.trim();

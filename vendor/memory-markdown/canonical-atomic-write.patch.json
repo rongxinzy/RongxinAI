@@ -1,0 +1,14 @@
+[
+  {
+    "before": "/** One file's on-disk name. */",
+    "after": "/** Replace a canonical file only after its complete bytes reach the filesystem.\n * The upstream per-owner queue still serializes apply/undo; a failed write or\n * pre-rename process crash never truncates the previous canonical file. */\nasync function writeCanonical(path, contents) {\n    const staging = `${path}.${randomUUID()}.tmp`;\n    try {\n        await writeFile(staging, contents, { encoding: \"utf8\", flag: \"wx\", flush: true });\n        await rename(staging, path);\n    }\n    finally {\n        await rm(staging, { force: true });\n    }\n}\n/** One file's on-disk name. */"
+  },
+  {
+    "before": "await writeFile(this.path(file), _a.contentOf(next), \"utf8\");",
+    "after": "await writeCanonical(this.path(file), _a.contentOf(next));"
+  },
+  {
+    "before": "await writeFile(this.path(file), versionBytes);",
+    "after": "await writeCanonical(this.path(file), versionBytes);"
+  }
+]

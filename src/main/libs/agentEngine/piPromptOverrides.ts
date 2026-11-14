@@ -10,20 +10,3 @@ function getChatIdentityPrompt(): string {
 }
 
 export const CHAT_IDENTITY_PROMPT = getChatIdentityPrompt();
-
-/** Configure Pi's system prompt with ZhiYuan branding while preserving native sections. */
-export function createPiPromptOverrides(
-  state: { chatMode: boolean; systemPrompt: string },
-  contributions: () => string[],
-) {
-  return {
-    systemPromptOverride: (_base?: string): string => getZhiyuanProductPreamble(),
-    appendSystemPromptOverride: (base: string[] = []): string[] => [
-      ...base,
-      ...contributions(),
-      ...[state.systemPrompt.trim(), ...(state.chatMode ? [CHAT_IDENTITY_PROMPT] : [])].filter(
-        Boolean,
-      ),
-    ],
-  };
-}

@@ -1,6 +1,7 @@
+import type { ToolDefinition, HostToolResult } from '../libs/agentEngine/durableToolTypes';
 import { MemoryScope } from '../../shared/memory';
 import type { CoworkMessage } from '../coworkStore';
-import { AtomicMemorySourceKind, EngramObservationType, PiMemoryAction } from './constants';
+import { AtomicMemorySourceKind, MemoryObservationType, PiMemoryAction } from './constants';
 import { AtomicMemoryExtractor, type AtomicMemoryExtractionResult } from './atomicMemoryExtractor';
 import { prepareExplicitUserRequestedMemory } from './explicitUserRequestedMemory';
 import type { ProjectMemoryService } from './projectMemoryService';
@@ -13,7 +14,7 @@ export function buildPiProjectMemoryTool(input: {
   getMessages: () => CoworkMessage[];
   complete: SessionMemoryCompletion;
   extractor?: AtomicMemoryExtractor;
-}): Record<string, unknown> {
+}): ToolDefinition {
   void input.extractor;
   return {
     name: 'memory',
@@ -47,14 +48,18 @@ export function buildPiProjectMemoryTool(input: {
         },
         kind: {
           type: 'string',
-          enum: [EngramObservationType.Decision, EngramObservationType.Preference],
+          enum: [MemoryObservationType.Decision, MemoryObservationType.Preference],
           description: 'Memory kind for save.',
         },
       },
       required: ['action'],
       additionalProperties: false,
     },
-    execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+    execute: async (_toolCallId: string, rawParams: unknown) => {
+      const params =
+        rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams)
+          ? (rawParams as Record<string, unknown>)
+          : {};
       try {
         const action = typeof params.action === 'string' ? params.action : '';
         if (action === PiMemoryAction.Recall) {
@@ -181,7 +186,7 @@ export async function extractRequestedMemoryForAutomaticSave(
   requestedMemory: {
     title: string;
     content: string;
-    kind: typeof EngramObservationType.Decision | typeof EngramObservationType.Preference;
+    kind: typeof MemoryObservationType.Decision | typeof MemoryObservationType.Preference;
   },
   input: {
     service: ProjectMemoryService;
@@ -232,12 +237,16 @@ function requiredString(value: unknown, field: string): string {
 
 function normalizeKind(
   value: unknown,
-): typeof EngramObservationType.Decision | typeof EngramObservationType.Preference {
-  return value === EngramObservationType.Preference
-    ? EngramObservationType.Preference
-    : EngramObservationType.Decision;
+): typeof MemoryObservationType.Decision | typeof MemoryObservationType.Preference {
+  return value === MemoryObservationType.Preference
+    ? MemoryObservationType.Preference
+    : MemoryObservationType.Decision;
 }
 
-function toolResult(text: string, details: Record<string, unknown>) {
-  return { content: [{ type: 'text', text }], details };
+function toolResult(text: string, details: Record<string, unknown>): HostToolResult {
+  return {
+    content: [{ type: 'text', text }],
+    details,
+    ...(details.isError === true ? { isError: true } : {}),
+  };
 }

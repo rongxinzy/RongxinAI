@@ -3,7 +3,6 @@ import { ActivitySource, ActivityStatus } from '../../../shared/activity/constan
 /** Trigger filter values for the activity feed. */
 export const ActivityTriggerFilter = {
   All: 'all',
-  Channel: ActivitySource.Channel,
   Cron: ActivitySource.ScheduledTask,
 } as const;
 export type ActivityTriggerFilter =

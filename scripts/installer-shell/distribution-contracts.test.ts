@@ -33,9 +33,7 @@ test('shared Windows builds retain the updater and WebView2 distribution safegua
     build.indexOf('const report = writeSetupManifest'),
   );
   expect(read('electron-builder.windows-signed.cjs')).toContain('forceCodeSigning: true');
-  expect(read('scripts/installer-shell/sign-shell.ps1')).toContain(
-    'runtime-signing\\sign-runtime.ps1',
-  );
+  expect(read('scripts/installer-shell/sign-shell.ps1')).toContain('sign-windows-file.ps1');
   expect(read('scripts/installer-shell/sign-shell.ps1')).toContain('TimeStamperCertificate');
   expect(read('scripts/installer-shell/pack-setup.cjs')).toContain(
     'manifest.components.length !== targets.length',

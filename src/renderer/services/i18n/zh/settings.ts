@@ -23,7 +23,6 @@ export const zhSettings: Record<string, string> = {
   settings: '设置',
   settingsGroupGeneral: '通用',
   settingsGroupModel: '模型与记忆',
-  settingsGroupChannels: '渠道',
   imChannelSettingsTitle: '{name} 设置',
   settingsGeneralSectionApplication: '应用',
   settingsGeneralSectionAdvanced: '高级与实验性功能',

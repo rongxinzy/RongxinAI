@@ -1,5 +1,4 @@
 export const ActivitySource = {
-  Channel: 'channel',
   ScheduledTask: 'scheduledTask',
 } as const;
 export type ActivitySource = (typeof ActivitySource)[keyof typeof ActivitySource];

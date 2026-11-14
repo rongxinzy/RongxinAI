@@ -274,7 +274,6 @@ export const enCowork: Record<string, string> = {
   coworkResumeTaskFailed: 'Failed to resume task',
   coworkDefaultSessionTitle: 'New Chat',
   coworkContinuePlaceholder: 'Continue the conversation...',
-  coworkRemoteManagedPlaceholder: 'Continue in the channel where this conversation started',
   coworkStartingSession: 'Starting session...',
   coworkPreparingEnvironment: 'Preparing environment…',
   coworkAddFile: 'Add File',

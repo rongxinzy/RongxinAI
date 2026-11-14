@@ -9,6 +9,9 @@ import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { ArtifactWorkerLimit, ArtifactWorkerTask } from './artifactWorkerConstants';
 import type { ArtifactWorkerInput, WorkspaceContentInspection } from './artifactWorkerTypes';
+import type { DurableImageInput } from './artifactWorkerTypes';
+import type { ImageLimits, PreparedImage } from '@earendil-works/pi-durable/tools';
+import { assertDurableImageInput, isPreparedDurableImage } from './durableImagePolicy';
 import { COMPANION_MAX_ATTACHMENTS } from '../../shared/companion/attachments';
 import {
   CompanionImageLimit,
@@ -17,11 +20,17 @@ import {
   type CompanionPreparedImage,
 } from '../../shared/companion/images';
 
-type Result = WorkspaceContentInspection | TextWorkerOutput | CompanionPreparedImage[];
+type Result =
+  | WorkspaceContentInspection
+  | TextWorkerOutput
+  | CompanionPreparedImage[]
+  | PreparedImage
+  | undefined;
 type Response = {
   text?: TextWorkerOutput;
   content?: WorkspaceContentInspection;
   images?: CompanionPreparedImage[];
+  image?: PreparedImage;
   error?: string;
   runMs: number;
 };
@@ -32,14 +41,52 @@ type Job = {
   reject: (error: Error) => void;
   signal?: AbortSignal;
   onAbort: () => void;
+  inputBytes: number;
 };
-type Slot = { worker: Worker; job?: Job; startedAt?: number; timer?: NodeJS.Timeout };
+type Slot = {
+  worker: Worker;
+  job?: Job;
+  startedAt?: number;
+  timer?: NodeJS.Timeout;
+  retiring?: boolean;
+};
 
 export class WorkbenchArtifactWorkerPool {
   private readonly slots: Slot[] = [];
   private readonly queue: Job[] = [];
+  private disposed = false;
 
-  constructor(private readonly workerPath = path.join(__dirname, 'artifactWorker.js')) {}
+  constructor(
+    private readonly workerPath = path.join(__dirname, 'artifactWorker.js'),
+    private readonly timeoutMs: number = ArtifactWorkerLimit.TimeoutMs,
+  ) {
+    if (
+      !Number.isSafeInteger(timeoutMs) ||
+      timeoutMs < 1 ||
+      timeoutMs > ArtifactWorkerLimit.TimeoutMs
+    )
+      throw new Error('Invalid artifact worker timeout.');
+  }
+
+  prepareDurableImage(
+    input: DurableImageInput,
+    signal?: AbortSignal,
+  ): Promise<PreparedImage | undefined> {
+    try {
+      assertDurableImageInput(input);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const pendingBytes = [
+      ...this.queue,
+      ...this.slots.flatMap(slot => (slot.job ? [slot.job] : [])),
+    ].reduce((sum, job) => sum + job.inputBytes, 0);
+    if (pendingBytes + input.bytes.byteLength > ArtifactWorkerLimit.PendingImageBytes)
+      return Promise.reject(new Error('Durable image pending byte limit exceeded.'));
+    return this.enqueue({ kind: ArtifactWorkerTask.PrepareDurableImage, input }, signal) as Promise<
+      PreparedImage | undefined
+    >;
+  }
 
   transform(input: TextWorkerInput, signal?: AbortSignal): Promise<TextWorkerOutput> {
     try {
@@ -91,6 +138,7 @@ export class WorkbenchArtifactWorkerPool {
   }
 
   private enqueue(task: ArtifactWorkerInput, signal?: AbortSignal): Promise<Result> {
+    if (this.disposed) return Promise.reject(new Error('Artifact collection pool closed.'));
     if (signal?.aborted) return Promise.reject(new Error('Artifact worker task cancelled.'));
     if (this.queue.length >= ArtifactWorkerLimit.Queue) {
       return Promise.reject(new Error('Artifact worker queue is full.'));
@@ -102,6 +150,8 @@ export class WorkbenchArtifactWorkerPool {
         resolve,
         reject,
         queuedAt: performance.now(),
+        inputBytes:
+          task.kind === ArtifactWorkerTask.PrepareDurableImage ? task.input.bytes.byteLength : 0,
         onAbort: () => {
           const slot = this.slots.find(candidate => candidate.job === job);
           if (slot) this.finish(slot, new Error('Artifact worker task cancelled.'), true);
@@ -120,6 +170,7 @@ export class WorkbenchArtifactWorkerPool {
   }
 
   dispose(): void {
+    this.disposed = true;
     for (const job of this.queue.splice(0)) {
       job.signal?.removeEventListener('abort', job.onAbort);
       job.reject(new Error('Artifact collection pool closed.'));
@@ -130,10 +181,19 @@ export class WorkbenchArtifactWorkerPool {
   }
 
   private dispatch(): void {
+    if (this.disposed) return;
     while (this.queue.length) {
-      let slot = this.slots.find(candidate => !candidate.job);
+      let slot = this.slots.find(candidate => !candidate.job && !candidate.retiring);
       if (!slot && this.slots.length < ArtifactWorkerLimit.Workers) {
-        const worker = new Worker(this.workerPath);
+        let worker: Worker;
+        try {
+          worker = new Worker(this.workerPath);
+        } catch (error) {
+          const job = this.queue.shift()!;
+          job.signal?.removeEventListener('abort', job.onAbort);
+          job.reject(error instanceof Error ? error : new Error(String(error)));
+          continue;
+        }
         slot = { worker };
         const created = slot;
         worker.on('message', (response: Response) => {
@@ -154,6 +214,14 @@ export class WorkbenchArtifactWorkerPool {
             )
               this.finish(created, new Error(response.error || 'Invalid text worker result.'));
             else this.finish(created, undefined, false, text);
+          } else if (job.task.kind === ArtifactWorkerTask.PrepareDurableImage) {
+            if (response.error || !isPreparedDurableImage(response.image, job.task.input))
+              this.finish(
+                created,
+                new Error(response.error || 'Invalid durable image worker result.'),
+                true,
+              );
+            else this.finish(created, undefined, true, response.image);
           } else if (job.task.kind === ArtifactWorkerTask.PrepareCompanionImages) {
             const images = response.images;
             const sources = job.task.input.sources;
@@ -202,7 +270,7 @@ export class WorkbenchArtifactWorkerPool {
         });
         worker.on('error', error => this.finish(created, error, true));
         worker.on('exit', () => {
-          if (this.slots.includes(created)) {
+          if (this.slots.includes(created) && !created.retiring) {
             this.finish(created, new Error('Artifact worker exited unexpectedly.'), true);
           }
         });
@@ -214,13 +282,16 @@ export class WorkbenchArtifactWorkerPool {
       slot.worker.ref();
       slot.timer = setTimeout(
         () => this.finish(slot!, new Error('Artifact collection timed out.'), true),
-        ArtifactWorkerLimit.TimeoutMs,
+        this.timeoutMs,
       );
       try {
         const task = slot.job.task;
         slot.worker.postMessage(
           task,
-          task.kind === ArtifactWorkerTask.InspectWorkspaceContent ? [task.input.bytes] : [],
+          task.kind === ArtifactWorkerTask.InspectWorkspaceContent ||
+            task.kind === ArtifactWorkerTask.PrepareDurableImage
+            ? [task.input.bytes]
+            : [],
         );
       } catch (error) {
         this.finish(slot, error instanceof Error ? error : new Error(String(error)), true);
@@ -229,13 +300,18 @@ export class WorkbenchArtifactWorkerPool {
   }
 
   private finish(slot: Slot, error?: Error, terminate = false, result?: Result): void {
+    if (slot.retiring) return;
     const job = slot.job;
     clearTimeout(slot.timer);
     slot.job = undefined;
     if (terminate) {
-      const index = this.slots.indexOf(slot);
-      if (index >= 0) this.slots.splice(index, 1);
-      void slot.worker.terminate();
+      // A retiring thread still owns WASM memory and occupies one of the two slots.
+      slot.retiring = true;
+      void slot.worker.terminate().finally(() => {
+        const index = this.slots.indexOf(slot);
+        if (index >= 0) this.slots.splice(index, 1);
+        this.dispatch();
+      });
     } else slot.worker.unref();
     if (job) {
       job.signal?.removeEventListener('abort', job.onAbort);
@@ -247,6 +323,21 @@ export class WorkbenchArtifactWorkerPool {
 }
 
 const pool = new WorkbenchArtifactWorkerPool();
+export const prepareDurableImageAsync = (
+  bytes: Uint8Array,
+  mimeType: string,
+  limits: ImageLimits,
+  signal?: AbortSignal,
+): Promise<PreparedImage | undefined> => {
+  if (signal?.aborted) return Promise.reject(new Error('Artifact worker task cancelled.'));
+  if (bytes.byteLength > ArtifactWorkerLimit.ImageBytes)
+    return Promise.reject(new Error('Durable image input limit exceeded.'));
+  // Transfer an owned, bounded copy without detaching caller or pooled Buffer bytes.
+  return pool.prepareDurableImage(
+    { bytes: Uint8Array.from(bytes).buffer, mimeType, limits },
+    signal,
+  );
+};
 export const prepareCompanionImagesAsync = (
   sources: CompanionImageSource[],
   signal?: AbortSignal,

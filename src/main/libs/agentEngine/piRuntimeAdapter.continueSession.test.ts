@@ -9,10 +9,10 @@
 import {
   adapter,
   mockCreateAgentSession,
-  mockDefaultResourceLoader,
-  mockMcpExtensionFactory,
+  mockCreateResources,
   mockSession,
   setupPiRuntimeAdapterSuite,
+  createdResourceState,
 } from './piRuntimeAdapter.testHarness';
 
 import { describe, expect, it, vi } from 'vitest';
@@ -214,7 +214,7 @@ describe('PiRuntimeAdapter', () => {
 
       expect(mockSession.reload).toHaveBeenCalledOnce();
       expect(mockSession.abort).not.toHaveBeenCalled();
-      expect(mockDefaultResourceLoader).toHaveBeenCalledOnce();
+      expect(mockCreateResources).toHaveBeenCalledOnce();
       expect(mockCreateAgentSession).toHaveBeenCalledOnce();
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
     });
@@ -254,17 +254,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.reload).toHaveBeenCalledOnce();
       expect(mockSession.abort).not.toHaveBeenCalled();
       expect(mockCreateAgentSession).toHaveBeenCalledOnce();
-      const loader = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
-          skills: Array<{ id: string }>;
-        };
-      };
-      expect(
-        loader.skillsOverride({
-          skills: [{ id: 'skill-a' }, { id: 'skill-b' }],
-          diagnostics: [],
-        }).skills,
-      ).toEqual([{ id: 'skill-b' }]);
+      expect(createdResourceState().skillIds).toEqual(['skill-b']);
     });
 
     it('recreates a Chat session when its selected skills change', async () => {
@@ -281,17 +271,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.abort).toHaveBeenCalledOnce();
       expect(mockSession.dispose).toHaveBeenCalledOnce();
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
-      const replacementLoader = mockDefaultResourceLoader.mock.calls[1]?.[0] as {
-        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
-          skills: Array<{ id: string }>;
-        };
-      };
-      expect(
-        replacementLoader.skillsOverride({
-          skills: [{ id: 'skill-a' }, { id: 'skill-b' }],
-          diagnostics: [],
-        }).skills,
-      ).toEqual([{ id: 'skill-b' }]);
+      expect(createdResourceState(1).skillIds).toEqual(['skill-b']);
     });
 
     it('reloads without creating an extra workbench run when Work skillIds change', async () => {

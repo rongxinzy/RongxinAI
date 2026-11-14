@@ -18,14 +18,10 @@ export const scheduledTasksContractChannels: IpcContractChannels<typeof schedule
   toggle: ScheduledTaskIpc.Toggle,
   runManually: ScheduledTaskIpc.RunManually,
   stop: ScheduledTaskIpc.Stop,
-  preflight: ScheduledTaskIpc.Preflight,
   listRuns: ScheduledTaskIpc.ListRuns,
-  listDeliveries: ScheduledTaskIpc.ListDeliveries,
   countRuns: ScheduledTaskIpc.CountRuns,
   listAllRuns: ScheduledTaskIpc.ListAllRuns,
   resolveSession: ScheduledTaskIpc.ResolveSession,
-  listChannels: ScheduledTaskIpc.ListChannels,
-  listChannelConversations: ScheduledTaskIpc.ListChannelConversations,
 } as const;
 
 export const activityContractChannels: IpcContractChannels<typeof activityContract> = {

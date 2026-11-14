@@ -6,7 +6,11 @@ import {
 import React, { useCallback, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
+import {
+  CoworkSessionMode,
+  CoworkSessionSource,
+  type CoworkPermissionMode,
+} from '../../../shared/cowork/constants';
 
 import { i18nService } from '../../services/i18n';
 import { RootState } from '../../store';
@@ -14,7 +18,6 @@ import {
   selectCurrentSession,
   selectCurrentToolActivities,
   selectIsStreaming,
-  selectRemoteManaged,
 } from '../../store/selectors/coworkSelectors';
 import { resolveSessionDisplayTitle } from '../../utils/sessionTitle';
 import {
@@ -67,6 +70,7 @@ import { CoworkRunStatus } from './components/CoworkRunStatus';
 import { SessionArtifactPanelRegion } from './sessionDetail/SessionArtifactPanelRegion';
 import { SessionExportDialog } from './sessionDetail/SessionExportDialog';
 import { SessionComposerOverlay } from './sessionDetail/SessionComposerOverlay';
+import { ScheduledSessionNotice } from './sessionDetail/ScheduledSessionNotice';
 import { useArtifactLinkInterception } from './sessionDetail/useArtifactLinkInterception';
 import { useArtifactPanelPresentation } from './sessionDetail/useArtifactPanelPresentation';
 import { useInlineArtifacts } from './sessionDetail/useInlineArtifacts';
@@ -121,7 +125,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const currentSession = useSelector(selectCurrentSession);
   const isStreaming = useSelector(selectIsStreaming);
   const toolActivities = useSelector(selectCurrentToolActivities);
-  const remoteManaged = useSelector(selectRemoteManaged);
   const skills = useSelector((state: RootState) => state.skill.skills);
   const detailRootRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -129,6 +132,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const composerOverlayRef = useCoworkComposerInset(detailRootRef);
 
   const sessionId = currentSession?.id;
+  const isScheduledRecord = currentSession?.source === CoworkSessionSource.Scheduled;
 
   const virtualizedTurnListRef = useRef<VirtualizedTurnListHandle>(null);
 
@@ -277,7 +281,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <UserBubble
                 message={turn.userMessage}
                 skills={skills}
-                onReEdit={remoteManaged ? undefined : handleReEdit}
+                onReEdit={isScheduledRecord ? undefined : handleReEdit}
               />
             </div>
           )}
@@ -294,8 +298,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 isTurnComplete={!isStreaming || !isLastTurn}
                 hideDefaultAssistantHeader={hideDefaultAssistantHeader}
                 // 仅末轮需要工具授权，避免历史轮次误挂授权按钮
-                pendingPermission={isLastTurn ? inlinePermission : null}
-                onRespondToPermission={isLastTurn ? onRespondToInlinePermission : undefined}
+                pendingPermission={isLastTurn && !isScheduledRecord ? inlinePermission : null}
+                onRespondToPermission={
+                  isLastTurn && !isScheduledRecord ? onRespondToInlinePermission : undefined
+                }
                 expandToolResults={isExportingImage}
               />
             </div>
@@ -365,7 +371,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           {/* 输入框绝对定位且与对话区平级，对话区 flex:1 会被挡住；用 paddingBottom 把可视区收在输入框上方 */}
           <div
             className="relative flex-1 min-h-0"
-            style={{ paddingBottom: COWORK_COMPOSER_INSET_VALUE }}
+            style={isScheduledRecord ? undefined : { paddingBottom: COWORK_COMPOSER_INSET_VALUE }}
           >
             {isSessionSwitching ? (
               <CoworkConversationLoadingSkeleton />
@@ -379,18 +385,21 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 >
                   <div ref={scrollContainerRef}>
                     <div className="mx-auto w-full max-w-4xl">{renderConversationTurns()}</div>
-                    {inlineQuestionPermission && onRespondToInlineQuestion && (
-                      <div className="px-3 pt-3">
-                        <div className="mx-auto w-full max-w-4xl min-w-[320px]">
-                          <AskUserQuestionCard
-                            permission={inlineQuestionPermission}
-                            onRespond={onRespondToInlineQuestion}
-                          />
+                    {!isScheduledRecord &&
+                      inlineQuestionPermission &&
+                      onRespondToInlineQuestion && (
+                        <div className="px-3 pt-3">
+                          <div className="mx-auto w-full max-w-4xl min-w-[320px]">
+                            <AskUserQuestionCard
+                              permission={inlineQuestionPermission}
+                              onRespond={onRespondToInlineQuestion}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     {/* 对不上工具卡片时才在对话流里兜底展示独立授权卡 */}
-                    {inlinePermission &&
+                    {!isScheduledRecord &&
+                      inlinePermission &&
                       onRespondToInlinePermission &&
                       !hasInlineToolPermissionCard && (
                         <div className="px-3 pt-3">
@@ -410,41 +419,40 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           </div>
 
           {/* Input Area */}
-          <SessionComposerOverlay
-            overlayRef={composerOverlayRef}
-            promptInputRef={promptInputRef}
-            pendingSessionId={
-              !isSessionSwitching && workMode === CoworkSessionMode.Work
-                ? currentSession.id
-                : undefined
-            }
-            onSubmit={onContinue}
-            onStop={onStop}
-            isStreaming={isSessionSwitching ? false : isStreaming}
-            placeholder={i18nService.t(
-              !isSessionSwitching && remoteManaged
-                ? 'coworkRemoteManagedPlaceholder'
-                : workMode === 'chat'
-                  ? 'chatPlaceholder'
-                  : 'coworkContinuePlaceholder',
-            )}
-            disabled={
-              !isSessionSwitching &&
-              (remoteManaged || isAwaitingInlineQuestion || Boolean(inlinePermission))
-            }
-            sessionContextPending={isSessionSwitching}
-            size="large"
-            remoteManaged={!isSessionSwitching && remoteManaged}
-            onManageSkills={!isSessionSwitching && remoteManaged ? undefined : onManageSkills}
-            onManageConnectors={
-              !isSessionSwitching && remoteManaged ? undefined : onManageConnectors
-            }
-            showPermissionModeSelector={workMode === 'work'}
-            permissionMode={permissionMode}
-            onPermissionModeChange={onPermissionModeChange}
-            showModelSelector={true}
-            sessionId={displayedSessionId ?? currentSession?.id}
-          />
+          {isScheduledRecord ? (
+            <ScheduledSessionNotice
+              isRunning={!isSessionSwitching && isStreaming}
+              onStop={onStop}
+            />
+          ) : (
+            <SessionComposerOverlay
+              overlayRef={composerOverlayRef}
+              promptInputRef={promptInputRef}
+              pendingSessionId={
+                !isSessionSwitching && workMode === CoworkSessionMode.Work
+                  ? currentSession.id
+                  : undefined
+              }
+              onSubmit={onContinue}
+              onStop={onStop}
+              isStreaming={isSessionSwitching ? false : isStreaming}
+              placeholder={i18nService.t(
+                workMode === 'chat' ? 'chatPlaceholder' : 'coworkContinuePlaceholder',
+              )}
+              disabled={
+                !isSessionSwitching && (isAwaitingInlineQuestion || Boolean(inlinePermission))
+              }
+              sessionContextPending={isSessionSwitching}
+              size="large"
+              onManageSkills={onManageSkills}
+              onManageConnectors={onManageConnectors}
+              showPermissionModeSelector={workMode === 'work'}
+              permissionMode={permissionMode}
+              onPermissionModeChange={onPermissionModeChange}
+              showModelSelector={true}
+              sessionId={displayedSessionId ?? currentSession?.id}
+            />
+          )}
         </div>
         {!isSessionSwitching && shouldRenderArtifactPanel && (
           <SessionArtifactPanelRegion

@@ -2,109 +2,72 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-
-import { afterEach, describe, expect, test } from 'vitest';
-
-import { verifyWindowsCompressedChannelRuntime } from './verify-windows-packaged-components.cjs';
-
-const temporaryDirectories: string[] = [];
-const sevenZipPath = path.join(process.cwd(), 'node_modules', '7zip-bin', 'win', 'x64', '7za.exe');
-
-function tempRoot() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-win-component-verify-'));
-  temporaryDirectories.push(root);
-  return root;
-}
-
+import { afterEach, expect, test } from 'vitest';
+import { verifyWindowsCompressedLlamaCppBundled } from './verify-windows-packaged-components.cjs';
+const require = createRequire(import.meta.url);
+const bundledSevenZipPath = require('7zip-bin').path7za as string;
+const directories: string[] = [];
+const hash = (bytes: Buffer | string) => crypto.createHash('sha256').update(bytes).digest('hex');
 afterEach(() => {
-  for (const directory of temporaryDirectories.splice(0)) {
+  for (const directory of directories.splice(0))
     fs.rmSync(directory, { recursive: true, force: true });
-  }
 });
-
-describe('verifyWindowsPackagedComponents', () => {
-  test('verifies channel-runtime from compressed Windows component archives', () => {
-    if (process.platform !== 'win32' || !fs.existsSync(sevenZipPath)) {
-      return;
-    }
-
-    const projectRoot = tempRoot();
-    const sidecarBytes = Buffer.from('pinned sidecar');
-    const checksum = crypto.createHash('sha256').update(sidecarBytes).digest('hex');
-    const componentRoot = path.join(projectRoot, 'vendor', 'channel-runtime', 'current');
-    fs.mkdirSync(componentRoot, { recursive: true });
-    fs.writeFileSync(path.join(componentRoot, 'cc-connect-sidecar.exe'), sidecarBytes);
-    fs.writeFileSync(
-      path.join(componentRoot, 'runtime-build-info.json'),
-      `${JSON.stringify({
-        schemaVersion: 1,
-        repo: 'rongxinzy/pi-connect',
-        version: 'zhiyuan-sidecar-v4',
-        sourceRevision: 'ecf720f875e31b3df3464d820e6c485775719abe',
-        target: 'win-x64',
-        assetName: 'cc-connect-sidecar-windows-amd64.exe',
-        checksum,
-      })}\n`,
-    );
-
-    const componentsDir = path.join(projectRoot, 'build-tar', 'windows-components');
-    fs.mkdirSync(componentsDir, { recursive: true });
-    const archivePath = path.join(componentsDir, 'channel-runtime.7z');
-    const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-channel-runtime-pack-'));
-    const stagedPrefix = path.join(stagingRoot, 'channel-runtime');
-    fs.symlinkSync(componentRoot, stagedPrefix, 'junction');
-    const packed = spawnSync(
-      sevenZipPath,
-      ['a', '-t7z', '-mx=9', '-m0=lzma2', '-ms=off', '-mmt=on', archivePath, 'channel-runtime'],
-      { cwd: stagingRoot, encoding: 'utf8' },
-    );
-    fs.rmSync(stagingRoot, { recursive: true, force: true });
-    expect(packed.status).toBe(0);
-
-    const archiveSha256 = crypto
-      .createHash('sha256')
-      .update(fs.readFileSync(archivePath))
-      .digest('hex');
-    fs.writeFileSync(
-      path.join(componentsDir, 'channel-runtime.manifest.json'),
-      `${JSON.stringify({
-        version: 4,
-        key: 'channel-runtime',
-        label: 'cc-connect channel runtime',
-        prefix: 'channel-runtime',
-        sentinel: 'channel-runtime/cc-connect-sidecar.exe',
-        contentId: 'a'.repeat(64),
-        archive: 'channel-runtime.7z',
-        archiveFormat: '7z',
-        archiveCompression: 'lzma2-mx5-nonsolid-v1',
-        archiveSha256,
-        archiveSizeBytes: fs.statSync(archivePath).size,
-        sentinelSha256: checksum,
-      })}\n`,
-    );
-    fs.writeFileSync(
-      path.join(projectRoot, 'package.json'),
-      `${JSON.stringify({
-        channelRuntime: {
-          repo: 'rongxinzy/pi-connect',
-          version: 'zhiyuan-sidecar-v4',
-          sourceRevision: 'ecf720f875e31b3df3464d820e6c485775719abe',
-          runtimeAssets: { 'win-x64': 'cc-connect-sidecar-windows-amd64.exe' },
-          runtimeChecksums: { 'win-x64': checksum },
-        },
-      })}\n`,
-    );
-
-    const context = {
-      electronPlatformName: 'win32',
-      arch: 1,
-      appOutDir: path.join(projectRoot, 'release', 'win-unpacked'),
-      packager: { projectDir: projectRoot },
-    };
-
-    expect(() =>
-      verifyWindowsCompressedChannelRuntime(context, 'win-x64', checksum, 'cc-connect-sidecar.exe'),
-    ).not.toThrow();
+function fixture() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'windows-component-'));
+  directories.push(root);
+  const sevenZipPath = path.join(root, process.platform === 'win32' ? '7za.exe' : '7za');
+  fs.copyFileSync(bundledSevenZipPath, sevenZipPath);
+  if (process.platform !== 'win32') fs.chmodSync(sevenZipPath, 0o755);
+  const staging = path.join(root, 'staging');
+  const component = path.join(staging, 'llamacpp-bundled');
+  const components = path.join(root, 'build-tar', 'windows-components');
+  fs.mkdirSync(component, { recursive: true });
+  fs.mkdirSync(components, { recursive: true });
+  const binary = 'MZfixture-local-inference';
+  const runtimeManifest = JSON.stringify({ executable: 'llama-server.exe', sha256: hash(binary) });
+  fs.writeFileSync(path.join(component, 'llama-server.exe'), binary);
+  fs.writeFileSync(path.join(component, 'manifest.json'), runtimeManifest);
+  const archive = path.join(components, 'llamacpp-bundled.7z');
+  const packed = spawnSync(sevenZipPath, ['a', '-t7z', archive, 'llamacpp-bundled'], {
+    cwd: staging,
+    encoding: 'utf8',
   });
+  expect(packed.status, packed.error?.message || packed.stderr || packed.stdout).toBe(0);
+  const manifest = {
+    archive: 'llamacpp-bundled.7z',
+    prefix: 'llamacpp-bundled',
+    archiveSha256: hash(fs.readFileSync(archive)),
+    sentinelSha256: hash(runtimeManifest),
+  };
+  const manifestPath = path.join(components, 'llamacpp-bundled.manifest.json');
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  const context = {
+    electronPlatformName: 'win32',
+    arch: 1,
+    appOutDir: path.join(root, 'release', 'win-unpacked'),
+    packager: { projectDir: root },
+  };
+  return { context, archive, manifest, manifestPath, sevenZipPath };
+}
+test('retains real archive extraction and binary digest verification for local inference', () => {
+  const f = fixture();
+  expect(() =>
+    verifyWindowsCompressedLlamaCppBundled(f.context, { sevenZipPath: f.sevenZipPath }),
+  ).not.toThrow();
+  fs.appendFileSync(f.archive, 'corrupt');
+  expect(() =>
+    verifyWindowsCompressedLlamaCppBundled(f.context, { sevenZipPath: f.sevenZipPath }),
+  ).toThrow('archive SHA-256 mismatch');
+});
+test('rejects mismatched manifest sentinels inside a valid compressed component', () => {
+  const f = fixture();
+  fs.writeFileSync(
+    f.manifestPath,
+    JSON.stringify({ ...f.manifest, sentinelSha256: 'f'.repeat(64) }),
+  );
+  expect(() =>
+    verifyWindowsCompressedLlamaCppBundled(f.context, { sevenZipPath: f.sevenZipPath }),
+  ).toThrow('manifest SHA-256 mismatch');
 });

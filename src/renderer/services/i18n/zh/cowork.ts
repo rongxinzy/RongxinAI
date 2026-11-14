@@ -214,7 +214,6 @@ export const zhCowork: Record<string, string> = {
   coworkResumeTaskFailed: '恢复任务失败',
   coworkDefaultSessionTitle: '新对话',
   coworkContinuePlaceholder: '继续对话...',
-  coworkRemoteManagedPlaceholder: '请在原来的渠道继续对话',
   coworkStartingSession: '正在启动会话...',
   coworkPreparingEnvironment: '正在准备环境…',
   coworkAddFile: '添加文件',

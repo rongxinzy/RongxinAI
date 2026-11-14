@@ -1,11 +1,15 @@
 import Database from 'better-sqlite3';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { EngramMemoryScope, EngramObservationType, MemoryOutboxStatus } from './constants';
+import { MemoryBackendScope, MemoryObservationType, MemoryOutboxStatus } from './constants';
 import { ProjectMemoryService } from './projectMemoryService';
 import { MemoryRepository } from './repository';
 import { recordSessionCheckpoint } from './sessionCheckpointService';
-import { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+import { MarkdownMemoryBackend, markdownMemoryId } from './markdownMemoryBackend';
+import { MarkdownMemoryRuntime } from './markdownMemoryRuntime';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -63,50 +67,36 @@ test('offline commit is readable after restart and resumes delivery', async () =
   ).resolves.toEqual({ checkpointId: result.checkpointId, syncState: 'synced' });
 });
 
-test('operation id survives a lost response, failed recovery and process restart', async () => {
-  const operationIds: string[] = [];
-  const resultIds: string[] = [];
-  let recoveryAttempts = 0;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (url: string | URL, init?: RequestInit) => {
-      const parsed = new URL(url);
-      if (parsed.pathname === '/sessions') return jsonResponse({ id: 'session-1' });
-      if (init?.method === 'POST') {
-        operationIds.push(JSON.parse(String(init.body)).operation_id);
-        throw new Error('socket timeout');
-      }
-      if (parsed.pathname === '/observations/17') {
-        return jsonResponse({ session_id: 'session-1' });
-      }
-      resultIds.push(parsed.searchParams.get('operation_id') ?? '');
-      recoveryAttempts += 1;
-      if (recoveryAttempts === 1) throw new Error('network unavailable');
-      return jsonResponse({ id: 17, status: 'committed' });
-    }),
-  );
-  const manager = {
-    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
-    start: vi.fn(),
-  } as never;
-  const adapter = new ZhiYuanEngramAdapter(manager);
-  const input = {
-    sessionId: 'session-1',
-    project: 'project-a',
-    scope: EngramMemoryScope.Project,
-    type: EngramObservationType.Decision,
-    title: 'title',
-    content: 'content',
-    operationId: 'link-stable-1',
-  };
-
-  await expect(adapter.confirmMemory(adapter.saveCandidate(input), '/work')).rejects.toThrow(
-    'network unavailable',
-  );
-  const restarted = new ZhiYuanEngramAdapter(manager);
-  await expect(restarted.confirmMemory(restarted.saveCandidate(input), '/work')).resolves.toBe(17);
-  expect(operationIds).toEqual(['link-stable-1', 'link-stable-1']);
-  expect(resultIds).toEqual(['link-stable-1', 'link-stable-1']);
+test('a native Markdown commit survives an interrupted projection acknowledgement', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'memory-ack-'));
+  const db = new Database(':memory:');
+  try {
+    const repository = new MemoryRepository(db);
+    const backend = new MarkdownMemoryBackend(new MarkdownMemoryRuntime(root), repository);
+    const input = {
+      sessionId: 'session-1',
+      project: 'project-a',
+      scope: MemoryBackendScope.Project,
+      type: MemoryObservationType.Decision,
+      title: 'title',
+      content: 'content',
+      operationId: 'link-stable-1',
+    };
+    await expect(
+      backend.confirmMemory(backend.saveCandidate(input), '/work', () => {
+        throw new Error('projection acknowledgement interrupted');
+      }),
+    ).rejects.toThrow('projection acknowledgement interrupted');
+    const runtime = new MarkdownMemoryRuntime(root);
+    const restarted = new MarkdownMemoryBackend(runtime, repository);
+    expect(await restarted.confirmMemory(restarted.saveCandidate(input), '/work')).toBe(
+      markdownMemoryId(input.operationId),
+    );
+    expect((await (await runtime.files(input.project)).read('memory')).entries).toHaveLength(1);
+  } finally {
+    db.close();
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('checkpoint and outbox commit atomically', () => {
@@ -131,10 +121,3 @@ test('checkpoint and outbox commit atomically', () => {
   expect(repository.listPending()).toHaveLength(0);
   expect(repository.maxSessionCheckpointSequence('session-1')).toBe(0);
 });
-
-function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
-}

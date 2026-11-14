@@ -8,19 +8,17 @@
  */
 
 import {
-  activePiModel,
   adapter,
   applyTestResolution,
   mockSession,
   setupPiRuntimeAdapterSuite,
+  activePiModel,
   stubRawApiConfig,
-  TEXT_ONLY_MODEL_RESOLUTION,
   UNKNOWN_MODEL_RESOLUTION,
-  VISION_400,
+  TEXT_ONLY_MODEL_RESOLUTION,
   VISION_MODEL_RESOLUTION,
+  VISION_400,
 } from './piRuntimeAdapter.testHarness';
-
-import path from 'path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ModelCapabilityStatus } from '../../../shared/providers';

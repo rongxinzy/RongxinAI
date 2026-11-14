@@ -1,12 +1,7 @@
 import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
 
-import {
-  ActivityErrorCode,
-  ActivityRetention,
-  ActivitySource,
-  ActivityStatus,
-} from '../../shared/activity/constants';
+import { ActivityRetention, ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 
 vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }));
 
@@ -14,8 +9,8 @@ test('persists activity snapshots by run id and returns newest updates first', a
   const { ActivityService } = await import('./activityService');
   const service = new ActivityService(new Database(':memory:'));
   service.upsert({
-    id: 'channel',
-    source: ActivitySource.Channel,
+    id: 'first-task',
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Running,
     inputPreview: 'hello',
     updatedAt: 1,
@@ -28,8 +23,8 @@ test('persists activity snapshots by run id and returns newest updates first', a
     updatedAt: 2,
   });
   service.upsert({
-    id: 'channel',
-    source: ActivitySource.Channel,
+    id: 'first-task',
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Completed,
     replyPreview: 'done',
     updatedAt: 3,
@@ -37,7 +32,7 @@ test('persists activity snapshots by run id and returns newest updates first', a
 
   expect(service.list()).toEqual([
     expect.objectContaining({
-      id: 'channel',
+      id: 'first-task',
       status: ActivityStatus.Completed,
       inputPreview: 'hello',
       replyPreview: 'done',
@@ -62,13 +57,13 @@ test('ignores an out-of-order update without broadcasting it', async () => {
   const service = new ActivityService(new Database(':memory:'));
   service.upsert({
     id: 'run',
-    source: ActivitySource.Channel,
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Running,
     updatedAt: 10,
   });
   const result = service.upsert({
     id: 'run',
-    source: ActivitySource.Channel,
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Failed,
     errorMessage: 'late',
     updatedAt: 5,
@@ -83,13 +78,13 @@ test('prunes only activity snapshots older than 180 days', async () => {
   const now = Date.UTC(2026, 7, 13);
   service.upsert({
     id: 'expired',
-    source: ActivitySource.Channel,
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Completed,
     updatedAt: now - ActivityRetention.Milliseconds - 1,
   });
   service.upsert({
     id: 'boundary',
-    source: ActivitySource.Channel,
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Completed,
     updatedAt: now - ActivityRetention.Milliseconds,
   });
@@ -104,9 +99,10 @@ test('prunes only activity snapshots older than 180 days', async () => {
   expect(service.list().map(run => run.id)).toEqual(['recent', 'boundary']);
 });
 
-test('recovers interrupted running snapshots during startup', async () => {
+test('keeps a persisted run pending until its resumed execution finishes', async () => {
   const { ActivityService } = await import('./activityService');
-  const service = new ActivityService(new Database(':memory:'));
+  const db = new Database(':memory:');
+  const service = new ActivityService(db);
   service.upsert({
     id: 'stale',
     source: ActivitySource.ScheduledTask,
@@ -115,21 +111,32 @@ test('recovers interrupted running snapshots during startup', async () => {
   });
   service.upsert({
     id: 'done',
-    source: ActivitySource.Channel,
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Completed,
     updatedAt: 11,
   });
 
-  expect(service.recoverInterruptedRuns()).toBe(1);
-  // Recovery keeps the run's own timestamp: a run that died days ago must not
-  // jump to the top of today's feed just because the app restarted.
-  expect(service.list()).toEqual([
+  const restartedService = new ActivityService(db);
+  expect(restartedService.list()).toEqual([
     expect.objectContaining({ id: 'done', status: ActivityStatus.Completed, updatedAt: 11 }),
     expect.objectContaining({
       id: 'stale',
-      status: ActivityStatus.Failed,
+      status: ActivityStatus.Running,
       updatedAt: 10,
-      errorMessage: ActivityErrorCode.Interrupted,
     }),
   ]);
+  restartedService.upsert({
+    id: 'stale',
+    source: ActivitySource.ScheduledTask,
+    status: ActivityStatus.Completed,
+    replyPreview: 'Resumed result',
+    updatedAt: 12,
+  });
+  expect(restartedService.list()).toHaveLength(2);
+  expect(restartedService.list()[0]).toMatchObject({
+    id: 'stale',
+    status: ActivityStatus.Completed,
+    startedAt: 10,
+    replyPreview: 'Resumed result',
+  });
 });

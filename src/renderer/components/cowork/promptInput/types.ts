@@ -52,6 +52,5 @@ export interface CoworkPromptInputProps {
   onPermissionModeChange?: (mode: CoworkPermissionMode) => void;
   sessionId?: string;
   /** When true, hides attachment/skill buttons but keeps the input box visible (disabled) */
-  remoteManaged?: boolean;
   topAccessory?: ReactNode;
 }

@@ -1,30 +1,12 @@
-import { runAgentLoop, type AgentEvent, type AgentTool } from '@earendil-works/pi-agent-core';
-import {
-  createAssistantMessageEventStream,
-  type AssistantMessage,
-  type Model,
-} from '@earendil-works/pi-ai';
 import { beforeEach, expect, test, vi } from 'vitest';
-
+import type { ToolDefinition } from './durableToolTypes';
+import { runDurableToolForTest } from './durableRuntime.testHarness';
+import type { PiEvent } from './piRuntimeSessionState';
 vi.mock('../skillRuntimeRunner', () => ({ runManagedSkillScript: vi.fn() }));
 import { runManagedSkillScript, type SkillScriptRunResult } from '../skillRuntimeRunner';
-import { buildPiSkillScriptTool, PiSkillScriptToolName } from './piSkillScriptTool';
+import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { PiToolEventType } from './constants';
-import { PiMessageRole } from './piSubagentExecution';
-import { PiAssistantStopReason, PiContentBlockType } from './piToolConstants';
 
-const model: Model<'openai-completions'> = {
-  id: 'test',
-  name: 'Test',
-  api: 'openai-completions',
-  provider: 'openai',
-  baseUrl: 'http://unused.invalid',
-  reasoning: false,
-  input: ['text'],
-  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-  contextWindow: 32768,
-  maxTokens: 4096,
-};
 const result: SkillScriptRunResult = {
   ok: false,
   status: 'failed',
@@ -48,58 +30,13 @@ beforeEach(() => {
 async function runTool(
   allowedSkillIds: string[],
   skillRoots?: Readonly<Record<string, string>>,
-): Promise<AgentEvent[]> {
+): Promise<PiEvent[]> {
   const tool = buildPiSkillScriptTool({
     workspaceRoot: '/workspace',
     allowedSkillIds,
     skillRoots,
-  }) as unknown as AgentTool;
-  const events: AgentEvent[] = [];
-  const assistant: AssistantMessage = {
-    role: PiMessageRole.Assistant,
-    api: model.api,
-    provider: model.provider,
-    model: model.id,
-    content: [
-      {
-        type: PiContentBlockType.ToolCall,
-        id: 'call',
-        name: PiSkillScriptToolName,
-        arguments: { skillId: 'pdf', script: 'check.py' },
-      },
-    ],
-    stopReason: PiAssistantStopReason.ToolUse,
-    timestamp: 1,
-    usage: {
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-    },
-  };
-  await runAgentLoop(
-    [],
-    { systemPrompt: '', messages: [], tools: [tool] },
-    {
-      model,
-      convertToLlm: () => [],
-      // pi 0.87 removed shouldStopAfterTurn; finishTurn with action "end"
-      // preserves this harness's single-turn semantics.
-      finishTurn: () => ({ action: 'end' }),
-    },
-    event => {
-      events.push(event);
-    },
-    undefined,
-    () => {
-      const stream = createAssistantMessageEventStream();
-      stream.push({ type: 'done', reason: PiAssistantStopReason.ToolUse, message: assistant });
-      return stream;
-    },
-  );
-  return events;
+  }) as unknown as ToolDefinition;
+  return runDurableToolForTest(tool, { skillId: 'pdf', script: 'check.py' });
 }
 
 test('Pi emits an error tool result for failed scripts and retains diagnostics', async () => {
@@ -162,7 +99,7 @@ test('reads the current selection and root when a skill is added during executio
     workspaceRoot: '/workspace',
     allowedSkillIds: [],
     getSkillSelection: () => selection,
-  }) as unknown as AgentTool;
+  }) as unknown as ToolDefinition;
   await expect(tool.execute('before', { skillId: 'pdf', script: 'check.py' })).rejects.toThrow(
     'SKILL_NOT_SELECTED',
   );

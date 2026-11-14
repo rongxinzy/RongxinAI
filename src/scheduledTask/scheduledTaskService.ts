@@ -1,13 +1,12 @@
 import type {
   ScheduledTask,
-  ScheduledTaskDeliveryRecord,
   ScheduledTaskInput,
   ScheduledTaskRun,
   ScheduledTaskRunWithName,
 } from './types';
 import type { RunFilter } from './types';
 
-/** Renderer-facing task service. Implementations must not make a runtime authoritative. */
+/** Product contract backed by native Durable tasks and their committed receipts. */
 export interface ScheduledTaskService {
   addJob(input: ScheduledTaskInput): Promise<ScheduledTask>;
   updateJob(id: string, input: Partial<ScheduledTaskInput>): Promise<ScheduledTask>;
@@ -22,7 +21,7 @@ export interface ScheduledTaskService {
     offset?: number,
     filter?: RunFilter,
   ): Promise<ScheduledTaskRun[]>;
-  listDeliveries(runId: string): Promise<ScheduledTaskDeliveryRecord[]>;
+  stopJob(id: string): Promise<boolean>;
   countRuns(taskId: string): Promise<number>;
   listAllRuns(
     limit?: number,

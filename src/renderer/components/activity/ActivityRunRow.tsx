@@ -2,13 +2,11 @@ import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { AlertCircle, CalendarClock, CheckCircle2, ChevronDown, MessageSquare } from 'lucide-react';
+import { AlertCircle, CalendarClock, CheckCircle2, ChevronDown } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import React, { useEffect, useRef, useState } from 'react';
 
-import { ActivitySource, ActivityStatus } from '../../../shared/activity/constants';
-import { PlatformRegistry, type Platform } from '../../../shared/platform';
-import { imPlatformLogo } from '../../assets/imLogos';
+import { ActivityStatus } from '../../../shared/activity/constants';
 import { i18nService } from '../../services/i18n';
 // 2026/09/23 活动失败行复用对话侧的 JSON message 提取，避免直接展示原始 payload
 import { extractUserFacingErrorMessage } from '../../services/coworkTerminalError';
@@ -27,13 +25,9 @@ interface ActivityRunRowProps {
 /** Threshold height in px beyond which response content becomes expandable (approx 2 lines). */
 const EXPANDABLE_THRESHOLD_PX = 46;
 
-/** Resolve the quiet left-hand label: cron runs name the trigger, channel runs name the platform. */
-const sourceLabel = (run: ActivityRun): string => {
-  if (run.source === ActivitySource.ScheduledTask) {
-    return run.taskName || i18nService.t('activityTriggerCron');
-  }
-  return run.platform ? i18nService.t(run.platform) : i18nService.t('activityTriggerChannel');
-};
+/** Resolve the quiet left-hand label from the automation title. */
+const sourceLabel = (run: ActivityRun): string =>
+  run.taskName || i18nService.t('activityTriggerCron');
 
 const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, currentTime }) => {
   const prefersReducedMotion = useReducedMotion();
@@ -51,12 +45,6 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
     : run.replyPreview?.trim() || '';
   const hasBody = bodyText.length > 0;
   const hasExpandableBody = hasBody && isBodyOverflowing;
-  const TriggerIcon = run.source === ActivitySource.ScheduledTask ? CalendarClock : MessageSquare;
-  const platform =
-    run.source === ActivitySource.Channel &&
-    PlatformRegistry.platforms.includes(run.platform as Platform)
-      ? (run.platform as Platform)
-      : null;
 
   useEffect(() => {
     if (!hasBody) {
@@ -101,15 +89,7 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
       <div className="flex items-start gap-3.5 min-w-0">
         {/* Icon Tile */}
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-surface-raised text-muted-foreground">
-          {platform ? (
-            <img
-              src={imPlatformLogo(platform)}
-              alt={i18nService.t(platform)}
-              className="size-5 rounded object-contain"
-            />
-          ) : (
-            <TriggerIcon className="size-4" />
-          )}
+          <CalendarClock className="size-4" />
         </div>
 
         {/* Title and Meta Information */}
@@ -119,9 +99,7 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance, c
               {sourceLabel(run)}
             </span>
             <span className="inline-flex items-center rounded-md border border-border/50 bg-muted/40 px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground shrink-0">
-              {run.source === ActivitySource.ScheduledTask
-                ? i18nService.t('activityTriggerCron')
-                : i18nService.t('activityTriggerChannel')}
+              {i18nService.t('activityTriggerCron')}
             </span>
           </div>
 

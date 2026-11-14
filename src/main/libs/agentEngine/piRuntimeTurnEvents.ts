@@ -6,6 +6,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import { projectDurableInput } from './durableInputProjection';
 
 import { classifyCoworkError, CoworkErrorKind, makeCoworkError } from '../../../common/coworkError';
 import type { CoworkMessage } from '../../coworkStore';
@@ -188,6 +189,7 @@ export class PiRuntimeTurnEvents {
 
       case 'message_start':
         if ((event.message as { role?: unknown } | undefined)?.role === 'user') {
+          projectDurableInput(this.host, active, event);
           this.host.onPiUserMessageStart?.(sessionId, active);
         }
         active.requestStartedAt = Date.now();

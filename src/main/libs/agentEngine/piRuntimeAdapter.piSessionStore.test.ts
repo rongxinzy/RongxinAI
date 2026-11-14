@@ -1,218 +1,125 @@
-/**
- * PiRuntimeAdapter unit tests: file-backed Pi session persistence.
- *
- * Covers the rebuild matrix of the persistent session store: eviction (and
- * any other rebuild) reopens the JSONL and sends only the new prompt; a
- * legacy session without a file uses the flattened text fallback exactly
- * once; transcript invalidation drops the file; session delete removes the
- * directory; a model-override change keeps history by reopening the file.
- *
- * The shared mocks live in piRuntimeAdapter.testHarness.ts (imported first
- * so the Pi SDK mocks are registered before any module under test loads).
- */
-
-import fs from 'fs';
-import path from 'path';
-
-import { describe, expect, it, vi } from 'vitest';
-
+/** Adapter routing to the native execution store; real reopen/replay lives in durableRuntime tests. */
 import {
   adapter,
   createTemporaryPiSessionRoot,
   createTemporaryWorkspace,
   mockCreateAgentSession,
   mockSession,
-  mockSessionManagerCreate,
-  mockSessionManagerInMemory,
-  mockSessionManagerOpen,
-  seedPersistedPiSession,
   setupPiRuntimeAdapterSuite,
 } from './piRuntimeAdapter.testHarness';
-import { hasPersistedPiSession, piSessionDirFor } from './piSessionStore';
-import type { CoworkStore } from '../../coworkStore';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { describe, expect, it, vi } from 'vitest';
+import { durableSessionFile, hasDurableSession } from './durableSessionStore';
 
-/** Store double with paged tail reads, the surface history restore relies on. */
-const createStoreWithHistory = (
-  messages: Array<{ id: string; type: string; content: string; metadata?: unknown }>,
-): { store: CoworkStore; addMessage: ReturnType<typeof vi.fn> } => {
-  const persisted = [...messages];
-  const addMessage = vi.fn((_sessionId: string, message: { type: string }) => {
-    persisted.push(message as (typeof persisted)[number]);
-    return { ...message, id: `stored-${persisted.length}`, timestamp: 1 };
-  });
-  const store = {
-    addMessage,
-    getSessionMessagesDesc: (_sessionId: string, limit: number, offset: number) =>
-      [...persisted].reverse().slice(offset, offset + limit),
-    getSessionMessageStats: () => ({
-      messageCount: persisted.length,
-      contentBytes: persisted.reduce((total, m) => total + m.content.length, 0),
-      metadataBytes: 0,
+function seedRuntimeFile(root: string, sessionId: string): string {
+  const file = durableSessionFile(root, sessionId);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, 'The application factory owns opening this file.');
+  return file;
+}
+
+function projectedHistory() {
+  return {
+    addMessage: vi.fn((_id: string, message: unknown) => message),
+    getSession: () => ({
+      messages: [{ id: 'old', type: 'user', content: 'Projected old turn' }],
+      experts: [],
     }),
-    getSession: () => ({ messages: persisted, experts: [] }),
     updateSession: vi.fn(),
-  } as unknown as CoworkStore;
-  return { store, addMessage };
-};
+  };
+}
 
-describe('PiRuntimeAdapter', () => {
+describe('adapter native Durable persistence', () => {
   setupPiRuntimeAdapterSuite();
 
-  describe('file-backed Pi session persistence', () => {
-    it('creates a persistent session manager under the session store root', async () => {
-      const root = createTemporaryPiSessionRoot();
-      const workspaceRoot = createTemporaryWorkspace();
-      adapter.setPiSessionStoreRoot(root);
-      adapter.setCoworkStore(createStoreWithHistory([]).store);
+  it('routes every new session to a stable native SQLite file', async () => {
+    const root = createTemporaryPiSessionRoot();
+    const workspaceRoot = createTemporaryWorkspace();
+    adapter.setPiSessionStoreRoot(root);
+    await adapter.startSession('persist-new', 'First prompt', { workspaceRoot });
+    const options = mockCreateAgentSession.mock.calls[0][0];
+    expect(options).toEqual(
+      expect.objectContaining({
+        cwd: workspaceRoot,
+        durableFile: durableSessionFile(root, 'persist-new'),
+      }),
+    );
+    expect(options).not.toHaveProperty('sessionManager');
+  });
 
-      await adapter.startSession('persist-new', 'First prompt', { workspaceRoot });
+  it('refuses execution when native persistence was not initialized', async () => {
+    adapter.on('error', () => {});
+    adapter.setPiSessionStoreRoot('');
+    await expect(adapter.startSession('persist-none', 'First prompt')).rejects.toThrow(
+      'Durable session persistence is not initialized.',
+    );
+    expect(mockCreateAgentSession).not.toHaveBeenCalled();
+  });
 
-      expect(mockSessionManagerCreate).toHaveBeenCalledTimes(1);
-      expect(mockSessionManagerInMemory).not.toHaveBeenCalled();
-      const createArgs = mockSessionManagerCreate.mock.calls[0];
-      expect(createArgs?.[0]).toBe(workspaceRoot);
-      expect(createArgs?.[1]).toBe(piSessionDirFor(root, 'persist-new'));
-      const launchOptions = mockCreateAgentSession.mock.calls[0]?.[0] as
-        | { sessionManager?: unknown }
-        | undefined;
-      expect(launchOptions?.sessionManager).toBe(mockSessionManagerCreate.mock.results[0]?.value);
+  it('reuses the same native store after an idle session is recreated', async () => {
+    const root = createTemporaryPiSessionRoot();
+    adapter.setPiSessionStoreRoot(root);
+    adapter.setCoworkStore(projectedHistory() as never);
+    const file = seedRuntimeFile(root, 'persist-reopen');
+    await adapter.startSession('persist-reopen', 'First prompt');
+    adapter.stopSession('persist-reopen');
+    mockSession.prompt.mockClear();
+    await adapter.continueSession('persist-reopen', 'Follow-up');
+    expect(mockCreateAgentSession.mock.calls.map(call => call[0].durableFile)).toEqual([
+      file,
+      file,
+    ]);
+    expect(mockSession.prompt).toHaveBeenCalledExactlyOnceWith('Follow-up');
+  });
+
+  it('keeps the application transcript as a projection instead of synthesizing model history', async () => {
+    adapter.setCoworkStore(projectedHistory() as never);
+    await adapter.continueSession('projection-only', 'New question');
+    expect(mockSession.prompt).toHaveBeenCalledExactlyOnceWith('New question');
+    expect(String(mockSession.prompt.mock.calls[0][0])).not.toContain('Projected old turn');
+  });
+
+  it('invalidates only the current execution store and its SQLite side files', async () => {
+    const root = createTemporaryPiSessionRoot();
+    adapter.setPiSessionStoreRoot(root);
+    const file = seedRuntimeFile(root, 'invalidate');
+    writeFileSync(file + '-wal', 'checkpoint');
+    writeFileSync(file + '-shm', 'shared memory');
+    const untouched = path.join(root, 'old-session-data.jsonl');
+    writeFileSync(untouched, 'Retired user data remains untouched.');
+    await adapter.invalidatePiSessionDir('invalidate');
+    expect(hasDurableSession(root, 'invalidate')).toBe(false);
+    expect(existsSync(file + '-wal')).toBe(false);
+    expect(existsSync(file + '-shm')).toBe(false);
+    expect(existsSync(untouched)).toBe(true);
+  });
+
+  it('deletes the native execution file when its owning application session is deleted', async () => {
+    const root = createTemporaryPiSessionRoot();
+    adapter.setPiSessionStoreRoot(root);
+    adapter.setCoworkStore(projectedHistory() as never);
+    const file = seedRuntimeFile(root, 'persist-delete');
+    await adapter.startSession('persist-delete', 'Hello');
+    await adapter.onSessionDeleted('persist-delete');
+    expect(existsSync(file)).toBe(false);
+    expect(mockSession.abort).toHaveBeenCalled();
+  });
+
+  it('keeps the native store identity across a model-override rebuild', async () => {
+    const root = createTemporaryPiSessionRoot();
+    adapter.setPiSessionStoreRoot(root);
+    const file = seedRuntimeFile(root, 'persist-model');
+    await adapter.startSession('persist-model', 'First', { modelOverride: 'llamacpp/qwen-local' });
+    mockSession.prompt.mockClear();
+    await adapter.continueSession('persist-model', 'After switch', {
+      modelOverride: 'moonshot/kimi-k2.6',
     });
-
-    it('falls back to the in-memory manager without an injected root', async () => {
-      await adapter.startSession('persist-none', 'First prompt');
-
-      expect(mockSessionManagerInMemory).toHaveBeenCalledTimes(1);
-      expect(mockSessionManagerCreate).not.toHaveBeenCalled();
-      expect(mockSessionManagerOpen).not.toHaveBeenCalled();
-    });
-
-    it('reopens the session file on a rebuild and sends only the new prompt', async () => {
-      const root = createTemporaryPiSessionRoot();
-      const workspaceRoot = createTemporaryWorkspace();
-      adapter.setPiSessionStoreRoot(root);
-      const { store } = createStoreWithHistory([
-        { id: 'u1', type: 'user', content: 'Earlier turn' },
-      ]);
-      adapter.setCoworkStore(store);
-      const sessionFile = seedPersistedPiSession(root, 'persist-evict');
-
-      await adapter.startSession('persist-evict', 'First prompt', { workspaceRoot });
-      // The seeded file existed before the first launch, so that launch
-      // already reopened it; stopping drops the live Pi session, exactly like
-      // an idle eviction or an app restart, and the next turn rebuilds.
-      adapter.stopSession('persist-evict');
-
-      mockSession.prompt.mockClear();
-      await adapter.continueSession('persist-evict', 'Follow-up');
-
-      expect(mockSessionManagerOpen).toHaveBeenCalledTimes(2);
-      expect(mockSessionManagerOpen).toHaveBeenLastCalledWith(
-        sessionFile,
-        piSessionDirFor(root, 'persist-evict'),
-        expect.any(String),
-      );
-      // Only the new prompt: no flattened history block.
-      expect(mockSession.prompt).toHaveBeenCalledTimes(1);
-      expect(mockSession.prompt.mock.calls[0]?.[0]).toBe('Follow-up');
-      expect(String(mockSession.prompt.mock.calls[0]?.[0])).not.toContain('PREVIOUS CONVERSATION');
-    });
-
-    it('starts a clean session without flattened history when no persisted JSONL file exists', async () => {
-      const root = createTemporaryPiSessionRoot();
-      const workspaceRoot = createTemporaryWorkspace();
-      adapter.setPiSessionStoreRoot(root);
-      const { store } = createStoreWithHistory([
-        { id: 'u1', type: 'user', content: 'Legacy question' },
-        { id: 'a1', type: 'assistant', content: 'Legacy answer' },
-      ]);
-      adapter.setCoworkStore(store);
-
-      // Without a seeded JSONL file, continuation creates a new persisted session
-      // directly with the new prompt rather than synthesizing flat-text history.
-      await adapter.continueSession('persist-legacy', 'Next question', { workspaceRoot });
-      expect(mockSessionManagerOpen).not.toHaveBeenCalled();
-      expect(mockSessionManagerCreate).toHaveBeenCalledTimes(1);
-      const firstPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-      expect(firstPrompt).toBe('Next question');
-      expect(firstPrompt).not.toContain('PREVIOUS CONVERSATION');
-      expect(mockSessionManagerCreate).toHaveBeenCalledWith(
-        workspaceRoot,
-        piSessionDirFor(root, 'persist-legacy'),
-      );
-
-      // Once the file exists on disk, later rebuilds reopen it.
-      seedPersistedPiSession(root, 'persist-legacy');
-      adapter.stopSession('persist-legacy');
-      mockSession.prompt.mockClear();
-      await adapter.continueSession('persist-legacy', 'Later question');
-      expect(mockSessionManagerOpen).toHaveBeenCalledTimes(1);
-      const secondPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-      expect(secondPrompt).toBe('Later question');
-    });
-
-    it('invalidates a corrupted persisted directory and recreates it cleanly', async () => {
-      const root = createTemporaryPiSessionRoot();
-      adapter.setPiSessionStoreRoot(root);
-      const { store } = createStoreWithHistory([
-        { id: 'u1', type: 'user', content: 'Imported turn' },
-      ]);
-      adapter.setCoworkStore(store);
-      seedPersistedPiSession(root, 'persist-diverge');
-
-      adapter.invalidatePiSessionDir('persist-diverge');
-      expect(hasPersistedPiSession(root, 'persist-diverge')).toBe(false);
-      expect(fs.existsSync(piSessionDirFor(root, 'persist-diverge'))).toBe(false);
-
-      await adapter.continueSession('persist-diverge', 'After import');
-      expect(mockSessionManagerOpen).not.toHaveBeenCalled();
-      const prompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-      expect(prompt).toBe('After import');
-    });
-
-    it('removes the directory when the cowork session is deleted', async () => {
-      const root = createTemporaryPiSessionRoot();
-      adapter.setPiSessionStoreRoot(root);
-      adapter.setCoworkStore(createStoreWithHistory([]).store);
-      seedPersistedPiSession(root, 'persist-delete');
-      await adapter.startSession('persist-delete', 'Hello');
-
-      adapter.onSessionDeleted('persist-delete');
-
-      expect(fs.existsSync(piSessionDirFor(root, 'persist-delete'))).toBe(false);
-      expect(mockSession.abort).toHaveBeenCalled();
-    });
-
-    it('keeps history across a model-override change by reopening the file', async () => {
-      const root = createTemporaryPiSessionRoot();
-      const workspaceRoot = createTemporaryWorkspace();
-      adapter.setPiSessionStoreRoot(root);
-      const { store } = createStoreWithHistory([
-        { id: 'u1', type: 'user', content: 'Before model switch' },
-      ]);
-      adapter.setCoworkStore(store);
-      seedPersistedPiSession(root, 'persist-model');
-
-      await adapter.startSession('persist-model', 'First', {
-        workspaceRoot,
-        modelOverride: 'llamacpp/qwen-local',
-      });
-      mockSession.prompt.mockClear();
-
-      await adapter.continueSession('persist-model', 'After switch', {
-        modelOverride: 'moonshot/kimi-k2.6',
-      });
-
-      // The rebuild recreated the Pi session…
-      expect(mockCreateAgentSession.mock.calls.length).toBeGreaterThanOrEqual(2);
-      // …by reopening the persisted file, not by flattening the transcript.
-      expect(mockSessionManagerOpen).toHaveBeenCalledWith(
-        path.join(piSessionDirFor(root, 'persist-model'), '2026-01-01T00-00-00-000Z_seed.jsonl'),
-        piSessionDirFor(root, 'persist-model'),
-        expect.any(String),
-      );
-      const prompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-      expect(prompt).toBe('After switch');
-      expect(prompt).not.toContain('PREVIOUS CONVERSATION');
-    });
+    expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+    expect(mockCreateAgentSession.mock.calls.map(call => call[0].durableFile)).toEqual([
+      file,
+      file,
+    ]);
+    expect(mockSession.prompt).toHaveBeenCalledExactlyOnceWith('After switch');
   });
 });

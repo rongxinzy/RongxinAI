@@ -52,7 +52,7 @@ afterEach(() => {
 test('validates all recovery rows against the current component contract before mutation', () => {
   const source = fs.readFileSync(scriptPath, 'utf8');
   expect(source).toContain(
-    "$state -cnotmatch '^(?:channel-runtime|mcps|python|skill-python|skills|uv|llamacpp-bundled|strata-bundled)\\|(?:True|False)\\z'",
+    "$state -cnotmatch '^(?:mcps|python|skill-python|skills|uv|llamacpp-bundled|strata-bundled)\\|(?:True|False)\\z'",
   );
   expect(source).not.toContain('Where-Object');
   expect(source.indexOf('Unsupported component recovery state')).toBeLessThan(

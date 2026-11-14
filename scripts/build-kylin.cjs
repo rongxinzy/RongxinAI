@@ -34,8 +34,6 @@ function buildKylin({ run = defaultRun, platform = process.platform, arch = proc
   }
 
   const steps = [
-    ['bun', ['run', 'channel:runtime:linux-x64']],
-    ['bun', ['run', 'engram:runtime:linux-x64']],
     ['node', ['scripts/ensure-build-version.js']],
     ['bun', ['run', 'sync:vendor-llamacpp-cpu']],
     ['bun', ['run', 'prepare:inference-edition-runtime']],

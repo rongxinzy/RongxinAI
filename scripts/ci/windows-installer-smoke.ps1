@@ -179,7 +179,7 @@ $installer = $installers[0].FullName
 $installRoot = Join-Path $env:LOCALAPPDATA "Programs\$InstallDirName"
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'ZhiYuanAgent\runtimes'
 $timingLog = Join-Path $env:APPDATA 'ZhiYuanAgent\install-timing.log'
-$componentKeys = @('channel-runtime', 'skills', 'mcps', 'python', 'skill-python', 'uv')
+$componentKeys = @('skills', 'mcps', 'python', 'skill-python', 'uv')
 $edition = if ($env:ZHIYUAN_UPDATE_VARIANT) { $env:ZHIYUAN_UPDATE_VARIANT.Trim().ToLowerInvariant() } else { 'lite' }
 if ($edition -in @('cpu', 'cuda')) { $componentKeys += 'llamacpp-bundled' }
 if ($edition -eq 'cuda') { $componentKeys += 'strata-bundled' }
@@ -215,8 +215,6 @@ function Assert-InstalledModelCatalog {
 try {
   Invoke-Installer $installer 'cold installation' 2700 $timingLog
   Assert-Path $installRoot 'installation root'
-  Assert-Path (Join-Path $installRoot 'resources\channel-runtime\cc-connect-sidecar.exe') 'installed channel runtime'
-  Assert-Path (Join-Path $installRoot 'resources\memory\engram.exe') 'installed memory runtime'
   $applicationExecutables = @(Get-ChildItem -LiteralPath $installRoot -Filter '*.exe' -File |
     Where-Object { $_.Name -notlike 'Uninstall*' })
   if ($applicationExecutables.Count -ne 1) {
@@ -264,8 +262,6 @@ try {
   }
 
   Invoke-Installer $installer 'cache-hit upgrade' 600 $timingLog
-  Assert-Path (Join-Path $installRoot 'resources\channel-runtime\cc-connect-sidecar.exe') 'upgraded channel runtime'
-  Assert-Path (Join-Path $installRoot 'resources\memory\engram.exe') 'upgraded memory runtime'
   Assert-Path $timingLog 'upgrade timing log'
   $upgradeLog = Get-LatestRunLog $timingLog
   if (($upgradeLog | Select-String -AllMatches 'phase=component-cache-hit ').Matches.Count -ne $componentKeys.Count) {

@@ -171,7 +171,6 @@ export const CoworkSessionIpc = {
   UpdateModel: 'cowork:session:updateModel',
   Get: 'cowork:session:get',
   RunSnapshot: 'cowork:session:runSnapshot',
-  RemoteManaged: 'cowork:session:remoteManaged',
   List: 'cowork:session:list',
   GetMessages: 'cowork:session:getMessages',
   ExportResultImage: 'cowork:session:exportResultImage',
@@ -272,60 +271,6 @@ export const LogIpc = {
 } as const;
 export type LogIpc = (typeof LogIpc)[keyof typeof LogIpc];
 
-// ─── IM ─────────────────────────────────────────────────────────────────────
-export const ImIpc = {
-  // Config
-  ConfigGet: 'im:config:get',
-  ConfigSet: 'im:config:set',
-  ConfigSync: 'im:config:sync',
-  // Gateway
-  GatewayStart: 'im:gateway:start',
-  GatewayStop: 'im:gateway:stop',
-  GatewayTest: 'im:gateway:test',
-  // Status
-  StatusGet: 'im:status:get',
-  GetLocalIp: 'im:getLocalIp',
-  // Events
-  StatusChange: 'im:status:change',
-  MessageReceived: 'im:message:received',
-} as const;
-export type ImIpc = (typeof ImIpc)[keyof typeof ImIpc];
-
-export const WeixinInstallIpc = {
-  Start: 'im:weixin:login:start',
-  Poll: 'im:weixin:login:poll',
-} as const;
-export type WeixinInstallIpc = (typeof WeixinInstallIpc)[keyof typeof WeixinInstallIpc];
-
-export const WeixinLoginErrorCode = {
-  Setup: 'setup',
-  Transport: 'transport',
-} as const;
-export type WeixinLoginErrorCode = (typeof WeixinLoginErrorCode)[keyof typeof WeixinLoginErrorCode];
-
-// ─── IM Multi-Instance factories ────────────────────────────────────────────
-export const ImInstanceIpc = {
-  dingtalkAdd: 'im:dingtalk:instance:add',
-  dingtalkDelete: 'im:dingtalk:instance:delete',
-  dingtalkSetConfig: 'im:dingtalk:instance:config:set',
-  qqAdd: 'im:qq:instance:add',
-  qqDelete: 'im:qq:instance:delete',
-  qqSetConfig: 'im:qq:instance:config:set',
-  feishuAdd: 'im:feishu:instance:add',
-  feishuDelete: 'im:feishu:instance:delete',
-  feishuSetConfig: 'im:feishu:instance:config:set',
-  wecomAdd: 'im:wecom:instance:add',
-  wecomDelete: 'im:wecom:instance:delete',
-  wecomSetConfig: 'im:wecom:instance:config:set',
-  telegramAdd: 'im:telegram:instance:add',
-  telegramDelete: 'im:telegram:instance:delete',
-  telegramSetConfig: 'im:telegram:instance:config:set',
-  discordAdd: 'im:discord:instance:add',
-  discordDelete: 'im:discord:instance:delete',
-  discordSetConfig: 'im:discord:instance:config:set',
-} as const;
-export type ImInstanceIpc = (typeof ImInstanceIpc)[keyof typeof ImInstanceIpc];
-
 // ─── Community Auth ─────────────────────────────────────────────────────────
 export const CommunityAuthIpc = {
   Login: 'auth:communityLogin',
@@ -334,20 +279,6 @@ export const CommunityAuthIpc = {
   Callback: 'auth:communityCallback',
 } as const;
 export type CommunityAuthIpc = (typeof CommunityAuthIpc)[keyof typeof CommunityAuthIpc];
-
-// ─── Feishu Install ─────────────────────────────────────────────────────────
-export const FeishuInstallIpc = {
-  Verify: 'feishu:install:verify',
-} as const;
-export type FeishuInstallIpc = (typeof FeishuInstallIpc)[keyof typeof FeishuInstallIpc];
-
-// ─── DingTalk Install ───────────────────────────────────────────────────────
-export const DingTalkInstallIpc = {
-  Qrcode: 'dingtalk:install:qrcode',
-  Poll: 'dingtalk:install:poll',
-  Verify: 'dingtalk:install:verify',
-} as const;
-export type DingTalkInstallIpc = (typeof DingTalkInstallIpc)[keyof typeof DingTalkInstallIpc];
 
 // ─── Network ────────────────────────────────────────────────────────────────
 export const NetworkIpc = {

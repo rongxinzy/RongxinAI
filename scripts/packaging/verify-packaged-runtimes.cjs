@@ -6,9 +6,7 @@ const path = require('node:path');
 
 const { verifyPackagedMagpie } = require('../magpie-runtime.cjs');
 const { verifyPackagedNodePty } = require('./verify-packaged-native-modules.cjs');
-const {
-  verifyWindowsCompressedChannelRuntime,
-} = require('./verify-windows-packaged-components.cjs');
+const { retiredRuntimeArtifact } = require('./retired-runtime-policy.cjs');
 
 const retiredRuntimeSegment = ['open', 'claw'].join('');
 const retiredMindSegment = ['cf', 'mind'].join('');
@@ -51,53 +49,6 @@ function verifySha256(relativeLabel, filePath, expectedSha256) {
   if (actual.toLowerCase() !== expectedSha256.trim().toLowerCase()) {
     throw new Error(
       `[PackagedRuntimeVerify] ${relativeLabel} SHA-256 mismatch (expected ${expectedSha256}, got ${actual})`,
-    );
-  }
-}
-
-function verifyPackagedChannelRuntime(context) {
-  const projectRoot = context.packager.projectDir;
-  const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
-  const config = packageJson.channelRuntime;
-  const platform = context.electronPlatformName;
-  const arch = resolveTargetArch(context);
-  const targetId = `${platform === 'win32' ? 'win' : platform === 'darwin' ? 'mac' : 'linux'}-${arch}`;
-  const binaryName = platform === 'win32' ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
-  const expectedChecksum = config?.runtimeChecksums?.[targetId];
-  const assetName = config?.runtimeAssets?.[targetId];
-  if (!expectedChecksum || !assetName) {
-    throw new Error(
-      `[PackagedRuntimeVerify] package.json is missing channelRuntime pin for ${targetId}`,
-    );
-  }
-
-  if (platform === 'win32') {
-    verifyWindowsCompressedChannelRuntime(context, targetId, expectedChecksum, binaryName);
-    return;
-  }
-
-  const runtimeDir = path.join(packagedResourcesRoot(context), 'channel-runtime');
-  const binaryPath = path.join(runtimeDir, binaryName);
-  const buildInfoPath = path.join(runtimeDir, 'runtime-build-info.json');
-  verifySha256(`channel-runtime ${targetId}`, binaryPath, expectedChecksum);
-
-  if (!fs.existsSync(buildInfoPath)) {
-    throw new Error(
-      `[PackagedRuntimeVerify] Missing channel-runtime runtime-build-info.json for ${targetId}`,
-    );
-  }
-  const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf8'));
-  if (
-    buildInfo?.schemaVersion !== 1 ||
-    buildInfo?.repo !== config?.repo ||
-    buildInfo?.version !== config?.version ||
-    buildInfo?.sourceRevision !== config?.sourceRevision ||
-    buildInfo?.target !== targetId ||
-    buildInfo?.assetName !== assetName ||
-    buildInfo?.checksum !== expectedChecksum
-  ) {
-    throw new Error(
-      '[PackagedRuntimeVerify] Packaged channel runtime metadata does not match package.json channelRuntime pin.',
     );
   }
 }
@@ -158,7 +109,7 @@ function verifyNoRetiredRuntimeArtifacts(context) {
   const root = context.appOutDir;
   if (!fs.existsSync(root)) return;
   walkPackagedTree('', root, relativePath => {
-    if (RETIRED_RUNTIME_IN_PATH.test(relativePath)) {
+    if (RETIRED_RUNTIME_IN_PATH.test(relativePath) || retiredRuntimeArtifact(relativePath)) {
       throw new Error(
         `[PackagedRuntimeVerify] Packaged artifact contains retired runtime path: ${relativePath}`,
       );
@@ -168,7 +119,6 @@ function verifyNoRetiredRuntimeArtifacts(context) {
 
 function verifyPackagedDeliverables(context) {
   verifyNoRetiredRuntimeArtifacts(context);
-  verifyPackagedChannelRuntime(context);
   verifyPackagedMagpie(context);
   verifyPackagedLlamaCppBundled(context);
   verifyPackagedNodePty(context);
@@ -176,7 +126,6 @@ function verifyPackagedDeliverables(context) {
 
 module.exports = {
   verifyPackagedDeliverables,
-  verifyPackagedChannelRuntime,
   verifyPackagedLlamaCppBundled,
   verifyNoRetiredRuntimeArtifacts,
   packagedResourcesRoot,

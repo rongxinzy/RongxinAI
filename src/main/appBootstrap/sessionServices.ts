@@ -6,10 +6,10 @@ import { agentRuntime } from './agentRuntimeState';
 import { memoryRuntime } from './memoryRuntimeState';
 import { mcpRuntime } from './mcpRuntimeState';
 import { getCoworkStore, getArtifactLedger, getSkillManager, getStore } from './runtimeServices';
-import { EngramManager } from '../memory/engramManager';
 import { ProjectMemoryService } from '../memory/projectMemoryService';
 import { MemoryRepository } from '../memory/repository';
-import { ZhiYuanEngramAdapter } from '../memory/zhiyuanEngramAdapter';
+import { MarkdownMemoryBackend } from '../memory/markdownMemoryBackend';
+import { MarkdownMemoryRuntime } from '../memory/markdownMemoryRuntime';
 import { resolveProjectIdentity } from '../memory/projectIdentity';
 import { coworkImageRoot } from '../coworkImageAttachments';
 import { ConversationHistoryService } from '../conversationHistory/service';
@@ -44,26 +44,18 @@ export const getWorkbenchTaskService = (): WorkbenchTaskService => {
   return agentRuntime.workbenchTaskService;
 };
 
-export const getEngramManager = (): EngramManager => {
-  if (!memoryRuntime.engramManager) {
-    memoryRuntime.engramManager = new EngramManager({
-      userDataPath: app.getPath('userData'),
-      resourcesPath: process.resourcesPath,
-      projectRoot: app.isPackaged ? undefined : process.cwd(),
-    });
-  }
-  return memoryRuntime.engramManager;
-};
-
 export const getProjectMemoryService = (): ProjectMemoryService => {
-  if (!memoryRuntime.engramAdapter)
-    memoryRuntime.engramAdapter = new ZhiYuanEngramAdapter(getEngramManager());
   if (!memoryRuntime.memoryRepository)
     memoryRuntime.memoryRepository = new MemoryRepository(getStore().getDatabase());
+  if (!memoryRuntime.memoryBackend)
+    memoryRuntime.memoryBackend = new MarkdownMemoryBackend(
+      new MarkdownMemoryRuntime(path.join(app.getPath('userData'), 'durable-memory')),
+      memoryRuntime.memoryRepository,
+    );
   if (!memoryRuntime.projectMemoryService) {
     memoryRuntime.projectMemoryService = new ProjectMemoryService(
       memoryRuntime.memoryRepository,
-      memoryRuntime.engramAdapter,
+      memoryRuntime.memoryBackend,
       resolveProjectIdentity,
       path.join(app.getPath('userData'), 'memory'),
     );

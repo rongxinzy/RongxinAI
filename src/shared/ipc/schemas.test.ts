@@ -33,6 +33,18 @@ describe('CoworkSessionStartSchema permissionMode', () => {
   });
 });
 
+test('interactive start cannot supply an automation source or choose an existing session identity', () => {
+  for (const field of [
+    { source: 'scheduled' },
+    { sessionId: 'automation:task' },
+    { id: 'automation:task' },
+  ]) {
+    expect(
+      CoworkSessionStartSchema.input.safeParse({ prompt: 'Run the task', ...field }).success,
+    ).toBe(false);
+  }
+});
+
 describe('CoworkSessionContinueSchema permissionMode', () => {
   const baseInput = { sessionId: 'session-1', prompt: 'go on' };
 

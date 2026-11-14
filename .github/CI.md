@@ -1,56 +1,44 @@
 # CI gate ownership
 
-Every PR runs workflow validation, lint (including Knip unused-code and `scripts/` Python dead-code checks),
-renderer type checking/build/bundle budgets, Electron compilation, unit tests, and Presentation Studio tests.
-Documentation-only and website-only PRs keep these baseline checks. They do not run install, memory,
-enterprise toolchain, or channel-runtime smoke jobs. Unknown paths never skip the baseline. Unit tests run
-as two shards of one `test` job; `ci-gate` still requires that job to succeed.
+Pull requests and pushes to main or release branches run lint, application and
+unit-test type checking, and two unit-test shards. The second shard also runs
+enterprise unit tests. Lint includes workflow syntax, formatting, Skill
+frontmatter, source and binary size checks, Knip and Python dead-code checks.
+Documentation-only changes use the same baseline. These jobs do not build or
+install application packages.
 
-`scripts/ci/gates/policy.ts` owns expensive-check selection:
+The required ci-gate aggregates lint, typecheck and test. Missing, failed,
+cancelled or skipped baseline jobs fail the gate. The contract is implemented
+in scripts/ci/gates/policy.ts and mirrored by .github/workflows/ci.yml.
 
-| Change                                                                                                      | Additional PR checks                                                        |
-| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Dependencies, patches, build/configuration, workflows, scripts, bundled runtimes, Skills/MCPs, main process | Memory regression. Linux and Windows install run on tags, manual dispatch, and release workflows |
-| Renderer services, hooks, store, application entry points, cowork UI, shared conversation components        | Memory regression                                                           |
-| Other renderer UI, styles, documentation, website                                                           | None                                                                        |
+## Release preflight
 
-The planner uses the full Git merge-base diff, with NUL-separated paths and rename
-detection disabled. Deleted paths and both sides of renames participate. Invalid SHAs
-or diff failures stop the planner; no API pagination or 300-file filter limit applies.
+Heavy verification runs through release-preflight.yml. The source job resolves
+one source commit, and every subsequent job checks that same commit. Required
+jobs cover quality and complete tests, the enterprise extension, native runtime
+integration, Python containment, browser preview and memory regression.
 
-`ci-gate` always runs and rejects failed, cancelled, missing, or unexpectedly skipped required
-jobs. Path-owned checks (channel runtime smoke, Python runtime containment, installer preview,
-browser preview) run as conditional jobs inside CI. Browser preview runs when the renderer, shared
-contracts, or `scripts/preview` change. Linux and Windows install workflows remain reusable/manual
-workflows. The parent CI owns concurrency cancellation and exposes `ci-gate` as the sole required
-GitHub check for pull requests.
+The native-runtime job verifies Pi Durable execution, native automations and Markdown plugin
+memory. It replaces the retired channel-binary
+download smoke job. No cc-connect or Engram executable is downloaded or started.
+The architecture gate explicitly rejects retired execution dependencies,
+runtime manifests, startup scripts and packaging inputs.
 
-## Release and nightly checks
+Linux and Windows installation jobs run when include-packaging is true and must
+succeed. When it is false they must be skipped; the gate rejects an unexpected
+result in either direction. Successful packaging preflight emits a release
+candidate attestation bound to the source commit and workflow run. Release
+publication and signed-package checks remain governed by [RELEASING.md](../RELEASING.md).
 
-Tag releases (`release.yml`) run memory regression, full quality gates, and platform
-packaging with Linux deb install smoke, Windows signing/install/uninstall checks, and
-beta-channel publish. Stable promotion is manual via `promote.yml` (no rebuild). See
-[RELEASING.md](../RELEASING.md).
+The Windows offline base contains Skills, MCPs, Python, the shared Skill Python
+environment and uv. CPU adds bundled llama.cpp; CUDA also adds Strata. NSIS,
+the installer shell, activation scripts and package smoke checks use the same
+component contract. Component archive hashes, sentinel hashes and native
+installation checks remain required.
 
-**Inference edition packaging (`build-platforms.yml`, not required):** pull requests
-that touch packaging definitions (`electron-builder*`, `vendor/llamacpp/**`, release/build
-workflows, `scripts/release/**`, and other packaging-specific scripts) run the full
-7-leg verify matrix. Pull requests that only change dependencies, bundled assets, or
-non-packaging scripts under `scripts/**` / `resources/**` run one Linux x64 **cpu**
-smoke leg. Unrelated PRs do not run this workflow. A nightly schedule on `main` and
-**workflow_dispatch** run the full matrix; tag releases already build every edition via
-`release.yml`.
+## Windows packaging latency
 
-Nightly uses the same memory scenario with additional MemLab analysis. Main pushes
-repeat baseline checks without duplicate installation jobs.
-
-After this workflow is available on main, use **CI → Run workflow** on a selected branch
-to force all expensive checks. Individual Linux/Windows manual workflows remain available.
-Manual checks supplement the PR checks; they do not replace the PR merge-commit check.
-
-## Windows PR latency
-
-PR installation checks retain installer size, clean-PATH runtime probes, cold install,
+Windows installation checks retain installer size, clean-PATH runtime probes, cold install,
 cache-hit upgrade and uninstall. Compression qualification runs on manual and weekly
 Windows builds, and is mandatory before both candidate assembly and tag publication.
 The shared action retains its JSON report and enforces the existing size, extraction
@@ -73,7 +61,7 @@ the miss and investigate the measured bottleneck without relaxing installation t
 ## Required-check rollout and measurement
 
 The default branch requires `ci-gate` from GitHub Actions (app ID 15368), with the branch up to
-date before merging. The `ci-gate` job aggregates every baseline and path-selected job via
+date before merging. The `ci-gate` job aggregates every baseline job via
 `scripts/ci/gates/verify.ts`. Lint also runs Knip, Python dead-code (scripts/), and a 2 MiB
 source line-limit gate (1000 lines; shrinking-only baseline for legacy files), and a diff-only
 binary size gate with an explicit asset allowlist. Do not require conditional platform jobs

@@ -5,77 +5,112 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { app } from 'electron';
 import { expect, test, vi } from 'vitest';
-import { SessionManager } from '@earendil-works/pi-coding-agent';
+import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
+import { createModels } from '@earendil-works/pi-ai';
+import {
+  AssistantEntry,
+  CompactionEntry,
+  Harness,
+  UserEntry,
+  createRegistry,
+} from '@earendil-works/pi-durable';
+import { openNodeSqliteStorage } from '@earendil-works/pi-durable/storage/sqlite/node';
 import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
 import { CoworkExecutionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import { CoworkStore } from '../../coworkStore';
 import { SqliteStore } from '../../sqliteStore';
-import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { runTextWorkerOperation } from '../../workbenchTask/textWorkerOperations';
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
-import { piSessionDirFor } from './piSessionStore';
-import { PiAssistantStopReason } from './piToolConstants';
+import { durableSessionFile } from './durableSessionStore';
 
-// Only Electron's unbuilt worker transport is replaced. The adapter, SDK,
-// provider HTTP parser, tools, SQLite and JSONL are real.
+// Replace only the unbuilt Electron worker transport. HTTP, native history,
+// compaction, tool writes and application persistence all remain real.
 vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
   transformCoworkTextAsync: async (input: Parameters<typeof runTextWorkerOperation>[0]) =>
     runTextWorkerOperation(input),
 }));
-
-const Scenario = { Restore: 'restore', SummaryFailure: 'summary-failure' } as const;
+const context = BACKGROUND_CONTEXT;
 const markers = Array.from(
   { length: 48 },
   (_, index) => `EVIDENCE_${String(index).padStart(3, '0')}`,
 );
+const usage = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 0,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+};
+const configurations = [
+  { window: 65536, terminal: 'stop', failSummary: false },
+  { window: 262144, terminal: 'stop', failSummary: false },
+  { window: 65536, terminal: 'error', failSummary: false },
+  { window: 65536, terminal: 'stop', failSummary: true },
+  { window: 65536, terminal: 'length', failSummary: true },
+  { window: 65536, terminal: 'stop', failSummary: false, excessive: true },
+] as const;
 
-test.each([
-  { window: 65536, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Stop },
-  { window: 262144, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Stop },
-  { window: 65536, scenario: Scenario.Restore, terminal: PiAssistantStopReason.Error },
-  { window: 65536, scenario: Scenario.SummaryFailure, terminal: PiAssistantStopReason.Stop },
-  { window: 65536, scenario: Scenario.SummaryFailure, terminal: PiAssistantStopReason.Length },
-])(
-  'resumes a genuinely oversized persisted session: $window $scenario $terminal',
+async function history(file: string, writable = false) {
+  return Harness.open(
+    await openNodeSqliteStorage(file),
+    {
+      models: createModels(),
+      registry: createRegistry(),
+      readOnly: !writable,
+    },
+    context,
+  );
+}
+async function entries(file: string) {
+  const native = await history(file);
+  try {
+    return (await (await native.root(context)).entries({}, 1000, undefined, context)).items;
+  } finally {
+    await native.close(context);
+  }
+}
+function independentTokens(text: string) {
+  const cjk = (
+    text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) ?? []
+  ).length;
+  return cjk + Math.ceil((text.length - cjk) / 3.5);
+}
+
+test.each(configurations)(
+  'native oversized resume: $window $terminal summaryFailure=$failSummary excessive=$excessive',
   async configuration => {
-    const root = await mkdtemp(path.join(tmpdir(), 'pi-oversized-resume-'));
+    const root = await mkdtemp(path.join(tmpdir(), 'durable-oversized-'));
     const workspace = path.join(root, 'workspace');
     const sessionId = 'oversized-history';
     const modelId = 'resume-model';
+    let failSummary = configuration.failSummary as boolean;
     let summaryCalls = 0;
-    let regularCalls = 0;
     let writeCalls = 0;
-    let failSummary = configuration.scenario === Scenario.SummaryFailure;
+    const errors: unknown[] = [];
+    let complete = 0;
     const serverErrors: unknown[] = [];
     const requests: Array<{ summary: boolean; input: number; output: number }> = [];
-    const server = createServer((req, res) => {
+    const server = createServer((request, response) => {
       void (async () => {
         const chunks: Buffer[] = [];
-        for await (const chunk of req) chunks.push(Buffer.from(chunk));
-        const body = JSON.parse(Buffer.concat(chunks).toString()) as {
-          messages: unknown[];
-          max_tokens?: number;
-          max_completion_tokens?: number;
-        };
+        for await (const chunk of request) chunks.push(Buffer.from(chunk));
+        const body = JSON.parse(Buffer.concat(chunks).toString());
         const text = JSON.stringify(body.messages);
         const summary = text.includes('context summarization assistant');
-        // Enforce an independent server budget against actual payload size, not
-        // invented high usage attached to a tiny prompt. Over-limit calls fail.
-        const input = Math.ceil(text.length / 3);
+        const input = independentTokens(text);
         const output = body.max_tokens ?? body.max_completion_tokens ?? 0;
         requests.push({ summary, input, output });
-        if (requests.length > 120) throw new Error('Unexpected recovery loop');
+        if (requests.length > 30) throw new Error('Unexpected recovery loop');
         if (input + output > configuration.window) {
-          res.writeHead(400, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: { message: 'maximum context length exceeded' } }));
+          response.writeHead(400, { 'content-type': 'application/json' });
+          response.end(JSON.stringify({ error: { message: 'maximum context length exceeded' } }));
           return;
         }
         if (summary) summaryCalls++;
-        else regularCalls++;
-        const partial = summary && failSummary && summaryCalls === 2;
         const found = [...new Set(text.match(/EVIDENCE_\d{3}/g) ?? [])];
         const write = !summary && writeCalls === 0;
         if (write) writeCalls++;
@@ -96,15 +131,13 @@ test.each([
             }
           : {
               role: 'assistant',
-              content: summary
-                ? found.join(' ') || 'Continue the task.'
-                : 'Recovered artifact verified.',
+              content: summary ? found.join(' ') : 'Recovered artifact verified.',
             };
-        res.writeHead(200, { 'content-type': 'text/event-stream' });
-        res.write(
+        response.writeHead(200, { 'content-type': 'text/event-stream' });
+        response.write(
           `data: ${JSON.stringify({ id: 'resume', model: modelId, choices: [{ index: 0, delta, finish_reason: null }] })}\n\n`,
         );
-        res.end(
+        response.end(
           `data: ${JSON.stringify({
             id: 'resume',
             model: modelId,
@@ -112,7 +145,7 @@ test.each([
               {
                 index: 0,
                 delta: {},
-                finish_reason: partial ? 'length' : write ? 'tool_calls' : 'stop',
+                finish_reason: summary && failSummary ? 'length' : write ? 'tool_calls' : 'stop',
               },
             ],
             usage: { prompt_tokens: input, completion_tokens: 200, total_tokens: input + 200 },
@@ -120,7 +153,7 @@ test.each([
         );
       })().catch(error => {
         serverErrors.push(error);
-        res.destroy();
+        response.destroy();
       });
     });
     let store: SqliteStore | undefined;
@@ -136,13 +169,11 @@ test.each([
       });
       gateway.upsert(modelId, { context_window: configuration.window, max_output_tokens: 4096 });
       gateway.setImage(modelId, false);
-      const mutableApp = app as unknown as Record<string, unknown>;
-      mutableApp.getAppPath ??= () => process.cwd();
+      (app as unknown as Record<string, unknown>).getAppPath ??= () => process.cwd();
       await mkdir(workspace);
       await mkdir(path.join(root, 'state'));
       store = await SqliteStore.create(path.join(root, 'state'));
       const db = store.getDatabase();
-      initializeWorkbenchTaskSchema(db);
       const cowork = new CoworkStore(db);
       cowork.createSession(
         'Resume',
@@ -158,81 +189,90 @@ test.each([
       adapter.setCoworkStore(cowork);
       adapter.setWorkbenchTaskService(new WorkbenchTaskService(db));
       adapter.setPiSessionStoreRoot(root);
-      const manager = SessionManager.create(workspace, piSessionDirFor(root, sessionId));
-      // Around 420K locally estimated input: larger than both tested windows.
-      for (const marker of markers) {
-        manager.appendMessage({
-          role: 'user',
-          content: `${marker}\n${'historical evidence '.repeat(1800)}`,
-          timestamp: 1,
-        });
-        manager.appendMessage({
-          role: 'assistant',
-          content: [{ type: 'text', text: 'Recorded.' }],
-          timestamp: 2,
-          api: 'openai-completions',
-          provider: 'magpie',
-          model: modelId,
-          stopReason:
-            marker === markers.at(-1) ? configuration.terminal : PiAssistantStopReason.Stop,
-          errorMessage:
-            configuration.terminal === PiAssistantStopReason.Error && marker === markers.at(-1)
-              ? 'Context window exceeded: estimated input 406565 leaves no output budget in 65536 tokens'
-              : undefined,
-          // Old/failed sessions may have no useful usage. Recovery must inspect history.
-          usage: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 0,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-          },
-        });
-      }
-      const file = manager.getSessionFile()!;
-      const original = await readFile(file, 'utf8');
-      const errors: unknown[] = [];
-      let complete = 0;
+      const file = durableSessionFile(root, sessionId);
+      await mkdir(path.dirname(file), { recursive: true });
+      const seed = await history(file, true);
+      const conversation = await seed.root(context);
+      const excessive = 'excessive' in configuration && configuration.excessive;
+      // Actual CJK token payload exceeds both supported windows, independent of
+      // reported usage (all historical usage is zero). The regular case still
+      // has a summary prefix that fits; the excessive case deliberately does not.
+      const chars = Math.ceil(
+        (excessive ? configuration.window * 5 : configuration.window + 9000) / markers.length,
+      );
+      await seed.commit(async tx => {
+        for (const marker of markers) {
+          await tx.appendEntry(conversation.id, {
+            kind: UserEntry.kind,
+            model: [
+              {
+                role: 'user',
+                content: `${marker}\n${'数据库事务日志索引调度一致性恢复'.repeat(Math.ceil(chars / '数据库事务日志索引调度一致性恢复'.length))}`,
+                timestamp: 1,
+              },
+            ],
+          });
+          await tx.appendEntry(conversation.id, {
+            kind: AssistantEntry.kind,
+            model: [
+              {
+                role: 'assistant',
+                content: [{ type: 'text', text: 'Recorded.' }],
+                timestamp: 2,
+                api: 'openai-completions',
+                provider: 'magpie',
+                model: modelId,
+                usage,
+                stopReason: marker === markers.at(-1) ? configuration.terminal : 'stop',
+                ...(configuration.terminal === 'error'
+                  ? { errorMessage: 'maximum context length exceeded' }
+                  : {}),
+              },
+            ],
+          });
+        }
+      }, context);
+      await seed.close(context);
+      const original = await entries(file);
+      expect(independentTokens(JSON.stringify(original))).toBeGreaterThan(configuration.window);
       adapter.on('error', (_id, error) => errors.push(error));
       adapter.on('complete', () => {
         complete++;
       });
-      adapter.on('permissionRequest', (_id, request) => {
-        adapter.respondToPermission(request.requestId, { behavior: 'allow' });
-      });
+      adapter.on('permissionRequest', (_id, request) =>
+        adapter.respondToPermission(request.requestId, { behavior: 'allow' }),
+      );
       const resume = () =>
         adapter.continueSession(
           sessionId,
-          'Continue the old task. Write all evidence markers, in order, to recovered.md.',
+          'Continue the task. Write all evidence markers, in order, to recovered.md.',
           {
             workspaceRoot: workspace,
             sessionMode: CoworkSessionMode.Work,
             approvalMode: WorkbenchApprovalMode.Ask,
           },
         );
-      if (failSummary) {
-        await expect(resume()).rejects.toThrow('summary is incomplete');
-        expect(summaryCalls).toBe(2);
-        expect(regularCalls).toBe(0);
+      if (failSummary || excessive) {
+        await expect(resume()).rejects.toThrow(/compaction|summary|context/i);
         expect(complete).toBe(0);
-        expect(errors).toHaveLength(1);
-        expect((await readFile(file, 'utf8')).startsWith(original)).toBe(true);
-        const failedBranch = SessionManager.open(file).getBranch();
-        expect(failedBranch.filter(entry => entry.type === 'message')).toEqual(
-          manager.getBranch().filter(entry => entry.type === 'message'),
-        );
-        expect(
-          failedBranch.some(entry => entry.type === 'compaction' || entry.type === 'context_edit'),
-        ).toBe(false);
+        expect(errors.length).toBeGreaterThan(0);
+        expect(writeCalls).toBe(0);
+        expect(requests.filter(request => !request.summary)).toEqual([]);
+        const failed = await entries(file);
+        expect(failed.filter(entry => original.some(old => old.id === entry.id))).toEqual(original);
+        expect(failed.some(entry => CompactionEntry.is(entry))).toBe(false);
         await expect(readFile(path.join(workspace, 'recovered.md'))).rejects.toThrow();
+        if (excessive) {
+          expect(serverErrors).toEqual([]);
+          return;
+        }
         failSummary = false;
         errors.length = 0;
       }
       await resume();
       expect(errors).toEqual([]);
       expect(complete).toBe(1);
-      expect(summaryCalls).toBeGreaterThan(1);
+      expect(summaryCalls).toBeGreaterThan(0);
       expect(await readFile(path.join(workspace, 'recovered.md'), 'utf8')).toBe(markers.join('\n'));
       expect(
         requests
@@ -240,15 +280,16 @@ test.each([
           .every(request => request.input + request.output <= configuration.window),
       ).toBe(true);
       expect(requests.every(request => request.output > 1)).toBe(true);
-      const persisted = SessionManager.open(file);
-      expect(persisted.getBranch().some(entry => entry.type === 'compaction')).toBe(true);
-      // Compaction adds a projection; the original source remains available intact.
-      expect((await readFile(file, 'utf8')).startsWith(original)).toBe(true);
+      const persisted = await entries(file);
+      expect(persisted.some(entry => CompactionEntry.is(entry))).toBe(true);
+      expect(persisted.filter(entry => original.some(old => old.id === entry.id))).toEqual(
+        original,
+      );
       expect(restored).toHaveBeenCalledWith(
         sessionId,
         expect.objectContaining({
-          source: 'jsonl',
-          messageCount: 96,
+          source: 'durable',
+          messageCount: 50,
           contextWindow: configuration.window,
           model: modelId,
         }),

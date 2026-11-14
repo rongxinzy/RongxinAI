@@ -1,6 +1,8 @@
 import { expect, test, vi } from 'vitest';
 
 import { McpServerManager } from './mcpServerManager';
+import { createServer } from 'node:http';
+import { buildDurableMcpTools } from './agentEngine/durableMcpTools';
 
 const createRecord = (updatedAt = 1) => ({
   id: 'server-1',
@@ -12,6 +14,64 @@ const createRecord = (updatedAt = 1) => ({
   isBuiltIn: false,
   createdAt: 1,
   updatedAt,
+});
+
+test('real MCP tool discovery preserves annotations through the Durable registration', async () => {
+  const server = createServer(async (request, response) => {
+    if (request.method !== 'POST') {
+      response.writeHead(204).end();
+      return;
+    }
+    let text = '';
+    for await (const chunk of request) text += chunk.toString();
+    const message = JSON.parse(text);
+    if (message.id === undefined) {
+      response.writeHead(204).end();
+      return;
+    }
+    response.writeHead(200, { 'content-type': 'application/json' });
+    const result =
+      message.method === 'initialize'
+        ? {
+            protocolVersion: '2025-06-18',
+            capabilities: { tools: {} },
+            serverInfo: { name: 'fixture', version: '1' },
+          }
+        : {
+            tools: [
+              {
+                name: 'peek',
+                description: 'Read an item.',
+                inputSchema: { type: 'object', properties: {} },
+                annotations: { readOnlyHint: true, idempotentHint: true },
+              },
+            ],
+          };
+    response.end(JSON.stringify({ jsonrpc: '2.0', id: message.id, result }));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+  const manager = new McpServerManager();
+  try {
+    const tools = await manager.startServers([
+      { ...createRecord(), url: `http://127.0.0.1:${address.port}/mcp` },
+    ]);
+    expect(tools).toHaveLength(1);
+    expect(tools[0].annotations).toEqual({ readOnlyHint: true, idempotentHint: true });
+    const native = buildDurableMcpTools(manager);
+    expect(native.annotations.get('mcp__Stable MCP__peek')).toEqual({
+      readOnlyHint: true,
+      idempotentHint: true,
+    });
+    expect(native.tools).toHaveLength(1);
+  } finally {
+    await manager.stopServers();
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) =>
+      server.close(error => (error ? reject(error) : resolve())),
+    );
+  }
 });
 
 const getManagerInternals = (manager: McpServerManager) =>

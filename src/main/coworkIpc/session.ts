@@ -16,6 +16,7 @@ import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
 
 import { startCoworkSession, type CoworkSessionIpcDeps } from './sessionStart';
+import { assertInteractiveCoworkSession } from './interactiveSession';
 export type { CoworkSessionIpcDeps } from './sessionStart';
 
 export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
@@ -28,6 +29,7 @@ export const registerCoworkSessionIpc = (deps: CoworkSessionIpcDeps): void => {
         // Work sessions use Pi (SDK mode, instant availability).
         const runtime = deps.getPiRuntimeAdapter();
         const localStore = deps.getCoworkStore();
+        assertInteractiveCoworkSession(localStore, options.sessionId);
         let existingSession = localStore.getSession(options.sessionId, 0, {
           includeArtifacts: false,
         });

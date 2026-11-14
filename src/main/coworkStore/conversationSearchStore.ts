@@ -3,6 +3,7 @@
 import { extractConversationSearchTerms, parseTimeToMs, truncate } from './helpers';
 import { CoworkConfigStore } from './configStore';
 import type { CoworkConversationSearchRecord } from './types';
+import { currentSessionFilter } from './currentSessionFilter';
 
 export class CoworkConversationSearchStore extends CoworkConfigStore {
   private getLatestMessageByType(sessionId: string, type: 'user' | 'assistant'): string {
@@ -33,8 +34,13 @@ export class CoworkConversationSearchStore extends CoworkConfigStore {
     const afterMs = parseTimeToMs(options.after);
 
     const likeClauses = terms.map(() => 'LOWER(m.content) LIKE ?');
-    const clauses: string[] = ["m.type IN ('user', 'assistant')", `(${likeClauses.join(' OR ')})`];
-    const params: Array<string | number> = terms.map(term => `%${term}%`);
+    const source = currentSessionFilter(undefined, 's.source');
+    const clauses: string[] = [
+      source.sql,
+      "m.type IN ('user', 'assistant')",
+      `(${likeClauses.join(' OR ')})`,
+    ];
+    const params: Array<string | number> = [...source.params, ...terms.map(term => `%${term}%`)];
 
     if (beforeMs !== null) {
       clauses.push('m.created_at < ?');
@@ -119,8 +125,9 @@ export class CoworkConversationSearchStore extends CoworkConfigStore {
     const beforeMs = parseTimeToMs(options.before);
     const afterMs = parseTimeToMs(options.after);
 
-    const clauses: string[] = [];
-    const params: Array<string | number> = [];
+    const source = currentSessionFilter();
+    const clauses: string[] = [source.sql];
+    const params: Array<string | number> = [...source.params];
 
     if (beforeMs !== null) {
       clauses.push('updated_at < ?');

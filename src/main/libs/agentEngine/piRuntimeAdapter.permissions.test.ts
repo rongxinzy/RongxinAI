@@ -10,9 +10,10 @@ import {
   adapter,
   createTemporaryWorkspace,
   mockCreateAgentSession,
-  mockDefaultResourceLoader,
   mockSession,
   setupPiRuntimeAdapterSuite,
+  createdResources,
+  invokeBeforeTool,
 } from './piRuntimeAdapter.testHarness';
 
 import Database from 'better-sqlite3';
@@ -22,7 +23,6 @@ import {
   WorkbenchApprovalMode,
   WorkbenchRunStatus,
 } from '../../../shared/workbenchTask';
-import { PiExtensionEventType } from './piExtensionTypes';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
@@ -58,22 +58,7 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot: createTemporaryWorkspace(),
           approvalMode: WorkbenchApprovalMode.Ask,
         });
-        const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-          extensionFactories?: Array<
-            (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
-          >;
-        };
-        const toolCallHandlers: Array<(event: unknown) => Promise<unknown>> = [];
-        for (const factory of loaderOptions.extensionFactories ?? []) {
-          factory({
-            on: (event, handler) => {
-              if (event === PiExtensionEventType.ToolCall) {
-                toolCallHandlers.push(handler as (event: unknown) => Promise<unknown>);
-              }
-            },
-          });
-        }
-        const authorization = toolCallHandlers.at(-1)!({
+        const authorization = invokeBeforeTool({
           toolCallId: 'write-call',
           toolName: 'write',
           input: { path: 'release.md', content: 'draft' },
@@ -86,8 +71,7 @@ describe('PiRuntimeAdapter', () => {
         });
 
         await expect(authorization).resolves.toEqual({
-          block: true,
-          reason: 'Do not write this file.',
+          block: 'Do not write this file.',
         });
         expect(mockSession.abortBash).not.toHaveBeenCalled();
         expect(mockSession.abort).not.toHaveBeenCalled();
@@ -103,120 +87,55 @@ describe('PiRuntimeAdapter', () => {
 
     it('appends the AskUserQuestion policy when a custom system prompt is configured', async () => {
       await adapter.startSession('test', 'Hello Pi', { systemPrompt: 'Custom instructions' });
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        appendSystemPromptOverride: () => string[];
-      };
-      const appended = loaderOptions.appendSystemPromptOverride(['existing Pi append']);
-      expect(appended).toEqual(expect.arrayContaining(['existing Pi append']));
-      if (process.platform === 'win32') {
-        expect(appended.some(entry => entry.includes('## Bash execution contract'))).toBe(true);
-      }
+      const options = mockCreateAgentSession.mock.calls[0][0];
+      expect(options.customTools.map((tool: { name: string }) => tool.name)).toContain(
+        'AskUserQuestion',
+      );
+      expect((await createdResources()).getSystemPrompt()).toContain('Custom instructions');
     });
 
     it('removes AskUserQuestion and adds autonomous guidance for unattended runs', async () => {
       await adapter.startSession('unattended', 'Run the scheduled task', { unattended: true });
-
-      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        customTools?: Array<{ name: string }>;
-      };
-      expect(sessionOptions.customTools?.map(tool => tool.name) ?? []).not.toContain(
-        'AskUserQuestion',
-      );
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        appendSystemPromptOverride: () => string[];
-      };
-      const appended = loaderOptions.appendSystemPromptOverride();
-      expect(appended).toContain(PiUnattendedSystemPrompt);
+      expect(
+        mockCreateAgentSession.mock.calls[0][0].customTools.map(
+          (tool: { name: string }) => tool.name,
+        ),
+      ).not.toContain('AskUserQuestion');
+      expect((await createdResources()).getSystemPrompt()).toContain(PiUnattendedSystemPrompt);
     });
 
     it('recreates the Pi session when unattended mode changes', async () => {
-      await adapter.startSession('mode-switch', 'Start in the foreground');
-      await adapter.continueSession('mode-switch', 'Run on schedule', { unattended: true });
-
+      await adapter.startSession('mode-switch', 'Foreground task');
+      await adapter.continueSession('mode-switch', 'Background task', { unattended: true });
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
-      const unattendedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
-        customTools?: Array<{ name: string }>;
-      };
-      expect(unattendedOptions.customTools?.map(tool => tool.name) ?? []).not.toContain(
-        'AskUserQuestion',
-      );
-      const unattendedLoaderOptions = mockDefaultResourceLoader.mock.calls[1]?.[0] as {
-        appendSystemPromptOverride: () => string[];
-      };
-      expect(unattendedLoaderOptions.appendSystemPromptOverride()).toContain(
-        PiUnattendedSystemPrompt,
-      );
-
+      expect(
+        mockCreateAgentSession.mock.calls[1][0].customTools.map(
+          (tool: { name: string }) => tool.name,
+        ),
+      ).not.toContain('AskUserQuestion');
+      expect((await createdResources(1)).getSystemPrompt()).toContain(PiUnattendedSystemPrompt);
       await adapter.continueSession('mode-switch', 'Return to the foreground');
-
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(3);
-      const attendedOptions = mockCreateAgentSession.mock.calls[2]?.[0] as {
-        customTools?: Array<{ name: string }>;
-      };
-      expect(attendedOptions.customTools?.map(tool => tool.name) ?? []).toContain(
-        'AskUserQuestion',
-      );
-      const attendedLoaderOptions = mockDefaultResourceLoader.mock.calls[2]?.[0] as {
-        appendSystemPromptOverride: () => string[];
-      };
-      const attendedPrompt = attendedLoaderOptions.appendSystemPromptOverride();
-      expect(attendedPrompt).not.toContain(PiUnattendedSystemPrompt);
+      expect(
+        mockCreateAgentSession.mock.calls[2][0].customTools.map(
+          (tool: { name: string }) => tool.name,
+        ),
+      ).toContain('AskUserQuestion');
+      expect((await createdResources(2)).getSystemPrompt()).not.toContain(PiUnattendedSystemPrompt);
     });
 
     it('blocks direct Python Skill script calls across bash and powershell tools before execution', async () => {
-      await adapter.startSession('bash-guard', 'Inspect the workspace', {
+      await adapter.startSession('bash-guard', 'Inspect workspace', {
         approvalMode: WorkbenchApprovalMode.AllowAll,
       });
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
-        >;
-      };
-      const toolCallHandlers: Array<(event: unknown) => unknown> = [];
-      for (const factory of loaderOptions.extensionFactories ?? []) {
-        factory({
-          on: (event, handler) => {
-            if (event === PiExtensionEventType.ToolCall) toolCallHandlers.push(handler);
-          },
+      for (const toolName of ['bash', 'powershell']) {
+        const result = await invokeBeforeTool({
+          toolCallId: toolName,
+          toolName,
+          input: { command: 'python3 "$SKILLS_ROOT/pdf/scripts/render.py"' },
         });
+        expect(result?.block).toContain('run_skill_script');
       }
-
-      const [bashResults, psResults] = await Promise.all([
-        Promise.all(
-          toolCallHandlers.map(handler =>
-            handler({
-              toolCallId: 'bash-guard-call',
-              toolName: 'bash',
-              input: { command: 'python3 "$SKILLS_ROOT/pdf/scripts/render.py"' },
-            }),
-          ),
-        ),
-        Promise.all(
-          toolCallHandlers.map(handler =>
-            handler({
-              toolCallId: 'ps-guard-call',
-              toolName: 'powershell',
-              input: { command: 'python.exe "$env:SKILLS_ROOT\\pdf\\scripts\\render.py"' },
-            }),
-          ),
-        ),
-      ]);
-      expect(toolCallHandlers.length).toBeGreaterThan(0);
-      expect(bashResults.find(value => value !== undefined)).toEqual(
-        expect.objectContaining({
-          block: true,
-          reason: expect.stringContaining('run_skill_script'),
-        }),
-      );
-      expect(psResults.find(value => value !== undefined)).toEqual(
-        expect.objectContaining({
-          block: true,
-          reason: expect.stringContaining('run_skill_script'),
-        }),
-      );
     });
 
     it('resolves a Pi AskUserQuestion tool call with the renderer response', async () => {

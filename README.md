@@ -58,7 +58,7 @@ The free model requires a network connection; availability and usage limits are 
 
 Open the local inference workspace, browse the model marketplace, and choose a GGUF model and quantization suited to your hardware. Install the model and start its service. Adjust context length, GPU allocation, threads, and other options, then use a running local model for agent tasks.
 
-Local models reduce reliance on cloud inference. Web search, model downloads, remote MCP services, and messaging channels still require their respective network services.
+Local models reduce reliance on cloud inference. Web search, model downloads, and remote MCP services still require their respective network services.
 
 ### Data and permissions
 
@@ -116,7 +116,7 @@ bun install
 bun run web:preview
 ```
 
-Open the Vite URL in a browser to iterate on the renderer with hot reload, without starting Electron. To verify real desktop and IPC flows, run `bun run electron:dev`; it prepares the channel and memory runtimes, then starts Vite and Electron. Initial runtime preparation requires network access. Development runs use an isolated `ZhiYuanAgentDev` (enterprise: `ZhiYuanAgentEnterpriseDev`) profile so a running dev instance never holds the installed build's single-instance lock; set `ZHIYUAN_DEV_SHARED_USER_DATA=1` to reuse the installed profile instead (the two builds then exclude each other). To use local inference, download the inference runtime for your host separately:
+Open the Vite URL in a browser to iterate on the renderer with hot reload, without starting Electron. To verify real desktop and IPC flows, run `bun run electron:dev`; it starts Vite and Electron. Agent execution and Markdown memory run inside the application. Development runs use an isolated `ZhiYuanAgentDev` (enterprise: `ZhiYuanAgentEnterpriseDev`) profile so a running dev instance never holds the installed build's single-instance lock; set `ZHIYUAN_DEV_SHARED_USER_DATA=1` to reuse the installed profile instead (the two builds then exclude each other). To use local inference, download the inference runtime for your host separately:
 
 ```bash
 bun run llamacpp:runtime:download
@@ -187,7 +187,7 @@ The stack includes Electron, React, TypeScript, Vite, Tailwind CSS, Redux Toolki
   <img src="public/readme/zhiyuan_agent_architecture_en.svg" alt="ZhiYuan desktop architecture and module relationships" width="760">
 </p>
 
-The renderer owns the UI, preload provides the communication boundary, and the main process owns sessions, execution, data, and service lifecycles. Task messages, tool status, and approval requests stream back to the UI. Dedicated services manage local inference, skills, MCP, and messaging channels.
+The renderer owns the UI, preload provides the communication boundary, and the main process owns sessions, execution, data, and service lifecycles. Task messages, tool status, and approval requests stream back to the UI. Dedicated services manage local inference, skills, MCP, native automations, and Markdown memory.
 
 </details>
 

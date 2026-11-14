@@ -352,7 +352,7 @@ export const mockScheduledTasks: ScheduledTask[] = [
     enabled: false,
     schedule: { kind: ScheduleKind.Every, everyMs: 7 * 24 * HOUR },
     sessionTarget: SessionTarget.Isolated,
-    wakeMode: WakeMode.NextHeartbeat,
+    wakeMode: WakeMode.Now,
     payload: {
       kind: PayloadKind.AgentTurn,
       message: 'Summarize TypeScript releases from the past week.',
@@ -398,9 +398,9 @@ export const mockAgents: Agent[] = [
 export const mockActivityRuns: ActivityRun[] = [
   {
     id: 'act-1',
-    source: ActivitySource.Channel,
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Running,
-    platform: 'weixin',
+    taskName: 'Workspace log review',
     startedAt: NOW - 10 * 60_000,
     updatedAt: NOW - 2 * 60_000,
     replyPreview: '正在查询最近30天的系统日志并统计异常分布...',
@@ -417,18 +417,18 @@ export const mockActivityRuns: ActivityRun[] = [
   },
   {
     id: 'act-3',
-    source: ActivitySource.Channel,
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Completed,
-    platform: 'feishu',
+    taskName: 'Quarterly review',
     startedAt: NOW - 5 * HOUR,
     updatedAt: NOW - 5 * HOUR + 15_000,
     replyPreview: '已经为您创建了任务【Q3季度复盘】，并邀请了相关参与人员。',
   },
   {
     id: 'act-4',
-    source: ActivitySource.Channel,
+    source: ActivitySource.ScheduledTask,
     status: ActivityStatus.Failed,
-    platform: 'dingtalk',
+    taskName: 'Knowledge base check',
     startedAt: NOW - 26 * HOUR,
     updatedAt: NOW - 26 * HOUR + 5_000,
     errorMessage: '网络连接超时：无法访问企业内部文档知识库服务。',

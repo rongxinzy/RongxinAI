@@ -1,6 +1,5 @@
 /** Late-bound services shared by the single Pi execution adapter. */
 import { EventEmitter } from 'node:events';
-import * as os from 'node:os';
 import path from 'node:path';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { persistCoworkImageAttachments } from '../../coworkImageAttachments';
@@ -10,11 +9,11 @@ import type { ConversationHistoryService } from '../../conversationHistory/servi
 import type { ProjectMemoryService } from '../../memory/projectMemoryService';
 import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
-import type { ScheduledTaskDelivery } from '../../../scheduledTask/types';
 import { getSkillsRoot } from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
 import { resolveBundledOcrHelper } from '../ocrHelper';
-import { invalidatePiSessionDir } from './piSessionStore';
+import { durableSessionFile, invalidateDurableSession } from './durableSessionStore';
+import { withClosedDurableStorage } from './durableSessionOwnership';
 import type { PiStartOptions } from './piRuntimeTypes';
 import type { ActivePiSession } from './piRuntimeSessionState';
 import { PiCompanionRuntime } from '../../companion/durableRuntime.mjs';
@@ -72,7 +71,7 @@ export class PiRuntimeServiceBindings extends EventEmitter {
    */
   protected mcpToolManifestGeneration = 0;
 
-  /** Root of per-session Pi JSONL directories (`<userData>/pi-sessions`). */
+  /** User-data root containing native execution databases. */
   protected piSessionStoreRoot: string | null = null;
 
   protected projectMemoryService: ProjectMemoryService | null = null;
@@ -94,19 +93,18 @@ export class PiRuntimeServiceBindings extends EventEmitter {
     this.imageAttachmentRoot = root;
   }
 
-  /**
-   * Root directory for file-backed Pi sessions (`<userData>/pi-sessions`).
-   * Each Cowork session then keeps its structured transcript in Pi's own
-   * JSONL and rebuilds reopen it instead of replaying a flattened prompt.
-   */
+  /** User-data root; each conversation owns one native SQLite execution store. */
   setPiSessionStoreRoot(root: string): void {
     this.piSessionStoreRoot = root;
   }
 
-  /** Drops a session's Pi JSONL so the next turn cannot restore stale history. */
-  invalidatePiSessionDir(sessionId: string): void {
+  /** Drops a closed native execution store after explicit history invalidation. */
+  async invalidatePiSessionDir(sessionId: string): Promise<void> {
     if (!this.piSessionStoreRoot) return;
-    invalidatePiSessionDir(this.piSessionStoreRoot, sessionId);
+    const root = this.piSessionStoreRoot;
+    await withClosedDurableStorage(durableSessionFile(root, sessionId), () =>
+      invalidateDurableSession(root, sessionId),
+    );
   }
 
   persistImageAttachments(
@@ -141,25 +139,6 @@ export class PiRuntimeServiceBindings extends EventEmitter {
 
   setScheduledTaskService(service: ScheduledTaskService): void {
     this.scheduledTaskService = service;
-  }
-
-  /** Resolves the delivery scheduled tasks in a session default to (IM chats). */
-  protected scheduledTaskDeliveryResolver:
-    | ((sessionId: string) => ScheduledTaskDelivery | null)
-    | null = null;
-
-  setScheduledTaskDeliveryResolver(
-    resolver: (sessionId: string) => ScheduledTaskDelivery | null,
-  ): () => void {
-    this.scheduledTaskDeliveryResolver = resolver;
-    return () => {
-      if (this.scheduledTaskDeliveryResolver === resolver)
-        this.scheduledTaskDeliveryResolver = null;
-    };
-  }
-
-  getScheduledTaskDeliveryForSession(sessionId: string): ScheduledTaskDelivery | null {
-    return this.scheduledTaskDeliveryResolver?.(sessionId) ?? null;
   }
 
   setMcpServerManager(mgr: McpServerManager): void {
@@ -257,8 +236,9 @@ export class PiRuntimeServiceBindings extends EventEmitter {
   }
 
   getPiAgentsDir(): string {
-    const homedir = os.homedir();
-    const configDir = process.env.PI_CODING_AGENT_DIR || path.join(homedir, '.pi', 'agent');
+    const configDir =
+      process.env.ZHIYUAN_AGENT_DIR ??
+      path.join(this.piSessionStoreRoot ?? process.cwd(), 'agent-resources');
     return path.join(configDir, 'agents');
   }
 

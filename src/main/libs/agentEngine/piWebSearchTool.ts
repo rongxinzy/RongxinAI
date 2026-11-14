@@ -1,4 +1,4 @@
-import type { ToolAnnotations, ToolDefinition } from '@earendil-works/pi-coding-agent';
+import type { ToolAnnotations, ToolDefinition } from './durableToolTypes';
 import { Type, type Static } from 'typebox';
 
 import { t } from '../../i18n';

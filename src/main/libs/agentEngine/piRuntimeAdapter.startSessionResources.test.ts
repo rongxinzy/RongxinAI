@@ -13,20 +13,11 @@ import {
   applyTestResolution,
   createTemporaryWorkspace,
   mockCreateAgentSession,
-  mockCodemodeExtensionFactory,
-  mockCreateMcpExtension,
-  mockDefaultResourceLoader,
-  mockGetModel,
-  mockMcpExtensionFactory,
   mockModelRuntime,
   mockSession,
-  mockSettingsManagerCreate,
-  mockSettingsManagerInMemory,
-  mockToolSearchExtensionFactory,
   setupPiRuntimeAdapterSuite,
+  createdResources,
 } from './piRuntimeAdapter.testHarness';
-
-import path from 'path';
 
 import { describe, expect, it, vi } from 'vitest';
 import { PiWebSearchToolName } from './constants';
@@ -37,7 +28,6 @@ import { resolveBundledOcrHelper } from '../ocrHelper';
 import { PiDocumentReaderToolName } from './piDocumentReaderTool';
 import { PiSubagentToolName } from './piSubagentTool';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
-import { applyPiPlatformToolOverrides } from './piRuntimeSettingsOverrides';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 
 describe('PiRuntimeAdapter', () => {
@@ -48,38 +38,17 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hello Pi', {
         systemPrompt: 'You are the selected expert.',
       });
-
-      expect(mockDefaultResourceLoader).toHaveBeenCalledWith(
-        expect.objectContaining({
-          agentDir: '/tmp/pi-agent',
-          cwd: process.cwd(),
-          noExtensions: true,
-          noPromptTemplates: true,
-          noSkills: true,
-          noThemes: true,
-          appendSystemPromptOverride: expect.any(Function),
-          systemPromptOverride: expect.any(Function),
-        }),
-      );
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        systemPromptOverride: (base: string | undefined) => string | undefined;
-      };
-      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBe(
-        getZhiyuanProductPreamble(),
-      );
+      const resource = await createdResources();
+      expect(resource.getSystemPrompt()).toContain(getZhiyuanProductPreamble());
+      expect(resource.getSystemPrompt()).toContain('You are the selected expert.');
       expect(mockCreateAgentSession).toHaveBeenCalledWith(
-        expect.objectContaining({
-          resourceLoader: expect.any(Object),
-        }),
+        expect.objectContaining({ resourceLoader: resource }),
       );
-      expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('systemPrompt');
+      expect(mockCreateAgentSession.mock.calls[0][0]).not.toHaveProperty('systemPrompt');
     });
 
     it('keeps Chat on Pi while skipping Work prompt, default Skill, and MCP resources', async () => {
-      adapter.setMcpServerManager({
-        toolManifest: [{ name: 'list_projects', description: 'List projects' }],
-        serverStatuses: [{ name: 'Supabase', connected: true, toolCount: 1 }],
-      } as never);
+      adapter.setMcpServerManager({ toolManifest: [], lastEnabledRecords: [] } as never);
       adapter.setProjectMemoryService({} as never);
       adapter.setConversationHistoryService({ search: vi.fn(() => []) } as never);
       const beginRun = vi.fn();
@@ -88,39 +57,23 @@ describe('PiRuntimeAdapter', () => {
         off: vi.fn(),
         beginRun,
       } as unknown as WorkbenchTaskService);
-
       await adapter.startSession('chat-resources', 'Hello', {
         sessionMode: 'chat',
         systemPrompt: 'Only the explicitly selected chat prompt.',
       });
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        additionalSkillPaths?: string[];
-        extensionFactories?: unknown[];
-        systemPromptOverride: (base: string | undefined) => string | undefined;
-        appendSystemPromptOverride: () => string[];
-      };
-      expect(loaderOptions.additionalSkillPaths).toEqual([]);
-      expect(loaderOptions.extensionFactories ?? []).not.toContain(mockMcpExtensionFactory);
-      expect(loaderOptions.extensionFactories ?? []).not.toContain(mockCodemodeExtensionFactory);
-      expect(mockSession.bindExtensions).not.toHaveBeenCalled();
-      expect(loaderOptions.systemPromptOverride('Discovered custom prompt')).toBe(
-        getZhiyuanProductPreamble(),
+      const resources = await createdResources();
+      expect(resources.getSkills().skills).toEqual([]);
+      expect(
+        resources.extensions.flatMap(extension => extension.tools ?? []).map(tool => tool.name),
+      ).not.toContain('codemode');
+      expect(resources.getSystemPrompt()).toContain('Only the explicitly selected chat prompt.');
+      const names = mockCreateAgentSession.mock.calls[0][0].customTools.map(
+        (tool: { name: string }) => tool.name,
       );
-      expect(loaderOptions.appendSystemPromptOverride()).toContain(
-        'Only the explicitly selected chat prompt.',
-      );
-      expect(loaderOptions.appendSystemPromptOverride().join('\n')).toContain('知远智能体');
-      expect(loaderOptions.appendSystemPromptOverride().join('\n')).not.toContain('Supabase');
-
-      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        customTools?: Array<{ name?: string }>;
-      };
-      const customToolNames = sessionOptions.customTools?.map(tool => tool.name) ?? [];
-      expect(customToolNames).toContain(PiWebSearchToolName);
-      expect(customToolNames).not.toContain(CONVERSATION_HISTORY_TOOL_NAME);
-      expect(customToolNames).not.toContain(PiDocumentReaderToolName);
-      expect(customToolNames).not.toContain(PiSubagentToolName);
+      expect(names).toContain(PiWebSearchToolName);
+      expect(names).not.toContain(CONVERSATION_HISTORY_TOOL_NAME);
+      expect(names).not.toContain(PiDocumentReaderToolName);
+      expect(names).not.toContain(PiSubagentToolName);
       expect(beginRun).not.toHaveBeenCalled();
     });
 
@@ -138,111 +91,80 @@ describe('PiRuntimeAdapter', () => {
     });
 
     it('passes the Chat context window to Pi without replacing native compaction policy', async () => {
-      mockGetModel.mockImplementationOnce(() => undefined);
       await adapter.startSession('chat-context-limit', 'First', {
         sessionMode: 'chat',
         modelOverride: 'openai/gpt-5.2',
       });
-
-      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        model?: { contextWindow?: number };
-      };
-      expect(sessionOptions.model?.contextWindow).toBe(272_000);
-
-      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
-      expect(settingsManager.applyOverrides).not.toHaveBeenCalledWith(
-        expect.objectContaining({ compaction: expect.anything() }),
-      );
+      const options = mockCreateAgentSession.mock.calls[0][0];
+      expect(options.model.contextWindow).toBe(272000);
+      expect(options).not.toHaveProperty('settingsManager');
+      expect(options).not.toHaveProperty('compaction');
     });
 
-    it('shares one isolated Pi SettingsManager with resource loading and the agent session', async () => {
-      await adapter.startSession('settings-manager', 'Hello Pi');
-
-      expect(mockSettingsManagerInMemory).toHaveBeenCalledOnce();
-      expect(mockSettingsManagerCreate).not.toHaveBeenCalled();
-      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
-      expect(mockDefaultResourceLoader.mock.calls[0]?.[0]).toEqual(
-        expect.objectContaining({ settingsManager }),
-      );
-      expect(mockCreateAgentSession.mock.calls[0]?.[0]).toEqual(
-        expect.objectContaining({ settingsManager }),
-      );
-      expect(settingsManager.applyOverrides).not.toHaveBeenCalledWith(
-        expect.objectContaining({ compaction: expect.anything() }),
-      );
+    it('keeps each session Durable resource bundle isolated', async () => {
+      await adapter.startSession('resources-a', 'First', { systemPrompt: 'Policy A' });
+      await adapter.startSession('resources-b', 'Second', { systemPrompt: 'Policy B' });
+      const first = await createdResources(0);
+      const second = await createdResources(1);
+      expect(first).not.toBe(second);
+      expect(first.getSystemPrompt()).toContain('Policy A');
+      expect(first.getSystemPrompt()).not.toContain('Policy B');
+      expect(second.getSystemPrompt()).toContain('Policy B');
+      expect(mockCreateAgentSession.mock.calls[0][0]).not.toHaveProperty('settingsManager');
     });
 
-    it('registers codemode and tool_search dormantly on work sessions unless codemode is activated', async () => {
+    it('keeps unused codemode out of the default Work tool surface', async () => {
       await adapter.startSession('codemode-off', 'Hello Pi');
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: unknown[];
-      };
-      const factories = loaderOptions?.extensionFactories ?? [];
-      expect(factories).toContain(mockCodemodeExtensionFactory);
-      expect(factories).toContain(mockToolSearchExtensionFactory);
-      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
-      expect(settingsManager.applyOverrides).not.toHaveBeenCalledWith(
-        expect.objectContaining({ defaultTools: expect.arrayContaining(['+codemode']) }),
-      );
+      const resources = await createdResources();
+      const names = resources.extensions
+        .flatMap(extension => extension.tools ?? [])
+        .map(tool => tool.name);
+      expect(names).not.toContain('codemode');
+      expect(names).not.toContain('tool_search');
     });
 
     it('activates codemode when requested on work sessions', async () => {
       await adapter.startSession('codemode-on', 'Hello Pi', { codemode: true });
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: unknown[];
-      };
-      const factories = loaderOptions?.extensionFactories ?? [];
-      expect(factories).toContain(mockCodemodeExtensionFactory);
-      expect(factories).toContain(mockToolSearchExtensionFactory);
-      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
-      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
-        defaultTools: ['+codemode'],
-      });
+      const resources = await createdResources();
+      const names = resources.extensions
+        .flatMap(extension => extension.tools ?? [])
+        .map(tool => tool.name);
+      expect(names).toContain('codemode');
+      expect(names).toContain('tool_search');
     });
 
-    it('switches default shell tool to native powershell on win32 only', () => {
-      const applyOverrides = vi.fn();
-      applyPiPlatformToolOverrides({ applyOverrides } as never, 'darwin');
-      expect(applyOverrides).not.toHaveBeenCalled();
-
-      applyPiPlatformToolOverrides({ applyOverrides } as never, 'win32');
-      expect(applyOverrides).toHaveBeenCalledWith({
-        defaultTools: ['read', 'powershell', 'edit', 'write'],
-      });
+    it('lets Durable select execution tools without host settings overrides', async () => {
+      await adapter.startSession('native-shell', 'Hello Pi');
+      expect(mockCreateAgentSession.mock.calls[0][0]).not.toHaveProperty('settingsManager');
+      expect(mockCreateAgentSession.mock.calls[0][0].cwd).toBe(process.cwd());
     });
 
-    it('always routes work sessions through Pi builtin MCP extension', async () => {
+    it('registers app-owned MCP tools directly in Durable', async () => {
       adapter.setMcpServerManager({
-        toolManifest: [],
-        lastEnabledRecords: [],
+        toolManifest: [
+          {
+            server: 'Docs',
+            name: 'search',
+            description: 'Search docs',
+            inputSchema: { type: 'object', properties: {} },
+          },
+        ],
+        lastEnabledRecords: [{ id: 'docs', name: 'Docs', enabled: true, exposure: 'direct' }],
+        callTool: vi.fn(),
       } as never);
       await adapter.startSession('mcp-native', 'Hello Pi');
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: unknown[];
-      };
-      expect(loaderOptions?.extensionFactories).toContain(mockMcpExtensionFactory);
-      expect(mockCreateMcpExtension).toHaveBeenCalledWith(
-        expect.objectContaining({
-          loadConfig: expect.any(Function),
-          createTransport: expect.any(Function),
-        }),
-      );
-      expect(mockSession.bindExtensions).toHaveBeenCalled();
+      const resources = await createdResources();
+      expect(
+        resources.extensions.flatMap(extension => extension.tools ?? []).map(tool => tool.name),
+      ).toContain('mcp__Docs__search');
     });
 
     it('excludes codemode from chat sessions even when requested', async () => {
-      await adapter.startSession('codemode-chat', 'Hello', {
-        codemode: true,
-        sessionMode: 'chat',
-      });
-
-      const loaderOptions = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
-        extensionFactories?: unknown[];
-      };
-      expect(loaderOptions?.extensionFactories ?? []).not.toContain('codemode-extension-factory');
+      await adapter.startSession('codemode-chat', 'Hello', { codemode: true, sessionMode: 'chat' });
+      const resources = await createdResources();
+      expect(
+        resources.extensions.flatMap(extension => extension.tools ?? []).map(tool => tool.name),
+      ).not.toContain('codemode');
     });
 
     it('routes the selected gateway model through the owned endpoint', async () => {
@@ -486,38 +408,31 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.dispose).toHaveBeenCalledOnce();
     });
 
-    it('injects project memory through before_agent_start sections instead of user prompt text', async () => {
+    it('routes memory through the native session binding without rewriting user input', async () => {
+      const memoryBinding = {
+        extension: { name: 'test.memory' },
+        bindConversation: vi.fn(),
+        runSettled: vi.fn(),
+        maintain: vi.fn(),
+      };
+      const createDurableMemoryBinding = vi.fn().mockResolvedValue(memoryBinding);
+      const buildProjectContext = vi.fn();
       adapter.setProjectMemoryService({
-        buildProjectContext: vi
-          .fn()
-          .mockResolvedValue('<project_memory>\nRemember convention X\n</project_memory>'),
+        createDurableMemoryBinding,
+        buildProjectContext,
         registerSession: vi.fn().mockResolvedValue(undefined),
       } as never);
-
+      const workspace = createTemporaryWorkspace();
       await adapter.startSession('memory-section', 'Inspect repository', {
         sessionMode: 'work',
-        workspaceRoot: createTemporaryWorkspace(),
+        workspaceRoot: workspace,
       });
-
       expect(mockSession.prompt).toHaveBeenCalledWith('Inspect repository');
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
-        >;
-      };
-      const beforeHandlers: Array<(event: unknown) => unknown> = [];
-      for (const factory of loaderOptions.extensionFactories ?? []) {
-        factory({
-          on: (event, handler) => {
-            if (event === 'before_agent_start') beforeHandlers.push(handler);
-          },
-        });
-      }
-      const sections: Record<string, string> = {};
-      for (const handler of beforeHandlers) {
-        await handler({ prompt: 'Inspect repository', systemPromptOptions: { sections } });
-      }
-      expect(sections.project_memory).toContain('Remember convention X');
+      expect(createDurableMemoryBinding).toHaveBeenCalledWith(workspace, 'memory-section');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({ memoryBinding }),
+      );
+      expect(buildProjectContext).not.toHaveBeenCalled();
     });
   });
 });

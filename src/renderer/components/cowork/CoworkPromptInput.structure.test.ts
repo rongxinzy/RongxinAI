@@ -76,15 +76,20 @@ test('keeps the session permission selector available during an active run', () 
 
 test('keeps model and permission controls reachable in compact toolbars', () => {
   const compactControlsStart = source.indexOf(
-    '{isPlusToolbar && (showModelSelector || (isCompactToolbar && isWorkVariant))',
+    '(showModelSelector || (isCompactToolbar && isWorkVariant)) && (',
   );
-  const compactControls = source.slice(compactControlsStart);
+  const compactControls = source.slice(
+    compactControlsStart,
+    source.indexOf('</PromptInputFooter>'),
+  );
 
   expect(compactControlsStart).toBeGreaterThanOrEqual(0);
   expect(compactControls).toContain('compact={isCompactToolbar}');
   expect(compactControls).toContain('isCompactToolbar && isWorkVariant');
   expect(compactControls).toContain('<PermissionModeMenu');
   expect(compactControls).toContain('showModelSelector');
+  expect(compactControls).toContain('<CoworkModelPicker');
+  expect(compactControls).not.toContain('isPlusToolbar');
 });
 
 test('places the active expert identity between permissions and MCP controls', () => {

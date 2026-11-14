@@ -48,7 +48,6 @@ const ELECTRON_MEMBERS = [
   'appUpdate',
   'runtimeNotices',
   'log',
-  'im',
   'scheduledTasks',
   'permissions',
   'auth',
@@ -56,8 +55,6 @@ const ELECTRON_MEMBERS = [
   'enterprise',
   'managedProviders',
   'networkStatus',
-  'feishu',
-  'dingtalk',
   'activity',
 ] as const;
 

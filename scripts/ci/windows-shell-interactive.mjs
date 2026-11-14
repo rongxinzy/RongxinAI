@@ -430,10 +430,6 @@ export async function runShellAcceptance() {
         `Missing sentinel: ${component.key}`,
       );
     }
-    assert(await exists(path.join(installRoot, 'resources/memory/engram.exe')));
-    assert(
-      await exists(path.join(installRoot, 'resources/channel-runtime/cc-connect-sidecar.exe')),
-    );
     report.checks.fullOfflineComponentSet = true;
     await save(session, `${name}-finish`, ['#btnDone', '#btnLaunch']);
   }

@@ -31,7 +31,6 @@ vi.mock('../../services/scheduledTask', () => ({
   scheduledTaskService: {
     isInitialized: true,
     loadTasks: async () => {},
-    listChannels: async () => [],
   },
 }));
 vi.mock('../../services/cowork', () => ({ coworkService: {} }));

@@ -278,6 +278,7 @@ export class MagpieManager implements MagpieRoutingGateway {
           if (data.name === 'magpie' && data.version === MAGPIE_VERSION && web.ok && !exited) {
             this.failedGatewayPorts.clear();
             this.state = { state: 'running', version: MAGPIE_VERSION, gatewayUrl };
+            queueMicrotask(() => this.options.onReady?.());
             void this.agentOperations.reapplyManagedAgentsAfterStart();
             if (lanAccessEnabled) void this.managementOperations.syncLanAccessKeyAfterStart();
             return this.status();

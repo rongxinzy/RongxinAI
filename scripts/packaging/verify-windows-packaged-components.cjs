@@ -40,75 +40,7 @@ function readWindowsComponentManifest(componentsDir, componentKey) {
   return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 }
 
-function verifyWindowsCompressedChannelRuntime(context, targetId, expectedChecksum, binaryName) {
-  const projectRoot = context.packager.projectDir;
-  const componentsDir = path.join(projectRoot, 'build-tar', 'windows-components');
-  const componentKey = 'channel-runtime';
-  const manifest = readWindowsComponentManifest(componentsDir, componentKey);
-  const archivePath = path.join(componentsDir, manifest.archive || `${componentKey}.7z`);
-  if (!fs.existsSync(archivePath)) {
-    throw new Error(
-      `[PackagedRuntimeVerify] Missing Windows channel-runtime archive: ${archivePath}`,
-    );
-  }
-
-  const archiveSha256 = sha256File(archivePath);
-  if (manifest.archiveSha256 && manifest.archiveSha256 !== archiveSha256) {
-    throw new Error(
-      `[PackagedRuntimeVerify] channel-runtime archive SHA-256 mismatch (expected ${manifest.archiveSha256}, got ${archiveSha256})`,
-    );
-  }
-
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-channel-runtime-verify-'));
-  try {
-    extractWindowsComponentArchive(resolveWindows7zaPath(projectRoot), archivePath, tempDir);
-    const binaryPath = path.join(tempDir, manifest.prefix || componentKey, binaryName);
-    if (!fs.existsSync(binaryPath)) {
-      throw new Error(
-        `[PackagedRuntimeVerify] Missing channel-runtime ${targetId} sidecar after extracting ${archivePath}`,
-      );
-    }
-    const actualChecksum = sha256File(binaryPath);
-    if (actualChecksum.toLowerCase() !== expectedChecksum.trim().toLowerCase()) {
-      throw new Error(
-        `[PackagedRuntimeVerify] channel-runtime ${targetId} SHA-256 mismatch (expected ${expectedChecksum}, got ${actualChecksum})`,
-      );
-    }
-    if (manifest.sentinelSha256 && manifest.sentinelSha256 !== actualChecksum) {
-      throw new Error(
-        '[PackagedRuntimeVerify] channel-runtime sentinel SHA-256 does not match extracted sidecar.',
-      );
-    }
-
-    const buildInfoPath = path.join(path.dirname(binaryPath), 'runtime-build-info.json');
-    if (!fs.existsSync(buildInfoPath)) {
-      throw new Error(
-        `[PackagedRuntimeVerify] Missing channel-runtime runtime-build-info.json for ${targetId} inside Windows component archive`,
-      );
-    }
-    const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf8'));
-    const packageJson = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
-    const config = packageJson.channelRuntime;
-    const assetName = config?.runtimeAssets?.[targetId];
-    if (
-      buildInfo?.schemaVersion !== 1 ||
-      buildInfo?.repo !== config?.repo ||
-      buildInfo?.version !== config?.version ||
-      buildInfo?.sourceRevision !== config?.sourceRevision ||
-      buildInfo?.target !== targetId ||
-      buildInfo?.assetName !== assetName ||
-      buildInfo?.checksum !== expectedChecksum
-    ) {
-      throw new Error(
-        '[PackagedRuntimeVerify] Packaged channel runtime metadata does not match package.json channelRuntime pin.',
-      );
-    }
-  } finally {
-    fs.rmSync(tempDir, { recursive: true, force: true });
-  }
-}
-
-function verifyWindowsCompressedLlamaCppBundled(context) {
+function verifyWindowsCompressedLlamaCppBundled(context, options = {}) {
   const projectRoot = context.packager.projectDir;
   const componentsDir = path.join(projectRoot, 'build-tar', 'windows-components');
   const componentKey = 'llamacpp-bundled';
@@ -119,15 +51,28 @@ function verifyWindowsCompressedLlamaCppBundled(context) {
       `[PackagedRuntimeVerify] Missing Windows llamacpp-bundled archive: ${archivePath}`,
     );
   }
+  if (
+    !/^[a-f0-9]{64}$/.test(manifest.archiveSha256 ?? '') ||
+    manifest.archiveSha256 !== sha256File(archivePath)
+  ) {
+    throw new Error('[PackagedRuntimeVerify] llamacpp-bundled archive SHA-256 mismatch.');
+  }
 
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-llamacpp-bundled-verify-'));
   try {
-    extractWindowsComponentArchive(resolveWindows7zaPath(projectRoot), archivePath, tempDir);
+    extractWindowsComponentArchive(
+      options.sevenZipPath ?? resolveWindows7zaPath(projectRoot),
+      archivePath,
+      tempDir,
+    );
     const manifestPath = path.join(tempDir, manifest.prefix || componentKey, 'manifest.json');
     if (!fs.existsSync(manifestPath)) {
       throw new Error(
         `[PackagedRuntimeVerify] Missing llamacpp-bundled manifest after extracting ${archivePath}`,
       );
+    }
+    if (manifest.sentinelSha256 && manifest.sentinelSha256 !== sha256File(manifestPath)) {
+      throw new Error('[PackagedRuntimeVerify] llamacpp-bundled manifest SHA-256 mismatch.');
     }
     const bundledManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     const bundledRoot = path.dirname(manifestPath);
@@ -158,6 +103,5 @@ function verifyWindowsCompressedLlamaCppBundled(context) {
 module.exports = {
   extractWindowsComponentArchive,
   readWindowsComponentManifest,
-  verifyWindowsCompressedChannelRuntime,
   verifyWindowsCompressedLlamaCppBundled,
 };

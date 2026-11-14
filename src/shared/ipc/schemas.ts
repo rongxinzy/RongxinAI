@@ -99,6 +99,7 @@ export const CoworkSessionStartSchema = {
       imageAttachments: z.array(ImageAttachmentSchema).optional(),
       fileAttachments: z.array(FileAttachmentSchema).optional(),
     })
+    .strict()
     .refine(hasCoworkSubmissionContent, { message: 'Prompt is required.', path: ['prompt'] }),
   output: IpcResult({
     session: z

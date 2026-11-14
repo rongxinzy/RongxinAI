@@ -6,11 +6,11 @@ import {
 } from './memoryOutboxPayloads';
 import { validateMemoryOutboxRelationships } from './memoryRelationshipResolution';
 import type { MemoryOutboxItem, MemoryRepository } from './repository';
-import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+import type { MemoryBackend } from './memoryBackendTypes';
 
 export async function processMemoryOutboxItem(
   repository: MemoryRepository,
-  adapter: ZhiYuanEngramAdapter,
+  adapter: MemoryBackend,
   item: MemoryOutboxItem | null,
 ): Promise<number | null> {
   if (!item) return null;
@@ -135,7 +135,7 @@ export async function processMemoryOutboxItem(
 
 async function processSessionFinalization(
   repository: MemoryRepository,
-  adapter: ZhiYuanEngramAdapter,
+  adapter: MemoryBackend,
   item: MemoryOutboxItem,
 ): Promise<number | null> {
   const payload = parseFinalizeSessionPayload(item.payload);
@@ -166,7 +166,7 @@ async function processSessionFinalization(
 
 async function processMemoryForget(
   repository: MemoryRepository,
-  adapter: ZhiYuanEngramAdapter,
+  adapter: MemoryBackend,
   item: MemoryOutboxItem,
 ): Promise<number | null> {
   const payload = parseForgetPayload(item.payload);

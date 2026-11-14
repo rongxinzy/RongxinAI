@@ -35,7 +35,6 @@ export const coworkContractChannels: IpcContractChannels<typeof coworkContract> 
   renameSession: CoworkSessionIpc.Rename,
   updateSessionModel: CoworkSessionIpc.UpdateModel,
   getSession: CoworkSessionIpc.Get,
-  remoteManaged: CoworkSessionIpc.RemoteManaged,
   listSessions: CoworkSessionIpc.List,
   getSessionMessages: CoworkSessionIpc.GetMessages,
   exportResultImage: CoworkSessionIpc.ExportResultImage,

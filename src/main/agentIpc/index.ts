@@ -2,7 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow } from 'electron';
 
 import {
   listAllMatchingSessionIds,
@@ -13,7 +13,6 @@ import { DB_FILENAME } from '../appConstants';
 import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
 import { CoworkStreamIpc } from '../../shared/ipc/channels';
 import { providersContract } from '../../shared/ipc/providersContract';
-import type { ChannelAccountManager } from '../im/channelAccountManager';
 import type { AgentManager } from '../agentManager';
 import type { CoworkStore } from '../coworkStore';
 import type { SkillManager } from '../skillManager';
@@ -25,7 +24,6 @@ export interface AgentIpcDeps {
   getCoworkStore: () => CoworkStore;
   getSkillManager: () => SkillManager;
   getStore: () => SqliteStore;
-  getIMGatewayManager: () => ChannelAccountManager;
   bumpCodingCommandCatalog: () => void;
   resolveDefaultAgentModelRef: () => string;
 }
@@ -94,23 +92,11 @@ export const registerAgentIpc = (deps: AgentIpcDeps): void => {
         // Cascade delete all Cowork sessions belonging to the deleted agent
         const agentIpcCoworkStore = deps.getCoworkStore();
         for (const sessionId of listAllMatchingSessionIds({ agentId: id })) {
-          forgetCoworkSession(sessionId);
+          await forgetCoworkSession(sessionId);
         }
         const deletedSessionIds = agentIpcCoworkStore.deleteSessionsByAgentId(id);
 
-        // Clean up IM session mappings for deleted sessions
         if (deletedSessionIds.length > 0) {
-          try {
-            const imStore = deps.getIMGatewayManager()?.getIMStore();
-            if (imStore) {
-              for (const sessionId of deletedSessionIds) {
-                imStore.deleteSessionMappingByCoworkSessionId(sessionId);
-              }
-            }
-          } catch {
-            // IM rt.store may not be initialised yet; safe to ignore.
-          }
-
           // Notify renderer to refresh session lists
           const windows = BrowserWindow.getAllWindows();
           for (const win of windows) {

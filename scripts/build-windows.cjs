@@ -10,7 +10,6 @@ const signed =
   process.argv.includes('--signed') || (enterprise && Boolean(process.env.CERTUM_CERT_THUMBPRINT));
 const env = {
   ...process.env,
-  ZHIYUAN_ALLOW_HOST_CHANNEL_RUNTIME: '1',
   ZHIYUAN_ENTERPRISE_BUILD: enterprise ? '1' : '0',
 };
 if (enterprise) env.ZHIYUAN_UPDATE_VARIANT = 'lite';
@@ -22,11 +21,7 @@ function run(command, args) {
   }
 }
 
-for (const task of [
-  'channel:runtime:win-x64',
-  'engram:runtime:win-x64',
-  'prepare:update-release',
-]) {
+for (const task of ['prepare:update-release']) {
   run('bun', ['run', task]);
 }
 run(process.execPath, ['scripts/ensure-build-version.js']);

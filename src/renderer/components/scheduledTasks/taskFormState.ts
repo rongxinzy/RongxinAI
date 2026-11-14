@@ -1,21 +1,12 @@
-import { PlatformRegistry } from '@shared/platform';
-
 import {
   DeliveryMode,
-  ManagedSessionKeyPrefix,
   PayloadKind,
   SessionBindingStrategy,
   SessionTarget,
   WakeMode,
   type SessionBindingStrategy as SessionBindingStrategyType,
 } from '../../../scheduledTask/constants';
-import type {
-  ScheduledTask,
-  ScheduledTaskChannelOption,
-  ScheduledTaskInput,
-  ScheduledTaskConversationOption,
-} from '../../../scheduledTask/types';
-import { i18nService } from '../../services/i18n';
+import type { ScheduledTask, ScheduledTaskInput } from '../../../scheduledTask/types';
 import {
   DEFAULT_CRON_BUILDER,
   cronBuilderToExpr,
@@ -40,17 +31,13 @@ export interface FormState {
   weekdays: number[];
   monthDay: number;
   payloadText: string;
-  notifyChannel: string;
-  notifyTo: string;
   cronExpr: string;
   cronTz: string;
   cronMode: CronMode;
   cronBuilder: CronBuilderValue;
-  notifyAccountId: string | undefined;
   workspaceId: string;
   modelId: string;
   sessionBinding: SessionBindingStrategyType;
-  boundSessionId: string;
 }
 
 export const TASK_NAME_MAX_LENGTH = 200;
@@ -77,17 +64,13 @@ const DEFAULT_FORM_STATE: FormState = {
   weekdays: [1, 2, 3, 4, 5],
   monthDay: 1,
   payloadText: '',
-  notifyChannel: 'none',
-  notifyTo: '',
   cronExpr: '',
   cronTz: '',
   cronMode: 'builder',
   cronBuilder: { ...DEFAULT_CRON_BUILDER },
-  notifyAccountId: undefined,
   workspaceId: '',
   modelId: '',
   sessionBinding: SessionBindingStrategy.PerRun,
-  boundSessionId: '',
 };
 
 export const PLAN_LABEL_KEY = {
@@ -121,10 +104,6 @@ export const WEEKDAY_SHORT_LABELS_EN: ReadonlyArray<readonly [string, number]> =
   ['scheduledTasksFormWeekShortFri', 5],
   ['scheduledTasksFormWeekShortSat', 6],
 ];
-
-export function isIMChannel(channel: string): boolean {
-  return PlatformRegistry.isIMChannel(channel);
-}
 
 export function createFormState(task?: ScheduledTask, prefill?: TaskTemplateValues): FormState {
   if (!task) {
@@ -177,27 +156,16 @@ export function createFormState(task?: ScheduledTask, prefill?: TaskTemplateValu
     weekdays: planInfo.weekdays,
     monthDay: planInfo.monthDay,
     payloadText: task.payload.kind === 'systemEvent' ? task.payload.text : task.payload.message,
-    notifyChannel: task.delivery.channel || 'none',
-    notifyTo: task.delivery.to || '',
     cronExpr: rawCronExpr,
     cronTz: planInfo.cronTz ?? (task.schedule.kind === 'cron' ? (task.schedule.tz ?? '') : ''),
     cronMode: 'builder',
     cronBuilder: parsedBuilder,
-    notifyAccountId: task.delivery.accountId,
     workspaceId: task.workspaceId || '',
     modelId: task.payload.kind === 'agentTurn' ? (task.payload.model ?? '') : '',
     sessionBinding:
       task.sessionTarget === SessionTarget.Task
         ? SessionBindingStrategy.Task
-        : task.sessionTarget === SessionTarget.Main &&
-            Boolean(task.sessionKey?.startsWith(ManagedSessionKeyPrefix.Zhiyuan))
-          ? SessionBindingStrategy.Existing
-          : SessionBindingStrategy.PerRun,
-    boundSessionId:
-      task.sessionTarget === SessionTarget.Main &&
-      task.sessionKey?.startsWith(ManagedSessionKeyPrefix.Zhiyuan)
-        ? task.sessionKey.slice(ManagedSessionKeyPrefix.Zhiyuan.length)
-        : '',
+        : SessionBindingStrategy.PerRun,
   };
 }
 
@@ -260,13 +228,8 @@ export function buildTaskInput(
     sessionTarget:
       form.sessionBinding === SessionBindingStrategy.Task
         ? SessionTarget.Task
-        : form.sessionBinding === SessionBindingStrategy.Existing
-          ? SessionTarget.Main
-          : SessionTarget.Isolated,
-    sessionKey:
-      form.sessionBinding === SessionBindingStrategy.Existing && form.boundSessionId
-        ? `${ManagedSessionKeyPrefix.Zhiyuan}${form.boundSessionId}`
-        : null,
+        : SessionTarget.Isolated,
+    sessionKey: null,
     wakeMode: WakeMode.Now,
     workspaceId: form.workspaceId,
     payload: {
@@ -274,15 +237,8 @@ export function buildTaskInput(
       message: form.payloadText.trim(),
       ...(form.modelId ? { model: form.modelId } : {}),
     },
-    delivery:
-      form.notifyChannel === 'none'
-        ? { mode: DeliveryMode.None }
-        : {
-            mode: DeliveryMode.Announce,
-            channel: form.notifyChannel,
-            ...(form.notifyTo ? { to: form.notifyTo } : {}),
-            ...(form.notifyAccountId ? { accountId: form.notifyAccountId } : {}),
-          },
+
+    delivery: { mode: DeliveryMode.None },
   };
 }
 
@@ -331,41 +287,12 @@ export function formsEqual(a: FormState, b: FormState): boolean {
     a.weekdays.every((day, index) => day === b.weekdays[index]) &&
     a.monthDay === b.monthDay &&
     a.payloadText === b.payloadText &&
-    a.notifyChannel === b.notifyChannel &&
-    a.notifyTo === b.notifyTo &&
     a.cronExpr === b.cronExpr &&
     a.cronTz === b.cronTz &&
     a.cronMode === b.cronMode &&
     cronBuildersEqual(a.cronBuilder, b.cronBuilder) &&
-    a.notifyAccountId === b.notifyAccountId &&
     a.workspaceId === b.workspaceId &&
     a.modelId === b.modelId &&
-    a.sessionBinding === b.sessionBinding &&
-    a.boundSessionId === b.boundSessionId
+    a.sessionBinding === b.sessionBinding
   );
-}
-
-export function getNotifyChannelLabel(channel: ScheduledTaskChannelOption): string {
-  const platform = PlatformRegistry.platformOfChannel(channel.value);
-  const platformLabel = platform ? i18nService.t(platform) || channel.label : channel.label;
-  // Singleton platforms use the platform name only. Multi-instance options
-  // carry a distinct instance label (for example, "Bot 1") after the dot.
-  const defaultLabel = platform ? PlatformRegistry.get(platform).label : channel.label;
-  return channel.accountId && channel.label !== defaultLabel
-    ? `${platformLabel} · ${channel.label}`
-    : platformLabel;
-}
-
-export function getNotifyConversationLabel(
-  conversation: Pick<ScheduledTaskConversationOption, 'conversationId'>,
-): string {
-  const conversationId = conversation.conversationId.trim();
-  if (conversationId === 'dm') return i18nService.t('scheduledTasksFormNotifyDirectMessage');
-  if (conversationId.startsWith('group:'))
-    return `${i18nService.t('scheduledTasksFormNotifyGroup')} · ${conversationId.slice(6)}`;
-  // Connectors may return opaque user/session IDs for direct chats. They are
-  // routing keys, not human-facing names, so never expose them in the form.
-  return conversationId
-    ? i18nService.t('scheduledTasksFormNotifyDirectMessage')
-    : i18nService.t('scheduledTasksFormNotifyConversationUnknown');
 }

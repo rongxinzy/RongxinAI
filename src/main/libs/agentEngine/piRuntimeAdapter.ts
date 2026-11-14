@@ -1,41 +1,18 @@
 /**
- * Pi Runtime Adapter
+ * Product bindings over the native Durable execution kernel.
  *
- * Implements the Pi-native PiRuntime interface using the Pi SDK (in-process).
- * Pi is an embeddable agent loop library — no subprocess, no HTTP, just import.
- *
- * Architecture:
- *   startSession    → createAgentSession() → session.subscribe() → emit PiRuntimeEvents
- *   continueSession → session.prompt()
- *   stopSession     → session.abort()
- *
- * The adapter owns session state, late-bound services, and event emission.
- * Turn execution lives in sibling modules driven through the
- * PiRuntimeAdapterHost contract:
- *   piRuntimeSessionLaunch         — startSession (new Pi AgentSession + turn)
- *   piRuntimeSessionContinuation   — continueSession / patchSession
- *   piRuntimeSessionCustomTools    — per-session custom tool composition
- *   piRuntimeSessionLifecycle      — stop / dispose / evict / delete cleanup
- *   piRuntimeQueueController       — pending-message + control-action queue
- *   piRuntimeSessionMemory         — serialized memory completions
- *   piRuntimeResourceLoader        — DefaultResourceLoader + MCP gateway tool
- *   piRuntimeSettingsOverrides     — Pi settings/model budget overrides
- *   piRuntimeSkillDirs             — app-managed SKILLs directory resolution
- *   piToolPermissionGate           — Pi-native tool permission checks
- *
- * Packages:
- *   @earendil-works/pi-coding-agent — AgentSession, createAgentSession
- *   @earendil-works/pi-ai/compat    — getModel(), completeSimple()
+ * Launch and continuation prepare models, resources, approvals and workbench
+ * projections. Durable owns generation, tool tasks, compaction, retries and
+ * persistent submissions. The adapter translates native events into the
+ * existing application stream and coordinates UI lifecycle operations.
  */
 
-import { randomUUID } from 'crypto';
+import { closeDurableHostSessions, recoverDurableHostSessions } from './durableHostLifecycle';
+import type { DurableSession } from './durableSession.mjs';
 import { PiRuntimeServiceBindings } from './piRuntimeServiceBindings';
 
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
-import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
-import { MemoryInjectionDedup } from '../../memory/memoryInjectionDedup';
-import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import type { SessionMemoryCompletion } from '../../memory/sessionMemoryExtractor';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import {
@@ -44,14 +21,9 @@ import {
   type PiToolAuthorizationResult,
 } from './piToolPermissionGate';
 import { PiAssistantTranscript } from './piAssistantTranscript';
-import {
-  buildPiBackgroundCompletionContext,
-  extractPiBackgroundCompletionText,
-} from './piBackgroundCompletion';
 import type { PiAskUserQuestionResponse } from './piAskUserQuestion';
 import type { PiCodingElicitationResponse } from './piCodingElicitation';
 import { PiCadViewerService } from './piCadViewerTool';
-import { resolvePiModel } from './piMagpiePiModel';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import { PiRuntimeQueueController } from './piRuntimeQueueController';
 import { PiRuntimeSessionMemory } from './piRuntimeSessionMemory';
@@ -68,11 +40,7 @@ import { PiRuntimeTurnEvents } from './piRuntimeTurnEvents';
 import { PiRuntimeTurnRecovery } from './piRuntimeTurnRecovery';
 import { recordCheckpointFallback } from '../../memory/sessionCheckpointService';
 import { HarnessActivationType } from '../../../shared/harness/constants';
-import {
-  getPiModules,
-  type ActivePiSession,
-  type InitializingPiSession,
-} from './piRuntimeSessionState';
+import { type ActivePiSession, type InitializingPiSession } from './piRuntimeSessionState';
 import type {
   PiContinueOptions,
   PiPermissionResult,
@@ -110,7 +78,7 @@ export class PiRuntimeAdapter
 
   /**
    * Resolvers declaring which sessions consume non-final full-text
-   * `messageUpdate` events (IM mirrors, coding lanes). With no resolver
+   * `messageUpdate` events (coding lanes). With no resolver
    * registered the adapter conservatively keeps emitting, which matches the
    * pre-gating behavior; final messageUpdate events are never gated.
    */
@@ -158,8 +126,8 @@ export class PiRuntimeAdapter
 
   readonly activeSessions = new Map<string, ActivePiSession>();
   /**
-   * Sessions that have been stopped still need to look active to IM routing,
-   * but must not keep the Pi session, transcript buffers, or tool maps.
+   * Preserve continuation identities without retaining native sessions,
+   * transcript buffers or tool maps after an explicit stop.
    */
   readonly retainedSessionIds = new Set<string>();
 
@@ -186,7 +154,6 @@ export class PiRuntimeAdapter
   private workbenchTaskService: WorkbenchTaskService | null = null;
 
   readonly initializingSessions = new Map<string, InitializingPiSession>();
-  readonly memoryInjectionDedup = new MemoryInjectionDedup();
   private readonly permissionGate = new PiToolPermissionGate(this);
 
   readonly recovery = new PiRuntimeTurnRecovery({
@@ -311,6 +278,36 @@ export class PiRuntimeAdapter
     stopAllPiRuntimeSessions(this);
   }
 
+  closeSessions(): Promise<void> {
+    return closeDurableHostSessions(this);
+  }
+  recoverSessions(): Promise<void> {
+    return recoverDurableHostSessions(this);
+  }
+
+  async prepareSession(sessionId: string, options: PiStartOptions): Promise<DurableSession> {
+    const previous = this.activeSessions.get(sessionId);
+    if (previous) {
+      previous.unsubscribe();
+      try {
+        await previous.piSession.close?.();
+      } finally {
+        previous.abortController.abort();
+        previous.artifactRecorder?.dispose();
+        this.activeSessions.delete(sessionId);
+      }
+    }
+    await this.startSession(sessionId, '', {
+      ...options,
+      _prepareOnly: true,
+      skipInitialUserMessage: true,
+    });
+    const session = this.activeSessions.get(sessionId)?.piSession;
+    if (!session || !('getDurableHost' in session))
+      throw new Error('Native automation core was not prepared.');
+    return session as DurableSession;
+  }
+
   evictIdleSessions(now = Date.now()): void {
     evictIdlePiRuntimeSessions(this, now);
   }
@@ -318,7 +315,11 @@ export class PiRuntimeAdapter
   /** Applies the current approval mode to sessions that are already running. */
   setApprovalModeForSession(sessionId: string, approvalMode: WorkbenchApprovalMode): void {
     const active = this.activeSessions.get(sessionId);
-    if (active) active.approvalMode = approvalMode;
+    if (!active || active.approvalMode === approvalMode) return;
+    active.approvalMode = approvalMode;
+    void active.piSession
+      .updateRuntimeOptions?.({ approvalMode })
+      .catch(error => console.warn('[DurableRuntime] could not persist approval choice:', error));
   }
 
   respondToPermission(requestId: string, result: PiPermissionResult): void {
@@ -466,8 +467,20 @@ export class PiRuntimeAdapter
     return this.activeSessions.get(sessionId)?.confirmationMode || null;
   }
 
-  onSessionDeleted(sessionId: string): void {
-    onPiSessionDeleted(this, sessionId);
+  async onSessionDeleted(sessionId: string): Promise<void> {
+    const automationPrefix = 'automation:';
+    if (sessionId.startsWith(automationPrefix)) {
+      const service = this.getScheduledTaskService();
+      const taskId = sessionId.slice(automationPrefix.length);
+      if (service && (await service.getJob(taskId))) await service.removeJob(taskId);
+    }
+    await onPiSessionDeleted(this, sessionId);
+  }
+
+  override async invalidatePiSessionDir(sessionId: string): Promise<void> {
+    const active = this.activeSessions.get(sessionId);
+    if (active) this.disposeSessionForRecreation(sessionId, active);
+    await super.invalidatePiSessionDir(sessionId);
   }
 
   getSessionMemoryCompletion(sessionId: string): SessionMemoryCompletion | null {
@@ -475,31 +488,12 @@ export class PiRuntimeAdapter
     return active ? this.sessionMemory.createCompletion(active) : null;
   }
 
-  /**
-   * Send a prompt directly to the LLM, bypassing the agent loop.
-   * For Chat mode — fast response, no tool execution.
-   */
-  async chatDirect(prompt: string, modelId?: string): Promise<string> {
-    const pi = await getPiModules();
-    const resolvedModel = await resolvePiModel(pi, modelId, undefined, {
-      conversationId: randomUUID(),
-      workload: ZhiyuanModelPoolWorkload.Chat,
-    });
-    const context = buildPiBackgroundCompletionContext([
-      { role: SessionMemoryCompletionRole.User, content: prompt },
-    ]);
-    const result = resolvedModel.modelRuntime?.completeSimple
-      ? await resolvedModel.modelRuntime.completeSimple(resolvedModel.model, context)
-      : await pi.completeSimple(resolvedModel.model, context, resolvedModel.requestOptions);
-    return extractPiBackgroundCompletionText(result);
-  }
-
   async resetImageInputCapabilities(): Promise<void> {
     await this.recovery.resetImageInputCapabilities();
   }
 
   /**
-   * Native session statistics from Pi's SessionManager.
+   * Native session statistics from the Durable journal.
    * Returns authoritative token metrics across all turns (including compacted turns) and cost.
    */
   getSessionStats(sessionId: string) {
@@ -512,11 +506,11 @@ export class PiRuntimeAdapter
    * Appends a non-destructive context edit to the active session branch in Pi.
    * Passing replacement = null omits the target from the LLM context.
    */
-  appendContextEdit(
+  async appendContextEdit(
     sessionId: string,
     targetId: string,
     replacement: { content: unknown } | null,
-  ): { success: boolean; entryId?: string; error?: string } {
+  ): Promise<{ success: boolean; entryId?: string; error?: string }> {
     const active = this.activeSessions.get(sessionId);
     if (!active) {
       return { success: false, error: 'Session is not active.' };
@@ -524,12 +518,11 @@ export class PiRuntimeAdapter
     if (active.isRunning) {
       return { success: false, error: 'Cannot edit context while session is running.' };
     }
-    const sessionManager = active.piSession?.sessionManager;
-    if (!sessionManager?.appendContextEdit) {
+    if (!active.piSession?.appendContextEdit) {
       return { success: false, error: 'Context edit is not supported by this session.' };
     }
     try {
-      const entryId = sessionManager.appendContextEdit(targetId, replacement);
+      const entryId = await active.piSession.appendContextEdit(targetId, replacement);
       try {
         const store = this.getStore() as unknown as {
           getMessage?: (
@@ -576,7 +569,7 @@ export class PiRuntimeAdapter
   }
 
   /**
-   * Navigates the active session JSONL tree to a prior branch point or checkpoint.
+   * Forks the native conversation at a prior journal entry.
    */
   async navigateSessionTree(
     sessionId: string,

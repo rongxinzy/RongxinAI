@@ -113,7 +113,6 @@ export const zhWorkbench: Record<string, string> = {
   agentTabBasic: '基础信息',
   agentTabSkills: '技能',
   agentTabIM: 'IM 渠道',
-  agentIMConfigured: '已配置',
   agentCreateFailed: '创建项目失败',
   agentNameDuplicate: '该项目名称已存在，请修改后重试',
   agentNameReserved: '不能使用「主项目」作为项目名称',

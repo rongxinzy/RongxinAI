@@ -1,17 +1,9 @@
-/**
- * Shared harness for the PiRuntimeAdapter test suites.
- *
- * Owns the Pi SDK module mocks, the per-file adapter lifecycle (fresh adapter,
- * test gateway, temporary workspaces), and the capability-resolution helpers
- * every suite drives the adapter through. Test files must import this module
- * BEFORE importing anything that transitively loads the mocked modules, so the
- * mocks are registered first.
- */
-
-import * as fs from 'fs';
-import * as os from 'os';
-import path from 'path';
-
+/** Application boundary doubles; native Durable execution has separate integration tests. */
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import path from 'node:path';
+import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
+import { ToolTask, type ToolHooks } from '@earendil-works/pi-durable';
 import { afterEach, beforeEach, vi } from 'vitest';
 import {
   installTestMagpie,
@@ -27,8 +19,8 @@ vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
   transformCoworkTextAsync: async (input: TextWorkerInput) => runTextWorkerOperation(input),
 }));
 
-const hoisted = vi.hoisted(() => {
-  const mockSession = {
+const doubles = vi.hoisted(() => {
+  const session = {
     prompt: vi.fn().mockResolvedValue(undefined),
     sendUserMessage: vi.fn().mockResolvedValue(undefined),
     steer: vi.fn().mockResolvedValue(undefined),
@@ -39,7 +31,6 @@ const hoisted = vi.hoisted(() => {
     reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     setThinkingLevel: vi.fn().mockResolvedValue(undefined),
-    bindExtensions: vi.fn().mockResolvedValue(undefined),
     getContextUsage: vi.fn(),
     compact: vi.fn().mockResolvedValue({ cancelled: false }),
     subscribe: vi.fn().mockReturnValue(() => {}),
@@ -54,335 +45,148 @@ const hoisted = vi.hoisted(() => {
       cost: 0.015,
       contextUsage: { percent: 12.5 },
     }),
-    navigateTree: vi.fn().mockResolvedValue({
-      editorText: 'rewound text',
-      cancelled: false,
-    }),
-    sessionManager: {
-      appendContextEdit: vi.fn().mockReturnValue('edit-entry-uuid-1'),
-    },
+    navigateTree: vi.fn().mockResolvedValue({ editorText: 'rewound text', cancelled: false }),
+    appendContextEdit: vi.fn().mockResolvedValue('edit-entry-uuid-1'),
   };
-
-  const mockSettingsManagerCreate = vi.fn((cwd: string, agentDir?: string) => ({
-    cwd,
-    agentDir,
-    applyOverrides: vi.fn(),
-    getShellPath: vi.fn(),
-  }));
-  const mockSettingsManagerInMemory = vi.fn(() => ({
-    applyOverrides: vi.fn(),
-    getShellPath: vi.fn(),
-  }));
-  const mockSessionManagerInMemory = vi.fn((cwd?: string) => ({ cwd }));
-  // File-backed SessionManager surface, recorded so specs can assert which
-  // strategy a launch picked and which directory it targeted.
-  const mockSessionManagerCreate = vi.fn((cwd: string, sessionDir?: string) => ({
-    cwd,
-    sessionDir,
-  }));
-  const mockSessionManagerOpen = vi.fn(
-    (sessionFile: string, sessionDir?: string, cwdOverride?: string) => ({
-      sessionFile,
-      sessionDir,
-      cwdOverride,
-    }),
-  );
-  const mockCompleteSimple = vi.fn().mockResolvedValue({
+  const completeSimple = vi.fn().mockResolvedValue({
     content: [{ type: 'text', text: 'Hello from Pi' }],
     stopReason: 'stop',
   });
-
-  const mockCodemodeExtensionFactory = vi.fn();
-  const mockMcpExtensionFactory = vi.fn();
-  const mockToolSearchExtensionFactory = vi.fn();
-
   return {
-    mockSession,
-    mockSettingsManagerCreate,
-    mockSettingsManagerInMemory,
-    mockSessionManagerInMemory,
-    mockSessionManagerCreate,
-    mockSessionManagerOpen,
-    mockCreateAgentSession: vi.fn().mockResolvedValue({ session: mockSession }),
-    mockDefaultResourceLoader: vi.fn(function (this: { reload: () => Promise<void> }) {
-      this.reload = vi.fn().mockResolvedValue(undefined);
-    }),
-    mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
-    mockCodemodeExtensionFactory,
-    mockMcpExtensionFactory,
-    mockToolSearchExtensionFactory,
-    mockCreateCodemodeExtension: vi.fn(() => mockCodemodeExtensionFactory),
-    mockCreateMcpExtension: vi.fn(() => mockMcpExtensionFactory),
-    mockCreateToolSearchExtension: vi.fn(() => mockToolSearchExtensionFactory),
-    mockApplyApplicationRuntimeEnv: vi.fn(),
-    mockCompleteSimple,
-    mockGetModel: vi.fn((provider: string, modelId: string) => ({
-      provider,
-      id: modelId,
-      baseUrl:
-        provider === 'openai'
-          ? 'https://api.openai.com/v1'
-          : provider === 'moonshotai-cn'
-            ? 'https://api.moonshot.cn/v1'
-            : undefined,
-    })),
-    mockModelRuntime: {
+    session,
+    createSession: vi.fn().mockResolvedValue({ session }),
+    createResources: vi.fn(),
+    createCatalog: vi.fn(),
+    catalog: {
       registerProvider: vi.fn(),
       setRuntimeApiKey: vi.fn().mockResolvedValue(undefined),
       getModel: vi.fn(),
-      completeSimple: mockCompleteSimple,
+      completeSimple,
     },
-    mockModelRuntimeCreate: vi.fn(),
-    mockResolveRawApiConfig: vi.fn(() => ({
-      config: {
-        apiKey: 'sk-test',
-        baseURL: 'http://127.0.0.1:11434/v1',
-        model: 'qwen-local',
-        apiType: 'openai' as const,
-      },
-      providerMetadata: {
-        providerName: 'llamacpp',
-        codingPlanEnabled: false,
-        supportsImage: false,
-        modelName: 'qwen-local',
-        capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-        contextWindow: 32768,
-        contextTokens: 32768,
-        maxTokens: 4096,
-      },
-    })),
-    mockResolveRawApiConfigForModelRef: vi.fn((modelRef: string) => {
-      const [providerName = 'llamacpp', modelName = modelRef] = modelRef.includes('/')
-        ? modelRef.split('/')
-        : ['llamacpp', modelRef];
-
-      if (providerName === 'openai') {
-        return {
-          config: {
-            apiKey: 'sk-openai',
-            baseURL: 'https://api.openai.com/v1',
-            model: modelName,
-            apiType: 'openai' as const,
-          },
-          providerMetadata: {
-            providerName: 'openai',
-            codingPlanEnabled: false,
-            supportsImage: true,
-            modelName,
-            contextWindow: 272000,
-            contextTokens: 272000,
-            maxTokens: 16384,
-          },
-        };
-      }
-
-      if (providerName === 'moonshot') {
-        return {
-          config: {
-            apiKey: 'sk-moonshot',
-            baseURL: 'http://172.18.5.179:3000/v1',
-            model: modelName,
-            apiType: 'openai' as const,
-          },
-          providerMetadata: {
-            providerName: 'moonshot',
-            codingPlanEnabled: false,
-            supportsImage: true,
-            modelName,
-            contextWindow: 262144,
-            contextTokens: 262144,
-            maxTokens: 32768,
-          },
-        };
-      }
-
-      return {
-        config: {
-          apiKey: 'sk-test',
-          baseURL: 'http://127.0.0.1:11434/v1',
-          model: modelName,
-          apiType: 'openai' as const,
-        },
-        providerMetadata: {
-          providerName,
-          codingPlanEnabled: false,
-          supportsImage: false,
-          modelName,
-          capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-          contextWindow: 32768,
-          contextTokens: 32768,
-          maxTokens: 4096,
-        },
-      };
-    }),
+    completeSimple,
+    getModel: vi.fn(),
+    applyRuntimeEnv: vi.fn(),
   };
 });
 
-// ── Mocks ──
-
-export const mockSession = hoisted.mockSession;
-export const mockCreateAgentSession = hoisted.mockCreateAgentSession;
-export const mockDefaultResourceLoader = hoisted.mockDefaultResourceLoader;
-export const mockSettingsManagerCreate = hoisted.mockSettingsManagerCreate;
-export const mockSettingsManagerInMemory = hoisted.mockSettingsManagerInMemory;
-export const mockSessionManagerInMemory = hoisted.mockSessionManagerInMemory;
-export const mockSessionManagerCreate = hoisted.mockSessionManagerCreate;
-export const mockSessionManagerOpen = hoisted.mockSessionManagerOpen;
-export const mockGetModel = hoisted.mockGetModel;
-export const mockModelRuntime = hoisted.mockModelRuntime;
-const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
-export const mockCreateMcpExtension = hoisted.mockCreateMcpExtension;
-export const mockCodemodeExtensionFactory = hoisted.mockCodemodeExtensionFactory;
-export const mockMcpExtensionFactory = hoisted.mockMcpExtensionFactory;
-export const mockToolSearchExtensionFactory = hoisted.mockToolSearchExtensionFactory;
-export const mockApplyApplicationRuntimeEnv = hoisted.mockApplyApplicationRuntimeEnv;
-export const mockCompleteSimple = hoisted.mockCompleteSimple;
-
-vi.mock('@earendil-works/pi-coding-agent', () => ({
-  createAgentSession: hoisted.mockCreateAgentSession,
-  DefaultResourceLoader: hoisted.mockDefaultResourceLoader,
-  SessionManager: {
-    inMemory: hoisted.mockSessionManagerInMemory,
-    create: hoisted.mockSessionManagerCreate,
-    open: hoisted.mockSessionManagerOpen,
-  },
-  SettingsManager: {
-    create: hoisted.mockSettingsManagerCreate,
-    inMemory: hoisted.mockSettingsManagerInMemory,
-  },
-  getAgentDir: hoisted.mockGetAgentDir,
-  ModelRuntime: {
-    create: hoisted.mockModelRuntimeCreate,
-  },
-  createCodemodeExtension: hoisted.mockCreateCodemodeExtension,
-  createToolSearchExtension: hoisted.mockCreateToolSearchExtension,
-  createMcpExtension: hoisted.mockCreateMcpExtension,
+vi.mock('./durableSession.mjs', () => ({ createDurableSession: doubles.createSession }));
+vi.mock('./durableModelCatalog.mjs', () => ({
+  DurableModelCatalog: { create: doubles.createCatalog },
 }));
-
+vi.mock('./piRuntimeResourceLoader', async importOriginal => {
+  const actual = await importOriginal<typeof import('./piRuntimeResourceLoader')>();
+  doubles.createResources.mockImplementation(actual.createPiRuntimeResourceLoader);
+  return { ...actual, createPiRuntimeResourceLoader: doubles.createResources };
+});
 vi.mock('@earendil-works/pi-ai/compat', () => ({
-  getModel: hoisted.mockGetModel,
-  completeSimple: hoisted.mockCompleteSimple,
+  getModel: doubles.getModel,
+  completeSimple: doubles.completeSimple,
 }));
-
-vi.mock('../coworkUtil', async importOriginal => {
-  const actual = await importOriginal<typeof import('../coworkUtil')>();
-  return {
-    ...actual,
-    applyApplicationRuntimeEnv: hoisted.mockApplyApplicationRuntimeEnv,
-  };
-});
+vi.mock('../coworkUtil', async importOriginal => ({
+  ...(await importOriginal<typeof import('../coworkUtil')>()),
+  applyApplicationRuntimeEnv: doubles.applyRuntimeEnv,
+}));
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { clearImageInputObservations } from './piImageInputFallback';
-import { piSessionDirFor } from './piSessionStore';
+import type { PiResourceLoader, PiResourceState } from './piRuntimeSessionState';
 
-/**
- * The adapter under test for the current spec.
- *
- * Reassigned by `setupPiRuntimeAdapterSuite`'s `beforeEach`, so specs must only
- * read it inside test bodies, never at module scope.
- */
+export const mockSession = doubles.session;
+export const mockCreateAgentSession = doubles.createSession;
+export const mockCreateResources = doubles.createResources;
+export const mockModelRuntime = doubles.catalog;
+export const mockApplyApplicationRuntimeEnv = doubles.applyRuntimeEnv;
+export const mockCompleteSimple = doubles.completeSimple;
 export let adapter: PiRuntimeAdapter;
+let gateway: TestMagpieGateway;
+let disposeGateway: (() => void) | undefined;
+const temporaryRoots = new Set<string>();
 
-/**
- * The gateway double backing model resolution for the current spec.
- *
- * Reassigned by `setupPiRuntimeAdapterSuite`'s `beforeEach`; same scoping rule
- * as `adapter`.
- */
-let testMagpie: TestMagpieGateway;
-
-let disposeMagpie: (() => void) | undefined;
-
-const temporaryWorkspaceRoots = new Set<string>();
-
-/** Create a real temporary workspace, removed by the suite's `afterEach`. */
-export const createTemporaryWorkspace = (): string => {
-  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-runtime-'));
-  temporaryWorkspaceRoots.add(workspaceRoot);
-  return workspaceRoot;
-};
-
-/**
- * Root for file-backed Pi session directories. Specs that enable persistence
- * pass this to `adapter.setPiSessionStoreRoot`; it is cleaned up with the
- * workspaces.
- */
-export const createTemporaryPiSessionRoot = (): string => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-sessions-'));
-  temporaryWorkspaceRoots.add(root);
+export function createTemporaryWorkspace(): string {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'durable-adapter-'));
+  temporaryRoots.add(root);
   return root;
-};
+}
 
-/** Drop a minimal Pi session JSONL so a rebuild resolves and reopens it. */
-export const seedPersistedPiSession = (rootDir: string, sessionId: string): string => {
-  const sessionDir = piSessionDirFor(rootDir, sessionId);
-  fs.mkdirSync(sessionDir, { recursive: true });
-  const sessionFile = path.join(sessionDir, '2026-01-01T00-00-00-000Z_seed.jsonl');
-  fs.writeFileSync(
-    sessionFile,
-    [
-      JSON.stringify({
-        type: 'session',
-        version: 3,
-        id: sessionId,
-        timestamp: '2026-01-01T00:00:00.000Z',
-        cwd: process.cwd(),
-      }),
-      JSON.stringify({
-        type: 'message',
-        id: 'entry-1',
-        parentId: null,
-        timestamp: '2026-01-01T00:00:01.000Z',
-        message: {
-          role: 'user',
-          content: [{ type: 'text', text: 'Earlier turn' }],
-          timestamp: '2026-01-01T00:00:01.000Z',
-        },
-      }),
-    ].join('\n') + '\n',
-    'utf8',
-  );
-  return sessionFile;
-};
+export const createTemporaryPiSessionRoot = createTemporaryWorkspace;
 
-/**
- * Register the shared adapter lifecycle: fresh mocks, gateway, and adapter per
- * spec, plus workspace cleanup afterwards. Call once at the top of each
- * `describe('PiRuntimeAdapter')` body.
- */
-export const setupPiRuntimeAdapterSuite = (): void => {
+export function setupPiRuntimeAdapterSuite(): void {
   beforeEach(() => {
-    mockApplyApplicationRuntimeEnv.mockClear();
     vi.clearAllMocks();
-    // Runtime image observations are process-wide state; reset per test so cases
-    // cannot leak a suppression into the next one.
     clearImageInputObservations();
-    mockModelRuntimeCreate.mockResolvedValue(mockModelRuntime);
-    disposeMagpie?.();
-    testMagpie = installTestMagpie();
-    disposeMagpie = () => testMagpie.dispose();
+    doubles.createCatalog.mockResolvedValue(doubles.catalog);
+    doubles.createSession.mockResolvedValue({ session: doubles.session });
+    disposeGateway?.();
+    gateway = installTestMagpie();
+    disposeGateway = () => gateway.dispose();
     adapter = new PiRuntimeAdapter();
+    adapter.setPiSessionStoreRoot(createTemporaryPiSessionRoot());
   });
-
-  afterEach(() => {
-    for (const workspaceRoot of temporaryWorkspaceRoots) {
-      fs.rmSync(workspaceRoot, { recursive: true, force: true });
+  afterEach(async () => {
+    for (const result of mockCreateResources.mock.results) {
+      const resources = await Promise.resolve(result.value).catch(() => null);
+      await resources?.close?.();
     }
-    temporaryWorkspaceRoots.clear();
-    disposeMagpie?.();
-    disposeMagpie = undefined;
+    for (const root of temporaryRoots) fs.rmSync(root, { recursive: true, force: true });
+    temporaryRoots.clear();
+    disposeGateway?.();
+    disposeGateway = undefined;
   });
-};
+}
 
-/**
- * Pin the resolution every capability read sees, and return a restore function.
- *
- * Capability reads happen at several points (model resolution, send gates,
- * capability sync), so counting `mockReturnValueOnce` values would make these
- * cases depend on call order.
- */
-export const applyTestResolution = (resolution: {
+export async function createdResources(index = 0): Promise<PiResourceLoader> {
+  const result = mockCreateResources.mock.results.at(index);
+  if (!result || result.type !== 'return') throw new Error('Resources were not created.');
+  return await result.value;
+}
+
+export function createdResourceState(index = 0): PiResourceState {
+  return mockCreateResources.mock.calls.at(index)![2] as PiResourceState;
+}
+
+export async function renderResourceSections(index = 0): Promise<Record<string, string>> {
+  const resources = await createdResources(index);
+  const sections: Record<string, string> = {};
+  for (const extension of resources.extensions) {
+    for (const section of extension.sections ?? []) {
+      if (section.key !== 'plan_mode') continue;
+      const value = await section.render({} as never, BACKGROUND_CONTEXT);
+      if (value !== undefined) sections[section.key] = value;
+    }
+  }
+  return sections;
+}
+
+export async function invokeBeforeTool(
+  input: {
+    toolCallId: string;
+    toolName: string;
+    input: Record<string, unknown>;
+  },
+  index = 0,
+): Promise<{ block?: string } | undefined> {
+  const resources = await createdResources(index);
+  for (const extension of resources.extensions) {
+    for (const registration of extension.hooks ?? []) {
+      if (registration.task !== ToolTask.definition.name) continue;
+      const hooks = registration.handlers as Partial<ToolHooks>;
+      const decision = await hooks.beforeTool?.(
+        {
+          type: 'toolCall',
+          id: input.toolCallId,
+          name: input.toolName,
+          arguments: input.input,
+        },
+        {} as never,
+        BACKGROUND_CONTEXT,
+      );
+      if (decision?.block) return decision;
+    }
+  }
+  return undefined;
+}
+
+export function applyTestResolution(resolution: {
   config?: { model?: string; apiKey?: string; baseURL?: string; apiType?: string };
   providerMetadata?: {
     providerName?: string;
@@ -394,9 +198,9 @@ export const applyTestResolution = (resolution: {
     maxTokens?: number;
     capabilities?: { imageInput?: ModelCapabilityStatus; toolCalling?: ModelCapabilityStatus };
   };
-}): void => {
-  const id = resolution.config?.model || testMagpie.defaultModelId;
-  testMagpie.upsert(id, {
+}): void {
+  const id = resolution.config?.model || gateway.defaultModelId;
+  gateway.upsert(id, {
     ...(resolution.providerMetadata?.contextWindow
       ? { context_window: resolution.providerMetadata.contextWindow }
       : {}),
@@ -405,92 +209,42 @@ export const applyTestResolution = (resolution: {
       : {}),
   });
   const image = resolution.providerMetadata?.capabilities?.imageInput;
-  if (image === ModelCapabilityStatus.Supported) testMagpie.setImage(id, true);
-  else if (image === ModelCapabilityStatus.Unsupported) testMagpie.setImage(id, false);
-  else testMagpie.setImage(id, 'unknown');
-  testMagpie.defaultModelId = id;
-};
+  gateway.setImage(
+    id,
+    image === ModelCapabilityStatus.Supported
+      ? true
+      : image === ModelCapabilityStatus.Unsupported
+        ? false
+        : 'unknown',
+  );
+  gateway.defaultModelId = id;
+}
 
-export const stubRawApiConfig = (resolution: {
-  config?: { model?: string };
-  providerMetadata?: {
-    contextWindow?: number;
-    maxTokens?: number;
-    capabilities?: { imageInput?: ModelCapabilityStatus };
-  };
-}): (() => void) => {
-  const previousDefault = testMagpie.defaultModelId;
+export function stubRawApiConfig(
+  resolution: Parameters<typeof applyTestResolution>[0],
+): () => void {
+  const previous = gateway.defaultModelId;
   applyTestResolution(resolution);
   return () => {
-    testMagpie.defaultModelId = previousDefault;
+    gateway.defaultModelId = previous;
   };
-};
+}
 
-/**
- * Pi model of a live session, for capability assertions.
- *
- * A model that cannot read images must not advertise image input: Pi then
- * downgrades every image block (attachments, `read` results, history) to a text
- * placeholder, so no image can re-enter a rejected request.
- */
-export const activePiModel = (
-  target: PiRuntimeAdapter,
-  sessionId: string,
-): Record<string, unknown> | undefined => {
-  const sessions = (
-    target as unknown as { activeSessions: Map<string, { model: Record<string, unknown> }> }
-  ).activeSessions;
-  return sessions.get(sessionId)?.model;
-};
+export function activePiModel(target: PiRuntimeAdapter, sessionId: string) {
+  return target.activeSessions.get(sessionId)?.model;
+}
 
-/** A configuration whose image input is unknown, for capability-change cases. */
 export const UNKNOWN_MODEL_RESOLUTION = {
-  config: {
-    apiKey: 'sk-unknown',
-    baseURL: 'https://api.moonshot.cn/v1',
-    model: 'kimi-k2.6',
-    apiType: 'openai' as const,
-  },
-  providerMetadata: {
-    providerName: 'moonshot',
-    codingPlanEnabled: false,
-    supportsImage: false,
-    capabilities: { imageInput: ModelCapabilityStatus.Unknown },
-  },
+  config: { model: 'kimi-k2.6' },
+  providerMetadata: { capabilities: { imageInput: ModelCapabilityStatus.Unknown } },
 };
-
-/** A configuration the user explicitly marked as text-only. */
 export const TEXT_ONLY_MODEL_RESOLUTION = {
-  config: {
-    apiKey: 'sk-text',
-    baseURL: 'https://api.moonshot.cn/v1',
-    model: 'kimi-k2.6',
-    apiType: 'openai' as const,
-  },
-  providerMetadata: {
-    providerName: 'moonshot',
-    codingPlanEnabled: false,
-    supportsImage: false,
-    capabilities: { imageInput: ModelCapabilityStatus.Unsupported },
-  },
+  config: { model: 'kimi-k2.6' },
+  providerMetadata: { capabilities: { imageInput: ModelCapabilityStatus.Unsupported } },
 };
-
-/** The gateway's rejection of a request whose payload carried an image. */
+export const VISION_MODEL_RESOLUTION = {
+  config: { model: 'kimi-k2.6' },
+  providerMetadata: { capabilities: { imageInput: ModelCapabilityStatus.Supported } },
+};
 export const VISION_400 =
   '400: {"message":"this server was started without the vision encoder (run setup again and choose \'vision\'), so it cannot read images"}';
-
-/** A vision-capable provider resolution, reused by the session-sync cases. */
-export const VISION_MODEL_RESOLUTION = {
-  config: {
-    apiKey: 'sk-vision',
-    baseURL: 'https://api.moonshot.cn/v1',
-    model: 'kimi-k2.6',
-    apiType: 'openai' as const,
-  },
-  providerMetadata: {
-    providerName: 'moonshot',
-    codingPlanEnabled: false,
-    supportsImage: true,
-    capabilities: { imageInput: ModelCapabilityStatus.Supported },
-  },
-};

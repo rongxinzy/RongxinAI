@@ -1,15 +1,4 @@
-export const EngramManagerPhase = {
-  Stopped: 'stopped',
-  Starting: 'starting',
-  Running: 'running',
-  Degraded: 'degraded',
-  Stopping: 'stopping',
-} as const;
-
 /** Optional context must never hold up an agent request for service startup. */
-export const MEMORY_PROMPT_RECALL_TIMEOUT_MS = 500;
-
-export type EngramManagerPhase = (typeof EngramManagerPhase)[keyof typeof EngramManagerPhase];
 
 import {
   MemoryDeliveryStatus,
@@ -24,11 +13,11 @@ import {
   type MemorySourceKind as MemorySourceKindValue,
 } from '../../shared/memory';
 
-export const EngramMemoryScope = MemoryScope;
-export type EngramMemoryScope = MemoryScopeValue;
+export const MemoryBackendScope = MemoryScope;
+export type MemoryBackendScope = MemoryScopeValue;
 
-export const EngramObservationType = MemoryKind;
-export type EngramObservationType = MemoryKindValue;
+export const MemoryObservationType = MemoryKind;
+export type MemoryObservationType = MemoryKindValue;
 
 export const MemoryOutboxStatus = MemoryDeliveryStatus;
 export type MemoryOutboxStatus = MemoryDeliveryStatusValue;
@@ -88,24 +77,12 @@ export const MemoryRecordStorageKind = {
 export type MemoryRecordStorageKind =
   (typeof MemoryRecordStorageKind)[keyof typeof MemoryRecordStorageKind];
 
-export const EngramSearchMatchMode = {
+export const MemorySearchMatchMode = {
   All: 'all',
   Any: 'any',
 } as const;
 
-export type EngramSearchMatchMode =
-  (typeof EngramSearchMatchMode)[keyof typeof EngramSearchMatchMode];
+export type MemorySearchMatchMode =
+  (typeof MemorySearchMatchMode)[keyof typeof MemorySearchMatchMode];
 
-export const EngramEnvironment = {
-  BinaryPath: 'ZHIYUAN_ENGRAM_BIN',
-  DataDirectory: 'ENGRAM_DATA_DIR',
-  Port: 'ENGRAM_PORT',
-  HttpToken: 'ENGRAM_HTTP_TOKEN',
-  CloudAutosync: 'ENGRAM_CLOUD_AUTOSYNC',
-} as const;
-
-export const ENGRAM_RUNTIME_DIRECTORY = 'engram-runtime';
-export const ENGRAM_PACKAGED_DIRECTORY = 'memory';
-export const ENGRAM_DATA_DIRECTORY_SEGMENTS = ['memory', 'engram'] as const;
-export const ENGRAM_LOOPBACK_HOST = '127.0.0.1';
 export const SESSION_SUMMARY_TTL_DAYS = 30;

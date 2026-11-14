@@ -10,29 +10,19 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@shared/components/ui/toggle-group';
-import { PlatformRegistry } from '@shared/platform';
 import { CircleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import {
-  SessionBindingStrategy,
-  type SessionBindingStrategy as SessionBindingStrategyType,
-} from '../../../scheduledTask/constants';
-import type {
-  ScheduledTask,
-  ScheduledTaskChannelOption,
-  ScheduledTaskConversationOption,
-} from '../../../scheduledTask/types';
+import type { SessionBindingStrategy as SessionBindingStrategyType } from '../../../scheduledTask/constants';
+import type { ScheduledTask } from '../../../scheduledTask/types';
 import type { Workspace } from '../../../shared/workspace';
-import { CoworkSessionSource } from '../../../shared/cowork/constants';
 import { i18nService } from '../../services/i18n';
 import {
   getLastPathSegment,
   getWorkspaceDisplayName,
   isScratchWorkspacePath,
 } from '../../utils/path';
-import { coworkService } from '../../services/cowork';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { toAgentModelRef } from '../../utils/agentModelRef';
@@ -45,7 +35,6 @@ import CronBuilder, { cronBuilderToExpr, type CronPreview } from './CronBuilder'
 import type { TaskTemplateValues } from './TaskTemplateGallery';
 import TaskFormBody from './TaskFormBody';
 import TaskTimePicker from './TaskTimePicker';
-import { channelOptionValue, findChannelOption } from './channelOptionValue';
 import {
   PLAN_LABEL_KEY,
   TASK_NAME_MAX_LENGTH,
@@ -54,9 +43,6 @@ import {
   buildTaskInput,
   createFormState,
   formsEqual,
-  getNotifyChannelLabel,
-  getNotifyConversationLabel,
-  isIMChannel,
   previewCron,
   type FormState,
 } from './taskFormState';
@@ -98,20 +84,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const currentWorkspaceId = useSelector((state: RootState) => state.workspace.currentWorkspaceId);
 
-  const [channelOptions, setChannelOptions] = useState<ScheduledTaskChannelOption[]>(() => {
-    const base: ScheduledTaskChannelOption[] = [];
-    const savedChannel = task?.delivery.channel;
-    if (savedChannel && isIMChannel(savedChannel) && !base.some(o => o.value === savedChannel)) {
-      const platform = PlatformRegistry.platformOfChannel(savedChannel);
-      const label = platform ? PlatformRegistry.get(platform).label : savedChannel;
-      base.push({ value: savedChannel, label, accountId: task?.delivery.accountId });
-    }
-    return base;
-  });
-  const [conversations, setConversations] = useState<ScheduledTaskConversationOption[]>([]);
-  const [conversationsLoading, setConversationsLoading] = useState(false);
-  const [sessionOptions, setSessionOptions] = useState<Array<{ value: string; label: string }>>([]);
-  const [sessionOptionsLoading, setSessionOptionsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [cronPreview, setCronPreview] = useState<CronPreview>(null);
@@ -125,10 +97,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
 
   const isAdvanced = form.planType === 'advanced';
   const isCron = form.planType === 'cron';
-  const showConversationSelector = isIMChannel(form.notifyChannel);
-  const selectedConversation = conversations.find(
-    conversation => conversation.conversationId === form.notifyTo,
-  );
 
   useEffect(() => {
     const nextForm = createFormState(task, prefill);
@@ -144,115 +112,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
     setForm(current => (current.workspaceId ? current : { ...current, workspaceId }));
     setInitialForm(current => (current.workspaceId ? current : { ...current, workspaceId }));
   }, [form.workspaceId, initialWorkspaceId, currentWorkspaceId, workspaces]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void scheduledTaskService.listChannels().then(channels => {
-      if (cancelled || channels.length === 0) return;
-      setChannelOptions(current => {
-        // Use the server-returned order (DEFINITIONS order) as the base,
-        // then append any saved channel that is not in the list (e.g. disabled platform).
-        const next = [...channels];
-        for (const saved of current) {
-          const sameValue = next.some(
-            item => channelOptionValue(item) === channelOptionValue(saved),
-          );
-          const samePlatformHasAccount = next.some(
-            item => item.value === saved.value && Boolean(item.accountId),
-          );
-          if (!sameValue && !(samePlatformHasAccount && !saved.accountId)) {
-            next.push(saved);
-          }
-        }
-        const deduplicated = next.filter(
-          (option, index, all) =>
-            all.findIndex(item => channelOptionValue(item) === channelOptionValue(option)) ===
-            index,
-        );
-        // A singleton channel can arrive both with and without an account ID
-        // (for example after upgrading an existing task). Prefer the routable
-        // account-backed option so the UI cannot show two identical labels.
-        return deduplicated.filter(
-          option =>
-            Boolean(option.accountId) ||
-            !deduplicated.some(item => item.value === option.value && Boolean(item.accountId)),
-        );
-      });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!showConversationSelector) {
-      setConversations([]);
-      return;
-    }
-
-    let cancelled = false;
-    const selectedChannelOption = channelOptions.find(
-      option => option.value === form.notifyChannel && option.accountId === form.notifyAccountId,
-    );
-    setConversationsLoading(true);
-    void scheduledTaskService
-      .listChannelConversations(
-        form.notifyChannel,
-        form.notifyAccountId,
-        selectedChannelOption?.filterAccountId ?? form.notifyAccountId,
-      )
-      .then(result => {
-        if (cancelled) return;
-        // Some connectors expose the same native private-chat target more than
-        // once (for example, `dm`). Keep one option per routable target so the
-        // selector does not present indistinguishable duplicate entries.
-        const uniqueConversations = result.filter(
-          (conversation, index, all) =>
-            all.findIndex(item => item.conversationId === conversation.conversationId) === index,
-        );
-        setConversations(uniqueConversations);
-        setConversationsLoading(false);
-
-        if (uniqueConversations.length > 0 && !form.notifyTo) {
-          setForm(current => ({ ...current, notifyTo: uniqueConversations[0].conversationId }));
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.notifyChannel, form.notifyAccountId, channelOptions]);
-
-  useEffect(() => {
-    if (form.sessionBinding !== SessionBindingStrategy.Existing || !form.workspaceId) {
-      setSessionOptions([]);
-      return;
-    }
-    let cancelled = false;
-    setSessionOptionsLoading(true);
-    void coworkService
-      .listSessionsForWorkspacePreview(form.workspaceId, 100, 0, [
-        CoworkSessionSource.Manual,
-        CoworkSessionSource.Im,
-      ])
-      .then(result => {
-        if (cancelled) return;
-        setSessionOptions(
-          (result.sessions ?? []).map(session => ({ value: session.id, label: session.title })),
-        );
-        setSessionOptionsLoading(false);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSessionOptions([]);
-          setSessionOptionsLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [form.sessionBinding, form.workspaceId]);
 
   // Live cron preview
   useEffect(() => {
@@ -278,22 +137,14 @@ const TaskForm: React.FC<TaskFormProps> = ({
     setForm(current => ({
       ...current,
       workspaceId,
-      boundSessionId:
-        current.sessionBinding === SessionBindingStrategy.Existing ? '' : current.boundSessionId,
     }));
   }, []);
   const handleSessionBindingChange = useCallback((sessionBinding: SessionBindingStrategyType) => {
     setForm(current => ({
       ...current,
       sessionBinding,
-      boundSessionId:
-        sessionBinding === SessionBindingStrategy.Existing ? current.boundSessionId : '',
     }));
   }, []);
-  const handleBoundSessionChange = useCallback(
-    (boundSessionId: string) => updateForm({ boundSessionId }),
-    [updateForm],
-  );
   const handlePayloadTextChange = useCallback(
     (payloadText: string) => updateForm({ payloadText }),
     [updateForm],
@@ -338,9 +189,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
     if (!form.workspaceId) {
       nextErrors.workspaceId = i18nService.t('scheduledTasksFormValidationWorkspaceRequired');
     }
-    if (form.sessionBinding === SessionBindingStrategy.Existing && !form.boundSessionId) {
-      nextErrors.boundSessionId = i18nService.t('scheduledTasksFormValidationSessionRequired');
-    }
     if (!form.payloadText.trim()) {
       nextErrors.payloadText = i18nService.t('scheduledTasksFormValidationPromptRequired');
     }
@@ -384,13 +232,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
 
     if (form.planType === 'weekly' && form.weekdays.length === 0) {
       nextErrors.schedule = i18nService.t('scheduledTasksFormValidationWeekdayRequired');
-    }
-
-    // An announce delivery without a destination cannot be routed at run time.
-    // Only the IM channels with a conversation selector are checked: legacy
-    // tasks may carry a channel this form cannot enumerate a target for.
-    if (isIMChannel(form.notifyChannel) && !form.notifyTo.trim()) {
-      nextErrors.notifyTo = i18nService.t('scheduledTasksFormValidationNotifyTargetRequired');
     }
 
     setErrors(nextErrors);
@@ -635,115 +476,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
     );
   }, [form, cronPreview, task, planSelect, updateForm]);
 
-  const notificationControl = useMemo(
-    () => (
-      <div className="flex items-center gap-3">
-        <Select
-          value={
-            form.notifyChannel === 'none'
-              ? 'none'
-              : channelOptionValue({
-                  value: form.notifyChannel,
-                  accountId: form.notifyAccountId,
-                })
-          }
-          onValueChange={value => {
-            const selected = findChannelOption(channelOptions, value);
-            updateForm({
-              notifyChannel: selected?.value ?? 'none',
-              notifyTo: '',
-              notifyAccountId: selected?.accountId,
-            });
-          }}
-        >
-          <SelectTrigger className="flex-1 min-w-0">
-            <SelectValue>
-              {form.notifyChannel === 'none'
-                ? i18nService.t('scheduledTasksFormNotifyChannelNone')
-                : (() => {
-                    const channel = channelOptions.find(
-                      option =>
-                        option.value === form.notifyChannel &&
-                        option.accountId === form.notifyAccountId,
-                    );
-                    return channel ? getNotifyChannelLabel(channel) : form.notifyChannel;
-                  })()}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="none">
-                {i18nService.t('scheduledTasksFormNotifyChannelNone')}
-              </SelectItem>
-              {channelOptions.map(channel => {
-                const baseDisplayName = getNotifyChannelLabel(channel);
-                const duplicateLabels = channelOptions.filter(
-                  option => getNotifyChannelLabel(option) === baseDisplayName,
-                );
-                const displayName =
-                  duplicateLabels.length > 1 && channel.accountId
-                    ? `${baseDisplayName} · ${channel.accountId.slice(-4)}`
-                    : baseDisplayName;
-                return (
-                  <SelectItem
-                    key={`${channel.value}:${channel.accountId ?? ''}`}
-                    value={channelOptionValue(channel)}
-                  >
-                    {displayName}
-                  </SelectItem>
-                );
-              })}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-
-        {showConversationSelector && (
-          <Select
-            value={form.notifyTo}
-            onValueChange={value => updateForm({ notifyTo: value ?? '' })}
-            disabled={conversationsLoading}
-          >
-            <SelectTrigger className="flex-1 min-w-0">
-              <SelectValue
-                placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')}
-              >
-                {selectedConversation
-                  ? getNotifyConversationLabel(selectedConversation)
-                  : undefined}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                {conversations.length === 0 ? (
-                  <SelectItem value="no-conversation" disabled>
-                    {i18nService.t('scheduledTasksFormNotifyConversationNone')}
-                  </SelectItem>
-                ) : (
-                  conversations.map(conv => (
-                    <SelectItem key={conv.conversationId} value={conv.conversationId}>
-                      {getNotifyConversationLabel(conv)}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        )}
-      </div>
-    ),
-    [
-      form.notifyChannel,
-      form.notifyAccountId,
-      form.notifyTo,
-      channelOptions,
-      conversations,
-      conversationsLoading,
-      selectedConversation,
-      showConversationSelector,
-      updateForm,
-    ],
-  );
-
   return (
     <div className="flex flex-col min-h-0 h-full">
       <div className="flex-1 overflow-y-auto py-3 min-h-0">
@@ -756,16 +488,11 @@ const TaskForm: React.FC<TaskFormProps> = ({
           modelOptions={modelOptions}
           workspaceOptions={workspaceOptions}
           sessionBinding={form.sessionBinding}
-          boundSessionId={form.boundSessionId}
-          sessionOptions={sessionOptions}
-          sessionOptionsLoading={sessionOptionsLoading}
           scheduleControl={scheduleControl}
-          notificationControl={notificationControl}
           onNameChange={handleNameChange}
           onModelChange={handleModelChange}
           onWorkspaceChange={handleWorkspaceChange}
           onSessionBindingChange={handleSessionBindingChange}
-          onBoundSessionChange={handleBoundSessionChange}
           onPayloadTextChange={handlePayloadTextChange}
         />
       </div>

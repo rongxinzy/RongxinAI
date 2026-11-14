@@ -38,17 +38,17 @@ afterEach(() => {
 });
 
 describe('Windows offline component identity', () => {
-  test('uses cc-connect as the first cached component (llamacpp optional by edition)', () => {
+  test('ships the five required application components without an external transport runtime', () => {
     const previous = process.env.ZHIYUAN_UPDATE_VARIANT;
     delete process.env.ZHIYUAN_UPDATE_VARIANT;
     const components = getWindowsResourceComponents(process.cwd());
     if (previous === undefined) delete process.env.ZHIYUAN_UPDATE_VARIANT;
     else process.env.ZHIYUAN_UPDATE_VARIANT = previous;
-    expect(components).toHaveLength(6);
+    expect(components).toHaveLength(5);
     expect(components[0]).toMatchObject({
-      key: 'channel-runtime',
-      prefix: 'channel-runtime',
-      sentinel: 'channel-runtime/cc-connect-sidecar.exe',
+      key: 'skills',
+      prefix: 'SKILLs',
+      sentinel: 'SKILLs/skills.config.json',
     });
     expect(components.map(component => component.key)).not.toContain('openclaw');
   });
@@ -67,7 +67,6 @@ describe('Windows offline component identity', () => {
     );
 
     expect(compressionByKey).toMatchObject({
-      'channel-runtime': 'lzma2-mx5-nonsolid-v1',
       skills: 'lzma2-mx5-solid-v1',
       mcps: 'lzma2-mx5-solid-v1',
       python: 'lzma2-mx5-solid-v1',

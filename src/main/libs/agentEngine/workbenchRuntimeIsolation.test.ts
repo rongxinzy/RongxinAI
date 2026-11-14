@@ -18,8 +18,10 @@ const mainSource = `${readSource('../../main.ts')}\n${appBootstrapSources}`;
 const coworkViewSource = readSource('../../../renderer/components/cowork/CoworkView.tsx');
 const coworkServiceSource = readSource('../../../renderer/services/cowork.ts');
 const piRuntimeAdapterSource = readSource('./piRuntimeAdapter.ts');
-const ccConnectPiBridgeSource = readSource('../../im/ccConnectPiBridge.ts');
-const runtimeTypesSource = readSource('./types.ts');
+const sessionStateSource = readSource('./piRuntimeSessionState.ts');
+const durableSessionSource = readSource('./durableSession.mts');
+const durableHostSource = readSource('./durableSessionHost.mts');
+const runtimeTypesSource = readSource('./piRuntimeTypes.ts');
 
 describe('Pi runtime isolation', () => {
   test('Pi is the sole agent runtime contract', () => {
@@ -37,10 +39,17 @@ describe('Pi runtime isolation', () => {
     expect(mainSource).not.toContain("webContents.send('cowork:stream:");
   });
 
-  test('routes cc-connect turns directly into Pi', () => {
-    expect(ccConnectPiBridgeSource).toContain('runtime: PiRuntimeAdapter');
-    expect(ccConnectPiBridgeSource).toContain('coworkRuntime: options.runtime');
-    expect(ccConnectPiBridgeSource).not.toContain('CoworkRuntime');
+  test('the session factory delegates to the native durable Harness', () => {
+    expect(sessionStateSource).toContain(
+      "import { createDurableSession } from './durableSession.mjs'",
+    );
+    expect(sessionStateSource).toContain(
+      'createAgentSession: options => createDurableSession(options ?? {})',
+    );
+    expect(sessionStateSource).not.toMatch(/from ['"]@earendil-works\/pi-coding-agent/);
+    expect(durableSessionSource).toContain('extends DurableSessionHost');
+    expect(durableHostSource).toMatch(/await Harness\.open\(\s*storage,/);
+    expect(durableHostSource).toContain('await openNodeSqliteStorage(this.options.durableFile)');
   });
 
   test('does not couple CoworkView initialization to a separate gateway state', () => {

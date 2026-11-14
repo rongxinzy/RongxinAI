@@ -1,48 +1,33 @@
 import { expect, test, vi } from 'vitest';
-
 import { MemoryScope } from '../../shared/memory';
 import { recallMemoryScope } from './memoryRecallSupport';
-import { EngramRequestError } from './zhiyuanEngramAdapter';
 
-test('treats an unknown project as an empty recall branch instead of failing', async () => {
-  const adapter = {
-    recall: vi.fn(async () => {
-      throw new EngramRequestError(
-        404,
-        'GET',
-        '/search',
-        'unknown_project',
-        '{"code":"unknown_project"}',
-      );
-    }),
-    recent: vi.fn(),
+test('an empty local index is an empty recall branch', async () => {
+  const backend = { recall: vi.fn(async () => []), recent: vi.fn(async () => []) };
+  const repository = {
+    filterRecallableMemoryIds: () => new Set(),
+    getRecallMetadata: () => new Map(),
   };
-  const repository = { getRecallMetadata: vi.fn(() => new Map()) };
-
   await expect(
-    recallMemoryScope(repository as never, adapter as never, {
+    recallMemoryScope(repository as never, backend as never, {
       query: '发票',
       projectId: 'workspace-without-records',
       scope: MemoryScope.Personal,
     }),
   ).resolves.toEqual([]);
-  expect(adapter.recent).not.toHaveBeenCalled();
 });
-
-test('does not swallow other runtime failures as empty recall results', async () => {
-  const adapter = {
+test('storage failures remain observable rather than becoming empty recall results', async () => {
+  const backend = {
     recall: vi.fn(async () => {
-      throw new EngramRequestError(500, 'GET', '/search', 'internal_error', 'boom');
+      throw new Error('database is locked');
     }),
     recent: vi.fn(),
   };
-  const repository = { getRecallMetadata: vi.fn(() => new Map()) };
-
   await expect(
-    recallMemoryScope(repository as never, adapter as never, {
+    recallMemoryScope({} as never, backend as never, {
       query: '发票',
       projectId: 'workspace-a',
       scope: MemoryScope.Project,
     }),
-  ).rejects.toThrow('HTTP 500');
+  ).rejects.toThrow('database is locked');
 });

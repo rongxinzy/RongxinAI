@@ -214,17 +214,17 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
   describe('Dimension 2: Context Edit and Tree Navigation (F18)', () => {
     let adapter: PiRuntimeAdapter;
     let mockPiSession: any;
-    let mockSessionManager: any;
+    let mockNativeEdits: any;
     let mockStore: any;
     const sessionId = 'tree-adversarial-session';
 
     beforeEach(() => {
       adapter = new PiRuntimeAdapter();
-      mockSessionManager = {
+      mockNativeEdits = {
         appendContextEdit: vi.fn((targetId: string, replacement: any) => `entry-${targetId}`),
       };
       mockPiSession = {
-        sessionManager: mockSessionManager,
+        appendContextEdit: mockNativeEdits.appendContextEdit,
         navigateTree: vi.fn(async (targetId: string, options?: any) => ({
           cancelled: false,
           editorText: `Navigated to ${targetId}`,
@@ -248,44 +248,41 @@ describe('Milestone 3 Adversarial Challenge: Queue, Tree, & Context Edit', () =>
       });
     });
 
-    it('Scenario 2.1: appendContextEdit masks target with null non-destructively', () => {
-      const res = adapter.appendContextEdit(sessionId, 'msg-to-mask', null);
+    it('Scenario 2.1: appendContextEdit masks target with null non-destructively', async () => {
+      const res = await adapter.appendContextEdit(sessionId, 'msg-to-mask', null);
       expect(res.success).toBe(true);
       expect(res.entryId).toBe('entry-msg-to-mask');
-      expect(mockSessionManager.appendContextEdit).toHaveBeenCalledWith('msg-to-mask', null);
+      expect(mockNativeEdits.appendContextEdit).toHaveBeenCalledWith('msg-to-mask', null);
       expect(mockStore.updateMessageMetadata).toHaveBeenCalledWith(sessionId, 'msg-to-mask', {
         contextEdit: { omitted: true },
       });
     });
 
-    it('Scenario 2.2: appendContextEdit replaces target with content non-destructively', () => {
+    it('Scenario 2.2: appendContextEdit replaces target with content non-destructively', async () => {
       const replacement = { content: 'Redacted safe content' };
-      const res = adapter.appendContextEdit(sessionId, 'msg-to-replace', replacement);
+      const res = await adapter.appendContextEdit(sessionId, 'msg-to-replace', replacement);
       expect(res.success).toBe(true);
       expect(res.entryId).toBe('entry-msg-to-replace');
-      expect(mockSessionManager.appendContextEdit).toHaveBeenCalledWith(
-        'msg-to-replace',
-        replacement,
-      );
+      expect(mockNativeEdits.appendContextEdit).toHaveBeenCalledWith('msg-to-replace', replacement);
       expect(mockStore.updateMessageMetadata).toHaveBeenCalledWith(sessionId, 'msg-to-replace', {
         contextEdit: { replaced: true },
       });
     });
 
-    it('Scenario 2.3: appendContextEdit rejects when session is running', () => {
+    it('Scenario 2.3: appendContextEdit rejects when session is running', async () => {
       (adapter as any).activeSessions.get(sessionId).isRunning = true;
-      const res = adapter.appendContextEdit(sessionId, 'msg-1', null);
+      const res = await adapter.appendContextEdit(sessionId, 'msg-1', null);
       expect(res.success).toBe(false);
       expect(res.error).toContain('running');
-      expect(mockSessionManager.appendContextEdit).not.toHaveBeenCalled();
+      expect(mockNativeEdits.appendContextEdit).not.toHaveBeenCalled();
     });
 
-    it('Scenario 2.4: appendContextEdit surfaces native SessionManager exceptions cleanly', () => {
-      mockSessionManager.appendContextEdit.mockImplementationOnce(() => {
+    it('Scenario 2.4: appendContextEdit surfaces native context-edit exceptions cleanly', async () => {
+      mockNativeEdits.appendContextEdit.mockImplementationOnce(() => {
         throw new Error('Entry msg-x is not on the active branch');
       });
 
-      const res = adapter.appendContextEdit(sessionId, 'msg-x', null);
+      const res = await adapter.appendContextEdit(sessionId, 'msg-x', null);
       expect(res.success).toBe(false);
       expect(res.error).toBe('Entry msg-x is not on the active branch');
     });

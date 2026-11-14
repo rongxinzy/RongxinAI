@@ -132,7 +132,6 @@ test('loading a session folds the ledger rows in without opening the panel', asy
             updatedAt: 1,
           },
         }),
-        remoteManaged: async () => ({ remoteManaged: false }),
         getRuntimeSnapshots: async () => ({ snapshots: [] }),
         requestStreamResync: async () => true,
         getConfig: async () => ({ success: false }),

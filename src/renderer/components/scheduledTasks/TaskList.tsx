@@ -20,7 +20,7 @@ import {
   Plus,
   RefreshCw,
 } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useSelector } from 'react-redux';
 
 import type { ScheduledTask } from '../../../scheduledTask/types';
@@ -52,39 +52,6 @@ interface TaskListItemProps {
  * A Run can succeed while its push silently fails, and the run history shows
  * no delivery column, so the task card has to report it.
  */
-const DELIVERY_RECHECK_DELAYS_MS = [3000, 10000];
-
-function useDeliveryFailure(task: ScheduledTask): string | null {
-  const deliverable = task.delivery.mode === 'announce' && Boolean(task.delivery.channel);
-  const lastRunAtMs = task.state.lastRunAtMs;
-  const [failure, setFailure] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!deliverable) {
-      setFailure(null);
-      return;
-    }
-    let cancelled = false;
-    const check = () => {
-      void scheduledTaskService.preflight(task.id).then(result => {
-        if (cancelled) return;
-        const latest = result?.latestDelivery;
-        setFailure(latest && latest.status === 'error' ? latest.error || '' : null);
-      });
-    };
-    check();
-    // The finished Run is published before the channel round trip persists its
-    // Delivery, so re-check while that call is still in flight.
-    const timers = DELIVERY_RECHECK_DELAYS_MS.map(delay => setTimeout(check, delay));
-    return () => {
-      cancelled = true;
-      timers.forEach(clearTimeout);
-    };
-  }, [deliverable, lastRunAtMs, task.id]);
-
-  return failure;
-}
-
 const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRequestEdit }) => {
   const isRunning = task.state.runningAtMs !== null;
   const displayStatus = isRunning ? 'running' : task.state.lastStatus;
@@ -92,7 +59,6 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
   const nextRunLabel = task.enabled
     ? formatNextRunRelative(computeNextRunAtMs(task.schedule, Date.now()))
     : null;
-  const deliveryFailure = useDeliveryFailure(task);
 
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const workspace = task.workspaceId ? workspaces.find(w => w.id === task.workspaceId) : undefined;
@@ -144,16 +110,6 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
           <Badge className={getStatusTextClass(displayStatus)} variant="outline">
             {statusLabel}
           </Badge>
-
-          {deliveryFailure !== null && (
-            <Badge
-              variant="outline"
-              className={cn('shrink-0', getStatusTextClass('error'))}
-              title={deliveryFailure || i18nService.t('scheduledTasksDeliveryFailed')}
-            >
-              {i18nService.t('scheduledTasksDeliveryFailed')}
-            </Badge>
-          )}
 
           <div
             onClick={e => e.stopPropagation()}

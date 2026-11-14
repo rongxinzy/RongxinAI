@@ -1,63 +1,69 @@
 import { expect, test, vi } from 'vitest';
-
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import type { ScheduledTaskInput } from '../../../scheduledTask/types';
 
-function createService(): { service: ScheduledTaskService; inputs: ScheduledTaskInput[] } {
+function fixture() {
   const inputs: ScheduledTaskInput[] = [];
-  const service = {
-    addJob: vi.fn(async (input: ScheduledTaskInput) => {
-      inputs.push(input);
-      return { id: 'task-1', name: input.name, sessionKey: input.sessionKey ?? null };
-    }),
-  } as unknown as ScheduledTaskService;
-  return { service, inputs };
+  const addJob = vi.fn(async (input: ScheduledTaskInput) => {
+    inputs.push(input);
+    return { id: 'task-1', name: input.name };
+  });
+  const tool = buildPiScheduledTaskTool({
+    service: { addJob } as unknown as ScheduledTaskService,
+    workspaceId: 'workspace',
+  });
+  const execute = tool.execute as (
+    call: string,
+    params: Record<string, unknown>,
+  ) => Promise<{ details: Record<string, unknown> }>;
+  return { inputs, execute, addJob, tool };
 }
+const params = { name: 'Task', schedule: { kind: 'every', everyMs: 60000 }, message: 'Run.' };
 
-const baseParams = {
-  name: '喝水提醒',
-  schedule: { kind: 'at', at: '2027-03-15T16:30:00+08:00' },
-  message: '提醒喝水',
-};
-
-test('uses the session default delivery when the model omits delivery', async () => {
-  const { service, inputs } = createService();
-  const tool = buildPiScheduledTaskTool({
-    service,
-    sessionKey: 'session-1',
-    defaultDelivery: { mode: 'announce', channel: 'dingtalk', to: 'user-42', accountId: 'acct-1' },
-  });
-
-  const result = await tool.execute!('call-1', baseParams);
-  expect(result.details).toMatchObject({ taskId: 'task-1' });
-  expect(inputs[0].delivery).toEqual({
-    mode: 'announce',
-    channel: 'dingtalk',
-    to: 'user-42',
-    accountId: 'acct-1',
-  });
-});
-
-test('an explicit delivery from the model wins over the session default', async () => {
-  const { service, inputs } = createService();
-  const tool = buildPiScheduledTaskTool({
-    service,
-    sessionKey: 'session-1',
-    defaultDelivery: { mode: 'announce', channel: 'dingtalk', to: 'user-42' },
-  });
-
-  await tool.execute!('call-1', {
-    ...baseParams,
+test('creates a local task conversation in the selected workspace', async () => {
+  const f = fixture();
+  expect((await f.execute('call', params)).details).toEqual({ taskId: 'task-1' });
+  expect(f.inputs[0]).toMatchObject({
+    workspaceId: 'workspace',
+    sessionTarget: 'isolated',
+    sessionKey: null,
     delivery: { mode: 'none' },
+    payload: { kind: 'agentTurn', message: 'Run.' },
   });
-  expect(inputs[0].delivery).toEqual({ mode: 'none' });
+  expect(JSON.stringify(f.tool.parameters)).not.toContain('delivery');
 });
 
-test('without a default or explicit delivery the task stays undelivered', async () => {
-  const { service, inputs } = createService();
-  const tool = buildPiScheduledTaskTool({ service, sessionKey: 'session-1' });
+test('invalid intervals and past one-time timestamps are reported without creating a job', async () => {
+  const f = fixture();
+  expect(
+    (await f.execute('call', { ...params, schedule: { kind: 'every', everyMs: 0 } })).details
+      .isError,
+  ).toBe(true);
+  expect(
+    (await f.execute('call', { ...params, schedule: { kind: 'at', at: '2000-01-01T00:00:00Z' } }))
+      .details.isError,
+  ).toBe(true);
+  expect(f.addJob).not.toHaveBeenCalled();
+});
 
-  await tool.execute!('call-1', baseParams);
-  expect(inputs[0].delivery).toEqual({ mode: 'none' });
+test('service failures remain visible to the agent', async () => {
+  const f = fixture();
+  f.addJob.mockRejectedValueOnce(new Error('Native storage is unavailable.'));
+  const result = await f.execute('call', params);
+  expect(result.details.isError).toBe(true);
+});
+
+test('cron timezone and stagger reach native scheduling without being discarded', async () => {
+  const f = fixture();
+  await f.execute('call', {
+    ...params,
+    schedule: { kind: 'cron', expr: '0 9 * * *', tz: 'Asia/Shanghai', staggerMs: 3000 },
+  });
+  expect(f.inputs[0].schedule).toEqual({
+    kind: 'cron',
+    expr: '0 9 * * *',
+    tz: 'Asia/Shanghai',
+    staggerMs: 3000,
+  });
 });

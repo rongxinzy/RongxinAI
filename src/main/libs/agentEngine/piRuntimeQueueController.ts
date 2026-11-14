@@ -48,7 +48,9 @@ export class PiRuntimeQueueController {
   resetNativeDispatch(sessionId: string): void {
     this.pendingSteerCounts.delete(sessionId);
     try {
-      this.host.activeSessions.get(sessionId)?.piSession.clearQueue?.();
+      void Promise.resolve(this.host.activeSessions.get(sessionId)?.piSession.clearQueue?.()).catch(
+        error => console.warn(`[PiRuntime] native queue reset failed for ${sessionId}:`, error),
+      );
     } catch {
       // Ignore cleanup errors when clearing Pi queue state.
     }
@@ -243,12 +245,8 @@ export class PiRuntimeQueueController {
     this.pendingSteerCounts.set(sessionId, (this.pendingSteerCounts.get(sessionId) ?? 0) + 1);
 
     try {
-      // Clear native queue first
-      try {
-        active.piSession.clearQueue?.();
-      } catch {
-        // Ignore clear queue errors
-      }
+      // A failed withdrawal must not be presented as a successful steer.
+      await active.piSession.clearQueue?.();
 
       const queuedImagePrompt = this.buildQueuedPromptPayload(active, item);
       this.host.recovery.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
@@ -433,7 +431,9 @@ export class PiRuntimeQueueController {
   private syncNativeFollowUpQueue(sessionId: string, active: ActivePiSession | undefined): void {
     if (!active || !this.host.isSessionRunning(sessionId)) return;
     try {
-      active.piSession.clearQueue?.();
+      void Promise.resolve(active.piSession.clearQueue?.()).catch(error =>
+        console.warn(`[PiRuntime] failed to clear native queue for ${sessionId}:`, error),
+      );
     } catch (e) {
       console.warn(`[PiRuntime] failed to clear native queue for ${sessionId}:`, e);
     }

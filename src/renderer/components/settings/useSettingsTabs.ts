@@ -57,7 +57,7 @@ export function useSettingsTabs({
     }
 
     // Filter out tabs with 'hide' action in enterprise config
-    // e.g., ui: { "settings.im": "hide" } → hide the 'im' tab
+    // Each enterprise UI policy addresses the corresponding settings tab.
     const ui = enterpriseConfig?.ui;
     const configuredTabs = ui
       ? flatTabs.filter(tab => ui[`settings.${tab.key}`] !== 'hide')

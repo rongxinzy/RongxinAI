@@ -58,28 +58,57 @@ test('main.ts invokes every appBootstrap helper it imports', () => {
   }
 });
 
-test('initApp constructs the canonical scheduler before the first window', () => {
+test('initApp makes the native automation tool available before the first window', () => {
   const source = readSource('./initApp.ts');
-
-  // The scheduled-task service must be constructed eagerly at startup:
-  // getCanonicalScheduledTaskService is the only place that injects it into
-  // the Pi adapter, and Work sessions started before the cc-connect sidecar
-  // attaches would otherwise silently lack the scheduled_task tool.
-  const eagerCall = source.indexOf('getCronJobService();');
+  const eagerCall = source.indexOf(
+    'getPiRuntimeAdapter().setScheduledTaskService(getScheduledTaskService());',
+  );
   const createWindow = source.indexOf('createMainWindow();');
   expect(eagerCall).toBeGreaterThan(-1);
   expect(createWindow).toBeGreaterThan(eagerCall);
 });
 
-test('constructing the canonical scheduler injects it into the Pi adapter', () => {
-  const source = readSource('./ccConnectRuntime.ts');
+test('native recovery starts after model MCP and managed resources are ready', () => {
+  const source = readSource('./initApp.ts');
+  const mcpReady = source.indexOf('await initMcpServers();');
+  const resourcesReady = source.indexOf('await Promise.all([');
+  const nativeReady = source.indexOf('await markNativeResourcesReady();');
+  expect(mcpReady).toBeGreaterThan(-1);
+  expect(resourcesReady).toBeGreaterThan(mcpReady);
+  expect(nativeReady).toBeGreaterThan(resourcesReady);
+  expect(source).not.toContain('recoverInterruptedRuns(');
+  const recovery = readSource('./nativeRecovery.ts');
+  const recover = recovery.indexOf('await getPiRuntimeAdapter().recoverSessions();');
+  const automations = recovery.indexOf('await startAutomations();');
+  const retryParked = recovery.indexOf('await getScheduledTaskService().retryParked();');
+  expect(recover).toBeGreaterThan(-1);
+  expect(automations).toBeGreaterThan(recover);
+  expect(retryParked).toBeGreaterThan(automations);
+  expect(recovery).toContain('await recoverNativeRuntimes();');
+});
 
-  // The lazy constructor must keep wiring setScheduledTaskService; dropping
-  // it removes the scheduled_task tool from every Work session.
-  const constructor = source.indexOf('export const getCanonicalScheduledTaskService');
-  const injection = source.indexOf(
-    'agentRuntime.piRuntimeAdapter?.setScheduledTaskService(channelRuntime.scheduledTaskService)',
-  );
-  expect(constructor).toBeGreaterThan(-1);
-  expect(injection).toBeGreaterThan(constructor);
+test('native automation startup injects its service before resuming durable tasks', () => {
+  const source = readSource('./automationRuntime.ts');
+  expect(source).toContain('new DurableAutomationService(');
+  const startup = source.slice(source.indexOf('export async function startAutomations'));
+  const injection = startup.indexOf('getPiRuntimeAdapter().setScheduledTaskService(current);');
+  const start = startup.indexOf('await current.start();');
+  expect(injection).toBeGreaterThan(-1);
+  expect(start).toBeGreaterThan(injection);
+});
+
+test('bootstrap registers local workbench todo and coding IPC before opening a window', () => {
+  const source = readSource('./initApp.ts');
+  const createWindow = source.indexOf('createMainWindow();');
+  for (const registration of [
+    'registerWorkbenchTaskIpcHandlers({',
+    'registerTodoIpcHandlers(',
+    'registerCodingAgentIpcHandlers(getCodingRoomService)',
+  ]) {
+    const invocation = source.indexOf(registration);
+    expect(invocation, `${registration} must be invoked during bootstrap`).toBeGreaterThan(-1);
+    expect(invocation, `${registration} must run before the first window`).toBeLessThan(
+      createWindow,
+    );
+  }
 });

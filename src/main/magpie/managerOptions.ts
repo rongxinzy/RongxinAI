@@ -14,6 +14,8 @@ export interface MagpieManagerOptions {
   port?: () => Promise<number>;
   gatewayPort?: MagpieGatewayPortStore;
   startupTimeoutMs?: number;
+  /** Notification after readiness; must not block gateway start or model catalog reads. */
+  onReady?: () => void;
   recoveryRetryDelayMs?: number;
   platform?: NodeJS.Platform;
   jobRunnerPath?: string | false;

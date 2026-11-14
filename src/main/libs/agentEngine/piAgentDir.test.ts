@@ -1,59 +1,52 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import { ensureEmbeddedPiAgentDir } from './piAgentDir';
 
-describe('ensureEmbeddedPiAgentDir', () => {
-  const roots: string[] = [];
+const roots: string[] = [];
+const previousAgentDir = process.env.ZHIYUAN_AGENT_DIR;
+afterEach(async () => {
+  if (previousAgentDir === undefined) delete process.env.ZHIYUAN_AGENT_DIR;
+  else process.env.ZHIYUAN_AGENT_DIR = previousAgentDir;
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  await Promise.all(roots.splice(0).map(root => fs.rm(root, { recursive: true, force: true })));
+});
 
-  afterEach(async () => {
-    delete process.env.PI_CODING_AGENT_DIR;
-    await Promise.all(roots.map(root => fs.rm(root, { recursive: true, force: true })));
-    roots.length = 0;
-  });
+test('creates product resources without inspecting HOME or migrating retired configuration', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-agent-resources-'));
+  roots.push(root);
+  const cliHome = path.join(root, 'unrelated-cli-home');
+  const cliAgent = path.join(cliHome, '.pi', 'agent');
+  const userData = path.join(root, 'user data');
+  const retiredAgent = path.join(userData, 'pi-agent');
+  await fs.mkdir(cliAgent, { recursive: true });
+  await fs.mkdir(retiredAgent, { recursive: true });
+  await fs.writeFile(path.join(cliAgent, 'settings.json'), 'CLI settings stay here');
+  await fs.writeFile(path.join(retiredAgent, 'prompt.md'), 'Retired data stays here');
+  const homedir = vi.spyOn(os, 'homedir').mockReturnValue(cliHome);
+  vi.stubEnv('PI_CODING_AGENT_DIR', cliAgent);
 
-  it('migrates prompts agents and extensions once without overwriting or mutating source', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-pi-agent-'));
-    roots.push(root);
-    const legacyHome = path.join(root, 'legacy-home');
-    const legacyAgent = path.join(legacyHome, '.pi', 'agent');
-    await fs.mkdir(path.join(legacyAgent, 'prompts'), { recursive: true });
-    await fs.mkdir(path.join(legacyAgent, 'agents'), { recursive: true });
-    await fs.mkdir(path.join(legacyAgent, 'extensions'), { recursive: true });
-    await fs.writeFile(path.join(legacyAgent, 'prompts', 'one.md'), 'prompt\n');
-    await fs.writeFile(path.join(legacyAgent, 'agents', 'team.json'), '{}\n');
-    await fs.writeFile(path.join(legacyAgent, 'extensions', 'ext.json'), '{}\n');
-    const previousHome = process.env.HOME;
-    process.env.HOME = legacyHome;
-    const agentDir = await ensureEmbeddedPiAgentDir(path.join(root, 'userData'));
-    expect(await fs.readFile(path.join(agentDir, 'prompts', 'one.md'), 'utf8')).toBe('prompt\n');
-    await fs.writeFile(path.join(legacyAgent, 'prompts', 'one.md'), 'changed\n');
-    await ensureEmbeddedPiAgentDir(path.join(root, 'userData'));
-    expect(await fs.readFile(path.join(agentDir, 'prompts', 'one.md'), 'utf8')).toBe('prompt\n');
-    expect(await fs.readFile(path.join(legacyAgent, 'prompts', 'one.md'), 'utf8')).toBe(
-      'changed\n',
-    );
-    process.env.HOME = previousHome;
-  });
+  const directory = await ensureEmbeddedPiAgentDir(userData);
+  expect(directory).toBe(path.join(userData, 'agent-resources'));
+  expect(process.env.ZHIYUAN_AGENT_DIR).toBe(directory);
+  expect(process.env.PI_CODING_AGENT_DIR).toBe(cliAgent);
+  expect(homedir).not.toHaveBeenCalled();
+  expect(await fs.readdir(directory)).toEqual([]);
+  expect(await fs.readFile(path.join(cliAgent, 'settings.json'), 'utf8')).toBe(
+    'CLI settings stay here',
+  );
+  expect(await fs.readFile(path.join(retiredAgent, 'prompt.md'), 'utf8')).toBe(
+    'Retired data stays here',
+  );
+});
 
-  it('sets PI_CODING_AGENT_DIR under userData and migrates legacy settings once', async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-pi-agent-'));
-    roots.push(root);
-    const legacyHome = path.join(root, 'legacy-home');
-    const legacyAgent = path.join(legacyHome, '.pi', 'agent');
-    await fs.mkdir(legacyAgent, { recursive: true });
-    await fs.writeFile(path.join(legacyAgent, 'settings.json'), '{"theme":"legacy"}\n');
-
-    const previousHome = process.env.HOME;
-    process.env.HOME = legacyHome;
-
-    const agentDir = await ensureEmbeddedPiAgentDir(path.join(root, 'userData'));
-    expect(process.env.PI_CODING_AGENT_DIR).toBe(agentDir);
-    expect(await fs.readFile(path.join(agentDir, 'settings.json'), 'utf8')).toContain('legacy');
-    await ensureEmbeddedPiAgentDir(path.join(root, 'userData'));
-    expect(await fs.readFile(path.join(agentDir, 'settings.json'), 'utf8')).toContain('legacy');
-
-    process.env.HOME = previousHome;
-  });
+test('reuses product resources without overwriting their existing contents', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'durable-agent-resources-'));
+  roots.push(root);
+  const directory = await ensureEmbeddedPiAgentDir(root);
+  await fs.writeFile(path.join(directory, 'prompt.md'), 'Product-owned prompt');
+  expect(await ensureEmbeddedPiAgentDir(root)).toBe(directory);
+  expect(await fs.readFile(path.join(directory, 'prompt.md'), 'utf8')).toBe('Product-owned prompt');
 });

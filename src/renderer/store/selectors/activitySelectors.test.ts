@@ -7,7 +7,7 @@ import { selectActivityRuns, selectHasActiveActivityRun } from './activitySelect
 
 const run = (overrides: Partial<ActivityRun> = {}): ActivityRun => ({
   id: 'run-1',
-  source: ActivitySource.Channel,
+  source: ActivitySource.ScheduledTask,
   status: ActivityStatus.Running,
   startedAt: 1,
   updatedAt: 1,

@@ -61,7 +61,6 @@ function writeNsisOfflineComponentRouting(
     `${JSON.stringify(targets, null, 2)}\n`,
   );
   const labels = {
-    'channel-runtime': '频道运行环境',
     skills: '内置 Skills',
     mcps: '内置 MCPs',
     python: 'Python 离线运行环境',

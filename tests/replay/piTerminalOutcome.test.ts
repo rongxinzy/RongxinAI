@@ -47,6 +47,7 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
     const adapter = new PiRuntimeAdapter();
     adapter.setCoworkStore(coworkStore);
     adapter.setWorkbenchTaskService(new WorkbenchTaskService(db));
+    adapter.setPiSessionStoreRoot(directory);
     const complete = vi.fn();
     const error = vi.fn();
     adapter.on('complete', complete);
@@ -58,18 +59,25 @@ test.each([PiAssistantStopReason.Length, PiAssistantStopReason.Stop])(
         '',
         CoworkExecutionMode.Local,
       );
-      await adapter.startSession(session.id, 'Respond once.', {
+      const started = adapter.startSession(session.id, 'Respond once.', {
         workspaceRoot: directory,
         sessionMode: 'work',
       });
-      expect(error).not.toHaveBeenCalled();
-      expect(complete).toHaveBeenCalledOnce();
-      expect(complete).toHaveBeenCalledWith(session.id, {});
+      if (finishReason === PiAssistantStopReason.Length) {
+        await expect(started).rejects.toThrow('completion is incomplete');
+        expect(error).toHaveBeenCalled();
+        expect(complete).not.toHaveBeenCalled();
+      } else {
+        await started;
+        expect(error).not.toHaveBeenCalled();
+        expect(complete).toHaveBeenCalledOnce();
+        expect(complete).toHaveBeenCalledWith(session.id, {});
+      }
       expect(requests).toBe(1);
     } finally {
       // Context-usage metadata is intentionally persisted on the next timer tick.
       await new Promise(resolve => setTimeout(resolve, 0));
-      adapter.stopAllSessions();
+      await adapter.stopAllSessions();
       gateway.dispose();
       await store.close();
       await new Promise<void>(resolve => {

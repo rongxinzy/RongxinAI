@@ -1,11 +1,11 @@
 import { createHash } from 'crypto';
 
-import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
+import type { ToolAnnotations } from '../libs/agentEngine/durableToolTypes';
 
 import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
 
 export const NATIVE_READ_ONLY_TOOLS = new Set(['read', 'grep', 'find', 'ls']);
-export const NATIVE_REVERSIBLE_TOOLS = new Set(['write', 'edit']);
+const NATIVE_REVERSIBLE_TOOLS = new Set(['write', 'edit']);
 
 // Legacy set preserved for standalone / backward-compatible callers that do not supply annotations
 const LEGACY_READ_ONLY_TOOLS = new Set([

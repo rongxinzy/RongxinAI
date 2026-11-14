@@ -301,14 +301,6 @@ export function createCowork(runtime: BrowserMockRuntime): Window['electron']['c
         },
       };
     },
-    remoteManaged: async _p0 => {
-      void _p0;
-      runtime.warnOnce('cowork.remoteManaged');
-      return {
-        success: true,
-        remoteManaged: false,
-      };
-    },
     listSessions: async _p0 => {
       void _p0;
       runtime.warnOnce('cowork.listSessions');
