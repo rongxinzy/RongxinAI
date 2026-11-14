@@ -6,7 +6,7 @@ import type { PiBeforeAgentStartSystemPromptOptions } from './piExtensionTypes';
 
 describe('ensureNativeSystemPromptSections - Empirical Adversarial Stress Testing', () => {
   const preamble = getZhiyuanProductPreamble();
-  const testCwd = '/Users/krli/workspace/RongxinAI';
+  const testCwd = process.cwd();
 
   it('handles empty selectedTools: []', () => {
     const options: PiBeforeAgentStartSystemPromptOptions = {
