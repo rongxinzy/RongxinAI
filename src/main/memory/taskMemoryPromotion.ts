@@ -2,7 +2,7 @@ import { MemoryScope } from '../../shared/memory';
 import {
   WorkbenchApprovalEffectStatus,
   WorkbenchContractKind,
-  WorkbenchRunStatus,
+  WorkbenchExecutionStatus,
   type WorkbenchApproval,
   type WorkbenchArtifact,
   type WorkbenchRun,
@@ -13,7 +13,7 @@ import { AtomicMemorySourceKind } from './constants';
 import type { ProjectMemoryService } from './projectMemoryService';
 import type { SessionMemoryCompletion } from './sessionMemoryExtractor';
 
-export interface CompletedWorkbenchRunMemorySource {
+export interface SettledWorkbenchRunMemorySource {
   task: WorkbenchTask;
   run: WorkbenchRun;
   artifacts: WorkbenchArtifact[];
@@ -22,13 +22,13 @@ export interface CompletedWorkbenchRunMemorySource {
   finalAnswer: string;
 }
 
-export async function promoteCompletedWorkbenchRun(
+export async function promoteSettledWorkbenchRun(
   service: ProjectMemoryService,
-  source: CompletedWorkbenchRunMemorySource,
+  source: SettledWorkbenchRunMemorySource,
   complete: SessionMemoryCompletion,
   extractor = new AtomicMemoryExtractor(),
 ): Promise<string[]> {
-  if (source.run.status !== WorkbenchRunStatus.Succeeded) return [];
+  if (source.run.status !== WorkbenchExecutionStatus.Settled) return [];
   if (source.task.contract.kind === WorkbenchContractKind.Chat) return [];
   if (!source.finalAnswer.trim()) return [];
   const artifacts = source.artifacts.filter(artifact => artifact.runId === source.run.id);
@@ -96,6 +96,7 @@ export async function promoteCompletedWorkbenchRun(
       artifactId: artifact?.id,
       approvalId: approval?.id,
       metadata: {
+        executionStatus: source.run.status,
         artifactIds: artifacts.map(item => item.id),
         approvalIds: approvals.map(item => item.id),
         extraction: extracted.metadataFor(memory),

@@ -13,13 +13,13 @@ import {
 import type { CompanionProfile } from '../../shared/companion/types';
 import {
   WorkbenchContractKind,
-  WorkbenchRunStatus,
+  WorkbenchExecutionStatus,
   WorkbenchRunTrigger,
-  WorkbenchTaskStatus,
 } from '../../shared/workbenchTask';
 import { prepareCoworkSession, type CoworkSessionIpcDeps } from '../coworkIpc/sessionStart';
 import type { MagpieModelService } from '../magpie/modelService';
 import type { WorkbenchTaskService } from '../workbenchTask/taskService';
+import { observeWorkbench } from '../workbenchTask/observe';
 import { companionInstructions } from './personas';
 import { CompanionAttachments } from './attachments';
 import { initializeCompanionTaskAdmissions } from './taskOwnership';
@@ -46,11 +46,13 @@ export class CompanionTasks {
       .prepare(`SELECT a.session_id AS sessionId FROM companion_task_admissions a
       JOIN workbench_runs r ON r.id = a.run_id
       JOIN workbench_tasks t ON t.id = a.task_id AND t.active_run_id = r.id WHERE r.status = ?`)
-      .all(WorkbenchRunStatus.Queued) as { sessionId: string }[];
+      .all(WorkbenchExecutionStatus.Queued) as { sessionId: string }[];
     for (const { sessionId } of queued)
-      options.tasks.failRun(sessionId, {
-        message: 'Task admission was interrupted before execution.',
-      });
+      observeWorkbench(sessionId, () =>
+        options.tasks.failRun(sessionId, {
+          message: 'Task admission was interrupted before execution.',
+        }),
+      );
   }
 
   workspaces() {
@@ -125,14 +127,21 @@ export class CompanionTasks {
       const existing = this.find(profile.petId, request.requestId);
       if (existing) return this.existing(existing, fingerprint);
       const sessionId = randomUUID();
+      const taskId = randomUUID();
+      const runId = randomUUID();
       const repository = this.options.tasks.repository;
-      const task = repository.createTask(sessionId, request.text, {
-        kind: WorkbenchContractKind.GenericWork,
-        requiresUserAcceptance: false,
-      });
-      const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
-      repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Planned, run.id);
-      repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Running, run.id);
+      observeWorkbench(sessionId, () =>
+        repository.transaction(() => {
+          repository.createTask(
+            sessionId,
+            request.text,
+            { kind: WorkbenchContractKind.GenericWork },
+            taskId,
+          );
+          repository.createRun(taskId, WorkbenchRunTrigger.Message, runId);
+          repository.updateTaskStatus(taskId, WorkbenchExecutionStatus.Queued, runId);
+        }),
+      );
       const prepared = prepareCoworkSession(
         this.options.sessions,
         {
@@ -161,19 +170,22 @@ export class CompanionTasks {
         },
         {
           sessionId,
-          workbenchRunId: run.id,
+          workbenchRunId: runId,
+          workbenchTaskId: taskId,
           onFailure: error =>
-            this.options.tasks.failRun(sessionId, {
-              message: error instanceof Error ? error.message : String(error),
-            }),
+            observeWorkbench(sessionId, () =>
+              this.options.tasks.failRun(sessionId, {
+                message: error instanceof Error ? error.message : String(error),
+              }),
+            ),
         },
       );
       const receipt = {
         petId: profile.petId,
         requestId: request.requestId,
         sessionId: prepared.session.id,
-        taskId: task.id,
-        runId: run.id,
+        taskId,
+        runId,
       };
       this.options.db
         .prepare(`INSERT INTO companion_task_admissions
@@ -190,7 +202,7 @@ export class CompanionTasks {
       launch.current = prepared.launch;
       return { receipt };
     })();
-    // Nothing reaches the execution adapter until all three records have committed.
+    // Native input and its ownership receipt must commit before execution.
     launch.current?.();
     return result;
   }
@@ -213,8 +225,10 @@ export class CompanionTasks {
   stop(petId: string, sessionId: string): void {
     if (!this.owned(petId, sessionId)) throw new Error('Task belongs to another companion');
     this.options.sessions.getPiRuntimeAdapter().stopSession(sessionId);
-    const task = this.options.tasks.getCurrent(sessionId)?.task;
-    if (task?.activeRunId) this.options.tasks.cancelRun(sessionId, task.activeRunId);
+    observeWorkbench(sessionId, () => {
+      const task = this.options.tasks.getCurrent(sessionId)?.task;
+      if (task?.activeRunId) this.options.tasks.cancelRun(sessionId, task.activeRunId);
+    });
   }
 
   snapshot(petId: string) {
@@ -241,7 +255,7 @@ export class CompanionTasks {
       return {
         receipt: this.receipt(row),
         title: session?.title ?? '',
-        status: run?.status ?? WorkbenchRunStatus.Cancelled,
+        status: run?.status ?? WorkbenchExecutionStatus.Cancelled,
         missing: !session || !task || !run,
       };
     });

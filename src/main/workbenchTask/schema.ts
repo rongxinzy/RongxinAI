@@ -40,7 +40,6 @@ const CURRENT_SCHEMA_DDL = `
     started_at INTEGER,
     ended_at INTEGER,
     context_json TEXT,
-    verification_result_json TEXT,
     failure_json TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,

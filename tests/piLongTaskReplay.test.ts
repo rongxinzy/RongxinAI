@@ -40,7 +40,7 @@ describe.skip('Pi long-task replay (recorded provider)', () => {
       expect(summary.errors).toEqual([]);
       expect(summary.counts.byType['agent_settled']).toBe(1);
       expect(summary.counts.byType['turn_start']).toBeGreaterThanOrEqual(LONGTASK_DOC_COUNT);
-      expect(summary.workbenchTaskStatus).toBe('needs_review');
+      expect(summary.workbenchTaskStatus).toBe('settled');
 
       // The golden run completed the full 32-document read/summarize loop
       // plus index.csv and report.md; artifact assertions anchor the

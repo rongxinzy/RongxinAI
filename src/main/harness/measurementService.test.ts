@@ -18,7 +18,6 @@ test('appends profile, activation, failure, and quality events in sequence', () 
     const repository = new WorkbenchTaskRepository(db);
     const task = repository.createTask('session', 'goal', {
       kind: WorkbenchContractKind.Chat,
-      requiresUserAcceptance: false,
     });
     const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
     const measurement = new HarnessMeasurementService(repository);

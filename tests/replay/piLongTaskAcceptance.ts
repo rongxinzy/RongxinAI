@@ -17,7 +17,8 @@ export function inspectLongTaskArtifacts(workDir: string, docCount: number): str
     (_, index) => `doc-${String(index + 1).padStart(3, '0')}`,
   );
   const summaries = read('summaries.md');
-  const summaryIds = [...summaries.matchAll(/^##\s+(doc-\d{3})\b/gm)].map(match => match[1]);
+  const summaryHeadings = [...summaries.matchAll(/^##\s+(doc-\d{3})\b([^\n]*)/gm)];
+  const summaryIds = summaryHeadings.map(match => match[1]);
   if (summaryIds.join(',') !== expected.join(',')) {
     errors.push(`summaries.md must contain all ${docCount} document sections in order`);
   }
@@ -34,6 +35,26 @@ export function inspectLongTaskArtifacts(workDir: string, docCount: number): str
     errors.push(
       `index.csv must contain a four-column header and all ${docCount} documents in order`,
     );
+  }
+  const normalizeTitle = (value: string) =>
+    value
+      .normalize('NFKC')
+      .replace(/^\s*(?:doc-)?\d{3}\s+/, '')
+      .trim();
+  for (const [index, id] of expected.entries()) {
+    const sourceTitle =
+      read(`data/${id}.txt`)
+        .split('\n')
+        .find(line => line.trim())
+        ?.replace(/^#+\s*/, '') ?? '';
+    const normalized = normalizeTitle(sourceTitle);
+    if (
+      !normalized ||
+      normalizeTitle(summaryHeadings[index]?.[2] ?? '') !== normalized ||
+      normalizeTitle(rows[index + 1]?.[1] ?? '') !== normalized
+    ) {
+      errors.push(`${id} titles in summaries.md and index.csv must match the source document`);
+    }
   }
   const report = read('report.md');
   if ((report.match(/\p{Script=Han}/gu)?.length ?? 0) < 1500) {

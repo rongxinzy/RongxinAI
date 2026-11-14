@@ -5,6 +5,8 @@
  * session map and write the notices the user actually sees.
  */
 
+import { observeWorkbench } from '../../workbenchTask/observe';
+
 import { randomUUID } from 'crypto';
 
 import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
@@ -324,7 +326,9 @@ export class PiRuntimeTurnRecovery {
     active.errorSurfaced = true;
     active.turnFailed = true;
     active.isRunning = false;
-    this.host.getWorkbench()?.failRun?.(sessionId, { message: rawMessage });
+    observeWorkbench(sessionId, () =>
+      this.host.getWorkbench()?.failRun(sessionId, { message: rawMessage }),
+    );
     // Persist a system error message so the error survives session switching
     // and is visible in the message list. The classified kind lets the renderer
     // translate it into a user-friendly i18n message; the raw message is kept

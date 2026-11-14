@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { WorkbenchRunStatus } from '../workbenchTask/constants';
+import { WorkbenchExecutionStatus } from '../workbenchTask/constants';
 import { CompanionUnavailableReason } from './constants';
 import { COMPANION_MAX_ATTACHMENTS } from './attachments';
 
@@ -24,7 +24,7 @@ const companionTaskReceipt = z
 export const companionTaskProjection = z.object({
   receipt: companionTaskReceipt,
   title: z.string(),
-  status: z.enum(Object.values(WorkbenchRunStatus)),
+  status: z.enum(Object.values(WorkbenchExecutionStatus)),
   missing: z.boolean(),
 });
 export const companionTaskResult = z.object({

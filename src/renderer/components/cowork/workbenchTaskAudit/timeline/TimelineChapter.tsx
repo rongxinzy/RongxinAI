@@ -1,35 +1,13 @@
-import { Badge } from '@shared/components/ui/badge';
 import { cn } from '@shared/lib/utils';
-import {
-  Check,
-  ChevronRight,
-  Circle,
-  Loader2,
-  Minus,
-  Pause,
-  ShieldQuestion,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
+import { ChevronRight, Circle, Loader2, X, type LucideIcon } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import {
-  WorkbenchRunStatus,
-  WorkbenchVerificationCheckStatus,
-  WorkbenchVerificationOutcome,
-  type WorkbenchRun,
-  type WorkbenchVerificationCheck,
-} from '../../../../../shared/workbenchTask';
+import { WorkbenchExecutionStatus, type WorkbenchRun } from '../../../../../shared/workbenchTask';
 import { i18nService } from '../../../../services/i18n';
 import { AuditJsonDisclosure } from '../AuditJsonDisclosure';
 import { TIMELINE_EASE } from '../constants';
-import {
-  statusLabel,
-  triggerLabel,
-  verificationCheckLabel,
-  verificationOutcomeLabel,
-} from '../utils';
+import { statusLabel, triggerLabel } from '../utils';
 import { TimelineEntryList } from './TimelineEntries';
 import {
   formatDuration,
@@ -45,17 +23,10 @@ interface TimelineChapterProps {
 
 const chapterStatusIcon = (status: WorkbenchRun['status']): LucideIcon => {
   switch (status) {
-    case WorkbenchRunStatus.Running:
+    case WorkbenchExecutionStatus.Running:
       return Loader2;
-    case WorkbenchRunStatus.Succeeded:
-      return Check;
-    case WorkbenchRunStatus.Failed:
+    case WorkbenchExecutionStatus.Failed:
       return X;
-    case WorkbenchRunStatus.WaitingApproval:
-      return ShieldQuestion;
-    case WorkbenchRunStatus.Paused:
-    case WorkbenchRunStatus.NeedsReview:
-      return Pause;
     default:
       return Circle;
   }
@@ -100,13 +71,11 @@ export function TimelineChapter({ chapter, runs, defaultOpen }: TimelineChapterP
         <StatusIcon
           className={cn(
             'size-3.5',
-            run.status === WorkbenchRunStatus.Running &&
+            run.status === WorkbenchExecutionStatus.Running &&
               'animate-spin text-primary motion-reduce:animate-none',
-            run.status === WorkbenchRunStatus.Succeeded && 'text-primary',
-            run.status === WorkbenchRunStatus.Failed && 'text-destructive',
-            run.status !== WorkbenchRunStatus.Running &&
-              run.status !== WorkbenchRunStatus.Succeeded &&
-              run.status !== WorkbenchRunStatus.Failed &&
+            run.status === WorkbenchExecutionStatus.Failed && 'text-destructive',
+            run.status !== WorkbenchExecutionStatus.Running &&
+              run.status !== WorkbenchExecutionStatus.Failed &&
               'text-muted-foreground',
           )}
         />
@@ -161,42 +130,8 @@ export function TimelineChapter({ chapter, runs, defaultOpen }: TimelineChapterP
 }
 
 function RunSummary({ run }: { run: WorkbenchRun }) {
-  const verification = run.verificationResult;
   return (
     <div className="flex flex-col gap-3">
-      {verification ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant={
-                verification.outcome === WorkbenchVerificationOutcome.Failed
-                  ? 'destructive'
-                  : 'outline'
-              }
-            >
-              {verificationOutcomeLabel(verification.outcome)}
-            </Badge>
-            <span className="text-sm text-muted-foreground">{verification.summary}</span>
-          </div>
-          {verification.checks.length > 0 && (
-            <ul className="flex flex-col gap-1">
-              {verification.checks.map((check, index) => (
-                <VerificationCheckRow key={`${check.name}-${index}`} check={check} />
-              ))}
-            </ul>
-          )}
-          {verification.evidence.length > 0 && (
-            <AuditJsonDisclosure
-              label={i18nService.t('workbenchTaskVerificationEvidence')}
-              value={verification.evidence}
-            />
-          )}
-        </div>
-      ) : (
-        <p className="text-xs text-muted-foreground">
-          {i18nService.t('workbenchTaskNoVerification')}
-        </p>
-      )}
       {run.context && (
         <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
           <RunContextItem label={i18nService.t('workbenchTaskModel')} value={run.context.model} />
@@ -231,29 +166,6 @@ function RunSummary({ run }: { run: WorkbenchRun }) {
         />
       )}
     </div>
-  );
-}
-
-const checkIcons: Record<string, { icon: LucideIcon; className: string }> = {
-  [WorkbenchVerificationCheckStatus.Passed]: { icon: Check, className: 'text-primary' },
-  [WorkbenchVerificationCheckStatus.Failed]: { icon: X, className: 'text-destructive' },
-  [WorkbenchVerificationCheckStatus.Skipped]: { icon: Minus, className: 'text-muted-foreground' },
-};
-
-function VerificationCheckRow({ check }: { check: WorkbenchVerificationCheck }) {
-  const { icon: Icon, className } =
-    checkIcons[check.status] ?? checkIcons[WorkbenchVerificationCheckStatus.Skipped];
-  return (
-    <li className="flex flex-wrap items-start gap-2">
-      <Icon className={cn('mt-0.5 size-3.5 shrink-0', className)} />
-      <span className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">
-        {check.name}
-      </span>
-      <span className="sr-only">{verificationCheckLabel(check.status)}</span>
-      {check.detail && (
-        <span className="basis-full pl-5.5 text-xs text-muted-foreground">{check.detail}</span>
-      )}
-    </li>
   );
 }
 

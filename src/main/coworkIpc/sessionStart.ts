@@ -38,7 +38,12 @@ export type CoworkSessionStartInput = z.infer<typeof CoworkSessionStartSchema.in
 export function prepareCoworkSession(
   deps: CoworkSessionIpcDeps,
   options: CoworkSessionStartInput,
-  internal: { sessionId?: string; workbenchRunId?: string; onFailure?(error: unknown): void } = {},
+  internal: {
+    sessionId?: string;
+    workbenchRunId?: string;
+    workbenchTaskId?: string;
+    onFailure?(error: unknown): void;
+  } = {},
 ) {
   const coworkStoreInstance = deps.getCoworkStore();
   const config = coworkStoreInstance.getConfig();
@@ -155,6 +160,7 @@ export function prepareCoworkSession(
       .startSession(session.id, options.prompt, {
         skipInitialUserMessage: true,
         _workbenchRunId: internal.workbenchRunId,
+        _workbenchTaskId: internal.workbenchTaskId,
         systemPrompt,
         skillIds: runtimeSkillIds,
         workspaceRoot: taskWorkingDirectory,

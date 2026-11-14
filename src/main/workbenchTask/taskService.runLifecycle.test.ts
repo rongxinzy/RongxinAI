@@ -8,8 +8,7 @@ import {
   WorkbenchContractKind,
   WorkbenchRunEventType,
   WorkbenchRunTrigger,
-  WorkbenchRunStatus,
-  WorkbenchTaskStatus,
+  WorkbenchExecutionStatus,
 } from '../../shared/workbenchTask';
 import { initializeWorkbenchTaskSchema } from './schema';
 import { WorkbenchTaskService, type WorkbenchTaskServiceOptions } from './taskService';
@@ -22,7 +21,6 @@ const createService = (options: WorkbenchTaskServiceOptions = {}) => {
 
 const chatContract = {
   kind: WorkbenchContractKind.Chat,
-  requiresUserAcceptance: false,
 };
 
 test('creates a new task for each ordinary user message and supersedes active runs', () => {
@@ -38,9 +36,9 @@ test('creates a new task for each ordinary user message and supersedes active ru
     expect(second.task.id).not.toBe(first.task.id);
     expect(second.run.attempt).toBe(1);
     const superseded = service.getDetail(first.task.id);
-    expect(superseded?.task.status).toBe(WorkbenchTaskStatus.Cancelled);
+    expect(superseded?.task.status).toBe(WorkbenchExecutionStatus.Cancelled);
     expect(superseded?.task.activeRunId).toBeNull();
-    expect(superseded?.runs[0].status).toBe(WorkbenchRunStatus.Cancelled);
+    expect(superseded?.runs[0].status).toBe(WorkbenchExecutionStatus.Cancelled);
     expect(superseded?.events).toContainEqual(
       expect.objectContaining({ type: WorkbenchRunEventType.RunCancelled }),
     );
@@ -49,7 +47,7 @@ test('creates a new task for each ordinary user message and supersedes active ru
   }
 });
 
-test('always sets requiresUserAcceptance to false on passive task creation', () => {
+test('records settlement without creating a business acceptance result', () => {
   const { db, service } = createService();
   try {
     const first = service.beginRun({
@@ -57,17 +55,17 @@ test('always sets requiresUserAcceptance to false on passive task creation', () 
       goal: 'create a presentation',
       contract: {
         kind: WorkbenchContractKind.Shortcut,
-        requiresUserAcceptance: true,
       },
     });
-    expect(first.task.contract.requiresUserAcceptance).toBe(false);
-    const completed = service.completeObservedRun({
+    expect(first.task.contract).toEqual({ kind: WorkbenchContractKind.Shortcut });
+    const completed = service.settleObservedRun({
       sessionId: 'session',
       runId: first.run.id,
       finalAnswer: 'done',
     });
-    expect(completed?.task.status).toBe(WorkbenchTaskStatus.Completed);
-    expect(completed?.runs[0].status).toBe(WorkbenchRunStatus.Succeeded);
+    expect(completed?.task.status).toBe(WorkbenchExecutionStatus.Settled);
+    expect(completed?.runs[0].status).toBe(WorkbenchExecutionStatus.Settled);
+    expect(completed?.runs[0]).not.toHaveProperty('verificationResult');
   } finally {
     db.close();
   }

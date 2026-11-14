@@ -5,7 +5,7 @@ import { PiAssistantStopReason } from './piToolConstants';
 import Database from 'better-sqlite3';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
-import { WorkbenchRunStatus } from '../../../shared/workbenchTask';
+import { WorkbenchExecutionStatus } from '../../../shared/workbenchTask';
 
 setupPiRuntimeAdapterSuite();
 
@@ -106,7 +106,7 @@ test('a settled response completes directly without a workbench verification gat
     await vi.waitFor(() => expect(complete).toHaveBeenCalledOnce());
     expect(error).not.toHaveBeenCalled();
     expect(service.getCurrent('direct-completion')!.runs[0].status).toBe(
-      WorkbenchRunStatus.Succeeded,
+      WorkbenchExecutionStatus.Settled,
     );
   } finally {
     adapter.stopAllSessions();

@@ -94,7 +94,7 @@ export class PiAssistantTranscript {
     this.pendingContextUsageBySession.delete(sessionId);
   }
 
-  /** Runs at most one deferred context-usage sync per session per settled turn. */
+  /** Drain the usage staged by message_end at a native persistence boundary. */
   flushContextUsageSync(sessionId: string): void {
     const pending = this.pendingContextUsageBySession.get(sessionId);
     this.pendingContextUsageBySession.delete(sessionId);
@@ -434,8 +434,8 @@ export class PiAssistantTranscript {
   }
 
   /**
-   * Pi commits usage after emitting the terminal assistant event. Deferring one
-   * task ensures the snapshot corresponds to the response just persisted.
+   * Pi persists message_end after notifying listeners. Keep the usage in memory
+   * until turn_end, when that response is available through getContextUsage().
    */
   scheduleContextUsageSync(
     sessionId: string,
@@ -447,7 +447,6 @@ export class PiAssistantTranscript {
     startupLatency?: PiStartupLatency,
   ): void {
     if (!messageId) return;
-    this.flushContextUsageSync(sessionId);
     this.pendingContextUsageBySession.set(sessionId, {
       messageId,
       piUsage,
@@ -467,66 +466,64 @@ export class PiAssistantTranscript {
     firstVisibleTextAt: number | null,
     startupLatency?: PiStartupLatency,
   ): void {
-    setTimeout(() => {
-      const active = this.host.getActiveSession(sessionId);
-      const contextUsage = active?.piSession.getContextUsage?.();
-      const hasValidContextUsage = Boolean(
-        contextUsage &&
-        contextUsage.tokens != null &&
-        Number.isFinite(contextUsage.tokens) &&
-        Number.isFinite(contextUsage.contextWindow) &&
-        contextUsage.tokens >= 0 &&
-        contextUsage.contextWindow > 0,
-      );
-      if (!hasValidContextUsage && !piUsage && requestStartedAt === null && !startupLatency) {
-        return;
-      }
+    const active = this.host.getActiveSession(sessionId);
+    const contextUsage = active?.piSession.getContextUsage?.();
+    const hasValidContextUsage = Boolean(
+      contextUsage &&
+      contextUsage.tokens != null &&
+      Number.isFinite(contextUsage.tokens) &&
+      Number.isFinite(contextUsage.contextWindow) &&
+      contextUsage.tokens >= 0 &&
+      contextUsage.contextWindow > 0,
+    );
+    if (!hasValidContextUsage && !piUsage && requestStartedAt === null && !startupLatency) {
+      return;
+    }
 
-      const message = this.host.getStore()?.getMessage(sessionId, messageId);
-      if (!message) return;
+    const message = this.host.getStore()?.getMessage(sessionId, messageId);
+    if (!message) return;
 
-      const usage = hasValidContextUsage
-        ? (() => {
-            const contextWindowTokens = Math.round(contextUsage!.contextWindow);
-            return {
-              usedTokens: Math.min(Math.round(contextUsage!.tokens!), contextWindowTokens),
-              contextWindowTokens,
-              updatedAt: Date.now(),
-            };
-          })()
-        : undefined;
-      // Pi materializes `usage` with zeros and only fills it once the provider
-      // reports one; persisting that default would read as a real zero in the
-      // stats line (see hasReportedTokenUsage).
-      const reportedUsage = piUsage
+    const usage = hasValidContextUsage
+      ? (() => {
+          const contextWindowTokens = Math.round(contextUsage!.contextWindow);
+          return {
+            usedTokens: Math.min(Math.round(contextUsage!.tokens!), contextWindowTokens),
+            contextWindowTokens,
+            updatedAt: Date.now(),
+          };
+        })()
+      : undefined;
+    // Pi materializes `usage` with zeros and only fills it once the provider
+    // reports one; persisting that default would read as a real zero in the
+    // stats line (see hasReportedTokenUsage).
+    const reportedUsage = piUsage
+      ? {
+          inputTokens: piUsage.input,
+          outputTokens: piUsage.output,
+          cacheReadTokens: piUsage.cacheRead,
+          cacheWriteTokens: piUsage.cacheWrite,
+          reasoningTokens: piUsage.reasoning,
+          totalTokens: piUsage.totalTokens,
+        }
+      : null;
+    const metadata = {
+      ...message.metadata,
+      ...(usage ? { contextUsage: usage } : {}),
+      ...(model ? { model } : {}),
+      ...(requestStartedAt !== null
         ? {
-            inputTokens: piUsage.input,
-            outputTokens: piUsage.output,
-            cacheReadTokens: piUsage.cacheRead,
-            cacheWriteTokens: piUsage.cacheWrite,
-            reasoningTokens: piUsage.reasoning,
-            totalTokens: piUsage.totalTokens,
+            metrics: {
+              requestStartedAt,
+              ...(firstVisibleTextAt !== null ? { firstVisibleTextAt } : {}),
+              completedAt: Date.now(),
+              ...(startupLatency ?? {}),
+            },
           }
-        : null;
-      const metadata = {
-        ...message.metadata,
-        ...(usage ? { contextUsage: usage } : {}),
-        ...(model ? { model } : {}),
-        ...(requestStartedAt !== null
-          ? {
-              metrics: {
-                requestStartedAt,
-                ...(firstVisibleTextAt !== null ? { firstVisibleTextAt } : {}),
-                completedAt: Date.now(),
-                ...(startupLatency ?? {}),
-              },
-            }
-          : {}),
-        ...(reportedUsage && hasReportedTokenUsage(reportedUsage) ? { usage: reportedUsage } : {}),
-      };
-      this.host.getStore()?.updateMessage(sessionId, messageId, { metadata });
-      this.host.emitMessageUpdate(sessionId, messageId, message.content, metadata);
-    }, 0);
+        : {}),
+      ...(reportedUsage && hasReportedTokenUsage(reportedUsage) ? { usage: reportedUsage } : {}),
+    };
+    this.host.getStore()?.updateMessage(sessionId, messageId, { metadata });
+    this.host.emitMessageUpdate(sessionId, messageId, message.content, metadata);
   }
 
   /**
@@ -654,6 +651,7 @@ export class PiAssistantTranscript {
   }
 
   clearThrottleStateBySession(sessionId: string, flush: boolean): void {
+    this.clearPendingContextUsage(sessionId);
     for (const [messageId, owner] of this.throttleSessionByMessageId) {
       if (owner !== sessionId) continue;
       if (flush) {
@@ -676,5 +674,14 @@ export class PiAssistantTranscript {
       this.lastCheckpointAtByMessageId.delete(messageId);
     }
     this.pruneFinalizedForSession(sessionId);
+  }
+
+  clearAll(): void {
+    const sessionIds = new Set([
+      ...this.throttleSessionByMessageId.values(),
+      ...this.pendingContextUsageBySession.keys(),
+      ...this.finalizedMessageIdsBySession.keys(),
+    ]);
+    for (const sessionId of sessionIds) this.clearThrottleStateBySession(sessionId, false);
   }
 }

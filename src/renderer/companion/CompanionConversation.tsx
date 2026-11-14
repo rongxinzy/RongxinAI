@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { Conversation, ConversationContent } from '@shared/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@shared/components/ai-elements/message';
 import { CompanionCapability } from '../../shared/companion/constants';
-import { WorkbenchRunStatus } from '../../shared/workbenchTask';
+import { WorkbenchExecutionStatus } from '../../shared/workbenchTask';
 import type { CompanionWindowState } from '../../shared/companion/types';
 import { i18nService } from '../services/i18n';
 import { CoworkInlineAttachments } from '../components/cowork/CoworkInlineAttachments';
@@ -62,11 +62,9 @@ export function CompanionConversation({
                 {!task.missing &&
                 (
                   [
-                    WorkbenchRunStatus.Queued,
-                    WorkbenchRunStatus.Running,
-                    WorkbenchRunStatus.WaitingApproval,
-                    WorkbenchRunStatus.Verifying,
-                  ] as readonly WorkbenchRunStatus[]
+                    WorkbenchExecutionStatus.Queued,
+                    WorkbenchExecutionStatus.Running,
+                  ] as readonly WorkbenchExecutionStatus[]
                 ).includes(task.status) ? (
                   <Button
                     variant="ghost"

@@ -5,10 +5,7 @@ import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
-import type {
-  WorkbenchApprovalMode,
-  WorkbenchVerificationResult,
-} from '../../../shared/workbenchTask';
+import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import type { PiPlanEntry } from './piPlanTool';
 import type { PiRunProgressEvent } from './piRunState';
 import type { UIMessageChunk } from 'ai';
@@ -70,8 +67,8 @@ export interface PiRuntimeEvents {
   ) => void;
   /** A plan-mode turn published its structured plan. */
   plan: (sessionId: string, plan: { entries: PiPlanEntry[] }) => void;
-  /** Execution ended normally; acceptance_required is not verified task success. */
-  complete: (sessionId: string, verification?: WorkbenchVerificationResult) => void;
+  /** Pi settled normally; this event makes no claim about business acceptance. */
+  complete: (sessionId: string) => void;
   error: (sessionId: string, error: CoworkError) => void;
   /**
    * Pi is retrying a failed attempt. Transient by nature: the renderer shows it
@@ -142,6 +139,7 @@ export type PiStartOptions = {
   thinkingLevel?: PiThinkingLevel;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
+  _workbenchTaskId?: string;
 };
 
 export type PiContinueOptions = {
@@ -183,6 +181,7 @@ export type PiContinueOptions = {
   unattended?: boolean;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
+  _workbenchTaskId?: string;
   /** Internal: do not persist a synthetic Resume/Retry prompt as a user message. */
   _skipUserMessage?: boolean;
   /** Internal: marks a queued follow-up in the persisted transcript. */
