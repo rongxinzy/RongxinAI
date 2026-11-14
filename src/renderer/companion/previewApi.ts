@@ -13,7 +13,7 @@ import type {
   CompanionReceipt,
 } from '../../shared/companion/types';
 import type { CompanionTaskProjection } from '../../shared/companion/tasks';
-import { WorkbenchRunStatus } from '../../shared/workbenchTask';
+import { WorkbenchExecutionStatus } from '../../shared/workbenchTask';
 
 /** DEV browser fixture only. It exercises the window UI, never models or production storage. */
 export function createCompanionPreviewApi(
@@ -177,7 +177,7 @@ export function createCompanionPreviewApi(
         runId: crypto.randomUUID(),
       };
       tasks.set(request.petId, [
-        { receipt, title: request.text, status: WorkbenchRunStatus.Queued, missing: false },
+        { receipt, title: request.text, status: WorkbenchExecutionStatus.Queued, missing: false },
         ...(tasks.get(request.petId) ?? []),
       ]);
       return { receipt };
@@ -203,7 +203,7 @@ export function createCompanionPreviewApi(
         active,
         (tasks.get(active) ?? []).map(task =>
           task.receipt.sessionId === sessionId
-            ? { ...task, status: WorkbenchRunStatus.Cancelled }
+            ? { ...task, status: WorkbenchExecutionStatus.Cancelled }
             : task,
         ),
       );

@@ -7,7 +7,7 @@ import {
   WorkbenchApprovalRiskLevel,
   WorkbenchContractKind,
   WorkbenchRunEventType,
-  WorkbenchRunStatus,
+  WorkbenchExecutionStatus,
 } from '../../shared/workbenchTask';
 import { initializeWorkbenchTaskSchema } from './schema';
 import { WorkbenchTaskService, type WorkbenchTaskServiceOptions } from './taskService';
@@ -20,7 +20,6 @@ const createService = (options: WorkbenchTaskServiceOptions = {}) => {
 
 const chatContract = {
   kind: WorkbenchContractKind.Chat,
-  requiresUserAcceptance: false,
 };
 
 test('passive observer records repeated identical tool calls without idempotency collisions', () => {
@@ -111,7 +110,7 @@ test('passive approval observation records user approval, denial, and completion
       decisionSource: WorkbenchApprovalDecisionSource.User,
       reason: 'not allowed',
     });
-    const completed = service.completeObservedRun({
+    const completed = service.settleObservedRun({
       sessionId: 'approvals',
       runId: run.id,
       finalAnswer: 'done',
@@ -121,8 +120,8 @@ test('passive approval observation records user approval, denial, and completion
     expect(byId.get('appr-approve')?.decision).toBe(WorkbenchApprovalDecision.Approved);
     expect(byId.get('appr-deny')?.decision).toBe(WorkbenchApprovalDecision.Denied);
     expect(byId.get('appr-stale')?.decision).toBe(WorkbenchApprovalDecision.Expired);
-    expect(completed!.runs[0].status).toBe(WorkbenchRunStatus.Succeeded);
-    expect(completed!.events.map(e => e.type)).toContain(WorkbenchRunEventType.RunSucceeded);
+    expect(completed!.runs[0].status).toBe(WorkbenchExecutionStatus.Settled);
+    expect(completed!.events.map(e => e.type)).toContain(WorkbenchRunEventType.RunSettled);
   } finally {
     db.close();
   }

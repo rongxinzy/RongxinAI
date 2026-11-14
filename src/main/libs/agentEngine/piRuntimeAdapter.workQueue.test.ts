@@ -17,7 +17,7 @@ import {
 
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
-import { WorkbenchApprovalMode, WorkbenchRunStatus } from '../../../shared/workbenchTask';
+import { WorkbenchApprovalMode, WorkbenchExecutionStatus } from '../../../shared/workbenchTask';
 import { PiExtensionEventType } from './piExtensionTypes';
 import { type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
@@ -352,7 +352,7 @@ describe('PiRuntimeAdapter', () => {
 
         // agent_end is not terminal: the SDK compacts and continues on its own,
         // so the run must stay alive and no completion may fire yet.
-        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchRunStatus.Running);
+        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchExecutionStatus.Running);
         expect(completes).toHaveLength(0);
 
         listener({ type: 'compaction_start', reason: 'threshold' });
@@ -369,12 +369,12 @@ describe('PiRuntimeAdapter', () => {
 
         assistantTurn(listener, 'Final report after compaction');
         listener({ type: 'agent_end' });
-        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchRunStatus.Running);
+        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchExecutionStatus.Running);
         expect(completes).toHaveLength(0);
 
         listener({ type: 'agent_settled' });
         await vi.waitFor(() => expect(completes).toHaveLength(1));
-        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchRunStatus.Succeeded);
+        expect(service.getDetail(taskId)?.runs[0]?.status).toBe(WorkbenchExecutionStatus.Settled);
         expect(errors).toHaveLength(0);
       } finally {
         adapter.stopAllSessions();

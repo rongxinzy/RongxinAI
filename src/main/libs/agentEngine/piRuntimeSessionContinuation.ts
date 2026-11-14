@@ -9,6 +9,8 @@
  * model or thinking level of a live session in place.
  */
 
+import { observeWorkbench } from '../../workbenchTask/observe';
+
 import { randomUUID } from 'crypto';
 
 import { classifyCoworkError } from '../../../common/coworkError';
@@ -193,34 +195,37 @@ export async function continuePiRuntimeSession(
     }
   }
 
-  const workbenchTaskService = host.getWorkbenchTaskService();
-  if (workbenchTaskService && !active.resourceState.chatMode) {
-    const workflowKind = WorkbenchContractKind.GenericWork;
-    const workbench = workbenchTaskService.beginRun({
-      sessionId,
-      goal: prompt,
-      contract: { kind: workflowKind, requiresUserAcceptance: false },
-      trigger: WorkbenchRunTrigger.Message,
-      preparedRunId: options._workbenchRunId,
-    });
-    active.workbenchRunId = workbench.run.id;
-    active.harnessModelProfile = {
-      ...active.harnessModelProfile,
-      workflowKind,
-    };
-    workbenchTaskService.measurement?.recordModelProfile(
-      workbench.run.id,
-      active.harnessModelProfile,
-    );
-    workbenchTaskService.updateRunContext(workbench.run.id, {
-      model: active.harnessModelProfile.model,
-      provider: active.harnessModelProfile.provider,
-      reasoningProfile: active.harnessModelProfile.reasoningProfile,
-      workspaceRoot: active.workspaceRoot,
-      skillIds: requestedSkillIds ?? [],
-    });
-  }
-
+  active.workbenchRunId = null;
+  observeWorkbench(sessionId, () => {
+    const workbenchTaskService = host.getWorkbenchTaskService();
+    if (workbenchTaskService && !active.resourceState.chatMode) {
+      const workflowKind = WorkbenchContractKind.GenericWork;
+      const workbench = workbenchTaskService.beginRun({
+        sessionId,
+        goal: prompt,
+        contract: { kind: workflowKind },
+        trigger: WorkbenchRunTrigger.Message,
+        preparedRunId: options._workbenchRunId,
+        preparedTaskId: options._workbenchTaskId,
+      });
+      active.workbenchRunId = workbench.run.id;
+      active.harnessModelProfile = {
+        ...active.harnessModelProfile,
+        workflowKind,
+      };
+      workbenchTaskService.measurement?.recordModelProfile(
+        workbench.run.id,
+        active.harnessModelProfile,
+      );
+      workbenchTaskService.updateRunContext(workbench.run.id, {
+        model: active.harnessModelProfile.model,
+        provider: active.harnessModelProfile.provider,
+        reasoningProfile: active.harnessModelProfile.reasoningProfile,
+        workspaceRoot: active.workspaceRoot,
+        skillIds: requestedSkillIds ?? [],
+      });
+    }
+  });
   // Reset turn state
   active.answerText = '';
   active.thinkingText = '';

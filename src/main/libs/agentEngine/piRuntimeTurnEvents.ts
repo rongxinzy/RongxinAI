@@ -5,6 +5,8 @@
  * approvals, and the follow-up queue.
  */
 
+import { observeWorkbench } from '../../workbenchTask/observe';
+
 import { randomUUID } from 'crypto';
 
 import { classifyCoworkError, CoworkErrorKind, makeCoworkError } from '../../../common/coworkError';
@@ -532,6 +534,7 @@ export class PiRuntimeTurnEvents {
       }
 
       case 'turn_end':
+        this.host.transcript.flushContextUsageSync(sessionId);
         break;
 
       case 'tool_execution_start': {
@@ -589,16 +592,18 @@ export class PiRuntimeTurnEvents {
         const resultText = event.displayResultText ?? syncPiToolResultDisplayText(event.result);
         const resultIsError = Boolean(event.isError) || extractToolResultIsError(event.result);
         agentResourceDiagnostics.recordPiToolResult(sessionId, resultText.length * 2);
-        if (active.workbenchRunId) {
-          this.host
-            .getWorkbench()
-            ?.recordToolResult(
-              active.workbenchRunId,
-              event.toolCallId,
-              event.result,
-              resultIsError,
-            );
-        }
+        observeWorkbench(sessionId, () => {
+          if (active.workbenchRunId) {
+            this.host
+              .getWorkbench()
+              ?.recordToolResult(
+                active.workbenchRunId,
+                event.toolCallId,
+                event.result,
+                resultIsError,
+              );
+          }
+        });
         const toolResultMsg: CoworkMessage = {
           id: randomUUID(),
           type: 'tool_result',
@@ -806,19 +811,16 @@ export class PiRuntimeTurnEvents {
       this.host.sessionCount(),
       this.host.activeSessions().filter(session => session.isRunning).length,
     );
-    const workbench = this.host.getWorkbench();
-    if (active.workbenchRunId && workbench) {
-      try {
-        workbench.completeObservedRun({
+    observeWorkbench(sessionId, () => {
+      if (active.workbenchRunId) {
+        this.host.getWorkbench()?.settleObservedRun({
           sessionId,
           runId: active.workbenchRunId,
           workspaceRoot: active.workspaceRoot,
           finalAnswer: active.lastCompletedAnswerText,
         });
-      } catch (error) {
-        console.warn(`[PiRuntimeAdapter] passive run projection failed for ${sessionId}:`, error);
       }
-    }
+    });
     const store = this.host.getStore();
     if (store) {
       store.updateSession(sessionId, { status: 'idle' });
@@ -836,7 +838,7 @@ export class PiRuntimeTurnEvents {
         void this.host.recordSummaryOmission(sessionId, active);
       }
     }
-    this.host.emit('complete', sessionId, {});
+    this.host.emit('complete', sessionId);
     void this.host.flushFollowUpQueue(sessionId, active);
   }
 }

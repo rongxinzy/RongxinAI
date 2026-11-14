@@ -7,6 +7,8 @@
  * eviction, and deletion cleanup.
  */
 
+import { observeWorkbench } from '../../workbenchTask/observe';
+
 import { randomUUID } from 'crypto';
 
 import {
@@ -34,6 +36,7 @@ export function disposePiSessionForRecreation(
   host.recovery.dismissAskUserQuestionsBySession(sessionId);
   host.recovery.dismissCodingElicitationsBySession(sessionId, 'The session was recreated.');
   active.artifactRecorder?.dispose();
+  host.transcript.clearThrottleStateBySession(sessionId, false);
   active.pendingError = null;
   active.toolStartedAtByCallId.clear();
   const clearActivity = active.toolActivityTracker.clear();
@@ -43,13 +46,15 @@ export function disposePiSessionForRecreation(
   active.unsubscribe();
   void active.piSession.abort();
   active.piSession.dispose?.();
-  host
-    .getWorkbenchTaskService()
-    ?.cancelRun?.(
-      sessionId,
-      active.workbenchRunId,
-      'The session resources changed before completion.',
-    );
+  observeWorkbench(sessionId, () => {
+    host
+      .getWorkbenchTaskService()
+      ?.cancelRun?.(
+        sessionId,
+        active.workbenchRunId,
+        'The session resources changed before completion.',
+      );
+  });
   host.recovery.clearApprovalsBySession(sessionId);
   host.memoryInjectionDedup.reset(sessionId);
   host.activeSessions.delete(sessionId);
@@ -74,8 +79,11 @@ export function stopActivePiRuntimeSession(
   }
   const active = host.activeSessions.get(sessionId);
   if (!active) {
+    host.transcript.clearThrottleStateBySession(sessionId, false);
     closeInterruptedToolUses(host, sessionId);
-    host.getWorkbenchTaskService()?.cancelRun?.(sessionId, undefined, reason);
+    observeWorkbench(sessionId, () =>
+      host.getWorkbenchTaskService()?.cancelRun?.(sessionId, undefined, reason),
+    );
     host.recovery.clearApprovalsBySession(sessionId);
     if (cause && !host.retainedSessionIds.has(sessionId)) {
       recordSessionInterruption(host, sessionId, cause);
@@ -112,7 +120,9 @@ export function stopActivePiRuntimeSession(
   void active.piSession.abort();
   active.piSession.dispose?.();
   host.queue.resetNativeDispatch(sessionId);
-  host.getWorkbenchTaskService()?.cancelRun?.(sessionId, active.workbenchRunId, reason);
+  observeWorkbench(sessionId, () =>
+    host.getWorkbenchTaskService()?.cancelRun?.(sessionId, active.workbenchRunId, reason),
+  );
   host.recovery.clearApprovalsBySession(sessionId);
   host.emit('sessionStopped', sessionId);
   if (cause) recordSessionInterruption(host, sessionId, cause);
@@ -122,11 +132,11 @@ export function stopActivePiRuntimeSession(
     drainQueuedFollowUp &&
     !active.resourceState.chatMode &&
     host.queue.hasPendingFollowUp(sessionId);
-  releaseStoppedSession(host, sessionId);
   // Stopping closes idle placeholders so a partial answer bubble with
   // isStreaming metadata cannot stay in flight after the run is gone; any
   // partial body it persists is bounded by the checkpoint policy.
   host.transcript.closeIdlePlaceholders(sessionId, active);
+  releaseStoppedSession(host, sessionId);
 
   if (shouldDrainFollowUp) {
     host.queue.resumeNextFollowUp(sessionId);
@@ -229,6 +239,7 @@ export function stopAllPiRuntimeSessions(host: PiRuntimeAdapterHost): void {
     // 'running' row until the next launch's bulk reset.
     host.getStore()?.updateSession(sessionId, { status: 'idle' });
   }
+  host.transcript.clearAll();
   void host.cadViewerService.stop();
 }
 
@@ -241,7 +252,7 @@ export function onPiSessionDeleted(host: PiRuntimeAdapterHost, sessionId: string
   host.transcript.clearThrottleStateBySession(sessionId, true);
   // queue.clear emits queueUpdated itself when the session had queued items.
   host.queue.clear(sessionId);
-  host.getWorkbenchTaskService()?.deleteSession(sessionId);
+  observeWorkbench(sessionId, () => host.getWorkbenchTaskService()?.deleteSession(sessionId));
   // The deleted session's Pi JSONL must go with it: it holds the only other
   // copy of the conversation and a reused cowork session id must start clean.
   host.invalidatePiSessionDir(sessionId);

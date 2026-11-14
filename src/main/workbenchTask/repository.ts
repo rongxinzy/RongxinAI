@@ -9,11 +9,8 @@ import {
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
-  WorkbenchRunStatus,
-  WorkbenchTaskStatus,
-  WorkbenchVerificationCheckStatus,
-  WorkbenchVerificationCheckName,
-  WorkbenchTerminalTaskStatuses,
+  WorkbenchExecutionStatus,
+  WorkbenchTerminalExecutionStatuses,
   isWorkbenchDeliverable,
   type WorkbenchApproval,
   type WorkbenchApprovalDecisionSource,
@@ -24,17 +21,15 @@ import {
   type WorkbenchRun,
   type WorkbenchRunContext,
   type WorkbenchRunEvent,
-  type WorkbenchRunStatus as WorkbenchRunStatusType,
+  type WorkbenchExecutionStatus as WorkbenchExecutionStatusType,
   type WorkbenchRunTrigger,
   type WorkbenchTask,
   type WorkbenchTaskContract,
   type WorkbenchTaskDetail,
-  type WorkbenchTaskStatus as WorkbenchTaskStatusType,
-  type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
-import { assertRunTransition, assertTaskTransition } from './stateMachine';
 
-const terminalTaskStatuses = new Set<string>(WorkbenchTerminalTaskStatuses);
+const terminalTaskStatuses = new Set<string>(WorkbenchTerminalExecutionStatuses);
+const executionStatuses = new Set<string>(Object.values(WorkbenchExecutionStatus));
 
 const artifactSourcePriority: Record<string, number> = {
   [WorkbenchArtifactCandidateSource.ToolEffect]: 1,
@@ -58,7 +53,7 @@ type TaskRow = {
   id: string;
   session_id: string;
   goal: string;
-  status: WorkbenchTaskStatusType;
+  status: WorkbenchExecutionStatusType;
   contract_json: string;
   active_run_id: string | null;
   created_at: number;
@@ -70,12 +65,11 @@ type RunRow = {
   id: string;
   task_id: string;
   attempt: number;
-  status: WorkbenchRunStatusType;
+  status: WorkbenchExecutionStatusType;
   trigger: WorkbenchRunTrigger;
   started_at: number | null;
   ended_at: number | null;
   context_json: string | null;
-  verification_result_json: string | null;
   failure_json: string | null;
   created_at: number;
   updated_at: number;
@@ -126,43 +120,27 @@ type ApprovalRow = {
 export class WorkbenchTaskRepository {
   constructor(private readonly db: Database.Database) {}
 
-  getTaskBoundaryForSession(
-    sessionId: string,
-  ): Pick<WorkbenchTask, 'id' | 'goal' | 'status'> | null {
-    const row = this.db
-      .prepare(`
-      SELECT t.id, t.goal, t.status FROM workbench_tasks t
-      WHERE t.session_id = ? AND t.status = ? AND EXISTS (
-        SELECT 1 FROM workbench_runs r, json_each(r.verification_result_json, '$.checks') c
-        WHERE r.task_id = t.id AND json_extract(c.value, '$.name') = ?
-          AND json_extract(c.value, '$.status') = ?
-      ) ORDER BY t.updated_at DESC, t.rowid DESC LIMIT 1
-    `)
-      .get(
-        sessionId,
-        WorkbenchTaskStatus.Completed,
-        WorkbenchVerificationCheckName.UserAcceptance,
-        WorkbenchVerificationCheckStatus.Passed,
-      ) as Pick<WorkbenchTask, 'id' | 'goal' | 'status'> | undefined;
-    return row ?? null;
-  }
-
   transaction<T>(operation: () => T): T {
     return this.db.transaction(operation)();
   }
 
-  createTask(sessionId: string, goal: string, contract: WorkbenchTaskContract): WorkbenchTask {
+  createTask(
+    sessionId: string,
+    goal: string,
+    contract: WorkbenchTaskContract,
+    id: string = randomUUID(),
+  ): WorkbenchTask {
     const now = Date.now();
     const task: WorkbenchTask = {
-      id: randomUUID(),
+      id,
       sessionId,
       goal,
-      status: WorkbenchTaskStatus.Planned,
+      status: WorkbenchExecutionStatus.Queued,
       contract,
       activeRunId: null,
       createdAt: now,
       updatedAt: now,
-      completedAt: null,
+      endedAt: null,
     };
     this.db
       .prepare(
@@ -179,7 +157,7 @@ export class WorkbenchTaskRepository {
         task.activeRunId,
         task.createdAt,
         task.updatedAt,
-        task.completedAt,
+        task.endedAt,
       );
     return task;
   }
@@ -188,15 +166,15 @@ export class WorkbenchTaskRepository {
     const row = this.db.prepare('SELECT * FROM workbench_tasks WHERE id = ?').get(taskId) as
       | TaskRow
       | undefined;
-    return row ? this.mapTask(row) : null;
+    return row && executionStatuses.has(row.status) ? this.mapTask(row) : null;
   }
 
   getLatestTaskForSession(sessionId: string): WorkbenchTask | null {
     const row = this.db
       .prepare(
-        'SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC LIMIT 1',
+        'SELECT * FROM workbench_tasks WHERE session_id = ? AND status IN (?, ?, ?, ?, ?) ORDER BY created_at DESC LIMIT 1',
       )
-      .get(sessionId) as TaskRow | undefined;
+      .get(sessionId, ...executionStatuses) as TaskRow | undefined;
     return row ? this.mapTask(row) : null;
   }
 
@@ -204,31 +182,33 @@ export class WorkbenchTaskRepository {
     const rows = this.db
       .prepare('SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC')
       .all(sessionId) as TaskRow[];
-    return rows.map(row => this.mapTask(row));
+    return rows.filter(row => executionStatuses.has(row.status)).map(row => this.mapTask(row));
   }
 
   getActiveTaskForSession(sessionId: string): WorkbenchTask | null {
     const rows = this.db
       .prepare('SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC')
       .all(sessionId) as TaskRow[];
-    const row = rows.find(candidate => !terminalTaskStatuses.has(candidate.status));
+    const row = rows.find(
+      candidate =>
+        candidate.status === WorkbenchExecutionStatus.Queued ||
+        candidate.status === WorkbenchExecutionStatus.Running,
+    );
     return row ? this.mapTask(row) : null;
   }
 
   updateTaskStatus(
     taskId: string,
-    status: WorkbenchTaskStatusType,
+    status: WorkbenchExecutionStatusType,
     activeRunId?: string | null,
   ): WorkbenchTask {
     const current = this.requireTask(taskId);
-    assertTaskTransition(current.status, status);
     const now = Date.now();
-    const completedAt =
-      status === WorkbenchTaskStatus.Completed
-        ? now
-        : status === WorkbenchTaskStatus.Running
-          ? null
-          : current.completedAt;
+    const endedAt = terminalTaskStatuses.has(status)
+      ? now
+      : status === WorkbenchExecutionStatus.Running
+        ? null
+        : current.endedAt;
     const nextActiveRunId = activeRunId === undefined ? current.activeRunId : activeRunId;
     this.db
       .prepare(
@@ -236,11 +216,11 @@ export class WorkbenchTaskRepository {
          SET status = ?, active_run_id = ?, updated_at = ?, completed_at = ?
          WHERE id = ?`,
       )
-      .run(status, nextActiveRunId, now, completedAt, taskId);
+      .run(status, nextActiveRunId, now, endedAt, taskId);
     return this.requireTask(taskId);
   }
 
-  createRun(taskId: string, trigger: WorkbenchRunTrigger): WorkbenchRun {
+  createRun(taskId: string, trigger: WorkbenchRunTrigger, id: string = randomUUID()): WorkbenchRun {
     const now = Date.now();
     const attemptRow = this.db
       .prepare(
@@ -248,15 +228,14 @@ export class WorkbenchTaskRepository {
       )
       .get(taskId) as { attempt: number };
     const run: WorkbenchRun = {
-      id: randomUUID(),
+      id,
       taskId,
       attempt: attemptRow.attempt,
-      status: WorkbenchRunStatus.Queued,
+      status: WorkbenchExecutionStatus.Queued,
       trigger,
       startedAt: null,
       endedAt: null,
       context: null,
-      verificationResult: null,
       failure: null,
       createdAt: now,
       updatedAt: now,
@@ -265,8 +244,8 @@ export class WorkbenchTaskRepository {
       .prepare(
         `INSERT INTO workbench_runs
          (id, task_id, attempt, status, trigger, started_at, ended_at,
-          context_json, verification_result_json, failure_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          context_json, failure_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         run.id,
@@ -274,7 +253,6 @@ export class WorkbenchTaskRepository {
         run.attempt,
         run.status,
         run.trigger,
-        null,
         null,
         null,
         null,
@@ -293,7 +271,7 @@ export class WorkbenchTaskRepository {
     const row = this.db.prepare('SELECT * FROM workbench_runs WHERE id = ?').get(runId) as
       | RunRow
       | undefined;
-    return row ? this.mapRun(row) : null;
+    return row && executionStatuses.has(row.status) ? this.mapRun(row) : null;
   }
 
   updateRunContext(runId: string, context: WorkbenchRunContext): WorkbenchRun {
@@ -305,9 +283,8 @@ export class WorkbenchTaskRepository {
   }
 
   /**
-   * Persist the run's final answer so later steps (e.g. user acceptance)
-   * can still dispatch the verified-run memory promotion, which consumes
-   * the answer text as extraction evidence.
+   * Keep the observed final answer as provenance for reviewable memory candidates.
+   * Native settlement alone does not verify the answer's business claims.
    */
   updateFinalAnswer(runId: string, finalAnswer: string): WorkbenchRun {
     this.requireRun(runId);
@@ -332,46 +309,26 @@ export class WorkbenchTaskRepository {
 
   updateRunStatus(
     runId: string,
-    status: WorkbenchRunStatusType,
+    status: WorkbenchExecutionStatusType,
     options: {
-      verificationResult?: WorkbenchVerificationResult | null;
       failure?: WorkbenchJsonObject | null;
     } = {},
   ): WorkbenchRun {
     const current = this.requireRun(runId);
-    assertRunTransition(current.status, status);
     const now = Date.now();
     const startedAt =
-      status === WorkbenchRunStatus.Running && current.startedAt === null ? now : current.startedAt;
-    const terminalStatuses = new Set<WorkbenchRunStatusType>([
-      WorkbenchRunStatus.Succeeded,
-      WorkbenchRunStatus.Failed,
-      WorkbenchRunStatus.Cancelled,
-      WorkbenchRunStatus.Paused,
-      WorkbenchRunStatus.NeedsReview,
-    ]);
-    const endedAt = terminalStatuses.has(status) ? now : current.endedAt;
-    const verification =
-      options.verificationResult === undefined
-        ? current.verificationResult
-        : options.verificationResult;
+      status === WorkbenchExecutionStatus.Running && current.startedAt === null
+        ? now
+        : current.startedAt;
+    const endedAt = terminalTaskStatuses.has(status) ? now : current.endedAt;
     const failure = options.failure === undefined ? current.failure : options.failure;
     this.db
       .prepare(
         `UPDATE workbench_runs
-         SET status = ?, started_at = ?, ended_at = ?, verification_result_json = ?,
-             failure_json = ?, updated_at = ?
+         SET status = ?, started_at = ?, ended_at = ?, failure_json = ?, updated_at = ?
          WHERE id = ?`,
       )
-      .run(
-        status,
-        startedAt,
-        endedAt,
-        verification ? JSON.stringify(verification) : null,
-        failure ? JSON.stringify(failure) : null,
-        now,
-        runId,
-      );
+      .run(status, startedAt, endedAt, failure ? JSON.stringify(failure) : null, now, runId);
     return this.requireRun(runId);
   }
 
@@ -633,12 +590,8 @@ export class WorkbenchTaskRepository {
          WHERE status IN (?, ?, ?)
          ORDER BY updated_at`,
       )
-      .all(
-        WorkbenchRunStatus.Running,
-        WorkbenchRunStatus.Verifying,
-        WorkbenchRunStatus.WaitingApproval,
-      ) as RunRow[];
-    return rows.map(row => this.mapRun(row));
+      .all(WorkbenchExecutionStatus.Running) as RunRow[];
+    return rows.filter(row => executionStatuses.has(row.status)).map(row => this.mapRun(row));
   }
 
   listExecutingApprovals(): WorkbenchApproval[] {
@@ -667,12 +620,18 @@ export class WorkbenchTaskRepository {
     const approvalRows = this.db
       .prepare('SELECT * FROM workbench_approvals WHERE task_id = ? ORDER BY created_at DESC')
       .all(taskId) as ApprovalRow[];
+    const currentRuns = runRows.filter(row => executionStatuses.has(row.status));
+    const currentRunIds = new Set(currentRuns.map(row => row.id));
     return {
       task,
-      runs: runRows.map(row => this.mapRun(row)),
-      events: eventRows.map(row => this.mapEvent(row)),
-      artifacts: artifactRows.map(row => this.mapArtifact(row)),
-      approvals: approvalRows.map(row => this.mapApproval(row)),
+      runs: currentRuns.map(row => this.mapRun(row)),
+      events: eventRows.filter(row => currentRunIds.has(row.run_id)).map(row => this.mapEvent(row)),
+      artifacts: artifactRows
+        .filter(row => currentRunIds.has(row.run_id))
+        .map(row => this.mapArtifact(row)),
+      approvals: approvalRows
+        .filter(row => currentRunIds.has(row.run_id))
+        .map(row => this.mapApproval(row)),
     };
   }
 
@@ -726,12 +685,11 @@ export class WorkbenchTaskRepository {
       status: row.status,
       contract: parseJson<WorkbenchTaskContract>(row.contract_json, {
         kind: WorkbenchContractKind.GenericWork,
-        requiresUserAcceptance: true,
       }),
       activeRunId: row.active_run_id,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      completedAt: row.completed_at,
+      endedAt: row.completed_at,
     };
   }
 
@@ -745,10 +703,6 @@ export class WorkbenchTaskRepository {
       startedAt: row.started_at,
       endedAt: row.ended_at,
       context: parseJson<WorkbenchRunContext | null>(row.context_json, null),
-      verificationResult: parseJson<WorkbenchVerificationResult | null>(
-        row.verification_result_json,
-        null,
-      ),
       failure: parseJson<WorkbenchJsonObject | null>(row.failure_json, null),
       createdAt: row.created_at,
       updatedAt: row.updated_at,

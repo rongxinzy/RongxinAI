@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { WorkbenchRunStatus } from '../../../src/shared/workbenchTask/constants.ts';
+import { WorkbenchExecutionStatus } from '../../../src/shared/workbenchTask/constants.ts';
 
 test('a failed task event received during bootstrap survives its older reply', async ({ page }) => {
   await page.addInitScript(
@@ -41,7 +41,7 @@ test('a failed task event received during bootstrap survives its older reply', a
         },
       });
     },
-    { running: WorkbenchRunStatus.Running, failed: WorkbenchRunStatus.Failed },
+    { running: WorkbenchExecutionStatus.Running, failed: WorkbenchExecutionStatus.Failed },
   );
   await page.goto('/companion.html');
   await expect(page.locator('.theme-companion-name')).toHaveText('小远');
@@ -76,7 +76,7 @@ test('a failed task event cannot be overwritten by an older admission refresh', 
         api = value;
       },
     });
-  }, WorkbenchRunStatus.Failed);
+  }, WorkbenchExecutionStatus.Failed);
   await page.goto('/companion.html');
   await page.getByRole('tab', { name: '交代任务', exact: true }).click();
   await page.getByRole('combobox', { name: '工作区', exact: true }).click();

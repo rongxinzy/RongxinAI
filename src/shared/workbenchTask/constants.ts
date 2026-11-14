@@ -1,27 +1,12 @@
-export const WorkbenchTaskStatus = {
-  Draft: 'draft',
-  Planned: 'planned',
-  Running: 'running',
-  Paused: 'paused',
-  NeedsReview: 'needs_review',
-  Completed: 'completed',
-  Failed: 'failed',
-  Cancelled: 'cancelled',
-} as const;
-export type WorkbenchTaskStatus = (typeof WorkbenchTaskStatus)[keyof typeof WorkbenchTaskStatus];
-
-export const WorkbenchRunStatus = {
+export const WorkbenchExecutionStatus = {
   Queued: 'queued',
   Running: 'running',
-  WaitingApproval: 'waiting_approval',
-  Verifying: 'verifying',
-  Paused: 'paused',
-  NeedsReview: 'needs_review',
-  Succeeded: 'succeeded',
+  Settled: 'settled',
   Failed: 'failed',
   Cancelled: 'cancelled',
 } as const;
-export type WorkbenchRunStatus = (typeof WorkbenchRunStatus)[keyof typeof WorkbenchRunStatus];
+export type WorkbenchExecutionStatus =
+  (typeof WorkbenchExecutionStatus)[keyof typeof WorkbenchExecutionStatus];
 
 export const WorkbenchRunTrigger = {
   Message: 'message',
@@ -38,28 +23,6 @@ export const WorkbenchContractKind = {
 } as const;
 export type WorkbenchContractKind =
   (typeof WorkbenchContractKind)[keyof typeof WorkbenchContractKind];
-
-export const WorkbenchVerificationOutcome = {
-  Passed: 'passed',
-  Failed: 'failed',
-  AcceptanceRequired: 'acceptance_required',
-} as const;
-export type WorkbenchVerificationOutcome =
-  (typeof WorkbenchVerificationOutcome)[keyof typeof WorkbenchVerificationOutcome];
-
-export const WorkbenchVerificationCheckStatus = {
-  Passed: 'passed',
-  Failed: 'failed',
-  Skipped: 'skipped',
-} as const;
-export type WorkbenchVerificationCheckStatus =
-  (typeof WorkbenchVerificationCheckStatus)[keyof typeof WorkbenchVerificationCheckStatus];
-
-export const WorkbenchVerificationCheckName = {
-  UserAcceptance: 'user_acceptance',
-  DeliveryReady: 'delivery_ready',
-  ArtifactVerification: 'artifact_verification',
-} as const;
 
 export const WorkbenchApprovalRiskLevel = {
   ReadOnly: 'read_only',
@@ -146,13 +109,9 @@ export const WorkbenchRunEventType = {
   ApprovalResolved: 'approval_resolved',
   ToolEffectStarted: 'tool_effect_started',
   ToolEffectFinished: 'tool_effect_finished',
-  VerificationStarted: 'verification_started',
-  VerificationFinished: 'verification_finished',
-  RunSucceeded: 'run_succeeded',
-  RunPaused: 'run_paused',
+  RunSettled: 'run_settled',
   RunCancelled: 'run_cancelled',
   RunFailed: 'run_failed',
-  RecoveryRequired: 'recovery_required',
   HarnessProfiled: 'harness_profiled',
   HarnessActivation: 'harness_activation',
   HarnessFailure: 'harness_failure',
@@ -171,8 +130,8 @@ export const WorkbenchTaskIpc = {
 } as const;
 export type WorkbenchTaskIpc = (typeof WorkbenchTaskIpc)[keyof typeof WorkbenchTaskIpc];
 
-export const WorkbenchTerminalTaskStatuses = [
-  WorkbenchTaskStatus.Completed,
-  WorkbenchTaskStatus.Failed,
-  WorkbenchTaskStatus.Cancelled,
+export const WorkbenchTerminalExecutionStatuses = [
+  WorkbenchExecutionStatus.Settled,
+  WorkbenchExecutionStatus.Failed,
+  WorkbenchExecutionStatus.Cancelled,
 ] as const;

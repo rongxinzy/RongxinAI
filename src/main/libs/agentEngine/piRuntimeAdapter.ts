@@ -28,6 +28,8 @@
  *   @earendil-works/pi-ai/compat    — getModel(), completeSimple()
  */
 
+import { observeWorkbench } from '../../workbenchTask/observe';
+
 import { randomUUID } from 'crypto';
 import { PiRuntimeServiceBindings } from './piRuntimeServiceBindings';
 
@@ -259,10 +261,12 @@ export class PiRuntimeAdapter
   async recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void> {
     const goal = active.summaryCheckpointGoal ?? '';
     const artifacts = this.artifactLedgerService?.list(sessionId) ?? [];
-    this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
-      activation: HarnessActivationType.SummaryOmitted,
-      mechanism: 'session_checkpoint',
-      evidence: { artifactsProduced: artifacts.length },
+    observeWorkbench(sessionId, () => {
+      this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
+        activation: HarnessActivationType.SummaryOmitted,
+        mechanism: 'session_checkpoint',
+        evidence: { artifactsProduced: artifacts.length },
+      });
     });
     if (!this.projectMemoryService) return;
     await recordCheckpointFallback(this.projectMemoryService, {
@@ -275,9 +279,11 @@ export class PiRuntimeAdapter
       verificationStatus: active.turnFailed ? 'failed' : 'unverified',
       artifactReferences: artifacts.map(artifact => artifact.filePath ?? artifact.title),
     });
-    this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
-      activation: HarnessActivationType.SummaryFallback,
-      mechanism: 'deterministic_fallback',
+    observeWorkbench(sessionId, () => {
+      this.workbenchTaskService?.measurement?.recordActivation(active.workbenchRunId ?? null, {
+        activation: HarnessActivationType.SummaryFallback,
+        mechanism: 'deterministic_fallback',
+      });
     });
   }
 

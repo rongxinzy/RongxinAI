@@ -5,11 +5,8 @@ import {
   WorkbenchArtifactKind,
   WorkbenchContractKind,
   WorkbenchRunEventType,
-  WorkbenchRunStatus,
+  WorkbenchExecutionStatus,
   WorkbenchRunTrigger,
-  WorkbenchTaskStatus,
-  WorkbenchVerificationCheckStatus,
-  WorkbenchVerificationOutcome,
   type WorkbenchRun,
   type WorkbenchArtifact,
   type WorkbenchTaskDetail,
@@ -19,18 +16,11 @@ import { i18nService } from '../../../services/i18n';
 import { WorkbenchTaskRunFilter } from './constants';
 
 const statusTranslationKeys: Record<string, string> = {
-  [WorkbenchTaskStatus.Draft]: 'workbenchTaskStatusDraft',
-  [WorkbenchTaskStatus.Planned]: 'workbenchTaskStatusPlanned',
-  [WorkbenchTaskStatus.Running]: 'workbenchTaskStatusRunning',
-  [WorkbenchTaskStatus.Paused]: 'workbenchTaskStatusPaused',
-  [WorkbenchTaskStatus.NeedsReview]: 'workbenchTaskStatusNeedsReview',
-  [WorkbenchTaskStatus.Completed]: 'workbenchTaskStatusCompleted',
-  [WorkbenchTaskStatus.Failed]: 'workbenchTaskStatusFailed',
-  [WorkbenchTaskStatus.Cancelled]: 'workbenchTaskStatusCancelled',
-  [WorkbenchRunStatus.Queued]: 'workbenchTaskStatusQueued',
-  [WorkbenchRunStatus.WaitingApproval]: 'workbenchTaskStatusWaitingApproval',
-  [WorkbenchRunStatus.Verifying]: 'workbenchTaskStatusVerifying',
-  [WorkbenchRunStatus.Succeeded]: 'workbenchTaskStatusSucceeded',
+  [WorkbenchExecutionStatus.Queued]: 'workbenchTaskStatusQueued',
+  [WorkbenchExecutionStatus.Running]: 'workbenchTaskStatusRunning',
+  [WorkbenchExecutionStatus.Settled]: 'workbenchTaskStatusSettled',
+  [WorkbenchExecutionStatus.Failed]: 'workbenchTaskStatusFailed',
+  [WorkbenchExecutionStatus.Cancelled]: 'workbenchTaskStatusCancelled',
 };
 
 const triggerTranslationKeys: Record<string, string> = {
@@ -66,18 +56,6 @@ const artifactKindTranslationKeys: Record<string, string> = {
   [WorkbenchArtifactKind.Evidence]: 'workbenchTaskArtifactEvidence',
 };
 
-const verificationOutcomeTranslationKeys: Record<string, string> = {
-  [WorkbenchVerificationOutcome.Passed]: 'workbenchTaskVerificationPassed',
-  [WorkbenchVerificationOutcome.Failed]: 'workbenchTaskVerificationFailed',
-  [WorkbenchVerificationOutcome.AcceptanceRequired]: 'workbenchTaskVerificationAcceptanceRequired',
-};
-
-const verificationCheckTranslationKeys: Record<string, string> = {
-  [WorkbenchVerificationCheckStatus.Passed]: 'workbenchTaskCheckPassed',
-  [WorkbenchVerificationCheckStatus.Failed]: 'workbenchTaskCheckFailed',
-  [WorkbenchVerificationCheckStatus.Skipped]: 'workbenchTaskCheckSkipped',
-};
-
 const contractTranslationKeys: Record<string, string> = {
   [WorkbenchContractKind.Chat]: 'workbenchTaskContractChat',
   [WorkbenchContractKind.Research]: 'workbenchTaskContractResearch',
@@ -93,13 +71,9 @@ const eventTranslationKeys: Record<string, string> = {
   [WorkbenchRunEventType.ApprovalResolved]: 'workbenchTaskEventApprovalResolved',
   [WorkbenchRunEventType.ToolEffectStarted]: 'workbenchTaskEventToolEffectStarted',
   [WorkbenchRunEventType.ToolEffectFinished]: 'workbenchTaskEventToolEffectFinished',
-  [WorkbenchRunEventType.VerificationStarted]: 'workbenchTaskEventVerificationStarted',
-  [WorkbenchRunEventType.VerificationFinished]: 'workbenchTaskEventVerificationFinished',
-  [WorkbenchRunEventType.RunPaused]: 'workbenchTaskEventRunPaused',
-  [WorkbenchRunEventType.RunSucceeded]: 'workbenchTaskEventRunSucceeded',
+  [WorkbenchRunEventType.RunSettled]: 'workbenchTaskEventRunSettled',
   [WorkbenchRunEventType.RunCancelled]: 'workbenchTaskEventRunCancelled',
   [WorkbenchRunEventType.RunFailed]: 'workbenchTaskEventRunFailed',
-  [WorkbenchRunEventType.RecoveryRequired]: 'workbenchTaskEventRecoveryRequired',
   [WorkbenchRunEventType.HarnessProfiled]: 'workbenchTaskEventHarnessProfiled',
   [WorkbenchRunEventType.HarnessActivation]: 'workbenchTaskEventHarnessActivation',
   [WorkbenchRunEventType.HarnessFailure]: 'workbenchTaskEventHarnessFailure',
@@ -117,25 +91,12 @@ export const decisionSourceLabel = (value: string): string =>
 export const effectLabel = (value: string): string => translated(effectTranslationKeys, value);
 export const artifactKindLabel = (value: string): string =>
   translated(artifactKindTranslationKeys, value);
-export const verificationOutcomeLabel = (value: string): string =>
-  translated(verificationOutcomeTranslationKeys, value);
-export const verificationCheckLabel = (value: string): string =>
-  translated(verificationCheckTranslationKeys, value);
 export const contractLabel = (value: string): string => translated(contractTranslationKeys, value);
 export const eventLabel = (value: string): string => translated(eventTranslationKeys, value);
 
 export const statusBadgeVariant = (status: string): 'secondary' | 'outline' | 'destructive' => {
-  if (status === WorkbenchTaskStatus.Failed || status === WorkbenchRunStatus.Failed) {
-    return 'destructive';
-  }
-  if (
-    status === WorkbenchTaskStatus.NeedsReview ||
-    status === WorkbenchTaskStatus.Paused ||
-    status === WorkbenchRunStatus.NeedsReview ||
-    status === WorkbenchRunStatus.Paused
-  ) {
-    return 'outline';
-  }
+  if (status === WorkbenchExecutionStatus.Failed) return 'destructive';
+  if (status === WorkbenchExecutionStatus.Cancelled) return 'outline';
   return 'secondary';
 };
 

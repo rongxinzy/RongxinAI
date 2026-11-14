@@ -2,6 +2,14 @@
 
 ## Architecture Overview
 
+### Workbench observation boundary (#1448)
+
+Workbench retains task/run identifiers, tool observations, artifact references and read-only history/export. It uses one execution vocabulary (`queued`, `running`, `settled`, `failed`, `cancelled`); normal Pi settlement carries no business-success or acceptance claim. The retired verification result, user-acceptance flag and task-boundary/transition state machine are no longer part of the runtime contract. Existing database columns are left in place without migration or deletion.
+
+Runtime-originated audit writes pass through `observeWorkbench(sessionId, record)`. A failed observation is logged with its session identifier and cannot prevent prompting, tool execution, permission delivery or shutdown. Companion input/ownership receipts commit independently of optional audit rows, with reserved identifiers available for recording at native launch. Memory extraction continues to propose review candidates from settled runs and records their execution provenance.
+
+Regression coverage compares complete Provider request bodies, tool results, user permission prompts and terminal events with observation disabled, enabled, and failing during either creation or subsequent writes. Controlled HTTP-provider runs check actual 21/32 partial and complete 32/48-document artifacts; these checks belong only to tests and never continue or gate a production Pi run.
+
 `src/main/libs/agentEngine/` serves as the core execution kernel of ZhiYuan Agent (知远智能体), driving Work, Chat, Channel, and Cron modes. This modernization transitions the engine from ambient type shims, loopback HTTP proxies, and redundant outer state machines to native `@earendil-works/pi-*` (v1.5.2) capabilities across three milestones (P0, P1, P2).
 
 ```

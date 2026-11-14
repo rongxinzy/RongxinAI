@@ -7,6 +7,8 @@
  * of the initial (history- and memory-augmented) prompt.
  */
 
+import { observeWorkbench } from '../../workbenchTask/observe';
+
 import { randomUUID } from 'crypto';
 
 import { classifyCoworkError } from '../../../common/coworkError';
@@ -212,16 +214,20 @@ export async function startPiRuntimeSession(
     );
 
     const workflowKind = chatMode ? WorkbenchContractKind.Chat : WorkbenchContractKind.GenericWork;
-    const workbenchTaskService = host.getWorkbenchTaskService();
-    if (workbenchTaskService && !chatMode) {
-      const workbench = workbenchTaskService.beginRun({
-        sessionId,
-        goal: prompt,
-        contract: { kind: workflowKind, requiresUserAcceptance: false },
-        trigger: WorkbenchRunTrigger.Message,
-        preparedRunId: options._workbenchRunId,
-      });
-      workbenchRunId = workbench.run.id;
+    if (!chatMode) {
+      workbenchRunId =
+        observeWorkbench(
+          sessionId,
+          () =>
+            host.getWorkbenchTaskService()?.beginRun({
+              sessionId,
+              goal: prompt,
+              contract: { kind: workflowKind },
+              trigger: WorkbenchRunTrigger.Message,
+              preparedRunId: options._workbenchRunId,
+              preparedTaskId: options._workbenchTaskId,
+            }).run.id,
+        ) ?? null;
     }
 
     // Pi's createAgentSession does not accept a systemPrompt option. Its
@@ -263,21 +269,25 @@ export async function startPiRuntimeSession(
       workflowKind,
       harnessVersion: HarnessVersion,
     };
-    const workbenchForContext = host.getWorkbenchTaskService();
-    if (workbenchRunId && workbenchForContext) {
-      workbenchForContext.updateRunContext(workbenchRunId, {
-        model: harnessModelProfile.model,
-        provider: harnessModelProfile.provider,
-        reasoningProfile: harnessModelProfile.reasoningProfile,
-        workspaceRoot,
-        skillIds: resourceState.skillIds ?? [],
-      });
-      workbenchForContext.measurement?.recordModelProfile(workbenchRunId, harnessModelProfile);
-    }
+    observeWorkbench(sessionId, () => {
+      const workbenchForContext = host.getWorkbenchTaskService();
+      if (workbenchRunId && workbenchForContext) {
+        workbenchForContext.updateRunContext(workbenchRunId, {
+          model: harnessModelProfile.model,
+          provider: harnessModelProfile.provider,
+          reasoningProfile: harnessModelProfile.reasoningProfile,
+          workspaceRoot,
+          skillIds: resourceState.skillIds ?? [],
+        });
+        workbenchForContext.measurement?.recordModelProfile(workbenchRunId, harnessModelProfile);
+      }
+    });
     const recordActivation = (event: HarnessActivationEvent): void => {
       const currentRunId = host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
       if (!currentRunId) return;
-      host.getWorkbenchTaskService()?.measurement?.recordActivation(currentRunId, event);
+      observeWorkbench(sessionId, () => {
+        host.getWorkbenchTaskService()?.measurement?.recordActivation(currentRunId, event);
+      });
     };
     if (
       options.sessionMode === CoworkSessionMode.Work &&
@@ -591,7 +601,9 @@ export async function startPiRuntimeSession(
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    host.getWorkbenchTaskService()?.failRun?.(sessionId, { message });
+    observeWorkbench(sessionId, () =>
+      host.getWorkbenchTaskService()?.failRun(sessionId, { message }),
+    );
     host.emit('error', sessionId, classifyCoworkError(message));
     throw error;
   } finally {
