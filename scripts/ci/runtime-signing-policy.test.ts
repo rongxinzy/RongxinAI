@@ -52,24 +52,34 @@ test('package smoke retains component hashes and runtime presence checks without
   );
   expect(smoke).toContain('SHA-256 mismatch for Windows component');
   expect(smoke).toContain('Sentinel SHA-256 mismatch');
-  expect(smoke).toContain("'channel-runtime\\cc-connect-sidecar.exe'");
-  expect(smoke).toContain("'release\\win-unpacked\\resources\\memory\\engram.exe'");
+  expect(smoke).not.toContain('cc-connect-sidecar');
+  expect(smoke).not.toContain('engram.exe');
   expect(smoke).toContain("$env:UV_OFFLINE = '1'");
 });
 
 test('cold installation and cache-hit upgrade retain runtime existence and component checks', () => {
   const smoke = read('scripts/ci/windows-installer-smoke.ps1');
   expect(smoke).not.toContain('verify-windows-runtime-signatures');
-  expect(smoke.match(/resources\\channel-runtime\\cc-connect-sidecar\.exe/g)).toHaveLength(2);
-  expect(smoke.match(/resources\\memory\\engram\.exe/g)).toHaveLength(2);
+  expect(smoke).not.toContain('cc-connect-sidecar');
+  expect(smoke).not.toContain('engram.exe');
   expect(smoke).toContain('phase=component-cache-hit');
   expect(smoke).toContain('phase=component-cache-miss');
   expect(smoke).toContain('Wait-ForUninstallCompletion $installRoot $runtimeRoot');
 });
 
-test('desktop signing preserves the centrally signed memory runtime bytes', () => {
-  const config = JSON.parse(read('electron-builder.json')) as { win: { signExts?: string[] } };
-  expect(config.win.signExts).toContain('!engram.exe');
+test('memory is local to the application database and no retired runtime is packaged', () => {
+  const config = JSON.parse(read('electron-builder.json')) as {
+    extraResources: { from: string }[];
+    win: { signExts?: string[] };
+  };
+  expect(config.extraResources.some(resource => resource.from.includes('engram'))).toBe(false);
+  expect(config.win.signExts).not.toContain('!engram.exe');
+  const manifest = JSON.parse(read('package.json'));
+  expect(manifest.engram).toBeUndefined();
+  expect(Object.keys(manifest.scripts).some(script => script.startsWith('engram:runtime'))).toBe(
+    false,
+  );
+  expect(existsSync(path.join(root, '.github/workflows/runtime-central-signing.yml'))).toBe(false);
 });
 
 test('electron-builder leaves Magpie to the afterSign hook that reseals its manifest', () => {
@@ -78,6 +88,17 @@ test('electron-builder leaves Magpie to the afterSign hook that reseals its mani
   const config = JSON.parse(read('electron-builder.json')) as { win: { signExts?: string[] } };
   expect(config.win.signExts).toContain('!magpie.exe');
   expect(read('scripts/notarize.js')).toContain('signPackagedWindowsMagpie');
+  expect(read('scripts/magpie-runtime.cjs')).toContain(
+    "path.join(__dirname, 'sign-windows-file.ps1')",
+  );
+  expect(read('scripts/installer-shell/sign-shell.ps1')).toContain('..\\sign-windows-file.ps1');
+  const signing = read('scripts/sign-windows-file.ps1');
+  expect(signing).toContain('$certificates.Count -ne 1');
+  expect(signing).toContain('HasPrivateKey');
+  expect(signing).toContain('NotAfter -le [DateTime]::UtcNow');
+  expect(signing).toContain('& $signTool sign /v /fd sha256');
+  expect(signing).toContain('/tr http://time.certum.pl /td sha256');
+  expect(signing).toContain('SignTool failed with exit code');
 });
 
 test('signed releases check the packaged Magpie helper signature and sealed digest', () => {

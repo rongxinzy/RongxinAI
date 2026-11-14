@@ -4,11 +4,9 @@ import { describe, expect, test } from 'vitest';
 
 import { enTranslations } from './en';
 import { enArtifactsUpdates } from './en/artifactsUpdates';
-import { enChannels } from './en/channels';
 import { enCoding } from './en/coding';
 import { enCommon } from './en/common';
 import { enCowork } from './en/cowork';
-import { enIm } from './en/im';
 import { enLocalInferenceCatalog } from './en/localInferenceCatalog';
 import { enLocalInferenceService } from './en/localInferenceService';
 import { enMarketplace } from './en/marketplace';
@@ -22,11 +20,9 @@ import { enWorkbench } from './en/workbench';
 import { translations } from './translations';
 import { zhTranslations } from './zh';
 import { zhArtifactsUpdates } from './zh/artifactsUpdates';
-import { zhChannels } from './zh/channels';
 import { zhCoding } from './zh/coding';
 import { zhCommon } from './zh/common';
 import { zhCowork } from './zh/cowork';
-import { zhIm } from './zh/im';
 import { zhLocalInferenceCatalog } from './zh/localInferenceCatalog';
 import { zhLocalInferenceService } from './zh/localInferenceService';
 import { zhMarketplace } from './zh/marketplace';
@@ -46,10 +42,8 @@ const zhModules = [
   zhCoding,
   zhCowork,
   zhScheduledTask,
-  zhIm,
   zhWorkbench,
   zhMcpSkills,
-  zhChannels,
   zhMarketplace,
   zhModelProviders,
   zhSecurity,
@@ -67,10 +61,8 @@ const enModules = [
   enCoding,
   enCowork,
   enScheduledTask,
-  enIm,
   enWorkbench,
   enMcpSkills,
-  enChannels,
   enMarketplace,
   enModelProviders,
   enSecurity,

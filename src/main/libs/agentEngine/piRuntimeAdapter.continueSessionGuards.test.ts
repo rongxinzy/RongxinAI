@@ -11,9 +11,10 @@ import {
   adapter,
   createTemporaryWorkspace,
   mockCreateAgentSession,
-  mockDefaultResourceLoader,
   mockSession,
   setupPiRuntimeAdapterSuite,
+  invokeBeforeTool,
+  renderResourceSections,
 } from './piRuntimeAdapter.testHarness';
 
 import Database from 'better-sqlite3';
@@ -23,7 +24,6 @@ import {
   WorkbenchContractKind,
   WorkbenchTaskStatus,
 } from '../../../shared/workbenchTask';
-import { PiExtensionEventType } from './piExtensionTypes';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
@@ -50,43 +50,13 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'First', {
         approvalMode: WorkbenchApprovalMode.AllowAll,
       });
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: {
-            on: (
-              event: 'tool_call',
-              handler: (toolCall: {
-                toolCallId: string;
-                toolName: string;
-                input: Record<string, unknown>;
-              }) => Promise<unknown>,
-            ) => void;
-          }) => void
-        >;
-      };
-      const toolCallHandlers: Array<
-        (toolCall: {
-          toolCallId: string;
-          toolName: string;
-          input: Record<string, unknown>;
-        }) => Promise<unknown>
-      > = [];
-      for (const factory of loaderOptions.extensionFactories ?? []) {
-        factory({
-          on: (event, handler) => {
-            if (event === PiExtensionEventType.ToolCall) toolCallHandlers.push(handler);
-          },
-        });
-      }
-      const handleToolCall = toolCallHandlers.at(-1);
-
-      await handleToolCall?.({
+      await invokeBeforeTool({
         toolCallId: 'first-call',
         toolName: 'write',
         input: { path: 'first.txt' },
       });
       await adapter.continueSession('test', 'Second');
-      await handleToolCall?.({
+      await invokeBeforeTool({
         toolCallId: 'second-call',
         toolName: 'write',
         input: { path: 'second.txt' },
@@ -130,23 +100,7 @@ describe('PiRuntimeAdapter', () => {
       expect(sessionOptions.customTools?.map(tool => tool.name)).toContain('plan_write');
       expect(mockSession.prompt).toHaveBeenCalledWith('Plan the migration');
 
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
-        >;
-      };
-      const beforeAgentHandlers: Array<(event: unknown) => unknown> = [];
-      for (const factory of loaderOptions.extensionFactories ?? []) {
-        factory({
-          on: (event, handler) => {
-            if (event === PiExtensionEventType.BeforeAgentStart) beforeAgentHandlers.push(handler);
-          },
-        });
-      }
-      const sections: Record<string, string> = {};
-      for (const handler of beforeAgentHandlers) {
-        await handler({ prompt: 'Plan the migration', systemPromptOptions: { sections } });
-      }
+      const sections = await renderResourceSections();
       expect(sections.plan_mode).toContain('## Plan Mode');
       expect(sections.plan_mode).toContain('This turn is read-only planning');
     });
@@ -183,23 +137,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenLastCalledWith('Plan the next step');
       expect(mockCreateAgentSession).toHaveBeenCalledOnce();
 
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
-        >;
-      };
-      const beforeAgentHandlers: Array<(event: unknown) => unknown> = [];
-      for (const factory of loaderOptions.extensionFactories ?? []) {
-        factory({
-          on: (event, handler) => {
-            if (event === PiExtensionEventType.BeforeAgentStart) beforeAgentHandlers.push(handler);
-          },
-        });
-      }
-      const sections: Record<string, string> = {};
-      for (const handler of beforeAgentHandlers) {
-        await handler({ prompt: 'Plan the next step', systemPromptOptions: { sections } });
-      }
+      const sections = await renderResourceSections();
       expect(sections.plan_mode).toContain('## Plan Mode');
     });
 
@@ -218,32 +156,14 @@ describe('PiRuntimeAdapter', () => {
         planMode: true,
         approvalMode: WorkbenchApprovalMode.AllowAll,
       });
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-        extensionFactories?: Array<
-          (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
-        >;
-      };
-      const toolCallHandlers: Array<(event: unknown) => unknown> = [];
-      const invokeToolCall = async (event: unknown) => {
-        const results = await Promise.all(toolCallHandlers.map(handler => handler(event)));
-        return results.find(value => value !== undefined);
-      };
-      for (const factory of loaderOptions.extensionFactories ?? []) {
-        factory({
-          on: (event, handler) => {
-            if (event !== PiExtensionEventType.ToolCall) return;
-            toolCallHandlers.push(handler);
-          },
-        });
-      }
-
+      const invokeToolCall = invokeBeforeTool;
       const blockedWrite = await invokeToolCall({
         toolCallId: 'w',
         toolName: 'write',
         input: { path: 'a.txt' },
       });
       expect(blockedWrite).toEqual(
-        expect.objectContaining({ block: true, reason: expect.stringContaining('Plan mode') }),
+        expect.objectContaining({ block: expect.stringContaining('Plan mode') }),
       );
       const blockedBash = await invokeToolCall({
         toolCallId: 'b',
@@ -251,7 +171,7 @@ describe('PiRuntimeAdapter', () => {
         input: { command: 'echo unsafe > a.txt' },
       });
       expect(blockedBash).toEqual(
-        expect.objectContaining({ block: true, reason: expect.stringContaining('Plan mode') }),
+        expect.objectContaining({ block: expect.stringContaining('Plan mode') }),
       );
       const allowedRead = await invokeToolCall({
         toolCallId: 'r',
@@ -335,29 +255,14 @@ describe('PiRuntimeAdapter', () => {
         });
         const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: unknown) => void;
         const first = service.getCurrent('denied-shortcut')!;
-        const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-          extensionFactories?: Array<
-            (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
-          >;
-        };
-        const toolCallHandlers: Array<(event: unknown) => Promise<unknown>> = [];
-        for (const factory of loaderOptions.extensionFactories ?? []) {
-          factory({
-            on: (event, handler) => {
-              if (event === PiExtensionEventType.ToolCall) {
-                toolCallHandlers.push(handler as (event: unknown) => Promise<unknown>);
-              }
-            },
-          });
-        }
-        const authorization = toolCallHandlers.at(-1)!({
+        const authorization = invokeBeforeTool({
           toolCallId: 'write-call',
           toolName: 'write',
           input: { path: 'slides.md', content: 'draft' },
         });
         await vi.waitFor(() => expect(requests).toHaveLength(1));
         adapter.respondToPermission(requests[0], { behavior: 'deny' });
-        await expect(authorization).resolves.toMatchObject({ block: true });
+        await expect(authorization).resolves.toMatchObject({ block: expect.any(String) });
         expect(mockSession.abort).not.toHaveBeenCalled();
 
         // Pi receives the block result and settles the turn normally.

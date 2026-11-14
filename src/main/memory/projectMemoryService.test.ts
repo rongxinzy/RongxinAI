@@ -9,9 +9,9 @@ import {
   PERSONAL_MEMORY_PROJECT_ID,
 } from '../../shared/memory';
 import {
-  EngramMemoryScope,
-  EngramObservationType,
-  EngramSearchMatchMode,
+  MemoryBackendScope,
+  MemoryObservationType,
+  MemorySearchMatchMode,
   MemoryOutboxOperation,
   MemoryOutboxStatus,
 } from './constants';
@@ -177,7 +177,7 @@ test('always recalls with the current project identity', async () => {
 
   expect(recall.mock.calls[0][0]).toMatchObject({
     project: 'project-alpha',
-    scope: EngramMemoryScope.Project,
+    scope: MemoryBackendScope.Project,
   });
   expect(recall.mock.calls[1][0]).toMatchObject({ project: 'project-beta' });
 });
@@ -255,7 +255,7 @@ test('persists the outbox before confirming and linking a project memory', async
     service.saveProjectMemory({
       sessionId: 'session-1',
       workingDirectory: 'alpha',
-      type: EngramObservationType.Decision,
+      type: MemoryObservationType.Decision,
       title: 'Database',
       content: 'Use SQLite.',
       importance: 0.8,
@@ -497,7 +497,7 @@ test('supersedes a legacy Project link through the durable outbox', async () => 
   const memoryId = await service.saveProjectMemory({
     sessionId: 'session-new',
     workingDirectory: 'alpha',
-    type: EngramObservationType.Decision,
+    type: MemoryObservationType.Decision,
     title: 'Project store',
     content: 'Use SQLite.',
     supersedesLinkId: target.id,
@@ -540,7 +540,7 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
   await service.saveProjectMemory({
     sessionId: 'session-1',
     workingDirectory: 'alpha',
-    type: EngramObservationType.Decision,
+    type: MemoryObservationType.Decision,
     title: 'Database',
     content: 'Use SQLite.',
   });
@@ -556,7 +556,7 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
 test('enforces the project context token budget', async () => {
   const adapter = {
     recall: vi.fn(async (input: { scope: string }) =>
-      input.scope !== EngramMemoryScope.Project
+      input.scope !== MemoryBackendScope.Project
         ? []
         : [
             { id: 1, title: 'First', content: 'A'.repeat(40) },
@@ -584,7 +584,7 @@ test('enforces the project context token budget', async () => {
 
 test('broadens an empty CJK search with any-match terms', async () => {
   const recall = vi.fn(async (input: { matchMode: string }) =>
-    input.matchMode === EngramSearchMatchMode.Any
+    input.matchMode === MemorySearchMatchMode.Any
       ? [
           {
             id: 9,
@@ -607,7 +607,7 @@ test('broadens an empty CJK search with any-match terms', async () => {
   ).resolves.toMatchObject([{ id: 9 }]);
   expect(recall).toHaveBeenNthCalledWith(
     2,
-    expect.objectContaining({ matchMode: EngramSearchMatchMode.Any }),
+    expect.objectContaining({ matchMode: MemorySearchMatchMode.Any }),
   );
 });
 
@@ -632,30 +632,30 @@ test('falls back to bounded recent active memory only for explicit memory intent
   ).resolves.toMatchObject([{ id: 10 }]);
   expect(recent).toHaveBeenCalledWith({
     project: 'project-alpha',
-    scope: EngramMemoryScope.Project,
+    scope: MemoryBackendScope.Project,
     limit: 8,
   });
 });
 
 test('lists the current workspace, confirmed personal, and current-session memories', () => {
   const memories = [
-    { id: 'project-current', projectId: 'project-alpha', scope: EngramMemoryScope.Project },
-    { id: 'project-other', projectId: 'project-beta', scope: EngramMemoryScope.Project },
+    { id: 'project-current', projectId: 'project-alpha', scope: MemoryBackendScope.Project },
+    { id: 'project-other', projectId: 'project-beta', scope: MemoryBackendScope.Project },
     {
       id: 'personal',
       projectId: 'personal://zhiyuan-agent/user',
-      scope: EngramMemoryScope.Personal,
+      scope: MemoryBackendScope.Personal,
     },
     {
       id: 'session-current',
       projectId: 'project-alpha',
-      scope: EngramMemoryScope.Session,
+      scope: MemoryBackendScope.Session,
       sessionId: 'session-a',
     },
     {
       id: 'session-other',
       projectId: 'project-alpha',
-      scope: EngramMemoryScope.Session,
+      scope: MemoryBackendScope.Session,
       sessionId: 'session-b',
     },
   ];
@@ -686,7 +686,7 @@ test('does not expose legacy copy-style Session summaries through controlled lis
         {
           id: 'legacy-session',
           projectId: 'project-alpha',
-          scope: EngramMemoryScope.Session,
+          scope: MemoryBackendScope.Session,
           sessionId: 'session-a',
         },
       ]),
@@ -734,7 +734,7 @@ test('stores rolling session summaries with a 30 day expiration', async () => {
   await service.drainOutbox();
 
   expect(repository.items[0].payload).toMatchObject({
-    scope: EngramMemoryScope.Session,
+    scope: MemoryBackendScope.Session,
     topicKey: 'session/session-1',
     expiresAt: '2026-09-10T00:00:00.000Z',
     metadata: {
@@ -756,12 +756,12 @@ test('stores rolling session summaries with a 30 day expiration', async () => {
 test('injects only the current session recall under its own context budget', async () => {
   const adapter = {
     recall: vi.fn(async (input: { scope: string; limit: number }) =>
-      input.scope === EngramMemoryScope.Session
+      input.scope === MemoryBackendScope.Session
         ? [
             ...Array.from({ length: 8 }, (_, index) => ({
               id: 100 + index,
               session_id: `other-session-${index}`,
-              type: EngramObservationType.SessionSummary,
+              type: MemoryObservationType.SessionSummary,
               title: 'Other session summary',
               content: 'Private result from another session.',
               updated_at: '2026-08-12T00:00:00.000Z',
@@ -769,7 +769,7 @@ test('injects only the current session recall under its own context budget', asy
             {
               id: 31,
               session_id: 'session-1',
-              type: EngramObservationType.SessionSummary,
+              type: MemoryObservationType.SessionSummary,
               title: 'Session summary',
               content: 'The previous session fixed CJK recall.',
               updated_at: '2026-08-11T00:00:00.000Z',
@@ -793,7 +793,7 @@ test('injects only the current session recall under its own context budget', asy
     }),
   ).resolves.toContain('Session:\n- [memory:31]');
   expect(adapter.recall).toHaveBeenCalledWith(
-    expect.objectContaining({ scope: EngramMemoryScope.Session, limit: 20 }),
+    expect.objectContaining({ scope: MemoryBackendScope.Session, limit: 20 }),
   );
   await expect(
     service.recallSession({
@@ -810,7 +810,7 @@ test('excludes session summaries returned by project recall', async () => {
       {
         id: 51,
         session_id: 'session-2',
-        type: EngramObservationType.SessionSummary,
+        type: MemoryObservationType.SessionSummary,
         title: 'Leaked session summary',
         content: 'Private result from another session.',
         updated_at: '2026-08-11T00:00:00.000Z',
@@ -818,7 +818,7 @@ test('excludes session summaries returned by project recall', async () => {
       {
         id: 52,
         session_id: 'session-2',
-        type: EngramObservationType.Decision,
+        type: MemoryObservationType.Decision,
         title: 'Project decision',
         content: 'Use SQLite.',
         updated_at: '2026-08-11T00:00:00.000Z',
@@ -840,7 +840,7 @@ test('excludes session summaries returned by project recall', async () => {
 test('counts CJK characters conservatively against context budgets', async () => {
   const adapter = {
     recall: vi.fn(async (input: { scope: string }) =>
-      input.scope === EngramMemoryScope.Project
+      input.scope === MemoryBackendScope.Project
         ? [{ id: 41, title: '中文', content: '记'.repeat(80) }]
         : [],
     ),

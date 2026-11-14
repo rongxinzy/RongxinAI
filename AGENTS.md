@@ -4,8 +4,8 @@
 
 ## 核心原则
 
-1. **Pi First。** `src/main/libs/agentEngine/piRuntimeAdapter.ts` 是唯一执行内核（Work/Chat/Channel/Cron 全走它）。新能力优先用 Pi 原生机制，不在 harness 层重造。
-2. **Harness 不得劣化 Pi。** 提示注入、工具包装、闸门、拦截、强制纠偏等不得浪费 token、制造模型摩擦或扭曲行为基线；被证明劣化的机制直接移除，不加固。反例：强制模型先调 `set_task_output` 声明交付物（#786 引入、#917 移除），不得重新引入。
+1. **Durable First。** `@earendil-works/pi-durable` Harness 是唯一执行内核。Work/Chat 经 `durableSession.mts`，自动化经同一会话的原生 Tasks，伴随助手同样使用 Durable。`piRuntimeAdapter.ts` 只连接产品服务与 UI 投影，不另建执行、重试或压缩循环。
+2. **宿主不得劣化原生内核。** 提示注入、工具包装、闸门、拦截、强制纠偏等不得浪费 token、制造模型摩擦或扭曲行为基线；被证明劣化的机制直接移除，不加固。反例：强制模型先调 `set_task_output` 声明交付物（#786 引入、#917 移除），不得重新引入。
 3. **设计合规是前端 P0 门禁。** 见下文「前端设计规则」。设计违规即阻断缺陷，功能可用或测试通过不能抵消。
 
 ## 命令
@@ -33,16 +33,16 @@ bun run rebuild:electron-native   # 原生模块依赖变更后
 
 - 仅在 `import.meta.env.DEV` 且没有 preload bridge 时，`main.tsx` 才动态加载 `src/renderer/browserMock/`。生产构建不含 mock。
 - 完整表面由 `scripts/preview/generate-browser-mock.ts` 按 `Window['electron']`（`src/renderer/types/electron.d.ts`）生成。没有单独实现的方法返回类型上合法的默认值，每个路径只 `console.warn` 一次，不抛异常。`on*` 订阅注册到进程内事件总线，fixture 用同一条总线回放流式事件。
-- 会话、流式回复、设置、Skills、MCP、自动化、本地推理和 IM 的数据在 `browserMock/interactive.ts` 与 `browserMock/fixtures/`。改了 preload 契约后跑 `bun run web:preview:codegen`，并提交 `src/renderer/browserMock/generated/`。`bun run web:preview:codegen:check` 会在生成结果过期时失败。
+- 会话、流式回复、设置、Skills、MCP、自动化和本地推理的数据在 `browserMock/interactive.ts` 与 `browserMock/fixtures/`。改了 preload 契约后跑 `bun run web:preview:codegen`，并提交 `src/renderer/browserMock/generated/`。`bun run web:preview:codegen:check` 会在生成结果过期时失败。
 - `bun run web:preview:check`（先 `bunx playwright install chromium`）在 headless Chromium 中跑 Playwright 交互测试与 warn-only 的 axe 抽检；mock 仍支持 URL 参数 `previewScenario` / `previewEdition` / `previewSkipBoot` 供本地走查。`console.error` 与 `pageerror` 会让检查失败。Preload 契约：`bun run web:preview:contract`；生成面校验：`bun run web:preview:codegen:check`。这些检查由发布前 `release-preflight.yml` 的 `browser-preview` job 统一执行，日常 PR 不自动启动浏览器。
 
-Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致）。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。桌面壳 Electron **44.x**；Agent 执行栈 `@earendil-works/pi-*` **1.5.2**，带原生 fork 修复（见 `package.json`、[上下文压力修复](docs/architecture/pi-context-pressure-fork.zh-CN.md)）。
+Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致）。包管理与脚本一律用 Bun（`bun install`、`bun run <script>`、`bun.lock`），不使用 npm。Windows 构建需 PortableGit（见 README.md）。桌面壳 Electron **44.x**；Agent 执行栈 `@earendil-works/pi-*` **1.5.2**，带原生 fork 修复（见 `package.json`、[上下文压力修复](docs/architecture/durable-core.zh-CN.md)）。
 
 ## 产品与品牌
 
 知远智能体 (ZhiYuan Agent)：Electron + React 本地优先 AI Agent 桌面应用（Cowork 会话、本地推理、Skills/MCP、Artifacts 预览）。
 
-- 对外文案只用「知远智能体 (ZhiYuan Agent)」，旧名不得复活。Pi、cc-connect、llama.cpp 是内部细节，不得出现在用户可见文案；对外称全栈自研。
+- 对外文案只用「知远智能体 (ZhiYuan Agent)」，旧名不得复活。Pi Durable、llama.cpp 是内部细节，不得出现在用户可见文案；对外称全栈自研。
 - **焦土政策**：旧标识、旧运行时、旧库文件不做迁移、兼容层、读取、启动、打包或回退；旧数据原地弃置，不主动删除。不做用户未要求的向后兼容。
 
 ## 架构
@@ -52,7 +52,7 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 ### 进程
 
 - **Main**（`src/main/main.ts`）：窗口、SQLite（better-sqlite3，`sqliteStore.ts`，库文件 userData/`zhiyuan.sqlite`）、Pi 运行时、llama.cpp 生命周期（`libs/llamacppManager/`、`libs/llamacppBackendManager/`、`ipcHandlers/llamacpp/`；对外仍经同名 barrel，`src/shared/llamacpp/` 共享类型）、Skill 管理（`skillManager.ts`）、MCP、IPC handler。安全：contextIsolation 开、nodeIntegration 关、sandbox 开。
-- **Channel/Cron 传输**（`src/main/libs/ccConnect*`、`src/main/im/`）：只搬运事件与 cron 触发，不执行 Agent、不持有任务状态。对外渠道：微信、企业微信、钉钉、飞书/Lark、QQ、Email；旧 connector 不得在 UI/文档重新暴露。
+- **自动化**（`src/main/automations/`）：定义、触发点、运行与 deadline 都持久化为 Durable Documents / Tasks，时间等待只用 `sleepUntil`；`croner` 只算日历。没有渠道接入、外发或独立 Cron 执行器。实现边界见 [Durable 内核](docs/architecture/durable-core.zh-CN.md)。
 - **Preload**（`src/main/preload.ts`）：`window.electron`，含 `cowork` 命名空间。
 - **Renderer**（`src/renderer/`）：全部 UI 与业务逻辑，只经 IPC 访问主进程；非 UI 逻辑放 `src/renderer/services/`。
 
@@ -75,9 +75,9 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 - `App.tsx` → `coworkService.init()` → IPC 加载配置/会话 → 流监听；`startSession()` → IPC → `PiRuntimeAdapter` → 流事件 → Redux。
 - 流式 IPC/渲染细节不在此维护，见 [docs/architecture/streaming.md](docs/architecture/streaming.md)（Pi 事件翻译为增量 UIMessageChunk，主进程仅 coalescer 一处合并，终态才落 Redux，快照只走异常路径）。
 - 流事件：`CoworkStreamIpc`（`src/shared/ipc/channels.ts`）——`cowork:stream:runState` / `contentPatch` / `runtimeSnapshots` / `uiEvent` / `resync` 与 `cowork:sessions:changed`。权限请求经 `CoworkPermissionModal` 回传引擎。
-- IPC（通道常量在 `src/shared/ipc/channels.ts`，契约在 `src/shared/ipc/coworkContract.ts`）：`cowork:session:start` / `continue` / `stop` / `get` / `list` / `delete`、`cowork:permission:respond`、`cowork:config:get` / `set`。`cowork:stream:*` 承载 Work/Chat；Channel/Cron run 以只读 activity 投影暴露。
+- IPC（通道常量在 `src/shared/ipc/channels.ts`，契约在 `src/shared/ipc/coworkContract.ts`）：`cowork:session:start` / `continue` / `stop` / `get` / `list` / `delete`、`cowork:permission:respond`、`cowork:config:get` / `set`。`cowork:stream:*` 承载 Work/Chat；自动化 run 以只读 activity 投影暴露。
 - 执行模式 `CoworkExecutionMode`：`auto` / `local`。
-- 存储：`cowork_sessions` / `cowork_messages`；应用配置在 `kv`；Cowork 配置在 `cowork_config`；Task/Run/Delivery/ChannelAccount/ChannelSession 以 ZhiYuan SQLite 为准。
+- 存储：`cowork_sessions` / `cowork_messages`、应用 `kv`、`cowork_config` 是业务/UI 投影；执行 transcript、任务与恢复状态以 `userData/agent-runtime/<session-id-sha256>.sqlite` 的 Durable 原始记录为准。
 - 认证：社区账号登录在主进程 `src/main/appBootstrap/communityAuth.ts` 与 `src/main/communityAuthSession.ts`，deep-link `zhiyuan://auth/callback` 换取 access/refresh token，剩余 <5 分钟时刷新；未登录时为免费模型签发访客 token。
 
 ### 托管 Python 运行时
@@ -88,14 +88,13 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 
 ### 记忆系统
 
-本地 Engram（`vendor/engram-runtime`）+ SQLite 投影表 `memory_links` / `memory_candidates` / `memory_outbox`。业务检查点、同步状态、原生会话身份与关闭意图分别存于 `memory_checkpoints` / `memory_runtime_sessions` / `memory_session_finalizations`。
+长期记忆使用 Durable 原生生态插件 `@sigrun/memory-markdown@0.3.1`；宿主接线为 `src/main/memory/markdownMemoryRuntime.ts`，事实正文存在 `userData/durable-memory/<scope-sha256>/USER.md` / `MEMORY.md`。这不是自研插件，也不是未经修改的官方包：`vendor/memory-markdown/` 保存官方 tarball 和可复现的包装补丁，将 Sigrun core peer 标为 optional、提供纯类型宿主声明，并只对 files.js 的 canonical 写入加同目录 temp/flush/rename 补丁；其余 5 个上游 JS 文件逐字节保持不变。`node scripts/vendor-memory-markdown.mjs --verify` 同时校验 npm integrity、补丁重现及 JS 一致性。禁止因此安装 Sigrun server、恢复旧执行内核或外部记忆边车。
 
-- 作用域：`project`（id = `workspace-` + sha256(cwd)，见 `src/main/workspaceUtils.ts`、`src/shared/memory/constants.ts`）；`personal`（`personal://zhiyuan-agent/user`，写入进候选队列，用户确认后生效）；`session`（摘要，30 天 TTL）。
-- 写入：显式 `memory` 工具保存走确定性的 `prepareExplicitUserRequestedMemory`（`src/main/memory/piMemoryTool.ts`，无额外 LLM 抽取）；会话检查点由 agent 通过 `session_summary` 工具（`src/main/sessionSummary/tool.ts`）在当前上下文中自写，经 `sessionCheckpointService.ts` 将不可变正文与 outbox 原子落 SQLite，再同步 Engram。不再按回合做窗口抽取（`runPostTurnMemoryMaintenance` 已退役）。新检查点使用独立 `session/<sessionId>/checkpoint/<checkpointId>` topic 保留可召回历史，本地最新检查点表示当前状态；旧滚动 topic 只兼容既有记录。
-- 身份与生命周期：工具执行时读取当前 run/turn 和产物工作版本，以 write/edit 完成时的实际 mtime 区分最终扫描与脚本对同一路径的后续修改，避免重复计数或漏算；written/skip 只覆盖当时的工作量，新回合或后续新增、修改产物会重新激活摘要义务。`memory_runtime_sessions` 保存全部 Engram effective/continuation ID 的历史归属，并另存当前写入指针；恢复旧 observation 只补历史、不回退指针，不自行拼接 ID。单删与批删在同一个共享 SQLite 事务中写关闭意图、finalize outbox 并删除会话；原生 finalize 必须等待同会话旧写入确认，并在投递时跟随实际 current effective ID，不能在关闭后自动续接。Completed 仅表示旧生命周期已关闭；恢复后有新写入时必须保留旧结果并创建新关闭意图，不能因旧 Completed 而跳过。finalize outbox 只按对应生命周期的 intent link 复用，禁止跨生命周期复用或改写历史结果。
-- 收尾义务：有文件产出的回合未写检查点时，不自动续跑模型或注入纠正提醒，只记录遗漏指标并以确定性兜底（目标/最终回复摘录/验证状态/台账）记为待审运行记录；skip 是显式合法结果。`taskMemoryPromotion` 的任务知识提炼仍走独立的 `AtomicMemoryExtractor`。
-- 投递与治理：outbox 在执行前按 ID 原子领取，已完成项只返回结果，后台与直接队列不得重复处理；各路径在投递结束后通知调度器，按最早 `available_at` 自动唤醒、串行排空，应用退出先停止调度再停止边车。可能已发送的写入先按稳定 operation_id 查 save-result 并恢复原 effective ID，禁止未查明结果就换会话重发。远端回执对应的 link 生命周期和 outbox 状态在同一本地事务确认；重放不得复活归档/删除项，历史 link 删除不得破坏其他修订共享的 observation。未发送的 finalize 请求失败可退避，结果不确定的请求不得自动盲目重放，失败后必须清除旧 effective 缓存。持久化 Completed 在检查点回执中映射为 Synced，Superseded 单独表示。
-- 注入：每轮前 `buildProjectMemoryContextSafe`，可选召回总等待最多 500ms 并支持取消，预算 project/personal/session = 900/250/350 token。按 observation 修订去重，原生压缩成功后重建注入边界。Chat 不注册记忆/检查点工具或注入记忆指引；IM/Cron 同 Work。旧 `MEMORY.md` 只在启动时导入为候选，永不注入 prompt。
+- **作用域与权限**：项目 owner 使用 `workspace-` + sha256(cwd)，个人 owner 使用 `personal://zhiyuan-agent/user`。每个 Harness 的 owner 闭包与 transcript backend 独立；不能用非全局唯一的数字 conversationId 作全局 owner 索引。个人提议仍进入 SQLite 候选队列，确认后才写入个人 `USER.md`。普通 Work 原生扩展只公开 `memory_recall` 和项目/个人 section，不公开上游 curator-only `memory_write`，FullAccess 不绕过确认。Chat 不安装记忆扩展。
+- **存储与治理**：上游 `files.apply` / `files.undo` / curation target 负责正文、文件限额、版本和整理；不维护自研 FTS 或第二个事实索引。SQLite 的 `memory_links` / `memory_candidates` / `memory_outbox` 仅承担产品投影、候选、幂等投递、作用域、归档及过期治理。确认后的条目有稳定 `[memory:<id>]` 标识，outbox 重试复用同一标识；整理保留标识并回写 UI 投影，不能通过整理加入未确认事实。
+- **原生注入与召回**：原生 `long-term-memory` section 每次模型请求从文件读取，项目/个人默认上限分别 2200 / 1375 字符；不另行 prepend 相同长期事实。`memory_recall` 搜索调用方 Durable 原始 transcript，包含已从上下文压缩掉的内容，并非跨项目的全文记忆库。打开/重启/分支时绑定实际 Conversation.entries，首次新回合也可回溯历史。归档和过期条目在原生 section 渲染前从当前文件移除。
+- **检查点与关闭**：`session_summary` 仍由 agent 在当前上下文自写，`sessionCheckpointService.ts` 将不可变正文及 outbox 事务写入应用 SQLite。检查点属于会话运行记录，30 天 TTL，不伪装成长期事实，也不再建立外部记忆运行时会话。Durable 拥有执行与 transcript；应用保留本地关闭意图与投递记录。
+- **删除与可靠性**：普通删除使用上游 remove，历史版本可用于撤销。硬删除同时清除该 scope 的插件版本目录，其他当前事实保留，但该 scope 过去的撤销历史会丢弃。canonical 文件经过同目录暂存、flush 和 rename，避免进程崩溃截断旧正文；强杀遗留的非 canonical 临时文件也在该 scope 硬删除时清理。该补丁不承诺 Markdown 与 SQLite 的跨存储事务或硬件断电保证。候选、outbox 和本地检查点的事务边界仍由应用 SQLite 保证。
 
 ### 其他
 

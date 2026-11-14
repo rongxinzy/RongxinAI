@@ -92,8 +92,6 @@ describe('Kylin packaging', () => {
       },
     });
     expect(calls.map(call => call.join(' '))).toEqual([
-      'bun run channel:runtime:linux-x64',
-      'bun run engram:runtime:linux-x64',
       'node scripts/ensure-build-version.js',
       'bun run sync:vendor-llamacpp-cpu',
       'bun run prepare:inference-edition-runtime',

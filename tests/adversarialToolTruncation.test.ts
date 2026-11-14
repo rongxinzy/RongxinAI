@@ -6,14 +6,13 @@ import JSZip from 'jszip';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  mockCreateAgentSession: vi.fn(),
+  mockExecuteDurableSubagent: vi.fn(),
 }));
 
-vi.mock('@earendil-works/pi-coding-agent', () => ({
-  createAgentSession: hoisted.mockCreateAgentSession,
+vi.mock('../src/main/libs/agentEngine/durableSubagent.mjs', () => ({
+  executeDurableSubagent: hoisted.mockExecuteDurableSubagent,
 }));
 
-import { safeSlice } from '../src/shared/lib/safeSlice';
 import {
   buildPiDocumentReaderTool,
   PI_DOCUMENT_READER_MAX_CHARS,
@@ -23,10 +22,6 @@ import {
   PI_SUBAGENT_MAX_OUTPUT_CHARS,
   type PiSubagentToolDeps,
 } from '../src/main/libs/agentEngine/piSubagentTool';
-import {
-  PiMessageRole,
-  PiSubagentEventType,
-} from '../src/main/libs/agentEngine/piSubagentExecution';
 
 describe('Adversarial Challenger Suite: Tool Truncation Bounds', () => {
   const assertNoDanglingHighSurrogate = (str: string, contextMsg = '') => {
@@ -147,29 +142,6 @@ describe('Adversarial Challenger Suite: Tool Truncation Bounds', () => {
       };
     };
 
-    const createMockSession = (output: string) => {
-      const listeners: Array<(event: unknown) => void> = [];
-      const session = {
-        prompt: vi.fn(async () => {
-          session.emit({
-            type: PiSubagentEventType.MessageEnd,
-            message: { role: PiMessageRole.Assistant, content: output, stopReason: 'stop' },
-          });
-          session.emit({ type: PiSubagentEventType.AgentSettled });
-        }),
-        steer: vi.fn().mockResolvedValue(undefined),
-        abort: vi.fn().mockResolvedValue(undefined),
-        subscribe: vi.fn((listener: (event: unknown) => void) => {
-          listeners.push(listener);
-          return () => {};
-        }),
-        emit: (event: unknown) => {
-          for (const listener of listeners) listener(event);
-        },
-      };
-      return session;
-    };
-
     const subagentSizes = [
       { name: '100KB', size: 100_000 },
       { name: '500KB', size: 500_000 },
@@ -185,8 +157,9 @@ describe('Adversarial Challenger Suite: Tool Truncation Bounds', () => {
           size,
         );
 
-        hoisted.mockCreateAgentSession.mockResolvedValueOnce({
-          session: createMockSession(astralPayload),
+        hoisted.mockExecuteDurableSubagent.mockResolvedValueOnce({
+          ok: true,
+          output: astralPayload,
         });
 
         const tool = buildSubagentTool();
@@ -204,8 +177,9 @@ describe('Adversarial Challenger Suite: Tool Truncation Bounds', () => {
 
     it('parallel mode: aggregates multiple 500KB subagent outputs and strictly bounds final text', async () => {
       const payload500k = 'P'.repeat(500_000);
-      hoisted.mockCreateAgentSession.mockImplementation(async () => ({
-        session: createMockSession(payload500k),
+      hoisted.mockExecuteDurableSubagent.mockImplementation(async () => ({
+        ok: true,
+        output: payload500k,
       }));
 
       const tool = buildSubagentTool();

@@ -1,18 +1,6 @@
-import type { EngramManagerPhase, EngramMemoryScope, EngramObservationType } from './constants';
+import type { MemoryBackendScope, MemoryObservationType } from './constants';
 
-export interface EngramConnection {
-  url: string;
-  token: string;
-}
-
-export interface EngramManagerStatus {
-  phase: EngramManagerPhase;
-  available: boolean;
-  restartAttempts: number;
-  error?: string;
-}
-
-export interface EngramObservation {
+export interface MemoryObservation {
   id: number;
   sync_id: string;
   session_id: string;
@@ -34,8 +22,8 @@ export interface MemoryCandidate {
   id: string;
   sessionId: string;
   project: string;
-  scope: EngramMemoryScope;
-  type: EngramObservationType;
+  scope: MemoryBackendScope;
+  type: MemoryObservationType;
   title: string;
   content: string;
   topicKey?: string;

@@ -1,10 +1,10 @@
 import { MemoryKind, MemoryScope } from '../../shared/memory';
-import { EngramSearchMatchMode } from './constants';
+import { MemorySearchMatchMode } from './constants';
 import { planRecallQuery, rankRecallResults } from './recallQueryPlanner';
 import type { MemoryRepository } from './repository';
-import { EngramRequestError, type ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+import type { MemoryBackend } from './memoryBackendTypes';
 
-const MAX_ENGRAM_RECALL_LIMIT = 20;
+const MAX_MEMORY_RECALL_LIMIT = 20;
 
 export interface MemoryRecallScopeInput {
   query: string;
@@ -17,17 +17,15 @@ export interface MemoryRecallScopeInput {
 
 export async function recallMemoryScope(
   repository: MemoryRepository,
-  adapter: ZhiYuanEngramAdapter,
+  adapter: MemoryBackend,
   input: MemoryRecallScopeInput,
 ) {
   const plan = planRecallQuery(input.query);
   if (!plan.exactQuery) return [];
   const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
-  const retrievalLimit = input.scope === MemoryScope.Session ? MAX_ENGRAM_RECALL_LIMIT : limit;
-  const isUnknownProject = (error: unknown): boolean =>
-    error instanceof EngramRequestError && error.status === 404 && error.code === 'unknown_project';
+  const retrievalLimit = input.scope === MemoryScope.Session ? MAX_MEMORY_RECALL_LIMIT : limit;
   let observations;
-  try {
+  {
     observations = filterRecallable(
       repository,
       input,
@@ -36,7 +34,7 @@ export async function recallMemoryScope(
         project: input.projectId,
         scope: input.scope,
         limit: retrievalLimit,
-        matchMode: EngramSearchMatchMode.All,
+        matchMode: MemorySearchMatchMode.All,
         signal: input.signal,
       }),
     );
@@ -49,7 +47,7 @@ export async function recallMemoryScope(
           project: input.projectId,
           scope: input.scope,
           limit: retrievalLimit,
-          matchMode: EngramSearchMatchMode.Any,
+          matchMode: MemorySearchMatchMode.Any,
           signal: input.signal,
         }),
       );
@@ -66,11 +64,6 @@ export async function recallMemoryScope(
         }),
       );
     }
-  } catch (error) {
-    // A project that has no records yet is an empty branch, not a failure:
-    // other recall scopes must still be allowed to contribute context.
-    if (isUnknownProject(error)) return [];
-    throw error;
   }
   const unique = [
     ...new Map(observations.map(observation => [observation.id, observation])).values(),

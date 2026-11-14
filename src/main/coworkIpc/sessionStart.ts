@@ -23,6 +23,7 @@ import { reportPiSessionFailure } from '../piSessionFailure';
 import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
 import { createLogger } from '../libs/structuredLog';
 import { t } from '../i18n';
+import { assertInteractiveCoworkSession } from './interactiveSession';
 
 export interface CoworkSessionIpcDeps {
   getCoworkImageRoot: () => string;
@@ -41,6 +42,7 @@ export function prepareCoworkSession(
   internal: { sessionId?: string; workbenchRunId?: string; onFailure?(error: unknown): void } = {},
 ) {
   const coworkStoreInstance = deps.getCoworkStore();
+  if (internal.sessionId) assertInteractiveCoworkSession(coworkStoreInstance, internal.sessionId);
   const config = coworkStoreInstance.getConfig();
   const selectedAgent = deps.getAgentManager().getAgent(options.agentId || 'main');
   const fallbackExpertIds =

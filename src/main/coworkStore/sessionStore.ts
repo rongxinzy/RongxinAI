@@ -27,6 +27,7 @@ import {
   type CoworkSessionReadOptions,
 } from '../coworkSessionRead';
 import { CoworkMessageStore } from './messageStore';
+import { currentSessionFilter } from './currentSessionFilter';
 import type { CoworkSession, CoworkSessionStatus, CoworkSessionSummary } from './types';
 
 export class CoworkSessionStore extends CoworkMessageStore {
@@ -151,13 +152,14 @@ export class CoworkSessionStore extends CoworkMessageStore {
       updated_at: number;
     }
 
+    const source = currentSessionFilter();
     const row = this.getOne<SessionRow>(
       `
       SELECT id, title, title_user_renamed, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, source, created_at, updated_at
       FROM cowork_sessions
-      WHERE id = ?
+      WHERE id = ? AND ${source.sql}
     `,
-      [id],
+      [id, ...source.params],
     );
 
     if (!row) return null;
@@ -371,6 +373,7 @@ export class CoworkSessionStore extends CoworkMessageStore {
     cwd: string;
     lastAssistantContent: string | null;
   } | null {
+    const source = currentSessionFilter(undefined, 's.source');
     const row = this.getOne<{
       id: string;
       title: string;
@@ -382,8 +385,8 @@ export class CoworkSessionStore extends CoworkMessageStore {
          WHERE m.session_id = s.id AND m.type = 'assistant'
          ORDER BY COALESCE(m.sequence, m.created_at) DESC, m.created_at DESC, m.rowid DESC
          LIMIT 1) AS last_assistant_content
-       FROM cowork_sessions s WHERE s.id = ?`,
-      [id],
+       FROM cowork_sessions s WHERE s.id = ? AND ${source.sql}`,
+      [id, ...source.params],
     );
     return row
       ? {
@@ -406,9 +409,10 @@ export class CoworkSessionStore extends CoworkMessageStore {
   }
 
   deleteSessionsByAgentId(agentId: string): string[] {
+    const source = currentSessionFilter();
     const rows = this.db
-      .prepare('SELECT id FROM cowork_sessions WHERE agent_id = ?')
-      .all(agentId) as { id: string }[];
+      .prepare(`SELECT id FROM cowork_sessions WHERE agent_id = ? AND ${source.sql}`)
+      .all(agentId, ...source.params) as { id: string }[];
     const ids = rows.map(r => r.id);
     if (ids.length > 0) {
       this.deleteSessions(ids);
@@ -454,8 +458,9 @@ export class CoworkSessionStore extends CoworkMessageStore {
     mode?: CoworkSessionModeType,
     sources?: readonly CoworkSessionSource[],
   ): number {
-    const filters: string[] = [];
-    const params: string[] = [];
+    const source = currentSessionFilter(sources);
+    const filters: string[] = [source.sql];
+    const params: string[] = [...source.params];
     if (workspaceId) {
       filters.push('workspace_id = ?');
       params.push(workspaceId);
@@ -467,11 +472,6 @@ export class CoworkSessionStore extends CoworkMessageStore {
       filters.push('mode = ?');
       params.push(mode);
     }
-    if (sources?.length) {
-      filters.push(`source IN (${sources.map(() => '?').join(', ')})`);
-      params.push(...sources);
-    }
-
     const whereClause = filters.length > 0 ? ` WHERE ${filters.join(' AND ')}` : '';
     const row = this.db
       .prepare(`SELECT COUNT(*) as count FROM cowork_sessions${whereClause}`)
@@ -502,8 +502,9 @@ export class CoworkSessionStore extends CoworkMessageStore {
       updated_at: number;
     }
 
-    const filters: string[] = [];
-    const params: Array<string | number> = [];
+    const source = currentSessionFilter(sources);
+    const filters: string[] = [source.sql];
+    const params: Array<string | number> = [...source.params];
     if (workspaceId) {
       filters.push('workspace_id = ?');
       params.push(workspaceId);
@@ -515,11 +516,6 @@ export class CoworkSessionStore extends CoworkMessageStore {
       filters.push('mode = ?');
       params.push(mode);
     }
-    if (sources?.length) {
-      filters.push(`source IN (${sources.map(() => '?').join(', ')})`);
-      params.push(...sources);
-    }
-
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
     const rows = this.getAll<SessionSummaryRow>(
       `
@@ -552,15 +548,16 @@ export class CoworkSessionStore extends CoworkMessageStore {
 
   resetRunningSessions(): number {
     const now = Date.now();
+    const source = currentSessionFilter();
     const result = this.db
       .prepare(
         `
       UPDATE cowork_sessions
       SET status = 'idle', updated_at = ?
-      WHERE status = 'running'
+      WHERE status = 'running' AND ${source.sql}
     `,
       )
-      .run(now);
+      .run(now, ...source.params);
     return result.changes;
   }
 
@@ -570,15 +567,16 @@ export class CoworkSessionStore extends CoworkMessageStore {
       updated_at: number;
     }
 
+    const source = currentSessionFilter();
     const rows = this.getAll<CwdRow>(
       `
       SELECT cwd, updated_at
       FROM cowork_sessions
-      WHERE cwd IS NOT NULL AND TRIM(cwd) != ''
+      WHERE cwd IS NOT NULL AND TRIM(cwd) != '' AND ${source.sql}
       ORDER BY updated_at DESC
       LIMIT ?
     `,
-      [Math.max(limit * 8, limit)],
+      [...source.params, Math.max(limit * 8, limit)],
     );
 
     const deduped: string[] = [];

@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 
 import { planRecallQuery, rankRecallResults } from './recallQueryPlanner';
-import type { EngramObservation } from './types';
+import type { MemoryObservation } from './types';
 
-function observation(input: Partial<EngramObservation> & Pick<EngramObservation, 'id'>) {
+function observation(input: Partial<MemoryObservation> & Pick<MemoryObservation, 'id'>) {
   return {
     sync_id: `sync-${input.id}`,
     session_id: 'session-1',
@@ -16,7 +16,7 @@ function observation(input: Partial<EngramObservation> & Pick<EngramObservation,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
     ...input,
-  } satisfies EngramObservation;
+  } satisfies MemoryObservation;
 }
 
 test('segments an unspaced CJK memory question into a broad fallback query', () => {

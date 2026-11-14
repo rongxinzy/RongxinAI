@@ -20,12 +20,9 @@ import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/workbenchTask';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
-import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
-import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { waitForPiRetryCancellation } from './piRetryCancellation';
 import { resolvePiModel } from './piMagpiePiModel';
-import { resolvePiSessionModel } from './piRuntimeSettingsOverrides';
 import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import {
@@ -193,6 +190,15 @@ export async function continuePiRuntimeSession(
     }
   }
 
+  await active.piSession.updateRuntimeOptions?.({
+    systemPrompt: active.requestedSystemPrompt,
+    skillIds: active.requestedSkillIds,
+    expertIds: active.requestedExpertIds,
+    approvalMode: active.approvalMode,
+    goalMode: nextGoalMode,
+    planMode: nextPlanMode,
+    unattended: active.unattended,
+  });
   const workbenchTaskService = host.getWorkbenchTaskService();
   if (workbenchTaskService && !active.resourceState.chatMode) {
     const workflowKind = WorkbenchContractKind.GenericWork;
@@ -288,23 +294,7 @@ export async function continuePiRuntimeSession(
   }
 
   try {
-    const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
-      chatMode: active.resourceState.chatMode,
-      memoryInjectionDedup: host.memoryInjectionDedup,
-      projectMemoryService: host.getProjectMemoryService(),
-      workspaceRoot: active.workspaceRoot,
-      sessionId,
-      userPrompt: prompt,
-      signal: active.abortController.signal,
-    });
     active.abortController.signal.throwIfAborted();
-    active.pendingTurnMemoryContext = projectMemoryContext;
-    captureMemoryPromptForE2e({
-      sessionId,
-      userPrompt: prompt,
-      memoryContext: projectMemoryContext,
-      initialPrompt: prompt,
-    });
     const continuedImagePrompt = preparePiPrompt(
       prompt,
       options.imageAttachments,
@@ -322,7 +312,6 @@ export async function continuePiRuntimeSession(
     }
     await active.eventProjection?.drain();
   } catch (error) {
-    host.memoryInjectionDedup.reset(sessionId);
     active.isRunning = false;
     if (active.abortController.signal.aborted) {
       host.emit('sessionStopped', sessionId);
@@ -345,6 +334,7 @@ export async function patchPiRuntimeSession(
   if (patch.thinkingLevel) {
     try {
       await active.piSession.setThinkingLevel?.(patch.thinkingLevel);
+      await active.piSession.updateRuntimeOptions?.({ thinkingLevel: patch.thinkingLevel });
       console.log('[PiRuntime] Thinking level updated via patchSession:', patch.thinkingLevel);
     } catch (err) {
       console.warn('[PiRuntime] Failed to update thinking level via patchSession:', err);
@@ -361,8 +351,9 @@ export async function patchPiRuntimeSession(
         ? ZhiyuanModelPoolWorkload.Chat
         : ZhiyuanModelPoolWorkload.Work,
     });
-    const model = resolvePiSessionModel(resolvedModel.model, active.resourceState.chatMode);
+    const model = resolvedModel.model;
     await active.piSession.setModel(model);
+    await active.piSession.updateRuntimeOptions?.({ modelOverride: patch.model });
     active.model = model;
     active.imageEndpointKey = resolvedModel.endpointKey;
     active.requestedModelOverride = patch.model;

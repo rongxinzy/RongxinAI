@@ -27,6 +27,7 @@ import {
   resolveEffectiveInferenceEdition,
   usesBundledLlamaCppRuntime,
 } from '../libs/inferenceEditionPolicy';
+import { registerConversationSetupIpc, type ConversationSetupIpcDeps } from './conversationSetup';
 
 /** 2026/09/14 lisa  打开开发调试面板 **/
 const canUseDevTools = (isDev: () => boolean): boolean => isDev() || !app.isPackaged;
@@ -48,18 +49,17 @@ export const toggleDevToolsForSender = (
   return true;
 };
 
-export interface AppIpcDeps {
+export interface AppIpcDeps extends ConversationSetupIpcDeps {
   isDev: () => boolean;
   isEnterprise: () => boolean;
   getStore: () => SqliteStore;
   setPreventSleepBlockerEnabled: (enabled: boolean) => void;
   showSystemMenu: (position?: { x?: number; y?: number }) => void;
-  reconcileCcConnectChannelSidecars: () => Promise<void>;
   getMainWindow: () => Electron.BrowserWindow | null;
-  hasIMGatewayManager: () => boolean;
 }
 
 export const registerAppIpc = (deps: AppIpcDeps): void => {
+  registerConversationSetupIpc(deps);
   const toggleDevToolsForSenderSafe = (webContents: WebContents | null | undefined): boolean =>
     toggleDevToolsForSender(webContents, deps.isDev);
   ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
@@ -70,11 +70,6 @@ export const registerAppIpc = (deps: AppIpcDeps): void => {
   ipcMain.removeAllListeners('network:status-change');
   ipcMain.on('network:status-change', (_event, status: 'online' | 'offline') => {
     console.log(`[Main] Network status changed: ${status}`);
-
-    if (status === 'online' && deps.hasIMGatewayManager()) {
-      console.log('[Main] Network restored, reconciling channel sidecars...');
-      void deps.reconcileCcConnectChannelSidecars();
-    }
   });
 
   handleIpcContractSubset(appSystemContract, {

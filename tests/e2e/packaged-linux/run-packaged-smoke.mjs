@@ -187,7 +187,7 @@ async function scenarioManagedMemory(executablePath) {
 
     const shot = await screenshot(page, 'managed-memory');
     record(
-      'managed-memory-engram',
+      'managed-memory-local',
       'pass',
       `Manual memory persisted across restart; updated and archived id=${listed.id}`,
       [shot, profile.dbPath],
@@ -195,7 +195,7 @@ async function scenarioManagedMemory(executablePath) {
   } catch (error) {
     const shot = page ? await screenshot(page, 'managed-memory-failure').catch(() => null) : null;
     record(
-      'managed-memory-engram',
+      'managed-memory-local',
       'fail',
       error instanceof Error ? error.message : String(error),
       [shot, profile.dbPath].filter(Boolean),
@@ -287,13 +287,10 @@ async function scenarioGlmWorkMemoryTool(executablePath, glmKey) {
     const promptCapture = readMemoryPromptCapture(profile.userDataPath, injectionSession);
     const memoryContext = promptCapture?.memoryContext ?? '';
     const promptHasInjectionBlock =
-      memoryContext.includes('Relevant memory') &&
+      promptCapture?.source === 'durable-before-request' &&
+      memoryContext.includes('<long-term-memory>') &&
       (memoryContext.includes(memoryInjectionMarker) || memoryContext.includes('SQLite'));
-    const injected =
-      !injectionSummary.memoryToolUsed &&
-      (promptHasInjectionBlock ||
-        (injectionSummary.assistantHasDistinctiveWord &&
-          !injectionSummary.userQuestionHasDistinctiveWord));
+    const injected = !injectionSummary.memoryToolUsed && promptHasInjectionBlock;
     const injectionDiagnostics = {
       injectionSessionId: injectionSession,
       memoryContextExcerpt: redactE2eText(memoryContext.slice(0, 800), [glmKey]),
@@ -608,7 +605,7 @@ async function main() {
   }
 
   const glm = resolveGlmApiKey();
-  if (shouldRunScenario('managed-memory-engram')) {
+  if (shouldRunScenario('managed-memory-local')) {
     await scenarioManagedMemory(executablePath);
   }
 

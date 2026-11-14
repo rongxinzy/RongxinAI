@@ -1,98 +1,40 @@
-import { AgentSession } from '@earendil-works/pi-coding-agent';
 import { expect, test, vi } from 'vitest';
-
+import { fauxProvider, fauxAssistantMessage } from '@earendil-works/pi-ai/providers/faux';
+import { DurableSession } from './durableSession.mjs';
+import { DurableModelCatalog } from './durableModelCatalog.mjs';
 import { cancelPiRetry, waitForPiRetryCancellation } from './piRetryCancellation';
 
-test('cancels the real SDK backoff and sends the next prompt through its public API', async () => {
-  // Replace model I/O only; retain AgentSession.prompt, retry, abort and idle lifecycle.
-  const session = Object.create(AgentSession.prototype) as AgentSession;
-  const internal = session as unknown as { _lastAssistantMessage: unknown };
-  const state = {
-    messages: [] as unknown[],
-    model: { provider: 'test', contextWindow: 128_000 },
-    systemPrompt: '',
-  };
-  const prompt = vi.fn(async (messages: unknown[]) => {
-    state.messages.push(...messages);
-    const response =
-      prompt.mock.calls.length === 1
-        ? {
-            role: 'assistant',
-            content: [],
-            stopReason: 'error',
-            errorMessage: '502 invalid api key',
-            usage: { input: 0 },
-          }
-        : { role: 'assistant', content: [], stopReason: 'stop', usage: { input: 0 } };
-    state.messages.push(response);
-    internal._lastAssistantMessage = response;
+test('cancels native persisted backoff and admits the next input without an outer retry loop', async () => {
+  const faux = fauxProvider();
+  const catalog = new DurableModelCatalog();
+  catalog.models.setProvider(faux.provider);
+  faux.setResponses([
+    fauxAssistantMessage([], { stopReason: 'error', errorMessage: '503 service unavailable' }),
+    fauxAssistantMessage('Recovered.'),
+  ]);
+  const session = await DurableSession.open({
+    cwd: process.cwd(),
+    model: faux.getModel() as unknown as Record<string, unknown>,
+    modelRuntime: catalog,
+    noTools: 'all',
+    settings: { retry: { enabled: true, maxRetries: 3, baseDelayMs: 60_000 } },
   });
-  const continueRun = vi.fn();
-  Object.assign(session, {
-    _isAgentRunActive: false,
-    _retryAttempt: 0,
-    _eventListeners: [],
-    _pendingNextTurnMessages: [],
-    _pendingCustomMessages: [],
-    _pendingToolNames: new Set<string>(),
-    _deferredSettledActions: [] as Array<() => Promise<void>>,
-    _entryIdsByMessage: new Map(),
-    sessionManager: {
-      getBranch: () => [] as never[],
-      buildSessionProjection: () => ({ entries: [] }),
-      getSessionFile: () => undefined,
-      getSessionId: () => 'retry-cancellation-test',
-      getSessionName: () => undefined,
-    },
-    _baseSystemPrompt: '',
-    _baseSystemPromptOptions: { selectedTools: [] },
-    _lastAssistantToolResults: [],
-    _recordSelection: () => undefined,
-    _preparePromptAndToolLoadout: () => undefined,
-    _runBeforeSettleBoundary: async () => false,
-    // pi 1.0.0 persists abandoned retry attempts as context edits before
-    // scheduling the backoff; persistence is orthogonal to the cancellation
-    // lifecycle under test, so omit it in this in-memory harness.
-    _omitRecoveryAttempt: () => undefined,
-    getActiveToolNames: () => [] as string[],
-    _flushPendingBashMessages: () => undefined,
-    _checkCompaction: async () => false,
-    _extensionRunner: {
-      hasHandlers: () => false,
-      emit: async () => undefined,
-      // pi 1.2+ passes BeforeAgentStartTrigger + BuildSystemPromptOptions (not prompt/images).
-      emitBeforeAgentStart: async (
-        _trigger: unknown,
-        systemPromptOptions: { selectedTools: string[] },
-      ) => ({
-        messages: [],
-        systemPromptOptions,
-      }),
-    },
-    _modelRuntime: { hasConfiguredAuth: () => true },
-    settingsManager: {
-      getRetrySettings: () => ({ enabled: true, maxRetries: 3, baseDelayMs: 60_000 }),
-    },
-    agent: { state, prompt, continue: continueRun, abort: vi.fn(), hasQueuedMessages: () => false },
-  });
-  const events: string[] = [];
+  let cancellation: Promise<void> | undefined;
   session.subscribe(event => {
-    events.push(event.type);
-    if (event.type === 'auto_retry_start') {
-      expect(session.isStreaming).toBe(true);
-      void cancelPiRetry(session);
-    }
+    if (event.type === 'auto_retry_start' && !cancellation) cancellation = cancelPiRetry(session);
   });
-  const startedAt = Date.now();
-  await session.prompt('first message', { expandPromptTemplates: false });
-  await waitForPiRetryCancellation(session);
-  expect(Date.now() - startedAt).toBeLessThan(5_000);
-  expect(events).toEqual(['auto_retry_start', 'auto_retry_end', 'agent_settled']);
-  expect(session.isIdle).toBe(true);
-  expect(continueRun).not.toHaveBeenCalled();
-  await session.prompt('second message', { expandPromptTemplates: false });
-  expect(prompt).toHaveBeenCalledTimes(2);
-  expect(session.isIdle).toBe(true);
+  try {
+    const started = Date.now();
+    await session.prompt('First input.');
+    await cancellation;
+    expect(cancellation).toBeDefined();
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(faux.state.callCount).toBe(1);
+    await session.prompt('Second input.');
+    expect(faux.state.callCount).toBe(2);
+  } finally {
+    await session.close();
+  }
 });
 
 test('deduplicates cancellation and holds continuations until abort finishes', async () => {

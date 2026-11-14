@@ -38,8 +38,6 @@ const settingsTabs = [
   ['settings-model', 'Model'],
   ['settings-platform-models', 'Platform Models'],
   ['settings-memory', 'Memory'],
-  ['settings-im', 'IM Bot'],
-  ['settings-email', 'Email'],
   ['settings-about', 'About'],
 ];
 

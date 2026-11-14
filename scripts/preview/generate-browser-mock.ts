@@ -39,7 +39,6 @@ const PRELOAD_FRAGMENT_EXPORTS: ReadonlyArray<{ file: string; exportName: string
   { file: 'src/main/preload/providers.ts', exportName: 'providersApi' },
   { file: 'src/main/preload/cowork.ts', exportName: 'coworkApi' },
   { file: 'src/main/preload/codingAgent.ts', exportName: 'codingAgentApi' },
-  { file: 'src/main/preload/im.ts', exportName: 'imApi' },
   { file: 'src/main/preload/memory.ts', exportName: 'memoryApi' },
   { file: 'src/main/preload/artifacts.ts', exportName: 'artifactsApi' },
   { file: 'src/main/preload/automation.ts', exportName: 'automationApi' },

@@ -110,7 +110,7 @@ public sealed class InstallerEngine
     private string ManifestPath => Path.Combine(payloadDir!, "component-manifest.json");
     private string TargetsPath => Path.Combine(payloadDir!, "component-targets.json");
     private static readonly string[] RequiredComponentKeys =
-        { "channel-runtime", "skills", "mcps", "python", "skill-python", "uv" };
+        { "skills", "mcps", "python", "skill-python", "uv" };
     private static readonly string[] OptionalComponentKeys = { "llamacpp-bundled", "strata-bundled" };
 
     private string? extractedPayloadDir;
@@ -606,7 +606,7 @@ public sealed class InstallerEngine
         ReportPhase("正在校验运行环境");
         var resources = Path.Combine(installDir, "resources");
         using var targets = JsonDocument.Parse(File.ReadAllText(TargetsPath));
-        // The six fixed components are always required; cpu/cuda editions
+        // The five fixed components are always required; cpu/cuda editions
         // add the bundled local runtime and CUDA also adds Strata.
         var keys = targets.RootElement.EnumerateArray()
             .Select(t => t.GetProperty("key").GetString() ?? "")

@@ -1,8 +1,6 @@
 import type {
   RunFilter,
   ScheduledTask,
-  ScheduledTaskChannelOption,
-  ScheduledTaskConversationOption,
   ScheduledTaskInput,
   ScheduledTaskRunEvent,
   ScheduledTaskStatusEvent,
@@ -275,35 +273,6 @@ export class ScheduledTaskService {
     }
   }
 
-  async preflight(id: string): Promise<{
-    hasChannel: boolean;
-    channel?: string;
-    latestDelivery?: import('../../scheduledTask/types').ScheduledTaskDeliveryRecord | null;
-  } | null> {
-    const api = window.electron?.scheduledTasks;
-    if (!api) return null;
-
-    try {
-      const result = await api.preflight(id);
-      return result.success ? (result.preflight ?? null) : null;
-    } catch {
-      return null;
-    }
-  }
-
-  async listDeliveries(
-    runId: string,
-  ): Promise<import('../../scheduledTask/types').ScheduledTaskDeliveryRecord[]> {
-    const api = window.electron?.scheduledTasks;
-    if (!api) return [];
-    try {
-      const result = await api.listDeliveries(runId);
-      return result.success && result.deliveries ? result.deliveries : [];
-    } catch {
-      return [];
-    }
-  }
-
   async stopTask(id: string): Promise<void> {
     const api = window.electron?.scheduledTasks;
     if (!api) return;
@@ -362,35 +331,6 @@ export class ScheduledTaskService {
     } catch (err: unknown) {
       store.dispatch(setError(err instanceof Error ? err.message : String(err)));
       showToast(i18nService.t('scheduledTasksLoadFailedHint'));
-    }
-  }
-
-  async listChannels(): Promise<ScheduledTaskChannelOption[]> {
-    const api = window.electron?.scheduledTasks;
-    if (!api?.listChannels) return [];
-
-    try {
-      const result = await api.listChannels();
-      return result.success && result.channels ? result.channels : [];
-    } catch (err: unknown) {
-      store.dispatch(setError(err instanceof Error ? err.message : String(err)));
-      return [];
-    }
-  }
-
-  async listChannelConversations(
-    channel: string,
-    accountId?: string,
-    filterAccountId?: string,
-  ): Promise<ScheduledTaskConversationOption[]> {
-    const api = window.electron?.scheduledTasks;
-    if (!api?.listChannelConversations) return [];
-
-    try {
-      const result = await api.listChannelConversations(channel, accountId, filterAccountId);
-      return result.success && result.conversations ? result.conversations : [];
-    } catch {
-      return [];
     }
   }
 }

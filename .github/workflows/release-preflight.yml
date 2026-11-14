@@ -127,36 +127,17 @@ jobs:
       - name: Verify enterprise packaging config
         run: bun run verify:enterprise:packaging-config
 
-  channel-runtime:
+  native-runtime:
     needs: source
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ needs.source.outputs.commit }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          check-latest: true
-      - name: Restore channel runtime download
-        id: channel-cache
-        uses: actions/cache/restore@v5
-        with:
-          path: vendor/channel-runtime
-          key: channel-runtime-${{ runner.os }}-${{ hashFiles('package.json', 'scripts/download-channel-runtime.cjs') }}
-          restore-keys: |
-            channel-runtime-${{ runner.os }}-
-      - name: Download the pinned channel runtime
-        run: npm run channel:runtime:linux-x64
-      - name: Verify channel transport and QQ Bot support
-        run: npm run channel:runtime:smoke
-      - name: Save channel runtime download
-        if: steps.channel-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: vendor/channel-runtime
-          key: ${{ steps.channel-cache.outputs.cache-primary-key }}
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Verify Durable execution, native automations and Markdown memory plugin
+        run: bun run test:unit -- src/main/libs/agentEngine/durable src/main/automations src/scheduledTask/ipc.test.ts src/main/memory
 
   python-runtime-linux:
     needs: source
@@ -248,7 +229,7 @@ jobs:
 
   preflight-gate:
     if: always()
-    needs: [source, quality, enterprise, channel-runtime, python-runtime-linux, browser-preview, memory-leak, linux-install, windows-install]
+    needs: [source, quality, enterprise, native-runtime, python-runtime-linux, browser-preview, memory-leak, linux-install, windows-install]
     runs-on: ubuntu-latest
     permissions:
       contents: read

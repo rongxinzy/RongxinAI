@@ -8,7 +8,7 @@
  *
  * Usage:
  *   import { ScheduleKind, SessionTarget } from './constants';
- *   const s: SessionTarget = SessionTarget.Main;
+ *   const s: SessionTarget = SessionTarget.Task;
  */
 
 // ─── Schedule Kind ──────────────────────────────────────────────────────────
@@ -29,19 +29,11 @@ export type PayloadKind = (typeof PayloadKind)[keyof typeof PayloadKind];
 // ─── Delivery Mode ──────────────────────────────────────────────────────────
 export const DeliveryMode = {
   None: 'none',
-  Announce: 'announce',
-  Webhook: 'webhook',
 } as const;
 export type DeliveryMode = (typeof DeliveryMode)[keyof typeof DeliveryMode];
 
-// ─── Delivery Channel (magic values) ────────────────────────────────────────
-export const DeliveryChannel = {
-  Last: 'last',
-} as const;
-
 // ─── Session Target ─────────────────────────────────────────────────────────
 export const SessionTarget = {
-  Main: 'main',
   Isolated: 'isolated',
   Task: 'task',
 } as const;
@@ -50,39 +42,15 @@ export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
 export const SessionBindingStrategy = {
   PerRun: 'per-run',
   Task: 'task',
-  Existing: 'existing',
 } as const;
 export type SessionBindingStrategy =
   (typeof SessionBindingStrategy)[keyof typeof SessionBindingStrategy];
 
-export const ManagedSessionKeyPrefix = {
-  Zhiyuan: 'zhiyuan:',
-} as const;
-
 // ─── Wake Mode ──────────────────────────────────────────────────────────────
 export const WakeMode = {
   Now: 'now',
-  NextHeartbeat: 'next-heartbeat',
 } as const;
 export type WakeMode = (typeof WakeMode)[keyof typeof WakeMode];
-
-// ─── Task Origin Kind ───────────────────────────────────────────────────────
-export const OriginKind = {
-  Legacy: 'legacy',
-  IM: 'im',
-  Cowork: 'cowork',
-  Manual: 'manual',
-} as const;
-export type OriginKind = (typeof OriginKind)[keyof typeof OriginKind];
-
-// ─── Execution Binding Kind ─────────────────────────────────────────────────
-export const BindingKind = {
-  NewSession: 'new_session',
-  UISession: 'ui_session',
-  IMSession: 'im_session',
-  SessionKey: 'session_key',
-} as const;
-export type BindingKind = (typeof BindingKind)[keyof typeof BindingKind];
 
 // ─── Task / Run Status ──────────────────────────────────────────────────────
 export const TaskStatus = {
@@ -92,24 +60,6 @@ export const TaskStatus = {
   Running: 'running',
 } as const;
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
-
-export const DeliveryStatus = {
-  Pending: 'pending',
-  Success: 'success',
-  Error: 'error',
-  Skipped: 'skipped',
-} as const;
-export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus];
-
-// ─── Default Agent ID ───────────────────────────────────────────────────────
-
-// ─── Policy Run-Behavior Descriptions ───────────────────────────────────────
-export const RunBehavior = {
-  newSession: 'Creates a new session on each trigger',
-  uiSession: 'Runs within the associated UI session',
-  imSession: (platform: string) => `Triggers and delivers results via ${platform}`,
-  sessionKey: 'Runs with an explicit managed session key',
-} as const;
 
 // ─── IPC Channels ───────────────────────────────────────────────────────────
 export const IpcChannel = {
@@ -122,13 +72,9 @@ export const IpcChannel = {
   RunManually: 'scheduledTask:runManually',
   Stop: 'scheduledTask:stop',
   ListRuns: 'scheduledTask:listRuns',
-  ListDeliveries: 'scheduledTask:listDeliveries',
   CountRuns: 'scheduledTask:countRuns',
   ListAllRuns: 'scheduledTask:listAllRuns',
   ResolveSession: 'scheduledTask:resolveSession',
-  ListChannels: 'scheduledTask:listChannels',
-  ListChannelConversations: 'scheduledTask:listChannelConversations',
-  Preflight: 'scheduledTask:preflight',
   StatusUpdate: 'scheduledTask:statusUpdate',
   RunUpdate: 'scheduledTask:runUpdate',
   Refresh: 'scheduledTask:refresh',

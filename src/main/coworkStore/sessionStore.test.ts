@@ -84,7 +84,7 @@ test('listSessions paginates independently by session source', () => {
   }
 
   const scheduledSources = [CoworkSessionSource.Scheduled];
-  const regularSources = [CoworkSessionSource.Manual, CoworkSessionSource.Im];
+  const regularSources = [CoworkSessionSource.Manual];
 
   expect(
     store
@@ -368,4 +368,23 @@ test('listRecentCwds returns unique normalized directories newest first', () => 
   // '/tmp/recent-a' and '/tmp/recent-a/' normalize to one entry.
   expect(recent).toEqual([first.cwd, third.cwd]);
   expect(store.listRecentCwds(0)).toEqual([]);
+});
+
+test('retired messaging sessions stay untouched and unavailable to current product reads', () => {
+  const { db, store } = harness;
+  const retired = store.createSession('retired messaging', '/tmp/retired-im');
+  const manual = store.createSession('current project', '/tmp/current-manual');
+  db.prepare(
+    "UPDATE cowork_sessions SET source = 'im', status = 'running', updated_at = 123 WHERE id = ?",
+  ).run(retired.id);
+  expect(store.getSession(retired.id)).toBeNull();
+  expect(store.listSessions().map(session => session.id)).toEqual([manual.id]);
+  expect(store.countSessions()).toBe(1);
+  expect(store.listRecentCwds()).toEqual([manual.cwd]);
+  expect(store.resetRunningSessions()).toBe(0);
+  expect(
+    db
+      .prepare('SELECT source, status, updated_at FROM cowork_sessions WHERE id = ?')
+      .get(retired.id),
+  ).toEqual({ source: 'im', status: 'running', updated_at: 123 });
 });

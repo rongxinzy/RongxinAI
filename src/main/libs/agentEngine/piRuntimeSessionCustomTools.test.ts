@@ -4,7 +4,6 @@ import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import type { HarnessActivationEvent } from '../../../shared/harness';
 import { buildPiSessionCustomTools } from './piRuntimeSessionCustomTools';
 import * as subagentModule from './piSubagentTool';
-import * as resourceLoaderModule from './piRuntimeResourceLoader';
 
 interface SavedCheckpoint {
   metadata: { runId: string; turnId: string };
@@ -37,7 +36,6 @@ test('a reused summary tool reads the current run and turn for content and metri
     activationRuns.push(active.workbenchRunId);
   };
   const { customTools } = buildPiSessionCustomTools(host as never, {
-    pi: {} as never,
     sessionId: 'session-1',
     options: { sessionMode: CoworkSessionMode.Work },
     resourceState: {
@@ -47,7 +45,6 @@ test('a reused summary tool reads the current run and turn for content and metri
       skillIds: [],
       skillRoots: {},
     } as never,
-    resolvedModel: {} as never,
     workspaceRoot: '/work',
     workbenchRunId: 'run-1',
     expertIds: [],
@@ -111,12 +108,8 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
   };
 
   const subagentSpy = vi.spyOn(subagentModule, 'buildPiSubagentTool');
-  const loaderSpy = vi
-    .spyOn(resourceLoaderModule, 'createPiRuntimeResourceLoader')
-    .mockReturnValue({} as never);
 
   const { customTools } = buildPiSessionCustomTools(host as never, {
-    pi: {} as never,
     sessionId: 'session-1',
     options: { sessionMode: CoworkSessionMode.Work },
     resourceState: {
@@ -125,11 +118,6 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
       unattended: false,
       skillIds: [],
       skillRoots: {},
-    } as never,
-    resolvedModel: {
-      model: { provider: 'test', id: 'test-model' },
-      modelRuntime: null,
-      maxOutputTokens: 4096,
     } as never,
     workspaceRoot: '/work',
     workbenchRunId: 'run-1',
@@ -142,6 +130,7 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
   expect(subagentTool).toBeDefined();
   expect(subagentTool!.annotations).toEqual({
     readOnlyHint: true,
+    idempotentHint: true,
     openWorldHint: false,
   });
 
@@ -193,17 +182,4 @@ test('subagent custom tool bubbles child events to host toolActivityTracker and 
     toolName: 'read',
   });
   expect(mockTracker.remove).toHaveBeenCalledWith('child-c1');
-
-  // Verify resource loader for subagents unlocks MCP & codemode (nativeToolsOnly: false)
-  subagentDeps.createPiResourceLoader('/work', 'system prompt', 4096);
-  expect(loaderSpy).toHaveBeenCalledWith(
-    host,
-    expect.anything(),
-    '/work',
-    expect.objectContaining({
-      nativeToolsOnly: false,
-    }),
-    expect.anything(),
-    undefined,
-  );
 });

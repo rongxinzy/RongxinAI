@@ -264,7 +264,7 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 - `PageTabs` 是页面级标签的唯一实现，放在 `PageHeader` 的 tabs 槽，选中靠文字层级与共享指示器，不铺色块。
 - `FluidTabs` 是分段/筛选的唯一实现；轨道中性，滑块内嵌、`shadow-xs`，文字承担状态区分。
-- 卡片式单选（主题、认证方式、渠道等）用描边与勾选，禁止整卡品牌色填充。
+- 卡片式单选（主题、认证方式等）用描边与勾选，禁止整卡品牌色填充。
 - 搜索复用 `SidebarSearchTrigger`、`TaskSearchDialog`；弹层最大宽度 512px、16px 圆角、结果行 32px；保留方向键、Enter、Cmd/Ctrl+1–9，Escape 关闭并恢复焦点。
 
 ### 6. 卡片、列表与空状态
@@ -371,6 +371,8 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 | 基准截图 | 主界面基准见 `docs/theme-previews/main-interface-2026-10-22-{light,dark}.png`（1280×800）；更新时运行 `bun run preview:doc-screenshots` |
 
 ## 十、落地检查清单
+
+自动化会话是只读运行记录：保留正文、复制、附件、产物与导出；底部用共享 FieldDescription 提示在“自动化”编辑或手动运行，不展示输入、模型或权限选择器。运行中只提供共享中性停止按钮。侧栏显式删除须说明同时删除自动化任务及其对话、停止未来运行；复用共享 DestructiveConfirmDialog，不添加新视觉样式。
 
 提交前端改动前逐项标「通过 / 不适用（理由）/ 未通过（问题）」。纯规范更新只做文档一致性检查，不据此声明 UI 验收完成。
 
@@ -506,7 +508,7 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 ### 布局契约
 
-- **设置页行式面板**（General / Appearance / Shortcuts）内容最大宽度 768px；Model、Platform Models、Email、About 同样使用 768px 阅读列，Memory 与 IM 使用 1024px 画布；主题卡片用 auto-fill、单列最小 13rem 排布，单张卡片不得拉伸占满整行。
+- **设置页行式面板**（General / Appearance / Shortcuts）内容最大宽度 768px；Model、Platform Models、About 同样使用 768px 阅读列，Memory 使用 1024px 画布；主题卡片用 auto-fill、单列最小 13rem 排布，单张卡片不得拉伸占满整行。
 - **首页快捷动作**：≥1280px 保持单行居中；更窄时使用 2/3 列网格，保持两行平衡，不得出现右侧孤立末项。
 - **会话阅读列**：对话与输入区共享 `max-w-4xl`（896px）并居中；首页输入岛仍为 `max-w-3xl`（768px）。长文行宽优先保证可读性，工具卡片在列内自适应。
 - **表单弹窗**：至少 448px，字段间距 16px；内容不足时优先加宽（512px）而不是压缩字号或控件。项目名与路径都必须有可见标签。
@@ -530,7 +532,7 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 ### 信息架构
 
-- 设置侧栏分组固定为 General / Models & memory / Channels；`Model Routing` 页删除，Memory 归入 Models & memory，不再单列在模型组末尾。
+- 设置侧栏分组固定为 General / Models & memory；`Model Routing` 页删除，Memory 归入 Models & memory，不再单列在模型组末尾。
 - 每页标题只由 PageHeader 提供；内容区从第一个设置分组或说明开始，不重复页面标题。
 - General 页分为 Application（语言、登录启动、防休眠、系统代理、自动备份）与 Agent runtime（Codemode、MCP native bridge）两组。设置行不卡片化。
 
@@ -538,13 +540,11 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 - **全部设置页自动保存**：页脚只保留 `Close`，不出现 `Save` / `Cancel`。切换、选择、开关在操作后立即写入；文本输入使用失焦或 600ms 防抖写入。
 - **General / Appearance / Shortcuts**：语言、主题、快捷键在变更时立即持久化；不得再出现「切换后还要点 Save」或关闭时回滚已生效设置。
-- **Email**：表单通过本地校验后自动写入 Skill 配置；关闭页面时冲刷未提交的有效表单。校验失败时不写入、不弹出自动错误。
-- **IM**：字段在失焦时持久化，800ms 防抖后自动同步网关；关闭页面时冲刷待同步配置。不得要求用户再点 `Save`。
 - 页脚与当前内容列同宽、右对齐；内容列切换时页脚按钮随之对齐，不固定在窗口最右缘。
 
 ### 宽度与间距
 
-- 行式设置页（General / Appearance / Shortcuts / Model / Platform Models / Email / About）使用 768px 阅读列；Memory 与 IM 使用 1024px 画布。
+- 行式设置页（General / Appearance / Shortcuts / Model / Platform Models / About）使用 768px 阅读列；Memory 使用 1024px 画布。
 - 页面自身不再叠加 `p-4`、`max-w-xl`、`max-w-2xl` 等内层宽度；宽度只由 SettingsPage 的内容列决定。
 - 页面内容顶部统一 24px，页脚 12px 垂直内边距；分组之间 32px，组内行 16px。
 
@@ -563,8 +563,6 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 ### 其他修订
 
 - 快捷键页增加录制说明；设置开关通过 `aria-labelledby`/`aria-describedby` 关联标签与描述。
-- IM 渠道标题使用 `{name} Settings / {name} 设置`，不得拼接出 `WeChatSettings`。
-- IM 项目必填字段默认使用中性样式与必填标记，不得在用户尚未操作时显示红色 invalid 态。
 
 ### 验收补充
 
@@ -587,3 +585,7 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 **Version**: 4.0.1
 **Last Updated**: 2026-10-24
+
+## 2026-11-14 渠道入口移除
+
+按用户要求移除渠道功能。设置侧栏删除 Channels 分组、IM 和 Email 页面；删除账号授权、渠道连接状态、渠道活动筛选与自动化外部投递设置。自动化任务的结果回到本地工作台。普通邮件 Skill 仍作为工具提供，不恢复独立渠道入口。现有 General / Models & memory、行式设置组件、主题、字号与间距规则继续适用。

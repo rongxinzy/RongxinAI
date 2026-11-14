@@ -10,15 +10,15 @@
 import {
   adapter,
   mockCreateAgentSession,
-  mockDefaultResourceLoader,
   mockSession,
   setupPiRuntimeAdapterSuite,
+  createdResourceState,
+  invokeBeforeTool,
 } from './piRuntimeAdapter.testHarness';
 
 import Database from 'better-sqlite3';
 import { describe, expect, it, vi } from 'vitest';
 import { WorkbenchApprovalMode, WorkbenchRunStatus } from '../../../shared/workbenchTask';
-import { PiExtensionEventType } from './piExtensionTypes';
 import { type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -205,20 +205,13 @@ describe('PiRuntimeAdapter', () => {
       listener!({ type: 'agent_settled' });
       await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(2));
 
+      await vi.waitFor(() => expect(added).toHaveLength(2));
+
       // The queued turn records only its own pick as the input attachment…
       expect(added.map(message => message.metadata?.skillIds)).toEqual([undefined, ['beta-skill']]);
 
       // …while the session keeps running with both skills loaded for the model.
-      const loader = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
-        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
-          skills: Array<{ id: string }>;
-        };
-      };
-      const visible = loader.skillsOverride({
-        skills: [{ id: 'alpha-skill' }, { id: 'beta-skill' }, { id: 'other' }],
-        diagnostics: [],
-      });
-      expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
+      expect(createdResourceState(-1).skillIds).toEqual(['alpha-skill', 'beta-skill']);
     });
 
     it('updates resourceState skillIds on steer without mid-stream reload, and reloads once idle', async () => {
@@ -251,16 +244,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenLastCalledWith('Change direction', {
         streamingBehavior: 'steer',
       });
-      const loader = mockDefaultResourceLoader.mock.calls.at(-1)?.[0] as {
-        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
-          skills: Array<{ id: string }>;
-        };
-      };
-      const visible = loader.skillsOverride({
-        skills: [{ id: 'alpha-skill' }, { id: 'beta-skill' }, { id: 'other' }],
-        diagnostics: [],
-      });
-      expect(visible.skills.map(skill => skill.id)).toEqual(['alpha-skill', 'beta-skill']);
+      expect(createdResourceState(-1).skillIds).toEqual(['alpha-skill', 'beta-skill']);
 
       // Once settled and idle, the next continueSession flushes the deferred reload.
       listener!({ type: 'agent_end' });
@@ -279,18 +263,6 @@ describe('PiRuntimeAdapter', () => {
   });
 
   describe('run completion on agent_settled', () => {
-    it('resets memory dedup only after successful native compaction', async () => {
-      await adapter.startSession('memory-compaction', 'Work', { sessionMode: 'work' });
-      const block = 'Workspace:\n- [memory:1] Remember the verified decision';
-      const listener = mockSession.subscribe.mock.calls.at(-1)![0];
-      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeTruthy();
-      listener({ type: 'compaction_end', aborted: false, errorMessage: 'failed' });
-      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeNull();
-      listener({ type: 'compaction_end', aborted: false, result: { summary: 'checkpoint' } });
-      expect(adapter.memoryInjectionDedup.take('memory-compaction', block)).toBeTruthy();
-      expect(mockSession.prompt).toHaveBeenCalledOnce();
-    });
-
     const assistantTurn = (
       listener: (event: {
         type: string;
@@ -323,21 +295,6 @@ describe('PiRuntimeAdapter', () => {
           sessionMode: 'work',
           approvalMode: WorkbenchApprovalMode.AllowAll,
         });
-        const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
-          extensionFactories?: Array<
-            (api: { on: (event: string, handler: (event: unknown) => unknown) => void }) => void
-          >;
-        };
-        const toolCallHandlers: Array<(event: unknown) => Promise<unknown>> = [];
-        for (const factory of loaderOptions.extensionFactories ?? []) {
-          factory({
-            on: (event, handler) => {
-              if (event === PiExtensionEventType.ToolCall) {
-                toolCallHandlers.push(handler as (event: unknown) => Promise<unknown>);
-              }
-            },
-          });
-        }
         const listener = mockSession.subscribe.mock.calls.at(-1)![0] as (event: {
           type: string;
           message?: { role: string; content: Array<Record<string, unknown>>; stopReason?: string };
@@ -360,7 +317,7 @@ describe('PiRuntimeAdapter', () => {
         listener({ type: 'turn_start' });
 
         // The continuation turn's tool calls still proceed normally without aborting Pi.
-        const authorization = await toolCallHandlers.at(-1)!({
+        const authorization = await invokeBeforeTool({
           toolCallId: 'post-compaction-call',
           toolName: 'bash',
           input: { command: 'ls -la' },

@@ -34,6 +34,7 @@ export const toAgentSidebarTaskNode = (
   return {
     id: session.id,
     agentId: normalizeAgentId(session.agentId),
+    source: session.source,
     title: session.title,
     status: session.status,
     pinned: session.pinned,

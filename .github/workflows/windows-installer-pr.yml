@@ -46,8 +46,6 @@ jobs:
             ~/.npm
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
-            vendor/engram-runtime
-            vendor/channel-runtime
           key: copy-v2-windows-installer-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             copy-v2-windows-installer-node24-bun1.4.0-
@@ -72,7 +70,6 @@ jobs:
         run: |
           bun run setup:uv-runtime
           bun run setup:python-runtime
-          bun run engram:runtime:win-x64
       - name: Build complete offline installer
         id: offline-build
         # Keep a stuck packager observable and fail it before the job-level
@@ -164,8 +161,6 @@ jobs:
             ~/.npm
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
-            vendor/engram-runtime
-            vendor/channel-runtime
           key: ${{ steps.packaging-cache.outputs.cache-primary-key }}
       - name: Collect installer diagnostics
         if: ${{ failure() }}

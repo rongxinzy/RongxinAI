@@ -124,11 +124,6 @@
     {
       "from": "resources/magpie/upstream.json",
       "to": "magpie/upstream.json"
-    },
-    {
-      "from": "vendor/engram-runtime/current",
-      "to": "memory",
-      "filter": ["engram", "engram.exe", "runtime-build-info.json", "LICENSE"]
     }
   ],
   "protocols": [
@@ -212,35 +207,6 @@
         "from": "resources/skill-python",
         "to": "skill-python",
         "filter": ["**/*"]
-      },
-      {
-        "from": "vendor/channel-runtime/current",
-        "to": "channel-runtime",
-        "filter": [
-          "**/*",
-          "!**/*.map",
-          "!**/*.d.ts",
-          "!**/*.d.cts",
-          "!**/*.d.mts",
-          "!**/README.md",
-          "!**/README",
-          "!**/readme.md",
-          "!**/CHANGELOG.md",
-          "!**/CHANGELOG",
-          "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
-          "!**/.eslintrc*",
-          "!**/.prettierrc*",
-          "!**/tsconfig.json",
-          "!**/tsconfig.*.json",
-          "!**/*.test.*",
-          "!**/*.spec.*",
-          "!**/tests/**",
-          "!**/test/**",
-          "!**/__tests__/**"
-        ]
       }
     ]
   },
@@ -248,7 +214,7 @@
     "sign": false
   },
   "win": {
-    "signExts": ["!engram.exe", "!magpie.exe"],
+    "signExts": ["!magpie.exe"],
     "target": ["nsis"],
     "publish": [
       {
@@ -315,35 +281,6 @@
           "!**/.env.*",
           "!**/.venv",
           "!**/.venv/**",
-          "!**/*.map",
-          "!**/*.d.ts",
-          "!**/*.d.cts",
-          "!**/*.d.mts",
-          "!**/README.md",
-          "!**/README",
-          "!**/readme.md",
-          "!**/CHANGELOG.md",
-          "!**/CHANGELOG",
-          "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
-          "!**/.eslintrc*",
-          "!**/.prettierrc*",
-          "!**/tsconfig.json",
-          "!**/tsconfig.*.json",
-          "!**/*.test.*",
-          "!**/*.spec.*",
-          "!**/tests/**",
-          "!**/test/**",
-          "!**/__tests__/**"
-        ]
-      },
-      {
-        "from": "vendor/channel-runtime/current",
-        "to": "channel-runtime",
-        "filter": [
-          "**/*",
           "!**/*.map",
           "!**/*.d.ts",
           "!**/*.d.cts",

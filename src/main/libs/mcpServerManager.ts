@@ -29,12 +29,14 @@ import { appendPythonRuntimeToEnv, getBundledPythonRoot, getUserPythonRoot } fro
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
 import { NpmCli, resolveBundledNpmRuntime } from './npmRuntime';
+import type { ToolAnnotations } from './agentEngine/durableToolTypes';
 
 export interface McpToolManifestEntry {
   server: string;
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  annotations?: ToolAnnotations;
 }
 
 export interface McpServerRuntimeStatus {
@@ -720,6 +722,7 @@ export class McpServerManager {
         name: t.name,
         description: t.description || '',
         inputSchema: (t.inputSchema || {}) as Record<string, unknown>,
+        ...(t.annotations ? { annotations: t.annotations } : {}),
       }));
       log(
         'INFO',

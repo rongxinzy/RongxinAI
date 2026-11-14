@@ -10,7 +10,7 @@ import {
   SessionMemoryCompletionRole,
   type SessionMemoryCompletion,
 } from './sessionMemoryExtractor';
-import { redactPrivateBlocks } from './zhiyuanEngramAdapter';
+import { redactPrivateBlocks } from './privateBlocks';
 
 const MAX_SOURCE_COUNT = 24;
 const MAX_SOURCE_CHARACTERS = 3_000;

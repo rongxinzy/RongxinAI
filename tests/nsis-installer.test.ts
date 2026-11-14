@@ -209,11 +209,6 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(offlineComponents).toEqual([
       {
-        key: 'channel-runtime',
-        prefix: 'channel-runtime',
-        sentinel: 'channel-runtime\\cc-connect-sidecar.exe',
-      },
-      {
         key: 'skills',
         prefix: 'SKILLs',
         sentinel: 'SKILLs\\skills.config.json',
@@ -646,15 +641,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(uninstallCleanupScript).toContain("$version.Name -cnotmatch '^[0-9a-f]{64}\\z'");
     expect(uninstallCleanupScript).toContain('-cne $version.Name');
     expect(uninstallCleanupScript).toContain('[IO.FileAttributes]::ReparsePoint');
-    for (const key of [
-      'channel-runtime',
-      'skills',
-      'mcps',
-      'portable-git',
-      'python',
-      'skill-python',
-      'uv',
-    ]) {
+    for (const key of ['skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv']) {
       expect(uninstallCleanupScript).toContain(`'${key}'`);
     }
     expect(uninstallCleanupScript).not.toContain('cmd /d /c rd /s /q');

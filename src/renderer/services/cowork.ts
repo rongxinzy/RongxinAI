@@ -33,7 +33,6 @@ import {
   setChatSessions,
   setCurrentSession,
   setHasMoreSessions,
-  setRemoteManaged,
   setSessions,
   updateSessionPinned,
   updateCurrentSessionModelOverride,
@@ -686,11 +685,6 @@ class CoworkService {
       // Re-edit explicitly restores a message's skills in CoworkSessionDetail.
       if (!wasCurrentSession) {
         store.dispatch(clearActiveSkills());
-      }
-
-      const imResult = await cowork.remoteManaged(sessionId);
-      if (requestId === this.latestLoadSessionRequestId) {
-        store.dispatch(setRemoteManaged(imResult?.remoteManaged ?? false));
       }
 
       return result.session;

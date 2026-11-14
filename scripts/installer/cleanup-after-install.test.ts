@@ -29,9 +29,10 @@ function fixture() {
   fs.writeFileSync(
     manifestPath,
     JSON.stringify({
-      components: ['channel-runtime', 'skills', 'mcps', 'python', 'skill-python', 'uv'].map(
-        key => ({ key, contentId: currentId }),
-      ),
+      components: ['skills', 'mcps', 'python', 'skill-python', 'uv'].map(key => ({
+        key,
+        contentId: currentId,
+      })),
     }),
   );
   return { root, installDir, runtimeRoot, manifestPath, markerPath };

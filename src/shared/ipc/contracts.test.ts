@@ -2,12 +2,6 @@ import { describe, expect, test } from 'vitest';
 
 import { artifactsContract } from './artifactsContract';
 import { codingAgentContract } from './codingAgentContract';
-import {
-  dingtalkInstallContract,
-  feishuInstallContract,
-  imContract,
-  imInstanceContract,
-} from './imContract';
 import { mcpContract } from './mcpContract';
 import { marketplaceContract, MarketplaceSearchRequestSchema } from '../marketplace/contract';
 import { memoryContract } from './memoryContract';
@@ -279,12 +273,6 @@ describe('contract/channel consistency', () => {
     const { mcpContractChannels } = await import('./mcpContract.channels');
     const { marketplaceContractChannels } = await import('../marketplace/contract.channels');
     const { codingAgentContractChannels } = await import('./codingAgentContract.channels');
-    const {
-      imContractChannels,
-      imInstanceContractChannels,
-      feishuInstallContractChannels,
-      dingtalkInstallContractChannels,
-    } = await import('./imContract.channels');
     const { scheduledTasksContractChannels, activityContractChannels } =
       await import('./automationContract.channels');
     const { memoryContractChannels } = await import('./memoryContract.channels');
@@ -295,10 +283,6 @@ describe('contract/channel consistency', () => {
       [mcpContractChannels, mcpContract],
       [marketplaceContractChannels, marketplaceContract],
       [codingAgentContractChannels, codingAgentContract],
-      [imContractChannels, imContract],
-      [imInstanceContractChannels, imInstanceContract],
-      [feishuInstallContractChannels, feishuInstallContract],
-      [dingtalkInstallContractChannels, dingtalkInstallContract],
       [scheduledTasksContractChannels, scheduledTasksContract],
       [activityContractChannels, activityContract],
       [memoryContractChannels, memoryContract],

@@ -83,7 +83,7 @@ export interface PiRuntimeEvents {
   queueUpdated: (sessionId: string, items: CoworkPendingMessage[]) => void;
 }
 
-/** Thinking levels supported by the Pi runtime (pi-agent-core ThinkingLevel). */
+/** Thinking levels supported by the Pi runtime (native ModelThinkingLevel). */
 export const PiThinkingLevel = {
   Off: 'off',
   Minimal: 'minimal',
@@ -104,6 +104,11 @@ type PiImageAttachment = {
 };
 
 export type PiStartOptions = {
+  /** Rebind a persisted native run without submitting a second input. */
+  _resumePending?: boolean;
+  /** Prepare the shared native core for a persistent automation without submitting input. */
+  _prepareOnly?: boolean;
+  _automationId?: string;
   skipInitialUserMessage?: boolean;
   /** Execution skill set for this session (user selection plus expert preset). */
   skillIds?: string[];
@@ -240,23 +245,9 @@ export interface PiRuntime {
   getSessionConfirmationMode(sessionId: string): 'modal' | 'text' | null;
   /**
    * Declares which sessions consume non-final full-text `messageUpdate` events
-   * (IM mirrors, coding lanes); returns an unregister function. Optional so
+   * (coding lanes); returns an unregister function. Optional so
    * test doubles can omit it — without any resolver the adapter keeps emitting.
    */
   registerStreamingTextInterestResolver?(resolver: (sessionId: string) => boolean): () => void;
-  /**
-   * Resolves the delivery scheduled tasks created in a session default to
-   * (IM chats announce back to their conversation); returns an unregister
-   * function. Optional so test doubles can omit it.
-   *
-   * Single slot: a later registration silently replaces the earlier one. Only
-   * one component (the IM cowork handler) owns the slot today; if a second
-   * owner ever appears, switch this to a resolver set.
-   */
-  setScheduledTaskDeliveryResolver?(
-    resolver: (
-      sessionId: string,
-    ) => import('../../../scheduledTask/types').ScheduledTaskDelivery | null,
-  ): () => void;
-  onSessionDeleted?(sessionId: string): void;
+  onSessionDeleted?(sessionId: string): void | Promise<void>;
 }

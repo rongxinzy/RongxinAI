@@ -1,3 +1,4 @@
+import type { ToolDefinition } from './durableToolTypes';
 import { Type } from 'typebox';
 
 export const PiAskUserQuestionToolName = 'AskUserQuestion' as const;
@@ -42,7 +43,7 @@ export type PiAskUserQuestionRequester = (
 
 export const createPiAskUserQuestionTool = (
   request: PiAskUserQuestionRequester,
-): Record<string, unknown> => ({
+): ToolDefinition<typeof PiAskUserQuestionParameters> => ({
   name: PiAskUserQuestionToolName,
   label: 'Ask User Question',
   description:

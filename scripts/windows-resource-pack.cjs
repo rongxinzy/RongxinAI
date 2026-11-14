@@ -74,13 +74,6 @@ const {
 function getWindowsResourceComponents(projectRoot) {
   const components = [
     {
-      key: 'channel-runtime',
-      label: 'cc-connect channel runtime',
-      dir: path.join(projectRoot, 'vendor', 'channel-runtime', 'current'),
-      prefix: 'channel-runtime',
-      sentinel: 'channel-runtime/cc-connect-sidecar.exe',
-    },
-    {
       key: 'skills',
       label: 'Built-in Skills',
       dir: path.join(projectRoot, 'SKILLs'),

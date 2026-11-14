@@ -14,21 +14,12 @@ type ScheduledTasksContractApi = IpcContractApi<typeof scheduledTasksContract>;
 
 export interface ScheduledTasksApi extends Omit<
   ScheduledTasksContractApi,
-  'onStatusUpdate' | 'onRunUpdate' | 'onRefresh' | 'resolveSession' | 'listChannelConversations'
+  'onStatusUpdate' | 'onRunUpdate' | 'onRefresh' | 'resolveSession'
 > {
   /** Runs store their Pi session id directly; the resolved session is null. */
   resolveSession: (sessionKey: string) => Promise<{
     success: boolean;
     session?: CoworkSession | null;
-    error?: string;
-  }>;
-  listChannelConversations?: (
-    channel: string,
-    accountId?: string,
-    filterAccountId?: string,
-  ) => Promise<{
-    success: boolean;
-    conversations?: import('../../../scheduledTask/types').ScheduledTaskConversationOption[];
     error?: string;
   }>;
   onStatusUpdate: (callback: (data: ScheduledTaskStatusEvent) => void) => () => void;

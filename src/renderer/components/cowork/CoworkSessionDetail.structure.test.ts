@@ -33,7 +33,9 @@ test('reserves conversation viewport above the absolutely positioned composer', 
 
   expect(source).toContain('const composerOverlayRef = useCoworkComposerInset(detailRootRef);');
   // 对话区与绝对定位输入框平级且 flex:1，用 paddingBottom 留出输入框高度，避免被遮挡
-  expect(source).toContain('style={{ paddingBottom: COWORK_COMPOSER_INSET_VALUE }}');
+  expect(source).toContain(
+    'isScheduledRecord ? undefined : { paddingBottom: COWORK_COMPOSER_INSET_VALUE }',
+  );
   expect(source).not.toContain('bg-gradient-to-t from-background to-transparent');
   expect(source).not.toContain('style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}');
   expect(inputArea).toBeGreaterThanOrEqual(0);

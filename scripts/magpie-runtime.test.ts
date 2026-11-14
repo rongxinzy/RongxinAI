@@ -309,7 +309,7 @@ describe('pinned Magpie runtime build', () => {
     });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe('powershell.exe');
-    expect(calls[0]?.args.join(' ')).toContain('sign-runtime.ps1');
+    expect(calls[0]?.args.join(' ')).toContain('sign-windows-file.ps1');
     expect(calls[0]?.args).toContain(binary);
     expect(calls[0]?.env).toEqual({ CERTUM_CERT_THUMBPRINT: 'ab'.repeat(20) });
     const signed = verifyRuntime(root, 'win32-x64', { allowSigned: true });

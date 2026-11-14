@@ -1,4 +1,4 @@
-import type { EngramObservation } from './types';
+import type { MemoryObservation } from './types';
 
 const CJK_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 const TOKEN_PATTERN = /[\p{L}\p{N}_]+/gu;
@@ -131,9 +131,9 @@ export function planRecallQuery(query: string): RecallQueryPlan {
 
 export function rankRecallResults(
   query: string,
-  observations: EngramObservation[],
+  observations: MemoryObservation[],
   metadata: ReadonlyMap<number, RecallRankingMetadata> = new Map(),
-): EngramObservation[] {
+): MemoryObservation[] {
   const normalizedQuery = query.toLocaleLowerCase();
   const terms = tokenizeForRanking(query);
   const now = Date.now();
@@ -186,7 +186,7 @@ function tokenizeForRanking(query: string): string[] {
 }
 
 function scoreObservation(
-  observation: EngramObservation,
+  observation: MemoryObservation,
   normalizedQuery: string,
   terms: string[],
   metadata: RecallRankingMetadata | undefined,

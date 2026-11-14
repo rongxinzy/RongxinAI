@@ -1,4 +1,4 @@
-import type { ToolAnnotations, ToolDefinition } from '@earendil-works/pi-coding-agent';
+import type { ToolAnnotations, ToolDefinition } from '../libs/agentEngine/durableToolTypes';
 import { Type, type Static } from 'typebox';
 
 import {
@@ -83,6 +83,7 @@ type ToolResult = {
   content: Array<{ type: 'text'; text: string }>;
   details: SessionSummaryOutput;
   structuredContent: SessionSummaryOutput;
+  isError?: boolean;
 };
 
 const failure = (message: string): ToolResult => {
@@ -91,6 +92,7 @@ const failure = (message: string): ToolResult => {
     content: [{ type: 'text', text: message }],
     details,
     structuredContent: details,
+    isError: true,
   };
 };
 

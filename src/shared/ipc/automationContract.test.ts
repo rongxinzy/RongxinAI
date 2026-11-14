@@ -18,7 +18,7 @@ import {
  * bad inputs are proven rejected.
  */
 
-/** Output of taskFormState.buildTaskInput for a cron announce task. */
+/** Output of taskFormState.buildTaskInput for a local cron task. */
 const taskInput = {
   name: 'Nightly report',
   description: '',
@@ -32,12 +32,12 @@ const taskInput = {
     model: 'glm-4.6',
     timeoutSeconds: 600,
   },
-  delivery: { mode: DeliveryMode.Announce, channel: 'feishu', to: 'oc_1' },
+  delivery: { mode: DeliveryMode.None },
   workspaceId: 'ws-1',
   sessionKey: null,
 };
 
-/** Full `ScheduledTask` row as the SQLite task service returns it. */
+/** Full `ScheduledTask` row as the durable task service returns it. */
 const taskRow = {
   ...taskInput,
   id: 'task-1',
@@ -66,10 +66,10 @@ describe('scheduledTasks contract args', () => {
           description: '',
           enabled: false,
           schedule: { kind: ScheduleKind.At, at: '2026-10-20T09:00:00.000Z' },
-          sessionTarget: SessionTarget.Main,
-          wakeMode: WakeMode.NextHeartbeat,
-          payload: { kind: PayloadKind.SystemEvent, text: 'reload config' },
-          sessionKey: 'zhiyuan:s-1',
+          sessionTarget: SessionTarget.Task,
+          wakeMode: WakeMode.Now,
+          payload: { kind: PayloadKind.AgentTurn, message: 'reload config' },
+          sessionKey: null,
         },
       ]).success,
     ).toBe(true);
@@ -83,6 +83,29 @@ describe('scheduledTasks contract args', () => {
     ).toBe(false);
     expect(
       scheduledTasksContract.create.args.safeParse([{ ...taskInput, sessionTarget: 'shared' }])
+        .success,
+    ).toBe(false);
+  });
+
+  test('rejects external delivery and binding an existing chat', () => {
+    for (const delivery of [
+      { mode: 'announce' },
+      { mode: 'webhook', to: 'https://example.com/hook' },
+      { mode: DeliveryMode.None, channel: 'feishu' },
+      { mode: DeliveryMode.None, to: 'oc_1' },
+      { mode: DeliveryMode.None, accountId: 'account-1' },
+      { mode: DeliveryMode.None, webhook: 'https://example.com/hook' },
+    ]) {
+      expect(
+        scheduledTasksContract.create.args.safeParse([{ ...taskInput, delivery }]).success,
+      ).toBe(false);
+    }
+    expect(
+      scheduledTasksContract.create.args.safeParse([{ ...taskInput, sessionTarget: 'main' }])
+        .success,
+    ).toBe(false);
+    expect(
+      scheduledTasksContract.create.args.safeParse([{ ...taskInput, sessionKey: 'existing-chat' }])
         .success,
     ).toBe(false);
   });
@@ -153,32 +176,6 @@ describe('scheduledTasks contract results', () => {
       scheduledTasksContract.stop.result.safeParse({ success: true, result: true }).success,
     ).toBe(true);
   });
-
-  test('preflight result accepts a delivery record projection', () => {
-    expect(
-      scheduledTasksContract.preflight.result.safeParse({
-        success: true,
-        preflight: {
-          hasChannel: true,
-          channel: 'feishu',
-          latestDelivery: {
-            id: 'd-1',
-            runId: 'run-1',
-            taskId: 'task-1',
-            mode: DeliveryMode.Announce,
-            channel: 'feishu',
-            to: 'oc_1',
-            accountId: 'acc-1',
-            status: 'error',
-            attemptedAt: '2026-10-02T01:00:00.000Z',
-            deliveredAt: null,
-            receiptId: null,
-            error: 'channel offline',
-          },
-        },
-      }).success,
-    ).toBe(true);
-  });
 });
 
 describe('activity contract', () => {
@@ -201,12 +198,10 @@ describe('activity contract', () => {
           },
           {
             id: 'run-2',
-            source: ActivitySource.Channel,
+            source: ActivitySource.ScheduledTask,
             status: ActivityStatus.Failed,
             startedAt: 1770000100000,
             updatedAt: 1770000105000,
-            platform: 'feishu',
-            conversationId: 'oc_1',
             errorMessage: 'agent crashed',
           },
         ],

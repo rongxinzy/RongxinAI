@@ -51,7 +51,6 @@ export function disposePiSessionForRecreation(
       'The session resources changed before completion.',
     );
   host.recovery.clearApprovalsBySession(sessionId);
-  host.memoryInjectionDedup.reset(sessionId);
   host.activeSessions.delete(sessionId);
 }
 
@@ -95,7 +94,7 @@ export function stopActivePiRuntimeSession(
   active.aborted = true;
   active.isRunning = false;
   active.turnFailed = false;
-  active.artifactRecorder?.dispose();
+  if (!active.nativeInputProjection) active.artifactRecorder?.dispose();
   // Drop any deferred error without surfacing it — the user stopped the turn.
   active.pendingError = null;
   active.retryStreamReusePending = false;
@@ -104,8 +103,20 @@ export function stopActivePiRuntimeSession(
   const clearActivity = active.toolActivityTracker.clear();
   if (clearActivity) host.emit('toolActivity', sessionId, clearActivity);
 
-  // Drop the Pi session after the turn is aborted. IM routing still treats the
-  // session as active via retainedSessionIds, and the next turn rebuilds from SQLite.
+  // An automation's schedule tasks must survive stopping its current model turn.
+  if (active.nativeInputProjection) {
+    active.aborted = false;
+    void active.piSession.abort();
+    host.queue.resetNativeDispatch(sessionId);
+    host.getWorkbenchTaskService()?.cancelRun?.(sessionId, active.workbenchRunId, reason);
+    host.recovery.clearApprovalsBySession(sessionId);
+    host.emit('sessionStopped', sessionId);
+    if (cause) recordSessionInterruption(host, sessionId, cause);
+    host.transcript.closeIdlePlaceholders(sessionId, active);
+    return;
+  }
+
+  // The next user turn reconstructs its bindings over the same native store.
   active.piSession.abortBash();
   active.abortController.abort();
   active.unsubscribe();
@@ -232,32 +243,46 @@ export function stopAllPiRuntimeSessions(host: PiRuntimeAdapterHost): void {
   void host.cadViewerService.stop();
 }
 
-export function onPiSessionDeleted(host: PiRuntimeAdapterHost, sessionId: string): void {
+export async function onPiSessionDeleted(
+  host: PiRuntimeAdapterHost,
+  sessionId: string,
+): Promise<void> {
+  const active = host.activeSessions.get(sessionId);
   stopActivePiRuntimeSession(host, sessionId, 'The session was deleted.', false);
+  if (active?.nativeInputProjection) {
+    try {
+      active.unsubscribe();
+      await active.piSession.close?.();
+    } finally {
+      active.artifactRecorder?.dispose();
+      active.abortController.abort();
+    }
+  }
   host.recovery.clearApprovalsBySession(sessionId);
-  host.memoryInjectionDedup.reset(sessionId);
   host.activeSessions.delete(sessionId);
   host.retainedSessionIds.delete(sessionId);
   host.transcript.clearThrottleStateBySession(sessionId, true);
   // queue.clear emits queueUpdated itself when the session had queued items.
   host.queue.clear(sessionId);
   host.getWorkbenchTaskService()?.deleteSession(sessionId);
-  // The deleted session's Pi JSONL must go with it: it holds the only other
-  // copy of the conversation and a reused cowork session id must start clean.
-  host.invalidatePiSessionDir(sessionId);
+  await host.invalidatePiSessionDir(sessionId);
 }
 
 export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Date.now()): void {
   const idle = [...host.activeSessions.values()]
     .filter(session => {
       if (session.isRunning) return false;
+      if (session.nativeInputProjection) return false;
       if (host.queue.hasPendingFollowUp(session.sessionId)) return false;
       if (host.queue.hasQueuedControlActions(session.sessionId)) return false;
       return now - session.lastUsedAt >= IDLE_SESSION_TTL_MS;
     })
     .sort((left, right) => left.lastUsedAt - right.lastUsedAt);
   const residentIdle = [...host.activeSessions.values()].filter(
-    session => !session.isRunning && !host.queue.hasPendingFollowUp(session.sessionId),
+    session =>
+      !session.isRunning &&
+      !session.nativeInputProjection &&
+      !host.queue.hasPendingFollowUp(session.sessionId),
   ).length;
   const excessCount = Math.max(0, residentIdle - MAX_RESIDENT_IDLE_SESSIONS);
   const expired = idle.filter(session => now - session.lastUsedAt >= IDLE_SESSION_TTL_MS);
@@ -273,7 +298,6 @@ export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Dat
     void session.piSession.abort();
     session.piSession.dispose?.();
     host.queue.resetNativeDispatch(session.sessionId);
-    host.memoryInjectionDedup.reset(session.sessionId);
     host.activeSessions.delete(session.sessionId);
     host.retainedSessionIds.add(session.sessionId);
     host.transcript.clearThrottleStateBySession(session.sessionId, true);
@@ -282,7 +306,6 @@ export function evictIdlePiRuntimeSessions(host: PiRuntimeAdapterHost, now = Dat
 }
 
 function releaseStoppedSession(host: PiRuntimeAdapterHost, sessionId: string): void {
-  host.memoryInjectionDedup.reset(sessionId);
   host.activeSessions.delete(sessionId);
   host.retainedSessionIds.add(sessionId);
   host.transcript.clearThrottleStateBySession(sessionId, true);

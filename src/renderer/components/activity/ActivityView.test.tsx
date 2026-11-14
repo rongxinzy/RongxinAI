@@ -19,7 +19,7 @@ const t = (key: string): string => i18nService.t(key);
 
 const run = (overrides: Partial<ActivityRun>): ActivityRun => ({
   id: 'run-1',
-  source: ActivitySource.Channel,
+  source: ActivitySource.ScheduledTask,
   status: ActivityStatus.Running,
   startedAt: 1,
   updatedAt: 1,
@@ -74,25 +74,6 @@ test('offers a scheduled-task entry point when there is no run at all', () => {
   expect(onShowScheduledTasks).toHaveBeenCalledTimes(1);
 });
 
-test('clears the source filter from the empty state instead of dead-ending the page', () => {
-  renderView([
-    run({
-      id: 'ok',
-      source: ActivitySource.Channel,
-      status: ActivityStatus.Running,
-      replyPreview: '回复内容',
-      updatedAt: 2,
-    }),
-  ]);
-
-  fireEvent.click(screen.getByRole('tab', { name: t('activityTriggerCron') }));
-  expect(screen.getByText(t('activityFilterEmpty'))).toBeInTheDocument();
-  expect(screen.getByText(t('activityFilterClear'))).toBeInTheDocument();
-
-  fireEvent.click(screen.getByText(t('activityFilterClear')));
-  expect(screen.getByText('回复内容')).toBeInTheDocument();
-});
-
 test('returns to every run through the explicit all status pill', () => {
   renderView([
     run({ id: 'failed', status: ActivityStatus.Failed, errorMessage: '接口超时', updatedAt: 2 }),
@@ -124,7 +105,7 @@ test('localizes an interrupted run instead of showing the persisted marker', () 
 
 test('shows reply preview and keeps running rows quiet until a reply exists', () => {
   renderView([
-    run({ id: 'running', platform: 'weixin', inputPreview: '帮我看下今天的日志', updatedAt: 3 }),
+    run({ id: 'running', inputPreview: '帮我看下今天的日志', updatedAt: 3 }),
     run({
       id: 'done',
       status: ActivityStatus.Completed,

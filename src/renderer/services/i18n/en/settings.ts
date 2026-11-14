@@ -25,7 +25,6 @@ export const enSettings: Record<string, string> = {
   settings: 'Settings',
   settingsGroupGeneral: 'General',
   settingsGroupModel: 'Models & memory',
-  settingsGroupChannels: 'Channels',
   imChannelSettingsTitle: '{name} Settings',
   settingsGeneralSectionApplication: 'Application',
   settingsGeneralSectionAdvanced: 'Advanced & Experimental',

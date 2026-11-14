@@ -1,0 +1,58 @@
+--- a/dist/harness/compaction.js
++++ b/dist/harness/compaction.js
+@@ -226,6 +226,12 @@
+  * that entry: an entry whose contribution starts with a user or assistant message, never a tool result, and never a
+  * user entry that a result of the preceding assistant's calls still follows.
+  */
++// The shared estimator uses 3.5 characters/token. Dense CJK needs roughly one
++// token/character; account for its remaining 5/7 in native context and cut budgets.
++function estimateCompactionTokens(message) {
++    const cjk = (JSON.stringify(message.content).match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu) ?? []).length;
++    return estimateMessageTokens(message) + Math.ceil(cjk * 5 / 7);
++}
+ export function selectCut(view, keepRecentTokens) {
+     const { contributions } = view;
+     const start = view.head === undefined ? 0 : 1;
+@@ -238,17 +244,26 @@
+     let cut;
+     for (let index = contributions.length - 1; index >= start; index--) {
+         for (const message of contributions[index])
+-            kept += estimateMessageTokens(message);
++            kept += estimateCompactionTokens(message);
+         if (kept < keepRecentTokens)
+             continue;
+         cut = candidates.find((candidate) => candidate >= index) ?? candidates.at(-1);
+         break;
+     }
+-    if (cut === undefined)
++    if (cut !== undefined) {
++        for (let index = start; index < cut; index++)
++            if (contributions[index].length > 0)
++                return cut;
++    }
++    // Actual provider usage can exceed the budget even when estimated text
++    // fits keepRecentTokens. If the preferred cut makes no progress, retain
++    // the latest legal boundary instead of declaring a cuttable view empty.
++    const latest = candidates.at(-1);
++    if (latest === undefined)
+         return undefined;
+-    for (let index = start; index < cut; index++)
++    for (let index = start; index < latest; index++)
+         if (contributions[index].length > 0)
+-            return cut;
++            return latest;
+     return undefined;
+ }
+ function isCandidate(contributions, index) {
+@@ -298,9 +313,9 @@
+     const from = measured === undefined ? 0 : view.messages.lastIndexOf(measured) + 1;
+     let tokens = measured === undefined ? 0 : calculateContextTokens(measured.usage);
+     for (const message of view.messages.slice(from))
+-        tokens += estimateMessageTokens(message);
++        tokens += estimateCompactionTokens(message);
+     for (const message of extra)
+-        tokens += estimateMessageTokens(message);
++        tokens += estimateCompactionTokens(message);
+     return tokens;
+ }
+ /** The summary of a clean `stop` with text and no tool call; anything else is not a summary. */

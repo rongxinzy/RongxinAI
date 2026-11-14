@@ -1,10 +1,12 @@
 import type { CoworkSessionStatus } from '../../types/cowork';
+import type { CoworkSessionSource } from '../../../shared/cowork/constants';
 import type { AgentSidebarIndicator } from './constants';
 
 export interface AgentSidebarTaskNode {
   id: string;
   agentId: string;
   workspaceId?: string;
+  source?: CoworkSessionSource;
   title: string;
   status: CoworkSessionStatus;
   pinned: boolean;

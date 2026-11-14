@@ -8,7 +8,7 @@
 # 安装器的 "Stopping running 知远 processes" 阶段对齐。
 #
 # 匹配范围(按可执行路径,避免误杀 dpkg 自身——其命令行含 .deb 文件名):
-#   - 主进程与全部子进程(renderer/GPU/node sidecar/engram):可执行路径均
+#   - 主进程与全部子进程(renderer/GPU/node helpers):可执行路径均
 #     位于 deb 安装目录 /opt/知远/ 下
 #   - 用户同时运行 AppImage 时,其挂载路径 /tmp/.mount_知远* 也匹配
 #

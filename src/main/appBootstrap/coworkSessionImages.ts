@@ -80,12 +80,10 @@ export const listAllMatchingSessionIds = (filter: {
   return ids;
 };
 
-export const forgetCoworkSession = (sessionId: string): void => {
-  try {
-    getPiRuntimeAdapter().onSessionDeleted(sessionId);
-  } catch (error) {
-    console.error('[Cowork] failed to release session runtime:', error);
-  }
+export const forgetCoworkSession = async (sessionId: string): Promise<void> => {
+  // Runtime cancellation and automation removal must succeed before their
+  // product projection is deleted. The IPC caller reports failures to the UI.
+  await getPiRuntimeAdapter().onSessionDeleted(sessionId);
   try {
     deleteCoworkSessionImages(getCoworkImageRoot(), sessionId);
   } catch (error) {

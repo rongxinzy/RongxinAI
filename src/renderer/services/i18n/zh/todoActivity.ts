@@ -2,14 +2,13 @@
 export const zhTodoActivity: Record<string, string> = {
   // 活动流
   activityTitle: '活动',
-  activityHeroDesc: '渠道消息与定时任务的每一次运行',
-  activityTriggerChannel: '渠道消息',
+  activityHeroDesc: '自动化任务的每一次运行',
   activityTriggerCron: '定时任务',
   activityFilterAll: '全部',
   activityStatusRunning: '进行中',
   activityStatusCompleted: '成功',
   activityStatusFailed: '失败',
-  activityEmpty: '暂无渠道或定时任务运行记录',
+  activityEmpty: '暂无自动化任务运行记录',
   activityEmptyAction: '查看定时任务',
   activityFilterEmpty: '暂无相关活动数据',
   activityFilterClear: '清除筛选条件',

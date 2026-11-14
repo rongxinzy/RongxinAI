@@ -46,7 +46,6 @@ export type CoworkSessionMode = (typeof CoworkSessionMode)[keyof typeof CoworkSe
 export const CoworkSessionSource = {
   Manual: 'manual',
   Scheduled: 'scheduled',
-  Im: 'im',
 } as const;
 
 export type CoworkSessionSource = (typeof CoworkSessionSource)[keyof typeof CoworkSessionSource];

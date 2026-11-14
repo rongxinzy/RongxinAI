@@ -11,6 +11,7 @@ import { handleIpcContract } from '../ipc/handleIpcContract';
 import { coworkConfigContract } from '../../shared/ipc/coworkContract';
 import type { SkillManager } from '../skillManager';
 import type { PiRuntimeAdapter } from '../libs/agentEngine/piRuntimeAdapter';
+import { assertInteractiveCoworkSession } from './interactiveSession';
 
 export interface CoworkConfigIpcDeps {
   getCoworkStore: () => CoworkStore;
@@ -108,13 +109,20 @@ export const registerCoworkConfigIpc = (deps: CoworkConfigIpcDeps): void => {
         };
         const previousConfig = deps.getCoworkStore().getConfig();
         const previousWorkingDir = previousConfig.workingDirectory;
+        const changedModes =
+          normalizedPermissionModeBySession === undefined
+            ? []
+            : getChangedSessionPermissionModes(
+                previousConfig.permissionModeBySession ?? {},
+                normalizedPermissionModeBySession,
+                normalizedPermissionMode ?? previousConfig.permissionMode,
+              );
+        for (const [sessionId] of changedModes) {
+          assertInteractiveCoworkSession(deps.getCoworkStore(), sessionId);
+        }
         deps.getCoworkStore().setConfig(normalizedConfig);
         if (normalizedPermissionModeBySession !== undefined) {
-          for (const [sessionId, mode] of getChangedSessionPermissionModes(
-            previousConfig.permissionModeBySession ?? {},
-            normalizedPermissionModeBySession,
-            normalizedPermissionMode ?? previousConfig.permissionMode,
-          )) {
+          for (const [sessionId, mode] of changedModes) {
             deps
               .getPiRuntimeAdapter()
               .setApprovalModeForSession(

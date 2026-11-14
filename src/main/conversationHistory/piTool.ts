@@ -1,4 +1,4 @@
-import type { ToolAnnotations, ToolDefinition } from '@earendil-works/pi-coding-agent';
+import type { ToolAnnotations, ToolDefinition } from '../libs/agentEngine/durableToolTypes';
 import { Type, type Static } from 'typebox';
 
 import { CONVERSATION_HISTORY_TOOL_NAME } from './constants';
@@ -91,5 +91,10 @@ function requiredQuery(value: unknown): string {
 }
 
 function toolResult(text: string, details: ConversationHistoryOutput) {
-  return { content: [{ type: 'text' as const, text }], details, structuredContent: details };
+  return {
+    content: [{ type: 'text' as const, text }],
+    details,
+    structuredContent: details,
+    ...(details.isError ? { isError: true } : {}),
+  };
 }

@@ -54,7 +54,6 @@ const config: KnipConfig = {
         // Invoked by the shared composite Windows acceptance action.
         'scripts/ci/verify-packaged-app-version.mjs',
         'scripts/ci/measure-llamacpp-bundled.cjs',
-        'scripts/ci/build-checkpoint.mjs',
         // Invoked from release.yml and publish workflows, not static imports.
         'scripts/release/print-electron-updater-verify-specs.mjs',
         'scripts/release/print-release-candidate-layout.mjs',
@@ -63,9 +62,7 @@ const config: KnipConfig = {
         'scripts/release/fetch-generation-build-metadata.sh',
         'scripts/release/publish-platform-beta-release.sh',
         'scripts/release/merge-update-manifest-collection.mjs',
-        'scripts/release/publish-update-manifest.mjs',
         'scripts/release/verify-release-candidate.mjs',
-        'scripts/release/windows/assemble-windows-edition.cjs',
         'scripts/ci/with-download-retries.sh',
         'scripts/release/upload-update-artifacts.mjs',
         'tests/setup/rebuild-sqlite-for-node.cjs',
@@ -121,7 +118,6 @@ const config: KnipConfig = {
     'openssl',
     // Host-installed encoder used only by the offline companion media author.
     'ffmpeg',
-    'reg',
     // Packaged Linux e2e seeds and reads SQLite through the sqlite3 CLI.
     'sqlite3',
     'taskkill.exe',
@@ -151,8 +147,6 @@ const config: KnipConfig = {
     '@electron/osx-sign',
     'app-builder-lib',
     'dotenv',
-    'typebox',
-    '@earendil-works/pi-agent-core',
   ],
   // llama.cpp sources stay untouched. Suppress findings instead of editing them.
   // Root-level only: workspace ignoreIssues are not applied to ".".

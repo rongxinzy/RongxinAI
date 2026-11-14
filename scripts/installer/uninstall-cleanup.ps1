@@ -19,7 +19,7 @@ Assert-PhysicalPath $RuntimeRoot
 $resources = Join-Path $InstallDir 'resources'
 Assert-PhysicalPath $resources
 # Include both optional inference engines used by CPU/CUDA editions.
-$prefixes = @('channel-runtime', 'SKILLs', 'MCPs', 'mingit', 'python-win', 'skill-python', 'uv-win', 'llamacpp-bundled', 'strata-bundled')
+$prefixes = @('SKILLs', 'MCPs', 'mingit', 'python-win', 'skill-python', 'uv-win', 'llamacpp-bundled', 'strata-bundled')
 foreach ($prefix in $prefixes) {
   $link = Join-Path $resources $prefix
   if (Test-Path -LiteralPath $link) {
@@ -60,7 +60,7 @@ function Remove-TreeWithoutFollowingLinks([string]$Path) {
   }
   [IO.File]::Delete($long)
 }
-foreach ($key in @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv', 'llamacpp-bundled', 'strata-bundled')) {
+foreach ($key in @('skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv', 'llamacpp-bundled', 'strata-bundled')) {
   $root = Join-Path $RuntimeRoot $key
   Assert-PhysicalPath $root
   if (-not (Test-Path -LiteralPath $root)) { continue }

@@ -9,14 +9,11 @@
 
 import path from 'path';
 
-import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
+import type { ToolDefinition } from './durableToolTypes';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
-import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import { type HarnessActivationEvent } from '../../../shared/harness';
-import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
-import { toToolActivityInput } from './toolActivity';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import { getPythonRuntimeService } from '../../pythonRuntime/host';
@@ -25,8 +22,8 @@ import { createPiAskUserQuestionTool } from './piAskUserQuestion';
 import { createPiCodingElicitationTool } from './piCodingElicitation';
 import { createPiPlanTool } from './piPlanTool';
 import { buildPiSubagentTool } from './piSubagentTool';
+import { createChildToolActivityForwarder } from './piChildToolActivity';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
-import { resolvePiSkillRoots } from './piSkillRoots';
 import { buildPiCadViewerTool } from './piCadViewerTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
@@ -36,18 +33,14 @@ import { buildPiPythonTools } from './piPythonTools';
 import { buildPiScheduledTaskTool } from './piScheduledTaskTool';
 import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { buildPiWebSearchTool } from './piWebSearchTool';
-import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
-import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
-import type { PiModules, PiResolvedModel, PiResourceState } from './piRuntimeSessionState';
+import type { PiResourceState } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import type { PiStartOptions } from './piRuntimeTypes';
 
 interface PiSessionCustomToolsParams {
-  pi: PiModules;
   sessionId: string;
   options: PiStartOptions;
   resourceState: PiResourceState;
-  resolvedModel: PiResolvedModel;
   workspaceRoot: string;
   workbenchRunId: string | null;
   expertIds: string[];
@@ -62,11 +55,9 @@ export function buildPiSessionCustomTools(
   customTools: ToolDefinition[];
 } {
   const {
-    pi,
     sessionId,
     options,
     resourceState,
-    resolvedModel,
     workspaceRoot,
     workbenchRunId,
     expertIds,
@@ -75,7 +66,7 @@ export function buildPiSessionCustomTools(
   } = params;
   // Build custom tools for this Pi session.
   // Each call creates a distinct tool instance so sequential execution mode cannot block another session.
-  const customTools: (ToolDefinition | any)[] = [];
+  const customTools: ToolDefinition[] = [];
   if (resourceState.chatMode) customTools.push(buildPiWebSearchTool());
 
   if (options.planTool === true || options.planMode === true) {
@@ -170,8 +161,6 @@ export function buildPiSessionCustomTools(
         workspaceId:
           host.getStore()?.getSession(sessionId, 0, { includeArtifacts: false })?.workspaceId ??
           null,
-        sessionKey: sessionId,
-        defaultDelivery: host.getScheduledTaskDeliveryForSession?.(sessionId) ?? null,
       }),
     );
   }
@@ -240,87 +229,13 @@ export function buildPiSessionCustomTools(
                 source: 'member' as const,
               })) ?? null
           : undefined,
-        resolvedModel,
-        getResolvedModel: () => {
-          const active = host.activeSessions.get(sessionId);
-          return active
-            ? {
-                model: active.model,
-                modelRuntime: active.modelRuntime,
-                maxOutputTokens: active.resourceState.maxOutputTokens,
-              }
-            : resolvedModel;
-        },
         signal: abortSignal,
-        workspaceRoot,
+        onChildToolActivity: createChildToolActivityForwarder(host, sessionId),
         webSearchSkillPath: path.join(getSkillsRoot(), 'web-search'),
-        onChildToolActivity: childEvent => {
-          const active = host.activeSessions.get(sessionId);
-          if (!active) return;
-          if (childEvent.type === 'tool_execution_start') {
-            const runningActivity = active.toolActivityTracker.upsert(
-              {
-                toolCallId: childEvent.toolCallId,
-                parentToolCallId: childEvent.parentToolCallId,
-                toolName: childEvent.toolName,
-                toolInput: toToolActivityInput(childEvent.args),
-              },
-              CoworkToolActivityPhase.Running,
-            );
-            if (runningActivity) host.emit('toolActivity', sessionId, runningActivity);
-          } else if (childEvent.type === 'tool_execution_update') {
-            const runningActivity = active.toolActivityTracker.upsert(
-              {
-                toolCallId: childEvent.toolCallId,
-                parentToolCallId: childEvent.parentToolCallId,
-                toolName: childEvent.toolName,
-                toolInput: toToolActivityInput(childEvent.args),
-                partialResult: childEvent.partialResult,
-              },
-              CoworkToolActivityPhase.Running,
-            );
-            if (runningActivity) host.emit('toolActivity', sessionId, runningActivity);
-          } else if (childEvent.type === 'tool_execution_end') {
-            const removeActivity = active.toolActivityTracker.remove(childEvent.toolCallId);
-            if (removeActivity) host.emit('toolActivity', sessionId, removeActivity);
-          }
-        },
-        createPiResourceLoader: (
-          cwd,
-          systemPrompt,
-          maxOutputTokens,
-          skillIds,
-          extensionFactories,
-        ) =>
-          createPiRuntimeResourceLoader(
-            host,
-            pi,
-            cwd,
-            {
-              systemPrompt,
-              skillIds: skillIds ?? [],
-              maxOutputTokens,
-              fileToolsEnabled: true,
-              unattended: resourceState.unattended,
-              chatMode: resourceState.chatMode,
-              nativeToolsOnly: false,
-              expertSkillDirs: [],
-              skillRoots: resolvePiSkillRoots(skillIds ?? [], resolveZhiyuanSkillDirs(), []),
-            },
-            {
-              sessionId,
-              getRunId: () => host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
-              getApprovalMode: () =>
-                host.activeSessions.get(sessionId)?.approvalMode ??
-                options.approvalMode ??
-                WorkbenchApprovalMode.Ask,
-            },
-            extensionFactories,
-          ),
       });
   if (subagentTool) {
     customTools.push(subagentTool);
   }
 
-  return { customTools: customTools as ToolDefinition[] };
+  return { customTools };
 }

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { createElement } from 'react';
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { CoworkSessionStatus } from '@shared/cowork/constants';
+import { CoworkSessionSource, CoworkSessionStatus } from '@shared/cowork/constants';
 import AgentTaskRow from './AgentTaskRow';
 import { AgentSidebarIndicator } from './constants';
 
@@ -78,4 +78,26 @@ test('opens the row menu by keyboard and saves a renamed title without selecting
   await user.type(input, 'Renamed task{Enter}');
   expect(handlers.onRename).toHaveBeenCalledWith('Renamed task');
   expect(handlers.onSelect).not.toHaveBeenCalled();
+});
+
+test('scheduled deletion explicitly confirms the automation and its conversation', async () => {
+  const user = userEvent.setup();
+  const handlers = props();
+  render(
+    createElement(AgentTaskRow, {
+      ...handlers,
+      task: { ...handlers.task, source: CoworkSessionSource.Scheduled },
+    }),
+  );
+  screen.getByRole('button', { name: 'coworkSessionActions' }).focus();
+  await user.keyboard('{Enter}');
+  await user.click(
+    await screen.findByRole('menuitem', { name: 'scheduledTasksDeleteConversationAction' }),
+  );
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent('scheduledTasksDeleteConversationTitle');
+  expect(dialog).toHaveTextContent('scheduledTasksDeleteConversationMessage');
+  expect(handlers.onDelete).not.toHaveBeenCalled();
+  await user.click(screen.getByRole('button', { name: 'scheduledTasksDeleteConversationAction' }));
+  expect(handlers.onDelete).toHaveBeenCalledOnce();
 });

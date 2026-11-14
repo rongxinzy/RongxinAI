@@ -63,14 +63,14 @@ export function createScheduledTasks(
             at: '',
           },
           sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
+          wakeMode: 'now',
           payload: {
             kind: 'agentTurn',
             message: 'Preview',
           },
           id: 'preview',
           workspaceId: '',
-          sessionKey: '',
+          sessionKey: null,
           state: {
             nextRunAtMs: 0,
             lastRunAtMs: 0,
@@ -102,14 +102,14 @@ export function createScheduledTasks(
             at: '',
           },
           sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
+          wakeMode: 'now',
           payload: {
             kind: 'agentTurn',
             message: 'Preview',
           },
           id: 'preview',
           workspaceId: '',
-          sessionKey: '',
+          sessionKey: null,
           state: {
             nextRunAtMs: 0,
             lastRunAtMs: 0,
@@ -141,14 +141,14 @@ export function createScheduledTasks(
             at: '',
           },
           sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
+          wakeMode: 'now',
           payload: {
             kind: 'agentTurn',
             message: 'Preview',
           },
           id: 'preview',
           workspaceId: '',
-          sessionKey: '',
+          sessionKey: null,
           state: {
             nextRunAtMs: 0,
             lastRunAtMs: 0,
@@ -187,14 +187,14 @@ export function createScheduledTasks(
             at: '',
           },
           sessionTarget: 'isolated',
-          wakeMode: 'next-heartbeat',
+          wakeMode: 'now',
           payload: {
             kind: 'agentTurn',
             message: 'Preview',
           },
           id: 'preview',
           workspaceId: '',
-          sessionKey: '',
+          sessionKey: null,
           state: {
             nextRunAtMs: 0,
             lastRunAtMs: 0,
@@ -226,30 +226,12 @@ export function createScheduledTasks(
         success: true,
       };
     },
-    preflight: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.preflight');
-      return {
-        success: true,
-        preflight: {
-          hasChannel: false,
-        },
-      };
-    },
     listRuns: async _p0 => {
       void _p0;
       runtime.warnOnce('scheduledTasks.listRuns');
       return {
         success: true,
         runs: [],
-      };
-    },
-    listDeliveries: async _p0 => {
-      void _p0;
-      runtime.warnOnce('scheduledTasks.listDeliveries');
-      return {
-        success: true,
-        deliveries: [],
       };
     },
     countRuns: async _p0 => {
@@ -265,13 +247,6 @@ export function createScheduledTasks(
       return {
         success: true,
         runs: [],
-      };
-    },
-    listChannels: async () => {
-      runtime.warnOnce('scheduledTasks.listChannels');
-      return {
-        success: true,
-        channels: [],
       };
     },
   };

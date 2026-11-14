@@ -5,11 +5,18 @@ import { ArtifactWorkerLimit, ArtifactWorkerTask } from './artifactWorkerConstan
 import type { ArtifactWorkerInput } from './artifactWorkerTypes';
 import path from 'node:path';
 import { prepareCompanionImages } from '../companion/prepareImages.mjs';
+import { prepareDurableImageInWorker } from './durableImageWorker.mjs';
 
 parentPort?.on('message', async (job: ArtifactWorkerInput) => {
   const startedAt = performance.now();
   try {
-    if (job.kind === ArtifactWorkerTask.PrepareCompanionImages) {
+    if (job.kind === ArtifactWorkerTask.PrepareDurableImage) {
+      const image = await prepareDurableImageInWorker(
+        job.input,
+        path.join(__dirname, 'companion-photon.wasm'),
+      );
+      parentPort?.postMessage({ image, runMs: performance.now() - startedAt });
+    } else if (job.kind === ArtifactWorkerTask.PrepareCompanionImages) {
       const images = await prepareCompanionImages(
         job.input.sources,
         path.join(__dirname, 'companion-photon.wasm'),

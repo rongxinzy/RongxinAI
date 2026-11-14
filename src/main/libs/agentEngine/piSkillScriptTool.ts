@@ -1,6 +1,7 @@
+import type { ToolDefinition } from './durableToolTypes';
 import { runManagedSkillScript, type SkillScriptRunResult } from '../skillRuntimeRunner';
 
-export const PiSkillScriptToolName = 'run_skill_script';
+const PiSkillScriptToolName = 'run_skill_script';
 
 type SkillScriptToolResult = {
   content: Array<{ type: 'text'; text: string }>;
@@ -38,7 +39,7 @@ export function buildPiSkillScriptTool(options: {
     skillIds: readonly string[] | undefined;
     skillRoots: Readonly<Record<string, string>>;
   };
-}): Record<string, unknown> {
+}): ToolDefinition {
   return {
     name: PiSkillScriptToolName,
     label: 'Run Skill Script',
@@ -80,9 +81,13 @@ export function buildPiSkillScriptTool(options: {
     },
     execute: async (
       _toolCallId: string,
-      params: Record<string, unknown>,
+      rawParams: unknown,
       signal?: AbortSignal,
     ): Promise<SkillScriptToolResult> => {
+      const params =
+        rawParams && typeof rawParams === 'object' && !Array.isArray(rawParams)
+          ? (rawParams as Record<string, unknown>)
+          : {};
       const skillId = text(params.skillId);
       const selection = options.getSkillSelection?.();
       const allowedSkillIds = selection?.skillIds ?? options.allowedSkillIds;

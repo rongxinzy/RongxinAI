@@ -49,7 +49,6 @@ interface CoworkState {
   /** Non-persistent tool preparation state, isolated by session and tool call. */
   toolActivitiesBySession: Record<string, Record<string, CoworkToolActivity>>;
   isCoworkActive: boolean;
-  remoteManaged: boolean;
   pendingPermissions: CoworkPermissionRequest[];
   config: CoworkConfig;
 }
@@ -69,7 +68,6 @@ const initialState: CoworkState = {
   streamingSessions: {},
   toolActivitiesBySession: {},
   isCoworkActive: false,
-  remoteManaged: false,
   pendingPermissions: [],
   config: {
     workingDirectory: '',
@@ -673,10 +671,6 @@ const coworkSlice = createSlice({
       state.toolActivitiesBySession[sessionId] = sessionActivities;
     },
 
-    setRemoteManaged(state, action: PayloadAction<boolean>) {
-      state.remoteManaged = action.payload;
-    },
-
     updateSessionPinned(
       state,
       action: PayloadAction<{ sessionId: string; pinned: boolean; pinOrder?: number | null }>,
@@ -763,13 +757,11 @@ const coworkSlice = createSlice({
       state.currentSessionId = null;
       state.currentSession = null;
       state.loadingSessionId = null;
-      state.remoteManaged = false;
     },
 
     clearCurrentSessionForWorkspaceChange(state) {
       state.currentSessionId = null;
       state.currentSession = null;
-      state.remoteManaged = false;
     },
 
     setDraftAttachments(
@@ -823,7 +815,6 @@ export const {
   updateMessageContents,
   removeMessage,
   updateToolActivity,
-  setRemoteManaged,
   updateSessionPinned,
   updateSessionTitle,
   updateCurrentSessionModelOverride,

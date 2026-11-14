@@ -5,16 +5,14 @@ import path from 'path';
 import { afterEach, expect, test } from 'vitest';
 
 import { MemoryKind, MemorySensitivity } from '../../shared/memory';
-import { resolveEngramBinary } from './binaryResolver';
-import { EngramManager } from './engramManager';
 import { EXPLICIT_MEMORY_SOURCE } from './explicitUserRequestedMemory';
 import { buildKeywordQuery } from './recallQueryPlanner';
 import { resolveProjectIdentity } from './projectIdentity';
 import { ProjectMemoryService } from './projectMemoryService';
 import { MemoryRepository } from './repository';
-import { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+import { MarkdownMemoryBackend } from './markdownMemoryBackend';
+import { MarkdownMemoryRuntime } from './markdownMemoryRuntime';
 
-const projectRoot = path.resolve(__dirname, '..', '..', '..');
 const workspaceRoot = path.join(os.tmpdir(), 'zhiyuan-recall-integration-workspace');
 const DECISION_TITLE = 'Workspace persistence decision';
 const DECISION_CONTENT =
@@ -40,29 +38,13 @@ test('integration: paraphrased questions rely on keyword recall rather than full
 });
 
 test('integration: buildProjectContext finds saved memory for paraphrased EN/CN questions', async () => {
-  const binary = resolveEngramBinary({
-    env: {},
-    projectRoot,
-    fileExists: fs.existsSync,
-  });
-  if (!binary) {
-    console.warn(
-      '[recallContextIntegration] No vendored engram binary found — skipping live integration test.',
-    );
-    return;
-  }
-
   const userDataPath = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-recall-integration-'));
   temporaryDirectories.push(userDataPath);
   fs.mkdirSync(workspaceRoot, { recursive: true });
 
-  const manager = new EngramManager({ userDataPath, projectRoot });
-  const connection = await manager.start();
-  expect(connection).not.toBeNull();
-
   const db = new Database(':memory:');
   const repository = new MemoryRepository(db);
-  const adapter = new ZhiYuanEngramAdapter(manager);
+  const adapter = new MarkdownMemoryBackend(new MarkdownMemoryRuntime(userDataPath), repository);
   const service = new ProjectMemoryService(
     repository,
     adapter,
@@ -101,5 +83,6 @@ test('integration: buildProjectContext finds saved memory for paraphrased EN/CN 
   expect(chineseContext).toContain('[memory:');
   expect(chineseContext).toContain('SQLite');
 
-  await manager.stop();
+  await service.stopOutboxScheduler();
+  db.close();
 }, 60_000);

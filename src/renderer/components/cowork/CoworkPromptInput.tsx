@@ -98,7 +98,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       permissionMode,
       onPermissionModeChange,
       sessionId,
-      remoteManaged = false,
       topAccessory,
     } = props;
     const dispatch = useDispatch();
@@ -271,7 +270,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const slashMenu = useCoworkSlashMenu({
       value,
       disabled,
-      remoteManaged,
       sessionId,
       setValue,
       focusEditor: () => textareaRef.current?.focus(),
@@ -389,10 +387,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       return onCreateProject(path, name);
     };
 
-    // Unified Kimi-style toolbar: "+" menu (+ permission selector in work mode)
-    // on the left, model picker + submit on the right. remoteManaged sessions
-    // keep the minimal read-only layout with the model picker.
-    const isPlusToolbar = !remoteManaged;
     const isWorkVariant = showFolderSelector || showPermissionModeSelector;
     // 2026/09/15 lixiang  Empty prompt: dim submit, not-allowed cursor, and ask-user tip
     const isSubmitEmpty = !hasVisiblePromptContent(value) && attachments.length === 0;
@@ -489,30 +483,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               aria-disabled={sessionContextPending}
               inert={sessionContextPending ? true : undefined}
             >
-              {!isCompactToolbar && !isPlusToolbar && showModelSelector && (
-                <>
-                  <ContextUsageIndicator
-                    usage={contextUsage}
-                    messageUsage={contextMessage?.metadata?.usage}
-                    modelId={contextMessage?.metadata?.model}
-                    modelProviderKey={contextMessage?.metadata?.modelProviderKey}
-                    selectedModelId={effectiveSelectedModel?.id}
-                    selectedModelProviderKey={effectiveSelectedModel?.providerKey}
-                    messages={currentSession?.messages}
-                    systemPrompt={currentSession?.systemPrompt}
-                  />
-                  <CoworkModelPicker
-                    models={availableModels}
-                    selectedModel={effectiveSelectedModel}
-                    open={modelSelectorOpen}
-                    onOpenChange={setModelSelectorOpen}
-                    onSelect={model => {
-                      void handleModelSelect(model);
-                    }}
-                  />
-                </>
-              )}
-              {isPlusToolbar && (
+              {
                 <PromptPlusMenu
                   onAddFile={() => {
                     void handleAddFile();
@@ -528,7 +499,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   onGoalModeChange={setGoalMode}
                   disabled={disabled || isStreaming || isAddingFile}
                 />
-              )}
+              }
               {showFolderSelector && (
                 <PromptWorkspaceSelector
                   onSelectFolder={handleFolderSelect}
@@ -542,7 +513,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   disabled={disabled || sessionContextPending}
                 />
               )}
-              {isPlusToolbar && (
+              {
                 <>
                   {!isCompactToolbar && isWorkVariant && (
                     <PermissionModeMenu
@@ -568,9 +539,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   )}
                   <ActiveMcpBadge />
                 </>
-              )}
+              }
             </PromptInputTools>
-            {isPlusToolbar && (showModelSelector || (isCompactToolbar && isWorkVariant)) && (
+            {(showModelSelector || (isCompactToolbar && isWorkVariant)) && (
               <div className="flex min-w-0 shrink-0 items-center gap-1.5">
                 {showModelSelector && (
                   <>

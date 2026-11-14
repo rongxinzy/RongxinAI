@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import path from 'path';
 
-import type { ToolAnnotations, ToolDefinition } from '@earendil-works/pi-coding-agent';
+import type { ToolAnnotations, ToolDefinition } from './durableToolTypes';
 import { formatFromPath, toMarkdown } from '@firecrawl/anydoc';
 import { Type, type Static } from 'typebox';
 

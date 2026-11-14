@@ -6,11 +6,11 @@ import JSZip from 'jszip';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
-  mockCreateAgentSession: vi.fn(),
+  mockExecuteDurableSubagent: vi.fn(),
 }));
 
-vi.mock('@earendil-works/pi-coding-agent', () => ({
-  createAgentSession: hoisted.mockCreateAgentSession,
+vi.mock('../src/main/libs/agentEngine/durableSubagent.mjs', () => ({
+  executeDurableSubagent: hoisted.mockExecuteDurableSubagent,
 }));
 
 import {
@@ -22,11 +22,6 @@ import {
   PI_SUBAGENT_MAX_OUTPUT_CHARS,
   type PiSubagentToolDeps,
 } from '../src/main/libs/agentEngine/piSubagentTool';
-import { PiSubagentProfileId } from '../src/main/libs/agentEngine/piSubagentConstants';
-import {
-  PiMessageRole,
-  PiSubagentEventType,
-} from '../src/main/libs/agentEngine/piSubagentExecution';
 
 describe('Adversarial Stress Harness: Payload Truncation Bounds', () => {
   // 2. Truncation Stress Harness on Large Payloads (100KB, 500KB, 2MB)
@@ -116,29 +111,6 @@ describe('Adversarial Stress Harness: Payload Truncation Bounds', () => {
   });
 
   describe('piSubagentTool Stress Tests (100KB, 500KB, 2MB Outputs)', () => {
-    const createMockSession = (output: string) => {
-      const listeners: Array<(event: unknown) => void> = [];
-      const session = {
-        prompt: vi.fn(async () => {
-          session.emit({
-            type: PiSubagentEventType.MessageEnd,
-            message: { role: PiMessageRole.Assistant, content: output, stopReason: 'stop' },
-          });
-          session.emit({ type: PiSubagentEventType.AgentSettled });
-        }),
-        steer: vi.fn().mockResolvedValue(undefined),
-        abort: vi.fn().mockResolvedValue(undefined),
-        subscribe: vi.fn((listener: (event: unknown) => void) => {
-          listeners.push(listener);
-          return () => {};
-        }),
-        emit: (event: unknown) => {
-          for (const listener of listeners) listener(event);
-        },
-      };
-      return session;
-    };
-
     const buildSubagentTool = () => {
       const deps: PiSubagentToolDeps = {
         getPiAgentsDir: () => '/nonexistent-pi-agents',
@@ -173,10 +145,10 @@ describe('Adversarial Stress Harness: Payload Truncation Bounds', () => {
     for (const { label, size } of subagentPayloads) {
       it(`strictly truncates single subagent ${label} to PI_SUBAGENT_MAX_OUTPUT_CHARS (${PI_SUBAGENT_MAX_OUTPUT_CHARS})`, async () => {
         const bigOutput = 'S'.repeat(size);
-        const mockSession = createMockSession(bigOutput);
 
-        hoisted.mockCreateAgentSession.mockResolvedValueOnce({
-          session: mockSession,
+        hoisted.mockExecuteDurableSubagent.mockResolvedValueOnce({
+          ok: true,
+          output: bigOutput,
         });
 
         const tool = buildSubagentTool();

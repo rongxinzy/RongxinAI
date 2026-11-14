@@ -130,8 +130,6 @@ try {
   }
 
   $resourcesRoot = $smokeRoot
-  Assert-Path (Join-Path $resourcesRoot 'channel-runtime\cc-connect-sidecar.exe') 'bundled channel runtime'
-  Assert-Path (Join-Path $ProjectRoot 'release\win-unpacked\resources\memory\engram.exe') 'bundled memory runtime'
   $python = Join-Path $resourcesRoot 'python-win\python.exe'
   $skillPython = Join-Path $resourcesRoot 'skill-python\layers\shared\Scripts\python.exe'
   $appExecutableName = $env:ZHIYUAN_ELECTRON_EXECUTABLE_NAME

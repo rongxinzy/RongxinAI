@@ -23,7 +23,6 @@ import {
 interface UseCoworkSlashMenuOptions {
   value: string;
   disabled: boolean;
-  remoteManaged: boolean;
   sessionId?: string;
   setValue: (value: string) => void;
   focusEditor: () => void;
@@ -37,7 +36,6 @@ interface UseCoworkSlashMenuOptions {
 export const useCoworkSlashMenu = ({
   value,
   disabled,
-  remoteManaged,
   sessionId,
   setValue,
   focusEditor,
@@ -104,13 +102,11 @@ export const useCoworkSlashMenu = ({
   // unlike the coding composer the menu only closes for disabled/read-only.
   const choiceMenuOpen =
     !disabled &&
-    !remoteManaged &&
     argument !== null &&
     argument.name === CoworkSlashCommand.Skill &&
     skillOptions.length > 0 &&
     !menuDismissed;
-  const commandMenuOpen =
-    !disabled && !remoteManaged && query !== null && commands.length > 0 && !menuDismissed;
+  const commandMenuOpen = !disabled && query !== null && commands.length > 0 && !menuDismissed;
   const open = choiceMenuOpen || commandMenuOpen;
 
   const items: SlashCommandMenuItem[] = choiceMenuOpen

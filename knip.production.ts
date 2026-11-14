@@ -65,19 +65,15 @@ const config: KnipConfig = {
     'src/main/codingAgent/codingRoomServiceTestHarness.ts': ['files'],
     'src/main/coworkStore/coworkStore.testHarness.ts': ['files'],
     'src/main/libs/agentEngine/piRuntimeAdapter.testHarness.ts': ['files'],
+    'src/main/libs/agentEngine/durableRuntime.testHarness.ts': ['files'],
+    'src/main/libs/agentEngine/durableQueue.testHarness.ts': ['files'],
+    'src/main/libs/agentEngine/durableModelCatalog.testHarness.ts': ['files'],
+    'src/main/workbenchTask/durableImage.testHarness.ts': ['files'],
+    'src/main/automations/automationServiceFixture.ts': ['files'],
     'src/main/libs/appUpdateCoordinator.testHarness.ts': ['files'],
     'src/main/magpie/manager.testHarness.ts': ['files'],
-    'src/main/im/__tests__/**': ['files'],
-    'src/scheduledTask/fixtures.ts': ['files'],
-    // Opt-in Magpie SMOKE (`integration.test.ts` dynamic import); not bundled in app.
+    // Opt-in model SMOKE fixture, not bundled in the application.
     'src/main/magpie/__fixtures__/durableProvider.ts': ['files'],
-    // Pending user decision (architecture review work package A.7): the legacy
-    // scheduled-task surface. The classic theme definitions were removed (N.2,
-    // #1169) and their entries retired with them.
-    'src/scheduledTask/metaStore.ts': ['files'],
-    'src/scheduledTask/modelMapper.ts': ['files'],
-    'src/scheduledTask/origin.ts': ['files'],
-    'src/scheduledTask/policies/**': ['files'],
     // Not yet triaged; production reachability unverified. Follow-up items —
     // each must be either wired into production code or deleted, then removed
     // from this list.

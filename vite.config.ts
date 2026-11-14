@@ -98,33 +98,10 @@ const rejectDuplicateHighlighterModules = () => ({
   },
 });
 
-const copyPhotonWasmPlugin = () => ({
-  name: 'copy-photon-wasm',
+const copyCompanionPhotonPlugin = () => ({
+  name: 'copy-companion-photon',
   closeBundle() {
     copyCompanionPhoton(projectRoot, path.join(projectRoot, 'dist-electron'));
-    const sourceCandidates = [
-      path.resolve(
-        projectRoot,
-        'node_modules/@earendil-works/pi-coding-agent/node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm',
-      ),
-      path.resolve(projectRoot, 'node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm'),
-    ];
-    const source = sourceCandidates.find(candidate => fs.existsSync(candidate));
-    if (!source) {
-      console.warn(
-        '[Vite] Photon WASM asset was not found; Electron main process may fail to start.',
-      );
-      return;
-    }
-    const targetDir = path.resolve(projectRoot, 'dist-electron');
-    fs.mkdirSync(targetDir, { recursive: true });
-    const target = path.join(targetDir, 'photon_rs_bg.wasm');
-    if (fs.existsSync(target)) {
-      const sourceBytes = fs.readFileSync(source);
-      const targetBytes = fs.readFileSync(target);
-      if (sourceBytes.equals(targetBytes)) return;
-    }
-    fs.copyFileSync(source, target);
   },
 });
 
@@ -369,7 +346,7 @@ export default defineConfig(async ({ command }) => {
                 // 主进程入口文件
                 entry: 'src/main/main.ts',
                 vite: {
-                  plugins: [copyPhotonWasmPlugin()],
+                  plugins: [copyCompanionPhotonPlugin()],
                   build: {
                     sourcemap: electronSourceMap,
                     outDir: 'dist-electron',
@@ -386,16 +363,6 @@ export default defineConfig(async ({ command }) => {
                 onstart() {
                   // Signal that the main process bundle is ready for electron to load
                   fs.writeFileSync(electronReadyPath, '');
-
-                  // Copy photon-node WASM artifact into dist-electron so pi-coding-agent can load it
-                  const wasmSource = path.resolve(
-                    projectRoot,
-                    'node_modules/@earendil-works/pi-coding-agent/node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm',
-                  );
-                  const wasmDest = path.resolve(projectRoot, 'dist-electron/photon_rs_bg.wasm');
-                  if (fs.existsSync(wasmSource) && !fs.existsSync(wasmDest)) {
-                    fs.copyFileSync(wasmSource, wasmDest);
-                  }
                 },
               },
             ]),
@@ -444,7 +411,6 @@ export default defineConfig(async ({ command }) => {
     optimizeDeps: {
       entries: ['src/renderer/main.tsx'],
       include: [
-        '@wecom/wecom-aibot-sdk',
         'ansi-to-react',
         'cronstrue/i18n',
         'jszip',

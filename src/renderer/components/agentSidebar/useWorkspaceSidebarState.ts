@@ -41,9 +41,7 @@ const isScheduledSession = (session: CoworkSessionSummary): boolean =>
   session.source === CoworkSessionSource.Scheduled;
 
 const sourcesForGroup = (scheduled: boolean) =>
-  scheduled
-    ? [CoworkSessionSource.Scheduled]
-    : [CoworkSessionSource.Manual, CoworkSessionSource.Im];
+  scheduled ? [CoworkSessionSource.Scheduled] : [CoworkSessionSource.Manual];
 
 const workspaceGroupKey = (workspaceId: string, scheduled: boolean): string =>
   `${workspaceId}:${scheduled ? CoworkSessionSource.Scheduled : CoworkSessionSource.Manual}`;
@@ -58,6 +56,7 @@ const toTaskNode = (
   id: session.id,
   agentId: session.agentId?.trim() || 'main',
   workspaceId: session.workspaceId,
+  source: session.source,
   title: resolveSessionDisplayTitle(session, language),
   status: session.status,
   pinned: session.pinned,

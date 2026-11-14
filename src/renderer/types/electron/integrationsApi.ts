@@ -77,42 +77,6 @@ export interface ManagedProvidersApi extends Renamed<{
   onChanged: (callback: () => void) => () => void;
 }
 
-export interface FeishuApi {
-  install: {
-    verify: (
-      appId: string,
-      appSecret: string,
-    ) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-  };
-}
-
-export interface DingTalkApi {
-  install: {
-    qrcode: () => Promise<{
-      url: string;
-      deviceCode: string;
-      interval: number;
-      expireIn: number;
-    }>;
-    poll: (deviceCode: string) => Promise<{
-      done: boolean;
-      clientId?: string;
-      clientSecret?: string;
-      error?: string;
-    }>;
-    verify: (
-      clientId: string,
-      clientSecret: string,
-    ) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-  };
-}
-
 type ActivityContractApi = IpcContractApi<typeof activityContract>;
 
 export interface ActivityApi extends Omit<ActivityContractApi, 'onUpdated'> {

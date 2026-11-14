@@ -28,14 +28,11 @@ import { isLocalProviderName, ModelCapabilityStatus } from '../../../shared/prov
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
-import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
-import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { applyApplicationRuntimeEnv } from '../coworkUtil';
 import {
   assertLlamaCppWorkModeContext,
   assertWorkModeContextWindow,
 } from '../llamacppWorkModeContextGuard';
-import { PiAgentEventType } from './piStreamConstants';
 import { resolvePiSkillRoots } from './piSkillRoots';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
@@ -44,10 +41,10 @@ import { PiEventProjectionQueue } from './piEventProjectionQueue';
 import { ToolActivityTracker } from './toolActivity';
 import { collectImagePathReferences } from './piImageInputFallback';
 import { DEFAULT_PI_LOCAL_MAX_TOKENS, resolvePiModel } from './piMagpiePiModel';
-import { createPiSettingsManager, resolvePiSessionModel } from './piRuntimeSettingsOverrides';
+import { applyPiEmbeddedHttpIdleTimeout } from './piHttpIdleTimeout';
 import { resolveExpertPresetSkillDirs, resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
 import { createPiRuntimeResourceLoader } from './piRuntimeResourceLoader';
-import { openPersistentPiSessionManager } from './piSessionStore';
+import { durableSessionFile, hasDurableSession } from './durableSessionStore';
 import { buildPiSessionCustomTools } from './piRuntimeSessionCustomTools';
 import {
   getPiModules,
@@ -74,7 +71,8 @@ export async function startPiRuntimeSession(
   prompt: string,
   options: PiStartOptions = {},
 ): Promise<void> {
-  assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
+  if (!options._resumePending && !options._prepareOnly)
+    assertCoworkSubmissionContent({ prompt, imageAttachments: options.imageAttachments });
   host.evictIdleSessions();
   const expertIds = normalizeSingleExpertIds(options.expertIds);
 
@@ -99,7 +97,7 @@ export async function startPiRuntimeSession(
   // Must persist via store.addMessage() — the CoworkStore is the source of
   // truth for messages; emit alone delivers to the in-memory Redux state
   // but never writes to SQLite, causing the prompt to vanish on session switch.
-  if (!options.skipInitialUserMessage) {
+  if (!options.skipInitialUserMessage && !options._resumePending && !options._prepareOnly) {
     const storedImages = host.persistImageAttachments(sessionId, options.imageAttachments);
     // The transcript shows what the user attached to this input, never the
     // session's execution set (which also carries the expert preset bundle).
@@ -156,24 +154,13 @@ export async function startPiRuntimeSession(
       hasAppliedApplicationRuntimeEnv = true;
     }
     const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
-    // Pi's session manager keeps the structured transcript (tool calls,
-    // results, images, thinking) in a per-Cowork-session JSONL. Rebuilds
-    // Reopen any persisted Pi JSONL session file so Pi owns structured history.
     const piSessionStoreRoot = host.getPiSessionStoreRoot();
     const historyRestoreStartedAt = Date.now();
-    let restoredNativeHistory = false;
-    if (piSessionStoreRoot && pi.SessionManager?.create && pi.SessionManager?.open) {
-      const persisted = openPersistentPiSessionManager(
-        pi.SessionManager,
-        piSessionStoreRoot,
-        sessionId,
-        workspaceRoot,
-      );
-      sessionOptions.sessionManager = persisted.manager;
-      restoredNativeHistory = persisted.reusedFile;
-    } else if (pi.SessionManager?.inMemory) {
-      sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
-    }
+    const restoredNativeHistory = Boolean(
+      piSessionStoreRoot && hasDurableSession(piSessionStoreRoot, sessionId),
+    );
+    if (!piSessionStoreRoot) throw new Error('Durable session persistence is not initialized.');
+    sessionOptions.durableFile = durableSessionFile(piSessionStoreRoot, sessionId);
 
     // System prompt — user config only. Skills are discovered and appended
     // by the resource loader (additionalSkillPaths), which renders them via
@@ -210,10 +197,17 @@ export async function startPiRuntimeSession(
       resolveZhiyuanSkillDirs(),
       resourceState.expertSkillDirs,
     );
+    sessionOptions.memoryBinding = chatMode
+      ? null
+      : await host
+          .getProjectMemoryService()
+          ?.createDurableMemoryBinding?.(workspaceRoot, sessionId);
 
     const workflowKind = chatMode ? WorkbenchContractKind.Chat : WorkbenchContractKind.GenericWork;
     const workbenchTaskService = host.getWorkbenchTaskService();
-    if (workbenchTaskService && !chatMode) {
+    if (options._resumePending || options._prepareOnly) {
+      workbenchRunId = workbenchTaskService?.getCurrent(sessionId)?.task.activeRunId ?? null;
+    } else if (workbenchTaskService && !chatMode) {
       const workbench = workbenchTaskService.beginRun({
         sessionId,
         goal: prompt,
@@ -224,10 +218,7 @@ export async function startPiRuntimeSession(
       workbenchRunId = workbench.run.id;
     }
 
-    // Pi's createAgentSession does not accept a systemPrompt option. Its
-    // default resource loader supplies the Pi Coding Assistant identity,
-    // so override that loader per session to keep expert contexts isolated.
-    // Resolve model early — needed by both MCP proxy and subagent tool
+    // Resolve the provider before building native resources and task bindings.
     const resolvedModel = await resolvePiModel(pi, options.modelOverride, undefined, {
       conversationId: sessionId,
       workload:
@@ -291,7 +282,7 @@ export async function startPiRuntimeSession(
       );
     }
     resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
-    const sessionModel = resolvePiSessionModel(resolvedModel.model, resourceState.chatMode);
+    const sessionModel = resolvedModel.model;
     sessionOptions.model = sessionModel;
     if (options.thinkingLevel) {
       // Pi clamps the level to what the resolved model actually supports.
@@ -302,46 +293,29 @@ export async function startPiRuntimeSession(
     }
 
     console.debug(`[PiRuntime] loading isolated resources for session ${sessionId}`);
-    const settingsManager = createPiSettingsManager(pi, workspaceRoot);
+    applyPiEmbeddedHttpIdleTimeout();
     const codemodeEnabled =
       options.codemode === true && !resourceState.chatMode && options.confirmationMode !== 'text';
     const expertMcpIds = Array.isArray(expertSession?.capabilityPolicy?.mcpIds)
       ? (expertSession.capabilityPolicy.mcpIds as string[])
       : [];
-    const resourceLoader = await createPiRuntimeResourceLoader(
-      host,
-      pi,
-      workspaceRoot,
-      resourceState,
-      {
-        sessionId,
-        getRunId: () => host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
-        settingsManager,
-        getApprovalMode: () =>
-          host.activeSessions.get(sessionId)?.approvalMode ??
-          options.approvalMode ??
-          WorkbenchApprovalMode.Ask,
-        enableCodemode: codemodeEnabled,
-        expertMcpIds,
-      },
-    );
-    if (codemodeEnabled && settingsManager) {
-      // "+codemode" adds the sandbox tool on top of the default tool set;
-      // tool_search stays dormant until a deferred MCP server needs it.
-      settingsManager.applyOverrides({ defaultTools: ['+codemode'] });
-    }
+    const resourceLoader = await createPiRuntimeResourceLoader(host, workspaceRoot, resourceState, {
+      sessionId,
+      getRunId: () => host.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
+      getApprovalMode: () =>
+        host.activeSessions.get(sessionId)?.approvalMode ??
+        options.approvalMode ??
+        WorkbenchApprovalMode.Ask,
+      enableCodemode: codemodeEnabled,
+      expertMcpIds,
+    });
     if (!isCurrentInitialization()) return;
     sessionOptions.resourceLoader = resourceLoader;
-    if (settingsManager) {
-      sessionOptions.settingsManager = settingsManager;
-    }
 
     const { customTools } = buildPiSessionCustomTools(host, {
-      pi,
       sessionId,
       options,
       resourceState,
-      resolvedModel,
       workspaceRoot,
       workbenchRunId,
       expertIds,
@@ -376,12 +350,31 @@ export async function startPiRuntimeSession(
     }
 
     const piSessionCreateStartedAt = Date.now();
+    sessionOptions.runtimeOptions = {
+      sessionId,
+      _automationId: options._automationId,
+      workspaceRoot,
+      modelOverride: modelId,
+      sessionMode: options.sessionMode,
+      systemPrompt: options.systemPrompt,
+      skillIds: effectiveSkillIds,
+      expertIds,
+      approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
+      unattended: options.unattended,
+      thinkingLevel: options.thinkingLevel,
+      confirmationMode: options.confirmationMode,
+      codemode: codemodeEnabled,
+      planMode: options.planMode,
+      readOnlyWorkspace: options.readOnlyWorkspace,
+      codingElicitation: options.codingElicitation,
+      goalMode: options.goalMode,
+    };
     console.debug(`[PiRuntime] creating agent session for ${sessionId}`);
     const result = await pi.createAgentSession(sessionOptions);
     const session = result.session;
     if (restoredNativeHistory) {
       agentResourceDiagnostics.recordPiHistoryRestored(sessionId, {
-        source: 'jsonl',
+        source: 'durable',
         messageCount: session.messages?.length,
         promptChars: prompt.length,
         restoreMs: Date.now() - historyRestoreStartedAt,
@@ -389,11 +382,6 @@ export async function startPiRuntimeSession(
           typeof sessionModel.contextWindow === 'number' ? sessionModel.contextWindow : undefined,
         model: modelId,
       });
-    }
-    if (!resourceState.chatMode && typeof session.bindExtensions === 'function') {
-      // Pi's builtin MCP extension connects servers on session_start; without
-      // an explicit bind, SDK sessions never emit it.
-      await session.bindExtensions({});
     }
     const piSessionCreatedAt = Date.now();
     if (!isCurrentInitialization()) {
@@ -403,6 +391,7 @@ export async function startPiRuntimeSession(
     }
 
     const active: ActivePiSession = {
+      nativeInputProjection: options._prepareOnly === true,
       sessionId,
       piSession: session,
       abortController,
@@ -460,8 +449,6 @@ export async function startPiRuntimeSession(
       goalMode: options.goalMode === true,
       planMode: options.planMode === true,
       pendingSkillReload: false,
-      pendingTurnMemoryContext: null,
-      injectedProjectMemorySections: [],
       pendingError: null,
       errorSurfaced: false,
       retryNoticeEmitted: false,
@@ -476,10 +463,9 @@ export async function startPiRuntimeSession(
         workspaceRoot,
         resourceState,
       ),
-      settingsManager,
       approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
       unattended: resourceState.unattended,
-      isRunning: true,
+      isRunning: !options._prepareOnly,
       lastUsedAt: Date.now(),
       turnFailed: false,
       lastImagePrompt: null,
@@ -505,10 +491,6 @@ export async function startPiRuntimeSession(
       if (abortController.signal.aborted || host.activeSessions.get(sessionId) !== active) {
         return;
       }
-      if (event.type === PiAgentEventType.CompactionEnd && event.result) {
-        host.memoryInjectionDedup.reset(sessionId);
-        active.injectedProjectMemorySections = [];
-      }
       host.emit('executionEvent', sessionId, event);
       active.eventProjection?.push(event);
     });
@@ -532,29 +514,17 @@ export async function startPiRuntimeSession(
       [...host.activeSessions.values()].filter(session => session.isRunning).length,
     );
     host.initializingSessions.delete(sessionId);
+    if (options._prepareOnly) return;
+    if (options._resumePending) {
+      if (!session.resume) throw new Error('Native execution recovery is unavailable.');
+      await session.resume();
+      await active.eventProjection?.drain();
+      return;
+    }
     // A live Pi session replaces the lightweight IM retention marker.
     host.retainedSessionIds.delete(sessionId);
 
-    // A fresh Pi transcript never contains an earlier memory block, so the
-    // per-session dedup fingerprint must restart with it.
-    host.memoryInjectionDedup.reset(sessionId);
-    const projectMemoryContext = await resolveProjectMemoryContextForPiPrompt({
-      chatMode: resourceState.chatMode,
-      memoryInjectionDedup: host.memoryInjectionDedup,
-      projectMemoryService: host.getProjectMemoryService(),
-      workspaceRoot,
-      sessionId,
-      userPrompt: prompt,
-      signal: abortController.signal,
-    });
     if (host.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
-    active.pendingTurnMemoryContext = projectMemoryContext;
-    captureMemoryPromptForE2e({
-      sessionId,
-      userPrompt: prompt,
-      memoryContext: projectMemoryContext,
-      initialPrompt: prompt,
-    });
 
     // The user may stop the session while the execution-mode question is
     // open. Do not revive an aborted Pi turn when that question resolves.
@@ -583,7 +553,10 @@ export async function startPiRuntimeSession(
     // A stopped turn can immediately restart from the first queued follow-up.
     // Its eventual abort rejection must not delete that replacement session.
     if (activeSession && host.activeSessions.get(sessionId) === activeSession) {
-      host.memoryInjectionDedup.reset(sessionId);
+      await activeSession.eventProjection?.drain();
+      activeSession.unsubscribe();
+      await activeSession.piSession.close?.();
+      activeSession.artifactRecorder?.dispose();
       host.activeSessions.delete(sessionId);
     }
     if (abortController.signal.aborted) {
@@ -591,7 +564,7 @@ export async function startPiRuntimeSession(
       return;
     }
     const message = error instanceof Error ? error.message : String(error);
-    host.getWorkbenchTaskService()?.failRun?.(sessionId, { message });
+    if (!options._resumePending) host.getWorkbenchTaskService()?.failRun?.(sessionId, { message });
     host.emit('error', sessionId, classifyCoworkError(message));
     throw error;
   } finally {

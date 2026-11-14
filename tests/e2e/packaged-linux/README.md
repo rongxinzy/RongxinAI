@@ -29,7 +29,7 @@ Artifacts: `.github/pr-assets/packaged-linux-e2e/` (`report.json`, PNG screensho
 | --- | --- | --- |
 | `fresh-start-legacy-tables` | No | Fresh profile must not retain legacy `user_memories` tables |
 | `upgrade-legacy-drop` | No | Pre-seeded legacy tables are dropped on startup |
-| `managed-memory-engram` | No | Memory IPC create/update/forget + restart persistence |
+| `managed-memory-local` | No | Memory IPC create/update/forget + restart persistence |
 | `glm-work-memory-tool` | Yes | Work-mode turn using memory tool + recall |
 | `im-cc-connect-bridge-reply` | Yes | cc-connect `/v1/cc-connect/turn` receives agent reply (sidecar config + bridge) |
 | `llama-overflow-compaction` | No | Import small Qwen GGUF, load with 8k ctx, long work prompt |

@@ -12,7 +12,6 @@ import { artifactsApi } from './artifacts';
 import { automationApi } from './automation';
 import { codingAgentApi } from './codingAgent';
 import { coworkApi } from './cowork';
-import { imApi } from './im';
 import { localInferenceApi } from './localInference';
 import { memoryApi } from './memory';
 import { providersApi } from './providers';
@@ -142,7 +141,6 @@ describe('split api fragments', () => {
   test('fragment surfaces keep their top-level sections', () => {
     expect(Object.keys(skillsAndMcpApi).sort()).toEqual(['marketplace', 'mcp', 'skills']);
     expect(Object.keys(codingAgentApi)).toEqual(['codingAgent']);
-    expect(Object.keys(imApi).sort()).toEqual(['dingtalk', 'feishu', 'im']);
     expect(Object.keys(memoryApi)).toEqual(['memory']);
     expect(Object.keys(artifactsApi)).toEqual(['artifacts']);
     expect(Object.keys(automationApi).sort()).toEqual(['activity', 'scheduledTasks']);
@@ -174,13 +172,10 @@ describe('preload entry', () => {
       'cowork',
       'desktopPet',
       'dialog',
-      'dingtalk',
       'enterprise',
-      'feishu',
       'generateSessionTitle',
       'getRecentCwds',
       'hardware',
-      'im',
       'llamacpp',
       'log',
       'magpie',

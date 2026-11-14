@@ -2,14 +2,13 @@
 export const enTodoActivity: Record<string, string> = {
   // Activity feed
   activityTitle: 'Activity',
-  activityHeroDesc: 'Every run from channel messages and scheduled tasks',
-  activityTriggerChannel: 'Channel',
+  activityHeroDesc: 'Every automation run',
   activityTriggerCron: 'Scheduled',
   activityFilterAll: 'All',
   activityStatusRunning: 'Running',
   activityStatusCompleted: 'Completed',
   activityStatusFailed: 'Failed',
-  activityEmpty: 'No channel or scheduled task runs yet',
+  activityEmpty: 'No automation runs yet',
   activityEmptyAction: 'View scheduled tasks',
   activityFilterEmpty: 'No related activity data',
   activityFilterClear: 'Clear filters',

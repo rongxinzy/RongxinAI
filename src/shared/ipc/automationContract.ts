@@ -15,7 +15,6 @@ import { z } from 'zod';
 import { defineIpcContract } from './contract';
 import {
   DeliveryMode,
-  DeliveryStatus,
   IpcChannel as ScheduledTaskIpc,
   PayloadKind,
   ScheduleKind,
@@ -50,13 +49,7 @@ const ScheduledTaskPayloadSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal(PayloadKind.SystemEvent), text: z.string() }),
 ]);
 
-const ScheduledTaskDeliverySchema = z.object({
-  mode: z.enum([DeliveryMode.None, DeliveryMode.Announce, DeliveryMode.Webhook]),
-  channel: z.string().optional(),
-  to: z.string().optional(),
-  accountId: z.string().optional(),
-  bestEffort: z.boolean().optional(),
-});
+const ScheduledTaskDeliverySchema = z.strictObject({ mode: z.literal(DeliveryMode.None) });
 
 /** Shape the task form submits (buildTaskInput in taskFormState.ts). */
 const ScheduledTaskInputSchema = z.object({
@@ -64,12 +57,12 @@ const ScheduledTaskInputSchema = z.object({
   description: z.string(),
   enabled: z.boolean(),
   schedule: ScheduleSchema,
-  sessionTarget: z.enum([SessionTarget.Main, SessionTarget.Isolated, SessionTarget.Task]),
-  wakeMode: z.enum([WakeMode.Now, WakeMode.NextHeartbeat]),
+  sessionTarget: z.enum([SessionTarget.Isolated, SessionTarget.Task]),
+  wakeMode: z.literal(WakeMode.Now),
   payload: ScheduledTaskPayloadSchema,
   delivery: ScheduledTaskDeliverySchema.optional(),
   workspaceId: z.string().nullable().optional(),
-  sessionKey: z.string().nullable().optional(),
+  sessionKey: z.null().optional(),
 });
 
 /** Edit flow sends only the changed fields (Partial<ScheduledTaskInput>). */
@@ -93,11 +86,11 @@ const TaskStateSchema = z.object({
   consecutiveErrors: z.number(),
 });
 
-/** `ScheduledTask` row as returned by the canonical SQLite task service. */
+/** `ScheduledTask` row as returned by the durable automation service. */
 const ScheduledTaskSchema = ScheduledTaskInputSchema.extend({
   id: z.string(),
   workspaceId: z.string().nullable(),
-  sessionKey: z.string().nullable(),
+  sessionKey: z.null(),
   scheduleVersion: z.string().optional(),
   state: TaskStateSchema,
   createdAt: z.string(),
@@ -120,40 +113,6 @@ const ScheduledTaskRunSchema = z.object({
 const ScheduledTaskRunWithNameSchema = ScheduledTaskRunSchema.extend({
   taskName: z.string(),
   taskPayload: z.string().optional(),
-});
-
-const ScheduledTaskDeliveryRecordSchema = z.object({
-  id: z.string(),
-  runId: z.string(),
-  taskId: z.string(),
-  mode: z.enum([DeliveryMode.None, DeliveryMode.Announce, DeliveryMode.Webhook]),
-  channel: z.string().nullable(),
-  to: z.string().nullable(),
-  accountId: z.string().nullable(),
-  status: z.enum([
-    DeliveryStatus.Pending,
-    DeliveryStatus.Success,
-    DeliveryStatus.Error,
-    DeliveryStatus.Skipped,
-  ]),
-  attemptedAt: z.string(),
-  deliveredAt: z.string().nullable(),
-  receiptId: z.string().nullable(),
-  error: z.string().nullable(),
-});
-
-const ScheduledTaskChannelOptionSchema = z.object({
-  value: z.string(),
-  label: z.string(),
-  accountId: z.string().optional(),
-  filterAccountId: z.string().optional(),
-});
-
-const ScheduledTaskConversationOptionSchema = z.object({
-  conversationId: z.string(),
-  platform: z.string(),
-  coworkSessionId: z.string(),
-  lastActiveAt: z.number(),
 });
 
 export const scheduledTasksContract = defineIpcContract({
@@ -221,28 +180,14 @@ export const scheduledTasksContract = defineIpcContract({
   stop: {
     channel: ScheduledTaskIpc.Stop,
     args: z.tuple([z.string()]),
-    // Handler returns `result: false` — a claimed Pi Run finishes on its own.
+    // Handler reports whether an active run was stopped.
     result: z.object({
       success: z.boolean(),
       result: z.boolean().optional(),
       error: z.string().optional(),
     }),
   },
-  preflight: {
-    channel: ScheduledTaskIpc.Preflight,
-    args: z.tuple([z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      error: z.string().optional(),
-      preflight: z
-        .object({
-          hasChannel: z.boolean(),
-          channel: z.string().optional(),
-          latestDelivery: ScheduledTaskDeliveryRecordSchema.nullable().optional(),
-        })
-        .optional(),
-    }),
-  },
+
   listRuns: {
     channel: ScheduledTaskIpc.ListRuns,
     args: z.tuple([
@@ -257,15 +202,7 @@ export const scheduledTasksContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  listDeliveries: {
-    channel: ScheduledTaskIpc.ListDeliveries,
-    args: z.tuple([z.string()]),
-    result: z.object({
-      success: z.boolean(),
-      deliveries: z.array(ScheduledTaskDeliveryRecordSchema).optional(),
-      error: z.string().optional(),
-    }),
-  },
+
   countRuns: {
     channel: ScheduledTaskIpc.CountRuns,
     args: z.tuple([z.string()]),
@@ -293,27 +230,9 @@ export const scheduledTasksContract = defineIpcContract({
       error: z.string().optional(),
     }),
   },
-  listChannels: {
-    channel: ScheduledTaskIpc.ListChannels,
-    args: z.tuple([]),
-    result: z.object({
-      success: z.boolean(),
-      channels: z.array(ScheduledTaskChannelOptionSchema).optional(),
-      error: z.string().optional(),
-    }),
-  },
-  listChannelConversations: {
-    channel: ScheduledTaskIpc.ListChannelConversations,
-    args: z.tuple([z.string(), z.string().optional(), z.string().optional()]),
-    result: z.object({
-      success: z.boolean(),
-      conversations: z.array(ScheduledTaskConversationOptionSchema).optional(),
-      error: z.string().optional(),
-    }),
-  },
 });
 
-/** Activity feed: read-only projection of channel/scheduled-task runs. */
+/** Activity feed: read-only projection of local automation runs. */
 export const activityContract = defineIpcContract({
   list: {
     channel: ActivityIpc.List,
@@ -323,13 +242,11 @@ export const activityContract = defineIpcContract({
       runs: z.array(
         z.object({
           id: z.string(),
-          source: z.enum([ActivitySource.Channel, ActivitySource.ScheduledTask]),
+          source: z.enum(ActivitySource),
           status: z.enum([ActivityStatus.Running, ActivityStatus.Completed, ActivityStatus.Failed]),
           startedAt: z.number(),
           updatedAt: z.number(),
           sessionId: z.string().optional(),
-          platform: z.string().optional(),
-          conversationId: z.string().optional(),
           taskName: z.string().optional(),
           inputPreview: z.string().optional(),
           replyPreview: z.string().optional(),

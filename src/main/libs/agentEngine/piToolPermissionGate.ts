@@ -10,7 +10,7 @@
 
 import { randomUUID } from 'crypto';
 
-import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
+import type { ToolAnnotations } from './durableToolTypes';
 
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {

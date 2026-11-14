@@ -34,7 +34,6 @@ import { createAppInfo } from './createAppInfo';
 import { createAppUpdate } from './createAppUpdate';
 import { createRuntimeNotices } from './createRuntimeNotices';
 import { createLog } from './createLog';
-import { createIm } from './createIm';
 import { createScheduledTasks } from './createScheduledTasks';
 import { createPermissions } from './createPermissions';
 import { createAuth } from './createAuth';
@@ -42,8 +41,6 @@ import { createModelPool } from './createModelPool';
 import { createEnterprise } from './createEnterprise';
 import { createManagedProviders } from './createManagedProviders';
 import { createNetworkStatus } from './createNetworkStatus';
-import { createFeishu } from './createFeishu';
-import { createDingtalk } from './createDingtalk';
 import { createActivity } from './createActivity';
 
 export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['electron'] {
@@ -83,7 +80,6 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     appUpdate: createAppUpdate(runtime),
     runtimeNotices: createRuntimeNotices(runtime),
     log: createLog(runtime),
-    im: createIm(runtime),
     scheduledTasks: createScheduledTasks(runtime),
     permissions: createPermissions(runtime),
     auth: createAuth(runtime),
@@ -91,8 +87,6 @@ export function createGeneratedSurface(runtime: BrowserMockRuntime): Window['ele
     enterprise: createEnterprise(runtime),
     managedProviders: createManagedProviders(runtime),
     networkStatus: createNetworkStatus(runtime),
-    feishu: createFeishu(runtime),
-    dingtalk: createDingtalk(runtime),
     activity: createActivity(runtime),
   };
 }

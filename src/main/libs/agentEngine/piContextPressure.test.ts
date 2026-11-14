@@ -5,7 +5,16 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { app } from 'electron';
 import { expect, test, vi } from 'vitest';
-import { SessionManager } from '@earendil-works/pi-coding-agent';
+import { createModels } from '@earendil-works/pi-ai';
+import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
+import {
+  Harness,
+  createRegistry,
+  UserEntry,
+  AssistantEntry,
+  CompactionEntry,
+} from '@earendil-works/pi-durable';
+import { openNodeSqliteStorage } from '@earendil-works/pi-durable/storage/sqlite/node';
 import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
 import { CoworkExecutionMode } from '../../../shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
@@ -15,16 +24,16 @@ import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
 import { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { runTextWorkerOperation } from '../../workbenchTask/textWorkerOperations';
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
-import { piSessionDirFor } from './piSessionStore';
+import { durableSessionFile } from './durableSessionStore';
 
 // Vitest does not build the Electron worker bundle. Keep the real text worker operation;
-// the session, provider transport, tools, SQLite and JSONL are all exercised.
+// the session, provider transport, tools, native SQLite are all exercised.
 vi.mock('../../workbenchTask/artifactWorkerPool', () => ({
   transformCoworkTextAsync: async (input: Parameters<typeof runTextWorkerOperation>[0]) =>
     runTextWorkerOperation(input),
 }));
 
-const Scenario = { Threshold: 'threshold', RepeatedLength: 'repeated-length' } as const;
+const Scenario = { Threshold: 'threshold', RepeatedLength: 'length' } as const;
 
 test.each([Scenario.Threshold, Scenario.RepeatedLength])(
   'full adapter preserves native context recovery and honest completion: %s',
@@ -149,31 +158,49 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
       adapter.setCoworkStore(cowork);
       adapter.setWorkbenchTaskService(new WorkbenchTaskService(db));
       adapter.setPiSessionStoreRoot(root);
-      const manager = SessionManager.create(root, piSessionDirFor(root, sessionId));
-      for (let i = 0; i < 18; i++) {
-        manager.appendMessage({
-          role: 'user',
-          content: '数据库事务日志索引调度一致性故障恢复'.repeat(160),
-          timestamp: Date.now(),
-        });
-        manager.appendMessage({
-          role: 'assistant',
-          content: [{ type: 'text', text: '已记录。' }],
-          timestamp: Date.now(),
-          api: 'openai-completions',
-          provider: 'magpie',
-          model: modelId,
-          stopReason: 'stop',
-          usage: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 0,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-          },
-        });
-      }
+      const native = await Harness.open(
+        await openNodeSqliteStorage(durableSessionFile(root, sessionId)),
+        { models: createModels(), registry: createRegistry() },
+        BACKGROUND_CONTEXT,
+      );
+      const conversation = await native.root(BACKGROUND_CONTEXT);
+      await native.commit(async tx => {
+        for (let i = 0; i < 18; i++) {
+          await tx.appendEntry(conversation.id, {
+            kind: UserEntry.kind,
+            model: [
+              {
+                role: 'user',
+                content: '数据库事务日志索引调度一致性故障恢复'.repeat(160),
+                timestamp: Date.now(),
+              },
+            ],
+          });
+          await tx.appendEntry(conversation.id, {
+            kind: AssistantEntry.kind,
+            model: [
+              {
+                role: 'assistant',
+                content: [{ type: 'text', text: '已记录。' }],
+                timestamp: Date.now(),
+                api: 'openai-completions',
+                provider: 'magpie',
+                model: modelId,
+                stopReason: 'stop',
+                usage: {
+                  input: 0,
+                  output: 0,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  totalTokens: 0,
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+                },
+              },
+            ],
+          });
+        }
+      }, BACKGROUND_CONTEXT);
+      await native.close(BACKGROUND_CONTEXT);
       const errors: unknown[] = [];
       let complete = 0;
       adapter.on('error', (_id, error) => errors.push(error));
@@ -184,7 +211,7 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
         adapter.respondToPermission(request.requestId, { behavior: 'allow' });
       });
       vi.useFakeTimers({ toFake: ['Date'] });
-      await adapter.startSession(
+      const start = adapter.startSession(
         sessionId,
         'Create 32 document summaries, index.csv and report.md. Verify every artifact before completing.',
         {
@@ -193,14 +220,26 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
           approvalMode: WorkbenchApprovalMode.Ask,
         },
       );
+      if (scenario === Scenario.Threshold) await start;
+      else await expect(start).rejects.toThrow('completion is incomplete');
       await vi.waitFor(() => expect(complete + errors.length).toBeGreaterThan(0), {
         timeout: 25000,
       });
       expect(serverErrors).toEqual([]);
       expect(requests.every(request => request.maxTokens > 1)).toBe(true);
-      const persisted = SessionManager.open(manager.getSessionFile()!);
-      expect(persisted.getBranch().some(entry => entry.type === 'compaction')).toBe(true);
+      const persisted = await Harness.open(
+        await openNodeSqliteStorage(durableSessionFile(root, sessionId)),
+        { models: createModels(), registry: createRegistry(), readOnly: true },
+        BACKGROUND_CONTEXT,
+      );
+      const entries = (
+        await (
+          await persisted.root(BACKGROUND_CONTEXT)
+        ).entries({}, 1000, undefined, BACKGROUND_CONTEXT)
+      ).items;
+      await persisted.close(BACKGROUND_CONTEXT);
       if (scenario === Scenario.Threshold) {
+        expect(entries.some(entry => CompactionEntry.is(entry))).toBe(true);
         expect(errors).toEqual([]);
         expect(complete).toBe(1);
         expect(summaries).toBeGreaterThan(2);
@@ -209,9 +248,8 @@ test.each([Scenario.Threshold, Scenario.RepeatedLength])(
       } else {
         expect(complete).toBe(0);
         expect(errors).not.toHaveLength(0);
-        // One compaction may summarize a split turn in two provider calls.
-        expect(persisted.getBranch().filter(entry => entry.type === 'compaction')).toHaveLength(1);
-        expect(requests.filter(request => !request.summary)).toHaveLength(2);
+        // A truncated answer is a failed product turn, not another implicit model run.
+        expect(requests.filter(request => !request.summary)).toHaveLength(1);
         expect((await readdir(root)).filter(name => artifacts.includes(name))).toEqual([]);
       }
     } finally {

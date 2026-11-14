@@ -64,10 +64,6 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   }, []);
   useEffect(() => i18nService.subscribe(() => setLanguage(i18nService.getLanguage())), []);
 
-  const channelCount = useMemo(
-    () => runs.filter(run => run.source === ActivityTriggerFilter.Channel).length,
-    [runs],
-  );
   const cronCount = useMemo(
     () => runs.filter(run => run.source === ActivityTriggerFilter.Cron).length,
     [runs],
@@ -131,16 +127,6 @@ const ActivityView: React.FC<ActivityViewProps> = ({
           ) : undefined,
       },
       {
-        value: ActivityTriggerFilter.Channel,
-        label: i18nService.t('activityTriggerChannel'),
-        badge:
-          channelCount > 0 ? (
-            <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
-              {channelCount}
-            </Badge>
-          ) : undefined,
-      },
-      {
         value: ActivityTriggerFilter.Cron,
         label: i18nService.t('activityTriggerCron'),
         badge:
@@ -151,7 +137,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
           ) : undefined,
       },
     ],
-    [runs.length, channelCount, cronCount],
+    [runs.length, cronCount],
   );
 
   return (

@@ -43,31 +43,31 @@ afterEach(() => {
 });
 
 describe.skipIf(process.platform !== 'win32')('component archive validator', () => {
-  test('accepts ordinary channel runtime paths emitted by 7-Zip', () => {
+  test('accepts ordinary uv runtime paths emitted by 7-Zip', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-component-validator-'));
     temporaryDirectories.push(root);
-    const componentRoot = path.join(root, 'channel-runtime');
-    const archivePath = path.join(root, 'channel-runtime.7z');
+    const componentRoot = path.join(root, 'uv-win');
+    const archivePath = path.join(root, 'uv-win.7z');
     fs.mkdirSync(componentRoot);
-    fs.writeFileSync(path.join(componentRoot, 'cc-connect-sidecar.exe'), 'runtime');
+    fs.writeFileSync(path.join(componentRoot, 'uv.exe'), 'runtime');
     fs.writeFileSync(path.join(componentRoot, 'runtime-build-info.json'), '{}');
 
-    const archive = spawnSync(sevenZipPath, ['a', '-t7z', archivePath, 'channel-runtime'], {
+    const archive = spawnSync(sevenZipPath, ['a', '-t7z', archivePath, 'uv-win'], {
       cwd: root,
       encoding: 'utf8',
     });
     expect(archive.status, archive.stderr || archive.stdout).toBe(0);
 
-    const accepted = runValidator(archivePath, 'channel-runtime');
+    const accepted = runValidator(archivePath, 'uv-win');
     expect(accepted.status, accepted.stderr || accepted.stdout).toBe(0);
     expect(accepted.stdout).toContain('Component archive validation passed');
 
     const rejected = runValidator(archivePath, 'wrong-prefix');
     expect(rejected.status).not.toBe(0);
-    expect(rejected.stderr).toContain('Unexpected archive entry: channel-runtime');
+    expect(rejected.stderr).toContain('Unexpected archive entry: uv-win');
 
     const expectedHash = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-    const hashMismatch = runValidator(archivePath, 'channel-runtime', sevenZipPath, expectedHash);
+    const hashMismatch = runValidator(archivePath, 'uv-win', sevenZipPath, expectedHash);
     expect(hashMismatch.status).toBe(2);
     expect(hashMismatch.stdout).toContain('hash-mismatch');
 
@@ -81,7 +81,7 @@ describe.skipIf(process.platform !== 'win32')('component archive validator', () 
       ],
       { encoding: 'utf8' },
     ).stdout.trim();
-    const hashMatch = runValidator(archivePath, 'channel-runtime', sevenZipPath, actualHash);
+    const hashMatch = runValidator(archivePath, 'uv-win', sevenZipPath, actualHash);
     expect(hashMatch.status, hashMatch.stderr || hashMatch.stdout).toBe(0);
     expect(hashMatch.stdout).toContain('Component archive validation passed');
   });
@@ -97,13 +97,13 @@ describe.skipIf(process.platform !== 'win32')('component archive validator', () 
       [
         '@echo off',
         'echo Path = fixture.7z',
-        'echo Path = channel-runtime',
+        'echo Path = uv-win',
         'echo Symbolic Link = ..\\outside',
         'exit /b 0',
       ].join('\r\n'),
     );
 
-    const rejected = runValidator(archivePath, 'channel-runtime', fakeSevenZipPath);
+    const rejected = runValidator(archivePath, 'uv-win', fakeSevenZipPath);
     expect(rejected.status).not.toBe(0);
     expect(rejected.stderr).toContain('Archive contains link metadata');
   });

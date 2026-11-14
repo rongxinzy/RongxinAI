@@ -238,7 +238,7 @@ function signPackagedWindowsMagpie(context, deps = {}) {
       ? null
       : (binary, expectedThumbprint) =>
           verifyWindowsAuthenticodeSignature(binary, expectedThumbprint, env, spawn));
-  const script = path.join(__dirname, 'runtime-signing', 'sign-runtime.ps1');
+  const script = path.join(__dirname, 'sign-windows-file.ps1');
   for (const key of contextTargets(context)) {
     const directory = path.join(root, key);
     const binary = path.join(directory, binaryName(key));

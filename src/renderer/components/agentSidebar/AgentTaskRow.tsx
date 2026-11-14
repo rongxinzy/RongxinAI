@@ -12,6 +12,8 @@ import { Ellipsis, ListChecks, Loader, Pencil, Pin, Share, Trash2 } from 'lucide
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { showAppToast } from '../../services/toastNotification';
+import { CoworkSessionSource } from '../../../shared/cowork/constants';
 import type { RootState } from '../../store';
 import { selectHasPendingPermissionForSession } from '../../store/selectors/coworkSelectors';
 import { useSelector } from 'react-redux';
@@ -101,6 +103,10 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
     selectHasPendingPermissionForSession(state, task.id),
   );
   const showRelativeTime = !isRunning && !hasPendingPermission;
+  const isAutomation = task.source === CoworkSessionSource.Scheduled;
+  const deleteLabel = i18nService.t(
+    isAutomation ? 'scheduledTasksDeleteConversationAction' : 'deleteSession',
+  );
 
   return (
     <div
@@ -242,7 +248,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                   <Share className="h-3.5 w-3.5" /> {i18nService.t('coworkShareSession')}
                 </DropdownMenuItem>
                 <DropdownMenuItem variant="destructive" onClick={() => setShowConfirmDelete(true)}>
-                  <Trash2 className="h-3.5 w-3.5" /> {i18nService.t('deleteSession')}
+                  <Trash2 className="h-3.5 w-3.5" /> {deleteLabel}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -252,15 +258,18 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
 
       <DestructiveConfirmDialog
         open={showConfirmDelete}
-        title={i18nService.t('deleteTaskConfirmTitle')}
-        description={i18nService.t('deleteTaskConfirmMessage')}
+        title={i18nService.t(
+          isAutomation ? 'scheduledTasksDeleteConversationTitle' : 'deleteTaskConfirmTitle',
+        )}
+        description={i18nService.t(
+          isAutomation ? 'scheduledTasksDeleteConversationMessage' : 'deleteTaskConfirmMessage',
+        )}
         cancelLabel={i18nService.t('cancel')}
-        confirmLabel={i18nService.t('deleteSession')}
-        confirmVariant="outline"
+        confirmLabel={deleteLabel}
         onCancel={() => setShowConfirmDelete(false)}
         onConfirm={() => {
           setShowConfirmDelete(false);
-          void onDelete();
+          void onDelete().catch(error => showAppToast(String(error), { isError: true }));
         }}
       />
     </div>

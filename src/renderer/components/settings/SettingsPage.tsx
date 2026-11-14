@@ -20,9 +20,7 @@ import PageHeader from '../PageHeader';
 import AboutSettingsPanel from './about/AboutSettingsPanel';
 import { AISphereSettings } from './AISphereSettings';
 import { AppearanceSettingsPanel } from './appearance/AppearanceSettingsPanel';
-import { EmailSettingsPage } from './email/EmailSettingsPage';
 import GeneralSettingsPanel from './general/GeneralSettingsPanel';
-import ImSettingsPanel from './im/ImSettingsPanel';
 import { ManagedMemorySettings } from './memory/ManagedMemorySettings';
 import ModelSettingsPanel from './model/ModelSettingsPanel';
 import ShortcutsSettingsPanel from './shortcuts/ShortcutsSettingsPanel';
@@ -343,9 +341,6 @@ export default function SettingsPage({
           <ShortcutsSettingsPanel shortcuts={shortcuts} onShortcutChange={handleShortcutChange} />
         );
 
-      case 'im':
-        return <ImSettingsPanel />;
-
       case 'about':
         return <AboutSettingsPanel setError={setError} setNoticeMessage={setNoticeMessage} />;
 
@@ -434,27 +429,14 @@ export default function SettingsPage({
                 className={cn(
                   'w-full min-w-0',
                   contentWidthClass,
-                  activeTab === 'email' ? 'block' : 'hidden',
-                )}
-              >
-                <EmailSettingsPage />
-              </div>
-              <div
-                className={cn(
-                  'w-full min-w-0',
-                  contentWidthClass,
                   activeTab === 'model' ? 'block h-full' : 'hidden',
                 )}
               >
                 {activeTab === 'model' && <ModelSettingsPanel />}
               </div>
-              {activeTab !== 'email' && activeTab !== 'model' && (
+              {activeTab !== 'model' && (
                 <div
-                  className={cn(
-                    'w-full min-w-0',
-                    !isEnterpriseTab(activeTab) && contentWidthClass,
-                    activeTab === 'im' && 'h-full',
-                  )}
+                  className={cn('w-full min-w-0', !isEnterpriseTab(activeTab) && contentWidthClass)}
                 >
                   {renderTabContent()}
                 </div>

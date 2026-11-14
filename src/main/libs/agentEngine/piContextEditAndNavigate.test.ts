@@ -4,21 +4,21 @@ import { PiRuntimeAdapter } from './piRuntimeAdapter';
 describe('piContextEditAndNavigate (F18)', () => {
   let adapter: PiRuntimeAdapter;
   let mockPiSession: any;
-  let mockSessionManager: any;
+  let mockNativeEdits: any;
   let mockStore: any;
   const sessionId = 'test-session-tree';
 
   beforeEach(() => {
     adapter = new PiRuntimeAdapter();
 
-    mockSessionManager = {
+    mockNativeEdits = {
       appendContextEdit: vi.fn(
         (targetId: string, _replacement: any) => `edit-entry-for-${targetId}`,
       ),
     };
 
     mockPiSession = {
-      sessionManager: mockSessionManager,
+      appendContextEdit: mockNativeEdits.appendContextEdit,
       navigateTree: vi.fn(async (targetId: string, _options?: any) => ({
         cancelled: false,
         editorText: `Rewound prompt for ${targetId}`,
@@ -43,12 +43,12 @@ describe('piContextEditAndNavigate (F18)', () => {
   });
 
   describe('appendContextEdit', () => {
-    it('appends non-destructive context masking with replacement: null', () => {
-      const result = adapter.appendContextEdit(sessionId, 'msg-1', null);
+    it('appends non-destructive context masking with replacement: null', async () => {
+      const result = await adapter.appendContextEdit(sessionId, 'msg-1', null);
 
       expect(result.success).toBe(true);
       expect(result.entryId).toBe('edit-entry-for-msg-1');
-      expect(mockSessionManager.appendContextEdit).toHaveBeenCalledWith('msg-1', null);
+      expect(mockNativeEdits.appendContextEdit).toHaveBeenCalledWith('msg-1', null);
 
       // Verify store metadata updated
       expect(mockStore.updateMessageMetadata).toHaveBeenCalledWith(sessionId, 'msg-1', {
@@ -56,13 +56,13 @@ describe('piContextEditAndNavigate (F18)', () => {
       });
     });
 
-    it('appends context replacement with content', () => {
+    it('appends context replacement with content', async () => {
       const replacement = { content: 'Redacted confidential content' };
-      const result = adapter.appendContextEdit(sessionId, 'msg-2', replacement);
+      const result = await adapter.appendContextEdit(sessionId, 'msg-2', replacement);
 
       expect(result.success).toBe(true);
       expect(result.entryId).toBe('edit-entry-for-msg-2');
-      expect(mockSessionManager.appendContextEdit).toHaveBeenCalledWith('msg-2', replacement);
+      expect(mockNativeEdits.appendContextEdit).toHaveBeenCalledWith('msg-2', replacement);
 
       // Verify store metadata updated
       expect(mockStore.updateMessageMetadata).toHaveBeenCalledWith(sessionId, 'msg-2', {
@@ -70,17 +70,17 @@ describe('piContextEditAndNavigate (F18)', () => {
       });
     });
 
-    it('refuses context editing while session is running', () => {
+    it('refuses context editing while session is running', async () => {
       (adapter as any).activeSessions.get(sessionId)!.isRunning = true;
 
-      const result = adapter.appendContextEdit(sessionId, 'msg-1', null);
+      const result = await adapter.appendContextEdit(sessionId, 'msg-1', null);
       expect(result.success).toBe(false);
       expect(result.error).toContain('running');
-      expect(mockSessionManager.appendContextEdit).not.toHaveBeenCalled();
+      expect(mockNativeEdits.appendContextEdit).not.toHaveBeenCalled();
     });
 
-    it('returns error when session is not found', () => {
-      const result = adapter.appendContextEdit('non-existent', 'msg-1', null);
+    it('returns error when session is not found', async () => {
+      const result = await adapter.appendContextEdit('non-existent', 'msg-1', null);
       expect(result.success).toBe(false);
       expect(result.error).toContain('not active');
     });

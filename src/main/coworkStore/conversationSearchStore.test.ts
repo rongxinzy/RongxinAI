@@ -161,3 +161,19 @@ test('message previews are whitespace-normalized and truncated to 280 characters
   expect(records[0].human.endsWith('…')).toBe(true);
   expect(records[0].human).not.toContain('\n');
 });
+
+test('search and recent history exclude retired messaging rows without changing them', () => {
+  const { db, store } = harness;
+  const retired = store.createSession('retired channel', '/tmp/search-im');
+  const current = store.createSession('current work', '/tmp/search-manual');
+  store.addMessage(retired.id, { type: 'user', content: 'searchable retired content' }, 1000);
+  store.addMessage(current.id, { type: 'user', content: 'searchable current content' }, 2000);
+  db.prepare("UPDATE cowork_sessions SET source = 'im' WHERE id = ?").run(retired.id);
+  expect(store.conversationSearch({ query: 'searchable' }).map(record => record.sessionId)).toEqual(
+    [current.id],
+  );
+  expect(store.recentChats({ n: 20 }).map(record => record.sessionId)).toEqual([current.id]);
+  expect(
+    db.prepare('SELECT content FROM cowork_messages WHERE session_id = ?').get(retired.id),
+  ).toEqual({ content: 'searchable retired content' });
+});

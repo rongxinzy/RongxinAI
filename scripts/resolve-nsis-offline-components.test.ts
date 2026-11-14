@@ -11,10 +11,42 @@ import {
 } from './resolve-nsis-offline-components.cjs';
 
 const previous = process.env.ZHIYUAN_UPDATE_VARIANT;
+const requiredKeys = ['skills', 'mcps', 'python', 'skill-python', 'uv'];
 
 afterEach(() => {
   if (previous === undefined) delete process.env.ZHIYUAN_UPDATE_VARIANT;
   else process.env.ZHIYUAN_UPDATE_VARIANT = previous;
+});
+
+test('the installer shell, native activation and smoke checks retain the same five required components', () => {
+  expect(
+    resolveNsisOfflineComponentTargets('lite')
+      .map(target => target.key)
+      .sort(),
+  ).toEqual([...requiredKeys].sort());
+  for (const file of [
+    'validate-offline-components.ps1',
+    'activate-components.ps1',
+    'cleanup-after-install.ps1',
+  ]) {
+    const code = readFileSync(path.join(import.meta.dirname, 'installer', file), 'utf8');
+    const declaration = /\$(?:RequiredComponentKeys|requiredKeys)\s*=\s*@\(([^)]+)\)/i.exec(
+      code,
+    )?.[1];
+    expect(declaration, file).toBeDefined();
+    expect([...declaration!.matchAll(/'([^']+)'/g)].map(match => match[1]).sort(), file).toEqual(
+      [...requiredKeys].sort(),
+    );
+  }
+  const shell = readFileSync(
+    path.join(import.meta.dirname, 'installer-shell/app/InstallerEngine.cs'),
+    'utf8',
+  );
+  const declaration = /RequiredComponentKeys\s*=\s*\{([^}]+)\}/.exec(shell)?.[1];
+  expect(declaration).toBeDefined();
+  expect([...declaration!.matchAll(/"([^"]+)"/g)].map(match => match[1]).sort()).toEqual(
+    [...requiredKeys].sort(),
+  );
 });
 
 test.each(['lite', 'cpu', 'cuda'])(
@@ -75,14 +107,14 @@ test('packaging and NSIS consume generated edition routing in all component phas
 test('lite targets exclude llamacpp-bundled component', () => {
   process.env.ZHIYUAN_UPDATE_VARIANT = 'lite';
   expect(shouldIncludeLlamaCppBundledComponent()).toBe(false);
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(6);
+  expect(resolveNsisOfflineComponentTargets()).toHaveLength(5);
 });
 
 test('cpu and cuda targets include llamacpp-bundled component', () => {
   process.env.ZHIYUAN_UPDATE_VARIANT = 'cpu';
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(7);
+  expect(resolveNsisOfflineComponentTargets()).toHaveLength(6);
   expect(shouldIncludeStrataBundledComponent()).toBe(false);
   process.env.ZHIYUAN_UPDATE_VARIANT = 'cuda';
-  expect(resolveNsisOfflineComponentTargets()).toHaveLength(8);
+  expect(resolveNsisOfflineComponentTargets()).toHaveLength(7);
   expect(shouldIncludeStrataBundledComponent()).toBe(true);
 });
