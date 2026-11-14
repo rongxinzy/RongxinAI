@@ -204,6 +204,19 @@ export function classicInteractiveSurfaces() {
       disabled: { opacity: '0.5' },
     }),
     'surface-skill-placeholder': recipe({ base: { color: 'var(--muted-foreground)' } }),
+    'surface-pending-content': recipe({
+      base: {
+        'min-height': '2rem',
+        'padding-inline': '0.75rem',
+        'font-size': 'var(--zy-component-text-sm)',
+        'line-height': '1.25rem',
+        'font-weight': '500',
+        color: 'var(--foreground)',
+      },
+    }),
+    'surface-pending-icon': recipe({
+      base: { width: '1rem', height: '1rem', color: 'var(--muted-foreground)' },
+    }),
     'surface-pending-row': recipe({
       base: {
         ...transition,

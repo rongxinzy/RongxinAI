@@ -8,6 +8,7 @@ export const enCowork: Record<string, string> = {
   coworkQueueStatusSending: 'Sending',
   coworkQueueStatusFollowUp: 'Sends after the current task',
   coworkQueueStatusFailed: 'Send failed',
+  coworkQueuePendingInputs: 'Queued inputs',
   coworkQueueSteer: 'Steer',
   coworkQueueRetry: 'Retry',
   coworkQueueUpdateFailed: 'Failed to update pending message',

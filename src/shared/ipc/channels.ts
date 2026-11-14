@@ -185,10 +185,6 @@ export type CoworkSessionIpc = (typeof CoworkSessionIpc)[keyof typeof CoworkSess
 export const CoworkQueueIpc = {
   List: 'cowork:queue:list',
   Enqueue: 'cowork:queue:enqueue',
-  Update: 'cowork:queue:update',
-  Delete: 'cowork:queue:delete',
-  Steer: 'cowork:queue:steer',
-  FollowUp: 'cowork:queue:followUp',
 } as const;
 export type CoworkQueueIpc = (typeof CoworkQueueIpc)[keyof typeof CoworkQueueIpc];
 

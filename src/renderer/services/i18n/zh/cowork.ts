@@ -8,6 +8,7 @@ export const zhCowork: Record<string, string> = {
   coworkQueueStatusSending: '\u53d1\u9001\u4e2d',
   coworkQueueStatusFollowUp: '\u4f1a\u8bdd\u7ed3\u675f\u540e\u81ea\u52a8\u53d1\u9001',
   coworkQueueStatusFailed: '\u53d1\u9001\u5931\u8d25',
+  coworkQueuePendingInputs: '已排队的输入',
   coworkQueueSteer: '\u5f15\u5bfc',
   coworkQueueRetry: '\u91cd\u8bd5',
   coworkQueueUpdateFailed: '\u66f4\u65b0\u5f85\u5904\u7406\u6d88\u606f\u5931\u8d25',

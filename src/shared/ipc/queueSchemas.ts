@@ -33,19 +33,3 @@ export const CoworkQueueEnqueueSchema = z.object({
   fileAttachments: z.array(CoworkQueueFileAttachmentSchema).optional(),
   skillIds: z.array(z.string().min(1)).max(32).optional(),
 });
-
-export const CoworkQueueUpdateSchema = z.object({
-  sessionId: CoworkQueueSessionSchema,
-  itemId: z.string().min(1),
-  text: z
-    .string()
-    .trim()
-    .min(1)
-    .max(100_000)
-    .refine(hasVisiblePromptContent, { message: 'Message text is required.' }),
-});
-
-export const CoworkQueueItemSchema = z.object({
-  sessionId: CoworkQueueSessionSchema,
-  itemId: z.string().min(1),
-});

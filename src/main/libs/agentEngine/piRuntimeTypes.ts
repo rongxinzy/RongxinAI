@@ -3,7 +3,6 @@ import type { RuntimeRetryNotice } from '../../../common/runtimeNotice';
 import type { CoworkToolActivityEvent } from '../../../shared/cowork/toolActivity';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
-import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import type { PiPlanEntry } from './piPlanTool';
@@ -184,10 +183,6 @@ export type PiContinueOptions = {
   _workbenchTaskId?: string;
   /** Internal: do not persist a synthetic Resume/Retry prompt as a user message. */
   _skipUserMessage?: boolean;
-  /** Internal: marks a queued follow-up in the persisted transcript. */
-  _queueDelivery?: CoworkQueueDelivery;
-  /** Internal: tells Pi how to queue a prompt while the agent is settling. */
-  _streamingBehavior?: 'steer' | 'followUp';
 };
 
 /** Workbench session patch; Pi supports switching the model and thinking level. */
@@ -222,20 +217,7 @@ export interface PiRuntime {
     fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>,
     skillIds?: string[],
   ): { success: boolean; item?: CoworkPendingMessage; error?: string };
-  updatePendingMessage(
-    sessionId: string,
-    itemId: string,
-    text: string,
-  ): { success: boolean; item?: CoworkPendingMessage; error?: string };
-  deletePendingMessage(sessionId: string, itemId: string): { success: boolean; error?: string };
-  steerPendingMessage(
-    sessionId: string,
-    itemId: string,
-  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
-  followUpPendingMessage(
-    sessionId: string,
-    itemId: string,
-  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
+  steerInput(sessionId: string, text: string): Promise<{ success: boolean; error?: string }>;
   getSessionConfirmationMode(sessionId: string): 'modal' | 'text' | null;
   /**
    * Declares which sessions consume non-final full-text `messageUpdate` events

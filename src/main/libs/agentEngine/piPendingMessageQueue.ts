@@ -60,38 +60,6 @@ export class PiPendingMessageQueue {
     return { ...item };
   }
 
-  update(sessionId: string, itemId: string, text: string): CoworkPendingMessage | null {
-    const item = this.find(sessionId, itemId);
-    if (!item) return null;
-    item.text = text;
-    item.status = CoworkQueueItemStatus.Pending;
-    delete item.error;
-    return { ...item };
-  }
-
-  remove(sessionId: string, itemId: string): boolean {
-    const items = this.itemsBySession.get(sessionId);
-    if (!items) return false;
-    const index = items.findIndex(item => item.id === itemId);
-    if (index < 0) return false;
-    items.splice(index, 1);
-    if (items.length === 0) this.itemsBySession.delete(sessionId);
-    return true;
-  }
-
-  takeNext(sessionId: string, delivery: CoworkQueueDeliveryType): CoworkPendingMessage | null {
-    const items = this.itemsBySession.get(sessionId);
-    if (!items) return null;
-    const index = items.findIndex(
-      item => item.status === CoworkQueueItemStatus.Pending && item.delivery === delivery,
-    );
-    if (index < 0) return null;
-    const [item] = items.splice(index, 1);
-    this.removedPositions.set(item.id, { sessionId, index });
-    if (items.length === 0) this.itemsBySession.delete(sessionId);
-    return { ...item, status: CoworkQueueItemStatus.Sending };
-  }
-
   take(
     sessionId: string,
     itemId: string,
@@ -138,9 +106,5 @@ export class PiPendingMessageQueue {
       if (position.sessionId === sessionId) this.removedPositions.delete(itemId);
     }
     return this.itemsBySession.delete(sessionId);
-  }
-
-  private find(sessionId: string, itemId: string): CoworkPendingMessage | null {
-    return this.itemsBySession.get(sessionId)?.find(item => item.id === itemId) ?? null;
   }
 }

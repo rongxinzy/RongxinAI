@@ -127,6 +127,8 @@ export const APP_SELECTORS = {
   'surface-image-overlay': '.theme-surface-image-overlay',
   'surface-skill-editor': '.theme-surface-skill-editor',
   'surface-pending-row': '.theme-surface-pending-row',
+  'surface-pending-content': '.theme-surface-pending-content',
+  'surface-pending-icon': '.theme-surface-pending-icon',
   'surface-pending-selected': '.theme-surface-pending-selected',
   'surface-pending-failed': '.theme-surface-pending-failed',
   'surface-market-link': '.theme-surface-market-link',

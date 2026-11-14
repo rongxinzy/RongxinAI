@@ -14,7 +14,6 @@ import { randomUUID } from 'crypto';
 
 import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
 
-import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalMode,
@@ -44,12 +43,6 @@ export interface PiToolPermissionGateHost {
   getWorkbenchTaskService(): WorkbenchTaskService | null;
   emit(event: 'permissionRequest', sessionId: string, request: PiPermissionRequest): unknown;
   emit(event: 'permissionDismiss', requestId: string): unknown;
-  stopActiveSession(
-    sessionId: string,
-    reason: string,
-    drainQueuedFollowUp: boolean,
-    cause?: CoworkInterruptionCause,
-  ): void;
 }
 
 type PendingToolApproval = {

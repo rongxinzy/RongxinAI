@@ -38,9 +38,9 @@ describe('coworkApi contract invokers', () => {
   test('cowork queue and workspace methods keep their payload arity', async () => {
     const invoke = vi.spyOn(ipcRenderer, 'invoke').mockResolvedValue({ success: true });
 
-    const payload = { sessionId: 'session-1', itemId: 'q-1' };
-    await coworkApi.cowork.steerPendingMessage(payload);
-    expect(invoke).toHaveBeenLastCalledWith('cowork:queue:steer', payload);
+    const payload = { sessionId: 'session-1', text: 'Next input' };
+    await coworkApi.cowork.enqueuePendingMessage(payload);
+    expect(invoke).toHaveBeenLastCalledWith('cowork:queue:enqueue', payload);
     expect(invoke.mock.calls[0]).toHaveLength(2);
 
     await coworkApi.cowork.renameWorkspace('workspace-1', 'Renamed');

@@ -225,11 +225,7 @@ export const getCodingRoomService = (): CodingRoomService => {
         isBuiltinSessionActive: sessionId => runtime.isSessionActive(sessionId),
         enqueueBuiltinMessage: (sessionId, prompt) =>
           runtime.enqueuePendingMessage(sessionId, prompt),
-        steerBuiltinMessage: async (sessionId, prompt) => {
-          const queued = runtime.enqueuePendingMessage(sessionId, prompt);
-          if (!queued.success || !queued.item) return queued;
-          return await runtime.steerPendingMessage(sessionId, queued.item.id);
-        },
+        steerBuiltinMessage: (sessionId, prompt) => runtime.steerInput(sessionId, prompt),
         getBuiltinWorkbenchLink: sessionId => {
           return (
             observeWorkbench(sessionId, () => {

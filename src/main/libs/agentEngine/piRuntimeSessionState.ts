@@ -23,7 +23,7 @@ import {
   buildPiBackgroundCompletionContext,
   type PiBackgroundCompletionResult,
 } from './piBackgroundCompletion';
-import { PiEventProjectionQueue } from './piEventProjectionQueue';
+import { PiEventProjection } from './piEventProjection';
 import {
   buildImageOmittedNotice,
   ImageInputVerdict,
@@ -47,7 +47,6 @@ export interface PiSession {
   ): Promise<void>;
   steer(text: string): Promise<unknown>;
   followUp?(text: string): Promise<unknown>;
-  clearQueue?(): { steering: string[]; followUp: string[] };
   abort(): Promise<void>;
   abortBash(): void;
   dispose?(): void;
@@ -137,7 +136,7 @@ export interface PiEvent {
 }
 
 export interface ActivePiSession {
-  eventProjection?: PiEventProjectionQueue<PiEvent>;
+  eventProjection?: PiEventProjection<PiEvent>;
   sessionId: string;
   piSession: PiSession;
   abortController: AbortController;
@@ -148,7 +147,6 @@ export interface ActivePiSession {
   codemodeEnabled: boolean;
   capabilities: ModelCapabilities;
   /** Endpoint identity behind the current model; scopes image observations. */
-  imageEndpointKey?: string;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
   requestedSystemPrompt: string;
@@ -221,13 +219,8 @@ export interface ActivePiSession {
    * Deferred — not persisted/emitted — because Pi may auto-retry the turn;
    * flushPendingError surfaces it once the run settles (auto_retry_end /
    * agent_settled). Cleared when a retry succeeds or the turn is reset.
-   *
-   * `sticky` marks a terminal error (including an explicitly cancelled retry).
-   * Pi can report aborted turns with a plain
-   * stop reason, so a later successful-looking assistant message must not erase
-   * them the way it erases a recovered retry.
    */
-  pendingError: { message: string; classified: CoworkError; sticky?: boolean } | null;
+  pendingError: { message: string; classified: CoworkError } | null;
   workbenchRunId: string | null;
   workspaceRoot: string;
   /** Event-time artifact capture for this session (null in chat mode or when
@@ -251,26 +244,8 @@ export interface ActivePiSession {
   pendingTurnMemoryContext?: string | null;
   /** Deduped memory blocks currently active in this compaction window's system prompt. */
   injectedProjectMemorySections?: string[];
-  /**
-   * Image attachments of the turn currently in flight. Kept so an image-payload
-   * rejection can be retried as text and explained to the user; cleared on every
-   * new user prompt so a stale turn can never drive the fallback.
-   */
-  lastImagePrompt: {
-    text: string;
-    sentImages: ImageInputAttachmentRef[];
-    omittedImages: ImageInputAttachmentRef[];
-    retried: boolean;
-  } | null;
-  /** Set when the failed turn carried images and deserves one text-only retry. */
-  imageRetryPending: boolean;
-  /**
-   * True once this turn's failure has been attributed to an image payload
-   * rejection, so repeated SDK retries cannot resurface it as a generic error.
-   */
-  imageRejectionHandled: boolean;
   /** Prevents duplicate queue drains when Pi emits multiple settled events. */
-  queueFlushInFlight: boolean;
+  controlActionInFlight: boolean;
   /** MCP tool manifest generation captured when this Pi session was created. */
   mcpToolManifestGeneration: number;
 }
@@ -442,13 +417,6 @@ export function preparePiPrompt(
     omittedImages: references,
   };
 }
-
-/** Yields one macrotask so settling bookkeeping (e.g. a cancelled retry) can run. */
-export const yieldToEventLoop = (): Promise<void> => {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, 0);
-  return promise;
-};
 
 /**
  * Prompt content prepared for one Pi turn: the text, plus image blocks when the

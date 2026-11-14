@@ -304,7 +304,7 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('classifies an image capability mismatch and cancels the SDK retry', async () => {
+    it('classifies an image capability mismatch without cancelling the SDK retry', async () => {
       await adapter.startSession('test', 'Hi');
 
       listener!({ type: 'turn_start' });
@@ -312,13 +312,11 @@ describe('PiRuntimeAdapter', () => {
         '500 {"code":500,"message":"image input is not supported - hint: the mmproj file is missing","type":"server_error"}',
       );
 
-      // The stored capability verdict is never rewritten: the rejection stays a
-      // runtime observation (see piImageInputFallback) so the user's own setting
-      // survives, and the SDK retry is cancelled because retrying cannot help.
+      // Classification only observes the failure. Pi still owns retry eligibility.
       expect(errors).toHaveLength(0);
       listener!({ type: 'auto_retry_start', attempt: 1 });
       await Promise.resolve();
-      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockSession.abort).not.toHaveBeenCalled();
       listener!({ type: 'agent_settled' });
 
       expect(errors).toHaveLength(1);
@@ -327,7 +325,7 @@ describe('PiRuntimeAdapter', () => {
       expect(completes).toHaveLength(0);
     });
 
-    it('retries an image-carrying turn as text after the server rejects the payload', async () => {
+    it('does not replace an image-carrying rejected input with a text prompt', async () => {
       applyTestResolution({
         config: {
           apiKey: 'sk-vision',
@@ -361,21 +359,13 @@ describe('PiRuntimeAdapter', () => {
       );
       listener!({ type: 'agent_settled' });
 
-      // Instead of a dead end: one text-only retry whose prompt carries the file
-      // path, plus a system notice explaining what happened.
-      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
-      const [retryPrompt] = mockSession.prompt.mock.calls[0] as [string];
-      expect(retryPrompt).toContain('Describe this image');
-      expect(retryPrompt).toContain('C:\\cowork-images\\s\\hash.png');
-      expect(errors).toHaveLength(0);
+      expect(mockSession.prompt).not.toHaveBeenCalled();
+      expect(errors).toHaveLength(1);
       expect(systemErrorMessages()).toHaveLength(1);
-      // The retried session no longer advertises image input to Pi: every image
-      // source (attachments, native `read` results, replayed history) is
-      // downgraded by the SDK, so a `read` cannot re-send the rejected payload.
-      expect(activePiModel(adapter, 'image-retry')?.input).toEqual(['text']);
+      expect(activePiModel(adapter, 'image-retry')?.input).toEqual(['text', 'image']);
     });
 
-    it('retries an image-only turn as text when the server rejects the payload', async () => {
+    it('does not replace a rejected image-only input with a text prompt', async () => {
       applyTestResolution({
         config: {
           apiKey: 'sk-vision',
@@ -410,18 +400,13 @@ describe('PiRuntimeAdapter', () => {
       );
       listener!({ type: 'agent_settled' });
 
-      // Without the text dependency the rejection is still classified, so the
-      // turn is retried once with the file path instead of dying.
-      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
-      const [retryPrompt] = mockSession.prompt.mock.calls[0] as [string];
-      expect(retryPrompt).toContain('C:\\cowork-images\\s\\hash.png');
-      expect(retryPrompt).toContain('not sent');
-      expect(errors).toHaveLength(0);
+      expect(mockSession.prompt).not.toHaveBeenCalled();
+      expect(errors).toHaveLength(1);
       expect(systemErrorMessages()).toHaveLength(1);
-      expect(activePiModel(adapter, 'image-only')?.input).toEqual(['text']);
+      expect(activePiModel(adapter, 'image-only')?.input).toEqual(['text', 'image']);
     });
 
-    it('restores image input on open sessions when the capability is cleared', async () => {
+    it('preserves configured image input after a rejection and settings refresh', async () => {
       const restore = stubRawApiConfig(VISION_MODEL_RESOLUTION);
       try {
         await adapter.startSession('live-image', 'Describe this image', {
@@ -437,20 +422,19 @@ describe('PiRuntimeAdapter', () => {
         listener!({ type: 'turn_start' });
         failedAttempt(VISION_400);
         listener!({ type: 'agent_settled' });
-        await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
-        expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text']);
+        expect(mockSession.prompt).not.toHaveBeenCalled();
+        expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text', 'image']);
 
-        // The user fixed the server and edited provider settings: the live
-        // session must stop downgrading images, not just the observation map.
+        // Refreshing unchanged user settings must not mutate the model either.
         await adapter.resetImageInputCapabilities();
         expect(activePiModel(adapter, 'live-image')?.input).toEqual(['text', 'image']);
-        expect(mockSession.setModel).toHaveBeenCalled();
+        expect(mockSession.setModel).not.toHaveBeenCalled();
       } finally {
         restore();
       }
     });
 
-    it('applies a recorded rejection to other open sessions of the same model', async () => {
+    it('does not downgrade other open sessions after one image rejection', async () => {
       const restore = stubRawApiConfig(VISION_MODEL_RESOLUTION);
       try {
         await adapter.startSession('peer-a', 'Describe this image', {
@@ -480,9 +464,9 @@ describe('PiRuntimeAdapter', () => {
         failedAttempt(VISION_400);
         listener!({ type: 'agent_settled' });
 
-        // peer-a never sent anything wrong, but its Pi snapshot still advertised
-        // image input, so its own `read` would re-send the refused payload.
-        await vi.waitFor(() => expect(activePiModel(adapter, 'peer-a')?.input).toEqual(['text']));
+        // One session failure says nothing about another session's configured model.
+        expect(activePiModel(adapter, 'peer-a')?.input).toEqual(['text', 'image']);
+        expect(mockSession.setModel).not.toHaveBeenCalled();
       } finally {
         restore();
       }
