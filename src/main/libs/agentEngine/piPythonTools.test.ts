@@ -14,11 +14,17 @@ type ExecutableTool = {
   name: string;
   description: string;
   parameters: import('typebox').TSchema;
+  outputSchema?: import('typebox').TSchema;
+  annotations?: import('@earendil-works/pi-coding-agent').ToolAnnotations;
   execute: (
     toolCallId: string,
     params: Record<string, unknown>,
     signal?: AbortSignal,
-  ) => Promise<{ content: Array<{ type: 'text'; text: string }>; details: unknown }>;
+  ) => Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    details: unknown;
+    structuredContent?: unknown;
+  }>;
 };
 
 for (const allow of [false, true]) {
@@ -47,6 +53,21 @@ for (const allow of [false, true]) {
 
     expect(tools.every(tool => /^[a-zA-Z0-9_-]{1,64}$/.test(tool.name))).toBe(true);
     const installTool = tools.find(tool => tool.name === PiPythonToolName.Install)!;
+    const executeTool = tools.find(tool => tool.name === PiPythonToolName.Execute)!;
+
+    expect(executeTool.annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: false,
+      openWorldHint: false,
+    });
+    expect(installTool.annotations).toEqual({
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    });
+    expect(executeTool.outputSchema).toBeDefined();
+    expect(installTool.outputSchema).toBeDefined();
 
     try {
       if (allow) {
@@ -54,6 +75,11 @@ for (const allow of [false, true]) {
           packages: ['packaging==25.0'],
         });
         expect(JSON.parse(result.content[0].text)).toMatchObject({
+          stdout: 'installed',
+          exitCode: 0,
+          environmentId: 'fixture',
+        });
+        expect(result.structuredContent).toMatchObject({
           stdout: 'installed',
           exitCode: 0,
           environmentId: 'fixture',

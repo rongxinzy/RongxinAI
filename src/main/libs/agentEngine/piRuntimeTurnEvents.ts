@@ -540,9 +540,11 @@ export class PiRuntimeTurnEvents {
         // Agent invoked a tool → emit a tool_use message so the UI renders the tool card.
         // Preserve the shared tool_use message shape.
         if (!event.toolCallId || !event.toolName) break;
+        const parentToolCallId = (event as { parentToolCallId?: string }).parentToolCallId;
         const runningActivity = active.toolActivityTracker.upsert(
           {
             toolCallId: event.toolCallId,
+            parentToolCallId,
             toolName: event.toolName,
             toolInput: toToolActivityInput(event.args),
           },
@@ -550,6 +552,11 @@ export class PiRuntimeTurnEvents {
         );
         active.toolStartedAtByCallId.set(event.toolCallId, Date.now());
         if (runningActivity) this.host.emit('toolActivity', sessionId, runningActivity);
+
+        // Nested tool calls (carrying parentToolCallId) are live execution events;
+        // do not emit standalone tool_use messages into the persisted transcript.
+        if (parentToolCallId) break;
+
         const toolUseMsg: CoworkMessage = {
           id: randomUUID(),
           type: 'tool_use',
@@ -575,6 +582,8 @@ export class PiRuntimeTurnEvents {
         if (!event.toolCallId) break;
         const removeActivity = active.toolActivityTracker.remove(event.toolCallId);
         if (removeActivity) this.host.emit('toolActivity', sessionId, removeActivity);
+        const parentToolCallId = (event as { parentToolCallId?: string }).parentToolCallId;
+        if (parentToolCallId) break;
         // Avoid duplicate result for the same call.
         if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
         const resultText = event.displayResultText ?? syncPiToolResultDisplayText(event.result);
@@ -631,10 +640,24 @@ export class PiRuntimeTurnEvents {
         break;
       }
 
-      case 'tool_execution_update':
-        // Streaming partial tool output — ignored for now (final result emitted on _end).
-        // Kept as an explicit no-op so it doesn't fall to the "Unhandled" default log.
+      case 'tool_execution_update': {
+        if (!event.toolCallId) break;
+        const parentToolCallId = (event as { parentToolCallId?: string }).parentToolCallId;
+        const runningActivity = active.toolActivityTracker.upsert(
+          {
+            toolCallId: event.toolCallId,
+            parentToolCallId,
+            toolName: event.toolName,
+            toolInput: toToolActivityInput(event.args),
+            partialResult: (event as { partialResult?: unknown }).partialResult,
+          },
+          CoworkToolActivityPhase.Running,
+        );
+        if (runningActivity) {
+          this.host.emit('toolActivity', sessionId, runningActivity);
+        }
         break;
+      }
 
       case 'agent_end': {
         this.host.transcript.finalizeActiveThinking(sessionId, active);

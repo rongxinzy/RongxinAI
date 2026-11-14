@@ -16,34 +16,36 @@ import {
   type ZhiyuanManagedProviderHostCapability,
   type ZhiyuanManagedProviderSource,
 } from './contract';
-import {
-  registerPiOpenAICompatTokenRefresher,
-  registerPiOpenAICompatUpstream,
-  unregisterPiOpenAICompatUpstream,
-  type PiOpenAICompatTokenRefresher,
-} from '../libs/agentEngine/piOpenAICompatProxy';
 import type { MagpieHostProvider } from '../magpie/hostProviders';
+
 const MANAGED_PROVIDER_KEY_PATTERN = /^custom_[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const MAX_MODELS = 256;
 const MAX_TEXT_LENGTH = 16_384;
-type Registrar = (providerId: string, refresher: PiOpenAICompatTokenRefresher) => () => void;
 
-/** Enterprise credentials stay in the loopback bridge, never in app config or the gateway catalog. */
+export interface ManagedEnterpriseModelRuntimeConfig {
+  modelId: string;
+  providerKey: string;
+  baseUrl: string;
+  api: 'openai-completions' | 'anthropic-messages';
+  apiKey: string;
+}
+
+/** Enterprise credentials stay in the extension bridge, never in app config or the gateway catalog. */
 export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostCapability {
   readonly apiVersion = ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION;
   readonly #listeners = new Set<() => void>();
   #source: ZhiyuanManagedProviderSource | null = null;
   #disposeSourceListener: (() => void) | null = null;
-  #disposeTokenRefresher: (() => void) | null = null;
   #epoch = 0;
   #definitions: MagpieHostProvider[] = [];
-  #upstreamIds = new Set<string>();
+  #enterpriseModels = new Map<string, ManagedEnterpriseModelRuntimeConfig>();
   #localKey = '';
+  #currentApiKey = '';
+  #tokenInvalidated = false;
   #refreshPromise: Promise<void> | null = null;
   #refreshAgain = false;
-  constructor(
-    private readonly registerTokenRefresher: Registrar = registerPiOpenAICompatTokenRefresher,
-  ) {}
+  #tokenRefreshPromise: Promise<string> | null = null;
+
   registerSource(source: ZhiyuanManagedProviderSource): () => void {
     if (this.#source) throw new Error('A Zhiyuan managed provider source is already registered.');
     validateSource(source);
@@ -54,30 +56,19 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
         this.#clearSnapshot();
         void this.refresh();
       }) ?? null;
-    this.#disposeTokenRefresher = this.registerTokenRefresher(source.providerKey, async () => {
-      try {
-        const snapshot = await this.#syncSnapshot(source);
-        this.#emitChanged();
-        return snapshot.config.apiKey;
-      } catch (error) {
-        if (source === this.#source) this.#clearSnapshot();
-        throw error;
-      }
-    });
     void this.refresh();
     let registered = true;
     return () => {
       if (!registered) return;
       registered = false;
       this.#disposeSourceListener?.();
-      this.#disposeTokenRefresher?.();
       this.#disposeSourceListener = null;
-      this.#disposeTokenRefresher = null;
       this.#source = null;
       this.#clearSnapshot();
       this.#localKey = '';
     };
   }
+
   accessPolicy(): ManagedProviderAccessPolicy {
     if (!this.#source?.exclusive) return OPEN_MANAGED_PROVIDER_ACCESS_POLICY;
     return Object.freeze({
@@ -85,18 +76,22 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
       providerKeys: Object.freeze(this.#definitions.map(def => def.id)),
     });
   }
+
   isManagedProvider(name: string): boolean {
     return name.startsWith('zhiyuan-host-enterprise-');
   }
+
   hostProviders(): readonly MagpieHostProvider[] {
     return this.#definitions;
   }
+
   allowedModel(modelRef: string): boolean {
     if (!this.#source?.exclusive) return true;
     return this.#definitions.some(def =>
       def.models.some(model => `${def.id}/${model.id}` === modelRef),
     );
   }
+
   catalog(): readonly ManagedProviderCatalogModel[] {
     return this.#definitions.flatMap(def =>
       def.models.map((model, index) => ({
@@ -109,10 +104,56 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
       })),
     );
   }
+
+  getEnterpriseModelConfig(modelRef: string): ManagedEnterpriseModelRuntimeConfig | null {
+    if (!modelRef) return null;
+    const direct = this.#enterpriseModels.get(modelRef);
+    if (direct) return direct;
+    // Check by stripping host provider prefix if passed like 'zhiyuan-host-enterprise-.../model-id'
+    const slashIndex = modelRef.indexOf('/');
+    if (slashIndex >= 0) {
+      const modelId = modelRef.slice(slashIndex + 1);
+      const matched = this.#enterpriseModels.get(modelId);
+      if (matched) return matched;
+    }
+    return null;
+  }
+
+  async getToken(_providerId?: string): Promise<string> {
+    if (this.#tokenInvalidated || !this.#currentApiKey) {
+      if (this.#tokenRefreshPromise) {
+        return this.#tokenRefreshPromise;
+      }
+      this.#tokenRefreshPromise = (async () => {
+        const source = this.#source;
+        if (!source) throw new Error('No managed provider source is registered.');
+        try {
+          const snapshot = await this.#syncSnapshot(source);
+          this.#tokenInvalidated = false;
+          this.#currentApiKey = snapshot.config.apiKey;
+          this.#emitChanged();
+          return this.#currentApiKey;
+        } catch (error) {
+          if (source === this.#source) this.#clearSnapshot();
+          throw error;
+        } finally {
+          this.#tokenRefreshPromise = null;
+        }
+      })();
+      return this.#tokenRefreshPromise;
+    }
+    return this.#currentApiKey;
+  }
+
+  invalidateToken(_providerId?: string): void {
+    this.#tokenInvalidated = true;
+  }
+
   onDidChange(listener: () => void): () => void {
     this.#listeners.add(listener);
     return () => this.#listeners.delete(listener);
   }
+
   refresh(): Promise<void> {
     if (this.#refreshPromise) {
       this.#refreshAgain = true;
@@ -137,6 +178,7 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     });
     return this.#refreshPromise;
   }
+
   async #syncSnapshot(source: ZhiyuanManagedProviderSource): Promise<ManagedProviderSnapshot> {
     const epoch = this.#epoch;
     const snapshot = normalizeSnapshot(
@@ -147,7 +189,7 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     if (source !== this.#source || epoch !== this.#epoch)
       throw new Error('Managed provider source changed during refresh.');
     const next: MagpieHostProvider[] = [];
-    const ids = new Set<string>();
+    const modelsMap = new Map<string, ManagedEnterpriseModelRuntimeConfig>();
     for (const model of snapshot.config.models ?? []) {
       const baseUrl = model.baseUrl ?? snapshot.config.baseUrl;
       const api =
@@ -161,28 +203,22 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
         .update(`${source.providerKey}\n${api}\n${baseUrl}\n${model.id}`)
         .digest('hex')
         .slice(0, 20);
-      const proxyId = `${source.providerKey}#${hash}`;
-      const loopback = await registerPiOpenAICompatUpstream(
-        proxyId,
-        {
-          baseURL: baseUrl,
-          apiKey: snapshot.config.apiKey,
-          requiredIncomingApiKey: this.#localKey,
-          forwardIncomingAuthorization: false,
-        },
-        { bareBaseUrl: api === 'anthropic-messages' },
-      );
-      if (source !== this.#source || epoch !== this.#epoch) {
-        unregisterPiOpenAICompatUpstream(proxyId);
-        throw new Error('Managed provider source changed during refresh.');
-      }
-      ids.add(proxyId);
-      this.#upstreamIds.add(proxyId);
+      const hostProviderId = `zhiyuan-host-enterprise-${hash}`;
+      const runtimeConfig: ManagedEnterpriseModelRuntimeConfig = {
+        modelId: model.id,
+        providerKey: hostProviderId,
+        baseUrl,
+        api,
+        apiKey: snapshot.config.apiKey,
+      };
+      modelsMap.set(model.id, runtimeConfig);
+      modelsMap.set(`${hostProviderId}/${model.id}`, runtimeConfig);
+      // Supplying virtual loopback URL http://127.0.0.1:0/v1 satisfies Magpie validation without binding ports
       next.push({
-        id: `zhiyuan-host-enterprise-${hash}`,
+        id: hostProviderId,
         name: snapshot.config.displayName ?? 'Enterprise',
         api,
-        baseUrl: loopback,
+        baseUrl: 'http://127.0.0.1:0/v1',
         apiKey: this.#localKey,
         models: [
           {
@@ -195,18 +231,22 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
         ],
       });
     }
-    for (const id of this.#upstreamIds) if (!ids.has(id)) unregisterPiOpenAICompatUpstream(id);
-    this.#upstreamIds = ids;
+    this.#enterpriseModels = modelsMap;
+    this.#currentApiKey = snapshot.config.apiKey;
+    this.#tokenInvalidated = false;
     this.#definitions = next;
     return snapshot;
   }
+
   #clearSnapshot(): void {
     this.#epoch++;
-    for (const id of this.#upstreamIds) unregisterPiOpenAICompatUpstream(id);
-    this.#upstreamIds.clear();
+    this.#enterpriseModels.clear();
+    this.#currentApiKey = '';
+    this.#tokenInvalidated = false;
     this.#definitions = [];
     this.#emitChanged();
   }
+
   #emitChanged(): void {
     for (const listener of this.#listeners)
       try {

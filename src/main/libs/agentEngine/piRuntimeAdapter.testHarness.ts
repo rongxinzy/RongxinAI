@@ -43,6 +43,24 @@ const hoisted = vi.hoisted(() => {
     getContextUsage: vi.fn(),
     compact: vi.fn().mockResolvedValue({ cancelled: false }),
     subscribe: vi.fn().mockReturnValue(() => {}),
+    getSessionStats: vi.fn().mockReturnValue({
+      sessionId: 'test-session',
+      userMessages: 2,
+      assistantMessages: 2,
+      toolCalls: 1,
+      toolResults: 1,
+      totalMessages: 6,
+      tokens: { input: 1200, output: 450, cacheRead: 300, cacheWrite: 100, total: 2050 },
+      cost: 0.015,
+      contextUsage: { percent: 12.5 },
+    }),
+    navigateTree: vi.fn().mockResolvedValue({
+      editorText: 'rewound text',
+      cancelled: false,
+    }),
+    sessionManager: {
+      appendContextEdit: vi.fn().mockReturnValue('edit-entry-uuid-1'),
+    },
   };
 
   const mockSettingsManagerCreate = vi.fn((cwd: string, agentDir?: string) => ({

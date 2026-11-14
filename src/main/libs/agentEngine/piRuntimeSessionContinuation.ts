@@ -100,12 +100,8 @@ export async function continuePiRuntimeSession(
       options.modelOverride !== active.requestedModelOverride) ||
     !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
     nextCodemode !== active.codemodeEnabled ||
-    mcpToolTopologyChanged ||
     unattendedTopologyChanged
   ) {
-    if (mcpToolTopologyChanged) {
-      console.log('[PiRuntime] recreating session after MCP tool manifest refresh');
-    }
     host.disposeSessionForRecreation(sessionId, active);
     return await host.startSession(sessionId, prompt, {
       ...options,
@@ -162,7 +158,12 @@ export async function continuePiRuntimeSession(
   active.goalMode = nextGoalMode;
   active.planMode = nextPlanMode;
 
-  if (promptChanged || skillsChanged || active.pendingSkillReload === true) {
+  if (
+    promptChanged ||
+    skillsChanged ||
+    active.pendingSkillReload === true ||
+    mcpToolTopologyChanged
+  ) {
     const previousSystemPrompt = active.resourceState.systemPrompt;
     const previousSkillIds = active.resourceState.skillIds;
     const previousSkillRoots = active.resourceState.skillRoots;
@@ -176,6 +177,10 @@ export async function continuePiRuntimeSession(
       active.requestedSystemPrompt = nextSystemPrompt;
       active.requestedSkillIds = requestedSkillIds;
       active.pendingSkillReload = false;
+      if (mcpToolTopologyChanged) {
+        active.mcpToolManifestGeneration = host.getMcpToolManifestGeneration();
+        console.debug('[PiRuntime] reloaded session in-place after MCP tool manifest refresh');
+      }
       console.debug('[PiRuntime] reloaded session resources after prompt or skill change');
     } catch (error) {
       active.resourceState.systemPrompt = previousSystemPrompt;

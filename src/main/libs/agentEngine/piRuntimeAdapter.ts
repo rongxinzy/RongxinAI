@@ -498,5 +498,118 @@ export class PiRuntimeAdapter
     await this.recovery.resetImageInputCapabilities();
   }
 
+  /**
+   * Native session statistics from Pi's SessionManager.
+   * Returns authoritative token metrics across all turns (including compacted turns) and cost.
+   */
+  getSessionStats(sessionId: string) {
+    const active = this.activeSessions.get(sessionId);
+    if (!active?.piSession?.getSessionStats) return null;
+    return active.piSession.getSessionStats();
+  }
+
+  /**
+   * Appends a non-destructive context edit to the active session branch in Pi.
+   * Passing replacement = null omits the target from the LLM context.
+   */
+  appendContextEdit(
+    sessionId: string,
+    targetId: string,
+    replacement: { content: unknown } | null,
+  ): { success: boolean; entryId?: string; error?: string } {
+    const active = this.activeSessions.get(sessionId);
+    if (!active) {
+      return { success: false, error: 'Session is not active.' };
+    }
+    if (active.isRunning) {
+      return { success: false, error: 'Cannot edit context while session is running.' };
+    }
+    const sessionManager = active.piSession?.sessionManager;
+    if (!sessionManager?.appendContextEdit) {
+      return { success: false, error: 'Context edit is not supported by this session.' };
+    }
+    try {
+      const entryId = sessionManager.appendContextEdit(targetId, replacement);
+      try {
+        const store = this.getStore() as unknown as {
+          getMessage?: (
+            sessionId: string,
+            messageId: string,
+          ) => { metadata?: Record<string, unknown> } | undefined;
+          updateMessage?: (
+            sessionId: string,
+            messageId: string,
+            patch: { metadata?: Record<string, unknown> },
+          ) => void;
+          updateMessageMetadata?: (
+            sessionId: string,
+            messageId: string,
+            metadataPatch: Record<string, unknown>,
+          ) => void;
+        } | null;
+        if (store) {
+          const contextEditMeta = replacement ? { replaced: true } : { omitted: true };
+          if (typeof store.updateMessageMetadata === 'function') {
+            store.updateMessageMetadata(sessionId, targetId, { contextEdit: contextEditMeta });
+          } else if (
+            typeof store.getMessage === 'function' &&
+            typeof store.updateMessage === 'function'
+          ) {
+            const targetMessage = store.getMessage(sessionId, targetId);
+            if (targetMessage) {
+              store.updateMessage(sessionId, targetId, {
+                metadata: {
+                  ...targetMessage.metadata,
+                  contextEdit: contextEditMeta,
+                },
+              });
+            }
+          }
+        }
+      } catch {
+        // SQLite sync failure should not fail context edit
+      }
+      return { success: true, entryId };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Navigates the active session JSONL tree to a prior branch point or checkpoint.
+   */
+  async navigateSessionTree(
+    sessionId: string,
+    targetId: string,
+    options?: {
+      summarize?: boolean;
+      customInstructions?: string;
+      replaceInstructions?: boolean;
+      label?: string;
+    },
+  ): Promise<{ success: boolean; editorText?: string; cancelled?: boolean; error?: string }> {
+    const active = this.activeSessions.get(sessionId);
+    if (!active) {
+      return { success: false, error: 'Session is not active.' };
+    }
+    if (active.isRunning) {
+      return { success: false, error: 'Cannot navigate tree while session is running.' };
+    }
+    if (!active.piSession?.navigateTree) {
+      return { success: false, error: 'Tree navigation is not supported by this session.' };
+    }
+    try {
+      const result = await active.piSession.navigateTree(targetId, options);
+      this.emit('sessionsChanged');
+      return {
+        success: !result?.cancelled,
+        editorText: result?.editorText,
+        cancelled: result?.cancelled,
+      };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   // ── Skills & MCP integration ──
 }

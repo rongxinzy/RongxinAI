@@ -6,13 +6,20 @@
  * extensions (authorization, bash guardrails, plan mode, codemode, native MCP).
  */
 
+import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
+
+import {
+  NATIVE_READ_ONLY_TOOLS,
+  NATIVE_REVERSIBLE_TOOLS,
+} from '../../workbenchTask/riskClassifier';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { buildPiLoadedMcpConfig, buildPiMcpTransportFactory } from './piMcpExtensionBridge';
 import { getPiBashPythonEnvViolation } from './piBashToolGuidelines';
 import { PiBuiltinFileToolName } from './piToolConstants';
-import { PiPlanModePrompt, isPlanModeBlockedTool } from './piPlanTool';
+import { PiPlanModePrompt } from './piPlanTool';
 import {
   PiExtensionEventType,
+  type PiBeforeAgentStartSystemPromptOptions,
   type PiExtensionApi,
   type PiExtensionFactory,
 } from './piExtensionTypes';
@@ -29,6 +36,8 @@ import type {
 } from './piRuntimeSessionState';
 import type { PiRuntimeAdapterHost } from './piRuntimeAdapterHost';
 import { filterExpertMcpRecords } from './expertMcpFilter';
+import { createPiEnterpriseProviderExtension } from '../../enterpriseExtension/piEnterpriseProviderExtension';
+import { zhiyuanManagedProviderBridge } from '../../enterpriseExtension/managedProviderBridge';
 
 export interface PiResourceLoaderApprovalContext {
   sessionId: string;
@@ -39,6 +48,79 @@ export interface PiResourceLoaderApprovalContext {
   enableCodemode?: boolean;
   /** Explicit MCP server IDs bound to the active session expert. */
   expertMcpIds?: string[];
+}
+
+/**
+ * Preserves Pi's structured XML sections (<tools> and <rules>) when a custom
+ * preamble (such as ZhiYuan product preamble) is provided. Without this, Pi's
+ * buildSystemPromptSections omits <tools> and <rules> whenever customPrompt is set.
+ */
+export function ensureNativeSystemPromptSections(
+  options: PiBeforeAgentStartSystemPromptOptions,
+): void {
+  if (!options.customPrompt) {
+    return;
+  }
+
+  const selectedTools = options.selectedTools ?? [];
+  const hiddenTools = options.hiddenTools ?? [];
+  const toolSnippets = options.toolSnippets ?? {};
+  const toolGuidelines = options.toolGuidelines ?? {};
+  const promptGuidelines = options.promptGuidelines ?? [];
+
+  const declaredTools = selectedTools.filter(name => !hiddenTools.includes(name));
+
+  if (!options.sections.tools) {
+    const visibleTools = declaredTools.filter(name => Boolean(toolSnippets[name]));
+    options.sections.tools =
+      visibleTools.length > 0
+        ? `${visibleTools.map(name => `- ${name}: ${toolSnippets[name]}`).join('\n')}\n\nAdditional tools may be available.`
+        : '(none)';
+  }
+
+  if (!options.sections.rules) {
+    const rules: string[] = [];
+    const seen = new Set<string>();
+    const addRule = (rule: string) => {
+      const normalized = rule.trim();
+      if (!normalized || seen.has(normalized)) return;
+      seen.add(normalized);
+      rules.push(normalized);
+    };
+
+    const hasBash = declaredTools.includes('bash');
+    const hasPowerShell = declaredTools.includes('powershell');
+    const hasGrep = declaredTools.includes('grep');
+    const hasFind = declaredTools.includes('find');
+    const hasLs = declaredTools.includes('ls');
+
+    if ((hasBash || hasPowerShell) && !hasGrep && !hasFind && !hasLs) {
+      if (hasBash && hasPowerShell) {
+        addRule(
+          'Use bash or PowerShell for file operations like listing, searching, and finding files',
+        );
+      } else if (hasPowerShell) {
+        addRule('Use PowerShell for file operations like listing, searching, and finding files');
+      } else {
+        addRule('Use bash for file operations like ls, rg, find');
+      }
+    }
+
+    for (const name of declaredTools) {
+      for (const rule of toolGuidelines[name] ?? []) {
+        addRule(rule);
+      }
+    }
+
+    for (const rule of promptGuidelines) {
+      addRule(rule);
+    }
+
+    addRule('Be concise in your responses');
+    addRule('Show file paths clearly when working with files');
+
+    options.sections.rules = rules.map(rule => `- ${rule}`).join('\n');
+  }
 }
 
 export async function createPiRuntimeResourceLoader(
@@ -95,6 +177,11 @@ export async function createPiRuntimeResourceLoader(
     ),
     extensionFactories: [
       (extensionApi: PiExtensionApi) => {
+        extensionApi.on(PiExtensionEventType.BeforeAgentStart, event => {
+          ensureNativeSystemPromptSections(event.systemPromptOptions);
+        });
+      },
+      (extensionApi: PiExtensionApi) => {
         extensionApi.on(PiExtensionEventType.ToolCall, event => {
           if (
             (event.toolName !== PiBuiltinFileToolName.Bash &&
@@ -114,7 +201,8 @@ export async function createPiRuntimeResourceLoader(
         extensionApi.on(PiExtensionEventType.ToolCall, event => {
           const planSessionId = approvalContext?.sessionId;
           if (!planSessionId) return undefined;
-          if (host.activeSessions.get(planSessionId)?.planMode !== true) return undefined;
+          const active = host.activeSessions.get(planSessionId);
+          if (active?.planMode !== true) return undefined;
           if (
             event.toolName === PiBuiltinFileToolName.Bash ||
             event.toolName === PiBuiltinFileToolName.PowerShell
@@ -126,14 +214,31 @@ export async function createPiRuntimeResourceLoader(
                 'Use read-only tools, publish the plan with plan_write, and end the turn before implementing.',
             };
           }
-          return isPlanModeBlockedTool(event.toolName)
-            ? {
-                block: true as const,
-                reason:
-                  'Plan mode is read-only: workspace-mutating tools are refused for this turn. ' +
-                  'Publish the plan with plan_write and end the turn before implementing.',
-              }
-            : undefined;
+          if (NATIVE_REVERSIBLE_TOOLS.has(event.toolName)) {
+            return {
+              block: true as const,
+              reason:
+                'Plan mode is read-only: workspace-mutating tools are refused for this turn. ' +
+                'Publish the plan with plan_write and end the turn before implementing.',
+            };
+          }
+          const toolDef = (
+            active?.piSession as
+              | { getToolDefinition?: (name: string) => { annotations?: ToolAnnotations } }
+              | undefined
+          )?.getToolDefinition?.(event.toolName);
+          const isReadOnly =
+            toolDef?.annotations?.readOnlyHint === true ||
+            NATIVE_READ_ONLY_TOOLS.has(event.toolName);
+          if (!isReadOnly) {
+            return {
+              block: true as const,
+              reason:
+                'Plan mode is read-only: workspace-mutating tools are refused for this turn. ' +
+                'Publish the plan with plan_write and end the turn before implementing.',
+            };
+          }
+          return undefined;
         });
       },
       ...(approvalContext
@@ -168,6 +273,12 @@ export async function createPiRuntimeResourceLoader(
                   event.input && typeof event.input === 'object'
                     ? (event.input as Record<string, unknown>)
                     : {};
+                const active = host.activeSessions.get(approvalContext.sessionId);
+                const toolDef = (
+                  active?.piSession as
+                    | { getToolDefinition?: (name: string) => { annotations?: ToolAnnotations } }
+                    | undefined
+                )?.getToolDefinition?.(event.toolName);
                 const authorization = await host.authorizeToolCall({
                   sessionId: approvalContext.sessionId,
                   runId,
@@ -175,6 +286,7 @@ export async function createPiRuntimeResourceLoader(
                   toolName: event.toolName,
                   toolInput,
                   approvalMode: approvalContext.getApprovalMode(),
+                  annotations: toolDef?.annotations,
                 });
                 if (authorization.allow) return undefined;
                 return {
@@ -215,6 +327,7 @@ export async function createPiRuntimeResourceLoader(
             }),
           ]
         : []),
+      createPiEnterpriseProviderExtension(zhiyuanManagedProviderBridge),
       ...additionalExtensionFactories,
     ],
   });

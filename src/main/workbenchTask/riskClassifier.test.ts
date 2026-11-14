@@ -87,3 +87,18 @@ test('read-only shell commands classify as ReadOnly without approval', () => {
     WorkbenchApprovalRiskLevel.Unknown,
   );
 });
+
+test('classifies tools using tool annotations when provided (F8)', () => {
+  expect(classifyWorkbenchToolRisk('custom_inspect', {}, { readOnlyHint: true })).toBe(
+    WorkbenchApprovalRiskLevel.ReadOnly,
+  );
+  expect(classifyWorkbenchToolRisk('custom_drop', {}, { destructiveHint: true })).toBe(
+    WorkbenchApprovalRiskLevel.Irreversible,
+  );
+  expect(
+    classifyWorkbenchToolRisk('custom_append', {}, { readOnlyHint: false, destructiveHint: false }),
+  ).toBe(WorkbenchApprovalRiskLevel.Reversible);
+  expect(classifyWorkbenchToolRisk('custom_mutate', {}, { readOnlyHint: false })).toBe(
+    WorkbenchApprovalRiskLevel.Reversible,
+  );
+});

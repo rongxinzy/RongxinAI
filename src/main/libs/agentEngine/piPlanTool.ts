@@ -1,12 +1,7 @@
-import { Type } from 'typebox';
+import type { ToolAnnotations, ToolDefinition } from '@earendil-works/pi-coding-agent';
+import { Type, type Static } from 'typebox';
 
 export const PiPlanToolName = 'plan_write';
-
-/** Built-in and native tools that can mutate the workspace; plan mode blocks them. */
-const PiPlanModeBlockedToolNames = ['write', 'edit', 'python_execute', 'python_install'] as const;
-
-export const isPlanModeBlockedTool = (toolName: string): boolean =>
-  (PiPlanModeBlockedToolNames as readonly string[]).includes(toolName);
 
 export const PiPlanModePrompt = [
   '## Plan Mode',
@@ -48,9 +43,19 @@ const PlanEntrySchema = Type.Object({
   ),
 });
 
-const PiPlanParameters = Type.Object({
+export const PiPlanParameters = Type.Object({
   entries: Type.Array(PlanEntrySchema, { minItems: 1, maxItems: 40 }),
 });
+
+export const PiPlanToolAnnotations: ToolAnnotations = {
+  readOnlyHint: true,
+  openWorldHint: false,
+};
+
+export const PiPlanOutputSchema = Type.Object({
+  accepted: Type.Integer({ description: 'Number of plan entries accepted and submitted.' }),
+});
+export type PiPlanOutput = Static<typeof PiPlanOutputSchema>;
 
 export type PiPlanEntriesInput = {
   entries: Array<{ content: string; priority?: PiPlanEntryPriority }>;
@@ -58,7 +63,9 @@ export type PiPlanEntriesInput = {
 
 export type PiPlanSubmitter = (entries: PiPlanEntry[]) => void;
 
-export const createPiPlanTool = (submit: PiPlanSubmitter): Record<string, unknown> => ({
+export const createPiPlanTool = (
+  submit: PiPlanSubmitter,
+): ToolDefinition<typeof PiPlanParameters, PiPlanOutput> => ({
   name: PiPlanToolName,
   label: 'Plan',
   description:
@@ -66,6 +73,8 @@ export const createPiPlanTool = (submit: PiPlanSubmitter): Record<string, unknow
     'Call it once, when the plan is settled and before you start implementing.',
   promptSnippet: 'Publish the ordered implementation plan for the current task',
   parameters: PiPlanParameters,
+  outputSchema: PiPlanOutputSchema,
+  annotations: PiPlanToolAnnotations,
   executionMode: 'sequential',
   execute: async (_toolCallId: string, params: PiPlanEntriesInput) => {
     const entries: PiPlanEntry[] = (params.entries ?? [])
@@ -76,17 +85,21 @@ export const createPiPlanTool = (submit: PiPlanSubmitter): Record<string, unknow
       }))
       .filter(entry => entry.content.length > 0);
     if (entries.length === 0) {
+      const details: PiPlanOutput = { accepted: 0 };
       return {
         content: [
           { type: 'text', text: 'No plan entries were accepted. Provide at least one step.' },
         ],
-        details: { accepted: 0 },
+        details,
+        structuredContent: details,
       };
     }
     submit(entries);
+    const details: PiPlanOutput = { accepted: entries.length };
     return {
       content: [{ type: 'text', text: `Plan submitted with ${entries.length} steps.` }],
-      details: { accepted: entries.length },
+      details,
+      structuredContent: details,
     };
   },
 });

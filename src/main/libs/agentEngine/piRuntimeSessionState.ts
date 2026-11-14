@@ -13,6 +13,12 @@ import type { HarnessModelProfileInput } from '../../../shared/harness';
 import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import type { ModelCapabilities } from '../../../shared/providers';
 import type { ArtifactRecorder } from '../../artifactLedger/artifactRecorder';
+import type {
+  AgentSession,
+  CreateAgentSessionOptions,
+  CreateAgentSessionResult,
+  DefaultResourceLoader,
+} from '@earendil-works/pi-coding-agent';
 import {
   buildPiBackgroundCompletionContext,
   type PiBackgroundCompletionResult,
@@ -39,8 +45,8 @@ export interface PiSession {
       | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>,
     options?: { deliverAs?: 'steer' | 'followUp' },
   ): Promise<void>;
-  steer(text: string): Promise<void>;
-  followUp?(text: string): Promise<void>;
+  steer(text: string): Promise<unknown>;
+  followUp?(text: string): Promise<unknown>;
   clearQueue?(): { steering: string[]; followUp: string[] };
   abort(): Promise<void>;
   abortBash(): void;
@@ -57,6 +63,19 @@ export interface PiSession {
         percent: number | null;
       }
     | undefined;
+  getSessionStats?(): unknown;
+  navigateTree?(
+    targetId: string,
+    options?: {
+      summarize?: boolean;
+      customInstructions?: string;
+      replaceInstructions?: boolean;
+      label?: string;
+    },
+  ): Promise<{ editorText?: string; cancelled?: boolean; aborted?: boolean }>;
+  readonly sessionManager?: {
+    appendContextEdit?(targetId: string, replacement: unknown): string;
+  };
   subscribe(listener: (event: PiEvent) => void): () => void;
 }
 
@@ -259,8 +278,10 @@ export interface ActivePiSession {
 // ── Dynamic imports ──
 
 export interface PiModules {
-  createAgentSession: (options: Record<string, unknown>) => Promise<{ session: PiSession }>;
-  DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
+  createAgentSession: (
+    options?: CreateAgentSessionOptions | Record<string, unknown>,
+  ) => Promise<{ session: PiSession }>;
+  DefaultResourceLoader: new (options?: Record<string, unknown>) => PiResourceLoader;
   SessionManager?: {
     inMemory(cwd?: string): unknown;
     create(cwd: string, sessionDir?: string, options?: { id?: string }): unknown;
@@ -477,14 +498,15 @@ export async function getPiModules(): Promise<PiModules> {
   if (!_piModules) {
     try {
       // Pi packages are ESM-only (package.json "exports" with only "import" condition).
-      // Vite/esbuild resolves them correctly at build time. Type declarations are provided
-      // by piModules.d.ts for tsc --noEmit.
+      // Vite/esbuild resolves them correctly at build time, and NodeNext module resolution
+      // resolves native type declarations from package exports for tsc --noEmit.
       const codingAgent = await import('@earendil-works/pi-coding-agent');
       const compat = await import('@earendil-works/pi-ai/compat');
       _piModules = {
-        createAgentSession: codingAgent.createAgentSession as PiModules['createAgentSession'],
+        createAgentSession:
+          codingAgent.createAgentSession as unknown as PiModules['createAgentSession'],
         DefaultResourceLoader:
-          codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
+          codingAgent.DefaultResourceLoader as unknown as PiModules['DefaultResourceLoader'],
         SessionManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SessionManager')
           ? ((codingAgent as typeof codingAgent & { SessionManager?: unknown })
               .SessionManager as PiModules['SessionManager'])

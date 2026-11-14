@@ -3,14 +3,16 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 
-// Exercise the pinned SDK implementation, bypassing this app's ESM type shim
-// and mocked runtime adapter. These are the modules AgentSession uses itself.
-import { DefaultResourceLoader } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js';
-import { SettingsManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js';
+import { DefaultResourceLoader, SettingsManager } from '@earendil-works/pi-coding-agent';
 import { buildSystemPrompt } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/system-prompt.js';
-import { CHAT_IDENTITY_PROMPT, createPiPromptOverrides } from './piPromptOverrides';
+import {
+  CHAT_IDENTITY_PROMPT,
+  createPiPromptOverrides,
+  getZhiyuanProductPreamble,
+} from './piPromptOverrides';
+import { ensureNativeSystemPromptSections } from './piRuntimeResourceLoader';
 
-const identity = '你是知远智能体（ZhiYuan Agent）。自我介绍时使用这一名称；回答简洁、准确。';
+const identity = getZhiyuanProductPreamble();
 const toolSnippet = 'Read a file for this integration test.';
 const toolGuideline = 'Preserve the test tool usage contract.';
 const existingAppend = 'Existing application policy.';
@@ -50,8 +52,8 @@ function createLoader(
 }
 
 function renderPrompt(loader: DefaultResourceLoader): string {
-  // Mirror AgentSession's public ResourceLoader -> buildSystemPrompt wiring.
-  return buildSystemPrompt({
+  // Mirror AgentSession's public ResourceLoader -> BeforeAgentStart -> buildSystemPrompt wiring.
+  const options = {
     cwd,
     customPrompt: loader.getSystemPrompt(),
     appendSystemPrompt: loader.getAppendSystemPrompt().join('\n\n'),
@@ -60,96 +62,104 @@ function renderPrompt(loader: DefaultResourceLoader): string {
     promptGuidelines: [toolGuideline],
     contextFiles: loader.getAgentsFiles().agentsFiles,
     skills: loader.getSkills().skills,
-  });
+    sections: {} as Record<string, string>,
+  };
+  ensureNativeSystemPromptSections(options);
+  return buildSystemPrompt(options);
 }
 
-function expectDefaultPrompt(prompt: string) {
-  expect(prompt).toContain('You are a coding assistant running inside pi');
+function expectZhiyuanPrompt(prompt: string) {
+  expect(prompt).toContain(getZhiyuanProductPreamble());
+  expect(prompt).not.toContain('You are a coding assistant running inside pi');
+  expect(prompt).not.toContain('Pi documentation');
+  expect(prompt).not.toContain('<docs>');
+  expect(prompt).toContain('<tools>');
   expect(prompt).toContain(`- read: ${toolSnippet}`);
+  expect(prompt).toContain('<rules>');
   expect(prompt).toContain(toolGuideline);
   expect(prompt).toContain('Be concise in your responses');
 }
 
-test('append override preserves the entire default prompt and tool guidelines', async () => {
-  const baseline = createLoader();
+test('append override with ZhiYuan preamble preserves native tools and rules while eliminating docs and English preamble', async () => {
   const appended = createLoader({
-    systemPromptOverride: () => undefined,
-    appendSystemPromptOverride: base => [...base, identity],
+    systemPromptOverride: () => getZhiyuanProductPreamble(),
+    appendSystemPromptOverride: base => [...base, 'Extra policy.'],
   });
-  await baseline.reload();
   await appended.reload();
   const prompt = renderPrompt(appended);
-  expectDefaultPrompt(prompt);
-  expect(appended.getSystemPrompt()).toBeUndefined();
-  expect(prompt.split(identity)).toHaveLength(2);
-  expect(prompt.replace(`\n\n${identity}`, '')).toBe(renderPrompt(baseline));
+  expectZhiyuanPrompt(prompt);
+  expect(prompt).toContain('Extra policy.');
+  expect(prompt).toContain(existingAppend);
+  expect(appended.getSystemPrompt()).toBe(getZhiyuanProductPreamble());
 });
 
-test('a nonempty system override bypasses default tool descriptions and guidelines', async () => {
+test('a nonempty system override with ensureNativeSystemPromptSections retains tools and rules', async () => {
   const loader = createLoader({ systemPromptOverride: () => identity });
   await loader.reload();
   const prompt = renderPrompt(loader);
   expect(prompt).toContain(identity);
   expect(prompt).toContain(existingAppend);
-  expect(prompt).not.toContain('<tools>');
-  expect(prompt).not.toContain(toolSnippet);
-  expect(prompt).not.toContain(toolGuideline);
+  expect(prompt).toContain('<tools>');
+  expect(prompt).toContain(toolSnippet);
+  expect(prompt).toContain(toolGuideline);
+  expect(prompt).not.toContain('<docs>');
+  expect(prompt).not.toContain('You are a coding assistant running inside pi');
 });
 
 test('reload rebuilds append contributions without accumulating identity text', async () => {
   const loader = createLoader({
-    systemPromptOverride: () => undefined,
-    appendSystemPromptOverride: base => [...base, identity],
+    systemPromptOverride: () => getZhiyuanProductPreamble(),
+    appendSystemPromptOverride: base => [...base, 'Extra policy.'],
   });
   await loader.reload();
   const initial = renderPrompt(loader);
   await loader.reload();
   await loader.reload();
   expect(renderPrompt(loader)).toBe(initial);
-  expect(loader.getAppendSystemPrompt()).toEqual([existingAppend, identity]);
+  expect(loader.getAppendSystemPrompt()).toEqual([existingAppend, 'Extra policy.']);
 });
 
-test('append alone cannot restore defaults replaced by a discovered SYSTEM.md', async () => {
+test('production overrides replace SYSTEM.md with Chinese product preamble while keeping tools/rules', async () => {
   await writeFile(path.join(agentDir, 'SYSTEM.md'), 'Custom file prompt.');
-  const inherited = createLoader({ appendSystemPromptOverride: base => [...base, identity] });
-  const defaults = createLoader({
-    systemPromptOverride: () => undefined,
-    appendSystemPromptOverride: base => [...base, identity],
-  });
-  await inherited.reload();
+  const defaults = createLoader(
+    createPiPromptOverrides({ chatMode: false, systemPrompt: 'Work expert.' }, () => [
+      toolGuideline,
+    ]),
+  );
   await defaults.reload();
-  expect(inherited.getSystemPrompt()).toBe('Custom file prompt.');
-  expect(renderPrompt(inherited)).not.toContain(toolGuideline);
-  expectDefaultPrompt(renderPrompt(defaults));
-  expect(renderPrompt(defaults)).toContain(identity);
-  expect(renderPrompt(defaults)).not.toContain('Custom file prompt.');
+  expect(defaults.getSystemPrompt()).toBe(getZhiyuanProductPreamble());
+  const prompt = renderPrompt(defaults);
+  expectZhiyuanPrompt(prompt);
+  expect(prompt).not.toContain('Custom file prompt.');
+  expect(prompt).toContain('Work expert.');
 });
 
-test('production Chat overrides preserve defaults and update fragments on continuation reload', async () => {
+test('production Chat overrides preserve Chinese product preamble, chat identity, and tools/rules', async () => {
   await writeFile(path.join(agentDir, 'SYSTEM.md'), 'Ambient custom prompt.');
   const state = { chatMode: true, systemPrompt: 'Selected Chat skill.' };
   const loader = createLoader(createPiPromptOverrides(state, () => [toolGuideline]));
   await loader.reload();
-  expectDefaultPrompt(renderPrompt(loader));
+  expect(loader.getSystemPrompt()).toBe(getZhiyuanProductPreamble());
+  expectZhiyuanPrompt(renderPrompt(loader));
   expect(renderPrompt(loader)).toContain(state.systemPrompt);
   expect(renderPrompt(loader)).not.toContain('Ambient custom prompt.');
   expect(renderPrompt(loader).split(CHAT_IDENTITY_PROMPT)).toHaveLength(2);
 
   state.systemPrompt = 'Updated Chat skill.';
   await loader.reload();
-  expectDefaultPrompt(renderPrompt(loader));
+  expectZhiyuanPrompt(renderPrompt(loader));
   expect(renderPrompt(loader)).toContain(state.systemPrompt);
   expect(renderPrompt(loader)).not.toContain('Selected Chat skill.');
   expect(renderPrompt(loader).split(CHAT_IDENTITY_PROMPT)).toHaveLength(2);
 });
 
-test('production Work preserves native tools and appends expert instructions without replacement', async () => {
+test('production Work preserves native tools and appends expert instructions with Chinese product preamble', async () => {
   await writeFile(path.join(agentDir, 'SYSTEM.md'), 'Work base.');
   const state = { chatMode: false, systemPrompt: 'Work expert.' };
   const loader = createLoader(createPiPromptOverrides(state, () => [toolGuideline]));
   await loader.reload();
-  expect(loader.getSystemPrompt()).toBeUndefined();
-  expectDefaultPrompt(renderPrompt(loader));
+  expect(loader.getSystemPrompt()).toBe(getZhiyuanProductPreamble());
+  expectZhiyuanPrompt(renderPrompt(loader));
   expect(renderPrompt(loader)).toContain('Work expert.');
   expect(renderPrompt(loader)).not.toContain('Work base.');
   expect(loader.getAppendSystemPrompt()).toEqual([existingAppend, toolGuideline, 'Work expert.']);

@@ -11,11 +11,33 @@ export const PiSubagentEventType = {
   Error: 'error',
   MessageEnd: 'message_end',
   ToolExecutionStart: 'tool_execution_start',
+  ToolExecutionUpdate: 'tool_execution_update',
+  ToolExecutionEnd: 'tool_execution_end',
 } as const;
 export const PiMessageRole = { Assistant: 'assistant' } as const;
 
+export type PiSubagentChildToolEvent = {
+  type: 'tool_execution_start' | 'tool_execution_update' | 'tool_execution_end';
+  toolCallId: string;
+  parentToolCallId?: string;
+  toolName: string;
+  args?: unknown;
+  result?: unknown;
+  partialResult?: unknown;
+  isError?: boolean;
+};
+
 type PiSubagentMessage = PiWriteRecoveryMessage & { role: string; errorMessage?: string };
-type PiSubagentEvent = { type: string; message?: PiSubagentMessage };
+type PiSubagentEvent = {
+  type: string;
+  message?: PiSubagentMessage;
+  toolCallId?: string;
+  toolName?: string;
+  args?: unknown;
+  result?: unknown;
+  partialResult?: unknown;
+  isError?: boolean;
+};
 
 export interface PiSubagentSession {
   prompt(text: string): Promise<void>;
@@ -31,11 +53,17 @@ export interface PiSubagentExecutionResult extends PiSubagentExecutionMetadata {
   output: string;
 }
 
+export interface RunPiSubagentOptions {
+  signal?: AbortSignal;
+  parentToolCallId?: string;
+  onChildToolEvent?: (event: PiSubagentChildToolEvent) => void;
+}
+
 /** Pi owns retries, compaction and tool turns. The parent owns cancellation. */
 export function runPiSubagent(
   session: PiSubagentSession,
   task: string,
-  options: { signal?: AbortSignal } = {},
+  options: RunPiSubagentOptions = {},
 ): Promise<PiSubagentExecutionResult> {
   return new Promise((resolve, reject) => {
     const startedAt = Date.now();
@@ -103,7 +131,25 @@ export function runPiSubagent(
                   .trim();
           if (text) latestAnswer = text;
         }
-        if (event.type === PiSubagentEventType.ToolExecutionStart) toolCalls += 1;
+        if (
+          event.type === PiSubagentEventType.ToolExecutionStart ||
+          event.type === PiSubagentEventType.ToolExecutionUpdate ||
+          event.type === PiSubagentEventType.ToolExecutionEnd
+        ) {
+          if (event.type === PiSubagentEventType.ToolExecutionStart) toolCalls += 1;
+          if (options.onChildToolEvent && event.toolCallId && event.toolName) {
+            options.onChildToolEvent({
+              type: event.type,
+              toolCallId: event.toolCallId,
+              parentToolCallId: options.parentToolCallId,
+              toolName: event.toolName,
+              args: event.args,
+              result: event.result,
+              partialResult: event.partialResult,
+              isError: event.isError,
+            });
+          }
+        }
         if (event.type === PiSubagentEventType.Error) {
           finish(
             `Error: ${message?.errorMessage || 'Subagent encountered an error'}`,

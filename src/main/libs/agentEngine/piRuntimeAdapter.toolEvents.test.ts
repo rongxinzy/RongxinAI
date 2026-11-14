@@ -193,5 +193,120 @@ describe('PiRuntimeAdapter', () => {
       const toolResult = messages.find(m => m.type === 'tool_result');
       expect(toolResult!.metadata?.isError).toBe(true);
     });
+
+    it('should emit toolActivity on tool_execution_update with partialResult and parentToolCallId', async () => {
+      const activities: Array<{ type: string; activity: Record<string, unknown> }> = [];
+      adapter.on('toolActivity', (_sessionId, event) => {
+        activities.push(event as never);
+      });
+      await adapter.startSession('test', 'Do something');
+
+      listener!({
+        type: 'tool_execution_start',
+        toolCallId: 'call-sub-1',
+        toolName: 'python_execute',
+        parentToolCallId: 'parent-agent-call',
+        args: { code: 'print("running")' },
+      });
+
+      listener!({
+        type: 'tool_execution_update',
+        toolCallId: 'call-sub-1',
+        toolName: 'python_execute',
+        parentToolCallId: 'parent-agent-call',
+        partialResult: { stdout: 'chunk 1\n' },
+      });
+
+      expect(activities.length).toBeGreaterThanOrEqual(2);
+      const updateActivity = activities.find(
+        a =>
+          a.activity?.toolCallId === 'call-sub-1' &&
+          (a.activity?.partialResult as Record<string, unknown>)?.stdout === 'chunk 1\n',
+      );
+      expect(updateActivity).toBeDefined();
+      expect(updateActivity!.type).toBe(CoworkToolActivityEventType.Upsert);
+      expect(updateActivity!.activity.phase).toBe(CoworkToolActivityPhase.Running);
+      expect(updateActivity!.activity.parentToolCallId).toBe('parent-agent-call');
+    });
+
+    it('should suppress transcript tool_use and tool_result messages when parentToolCallId is present', async () => {
+      const messages: Array<{ type: string; metadata?: Record<string, unknown> }> = [];
+      adapter.on('message', (_sid, msg) => messages.push(msg as never));
+      await adapter.startSession('test', 'Do something');
+
+      listener!({
+        type: 'tool_execution_start',
+        toolCallId: 'call-child',
+        toolName: 'read',
+        parentToolCallId: 'parent-call-123',
+        args: { path: 'test.txt' },
+      });
+
+      listener!({
+        type: 'tool_execution_end',
+        toolCallId: 'call-child',
+        toolName: 'read',
+        parentToolCallId: 'parent-call-123',
+        result: 'contents',
+        isError: false,
+      });
+
+      // No transcript messages should have been created for child tool calls
+      expect(messages.filter(m => m.type === 'tool_use' || m.type === 'tool_result')).toHaveLength(
+        0,
+      );
+    });
+
+    it('should throttle rapid tool_execution_update events within 250ms interval', async () => {
+      vi.useFakeTimers();
+      try {
+        const updateEvents: Array<{ type: string; activity: Record<string, unknown> }> = [];
+        adapter.on('toolActivity', (_sessionId, event) => {
+          if ((event as { type?: string }).type === CoworkToolActivityEventType.Upsert) {
+            updateEvents.push(event as never);
+          }
+        });
+        await adapter.startSession('test', 'Do something');
+
+        listener!({
+          type: 'tool_execution_start',
+          toolCallId: 'call-throttle',
+          toolName: 'python_execute',
+          args: {},
+        });
+        const initialCount = updateEvents.length;
+
+        // First update should emit immediately
+        listener!({
+          type: 'tool_execution_update',
+          toolCallId: 'call-throttle',
+          toolName: 'python_execute',
+          partialResult: 'update-1',
+        });
+        expect(updateEvents.length).toBe(initialCount + 1);
+
+        // Rapid second update (100ms later) should be throttled and NOT emit
+        vi.advanceTimersByTime(100);
+        listener!({
+          type: 'tool_execution_update',
+          toolCallId: 'call-throttle',
+          toolName: 'python_execute',
+          partialResult: 'update-2',
+        });
+        expect(updateEvents.length).toBe(initialCount + 1);
+
+        // After 250ms has elapsed from first update (advance another 160ms = 260ms total), next update emits
+        vi.advanceTimersByTime(160);
+        listener!({
+          type: 'tool_execution_update',
+          toolCallId: 'call-throttle',
+          toolName: 'python_execute',
+          partialResult: 'update-3',
+        });
+        expect(updateEvents.length).toBe(initialCount + 2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });

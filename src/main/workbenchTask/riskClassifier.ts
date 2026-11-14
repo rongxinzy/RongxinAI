@@ -1,18 +1,18 @@
 import { createHash } from 'crypto';
 
+import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
+
 import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
 
-const readOnlyTools = new Set([
-  'read',
-  'grep',
-  'find',
-  'ls',
+export const NATIVE_READ_ONLY_TOOLS = new Set(['read', 'grep', 'find', 'ls']);
+export const NATIVE_REVERSIBLE_TOOLS = new Set(['write', 'edit']);
+
+// Legacy set preserved for standalone / backward-compatible callers that do not supply annotations
+const LEGACY_READ_ONLY_TOOLS = new Set([
   'skill_runtime_capabilities',
   'read_document',
   'conversation_history',
   'web_search',
-]);
-const internalControlTools = new Set([
   'askuserquestion',
   'session_summary',
   'plan_write',
@@ -20,7 +20,6 @@ const internalControlTools = new Set([
   'subagent',
   'codemode',
 ]);
-const reversibleTools = new Set(['write', 'edit']);
 const irreversibleShellPattern =
   /(?:\brm\b|\brmdir\b|\bdel\b|\bremove-item\b|\bformat\b|\bshutdown\b|\bgit\s+push\b|\bgit\s+reset\s+--hard\b|\bdrop\s+(?:table|database)\b)/i;
 // Read-only shell commands, validated segment by segment instead of with one
@@ -76,12 +75,32 @@ const stableValue = (value: unknown): unknown => {
 export function classifyWorkbenchToolRisk(
   toolName: string,
   input: Record<string, unknown>,
+  annotations?: ToolAnnotations,
 ): WorkbenchApprovalRiskLevel {
   const normalizedName = toolName.trim().toLowerCase();
-  if (readOnlyTools.has(normalizedName) || internalControlTools.has(normalizedName)) {
+
+  // 1. Direct evaluation from ToolAnnotations
+  if (annotations) {
+    if (annotations.readOnlyHint === true) {
+      return WorkbenchApprovalRiskLevel.ReadOnly;
+    }
+    if (annotations.destructiveHint === true) {
+      return WorkbenchApprovalRiskLevel.Irreversible;
+    }
+    if (annotations.readOnlyHint === false) {
+      return WorkbenchApprovalRiskLevel.Reversible;
+    }
+  }
+
+  // 2. Built-in native Pi tools fallback
+  if (NATIVE_READ_ONLY_TOOLS.has(normalizedName)) {
     return WorkbenchApprovalRiskLevel.ReadOnly;
   }
-  if (reversibleTools.has(normalizedName)) return WorkbenchApprovalRiskLevel.Reversible;
+  if (NATIVE_REVERSIBLE_TOOLS.has(normalizedName)) {
+    return WorkbenchApprovalRiskLevel.Reversible;
+  }
+
+  // 3. Shell execution analysis
   if (normalizedName === 'bash' || normalizedName === 'powershell' || normalizedName === 'shell') {
     const command = typeof input.command === 'string' ? input.command : JSON.stringify(input);
     if (isSafeShellCommand(command)) return WorkbenchApprovalRiskLevel.ReadOnly;
@@ -89,6 +108,12 @@ export function classifyWorkbenchToolRisk(
       ? WorkbenchApprovalRiskLevel.Irreversible
       : WorkbenchApprovalRiskLevel.Unknown;
   }
+
+  // 4. Legacy backward compatibility fallback
+  if (LEGACY_READ_ONLY_TOOLS.has(normalizedName)) {
+    return WorkbenchApprovalRiskLevel.ReadOnly;
+  }
+
   return WorkbenchApprovalRiskLevel.Unknown;
 }
 
