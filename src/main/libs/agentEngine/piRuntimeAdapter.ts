@@ -144,16 +144,11 @@ export class PiRuntimeAdapter
     emit: (event, ...args) => {
       this.emit(event as 'started', ...(args as [string]));
     },
-    stopActiveSession: (sessionId, reason, drainQueuedFollowUp, cause) => {
-      this.stopActiveSession(sessionId, reason, drainQueuedFollowUp, cause);
-    },
-    flushFollowUpQueue: (sessionId, active) => this.queue.flushFollowUpQueue(sessionId, active),
+    flushControlActions: (sessionId, active) => this.queue.flushControlActions(sessionId, active),
     onPiUserMessageStart: (sessionId, active) =>
       this.queue.onNativeUserMessageStart(sessionId, active),
     resetNativeQueueDispatch: sessionId => this.queue.resetNativeDispatch(sessionId),
     flushPendingError: (sessionId, active) => this.recovery.flushPendingError(sessionId, active),
-    imageCapabilityConfiguration: active => this.recovery.imageCapabilityConfiguration(active),
-    syncImageInputCapability: sessionIds => this.recovery.syncImageInputCapability(sessionIds),
     createSessionMemoryCompletion: active => this.sessionMemory.createCompletion(active),
     recordSummaryOmission: (sessionId, active) => this.recordSummaryOmission(sessionId, active),
   });
@@ -197,15 +192,9 @@ export class PiRuntimeAdapter
     transcript: this.transcript,
     getActiveSession: sessionId => this.activeSessions.get(sessionId),
     activeSessionIds: () => this.activeSessions.keys(),
-    deleteActiveSession: sessionId => {
-      this.activeSessions.delete(sessionId);
-    },
     emit: (event, ...args) => {
       this.emit(event as 'started', ...(args as [string]));
     },
-    continueSession: (sessionId, prompt, options) =>
-      this.continueSession(sessionId, prompt, options),
-    ocrCommandFor: () => this.bundledOcrHelper?.commandFor,
     clearToolPermissionsBySession: sessionId => this.permissionGate.clearBySession(sessionId),
     approvalSessionMap: this.approvalSessionMap,
     pendingAskUserQuestions: this.pendingAskUserQuestions,
@@ -299,18 +288,12 @@ export class PiRuntimeAdapter
     this.stopActiveSession(
       sessionId,
       'The user stopped this run.',
-      true,
       CoworkInterruptionCause.UserStop,
     );
   }
 
-  stopActiveSession(
-    sessionId: string,
-    reason: string,
-    drainQueuedFollowUp: boolean,
-    cause?: CoworkInterruptionCause,
-  ): void {
-    stopActivePiRuntimeSession(this, sessionId, reason, drainQueuedFollowUp, cause);
+  stopActiveSession(sessionId: string, reason: string, cause?: CoworkInterruptionCause): void {
+    stopActivePiRuntimeSession(this, sessionId, reason, cause);
   }
 
   stopAllSessions(): void {
@@ -452,20 +435,8 @@ export class PiRuntimeAdapter
     );
   }
 
-  updatePendingMessage(sessionId: string, itemId: string, text: string) {
-    return this.queue.updatePendingMessage(sessionId, itemId, text);
-  }
-
-  deletePendingMessage(sessionId: string, itemId: string) {
-    return this.queue.deletePendingMessage(sessionId, itemId);
-  }
-
-  steerPendingMessage(sessionId: string, itemId: string) {
-    return this.queue.steerPendingMessage(sessionId, itemId);
-  }
-
-  followUpPendingMessage(sessionId: string, itemId: string) {
-    return this.queue.followUpPendingMessage(sessionId, itemId);
+  steerInput(sessionId: string, text: string) {
+    return this.queue.steerInput(sessionId, text);
   }
 
   getSessionConfirmationMode(sessionId: string): 'modal' | 'text' | null {

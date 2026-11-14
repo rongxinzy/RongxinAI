@@ -2,7 +2,7 @@
  * Session lifecycle operations for the Pi runtime adapter.
  *
  * Extracted from PiRuntimeAdapter: stopping active sessions (closing
- * in-flight tool uses, recording interruptions, draining queued follow-ups),
+ * in-flight tool uses, recording interruptions and closing queued-input metadata),
  * disposing sessions before a resource-driven recreation, idle-session
  * eviction, and deletion cleanup.
  */
@@ -64,7 +64,6 @@ export function stopActivePiRuntimeSession(
   host: PiRuntimeAdapterHost,
   sessionId: string,
   reason: string,
-  drainQueuedFollowUp: boolean,
   cause?: CoworkInterruptionCause,
 ): void {
   // Control actions are not durable user input: an explicit stop must not
@@ -90,8 +89,7 @@ export function stopActivePiRuntimeSession(
     }
     return;
   }
-  const wasRunning = active.isRunning;
-  if (!wasRunning && active.aborted) return;
+  if (!active.isRunning && active.aborted) return;
 
   host.transcript.finalizeActiveThinking(sessionId, active);
   // Close in-flight tools before the turn is marked paused. Otherwise resume
@@ -127,20 +125,13 @@ export function stopActivePiRuntimeSession(
   host.emit('sessionStopped', sessionId);
   if (cause) recordSessionInterruption(host, sessionId, cause);
 
-  const shouldDrainFollowUp =
-    wasRunning &&
-    drainQueuedFollowUp &&
-    !active.resourceState.chatMode &&
-    host.queue.hasPendingFollowUp(sessionId);
   // Stopping closes idle placeholders so a partial answer bubble with
   // isStreaming metadata cannot stay in flight after the run is gone; any
   // partial body it persists is bounded by the checkpoint policy.
   host.transcript.closeIdlePlaceholders(sessionId, active);
   releaseStoppedSession(host, sessionId);
 
-  if (shouldDrainFollowUp) {
-    host.queue.resumeNextFollowUp(sessionId);
-  }
+  host.queue.clear(sessionId);
 }
 
 /** Persist a terminal result for tool calls still open when the user pauses. */
@@ -228,12 +219,7 @@ function recordSessionInterruption(
 export function stopAllPiRuntimeSessions(host: PiRuntimeAdapterHost): void {
   const sessionIds = new Set([...host.activeSessions.keys(), ...host.initializingSessions.keys()]);
   for (const sessionId of sessionIds) {
-    stopActivePiRuntimeSession(
-      host,
-      sessionId,
-      'The application stopped the active session.',
-      false,
-    );
+    stopActivePiRuntimeSession(host, sessionId, 'The application stopped the active session.');
     // Quit stops carry no interruption cause (no interruption record is
     // written), but the status projection must not survive as a zombie
     // 'running' row until the next launch's bulk reset.
@@ -244,7 +230,7 @@ export function stopAllPiRuntimeSessions(host: PiRuntimeAdapterHost): void {
 }
 
 export function onPiSessionDeleted(host: PiRuntimeAdapterHost, sessionId: string): void {
-  stopActivePiRuntimeSession(host, sessionId, 'The session was deleted.', false);
+  stopActivePiRuntimeSession(host, sessionId, 'The session was deleted.');
   host.recovery.clearApprovalsBySession(sessionId);
   host.memoryInjectionDedup.reset(sessionId);
   host.activeSessions.delete(sessionId);

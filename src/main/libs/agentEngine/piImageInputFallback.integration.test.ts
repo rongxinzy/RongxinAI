@@ -1,11 +1,3 @@
-/**
- * Temporary end-to-end check (not committed): real Pi SDK + real HTTP provider.
- *
- * The fake provider mirrors the 172.18.x gateway: a request carrying an image
- * block is rejected with the vision-encoder 400, text-only requests answer
- * normally. That reproduces the reported scenario exactly — "configured as
- * image-capable, server cannot read images".
- */
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -122,7 +114,6 @@ vi.mock('../coworkUtil', async importOriginal => {
   };
 });
 
-import { resolveBundledOcrHelper } from '../ocrHelper';
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 
 const fakeStore = {
@@ -133,9 +124,6 @@ const fakeStore = {
   getSession: () => undefined,
   listSessionArtifacts: () => [],
 } as unknown as CoworkStore; // test double for a wide store interface
-
-const readRecord = (value: unknown, key: string): unknown =>
-  typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
 
 let disposeMagpie: (() => void) | undefined;
 
@@ -157,56 +145,26 @@ afterAll(() => {
   fs.rmSync(imageDir, { recursive: true, force: true });
 });
 
-test('image rejection is retried as text and reported to the user', async () => {
-  const messages: unknown[] = [];
+test('a real image rejection reports failure once without hidden text requests or capability downgrade', async () => {
   const errors: unknown[] = [];
   const adapter = new PiRuntimeAdapter();
-  adapter.on('message', (_sessionId, message) => messages.push(message));
   adapter.on('error', (_sessionId, error) => errors.push(error));
   adapter.setCoworkStore(fakeStore);
-
-  const attachmentPath = writeImage('hash.png');
-  await adapter.startSession('e2e-image-rejection', '图里面的内容是', {
-    imageAttachments: [{ name: 'image-1791.png', mimeType: 'image/png', path: attachmentPath }],
-  });
-
-  await vi.waitFor(
-    () => {
-      expect(requests.filter(request => request.hasImage).length).toBeGreaterThanOrEqual(1);
-      expect(requests.filter(request => !request.hasImage).length).toBeGreaterThanOrEqual(1);
-    },
-    { timeout: 30000 },
-  );
-
-  const textOnly = requests.find(request => !request.hasImage);
-  expect(textOnly?.body).toContain('hash.png'); // the model receives the file path
-  // ...together with the extraction path: the bundled helper's command where the
-  // helper resolves (Windows), the self-written guidance otherwise.
-  expect(textOnly?.body).toContain(
-    resolveBundledOcrHelper() ? 'ocr-image.ps1' : 'ask the user to paste',
-  );
-  expect(errors).toHaveLength(0); // no dead-end error bubble
-  const notices = messages.filter(
-    message =>
-      readRecord(message, 'type') === 'system' &&
-      String(readRecord(message, 'content')).includes('纯文本重试'),
-  );
-  expect(notices).toHaveLength(1);
-}, 60000);
-
-test('a second image turn on the same model no longer sends the bytes', async () => {
-  requests.length = 0;
-  const adapter = new PiRuntimeAdapter();
-  adapter.setCoworkStore(fakeStore);
-  adapter.on('error', () => undefined);
-
-  await adapter.startSession('e2e-image-suppressed', '再看一张', {
-    imageAttachments: [
-      { name: 'image-1792.png', mimeType: 'image/png', path: writeImage('hash2.png') },
-    ],
-  });
-  await vi.waitFor(() => expect(requests.length).toBeGreaterThanOrEqual(1), { timeout: 20000 });
-
-  expect(requests.every(request => !request.hasImage)).toBe(true);
-  expect(requests[0].body).toContain('hash2.png');
-}, 60000);
+  try {
+    for (const sessionId of ['first-image', 'next-image']) {
+      requests.length = 0;
+      await adapter.startSession(sessionId, 'Describe this image', {
+        imageAttachments: [
+          { name: 'input.png', mimeType: 'image/png', path: writeImage(`${sessionId}.png`) },
+        ],
+      });
+      expect(requests).toHaveLength(1);
+      expect(requests[0].hasImage).toBe(true);
+      expect(requests[0].body).not.toContain('Image not sent');
+      expect(adapter.isSessionRunning(sessionId)).toBe(false);
+    }
+    expect(errors).toHaveLength(2);
+  } finally {
+    adapter.stopAllSessions();
+  }
+});

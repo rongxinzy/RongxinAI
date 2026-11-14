@@ -1,8 +1,8 @@
 /**
  * Maps Pi session events onto Cowork messages, tool activity, and run completion.
  *
- * Completion stays on agent_settled. The adapter still owns session lifetime,
- * approvals, and the follow-up queue.
+ * Completion stays on agent_settled. Pi owns execution and queued inputs;
+ * the adapter projects events and retains user authorization.
  */
 
 import { observeWorkbench } from '../../workbenchTask/observe';
@@ -13,20 +13,11 @@ import { classifyCoworkError, CoworkErrorKind, makeCoworkError } from '../../../
 import type { CoworkMessage } from '../../coworkStore';
 import { t } from '../../i18n';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
-import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
-import { cancelPiRetry } from './piRetryCancellation';
 import { handlePiCompactionEvent } from './piCompactionEvents';
 import { PiAssistantEventType } from './piStreamConstants';
 import { invalidatesPiFinalResponse, isPiFinalResponse } from './piFinalResponse';
-import {
-  imageCapabilityFingerprint,
-  isImageCapabilityError,
-  isImagePayloadRejection,
-  markImageInputRejected,
-  type ImageCapabilityConfiguration,
-} from './piImageInputFallback';
 import { getPiPreparingToolActivity, toToolActivityInput } from './toolActivity';
 import type { PiAssistantTranscript } from './piAssistantTranscript';
 import { clonePiStreamMessage } from './piStreamMessageClone';
@@ -56,18 +47,10 @@ export interface PiRuntimeTurnHost {
   activeSessions(): ActivePiSession[];
   getActiveSession(sessionId: string): ActivePiSession | undefined;
   emit(event: string, ...args: unknown[]): void;
-  stopActiveSession(
-    sessionId: string,
-    reason: string,
-    drainQueuedFollowUp: boolean,
-    cause?: CoworkInterruptionCause,
-  ): void;
-  flushFollowUpQueue(sessionId: string, active: ActivePiSession): Promise<void>;
+  flushControlActions(sessionId: string, active: ActivePiSession): Promise<void>;
   onPiUserMessageStart?: (sessionId: string, active: ActivePiSession) => void;
   resetNativeQueueDispatch?: (sessionId: string) => void;
-  flushPendingError(sessionId: string, active: ActivePiSession): boolean;
-  imageCapabilityConfiguration(active: ActivePiSession): ImageCapabilityConfiguration;
-  syncImageInputCapability(sessionIds?: Iterable<string>): Promise<void>;
+  flushPendingError(sessionId: string, active: ActivePiSession): void;
   createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion;
   recordSummaryOmission(sessionId: string, active: ActivePiSession): Promise<void>;
 }
@@ -415,60 +398,21 @@ export class PiRuntimeTurnEvents {
             // attempt — flushPendingError surfaces the error exactly once when
             // the run settles (auto_retry_end / agent_settled).
             const classified = classifyCoworkError(errMsg);
-            const carriedImages = (active.lastImagePrompt?.sentImages.length ?? 0) > 0;
-            // A 400-class rejection of a turn that actually carried images is an
-            // image-capability rejection even when the server wording misses the
-            // textual rules (see piImageInputFallback).
-            const imageRejection =
-              classified.kind === CoworkErrorKind.ModelCapabilityUnsupported
-                ? // Only image rejections are corrected: an audio/video capability
-                  // error must not silently strip the model's image-input verdict,
-                  // and a payload problem must not either.
-                  isImageCapabilityError(errMsg)
-                : isImagePayloadRejection(errMsg, carriedImages);
-            active.pendingError = {
-              message: errMsg,
-              classified: imageRejection
-                ? makeCoworkError(CoworkErrorKind.ModelCapabilityUnsupported, errMsg)
-                : classified,
-            };
+            active.pendingError = { message: errMsg, classified };
             active.turnFailed = true;
             active.retryStreamReusePending = false;
             this.host.transcript.closeIdlePlaceholders(sessionId, active, {
               finalize: true,
             });
-            if (imageRejection) {
-              // Keep the rejection as a runtime observation instead of rewriting
-              // the user's capability configuration: following turns simply stop
-              // sending images, and the file paths still reach the model as text.
-              markImageInputRejected(
-                active.harnessModelProfile.provider,
-                active.harnessModelProfile.model,
-                imageCapabilityFingerprint(this.host.imageCapabilityConfiguration(active)),
-              );
-              // Other live sessions on the same model must learn this too: their
-              // Pi snapshot still advertises image input, so their own `read`
-              // would send the payload this server just refused.
-              void this.host.syncImageInputCapability();
-              active.pendingError.sticky = true;
-              if (carriedImages) {
-                active.imageRetryPending = true;
-                active.imageRejectionHandled = true;
-              }
-            }
             return;
           }
 
           // A successful assistant message after failed attempts means the retry
           // recovered — drop the deferred error so it is never surfaced, and
           // clear the flag so agent_end still finalizes and completes the turn.
-          // Errors the runtime recorded itself are sticky: Pi reports those
-          // turns as a plain aborted or truncated turn, which must not erase them.
-          if (!active.pendingError?.sticky) {
-            active.errorSurfaced = false;
-            active.pendingError = null;
-            active.turnFailed = false;
-          }
+          active.errorSurfaced = false;
+          active.pendingError = null;
+          active.turnFailed = false;
 
           const { text, thinking } = active.streamAccumulator.reconcile(
             clonePiStreamMessage(event.message),
@@ -693,15 +637,6 @@ export class PiRuntimeTurnEvents {
       }
 
       case 'auto_retry_start':
-        // Cancel Pi's own backoff only when switching to an immediate image-less
-        // retry or when the server rejected image input for this model; otherwise
-        // Pi's native `_isRetryableError` governs retry eligibility.
-        if (active.imageRetryPending || active.pendingError?.sticky) {
-          void cancelPiRetry(active.piSession).catch(error => {
-            console.error(`[PiRuntime] failed to cancel retry for session ${sessionId}:`, error);
-          });
-          break;
-        }
         if (active.assistantMessageId || active.thinkingMessageId) {
           active.retryStreamReusePending = true;
         }
@@ -741,19 +676,19 @@ export class PiRuntimeTurnEvents {
         // must not reopen the error.
         if (active.errorSurfaced) break;
         // Pi reports both recovered retries and final exhaustion here.
-        if (event.success === true && !active.pendingError?.sticky) {
+        if (event.success === true) {
           active.pendingError = null;
           active.turnFailed = false;
           break;
         }
-        if (event.finalError && !active.pendingError?.sticky) {
+        if (event.finalError) {
           active.pendingError = {
             message: event.finalError,
             classified: classifyCoworkError(event.finalError),
           };
         }
         // Cancellation precedes agent_settled: retain the lane and writer lease.
-        if (!active.pendingError?.sticky) this.host.flushPendingError(sessionId, active);
+        this.host.flushPendingError(sessionId, active);
         break;
 
       case 'agent_settled':
@@ -797,8 +732,8 @@ export class PiRuntimeTurnEvents {
     // Run settled with a deferred or surfaced failure: never complete it.
     // flushPendingError is idempotent after auto_retry_end.
     if (active.pendingError || active.errorSurfaced) {
-      const retryingWithoutImages = this.host.flushPendingError(sessionId, active);
-      if (!retryingWithoutImages) void this.host.flushFollowUpQueue(sessionId, active);
+      this.host.flushPendingError(sessionId, active);
+      void this.host.flushControlActions(sessionId, active);
       return;
     }
     active.retryPriorAnswer = '';
@@ -839,7 +774,7 @@ export class PiRuntimeTurnEvents {
       }
     }
     this.host.emit('complete', sessionId);
-    void this.host.flushFollowUpQueue(sessionId, active);
+    void this.host.flushControlActions(sessionId, active);
   }
 }
 

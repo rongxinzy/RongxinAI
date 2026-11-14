@@ -26,7 +26,6 @@ export function handlePiCompactionEvent(
       !event.aborted &&
       event.reason !== PiCompactionReason.Manual &&
       !active.errorSurfaced &&
-      !active.pendingError?.sticky &&
       unfinished
     ) {
       active.pendingError = {

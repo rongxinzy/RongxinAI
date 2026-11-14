@@ -25,7 +25,6 @@ import type { CoworkMessage } from '../../coworkStore';
 import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
 import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
 import { collectImagePathReferences } from './piImageInputFallback';
-import { waitForPiRetryCancellation } from './piRetryCancellation';
 import { resolvePiModel } from './piMagpiePiModel';
 import { resolvePiSessionModel } from './piRuntimeSettingsOverrides';
 import { resolveZhiyuanSkillDirs } from './piRuntimeSkillDirs';
@@ -51,8 +50,6 @@ export async function continuePiRuntimeSession(
   const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
   const nextUnattended = options.unattended === true;
   const active = host.activeSessions.get(sessionId);
-  const retryCancellation = active && waitForPiRetryCancellation(active.piSession);
-  if (retryCancellation) await retryCancellation;
   if (!active || active.aborted) {
     if (active?.aborted) {
       host.activeSessions.delete(sessionId);
@@ -272,13 +269,11 @@ export async function continuePiRuntimeSession(
       timestamp: Date.now(),
       metadata:
         attachedSkillIds?.length ||
-        options._queueDelivery ||
         storedImages?.length ||
         options.fileAttachments?.length ||
         active.turnExperts.length
           ? {
               ...(attachedSkillIds?.length ? { skillIds: attachedSkillIds } : {}),
-              ...(options._queueDelivery ? { queueDelivery: options._queueDelivery } : {}),
               ...(storedImages?.length ? { imageAttachments: storedImages } : {}),
               ...(options.fileAttachments?.length
                 ? { fileAttachments: options.fileAttachments }
@@ -317,15 +312,8 @@ export async function continuePiRuntimeSession(
       host.getOcrCommandFor(),
       collectImagePathReferences(options.fileAttachments),
     );
-    host.recovery.recordImagePrompt(sessionId, active, prompt, continuedImagePrompt);
-    host.queue.expectDirectUserPrompt(sessionId);
-    try {
-      await sendPiPrompt(active.piSession, continuedImagePrompt, options._streamingBehavior);
-    } catch (sendError) {
-      host.queue.cancelDirectUserPrompt(sessionId);
-      throw sendError;
-    }
-    await active.eventProjection?.drain();
+    host.recovery.reportOmittedImages(sessionId, continuedImagePrompt);
+    await sendPiPrompt(active.piSession, continuedImagePrompt);
   } catch (error) {
     host.memoryInjectionDedup.reset(sessionId);
     active.isRunning = false;
@@ -369,7 +357,6 @@ export async function patchPiRuntimeSession(
     const model = resolvePiSessionModel(resolvedModel.model, active.resourceState.chatMode);
     await active.piSession.setModel(model);
     active.model = model;
-    active.imageEndpointKey = resolvedModel.endpointKey;
     active.requestedModelOverride = patch.model;
     active.modelRuntime = resolvedModel.modelRuntime;
     active.modelRequestOptions = resolvedModel.requestOptions;

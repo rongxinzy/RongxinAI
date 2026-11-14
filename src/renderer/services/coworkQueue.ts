@@ -51,22 +51,6 @@ class CoworkQueueService {
     });
   }
 
-  update(sessionId: string, itemId: string, text: string) {
-    return window.electron.cowork.updatePendingMessage({ sessionId, itemId, text });
-  }
-
-  remove(sessionId: string, itemId: string) {
-    return window.electron.cowork.deletePendingMessage({ sessionId, itemId });
-  }
-
-  steer(sessionId: string, itemId: string) {
-    return window.electron.cowork.steerPendingMessage({ sessionId, itemId });
-  }
-
-  followUp(sessionId: string, itemId: string) {
-    return window.electron.cowork.followUpPendingMessage({ sessionId, itemId });
-  }
-
   dispose(): void {
     this.streamCleanup?.();
     this.streamCleanup = null;

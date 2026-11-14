@@ -24,6 +24,8 @@ const ObservationMode = {
   On: 'on',
   BrokenStart: 'broken_start',
   BrokenAudit: 'broken_audit',
+  BrokenProjection: 'broken_projection',
+  BrokenExecutionEvents: 'broken_execution_events',
 } as const;
 type ObservationMode = (typeof ObservationMode)[keyof typeof ObservationMode];
 const docId = (index: number) => `doc-${String(index).padStart(3, '0')}`;
@@ -133,6 +135,16 @@ async function runScenario(
   const workbench = new WorkbenchTaskService(db);
   const adapter = new PiRuntimeAdapter();
   adapter.setCoworkStore(cowork);
+  if (mode === ObservationMode.BrokenProjection) {
+    adapter.on('message', (_sessionId, message) => {
+      if (message.type === 'assistant') throw new Error('Display projection unavailable');
+    });
+  }
+  if (mode === ObservationMode.BrokenExecutionEvents) {
+    adapter.on('executionEvent', () => {
+      throw new Error('Execution display unavailable');
+    });
+  }
   if (mode !== ObservationMode.Off) adapter.setWorkbenchTaskService(workbench);
   if (mode === ObservationMode.BrokenStart || mode === ObservationMode.BrokenAudit) {
     const methods =
@@ -244,9 +256,7 @@ test(
         await rm(path.join(workspace, 'summaries.md'), { force: true });
         results.push(await runScenario(workspace, 32, 21, mode));
       }
-      expect(results[1]).toEqual(results[0]);
-      expect(results[2]).toEqual(results[0]);
-      expect(results[3]).toEqual(results[0]);
+      for (const result of results.slice(1)) expect(result).toEqual(results[0]);
       expect(
         (await readFile(path.join(workspace, 'summaries.md'), 'utf8')).match(/^## /gm),
       ).toHaveLength(21);
@@ -284,13 +294,18 @@ test(
       await mkdir(path.join(workspace, 'data'));
       await writeFile(path.join(workspace, 'data', 'doc-001.txt'), `# ${title(1)}\n原始资料。`);
       const results = [];
-      for (const mode of [ObservationMode.Off, ObservationMode.On, ObservationMode.BrokenAudit]) {
+      for (const mode of [
+        ObservationMode.Off,
+        ObservationMode.On,
+        ObservationMode.BrokenAudit,
+        ObservationMode.BrokenProjection,
+        ObservationMode.BrokenExecutionEvents,
+      ]) {
         for (const file of ['summaries.md', 'index.csv', 'report.md'])
           await rm(path.join(workspace, file), { force: true });
         results.push(await runScenario(workspace, 1, 1, mode, true));
       }
-      expect(results[1]).toEqual(results[0]);
-      expect(results[2]).toEqual(results[0]);
+      for (const result of results.slice(1)) expect(result).toEqual(results[0]);
     } finally {
       await rm(workspace, { recursive: true, force: true });
     }

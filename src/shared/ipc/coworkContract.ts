@@ -27,12 +27,7 @@ import {
   CoworkSessionIpc,
   CoworkStreamIpc,
 } from './channels';
-import {
-  CoworkQueueEnqueueSchema,
-  CoworkQueueItemSchema,
-  CoworkQueueSessionSchema,
-  CoworkQueueUpdateSchema,
-} from './queueSchemas';
+import { CoworkQueueEnqueueSchema, CoworkQueueSessionSchema } from './queueSchemas';
 import {
   CoworkConfigSetSchema,
   CoworkSessionContinueSchema,
@@ -586,38 +581,6 @@ export const coworkQueueContract = defineIpcContract({
   enqueuePendingMessage: {
     channel: CoworkQueueIpc.Enqueue,
     args: z.tuple([CoworkQueueEnqueueSchema]),
-    result: z.object({
-      success: z.boolean(),
-      item: CoworkPendingMessageSchema.optional(),
-      error: z.string().optional(),
-    }),
-  },
-  updatePendingMessage: {
-    channel: CoworkQueueIpc.Update,
-    args: z.tuple([CoworkQueueUpdateSchema]),
-    result: z.object({
-      success: z.boolean(),
-      item: CoworkPendingMessageSchema.optional(),
-      error: z.string().optional(),
-    }),
-  },
-  deletePendingMessage: {
-    channel: CoworkQueueIpc.Delete,
-    args: z.tuple([CoworkQueueItemSchema]),
-    result: z.object({ success: z.boolean(), error: z.string().optional() }),
-  },
-  steerPendingMessage: {
-    channel: CoworkQueueIpc.Steer,
-    args: z.tuple([CoworkQueueItemSchema]),
-    result: z.object({
-      success: z.boolean(),
-      item: CoworkPendingMessageSchema.optional(),
-      error: z.string().optional(),
-    }),
-  },
-  followUpPendingMessage: {
-    channel: CoworkQueueIpc.FollowUp,
-    args: z.tuple([CoworkQueueItemSchema]),
     result: z.object({
       success: z.boolean(),
       item: CoworkPendingMessageSchema.optional(),
