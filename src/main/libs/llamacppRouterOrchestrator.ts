@@ -450,14 +450,20 @@ export class LlamaCppRouterOrchestrator implements LlamaCppModelOrchestrator {
 
   private currentStatus(): LlamaCppModelDaemonStatus {
     if (!this.routerProcess) return this.stoppedStatus();
+    const modelProcesses =
+      this.lastRunningModels.length > 0
+        ? this.lastRunningModels.map(model => ({
+            modelName: (model.name || model.model || model.id || '').trim(),
+            modelPath: model.path ?? '',
+            port: this.routerPort ?? 0,
+          }))
+        : this.routerPort
+          ? [{ modelName: '', modelPath: '', port: this.routerPort }]
+          : [];
     return {
       status: { status: 'running', managedByApp: true, checkedAt: new Date().toISOString() },
       runningModels: this.lastRunningModels,
-      modelProcesses: this.lastRunningModels.map(model => ({
-        modelName: (model.name || model.model || model.id || '').trim(),
-        modelPath: model.path ?? '',
-        port: this.routerPort ?? 0,
-      })),
+      modelProcesses,
       gatewayBaseUrl: this.gatewayBaseUrl(),
     };
   }

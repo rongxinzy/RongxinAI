@@ -639,6 +639,8 @@ export class LlamaCppManagerCore extends EventEmitter {
       devices,
       backendKinds,
       gpuDeviceCount,
+      kvCacheTypes:
+        helpFlagsResult.kvCacheTypes.length > 0 ? helpFlagsResult.kvCacheTypes : undefined,
       supports: buildLlamaCppServiceConfigFieldSupport({
         helpProbeSucceeded: helpFlagsResult.success,
         flags: helpFlagsResult.flags,
@@ -651,14 +653,7 @@ export class LlamaCppManagerCore extends EventEmitter {
     };
   }
 
-  /**
-   * Import a user-provided llama.cpp runtime from a local directory.
-   * Copies all files from the directory containing llama-server into
-   * <runtimeRoot>/current/bin/, matching the existing auto-download
-   * copy strategy. Platform differences (DLLs, dylibs, .so) are handled
-   * automatically by copying the full directory.
-   */
-
+  /** Import user llama.cpp runtime files into `<runtimeRoot>/current/bin/`. */
   async detect(): Promise<LlamaCppStatusSnapshot> {
     const client = new LlamaCppClient(this.getBaseUrl());
     try {

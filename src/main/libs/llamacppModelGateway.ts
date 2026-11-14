@@ -41,6 +41,7 @@ export function createLlamaCppModelGateway(
       await new Promise<void>((resolve, reject) => {
         const nextServer = http.createServer((request, response) => {
           void handleGatewayRequest(request, response, options).catch(error => {
+            if (response.headersSent || response.writableEnded) return;
             const message = error instanceof Error ? error.message : 'Local model gateway failed.';
             writeJsonError(response, 502, message);
           });
@@ -143,6 +144,12 @@ async function forwardRequest(
       response.write(Buffer.from(value));
     }
     response.end();
+  } catch (error) {
+    if (controller.signal.aborted || response.headersSent) {
+      if (!response.writableEnded) response.end();
+      return;
+    }
+    throw error;
   } finally {
     request.removeListener('aborted', abort);
     response.removeListener('close', abort);
@@ -182,7 +189,7 @@ function getModelName(body: Buffer): string {
 }
 
 function writeJson(response: http.ServerResponse, status: number, body: unknown): void {
-  if (response.writableEnded) return;
+  if (response.writableEnded || response.headersSent) return;
   response.statusCode = status;
   response.setHeader('content-type', 'application/json; charset=utf-8');
   response.end(JSON.stringify(body));

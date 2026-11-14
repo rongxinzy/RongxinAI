@@ -23,6 +23,7 @@ import {
   mergeLocalModels,
   modelLaunchOptionsToPreset,
   parseLlamaCppHelpFlags,
+  parseLlamaCppKvCacheTypesFromHelp,
   parseLlamaCppListDevicesOutput,
   replaceIniSectionKeys,
   resolveLlamaCppDeviceSelection,
@@ -533,6 +534,36 @@ test('parseLlamaCppListDevicesOutput extracts backend and device names', () => {
     { id: 'GPU0', name: 'Adreno X1-85', backend: 'opencl' },
     { id: 'CPU', name: 'CPU', backend: 'cpu' },
   ]);
+});
+
+test('parseLlamaCppKvCacheTypesFromHelp reads allowed values from help output', () => {
+  expect(
+    parseLlamaCppKvCacheTypesFromHelp(
+      [
+        '-ctk,  --cache-type-k TYPE              KV cache data type for K',
+        '                                        allowed values: f32, f16, bf16, f8_e4m3, q8_0, q4_0, q4_1, iq4_nl,',
+        '                                        q5_0, q5_1',
+      ].join('\n'),
+    ),
+  ).toEqual(expect.arrayContaining(['f16', 'f8_e4m3', 'q8_0']));
+});
+
+test('filterLlamaCppServiceConfigByRuntimeCapabilities drops KV types missing from runtime help', () => {
+  expect(
+    filterLlamaCppServiceConfigByRuntimeCapabilities(
+      { cacheTypeK: 'f8_e4m3', cacheTypeV: 'q8_0' },
+      {
+        success: true,
+        flags: ['--cache-type-k'],
+        deviceProbeSucceeded: false,
+        devices: [],
+        backendKinds: [],
+        gpuDeviceCount: 0,
+        supports: { cacheTypeK: true, cacheTypeV: true },
+        kvCacheTypes: ['f16', 'q8_0'],
+      },
+    ),
+  ).toEqual({ cacheTypeV: 'q8_0' });
 });
 
 test('parseLlamaCppHelpFlags extracts normalized long flags from help output', () => {

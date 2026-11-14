@@ -7,7 +7,11 @@ export default mergeConfig(
   base,
   defineConfig({
     test: {
-      exclude: ['**/*.integration.test.ts', 'scripts/electron-native-abi.test.ts'],
+      exclude: [
+        '**/*.integration.test.ts',
+        '**/*.smoke.test.ts',
+        'scripts/electron-native-abi.test.ts',
+      ],
     },
   }),
 );

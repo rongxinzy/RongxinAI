@@ -43,6 +43,7 @@ import {
   isSameInstallRequest,
   prefillInstallInputFromMarketplace,
   refreshInstallInputFromMarketplace,
+  resolveSiblingMmprojPath,
 } from '../llamacppModelInstallation';
 import {
   getLlamaCppBackendCompatibilityError,
@@ -573,12 +574,14 @@ export class LlamaCppManager extends LlamaCppManagerService {
   ): Promise<void> {
     const model = models.find(item => item.name === input.model || item.id === input.model);
     const modelPath = input.modelPath || model?.path;
+    const mmprojPath = modelPath ? resolveSiblingMmprojPath(modelPath) : undefined;
     const existing = fs.existsSync(this.getPresetPath())
       ? fs.readFileSync(this.getPresetPath(), 'utf-8')
       : 'version = 1\n\n';
     const next = upsertIniSection(existing, input.model, {
       ...(modelPath ? { model: modelPath } : {}),
       ...modelLaunchOptionsToPreset(input.options ?? {}),
+      ...(mmprojPath ? { mmproj: mmprojPath } : {}),
     });
     fs.mkdirSync(path.dirname(this.getPresetPath()), { recursive: true });
     fs.writeFileSync(this.getPresetPath(), next, 'utf-8');

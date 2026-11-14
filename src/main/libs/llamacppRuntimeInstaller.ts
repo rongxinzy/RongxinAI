@@ -10,21 +10,13 @@ import type {
 } from '../../shared/llamacpp';
 import { resolveLlamaCppRuntimeAssetDownloadUrls } from '../../shared/llamacpp/runtimeDownloadSources';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
+import {
+  readLlamaCppPackagePin,
+  resolvePinnedLlamaCppRuntimeAssetName,
+} from './llamacppPackagePin';
 
-const LLAMACPP_RUNTIME_RELEASE_TAG = 'b9505';
-const LLAMACPP_RUNTIME_ASSETS: Record<string, string> = {
-  [LlamaCppRuntimeTargetId.MacArm64]: 'llama-{tag}-bin-macos-arm64.tar.gz',
-  [LlamaCppRuntimeTargetId.MacX64]: 'llama-{tag}-bin-macos-x64.tar.gz',
-  [LlamaCppRuntimeTargetId.WinX64]: 'llama-{tag}-bin-win-cpu-x64.tar.gz',
-  [LlamaCppRuntimeTargetId.WinX64Cuda12]: 'llama-{tag}-bin-win-cuda-12.4-x64.tar.gz',
-  [LlamaCppRuntimeTargetId.WinArm64]: 'llama-{tag}-bin-win-cpu-arm64.tar.gz',
-  [LlamaCppRuntimeTargetId.LinuxX64]: 'llama-{tag}-bin-ubuntu-x64.tar.gz',
-  [LlamaCppRuntimeTargetId.LinuxX64Cuda12]: 'llama-{tag}-bin-ubuntu-cuda-12.4-x64.tar.gz',
-  [LlamaCppRuntimeTargetId.LinuxX64Cuda13]: 'llama-{tag}-bin-ubuntu-cuda-13.3-x64.tar.gz',
-  [LlamaCppRuntimeTargetId.LinuxArm64]: 'llama-{tag}-bin-ubuntu-arm64.tar.gz',
-};
 const LLAMACPP_RUNTIME_COMPANION_ASSETS: Record<string, string[]> = {
-  [LlamaCppRuntimeTargetId.WinX64Cuda12]: ['cudart-llama-bin-win-cuda-12.4-x64.tar.gz'],
+  [LlamaCppRuntimeTargetId.WinX64Cuda12]: ['cudart-llama-bin-win-cuda-12.4-x64.zip'],
 };
 
 export type LlamaCppRuntimeInstallContext = {
@@ -64,9 +56,7 @@ export function resolveLlamaCppRuntimeTargetId(
 }
 
 export function resolveLlamaCppRuntimeAssetName(targetId: string): string {
-  const template = LLAMACPP_RUNTIME_ASSETS[targetId];
-  if (!template) throw new Error(`Unsupported prebuilt llama.cpp runtime target: ${targetId}`);
-  return template.replace(/\{tag\}/g, LLAMACPP_RUNTIME_RELEASE_TAG);
+  return resolvePinnedLlamaCppRuntimeAssetName(targetId);
 }
 
 export function resolveLlamaCppRuntimeDownloadUrl(
@@ -89,7 +79,7 @@ export function resolveLlamaCppRuntimeCompanionDownloads(
   env: NodeJS.ProcessEnv = process.env,
 ): Array<{ assetName: string; url: string; fallbackUrls?: string[] }> {
   return (LLAMACPP_RUNTIME_COMPANION_ASSETS[targetId] ?? []).map(template => {
-    const assetName = template.replace(/\{tag\}/g, LLAMACPP_RUNTIME_RELEASE_TAG);
+    const assetName = template.replace(/\{tag\}/g, readLlamaCppPackagePin().runtimeReleaseTag);
     const [url, ...fallbackUrls] = resolveRuntimeAssetDownloadUrls(targetId, assetName, env);
     return { assetName, url, fallbackUrls };
   });
@@ -103,7 +93,7 @@ function resolveRuntimeAssetDownloadUrls(
   return resolveLlamaCppRuntimeAssetDownloadUrls({
     targetId,
     assetName,
-    releaseTag: LLAMACPP_RUNTIME_RELEASE_TAG,
+    releaseTag: readLlamaCppPackagePin().runtimeReleaseTag,
     env,
   });
 }

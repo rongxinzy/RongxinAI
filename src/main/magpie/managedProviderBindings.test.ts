@@ -3,10 +3,27 @@ import { ManagedMagpieProviderBindings } from './managedProviderBindings';
 import { LOCAL_GPU_MAGPIE_PROVIDER_ID } from '../../shared/magpie/constants';
 import { ZhiyuanManagedProviderBridge } from '../enterpriseExtension/managedProviderBridge';
 import { buildLlamaCppRunningModelBinding } from '../libs/llamacppAgentBinding';
+import { ModelCapabilityStatus } from '../../shared/providers';
 const model = buildLlamaCppRunningModelBinding({
   name: 'local-model',
   runtime_context_length: 8192,
 })!;
+test('maps vision-capable local GPU models to text+image Magpie input', async () => {
+  const sink = { syncHostProviders: vi.fn(async () => {}) };
+  const bindings = new ManagedMagpieProviderBindings(new ZhiyuanManagedProviderBridge(), sink);
+  const visionModel = {
+    ...model,
+    supportsImage: true,
+    capabilities: { imageInput: ModelCapabilityStatus.Supported },
+  };
+  bindings.setGpuSnapshot('http://127.0.0.1:1234/v1', [visionModel]);
+  await bindings.synchronize();
+  expect(sink.syncHostProviders.mock.calls.at(-1)?.[0]?.[0]?.models?.[0]?.input).toEqual([
+    'text',
+    'image',
+  ]);
+});
+
 test('publishes live GPU endpoint/model changes and removes unavailable models instead of preserving stale choices', async () => {
   const sink = { syncHostProviders: vi.fn(async () => {}) };
   const bindings = new ManagedMagpieProviderBindings(new ZhiyuanManagedProviderBridge(), sink);
