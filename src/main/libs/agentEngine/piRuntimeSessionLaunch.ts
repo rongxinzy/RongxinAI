@@ -356,6 +356,23 @@ export async function startPiRuntimeSession(
     // Chat mode: disable all built-in tools for direct LLM access
     if (options.confirmationMode === 'text') {
       sessionOptions.noTools = 'all';
+    } else {
+      const readOnlyWorkspace = options.planMode === true || options.readOnlyWorkspace === true;
+      const customToolNames = customTools.map(t => (t as { name: string }).name);
+      if (readOnlyWorkspace) {
+        sessionOptions.tools = ['read', 'grep', 'find', 'ls', ...customToolNames];
+      } else {
+        sessionOptions.tools = [
+          'read',
+          'bash',
+          'edit',
+          'write',
+          'grep',
+          'find',
+          'ls',
+          ...customToolNames,
+        ];
+      }
     }
 
     const piSessionCreateStartedAt = Date.now();

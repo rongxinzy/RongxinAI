@@ -114,10 +114,12 @@ interface ToolResult {
 interface SubagentTool {
   name: string;
   description: string;
+  annotations?: import('@earendil-works/pi-coding-agent').ToolAnnotations;
   execute(
     toolCallId: string,
     params: Record<string, unknown>,
     signal?: AbortSignal,
+    onUpdate?: (update: unknown) => void,
   ): Promise<ToolResult>;
 }
 
@@ -515,6 +517,69 @@ describe('buildPiSubagentTool', () => {
       );
       expect(subSession.abort).toHaveBeenCalledOnce();
       expect(subSession.dispose).toHaveBeenCalledOnce();
+    });
+
+    it('provides readOnly annotations and passes onUpdate progress events from child tools', async () => {
+      let childListener: ((event: unknown) => void) | undefined;
+      const childSession = {
+        prompt: vi.fn(async () => {
+          childListener?.({
+            type: PiSubagentEventType.ToolExecutionStart,
+            toolCallId: 'child-c1',
+            toolName: 'read',
+            args: { path: 'a.txt' },
+          });
+          childListener?.({
+            type: PiSubagentEventType.ToolExecutionUpdate,
+            toolCallId: 'child-c1',
+            toolName: 'read',
+            partialResult: 'reading...',
+          });
+          childListener?.({
+            type: PiSubagentEventType.ToolExecutionEnd,
+            toolCallId: 'child-c1',
+            toolName: 'read',
+            result: 'done',
+            isError: false,
+          });
+          childListener?.(assistantEndEvent('finished child task'));
+          childListener?.(agentSettledEvent());
+        }),
+        steer: vi.fn(),
+        abort: vi.fn(),
+        dispose: vi.fn(),
+        subscribe: vi.fn((listener: (event: unknown) => void) => {
+          childListener = listener;
+          return () => {};
+        }),
+      };
+      hoisted.mockCreateAgentSession.mockResolvedValueOnce({ session: childSession });
+
+      const { tool } = buildTool();
+      expect(tool.annotations).toEqual({
+        readOnlyHint: true,
+        openWorldHint: false,
+      });
+
+      const updates: unknown[] = [];
+      const onUpdate = vi.fn((update: unknown) => updates.push(update));
+
+      const result = await tool.execute(
+        'parent-call-id',
+        { agent: 'scout', task: 'scan dir' },
+        undefined,
+        onUpdate,
+      );
+
+      expect(result.content[0].text).toBe('finished child task');
+      expect(onUpdate).toHaveBeenCalled();
+      expect(
+        updates.some(
+          (u: any) =>
+            u.details?.childToolCallId === 'child-c1' &&
+            u.details?.parentToolCallId === 'parent-call-id',
+        ),
+      ).toBe(true);
     });
   });
 });

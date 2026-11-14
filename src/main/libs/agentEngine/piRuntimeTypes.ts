@@ -129,6 +129,8 @@ export type PiStartOptions = {
   codemode?: boolean;
   /** Read-only planning turn: excludes workspace-mutating tools and requires plan_write. */
   planMode?: boolean;
+  /** Read-only workspace review: excludes workspace-mutating tools. */
+  readOnlyWorkspace?: boolean;
   /** Registers plan_write for the whole session, so plan mode also works on a live session. */
   planTool?: boolean;
   imageAttachments?: PiImageAttachment[];
@@ -160,6 +162,8 @@ export type PiContinueOptions = {
   codemode?: boolean;
   /** Read-only planning turn, forwarded when the runtime recreates the session. */
   planMode?: boolean;
+  /** Read-only workspace review, forwarded when the runtime recreates the session. */
+  readOnlyWorkspace?: boolean;
   /** Registers plan_write when the runtime has to recreate the session. */
   planTool?: boolean;
   imageAttachments?: PiImageAttachment[];

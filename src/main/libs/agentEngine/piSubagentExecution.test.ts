@@ -228,3 +228,85 @@ test('cleans up when prompting throws synchronously', async () => {
   await expect(runPiSubagent(session, 'Implement it', {})).rejects.toBe(error);
   expect(unsubscribe).toHaveBeenCalledOnce();
 });
+
+test('forwards child tool events tagged with parentToolCallId to onChildToolEvent', async () => {
+  const { session, emit, resolvePrompt } = createSession();
+  const forwardedEvents: unknown[] = [];
+  const onChildToolEvent = vi.fn((event: unknown) => {
+    forwardedEvents.push(event);
+  });
+
+  const outputPromise = runPiSubagent(session, 'Task with child tools', {
+    parentToolCallId: 'parent-call-999',
+    onChildToolEvent,
+  });
+
+  emit({
+    type: PiSubagentEventType.ToolExecutionStart,
+    toolCallId: 'child-call-1',
+    toolName: 'read',
+    args: { path: 'foo.ts' },
+  });
+
+  emit({
+    type: PiSubagentEventType.ToolExecutionUpdate,
+    toolCallId: 'child-call-1',
+    toolName: 'read',
+    partialResult: 'reading chunk...',
+  });
+
+  emit({
+    type: PiSubagentEventType.ToolExecutionEnd,
+    toolCallId: 'child-call-1',
+    toolName: 'read',
+    result: 'file content',
+    isError: false,
+  });
+
+  emit({
+    type: PiSubagentEventType.MessageEnd,
+    message: {
+      role: PiMessageRole.Assistant,
+      stopReason: PiAssistantStopReason.Stop,
+      content: [{ type: PiContentBlockType.Text, text: 'Child done' }],
+    },
+  });
+  emit({ type: PiSubagentEventType.AgentSettled });
+  resolvePrompt();
+
+  const result = await outputPromise;
+  expect(result.output).toBe('Child done');
+  expect(result.toolCalls).toBe(1);
+
+  expect(onChildToolEvent).toHaveBeenCalledTimes(3);
+  expect(forwardedEvents[0]).toEqual({
+    type: PiSubagentEventType.ToolExecutionStart,
+    toolCallId: 'child-call-1',
+    parentToolCallId: 'parent-call-999',
+    toolName: 'read',
+    args: { path: 'foo.ts' },
+    result: undefined,
+    partialResult: undefined,
+    isError: undefined,
+  });
+  expect(forwardedEvents[1]).toEqual({
+    type: PiSubagentEventType.ToolExecutionUpdate,
+    toolCallId: 'child-call-1',
+    parentToolCallId: 'parent-call-999',
+    toolName: 'read',
+    args: undefined,
+    result: undefined,
+    partialResult: 'reading chunk...',
+    isError: undefined,
+  });
+  expect(forwardedEvents[2]).toEqual({
+    type: PiSubagentEventType.ToolExecutionEnd,
+    toolCallId: 'child-call-1',
+    parentToolCallId: 'parent-call-999',
+    toolName: 'read',
+    args: undefined,
+    result: 'file content',
+    partialResult: undefined,
+    isError: false,
+  });
+});

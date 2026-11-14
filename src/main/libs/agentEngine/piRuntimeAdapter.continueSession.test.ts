@@ -146,7 +146,7 @@ describe('PiRuntimeAdapter', () => {
       ]);
     });
 
-    it('recreates the session after MCP discovery refreshes its tool topology', async () => {
+    it('reloads the session in place after MCP discovery refreshes its tool topology (F13)', async () => {
       adapter.setMcpServerManager({
         toolManifest: [
           {
@@ -163,13 +163,9 @@ describe('PiRuntimeAdapter', () => {
       adapter.refreshMcpTools();
       await adapter.continueSession('test', 'Use Supabase');
 
-      expect(mockSession.abort).toHaveBeenCalledOnce();
-      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
-      const replacementLoaderOptions = mockDefaultResourceLoader.mock.calls[1]?.[0] as {
-        extensionFactories?: unknown[];
-      };
-      expect(replacementLoaderOptions.extensionFactories).toContain(mockMcpExtensionFactory);
-      expect(mockSession.bindExtensions).toHaveBeenCalledTimes(2);
+      expect(mockSession.abort).not.toHaveBeenCalled();
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(1);
+      expect(mockSession.reload).toHaveBeenCalled();
     });
 
     it('persists the selected expert on a continuation user message', async () => {

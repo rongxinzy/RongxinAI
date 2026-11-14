@@ -217,3 +217,51 @@ test('safely truncates documents with astral plane surrogates at boundary', asyn
   expect(result.details.truncated).toBe(true);
   expect(result.content[0]?.text).toContain('Output truncated to 30,000 characters');
 });
+
+test('declares native tool annotations and output schema with text property', () => {
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: createRoot() });
+  expect(tool.annotations).toEqual({
+    readOnlyHint: true,
+    openWorldHint: false,
+    idempotentHint: true,
+  });
+  expect((tool.outputSchema as any)?.properties?.text).toBeDefined();
+});
+
+test('populates structuredContent.text on successful document reading', async () => {
+  const root = createRoot();
+  await writeDocxFixture(path.join(root, 'structured.docx'), 'Structured codemode text');
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root });
+
+  const result = await tool.execute('tool-1', { path: 'structured.docx' });
+  expect(result.structuredContent.text).toContain('Structured codemode text');
+  expect(result.details.text).toContain('Structured codemode text');
+  expect(result.isError).toBeUndefined();
+});
+
+test('sets isError: true on path denial', async () => {
+  const root = createRoot();
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root });
+
+  const denied = await tool.execute('tool-1', { path: '../forbidden.docx' });
+  expect(denied.isError).toBe(true);
+  expect(denied.details.errorCode).toBe('DOCUMENT_PATH_DENIED');
+
+  const missing = await tool.execute('tool-2', { path: 'nonexistent.docx' });
+  expect(missing.isError).toBe(true);
+  expect(missing.details.errorCode).toBe('DOCUMENT_PATH_DENIED');
+});
+
+test('aborts early when AbortSignal is triggered', async () => {
+  const root = createRoot();
+  await writeDocxFixture(path.join(root, 'abort.docx'), 'Will not be read');
+  const tool = buildPiDocumentReaderTool({ workspaceRoot: root });
+
+  const controller = new AbortController();
+  controller.abort();
+
+  const result = await tool.execute('tool-1', { path: 'abort.docx' }, controller.signal);
+  expect(result.isError).toBe(true);
+  expect(result.details.errorCode).toBe('DOCUMENT_ABORTED');
+  expect(result.content[0]?.text).toContain('cancelled');
+});

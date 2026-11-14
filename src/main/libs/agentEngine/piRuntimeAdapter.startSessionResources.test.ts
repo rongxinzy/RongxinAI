@@ -30,6 +30,7 @@ import path from 'path';
 
 import { describe, expect, it, vi } from 'vitest';
 import { PiWebSearchToolName } from './constants';
+import { getZhiyuanProductPreamble } from './piPromptOverrides';
 import { TEST_MAGPIE_GATEWAY } from '../../../../tests/helpers/installTestMagpie';
 import { ModelCapabilityStatus } from '../../../shared/providers';
 import { resolveBundledOcrHelper } from '../ocrHelper';
@@ -63,7 +64,9 @@ describe('PiRuntimeAdapter', () => {
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         systemPromptOverride: (base: string | undefined) => string | undefined;
       };
-      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBeUndefined();
+      expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBe(
+        getZhiyuanProductPreamble(),
+      );
       expect(mockCreateAgentSession).toHaveBeenCalledWith(
         expect.objectContaining({
           resourceLoader: expect.any(Object),
@@ -101,7 +104,9 @@ describe('PiRuntimeAdapter', () => {
       expect(loaderOptions.extensionFactories ?? []).not.toContain(mockMcpExtensionFactory);
       expect(loaderOptions.extensionFactories ?? []).not.toContain(mockCodemodeExtensionFactory);
       expect(mockSession.bindExtensions).not.toHaveBeenCalled();
-      expect(loaderOptions.systemPromptOverride('Discovered custom prompt')).toBeUndefined();
+      expect(loaderOptions.systemPromptOverride('Discovered custom prompt')).toBe(
+        getZhiyuanProductPreamble(),
+      );
       expect(loaderOptions.appendSystemPromptOverride()).toContain(
         'Only the explicitly selected chat prompt.',
       );

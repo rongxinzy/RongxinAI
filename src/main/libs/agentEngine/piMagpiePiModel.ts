@@ -17,6 +17,7 @@ import {
   hasMagpieModelService,
   MAGPIE_RUNTIME_API_KEY,
 } from '../../magpie/modelService';
+import { zhiyuanManagedProviderBridge } from '../../enterpriseExtension/managedProviderBridge';
 import { ImageInputVerdict, imageInputVerdict } from './piImageInputFallback';
 import type { PiModelRuntime, PiModules, PiResolvedModel } from './piRuntimeSessionState';
 
@@ -122,6 +123,85 @@ export async function resolvePiModel(
   if (hasMagpieModelService()) {
     const magpieService = getMagpieModelService();
     const resolution = await magpieService.resolve(modelRef);
+
+    const enterpriseConfig =
+      zhiyuanManagedProviderBridge.getEnterpriseModelConfig(resolution.model.id) ??
+      (modelRef ? zhiyuanManagedProviderBridge.getEnterpriseModelConfig(modelRef) : null);
+
+    if (enterpriseConfig) {
+      const api = enterpriseConfig.api;
+      const contextWindow = resolution.model.context_window ?? 32768;
+      const defaultOutputTokens =
+        resolution.model.reasoning === true ? 16384 : DEFAULT_PI_LOCAL_MAX_TOKENS;
+      const maxTokens = Math.min(
+        resolution.model.max_output_tokens ?? defaultOutputTokens,
+        contextWindow,
+      );
+      const imageInput = magpieImageInput(resolution.model);
+      const supportsImage = imageInput === ModelCapabilityStatus.Supported;
+      const providerId = enterpriseConfig.providerKey;
+
+      const customModel: Model<any> & Record<string, unknown> = {
+        id: resolution.model.id,
+        name: resolution.model.display_name || resolution.model.id,
+        provider: providerId,
+        api,
+        baseUrl: enterpriseConfig.baseUrl,
+        reasoning: resolution.model.reasoning === true,
+        input: supportsImage ? ['text', 'image'] : ['text'],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow,
+        maxTokens,
+        compat: { sendSessionAffinityHeaders: true },
+        headers: {
+          ...(modelPoolRequestContext?.conversationId
+            ? {
+                [ZhiyuanModelPoolHeader.ConversationId]: modelPoolRequestContext.conversationId,
+                [ZhiyuanModelPoolHeader.Workload]: modelPoolRequestContext.workload,
+              }
+            : {}),
+        },
+      };
+
+      const modelRuntime =
+        existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: true }));
+      modelRuntime.registerProvider(providerId, {
+        name: providerId,
+        baseUrl: enterpriseConfig.baseUrl,
+        api,
+        models: [customModel],
+      });
+      await modelRuntime.setRuntimeApiKey(
+        providerId,
+        enterpriseConfig.apiKey || 'managed-enterprise',
+      );
+
+      const effectiveImageInput = imageInputVerdict(
+        imageInput,
+        ProviderName.Custom,
+        resolution.model.id,
+        {
+          supportsImage: imageInput === ModelCapabilityStatus.Supported,
+          imageInput,
+          endpointKey: enterpriseConfig.baseUrl,
+        },
+      );
+      const model =
+        effectiveImageInput === ImageInputVerdict.Supported
+          ? customModel
+          : { ...customModel, input: ['text'] as Array<'text' | 'image'> };
+
+      return {
+        model,
+        endpointKey: enterpriseConfig.baseUrl,
+        modelRuntime,
+        maxOutputTokens: maxTokens,
+        providerName: ProviderName.Custom,
+        capabilities: { imageInput },
+        requestOptions: { apiKey: enterpriseConfig.apiKey || 'managed-enterprise' },
+      };
+    }
+
     const {
       model: customModel,
       baseUrl,

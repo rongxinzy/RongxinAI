@@ -10,6 +10,8 @@
 
 import { randomUUID } from 'crypto';
 
+import type { ToolAnnotations } from '@earendil-works/pi-coding-agent';
+
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   WorkbenchApprovalDecision,
@@ -30,6 +32,7 @@ export interface PiToolAuthorizationInput {
   toolName: string;
   toolInput: Record<string, unknown>;
   approvalMode: WorkbenchApprovalMode;
+  annotations?: ToolAnnotations;
 }
 
 export interface PiToolAuthorizationResult {
@@ -75,7 +78,7 @@ export class PiToolPermissionGate {
   constructor(private readonly host: PiToolPermissionGateHost) {}
 
   async authorizeToolCall(input: PiToolAuthorizationInput): Promise<PiToolAuthorizationResult> {
-    const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput);
+    const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput, input.annotations);
     const idempotencyKey = createToolIdempotencyKey(
       input.runId ?? input.sessionId,
       input.toolCallId,

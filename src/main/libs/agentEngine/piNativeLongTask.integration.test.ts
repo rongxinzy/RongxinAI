@@ -5,12 +5,14 @@ import { expect, test, vi } from 'vitest';
 import { Type } from 'typebox';
 import { createAssistantMessageEventStream, type AssistantMessage } from '@earendil-works/pi-ai';
 // Exercise the installed SDK, without the adapter's test doubles or a live provider.
-import { createAgentSession } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/sdk.js';
-import { ModelRuntime } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js';
-import { DefaultResourceLoader } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js';
-import { SessionManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js';
-import { SettingsManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js';
-import { createPiPromptOverrides } from './piPromptOverrides';
+import {
+  DefaultResourceLoader,
+  ModelRuntime,
+  SessionManager,
+  SettingsManager,
+  createAgentSession,
+} from '@earendil-works/pi-coding-agent';
+import { createPiPromptOverrides, getZhiyuanProductPreamble } from './piPromptOverrides';
 
 test.each(['threshold', 'overflow'] as const)(
   'native SDK finishes 32 tool steps across %s compaction without harness continuation',
@@ -148,7 +150,8 @@ test.each(['threshold', 'overflow'] as const)(
     vi.useFakeTimers({ toFake: ['Date'] });
     try {
       await session.prompt('Create and verify 32 files.');
-      expect(session.agent.state.systemPrompt).toContain(
+      expect(session.agent.state.systemPrompt).toContain(getZhiyuanProductPreamble());
+      expect(session.agent.state.systemPrompt).not.toContain(
         'You are a coding assistant running inside pi',
       );
       expect(session.agent.state.systemPrompt).toContain('You are the assigned specialist.');

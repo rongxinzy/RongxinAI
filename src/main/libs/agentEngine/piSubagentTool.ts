@@ -19,6 +19,8 @@
 import * as fs from 'fs';
 import path from 'path';
 
+import type { AgentToolUpdateCallback, ToolAnnotations } from '@earendil-works/pi-coding-agent';
+
 import { safeSlice } from '../../../shared/lib/safeSlice';
 import { CoreSkillId } from '../../../shared/skills/constants';
 import {
@@ -28,6 +30,7 @@ import {
 } from './piSubagentConstants';
 import {
   runPiSubagent,
+  type PiSubagentChildToolEvent,
   type PiSubagentExecutionMetadata,
   type PiSubagentSession,
 } from './piSubagentExecution';
@@ -37,6 +40,11 @@ import type { PiSettingsManager } from './piRuntimeSessionState';
 // ── Constants ──
 
 export { PiSubagentToolName } from './piSubagentConstants';
+
+export const PiSubagentToolAnnotations: ToolAnnotations = {
+  readOnlyHint: true,
+  openWorldHint: false,
+};
 
 /** Maximum number of subagent sessions running at once in parallel mode. */
 export const SUBAGENT_PARALLEL_LIMIT = 4;
@@ -61,9 +69,8 @@ interface PiSubagentSubSession extends PiSubagentSession {
 }
 
 /**
- * Minimal Pi module surface used here. piModules.d.ts declares
- * createAgentSession with a narrower session type, so the dynamic import is
- * cast to this interface — the same approach piRuntimeAdapter takes.
+ * Minimal Pi module surface used here. The dynamic import is cast to this
+ * interface — the same approach piRuntimeAdapter takes.
  */
 interface PiSubagentModules {
   createAgentSession: (options: Record<string, unknown>) => Promise<{
@@ -109,6 +116,7 @@ export interface PiSubagentToolDeps {
     skillIds?: string[],
     extensionFactories?: PiExtensionFactory[],
   ): Promise<unknown>;
+  onChildToolActivity?: (event: PiSubagentChildToolEvent) => void;
 }
 
 interface SubagentProfile {
@@ -184,7 +192,7 @@ let _piSubagentModules: Promise<PiSubagentModules> | null = null;
 function getPiSubagentModules(): Promise<PiSubagentModules> {
   if (!_piSubagentModules) {
     // Pi packages are ESM-only; Vite/esbuild resolves them at build time and
-    // piModules.d.ts provides the base declarations for tsc --noEmit.
+    // NodeNext module resolution provides declarations for tsc --noEmit.
     _piSubagentModules = import('@earendil-works/pi-coding-agent').then(codingAgent => ({
       createAgentSession:
         codingAgent.createAgentSession as unknown as PiSubagentModules['createAgentSession'],
@@ -271,6 +279,8 @@ async function runSubagent(
   profile: SubagentProfile,
   task: string,
   signal?: AbortSignal,
+  parentToolCallId?: string,
+  onUpdate?: AgentToolUpdateCallback,
 ): Promise<SubagentRunResult> {
   const startedAt = Date.now();
   let subSession: PiSubagentSubSession | null = null;
@@ -329,6 +339,27 @@ async function runSubagent(
     signal?.throwIfAborted();
     const result = await runPiSubagent(session, task, {
       signal,
+      parentToolCallId,
+      onChildToolEvent: event => {
+        deps.onChildToolActivity?.(event);
+        if (
+          onUpdate &&
+          (event.type === 'tool_execution_start' || event.type === 'tool_execution_update')
+        ) {
+          onUpdate({
+            content: [
+              { type: 'text', text: `Subagent [${profile.id}] running ${event.toolName}...` },
+            ],
+            details: {
+              agent: profile.id,
+              activeChildTool: event.toolName,
+              childToolCallId: event.toolCallId,
+              parentToolCallId,
+              childProgress: event.partialResult,
+            },
+          });
+        }
+      },
     });
     const { output, ...execution } = result;
     return {
@@ -463,23 +494,27 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
   const runSpec = async (
     spec: SubagentTaskSpec,
     signal?: AbortSignal,
+    parentToolCallId?: string,
+    onUpdate?: AgentToolUpdateCallback,
   ): Promise<SubagentRunResult> => {
     const profile = findProfile(spec.agent);
     if (!profile) {
       return { ok: false, output: unknownAgentMessage(spec.agent) };
     }
-    return runSubagent(deps, profile, spec.task, signal);
+    return runSubagent(deps, profile, spec.task, signal, parentToolCallId, onUpdate);
   };
 
   const executeSingle = async (
     spec: SubagentTaskSpec,
     signal?: AbortSignal,
+    parentToolCallId?: string,
+    onUpdate?: AgentToolUpdateCallback,
   ): Promise<SubagentToolResult> => {
     const profile = findProfile(spec.agent);
     if (!profile) {
       return textResult(unknownAgentMessage(spec.agent));
     }
-    const result = await runSubagent(deps, profile, spec.task, signal);
+    const result = await runSubagent(deps, profile, spec.task, signal, parentToolCallId, onUpdate);
     signal?.throwIfAborted();
     return textResult(result.output, { agentId: spec.agent, execution: result.execution });
   };
@@ -487,9 +522,11 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
   const executeParallel = async (
     specs: SubagentTaskSpec[],
     signal?: AbortSignal,
+    parentToolCallId?: string,
+    onUpdate?: AgentToolUpdateCallback,
   ): Promise<SubagentToolResult> => {
     const results = await runWithConcurrency(specs, SUBAGENT_PARALLEL_LIMIT, spec =>
-      runSpec(spec, signal),
+      runSpec(spec, signal, parentToolCallId, onUpdate),
     );
     signal?.throwIfAborted();
     const succeeded = results.filter(result => result.ok).length;
@@ -515,6 +552,7 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
       '\n\nModes (mutually exclusive):\n' +
       '- Single: {agent, task} — delegate one task to one agent.\n' +
       `- Parallel: {parallel: [{agent, task}, ...]} — run agents concurrently (max ${SUBAGENT_PARALLEL_LIMIT} at once).`,
+    annotations: PiSubagentToolAnnotations,
 
     parameters: {
       type: 'object',
@@ -551,9 +589,10 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
     },
 
     execute: async (
-      _toolCallId: string,
+      toolCallId: string,
       params: Record<string, unknown>,
       signal?: AbortSignal,
+      onUpdate?: AgentToolUpdateCallback,
     ): Promise<SubagentToolResult> => {
       signal =
         deps.signal && signal ? AbortSignal.any([deps.signal, signal]) : (signal ?? deps.signal);
@@ -577,14 +616,14 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
         if (!agent || !task) {
           return textResult('Both "agent" and "task" parameters are required.');
         }
-        return executeSingle({ agent, task }, signal);
+        return executeSingle({ agent, task }, signal, toolCallId, onUpdate);
       }
 
       const specs = parseTaskList(params.parallel, 'parallel');
       if (typeof specs === 'string') {
         return textResult(specs);
       }
-      return executeParallel(specs, signal);
+      return executeParallel(specs, signal, toolCallId, onUpdate);
     },
   };
 }

@@ -1,16 +1,16 @@
 /**
  * Pending-message queue and control-action runtime for the Pi adapter.
  *
- * Extracted from PiRuntimeAdapter: owns the Cowork pending Work-message queue
- * and the application-owned control actions that run after queued prompts
- * settle. Follow-ups are delivered when the running turn ends; steers land in
- * the live turn; control actions never reach the model or the transcript.
+ * Extracted from PiRuntimeAdapter: owns the Cowork pending Work-message metadata
+ * sidecar and the application-owned control actions that run after queued prompts
+ * settle. Native follow-up and steer queues are delegated directly to Pi.
  */
 
 import { randomUUID } from 'crypto';
 
 import {
   CoworkQueueDelivery,
+  CoworkQueueItemStatus,
   type CoworkPendingMessage,
 } from '../../../shared/cowork/pendingMessageQueue';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
@@ -34,32 +34,19 @@ export class PiRuntimeQueueController {
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
   /** Opaque application actions that run after queued Work prompts settle. */
   private readonly queuedControlActions = new Map<string, Array<() => Promise<void>>>();
-  /** Counts direct/steer prompts whose native `message_start { role: 'user' }` is expected. */
-  private readonly pendingDirectUserPrompts = new Map<string, number>();
-  /** Ordered queued item IDs already pushed into Pi's native `followUp` queue. */
-  private readonly dispatchedNativeFollowUpIds = new Map<string, string[]>();
+  /** In-flight steer dispatches awaiting their initial native user message_start. */
+  private readonly pendingSteerCounts = new Map<string, number>();
 
   constructor(private readonly host: PiRuntimeAdapterHost) {}
 
-  expectDirectUserPrompt(sessionId: string): void {
-    this.pendingDirectUserPrompts.set(
-      sessionId,
-      (this.pendingDirectUserPrompts.get(sessionId) ?? 0) + 1,
-    );
-  }
+  /** Maintained for backward compatibility with continuation/launch helpers. */
+  expectDirectUserPrompt(_sessionId: string): void {}
 
-  cancelDirectUserPrompt(sessionId: string): void {
-    const count = this.pendingDirectUserPrompts.get(sessionId) ?? 0;
-    if (count <= 1) {
-      this.pendingDirectUserPrompts.delete(sessionId);
-    } else {
-      this.pendingDirectUserPrompts.set(sessionId, count - 1);
-    }
-  }
+  /** Maintained for backward compatibility with continuation/launch helpers. */
+  cancelDirectUserPrompt(_sessionId: string): void {}
 
   resetNativeDispatch(sessionId: string): void {
-    this.pendingDirectUserPrompts.delete(sessionId);
-    this.dispatchedNativeFollowUpIds.delete(sessionId);
+    this.pendingSteerCounts.delete(sessionId);
     try {
       this.host.activeSessions.get(sessionId)?.piSession.clearQueue?.();
     } catch {
@@ -68,19 +55,29 @@ export class PiRuntimeQueueController {
   }
 
   onNativeUserMessageStart(sessionId: string, active: ActivePiSession): void {
-    const pendingDirect = this.pendingDirectUserPrompts.get(sessionId) ?? 0;
-    if (pendingDirect > 0) {
-      this.cancelDirectUserPrompt(sessionId);
+    const steerCount = this.pendingSteerCounts.get(sessionId) ?? 0;
+    if (steerCount > 0) {
+      if (steerCount === 1) {
+        this.pendingSteerCounts.delete(sessionId);
+      } else {
+        this.pendingSteerCounts.set(sessionId, steerCount - 1);
+      }
       return;
     }
-    const dispatched = this.dispatchedNativeFollowUpIds.get(sessionId);
-    if (!dispatched?.length) return;
-    const nextId = dispatched.shift();
-    if (dispatched.length === 0) {
-      this.dispatchedNativeFollowUpIds.delete(sessionId);
+
+    const nextPending = this.pendingMessageQueue.findNextPending(
+      sessionId,
+      CoworkQueueDelivery.FollowUp,
+    );
+    if (!nextPending) {
+      // Direct prompt: already persisted to SQLite before dispatching to Pi.
+      return;
     }
-    if (!nextId) return;
-    const item = this.pendingMessageQueue.take(sessionId, nextId, CoworkQueueDelivery.FollowUp);
+    const item = this.pendingMessageQueue.take(
+      sessionId,
+      nextPending.id,
+      CoworkQueueDelivery.FollowUp,
+    );
     if (!item) return;
     this.emitQueueUpdated(sessionId);
     active.summaryCheckpointGoal = item.text;
@@ -108,6 +105,7 @@ export class PiRuntimeQueueController {
 
   /** Clear a deleted session's queue, emitting queueUpdated when it had items. */
   clear(sessionId: string): boolean {
+    this.pendingSteerCounts.delete(sessionId);
     this.resetNativeDispatch(sessionId);
     const cleared = this.pendingMessageQueue.clear(sessionId);
     if (cleared) this.emitQueueUpdated(sessionId);
@@ -171,7 +169,23 @@ export class PiRuntimeQueueController {
     );
     this.emitQueueUpdated(sessionId);
     this.applyQueuedSkillIds(active, item.skillIds);
-    this.dispatchNativeFollowUpItem(sessionId, active, item);
+
+    const payload = this.buildQueuedPromptPayload(active, item);
+    void sendPiPrompt(active.piSession, payload, 'followUp').catch(error => {
+      if (
+        this.host.activeSessions.get(sessionId) !== active ||
+        active.aborted ||
+        active.abortController.signal.aborted
+      ) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      const taken = this.pendingMessageQueue.take(sessionId, item.id, CoworkQueueDelivery.FollowUp);
+      if (!taken) return;
+      this.pendingMessageQueue.restore(sessionId, { ...taken, error: message });
+      this.emitQueueUpdated(sessionId);
+    });
+
     return { success: true, item };
   }
 
@@ -222,29 +236,45 @@ export class PiRuntimeQueueController {
     // explicitly promote any pending item to an immediate Steer.
     const item = this.pendingMessageQueue.take(sessionId, itemId);
     if (!item) return { success: false, error: 'Pending message was not found.' };
+
     this.emitQueueUpdated(sessionId);
-    this.syncNativeFollowUpQueue(sessionId, active);
-    // Keep resourceState.skillIds/skillRoots up to date so run_skill_script works
-    // immediately; never call piSession.reload() while streaming (Pi throws).
     this.applyQueuedSkillIds(active, item.skillIds);
+
+    this.pendingSteerCounts.set(sessionId, (this.pendingSteerCounts.get(sessionId) ?? 0) + 1);
+
     try {
+      // Clear native queue first
+      try {
+        active.piSession.clearQueue?.();
+      } catch {
+        // Ignore clear queue errors
+      }
+
       const queuedImagePrompt = this.buildQueuedPromptPayload(active, item);
       this.host.recovery.recordImagePrompt(sessionId, active, item.text, queuedImagePrompt);
-      this.expectDirectUserPrompt(sessionId);
-      try {
-        await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
-      } catch (sendError) {
-        this.cancelDirectUserPrompt(sessionId);
-        throw sendError;
-      }
+
+      await sendPiPrompt(active.piSession, queuedImagePrompt, 'steer');
+
       this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.Steer);
       active.isRunning = true;
+      active.summaryCheckpointGoal = item.text;
       this.pendingMessageQueue.finishDelivery(item.id);
+
+      // Re-enqueue remaining follow-ups preserving attachments
+      this.reEnqueueRemainingFollowUps(sessionId, active);
+
       return { success: true, item };
     } catch (error) {
+      const current = this.pendingSteerCounts.get(sessionId) ?? 0;
+      if (current <= 1) {
+        this.pendingSteerCounts.delete(sessionId);
+      } else {
+        this.pendingSteerCounts.set(sessionId, current - 1);
+      }
       const message = error instanceof Error ? error.message : String(error);
       const restored = this.pendingMessageQueue.restore(sessionId, { ...item, error: message });
       this.emitQueueUpdated(sessionId);
+      this.reEnqueueRemainingFollowUps(sessionId, active);
       return { success: false, item: restored, error: message };
     }
   }
@@ -384,87 +414,30 @@ export class PiRuntimeQueueController {
     active.pendingSkillReload = true;
   }
 
-  private pushDispatchedFollowUpId(sessionId: string, itemId: string): void {
-    const dispatched = this.dispatchedNativeFollowUpIds.get(sessionId) ?? [];
-    dispatched.push(itemId);
-    this.dispatchedNativeFollowUpIds.set(sessionId, dispatched);
-  }
-
-  private removeDispatchedFollowUpId(sessionId: string, itemId: string): void {
-    const dispatched = this.dispatchedNativeFollowUpIds.get(sessionId);
-    if (!dispatched?.length) return;
-    const filtered = dispatched.filter(id => id !== itemId);
-    if (filtered.length > 0) {
-      this.dispatchedNativeFollowUpIds.set(sessionId, filtered);
-    } else {
-      this.dispatchedNativeFollowUpIds.delete(sessionId);
+  private reEnqueueRemainingFollowUps(sessionId: string, active: ActivePiSession): void {
+    const remaining = this.pendingMessageQueue
+      .list(sessionId)
+      .filter(
+        entry =>
+          entry.delivery === CoworkQueueDelivery.FollowUp &&
+          entry.status === CoworkQueueItemStatus.Pending,
+      );
+    for (const pending of remaining) {
+      const payload = this.buildQueuedPromptPayload(active, pending);
+      void sendPiPrompt(active.piSession, payload, 'followUp').catch(err => {
+        console.warn(`[PiRuntime] failed to re-enqueue follow-up for ${sessionId}:`, err);
+      });
     }
-  }
-
-  private dispatchNativeFollowUpItem(
-    sessionId: string,
-    active: ActivePiSession,
-    item: CoworkPendingMessage,
-  ): void {
-    this.pushDispatchedFollowUpId(sessionId, item.id);
-    const payload = this.buildQueuedPromptPayload(active, item);
-    void sendPiPrompt(active.piSession, payload, 'followUp').catch(error => {
-      this.removeDispatchedFollowUpId(sessionId, item.id);
-      if (
-        this.host.activeSessions.get(sessionId) !== active ||
-        active.aborted ||
-        active.abortController.signal.aborted
-      ) {
-        return;
-      }
-      const message = error instanceof Error ? error.message : String(error);
-      const taken = this.pendingMessageQueue.take(sessionId, item.id, CoworkQueueDelivery.FollowUp);
-      if (!taken) return;
-      this.pendingMessageQueue.restore(sessionId, { ...taken, error: message });
-      this.emitQueueUpdated(sessionId);
-    });
   }
 
   private syncNativeFollowUpQueue(sessionId: string, active: ActivePiSession | undefined): void {
     if (!active || !this.host.isSessionRunning(sessionId)) return;
-    if (typeof active.piSession.clearQueue !== 'function') {
-      const pendingIds = new Set(
-        this.pendingMessageQueue
-          .list(sessionId)
-          .filter(entry => entry.delivery === CoworkQueueDelivery.FollowUp)
-          .map(entry => entry.id),
-      );
-      const remaining = (this.dispatchedNativeFollowUpIds.get(sessionId) ?? []).filter(id =>
-        pendingIds.has(id),
-      );
-      if (remaining.length > 0) {
-        this.dispatchedNativeFollowUpIds.set(sessionId, remaining);
-      } else {
-        this.dispatchedNativeFollowUpIds.delete(sessionId);
-      }
-      return;
+    try {
+      active.piSession.clearQueue?.();
+    } catch (e) {
+      console.warn(`[PiRuntime] failed to clear native queue for ${sessionId}:`, e);
     }
-    const cleared = active.piSession.clearQueue();
-    this.dispatchedNativeFollowUpIds.delete(sessionId);
-    for (const steeringPrompt of cleared.steering ?? []) {
-      void sendPiPrompt(
-        active.piSession,
-        {
-          content: steeringPrompt,
-          hasImages: false,
-          sentImages: [],
-          omittedImages: [],
-        },
-        'steer',
-      ).catch(error => {
-        console.warn(`[PiRuntime] failed to restore native steer for ${sessionId}:`, error);
-      });
-    }
-    for (const pending of this.pendingMessageQueue.list(sessionId)) {
-      if (pending.delivery === CoworkQueueDelivery.FollowUp) {
-        this.dispatchNativeFollowUpItem(sessionId, active, pending);
-      }
-    }
+    this.reEnqueueRemainingFollowUps(sessionId, active);
   }
 
   private persistQueuedUserMessage(

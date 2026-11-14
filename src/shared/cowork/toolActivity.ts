@@ -18,9 +18,11 @@ export type CoworkToolActivityProgress = {
 
 export type CoworkToolActivity = {
   toolCallId: string;
+  parentToolCallId?: string;
   phase: CoworkToolActivityPhase;
   toolName?: string;
   toolInput?: Record<string, unknown>;
+  partialResult?: unknown;
   progress?: CoworkToolActivityProgress;
   updatedAt: number;
 };

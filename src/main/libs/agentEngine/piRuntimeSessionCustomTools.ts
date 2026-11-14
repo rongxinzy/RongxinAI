@@ -9,10 +9,14 @@
 
 import path from 'path';
 
+import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
+
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
+import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import { type HarnessActivationEvent } from '../../../shared/harness';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
+import { toToolActivityInput } from './toolActivity';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import { getPythonRuntimeService } from '../../pythonRuntime/host';
@@ -55,7 +59,7 @@ export function buildPiSessionCustomTools(
   host: PiRuntimeAdapterHost,
   params: PiSessionCustomToolsParams,
 ): {
-  customTools: Record<string, unknown>[];
+  customTools: ToolDefinition[];
 } {
   const {
     pi,
@@ -71,7 +75,7 @@ export function buildPiSessionCustomTools(
   } = params;
   // Build custom tools for this Pi session.
   // Each call creates a distinct tool instance so sequential execution mode cannot block another session.
-  const customTools: Record<string, unknown>[] = [];
+  const customTools: (ToolDefinition | any)[] = [];
   if (resourceState.chatMode) customTools.push(buildPiWebSearchTool());
 
   if (options.planTool === true || options.planMode === true) {
@@ -250,6 +254,37 @@ export function buildPiSessionCustomTools(
         signal: abortSignal,
         workspaceRoot,
         webSearchSkillPath: path.join(getSkillsRoot(), 'web-search'),
+        onChildToolActivity: childEvent => {
+          const active = host.activeSessions.get(sessionId);
+          if (!active) return;
+          if (childEvent.type === 'tool_execution_start') {
+            const runningActivity = active.toolActivityTracker.upsert(
+              {
+                toolCallId: childEvent.toolCallId,
+                parentToolCallId: childEvent.parentToolCallId,
+                toolName: childEvent.toolName,
+                toolInput: toToolActivityInput(childEvent.args),
+              },
+              CoworkToolActivityPhase.Running,
+            );
+            if (runningActivity) host.emit('toolActivity', sessionId, runningActivity);
+          } else if (childEvent.type === 'tool_execution_update') {
+            const runningActivity = active.toolActivityTracker.upsert(
+              {
+                toolCallId: childEvent.toolCallId,
+                parentToolCallId: childEvent.parentToolCallId,
+                toolName: childEvent.toolName,
+                toolInput: toToolActivityInput(childEvent.args),
+                partialResult: childEvent.partialResult,
+              },
+              CoworkToolActivityPhase.Running,
+            );
+            if (runningActivity) host.emit('toolActivity', sessionId, runningActivity);
+          } else if (childEvent.type === 'tool_execution_end') {
+            const removeActivity = active.toolActivityTracker.remove(childEvent.toolCallId);
+            if (removeActivity) host.emit('toolActivity', sessionId, removeActivity);
+          }
+        },
         createPiResourceLoader: (
           cwd,
           systemPrompt,
@@ -268,7 +303,7 @@ export function buildPiSessionCustomTools(
               fileToolsEnabled: true,
               unattended: resourceState.unattended,
               chatMode: resourceState.chatMode,
-              nativeToolsOnly: true,
+              nativeToolsOnly: false,
               expertSkillDirs: [],
               skillRoots: resolvePiSkillRoots(skillIds ?? [], resolveZhiyuanSkillDirs(), []),
             },
@@ -287,5 +322,5 @@ export function buildPiSessionCustomTools(
     customTools.push(subagentTool);
   }
 
-  return { customTools };
+  return { customTools: customTools as ToolDefinition[] };
 }

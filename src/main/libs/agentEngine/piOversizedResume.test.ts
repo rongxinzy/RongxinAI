@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { app } from 'electron';
 import { expect, test, vi } from 'vitest';
-import { SessionManager } from '../../../../node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.js';
+import { SessionManager } from '@earendil-works/pi-coding-agent';
 import { installTestMagpie } from '../../../../tests/helpers/installTestMagpie';
 import { CoworkExecutionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';

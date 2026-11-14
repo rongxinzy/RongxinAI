@@ -86,8 +86,10 @@ const readString = (
 
 export type PreparingToolActivity = {
   toolCallId: string;
+  parentToolCallId?: string;
   toolName?: string;
   toolInput?: Record<string, unknown>;
+  partialResult?: unknown;
   progress?: CoworkToolActivityProgress;
   /** Per-delta argument character count, used when no cumulative snapshot exists. */
   progressDeltaChars?: number;
@@ -187,6 +189,29 @@ export const extractAgentPreparingToolActivities = (payload: unknown): Preparing
   return [...activities.values()];
 };
 
+const MAX_PARTIAL_RESULT_CHARS = 32_768;
+
+const toToolActivityPartialResult = (value: unknown): unknown => {
+  if (typeof value === 'string') {
+    return value.length <= MAX_PARTIAL_RESULT_CHARS
+      ? value
+      : `${value.slice(0, MAX_PARTIAL_RESULT_CHARS - 3)}...`;
+  }
+  if (value && typeof value === 'object') {
+    if (
+      isRecord(value) &&
+      typeof value.stdout === 'string' &&
+      value.stdout.length > MAX_PARTIAL_RESULT_CHARS
+    ) {
+      return {
+        ...value,
+        stdout: `${value.stdout.slice(0, MAX_PARTIAL_RESULT_CHARS - 3)}...`,
+      };
+    }
+  }
+  return value;
+};
+
 const createToolActivityUpsert = (
   activity: PreparingToolActivity,
   phase: CoworkToolActivityPhase = CoworkToolActivityPhase.Preparing,
@@ -194,8 +219,10 @@ const createToolActivityUpsert = (
   type: CoworkToolActivityEventType.Upsert,
   activity: {
     toolCallId: activity.toolCallId,
+    parentToolCallId: activity.parentToolCallId,
     toolName: activity.toolName,
     toolInput: activity.toolInput,
+    partialResult: activity.partialResult,
     progress: activity.progress,
     phase,
     updatedAt: Date.now(),
@@ -219,6 +246,7 @@ type TrackedToolActivity = {
   argsChars?: number;
   lastEmittedArgsChars?: number;
   lastEmittedAt: number;
+  hasPartialResult?: boolean;
 };
 
 export class ToolActivityTracker {
@@ -246,6 +274,7 @@ export class ToolActivityTracker {
         argsChars,
         lastEmittedArgsChars: argsChars,
         lastEmittedAt: now,
+        hasPartialResult: activity.partialResult !== undefined,
       });
       return createToolActivityUpsert(
         { ...activity, progress: argsChars === undefined ? undefined : { argsChars } },
@@ -255,6 +284,37 @@ export class ToolActivityTracker {
 
     // Phase, tool name, or projected input changes always emit immediately.
     if (!existing || existing.signature !== signature) return emit();
+
+    // Partial result streaming updates (during Running phase)
+    if (activity.partialResult !== undefined) {
+      const sanitizedPartial = toToolActivityPartialResult(activity.partialResult);
+      const updatedActivity = {
+        ...activity,
+        partialResult: sanitizedPartial,
+        progress: argsChars === undefined ? undefined : { argsChars },
+      };
+
+      if (!existing.hasPartialResult) {
+        this.tracked.set(activity.toolCallId, {
+          ...existing,
+          lastEmittedAt: now,
+          hasPartialResult: true,
+        });
+        return createToolActivityUpsert(updatedActivity, phase);
+      }
+
+      const msSinceEmit = now - existing.lastEmittedAt;
+      if (msSinceEmit >= TOOL_ACTIVITY_PROGRESS_INTERVAL_MS) {
+        this.tracked.set(activity.toolCallId, {
+          ...existing,
+          lastEmittedAt: now,
+          hasPartialResult: true,
+        });
+        return createToolActivityUpsert(updatedActivity, phase);
+      }
+      return null;
+    }
+
     if (argsChars === undefined || argsChars === existing.argsChars) return null;
 
     this.tracked.set(activity.toolCallId, { ...existing, argsChars });

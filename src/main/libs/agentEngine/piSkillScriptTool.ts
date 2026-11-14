@@ -47,6 +47,10 @@ export function buildPiSkillScriptTool(options: {
       'Use this for Python, Node, PowerShell, or Bash scripts from a selected Skill; ' +
       'do not invoke python3, node, npm, or bash directly for a bundled Skill script. ' +
       'The script path must be relative to the selected Skill directory.',
+    promptSnippet: 'Run a bundled Skill script with the application-managed runtime.',
+    promptGuidelines: [
+      'Bundled Skill scripts run through the `run_skill_script` tool; check `skill_runtime_capabilities` for environment readiness first, and never invoke them with `python`/`python3` on a Skills directory path.',
+    ],
     parameters: {
       type: 'object',
       properties: {

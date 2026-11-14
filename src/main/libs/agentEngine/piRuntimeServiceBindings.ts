@@ -16,6 +16,7 @@ import type { McpServerManager } from '../mcpServerManager';
 import { resolveBundledOcrHelper } from '../ocrHelper';
 import { invalidatePiSessionDir } from './piSessionStore';
 import type { PiStartOptions } from './piRuntimeTypes';
+import type { ActivePiSession } from './piRuntimeSessionState';
 import { PiCompanionRuntime } from '../../companion/durableRuntime.mjs';
 import { CompanionModelAssignment } from '../../companion/modelAssignment.mjs';
 import { CompanionProfiles, type CompanionProfileStore } from '../../companion/profiles';
@@ -173,6 +174,37 @@ export class PiRuntimeServiceBindings extends EventEmitter {
 
   refreshMcpTools(): void {
     this.mcpToolManifestGeneration += 1;
+    const activeSessions = (this as unknown as { activeSessions?: Map<string, ActivePiSession> })
+      .activeSessions;
+    if (activeSessions) {
+      for (const [sessionId, active] of activeSessions.entries()) {
+        const session = active.piSession as unknown as {
+          isStreaming?: boolean;
+          isCompacting?: boolean;
+          reload: () => Promise<void>;
+        };
+        if (
+          !active.resourceState.chatMode &&
+          !active.isRunning &&
+          session &&
+          session.isStreaming !== true &&
+          session.isCompacting !== true &&
+          typeof session.reload === 'function'
+        ) {
+          void session
+            .reload()
+            .then(() => {
+              active.mcpToolManifestGeneration = this.mcpToolManifestGeneration;
+              console.debug(
+                `[PiRuntime] eagerly hot-reloaded MCP servers for idle session ${sessionId}`,
+              );
+            })
+            .catch(err => {
+              console.debug(`[PiRuntime] deferred MCP reload for session ${sessionId}:`, err);
+            });
+        }
+      }
+    }
   }
 
   hasMcpServerManager(): boolean {
