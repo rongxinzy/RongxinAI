@@ -173,7 +173,7 @@ export const enCowork: Record<string, string> = {
   coworkApiConfigSaveFailed: 'Failed to save API configuration',
   coworkApiConfigLoadFailed: 'Failed to load API configuration',
   coworkStatusIdle: 'Idle',
-  coworkInterruptionUserStop: 'This run was stopped. You can continue sending messages.',
+  coworkInterruptionUserStop: 'This run was stopped.',
   coworkInterruptionApprovalDenied: 'The action was denied and the current task was paused.',
   coworkInterruptionRuntimePaused: 'The run was paused. Review the task status before continuing.',
   coworkStatusRunning: 'Running',

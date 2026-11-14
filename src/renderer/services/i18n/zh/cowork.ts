@@ -165,7 +165,7 @@ export const zhCowork: Record<string, string> = {
   coworkApiConfigSaveFailed: '保存 API 配置失败',
   coworkApiConfigLoadFailed: '加载 API 配置失败',
   coworkStatusIdle: '已停止',
-  coworkInterruptionUserStop: '已停止本次执行。你可以继续发送消息。',
+  coworkInterruptionUserStop: '本次运行已停止。',
   coworkInterruptionApprovalDenied: '已拒绝该操作，当前任务已暂停。',
   coworkInterruptionRuntimePaused: '执行已暂停，请检查任务状态后继续。',
   coworkStatusRunning: '运行中',
