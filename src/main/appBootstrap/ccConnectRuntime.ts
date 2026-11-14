@@ -304,6 +304,7 @@ const reconcileCcConnectChannelSidecarsNow = async (): Promise<void> => {
   } finally {
     channelRuntime.stopping = false;
   }
+  if (accounts.length === 0) return;
   await startCcConnectRuntime(accounts, signature);
 };
 
