@@ -66,6 +66,7 @@ def main() -> int:
 
     print("=== minimax-docx Environment Check ===")
     print("")
+    print(f"[OK]      {'python3':<14} {platform.python_version()} (stdlib fallback: scripts/make_docx.py)")
 
     status = "READY"
     warnings = 0
@@ -212,7 +213,7 @@ def main() -> int:
         return 0
     if status == "LIMITED":
         print(
-            "Status: LIMITED (bundled Markdown fallback is available for simple document creation; OpenXML editing/template operations require .NET 8+)"
+            "Status: LIMITED (a bundled Node or Python Markdown fallback is available for simple document creation; OpenXML editing/template operations require .NET 8+)"
         )
         return 0
 
