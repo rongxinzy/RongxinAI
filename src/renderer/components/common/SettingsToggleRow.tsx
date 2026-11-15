@@ -7,7 +7,7 @@ type SettingsToggleRowProps = {
   description: ReactNode;
   checked: boolean;
   disabled?: boolean;
-  labelHeadingLevel?: 3 | 4;
+  labelHeadingLevel?: 2 | 3 | 4;
   onCheckedChange: (checked: boolean) => void | Promise<void>;
 };
 
@@ -21,7 +21,7 @@ function SettingsToggleRow({
 }: SettingsToggleRowProps) {
   const labelId = useId();
   const descriptionId = useId();
-  const LabelHeading = labelHeadingLevel === 3 ? 'h3' : 'h4';
+  const LabelHeading = labelHeadingLevel === 2 ? 'h2' : labelHeadingLevel === 3 ? 'h3' : 'h4';
   return (
     <div className="flex items-center justify-between gap-6">
       <div className="min-w-0 flex-1">

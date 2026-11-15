@@ -9,13 +9,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupInput,
 } from '@shared/components/ui/input-group';
-import { PageTabs } from '@shared/components/ui/page-tabs';
 import {
   ExternalLink,
   FolderOpen,
@@ -173,18 +173,20 @@ export function SkillsPageToolbar({
         </div>
       </div>
 
-      <div className="border-b border-border">
-        <PageTabs
+      <div className="flex items-center">
+        <FluidTabs
+          aria-label={i18nService.t('skills')}
           value={activeTab}
           onValueChange={onTabChange}
           items={[
             {
               value: SkillTab.Installed,
-              label: i18nService.t('skillInstalled'),
-              badge:
-                installedCount > 0 ? (
-                  <Badge variant="secondary">{installedCount}</Badge>
-                ) : undefined,
+              label: (
+                <span className="inline-flex items-center gap-1.5">
+                  <span>{i18nService.t('skillInstalled')}</span>
+                  {installedCount > 0 ? <Badge variant="secondary">{installedCount}</Badge> : null}
+                </span>
+              ),
             },
             { value: SkillTab.Marketplace, label: i18nService.t('skillMarketplace') },
           ]}

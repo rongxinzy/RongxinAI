@@ -3143,7 +3143,10 @@
   padding: 0.75rem;
 }
 :where(:root, [data-theme]) :where(.theme-page-task-template-gallery-card-1) {
-  transition-property: background-color;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  transition-property: background-color, border-color;
   transition-duration: 120ms;
   box-shadow: none;
 }

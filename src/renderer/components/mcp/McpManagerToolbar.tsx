@@ -1,12 +1,12 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
   InputGroupText,
 } from '@shared/components/ui/input-group';
-import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Cable, Cloud, FileUp, Search, Terminal } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
@@ -130,19 +130,25 @@ export function McpManagerToolbar({
       </div>
 
       {showTabs ? (
-        <PageTabs
-          value={activeTab}
-          onValueChange={onTabChange}
-          className="-mb-px"
-          items={MCP_TAB_ITEMS.map(tab => {
-            const count = getTabCount(tab.value, installedCount, marketplaceCount, customCount);
-            return {
-              value: tab.value,
-              label: i18nService.t(tab.labelKey),
-              badge: count > 0 ? <Badge variant="secondary">{count}</Badge> : undefined,
-            };
-          })}
-        />
+        <div className="flex items-center">
+          <FluidTabs
+            aria-label={i18nService.t('connectors')}
+            value={activeTab}
+            onValueChange={onTabChange}
+            items={MCP_TAB_ITEMS.map(tab => {
+              const count = getTabCount(tab.value, installedCount, marketplaceCount, customCount);
+              return {
+                value: tab.value,
+                label: (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span>{i18nService.t(tab.labelKey)}</span>
+                    {count > 0 ? <Badge variant="secondary">{count}</Badge> : null}
+                  </span>
+                ),
+              };
+            })}
+          />
+        </div>
       ) : null}
     </header>
   );

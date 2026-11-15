@@ -306,7 +306,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       onToggleSidebar={onToggleSidebar}
       onNewChat={onNewChat}
       updateBadge={updateBadge}
-      actions={<SecurityStatusIndicator permissionMode={config.permissionMode} />}
+      actions={
+        workMode === WorkMode.Chat ? undefined : (
+          <SecurityStatusIndicator permissionMode={config.permissionMode} />
+        )
+      }
     />
   );
 

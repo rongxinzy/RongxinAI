@@ -12,6 +12,7 @@ export const zhCommon: Record<string, string> = {
   saving: '保存中...',
   delete: '删除',
   edit: '编辑',
+  configure: '配置',
   create: '创建',
   clear: '清除',
   pagination: '分页',
