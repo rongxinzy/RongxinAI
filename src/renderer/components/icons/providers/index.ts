@@ -1,13 +1,15 @@
-export { default as AnthropicIcon } from './AnthropicIcon';
 export { default as CustomProviderIcon } from './CustomProviderIcon';
-export { default as DeepSeekIcon } from './DeepSeekIcon';
-export { default as GeminiIcon } from './GeminiIcon';
-export { default as MiniMaxIcon } from './MiniMaxIcon';
-export { default as MoonshotIcon } from './MoonshotIcon';
-export { default as OpenAIIcon } from './OpenAIIcon';
-export { default as QianfanIcon } from './QianfanIcon';
-export { default as QwenIcon } from './QwenIcon';
-export { default as StepfunIcon } from './StepfunIcon';
-export { default as VolcengineIcon } from './VolcengineIcon';
-export { default as XiaomiIcon } from './XiaomiIcon';
-export { default as ZhipuIcon } from './ZhipuIcon';
+export {
+  AnthropicIcon,
+  DeepSeekIcon,
+  GeminiIcon,
+  MiniMaxIcon,
+  MoonshotIcon,
+  OpenAIIcon,
+  QianfanIcon,
+  QwenIcon,
+  StepfunIcon,
+  VolcengineIcon,
+  XiaomiIcon,
+  ZhipuIcon,
+} from '@shared/components/model-picker/icons';

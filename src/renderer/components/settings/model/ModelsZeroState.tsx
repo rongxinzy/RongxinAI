@@ -1,6 +1,6 @@
 import { ProviderAvatar } from '@shared/components/model-picker/ProviderAvatar';
 import { Button } from '@shared/components/ui/button';
-import { ArrowRight, Building2, Cpu, KeyRound, Plus } from 'lucide-react';
+import { ArrowRight, Plus } from 'lucide-react';
 import { i18nService } from '../../../services/i18n';
 import {
   type ConsolidatedProviderPreset,
@@ -82,9 +82,7 @@ export function ModelsZeroState({
           {showLocalModelsOption && onOpenLocalModels && (
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                  <Cpu className="size-4" />
-                </span>
+                <ProviderAvatar providerKey="llamacpp" size="md" />
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-foreground">
                     {i18nService.t('modelsZeroLocalTitle')}
@@ -108,9 +106,7 @@ export function ModelsZeroState({
 
           <div className="flex items-center justify-between gap-4 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <KeyRound className="size-4" />
-              </span>
+              <ProviderAvatar providerKey="subscription" size="md" />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-foreground">
                   {i18nService.t('modelsZeroSubsTitle')}
@@ -134,9 +130,7 @@ export function ModelsZeroState({
 
           <div className="flex items-center justify-between gap-4 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Building2 className="size-4" />
-              </span>
+              <ProviderAvatar providerKey="organization" size="md" />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-foreground">
                   {i18nService.t('modelsZeroOrgTitle')}

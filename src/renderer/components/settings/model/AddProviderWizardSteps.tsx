@@ -26,11 +26,13 @@ export function WizardStepSelectPreset({
   filteredPresets,
   onSearchChange,
   onChoosePreset,
+  onChooseCustom,
 }: {
   searchQuery: string;
   filteredPresets: readonly ConsolidatedProviderPreset[];
   onSearchChange: (value: string) => void;
   onChoosePreset: (preset: ConsolidatedProviderPreset) => void;
+  onChooseCustom?: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -43,22 +45,35 @@ export function WizardStepSelectPreset({
           className="pl-9"
         />
       </div>
-      <div className="grid max-h-[360px] grid-cols-2 gap-2.5 overflow-y-auto pr-1">
-        {filteredPresets.map(item => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => onChoosePreset(item)}
-            className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-foreground/25 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-          >
-            <ProviderAvatar name={item.name} providerKey={item.key} size="md" />
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-foreground">{item.name}</div>
-              <div className="truncate text-xs text-muted-foreground">{item.shortDesc}</div>
-            </div>
-          </button>
-        ))}
-      </div>
+      {filteredPresets.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-muted/20 px-4 py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            {i18nService.t('providerWizardSearchEmpty')}
+          </p>
+          {onChooseCustom && (
+            <Button type="button" variant="outline" size="sm" onClick={onChooseCustom}>
+              {i18nService.t('providerWizardUseCustomFallback')}
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="grid max-h-[360px] grid-cols-2 gap-2.5 overflow-y-auto pr-1">
+          {filteredPresets.map(item => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => onChoosePreset(item)}
+              className="flex items-center gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-foreground/25 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <ProviderAvatar name={item.name} providerKey={item.key} size="md" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium text-foreground">{item.name}</div>
+                <div className="truncate text-xs text-muted-foreground">{item.shortDesc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -112,7 +127,12 @@ export function WizardStepConfigureConnection({
     <div className="space-y-4">
       <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2.5">
         <div className="flex items-center gap-2.5">
-          <ProviderAvatar name={preset.name} providerKey={preset.key} size="md" />
+          <ProviderAvatar
+            name={preset.name}
+            providerKey={preset.key}
+            baseUrl={baseUrl || preset.baseUrl}
+            size="md"
+          />
           <div>
             <div className="text-sm font-medium text-foreground">{preset.name}</div>
             <div className="text-xs text-muted-foreground">{preset.shortDesc}</div>
@@ -202,9 +222,9 @@ export function WizardStepConfigureConnection({
 
       {testError && <ProviderErrorBanner classified={testError} onAction={onErrorAction} />}
 
-      <details className="rounded-lg border border-border px-3 py-2 text-sm">
+      <details className="group rounded-lg border border-border px-3 py-2 text-sm">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground select-none hover:text-foreground">
-          <ChevronDown className="size-4" />
+          <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
           <span>{i18nService.t('providerEditMoreOptions')}</span>
         </summary>
         <div className="mt-3 space-y-3 border-t border-border pt-3">
@@ -338,9 +358,9 @@ export function WizardStepSelectModels({
         <span>{i18nService.t('providerWizardSetDefaultModel')}</span>
       </label>
 
-      <details className="rounded-lg border border-border px-3 py-2 text-sm">
+      <details className="group rounded-lg border border-border px-3 py-2 text-sm">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground select-none hover:text-foreground">
-          <ChevronDown className="size-4" />
+          <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
           <span>{i18nService.t('providerAdvancedSummary')}</span>
         </summary>
         <div className="mt-3 space-y-2 border-t border-border pt-3">

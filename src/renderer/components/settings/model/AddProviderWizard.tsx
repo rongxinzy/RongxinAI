@@ -247,6 +247,13 @@ export function AddProviderWizard({
               applyPreset(item);
               setStep(2);
             }}
+            onChooseCustom={() => {
+              const customPreset = CONSOLIDATED_PROVIDER_PRESETS.find(p => p.key === 'custom');
+              if (customPreset) {
+                applyPreset(customPreset);
+                setStep(2);
+              }
+            }}
           />
         )}
 
