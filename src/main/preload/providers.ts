@@ -46,6 +46,7 @@ export const providersApi = {
     onChanged: (callback: () => void) => onPushVoid(ManagedProviderIpc.Changed, callback),
     aisphereSnapshot: asApi('aisphereSnapshot'),
     aisphereConnect: asApi('aisphereConnect'),
+    aisphereDisconnect: asApi('aisphereDisconnect'),
     aisphereRefresh: asApi('aisphereRefresh'),
   },
 
@@ -186,6 +187,7 @@ export const providersApi = {
       catalog: 'managedProviderCatalog';
       aisphereSnapshot: 'aisphereSnapshot';
       aisphereConnect: 'aisphereConnect';
+      aisphereDisconnect: 'aisphereDisconnect';
       aisphereRefresh: 'aisphereRefresh';
     }
   >;

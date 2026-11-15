@@ -315,6 +315,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       <div className="flex-1 flex flex-col h-full bg-background">
         <CoworkSessionViewport
           sessionId={displayedSessionId}
+          onManageModels={
+            onRequestAppSettings ? () => onRequestAppSettings({ initialTab: 'models' }) : undefined
+          }
           onManageSkills={() => onShowSkills?.()}
           onManageConnectors={() => onShowConnectors?.()}
           permissionMode={sessionPermissionMode}
@@ -416,6 +419,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}
                   showNoFolderAction={!currentWorkspaceId}
                   showModelSelector
+                  onManageModels={
+                    onRequestAppSettings
+                      ? () => onRequestAppSettings({ initialTab: 'models' })
+                      : undefined
+                  }
                   onManageSkills={() => onShowSkills?.()}
                   onManageConnectors={() => onShowConnectors?.()}
                   showPermissionModeSelector={workMode !== WorkMode.Chat}

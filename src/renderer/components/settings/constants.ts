@@ -1,13 +1,15 @@
 import {
+  BarChart3,
   Box,
   Brain,
   CircleHelp,
   Keyboard,
-  MailCheck,
   MessageCircleMore,
-  Network,
+  ShieldCheck,
   SlidersHorizontal,
+  Smile,
   SunMedium,
+  Wrench,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -21,12 +23,14 @@ export interface SettingsTabMeta {
 export const SETTINGS_TAB_METAS: Record<TabType, SettingsTabMeta> = {
   general: { labelKey: 'general', icon: SlidersHorizontal },
   appearance: { labelKey: 'appearance', icon: SunMedium },
+  companion: { labelKey: 'settingsTabCompanion', icon: Smile },
   shortcuts: { labelKey: 'shortcuts', icon: Keyboard },
-  model: { labelKey: 'model', icon: Box },
-  aisphere: { labelKey: 'aisphereTab', icon: Network },
-  coworkMemory: { labelKey: 'coworkMemoryTitle', icon: Brain },
-  im: { labelKey: 'imBot', icon: MessageCircleMore },
-  email: { labelKey: 'emailTab', icon: MailCheck },
+  models: { labelKey: 'model', icon: Box },
+  memory: { labelKey: 'coworkMemoryTitle', icon: Brain },
+  usage: { labelKey: 'settingsTabUsage', icon: BarChart3 },
+  privacy: { labelKey: 'settingsTabPrivacy', icon: ShieldCheck },
+  channels: { labelKey: 'settingsTabChannels', icon: MessageCircleMore },
+  advanced: { labelKey: 'settingsTabAdvanced', icon: Wrench },
   about: { labelKey: 'about', icon: CircleHelp },
 };
 
@@ -37,23 +41,22 @@ export interface SettingsNavGroupDef {
 }
 
 /**
- * Category sidebar grouping, aligned with the main sidebar's information
- * grouping. Enterprise extension tabs are injected into the last group
- * (before `about`) by useSettingsTabs.
+ * Category sidebar grouping: Personal / AI / Connect / System.
+ * Enterprise extension tabs are injected into the last group (before `about`)
+ * by useSettingsTabs.
  */
 export const SETTINGS_NAV_GROUPS: SettingsNavGroupDef[] = [
-  { titleKey: 'settingsGroupGeneral', tabs: ['general', 'appearance', 'shortcuts'] },
-  { titleKey: 'settingsGroupModel', tabs: ['model', 'aisphere', 'coworkMemory'] },
-  { titleKey: 'settingsGroupChannels', tabs: ['im', 'email'] },
-  { titleKey: null, tabs: ['about'] },
+  { titleKey: 'settingsGroupPersonal', tabs: ['general', 'appearance', 'companion', 'shortcuts'] },
+  { titleKey: 'settingsGroupAI', tabs: ['models', 'memory', 'usage', 'privacy'] },
+  { titleKey: 'settingsGroupConnect', tabs: ['channels'] },
+  { titleKey: 'settingsGroupSystem', tabs: ['advanced', 'about'] },
 ];
 
 /**
- * Wide canvases are reserved for list/workspace panels that need to show a
- * second navigation column (IM) or a two-column card surface (memory). Every
- * other settings page shares the compact reading column.
+ * Wide canvases are reserved for two-column memory workspaces and usage charts.
+ * Every other settings page shares the compact reading column.
  */
-const WIDE_SETTINGS_TABS: readonly SettingsTabType[] = ['coworkMemory', 'im'];
+const WIDE_SETTINGS_TABS: readonly SettingsTabType[] = ['memory', 'usage', 'coworkMemory'];
 
 export function settingsContentWidthClass(tab: SettingsTabType): string {
   if (WIDE_SETTINGS_TABS.includes(tab)) return 'max-w-5xl';

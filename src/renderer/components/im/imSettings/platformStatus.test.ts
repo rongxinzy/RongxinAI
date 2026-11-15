@@ -17,14 +17,14 @@ import {
 const instance = (fields: Record<string, unknown>): never => fields as never;
 const instanceStatus = (fields: Record<string, unknown>): never => fields as never;
 
-test('isMultiInstancePlatform matches the six multi-instance platforms', () => {
+test('isMultiInstancePlatform matches the four active multi-instance platforms', () => {
   expect(isMultiInstancePlatform('dingtalk')).toBe(true);
   expect(isMultiInstancePlatform('feishu')).toBe(true);
   expect(isMultiInstancePlatform('qq')).toBe(true);
   expect(isMultiInstancePlatform('wecom')).toBe(true);
-  expect(isMultiInstancePlatform('telegram')).toBe(true);
-  expect(isMultiInstancePlatform('discord')).toBe(true);
   expect(isMultiInstancePlatform('weixin')).toBe(false);
+  expect(isMultiInstancePlatform('telegram')).toBe(false);
+  expect(isMultiInstancePlatform('discord')).toBe(false);
 });
 
 test('canStartIMPlatform: weixin needs no credentials', () => {
@@ -40,10 +40,6 @@ test('canStartIMPlatform requires credentials on at least one instance', () => {
         instance({ instanceId: 'b', enabled: false, clientId: 'id', clientSecret: 'secret' }),
       ],
     },
-    telegram: { instances: [instance({ instanceId: 't', enabled: false, botToken: '' })] as any },
-    discord: {
-      instances: [instance({ instanceId: 'd', enabled: false, botToken: 'token' })] as any,
-    },
     qq: {
       instances: [instance({ instanceId: 'q', enabled: false, appId: 'a', appSecret: '' })] as any,
     },
@@ -56,11 +52,11 @@ test('canStartIMPlatform requires credentials on at least one instance', () => {
   };
 
   expect(canStartIMPlatform(config, 'dingtalk')).toBe(true);
-  expect(canStartIMPlatform(config, 'telegram')).toBe(false);
-  expect(canStartIMPlatform(config, 'discord')).toBe(true);
   expect(canStartIMPlatform(config, 'qq')).toBe(false);
   expect(canStartIMPlatform(config, 'wecom')).toBe(true);
   expect(canStartIMPlatform(config, 'feishu')).toBe(true);
+  expect(canStartIMPlatform(config, 'telegram')).toBe(false);
+  expect(canStartIMPlatform(config, 'discord')).toBe(false);
 });
 
 test('isIMPlatformEnabled reads the persisted enabled flag per platform', () => {
@@ -76,16 +72,7 @@ test('isIMPlatformEnabled reads the persisted enabled flag per platform', () => 
     weixin: { ...DEFAULT_IM_CONFIG.weixin, enabled: true },
   };
 
-  // Defaults: nothing enabled anywhere.
-  for (const platform of [
-    'weixin',
-    'dingtalk',
-    'qq',
-    'feishu',
-    'wecom',
-    'telegram',
-    'discord',
-  ] as const) {
+  for (const platform of ['weixin', 'dingtalk', 'qq', 'feishu', 'wecom'] as const) {
     expect(isIMPlatformEnabled(DEFAULT_IM_CONFIG, platform)).toBe(false);
   }
 
@@ -103,34 +90,21 @@ test('getIMPlatformConnected reflects any connected instance or weixin runtime s
         instanceStatus({ instanceId: 'b', connected: true }),
       ],
     },
-    discord: {
-      instances: [instanceStatus({ instanceId: 'd', connected: false, starting: true })],
-    },
     weixin: { ...DEFAULT_IM_STATUS.weixin, connected: true },
   };
 
   expect(getIMPlatformConnected(DEFAULT_IM_STATUS, 'dingtalk')).toBe(false);
   expect(getIMPlatformConnected(status, 'dingtalk')).toBe(true);
-  expect(getIMPlatformConnected(status, 'discord')).toBe(false);
   expect(getIMPlatformConnected(status, 'weixin')).toBe(true);
   expect(getIMPlatformConnected(DEFAULT_IM_STATUS, 'qq')).toBe(false);
 });
 
-test('getIMPlatformStarting only reports discord first-instance starting state', () => {
-  const status: IMGatewayStatus = {
-    ...DEFAULT_IM_STATUS,
-    discord: {
-      instances: [instanceStatus({ instanceId: 'd', connected: false, starting: true })],
-    },
-  };
-
-  expect(getIMPlatformStarting(status, 'discord')).toBe(true);
-  expect(getIMPlatformStarting(DEFAULT_IM_STATUS, 'discord')).toBe(false);
-  expect(getIMPlatformStarting(status, 'weixin')).toBe(false);
-  expect(getIMPlatformStarting(status, 'telegram')).toBe(false);
+test('getIMPlatformStarting returns false for active platforms', () => {
+  expect(getIMPlatformStarting(DEFAULT_IM_STATUS, 'weixin')).toBe(false);
+  expect(getIMPlatformStarting(DEFAULT_IM_STATUS, 'dingtalk')).toBe(false);
 });
 
-test('getNavInstances and getNavInstanceStatuses map each platform to its own list', () => {
+test('getNavInstances and getNavInstanceStatuses map each active platform to its own list', () => {
   const config: IMGatewayConfig = {
     ...DEFAULT_IM_CONFIG,
     dingtalk: {
@@ -151,5 +125,5 @@ test('getNavInstances and getNavInstanceStatuses map each platform to its own li
   expect(getNavInstanceStatuses(status, 'dingtalk')).toEqual([
     { instanceId: 'dt-1', connected: false },
   ]);
-  expect(getNavInstanceStatuses(DEFAULT_IM_STATUS, 'telegram')).toEqual([]);
+  expect(getNavInstanceStatuses(DEFAULT_IM_STATUS, 'wecom')).toEqual([]);
 });

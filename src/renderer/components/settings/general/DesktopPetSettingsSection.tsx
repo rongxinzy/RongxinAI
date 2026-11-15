@@ -101,7 +101,7 @@ export function DesktopPetSettingsSection() {
           label={i18nService.t('desktopPetDoNotDisturb')}
           description={i18nService.t('desktopPetDoNotDisturbDescription')}
           checked={settings?.doNotDisturb ?? false}
-          disabled={!settings || saving}
+          disabled={!settings || saving || !settings.enabled}
           onCheckedChange={doNotDisturb => update({ doNotDisturb })}
         />
         <SettingsToggleRow
@@ -109,7 +109,7 @@ export function DesktopPetSettingsSection() {
           label={i18nService.t('desktopPetHideInFullscreen')}
           description={i18nService.t('desktopPetHideInFullscreenDescription')}
           checked={settings?.hideInFullscreen ?? true}
-          disabled={!settings || saving}
+          disabled={!settings || saving || !settings.enabled}
           onCheckedChange={hideInFullscreen => update({ hideInFullscreen })}
         />
         <SettingsToggleRow
@@ -117,7 +117,7 @@ export function DesktopPetSettingsSection() {
           label={i18nService.t('desktopPetRoaming')}
           description={i18nService.t('desktopPetRoamingDescription')}
           checked={settings?.roaming ?? true}
-          disabled={!settings || saving}
+          disabled={!settings || saving || !settings.enabled}
           onCheckedChange={roaming => update({ roaming })}
         />
         <SettingsToggleRow
@@ -125,7 +125,7 @@ export function DesktopPetSettingsSection() {
           label={i18nService.t('desktopPetChatter')}
           description={i18nService.t('desktopPetChatterDescription')}
           checked={settings?.chatter ?? true}
-          disabled={!settings || saving}
+          disabled={!settings || saving || !settings.enabled}
           onCheckedChange={chatter => update({ chatter })}
         />
       </FieldGroup>

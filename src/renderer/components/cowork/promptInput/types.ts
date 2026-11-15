@@ -44,6 +44,7 @@ export interface CoworkPromptInputProps {
   showFolderSelector?: boolean;
   showNoFolderAction?: boolean;
   showModelSelector?: boolean;
+  onManageModels?: () => void;
   onManageSkills?: () => void;
   onManageConnectors?: () => void;
   /** Work mode: show the permission mode selector (敏感操作需确认 / 全部允许) in the toolbar */

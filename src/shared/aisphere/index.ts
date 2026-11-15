@@ -12,6 +12,7 @@ export const AISphere = {
 export const AISphereIpc = {
   Snapshot: 'aisphere:snapshot',
   Connect: 'aisphere:connect',
+  Disconnect: 'aisphere:disconnect',
   Refresh: 'aisphere:refresh',
 } as const;
 

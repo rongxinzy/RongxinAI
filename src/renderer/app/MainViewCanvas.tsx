@@ -56,6 +56,7 @@ export interface MainViewCanvasProps {
   isLocalInferenceDormant: boolean;
   localInferenceRefreshRequestId: number;
   onOpenModelSettings: () => void;
+  onOpenLocalModels?: () => void;
   /** Cowork inline permission prompts */
   currentSessionId: string | null;
   pendingPermission: CoworkPermissionRequest | null;
@@ -95,6 +96,7 @@ export function MainViewCanvas({
   isLocalInferenceDormant,
   localInferenceRefreshRequestId,
   onOpenModelSettings,
+  onOpenLocalModels,
   currentSessionId,
   pendingPermission,
   isInlineAskUserQuestion,
@@ -145,6 +147,7 @@ export function MainViewCanvas({
                 isSidebarCollapsed={isSidebarCollapsed}
                 onToggleSidebar={onToggleSidebar}
                 onNewChat={onNewChat}
+                onOpenLocalModels={localInferenceEnabled ? onOpenLocalModels : undefined}
               />
             ) : mainView === MainView.Skills ? (
               <SkillsView

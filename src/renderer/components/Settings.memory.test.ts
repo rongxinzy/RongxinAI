@@ -9,8 +9,8 @@ const source = readFileSync(
 );
 
 test('hides embedding controls until semantic recall is implemented', () => {
-  const memorySettingsStart = source.indexOf("case 'coworkMemory':");
-  const memorySettingsEnd = source.indexOf("case 'aisphere':", memorySettingsStart);
+  const memorySettingsStart = source.indexOf("case 'memory':");
+  const memorySettingsEnd = source.indexOf("case 'usage':", memorySettingsStart);
   const memorySettingsSource = source.slice(memorySettingsStart, memorySettingsEnd);
 
   expect(memorySettingsStart).toBeGreaterThanOrEqual(0);

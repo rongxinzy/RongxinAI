@@ -3,7 +3,6 @@ import { FieldGroup } from '@shared/components/ui/field';
 import { i18nService, type LanguageType } from '../../../services/i18n';
 import { SettingsToggleRow } from '../../common/SettingsToggleRow';
 import { GeneralLanguageField } from './GeneralLanguageField';
-import { DesktopPetSettingsSection } from './DesktopPetSettingsSection';
 
 interface GeneralSettingsPanelProps {
   language: LanguageType;
@@ -12,13 +11,9 @@ interface GeneralSettingsPanelProps {
   onAutoLaunchChange: (next: boolean) => void;
   preventSleep: boolean;
   onPreventSleepChange: (next: boolean) => void;
-  useSystemProxy: boolean;
-  onUseSystemProxyChange: (next: boolean) => void;
   sqliteAutoBackupEnabled: boolean;
   sqliteAutoBackupDisabled: boolean;
   onSqliteAutoBackupEnabledChange: (next: boolean) => void;
-  codemodeEnabled: boolean;
-  onCodemodeEnabledChange: (next: boolean) => void;
 }
 
 export default function GeneralSettingsPanel({
@@ -28,23 +23,26 @@ export default function GeneralSettingsPanel({
   onAutoLaunchChange,
   preventSleep,
   onPreventSleepChange,
-  useSystemProxy,
-  onUseSystemProxyChange,
   sqliteAutoBackupEnabled,
   sqliteAutoBackupDisabled,
   onSqliteAutoBackupEnabledChange,
-  codemodeEnabled,
-  onCodemodeEnabledChange,
 }: GeneralSettingsPanelProps) {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
         <h2 className="text-base font-semibold text-foreground">
-          {i18nService.t('settingsGeneralSectionApplication')}
+          {i18nService.t('settingsSectionBasic')}
         </h2>
         <FieldGroup className="gap-4">
           <GeneralLanguageField value={language} onValueChange={onLanguageChange} />
+        </FieldGroup>
+      </section>
 
+      <section className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold text-foreground">
+          {i18nService.t('settingsSectionStartup')}
+        </h2>
+        <FieldGroup className="gap-4">
           <SettingsToggleRow
             label={i18nService.t('autoLaunch')}
             description={i18nService.t('autoLaunchDescription')}
@@ -58,36 +56,20 @@ export default function GeneralSettingsPanel({
             checked={preventSleep}
             onCheckedChange={onPreventSleepChange}
           />
+        </FieldGroup>
+      </section>
 
-          <SettingsToggleRow
-            label={i18nService.t('useSystemProxy')}
-            description={i18nService.t('useSystemProxyDescription')}
-            checked={useSystemProxy}
-            onCheckedChange={onUseSystemProxyChange}
-          />
-
+      <section className="flex flex-col gap-4">
+        <h2 className="text-base font-semibold text-foreground">
+          {i18nService.t('settingsSectionData')}
+        </h2>
+        <FieldGroup className="gap-4">
           <SettingsToggleRow
             label={i18nService.t('sqliteAutoBackupEnabled')}
             description={i18nService.t('sqliteAutoBackupEnabledDescription')}
             checked={sqliteAutoBackupEnabled}
             disabled={sqliteAutoBackupDisabled}
             onCheckedChange={onSqliteAutoBackupEnabledChange}
-          />
-        </FieldGroup>
-      </section>
-
-      <DesktopPetSettingsSection />
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-base font-semibold text-foreground">
-          {i18nService.t('settingsGeneralSectionAdvanced')}
-        </h2>
-        <FieldGroup className="gap-4">
-          <SettingsToggleRow
-            label={i18nService.t('codemodeEnabled')}
-            description={i18nService.t('codemodeEnabledDescription')}
-            checked={codemodeEnabled}
-            onCheckedChange={onCodemodeEnabledChange}
           />
         </FieldGroup>
       </section>

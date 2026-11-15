@@ -18,9 +18,6 @@ export interface Model {
   llamaCppTrainedContextWindow?: number;
 }
 const EMPTY_MODEL: Model = { id: '', name: '' };
-export function getModelIdentityKey(model: Pick<Model, 'id'>): string {
-  return model.id;
-}
 export function isSameModelIdentity(a: Pick<Model, 'id'>, b: Pick<Model, 'id'>): boolean {
   return a.id === b.id;
 }

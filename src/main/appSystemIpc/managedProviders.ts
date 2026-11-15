@@ -19,6 +19,7 @@ export const registerManagedProvidersIpc = (deps: ManagedProvidersIpcDeps): void
     handleIpcContractSubset(providersContract, {
       aisphereSnapshot: async () => aisphereService.snapshot(),
       aisphereConnect: async (_event, address) => aisphereService.connect(address),
+      aisphereDisconnect: async () => aisphereService.disconnect(),
       aisphereRefresh: async () => {
         await aisphereService.refresh();
         return aisphereService.snapshot();
