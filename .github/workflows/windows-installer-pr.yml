@@ -73,6 +73,12 @@ jobs:
           bun run setup:uv-runtime
           bun run setup:python-runtime
           bun run engram:runtime:win-x64
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build and verify the Windows Python job helper
+        shell: pwsh
+        run: |
+          ./scripts/python-runtime/build-job-runner.ps1
+          node --test scripts/python-runtime/job-runner.test.cjs
       - name: Build complete offline installer
         id: offline-build
         # Keep a stuck packager observable and fail it before the job-level
