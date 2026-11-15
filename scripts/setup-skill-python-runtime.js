@@ -63,6 +63,7 @@ const PYTHON_STDLIB_MODULES = new Set([
   'collections',
   'colorsys',
   'copy',
+  'csv',
   'datetime',
   'decimal',
   'html',
@@ -88,6 +89,7 @@ const PYTHON_STDLIB_MODULES = new Set([
   'traceback',
   'tracemalloc',
   'typing',
+  'urllib',
   'xml',
   'zipfile',
 ]);

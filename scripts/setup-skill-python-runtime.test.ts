@@ -42,11 +42,13 @@ test('recognizes standard-library imports used by bundled skill launchers', () =
   fs.writeFileSync(
     path.join(skillRoot, 'launcher.py'),
     [
+      'import csv',
       'import hashlib',
       'import platform',
       'import runpy',
       'import tarfile',
       'import trimesh',
+      'import urllib.request',
       '',
     ].join('\n'),
   );

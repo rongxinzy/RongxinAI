@@ -900,8 +900,10 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_b576dca56aa647b3a5d3df4b",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": null,
+            "partialResult": null,
             "progress": null,
             "phase": "preparing",
             "updatedAt": 1700000000055
@@ -922,10 +924,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_b576dca56aa647b3a5d3df4b",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": ""
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 6
             },
@@ -948,10 +952,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_b576dca56aa647b3a5d3df4b",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": "."
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 9
             },
@@ -1009,10 +1015,12 @@
           "type": "upsert",
           "activity": {
             "toolCallId": "call_b576dca56aa647b3a5d3df4b",
+            "parentToolCallId": null,
             "toolName": "list_files",
             "toolInput": {
               "path": "."
             },
+            "partialResult": null,
             "progress": {
               "argsChars": 12
             },
