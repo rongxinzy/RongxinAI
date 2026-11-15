@@ -558,17 +558,6 @@ const ModelCard = memo(function ModelCard({
           </div>
         ) : null}
 
-        {isRunning ? (
-          <span className="pointer-events-none absolute right-3.5 top-3.5 z-10">
-            <BreathingDot
-              color="var(--zy-success)"
-              duration={2}
-              label={i18nService.t('localInferenceStatus_running')}
-              size={8}
-            />
-          </span>
-        ) : null}
-
         <CardHeader className="flex flex-row items-start gap-3 p-4 pb-2">
           <span
             aria-hidden="true"
@@ -593,7 +582,15 @@ const ModelCard = memo(function ModelCard({
               ) : null}
             </CardDescription>
           </div>
-          <div className="ml-auto flex shrink-0 items-center gap-1">
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            {isRunning ? (
+              <BreathingDot
+                color="var(--zy-success)"
+                duration={2}
+                label={i18nService.t('localInferenceStatus_running')}
+                size={8}
+              />
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
@@ -650,8 +647,8 @@ const ModelCard = memo(function ModelCard({
                   closeDelay={100}
                   render={
                     <Badge
-                      variant="secondary"
-                      className={cn(modelCardTagBaseClassName, 'shrink-0 cursor-default')}
+                      variant="outline"
+                      className={cn(modelCardTagBaseClassName, 'shrink-0 cursor-pointer')}
                     >
                       {i18nService.t('localInferenceDetails')}
                     </Badge>

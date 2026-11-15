@@ -103,6 +103,7 @@ export function ModelRoutingQuotaSection({ quotas }: { quotas: MagpieSubscriptio
 
 interface ModelRoutingCallsSectionProps {
   period: MagpieUsagePeriod;
+  showPeriodSelect?: boolean;
   disabled?: boolean;
   requests: MagpieUsageRequestPage | null;
   pageSize: number;
@@ -113,6 +114,7 @@ interface ModelRoutingCallsSectionProps {
 
 export function ModelRoutingCallsSection({
   period,
+  showPeriodSelect = true,
   disabled,
   requests,
   pageSize,
@@ -126,7 +128,9 @@ export function ModelRoutingCallsSection({
 
   return (
     <div className="flex flex-col gap-3">
-      <UsagePeriodSelect period={period} disabled={disabled} onPeriodChange={onPeriodChange} />
+      {showPeriodSelect ? (
+        <UsagePeriodSelect period={period} disabled={disabled} onPeriodChange={onPeriodChange} />
+      ) : null}
       {!requests?.rows.length ? (
         <div className="flex flex-col items-center justify-center py-8 text-center text-xs text-muted-foreground">
           <p>{i18nService.t('modelCallsEmpty')}</p>
@@ -154,8 +158,8 @@ export function ModelRoutingCallsSection({
                   </td>
                   <td className="max-w-[8rem] truncate px-3 py-2">{row.agentName}</td>
                   <td className="max-w-[10rem] truncate px-3 py-2">{row.model}</td>
-                  <td className="whitespace-nowrap px-3 py-2">
-                    {row.input + row.output}
+                  <td className="whitespace-nowrap px-3 py-2 tabular-nums">
+                    {(row.input + row.output).toLocaleString()}
                     {row.failed ? (
                       <Badge variant="destructive" className="ml-2 font-normal">
                         {i18nService.t('modelCallsFailed')}
@@ -208,6 +212,7 @@ export function ModelRoutingCallsSection({
 
 interface ModelRoutingCostSectionProps {
   period: MagpieUsagePeriod;
+  showPeriodSelect?: boolean;
   disabled?: boolean;
   summary: MagpieUsageSummary | null;
   budget: MagpieUsageBudget | null;
@@ -222,6 +227,7 @@ function formatCostSummary(summary: MagpieUsageSummary): string {
 
 export function ModelRoutingCostSection({
   period,
+  showPeriodSelect = true,
   disabled,
   summary,
   budget,
@@ -229,28 +235,36 @@ export function ModelRoutingCostSection({
 }: ModelRoutingCostSectionProps) {
   return (
     <div className="flex flex-col gap-4">
-      <UsagePeriodSelect period={period} disabled={disabled} onPeriodChange={onPeriodChange} />
+      {showPeriodSelect ? (
+        <UsagePeriodSelect period={period} disabled={disabled} onPeriodChange={onPeriodChange} />
+      ) : null}
       {summary ? (
-        <dl className="grid gap-3 sm:grid-cols-2">
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <div className="rounded-lg border border-border-subtle px-4 py-3">
             <dt className="text-sm text-muted-foreground">{i18nService.t('modelCostCalls')}</dt>
-            <dd className="text-lg font-semibold">{summary.calls}</dd>
+            <dd className="text-lg font-semibold tabular-nums">{summary.calls.toLocaleString()}</dd>
           </div>
           <div className="rounded-lg border border-border-subtle px-4 py-3">
             <dt className="text-sm text-muted-foreground">{i18nService.t('modelCostTotal')}</dt>
-            <dd className="text-lg font-semibold">{formatCostSummary(summary)}</dd>
+            <dd className="text-lg font-semibold tabular-nums">{formatCostSummary(summary)}</dd>
           </div>
           <div className="rounded-lg border border-border-subtle px-4 py-3">
             <dt className="text-sm text-muted-foreground">{i18nService.t('modelCostUnpriced')}</dt>
-            <dd className="text-lg font-semibold">{summary.unpriced}</dd>
+            <dd className="text-lg font-semibold tabular-nums">
+              {summary.unpriced.toLocaleString()}
+            </dd>
           </div>
           <div className="rounded-lg border border-border-subtle px-4 py-3">
             <dt className="text-sm text-muted-foreground">{i18nService.t('modelCostTokens')}</dt>
-            <dd className="text-lg font-semibold">{summary.input + summary.output}</dd>
+            <dd className="text-lg font-semibold tabular-nums">
+              {(summary.input + summary.output).toLocaleString()}
+            </dd>
           </div>
           <div className="rounded-lg border border-border-subtle px-4 py-3">
             <dt className="text-sm text-muted-foreground">{i18nService.t('modelCostErrors')}</dt>
-            <dd className="text-lg font-semibold">{summary.errors}</dd>
+            <dd className="text-lg font-semibold tabular-nums">
+              {summary.errors.toLocaleString()}
+            </dd>
           </div>
         </dl>
       ) : (

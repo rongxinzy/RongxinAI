@@ -215,8 +215,8 @@ const ExpertManager: React.FC<ExpertManagerProps> = ({ onChatWithExpert }) => {
     <div className="flex flex-col gap-5 pb-12">
       {/* Top Action Toolbar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-2.5 flex-1 max-w-md">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={searchQuery}

@@ -177,7 +177,7 @@ export const magpieTranslationsEn = {
   modelCostErrors: 'Errors',
   modelBudgetTitle: 'Budget alert thresholds',
   modelBudgetUsageAlert: 'Alert when quota use reaches {percent}%',
-  modelBudgetBalanceAlert: 'Alert when balance falls below {amount}',
+  modelBudgetBalanceAlert: 'Alert when balance falls below ${amount}',
   modelBudgetUsageOff: 'Quota usage alert is off',
   modelBudgetBalanceOff: 'Balance alert is off',
   modelBudgetOff: 'Off',
@@ -237,6 +237,7 @@ export const magpieTranslationsEn = {
   magpieRedactPersonal: 'Mask personal data',
   magpieRedactPersonalHint:
     'Emails, phone numbers, identity numbers, and bank card numbers are masked too.',
+  magpieRedactKinds: 'Redaction categories',
   magpieRedactWords: 'Masked words',
   magpieRedactWordsHint: 'Names, codenames, or hostnames kept from vendors, separated by commas.',
   magpieRedactWordsPlaceholder: 'project name, internal host',

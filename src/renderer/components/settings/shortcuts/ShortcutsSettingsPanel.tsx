@@ -1,5 +1,11 @@
 import { Button } from '@shared/components/ui/button';
-import { Field, FieldDescription, FieldGroup, FieldLabel } from '@shared/components/ui/field';
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from '@shared/components/ui/field';
 import { Input } from '@shared/components/ui/input';
 import {
   Select,
@@ -164,24 +170,24 @@ export default function ShortcutsSettingsPanel({
 }: ShortcutsSettingsPanelProps) {
   return (
     <div className="flex flex-col gap-4">
-      <Field orientation="horizontal" className="!items-center">
-        <div className="flex flex-col">
-          <FieldLabel htmlFor="shortcut-companion">
-            {i18nService.t('companionShortcutLabel')}
-          </FieldLabel>
-          <FieldDescription id="shortcut-companion-description">
-            {i18nService.t('shortcutGlobal')}
-          </FieldDescription>
-        </div>
-        <Input
-          id="shortcut-companion"
-          aria-describedby="shortcut-companion-description"
-          readOnly
-          className="w-36"
-          value={formatShortcutLabel(COMPANION_SHORTCUT, isMacPlatform)}
-        />
-      </Field>
       <FieldGroup className="gap-4">
+        <Field orientation="horizontal" className="!items-center">
+          <FieldContent className="gap-0.5">
+            <FieldLabel htmlFor="shortcut-companion">
+              {i18nService.t('companionShortcutLabel')}
+            </FieldLabel>
+            <FieldDescription id="shortcut-companion-description">
+              {i18nService.t('shortcutGlobal')}
+            </FieldDescription>
+          </FieldContent>
+          <Input
+            id="shortcut-companion"
+            aria-describedby="shortcut-companion-description"
+            readOnly
+            className="w-36 text-center"
+            value={formatShortcutLabel(COMPANION_SHORTCUT, isMacPlatform)}
+          />
+        </Field>
         <Field orientation="horizontal" className="!items-center">
           <FieldLabel htmlFor="shortcut-new-chat">{i18nService.t('newChat')}</FieldLabel>
           <ShortcutRecorder

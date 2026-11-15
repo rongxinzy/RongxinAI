@@ -372,6 +372,8 @@ export function ModelRoutingGroupsSection({
               <Label htmlFor="routing-group-name">{i18nService.t('modelRoutingName')}</Label>
               <Input
                 id="routing-group-name"
+                className="max-w-sm"
+                placeholder={i18nService.t('modelRoutingName')}
                 value={newName}
                 disabled={disabled}
                 onChange={event => setNewName(event.target.value)}

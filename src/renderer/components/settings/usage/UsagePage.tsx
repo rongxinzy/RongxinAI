@@ -85,6 +85,7 @@ export function UsagePage() {
         </h3>
         <ModelRoutingCostSection
           period={period}
+          showPeriodSelect={false}
           disabled={loading}
           summary={summary}
           budget={budget}
@@ -108,6 +109,7 @@ export function UsagePage() {
         </h3>
         <ModelRoutingCallsSection
           period={period}
+          showPeriodSelect={false}
           disabled={loading}
           requests={requests}
           pageSize={PAGE_SIZE}
