@@ -319,20 +319,12 @@ async function extractArchiveToDirectory(archivePath, extractDir) {
   if (process.platform === 'win32') {
     // extract-zip (yauzl) stalls mid-archive on some Windows zips; the pending
     // promise then lets Node exit silently with code 0 before the runtime is
-    // installed. Use PowerShell's Expand-Archive on Windows instead.
-    const psCommand = [
-      'Expand-Archive',
-      '-LiteralPath',
-      JSON.stringify(archivePath),
-      '-DestinationPath',
-      JSON.stringify(extractDir),
-      '-Force',
-    ].join(' ');
-    const result = spawnSync(
-      'powershell.exe',
-      ['-NoProfile', '-NonInteractive', '-Command', psCommand],
-      { stdio: 'inherit' },
-    );
+    // installed. Use the native bsdtar shipped with Windows instead.
+    const tarPath = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+    const result = spawnSync(tarPath, ['-xf', archivePath, '-C', extractDir], {
+      stdio: 'inherit',
+      windowsHide: true,
+    });
     if (result.status !== 0) {
       throw new Error(`Failed to extract runtime archive: ${path.basename(archivePath)}`);
     }
