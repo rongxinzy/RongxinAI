@@ -247,11 +247,11 @@ describe('Magpie owned lifecycle', () => {
     });
     try {
       await expect(manager.ensureRunning()).rejects.toThrow(
-        'Unable to start the verified local model service',
+        'Unable to start the verified model service',
       );
       expect(manager.status()).toMatchObject({
         state: 'failed',
-        error: 'Unable to start the verified local model service',
+        error: 'Unable to start the verified model service',
       });
       const launchWarn = warnSpy.mock.calls.find(([msg]) =>
         String(msg).includes('[Magpie] Launch failed:'),

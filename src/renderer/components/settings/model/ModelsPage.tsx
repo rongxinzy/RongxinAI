@@ -79,9 +79,7 @@ export function ModelsPage({
   }, []);
 
   useEffect(() => {
-    if (running) {
-      void refreshAll();
-    }
+    void refreshAll();
   }, [running, refreshAll]);
 
   useEffect(() => {
@@ -215,6 +213,12 @@ export function ModelsPage({
   const handleToggleSubscriptions = async (enabled: boolean) => {
     setSubsBusy(true);
     try {
+      if (status?.state !== 'running' && window.electron?.magpie?.start) {
+        const started = await window.electron.magpie.start();
+        if (started.state !== 'running') {
+          throw new Error(started.error || i18nService.t('magpieGatewayStartFailedHint'));
+        }
+      }
       await window.electron.magpie.setSubscriptionAccounts(enabled);
       setSubsRestartBanner(true);
       await refreshAll();

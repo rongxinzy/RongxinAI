@@ -138,10 +138,14 @@ test('gateway: draining', () => {
   expect(classifyError('gateway draining for restart')).toBe('coworkErrorGatewayDraining');
 });
 
-test('gateway: local model service startup and exit classify as GatewayStartFailed', () => {
+test('gateway: model service startup and exit classify as GatewayStartFailed', () => {
+  expect(classifyError('Unable to start the verified model service')).toBe(
+    'coworkErrorGatewayStartFailed',
+  );
   expect(classifyError('Unable to start the verified local model service')).toBe(
     'coworkErrorGatewayStartFailed',
   );
+  expect(classifyError('Model service exited')).toBe('coworkErrorGatewayStartFailed');
   expect(classifyError('Local model service exited')).toBe('coworkErrorGatewayStartFailed');
   expect(classifyError('The model service could not start. Retry in model settings.')).toBe(
     'coworkErrorGatewayStartFailed',
