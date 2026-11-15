@@ -123,6 +123,12 @@ jobs:
           bun run setup:uv-runtime
           bun run setup:python-runtime
           bun run engram:runtime:win-x64
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: Build and verify the Windows Python job helper
+        shell: pwsh
+        run: |
+          ./scripts/python-runtime/build-job-runner.ps1
+          node --test scripts/python-runtime/job-runner.test.cjs
       - run: node scripts/sync-vendor-llamacpp-cpu-edition.cjs
         if: ${{ !inputs.enterprise-extension }}
         env:
