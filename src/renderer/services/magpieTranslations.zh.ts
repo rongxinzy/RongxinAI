@@ -91,7 +91,7 @@ export const magpieTranslationsZh = {
   magpieState_stopping: '停止中',
   magpieState_failed: '启动失败',
   magpieGatewayStartFailedTitle: '模型服务启动失败',
-  magpieGatewayStartFailedHint: '本地模型服务启动失败，建议重启应用后再试。',
+  magpieGatewayStartFailedHint: 'AI 模型服务未能正常启动，请检查运行环境或重启应用后再试。',
 
   magpieActionFailed: '模型管理操作未完成。请检查运行时是否可用，或稍后重试。',
 
@@ -290,8 +290,8 @@ export const magpieTranslationsZh = {
     '该模型名称可能已下线或拼写不符，请打开模型列表手动勾选或填写有效名称。',
   providerErrContextTitle: '本次对话内容超出模型上限',
   providerErrContextHint: '输入内容已超过该模型允许的上下文长度，请新建对话或精简上文内容后重试。',
-  providerErrServiceDownTitle: '本地模型服务尚未就绪',
-  providerErrServiceDownHint: '本地模型服务未能正常启动，请点击重试或检查系统运行环境。',
+  providerErrServiceDownTitle: '模型服务尚未就绪',
+  providerErrServiceDownHint: 'AI 模型服务未能正常启动，请点击重试或检查系统运行环境。',
   providerErrUnknownTitle: '连接 {provider} 失败',
   providerErrUnknownHint: '测试未通过，请展开详细信息查看具体原因，或核对密钥与服务地址。',
   providerErrShowDetail: '查看技术详情',
@@ -448,7 +448,7 @@ export const magpieTranslationsZh = {
   advancedHiddenModelsAdd: '隐藏此模型',
   advancedNetworkTitle: '网络与代理',
   advancedProxySyncHint: '统一应用于应用桌面请求与模型服务调用。',
-  advancedLocalApiTitle: '本地模型服务接口',
+  advancedLocalApiTitle: '模型服务本机接口',
   advancedDiagnosticsTitle: '运行健康与错误日志',
   advancedExperimentalTitle: '实验性能力',
   advancedDevTitle: '开发者工具',

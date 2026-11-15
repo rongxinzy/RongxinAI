@@ -113,7 +113,7 @@ export const magpieTranslationsEn = {
   magpieSectionRoutingUsage: 'Routing & usage',
   modelUsageTitle: 'Routing & usage',
   modelUsageDescription:
-    'Configure model fallback groups and review subscription quotas, recent calls, and estimated cost. Data comes from the local model service while it is running.',
+    'Configure model fallback groups and review subscription quotas, recent calls, and estimated cost. Data comes from the model service while it is running.',
   modelUsageRefresh: 'Refresh',
   modelUsageTabs: 'Routing and usage views',
   modelUsageTab_routing: 'Routing groups',
@@ -271,7 +271,7 @@ export const magpieTranslationsEn = {
   magpieState_failed: 'Failed',
   magpieGatewayStartFailedTitle: 'Model service failed to start',
   magpieGatewayStartFailedHint:
-    'The local model service failed to start. Please restart the app and try again.',
+    'The AI model service failed to start. Please restart the app and try again.',
 
   // Provider error classifier & recovery actions
   providerErrAuthInvalidTitle: '{provider} API key is invalid or expired',
@@ -313,9 +313,9 @@ export const magpieTranslationsEn = {
   providerErrContextTitle: 'Message exceeds model context limit',
   providerErrContextHint:
     'The conversation is longer than this model supports. Start a new chat or shorten the input.',
-  providerErrServiceDownTitle: 'Local model service not ready',
+  providerErrServiceDownTitle: 'Model service not ready',
   providerErrServiceDownHint:
-    'The local model service could not start cleanly. Retry or check your runtime environment.',
+    'The AI model service could not start cleanly. Retry or check your runtime environment.',
   providerErrUnknownTitle: 'Failed to connect to {provider}',
   providerErrUnknownHint:
     'The check did not pass. Expand technical details for more context or verify your key and URL.',
@@ -487,7 +487,7 @@ export const magpieTranslationsEn = {
   advancedHiddenModelsAdd: 'Hide model',
   advancedNetworkTitle: 'Network & proxy',
   advancedProxySyncHint: 'Applies to both app requests and model services.',
-  advancedLocalApiTitle: 'Local model service endpoint',
+  advancedLocalApiTitle: 'Model service local endpoint',
   advancedDiagnosticsTitle: 'Service health & error logs',
   advancedExperimentalTitle: 'Experimental features',
   advancedDevTitle: 'Developer tools',

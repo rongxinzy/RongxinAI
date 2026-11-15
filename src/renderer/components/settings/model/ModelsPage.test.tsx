@@ -137,4 +137,21 @@ describe('ModelsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'modelsOrgBannerDisconnect' }));
     await waitFor(() => expect(mockAisphereDisconnect).toHaveBeenCalledOnce());
   });
+
+  test('does not auto-start model service when stopped and never enabled', async () => {
+    const startSpy = vi.fn().mockResolvedValue({ state: 'running', version: '1.0.0' });
+    (
+      window.electron.magpie as unknown as {
+        status: () => Promise<unknown>;
+        start: () => Promise<unknown>;
+      }
+    ).status = vi.fn().mockResolvedValue({ state: 'stopped', enabled: false, version: '1.0.0' });
+    (window.electron.magpie as unknown as { start: () => Promise<unknown> }).start = startSpy;
+
+    render(<ModelsPage showLocalModelsEntry={false} />);
+
+    await waitFor(() => expect(screen.getByText('modelsZeroTitle')).toBeInTheDocument());
+    expect(startSpy).not.toHaveBeenCalled();
+    expect(screen.queryByText('magpieGatewayStartFailedHint')).not.toBeInTheDocument();
+  });
 });

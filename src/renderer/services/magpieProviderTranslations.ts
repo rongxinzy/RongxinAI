@@ -111,7 +111,7 @@ export const magpieProviderTranslations = {
     magpieModelConfigTitle: '本地模型配置',
     magpieWireConfirmTitle: '接入本地服务确认',
     magpieWireConfirmDesc:
-      '此操作将配置该工具使用知远本地模型服务调用模型。原有本机凭据不会被删除，随时可恢复。',
+      '此操作将配置该工具使用知远模型服务调用模型。原有本机凭据不会被删除，随时可恢复。',
     magpieWireTargetAgent: '目标 Agent',
     magpieWireTargetModel: '生效模型',
     magpieProbeGuideNoModel: '该 Agent 尚未配置生效模型，请在下方选择模型后点击应用。',

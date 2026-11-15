@@ -171,7 +171,7 @@ const RULES: ErrorRule[] = [
   {
     kind: CoworkErrorKind.GatewayStartFailed,
     pattern:
-      /unable to start the verified local model service|local model service exited|model service could not start|unable to stop the local model service/i,
+      /unable to start the verified (?:local )?model service|(?:local )?model service exited|model service could not start|unable to stop the (?:local )?model service/i,
   },
 
   // ── Gateway disconnected ────────────────────────────────────────────────

@@ -74,7 +74,7 @@ export function useModelServiceAutoStart(): UseModelServiceAutoStartResult {
     const bootstrap = async () => {
       const current = await refreshStatus();
       if (!active || !current) return;
-      if (current.state === 'stopped' && !attemptedAutoStartRef.current) {
+      if (current.state === 'stopped' && current.enabled && !attemptedAutoStartRef.current) {
         attemptedAutoStartRef.current = true;
         await retryStart();
       }
