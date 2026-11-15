@@ -1,3 +1,4 @@
+import { ProviderAvatar } from '@shared/components/model-picker/ProviderAvatar';
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import {
@@ -201,7 +202,15 @@ export function EditProviderDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{i18nService.t('magpieEditProvider')}</DialogTitle>
+          <div className="flex items-center gap-3 pr-6">
+            <ProviderAvatar
+              name={name || provider.name}
+              providerKey={provider.id}
+              baseUrl={baseUrl || provider.baseUrl}
+              size="md"
+            />
+            <DialogTitle>{i18nService.t('magpieEditProvider')}</DialogTitle>
+          </div>
         </DialogHeader>
 
         <div className="max-h-[70vh] space-y-5 overflow-y-auto pr-1">
@@ -367,9 +376,9 @@ export function EditProviderDialog({
             </div>
           </div>
 
-          <details className="rounded-lg border border-border px-3 py-2 text-sm">
+          <details className="group rounded-lg border border-border px-3 py-2 text-sm">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium text-muted-foreground select-none hover:text-foreground">
-              <ChevronDown className="size-4" />
+              <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
               <span>{i18nService.t('providerEditMoreOptions')}</span>
             </summary>
             <div className="mt-3 space-y-3 border-t border-border pt-3">

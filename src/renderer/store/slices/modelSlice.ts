@@ -8,6 +8,7 @@ export interface Model {
   name: string;
   provider?: string;
   providerKey?: string;
+  providerBaseUrl?: string;
   agentProviderId?: string;
   supportsImage?: boolean;
   capabilities?: Partial<ModelCapabilities>;

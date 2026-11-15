@@ -18,6 +18,7 @@ export interface ModelPickerItem {
   name: string;
   providerLabel?: string;
   providerKey?: string;
+  providerBaseUrl?: string;
   isLocal?: boolean;
   isGroup?: boolean;
   vision?: boolean;
@@ -213,6 +214,7 @@ export function ModelPickerContent({
                       <ProviderAvatar
                         name={item.providerLabel || item.name}
                         providerKey={item.isGroup ? 'group' : item.providerKey}
+                        baseUrl={item.isGroup ? undefined : item.providerBaseUrl}
                         size="sm"
                       />
                       <span className="flex min-w-0 flex-1 flex-col">
@@ -318,6 +320,7 @@ export function ModelPicker({
             <ProviderAvatar
               name={selected.providerLabel || selected.name}
               providerKey={selected.isGroup ? 'group' : selected.providerKey}
+              baseUrl={selected.isGroup ? undefined : selected.providerBaseUrl}
               size="sm"
             />
           )}

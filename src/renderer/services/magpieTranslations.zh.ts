@@ -309,6 +309,8 @@ export const magpieTranslationsZh = {
   providerWizardStep3Title: '选择要启用的模型',
   providerWizardStepProgress: '第 {step} 步，共 {total} 步',
   providerWizardSearchPlaceholder: '搜索服务商名称或关键字…',
+  providerWizardSearchEmpty: '没有找到匹配的预置服务商',
+  providerWizardUseCustomFallback: '使用自定义服务商',
   providerWizardCustomCardTitle: '自定义服务商',
   providerWizardCustomCardDesc: '兼容 OpenAI 或 Anthropic 接口的任何中转或自建服务',
   providerWizardPlanToggle: '使用包月 / Token 套餐密钥',

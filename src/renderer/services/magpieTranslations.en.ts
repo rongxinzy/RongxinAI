@@ -334,6 +334,8 @@ export const magpieTranslationsEn = {
   providerWizardStep3Title: 'Select models to enable',
   providerWizardStepProgress: 'Step {step} of {total}',
   providerWizardSearchPlaceholder: 'Search providers…',
+  providerWizardSearchEmpty: 'No matching preset providers found',
+  providerWizardUseCustomFallback: 'Use custom provider',
   providerWizardCustomCardTitle: 'Custom provider',
   providerWizardCustomCardDesc: 'Any OpenAI- or Anthropic-compatible relay or self-hosted endpoint',
   providerWizardPlanToggle: 'Use coding / token subscription plan key',

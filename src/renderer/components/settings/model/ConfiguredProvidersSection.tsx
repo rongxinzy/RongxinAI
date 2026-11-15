@@ -2,7 +2,7 @@ import { ProviderAvatar } from '@shared/components/model-picker/ProviderAvatar';
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
-import { Building2, Cpu, KeyRound, Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
+import { Pencil, Plus, RotateCw, Trash2 } from 'lucide-react';
 import type { MagpieProviderSummary } from '../../../../shared/magpie/types';
 import { i18nService } from '../../../services/i18n';
 import type {
@@ -88,8 +88,17 @@ export function ConfiguredProvidersSection({
           return (
             <div key={provider.id} className="space-y-3 px-4 py-3.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <ProviderAvatar name={provider.name} providerKey={provider.id} size="md" />
+                <button
+                  type="button"
+                  onClick={() => onEditProvider(provider)}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                  <ProviderAvatar
+                    name={provider.name}
+                    providerKey={provider.id}
+                    baseUrl={provider.baseUrl}
+                    size="md"
+                  />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium text-foreground">
@@ -106,7 +115,7 @@ export function ConfiguredProvidersSection({
                       {provider.models.length} {i18nService.t('availableModels')}
                     </div>
                   </div>
-                </div>
+                </button>
 
                 <div className="flex shrink-0 items-center gap-1.5">
                   <Button
@@ -160,9 +169,7 @@ export function ConfiguredProvidersSection({
         {showLocalModelsEntry && onOpenLocalModels && (
           <div className="flex items-center justify-between gap-4 px-4 py-3.5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Cpu className="size-4" />
-              </span>
+              <ProviderAvatar providerKey="llamacpp" size="md" />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-foreground">
                   {i18nService.t('modelsLocalRowTitle')}
@@ -187,9 +194,7 @@ export function ConfiguredProvidersSection({
         <div className="space-y-2.5 px-4 py-3.5">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <KeyRound className="size-4" />
-              </span>
+              <ProviderAvatar providerKey="subscription" size="md" />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-foreground">
                   {i18nService.t('modelsSubsRowTitle')}
@@ -224,9 +229,7 @@ export function ConfiguredProvidersSection({
         {!orgConnected && (
           <div className="flex items-center justify-between gap-4 px-4 py-3.5">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Building2 className="size-4" />
-              </span>
+              <ProviderAvatar providerKey="organization" size="md" />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-foreground">
                   {i18nService.t('modelsZeroOrgTitle')}

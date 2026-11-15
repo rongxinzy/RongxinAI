@@ -112,6 +112,7 @@ export function toModelPickerItem(model: Model): ModelPickerItem {
     name: model.name,
     providerLabel: model.provider || model.providerKey || '',
     providerKey: model.providerKey || (isGroupModelEntry(model) ? 'group' : undefined),
+    providerBaseUrl: model.providerBaseUrl,
     isLocal: isLocalModelEntry(model),
     isGroup: isGroupModelEntry(model),
     vision: caps.vision,

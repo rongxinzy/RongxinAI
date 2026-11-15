@@ -78,4 +78,17 @@ describe('AddProviderWizard', () => {
     );
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
+
+  test('offers custom provider fallback when preset search has no matches', () => {
+    render(<AddProviderWizard open onOpenChange={vi.fn()} onSave={onSave} />);
+
+    fireEvent.change(screen.getByPlaceholderText('providerWizardSearchPlaceholder'), {
+      target: { value: 'nonexistent-xyz' },
+    });
+
+    expect(screen.getByText('providerWizardSearchEmpty')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'providerWizardUseCustomFallback' }));
+    expect(screen.getByText('providerWizardStep2Title')).toBeInTheDocument();
+    expect(screen.getByText('自定义服务商')).toBeInTheDocument();
+  });
 });

@@ -9,7 +9,6 @@ const MoonshotIcon: React.FC<{ className?: string }> = ({ className }) => (
     xmlns="http://www.w3.org/2000/svg"
     style={{ flex: '0 0 auto', lineHeight: 1 }}
   >
-    <title>Kimi</title>
     <path
       d="M21.846 0a1.923 1.923 0 110 3.846H20.15a.226.226 0 01-.227-.226V1.923C19.923.861 20.784 0 21.846 0z"
       fill="#1783FF"
