@@ -8,7 +8,13 @@ import { configService } from '../../services/config';
 import { showAppToast } from '../../services/toastNotification';
 import SettingsPage from './SettingsPage';
 
-vi.mock('react-redux', () => ({ useSelector: () => ({ workingDirectory: '/workspace' }) }));
+vi.mock('react-redux', () => ({
+  useSelector: (selector: (state: unknown) => unknown) =>
+    selector({
+      cowork: { config: { workingDirectory: '/workspace' } },
+      model: { availableModels: [{ id: 'gpt-4o', name: 'GPT-4o', providerKey: 'openai' }] },
+    }),
+}));
 vi.mock('../../services/config', () => ({
   configService: { reload: vi.fn(), updateConfig: vi.fn() },
 }));
@@ -22,18 +28,22 @@ vi.mock('../../services/cowork', () => ({ coworkService: { updateConfig: vi.fn()
 vi.mock('../../services/toastNotification', () => ({ showAppToast: vi.fn() }));
 vi.mock('../../services/errorNormalization', () => ({ reportError: (message: string) => message }));
 vi.mock('./useSettingsTabs', () => ({ useSettingsTabs: () => ({ groups: [], tabs: [] }) }));
-vi.mock('../PageHeader', () => ({ default: () => null }));
+vi.mock('../PageHeader', () => ({
+  default: ({ actions }: { actions?: React.ReactNode }) =>
+    React.createElement('div', null, actions),
+}));
 vi.mock('../enterprise/EnterpriseSettingsPage', () => ({ EnterpriseSettingsPage: () => null }));
 vi.mock('./about/AboutSettingsPanel', () => ({ default: () => null }));
-vi.mock('./AISphereSettings', () => ({ AISphereSettings: () => null }));
+vi.mock('./advanced/AdvancedPage', () => ({ AdvancedPage: () => null }));
 vi.mock('./appearance/AppearanceSettingsPanel', () => ({ AppearanceSettingsPanel: () => null }));
-vi.mock('./email/EmailSettingsPage', () => ({ EmailSettingsPage: () => null }));
-vi.mock('./im/ImSettingsPanel', () => ({ default: () => null }));
+vi.mock('./channels/ChannelsPage', () => ({ ChannelsPage: () => null }));
+vi.mock('./companion/CompanionPage', () => ({ CompanionPage: () => null }));
 vi.mock('./memory/ManagedMemorySettings', () => ({ ManagedMemorySettings: () => null }));
-vi.mock('./model/ModelSettingsPanel', () => ({ default: () => null }));
+vi.mock('./model/ModelsPage', () => ({ ModelsPage: () => null }));
+vi.mock('./privacy/PrivacyPage', () => ({ PrivacyPage: () => null }));
 vi.mock('./shortcuts/ShortcutsSettingsPanel', () => ({ default: () => null }));
+vi.mock('./usage/UsagePage', () => ({ UsagePage: () => null }));
 vi.mock('./general/GeneralLanguageField', () => ({ GeneralLanguageField: () => null }));
-vi.mock('./general/DesktopPetSettingsSection', () => ({ DesktopPetSettingsSection: () => null }));
 
 beforeEach(() => {
   vi.resetAllMocks();

@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
-import { Textarea } from '@shared/components/ui/textarea';
 import { CheckCircle, Eye, EyeOff, XCircle } from 'lucide-react';
 import React from 'react';
 
@@ -136,27 +135,6 @@ export function IMInputField({
           </InputGroupAddon>
         ) : null}
       </InputGroup>
-      {description ? <FieldDescription>{description}</FieldDescription> : null}
-    </Field>
-  );
-}
-
-interface IMTextareaFieldProps extends React.ComponentProps<typeof Textarea> {
-  id: string;
-  label: React.ReactNode;
-  description?: React.ReactNode;
-}
-
-export function IMTextareaField({
-  id,
-  label,
-  description,
-  ...textareaProps
-}: IMTextareaFieldProps) {
-  return (
-    <Field data-disabled={textareaProps.disabled || undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Textarea id={id} {...textareaProps} />
       {description ? <FieldDescription>{description}</FieldDescription> : null}
     </Field>
   );

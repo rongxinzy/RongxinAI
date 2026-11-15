@@ -1,17 +1,23 @@
 import type { InferenceEdition } from '../../../shared/inferenceEdition';
 
-export type TabType =
+type CanonicalTabType =
   | 'general'
   | 'appearance'
-  | 'model'
-  | 'aisphere'
-  | 'coworkMemory'
+  | 'companion'
   | 'shortcuts'
-  | 'im'
-  | 'email'
+  | 'memory'
+  | 'models'
+  | 'usage'
+  | 'privacy'
+  | 'channels'
+  | 'advanced'
   | 'about';
+
+type LegacyTabType = 'model' | 'aisphere' | 'coworkMemory' | 'im' | 'email';
+
+export type TabType = CanonicalTabType;
 export type EnterpriseTabType = `extension:${string}`;
-export type SettingsTabType = TabType | EnterpriseTabType;
+export type SettingsTabType = TabType | LegacyTabType | EnterpriseTabType;
 
 export const toEnterpriseTab = (pageId: string): EnterpriseTabType => `extension:${pageId}`;
 export const isEnterpriseTab = (tab: SettingsTabType): tab is EnterpriseTabType =>
@@ -36,6 +42,7 @@ export interface SettingsPageProps extends SettingsOpenOptions {
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
+  onOpenLocalModels?: () => void;
   enterpriseConfig?: SettingsEnterpriseConfig | null;
   managedModelsOnly?: boolean;
   inferenceEdition?: InferenceEdition;

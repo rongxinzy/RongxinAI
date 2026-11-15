@@ -61,6 +61,7 @@ export const providersContractChannels: IpcContractChannels<typeof providersCont
   managedProviderCatalog: ManagedProviderIpc.Catalog,
   aisphereSnapshot: AISphereIpc.Snapshot,
   aisphereConnect: AISphereIpc.Connect,
+  aisphereDisconnect: AISphereIpc.Disconnect,
   aisphereRefresh: AISphereIpc.Refresh,
   authCommunityLogin: CommunityAuthIpc.Login,
   authGetCommunityUser: CommunityAuthIpc.GetCommunityUser,

@@ -58,6 +58,7 @@ for (const theme of ['light', 'dark']) {
     await page.goto('/?previewSkipBoot=1');
     await page.getByText('Login', { exact: true }).first().click();
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Desktop companion', exact: true }).click();
     const settings = page.getByRole('region', { name: 'Desktop companion', exact: true });
     await expect(
       settings.getByRole('switch', { name: 'Show desktop companion', exact: true }),

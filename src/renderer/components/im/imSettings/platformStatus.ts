@@ -10,15 +10,13 @@ import type { Platform } from '@shared/platform';
 import type { IMGatewayConfig, IMGatewayStatus } from '../../../types/im';
 
 /** Platforms whose IM config is a list of instances managed in the settings UI. */
-export type MultiInstancePlatform = 'dingtalk' | 'feishu' | 'qq' | 'wecom' | 'telegram' | 'discord';
+export type MultiInstancePlatform = 'dingtalk' | 'feishu' | 'qq' | 'wecom';
 
 const MULTI_INSTANCE_PLATFORMS: readonly MultiInstancePlatform[] = [
   'dingtalk',
   'feishu',
   'qq',
   'wecom',
-  'telegram',
-  'discord',
 ];
 
 export const isMultiInstancePlatform = (platform: Platform): platform is MultiInstancePlatform =>
@@ -29,12 +27,6 @@ export const canStartIMPlatform = (config: IMGatewayConfig, platform: Platform):
   if (platform === 'dingtalk') {
     return config.dingtalk.instances.some(i => !!(i.clientId && i.clientSecret));
   }
-  if (platform === 'telegram') {
-    return config.telegram.instances.some(i => !!i.botToken);
-  }
-  if (platform === 'discord') {
-    return config.discord.instances.some(i => !!i.botToken);
-  }
   if (platform === 'qq') {
     return config.qq.instances.some(i => !!(i.appId && i.appSecret));
   }
@@ -44,7 +36,10 @@ export const canStartIMPlatform = (config: IMGatewayConfig, platform: Platform):
   if (platform === 'weixin') {
     return true; // No credentials needed, connects via QR code in CLI
   }
-  return config.feishu.instances?.some(i => !!(i.appId && i.appSecret));
+  if (platform === 'feishu') {
+    return config.feishu.instances?.some(i => !!(i.appId && i.appSecret));
+  }
+  return false;
 };
 
 /** Get platform enabled state (persisted toggle state). */
@@ -61,29 +56,21 @@ export const isIMPlatformEnabled = (config: IMGatewayConfig, platform: Platform)
   if (platform === 'wecom') {
     return config.wecom.instances?.some(i => i.enabled);
   }
-  if (platform === 'telegram') {
-    return config.telegram.instances?.some(i => i.enabled);
-  }
-  if (platform === 'discord') {
-    return config.discord.instances?.some(i => i.enabled);
-  }
-  return (config[platform] as { enabled: boolean }).enabled;
+  return Boolean((config[platform] as { enabled?: boolean } | undefined)?.enabled);
 };
 
 /** Get platform connection status (runtime state). */
 export const getIMPlatformConnected = (status: IMGatewayStatus, platform: Platform): boolean => {
   if (platform === 'dingtalk') return status.dingtalk?.instances?.some(i => i.connected) ?? false;
-  if (platform === 'telegram') return status.telegram?.instances?.some(i => i.connected) ?? false;
-  if (platform === 'discord') return status.discord?.instances?.some(i => i.connected) ?? false;
   if (platform === 'qq') return status.qq?.instances?.some(i => i.connected) ?? false;
   if (platform === 'wecom') return status.wecom?.instances?.some(i => i.connected) ?? false;
   if (platform === 'weixin') return status.weixin?.connected ?? false;
-  return status.feishu?.instances?.some(i => i.connected) ?? false;
+  if (platform === 'feishu') return status.feishu?.instances?.some(i => i.connected) ?? false;
+  return false;
 };
 
 /** Get platform transient starting status. */
-export const getIMPlatformStarting = (status: IMGatewayStatus, platform: Platform): boolean => {
-  if (platform === 'discord') return status.discord.instances?.[0]?.starting ?? false;
+export const getIMPlatformStarting = (_status: IMGatewayStatus, _platform: Platform): boolean => {
   return false;
 };
 
@@ -112,10 +99,6 @@ export const getNavInstances = (
       return config.qq.instances;
     case 'wecom':
       return config.wecom.instances;
-    case 'telegram':
-      return config.telegram.instances;
-    case 'discord':
-      return config.discord.instances;
   }
 };
 
@@ -132,9 +115,5 @@ export const getNavInstanceStatuses = (
       return status.qq?.instances;
     case 'wecom':
       return status.wecom?.instances;
-    case 'telegram':
-      return status.telegram?.instances;
-    case 'discord':
-      return status.discord?.instances;
   }
 };

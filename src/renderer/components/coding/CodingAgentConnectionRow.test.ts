@@ -207,7 +207,7 @@ test('displays Magpie wired status badge and direct standalone badge', () => {
       }),
     ),
   );
-  expect(screen.getByText('已接入统一网关')).toBeInTheDocument();
+  expect(screen.getByText('已接入本地服务')).toBeInTheDocument();
 
   rerender(
     createElement(
@@ -223,7 +223,7 @@ test('displays Magpie wired status badge and direct standalone badge', () => {
       }),
     ),
   );
-  expect(screen.getByText('直连独立模式')).toBeInTheDocument();
+  expect(screen.getByText('直连模式')).toBeInTheDocument();
 });
 
 test('allows selecting and applying model with explicit confirmation (A4 compliance)', async () => {

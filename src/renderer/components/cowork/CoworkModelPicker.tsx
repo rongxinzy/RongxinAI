@@ -1,24 +1,18 @@
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@shared/components/ui/command';
+import { ModelPickerContent } from '@shared/components/model-picker/ModelPicker';
+import { CommandGroup, CommandItem } from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
-import { Check, Cpu } from 'lucide-react';
+import { Cpu } from 'lucide-react';
 import { useMemo, useState } from 'react';
-
-import { ProviderIcon } from '../../providers/uiRegistry';
 import { i18nService } from '../../services/i18n';
 import {
-  getModelIdentityKey,
-  isSameModelIdentity,
-  type Model,
-} from '../../store/slices/modelSlice';
-import { SelectorOptionContent } from './SelectorOptionContent';
+  getModelPickerLabels,
+  getRecentModelIds,
+  recordRecentModelId,
+  toModelPickerItem,
+} from '../../services/modelSettings/modelCapabilities';
+import type { Model } from '../../store/slices/modelSlice';
 import { PromptSelectorButton } from './PromptSelectorButton';
+import { SelectorOptionContent } from './SelectorOptionContent';
 import { getPreferredReadyLocalModel } from './preferredLocalModel';
 
 type CoworkModelPickerProps = {
@@ -28,11 +22,8 @@ type CoworkModelPickerProps = {
   onOpenChange: (open: boolean) => void;
   onSelect: (model: Model) => void;
   compact?: boolean;
+  onManageModels?: () => void;
 };
-
-function ModelProviderIcon({ provider }: { provider: string }) {
-  return <ProviderIcon id={provider} className="size-4" />;
-}
 
 export function CoworkModelPicker({
   models,
@@ -41,28 +32,27 @@ export function CoworkModelPicker({
   onOpenChange,
   onSelect,
   compact = false,
+  onManageModels,
 }: CoworkModelPickerProps) {
   const displayedSelectedModel = models.find(model => model.id === selectedModel?.id) ?? null;
   const readyLocalModel = getPreferredReadyLocalModel(models, selectedModel);
   const [searchQuery, setSearchQuery] = useState('');
-  const matchingModels = useMemo(() => {
-    const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
-    if (!normalizedSearchQuery) return models;
 
-    return models.filter(model =>
-      [model.name, model.providerKey, model.provider]
-        .filter(Boolean)
-        .join(' ')
-        .toLocaleLowerCase()
-        .includes(normalizedSearchQuery),
-    );
-  }, [models, searchQuery]);
+  const items = useMemo(() => models.map(toModelPickerItem), [models]);
+  const recentIds = useMemo(() => (open ? getRecentModelIds() : []), [open]);
+  const labels = useMemo(() => getModelPickerLabels(), []);
 
   const handleOpenChange = (nextOpen: boolean) => {
     onOpenChange(nextOpen);
     if (!nextOpen) {
       setSearchQuery('');
     }
+  };
+
+  const handlePickModel = (model: Model) => {
+    recordRecentModelId(model.id);
+    onSelect(model);
+    handleOpenChange(false);
   };
 
   return (
@@ -77,19 +67,32 @@ export function CoworkModelPicker({
         }
       />
       <PopoverContent
-        className="theme-model-menu w-72 max-w-[calc(100vw-2rem)]"
+        className="theme-model-menu w-80 max-w-[calc(100vw-2rem)]"
         side="bottom"
         align="start"
         sideOffset={4}
       >
-        <Command shouldFilter={false} label={i18nService.t('searchModels')}>
-          <CommandInput
-            placeholder={i18nService.t('searchModels')}
-            value={searchQuery}
-            onValueChange={setSearchQuery}
-          />
-          <CommandList>
-            {!searchQuery.trim() && (
+        <ModelPickerContent
+          items={items}
+          selectedId={displayedSelectedModel?.id ?? null}
+          recentIds={recentIds}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          labels={labels}
+          onSelect={item => {
+            const matched = models.find(model => model.id === item.id);
+            if (matched) handlePickModel(matched);
+          }}
+          onManageModels={
+            onManageModels
+              ? () => {
+                  handleOpenChange(false);
+                  onManageModels();
+                }
+              : undefined
+          }
+          topSlot={
+            !searchQuery.trim() ? (
               <CommandGroup heading={i18nService.t('coworkLocalModelsHeading')}>
                 <CommandItem
                   value="use-ready-local-model"
@@ -97,8 +100,7 @@ export function CoworkModelPicker({
                   disabled={!readyLocalModel}
                   onSelect={() => {
                     if (!readyLocalModel) return;
-                    onSelect(readyLocalModel);
-                    handleOpenChange(false);
+                    handlePickModel(readyLocalModel);
                   }}
                 >
                   <SelectorOptionContent
@@ -108,60 +110,9 @@ export function CoworkModelPicker({
                   />
                 </CommandItem>
               </CommandGroup>
-            )}
-            {models.length === 0 ? (
-              <CommandGroup heading={i18nService.t('availableModels')}>
-                <CommandItem disabled value={i18nService.t('modelSelectorNone')}>
-                  {i18nService.t('modelSelectorNone')}
-                </CommandItem>
-              </CommandGroup>
-            ) : matchingModels.length === 0 ? (
-              <CommandEmpty>{i18nService.t('modelSelectorNoMatches')}</CommandEmpty>
-            ) : (
-              <CommandGroup heading={i18nService.t('availableModels')}>
-                {matchingModels.map(model => (
-                  <CommandItem
-                    key={getModelIdentityKey(model)}
-                    value={getModelIdentityKey(model)}
-                    variant="selector"
-                    aria-label={model.name}
-                    aria-description={[
-                      model.provider || model.providerKey || '',
-                      displayedSelectedModel && isSameModelIdentity(model, displayedSelectedModel)
-                        ? i18nService.t('currentModel')
-                        : '',
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}
-                    onSelect={() => {
-                      onSelect(model);
-                      handleOpenChange(false);
-                    }}
-                  >
-                    <SelectorOptionContent
-                      icon={
-                        <ModelProviderIcon
-                          provider={model.providerKey || model.provider || 'openai'}
-                        />
-                      }
-                      title={model.name}
-                      description={model.provider || model.providerKey || ''}
-                    />
-                    <span
-                      aria-hidden="true"
-                      className="flex size-4 shrink-0 items-center justify-center"
-                    >
-                      {displayedSelectedModel &&
-                        isSameModelIdentity(model, displayedSelectedModel) && (
-                          <Check className="size-4" />
-                        )}
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
+            ) : undefined
+          }
+        />
       </PopoverContent>
     </Popover>
   );

@@ -36,6 +36,14 @@ export function createManagedProviders(
         models: [],
       };
     },
+    aisphereDisconnect: async () => {
+      runtime.warnOnce('managedProviders.aisphereDisconnect');
+      return {
+        address: '',
+        status: 'ready',
+        models: [],
+      };
+    },
     aisphereRefresh: async () => {
       runtime.warnOnce('managedProviders.aisphereRefresh');
       return {

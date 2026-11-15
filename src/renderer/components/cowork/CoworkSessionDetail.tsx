@@ -75,6 +75,7 @@ import { useSessionExport } from './sessionDetail/useSessionExport';
 interface CoworkSessionDetailProps {
   displayedSessionId?: string;
   isSessionSwitching?: boolean;
+  onManageModels?: () => void;
   onManageSkills?: () => void;
   onManageConnectors?: () => void;
   permissionMode?: CoworkPermissionMode;
@@ -101,6 +102,7 @@ interface CoworkSessionDetailProps {
 const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   displayedSessionId,
   isSessionSwitching = false,
+  onManageModels,
   onManageSkills,
   onManageConnectors,
   permissionMode,
@@ -435,6 +437,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             sessionContextPending={isSessionSwitching}
             size="large"
             remoteManaged={!isSessionSwitching && remoteManaged}
+            onManageModels={!isSessionSwitching && remoteManaged ? undefined : onManageModels}
             onManageSkills={!isSessionSwitching && remoteManaged ? undefined : onManageSkills}
             onManageConnectors={
               !isSessionSwitching && remoteManaged ? undefined : onManageConnectors

@@ -63,7 +63,7 @@ export function toCatalogModel(
     ...(llamaCppAgentEligibility ? { llamaCppAgentEligibility } : {}),
   };
 }
-export function applyMagpieCatalog(
+function applyMagpieCatalog(
   catalog: MagpieModelCatalog,
   providers: readonly MagpieProviderSummary[] = [],
 ): void {

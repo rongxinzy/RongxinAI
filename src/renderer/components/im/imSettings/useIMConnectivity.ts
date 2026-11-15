@@ -12,10 +12,8 @@ import { useDispatch } from 'react-redux';
 import { imService } from '../../../services/im';
 import {
   setDingTalkInstanceConfig,
-  setDiscordInstanceConfig,
   setFeishuInstanceConfig,
   setQQInstanceConfig,
-  setTelegramInstanceConfig,
   setWecomInstanceConfig,
 } from '../../../store/slices/imSlice';
 import type { IMConnectivityTestResult, IMGatewayConfig } from '../../../types/im';
@@ -121,30 +119,6 @@ export const useIMConnectivity = ({
     setTestingPlatform(platform);
 
     try {
-      // For Telegram, persist telegram config and test (multi-instance)
-      if (platform === 'telegram') {
-        await imService.persistConfig({ telegram: config.telegram });
-        const result = await runConnectivityTest(
-          platform,
-          {
-            telegram: config.telegram,
-          } as Partial<IMGatewayConfig>,
-          activeInstanceIds.telegram ?? undefined,
-        );
-        // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
-        const activeId = activeInstanceIds.telegram;
-        if (activeId && result) {
-          const inst = config.telegram.instances.find(i => i.instanceId === activeId);
-          await maybeAutoEnableInstance(result, inst, async () => {
-            dispatch(
-              setTelegramInstanceConfig({ instanceId: activeId, config: { enabled: true } }),
-            );
-            await imService.updateTelegramInstanceConfig(activeId, { enabled: true });
-          });
-        }
-        return;
-      }
-
       // Persist DingTalk config and test connectivity.
       if (platform === 'dingtalk') {
         await imService.persistConfig({ dingtalk: config.dingtalk });
@@ -246,27 +220,6 @@ export const useIMConnectivity = ({
         }
         return;
       }
-      // Persist Discord config and test connectivity.
-      if (platform === 'discord') {
-        await imService.persistConfig({ discord: config.discord });
-        const result = await runConnectivityTest(
-          platform,
-          {
-            discord: config.discord,
-          } as Partial<IMGatewayConfig>,
-          activeInstanceIds.discord ?? undefined,
-        );
-        const activeId = activeInstanceIds.discord;
-        if (activeId && result) {
-          const inst = config.discord.instances.find(i => i.instanceId === activeId);
-          await maybeAutoEnableInstance(result, inst, async () => {
-            dispatch(setDiscordInstanceConfig({ instanceId: activeId, config: { enabled: true } }));
-            await imService.updateDiscordInstanceConfig(activeId, { enabled: true });
-          });
-        }
-        return;
-      }
-
       // 1. Persist latest config to backend (without changing enabled state)
       await imService.persistConfig({
         [platform]: config[platform],
@@ -301,15 +254,7 @@ export const useIMConnectivity = ({
   useEffect(() => {
     if (!configLoaded) return;
 
-    const imPlatforms: Platform[] = [
-      'weixin',
-      'dingtalk',
-      'qq',
-      'feishu',
-      'wecom',
-      'telegram',
-      'discord',
-    ];
+    const imPlatforms: Platform[] = ['weixin', 'dingtalk', 'qq', 'feishu', 'wecom'];
     const enabledPlatforms = imPlatforms.filter(platform => isPlatformEnabled(platform));
     if (enabledPlatforms.length === 0) return;
 

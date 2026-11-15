@@ -172,6 +172,32 @@ export class AISphereService {
     }
   }
 
+  async disconnect(): Promise<AISphereSnapshot> {
+    if (this.changing || this.active || this.busy()) throw new Error(AISphereError.Busy);
+    this.changing = true;
+    try {
+      await this.pending?.catch((): void => {});
+      if (this.active || this.busy()) throw new Error(AISphereError.Busy);
+      this.store?.set(AISphere.StoreKey, '');
+      this.gatewayToken = randomBytes(32).toString('hex');
+      this.address = '';
+      this.models = [];
+      this.ready = false;
+      this.checkedAt = 0;
+      const current = this.store?.get<Config>(AISphere.AppConfigKey) ?? {};
+      if (current.model?.defaultModelProvider === AISphere.Provider) {
+        this.store?.set(AISphere.AppConfigKey, {
+          ...current,
+          model: { ...current.model, defaultModel: '', defaultModelProvider: '' },
+        });
+      }
+      this.notify();
+      return this.snapshot();
+    } finally {
+      this.changing = false;
+    }
+  }
+
   async refresh(): Promise<void> {
     if (this.changing) throw new Error(AISphereError.Busy);
     if (this.pending) return this.pending;

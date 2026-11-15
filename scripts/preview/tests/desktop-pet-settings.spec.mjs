@@ -46,7 +46,8 @@ for (const colorScheme of ['light', 'dark']) {
     await home(page, baseURL, '?previewSkipBoot=1');
     await page.getByText('Login', { exact: true }).first().click();
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
-    const group = page.getByRole('region', { name: 'Desktop companion', exact: true });
+    await page.getByRole('button', { name: 'Desktop companion', exact: true }).click();
+    const group = page.locator('section[aria-label="Desktop companion"]');
     const enabled = group.getByRole('switch', { name: 'Show desktop companion', exact: true });
     await expect(enabled).not.toBeChecked();
     await page.evaluate(() => {
@@ -88,6 +89,7 @@ for (const colorScheme of ['light', 'dark']) {
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByText('Login', { exact: true }).first().click();
     await page.getByRole('menuitem', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Desktop companion', exact: true }).click();
     await expect(enabled).toBeChecked();
     await expect(appearance).toContainText('Youli');
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -124,11 +126,13 @@ for (const colorScheme of ['light', 'dark']) {
     await expect(enabled).toBeChecked();
     await page.emulateMedia({ colorScheme });
     await page.setViewportSize({ width: 1280, height: 800 });
+    await page.getByRole('button', { name: 'General', exact: true }).click();
     await page.getByRole('combobox').first().click();
     await page.getByRole('option', { name: 'Chinese', exact: true }).click();
+    await page.getByRole('button', { name: '桌面伙伴', exact: true }).click();
     await expect(
       page
-        .getByRole('region', { name: '桌面伙伴', exact: true })
+        .locator('section[aria-label="桌面伙伴"]')
         .getByRole('switch', { name: '显示桌面伙伴', exact: true }),
     ).toBeChecked();
     await page.screenshot({ path: `/tmp/desktop-pet-settings-${colorScheme}-zh.png` });

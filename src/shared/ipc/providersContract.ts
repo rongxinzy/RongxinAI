@@ -512,6 +512,11 @@ export const providersContract = defineIpcContract({
     args: z.tuple([z.string()]),
     result: AISphereSnapshotSchema,
   },
+  aisphereDisconnect: {
+    channel: AISphereIpc.Disconnect,
+    args: z.tuple([]),
+    result: AISphereSnapshotSchema,
+  },
   aisphereRefresh: {
     channel: AISphereIpc.Refresh,
     args: z.tuple([]),

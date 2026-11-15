@@ -13,18 +13,22 @@ import { formatShortcutLabel } from '../../services/shortcutLabel';
 import { shortcutsConflict } from '../../services/shortcuts';
 import { themeService } from '../../services/theme';
 import { showAppToast } from '../../services/toastNotification';
+import type { RootState } from '../../store';
 import { selectCoworkConfig } from '../../store/selectors/coworkSelectors';
 import ErrorMessage from '../ErrorMessage';
 import { EnterpriseSettingsPage } from '../enterprise/EnterpriseSettingsPage';
 import PageHeader from '../PageHeader';
 import AboutSettingsPanel from './about/AboutSettingsPanel';
-import { AISphereSettings } from './AISphereSettings';
+import { AdvancedPage } from './advanced/AdvancedPage';
 import { AppearanceSettingsPanel } from './appearance/AppearanceSettingsPanel';
-import { EmailSettingsPage } from './email/EmailSettingsPage';
+import { ChannelsPage } from './channels/ChannelsPage';
+import { CompanionPage } from './companion/CompanionPage';
+import { settingsContentWidthClass } from './constants';
 import GeneralSettingsPanel from './general/GeneralSettingsPanel';
-import ImSettingsPanel from './im/ImSettingsPanel';
 import { ManagedMemorySettings } from './memory/ManagedMemorySettings';
-import ModelSettingsPanel from './model/ModelSettingsPanel';
+import { ModelsPage } from './model/ModelsPage';
+import { PrivacyPage } from './privacy/PrivacyPage';
+import { normalizeSettingsTab } from './settingsRoutes';
 import ShortcutsSettingsPanel from './shortcuts/ShortcutsSettingsPanel';
 import {
   fromEnterpriseTab,
@@ -32,7 +36,7 @@ import {
   type SettingsPageProps,
   type SettingsTabType,
 } from './types';
-import { settingsContentWidthClass } from './constants';
+import { UsagePage } from './usage/UsagePage';
 import { useSettingsTabs } from './useSettingsTabs';
 
 export default function SettingsPage({
@@ -48,8 +52,13 @@ export default function SettingsPage({
   isSidebarCollapsed,
   onToggleSidebar,
   onNewChat,
+  onOpenLocalModels,
 }: SettingsPageProps) {
-  const [requestedActiveTab, setActiveTab] = useState<SettingsTabType>(initialTab ?? 'general');
+  const availableModels = useSelector((state: RootState) => state.model?.availableModels ?? []);
+  const defaultLandingTab = availableModels.length === 0 ? 'models' : 'general';
+  const [requestedActiveTab, setActiveTab] = useState<SettingsTabType>(() =>
+    normalizeSettingsTab(initialTab, defaultLandingTab),
+  );
   const [enterpriseSettingsPages, setEnterpriseSettingsPages] = useState<
     readonly EnterpriseRendererSettingsPage[]
   >([]);
@@ -161,7 +170,7 @@ export default function SettingsPage({
   }, [buildNoticeMessage]);
 
   useEffect(() => {
-    if (initialTab) setActiveTab(initialTab);
+    if (initialTab) setActiveTab(normalizeSettingsTab(initialTab));
   }, [initialTab]);
 
   useEffect(() => {
@@ -175,7 +184,7 @@ export default function SettingsPage({
     return unsubscribe;
   }, [noticeI18nKey, noticeExtra]);
 
-  const handleTabChange = (tab: SettingsTabType) => setActiveTab(tab);
+  const handleTabChange = (tab: SettingsTabType) => setActiveTab(normalizeSettingsTab(tab));
 
   const handleLanguageChange = (next: LanguageType) => {
     setLanguage(next);
@@ -309,16 +318,9 @@ export default function SettingsPage({
             onAutoLaunchChange={next => void handleAutoLaunchChange(next)}
             preventSleep={preventSleep}
             onPreventSleepChange={next => void handlePreventSleepChange(next)}
-            useSystemProxy={useSystemProxy}
-            onUseSystemProxyChange={next => {
-              setUseSystemProxy(next);
-              void persistConfig({ useSystemProxy: next });
-            }}
             sqliteAutoBackupEnabled={sqliteAutoBackupEnabled}
             sqliteAutoBackupDisabled={!sqliteAutoBackupReady || sqliteAutoBackupSaving}
             onSqliteAutoBackupEnabledChange={next => void handleSqliteAutoBackupChange(next)}
-            codemodeEnabled={codemodeEnabled}
-            onCodemodeEnabledChange={next => void handleCodemodeChange(next)}
           />
         );
 
@@ -332,19 +334,38 @@ export default function SettingsPage({
           />
         );
 
-      case 'coworkMemory':
-        return <ManagedMemorySettings workingDirectory={coworkConfig.workingDirectory} />;
-
-      case 'aisphere':
-        return <AISphereSettings />;
+      case 'companion':
+        return <CompanionPage />;
 
       case 'shortcuts':
         return (
           <ShortcutsSettingsPanel shortcuts={shortcuts} onShortcutChange={handleShortcutChange} />
         );
 
-      case 'im':
-        return <ImSettingsPanel />;
+      case 'memory':
+        return <ManagedMemorySettings workingDirectory={coworkConfig.workingDirectory} />;
+
+      case 'usage':
+        return <UsagePage />;
+
+      case 'privacy':
+        return <PrivacyPage />;
+
+      case 'channels':
+        return <ChannelsPage />;
+
+      case 'advanced':
+        return (
+          <AdvancedPage
+            useSystemProxy={useSystemProxy}
+            onUseSystemProxyChange={next => {
+              setUseSystemProxy(next);
+              void persistConfig({ useSystemProxy: next });
+            }}
+            codemodeEnabled={codemodeEnabled}
+            onCodemodeEnabledChange={next => void handleCodemodeChange(next)}
+          />
+        );
 
       case 'about':
         return <AboutSettingsPanel setError={setError} setNoticeMessage={setNoticeMessage} />;
@@ -361,6 +382,13 @@ export default function SettingsPage({
         isSidebarCollapsed={isSidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
         onNewChat={onNewChat}
+        actions={
+          !isEnterpriseTab(activeTab) ? (
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+              {i18nService.t('close')}
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
@@ -434,47 +462,25 @@ export default function SettingsPage({
                 className={cn(
                   'w-full min-w-0',
                   contentWidthClass,
-                  activeTab === 'email' ? 'block' : 'hidden',
+                  activeTab === 'models' ? 'block h-full' : 'hidden',
                 )}
               >
-                <EmailSettingsPage />
-              </div>
-              <div
-                className={cn(
-                  'w-full min-w-0',
-                  contentWidthClass,
-                  activeTab === 'model' ? 'block h-full' : 'hidden',
+                {activeTab === 'models' && (
+                  <ModelsPage
+                    onNavigateTab={tab => handleTabChange(tab)}
+                    onOpenLocalModels={onOpenLocalModels}
+                    showLocalModelsEntry={Boolean(onOpenLocalModels) && !managedModelsOnly}
+                  />
                 )}
-              >
-                {activeTab === 'model' && <ModelSettingsPanel />}
               </div>
-              {activeTab !== 'email' && activeTab !== 'model' && (
+              {activeTab !== 'models' && (
                 <div
-                  className={cn(
-                    'w-full min-w-0',
-                    !isEnterpriseTab(activeTab) && contentWidthClass,
-                    activeTab === 'im' && 'h-full',
-                  )}
+                  className={cn('w-full min-w-0', !isEnterpriseTab(activeTab) && contentWidthClass)}
                 >
                   {renderTabContent()}
                 </div>
               )}
             </div>
-
-            {!isEnterpriseTab(activeTab) && (
-              <div className="shrink-0 border-t border-border bg-background">
-                <div className="flex w-full flex-wrap items-center justify-end gap-2 px-4 py-3 sm:px-6">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="theme-confirm-cancel"
-                    onClick={onClose}
-                  >
-                    {i18nService.t('close')}
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -136,7 +136,7 @@ export function useCoworkSessionActions({
         const apiConfig = await coworkService.checkApiConfig();
         if (apiConfig && !apiConfig.hasConfig) {
           onRequestAppSettings?.({
-            initialTab: 'model',
+            initialTab: 'models',
             ...buildApiConfigNotice(apiConfig.error),
           });
           startingSessionIdsRef.current.delete(startSessionKey);

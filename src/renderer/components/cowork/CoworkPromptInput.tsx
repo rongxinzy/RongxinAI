@@ -92,6 +92,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       showFolderSelector = false,
       showNoFolderAction = true,
       showModelSelector = false,
+      onManageModels,
       onManageSkills,
       onManageConnectors,
       showPermissionModeSelector = false,
@@ -506,6 +507,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     selectedModel={effectiveSelectedModel}
                     open={modelSelectorOpen}
                     onOpenChange={setModelSelectorOpen}
+                    onManageModels={onManageModels}
                     onSelect={model => {
                       void handleModelSelect(model);
                     }}
@@ -591,6 +593,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                       selectedModel={effectiveSelectedModel}
                       open={modelSelectorOpen}
                       onOpenChange={setModelSelectorOpen}
+                      onManageModels={onManageModels}
                       onSelect={model => {
                         void handleModelSelect(model);
                       }}

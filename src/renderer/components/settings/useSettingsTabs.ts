@@ -57,11 +57,19 @@ export function useSettingsTabs({
     }
 
     // Filter out tabs with 'hide' action in enterprise config
-    // e.g., ui: { "settings.im": "hide" } → hide the 'im' tab
+    // Support both canonical keys and legacy keys (e.g. settings.im, settings.model, settings.coworkMemory)
     const ui = enterpriseConfig?.ui;
-    const configuredTabs = ui
-      ? flatTabs.filter(tab => ui[`settings.${tab.key}`] !== 'hide')
-      : flatTabs;
+    const isHiddenByEnterprise = (key: SettingsTabType): boolean => {
+      if (!ui) return false;
+      if (ui[`settings.${key}`] === 'hide') return true;
+      if (key === 'channels' && (ui['settings.im'] === 'hide' || ui['settings.email'] === 'hide')) {
+        return true;
+      }
+      if (key === 'models' && ui['settings.model'] === 'hide') return true;
+      if (key === 'memory' && ui['settings.coworkMemory'] === 'hide') return true;
+      return false;
+    };
+    const configuredTabs = ui ? flatTabs.filter(tab => !isHiddenByEnterprise(tab.key)) : flatTabs;
     const tabs = configuredTabs;
 
     const groups: SettingsNavGroup[] = [];

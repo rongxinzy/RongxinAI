@@ -22,7 +22,7 @@ export const modelBrowseTranslations = {
     modelBrowseUnsaved: '待保存，尚未更改默认',
     modelBrowseMissingDefault: '已保存的模型不在当前目录中，请明确选择新的默认模型。',
     modelBrowseConnectionHint:
-      '来源和能力由目录提供；目录收录不代表已验证连接或凭据有效。可在「渠道」中检查配置，返回后刷新目录。',
+      '来源和能力由目录提供；目录收录不代表已验证连接或凭据有效。可在「模型服务商」中检查配置，返回后刷新目录。',
     modelBrowseSelect: '选择',
     modelBrowseSelected: '已选择',
     modelBrowsePrevious: '上一页',
