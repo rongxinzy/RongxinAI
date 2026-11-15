@@ -10,13 +10,14 @@ import sys
 import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+NPM = 'npm.cmd' if os.name == 'nt' else 'npm'
 TESTS = [
     'tests/streamingGlmReplay.test.ts',
     'tests/streamingAuditPipeline.test.ts',
     'tests/streamingAuditPrune.test.ts',
     'tests/streamingRetryStoreGuards.test.ts',
     'src/main/libs/agentEngine/piStreamAccumulator.test.ts',
-    'src/main/libs/agentEngine/piEventProjectionQueue.test.ts',
+    'src/main/libs/agentEngine/piEventProjection.test.ts',
     'src/main/libs/agentEngine/piRuntimeAdapter.assistantStreaming.test.ts',
     'src/main/libs/agentEngine/piRuntimeAdapter.autoRetry.test.ts',
     'src/main/libs/agentEngine/piRuntimeAdapter.sessionControl.test.ts',
@@ -38,6 +39,7 @@ ALLOWLIST_SURVIVORS: tuple[str, ...] = (
     'M15 ',
     'M16 ',
     'M18 stop path does not clear retry flag',
+    'M18 stop path does not clear pending context usage',
 )
 
 M: dict[str, list[tuple[str, str, str]]] = {
@@ -75,9 +77,9 @@ M: dict[str, list[tuple[str, str, str]]] = {
     ],
     'M7 multi-answer context flush removed': [
         (
-            TR,
-            '    if (!messageId) return;\n    this.flushContextUsageSync(sessionId);\n',
-            '    if (!messageId) return;\n',
+            TE,
+            "      case 'turn_end':\n        this.host.transcript.flushContextUsageSync(sessionId);",
+            "      case 'turn_end':",
         ),
     ],
     'M8 image blocks not skipped': [
@@ -91,9 +93,9 @@ M: dict[str, list[tuple[str, str, str]]] = {
     ],
     'M11 tool text raw displayResultText': [
         (
-            'src/main/libs/agentEngine/piEventProjectionQueue.ts',
-            'event.displayResultText ?? syncPiToolResultDisplayText(event.result);',
-            'event.displayResultText;',
+            'src/main/libs/agentEngine/piEventProjection.ts',
+            'event.displayResultText ?? syncPiToolResultDisplayText(event.result),',
+            'event.displayResultText,',
         ),
     ],
     'M12 arm flag on any error (old A9 bug)': [
@@ -133,7 +135,7 @@ M: dict[str, list[tuple[str, str, str]]] = {
     'M18 stop path does not clear retry flag (defensive duplicate)': [
         (LC, '  active.retryStreamReusePending = false;\n', ''),
     ],
-    'M18 stop path does not clear pending context usage': [
+    'M18 stop path does not clear pending context usage (defensive duplicate)': [
         (LC, '  host.transcript.clearPendingContextUsage(sessionId);\n', ''),
     ],
     'M19 finalizedMessageIds not pruned': [
@@ -211,7 +213,7 @@ def is_allowlisted(name: str) -> bool:
 
 def ensure_node_sqlite() -> None:
     subprocess.run(
-        ['npm', 'rebuild', 'better-sqlite3', '--build-from-source'],
+        [NPM, 'rebuild', 'better-sqlite3', '--build-from-source'],
         cwd=ROOT,
         check=True,
         stdout=subprocess.DEVNULL,
@@ -223,7 +225,7 @@ def run_vitest() -> subprocess.CompletedProcess[str]:
     env = {**os.environ, 'CI': 'true'}
     return subprocess.run(
         [
-            'npm',
+            NPM,
             'exec',
             '--',
             'vitest',
@@ -235,6 +237,8 @@ def run_vitest() -> subprocess.CompletedProcess[str]:
         cwd=ROOT,
         capture_output=True,
         text=True,
+        encoding='utf-8',
+        errors='replace',
         timeout=900,
         env=env,
     )

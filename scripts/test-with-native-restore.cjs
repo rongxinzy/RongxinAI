@@ -2,7 +2,7 @@ const { spawnSync } = require('node:child_process');
 
 const bunCommand = process.platform === 'win32' ? 'bun.exe' : 'bun';
 const spawnOptions = {
-  shell: process.platform === 'win32',
+  shell: false,
   stdio: 'inherit',
 };
 
