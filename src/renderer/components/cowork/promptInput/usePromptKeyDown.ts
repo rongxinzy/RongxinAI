@@ -11,12 +11,13 @@ interface UsePromptKeyDownParams {
   canQueueWhileStreaming: boolean;
   slashMenu: ReturnType<typeof useCoworkSlashMenu>;
   handleSubmit: () => void | Promise<void>;
+  useNativeNewline?: boolean;
 }
 
 /**
  * Keyboard interaction for the Cowork composer: while the slash menu is open
  * it owns the navigation keys, and Enter submits according to the configured
- * send shortcut (falling back to inserting a plain newline text node).
+ * send shortcut (falling back to editor/ProseMirror newline handling).
  */
 export function usePromptKeyDown({
   value,
@@ -26,6 +27,7 @@ export function usePromptKeyDown({
   canQueueWhileStreaming,
   slashMenu,
   handleSubmit,
+  useNativeNewline = false,
 }: UsePromptKeyDownParams) {
   const currentSendShortcut = useSendShortcut();
 
@@ -90,9 +92,8 @@ export function usePromptKeyDown({
     if (isSendCombo && (!isStreaming || canQueueWhileStreaming) && !disabled && !isPatchingModel) {
       event.preventDefault();
       handleSubmit();
-    } else {
-      // Keep newlines as text nodes. Letting contenteditable create block
-      // elements makes the serialized prompt browser-dependent.
+    } else if (!useNativeNewline) {
+      // Legacy plain contenteditable path keeps newlines as text nodes.
       event.preventDefault();
       document.execCommand('insertText', false, '\n');
     }

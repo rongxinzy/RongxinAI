@@ -30,28 +30,35 @@ interface CreateSkillMentionExtensionOptions {
   onSelectCandidate: (candidate: MentionCandidate) => boolean;
 }
 
-const positionPopupContainer = (
-  container: HTMLDivElement,
-  clientRect?: (() => DOMRect | null) | null,
-): void => {
-  const rect = clientRect?.();
-  if (!rect) return;
-  const top = Math.max(8, rect.top - 8);
-  container.style.position = 'fixed';
-  container.style.left = `${Math.max(8, Math.min(window.innerWidth - 300, rect.left))}px`;
-  container.style.top = `${top}px`;
-  container.style.transform = 'translateY(-100%)';
-  container.style.zIndex = '60';
-};
-
 /**
  * Builds the `@` mention Tiptap extension backed by enabled Skills and current attachments.
+ * Uses `@tiptap/suggestion`'s native `mount()` positioning/lifecycle and retains
+ * `id`, `label`, `kind`, and `path` on file mention nodes in Tiptap JSON.
  */
 export const createSkillMentionExtension = ({
   getCandidates,
   onSelectCandidate,
 }: CreateSkillMentionExtensionOptions) =>
-  Mention.extend({ priority: 1000 }).configure({
+  Mention.extend({
+    priority: 1000,
+    addAttributes() {
+      return {
+        ...this.parent?.(),
+        kind: {
+          default: null,
+          parseHTML: element => element.getAttribute('data-mention-kind'),
+          renderHTML: attributes =>
+            attributes.kind ? { 'data-mention-kind': String(attributes.kind) } : {},
+        },
+        path: {
+          default: null,
+          parseHTML: element => element.getAttribute('data-mention-path'),
+          renderHTML: attributes =>
+            attributes.path ? { 'data-mention-path': String(attributes.path) } : {},
+        },
+      };
+    },
+  }).configure({
     HTMLAttributes: {
       class: 'theme-conversation-skill-token inline-flex items-center',
     },
@@ -59,6 +66,10 @@ export const createSkillMentionExtension = ({
     suggestion: {
       char: '@',
       allowSpaces: false,
+      placement: 'top-start',
+      offset: { mainAxis: 8, crossAxis: 0 },
+      flip: true,
+      floatingUi: { strategy: 'fixed' },
       items: ({ query }) => getCandidates(query),
       command: ({ editor, range, props }) => {
         const candidate = props as unknown as MentionCandidate;
@@ -73,7 +84,12 @@ export const createSkillMentionExtension = ({
           .insertContentAt(range, [
             {
               type: 'mention',
-              attrs: { id: candidate.id, label: candidate.label },
+              attrs: {
+                id: candidate.id,
+                label: candidate.label,
+                kind: candidate.kind,
+                path: candidate.id,
+              },
             },
             { type: 'text', text: ' ' },
           ])
@@ -81,19 +97,28 @@ export const createSkillMentionExtension = ({
       },
       render: () => {
         let component: ReactRenderer<MentionSuggestionListHandle> | null = null;
-        let container: HTMLDivElement | null = null;
+        let unmount: (() => void) | null = null;
+
+        const syncMount = (props: SuggestionProps<MentionCandidate>) => {
+          if (!component) return;
+          const element = component.element;
+          if (props.items.length > 0 && element instanceof HTMLElement) {
+            unmount ??= props.mount(element);
+          } else {
+            unmount?.();
+            unmount = null;
+          }
+        };
 
         const destroy = () => {
+          unmount?.();
+          unmount = null;
           component?.destroy();
           component = null;
-          container?.remove();
-          container = null;
         };
 
         return {
           onStart: (props: SuggestionProps<MentionCandidate>) => {
-            container = document.createElement('div');
-            document.body.appendChild(container);
             component = new ReactRenderer(MentionSuggestionList, {
               props: {
                 items: props.items,
@@ -101,26 +126,25 @@ export const createSkillMentionExtension = ({
               },
               editor: props.editor,
             });
-            container.appendChild(component.element);
-            positionPopupContainer(container, props.clientRect);
+            syncMount(props);
           },
           onUpdate: (props: SuggestionProps<MentionCandidate>) => {
             component?.updateProps({
               items: props.items,
               command: (item: MentionCandidate) => props.command(item),
             });
-            if (container) {
-              positionPopupContainer(container, props.clientRect);
-            }
+            syncMount(props);
           },
           onKeyDown: (props: SuggestionKeyDownProps) => {
             if (props.event.key === 'Escape') {
               destroy();
               return true;
             }
-            return component?.ref?.onKeyDown({ event: props.event }) ?? false;
+            return component?.ref?.onKeyDown(props) ?? false;
           },
-          onExit: destroy,
+          onExit: () => {
+            destroy();
+          },
         };
       },
     },

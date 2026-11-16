@@ -1,11 +1,8 @@
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from '@shared/components/ai-elements/conversation';
 import { TurnNavigator, type TurnNavigatorItem } from '@shared/components/conversation';
-import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
-import { useStickToBottomContext } from 'use-stick-to-bottom';
+import { Button } from '@shared/components/ui/button';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { ArrowDown } from 'lucide-react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { i18nService } from '../../../services/i18n';
 import type {
@@ -17,9 +14,30 @@ import type { Skill } from '../../../types/skill';
 import CoworkPermissionModal from '../../cowork/CoworkPermissionModal';
 import type { ConversationTurn } from '../model/types';
 import { TurnView } from './TurnView';
-import { HistoryScrollAnchor } from './HistoryScrollAnchor';
+
+const CHAT_SCROLL_END_THRESHOLD = 80;
+const CHAT_INITIAL_VIEWPORT = { width: 800, height: 600 };
+
+const estimateTurnHeight = (turn: ConversationTurn | undefined): number => {
+  if (!turn) return 220;
+  let height = turn.userMessage ? 84 : 24;
+  for (const part of turn.parts) {
+    if (part.kind === 'reasoning') {
+      height += 52;
+    } else if (part.kind === 'text') {
+      height += Math.max(72, Math.min(960, Math.ceil(part.message.content.length / 4)));
+    } else if (part.kind === 'tool' || part.kind === 'tool_group') {
+      height += 52;
+    } else {
+      height += 72;
+    }
+  }
+  if (turn.deliverables.length > 0) height += 116;
+  return Math.max(96, height);
+};
 
 interface ConversationThreadProps {
+  sessionId?: string;
   turns: ConversationTurn[];
   skills: Skill[];
   cwd?: string;
@@ -32,31 +50,13 @@ interface ConversationThreadProps {
   onInitialScrollReady?: () => void;
 }
 
-const StickToBottomBridge: React.FC<{
-  scrollContainerRef: React.RefObject<HTMLDivElement | null>;
-  hasTurns: boolean;
-  onInitialScrollReady?: () => void;
-}> = ({ scrollContainerRef, hasTurns, onInitialScrollReady }) => {
-  const { scrollRef } = useStickToBottomContext();
-  const notifiedRef = useRef(false);
-
-  useLayoutEffect(() => {
-    scrollContainerRef.current = (scrollRef.current as HTMLDivElement | null) ?? null;
-    if (hasTurns && !notifiedRef.current) {
-      notifiedRef.current = true;
-      onInitialScrollReady?.();
-    }
-  }, [hasTurns, onInitialScrollReady, scrollContainerRef, scrollRef]);
-
-  return null;
-};
-
 /**
- * Main scrollable transcript surface powered by `use-stick-to-bottom`.
- * Exposes the scroll element for export/link interception and renders a subtle
- * TurnNavigator rail for long conversations (>= 6 turns).
+ * Virtualized scrollable transcript powered exclusively by TanStack Virtual's
+ * native chat mode (`anchorTo: 'end'`, `followOnAppend: true`), with a static
+ * full-DOM path reserved strictly for long-screenshot export.
  */
 export const ConversationThread: React.FC<ConversationThreadProps> = ({
+  sessionId,
   turns,
   skills,
   cwd,
@@ -69,6 +69,42 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
   onInitialScrollReady,
 }) => {
   const threadRootRef = useRef<HTMLDivElement>(null);
+  const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+  const initialPositionedKeyRef = useRef<string | null>(null);
+
+  const attachScrollElement = useCallback(
+    (node: HTMLDivElement | null) => {
+      scrollContainerRef.current = node;
+      setScrollElement(node);
+    },
+    [scrollContainerRef],
+  );
+
+  const virtualizer = useVirtualizer({
+    count: turns.length,
+    getScrollElement: () => scrollElement,
+    getItemKey: index => turns[index]?.id ?? index,
+    estimateSize: index => estimateTurnHeight(turns[index]),
+    overscan: 4,
+    initialRect: CHAT_INITIAL_VIEWPORT,
+    anchorTo: 'end',
+    followOnAppend: true,
+    scrollEndThreshold: CHAT_SCROLL_END_THRESHOLD,
+    enabled: !isExporting,
+  });
+
+  useEffect(() => {
+    initialPositionedKeyRef.current = null;
+  }, [sessionId]);
+
+  useLayoutEffect(() => {
+    if (isExporting || !scrollElement || turns.length === 0) return;
+    const sessionKey = sessionId ?? '__active__';
+    if (initialPositionedKeyRef.current === sessionKey) return;
+    initialPositionedKeyRef.current = sessionKey;
+    virtualizer.scrollToEnd({ behavior: 'auto' });
+    onInitialScrollReady?.();
+  }, [isExporting, onInitialScrollReady, scrollElement, sessionId, turns.length, virtualizer]);
 
   const navigatorItems = useMemo<TurnNavigatorItem[]>(
     () =>
@@ -93,59 +129,103 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
     [turns],
   );
 
-  const handleSelectTurn = useCallback((turnId: string) => {
-    const target = threadRootRef.current?.querySelector<HTMLElement>(`[data-turn-id="${turnId}"]`);
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, []);
+  const handleSelectTurn = useCallback(
+    (_turnId: string, index: number) => {
+      if (isExporting) {
+        const target = threadRootRef.current?.querySelector<HTMLElement>(
+          `[data-turn-index="${index}"]`,
+        );
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      virtualizer.scrollToIndex(index, { align: 'start', behavior: 'smooth' });
+    },
+    [isExporting, virtualizer],
+  );
 
   const activeTurnId = turns[turns.length - 1]?.id ?? null;
+  const virtualItems = virtualizer.getVirtualItems();
+  const showScrollToBottom = !isExporting && turns.length > 0 && !virtualizer.isAtEnd();
 
   return (
-    <div ref={threadRootRef} className="relative flex-1 h-full min-h-0 overflow-hidden">
-      <Conversation className="relative flex-1 h-full overflow-y-hidden">
-        <StickToBottomBridge
-          scrollContainerRef={scrollContainerRef}
-          hasTurns={turns.length > 0}
-          onInitialScrollReady={onInitialScrollReady}
-        />
-        <ConversationContent
-          className="pt-3"
-          reverse={false}
-          scrollClassName="cowork-conversation-scroll"
-        >
-          <div>
-            <div className="mx-auto w-full max-w-4xl">
-              <HistoryScrollAnchor firstTurnId={turns[0]?.id} lastTurnId={turns.at(-1)?.id}>
-                {turns.map(turn => (
-                  <TurnView
-                    key={turn.id}
-                    turn={turn}
-                    skills={skills}
-                    cwd={cwd}
-                    forceExpand={isExporting}
-                    isExporting={isExporting}
-                    onReEdit={onReEdit}
-                    onRespondToPermission={onRespondToPermission}
-                    onRespondToQuestion={onRespondToQuestion}
-                  />
-                ))}
-              </HistoryScrollAnchor>
-            </div>
-
-            {unmatchedPermission && onRespondToPermission ? (
-              <div className="px-3 pt-3">
-                <div className="mx-auto w-full max-w-4xl min-w-[320px]">
-                  <CoworkPermissionModal
-                    permission={unmatchedPermission}
-                    onRespond={onRespondToPermission}
-                  />
-                </div>
-              </div>
-            ) : null}
+    <div
+      ref={threadRootRef}
+      role="log"
+      className="relative flex flex-1 flex-col h-full min-h-0 overflow-hidden"
+    >
+      <div
+        ref={attachScrollElement}
+        className="cowork-conversation-scroll relative flex-1 min-h-0 overflow-y-auto pt-3"
+        style={{ overflowAnchor: 'none' }}
+      >
+        {isExporting ? (
+          <div className="mx-auto w-full max-w-4xl">
+            {turns.map(turn => (
+              <TurnView
+                key={turn.id}
+                turn={turn}
+                skills={skills}
+                cwd={cwd}
+                forceExpand
+                onReEdit={onReEdit}
+                onRespondToPermission={onRespondToPermission}
+                onRespondToQuestion={onRespondToQuestion}
+              />
+            ))}
           </div>
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
+        ) : (
+          <div className="mx-auto w-full max-w-4xl">
+            <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+              {virtualItems.map(virtualRow => {
+                const turn = turns[virtualRow.index];
+                if (!turn) return null;
+                return (
+                  <div
+                    key={virtualRow.key}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
+                    className="absolute top-0 left-0 w-full"
+                    style={{ transform: `translateY(${virtualRow.start}px)` }}
+                  >
+                    <TurnView
+                      turn={turn}
+                      skills={skills}
+                      cwd={cwd}
+                      onReEdit={onReEdit}
+                      onRespondToPermission={onRespondToPermission}
+                      onRespondToQuestion={onRespondToQuestion}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {unmatchedPermission && onRespondToPermission ? (
+        <div className="shrink-0 px-3 pt-3">
+          <div className="mx-auto w-full max-w-4xl min-w-[320px]">
+            <CoworkPermissionModal
+              permission={unmatchedPermission}
+              onRespond={onRespondToPermission}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {showScrollToBottom ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          aria-label="Scroll to bottom"
+          onClick={() => virtualizer.scrollToEnd({ behavior: 'smooth' })}
+          className="theme-page-conversation-button-variant-1 absolute bottom-4 left-[50%] z-10 translate-x-[-50%]"
+        >
+          <ArrowDown className="size-4" />
+        </Button>
+      ) : null}
 
       <div className="pointer-events-none absolute inset-y-4 right-2 z-10">
         <div className="pointer-events-auto max-h-full">

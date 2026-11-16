@@ -184,9 +184,8 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
               />
             )}
 
-            {(outputCollapse.collapsible || inputCollapse.collapsible) &&
-              !forceExpand &&
-              !diffSpec && (
+            {((inputCollapse.collapsible && !diffSpec) || outputCollapse.collapsible) &&
+              !forceExpand && (
                 <Button
                   type="button"
                   variant="ghost"

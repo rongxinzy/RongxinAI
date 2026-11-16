@@ -18,19 +18,28 @@ import {
 } from '../../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../../store/selectors/workModeSelectors';
 import { clearCurrentSession } from '../../store/slices/coworkSlice';
+import {
+  ArtifactLayoutMode,
+  selectIsSessionArtifactPanelOpen,
+  selectSessionArtifactLayoutMode,
+  togglePanel,
+} from '../../store/slices/artifactSlice';
 import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
 import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import type { CoworkPermissionRequest, CoworkPermissionResult } from '../../types/cowork';
 import { homeGreetingKey } from '../../utils/homeGreeting';
 import { isScratchWorkspacePath } from '../../utils/path';
-import PageHeader from '../PageHeader';
+import { resolveSessionDisplayTitle } from '../../utils/sessionTitle';
 import { resolveSkillPlaceholderKey } from '../chat/constants';
-import { CoworkSessionColdStartSkeleton } from '../cowork/CoworkSessionLoadingState';
+import { CoworkSessionLayout } from '../cowork/CoworkSessionLayout';
+import { CoworkConversationLoadingSkeleton } from '../cowork/CoworkSessionLoadingState';
 import SecurityStatusIndicator from '../cowork/SecurityStatusIndicator';
 import { useAgentSelectedModel } from '../cowork/agentModelSelection';
+import { CoworkRunStatus } from '../cowork/components/CoworkRunStatus';
 import { useCoworkSessionActions } from '../cowork/hooks/useCoworkSessionActions';
-import type { CoworkPromptInputRef } from '../cowork/promptInput/types';
+import { resolveStableSessionKey } from '../cowork/hooks/usePersistentToggle';
+import type { CoworkPromptInputProps, CoworkPromptInputRef } from '../cowork/promptInput/types';
 import { useUnmanagedWorkingDirectory } from '../cowork/useUnmanagedWorkingDirectory';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
 import {
@@ -39,13 +48,16 @@ import {
 } from '../quick-actions/quickActionSelection';
 import type { SettingsOpenOptions } from '../settings/types';
 import { StageComposer } from './composer/StageComposer';
-import { usePersistentComposer } from './composer/usePersistentComposer';
-import type { CoworkPromptInputProps } from '../cowork/promptInput/types';
 
 // Keep Streamdown, Shiki, KaTeX, Mermaid and @pierre/diffs out of the cold Home startup bundle.
 const loadSessionStage = () => import('./SessionStage');
 const sessionStagePromise = loadSessionStage();
-const SessionStage = React.lazy(() => sessionStagePromise);
+const SessionTranscriptStage = React.lazy(() =>
+  sessionStagePromise.then(module => ({ default: module.SessionTranscriptStage })),
+);
+const SessionArtifactSidePane = React.lazy(() =>
+  sessionStagePromise.then(module => ({ default: module.SessionArtifactSidePane })),
+);
 
 export interface ConversationStageProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
@@ -80,9 +92,11 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
   onRespondToInlinePermission,
 }) => {
   const dispatch = useDispatch();
-  const { rootRef, slotRef, renderComposer } = usePersistentComposer();
   const [isInitialized, setIsInitialized] = useState(false);
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
+  const detailRootRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const contentRowRef = useRef<HTMLDivElement>(null);
   const quickActionActivationRef = useRef<string | null>(null);
 
   const currentSession = useSelector(selectCurrentSession);
@@ -337,54 +351,72 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
     },
   };
 
-  const sessionFallback = <CoworkSessionColdStartSkeleton composer={<div ref={slotRef} />} />;
-  const waitingCold =
-    displayedSessionId && loadingSessionId === displayedSessionId && !currentSession;
+  const isPanelOpen = useSelector((state: RootState) =>
+    selectIsSessionArtifactPanelOpen(state, currentSession?.id),
+  );
+  const artifactLayoutMode = useSelector((state: RootState) =>
+    selectSessionArtifactLayoutMode(state, currentSession?.id),
+  );
+  const isHome = !displayedSessionId;
+  const isWaitingSession =
+    !isHome &&
+    ((loadingSessionId === displayedSessionId && currentSession?.id !== displayedSessionId) ||
+      !currentSession);
+  const isArtifactWorkspace = artifactLayoutMode === ArtifactLayoutMode.Workspace;
+  const isTranscriptHidden = !isHome && !isWaitingSession && isArtifactWorkspace;
+  const stableSessionKey = resolveStableSessionKey(currentSession?.id);
+  const sessionTitle = currentSession
+    ? resolveSessionDisplayTitle(currentSession, i18nService.getLanguage()) ||
+      i18nService.t('coworkNewSession')
+    : i18nService.t('coworkNewSession');
+
   return (
-    <div ref={rootRef} className="relative flex h-full min-h-0 flex-1 flex-col">
-      {displayedSessionId ? (
-        <div className="flex h-full min-h-0 flex-1 flex-col bg-background">
-          <React.Suspense fallback={sessionFallback}>
-            {waitingCold ? (
-              sessionFallback
-            ) : (
-              <SessionStage
-                displayedSessionId={displayedSessionId}
-                composerSlotRef={slotRef}
-                promptInputRef={promptInputRef}
-                isSidebarCollapsed={isSidebarCollapsed}
-                onToggleSidebar={onToggleSidebar}
-                onNewChat={onNewChat}
-                updateBadge={updateBadge}
-                inlineQuestionPermission={inlineQuestionPermission}
-                onRespondToInlineQuestion={onRespondToInlineQuestion}
-                inlinePermission={inlinePermission}
-                onRespondToInlinePermission={onRespondToInlinePermission}
-              />
-            )}
-          </React.Suspense>
-        </div>
-      ) : (
-        <div data-page-canvas className="flex h-full flex-1 flex-col bg-background">
-          <PageHeader
-            title={i18nService.t(workMode === WorkMode.Chat ? 'newChat' : 'newTaskTitle')}
-            divider={false}
-            isSidebarCollapsed={isSidebarCollapsed}
-            onToggleSidebar={onToggleSidebar}
-            onNewChat={onNewChat}
-            updateBadge={updateBadge}
-            actions={
-              workMode === WorkMode.Chat ? undefined : (
-                <SecurityStatusIndicator permissionMode={config.permissionMode} />
-              )
-            }
+    <CoworkSessionLayout
+      mode={isHome ? 'home' : 'session'}
+      divider={!isHome}
+      homeActions={
+        workMode === WorkMode.Chat ? undefined : (
+          <SecurityStatusIndicator permissionMode={config.permissionMode} />
+        )
+      }
+      title={
+        isHome
+          ? i18nService.t(workMode === WorkMode.Chat ? 'newChat' : 'newTaskTitle')
+          : sessionTitle
+      }
+      sessionId={currentSession?.id}
+      isSessionSwitching={isWaitingSession}
+      isSidebarCollapsed={isSidebarCollapsed}
+      isArtifactPanelOpen={isPanelOpen}
+      onToggleSidebar={onToggleSidebar}
+      onNewChat={onNewChat}
+      onToggleArtifactPanel={() => dispatch(togglePanel())}
+      updateBadge={updateBadge}
+      runIndicator={
+        isWaitingSession || !currentSession ? null : (
+          <CoworkRunStatus
+            key={stableSessionKey}
+            sessionId={currentSession.id}
+            isStreaming={isStreaming}
           />
-
-          <div className="relative min-h-0 flex-1 overflow-y-auto pb-12">
-            <div aria-hidden className="min-h-[max(24px,calc(36%-8rem))]" />
-
-            <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-8 px-6">
-              <div className="theme-home-sticky sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
+        )
+      }
+    >
+      <div ref={contentRowRef} className="flex flex-1 overflow-hidden">
+        <div
+          ref={detailRootRef}
+          data-page-canvas
+          className={cn(
+            'relative flex h-full min-w-0 flex-1 flex-col bg-background',
+            isHome ? 'overflow-y-auto pb-12' : 'overflow-hidden',
+            isTranscriptHidden && 'hidden',
+          )}
+          aria-hidden={isTranscriptHidden || undefined}
+        >
+          {isHome ? (
+            <div className="w-full shrink-0">
+              <div aria-hidden className="min-h-[max(24px,calc(36vh-9.5rem))]" />
+              <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center px-6 pb-8 pt-2">
                 <div className="flex flex-col items-center justify-center gap-3 text-center">
                   <h1 className="theme-home-greeting max-w-2xl text-balance">
                     {i18nService.t(homeGreetingKey())}
@@ -398,49 +430,83 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
                     {i18nService.t('coworkHomeSubtitle')}
                   </p>
                 </div>
-
-                <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-                  <div className="min-w-0">
-                    <div ref={slotRef} />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex w-full flex-col gap-4 pb-8">
-                {!selectedAction ? (
-                  <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
-                ) : (
-                  <PromptPanel
-                    action={selectedAction}
-                    onPromptSelect={handleQuickActionPromptSelect}
-                  />
-                )}
               </div>
             </div>
+          ) : (
+            <div className="relative min-h-0 flex-1">
+              {isWaitingSession ? (
+                <CoworkConversationLoadingSkeleton />
+              ) : (
+                <React.Suspense fallback={<CoworkConversationLoadingSkeleton />}>
+                  <SessionTranscriptStage
+                    scrollContainerRef={scrollContainerRef}
+                    detailRootRef={detailRootRef}
+                    promptInputRef={promptInputRef}
+                    inlineQuestionPermission={inlineQuestionPermission}
+                    onRespondToInlineQuestion={onRespondToInlineQuestion}
+                    inlinePermission={inlinePermission}
+                    onRespondToInlinePermission={onRespondToInlinePermission}
+                  />
+                </React.Suspense>
+              )}
+            </div>
+          )}
+
+          {/* Single persistent StageComposer anchored at a stable React child index */}
+          <div
+            className={cn(
+              'shrink-0',
+              isHome
+                ? 'mx-auto w-full max-w-[calc(48rem+3rem)] px-6'
+                : 'mx-auto w-full max-w-[calc(56rem+2rem)] min-w-[320px] px-4',
+            )}
+          >
+            <div className={isHome ? 'min-w-0' : 'theme-composer-backdrop relative min-w-0'}>
+              <StageComposer
+                homeProps={homeComposerProps}
+                inputRef={promptInputRef}
+                displayedSessionId={displayedSessionId}
+                onContinue={handleContinueSession}
+                sessionPermissionMode={sessionPermissionMode}
+                onSessionPermissionModeChange={mode => {
+                  if (!currentSession) return;
+                  void coworkService.updateConfig({
+                    permissionModeBySession: {
+                      ...(config.permissionModeBySession ?? {}),
+                      [currentSession.id]: mode,
+                    },
+                  });
+                }}
+                awaitingQuestion={Boolean(inlineQuestionPermission && onRespondToInlineQuestion)}
+                awaitingPermission={Boolean(inlinePermission)}
+              />
+            </div>
           </div>
+
+          {isHome ? (
+            <div className="mx-auto mt-8 flex w-full max-w-4xl shrink-0 flex-col gap-4 px-6 pb-8">
+              {!selectedAction ? (
+                <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
+              ) : (
+                <PromptPanel
+                  action={selectedAction}
+                  onPromptSelect={handleQuickActionPromptSelect}
+                />
+              )}
+            </div>
+          ) : null}
         </div>
-      )}
-      {renderComposer(
-        <StageComposer
-          homeProps={homeComposerProps}
-          inputRef={promptInputRef}
-          displayedSessionId={displayedSessionId}
-          onContinue={handleContinueSession}
-          sessionPermissionMode={sessionPermissionMode}
-          onSessionPermissionModeChange={mode => {
-            if (!currentSession) return;
-            void coworkService.updateConfig({
-              permissionModeBySession: {
-                ...(config.permissionModeBySession ?? {}),
-                [currentSession.id]: mode,
-              },
-            });
-          }}
-          awaitingQuestion={Boolean(inlineQuestionPermission && onRespondToInlineQuestion)}
-          awaitingPermission={Boolean(inlinePermission)}
-        />,
-      )}
-    </div>
+
+        {!isHome && !isWaitingSession && displayedSessionId ? (
+          <React.Suspense fallback={null}>
+            <SessionArtifactSidePane
+              displayedSessionId={displayedSessionId}
+              contentRowRef={contentRowRef}
+            />
+          </React.Suspense>
+        ) : null}
+      </div>
+    </CoworkSessionLayout>
   );
 };
 

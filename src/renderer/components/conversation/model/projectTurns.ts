@@ -1,3 +1,5 @@
+import { createSelector, lruMemoize } from '@reduxjs/toolkit';
+
 import {
   CoworkToolActivityPhase,
   type CoworkToolActivity,
@@ -136,74 +138,219 @@ const groupConsecutiveReadOnlyTools = (parts: TurnPart[]): TurnPart[] => {
   return result;
 };
 
-export interface ProjectTurnsInput {
-  messages: readonly CoworkMessage[];
-  toolActivities: readonly CoworkToolActivity[];
-  pendingPermission?: CoworkPermissionRequest | null;
-  inlineQuestionPermission?: CoworkPermissionRequest | null;
-  artifacts: readonly Artifact[];
-  previewableTypes: ReadonlySet<string>;
-  isStreaming: boolean;
+interface DeliverableIndex {
+  byMessageId: Map<string, Artifact[]>;
+  byToolCallId: Map<string, Artifact[]>;
+  orderById: Map<string, number>;
 }
 
-export interface ProjectTurnsResult {
-  turns: ConversationTurn[];
-  unmatchedPermission: CoworkPermissionRequest | null;
+const buildDeliverableIndex = (
+  artifacts: readonly Artifact[],
+  previewableTypes: ReadonlySet<string>,
+): DeliverableIndex => {
+  const byMessageId = new Map<string, Artifact[]>();
+  const byToolCallId = new Map<string, Artifact[]>();
+  const orderById = new Map<string, number>();
+
+  for (let i = 0; i < artifacts.length; i += 1) {
+    const artifact = artifacts[i];
+    if (
+      artifact.role !== ArtifactRole.Deliverable ||
+      !artifact.declared ||
+      !previewableTypes.has(artifact.type)
+    ) {
+      continue;
+    }
+    orderById.set(artifact.id, i);
+    if (artifact.messageId) {
+      const list = byMessageId.get(artifact.messageId);
+      if (list) list.push(artifact);
+      else byMessageId.set(artifact.messageId, [artifact]);
+    }
+    if (artifact.toolCallId) {
+      const list = byToolCallId.get(artifact.toolCallId);
+      if (list) list.push(artifact);
+      else byToolCallId.set(artifact.toolCallId, [artifact]);
+    }
+  }
+
+  return { byMessageId, byToolCallId, orderById };
+};
+
+const EMPTY_DELIVERABLES: Artifact[] = [];
+
+const collectTurnDeliverables = (
+  messageIds: ReadonlySet<string>,
+  toolCallIds: ReadonlySet<string>,
+  index: DeliverableIndex,
+): Artifact[] => {
+  if (index.orderById.size === 0) return EMPTY_DELIVERABLES;
+  const seen = new Set<string>();
+  const collected: Artifact[] = [];
+
+  for (const messageId of messageIds) {
+    const items = index.byMessageId.get(messageId);
+    if (!items) continue;
+    for (const artifact of items) {
+      if (!seen.has(artifact.id)) {
+        seen.add(artifact.id);
+        collected.push(artifact);
+      }
+    }
+  }
+
+  for (const toolCallId of toolCallIds) {
+    const items = index.byToolCallId.get(toolCallId);
+    if (!items) continue;
+    for (const artifact of items) {
+      if (!seen.has(artifact.id)) {
+        seen.add(artifact.id);
+        collected.push(artifact);
+      }
+    }
+  }
+
+  if (collected.length <= 1) return collected;
+  collected.sort((a, b) => (index.orderById.get(a.id) ?? 0) - (index.orderById.get(b.id) ?? 0));
+  return collected;
+};
+
+interface TurnMessageBucket {
+  id: string;
+  userMessage: CoworkMessage | null;
+  ownMessages: CoworkMessage[];
+  externalResults: CoworkMessage[];
+  messageIds: Set<string>;
+  toolCallIds: Set<string>;
 }
 
-export function projectSessionToTurns({
-  messages,
-  toolActivities,
-  pendingPermission = null,
-  inlineQuestionPermission = null,
-  artifacts,
-  previewableTypes,
-  isStreaming,
-}: ProjectTurnsInput): ProjectTurnsResult {
+/**
+ * Partitions session messages into turn buckets while preserving cross-turn
+ * correlation for steered tool results (`user -> tool_use(c1) -> user -> tool_result(c1)`).
+ */
+const partitionMessagesIntoTurnBuckets = (
+  messages: readonly CoworkMessage[],
+): TurnMessageBucket[] => {
   const cleaned = keepLatestInterruption(messages);
-  const rawTurns: Array<{
-    id: string;
-    userMessage: CoworkMessage | null;
-    parts: TurnPart[];
-    messageIds: Set<string>;
-    toolCallIds: Set<string>;
-    toolPartsByCallId: Map<string, ToolTurnPart>;
-    openTools: ToolTurnPart[];
-  }> = [];
+  const buckets: TurnMessageBucket[] = [];
+  const originBucketByToolCallId = new Map<string, TurnMessageBucket>();
 
-  const ensureTurn = (fallbackId: string) => {
-    const last = rawTurns[rawTurns.length - 1];
+  const ensureBucket = (fallbackId: string): TurnMessageBucket => {
+    const last = buckets[buckets.length - 1];
     if (last) return last;
-    const orphan = {
+    const orphan: TurnMessageBucket = {
       id: `orphan:${fallbackId}`,
       userMessage: null,
-      parts: [],
+      ownMessages: [],
+      externalResults: [],
       messageIds: new Set<string>(),
       toolCallIds: new Set<string>(),
-      toolPartsByCallId: new Map<string, ToolTurnPart>(),
-      openTools: [],
     };
-    rawTurns.push(orphan);
+    buckets.push(orphan);
     return orphan;
   };
 
   for (const message of cleaned) {
     if (message.type === 'user') {
-      rawTurns.push({
+      const bucket: TurnMessageBucket = {
         id: message.id,
         userMessage: message,
-        parts: [],
+        ownMessages: [],
+        externalResults: [],
         messageIds: new Set([message.id]),
         toolCallIds: new Set(),
-        toolPartsByCallId: new Map(),
-        openTools: [],
-      });
+      };
+      buckets.push(bucket);
       continue;
     }
 
-    const turn = ensureTurn(message.id);
-    turn.messageIds.add(message.id);
+    const currentBucket = ensureBucket(message.id);
+    if (message.type === 'tool_use') {
+      const toolCallId =
+        typeof message.metadata?.toolUseId === 'string' && message.metadata.toolUseId.trim()
+          ? message.metadata.toolUseId.trim()
+          : message.id;
+      currentBucket.ownMessages.push(message);
+      currentBucket.messageIds.add(message.id);
+      currentBucket.toolCallIds.add(toolCallId);
+      originBucketByToolCallId.set(toolCallId, currentBucket);
+      continue;
+    }
 
+    if (message.type === 'tool_result') {
+      const toolCallId =
+        typeof message.metadata?.toolUseId === 'string' && message.metadata.toolUseId.trim()
+          ? message.metadata.toolUseId.trim()
+          : '';
+      const originBucket = toolCallId ? originBucketByToolCallId.get(toolCallId) : undefined;
+      if (originBucket && originBucket !== currentBucket) {
+        originBucket.externalResults.push(message);
+        originBucket.messageIds.add(message.id);
+        continue;
+      }
+    }
+
+    currentBucket.ownMessages.push(message);
+    currentBucket.messageIds.add(message.id);
+  }
+
+  return buckets;
+};
+
+interface BuiltTurnState {
+  id: string;
+  userMessage: CoworkMessage | null;
+  parts: TurnPart[];
+  toolPartsByCallId: Map<string, ToolTurnPart>;
+  toolCallIds: Set<string>;
+}
+
+const buildTurnPartsFromBucket = (bucket: TurnMessageBucket): BuiltTurnState => {
+  const parts: TurnPart[] = [];
+  const toolPartsByCallId = new Map<string, ToolTurnPart>();
+  const openTools: ToolTurnPart[] = [];
+
+  const applyToolResult = (message: CoworkMessage) => {
+    const toolCallId =
+      typeof message.metadata?.toolUseId === 'string' && message.metadata.toolUseId.trim()
+        ? message.metadata.toolUseId.trim()
+        : '';
+    const target =
+      (toolCallId ? toolPartsByCallId.get(toolCallId) : undefined) ??
+      openTools.find(candidate => candidate.phase === 'running');
+    const output = getToolResultDisplay(message);
+    const isError = Boolean(message.metadata?.isError || message.metadata?.error);
+    const phase: ToolPhase = isError ? 'output-error' : 'output-available';
+    if (target) {
+      target.phase = phase;
+      target.output = output;
+      target.isError = isError;
+      target.contentTruncated = Boolean(message.metadata?.contentTruncated);
+      target.updatedAt = message.timestamp;
+      const openIdx = openTools.indexOf(target);
+      if (openIdx >= 0) openTools.splice(openIdx, 1);
+      return;
+    }
+
+    const classification = classifyTool(
+      typeof message.metadata?.toolName === 'string' ? message.metadata.toolName : 'Tool',
+    );
+    parts.push({
+      kind: 'tool',
+      id: `tool:${message.id}`,
+      toolCallId: toolCallId || message.id,
+      toolName: typeof message.metadata?.toolName === 'string' ? message.metadata.toolName : 'Tool',
+      category: classification.category,
+      readOnly: classification.readOnly,
+      phase,
+      output,
+      contentTruncated: Boolean(message.metadata?.contentTruncated),
+      isError,
+      updatedAt: message.timestamp,
+    });
+  };
+
+  for (const message of bucket.ownMessages) {
     if (message.type === 'tool_use') {
       const toolName =
         typeof message.metadata?.toolName === 'string' && message.metadata.toolName.trim()
@@ -226,65 +373,28 @@ export function projectSessionToTurns({
         isError: false,
         startedAt: message.timestamp,
       };
-      turn.parts.push(part);
-      turn.toolCallIds.add(toolCallId);
-      turn.toolPartsByCallId.set(toolCallId, part);
-      turn.openTools.push(part);
+      parts.push(part);
+      toolPartsByCallId.set(toolCallId, part);
+      openTools.push(part);
       continue;
     }
 
     if (message.type === 'tool_result') {
-      const toolCallId =
-        typeof message.metadata?.toolUseId === 'string' && message.metadata.toolUseId.trim()
-          ? message.metadata.toolUseId.trim()
-          : '';
-      const target =
-        (toolCallId ? turn.toolPartsByCallId.get(toolCallId) : undefined) ??
-        turn.openTools.find(candidate => candidate.phase === 'running');
-      const output = getToolResultDisplay(message);
-      const isError = Boolean(message.metadata?.isError || message.metadata?.error);
-      const phase: ToolPhase = isError ? 'output-error' : 'output-available';
-      if (target) {
-        target.phase = phase;
-        target.output = output;
-        target.isError = isError;
-        target.contentTruncated = Boolean(message.metadata?.contentTruncated);
-        target.updatedAt = message.timestamp;
-        const openIdx = turn.openTools.indexOf(target);
-        if (openIdx >= 0) turn.openTools.splice(openIdx, 1);
-      } else {
-        const classification = classifyTool(
-          typeof message.metadata?.toolName === 'string' ? message.metadata.toolName : 'Tool',
-        );
-        turn.parts.push({
-          kind: 'tool',
-          id: `tool:${message.id}`,
-          toolCallId: toolCallId || message.id,
-          toolName:
-            typeof message.metadata?.toolName === 'string' ? message.metadata.toolName : 'Tool',
-          category: classification.category,
-          readOnly: classification.readOnly,
-          phase,
-          output,
-          contentTruncated: Boolean(message.metadata?.contentTruncated),
-          isError,
-          updatedAt: message.timestamp,
-        });
-      }
+      applyToolResult(message);
       continue;
     }
 
     if (message.type === 'system') {
       const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
       if (interruption) {
-        for (const openTool of turn.openTools) {
+        for (const openTool of openTools) {
           openTool.phase = 'output-error';
           openTool.isError = true;
           openTool.output = openTool.output ?? '';
         }
-        turn.openTools.length = 0;
+        openTools.length = 0;
       }
-      turn.parts.push({
+      parts.push({
         kind: 'notice',
         id: `notice:${message.id}`,
         message,
@@ -296,7 +406,7 @@ export function projectSessionToTurns({
 
     if (message.type === 'assistant') {
       if (message.metadata?.isThinking) {
-        turn.parts.push({
+        parts.push({
           kind: 'reasoning',
           id: `reasoning:${message.id}`,
           message,
@@ -305,7 +415,7 @@ export function projectSessionToTurns({
           durationSeconds: toThinkingDurationSeconds(message.metadata?.thinkingDurationMs),
         });
       } else if (message.content.trim().length > 0 || message.metadata?.isStreaming) {
-        turn.parts.push({
+        parts.push({
           kind: 'text',
           id: `text:${message.id}`,
           message,
@@ -316,12 +426,140 @@ export function projectSessionToTurns({
     }
   }
 
-  // Merge in-flight pre-call tool activities onto the active last turn without creating a separate UI track.
+  // Apply any cross-turn tool results that landed after a steered user prompt.
+  for (const steeredResult of bucket.externalResults) {
+    applyToolResult(steeredResult);
+  }
+
+  return {
+    id: bucket.id,
+    userMessage: bucket.userMessage,
+    parts,
+    toolPartsByCallId,
+    toolCallIds: new Set(bucket.toolCallIds),
+  };
+};
+
+const finalizeTurnState = (
+  state: BuiltTurnState,
+  index: number,
+  isLastTurn: boolean,
+  isStreaming: boolean,
+  deliverables: Artifact[],
+): ConversationTurn => {
+  const turnIsStreaming = isStreaming && isLastTurn;
+  const turnIsComplete = !turnIsStreaming;
+
+  const settledParts = state.parts.map(part => {
+    if (part.kind === 'reasoning') {
+      const partStreaming = isLastTurn
+        ? Boolean(part.message.metadata?.isStreaming) &&
+          (isStreaming || Boolean(part.message.metadata?.isStreaming))
+        : false;
+      return {
+        ...part,
+        isStreaming: partStreaming,
+        isComplete: part.isComplete || (turnIsComplete && !partStreaming),
+      };
+    }
+    if (part.kind === 'text') {
+      return {
+        ...part,
+        isStreaming: isLastTurn ? Boolean(part.message.metadata?.isStreaming) : false,
+      };
+    }
+    return part;
+  });
+
+  const groupedParts = groupConsecutiveReadOnlyTools(settledParts);
+  const lastTextPart = [...groupedParts]
+    .reverse()
+    .find(
+      (part): part is Extract<TurnPart, { kind: 'text' }> =>
+        part.kind === 'text' && part.message.content.trim().length > 0,
+    );
+
+  const experts = Array.isArray(state.userMessage?.metadata?.experts)
+    ? state.userMessage.metadata.experts
+    : [];
+
+  const hasApproval = groupedParts.some(
+    part =>
+      (part.kind === 'tool' && part.phase === 'approval-requested') || part.kind === 'question',
+  );
+  const hasError = groupedParts.some(
+    part => (part.kind === 'tool' && part.isError) || (part.kind === 'notice' && part.isError),
+  );
+
+  return {
+    id: state.id,
+    index,
+    userMessage: state.userMessage,
+    parts: groupedParts,
+    deliverables,
+    copyText: lastTextPart ? lastTextPart.message.content : null,
+    experts,
+    isStreaming: turnIsStreaming,
+    isComplete: turnIsComplete,
+    hasApproval,
+    hasError,
+    modelLabel:
+      getModelLabel(lastTextPart?.message.metadata) ?? getModelLabel(state.userMessage?.metadata),
+    timestamp: lastTextPart?.message.timestamp ?? state.userMessage?.timestamp ?? null,
+  };
+};
+
+const shallowArrayEqual = <T>(a: readonly T[], b: readonly T[]): boolean => {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+};
+
+const historicalArgEqual = (a: unknown, b: unknown): boolean => {
+  if (a === b) return true;
+  if (Array.isArray(a) && Array.isArray(b)) return shallowArrayEqual(a, b);
+  return false;
+};
+
+const finalizeTailTurnWithOverlay = ({
+  tailBucket,
+  tailIndex,
+  deliverableIndex,
+  toolActivities,
+  pendingPermission,
+  inlineQuestionPermission,
+  isStreaming,
+}: {
+  tailBucket: TurnMessageBucket | null;
+  tailIndex: number;
+  deliverableIndex: DeliverableIndex;
+  toolActivities: readonly CoworkToolActivity[];
+  pendingPermission: CoworkPermissionRequest | null;
+  inlineQuestionPermission: CoworkPermissionRequest | null;
+  isStreaming: boolean;
+}): { tailTurn: ConversationTurn | null; unmatchedPermission: CoworkPermissionRequest | null } => {
+  let state = tailBucket ? buildTurnPartsFromBucket(tailBucket) : null;
+
+  const ensureTailState = (fallbackId: string): BuiltTurnState => {
+    if (state) return state;
+    state = {
+      id: `orphan:${fallbackId}`,
+      userMessage: null,
+      parts: [],
+      toolPartsByCallId: new Map(),
+      toolCallIds: new Set(),
+    };
+    return state;
+  };
+
   if (isStreaming && toolActivities.length > 0) {
-    const activeTurn = ensureTurn('streaming');
+    const activeTurn = ensureTailState('streaming');
     for (const activity of toolActivities) {
-      if (activeTurn.toolPartsByCallId.has(activity.toolCallId)) {
-        const existing = activeTurn.toolPartsByCallId.get(activity.toolCallId)!;
+      const existing = activeTurn.toolPartsByCallId.get(activity.toolCallId);
+      if (existing) {
         if (
           (existing.phase === 'running' || existing.phase === 'input-streaming') &&
           activity.progress
@@ -354,11 +592,9 @@ export function projectSessionToTurns({
     }
   }
 
-  // Bind pending permission directly into the matching tool part on the active turn.
   let unmatchedPermission: CoworkPermissionRequest | null = null;
-  if (pendingPermission && rawTurns.length > 0) {
-    const lastTurn = rawTurns[rawTurns.length - 1];
-    const matched = matchPermissionToTool(lastTurn.parts, pendingPermission);
+  if (pendingPermission && state) {
+    const matched = matchPermissionToTool(state.parts, pendingPermission);
     if (matched) {
       matched.phase = 'approval-requested';
       matched.pendingPermission = pendingPermission;
@@ -370,7 +606,7 @@ export function projectSessionToTurns({
   }
 
   if (inlineQuestionPermission) {
-    const activeTurn = ensureTurn(`question:${inlineQuestionPermission.requestId}`);
+    const activeTurn = ensureTailState(`question:${inlineQuestionPermission.requestId}`);
     activeTurn.parts.push({
       kind: 'question',
       id: `question:${inlineQuestionPermission.requestId}`,
@@ -378,79 +614,173 @@ export function projectSessionToTurns({
     });
   }
 
-  const turns: ConversationTurn[] = rawTurns.map((raw, index) => {
-    const isLastTurn = index === rawTurns.length - 1;
-    const turnIsStreaming = isStreaming && isLastTurn;
-    const turnIsComplete = !turnIsStreaming;
+  if (!state) {
+    return { tailTurn: null, unmatchedPermission };
+  }
 
-    // Settle streaming state on completed turns cleanly, while honoring streamReopen on the active last turn.
-    const settledParts = raw.parts.map(part => {
-      if (part.kind === 'reasoning') {
-        const partStreaming = isLastTurn
-          ? Boolean(part.message.metadata?.isStreaming) &&
-            (isStreaming || Boolean(part.message.metadata?.isStreaming))
-          : false;
-        return {
-          ...part,
-          isStreaming: partStreaming,
-          isComplete: part.isComplete || (turnIsComplete && !partStreaming),
-        };
+  const tailMessageIds = tailBucket?.messageIds ?? new Set<string>();
+  const deliverables = collectTurnDeliverables(tailMessageIds, state.toolCallIds, deliverableIndex);
+  return {
+    tailTurn: finalizeTurnState(state, tailIndex, true, isStreaming, deliverables),
+    unmatchedPermission,
+  };
+};
+
+export interface ProjectTurnsInput {
+  messages: readonly CoworkMessage[];
+  toolActivities: readonly CoworkToolActivity[];
+  pendingPermission?: CoworkPermissionRequest | null;
+  inlineQuestionPermission?: CoworkPermissionRequest | null;
+  artifacts: readonly Artifact[];
+  previewableTypes: ReadonlySet<string>;
+  isStreaming: boolean;
+}
+
+export interface ProjectTurnsResult {
+  turns: ConversationTurn[];
+  unmatchedPermission: CoworkPermissionRequest | null;
+}
+
+/**
+ * Creates a layered `@reduxjs/toolkit` selector pipeline for one session.
+ * Historical turns remain reference-identical across `toolActivities`,
+ * permission updates, and tail streaming deltas, while artifacts are indexed
+ * in O(artifacts) instead of scanned per turn.
+ */
+export function createSessionTurnsSelector(): (input: ProjectTurnsInput) => ProjectTurnsResult {
+  const projectHistoricalTurnMemo = lruMemoize(
+    (
+      _id: string,
+      index: number,
+      userMessage: CoworkMessage | null,
+      ownMessages: readonly CoworkMessage[],
+      externalResults: readonly CoworkMessage[],
+      deliverables: Artifact[],
+    ): ConversationTurn => {
+      const bucket: TurnMessageBucket = {
+        id: _id,
+        userMessage,
+        ownMessages: ownMessages as CoworkMessage[],
+        externalResults: externalResults as CoworkMessage[],
+        messageIds: new Set(),
+        toolCallIds: new Set(),
+      };
+      const built = buildTurnPartsFromBucket(bucket);
+      return finalizeTurnState(built, index, false, false, deliverables);
+    },
+    { maxSize: 6000, equalityCheck: historicalArgEqual },
+  );
+
+  const selectDeliverableIndex = createSelector(
+    [
+      (input: ProjectTurnsInput) => input.artifacts,
+      (input: ProjectTurnsInput) => input.previewableTypes,
+    ],
+    buildDeliverableIndex,
+  );
+
+  const selectTurnBuckets = createSelector(
+    [(input: ProjectTurnsInput) => input.messages],
+    partitionMessagesIntoTurnBuckets,
+  );
+
+  const selectHistoryTurns = createSelector(
+    [selectTurnBuckets, selectDeliverableIndex],
+    (buckets, deliverableIndex): ConversationTurn[] => {
+      if (buckets.length <= 1) return [];
+      const historyCount = buckets.length - 1;
+      const result = new Array<ConversationTurn>(historyCount);
+      for (let i = 0; i < historyCount; i += 1) {
+        const bucket = buckets[i];
+        const deliverables = collectTurnDeliverables(
+          bucket.messageIds,
+          bucket.toolCallIds,
+          deliverableIndex,
+        );
+        result[i] = projectHistoricalTurnMemo(
+          bucket.id,
+          i,
+          bucket.userMessage,
+          bucket.ownMessages,
+          bucket.externalResults,
+          deliverables,
+        );
       }
-      if (part.kind === 'text') {
-        return {
-          ...part,
-          isStreaming: isLastTurn ? Boolean(part.message.metadata?.isStreaming) : false,
-        };
-      }
-      return part;
-    });
+      return result;
+    },
+  );
 
-    const groupedParts = groupConsecutiveReadOnlyTools(settledParts);
-    const deliverables = artifacts.filter(
-      artifact =>
-        artifact.role === ArtifactRole.Deliverable &&
-        artifact.declared &&
-        previewableTypes.has(artifact.type) &&
-        (raw.messageIds.has(artifact.messageId) ||
-          (artifact.toolCallId ? raw.toolCallIds.has(artifact.toolCallId) : false)),
+  return createSelector(
+    [
+      selectHistoryTurns,
+      selectTurnBuckets,
+      selectDeliverableIndex,
+      (input: ProjectTurnsInput) => input.toolActivities,
+      (input: ProjectTurnsInput) => input.pendingPermission ?? null,
+      (input: ProjectTurnsInput) => input.inlineQuestionPermission ?? null,
+      (input: ProjectTurnsInput) => input.isStreaming,
+    ],
+    (
+      historyTurns,
+      buckets,
+      deliverableIndex,
+      toolActivities,
+      pendingPermission,
+      inlineQuestionPermission,
+      isStreaming,
+    ): ProjectTurnsResult => {
+      const tailBucket = buckets.length > 0 ? buckets[buckets.length - 1] : null;
+      const tailIndex = Math.max(0, buckets.length - 1);
+      const { tailTurn, unmatchedPermission } = finalizeTailTurnWithOverlay({
+        tailBucket,
+        tailIndex,
+        deliverableIndex,
+        toolActivities,
+        pendingPermission,
+        inlineQuestionPermission,
+        isStreaming,
+      });
+
+      const turns = tailTurn ? [...historyTurns, tailTurn] : historyTurns;
+      return { turns, unmatchedPermission };
+    },
+  );
+}
+
+/** Convenience stateless projection for modals and unit tests. */
+export function projectSessionToTurns(input: ProjectTurnsInput): ProjectTurnsResult {
+  const deliverableIndex = buildDeliverableIndex(input.artifacts, input.previewableTypes);
+  const buckets = partitionMessagesIntoTurnBuckets(input.messages);
+  const historyCount = Math.max(0, buckets.length - 1);
+  const historyTurns = new Array<ConversationTurn>(historyCount);
+  for (let i = 0; i < historyCount; i += 1) {
+    const bucket = buckets[i];
+    const deliverables = collectTurnDeliverables(
+      bucket.messageIds,
+      bucket.toolCallIds,
+      deliverableIndex,
     );
-
-    const lastTextPart = [...groupedParts]
-      .reverse()
-      .find(
-        (part): part is Extract<TurnPart, { kind: 'text' }> =>
-          part.kind === 'text' && part.message.content.trim().length > 0,
-      );
-
-    const experts = Array.isArray(raw.userMessage?.metadata?.experts)
-      ? raw.userMessage.metadata.experts
-      : [];
-
-    const hasApproval = groupedParts.some(
-      part =>
-        (part.kind === 'tool' && part.phase === 'approval-requested') || part.kind === 'question',
-    );
-    const hasError = groupedParts.some(
-      part => (part.kind === 'tool' && part.isError) || (part.kind === 'notice' && part.isError),
-    );
-
-    return {
-      id: raw.id,
-      index,
-      userMessage: raw.userMessage,
-      parts: groupedParts,
+    historyTurns[i] = finalizeTurnState(
+      buildTurnPartsFromBucket(bucket),
+      i,
+      false,
+      false,
       deliverables,
-      copyText: lastTextPart ? lastTextPart.message.content : null,
-      experts,
-      isStreaming: turnIsStreaming,
-      isComplete: turnIsComplete,
-      hasApproval,
-      hasError,
-      modelLabel:
-        getModelLabel(lastTextPart?.message.metadata) ?? getModelLabel(raw.userMessage?.metadata),
-      timestamp: lastTextPart?.message.timestamp ?? raw.userMessage?.timestamp ?? null,
-    };
+    );
+  }
+  const tailBucket = buckets.length > 0 ? buckets[buckets.length - 1] : null;
+  const tailIndex = Math.max(0, buckets.length - 1);
+  const { tailTurn, unmatchedPermission } = finalizeTailTurnWithOverlay({
+    tailBucket,
+    tailIndex,
+    deliverableIndex,
+    toolActivities: input.toolActivities,
+    pendingPermission: input.pendingPermission ?? null,
+    inlineQuestionPermission: input.inlineQuestionPermission ?? null,
+    isStreaming: input.isStreaming,
   });
-
-  return { turns, unmatchedPermission };
+  return {
+    turns: tailTurn ? [...historyTurns, tailTurn] : historyTurns,
+    unmatchedPermission,
+  };
 }

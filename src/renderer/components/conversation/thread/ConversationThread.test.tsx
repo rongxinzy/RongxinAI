@@ -11,6 +11,18 @@ import { projectSessionToTurns } from '../model/projectTurns';
 import { ConversationThread } from './ConversationThread';
 
 beforeEach(() => {
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    value: 600,
+  });
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    value: 800,
+  });
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+    configurable: true,
+    value: 600,
+  });
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -218,5 +230,54 @@ describe('ConversationThread', () => {
       <ConversationThread turns={postToolTurns} skills={[]} scrollContainerRef={scrollRef} />,
     );
     expect(postToolView.container.querySelector('[role="status"]')).not.toBeNull();
+  });
+
+  test('virtualizes long sessions to a bounded DOM window while keeping full static rendering for export', () => {
+    const messages = Array.from({ length: 200 }, (_, index) => [
+      {
+        id: `vu-${index}`,
+        type: 'user' as const,
+        content: `Turn ${index}`,
+        timestamp: 1000 + index * 2,
+      },
+      {
+        id: `va-${index}`,
+        type: 'assistant' as const,
+        content: `Answer ${index}`,
+        timestamp: 1001 + index * 2,
+      },
+    ]).flat();
+
+    const { turns } = projectSessionToTurns({
+      messages,
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: false,
+    });
+
+    const scrollRef = React.createRef<HTMLDivElement | null>();
+    const virtualized = render(
+      <ConversationThread
+        sessionId="s-virtual"
+        turns={turns}
+        skills={[]}
+        scrollContainerRef={scrollRef}
+      />,
+    );
+    const mountedCount = virtualized.container.querySelectorAll('[data-turn-id]').length;
+    expect(mountedCount).toBeGreaterThan(0);
+    expect(mountedCount).toBeLessThan(30);
+
+    virtualized.rerender(
+      <ConversationThread
+        sessionId="s-virtual"
+        turns={turns}
+        skills={[]}
+        isExporting
+        scrollContainerRef={scrollRef}
+      />,
+    );
+    expect(virtualized.container.querySelectorAll('[data-turn-id]')).toHaveLength(200);
   });
 });

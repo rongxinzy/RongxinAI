@@ -31,6 +31,15 @@ export function useArtifactPreviewContent({ artifact, cwd, isCodeView, panelView
   const [imageRevision, setImageRevision] = useState(0);
   const currentArtifactId = useRef(artifact?.id);
   currentArtifactId.current = artifact?.id;
+  const lastImageCreatedAtRef = useRef<{ id: string; createdAt: number } | null>(null);
+  useEffect(() => {
+    if (!artifact || artifact.type !== 'image' || !artifact.filePath) return;
+    const prev = lastImageCreatedAtRef.current;
+    if (prev && prev.id === artifact.id && prev.createdAt !== artifact.createdAt) {
+      setImageRevision(value => value + 1);
+    }
+    lastImageCreatedAtRef.current = { id: artifact.id, createdAt: artifact.createdAt };
+  }, [artifact]);
   useEffect(() => {
     if (
       panelView !== ArtifactPanelView.Preview ||

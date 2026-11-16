@@ -30,7 +30,6 @@ interface TurnViewProps {
   skills: Skill[];
   cwd?: string;
   forceExpand?: boolean;
-  isExporting?: boolean;
   onReEdit?: (message: CoworkMessage) => void;
   onRespondToPermission?: (result: CoworkPermissionResult) => void | Promise<void>;
   onRespondToQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
@@ -189,8 +188,8 @@ const renderBottomActivity = (activity: BottomActivityState | null): React.React
 };
 
 /**
- * Renders one user+assistant turn in normal DOM order with `content-visibility: auto`
- * on settled turns (bypassed for active streaming turns and long-screenshot export).
+ * Renders one user+assistant turn in normal DOM order; offscreen virtualization
+ * is owned by `ConversationThread` via `@tanstack/react-virtual`.
  */
 export const TurnView: React.FC<TurnViewProps> = React.memo(
   ({
@@ -198,7 +197,6 @@ export const TurnView: React.FC<TurnViewProps> = React.memo(
     skills,
     cwd,
     forceExpand = false,
-    isExporting = false,
     onReEdit,
     onRespondToPermission,
     onRespondToQuestion,
@@ -212,15 +210,7 @@ export const TurnView: React.FC<TurnViewProps> = React.memo(
       Boolean(primaryExpert);
 
     return (
-      <section
-        data-turn-id={turn.id}
-        data-turn-index={turn.index}
-        style={
-          !isExporting && !turn.isStreaming
-            ? { contentVisibility: 'auto', containIntrinsicSize: 'auto 280px' }
-            : undefined
-        }
-      >
+      <section data-turn-id={turn.id} data-turn-index={turn.index}>
         {turn.userMessage ? (
           <UserPromptBubble message={turn.userMessage} skills={skills} onReEdit={onReEdit} />
         ) : null}

@@ -64,41 +64,43 @@ export const MentionSuggestionList = forwardRef<
   if (items.length === 0) return null;
 
   return (
-    <div
-      role="listbox"
-      className="theme-conversation-mention-list z-50 max-h-60 max-w-[calc(100vw-16px)] overflow-y-auto"
-    >
-      {items.map((item, index) => {
-        const isSelected = index === selectedIndex;
-        return (
-          <Button
-            variant="navigation"
-            size="navigation"
-            key={`${item.kind}:${item.id}`}
-            type="button"
-            role="option"
-            aria-selected={isSelected}
-            onMouseDown={event => {
-              event.preventDefault();
-              selectItem(index);
-            }}
-            onMouseEnter={() => setSelectedIndex(index)}
-            className="w-full justify-start gap-2"
-          >
-            {item.kind === 'skill' ? (
-              <Sparkles className="theme-conversation-icon shrink-0" />
-            ) : (
-              <FileText className="theme-conversation-icon shrink-0" />
-            )}
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
-            {item.description ? (
-              <span className="theme-conversation-meta max-w-28 shrink-0 truncate">
-                {item.description}
-              </span>
-            ) : null}
-          </Button>
-        );
-      })}
+    <div className="z-50">
+      <div
+        role="listbox"
+        className="theme-conversation-mention-list max-h-60 max-w-[calc(100vw-16px)] overflow-y-auto"
+      >
+        {items.map((item, index) => {
+          const isSelected = index === selectedIndex;
+          return (
+            <Button
+              variant="navigation"
+              size="navigation"
+              key={`${item.kind}:${item.id}`}
+              type="button"
+              role="option"
+              aria-selected={isSelected}
+              onMouseDown={event => {
+                event.preventDefault();
+                selectItem(index);
+              }}
+              onMouseEnter={() => setSelectedIndex(index)}
+              className="w-full justify-start gap-2"
+            >
+              {item.kind === 'skill' ? (
+                <Sparkles className="theme-conversation-icon shrink-0" />
+              ) : (
+                <FileText className="theme-conversation-icon shrink-0" />
+              )}
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {item.description ? (
+                <span className="theme-conversation-meta max-w-28 shrink-0 truncate">
+                  {item.description}
+                </span>
+              ) : null}
+            </Button>
+          );
+        })}
+      </div>
     </div>
   );
 });

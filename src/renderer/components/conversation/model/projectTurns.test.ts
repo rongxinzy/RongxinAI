@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { CoworkPermissionOrigin } from '../../../../shared/cowork/constants';
 import { CoworkToolActivityPhase } from '../../../../shared/cowork/toolActivity';
 import type { CoworkMessage, CoworkPermissionRequest } from '../../../types/cowork';
-import { projectSessionToTurns } from './projectTurns';
+import { createSessionTurnsSelector, projectSessionToTurns } from './projectTurns';
 
 const makeMsg = (
   partial: Partial<CoworkMessage> & Pick<CoworkMessage, 'id' | 'type'>,
@@ -230,5 +230,97 @@ describe('projectSessionToTurns', () => {
       'artifact-tool-r1',
       'artifact-a1-0',
     ]);
+  });
+
+  test('matches cross-turn tool results caused by mid-run steering without stranding open tools', () => {
+    const messages: CoworkMessage[] = [
+      makeMsg({ id: 'u1', type: 'user', content: 'Analyze file' }),
+      makeMsg({
+        id: 't1',
+        type: 'tool_use',
+        metadata: { toolName: 'bash', toolUseId: 'c1', toolInput: { command: 'sleep 1' } },
+      }),
+      makeMsg({ id: 'u2', type: 'user', content: 'Also check tests' }),
+      makeMsg({
+        id: 'r1',
+        type: 'tool_result',
+        content: 'exit 0',
+        metadata: { toolUseId: 'c1', toolResult: 'exit 0' },
+      }),
+      makeMsg({
+        id: 'a2',
+        type: 'assistant',
+        content: 'Both done!',
+        metadata: { isFinalAnswer: true },
+      }),
+    ];
+
+    const { turns } = projectSessionToTurns({
+      messages,
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: false,
+    });
+
+    expect(turns).toHaveLength(2);
+    expect(turns[0]?.parts).toHaveLength(1);
+    const matchedTool = turns[0]?.parts[0];
+    expect(matchedTool?.kind).toBe('tool');
+    if (matchedTool?.kind === 'tool') {
+      expect(matchedTool.phase).toBe('output-available');
+      expect(matchedTool.output).toBe('exit 0');
+    }
+    expect(turns[1]?.parts.map(p => p.kind)).toEqual(['text']);
+  });
+
+  test('keeps historical turn references stable when toolActivities or tail streaming change', () => {
+    const selector = createSessionTurnsSelector();
+    const baseHistory: CoworkMessage[] = [
+      makeMsg({ id: 'u1', type: 'user', content: 'Turn 1' }),
+      makeMsg({
+        id: 'a1',
+        type: 'assistant',
+        content: 'Reply 1',
+        metadata: { isFinalAnswer: true },
+      }),
+      makeMsg({ id: 'u2', type: 'user', content: 'Turn 2' }),
+    ];
+    const first = selector({
+      messages: baseHistory,
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(['html']),
+      isStreaming: true,
+    });
+
+    const second = selector({
+      messages: baseHistory,
+      toolActivities: [
+        {
+          toolCallId: 'c-tail',
+          toolName: 'write',
+          phase: CoworkToolActivityPhase.Preparing,
+          progress: { argsChars: 240 },
+          updatedAt: 2000,
+        },
+      ],
+      artifacts: [],
+      previewableTypes: new Set(['html']),
+      isStreaming: true,
+    });
+
+    expect(second.turns[0]).toBe(first.turns[0]);
+    expect(second.turns[0].parts).toBe(first.turns[0].parts);
+    expect(second.turns[1]).not.toBe(first.turns[1]);
+
+    const third = selector({
+      messages: [...baseHistory, makeMsg({ id: 'a2', type: 'assistant', content: 'Streaming...' })],
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(['html']),
+      isStreaming: true,
+    });
+    expect(third.turns[0]).toBe(first.turns[0]);
   });
 });

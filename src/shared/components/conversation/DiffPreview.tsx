@@ -1,9 +1,11 @@
 import { cn } from '@shared/lib/utils';
-import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useState } from 'react';
 
-const LazyMultiFileDiff = React.lazy(() =>
-  import('@pierre/diffs/react').then(module => ({ default: module.MultiFileDiff })),
-);
+const MAX_DIFF_CHARS = 120_000;
+const MAX_DIFF_LINES = 3_000;
+const EXCERPT_CHARS = 4_000;
+
+const LazyDiffPreviewCanvas = React.lazy(() => import('./DiffPreviewCanvas'));
 
 function useDocumentThemeType(): 'light' | 'dark' {
   const [isDark, setIsDark] = useState(() =>
@@ -23,6 +25,20 @@ function useDocumentThemeType(): 'light' | 'dark' {
   return isDark ? 'dark' : 'light';
 }
 
+const exceedsDiffBudget = (oldContent: string, newContent: string): boolean => {
+  if (oldContent.length + newContent.length > MAX_DIFF_CHARS) return true;
+  let lines = 1;
+  for (const source of [oldContent, newContent]) {
+    for (let i = 0; i < source.length; i += 1) {
+      if (source.charCodeAt(i) === 10) {
+        lines += 1;
+        if (lines > MAX_DIFF_LINES) return true;
+      }
+    }
+  }
+  return false;
+};
+
 export interface DiffPreviewProps {
   fileName: string;
   oldContent: string;
@@ -31,45 +47,44 @@ export interface DiffPreviewProps {
 }
 
 /**
- * Lazy-loaded Shiki code diff surface powered by `@pierre/diffs`.
- * Kept dynamically imported so the diff/worker bundle stays out of initial app paint.
+ * Lazy-loaded Shiki code diff surface backed by `@pierre/diffs`'s native
+ * `WorkerPoolContextProvider` and `Virtualizer`, with explicit size/failure
+ * guards so oversized inputs or broken workers never block the main thread.
  */
 export function DiffPreview({ fileName, oldContent, newContent, className }: DiffPreviewProps) {
   const themeType = useDocumentThemeType();
-  const files = useMemo(
-    () => ({
-      oldFile: { name: fileName, contents: oldContent },
-      newFile: { name: fileName, contents: newContent },
-    }),
-    [fileName, oldContent, newContent],
-  );
+  const [workerFailed, setWorkerFailed] = useState(false);
+  const overBudget = exceedsDiffBudget(oldContent, newContent);
 
-  const options = useMemo(
-    () => ({
-      diffStyle: 'unified' as const,
-      themeType,
-      disableFileHeader: true,
-      overflow: 'scroll' as const,
-    }),
-    [themeType],
-  );
+  const handleWorkerFailure = useCallback(() => {
+    setWorkerFailed(true);
+  }, []);
+
+  const excerptSource = newContent || oldContent;
+  const excerpt =
+    excerptSource.length > EXCERPT_CHARS
+      ? `${excerptSource.slice(0, EXCERPT_CHARS)}\n…`
+      : excerptSource;
 
   const fallback = (
-    <pre className="theme-conversation-code-fallback max-h-72 overflow-auto">
-      {newContent || oldContent}
-    </pre>
+    <pre className="theme-conversation-code-fallback max-h-72 overflow-auto">{excerpt}</pre>
   );
 
   return (
-    <div className={cn('theme-conversation-diff max-h-80 overflow-auto', className)}>
-      <Suspense fallback={fallback}>
-        <LazyMultiFileDiff
-          oldFile={files.oldFile}
-          newFile={files.newFile}
-          options={options}
-          disableWorkerPool
-        />
-      </Suspense>
+    <div className={cn('theme-conversation-diff max-h-80 overflow-hidden', className)}>
+      {overBudget || workerFailed ? (
+        fallback
+      ) : (
+        <Suspense fallback={fallback}>
+          <LazyDiffPreviewCanvas
+            fileName={fileName}
+            oldContent={oldContent}
+            newContent={newContent}
+            themeType={themeType}
+            onWorkerFailure={handleWorkerFailure}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

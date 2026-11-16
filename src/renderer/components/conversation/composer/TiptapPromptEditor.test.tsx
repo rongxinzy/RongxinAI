@@ -83,4 +83,64 @@ describe('TiptapPromptEditor', () => {
     fireEvent.keyDown(textbox, { key: 'Enter', isComposing: false });
     expect(onKeyDown).toHaveBeenCalledTimes(1);
   });
+
+  test('restores and preserves rich mention node attrs across draftDoc replacements', () => {
+    const onChange = vi.fn();
+    const initialDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Inspect ' },
+            {
+              type: 'mention',
+              attrs: {
+                id: '/tmp/report.png',
+                label: 'report.png',
+                kind: 'file',
+                path: '/tmp/report.png',
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const { rerender } = render(
+      <TiptapPromptEditor
+        value="Inspect @report.png"
+        draftDoc={initialDoc}
+        externalVersion={1}
+        onChange={onChange}
+      />,
+    );
+
+    const mentionEl = document.querySelector('[data-mention-kind="file"]');
+    expect(mentionEl).not.toBeNull();
+    expect(mentionEl?.getAttribute('data-id')).toBe('/tmp/report.png');
+
+    rerender(
+      <TiptapPromptEditor
+        value="Plain switched session"
+        draftDoc={null}
+        externalVersion={2}
+        onChange={onChange}
+      />,
+    );
+    expect(document.querySelector('[data-mention-kind="file"]')).toBeNull();
+    expect(screen.getByRole('textbox').textContent).toContain('Plain switched session');
+
+    rerender(
+      <TiptapPromptEditor
+        value="Inspect @report.png"
+        draftDoc={initialDoc}
+        externalVersion={3}
+        onChange={onChange}
+      />,
+    );
+    const restored = document.querySelector('[data-mention-kind="file"]');
+    expect(restored?.getAttribute('data-id')).toBe('/tmp/report.png');
+    expect(restored?.getAttribute('data-label')).toBe('report.png');
+  });
 });

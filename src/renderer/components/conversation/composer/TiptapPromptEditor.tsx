@@ -1,7 +1,7 @@
 import { cn } from '@shared/lib/utils';
 import { Button } from '@shared/components/ui/button';
 import Placeholder from '@tiptap/extension-placeholder';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { EditorContent, type JSONContent, useEditor, useEditorState } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { X } from 'lucide-react';
 import React, {
@@ -31,11 +31,14 @@ import { createPromptKeyboardExtension } from './promptKeyboardExtension';
 export interface TiptapPromptEditorHandle {
   focus: () => void;
   clear: () => void;
+  setDocument: (value: string, doc?: Record<string, unknown> | null) => void;
 }
 
 interface TiptapPromptEditorProps {
   value: string;
-  onChange: (value: string) => void;
+  draftDoc?: Record<string, unknown> | null;
+  externalVersion?: number;
+  onChange: (value: string, doc?: Record<string, unknown>) => void;
   placeholder?: string;
   disabled?: boolean;
   attachments?: CoworkAttachment[];
@@ -44,16 +47,26 @@ interface TiptapPromptEditorProps {
   className?: string;
 }
 
+const resolveInitialContent = (
+  value: string,
+  draftDoc: Record<string, unknown> | null | undefined,
+): JSONContent =>
+  draftDoc && typeof draftDoc === 'object' && draftDoc.type === 'doc'
+    ? (draftDoc as JSONContent)
+    : createTextDocFromString(value);
+
 /**
  * Rich composer input built on `@tiptap/react` + `@tiptap/extension-mention`.
- * Synchronizes leading skill pills with Redux `activeSkillIds`, supports `@`
- * skill/attachment completion, preserves IME composition and keeps DOM selection
- * intact across light/dark theme switches.
+ * Keeps the ProseMirror document as the single live editing truth, persisting
+ * `getJSON()` across session transitions and restoring rich mention attributes
+ * only on session changes or explicit external replacements.
  */
 export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPromptEditorProps>(
   (
     {
       value,
+      draftDoc = null,
+      externalVersion = 0,
       onChange,
       placeholder = '',
       disabled = false,
@@ -70,7 +83,9 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
     const quickActions = useSelector((state: RootState) => state.quickAction.actions);
     const selectedActionId = useSelector((state: RootState) => state.quickAction.selectedActionId);
 
-    const lastEmittedValueRef = useRef(value);
+    const lastSeedRef = useRef({ value, draftDoc, externalVersion });
+    const lastPropsValueRef = useRef(value);
+    const pendingSelfValuesRef = useRef<string[]>([]);
     const mountedRef = useRef(false);
     const clearingRef = useRef(false);
     const placeholderRef = useRef(placeholder);
@@ -200,7 +215,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
     const editor = useEditor(
       {
         extensions,
-        content: createTextDocFromString(value),
+        content: resolveInitialContent(value, draftDoc),
         editable: !disabled,
         editorProps: {
           attributes: {
@@ -230,11 +245,6 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
           if (firstChild && firstChild.classList.contains('is-empty')) {
             firstChild.setAttribute('data-placeholder', placeholderRef.current);
           }
-          if (lastEmittedValueRef.current !== activeEditor.getText({ blockSeparator: '\n' })) {
-            activeEditor.commands.setContent(createTextDocFromString(lastEmittedValueRef.current), {
-              emitUpdate: false,
-            });
-          }
         },
         onDestroy: () => {
           mountedRef.current = false;
@@ -242,14 +252,26 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
         onUpdate: ({ editor: activeEditor }) => {
           if (clearingRef.current) return;
           const nextText = activeEditor.getText({ blockSeparator: '\n' });
-          if (nextText !== lastEmittedValueRef.current) {
-            lastEmittedValueRef.current = nextText;
-            onChangeRef.current(nextText);
+          const nextDoc = activeEditor.getJSON() as Record<string, unknown>;
+          lastSeedRef.current = {
+            value: nextText,
+            draftDoc: nextDoc,
+            externalVersion: lastSeedRef.current.externalVersion,
+          };
+          pendingSelfValuesRef.current.push(nextText);
+          if (pendingSelfValuesRef.current.length > 16) {
+            pendingSelfValuesRef.current.shift();
           }
+          onChangeRef.current(nextText, nextDoc);
         },
       },
       [extensions],
     );
+
+    const editorEmpty = useEditorState({
+      editor,
+      selector: ({ editor: active }) => (!active ? value.trim().length === 0 : active.isEmpty),
+    });
 
     useEffect(() => {
       if (!editor || editor.isDestroyed) return;
@@ -268,25 +290,56 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
       }
     }, [editor, placeholder]);
 
-    useEffect(() => {
-      if (!editor || editor.isDestroyed) return;
-      const currentEditorText = mountedRef.current
-        ? editor.getText({ blockSeparator: '\n' })
-        : lastEmittedValueRef.current;
-      if (value === lastEmittedValueRef.current && value === currentEditorText) return;
-      lastEmittedValueRef.current = value;
-      if (!mountedRef.current) return;
-      if (value === '') {
-        clearingRef.current = true;
-        try {
-          editor.commands.clearContent(false);
-        } finally {
-          clearingRef.current = false;
+    const applyDocumentToEditor = useCallback(
+      (nextText: string, nextDoc: Record<string, unknown> | null | undefined) => {
+        lastSeedRef.current = {
+          value: nextText,
+          draftDoc: nextDoc ?? null,
+          externalVersion,
+        };
+        lastPropsValueRef.current = nextText;
+        pendingSelfValuesRef.current = [];
+        if (!editor || editor.isDestroyed || !mountedRef.current) return;
+        if (!nextText && !nextDoc) {
+          clearingRef.current = true;
+          try {
+            editor.commands.clearContent(false);
+          } finally {
+            clearingRef.current = false;
+          }
+          return;
         }
+        editor.commands.setContent(resolveInitialContent(nextText, nextDoc), {
+          emitUpdate: false,
+        });
+      },
+      [editor, externalVersion],
+    );
+
+    // Apply document changes only when driven by explicit external replacements
+    // (session switches, draft restoration, quick-action prompts, or direct prop updates).
+    useEffect(() => {
+      const versionChanged = lastSeedRef.current.externalVersion !== externalVersion;
+      const propValueChanged = lastPropsValueRef.current !== value;
+      lastPropsValueRef.current = value;
+
+      if (versionChanged) {
+        applyDocumentToEditor(value, draftDoc);
         return;
       }
-      editor.commands.setContent(createTextDocFromString(value), { emitUpdate: false });
-    }, [editor, value]);
+
+      if (!propValueChanged) return;
+
+      const selfIdx = pendingSelfValuesRef.current.indexOf(value);
+      if (selfIdx !== -1) {
+        pendingSelfValuesRef.current.splice(0, selfIdx + 1);
+        return;
+      }
+
+      if (lastSeedRef.current.value !== value) {
+        applyDocumentToEditor(value, draftDoc);
+      }
+    }, [applyDocumentToEditor, draftDoc, externalVersion, value]);
 
     useImperativeHandle(
       ref,
@@ -297,14 +350,18 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
           }
         },
         clear: () => {
-          lastEmittedValueRef.current = '';
+          lastSeedRef.current = {
+            value: '',
+            draftDoc: null,
+            externalVersion: lastSeedRef.current.externalVersion,
+          };
           if (!editor || editor.isDestroyed) return;
           const resetToEmpty = () => {
             if (!editor || editor.isDestroyed || !mountedRef.current) return;
-            if (lastEmittedValueRef.current !== '') return;
+            if (lastSeedRef.current.value !== '') return;
             clearingRef.current = true;
             try {
-              if (editor.getText({ blockSeparator: '\n' }) !== '') {
+              if (!editor.isEmpty || editor.getText({ blockSeparator: '\n' }) !== '') {
                 editor.commands.clearContent(false);
               }
             } finally {
@@ -315,8 +372,11 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
           // Guard against delayed ProseMirror/IME DOM observer mutations right after Enter submit.
           queueMicrotask(resetToEmpty);
         },
+        setDocument: (nextText, nextDoc) => {
+          applyDocumentToEditor(nextText, nextDoc);
+        },
       }),
-      [editor],
+      [applyDocumentToEditor, editor],
     );
 
     const activeSkills = useMemo(
@@ -329,6 +389,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
 
     return (
       <div
+        data-editor-empty={editorEmpty ? 'true' : 'false'}
         className={cn(
           'theme-conversation-editor-shell flex w-full min-w-0 flex-col gap-1.5',
           className,

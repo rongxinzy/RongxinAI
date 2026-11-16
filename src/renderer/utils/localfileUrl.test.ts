@@ -12,4 +12,7 @@ test('preserves remote image URLs and encodes native path delimiters exactly onc
     'localfile:///work/chart%20%231.png',
   );
   expect(toLocalfileUrl('C:\\images\\result.png')).toBe('localfile:///C:/images/result.png');
+  expect(toLocalfileUrl('\\\\fileserver\\share\\图 #1?100%.png')).toBe(
+    'localfile://fileserver/share/%E5%9B%BE%20%231%3F100%25.png',
+  );
 });

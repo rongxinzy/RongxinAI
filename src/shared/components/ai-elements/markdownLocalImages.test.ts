@@ -2,6 +2,7 @@
 import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
+import { i18nService } from '../../../renderer/services/i18n';
 import { clearResolvedLocalPathCache } from '../../../renderer/services/useResolvedLocalPath';
 import { StreamingMarkdownResponse } from './streamingMarkdownResponse';
 
@@ -20,7 +21,9 @@ function installResolver(path = '/work/chart #1.png') {
 test.each([
   ['file:///work/chart%20%231.png', '/work/chart #1.png'],
   ['/work/chart%20%231.png', '/work/chart #1.png'],
-  ['./chart.png', '/chart.png'],
+  ['./chart.png', './chart.png'],
+  ['<chart #1.png>', 'chart #1.png'],
+  ['chart%20%231.png', 'chart #1.png'],
   ['C:/work/chart.png', 'C:/work/chart.png'],
   ['file:///work/chart%2520.png', '/work/chart%20.png'],
 ])('local image %s resolves through main and opens the shared preview', async (path, candidate) => {
@@ -76,4 +79,29 @@ test('image normalization preserves sanitization of executable protocols and raw
   expect(container.querySelector('script')).toBeNull();
   expect(container.querySelector('img[src^="javascript:"]')).toBeNull();
   expect(resolve).not.toHaveBeenCalled();
+});
+
+test('retains retry recovery when a local image fails to load or is generated after first check', async () => {
+  const resolveLocalPath = vi
+    .fn()
+    .mockResolvedValueOnce({ path: null })
+    .mockResolvedValueOnce({ path: '/work/generated.png' });
+  Object.assign(window, { electron: { shell: { resolveLocalPath } } });
+
+  render(
+    createElement(StreamingMarkdownResponse, {
+      content: '![Pending chart](generated.png)',
+      isStreaming: false,
+      cwd: '/work',
+    }),
+  );
+
+  const retryButton = await screen.findByRole('button', {
+    name: i18nService.t('artifactImageRetry'),
+  });
+  fireEvent.click(retryButton);
+
+  const img = await screen.findByRole('img', { name: 'Pending chart' });
+  expect(img.getAttribute('src')).toBe('localfile:///work/generated.png?revision=1');
+  expect(resolveLocalPath).toHaveBeenCalledTimes(2);
 });

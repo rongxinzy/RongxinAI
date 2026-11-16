@@ -92,12 +92,10 @@ for (const theme of ['light', 'dark']) {
         return { id: row.dataset.turnId, top: row.getBoundingClientRect().top };
       });
       await page.evaluate(async () => {
-        const { allThemes } = await import(
-          new URL('/src/renderer/theme/index.ts', window.location.href).href
-        );
-        const { themeService } = await import(
-          new URL('/src/renderer/services/theme.ts', window.location.href).href
-        );
+        const [{ allThemes }, { themeService }] = await Promise.all([
+          import(new URL('/src/renderer/theme/index.ts', window.location.href).href),
+          import(new URL('/src/renderer/services/theme.ts', window.location.href).href),
+        ]);
         const current = themeService.getEffectiveTheme();
         const next = current === 'light' ? 'dark' : 'light';
         allThemes.find(item => item.meta.appearance === next).components[
@@ -123,12 +121,10 @@ for (const theme of ['light', 'dark']) {
         ),
       ).toBeLessThan(2);
       await page.evaluate(async theme => {
-        const { allThemes } = await import(
-          new URL('/src/renderer/theme/index.ts', window.location.href).href
-        );
-        const { themeService } = await import(
-          new URL('/src/renderer/services/theme.ts', window.location.href).href
-        );
+        const [{ allThemes }, { themeService }] = await Promise.all([
+          import(new URL('/src/renderer/theme/index.ts', window.location.href).href),
+          import(new URL('/src/renderer/services/theme.ts', window.location.href).href),
+        ]);
         for (const item of allThemes)
           item.components['conversation-editor'].base['font-size'] =
             'var(--zy-component-text-base)';

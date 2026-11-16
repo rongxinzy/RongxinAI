@@ -17,7 +17,7 @@
 | v4.0 Quiet Studio | 2026-10-20 | 用户审阅主界面截图后授权重定规范。以参考实现为代码标杆。 |
 | v4.0.1 | 2026-10-24 | 用户确认保留三段模型设置；修正元信息对比度与深色字阶，使规范与实现重新对齐。 |
 | v4.1.0 | 2026-11-14 | 用户授权全面重构设置页与模型配置：单页零标签模型页、统一 `ModelPicker`、分步添加服务商向导、拆分桌面伙伴/用量/隐私/高级页、AISphere 更名为「组织平台」并并入模型页、下线 Discord/Telegram、全站统一用「您」及人话术语表。 |
-| v4.2.0 | 2026-11-16 | 用户授权彻底重构对话页（一步跨向绿地架构）：单一 `ConversationStage`（首页与会话共享常驻 Composer）、Pi 原生 `Turn / Part[]` 投影、原生 Streamdown 流式排版 + `use-stick-to-bottom`、`Steps` 只读工具聚合、语义化工具卡片（含 `@pierre/diffs`）、Tiptap 富文本/提及输入核。 |
+| v4.2.0 | 2026-11-16 | 用户授权彻底重构对话页（一步跨向绿地架构）：单一 `ConversationStage`（首页与会话共享常驻 Composer）、Pi 原生 `Turn / Part[]` 投影（RTK `createSelector` 分层派生）、原生 Streamdown 流式排版 + TanStack Virtual 原生聊天模式（`anchorTo: 'end'` / `followOnAppend: true`）与静态导出全量渲染、`Steps` 只读工具聚合、语义化工具卡片（含 `@pierre/diffs`）、Tiptap 富文本/提及输入核。 |
 
 ## 一、诊断：v3 主界面为什么不像大厂作品
 
@@ -604,7 +604,7 @@ HEX 值仅供主题作者落实 token，禁止复制到业务组件。变量名�
 
 1. **单一连续舞台（`ConversationStage`）**：取消首页与会话页的树分离；空白新建态展示时段问候语、输入岛与轻量引导项，发送首轮消息后就地切入对话流，底部输入区保持挂载不闪烁、不丢失焦点与草稿。
 2. **一等公民 `Turn / Part[]` 投影与降噪**：按时间顺序直接呈现实体（思考、回答正文、工具调用、连续只读步骤、行内提问、交付物芯片、中断/错误通知）；移除每轮重复的默认标签头部，时间戳与复制/重编辑等次要动作仅在 hover / focus-within 时出现。
-3. **流畅流式与自动贴底**：使用 `streamdown` 原生分块记忆与残缺语法补全替代 8KB 纯文本滞后批处理；使用 `use-stick-to-bottom` 配合 `content-visibility: auto` 统一管理贴底与回底按钮，停止手工多层争抢 `scrollTop`。
+3. **流畅流式与自动贴底**：使用 `streamdown` 原生分块记忆与残缺语法补全替代 8KB 纯文本滞后批处理；主对话滚动容器由 `@tanstack/react-virtual` 原生聊天模式（`anchorTo: 'end'`、`followOnAppend: true`、`scrollEndThreshold: 80`、`measureElement`、`scrollToEnd`、`scrollToIndex`、`isAtEnd`）独占管理虚拟挂载、历史前插锚定、自动贴底与回底按钮，停止手工多层争抢 `scrollTop`；截图导出使用独立的静态全量渲染路径。
 4. **语义化工具展示与连续步骤折叠**：
    - `read` / `grep` / `find` / `ls` 等连续只读工具自动聚合成可折叠的 `Steps` 时间线（运行中显示当前探测步骤，完成后折叠为步骤摘要）。
    - `bash` 使用终端输出行；`edit` / `write` 展开使用 `@pierre/diffs` 展示 Shiki 代码 diff；联网检索展示来源胶囊（`Source`）；等待批准的权限请求直接在对应工具行内就地展开预览并常显审批操作，支持 `⌘↵` 允许与 `Esc` 拒绝。

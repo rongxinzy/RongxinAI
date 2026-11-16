@@ -6,14 +6,15 @@
 
 | 场景 | 根因 | 修复与回归 |
 | --- | --- | --- |
-| `@` 后按 Enter | 编辑器的直接按键处理早于 Mention 插件，先触发发送 | 使用原生插件优先级，让 Mention 先接管候选键；浏览器验证 Enter/Tab 选择不发送 |
-| 上滚后加载历史 | 移除虚拟列表后缺少前插锚定，浏览器原生锚定又被关闭 | React 在 DOM 更新前记录可见消息，用唯一滚动拥有者的 setter 补偿；补齐分页从半个回合开始、随后加载用户消息导致 orphan 外壳重建的回归 |
-| edit/write 失败 | diff 分支跳过工具错误输出 | 独立渲染错误详情，同时保留拟议 diff；单测与浏览器验证 EACCES |
-| 新组件外观 | 局部颜色、字号、圆角、阴影、宽度/高度动画绕过主题 | 注册 conversation hooks/recipe，复用共享 Button，补全双主题；仅保留颜色、阴影、透明度过渡 |
-| 首页进入会话 | 两个输入组件分别挂载；常驻后会话切换也不再触发原来的卸载刷写 | 同一 portal/editor 在槽位间移动；切换草稿身份时刷写尚未防抖保存的输入，并保留 temp→real 的下一轮草稿 |
-| 正文本地图片 | 默认 Markdown 清洗拒绝 `file:`/盘符；绝对路径可能成为网页请求；文件名空格被 URI 编码后，解析器按字面 `%20` 查找文件 | 只规范化图片 AST，保持原清洗与链接策略；解码一次后由主进程确认路径，再用受控图片协议加载 |
-| 特殊文件名与远程图片 | 旧 URL 转换器未编码 `#`/`?`/`%`，也未保留 HTTP(S) 图片 | 区分远程 URI 与本地路径，正确编码文件名；回归包含空格、`#`、字面 `%20`、Windows 路径和远程图片 |
-| 右侧图片 | 文件图片先走有 20 MiB 上限的 base64 读取并进入 Redux；旧错误状态还会污染后续图片 | 路径图片直接走受控协议；按源隔离缩放/错误；刷新与重试更新加载版本，不经 base64 读取 |
+| 长对话虚拟化与滚动 | 旧版移除虚拟列表并关闭原生锚定，万字流式与长会话 DOM 规模线性增长 | 启用 `@tanstack/react-virtual@3.14.6` Chat 模式（`anchorTo: 'end'`、`followOnAppend: true`、`scrollEndThreshold: 80`）作为 `.cowork-conversation-scroll` 唯一滚动拥有者，配合 `overflowAnchor: 'none'`、底端吸底按钮、TurnNavigator `scrollToIndex` 及导出静态全量通道；验证 1200 轮仅挂载视口附近节点、上滚后不回拉、前插历史位移 <2px |
+| `@` 后按 Enter 与富文本草稿 | 编辑器直接按键早于 Mention 插件，手动定位浮层，且切会话仅存纯文本丢属性 | 使用 `@tiptap/suggestion@3.34.0` 原生 `props.mount`（Floating UI `top-start` + `flip`）与插件优先级，`getJSON()` 结构化草稿保留 `mention` 节点的 `id`/`label`/`kind`/`path`；单测与浏览器验证 Enter/Tab 选中与跨会话还原 |
+| 投影身份稳定与 steer 配对 | 无界纯映射在每次 delta 全量重建历史 turn，`artifacts` O(turns×artifacts) 扫描，steer 插队后 `tool_result` 跨回合失配 | 接入 `createSessionTurnsSelector()`（`@reduxjs/toolkit` `createSelector` + `maxSize: 6000` `lruMemoize`），历史回合引用恒等、`deliverables` O(artifacts) 索引并支持跨回合 `tool_result` 归位 |
+| Diff WorkerPool 与预算保护 | `@pierre/diffs` 默认同步高亮大 diff，worker 异常静默吞掉 | `DiffPreviewCanvas` 使用 `@pierre/diffs` 原生 `WorkerPoolContextProvider`（`poolSize: 2`、`totalASTLRUCacheSize: 100`）与 `Virtualizer`；超过 120K 字符或 3000 行、或 worker 失败时退回纯文本摘要而不回退主线程同步高亮 |
+| edit/write 失败 | diff 分支跳过工具错误输出，长错误不可展开 | 独立渲染错误详情，保留长输出展开按钮与拟议 diff；单测与浏览器验证 `EACCES` 与长错误展开 |
+| 新组件外观 | 局部颜色、字号、圆角、阴影、宽度/高度动画绕过主题 | 注册 conversation hooks/recipe，复用共享 `Button`，补全双主题；仅保留颜色、阴影、透明度过渡 |
+| 首页进入会话常驻输入区 | portal/DOM 搬运（`usePersistentComposer` / `moveBefore` / `appendChild`）与绝对定位叠加高度测量（`useCoworkComposerInset`） | 拆除 portal 与 DOM 搬运，将单实例 `<StageComposer>` 固定在 `CoworkSessionLayout` + `ConversationStage` 同一 React 子树位置，保持 `SessionStage` 懒加载分包，跨首页/冷加载/活跃会话/Tab 切换保留编辑器 DOM 与焦点选区 |
+| 正文本地图片与特殊文件名 | 默认 Markdown 清洗拒绝 `file:`/盘符；特殊字符 `#`/`?`/`%`/空格与 UNC 路径未区分；失败缓存永久污染 | 在未改动 `rehype-sanitize` + `rehype-harden` 前仅规范化图片 AST，`resolveLocalfileRequestPath`（`node:url#fileURLToPath` + 盘符/UNC）经受控 `localfile://` 加载，`useResolvedLocalPathState` 永不缓存失败结果并支持 `Retry` 重试（含远程/本地图片）与版本刷新 |
+| 右侧图片与同路径重生成 | base64 读取受限且错误状态跨产物污染；同路径重生成缓存不失效 | 路径图片直连受控协议；按源隔离缩放/错误；`artifact.createdAt` 变化递增 `imageRevision` 触发 `?v=` 缓存穿透 |
 
 图片安全边界保持：原 Markdown sanitizer、主进程路径解析、受控协议的扩展名/敏感路径校验、SVG 清洗和 HTML 隔离均保留。恶意图片协议与原始 script 有回归断言。
 
@@ -67,15 +68,13 @@
 
 | 检查 | 结果 |
 | --- | --- |
-| `bun run test:unit` | 最终完整运行 6042 passed，85 skipped；随后新增半回合锚定回归与相关用例合计 17 项通过，CI 绑定最新提交 |
-| `bun run web:preview:check` | 143 passed，1 个既有 fixme；最终设计/回归 15 项验证通过，其中 1 项首次在创建页面阶段超时、单独重跑通过；审批文案另复测 |
-| 新图片单测 | 10 passed，含 URI→真实文件候选校验、清洗边界、失败切换/重试及跳过 base64 读取 |
-| 草稿/提交补充单测 | 19 passed |
-| `bun run build` / `test:bundle-budget` | 通过；startup 1.79 MiB，最大 startup chunk 452 KiB |
+| `bun run test:unit` | 975 passed，11 skipped（6052 tests passed，85 skipped），含虚拟化、selector 身份稳定性、WorkerPool/预算与 `@` 提及/JSON 草稿回归 |
+| `bun run web:preview:check` | 148 passed，1 个既有 fixme（0 failed），含 1200 轮虚拟化、流式吸底与上滚不回拉、Markdown/产物图解码重试、`@` 提及草稿持久化、双主题 5 视口设计走查 |
+| `bun run build` / `test:bundle-budget` | 通过（8284 modules）；preload 18 files / 0.90 MiB，startup 36 files / 1.79 MiB，最大 chunk 452 KiB，sourcemaps: 0 |
 | `build:tsc` / `typecheck:electron` | 通过 |
-| `theme:generate` / `lint` / `format:check` | 通过；lint 的 328 条存量警告与原始 HEAD 归一化对照完全相同，无新增警告 |
-| `knip` / `knip:production` / source line limit | 通过；Knip 保留既有配置提示 |
-| Electron 真实文件图片 | 两个入口、特殊文件名、损坏后重试、切换、明暗截图通过；未调用收费模型 |
+| `lint` / `format:check` | 通过；328 条存量警告（修改文件零新增告警），517 个主题组件模块审计通过 |
+| `knip` / `knip:production` / source line limit | 通过；源码行数上限、preload 契约（460 required / 461 typed）及生成 mock 检查均通过 |
+| Electron 真实文件图片 | 前置提交已验证 macOS Electron `localfile://` 两入口及特殊文件名解码，本轮保留同协议与路径解析单测（21 passed）并在 macOS 环境持续约束生效；未复跑完整收费模型对话 |
 
 ## 截图
 

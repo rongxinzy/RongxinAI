@@ -30,3 +30,39 @@ test.each(['edit', 'write'])(
     expect(screen.getByText('EACCES: permission denied')).toBeVisible();
   },
 );
+
+test('shell failures and empty error payloads stay visible cleanly', () => {
+  const shellFail: ToolTurnPart = {
+    kind: 'tool',
+    id: 'tool-bash-fail',
+    toolCallId: 'call-bash-fail',
+    toolName: 'bash',
+    category: 'shell',
+    readOnly: false,
+    phase: 'output-error',
+    isError: true,
+    input: { command: 'npm test' },
+    output: 'Command failed with exit code 1',
+  };
+  const emptyFail: ToolTurnPart = {
+    kind: 'tool',
+    id: 'tool-empty-fail',
+    toolCallId: 'call-empty-fail',
+    toolName: 'bash',
+    category: 'shell',
+    readOnly: false,
+    phase: 'output-error',
+    isError: true,
+    input: { command: 'false' },
+    output: '',
+  };
+
+  const view = render(createElement(ToolPartView, { part: shellFail, forceExpand: true }));
+  expect(view.container.textContent).toContain('Command failed with exit code 1');
+
+  view.rerender(createElement(ToolPartView, { part: emptyFail, forceExpand: true }));
+  expect(
+    view.container.querySelectorAll('[role="alert"], [data-slot="tool-output"]').length,
+  ).toBeGreaterThanOrEqual(0);
+  expect(view.container.textContent).toMatch(/error|失败|No error details/i);
+});

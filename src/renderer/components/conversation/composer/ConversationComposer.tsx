@@ -16,7 +16,10 @@ import { hasVisiblePromptContent } from '../../../../shared/cowork/submissionCon
 import { i18nService } from '../../../services/i18n';
 import { skillService } from '../../../services/skill';
 import type { RootState } from '../../../store';
-import { selectDraftPrompts } from '../../../store/selectors/coworkSelectors';
+import {
+  selectDraftPromptDocs,
+  selectDraftPrompts,
+} from '../../../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../../../store/selectors/workModeSelectors';
 import {
   clearDraftAttachments,
@@ -71,7 +74,9 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
     const dispatch = useDispatch();
     const draftKey = sessionId || PromptDraftKey.Home;
     const draftPrompts = useSelector(selectDraftPrompts);
+    const draftPromptDocs = useSelector(selectDraftPromptDocs);
     const draftPrompt = draftPrompts[draftKey] ?? '';
+    const draftDoc = draftPromptDocs?.[draftKey] ?? null;
     const rawAttachments = useSelector(
       (state: RootState) => state.cowork.draftAttachments[draftKey],
     );
@@ -99,7 +104,23 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
       [currentSession?.experts],
     );
     const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>(() => persistedExpertIds);
-    const [value, setValue] = useState(draftPrompt);
+    const [value, setValueState] = useState(draftPrompt);
+    const [doc, setDocState] = useState<Record<string, unknown> | null>(draftDoc);
+    const [externalVersion, setExternalVersion] = useState(0);
+    const applyExternalDraft = useCallback(
+      (nextValue: string, nextDoc: Record<string, unknown> | null = null) => {
+        setValueState(nextValue);
+        setDocState(nextDoc);
+        setExternalVersion(version => version + 1);
+      },
+      [],
+    );
+    const setValue = useCallback(
+      (nextValue: string) => {
+        applyExternalDraft(nextValue, null);
+      },
+      [applyExternalDraft],
+    );
     const [goalMode, setGoalMode] = useState(false);
     const [showFolderRequiredWarning, setShowFolderRequiredWarning] = useState(false);
     const [imageVisionHint, setImageVisionHint] = useState(false);
@@ -151,8 +172,11 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
     const { markDraftCleared, clearSuppressedDraft } = usePromptDraftSync({
       draftKey,
       draftPrompt,
+      draftDoc,
       value,
+      doc,
       setValue,
+      setDraftState: applyExternalDraft,
       attachments,
       modelSupportsImage,
       setImageVisionHint,
@@ -191,7 +215,7 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
         dispatch(clearActiveSkills());
         dispatch(clearSelection());
       }
-    }, [workMode, dispatch, draftKey]);
+    }, [workMode, dispatch, draftKey, setValue]);
 
     useEffect(() => {
       const unsubscribe = skillService.onSkillsChanged(() => {
@@ -311,7 +335,7 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
         window.removeEventListener('cowork:focus-input', handleFocusInput);
         cancelFolderWarningTimer();
       };
-    }, [dispatch, draftKey, cancelFolderWarningTimer]);
+    }, [dispatch, draftKey, cancelFolderWarningTimer, setValue]);
 
     const handleKeyDown = usePromptKeyDown({
       value,
@@ -321,6 +345,7 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
       canQueueWhileStreaming,
       slashMenu,
       handleSubmit,
+      useNativeNewline: true,
     });
 
     const isSubmitEmpty = !hasVisiblePromptContent(value) && attachments.length === 0;
@@ -390,14 +415,17 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
             <TiptapPromptEditor
               ref={editorRef}
               value={value}
+              draftDoc={doc}
+              externalVersion={externalVersion}
               placeholder={placeholder}
               disabled={disabled}
               attachments={attachments}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              onChange={nextValue => {
+              onChange={(nextValue, nextDoc) => {
                 slashMenu.clearDismissal();
-                setValue(nextValue);
+                setValueState(nextValue);
+                setDocState(nextDoc ?? null);
               }}
               className={cn(
                 'py-0 pr-1.5',
