@@ -74,7 +74,7 @@ test('unsigned defaults and protected release signing environment remain intact'
     'build-macos': '${{ inputs.build_macos }}',
     'build-windows': '${{ inputs.build_windows }}',
     'build-linux': '${{ inputs.build_linux }}',
-    'linux-inference-editions': 'cpu,cuda',
+    'linux-inference-editions': 'lite,cuda',
   });
   expect(unsigned.secrets).toEqual({ MODELSCOPE_TOKENS: '${{ secrets.MODELSCOPE_TOKENS }}' });
   for (const name of ['build_macos', 'build_windows', 'build_linux']) {
@@ -88,7 +88,7 @@ test('unsigned defaults and protected release signing environment remain intact'
   const injections = callee.jobs['windows-release'].steps?.filter(
     step => step.env && 'MODELSCOPE_TOKENS' in step.env,
   );
-  expect(injections).toHaveLength(3);
+  expect(injections).toHaveLength(2);
   for (const step of injections || []) {
     expect(step.env?.MODELSCOPE_TOKENS).toBe(
       "${{ inputs.include-modelscope-token && secrets.MODELSCOPE_TOKENS || '' }}",

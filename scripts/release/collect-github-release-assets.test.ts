@@ -8,7 +8,7 @@ import { expect, test } from 'vitest';
 const version = '2026.10.19-build.12';
 const commit = 'a'.repeat(40);
 const runId = '123';
-const editions = ['lite', 'cpu', 'cuda'];
+const editions = ['lite', 'cuda'];
 const kinds = ['installer', 'updater', 'blockmap', 'metadata'];
 const filenames = ['installer.exe', 'Setup.exe', 'Setup.exe.blockmap', 'latest.yml'];
 
@@ -75,7 +75,7 @@ test('publishes each Windows WebView2 installer and excludes NSIS automatic upda
     const result = f.run();
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
-    expect(readdirSync(f.destination)).toHaveLength(3);
+    expect(readdirSync(f.destination)).toHaveLength(2);
     for (const edition of editions) {
       expect(readFileSync(path.join(f.destination, `win32-x64-${edition}-${filenames[0]}`)))
         .toEqual(webSetupBytes());
@@ -122,7 +122,7 @@ test('rejects a renamed native executable even when its candidate hashes match',
 test('rejects a corrupted candidate before staging any release assets', () => {
   const f = fixture();
   try {
-    writeFileSync(path.join(f.candidateRoot, 'win32-x64-cpu/payload/win32-x64-cpu/Setup.exe'), 'wrong edition');
+    writeFileSync(path.join(f.candidateRoot, 'win32-x64-cuda/payload/win32-x64-cuda/Setup.exe'), 'wrong edition');
     const result = f.run();
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain('bytes do not match');

@@ -2,7 +2,7 @@ name: Build Windows release (staged)
 
 # Release-mode Windows pipeline: prepare/restore cached runtimes, authenticate
 # Certum SimplySign with TOTP window alignment and automatic retries, build and
-# sign lite/cpu/cuda installers in one session, and upload release candidates.
+# sign lite/cuda installers in one session, and upload release candidates.
 
 on:
   workflow_call:
@@ -199,36 +199,6 @@ jobs:
         if: ${{ !inputs.enterprise-extension }}
         shell: pwsh
         run: Remove-Item -LiteralPath checkpoint-win32-x64-lite -Recurse
-      - name: Assemble signed Windows cpu installer
-        if: ${{ !inputs.enterprise-extension }}
-        run: node scripts/release/windows/assemble-windows-edition.cjs cpu
-        env:
-          ZHIYUAN_UPDATE_VARIANT: cpu
-          APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
-          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          MODELSCOPE_TOKENS: ${{ inputs.include-modelscope-token && secrets.MODELSCOPE_TOKENS || '' }}
-      - name: Checkpoint final Windows cpu bytes
-        if: ${{ !inputs.enterprise-extension }}
-        uses: ./.github/actions/checkpoint-windows-package
-        with:
-          edition: cpu
-          version: ${{ inputs.app-build-version }}
-          certificate-thumbprint: ${{ steps.certum-signing.outputs.thumbprint }}
-      - name: Upload Windows cpu acceptance inputs
-        if: ${{ !inputs.enterprise-extension }}
-        uses: actions/upload-artifact@v6
-        with:
-          name: windows-acceptance-${{ github.run_id }}-${{ github.run_attempt }}-cpu
-          path: checkpoint-win32-x64-cpu/
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: 7
-      - name: Remove uploaded Windows cpu checkpoint
-        if: ${{ !inputs.enterprise-extension }}
-        shell: pwsh
-        run: Remove-Item -LiteralPath checkpoint-win32-x64-cpu -Recurse
       - name: Assemble signed Windows cuda installer
         if: ${{ !inputs.enterprise-extension }}
         run: node scripts/release/windows/assemble-windows-edition.cjs cuda
@@ -279,7 +249,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        edition: [lite, cpu, cuda]
+        edition: [lite, cuda]
     runs-on: windows-2022
     timeout-minutes: 90
     env:

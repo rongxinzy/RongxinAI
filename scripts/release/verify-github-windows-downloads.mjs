@@ -26,7 +26,7 @@ export function assertWindowsDownloads(release, manifests, version) {
   assert.equal(
     downloads.length,
     installers.length,
-    'Public download page must contain exactly three Windows WebView2 installers',
+    'Public download page must contain exactly the supported Windows WebView2 installers',
   );
   for (const artifact of installers) {
     assert.equal(
@@ -81,7 +81,7 @@ async function main() {
   assert(response.ok, `GitHub release inspection returned HTTP ${response.status}`);
   assertWindowsDownloads(await response.json(), manifests, version);
   console.log(
-    '[GitHubRelease] public Windows downloads match the three verified WebView2 installers',
+    '[GitHubRelease] public Windows downloads match the verified lite and CUDA WebView2 installers',
   );
 }
 
