@@ -129,7 +129,11 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
         : undefined;
 
     return (
-      <div data-tool-name={part.toolName} data-tool-state={part.phase}>
+      <div
+        data-tool-name={part.toolName}
+        data-tool-state={part.phase}
+        data-conversation-anchor={`tool:${part.toolCallId}`}
+      >
         <Tool
           open={isOpen}
           onOpenChange={next => {
@@ -167,17 +171,17 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
               <>
                 {part.input != null && <ToolInput input={part.input} displayText={visibleInput} />}
                 {webSources.length > 0 && <SourcePills sources={webSources} />}
-                {(part.output !== undefined || part.isError) && (
-                  <ToolOutput
-                    output={part.isError ? undefined : visibleOutput || undefined}
-                    errorText={
-                      part.isError
-                        ? visibleOutput || i18nService.t('coworkToolNoErrorDetail')
-                        : undefined
-                    }
-                  />
+                {!part.isError && part.output !== undefined && (
+                  <ToolOutput output={visibleOutput || undefined} errorText={undefined} />
                 )}
               </>
+            )}
+
+            {part.isError && (
+              <ToolOutput
+                output={undefined}
+                errorText={visibleOutput || i18nService.t('coworkToolNoErrorDetail')}
+              />
             )}
 
             {(outputCollapse.collapsible || inputCollapse.collapsible) &&

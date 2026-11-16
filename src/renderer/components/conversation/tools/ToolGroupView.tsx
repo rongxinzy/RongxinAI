@@ -44,9 +44,9 @@ export const ToolGroupView: React.FC<ToolGroupViewProps> = React.memo(
           data-tool-state={isRunning ? 'input-available' : 'output-available'}
           leftIcon={
             isRunning ? (
-              <Search className="size-4 text-primary" />
+              <Search className="theme-conversation-icon" />
             ) : (
-              <CheckCircle2 className="size-4 text-muted-foreground" />
+              <CheckCircle2 className="theme-conversation-icon" />
             )
           }
         >

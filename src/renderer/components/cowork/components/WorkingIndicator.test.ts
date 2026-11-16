@@ -42,7 +42,7 @@ test('escalates the copy after a long silence', () => {
 
 test('renders the waiting status through the ai-elements Shimmer sweep', () => {
   expect(source).toContain("import { Shimmer } from '@shared/components/ai-elements/shimmer';");
-  expect(source).toContain('<Shimmer duration={1.5} className="text-sm">');
+  expect(source).toContain('<Shimmer duration={1.5} className="theme-conversation-status">');
   expect(source).not.toContain('AgentCompanion');
   expect(source).not.toContain('animate-');
 });

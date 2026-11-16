@@ -22,12 +22,13 @@ export function MessageActions({
 }: MessageActionsProps) {
   return (
     <div
+      data-visible={visible}
       className={cn(
-        'mt-1 flex items-center gap-2 text-xs text-muted-foreground select-none transition-opacity duration-150',
+        'theme-conversation-actions mt-1 flex items-center gap-2 select-none',
         align === 'end' ? 'justify-end' : 'justify-start',
         visible
-          ? 'opacity-100'
-          : 'opacity-0 pointer-events-none group-hover/turn:opacity-100 group-hover/turn:pointer-events-auto group-focus-within/turn:opacity-100 group-focus-within/turn:pointer-events-auto',
+          ? ''
+          : 'pointer-events-none group-hover/turn:pointer-events-auto group-focus-within/turn:pointer-events-auto',
         className,
       )}
     >

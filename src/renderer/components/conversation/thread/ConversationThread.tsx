@@ -17,6 +17,7 @@ import type { Skill } from '../../../types/skill';
 import CoworkPermissionModal from '../../cowork/CoworkPermissionModal';
 import type { ConversationTurn } from '../model/types';
 import { TurnView } from './TurnView';
+import { HistoryScrollAnchor } from './HistoryScrollAnchor';
 
 interface ConversationThreadProps {
   turns: ConversationTurn[];
@@ -114,19 +115,21 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
         >
           <div>
             <div className="mx-auto w-full max-w-4xl">
-              {turns.map(turn => (
-                <TurnView
-                  key={turn.id}
-                  turn={turn}
-                  skills={skills}
-                  cwd={cwd}
-                  forceExpand={isExporting}
-                  isExporting={isExporting}
-                  onReEdit={onReEdit}
-                  onRespondToPermission={onRespondToPermission}
-                  onRespondToQuestion={onRespondToQuestion}
-                />
-              ))}
+              <HistoryScrollAnchor firstTurnId={turns[0]?.id} lastTurnId={turns.at(-1)?.id}>
+                {turns.map(turn => (
+                  <TurnView
+                    key={turn.id}
+                    turn={turn}
+                    skills={skills}
+                    cwd={cwd}
+                    forceExpand={isExporting}
+                    isExporting={isExporting}
+                    onReEdit={onReEdit}
+                    onRespondToPermission={onRespondToPermission}
+                    onRespondToQuestion={onRespondToQuestion}
+                  />
+                ))}
+              </HistoryScrollAnchor>
             </div>
 
             {unmatchedPermission && onRespondToPermission ? (
@@ -144,9 +147,10 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
         <ConversationScrollButton />
       </Conversation>
 
-      <div className="pointer-events-none absolute top-4 right-2 z-10">
-        <div className="pointer-events-auto">
+      <div className="pointer-events-none absolute inset-y-4 right-2 z-10">
+        <div className="pointer-events-auto max-h-full">
           <TurnNavigator
+            label={i18nService.t('coworkConversationTurns')}
             items={navigatorItems}
             activeTurnId={activeTurnId}
             onSelectTurn={handleSelectTurn}

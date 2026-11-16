@@ -25,7 +25,7 @@ export const AssistantTextPartView: React.FC<AssistantTextPartViewProps> = React
     if (displayContent.trim().length === 0) return null;
 
     return (
-      <div className="focus:outline-none">
+      <div className="focus:outline-none" data-conversation-anchor={`message:${part.message.id}`}>
         <Message from="assistant">
           <MessageContent>
             <StreamingMarkdownResponse

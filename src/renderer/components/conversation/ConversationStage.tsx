@@ -2,7 +2,6 @@ import { cn } from '@shared/lib/utils';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import type { CoworkPermissionMode } from '../../../shared/cowork/constants';
 import { agentService } from '../../services/agent';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
@@ -39,7 +38,9 @@ import {
   shouldClearQuickActionSelection,
 } from '../quick-actions/quickActionSelection';
 import type { SettingsOpenOptions } from '../settings/types';
-import { ConversationComposer } from './composer/ConversationComposer';
+import { StageComposer } from './composer/StageComposer';
+import { usePersistentComposer } from './composer/usePersistentComposer';
+import type { CoworkPromptInputProps } from '../cowork/promptInput/types';
 
 // Keep Streamdown, Shiki, KaTeX, Mermaid and @pierre/diffs out of the cold Home startup bundle.
 const loadSessionStage = () => import('./SessionStage');
@@ -79,6 +80,7 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
   onRespondToInlinePermission,
 }) => {
   const dispatch = useDispatch();
+  const { rootRef, slotRef, renderComposer } = usePersistentComposer();
   const [isInitialized, setIsInitialized] = useState(false);
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
   const quickActionActivationRef = useRef<string | null>(null);
@@ -291,155 +293,153 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
     };
   }, [currentSession, isStreaming]);
 
-  if (displayedSessionId) {
-    const isWaitingCold =
-      loadingSessionId === displayedSessionId &&
-      currentSession?.id !== displayedSessionId &&
-      !currentSession;
+  const homeComposerProps: CoworkPromptInputProps = {
+    onSubmit: handleStartSession,
+    onStop: handleStopSession,
+    isStreaming,
+    disabled: false,
+    placeholder: i18nService.t(
+      workMode === WorkMode.Chat
+        ? (resolveSkillPlaceholderKey(activeSkillIds) ?? 'chatPlaceholder')
+        : 'coworkPlaceholder',
+    ),
+    size: 'large',
+    workingDirectory: currentWorkspacePath,
+    workingDirectoryName: currentWorkspaceDisplayName,
+    onWorkingDirectoryChange: async dir => {
+      clearUnmanagedWorkingDirectory();
+      const workspace = await workspaceService.ensureWorkspace(dir);
+      if (workspace) await workspaceService.selectWorkspace(workspace.id);
+    },
+    onCreateProject: async (dir, name) => {
+      clearUnmanagedWorkingDirectory();
+      const workspace = await workspaceService.createWorkspace(dir, name);
+      if (!workspace) return false;
+      await workspaceService.selectWorkspace(workspace.id);
+      return true;
+    },
+    onUseNoFolder: async dir => {
+      if (!(await selectUnmanagedWorkingDirectory(dir)))
+        showAppErrorToast(i18nService.t('projectCreateFailed'));
+    },
+    showFolderSelector: workMode !== WorkMode.Chat && !currentWorkspace?.isHidden,
+    showNoFolderAction: !currentWorkspaceId,
+    showModelSelector: true,
+    onManageModels: onRequestAppSettings
+      ? () => onRequestAppSettings({ initialTab: 'models' })
+      : undefined,
+    onManageSkills: () => onShowSkills?.(),
+    onManageConnectors: () => onShowConnectors?.(),
+    showPermissionModeSelector: workMode !== WorkMode.Chat,
+    permissionMode: config.permissionMode,
+    onPermissionModeChange: mode => {
+      void coworkService.updateConfig({ permissionMode: mode });
+    },
+  };
 
-    if (isWaitingCold) {
-      return <CoworkSessionColdStartSkeleton />;
-    }
-
-    return (
-      <div className="flex h-full min-h-0 flex-1 flex-col bg-background">
-        <React.Suspense fallback={<CoworkSessionColdStartSkeleton />}>
-          <SessionStage
-            displayedSessionId={displayedSessionId}
-            onManageModels={
-              onRequestAppSettings
-                ? () => onRequestAppSettings({ initialTab: 'models' })
-                : undefined
-            }
-            onManageSkills={() => onShowSkills?.()}
-            onManageConnectors={() => onShowConnectors?.()}
-            permissionMode={sessionPermissionMode}
-            onPermissionModeChange={(mode: CoworkPermissionMode) => {
-              if (!currentSession) return;
-              void coworkService.updateConfig({
-                permissionModeBySession: {
-                  ...(config.permissionModeBySession ?? {}),
-                  [currentSession.id]: mode,
-                },
-              });
-            }}
-            onContinue={handleContinueSession}
-            onStop={handleStopSession}
+  const sessionFallback = <CoworkSessionColdStartSkeleton composer={<div ref={slotRef} />} />;
+  const waitingCold =
+    displayedSessionId && loadingSessionId === displayedSessionId && !currentSession;
+  return (
+    <div ref={rootRef} className="relative flex h-full min-h-0 flex-1 flex-col">
+      {displayedSessionId ? (
+        <div className="flex h-full min-h-0 flex-1 flex-col bg-background">
+          <React.Suspense fallback={sessionFallback}>
+            {waitingCold ? (
+              sessionFallback
+            ) : (
+              <SessionStage
+                displayedSessionId={displayedSessionId}
+                composerSlotRef={slotRef}
+                promptInputRef={promptInputRef}
+                isSidebarCollapsed={isSidebarCollapsed}
+                onToggleSidebar={onToggleSidebar}
+                onNewChat={onNewChat}
+                updateBadge={updateBadge}
+                inlineQuestionPermission={inlineQuestionPermission}
+                onRespondToInlineQuestion={onRespondToInlineQuestion}
+                inlinePermission={inlinePermission}
+                onRespondToInlinePermission={onRespondToInlinePermission}
+              />
+            )}
+          </React.Suspense>
+        </div>
+      ) : (
+        <div data-page-canvas className="flex h-full flex-1 flex-col bg-background">
+          <PageHeader
+            title={i18nService.t(workMode === WorkMode.Chat ? 'newChat' : 'newTaskTitle')}
+            divider={false}
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebar={onToggleSidebar}
             onNewChat={onNewChat}
             updateBadge={updateBadge}
-            workMode={workMode}
-            inlineQuestionPermission={inlineQuestionPermission}
-            onRespondToInlineQuestion={onRespondToInlineQuestion}
-            inlinePermission={inlinePermission}
-            onRespondToInlinePermission={onRespondToInlinePermission}
+            actions={
+              workMode === WorkMode.Chat ? undefined : (
+                <SecurityStatusIndicator permissionMode={config.permissionMode} />
+              )
+            }
           />
-        </React.Suspense>
-      </div>
-    );
-  }
 
-  return (
-    <div data-page-canvas className="flex h-full flex-1 flex-col bg-background">
-      <PageHeader
-        title={i18nService.t(workMode === WorkMode.Chat ? 'newChat' : 'newTaskTitle')}
-        divider={false}
-        isSidebarCollapsed={isSidebarCollapsed}
-        onToggleSidebar={onToggleSidebar}
-        onNewChat={onNewChat}
-        updateBadge={updateBadge}
-        actions={
-          workMode === WorkMode.Chat ? undefined : (
-            <SecurityStatusIndicator permissionMode={config.permissionMode} />
-          )
-        }
-      />
+          <div className="relative min-h-0 flex-1 overflow-y-auto pb-12">
+            <div aria-hidden className="min-h-[max(24px,calc(36%-8rem))]" />
 
-      <div className="relative min-h-0 flex-1 overflow-y-auto pb-12">
-        <div aria-hidden className="min-h-[max(24px,calc(36%-8rem))]" />
+            <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-8 px-6">
+              <div className="theme-home-sticky sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
+                <div className="flex flex-col items-center justify-center gap-3 text-center">
+                  <h1 className="theme-home-greeting max-w-2xl text-balance">
+                    {i18nService.t(homeGreetingKey())}
+                  </h1>
+                  <p
+                    className={cn(
+                      'theme-home-caption max-w-md px-2 text-pretty',
+                      workMode === WorkMode.Chat && 'invisible',
+                    )}
+                  >
+                    {i18nService.t('coworkHomeSubtitle')}
+                  </p>
+                </div>
 
-        <div className="mx-auto flex w-full max-w-4xl min-w-0 flex-col items-center gap-8 px-6">
-          <div className="theme-home-sticky sticky top-0 z-10 flex w-full flex-col items-center gap-8 py-2">
-            <div className="flex flex-col items-center justify-center gap-3 text-center">
-              <h1 className="theme-home-greeting max-w-2xl text-balance">
-                {i18nService.t(homeGreetingKey())}
-              </h1>
-              <p
-                className={cn(
-                  'theme-home-caption max-w-md px-2 text-pretty',
-                  workMode === WorkMode.Chat && 'invisible',
+                <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+                  <div className="min-w-0">
+                    <div ref={slotRef} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex w-full flex-col gap-4 pb-8">
+                {!selectedAction ? (
+                  <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
+                ) : (
+                  <PromptPanel
+                    action={selectedAction}
+                    onPromptSelect={handleQuickActionPromptSelect}
+                  />
                 )}
-              >
-                {i18nService.t('coworkHomeSubtitle')}
-              </p>
-            </div>
-
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
-              <div className="min-w-0">
-                <ConversationComposer
-                  ref={promptInputRef}
-                  onSubmit={handleStartSession}
-                  onStop={handleStopSession}
-                  isStreaming={isStreaming}
-                  disabled={false}
-                  placeholder={
-                    workMode === WorkMode.Chat
-                      ? i18nService.t(
-                          resolveSkillPlaceholderKey(activeSkillIds) ?? 'chatPlaceholder',
-                        )
-                      : i18nService.t('coworkPlaceholder')
-                  }
-                  size="large"
-                  workingDirectory={currentWorkspacePath}
-                  workingDirectoryName={currentWorkspaceDisplayName}
-                  onWorkingDirectoryChange={async (dir: string) => {
-                    clearUnmanagedWorkingDirectory();
-                    const workspace = await workspaceService.ensureWorkspace(dir);
-                    if (workspace) await workspaceService.selectWorkspace(workspace.id);
-                  }}
-                  onCreateProject={async (dir, name) => {
-                    clearUnmanagedWorkingDirectory();
-                    const workspace = await workspaceService.createWorkspace(dir, name);
-                    if (!workspace) return false;
-                    await workspaceService.selectWorkspace(workspace.id);
-                    return true;
-                  }}
-                  onUseNoFolder={async dir => {
-                    const selected = await selectUnmanagedWorkingDirectory(dir);
-                    if (!selected) {
-                      showAppErrorToast(i18nService.t('projectCreateFailed'));
-                    }
-                  }}
-                  showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}
-                  showNoFolderAction={!currentWorkspaceId}
-                  showModelSelector
-                  onManageModels={
-                    onRequestAppSettings
-                      ? () => onRequestAppSettings({ initialTab: 'models' })
-                      : undefined
-                  }
-                  onManageSkills={() => onShowSkills?.()}
-                  onManageConnectors={() => onShowConnectors?.()}
-                  showPermissionModeSelector={workMode !== WorkMode.Chat}
-                  permissionMode={config.permissionMode}
-                  onPermissionModeChange={(mode: CoworkPermissionMode) => {
-                    void coworkService.updateConfig({ permissionMode: mode });
-                  }}
-                />
               </div>
             </div>
           </div>
-
-          <div className="flex w-full flex-col gap-4 pb-8">
-            {!selectedAction ? (
-              <QuickActionBar actions={quickActions} onActionSelect={handleActionSelect} />
-            ) : (
-              <PromptPanel action={selectedAction} onPromptSelect={handleQuickActionPromptSelect} />
-            )}
-          </div>
         </div>
-      </div>
+      )}
+      {renderComposer(
+        <StageComposer
+          homeProps={homeComposerProps}
+          inputRef={promptInputRef}
+          displayedSessionId={displayedSessionId}
+          onContinue={handleContinueSession}
+          sessionPermissionMode={sessionPermissionMode}
+          onSessionPermissionModeChange={mode => {
+            if (!currentSession) return;
+            void coworkService.updateConfig({
+              permissionModeBySession: {
+                ...(config.permissionModeBySession ?? {}),
+                [currentSession.id]: mode,
+              },
+            });
+          }}
+          awaitingQuestion={Boolean(inlineQuestionPermission && onRespondToInlineQuestion)}
+          awaitingPermission={Boolean(inlinePermission)}
+        />,
+      )}
     </div>
   );
 };

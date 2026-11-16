@@ -1,10 +1,9 @@
 import { cn } from '@shared/lib/utils';
 import React, { Suspense, useEffect, useMemo, useState } from 'react';
 
-const LazyMultiFileDiff = React.lazy(async () => {
-  const mod = await import('@pierre/diffs/react');
-  return { default: mod.MultiFileDiff };
-});
+const LazyMultiFileDiff = React.lazy(() =>
+  import('@pierre/diffs/react').then(module => ({ default: module.MultiFileDiff })),
+);
 
 function useDocumentThemeType(): 'light' | 'dark' {
   const [isDark, setIsDark] = useState(() =>
@@ -56,18 +55,13 @@ export function DiffPreview({ fileName, oldContent, newContent, className }: Dif
   );
 
   const fallback = (
-    <pre className="max-h-72 overflow-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-xs text-foreground">
+    <pre className="theme-conversation-code-fallback max-h-72 overflow-auto">
       {newContent || oldContent}
     </pre>
   );
 
   return (
-    <div
-      className={cn(
-        'max-h-80 overflow-auto rounded-md border border-border bg-background text-xs',
-        className,
-      )}
-    >
+    <div className={cn('theme-conversation-diff max-h-80 overflow-auto', className)}>
       <Suspense fallback={fallback}>
         <LazyMultiFileDiff
           oldFile={files.oldFile}

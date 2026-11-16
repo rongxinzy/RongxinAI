@@ -42,17 +42,17 @@ const MessageSkillPill: React.FC<{ skill: Skill }> = ({ skill }) => {
   const ShortcutIcon = shortcut?.icon;
 
   return (
-    <span className="theme-surface-skill-token mx-0.5 inline-flex h-6 max-w-40 select-none items-center gap-1 align-baseline px-2 text-sm leading-none">
+    <span className="theme-conversation-skill-token mx-0.5 inline-flex max-w-40 select-none items-center gap-1 align-baseline">
       {skill.iconUrl ? (
         <img
           src={resolveSkillIconUrl(skill.iconUrl)}
           alt=""
-          className="size-3.5 shrink-0 object-contain"
+          className="theme-conversation-icon shrink-0 object-contain"
         />
       ) : ShortcutIcon ? (
-        <ShortcutIcon className="theme-surface-skill-fallback size-3.5 shrink-0" />
+        <ShortcutIcon className="theme-surface-skill-fallback theme-conversation-icon shrink-0" />
       ) : (
-        <PlusMenuSkillsIcon className="theme-surface-skill-fallback size-3.5 shrink-0" />
+        <PlusMenuSkillsIcon className="theme-surface-skill-fallback theme-conversation-icon shrink-0" />
       )}
       <span className="truncate">{label}</span>
     </span>
@@ -118,7 +118,11 @@ export const UserPromptBubble: React.FC<UserPromptBubbleProps> = React.memo(
     const hasTextOrSkill = Boolean(textContent.trim()) || messageSkills.length > 0;
 
     return (
-      <div data-export-role="user-message" className="group/turn w-full py-2 focus:outline-none">
+      <div
+        data-export-role="user-message"
+        data-conversation-anchor={`message:${message.id}`}
+        className="group/turn w-full py-2 focus:outline-none"
+      >
         <div className="mx-auto flex w-full max-w-4xl min-w-[320px] flex-col items-end">
           {hasTextOrSkill && (
             <Message from="user" className="ml-auto items-end">
@@ -148,7 +152,7 @@ export const UserPromptBubble: React.FC<UserPromptBubbleProps> = React.memo(
             meta={
               <>
                 <span>{formatMessageDateTime(message.timestamp)}</span>
-                {modelLabel ? <span className="opacity-70">{modelLabel}</span> : null}
+                {modelLabel ? <span className="theme-conversation-meta">{modelLabel}</span> : null}
               </>
             }
           >
@@ -160,7 +164,11 @@ export const UserPromptBubble: React.FC<UserPromptBubbleProps> = React.memo(
               title={i18nService.t('copy')}
               onClick={() => void handleCopy()}
             >
-              {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+              {copied ? (
+                <Check className="theme-conversation-icon" />
+              ) : (
+                <Copy className="theme-conversation-icon" />
+              )}
             </Button>
             {onReEdit ? (
               <Button
@@ -171,7 +179,7 @@ export const UserPromptBubble: React.FC<UserPromptBubbleProps> = React.memo(
                 title={i18nService.t('coworkReEdit')}
                 onClick={() => onReEdit(message)}
               >
-                <Pencil className="size-3.5" />
+                <Pencil className="theme-conversation-icon" />
               </Button>
             ) : null}
           </MessageActions>

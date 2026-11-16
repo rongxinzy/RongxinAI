@@ -2,9 +2,11 @@ import { CHAT_TOOL_SELECTORS } from '../chat-tool-contract';
 import { SHELL_SIDEBAR_SELECTORS } from '../shell-sidebar-contract';
 import { HOME_STUDIO_SELECTORS } from '../home-studio-contract';
 import { QUIET_STUDIO_SELECTORS } from '../quiet-studio-contract';
+import { CONVERSATION_SELECTORS } from '../conversation-contract';
 
 /** App-level part, piece, surface, composition and tab hooks. */
 export const APP_SELECTORS = {
+  ...CONVERSATION_SELECTORS,
   'part-coding-agent-manager-dialog-header-1': '.theme-part-coding-agent-manager-dialog-header-1',
   'part-coding-agent-manager-dialog-footer-1': '.theme-part-coding-agent-manager-dialog-footer-1',
   'part-session-expert-picker-command-1': '.theme-part-session-expert-picker-command-1',

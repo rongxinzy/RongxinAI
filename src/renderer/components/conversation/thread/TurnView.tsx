@@ -95,7 +95,11 @@ const CopyResponseButton: React.FC<{ content: string }> = ({ content }) => {
       title={i18nService.t('copy')}
       onClick={() => void handleCopy()}
     >
-      {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+      {copied ? (
+        <Check className="theme-conversation-icon" />
+      ) : (
+        <Copy className="theme-conversation-icon" />
+      )}
     </Button>
   );
 };
@@ -226,11 +230,11 @@ export const TurnView: React.FC<TurnViewProps> = React.memo(
             <div className="mx-auto w-full max-w-4xl min-w-[320px]">
               <div className="flex min-w-0 flex-col gap-3 py-2">
                 {primaryExpert ? (
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <div className="flex items-center gap-2 theme-conversation-heading">
                     <ExpertAvatar
                       name={primaryExpert.presetId}
                       label={primaryExpert.expertName}
-                      className="size-7 rounded-full border-0"
+                      className="theme-conversation-avatar"
                     />
                     <span className="truncate">{primaryExpert.expertName}</span>
                   </div>

@@ -1,4 +1,4 @@
-import { cn } from '@shared/lib/utils';
+import { Button } from '@shared/components/ui/button';
 import { Sparkles, FileText } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 
@@ -66,12 +66,14 @@ export const MentionSuggestionList = forwardRef<
   return (
     <div
       role="listbox"
-      className="z-50 max-h-60 w-72 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+      className="theme-conversation-mention-list z-50 max-h-60 max-w-[calc(100vw-16px)] overflow-y-auto"
     >
       {items.map((item, index) => {
         const isSelected = index === selectedIndex;
         return (
-          <button
+          <Button
+            variant="navigation"
+            size="navigation"
             key={`${item.kind}:${item.id}`}
             type="button"
             role="option"
@@ -81,25 +83,20 @@ export const MentionSuggestionList = forwardRef<
               selectItem(index);
             }}
             onMouseEnter={() => setSelectedIndex(index)}
-            className={cn(
-              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors duration-100',
-              isSelected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted/60',
-            )}
+            className="w-full justify-start gap-2"
           >
             {item.kind === 'skill' ? (
-              <Sparkles className="size-3.5 shrink-0 text-primary" />
+              <Sparkles className="theme-conversation-icon shrink-0" />
             ) : (
-              <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+              <FileText className="theme-conversation-icon shrink-0" />
             )}
-            <span className="min-w-0 flex-1 truncate font-medium text-foreground">
-              {item.label}
-            </span>
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
             {item.description ? (
-              <span className="max-w-28 shrink-0 truncate text-muted-foreground">
+              <span className="theme-conversation-meta max-w-28 shrink-0 truncate">
                 {item.description}
               </span>
             ) : null}
-          </button>
+          </Button>
         );
       })}
     </div>

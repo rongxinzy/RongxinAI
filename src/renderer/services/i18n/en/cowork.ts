@@ -1,5 +1,6 @@
 // Cowork sessions
 export const enCowork: Record<string, string> = {
+  coworkConversationTurns: 'Conversation turns',
   coworkQueueTitle: 'Pending messages',
   coworkQueueCount: '{count} pending',
   coworkQueueEmpty: 'Queue is empty',

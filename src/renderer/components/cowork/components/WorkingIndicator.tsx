@@ -78,19 +78,27 @@ export const WorkingIndicator: React.FC<WorkingIndicatorProps> = ({
     : phase !== WorkingIndicatorPhase.Initial;
 
   return (
-    <div className="flex items-center gap-2 text-muted-foreground" role="status" aria-live="polite">
+    <div
+      className="theme-conversation-status flex items-center gap-2"
+      role="status"
+      aria-live="polite"
+    >
       {showElapsedImmediately ? (
-        <Spinner aria-hidden="true" role="presentation" className="size-3.5 shrink-0" />
+        <Spinner
+          aria-hidden="true"
+          role="presentation"
+          className="theme-conversation-icon shrink-0"
+        />
       ) : null}
       <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <Shimmer duration={1.5} className="text-sm">
+        <Shimmer duration={1.5} className="theme-conversation-status">
           {resolvedStatus}
         </Shimmer>
         {detailLabel ? (
-          <span className="max-w-xs truncate text-xs text-muted-foreground">{detailLabel}</span>
+          <span className="max-w-xs truncate theme-conversation-meta">{detailLabel}</span>
         ) : null}
         {showElapsed ? (
-          <span className="text-xs text-muted-foreground tabular-nums">
+          <span className="theme-conversation-meta tabular-nums">
             {i18nService.t('coworkWorkingElapsed').replace('{seconds}', String(elapsedSeconds))}
           </span>
         ) : null}

@@ -21,6 +21,7 @@ export const zhArtifactsUpdates: Record<string, string> = {
   artifactResizePreview: '调整预览宽度',
   artifactNoPreview: '暂无预览',
   artifactImageAlt: '图片',
+  artifactImageRetry: '重试',
   artifactFiles: '文件',
   artifactFileList: '文件列表',
   artifactEmptyFiles: '当前会话暂无文件',

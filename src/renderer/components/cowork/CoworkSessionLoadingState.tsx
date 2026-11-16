@@ -1,5 +1,6 @@
 import { Skeleton } from '@shared/components/ui/skeleton';
 import { cn } from '@shared/lib/utils';
+import type { ReactNode } from 'react';
 
 const shimmerClassName = 'skeleton';
 
@@ -53,7 +54,7 @@ export const CoworkConversationLoadingSkeleton = () => (
   </div>
 );
 
-export const CoworkSessionColdStartSkeleton = () => (
+export const CoworkSessionColdStartSkeleton = ({ composer }: { composer?: ReactNode } = {}) => (
   <div className="flex min-h-0 flex-1 flex-col bg-background">
     <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
       <CoworkSessionTitleLoadingSkeleton />
@@ -65,12 +66,14 @@ export const CoworkSessionColdStartSkeleton = () => (
         <CoworkConversationLoadingSkeleton />
       </div>
       <div className="shrink-0 px-4 pb-4">
-        <Skeleton
-          className={cn(
-            shimmerClassName,
-            'theme-scene-loading-composer mx-auto h-24 w-full max-w-4xl',
-          )}
-        />
+        {composer ?? (
+          <Skeleton
+            className={cn(
+              shimmerClassName,
+              'theme-scene-loading-composer mx-auto h-24 w-full max-w-4xl',
+            )}
+          />
+        )}
       </div>
     </div>
   </div>

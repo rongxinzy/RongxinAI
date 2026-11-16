@@ -51,9 +51,9 @@ export const createSkillMentionExtension = ({
   getCandidates,
   onSelectCandidate,
 }: CreateSkillMentionExtensionOptions) =>
-  Mention.configure({
+  Mention.extend({ priority: 1000 }).configure({
     HTMLAttributes: {
-      class: 'theme-surface-skill-token inline-flex items-center px-1.5 py-0.5 text-xs font-medium',
+      class: 'theme-conversation-skill-token inline-flex items-center',
     },
     renderText: ({ node }) => `@${String(node.attrs.label ?? node.attrs.id ?? '')}`,
     suggestion: {

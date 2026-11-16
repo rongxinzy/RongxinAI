@@ -38,11 +38,11 @@ export function SourcePills({ sources, className }: SourcePillsProps) {
             target="_blank"
             rel="noopener noreferrer"
             title={source.snippet ? `${label} — ${source.snippet}` : source.url}
-            className="inline-flex h-7 max-w-60 items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-2.5 text-xs text-muted-foreground transition-colors duration-150 hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="theme-conversation-source inline-flex max-w-60 items-center gap-1.5"
           >
-            <Globe className="size-3 shrink-0" />
-            <span className="truncate font-medium text-foreground/90">{label}</span>
-            <ExternalLink className="size-2.5 shrink-0 opacity-60" />
+            <Globe className="theme-conversation-icon shrink-0" />
+            <span className="truncate">{label}</span>
+            <ExternalLink className="theme-conversation-icon shrink-0" />
           </a>
         );
       })}

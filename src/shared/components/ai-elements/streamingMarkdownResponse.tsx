@@ -11,6 +11,7 @@ import { MessageResponse } from '@shared/components/ai-elements/message';
 import type { ComponentProps, MouseEvent, ReactNode } from 'react';
 import { memo, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { StreamdownContext } from 'streamdown';
+import { localImageRehypePlugins, MarkdownLocalImage } from './markdownLocalImages';
 
 import {
   isLocalPathCandidate,
@@ -170,6 +171,9 @@ const MarkdownContentBlock = memo(function MarkdownContentBlock({
       inlineCode: (props: InlineCodeProps) => (
         <LocalAwareInlineCode {...props} cwd={cwd} enabled={localPathEnabled} />
       ),
+      img: (props: ComponentProps<'img'> & { node?: unknown }) => (
+        <MarkdownLocalImage {...props} cwd={cwd} enabled={localPathEnabled} />
+      ),
     }),
     [cwd, localPathEnabled],
   );
@@ -179,6 +183,7 @@ const MarkdownContentBlock = memo(function MarkdownContentBlock({
       parseIncompleteMarkdown={isStreaming}
       isAnimating={isStreaming}
       components={components}
+      rehypePlugins={localImageRehypePlugins}
     >
       {content}
     </MessageResponse>

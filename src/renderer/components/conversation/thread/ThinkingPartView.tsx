@@ -46,6 +46,7 @@ export const ThinkingPartView: React.FC<ThinkingPartViewProps> = React.memo(({ p
 
   return (
     <Reasoning
+      data-conversation-anchor={`message:${part.message.id}`}
       isStreaming={part.isStreaming}
       autoClose
       showConnector
@@ -61,7 +62,7 @@ export const ThinkingPartView: React.FC<ThinkingPartViewProps> = React.memo(({ p
                   {i18nService.t('codingAgentReasoningActive')}
                 </Shimmer>
                 {liveSeconds > 0 ? (
-                  <span className="text-xs text-muted-foreground tabular-nums">
+                  <span className="theme-conversation-meta tabular-nums">
                     {i18nService
                       .t('coworkWorkingElapsed')
                       .replace('{seconds}', String(liveSeconds))}

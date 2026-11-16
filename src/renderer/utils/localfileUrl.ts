@@ -1,13 +1,15 @@
-/** Convert a filesystem path into the privileged `localfile://` preview URL. */
+import { normalizeArtifactPath } from '../../shared/cowork/artifactPath';
+
+/** Preserve web images; encode native filenames without turning #/?/% into URL syntax. */
 export function toLocalfileUrl(filePath: string): string {
   if (!filePath || filePath.startsWith('inline:')) return '';
-  if (/^localfile:/i.test(filePath)) return filePath;
-  if (/^data:/i.test(filePath)) return filePath;
-  if (/^file:/i.test(filePath)) {
-    return filePath.replace(/^file:\/\//i, 'localfile://');
-  }
-
-  const normalized = filePath.replace(/\\/g, '/');
+  if (/^(?:https?|data|blob|localfile):/i.test(filePath)) return filePath;
+  const normalized = normalizeArtifactPath(filePath);
   const withLeading = normalized.startsWith('/') ? normalized : `/${normalized}`;
-  return `localfile://${withLeading}`;
+  const encoded = withLeading
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/')
+    .replace(/^\/([a-z])%3A/i, '/$1:');
+  return new URL(`localfile://${encoded}`).href;
 }

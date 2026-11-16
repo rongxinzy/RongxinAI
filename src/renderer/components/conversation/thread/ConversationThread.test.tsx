@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { CoworkToolActivityPhase } from '../../../../shared/cowork/toolActivity';
 import { coworkLiveTextStore } from '../../../services/liveTextStore';
+import { i18nService } from '../../../services/i18n';
 import { projectSessionToTurns } from '../model/projectTurns';
 import { ConversationThread } from './ConversationThread';
 
@@ -112,7 +113,9 @@ describe('ConversationThread', () => {
       <ConversationThread turns={turns} skills={[]} scrollContainerRef={scrollRef} />,
     );
 
-    const nav = container.querySelector('nav[aria-label="Conversation turns"]');
+    const nav = container.querySelector(
+      `nav[aria-label="${i18nService.t('coworkConversationTurns')}"]`,
+    );
     expect(nav).not.toBeNull();
     expect(nav?.querySelectorAll('button')).toHaveLength(6);
   });

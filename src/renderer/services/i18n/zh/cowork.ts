@@ -1,5 +1,6 @@
 // Cowork 会话
 export const zhCowork: Record<string, string> = {
+  coworkConversationTurns: '对话轮次',
   coworkQueueTitle: '\u5f85\u5904\u7406\u6d88\u606f',
   coworkQueueCount: '{count} \u6761\u5f85\u5904\u7406\u6d88\u606f',
   coworkQueueEmpty: '\u961f\u5217\u4e3a\u7a7a',

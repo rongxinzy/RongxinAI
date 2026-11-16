@@ -4,6 +4,7 @@ import { useDispatch } from 'react-redux';
 import { setDraftPrompt } from '../../../store/slices/coworkSlice';
 import { isImagePath } from './promptInputUtils';
 import type { CoworkAttachment } from './types';
+import { PromptDraftKey } from './constants';
 
 interface UsePromptDraftSyncParams {
   draftKey: string;
@@ -34,15 +35,39 @@ export function usePromptDraftSync({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressedDraftKeyRef = useRef<string | null>(null);
   const previousDraftKeyRef = useRef(draftKey);
+  const previousDraftRef = useRef({ draftKey, value, draftPrompt });
+  if (previousDraftKeyRef.current === draftKey) {
+    previousDraftRef.current = { draftKey, value, draftPrompt };
+  }
   // Sync value from draft when sessionId changes
   useEffect(() => {
     const previousDraftKey = previousDraftKeyRef.current;
+    const previousDraft = previousDraftRef.current;
     previousDraftKeyRef.current = draftKey;
-    suppressedDraftKeyRef.current = null;
     const isTempPromotion =
-      previousDraftKey.startsWith('temp-') &&
-      draftKey !== '__home__' &&
-      !draftKey.startsWith('temp-');
+      (previousDraftKey === PromptDraftKey.Home &&
+        draftKey.startsWith(PromptDraftKey.TemporaryPrefix)) ||
+      (previousDraftKey.startsWith(PromptDraftKey.TemporaryPrefix) &&
+        draftKey !== PromptDraftKey.Home &&
+        !draftKey.startsWith(PromptDraftKey.TemporaryPrefix));
+    // A persistent editor switches draft identities without unmounting. Flush
+    // its previous key before cancelling the debounce, or the last keystrokes
+    // disappear when switching sessions within 300ms.
+    if (previousDraftKey !== draftKey && suppressedDraftKeyRef.current !== previousDraftKey) {
+      if (isTempPromotion) {
+        if (previousDraft.value !== draftPrompt) {
+          dispatch(setDraftPrompt({ sessionId: draftKey, draft: previousDraft.value }));
+        }
+      } else if (previousDraft.value !== previousDraft.draftPrompt) {
+        dispatch(setDraftPrompt({ sessionId: previousDraftKey, draft: previousDraft.value }));
+      }
+    }
+    previousDraftRef.current = {
+      draftKey,
+      value: isTempPromotion ? previousDraft.value : draftPrompt,
+      draftPrompt,
+    };
+    suppressedDraftKeyRef.current = null;
     if (!isTempPromotion) {
       setValue(draftPrompt);
       // Re-derive imageVisionHint from the new session's draft attachments
@@ -108,6 +133,7 @@ export function usePromptDraftSync({
       value: '',
       draftPrompt: '',
     };
+    previousDraftRef.current = { ...previousDraftRef.current, value: '', draftPrompt: '' };
   }, []);
 
   const clearSuppressedDraft = useCallback(() => {

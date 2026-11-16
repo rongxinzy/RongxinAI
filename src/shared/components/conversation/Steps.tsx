@@ -32,7 +32,7 @@ export function Steps({
       open={open}
       defaultOpen={defaultOpen}
       onOpenChange={onOpenChange}
-      className={cn('group/steps min-w-0 text-sm', className)}
+      className={cn('theme-conversation-steps group/steps min-w-0', className)}
     >
       {children}
     </Collapsible>
@@ -54,7 +54,7 @@ export function StepsTrigger({
   return (
     <CollapsibleTrigger
       className={cn(
-        'theme-chat-tool-trigger group flex min-h-8 w-full cursor-pointer items-center justify-between gap-2 text-left text-sm text-muted-foreground',
+        'theme-chat-tool-trigger theme-conversation-steps-trigger group flex w-full cursor-pointer items-center justify-between gap-2 text-left',
         className,
       )}
       {...props}
@@ -65,7 +65,7 @@ export function StepsTrigger({
       </span>
       <span className="flex shrink-0 items-center gap-2">
         {trailing}
-        <ChevronDown className="theme-chat-tool-chevron size-4" />
+        <ChevronDown className="theme-chat-tool-chevron theme-conversation-icon" />
       </span>
     </CollapsibleTrigger>
   );
@@ -80,7 +80,9 @@ export function StepsContent({
 }) {
   return (
     <CollapsibleContent className={cn('overflow-hidden pt-1', className)}>
-      <div className="ml-2 flex min-w-0 flex-col gap-1 border-l border-border pl-3">{children}</div>
+      <div className="theme-conversation-steps-rail ml-2 flex min-w-0 flex-col gap-1">
+        {children}
+      </div>
     </CollapsibleContent>
   );
 }
@@ -92,7 +94,5 @@ export function StepsItem({
   children: React.ReactNode;
   className?: string;
 }) {
-  return (
-    <div className={cn('min-w-0 py-0.5 text-xs text-muted-foreground', className)}>{children}</div>
-  );
+  return <div className={cn('theme-conversation-steps-item min-w-0', className)}>{children}</div>;
 }

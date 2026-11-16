@@ -76,11 +76,9 @@ export function ToolApprovalBar({ permission, onRespond }: ToolApprovalBarProps)
       role="region"
       aria-live="polite"
       aria-label={i18nService.t('codingAgentPermissionEvent')}
-      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2"
+      className="theme-conversation-approval flex flex-wrap items-center justify-between gap-2"
     >
-      <span className="text-xs text-muted-foreground">
-        {i18nService.t('codingAgentPermissionEvent')}
-      </span>
+      <span className="theme-conversation-meta">{i18nService.t('codingAgentPermissionEvent')}</span>
       <div className="flex items-center gap-2">
         <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={handleDeny}>
           {i18nService.t('coworkDeny')}

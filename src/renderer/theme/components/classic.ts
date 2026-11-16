@@ -10,6 +10,7 @@ import { classicChoiceControls } from './classic-choice-controls';
 import { classicSupplementaryControls } from './classic-supplementary-controls';
 import { classicTabs } from './classic-tabs';
 import { classicMessageSurfaces } from './classic-message-surfaces';
+import { conversationAppearances } from './conversation';
 import { classicPromptActions } from './classic-prompt-actions';
 import { classicControlPieces } from './classic-control-pieces';
 import { classicControlSizing } from './classic-control-sizing';
@@ -171,6 +172,7 @@ export function classicComponentAppearances(): ComponentAppearances {
     ...classicControlPieces(),
     ...classicPromptActions(),
     ...classicMessageSurfaces(),
+    ...conversationAppearances(),
     ...classicTabs(),
     ...classicSupplementaryControls(),
     ...classicChoiceControls(),

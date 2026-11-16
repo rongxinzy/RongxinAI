@@ -1,4 +1,5 @@
 import { cn } from '@shared/lib/utils';
+import { Button } from '@shared/components/ui/button';
 
 export interface TurnNavigatorItem {
   id: string;
@@ -12,6 +13,7 @@ export interface TurnNavigatorProps {
   activeTurnId?: string | null;
   onSelectTurn: (turnId: string, index: number) => void;
   className?: string;
+  label?: string;
 }
 
 /**
@@ -22,39 +24,34 @@ export function TurnNavigator({
   activeTurnId,
   onSelectTurn,
   className,
+  label = 'Conversation turns',
 }: TurnNavigatorProps) {
   if (items.length < 6) return null;
 
   return (
     <nav
-      aria-label="Conversation turns"
-      className={cn('hidden xl:flex flex-col items-end gap-1.5 py-2 pr-1.5 select-none', className)}
+      aria-label={label}
+      className={cn(
+        'hidden xl:flex max-h-full flex-col items-end gap-1 overflow-y-auto py-2 select-none',
+        className,
+      )}
     >
       {items.map(item => {
         const isActive = activeTurnId === item.id;
         return (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             key={item.id}
             type="button"
             title={item.label}
             aria-label={item.label}
             onClick={() => onSelectTurn(item.id, item.index)}
-            className={cn(
-              'group flex h-2.5 cursor-pointer items-center justify-end px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-xs',
-            )}
+            aria-current={isActive ? 'step' : undefined}
+            data-turn-state={item.state}
           >
-            <span
-              className={cn(
-                'h-0.5 rounded-full transition-[width,background-color] duration-150',
-                isActive
-                  ? 'w-4 bg-foreground'
-                  : 'w-2 bg-muted-foreground/40 group-hover:w-3.5 group-hover:bg-foreground/70',
-                item.state === 'approval' && 'w-3.5 bg-warning',
-                item.state === 'error' && 'w-3.5 bg-destructive',
-                item.state === 'streaming' && 'w-4 bg-primary',
-              )}
-            />
-          </button>
+            <span className="theme-conversation-turn-marker" />
+          </Button>
         );
       })}
     </nav>

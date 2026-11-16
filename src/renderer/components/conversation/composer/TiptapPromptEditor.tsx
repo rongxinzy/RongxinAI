@@ -1,4 +1,5 @@
 import { cn } from '@shared/lib/utils';
+import { Button } from '@shared/components/ui/button';
 import Placeholder from '@tiptap/extension-placeholder';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -25,6 +26,7 @@ import { PlusMenuSkillsIcon } from '../../cowork/plusMenuIcons';
 import type { CoworkAttachment } from '../../cowork/promptInput/types';
 import type { MentionCandidate } from './MentionSuggestionList';
 import { createSkillMentionExtension, createTextDocFromString } from './SkillMentionExtension';
+import { createPromptKeyboardExtension } from './promptKeyboardExtension';
 
 export interface TiptapPromptEditorHandle {
   focus: () => void;
@@ -152,6 +154,45 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
             return false;
           },
         }),
+        createPromptKeyboardExtension((view, event) => {
+          const isComposing = event.isComposing || event.keyCode === 229;
+          if (isComposing) return false;
+
+          if (
+            event.key === 'Backspace' &&
+            view.state.selection.empty &&
+            view.state.selection.from <= 1 &&
+            activeSkillIdsRef.current.length > 0
+          ) {
+            const lastSkillId = activeSkillIdsRef.current[activeSkillIdsRef.current.length - 1];
+            if (lastSkillId) {
+              event.preventDefault();
+              removeSkillRef.current(lastSkillId);
+              return true;
+            }
+          }
+
+          if (onKeyDownRef.current) {
+            let prevented = false;
+            const synthetic = {
+              key: event.key,
+              shiftKey: event.shiftKey,
+              ctrlKey: event.ctrlKey,
+              metaKey: event.metaKey,
+              altKey: event.altKey,
+              nativeEvent: event,
+              preventDefault: () => {
+                prevented = true;
+                event.preventDefault();
+              },
+              stopPropagation: () => event.stopPropagation(),
+            } as unknown as React.KeyboardEvent<HTMLDivElement>;
+            onKeyDownRef.current(synthetic);
+            if (prevented) return true;
+          }
+
+          return false;
+        }),
       ],
       [dispatch],
     );
@@ -167,46 +208,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
             'aria-multiline': 'true',
             'aria-label': placeholder,
             class:
-              'cowork-prompt-editor min-h-[26px] w-full outline-none whitespace-pre-wrap wrap-break-word text-[14px] leading-relaxed text-foreground [&_.is-editor-empty:first-child::before]:pointer-events-none [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:h-0 [&_.is-editor-empty:first-child::before]:text-muted-foreground [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_p]:m-0',
-          },
-          handleKeyDown: (view, event) => {
-            const isComposing = event.isComposing || event.keyCode === 229;
-            if (isComposing) return false;
-
-            if (
-              event.key === 'Backspace' &&
-              view.state.selection.empty &&
-              view.state.selection.from <= 1 &&
-              activeSkillIdsRef.current.length > 0
-            ) {
-              const lastSkillId = activeSkillIdsRef.current[activeSkillIdsRef.current.length - 1];
-              if (lastSkillId) {
-                event.preventDefault();
-                removeSkillRef.current(lastSkillId);
-                return true;
-              }
-            }
-
-            if (onKeyDownRef.current) {
-              let prevented = false;
-              const synthetic = {
-                key: event.key,
-                shiftKey: event.shiftKey,
-                ctrlKey: event.ctrlKey,
-                metaKey: event.metaKey,
-                altKey: event.altKey,
-                nativeEvent: event,
-                preventDefault: () => {
-                  prevented = true;
-                  event.preventDefault();
-                },
-                stopPropagation: () => event.stopPropagation(),
-              } as unknown as React.KeyboardEvent<HTMLDivElement>;
-              onKeyDownRef.current(synthetic);
-              if (prevented) return true;
-            }
-
-            return false;
+              'theme-conversation-editor cowork-prompt-editor w-full outline-none whitespace-pre-wrap wrap-break-word [&_.is-editor-empty:first-child::before]:pointer-events-none [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:h-0 [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_p]:m-0',
           },
           handlePaste: (_view, event) => {
             if (!onPasteRef.current) return false;
@@ -326,7 +328,12 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
     );
 
     return (
-      <div className={cn('flex w-full min-w-0 flex-col gap-1.5 px-3', className)}>
+      <div
+        className={cn(
+          'theme-conversation-editor-shell flex w-full min-w-0 flex-col gap-1.5',
+          className,
+        )}
+      >
         {activeSkills.length > 0 ? (
           <div className="flex flex-wrap items-center gap-1">
             {activeSkills.map(skill => {
@@ -339,30 +346,31 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
                 <span
                   key={skill.id}
                   data-skill-token={skill.id}
-                  className="theme-surface-skill-token inline-flex h-6 max-w-44 select-none items-center gap-1 px-2 text-xs leading-none"
+                  className="theme-conversation-skill-token inline-flex max-w-44 select-none items-center gap-1"
                 >
                   {skill.iconUrl ? (
                     <img
                       src={resolveSkillIconUrl(skill.iconUrl)}
                       alt=""
-                      className="size-3 shrink-0 object-contain"
+                      className="theme-conversation-icon shrink-0 object-contain"
                     />
                   ) : ShortcutIcon ? (
-                    <ShortcutIcon className="theme-surface-skill-fallback size-3 shrink-0" />
+                    <ShortcutIcon className="theme-surface-skill-fallback theme-conversation-icon shrink-0" />
                   ) : (
-                    <PlusMenuSkillsIcon className="theme-surface-skill-fallback size-3 shrink-0" />
+                    <PlusMenuSkillsIcon className="theme-surface-skill-fallback theme-conversation-icon shrink-0" />
                   )}
                   <span className="truncate">{label}</span>
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
                     type="button"
-                    tabIndex={-1}
                     aria-label={`${i18nService.t('clearSkill')} ${label}`}
                     title={i18nService.t('clearSkill')}
                     onClick={() => removeSkill(skill.id)}
-                    className="ml-0.5 inline-flex size-3.5 shrink-0 cursor-pointer items-center justify-center rounded-xs text-muted-foreground hover:text-foreground"
+                    className="ml-0.5 shrink-0"
                   >
-                    <X className="size-3" />
-                  </button>
+                    <X className="theme-conversation-icon" />
+                  </Button>
                 </span>
               );
             })}

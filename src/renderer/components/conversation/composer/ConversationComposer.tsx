@@ -1,29 +1,17 @@
 import {
   PromptInput,
   PromptInputBody,
-  PromptInputFooter,
   PromptInputHeader,
   PromptInputProvider,
-  PromptInputSubmit,
-  PromptInputTools,
 } from '@shared/components/ai-elements/prompt-input';
 import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
 import { TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import {
-  CoworkSessionMode,
-  DEFAULT_COWORK_PERMISSION_MODE,
-} from '../../../../shared/cowork/constants';
+import { CoworkSessionMode } from '../../../../shared/cowork/constants';
 import { hasVisiblePromptContent } from '../../../../shared/cowork/submissionContent';
 import { i18nService } from '../../../services/i18n';
 import { skillService } from '../../../services/skill';
@@ -40,14 +28,7 @@ import { clearActiveSkills, setSkills } from '../../../store/slices/skillSlice';
 import { WorkMode } from '../../../store/workMode/constants';
 import type { CoworkImageAttachment } from '../../../types/cowork';
 import { SlashCommandMenu } from '../../common/SlashCommandMenu';
-import ActiveExpertBadge from '../../cowork/ActiveExpertBadge';
-import { ContextUsageIndicator } from '../../cowork/ContextUsageIndicator';
 import { CoworkInlineAttachments } from '../../cowork/CoworkInlineAttachments';
-import { CoworkModelPicker } from '../../cowork/CoworkModelPicker';
-import PermissionModeMenu from '../../cowork/PermissionModeMenu';
-import PromptPlusMenu from '../../cowork/PromptPlusMenu';
-import { PromptWorkspaceSelector } from '../../cowork/PromptWorkspaceSelector';
-import GoalModeChip from '../../cowork/promptInput/GoalModeChip';
 import { EMPTY_ATTACHMENTS } from '../../cowork/promptInput/promptInputUtils';
 import type {
   CoworkAttachment,
@@ -57,6 +38,7 @@ import type {
 import { useCoworkPromptSubmission } from '../../cowork/promptInput/useCoworkPromptSubmission';
 import { usePromptAttachments } from '../../cowork/promptInput/usePromptAttachments';
 import { usePromptDraftSync } from '../../cowork/promptInput/usePromptDraftSync';
+import { PromptDraftKey } from '../../cowork/promptInput/constants';
 import { usePromptFileDrop } from '../../cowork/promptInput/usePromptFileDrop';
 import { usePromptKeyDown } from '../../cowork/promptInput/usePromptKeyDown';
 import { usePromptModelSelection } from '../../cowork/promptInput/usePromptModelSelection';
@@ -64,7 +46,7 @@ import { resolveInitialSelectedExpertIds } from '../../cowork/resolveInitialSele
 import { SessionStatsLine } from '../../cowork/SessionStatsLine';
 import { useCoworkSlashMenu } from '../../cowork/useCoworkSlashMenu';
 import { usePromptSubmissionLock } from '../../cowork/usePromptSubmissionLock';
-import ActiveMcpBadge from '../../mcp/ActiveMcpBadge';
+import { ComposerToolbar } from './ComposerToolbar';
 import { TiptapPromptEditor, type TiptapPromptEditorHandle } from './TiptapPromptEditor';
 
 const COMPACT_TOOLBAR_MAX_WIDTH = 480;
@@ -74,33 +56,20 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
   (props, ref) => {
     const {
       onSubmit,
-      onStop,
       isStreaming = false,
       placeholder = 'Enter your task...',
       disabled = false,
       sessionContextPending = false,
       size = 'normal',
       workingDirectory = '',
-      workingDirectoryName,
-      onWorkingDirectoryChange,
-      onCreateProject,
-      onUseNoFolder,
       showFolderSelector = false,
-      showNoFolderAction = true,
-      showModelSelector = false,
-      onManageModels,
-      onManageSkills,
-      onManageConnectors,
-      showPermissionModeSelector = false,
-      permissionMode,
-      onPermissionModeChange,
       sessionId,
       remoteManaged = false,
       topAccessory,
     } = props;
 
     const dispatch = useDispatch();
-    const draftKey = sessionId || '__home__';
+    const draftKey = sessionId || PromptDraftKey.Home;
     const draftPrompts = useSelector(selectDraftPrompts);
     const draftPrompt = draftPrompts[draftKey] ?? '';
     const rawAttachments = useSelector(
@@ -121,7 +90,6 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
           .find(message => message.metadata?.contextUsage),
       [currentSession?.messages],
     );
-    const contextUsage = contextMessage?.metadata?.contextUsage;
     const workMode = useSelector(selectWorkMode);
     const canQueueWhileStreaming =
       workMode === WorkMode.Work &&
@@ -135,7 +103,6 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
     const [goalMode, setGoalMode] = useState(false);
     const [showFolderRequiredWarning, setShowFolderRequiredWarning] = useState(false);
     const [imageVisionHint, setImageVisionHint] = useState(false);
-    const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
     const [isCompactToolbar, setIsCompactToolbar] = useState(false);
     const [isTightToolbar, setIsTightToolbar] = useState(false);
 
@@ -216,11 +183,11 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
       if (prevWorkModeForDraftRef.current === workMode) return;
       prevWorkModeForDraftRef.current = workMode;
 
-      if (draftKey === '__home__') {
+      if (draftKey === PromptDraftKey.Home) {
         setValue('');
         setImageVisionHint(false);
-        dispatch(setDraftPrompt({ sessionId: '__home__', draft: '' }));
-        dispatch(clearDraftAttachments('__home__'));
+        dispatch(setDraftPrompt({ sessionId: PromptDraftKey.Home, draft: '' }));
+        dispatch(clearDraftAttachments(PromptDraftKey.Home));
         dispatch(clearActiveSkills());
         dispatch(clearSelection());
       }
@@ -356,8 +323,6 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
       handleSubmit,
     });
 
-    const isPlusToolbar = !remoteManaged;
-    const isWorkVariant = showFolderSelector || showPermissionModeSelector;
     const isSubmitEmpty = !hasVisiblePromptContent(value) && attachments.length === 0;
     const showEmptySubmitHint = isSubmitEmpty && !isStreaming;
 
@@ -371,8 +336,8 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
           </Alert>
         )}
         {imageVisionHint && (
-          <div className="mb-2 flex items-start gap-1.5 rounded-md border border-border bg-surface-raised px-2.5 py-1.5 text-xs text-muted-foreground">
-            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
+          <div className="theme-conversation-notice mb-2 flex items-start gap-1.5">
+            <TriangleAlert className="theme-conversation-icon mt-0.5 shrink-0" />
             <span>{i18nService.t('imageVisionHint')}</span>
             <Button
               variant="ghost"
@@ -380,7 +345,7 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
               className="ml-auto shrink-0"
               onClick={() => setImageVisionHint(false)}
             >
-              <X className="h-3 w-3" />
+              <X className="theme-conversation-icon" />
             </Button>
           </div>
         )}
@@ -408,7 +373,7 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
           onSubmit={handleSubmit}
         >
           {isDraggingFiles && (
-            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[inherit] bg-primary/10 text-xs font-medium text-primary">
+            <div className="theme-conversation-drop pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
               {i18nService.t('coworkDropFileHint')}
             </div>
           )}
@@ -440,172 +405,24 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
               )}
             />
           </PromptInputBody>
-          <PromptInputFooter className="flex-nowrap">
-            <PromptInputTools
-              className={cn(
-                'min-w-0 flex-1 flex-wrap',
-                sessionContextPending && 'pointer-events-none opacity-50',
-              )}
-              aria-disabled={sessionContextPending}
-              inert={sessionContextPending ? true : undefined}
-            >
-              {!isCompactToolbar && !isPlusToolbar && showModelSelector && (
-                <>
-                  <ContextUsageIndicator
-                    usage={contextUsage}
-                    messageUsage={contextMessage?.metadata?.usage}
-                    modelId={contextMessage?.metadata?.model}
-                    modelProviderKey={contextMessage?.metadata?.modelProviderKey}
-                    selectedModelId={effectiveSelectedModel?.id}
-                    selectedModelProviderKey={effectiveSelectedModel?.providerKey}
-                    messages={currentSession?.messages}
-                    systemPrompt={currentSession?.systemPrompt}
-                  />
-                  <CoworkModelPicker
-                    models={availableModels}
-                    selectedModel={effectiveSelectedModel}
-                    open={modelSelectorOpen}
-                    onOpenChange={setModelSelectorOpen}
-                    onManageModels={onManageModels}
-                    onSelect={model => {
-                      void handleModelSelect(model);
-                    }}
-                  />
-                </>
-              )}
-              {isPlusToolbar && (
-                <PromptPlusMenu
-                  onAddFile={() => {
-                    void handleAddFile();
-                  }}
-                  onManageSkills={() => onManageSkills?.()}
-                  onManageConnectors={() => onManageConnectors?.()}
-                  experts={
-                    isWorkVariant
-                      ? { selectedExpertIds, onChange: setSelectedExpertIds }
-                      : undefined
-                  }
-                  goalMode={goalMode}
-                  onGoalModeChange={setGoalMode}
-                  disabled={disabled || isStreaming || isAddingFile}
-                />
-              )}
-              {showFolderSelector && (
-                <PromptWorkspaceSelector
-                  onSelectFolder={path => onWorkingDirectoryChange?.(path)}
-                  onCreateProject={async (path, name) =>
-                    onCreateProject ? onCreateProject(path, name) : false
-                  }
-                  onUseNoFolder={onUseNoFolder}
-                  showNoFolderAction={showNoFolderAction}
-                  initialDirectory={workingDirectory}
-                  label={workingDirectoryName || i18nService.t('enterProjectWork')}
-                  compact={isTightToolbar}
-                  warning={showFolderRequiredWarning}
-                  disabled={disabled || sessionContextPending}
-                />
-              )}
-              {isPlusToolbar && (
-                <>
-                  {!isCompactToolbar && isWorkVariant && (
-                    <PermissionModeMenu
-                      value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
-                      onChange={mode => onPermissionModeChange?.(mode)}
-                      disabled={disabled}
-                    />
-                  )}
-                  {isWorkVariant && (
-                    <ActiveExpertBadge
-                      expertId={selectedExpertIds[0]}
-                      expertName={
-                        currentSession?.experts?.find(
-                          expert => expert.expertId === selectedExpertIds[0],
-                        )?.expertName
-                      }
-                      onRemove={() => setSelectedExpertIds([])}
-                      compact={isTightToolbar}
-                    />
-                  )}
-                  {isWorkVariant && goalMode && (
-                    <GoalModeChip compact={isTightToolbar} onRemove={() => setGoalMode(false)} />
-                  )}
-                  <ActiveMcpBadge />
-                </>
-              )}
-            </PromptInputTools>
-            {isPlusToolbar && (showModelSelector || (isCompactToolbar && isWorkVariant)) && (
-              <div className="flex min-w-0 shrink-0 items-center gap-1.5">
-                {showModelSelector && (
-                  <>
-                    {!isCompactToolbar && (
-                      <ContextUsageIndicator
-                        usage={contextUsage}
-                        messageUsage={contextMessage?.metadata?.usage}
-                        modelId={contextMessage?.metadata?.model}
-                        modelProviderKey={contextMessage?.metadata?.modelProviderKey}
-                        selectedModelId={effectiveSelectedModel?.id}
-                        selectedModelProviderKey={effectiveSelectedModel?.providerKey}
-                        messages={currentSession?.messages}
-                        systemPrompt={currentSession?.systemPrompt}
-                      />
-                    )}
-                    <CoworkModelPicker
-                      models={availableModels}
-                      selectedModel={effectiveSelectedModel}
-                      open={modelSelectorOpen}
-                      onOpenChange={setModelSelectorOpen}
-                      onManageModels={onManageModels}
-                      onSelect={model => {
-                        void handleModelSelect(model);
-                      }}
-                      compact={isCompactToolbar}
-                    />
-                  </>
-                )}
-                {isCompactToolbar && isWorkVariant && (
-                  <PermissionModeMenu
-                    value={permissionMode ?? DEFAULT_COWORK_PERMISSION_MODE}
-                    onChange={mode => onPermissionModeChange?.(mode)}
-                    disabled={disabled}
-                    compact
-                  />
-                )}
-              </div>
-            )}
-            {showEmptySubmitHint ? (
-              <TooltipProvider delay={0}>
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <span
-                        className="inline-flex cursor-not-allowed"
-                        aria-label={i18nService.t('chatSubmitEmptyHint')}
-                      />
-                    }
-                  >
-                    <PromptInputSubmit
-                      type="button"
-                      status="ready"
-                      aria-disabled="true"
-                      tabIndex={-1}
-                      onClick={event => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                      className="cursor-not-allowed opacity-40"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent side="top">{i18nService.t('chatSubmitEmptyHint')}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : (
-              <PromptInputSubmit
-                disabled={sessionContextPending}
-                status={isStreaming ? 'streaming' : 'ready'}
-                onStop={isStreaming ? onStop : undefined}
-              />
-            )}
-          </PromptInputFooter>
+          <ComposerToolbar
+            config={props}
+            currentSession={currentSession}
+            contextMessage={contextMessage}
+            availableModels={availableModels}
+            effectiveSelectedModel={effectiveSelectedModel}
+            handleModelSelect={handleModelSelect}
+            isCompactToolbar={isCompactToolbar}
+            isTightToolbar={isTightToolbar}
+            isAddingFile={isAddingFile}
+            showFolderRequiredWarning={showFolderRequiredWarning}
+            selectedExpertIds={selectedExpertIds}
+            setSelectedExpertIds={setSelectedExpertIds}
+            goalMode={goalMode}
+            setGoalMode={setGoalMode}
+            handleAddFile={handleAddFile}
+            showEmptySubmitHint={showEmptySubmitHint}
+          />
         </PromptInput>
         <SessionStatsLine messages={currentSession?.messages ?? []} />
         {showFolderSelector && showFolderRequiredWarning && (
