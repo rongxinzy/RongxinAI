@@ -104,7 +104,7 @@ test('quick skill selections automatically allow tools for their chat session on
 
 test('chat uses the complete local skill registry shared with Work', () => {
   const source = readFileSync(
-    fileURLToPath(new URL('../cowork/CoworkPromptInput.tsx', import.meta.url)),
+    fileURLToPath(new URL('../conversation/composer/ConversationComposer.tsx', import.meta.url)),
     'utf8',
   );
   expect(source).toContain('dispatch(setSkills(loadedSkills));');

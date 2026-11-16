@@ -15,7 +15,9 @@ const appBootstrapSources = readdirSync(appBootstrapDir)
   .join('\n');
 
 const mainSource = `${readSource('../../main.ts')}\n${appBootstrapSources}`;
-const coworkViewSource = readSource('../../../renderer/components/cowork/CoworkView.tsx');
+const coworkViewSource = readSource(
+  '../../../renderer/components/conversation/ConversationStage.tsx',
+);
 const coworkServiceSource = readSource('../../../renderer/services/cowork.ts');
 const piRuntimeAdapterSource = readSource('./piRuntimeAdapter.ts');
 const ccConnectPiBridgeSource = readSource('../../im/ccConnectPiBridge.ts');

@@ -425,6 +425,16 @@ export default defineConfig(async ({ command }) => {
           desktopPet: path.resolve(projectRoot, 'desktop-pet.html'),
           companion: path.resolve(projectRoot, 'companion.html'),
         },
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: 'i18n',
+                test: /src[\\/]renderer[\\/]services[\\/]i18n[\\/]/,
+              },
+            ],
+          },
+        },
       },
       // CI 中指定 chrome130（Electron 40 运行时）跳过降级转译省内存
       ...(process.env.CI && { target: 'chrome130' }),

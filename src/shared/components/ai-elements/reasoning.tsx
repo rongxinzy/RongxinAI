@@ -24,11 +24,6 @@ import { Streamdown, type StreamdownProps } from 'streamdown';
 
 import { LinkSafetyModal } from './linkSafetyModal';
 import { Shimmer } from './shimmer';
-import {
-  isPlainTextStreamingTail,
-  useAdaptiveTextReveal,
-  useStreamingTextSegments,
-} from './streamingText';
 
 // Same on-demand pipeline as MessageResponse: plain reasoning text never
 // pays for the Shiki/KaTeX/Mermaid runtimes (issue #141).
@@ -231,9 +226,6 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
   const userScrolledUpRef = useRef(false);
 
   const text = typeof children === 'string' ? children : '';
-  const { committed, tail } = useStreamingTextSegments(text, isStreaming);
-  const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
-  const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -258,35 +250,29 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
     if (isStreaming && scrollRef.current && !userScrolledUpRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [children, isStreaming]);
+  }, [text, isStreaming]);
 
   const base = (
-    <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
+    <Streamdown
+      mode="streaming"
+      parseIncompleteMarkdown={isStreaming}
+      isAnimating={isStreaming}
+      plugins={basePlugins}
+      linkSafety={linkSafety}
+    >
       {text}
     </Streamdown>
   );
 
-  const committedElement = useMemo(
-    () =>
-      committed ? (
-        <Streamdown plugins={basePlugins} linkSafety={linkSafety}>
-          {committed}
-        </Streamdown>
-      ) : null,
-    [committed],
-  );
-
-  const streamingContent = (
-    <>
-      {committedElement}
-      {revealedTail && <div className="whitespace-pre-wrap wrap-break-word">{revealedTail}</div>}
-    </>
-  );
-  const content = isStreaming ? (
-    streamingContent
-  ) : RICH_CONTENT_PATTERN.test(text) ? (
+  const content = RICH_CONTENT_PATTERN.test(text) ? (
     <React.Suspense fallback={base}>
-      <RichMessageResponse>{text}</RichMessageResponse>
+      <RichMessageResponse
+        mode="streaming"
+        parseIncompleteMarkdown={isStreaming}
+        isAnimating={isStreaming}
+      >
+        {text}
+      </RichMessageResponse>
     </React.Suspense>
   ) : (
     base

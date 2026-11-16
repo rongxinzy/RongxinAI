@@ -66,4 +66,28 @@ describe('LiveTextStore', () => {
     store.applyChunk('m1', { type: 'text-delta', id: 'p1', delta: 'kept' }, 's1');
     expect(store.getSnapshot('m1')).toBe('basekept');
   });
+
+  test('subscribeMessage notifies only listeners for dirty messageIds', () => {
+    const scheduler = new ManualNotifyScheduler();
+    const store = new LiveTextStore(scheduler);
+    const listener1 = vi.fn();
+    const listener2 = vi.fn();
+    const off1 = store.subscribeMessage('m1', listener1);
+    store.subscribeMessage('m2', listener2);
+
+    store.applyChunk('m1', { type: 'text-start', id: 'p1' }, 's1');
+    store.applyChunk('m1', { type: 'text-delta', id: 'p1', delta: 'hi' }, 's1');
+    scheduler.drain();
+
+    expect(listener1).toHaveBeenCalledTimes(1);
+    expect(listener2).not.toHaveBeenCalled();
+
+    off1();
+    store.applyChunk('m1', { type: 'text-delta', id: 'p1', delta: '!' }, 's1');
+    store.applyChunk('m2', { type: 'text-delta', id: 'p2', delta: 'yo' }, 's1');
+    scheduler.drain();
+
+    expect(listener1).toHaveBeenCalledTimes(1);
+    expect(listener2).toHaveBeenCalledTimes(1);
+  });
 });

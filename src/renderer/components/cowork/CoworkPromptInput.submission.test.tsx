@@ -7,7 +7,7 @@ import { resetAppToastDedupeForTests } from '../../services/toastNotification';
 import type { RootState } from '../../store';
 import { clearDraftAttachments, type DraftAttachment } from '../../store/slices/coworkSlice';
 import { WorkMode } from '../../store/workMode/constants';
-import CoworkPromptInput from './CoworkPromptInput';
+import { ConversationComposer as CoworkPromptInput } from '../conversation/composer/ConversationComposer';
 
 type Dispatcher = { mock: { calls: [unknown][] } };
 

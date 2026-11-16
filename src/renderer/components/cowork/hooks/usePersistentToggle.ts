@@ -86,7 +86,7 @@ const scopedKey = (key: string): string => {
 };
 
 /** Reads a persisted toggle state in the active session namespace if recorded. */
-export const getPersistentToggleValue = (key: string): boolean | undefined =>
+const getPersistentToggleValue = (key: string): boolean | undefined =>
   expansionMemory.get(scopedKey(key)) ?? expansionMemory.get(`${currentNamespace}:${key}`);
 
 export const usePersistentToggle = (
