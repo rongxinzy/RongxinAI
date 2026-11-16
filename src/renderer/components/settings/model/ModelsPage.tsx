@@ -25,6 +25,7 @@ import {
 } from '../../../services/modelSettings/providerErrorClassifier';
 import type { ConsolidatedProviderPreset } from '../../../services/modelSettings/providerPresets';
 import { useModelServiceAutoStart } from '../../../services/modelSettings/useModelServiceAutoStart';
+import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
 import { showAppToast } from '../../../services/toastNotification';
 import type { RootState } from '../../../store';
 import { AddProviderWizard } from './AddProviderWizard';
@@ -216,7 +217,10 @@ export function ModelsPage({
       if (status?.state !== 'running' && window.electron?.magpie?.start) {
         const started = await window.electron.magpie.start();
         if (started.state !== 'running') {
-          throw new Error(started.error || i18nService.t('magpieGatewayStartFailedHint'));
+          throw new Error(
+            (started.error ? neutralRuntimeName(started.error) : '') ||
+              i18nService.t('magpieGatewayStartFailedHint'),
+          );
         }
       }
       await window.electron.magpie.setSubscriptionAccounts(enabled);
@@ -224,7 +228,8 @@ export function ModelsPage({
       await refreshAll();
     } catch (error) {
       showAppToast({
-        message: error instanceof Error ? error.message : i18nService.t('saveFailed'),
+        message:
+          error instanceof Error ? neutralRuntimeName(error.message) : i18nService.t('saveFailed'),
         isError: true,
       });
     } finally {
@@ -239,7 +244,8 @@ export function ModelsPage({
       await refreshAll();
     } catch (error) {
       showAppToast({
-        message: error instanceof Error ? error.message : i18nService.t('saveFailed'),
+        message:
+          error instanceof Error ? neutralRuntimeName(error.message) : i18nService.t('saveFailed'),
         isError: true,
       });
     }

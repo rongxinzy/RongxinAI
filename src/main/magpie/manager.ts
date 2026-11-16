@@ -270,7 +270,7 @@ export class MagpieManager implements MagpieRoutingGateway {
       const deadline = Date.now() + (this.options.startupTimeoutMs ?? 30_000);
       while (Date.now() < deadline) {
         signal.throwIfAborted();
-        if (exited) throw new Error('Magpie process exited during startup');
+        if (exited) throw new Error('Model service process exited during startup');
         try {
           const hello = await this.request(`${gatewayUrl}/api/hello`, { signal });
           const data = (await hello.json()) as { name?: string; version?: string };
@@ -287,7 +287,7 @@ export class MagpieManager implements MagpieRoutingGateway {
         }
         await delay(100);
       }
-      throw new Error('Magpie startup timed out');
+      throw new Error('Model service startup timed out');
     } catch (error) {
       if (chosenGatewayPort !== undefined && (phase === 'spawn' || phase === 'probe')) {
         if (this.failedGatewayPorts.size >= 8) this.failedGatewayPorts.clear();

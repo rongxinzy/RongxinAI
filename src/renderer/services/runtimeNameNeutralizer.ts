@@ -9,6 +9,8 @@ import { i18nService } from './i18n';
  * usage load errors, preview dialogs).
  */
 export function neutralRuntimeName(text: string): string {
-  const neutralName = i18nService.getLanguage() === 'zh' ? '模型服务' : 'model service';
-  return text.replace(/magpie/gi, neutralName);
+  const language =
+    typeof i18nService?.getLanguage === 'function' ? i18nService.getLanguage() : 'zh';
+  const neutralName = language === 'zh' ? '模型服务' : 'model service';
+  return text.replace(/magpie|喜鹊|yetone/gi, neutralName);
 }

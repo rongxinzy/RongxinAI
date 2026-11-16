@@ -1,6 +1,7 @@
 // Models and providers
 export const enModelProviders: Record<string, string> = {
   aisphereTab: 'Organization Platform',
+  aisphereTitle: 'Connect organization platform',
   aisphereAddress: 'Organization platform address',
   aisphereAddressPlaceholder: 'https://platform-address or http://platform-address',
   aisphereDescription:

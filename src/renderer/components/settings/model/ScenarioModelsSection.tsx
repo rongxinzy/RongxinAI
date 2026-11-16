@@ -10,12 +10,32 @@ import type {
   MagpiePreferencesPatch,
 } from '../../../../shared/magpie/preferences';
 import { i18nService } from '../../../services/i18n';
+import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
+
+const EFFORT_LABEL_KEYS: Record<string, string> = {
+  '': 'modelEffortDefault',
+  default: 'modelEffortDefault',
+  auto: 'modelEffortAuto',
+  off: 'modelEffortOff',
+  none: 'modelEffortNone',
+  minimal: 'modelEffortMinimal',
+  low: 'modelEffortLow',
+  medium: 'modelEffortMedium',
+  high: 'modelEffortHigh',
+  xhigh: 'modelEffortXHigh',
+  max: 'modelEffortMax',
+};
+
+function formatEffortLabel(effort: string): string {
+  const key = EFFORT_LABEL_KEYS[effort.trim().toLowerCase()];
+  return key ? i18nService.t(key) : neutralRuntimeName(effort);
+}
 
 function mapRefsToPickerItems(refs: MagpieModelRef[]): ModelPickerItem[] {
   return refs.map(ref => ({
     id: ref.id,
-    name: ref.name || ref.id,
-    providerLabel: ref.providerName || '',
+    name: neutralRuntimeName(ref.name || ref.id),
+    providerLabel: ref.providerName ? neutralRuntimeName(ref.providerName) : '',
     providerKey: ref.providerName || 'custom',
   }));
 }
@@ -40,8 +60,11 @@ export function ScenarioModelsSection({
 
   const effortItems = (preferences.visionEfforts || []).map(effort => ({
     value: effort,
-    label: i18nService.t(`magpieEffort_${effort}`) || effort,
+    label: formatEffortLabel(effort),
   }));
+  const selectedEffort = effortItems.some(item => item.value === preferences.visionEffort)
+    ? preferences.visionEffort
+    : (effortItems[0]?.value ?? '');
 
   const currentVision =
     preferences.vision && preferences.vision !== 'off' ? preferences.vision : null;
@@ -76,7 +99,7 @@ export function ScenarioModelsSection({
               aria-label={i18nService.t('modelsScenarioReasoningLabel')}
               size={FluidTabsSize.Small}
               items={effortItems}
-              value={preferences.visionEffort || effortItems[0].value}
+              value={selectedEffort}
               disabled={disabled}
               onValueChange={visionEffort => void onUpdate({ visionEffort })}
             />

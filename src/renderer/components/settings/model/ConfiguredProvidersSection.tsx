@@ -9,6 +9,7 @@ import type {
   ClassifiedProviderError,
   ProviderErrorAction,
 } from '../../../services/modelSettings/providerErrorClassifier';
+import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
 import { ProviderErrorBanner } from './ProviderErrorBanner';
 
 export interface ConfiguredProvidersSectionProps {
@@ -85,6 +86,7 @@ export function ConfiguredProvidersSection({
         {personalProviders.map(provider => {
           const err = providerErrors[provider.id];
           const paused = orgConnected && !provider.off;
+          const displayName = neutralRuntimeName(provider.name);
           return (
             <div key={provider.id} className="space-y-3 px-4 py-3.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -94,7 +96,7 @@ export function ConfiguredProvidersSection({
                   className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                   <ProviderAvatar
-                    name={provider.name}
+                    name={displayName}
                     providerKey={provider.id}
                     baseUrl={provider.baseUrl}
                     size="md"
@@ -102,7 +104,7 @@ export function ConfiguredProvidersSection({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate text-sm font-medium text-foreground">
-                        {provider.name}
+                        {displayName}
                       </span>
                       {paused && (
                         <Badge variant="outline">{i18nService.t('modelsOrgPausedHint')}</Badge>
@@ -150,7 +152,7 @@ export function ConfiguredProvidersSection({
                   </Button>
                   <Switch
                     checked={!provider.off}
-                    aria-label={provider.name}
+                    aria-label={displayName}
                     onCheckedChange={checked => onToggleProviderEnabled(provider, checked)}
                   />
                 </div>

@@ -201,7 +201,7 @@ export function AdvancedPage({
               className="shrink-0 gap-1.5"
               onClick={() => {
                 void navigator.clipboard.writeText(preferences.gateway);
-                showAppToast(i18nService.t('copiedToClipboard'));
+                showAppToast(i18nService.t('copied'));
               }}
             >
               <Copy className="size-3.5" />
