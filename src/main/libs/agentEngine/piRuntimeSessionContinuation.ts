@@ -3,7 +3,7 @@
  *
  * Extracted from PiRuntimeAdapter.continueSession/patchSession: drives a
  * follow-up turn on a live Pi session — deciding whether the session can be
- * reused or must be recreated (model/skills/MCP topology/unattended changes
+ * reused or must be recreated (workspace/model/skills/MCP topology/unattended changes
  * restore history from the store), reloading resources, running the workbench
  * run bookkeeping, and dispatching the next prompt. patchSession swaps the
  * model or thinking level of a live session in place.
@@ -20,7 +20,6 @@ import { assertCoworkSubmissionContent } from '../../../shared/cowork/submission
 import { HarnessVersion } from '../../../shared/harness';
 import { ZhiyuanModelPoolWorkload } from '../../../shared/modelPool/constants';
 import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../../shared/workbenchTask';
-import { agentResourceDiagnostics } from '../../agentResourceDiagnostics';
 import type { CoworkMessage } from '../../coworkStore';
 import { captureMemoryPromptForE2e } from '../../memory/memoryPromptE2eCapture';
 import { resolveProjectMemoryContextForPiPrompt } from '../../memory/piRuntimeProjectMemoryPrompt';
@@ -94,7 +93,10 @@ export async function continuePiRuntimeSession(
     !active.resourceState.chatMode &&
     active.mcpToolManifestGeneration !== host.getMcpToolManifestGeneration();
   const unattendedTopologyChanged = nextUnattended !== active.unattended;
+  // Native tools and resources capture cwd when created. Reopen the persisted
+  // Pi session instead of only changing the adapter's workspace field.
   if (
+    (options.workspaceRoot !== undefined && options.workspaceRoot !== active.workspaceRoot) ||
     (options.modelOverride !== undefined &&
       options.modelOverride !== active.requestedModelOverride) ||
     !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
@@ -105,6 +107,7 @@ export async function continuePiRuntimeSession(
     return await host.startSession(sessionId, prompt, {
       ...options,
       sessionMode: requestedSessionMode,
+      skipInitialUserMessage: options._skipUserMessage,
       systemPrompt: requestedSystemPrompt ?? active.requestedSystemPrompt,
       skillIds: requestedSkillIds,
       expertIds: requestedExpertIds,
