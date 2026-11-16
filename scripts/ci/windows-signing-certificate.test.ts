@@ -39,7 +39,7 @@ test('windows-release signs in one Certum session and verifier enforces public D
   const acceptance = workflow.jobs.acceptance;
   expect(acceptance.needs).toBe('windows-release');
   expect(acceptance['runs-on']).toBe('windows-2022');
-  expect(acceptance.strategy?.matrix.edition).toEqual(['lite', 'cpu', 'cuda']);
+  expect(acceptance.strategy?.matrix.edition).toEqual(['lite', 'cuda']);
   expect(JSON.stringify(acceptance)).not.toContain('secrets.');
   expect(JSON.stringify(acceptance)).not.toContain('setup-certum-signing');
   const restore = acceptance.steps.findIndex(step =>

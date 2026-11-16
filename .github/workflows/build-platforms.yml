@@ -57,7 +57,7 @@ jobs:
       build-macos: ${{ inputs.build_macos }}
       build-windows: ${{ inputs.build_windows }}
       build-linux: ${{ inputs.build_linux }}
-      linux-inference-editions: 'cpu,cuda'
+      linux-inference-editions: 'lite,cuda'
     secrets:
       MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
 

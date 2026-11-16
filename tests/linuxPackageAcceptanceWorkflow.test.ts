@@ -56,7 +56,7 @@ test('Linux package acceptance is restricted to the repair branch without releas
       "contains(github.event.head_commit.message, '[linux-package-acceptance]') }}",
   );
   assert.doesNotMatch(source, /secrets[.:]|mode: release|assemble-inference-candidate|publish:/);
-  assert.deepEqual(job.strategy.matrix.edition, ['cpu', 'cuda']);
+  assert.deepEqual(job.strategy.matrix.edition, ['lite', 'cuda']);
   assert.equal(job.strategy['fail-fast'], false);
 });
 

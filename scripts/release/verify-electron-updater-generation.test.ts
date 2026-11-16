@@ -7,7 +7,7 @@ import { afterEach, expect, test } from 'vitest';
 import { ELECTRON_UPDATER_METADATA_FILENAMES } from './inference-edition-targets.mjs';
 
 const VERSION = '2026.10.19-build.11';
-const WINDOWS_TARGETS = ['win32:x64:lite', 'win32:x64:cpu', 'win32:x64:cuda'];
+const WINDOWS_TARGETS = ['win32:x64:lite', 'win32:x64:cuda'];
 const directories: string[] = [];
 
 afterEach(() => {
@@ -51,14 +51,14 @@ function verify(targets: string[], platforms: string, corruptHash = false) {
   );
 }
 
-test('accepts all three Windows editions for a Windows-only generation', () => {
+test('accepts both Windows editions for a Windows-only generation', () => {
   const result = verify(WINDOWS_TARGETS, 'win32');
   expect(result.stderr).toBe('');
   expect(result.status).toBe(0);
 });
 
 test('still requires every selected Windows edition', () => {
-  const result = verify(WINDOWS_TARGETS.slice(0, 2), 'win32');
+  const result = verify(WINDOWS_TARGETS.slice(0, 1), 'win32');
   expect(result.status).not.toBe(0);
   expect(result.stderr).toContain('exactly the supported updater targets');
 });

@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        edition: [cpu, cuda]
+        edition: [lite, cuda]
     env:
       ZHIYUAN_UPDATE_VARIANT: ${{ matrix.edition }}
     steps:

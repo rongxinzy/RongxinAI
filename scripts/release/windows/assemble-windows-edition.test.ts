@@ -78,7 +78,7 @@ test('each edition restores exact inputs on a fresh runner before shared accepta
   const acceptance = releaseWorkflow().jobs.acceptance;
   expect(acceptance.needs).toBe('windows-release');
   expect(acceptance.if).toBe('${{ !inputs.enterprise-extension }}');
-  expect(acceptance.strategy?.matrix.edition).toEqual(['lite', 'cpu', 'cuda']);
+  expect(acceptance.strategy?.matrix.edition).toEqual(['lite', 'cuda']);
   expect(acceptance.env?.ZHIYUAN_UPDATE_VARIANT).toBe('${{ matrix.edition }}');
   const steps = acceptance.steps;
   const restore = steps.findIndex(step => step.run?.includes('build-checkpoint.mjs restore'));
@@ -109,8 +109,8 @@ test('producer checkpoints editions before repackaging without publishing candid
   const checkpoints = steps.filter(
     step => step.uses === './.github/actions/checkpoint-windows-package',
   );
-  expect(checkpoints.map(step => step.with?.edition)).toEqual(['lite', 'cpu', 'cuda']);
-  for (const edition of ['lite', 'cpu', 'cuda']) {
+  expect(checkpoints.map(step => step.with?.edition)).toEqual(['lite', 'cuda']);
+  for (const edition of ['lite', 'cuda']) {
     const checkpoint = steps.findIndex(
       step =>
         step.uses === './.github/actions/checkpoint-windows-package' &&

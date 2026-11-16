@@ -229,17 +229,6 @@ runs:
         UPDATE_MANIFEST_KEY_ID: ${{ inputs.UPDATE-MANIFEST-KEY-ID }}
         UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ inputs.UPDATE-MANIFEST-PUBLIC-KEY-BASE64 }}
         MODELSCOPE_TOKENS: ${{ inputs.MODELSCOPE-TOKENS }}
-    - name: Build Windows release (cpu)
-      shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
-      if: ${{ inputs.mode == 'release' && inputs.platform == 'windows' && inputs.inference-edition == 'cpu' }}
-      run: bun run dist:win:signed:cpu
-      env:
-        NODE_OPTIONS: '--max-old-space-size=4096'
-        APP_BUILD_VERSION: ${{ inputs.app-build-version }}
-        CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
-        UPDATE_MANIFEST_KEY_ID: ${{ inputs.UPDATE-MANIFEST-KEY-ID }}
-        UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ inputs.UPDATE-MANIFEST-PUBLIC-KEY-BASE64 }}
-        MODELSCOPE_TOKENS: ${{ inputs.MODELSCOPE-TOKENS }}
     - name: Build Windows release (cuda)
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
       if: ${{ inputs.mode == 'release' && inputs.platform == 'windows' && inputs.inference-edition == 'cuda' }}
@@ -317,10 +306,8 @@ runs:
     - name: Build Linux (verify)
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
       if: ${{ inputs.mode == 'verify' && inputs.platform == 'linux' }}
-      # The CUDA llama-server is already built in Docker, finalized and staged
-      # above; dist:linux:cuda would rebuild it on the host against the
-      # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
-      run: ${{ inputs.inference-edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', inputs.inference-edition) }}
+      # CUDA is already built and staged above; lite needs no inference runtime.
+      run: bun run dist:linux
       env:
         ZHIYUAN_UPDATE_VARIANT: ${{ inputs.inference-edition }}
         NODE_OPTIONS: '--max-old-space-size=4096'
@@ -328,10 +315,8 @@ runs:
     - name: Build Linux release
       shell: ${{ inputs.platform == 'windows' && 'pwsh' || 'bash -e {0}' }}
       if: ${{ inputs.mode == 'release' && inputs.platform == 'linux' }}
-      # The CUDA llama-server is already built in Docker, finalized and staged
-      # above; dist:linux:cuda would rebuild it on the host against the
-      # Docker-generated CMake cache, so CUDA packages with plain dist:linux.
-      run: ${{ inputs.inference-edition == 'cuda' && 'bun run dist:linux' || format('bun run dist:linux:{0}', inputs.inference-edition) }}
+      # CUDA is already built and staged above; lite needs no inference runtime.
+      run: bun run dist:linux
       env:
         ZHIYUAN_UPDATE_VARIANT: ${{ inputs.inference-edition }}
         NODE_OPTIONS: '--max-old-space-size=4096'

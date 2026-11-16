@@ -5,7 +5,7 @@ import { assertWindowsDownloads } from './verify-github-windows-downloads.mjs';
 const version = '2026.11.11-build.1';
 
 function fixture() {
-  const manifests = ['lite', 'cpu', 'cuda'].map(variant => ({
+  const manifests = ['lite', 'cuda'].map(variant => ({
     artifacts: [
       {
         platform: 'win32',
@@ -41,7 +41,15 @@ test('blocks the previous mixed NSIS and WebView2 download page', () => {
   const { manifests, release } = fixture();
   release.assets.push({ ...release.assets[0], name: `win32-x64-lite-Native-Setup-${version}.exe` });
   expect(() => assertWindowsDownloads(release, manifests, version)).toThrow(
-    'exactly three Windows WebView2 installers',
+    'exactly the supported Windows WebView2 installers',
+  );
+});
+
+test('rejects an extra CPU-only download on the public release', () => {
+  const { manifests, release } = fixture();
+  release.assets.push({ ...release.assets[0], name: `win32-x64-cpu-ZhiYuanAgent-Setup-${version}.exe` });
+  expect(() => assertWindowsDownloads(release, manifests, version)).toThrow(
+    'exactly the supported Windows WebView2 installers',
   );
 });
 

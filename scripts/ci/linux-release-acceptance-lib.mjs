@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { LINUX_INFERENCE_VARIANTS } from '../release/inference-edition-targets.mjs';
 
 export function releaseIdentity(env) {
   const identity = {
@@ -14,7 +15,7 @@ export function releaseIdentity(env) {
   if (
     !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(identity.version ?? '') ||
     !/^[a-f0-9]{40}$/.test(identity.sourceCommit ?? '') ||
-    !['cpu', 'cuda'].includes(identity.edition) ||
+    !LINUX_INFERENCE_VARIANTS.includes(identity.edition) ||
     !/^\d+$/.test(identity.runId ?? '') ||
     !/^[1-9]\d*$/.test(identity.runAttempt ?? '')
   ) {
