@@ -40,4 +40,13 @@ describe('providerErrorClassifier', () => {
       /magpie|abcdef12345/i,
     );
   });
+
+  test('neutralizes internal runtime brand in providerName as well as raw detail', () => {
+    const result = classifyProviderError({
+      raw: 'ECONNREFUSED 127.0.0.1:3425',
+      providerName: 'Magpie',
+    });
+    expect(result.title).not.toMatch(/magpie/i);
+    expect(result.hint).not.toMatch(/magpie/i);
+  });
 });

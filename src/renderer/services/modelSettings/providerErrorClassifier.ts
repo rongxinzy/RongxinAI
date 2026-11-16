@@ -112,8 +112,9 @@ export function classifyProviderError(params: {
   const { raw = '', testResult, providerName, baseUrl = '' } = params;
   const rawMessage = testResult?.error || raw || '';
   const code = classifyCodeFromRaw(rawMessage, testResult);
+  const rawProviderName = providerName ? neutralRuntimeName(providerName.trim()) : '';
   const providerLabel =
-    providerName?.trim() || (i18nService.getLanguage() === 'zh' ? '服务商' : 'the provider');
+    rawProviderName || (i18nService.getLanguage() === 'zh' ? '服务商' : 'the provider');
   const suggestedBaseUrl = code === 'html_endpoint' ? appendV1ToBaseUrl(baseUrl) : undefined;
   const technicalDetail = rawMessage ? maskSecretsInError(rawMessage) : undefined;
 

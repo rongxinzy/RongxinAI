@@ -6,6 +6,7 @@ import type {
 } from '../../../../shared/magpie/preferences';
 import { showAppError } from '../../../services/appToast';
 import { i18nService } from '../../../services/i18n';
+import { neutralRuntimeName } from '../../../services/runtimeNameNeutralizer';
 
 export function useMagpiePreferences(enabled: boolean) {
   const [preferences, setPreferences] = useState<MagpiePreferences | null>(null);
@@ -58,7 +59,11 @@ export function useMagpiePreferences(enabled: boolean) {
     } catch (err: unknown) {
       if (!mounted.current) return false;
       setError(i18nService.t('magpiePreferencesSaveFailed'));
-      showAppError(err instanceof Error ? err.message : i18nService.t('magpieActionFailed'));
+      showAppError(
+        neutralRuntimeName(
+          err instanceof Error ? err.message : i18nService.t('magpieActionFailed'),
+        ),
+      );
       return false;
     } finally {
       savingRef.current = false;

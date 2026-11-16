@@ -1,6 +1,7 @@
 // 模型与提供商
 export const zhModelProviders: Record<string, string> = {
   aisphereTab: '组织平台',
+  aisphereTitle: '连接组织平台',
   aisphereAddress: '组织平台地址',
   aisphereAddressPlaceholder: 'https://平台地址 或 http://平台地址',
   aisphereDescription: '连接组织平台后，仅可使用组织提供的模型。',
