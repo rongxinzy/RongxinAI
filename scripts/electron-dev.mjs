@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -7,6 +8,11 @@ import concurrently from 'concurrently';
 
 import { resolveDevPort } from './find-dev-port.mjs';
 import { describeNativeAbi, inspectNativeAbi, NativeAbiStatus } from './electron-native-abi.mjs';
+
+const require = createRequire(import.meta.url);
+const { ensureWindowsJobRunner } = require('./python-runtime/ensure-job-runner.cjs');
+const { ensurePortableUvRuntime } = require('./setup-uv-runtime.js');
+const { ensurePortablePythonRuntime } = require('./setup-python-runtime.js');
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(scriptDirectory, '..');
@@ -74,8 +80,14 @@ async function main() {
   }
 
   // Windows: embed the app icon into development electron.exe so the taskbar
-  // does not keep showing the default Electron atom logo.
+  // does not keep showing the default Electron atom logo, and ensure the
+  // bundled Python/uv runtimes and Job Object helper exist locally.
   patchWindowsElectronIcon();
+  if (process.platform === 'win32') {
+    ensureWindowsJobRunner({ projectRoot });
+    await ensurePortableUvRuntime();
+    await ensurePortablePythonRuntime();
+  }
 
   const port = await resolveDevPort();
   const startUrl = `http://localhost:${port}`;

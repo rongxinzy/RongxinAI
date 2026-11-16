@@ -1,7 +1,12 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { access, mkdir, readFile, realpath, rename, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { isolatedEnvironment, runtimeNetworkEnvironment, runProcess } from './process';
+import {
+  assertWindowsJobRunnerAvailable,
+  isolatedEnvironment,
+  runtimeNetworkEnvironment,
+  runProcess,
+} from './process';
 import type { PythonExecutionResult, PythonRunnerRequest } from '../../shared/pythonRuntime';
 
 const REQUIREMENT =
@@ -68,10 +73,7 @@ export async function runPythonOperation(
   signal: AbortSignal,
 ): Promise<PythonExecutionResult> {
   const input = request.input;
-  if (process.platform === 'win32') {
-    if (!request.jobRunnerPath) throw new Error('The Windows Python Job Object helper is missing.');
-    await access(request.jobRunnerPath);
-  }
+  await assertWindowsJobRunnerAvailable(request.jobRunnerPath);
   const runtime = await resolvePreinstalledRuntime(request);
   if (input.runtimeId !== undefined && input.runtimeId !== runtime.runtimeId)
     throw new Error('Unsupported Python runtime version.');
