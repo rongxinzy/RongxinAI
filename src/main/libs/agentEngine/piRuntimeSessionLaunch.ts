@@ -372,16 +372,18 @@ export async function startPiRuntimeSession(
       if (readOnlyWorkspace) {
         sessionOptions.tools = ['read', 'grep', 'find', 'ls', ...customToolNames];
       } else {
+        // Use +modifiers so platform defaultTools (powershell on Windows, bash on POSIX,
+        // plus optional +codemode) stay intact rather than being replaced by a plain list.
         sessionOptions.tools = [
-          'read',
-          'bash',
-          'edit',
-          'write',
-          'grep',
-          'find',
-          'ls',
-          ...customToolNames,
+          '+grep',
+          '+find',
+          '+ls',
+          ...customToolNames.map(name => `+${name}`),
         ];
+        if (process.platform === 'win32') {
+          // Ensure resumed transcripts never reactivate bash on Windows.
+          sessionOptions.excludeTools = ['bash'];
+        }
       }
     }
 

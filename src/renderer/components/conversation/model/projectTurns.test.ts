@@ -157,4 +157,78 @@ describe('projectSessionToTurns', () => {
       expect(part.progress?.argsChars).toBe(1480);
     }
   });
+
+  test('projects both ledger-recorded and explicit inline deliverables onto their turn', () => {
+    const messages: CoworkMessage[] = [
+      makeMsg({ id: 'u1', type: 'user', content: 'Generate report' }),
+      makeMsg({
+        id: 't1',
+        type: 'tool_use',
+        metadata: { toolName: 'write', toolUseId: 'c1', toolInput: { path: 'report.html' } },
+      }),
+      makeMsg({ id: 'r1', type: 'tool_result', content: 'ok', metadata: { toolUseId: 'c1' } }),
+      makeMsg({
+        id: 'a1',
+        type: 'assistant',
+        content: 'Done!',
+        metadata: { isFinalAnswer: true },
+      }),
+    ];
+
+    const { turns } = projectSessionToTurns({
+      messages,
+      toolActivities: [],
+      artifacts: [
+        {
+          id: 'artifact-tool-r1',
+          messageId: 'r1',
+          sessionId: 's1',
+          toolCallId: 'c1',
+          type: 'html',
+          title: 'report.html',
+          content: '<h1>Hi</h1>',
+          fileName: 'report.html',
+          filePath: '/work/report.html',
+          source: 'tool',
+          role: 'deliverable',
+          declared: true,
+          createdAt: 1000,
+        },
+        {
+          id: 'artifact-a1-0',
+          messageId: 'a1',
+          sessionId: 's1',
+          type: 'mermaid',
+          title: 'Flow',
+          content: 'graph TD; A-->B;',
+          source: 'codeblock',
+          role: 'deliverable',
+          declared: true,
+          createdAt: 1001,
+        },
+        {
+          id: 'artifact-helper',
+          messageId: 'r1',
+          sessionId: 's1',
+          toolCallId: 'c1',
+          type: 'code',
+          title: 'helper.py',
+          content: 'print(1)',
+          fileName: 'helper.py',
+          filePath: '/work/helper.py',
+          source: 'tool',
+          role: 'intermediate',
+          declared: false,
+          createdAt: 1002,
+        },
+      ],
+      previewableTypes: new Set(['html', 'mermaid', 'code']),
+      isStreaming: false,
+    });
+
+    expect(turns[0]?.deliverables.map(item => item.id)).toEqual([
+      'artifact-tool-r1',
+      'artifact-a1-0',
+    ]);
+  });
 });

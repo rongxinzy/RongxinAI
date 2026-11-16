@@ -17,6 +17,7 @@ import {
   getArtifactTypeByExtension,
   isBinaryArtifactFile,
 } from '../../shared/cowork/artifactPreview';
+import { getRecordedArtifactClassification } from '../../shared/cowork/artifactClassification';
 import type { CoworkArtifactRole, CoworkArtifactType } from '../../shared/cowork/artifacts';
 import { CoworkArtifactRole as ArtifactRole } from '../../shared/cowork/artifacts';
 import {
@@ -207,6 +208,10 @@ export class ArtifactRecorder {
   }): void {
     const type = getArtifactTypeByExtension(input.absolutePath);
     if (!type) return;
+    const { role, declared } = getRecordedArtifactClassification(
+      type,
+      isInternalWorkflowStatePath(input.absolutePath, this.workspaceRoot),
+    );
     this.record({
       filePath: input.absolutePath,
       id: `artifact-tool-${input.messageId}`,
@@ -217,8 +222,8 @@ export class ArtifactRecorder {
       title: getArtifactFileName(input.absolutePath),
       content: input.content,
       source: 'tool',
-      role: ArtifactRole.Intermediate,
-      declared: false,
+      role,
+      declared,
     });
     this.rememberRecordedMtime(input.absolutePath);
   }
@@ -330,6 +335,10 @@ export class ArtifactRecorder {
       }
       const type = getArtifactTypeByExtension(entry.path);
       if (!type) continue;
+      const { role, declared } = getRecordedArtifactClassification(
+        type,
+        isInternalWorkflowStatePath(entry.path, this.workspaceRoot),
+      );
       this.record({
         filePath: entry.path,
         id: `artifact-diff-${anchorMessageId}-${key}`,
@@ -340,8 +349,8 @@ export class ArtifactRecorder {
         title: getArtifactFileName(entry.path),
         content: '',
         source: 'tool',
-        role: ArtifactRole.Intermediate,
-        declared: false,
+        role,
+        declared,
       });
       this.recordedMtimes.set(artifactKey, entry.mtimeMs);
     }

@@ -141,8 +141,14 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const isMac = window.electron.platform === 'darwin';
   const isTopLevelPanel = layoutMode === ArtifactLayoutMode.Workspace || isFullscreen;
 
+  const hasDeliverableArtifacts = artifacts.some(
+    artifact => artifact.role === ArtifactRole.Deliverable,
+  );
   const visibleArtifacts = artifacts.filter(
-    artifact => showIntermediateArtifacts || artifact.role === ArtifactRole.Deliverable,
+    artifact =>
+      showIntermediateArtifacts ||
+      !hasDeliverableArtifacts ||
+      artifact.role === ArtifactRole.Deliverable,
   );
   const previewableArtifacts = visibleArtifacts.filter(a => PREVIEWABLE_ARTIFACT_TYPES.has(a.type));
   const artifactPreviewMode = selectedArtifact
