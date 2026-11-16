@@ -181,7 +181,7 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
       availableModels,
     });
 
-    usePromptDraftSync({
+    const { markDraftCleared, clearSuppressedDraft } = usePromptDraftSync({
       draftKey,
       draftPrompt,
       value,
@@ -310,6 +310,9 @@ const ConversationComposerInner = React.forwardRef<CoworkPromptInputRef, CoworkP
       findSlashSkill: slashMenu.findEnabledSkill,
       runSlashCompact: slashMenu.runCompact,
       setImageVisionHint,
+      onBeforeClearSubmittedDraft: markDraftCleared,
+      onAfterClearSubmittedDraft: () => editorRef.current?.clear(),
+      onRestoreRejectedDraft: clearSuppressedDraft,
     });
 
     const handleSubmit = usePromptSubmissionLock(submitPrompt);

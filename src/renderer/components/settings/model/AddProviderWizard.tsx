@@ -55,6 +55,9 @@ export function AddProviderWizard({
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [discoveredModels, setDiscoveredModels] = useState<string[]>([]);
+  const [discoveredModelContexts, setDiscoveredModelContexts] = useState<Record<string, number>>(
+    {},
+  );
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [customModelInput, setCustomModelInput] = useState('');
   const [testError, setTestError] = useState<ClassifiedProviderError | null>(null);
@@ -72,6 +75,7 @@ export function AddProviderWizard({
     setBaseUrl(chosen.baseUrl);
     setUsePlanEndpoint(false);
     setDiscoveredModels([]);
+    setDiscoveredModelContexts({});
     const defaults = chosen.defaultModels
       .split(',')
       .map(s => s.trim())
@@ -134,6 +138,7 @@ export function AddProviderWizard({
       if (result.ok) {
         const models = result.discoveredModels ?? [];
         setDiscoveredModels(models);
+        setDiscoveredModelContexts(result.discoveredModelContexts ?? {});
         if (models.length > 0) {
           setSelectedModels(models.length <= 12 ? models : models.slice(0, 8));
         }
@@ -205,9 +210,17 @@ export function AddProviderWizard({
     if (selectedModels.length === 0 || !parsedContext.ok) return;
     setSaving(true);
     try {
+      const contexts: Record<string, number> = {};
+      for (const modelId of selectedModels) {
+        const detected = discoveredModelContexts[modelId];
+        if (detected) contexts[modelId] = detected;
+      }
+      if (parsedContext.value) {
+        contexts['*'] = parsedContext.value;
+      }
       const payload: MagpieSaveProviderInput = {
         ...buildDraft(),
-        contexts: parsedContext.value ? { '*': parsedContext.value } : undefined,
+        contexts: Object.keys(contexts).length > 0 ? contexts : undefined,
       };
       await onSave(payload, setAsDefault ? selectedModels[0] : undefined);
       onOpenChange(false);
@@ -296,6 +309,7 @@ export function AddProviderWizard({
           <WizardStepSelectModels
             allModelCandidates={allModelCandidates}
             selectedModels={selectedModels}
+            discoveredModelContexts={discoveredModelContexts}
             customModelInput={customModelInput}
             setAsDefault={setAsDefault}
             contextInput={contextInput}

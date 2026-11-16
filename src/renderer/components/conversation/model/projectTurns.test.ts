@@ -123,4 +123,38 @@ describe('projectSessionToTurns', () => {
       expect(part.toolName).toBe('bash');
     }
   });
+
+  test('updates argsChars progress on active input-streaming tool activities', () => {
+    const { turns } = projectSessionToTurns({
+      messages: [makeMsg({ id: 'u1', type: 'user', content: 'Write file' })],
+      toolActivities: [
+        {
+          toolCallId: 'write-1',
+          toolName: 'write',
+          toolInput: { file_path: 'src/index.ts' },
+          phase: CoworkToolActivityPhase.Preparing,
+          progress: { argsChars: 240 },
+          updatedAt: 1001,
+        },
+        {
+          toolCallId: 'write-1',
+          toolName: 'write',
+          toolInput: { file_path: 'src/index.ts' },
+          phase: CoworkToolActivityPhase.Preparing,
+          progress: { argsChars: 1480 },
+          updatedAt: 1002,
+        },
+      ],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: true,
+    });
+
+    const part = turns[0]?.parts[0];
+    expect(part?.kind).toBe('tool');
+    if (part?.kind === 'tool') {
+      expect(part.phase).toBe('input-streaming');
+      expect(part.progress?.argsChars).toBe(1480);
+    }
+  });
 });

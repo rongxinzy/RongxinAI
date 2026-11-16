@@ -120,6 +120,14 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
         ? part.input.command
         : null;
 
+    const streamingChars = part.phase === 'input-streaming' ? part.progress?.argsChars : undefined;
+    const statusLabel =
+      typeof streamingChars === 'number' && streamingChars > 0
+        ? i18nService
+            .t('coworkExecutionGeneratedChars')
+            .replace('{chars}', streamingChars.toLocaleString())
+        : undefined;
+
     return (
       <div data-tool-name={part.toolName} data-tool-state={part.phase}>
         <Tool
@@ -134,6 +142,7 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
             state={PHASE_TO_TOOL_STATE[part.phase]}
             title={getToolDisplayName(part.toolName)}
             summary={summary ?? undefined}
+            statusLabel={statusLabel}
             icon={CATEGORY_ICONS[part.category]}
             statusAtEnd
           />

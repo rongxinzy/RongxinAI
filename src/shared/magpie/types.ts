@@ -93,6 +93,8 @@ export interface MagpieTestProviderResult {
   latencyMs?: number;
   modelCount?: number;
   discoveredModels?: string[];
+  /** Per-model context windows reported by the upstream `/v1/models` endpoint. */
+  discoveredModelContexts?: Record<string, number>;
   requiresKey?: boolean;
   error?: string;
   errorCode?: MagpieTestProviderErrorCode;

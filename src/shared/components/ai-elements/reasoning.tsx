@@ -74,8 +74,8 @@ export const Reasoning = memo(
     ...props
   }: ReasoningProps) => {
     const resolvedDefaultOpen = defaultOpen ?? isStreaming;
-    // Track if defaultOpen was explicitly set to false (to prevent auto-open)
     const isExplicitlyClosed = defaultOpen === false;
+    const userClosedRef = useRef(false);
 
     const [isOpen, setIsOpen] = useControllableState<boolean>({
       defaultProp: resolvedDefaultOpen,
@@ -89,12 +89,13 @@ export const Reasoning = memo(
 
     const hasEverStreamedRef = useRef(isStreaming);
     const [hasAutoClosed, setHasAutoClosed] = useState(false);
-    const startTimeRef = useRef<number | null>(null);
+    const startTimeRef = useRef<number | null>(isStreaming ? Date.now() : null);
 
     // Track when streaming starts and compute duration when it settles
     useEffect(() => {
       if (isStreaming) {
         hasEverStreamedRef.current = true;
+        setHasAutoClosed(false);
         if (startTimeRef.current === null) {
           startTimeRef.current = Date.now();
         }
@@ -104,9 +105,9 @@ export const Reasoning = memo(
       }
     }, [isStreaming, setDuration]);
 
-    // Auto-open when streaming starts (unless explicitly closed)
+    // Auto-open when streaming starts (unless explicitly configured closed or user closed it)
     useEffect(() => {
-      if (isStreaming && !isOpen && !isExplicitlyClosed) {
+      if (isStreaming && !isOpen && !isExplicitlyClosed && !userClosedRef.current) {
         setIsOpen(true);
       }
     }, [isStreaming, isOpen, setIsOpen, isExplicitlyClosed]);
@@ -125,6 +126,7 @@ export const Reasoning = memo(
 
     const handleOpenChange = useCallback(
       (newOpen: boolean) => {
+        userClosedRef.current = !newOpen;
         setIsOpen(newOpen);
       },
       [setIsOpen],

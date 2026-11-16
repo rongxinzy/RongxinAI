@@ -1,7 +1,44 @@
+import { MAX_CONTEXT_TOKENS } from '../../shared/magpie/contexts';
 import { extractRuntimeErrorMessage } from '../../shared/magpie/runtimeErrorMessage';
 import type { MagpieProviderApi, MagpieTestProviderResult } from '../../shared/magpie/types';
 
 const TEST_BODY_LIMIT_BYTES = 256 * 1024;
+
+function normalizeContextTokens(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const rounded = Math.floor(value);
+  if (rounded <= 0 || rounded > MAX_CONTEXT_TOKENS) return undefined;
+  return rounded;
+}
+
+function readNestedContextTokens(record: Record<string, unknown>, key: string): number | undefined {
+  const nested = record[key];
+  if (!nested || typeof nested !== 'object') return undefined;
+  const obj = nested as Record<string, unknown>;
+  return (
+    normalizeContextTokens(obj.context) ??
+    normalizeContextTokens(obj.context_length) ??
+    normalizeContextTokens(obj.context_window) ??
+    normalizeContextTokens(obj.max_model_len)
+  );
+}
+
+/** Extracts a model's declared context window from OpenAI-compat / vLLM / SGLang / Ollama fields. */
+export function extractDiscoveredModelContextWindow(item: unknown): number | undefined {
+  if (!item || typeof item !== 'object') return undefined;
+  const record = item as Record<string, unknown>;
+  return (
+    normalizeContextTokens(record.max_model_len) ??
+    normalizeContextTokens(record.context_window) ??
+    normalizeContextTokens(record.context_length) ??
+    normalizeContextTokens(record.max_context_length) ??
+    normalizeContextTokens(record.model_context_length) ??
+    normalizeContextTokens(record.max_context_window) ??
+    normalizeContextTokens(record.n_ctx) ??
+    readNestedContextTokens(record, 'limits') ??
+    readNestedContextTokens(record, 'top_provider')
+  );
+}
 
 /** Reads at most `limit` bytes so a channel can't stream an unbounded page into main. */
 async function readBoundedBody(
@@ -128,20 +165,35 @@ export async function probeProviderEndpoint(
       };
     }
     if (!data) return { ok: true, latencyMs };
-    const discoveredModels = Array.from(
-      new Set(
-        data
-          .map(item => {
-            if (typeof item === 'string') return item.trim();
-            if (item && typeof item === 'object' && 'id' in item && typeof item.id === 'string') {
-              return item.id.trim();
-            }
-            return '';
-          })
-          .filter(Boolean),
-      ),
-    );
-    return { ok: true, latencyMs, modelCount: discoveredModels.length, discoveredModels };
+    const discoveredModels: string[] = [];
+    const seenIds = new Set<string>();
+    const discoveredModelContexts: Record<string, number> = {};
+    for (const item of data) {
+      let id = '';
+      if (typeof item === 'string') {
+        id = item.trim();
+      } else if (item && typeof item === 'object' && 'id' in item && typeof item.id === 'string') {
+        id = item.id.trim();
+      }
+      if (!id) continue;
+      if (!seenIds.has(id)) {
+        seenIds.add(id);
+        discoveredModels.push(id);
+      }
+      if (discoveredModelContexts[id] === undefined) {
+        const contextTokens = extractDiscoveredModelContextWindow(item);
+        if (contextTokens !== undefined) {
+          discoveredModelContexts[id] = contextTokens;
+        }
+      }
+    }
+    return {
+      ok: true,
+      latencyMs,
+      modelCount: discoveredModels.length,
+      discoveredModels,
+      ...(Object.keys(discoveredModelContexts).length > 0 ? { discoveredModelContexts } : {}),
+    };
   } catch (err: unknown) {
     return {
       ok: false,

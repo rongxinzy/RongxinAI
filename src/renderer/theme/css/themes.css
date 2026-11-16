@@ -4115,15 +4115,15 @@
 :where(:root, [data-theme]) :where(.theme-reasoning-panel-indented) {
   padding-left: 1rem;
 }
-:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-state="open"]) {
+:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-open]) {
   animation-name: zy-component-reasoning-panel-open-1su47v9;
-  animation-duration: 150ms;
-  animation-timing-function: ease;
+  animation-duration: 160ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
-:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-state="closed"]) {
+:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-closed]) {
   animation-name: zy-component-reasoning-panel-closed-1su47v9;
-  animation-duration: 150ms;
-  animation-timing-function: ease;
+  animation-duration: 160ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
 }
 :where(:root, [data-theme]) :where(.theme-input-submit) {
   border-radius: 9999px;
@@ -7509,21 +7509,17 @@ to {
 @keyframes zy-component-reasoning-panel-open-1su47v9 {
 from {
   opacity: 0;
-  translate: 0 -0.5rem;
 }
 to {
   opacity: 1;
-  translate: 0 0;
 }
 }
 @keyframes zy-component-reasoning-panel-closed-1su47v9 {
 from {
   opacity: 1;
-  translate: 0 0;
 }
 to {
   opacity: 0;
-  translate: 0 -0.5rem;
 }
 }
 @keyframes zy-component-legacy-modal-backdrop-1su47v9 {
@@ -8221,8 +8217,8 @@ to {
 :where(:root, [data-theme]) :where(.theme-queue-body-completed),
 :where(:root, [data-theme]) :where(.theme-reasoning-panel),
 :where(:root, [data-theme]) :where(.theme-reasoning-panel-indented),
-:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-state="open"]),
-:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-state="closed"]),
+:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-open]),
+:where(:root, [data-theme]) :where(.theme-reasoning-panel[data-closed]),
 :where(:root, [data-theme]) :where(.theme-input-submit),
 :where(:root, [data-theme]) :where(.theme-control-content-height),
 :where(:root, [data-theme]) :where(.theme-button svg:not([class*="size-"])),

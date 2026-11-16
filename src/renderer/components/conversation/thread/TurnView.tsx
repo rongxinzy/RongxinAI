@@ -17,7 +17,8 @@ import ArtifactPreviewCard from '../../artifacts/ArtifactPreviewCard';
 import { ExpertAvatar } from '../../expert/expertAvatars';
 import AskUserQuestionCard from '../../cowork/AskUserQuestionCard';
 import { WorkingIndicator } from '../../cowork/components/WorkingIndicator';
-import type { ConversationTurn, NoticeTurnPart } from '../model/types';
+import type { ConversationTurn, NoticeTurnPart, ToolTurnPart } from '../model/types';
+import { getToolDisplayName, getToolInputSummary } from '../tools/toolFormatters';
 import { ToolGroupView } from '../tools/ToolGroupView';
 import { ToolPartView } from '../tools/ToolPartView';
 import { AssistantTextPartView } from './AssistantTextPartView';
@@ -99,6 +100,90 @@ const CopyResponseButton: React.FC<{ content: string }> = ({ content }) => {
   );
 };
 
+type BottomActivityState =
+  | { kind: 'initial' }
+  | { kind: 'waiting'; resetKey: string }
+  | { kind: 'tool'; tool: ToolTurnPart };
+
+const resolveBottomActivity = (turn: ConversationTurn): BottomActivityState | null => {
+  if (!turn.isStreaming || turn.hasApproval) return null;
+  if (turn.parts.length === 0) return { kind: 'initial' };
+
+  let activeTool: ToolTurnPart | null = null;
+  for (const part of turn.parts) {
+    if (part.kind === 'tool') {
+      if (part.phase === 'input-streaming' || part.phase === 'running') {
+        activeTool = part;
+      }
+    } else if (part.kind === 'tool_group') {
+      for (const nested of part.parts) {
+        if (nested.phase === 'input-streaming' || nested.phase === 'running') {
+          activeTool = nested;
+        }
+      }
+    }
+  }
+  if (activeTool) return { kind: 'tool', tool: activeTool };
+
+  const lastPart = turn.parts[turn.parts.length - 1];
+  if (lastPart?.kind === 'reasoning' && lastPart.isStreaming) return null;
+  if (lastPart?.kind === 'text' && lastPart.isStreaming && lastPart.message.content.trim()) {
+    return null;
+  }
+
+  return { kind: 'waiting', resetKey: `${turn.id}:${lastPart?.id ?? 'tail'}` };
+};
+
+const renderBottomActivity = (activity: BottomActivityState | null): React.ReactNode => {
+  if (!activity) return null;
+  if (activity.kind === 'initial') return <WorkingIndicator />;
+  if (activity.kind === 'waiting') {
+    return (
+      <WorkingIndicator
+        statusLabel={i18nService.t('coworkRunWaiting')}
+        showElapsedImmediately
+        resetKey={activity.resetKey}
+      />
+    );
+  }
+  const { tool } = activity;
+  const actionLabel =
+    tool.category === 'file-write'
+      ? i18nService.t('coworkExecutionWrite')
+      : tool.category === 'file-read'
+        ? i18nService.t('coworkExecutionRead')
+        : tool.category === 'shell'
+          ? i18nService.t('coworkExecutionCommand')
+          : tool.category === 'search'
+            ? i18nService.t('coworkExecutionSearch')
+            : i18nService.t('coworkExecutionTool');
+  const displayName = getToolDisplayName(tool.toolName);
+  const statusLabel =
+    tool.category === 'other' ||
+    tool.category === 'mcp' ||
+    tool.category === 'python' ||
+    tool.category === 'skill'
+      ? `${actionLabel} ${displayName}`
+      : `${actionLabel} (${displayName})`;
+  const summary = getToolInputSummary(tool.toolName, tool.input);
+  const charsText =
+    tool.phase === 'input-streaming' && tool.progress?.argsChars
+      ? i18nService
+          .t('coworkExecutionGeneratedChars')
+          .replace('{chars}', tool.progress.argsChars.toLocaleString())
+      : null;
+  const detailLabel = [summary, charsText].filter(Boolean).join(' · ') || undefined;
+
+  return (
+    <WorkingIndicator
+      statusLabel={statusLabel}
+      detailLabel={detailLabel}
+      showElapsedImmediately
+      resetKey={`${tool.toolCallId}:${tool.phase}`}
+    />
+  );
+};
+
 /**
  * Renders one user+assistant turn in normal DOM order with `content-visibility: auto`
  * on settled turns (bypassed for active streaming turns and long-screenshot export).
@@ -115,6 +200,7 @@ export const TurnView: React.FC<TurnViewProps> = React.memo(
     onRespondToQuestion,
   }) => {
     const primaryExpert = turn.experts[0];
+    const bottomActivity = resolveBottomActivity(turn);
     const hasAssistantBody =
       turn.parts.length > 0 ||
       turn.deliverables.length > 0 ||
@@ -182,7 +268,7 @@ export const TurnView: React.FC<TurnViewProps> = React.memo(
                   }
                 })}
 
-                {turn.isStreaming && turn.parts.length === 0 ? <WorkingIndicator /> : null}
+                {renderBottomActivity(bottomActivity)}
 
                 {turn.deliverables.length > 0 ? (
                   <div className="flex flex-wrap gap-2">

@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { CoworkToolActivityPhase } from '../../../../shared/cowork/toolActivity';
+import { coworkLiveTextStore } from '../../../services/liveTextStore';
 import { projectSessionToTurns } from '../model/projectTurns';
 import { ConversationThread } from './ConversationThread';
 
@@ -113,5 +115,105 @@ describe('ConversationThread', () => {
     const nav = container.querySelector('nav[aria-label="Conversation turns"]');
     expect(nav).not.toBeNull();
     expect(nav?.querySelectorAll('button')).toHaveLength(6);
+  });
+
+  test('streams live thinking deltas visibly while isStreaming is true before thinking completes', async () => {
+    const { turns } = projectSessionToTurns({
+      messages: [
+        { id: 'u-live', type: 'user', content: 'Think step by step', timestamp: 1000 },
+        {
+          id: 'th-live',
+          type: 'assistant',
+          content: 'Step 1:',
+          timestamp: 1001,
+          metadata: { isThinking: true, isStreaming: true, isFinal: false },
+        },
+      ],
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: true,
+    });
+
+    const scrollRef = React.createRef<HTMLDivElement | null>();
+    const { container } = render(
+      <ConversationThread turns={turns} skills={[]} scrollContainerRef={scrollRef} />,
+    );
+
+    const panel = container.querySelector('.theme-reasoning-panel');
+    expect(panel).not.toBeNull();
+    expect(panel?.hasAttribute('data-open')).toBe(true);
+    expect(panel?.textContent).toContain('Step 1:');
+
+    await act(async () => {
+      coworkLiveTextStore.applyChunk('th-live', { type: 'reasoning-start', id: 'r1' });
+      coworkLiveTextStore.applyChunk('th-live', {
+        type: 'reasoning-delta',
+        id: 'r1',
+        delta: 'Step 1: checking AST nodes smoothly',
+      });
+      await new Promise(resolve => window.requestAnimationFrame(() => resolve(undefined)));
+    });
+
+    expect(container.querySelector('.theme-reasoning-panel')?.textContent).toContain(
+      'checking AST nodes smoothly',
+    );
+    coworkLiveTextStore.clear('th-live');
+  });
+
+  test('shows bottom status indicator while preparing/running a tool or awaiting next step', () => {
+    const { turns: preparingTurns } = projectSessionToTurns({
+      messages: [{ id: 'u-tool', type: 'user', content: 'Write code', timestamp: 1000 }],
+      toolActivities: [
+        {
+          toolCallId: 'call-write-1',
+          toolName: 'write',
+          toolInput: { file_path: 'src/app.ts' },
+          phase: CoworkToolActivityPhase.Preparing,
+          progress: { argsChars: 640 },
+          updatedAt: 1001,
+        },
+      ],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: true,
+    });
+
+    const scrollRef = React.createRef<HTMLDivElement | null>();
+    const preparingView = render(
+      <ConversationThread turns={preparingTurns} skills={[]} scrollContainerRef={scrollRef} />,
+    );
+    const preparingStatus = preparingView.container.querySelector('[role="status"]');
+    expect(preparingStatus).not.toBeNull();
+    expect(preparingStatus?.textContent).toContain('640');
+
+    const { turns: postToolTurns } = projectSessionToTurns({
+      messages: [
+        { id: 'u-post', type: 'user', content: 'Check dir', timestamp: 1000 },
+        {
+          id: 'tu-post',
+          type: 'tool_use',
+          content: '',
+          timestamp: 1001,
+          metadata: { toolName: 'bash', toolUseId: 'c1', toolInput: { command: 'ls' } },
+        },
+        {
+          id: 'tr-post',
+          type: 'tool_result',
+          content: 'ok',
+          timestamp: 1002,
+          metadata: { toolUseId: 'c1', toolResult: 'ok' },
+        },
+      ],
+      toolActivities: [],
+      artifacts: [],
+      previewableTypes: new Set(),
+      isStreaming: true,
+    });
+
+    const postToolView = render(
+      <ConversationThread turns={postToolTurns} skills={[]} scrollContainerRef={scrollRef} />,
+    );
+    expect(postToolView.container.querySelector('[role="status"]')).not.toBeNull();
   });
 });

@@ -322,8 +322,13 @@ export function projectSessionToTurns({
     for (const activity of toolActivities) {
       if (activeTurn.toolPartsByCallId.has(activity.toolCallId)) {
         const existing = activeTurn.toolPartsByCallId.get(activity.toolCallId)!;
-        if (existing.phase === 'running' && activity.progress) {
+        if (
+          (existing.phase === 'running' || existing.phase === 'input-streaming') &&
+          activity.progress
+        ) {
           existing.progress = activity.progress;
+          if (activity.toolInput) existing.input = activity.toolInput;
+          existing.updatedAt = activity.updatedAt;
         }
         continue;
       }

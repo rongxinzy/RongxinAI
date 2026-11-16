@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 
 import { setDraftPrompt } from '../../../store/slices/coworkSlice';
@@ -18,7 +18,7 @@ interface UsePromptDraftSyncParams {
 /**
  * Draft persistence for the composer: syncs from the Redux draft on session
  * switches, debounces writes while typing, and flushes the pending draft on
- * unmount.
+ * unmount (unless the composer was explicitly cleared for submission).
  */
 export function usePromptDraftSync({
   draftKey,
@@ -31,11 +31,14 @@ export function usePromptDraftSync({
 }: UsePromptDraftSyncParams) {
   const dispatch = useDispatch();
 
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const suppressedDraftKeyRef = useRef<string | null>(null);
   const previousDraftKeyRef = useRef(draftKey);
   // Sync value from draft when sessionId changes
   useEffect(() => {
     const previousDraftKey = previousDraftKeyRef.current;
     previousDraftKeyRef.current = draftKey;
+    suppressedDraftKeyRef.current = null;
     const isTempPromotion =
       previousDraftKey.startsWith('temp-') &&
       draftKey !== '__home__' &&
@@ -51,11 +54,28 @@ export function usePromptDraftSync({
   }, [draftKey]); // intentionally omit other deps to only trigger on session switch
 
   useEffect(() => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
     if (value !== draftPrompt) {
-      const timer = setTimeout(() => {
+      if (value) {
+        suppressedDraftKeyRef.current = null;
+      }
+      if (suppressedDraftKeyRef.current === draftKey && !value) {
+        return;
+      }
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null;
+        if (suppressedDraftKeyRef.current === draftKey && !value) return;
         dispatch(setDraftPrompt({ sessionId: draftKey, draft: value }));
       }, 300);
-      return () => clearTimeout(timer);
+      return () => {
+        if (debounceTimerRef.current !== null) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+      };
     }
   }, [value, draftPrompt, dispatch, draftKey]);
 
@@ -65,10 +85,34 @@ export function usePromptDraftSync({
   latestDraftRef.current = { value, draftPrompt, draftKey };
   useEffect(() => {
     return () => {
+      if (debounceTimerRef.current !== null) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
       const latest = latestDraftRef.current;
+      if (suppressedDraftKeyRef.current === latest.draftKey) return;
       if (latest.value !== latest.draftPrompt) {
         dispatch(setDraftPrompt({ sessionId: latest.draftKey, draft: latest.value }));
       }
     };
   }, [dispatch]);
+
+  const markDraftCleared = useCallback(() => {
+    if (debounceTimerRef.current !== null) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    suppressedDraftKeyRef.current = latestDraftRef.current.draftKey;
+    latestDraftRef.current = {
+      ...latestDraftRef.current,
+      value: '',
+      draftPrompt: '',
+    };
+  }, []);
+
+  const clearSuppressedDraft = useCallback(() => {
+    suppressedDraftKeyRef.current = null;
+  }, []);
+
+  return { markDraftCleared, clearSuppressedDraft };
 }

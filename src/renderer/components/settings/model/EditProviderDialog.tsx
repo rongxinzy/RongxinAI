@@ -74,6 +74,9 @@ export function EditProviderDialog({
   const [fallback, setFallback] = useState<string[]>(provider.fallback ?? []);
   const [newModelInput, setNewModelInput] = useState('');
   const [defaultContextInput, setDefaultContextInput] = useState('');
+  const [discoveredModelContexts, setDiscoveredModelContexts] = useState<Record<string, number>>(
+    {},
+  );
   const [testing, setTesting] = useState(false);
   const [testPassed, setTestPassed] = useState(false);
   const [testError, setTestError] = useState<ClassifiedProviderError | null>(null);
@@ -90,6 +93,7 @@ export function EditProviderDialog({
     setFallback([...(provider.fallback ?? [])]);
     setNewModelInput('');
     setDefaultContextInput(formatContextTokens(provider.contexts?.['*']));
+    setDiscoveredModelContexts({});
     setTestPassed(false);
     setTestError(null);
   }, [open, provider]);
@@ -114,6 +118,9 @@ export function EditProviderDialog({
       if (result.ok) {
         setTestPassed(true);
         const discovered = result.discoveredModels ?? [];
+        if (result.discoveredModelContexts) {
+          setDiscoveredModelContexts(result.discoveredModelContexts);
+        }
         if (discovered.length > 0) {
           setModels(prev => Array.from(new Set([...prev, ...discovered])));
         }
@@ -177,6 +184,11 @@ export function EditProviderDialog({
     setSaving(true);
     try {
       const contexts = { ...(provider.contexts ?? {}) };
+      for (const [modelId, detected] of Object.entries(discoveredModelContexts)) {
+        if (models.includes(modelId) && contexts[modelId] === undefined) {
+          contexts[modelId] = detected;
+        }
+      }
       if (parsedContext.value) {
         contexts['*'] = parsedContext.value;
       } else {

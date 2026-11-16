@@ -11,6 +11,13 @@ export type ConversationProps = Omit<ComponentProps<typeof StickToBottom>, 'chil
   children?: ComponentProps<typeof StickToBottom>['children'];
 };
 
+function isWallClockFrozen(startDateMs: number, startPerfMs: number): boolean {
+  if (typeof performance === 'undefined') return false;
+  const elapsedPerf = performance.now() - startPerfMs;
+  const elapsedDate = Date.now() - startDateMs;
+  return elapsedPerf > 30 && elapsedDate === 0;
+}
+
 /**
  * Chat scroll container powered by `use-stick-to-bottom`.
  * Automatically follows streaming growth at the tail, pauses on user scroll-up,
@@ -19,7 +26,7 @@ export type ConversationProps = Omit<ComponentProps<typeof StickToBottom>, 'chil
 export const Conversation = ({
   className,
   initial = 'instant',
-  resize = 'instant',
+  resize = 'smooth',
   instance: externalInstance,
   targetScrollTop,
   mass,
@@ -28,6 +35,8 @@ export const Conversation = ({
   children,
   ...props
 }: ConversationProps) => {
+  const startDateRef = useRef(Date.now());
+  const startPerfRef = useRef(typeof performance !== 'undefined' ? performance.now() : 0);
   const fallbackInstance = useStickToBottom({
     initial,
     resize,
@@ -46,15 +55,18 @@ export const Conversation = ({
 
     // use-stick-to-bottom schedules ResizeObserver scrolls with `wait: true`
     // (`Number(true) === 1`), which never clears if `Date.now()` is mocked.
-    // Re-sync instantly whenever the container is pinned and resized.
+    // Re-sync instantly when clocks are frozen (tests) or `resize="instant"`,
+    // and otherwise follow smoothly.
     const observer = new ResizeObserver(() => {
       const current = instanceRef.current;
       if (!current.state.isAtBottom || current.state.escapedFromLock) return;
-      if (resize === 'instant') {
+      const clockFrozen = isWallClockFrozen(startDateRef.current, startPerfRef.current);
+      const effectiveAnimation = resize === 'instant' || clockFrozen ? 'instant' : resize;
+      if (effectiveAnimation === 'instant') {
         current.state.scrollTop = current.state.calculatedTargetScrollTop;
       }
       void current.scrollToBottom({
-        animation: resize === 'instant' ? 'instant' : resize,
+        animation: effectiveAnimation,
         preserveScrollPosition: true,
       });
     });
@@ -122,7 +134,7 @@ export const ConversationScrollButton = ({
   const { isAtBottom, scrollToBottom } = useStickToBottomContext();
 
   const handleScrollToBottom = useCallback(() => {
-    void scrollToBottom('instant');
+    void scrollToBottom('smooth');
   }, [scrollToBottom]);
 
   return (

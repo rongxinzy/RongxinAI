@@ -28,6 +28,7 @@ import { createSkillMentionExtension, createTextDocFromString } from './SkillMen
 
 export interface TiptapPromptEditorHandle {
   focus: () => void;
+  clear: () => void;
 }
 
 interface TiptapPromptEditorProps {
@@ -69,6 +70,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
 
     const lastEmittedValueRef = useRef(value);
     const mountedRef = useRef(false);
+    const clearingRef = useRef(false);
     const placeholderRef = useRef(placeholder);
     placeholderRef.current = placeholder;
     const activeSkillIdsRef = useRef(activeSkillIds);
@@ -236,6 +238,7 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
           mountedRef.current = false;
         },
         onUpdate: ({ editor: activeEditor }) => {
+          if (clearingRef.current) return;
           const nextText = activeEditor.getText({ blockSeparator: '\n' });
           if (nextText !== lastEmittedValueRef.current) {
             lastEmittedValueRef.current = nextText;
@@ -265,9 +268,21 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
 
     useEffect(() => {
       if (!editor || editor.isDestroyed) return;
-      if (value === lastEmittedValueRef.current) return;
+      const currentEditorText = mountedRef.current
+        ? editor.getText({ blockSeparator: '\n' })
+        : lastEmittedValueRef.current;
+      if (value === lastEmittedValueRef.current && value === currentEditorText) return;
       lastEmittedValueRef.current = value;
       if (!mountedRef.current) return;
+      if (value === '') {
+        clearingRef.current = true;
+        try {
+          editor.commands.clearContent(false);
+        } finally {
+          clearingRef.current = false;
+        }
+        return;
+      }
       editor.commands.setContent(createTextDocFromString(value), { emitUpdate: false });
     }, [editor, value]);
 
@@ -278,6 +293,25 @@ export const TiptapPromptEditor = forwardRef<TiptapPromptEditorHandle, TiptapPro
           if (editor && mountedRef.current && !editor.isDestroyed) {
             editor.commands.focus();
           }
+        },
+        clear: () => {
+          lastEmittedValueRef.current = '';
+          if (!editor || editor.isDestroyed) return;
+          const resetToEmpty = () => {
+            if (!editor || editor.isDestroyed || !mountedRef.current) return;
+            if (lastEmittedValueRef.current !== '') return;
+            clearingRef.current = true;
+            try {
+              if (editor.getText({ blockSeparator: '\n' }) !== '') {
+                editor.commands.clearContent(false);
+              }
+            } finally {
+              clearingRef.current = false;
+            }
+          };
+          resetToEmpty();
+          // Guard against delayed ProseMirror/IME DOM observer mutations right after Enter submit.
+          queueMicrotask(resetToEmpty);
         },
       }),
       [editor],
