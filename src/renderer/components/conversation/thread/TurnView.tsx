@@ -137,6 +137,12 @@ const resolveBottomActivity = (turn: ConversationTurn): BottomActivityState | nu
 
   const lastPart = turn.parts[turn.parts.length - 1];
   if (lastPart?.kind === 'reasoning' && lastPart.isStreaming) return null;
+  if (
+    lastPart?.kind === 'tool_group' &&
+    lastPart.parts.some(nested => nested.kind === 'reasoning' && nested.isStreaming)
+  ) {
+    return null;
+  }
   if (lastPart?.kind === 'text' && lastPart.isStreaming && lastPart.message.content.trim()) {
     return null;
   }
