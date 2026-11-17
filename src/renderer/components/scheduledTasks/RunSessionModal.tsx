@@ -1,3 +1,4 @@
+import { DiffWorkerPoolProvider } from '@shared/components/conversation';
 import { Button } from '@shared/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@shared/components/ui/dialog';
 import { Spinner } from '@shared/components/ui/spinner';
@@ -208,11 +209,13 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({
 
           {!loading && !error && turns.length > 0 && (
             <PersistentToggleNamespaceProvider namespace={session?.id ?? ''}>
-              <div className="py-2">
-                {turns.map(turn => (
-                  <TurnView key={turn.id} turn={turn} skills={[]} cwd={session?.cwd} />
-                ))}
-              </div>
+              <DiffWorkerPoolProvider>
+                <div className="py-2">
+                  {turns.map(turn => (
+                    <TurnView key={turn.id} turn={turn} skills={[]} cwd={session?.cwd} />
+                  ))}
+                </div>
+              </DiffWorkerPoolProvider>
             </PersistentToggleNamespaceProvider>
           )}
         </div>

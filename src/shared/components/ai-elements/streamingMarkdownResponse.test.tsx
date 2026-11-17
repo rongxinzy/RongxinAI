@@ -181,4 +181,27 @@ describe('StreamingMarkdownResponse rendering stability', () => {
       vi.useRealTimers();
     }
   });
+
+  test('never flashes empty content when streaming crosses the 32KB threshold', () => {
+    vi.useFakeTimers();
+    try {
+      const belowThreshold = 'a'.repeat(30_000);
+      const { container, rerender } = render(
+        <StreamingMarkdownResponse content={belowThreshold} isStreaming />,
+      );
+      expect(container.textContent?.length).toBe(30_000);
+
+      const aboveThreshold = `${belowThreshold}${'b'.repeat(4_000)}`;
+      rerender(<StreamingMarkdownResponse content={aboveThreshold} isStreaming />);
+      expect(container.textContent?.length).toBe(34_000);
+
+      const further = `${aboveThreshold}tail`;
+      rerender(<StreamingMarkdownResponse content={further} isStreaming />);
+      expect(container.textContent?.length).toBe(34_000);
+      act(() => vi.advanceTimersByTime(48));
+      expect(container.textContent?.length).toBe(34_004);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

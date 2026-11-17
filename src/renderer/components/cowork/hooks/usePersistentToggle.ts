@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 /**
  * Expansion memory for collapsible turn content. Turn rows unmount under
@@ -89,25 +89,31 @@ export const PersistentToggleNamespaceProvider: React.FC<{
   namespace: string;
   children?: React.ReactNode;
 }> = ({ namespace, children }) => {
-  const previousNamespaceRef = useRef(namespace);
-  const stableNamespace = resolveStableSessionKey(namespace) ?? namespace;
+  const [tracked, setTracked] = useState(() => ({
+    raw: namespace,
+    canonical: resolveStableSessionKey(namespace) ?? namespace,
+  }));
+
+  if (tracked.raw !== namespace) {
+    const isPromotion =
+      tracked.raw.startsWith('temp-') && Boolean(namespace) && !namespace.startsWith('temp-');
+    setTracked({
+      raw: namespace,
+      canonical: isPromotion
+        ? tracked.canonical
+        : (resolveStableSessionKey(namespace) ?? namespace),
+    });
+  }
 
   useEffect(() => {
-    const previous = previousNamespaceRef.current;
-    if (
-      previous.startsWith('temp-') &&
-      namespace &&
-      !namespace.startsWith('temp-') &&
-      !promotedSessionKeyMap.has(namespace)
-    ) {
-      promotePersistentToggleNamespace(previous, namespace);
+    if (tracked.raw && tracked.canonical !== tracked.raw && tracked.canonical.startsWith('temp-')) {
+      promotePersistentToggleNamespace(tracked.canonical, tracked.raw);
     }
-    previousNamespaceRef.current = namespace;
-  }, [namespace]);
+  }, [tracked.canonical, tracked.raw]);
 
   return React.createElement(
     PersistentToggleNamespaceContext.Provider,
-    { value: stableNamespace },
+    { value: tracked.canonical },
     children,
   );
 };

@@ -9,7 +9,7 @@
 | 长对话虚拟化与滚动 | 旧版移除虚拟列表并关闭原生锚定，万字流式与长会话 DOM 规模线性增长 | 启用 `@tanstack/react-virtual@3.14.6` Chat 模式（`anchorTo: 'end'`、`followOnAppend: true`、`scrollEndThreshold: 80`）作为 `.cowork-conversation-scroll` 唯一滚动拥有者，配合 `overflowAnchor: 'none'`、底端吸底按钮、TurnNavigator `scrollToIndex` 及导出静态全量通道；验证 1200 轮仅挂载视口附近节点、上滚后不回拉、前插历史位移 <2px |
 | `@` 后按 Enter 与富文本草稿 | 编辑器直接按键早于 Mention 插件，手动定位浮层，且切会话仅存纯文本丢属性 | 使用 `@tiptap/suggestion@3.34.0` 原生 `props.mount`（Floating UI `top-start` + `flip`）与插件优先级，`getJSON()` 结构化草稿保留 `mention` 节点的 `id`/`label`/`kind`/`path`；单测与浏览器验证 Enter/Tab 选中与跨会话还原 |
 | 投影身份稳定与 steer 配对 | 无界纯映射在每次 delta 全量重建历史 turn，`artifacts` O(turns×artifacts) 扫描，steer 插队后 `tool_result` 跨回合失配 | 接入 `createSessionTurnsSelector()`（`@reduxjs/toolkit` `createSelector` + `maxSize: 6000` `lruMemoize`），历史回合引用恒等、`deliverables` O(artifacts) 索引并支持跨回合 `tool_result` 归位 |
-| Diff WorkerPool 与预算保护 | `@pierre/diffs` 默认同步高亮大 diff，单卡自建 Provider 在虚拟化滑出时销毁缓存池，worker 异常静默吞掉 | 在 `SessionStage` 外围通过 `DiffWorkerPoolProvider`（基于 `@pierre/diffs` `WorkerPoolContext` / `getOrCreateWorkerPoolSingleton`）按会话共享 `poolSize: 2`、`totalASTLRUCacheSize: 100` 且在首张预算内 diff 展开时按需拉起；超过 120K 字符或 3000 行、或 worker 失败时退回纯文本摘要而不回退主线程同步高亮 |
+| Diff WorkerPool 与预算保护 | `@pierre/diffs` 默认同步高亮大 diff，单卡自建 Provider 在虚拟化滑出时销毁缓存池，worker 异常静默吞掉 | 在 `SessionStage` 与 `RunSessionModal` 外围通过 `DiffWorkerPoolProvider`（基于 `@pierre/diffs` `WorkerPoolContext` / `getOrCreateWorkerPoolSingleton`）按会话共享 `poolSize: 2`、`totalASTLRUCacheSize: 100` 且在首张预算内 diff 展开时按需拉起；超过 120K 字符或 3000 行、或 worker 失败时退回纯文本摘要而不回退主线程同步高亮 |
 | edit/write 失败与折叠状态 | diff 分支跳过工具错误输出，长错误不可展开；虚拟化卸载会重置手动展开的工具卡 | 独立渲染错误详情，保留长输出展开按钮与拟议 diff；通过 React Context 化的 `PersistentToggleNamespaceProvider`（无 render 期全局副作用）在 1200 轮虚拟滚动与弹窗隔离间保持 `ToolPartView`/`ToolGroupView` 展开记忆 |
 | 新组件外观 | 局部颜色、字号、圆角、阴影、宽度/高度动画绕过主题 | 注册 conversation hooks/recipe，复用共享 `Button`，补全双主题；仅保留颜色、阴影、透明度过渡 |
 | 首页进入会话常驻输入区 | portal/DOM 搬运（`usePersistentComposer` / `moveBefore` / `appendChild`）与绝对定位叠加高度测量（`useCoworkComposerInset`） | 拆除 portal 与 DOM 搬运，将单实例 `<StageComposer>` 固定在 `CoworkSessionLayout` + `ConversationStage` 同一 React 子树位置，保持 `SessionStage` 仅在挂载会话时懒加载分包，跨首页/冷加载/活跃会话/Tab 切换保留编辑器 DOM 与焦点选区 |
@@ -68,7 +68,7 @@
 
 | 检查 | 结果 |
 | --- | --- |
-| `bun run test:unit` | 975 passed，11 skipped（6055 tests passed，85 skipped），含虚拟化、selector 身份稳定性、WorkerPool 会话共享/预算、`PersistentToggleNamespaceProvider` 与 `@` 提及/JSON 草稿回归 |
+| `bun run test:unit` | 975 passed，11 skipped（6057 tests passed，85 skipped），含虚拟化、selector 身份稳定性、WorkerPool 会话共享/预算、`PersistentToggleNamespaceProvider`（含 `temp-*` 提升无竞态）、32KB 阈值无空帧回归与 `@` 提及/JSON 草稿回归 |
 | `bun run web:preview:check` | 148 passed，1 个既有 fixme（0 failed），冷 `.vite` 缓存验证通过，含 1200 轮虚拟化、流式吸底与上滚不回拉、Markdown/产物图解码重试、`@` 提及草稿持久化、双主题 5 视口设计走查 |
 | `bun run build` / `test:bundle-budget` | 通过（8286 modules）；preload 18 files / 0.90 MiB，startup 36 files / 1.79 MiB，最大 chunk 452 KiB，sourcemaps: 0 |
 | `build:tsc` / `typecheck:electron` | 通过 |

@@ -226,7 +226,11 @@ const useThrottledStreamingContent = (content: string, isStreaming: boolean): st
     return () => window.clearTimeout(timer);
   }, [content, shouldThrottle]);
 
-  return shouldThrottle ? visibleContent : content;
+  return shouldThrottle &&
+    visibleContent.length >= LARGE_STREAMING_CHARACTERS &&
+    content.startsWith(visibleContent)
+    ? visibleContent
+    : content;
 };
 
 export const StreamingMarkdownResponse = ({
