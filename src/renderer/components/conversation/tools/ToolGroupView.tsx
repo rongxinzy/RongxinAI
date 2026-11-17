@@ -3,7 +3,7 @@ import { ToolState } from '@shared/components/ai-elements/constants';
 import { Steps, StepsContent, StepsItem, StepsTrigger } from '@shared/components/conversation';
 import { Badge } from '@shared/components/ui/badge';
 import { CheckCircle2, Clock, Layers, XCircle } from 'lucide-react';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 
 import { i18nService } from '../../../services/i18n';
 import { useLiveMessageText } from '../../../services/useLiveMessageText';
@@ -51,13 +51,23 @@ const getFirstNonEmptyLine = (text: string): string | null => {
 /**
  * Collapses contiguous reasoning and tool parts into a compact Steps timeline
  * inspired by assistant-ui GroupedParts and prompt-kit Steps. Collapsed by
- * default; forced open when any item fails, awaits permission, or during export.
+ * default; auto-expands on error (while remaining collapsible) and locks open
+ * when awaiting permission or during export.
  */
 export const ToolGroupView: React.FC<ToolGroupViewProps> = React.memo(
   ({ group, forceExpand = false, onRespondToPermission }) => {
-    const [open, setOpen] = usePersistentToggle(`tool-group:${group.id}`, false);
-    const forcedOpen = forceExpand || group.hasError || group.hasApproval;
-    const isOpen = forcedOpen || open;
+    const [open, setOpen] = usePersistentToggle(`tool-group:${group.id}`, group.hasError);
+    const prevHasErrorRef = useRef(group.hasError);
+    useEffect(() => {
+      const hadError = prevHasErrorRef.current;
+      prevHasErrorRef.current = group.hasError;
+      if (!hadError && group.hasError) {
+        setOpen(true);
+      }
+    }, [group.hasError, setOpen]);
+
+    const lockedOpen = forceExpand || group.hasApproval;
+    const isOpen = lockedOpen || open;
 
     const targetPart = findTargetPart(group.parts);
     const liveThinkingText = useLiveMessageText(
@@ -122,7 +132,7 @@ export const ToolGroupView: React.FC<ToolGroupViewProps> = React.memo(
       <Steps
         open={isOpen}
         onOpenChange={next => {
-          if (!forcedOpen) setOpen(next);
+          if (!lockedOpen) setOpen(next);
         }}
       >
         <StepsTrigger

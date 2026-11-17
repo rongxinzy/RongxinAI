@@ -105,7 +105,7 @@ describe('ToolGroupView', () => {
     expect(trigger).toHaveTextContent(i18nService.t('codingAgentToolRunning'));
   });
 
-  test('forces group open when any tool inside fails', () => {
+  test('auto-expands when any tool inside fails and allows the user to collapse it', () => {
     setPersistentToggleNamespace('group-error-open');
     const group: ToolGroupTurnPart = {
       kind: 'tool_group',
@@ -126,13 +126,71 @@ describe('ToolGroupView', () => {
       hasApproval: false,
     };
 
-    render(createElement(ToolGroupView, { group }));
+    const view = render(createElement(ToolGroupView, { group }));
     const groupTrigger = screen.getAllByRole('button')[0];
     expect(groupTrigger).toHaveAttribute('aria-expanded', 'true');
     expect(groupTrigger).toHaveAttribute('data-tool-state', 'output-error');
     expect(groupTrigger).toHaveTextContent(i18nService.t('codingAgentToolFailed'));
     expect(screen.getAllByText('npm test')).toHaveLength(2);
     expect(screen.getByText(i18nService.t('codingAgentReasoningComplete'))).toBeVisible();
+
+    fireEvent.click(groupTrigger);
+    expect(groupTrigger).toHaveAttribute('aria-expanded', 'false');
+
+    // Persisted collapse survives virtualization unmount/remount.
+    view.unmount();
+    render(createElement(ToolGroupView, { group }));
+    expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('auto-expands if a running group transitions to failed even after manual collapse', () => {
+    setPersistentToggleNamespace('group-error-transition');
+    const runningGroup: ToolGroupTurnPart = {
+      kind: 'tool_group',
+      id: 'group:transition',
+      parts: [
+        makeReasoning('r1', 'Running checks'),
+        makeTool('t1', {
+          toolName: 'bash',
+          category: 'shell',
+          readOnly: false,
+          input: { command: 'npm test' },
+          phase: 'running',
+          isError: false,
+        }),
+      ],
+      hasError: false,
+      hasApproval: false,
+    };
+
+    const view = render(createElement(ToolGroupView, { group: runningGroup }));
+    const trigger = screen.getByRole('button');
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    const failedGroup: ToolGroupTurnPart = {
+      ...runningGroup,
+      parts: [
+        runningGroup.parts[0],
+        makeTool('t1', {
+          toolName: 'bash',
+          category: 'shell',
+          readOnly: false,
+          input: { command: 'npm test' },
+          phase: 'output-error',
+          isError: true,
+          output: 'Exit code 1',
+        }),
+      ],
+      hasError: true,
+    };
+    view.rerender(createElement(ToolGroupView, { group: failedGroup }));
+    expect(screen.getAllByRole('button')[0]).toHaveAttribute('aria-expanded', 'true');
+
+    fireEvent.click(screen.getAllByRole('button')[0]);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
   });
 
   test('forces group open and forwards permission callbacks when approval is requested', () => {
