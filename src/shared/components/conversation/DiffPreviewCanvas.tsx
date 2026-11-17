@@ -1,22 +1,23 @@
-import { MultiFileDiff, Virtualizer, WorkerPoolContextProvider } from '@pierre/diffs/react';
-import React, { useEffect, useMemo } from 'react';
+import {
+  MultiFileDiff,
+  useWorkerPool,
+  Virtualizer,
+  WorkerPoolContextProvider,
+} from '@pierre/diffs/react';
+import React, { useContext, useEffect, useMemo } from 'react';
 
-const DIFF_WORKER_POOL_OPTIONS = {
-  poolSize: 2,
-  totalASTLRUCacheSize: 100,
-};
-
-const DIFF_HIGHLIGHTER_OPTIONS = {
-  theme: { dark: 'pierre-dark', light: 'pierre-light' } as const,
-  tokenizeMaxLineLength: 2000,
-  lineDiffType: 'word-alt' as const,
-};
+import {
+  DIFF_HIGHLIGHTER_OPTIONS,
+  DIFF_WORKER_POOL_OPTIONS,
+  DiffPoolBoundaryContext,
+} from './DiffWorkerPoolProvider';
 
 interface DiffPreviewCanvasProps {
   fileName: string;
   oldContent: string;
   newContent: string;
   themeType: 'light' | 'dark';
+  fallback: React.ReactNode;
   onWorkerFailure: () => void;
 }
 
@@ -25,15 +26,22 @@ const DiffPreviewCanvas: React.FC<DiffPreviewCanvasProps> = ({
   oldContent,
   newContent,
   themeType,
+  fallback,
   onWorkerFailure,
 }) => {
   const hasWorkerGlobal = typeof Worker !== 'undefined';
+  const existingPool = useWorkerPool();
+  const boundary = useContext(DiffPoolBoundaryContext);
 
   useEffect(() => {
     if (!hasWorkerGlobal) {
       onWorkerFailure();
+      return;
     }
-  }, [hasWorkerGlobal, onWorkerFailure]);
+    if (boundary.inBoundary && existingPool == null && !boundary.workerFailed) {
+      boundary.ensurePool();
+    }
+  }, [boundary, existingPool, hasWorkerGlobal, onWorkerFailure]);
 
   const poolOptions = useMemo(
     () => ({
@@ -75,7 +83,27 @@ const DiffPreviewCanvas: React.FC<DiffPreviewCanvasProps> = ({
   );
 
   if (!hasWorkerGlobal) {
-    return null;
+    return <>{fallback}</>;
+  }
+
+  const diffContent = (
+    <Virtualizer className="max-h-80 overflow-auto">
+      <MultiFileDiff oldFile={files.oldFile} newFile={files.newFile} options={options} />
+    </Virtualizer>
+  );
+
+  // Inside a session-level DiffWorkerPoolProvider, reuse its shared WorkerPoolContext
+  // instead of wrapping every card in a separate WorkerPoolContextProvider.
+  if (boundary.inBoundary) {
+    if (existingPool == null) {
+      return <>{fallback}</>;
+    }
+    return diffContent;
+  }
+
+  // Standalone fallback (when DiffPreview is mounted outside SessionStage).
+  if (existingPool != null) {
+    return diffContent;
   }
 
   return (
@@ -83,9 +111,7 @@ const DiffPreviewCanvas: React.FC<DiffPreviewCanvasProps> = ({
       poolOptions={poolOptions}
       highlighterOptions={DIFF_HIGHLIGHTER_OPTIONS}
     >
-      <Virtualizer className="max-h-80 overflow-auto">
-        <MultiFileDiff oldFile={files.oldFile} newFile={files.newFile} options={options} />
-      </Virtualizer>
+      {diffContent}
     </WorkerPoolContextProvider>
   );
 };

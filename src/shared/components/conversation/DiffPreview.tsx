@@ -1,5 +1,7 @@
 import { cn } from '@shared/lib/utils';
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import React, { Suspense, useCallback, useContext, useEffect, useState } from 'react';
+
+import { DiffPoolBoundaryContext } from './DiffWorkerPoolProvider';
 
 const MAX_DIFF_CHARS = 120_000;
 const MAX_DIFF_LINES = 3_000;
@@ -53,12 +55,16 @@ export interface DiffPreviewProps {
  */
 export function DiffPreview({ fileName, oldContent, newContent, className }: DiffPreviewProps) {
   const themeType = useDocumentThemeType();
+  const boundary = useContext(DiffPoolBoundaryContext);
   const [workerFailed, setWorkerFailed] = useState(false);
   const overBudget = exceedsDiffBudget(oldContent, newContent);
 
   const handleWorkerFailure = useCallback(() => {
     setWorkerFailed(true);
-  }, []);
+    if (boundary.inBoundary) {
+      boundary.reportWorkerFailure();
+    }
+  }, [boundary]);
 
   const excerptSource = newContent || oldContent;
   const excerpt =
@@ -72,7 +78,7 @@ export function DiffPreview({ fileName, oldContent, newContent, className }: Dif
 
   return (
     <div className={cn('theme-conversation-diff max-h-80 overflow-hidden', className)}>
-      {overBudget || workerFailed ? (
+      {overBudget || workerFailed || boundary.workerFailed ? (
         fallback
       ) : (
         <Suspense fallback={fallback}>
@@ -81,6 +87,7 @@ export function DiffPreview({ fileName, oldContent, newContent, className }: Dif
             oldContent={oldContent}
             newContent={newContent}
             themeType={themeType}
+            fallback={fallback}
             onWorkerFailure={handleWorkerFailure}
           />
         </Suspense>

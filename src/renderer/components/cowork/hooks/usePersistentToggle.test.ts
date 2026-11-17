@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from '@testing-library/react';
+import React from 'react';
 import { beforeEach, expect, test } from 'vitest';
 
 import {
+  PersistentToggleNamespaceProvider,
   resolveStableSessionKey,
   setPersistentToggleNamespace,
   usePersistentToggle,
@@ -94,4 +96,42 @@ test('preserves stable session key and toggle memory when a temp-* session is pr
   expect(resolveStableSessionKey('real-session-1001')).toBe('temp-1001');
   const realHook = renderHook(() => usePersistentToggle('reasoning-promoted', false));
   expect(realHook.result.current[0]).toBe(true);
+});
+
+test('PersistentToggleNamespaceProvider isolates concurrent sessions from global namespace', () => {
+  setPersistentToggleNamespace('global-session');
+  const wrapperA = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(
+      PersistentToggleNamespaceProvider,
+      { namespace: 'modal-session-a' },
+      children,
+    );
+  const wrapperB = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(
+      PersistentToggleNamespaceProvider,
+      { namespace: 'modal-session-b' },
+      children,
+    );
+
+  const first = renderHook(() => usePersistentToggle('tool-open:call-1', false), {
+    wrapper: wrapperA,
+  });
+  expect(first.result.current[0]).toBe(false);
+  act(() => {
+    first.result.current[1](true);
+  });
+  first.unmount();
+
+  // Different session stays closed
+  const second = renderHook(() => usePersistentToggle('tool-open:call-1', false), {
+    wrapper: wrapperB,
+  });
+  expect(second.result.current[0]).toBe(false);
+  second.unmount();
+
+  // Same session preserves expanded state across unmount/remount
+  const remountedA = renderHook(() => usePersistentToggle('tool-open:call-1', false), {
+    wrapper: wrapperA,
+  });
+  expect(remountedA.result.current[0]).toBe(true);
 });

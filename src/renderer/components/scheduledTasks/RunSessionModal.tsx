@@ -8,6 +8,7 @@ import { i18nService } from '../../services/i18n';
 import type { CoworkSession } from '../../types/cowork';
 import { projectSessionToTurns } from '../conversation/model/projectTurns';
 import { TurnView } from '../conversation/thread/TurnView';
+import { PersistentToggleNamespaceProvider } from '../cowork/hooks/usePersistentToggle';
 
 interface RunSessionModalProps {
   sessionId?: string | null;
@@ -206,11 +207,13 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({
           )}
 
           {!loading && !error && turns.length > 0 && (
-            <div className="py-2">
-              {turns.map(turn => (
-                <TurnView key={turn.id} turn={turn} skills={[]} cwd={session?.cwd} />
-              ))}
-            </div>
+            <PersistentToggleNamespaceProvider namespace={session?.id ?? ''}>
+              <div className="py-2">
+                {turns.map(turn => (
+                  <TurnView key={turn.id} turn={turn} skills={[]} cwd={session?.cwd} />
+                ))}
+              </div>
+            </PersistentToggleNamespaceProvider>
           )}
         </div>
       </DialogContent>

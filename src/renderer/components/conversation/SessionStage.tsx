@@ -1,3 +1,4 @@
+import { DiffWorkerPoolProvider } from '@shared/components/conversation';
 import React, { useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -26,7 +27,7 @@ import type {
   CoworkPermissionRequest,
   CoworkPermissionResult,
 } from '../../types/cowork';
-import { setPersistentToggleNamespace } from '../cowork/hooks/usePersistentToggle';
+import { PersistentToggleNamespaceProvider } from '../cowork/hooks/usePersistentToggle';
 import { useSessionHistoryPagination } from '../cowork/hooks/useSessionHistoryPagination';
 import type { CoworkPromptInputRef } from '../cowork/promptInput/types';
 import { SessionArtifactPanelRegion } from '../cowork/sessionDetail/SessionArtifactPanelRegion';
@@ -40,7 +41,6 @@ import { ConversationThread } from './thread/ConversationThread';
 
 export interface SessionTranscriptStageProps {
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
-  detailRootRef: React.RefObject<HTMLDivElement | null>;
   promptInputRef: React.RefObject<CoworkPromptInputRef | null>;
   inlineQuestionPermission?: CoworkPermissionRequest | null;
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
@@ -54,7 +54,6 @@ export interface SessionTranscriptStageProps {
  */
 export const SessionTranscriptStage: React.FC<SessionTranscriptStageProps> = ({
   scrollContainerRef,
-  detailRootRef,
   promptInputRef,
   inlineQuestionPermission,
   onRespondToInlineQuestion,
@@ -108,12 +107,10 @@ export const SessionTranscriptStage: React.FC<SessionTranscriptStageProps> = ({
     [dispatch, promptInputRef],
   );
 
-  setPersistentToggleNamespace(currentSession?.id ?? '');
-
   const markInitialHistoryTailPositioned = useSessionHistoryPagination({
     sessionId,
     messagesOffset: currentSession?.messagesOffset ?? 0,
-    rootRef: detailRootRef,
+    scrollContainerRef,
   });
 
   const selectSessionTurns = useMemo(() => createSessionTurnsSelector(), []);
@@ -144,28 +141,30 @@ export const SessionTranscriptStage: React.FC<SessionTranscriptStageProps> = ({
   }
 
   return (
-    <>
-      <SessionExportDialog
-        open={showExportOptions}
-        onOpenChange={setShowExportOptions}
-        onExportImage={handleShareClick}
-        onExportText={handleExportText}
-        disabled={isExportingImage}
-      />
-      <ConversationThread
-        sessionId={currentSession.id}
-        turns={turns}
-        skills={skills}
-        cwd={currentSession.cwd}
-        isExporting={isExportingImage}
-        scrollContainerRef={scrollContainerRef}
-        unmatchedPermission={unmatchedPermission}
-        onRespondToPermission={onRespondToInlinePermission}
-        onRespondToQuestion={onRespondToInlineQuestion}
-        onReEdit={remoteManaged ? undefined : handleReEdit}
-        onInitialScrollReady={markInitialHistoryTailPositioned}
-      />
-    </>
+    <PersistentToggleNamespaceProvider namespace={currentSession.id}>
+      <DiffWorkerPoolProvider>
+        <SessionExportDialog
+          open={showExportOptions}
+          onOpenChange={setShowExportOptions}
+          onExportImage={handleShareClick}
+          onExportText={handleExportText}
+          disabled={isExportingImage}
+        />
+        <ConversationThread
+          sessionId={currentSession.id}
+          turns={turns}
+          skills={skills}
+          cwd={currentSession.cwd}
+          isExporting={isExportingImage}
+          scrollContainerRef={scrollContainerRef}
+          unmatchedPermission={unmatchedPermission}
+          onRespondToPermission={onRespondToInlinePermission}
+          onRespondToQuestion={onRespondToInlineQuestion}
+          onReEdit={remoteManaged ? undefined : handleReEdit}
+          onInitialScrollReady={markInitialHistoryTailPositioned}
+        />
+      </DiffWorkerPoolProvider>
+    </PersistentToggleNamespaceProvider>
   );
 };
 

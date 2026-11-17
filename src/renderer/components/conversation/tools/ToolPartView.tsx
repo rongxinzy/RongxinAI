@@ -26,11 +26,12 @@ import {
   Terminal as TerminalIcon,
   Wrench,
 } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 
 import { i18nService } from '../../../services/i18n';
 import type { CoworkPermissionResult } from '../../../types/cowork';
 import { CoworkContentNotice } from '../../cowork/components/CoworkContentNotice';
+import { usePersistentToggle } from '../../cowork/hooks/usePersistentToggle';
 import type { ToolCategory, ToolPhase, ToolTurnPart } from '../model/types';
 import { ToolApprovalBar } from './ToolApprovalBar';
 import {
@@ -71,8 +72,11 @@ export interface ToolPartViewProps {
 
 export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
   ({ part, forceExpand = false, onRespondToPermission }) => {
-    const [open, setOpen] = useState(false);
-    const [expandedOutput, setExpandedOutput] = useState(false);
+    const [open, setOpen] = usePersistentToggle(`tool-open:${part.toolCallId}`, false);
+    const [expandedOutput, setExpandedOutput] = usePersistentToggle(
+      `tool-output:${part.toolCallId}`,
+      false,
+    );
 
     const awaitingPermission =
       part.phase === 'approval-requested' &&
@@ -191,7 +195,7 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
                   variant="ghost"
                   size="sm"
                   aria-expanded={expandedOutput}
-                  onClick={() => setExpandedOutput(current => !current)}
+                  onClick={() => setExpandedOutput(!expandedOutput)}
                 >
                   {i18nService.t(
                     expandedOutput ? 'coworkToolResultCollapse' : 'coworkToolResultShowAll',

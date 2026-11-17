@@ -454,6 +454,9 @@ export default defineConfig(async ({ command }) => {
     optimizeDeps: {
       entries: ['src/renderer/main.tsx'],
       include: [
+        '@pierre/diffs/react',
+        '@pierre/diffs/worker',
+        '@pierre/diffs/worker/worker.js',
         '@wecom/wecom-aibot-sdk',
         'ansi-to-react',
         'cronstrue/i18n',

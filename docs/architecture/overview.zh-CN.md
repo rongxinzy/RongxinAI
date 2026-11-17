@@ -73,7 +73,7 @@ App.tsx → coworkService.init() → IPC 加载配置/会话 → 流监听
 startSession() → IPC → PiRuntimeAdapter → 流事件 → Redux
 ```
 
-流式 IPC/渲染说明见 [streaming.md](streaming.md)（Pi 事件翻译为增量 UIMessageChunk，主进程仅 coalescer 一处合并，渲染端 rAF 批处理进 `LiveTextStore`，经懒加载 `SessionStage`、`projectSessionToTurns` 回合投影、`AssistantTextPartView`/`ThinkingPartView` 隔离订阅与 Streamdown 2.7 / `use-stick-to-bottom` 增量渲染；全文快照仅限异常路径与终态）。权限请求经 `CoworkPermissionModal` 回传引擎。
+流式 IPC/渲染说明见 [streaming.md](streaming.md)（Pi 事件翻译为增量 UIMessageChunk，主进程仅 coalescer 一处合并，渲染端 rAF 批处理进 `LiveTextStore`，经 `ConversationStage` / 常驻 `<StageComposer>`、懒加载 `SessionStage`、`projectSessionToTurns` 回合投影、`AssistantTextPartView`/`ThinkingPartView` 隔离订阅与 Streamdown 2.7 / `@tanstack/react-virtual` 增量渲染；全文快照仅限异常路径与终态）。权限请求经 `CoworkPermissionModal` 回传引擎。
 
 存储：`cowork_sessions` / `cowork_messages`；Cowork 配置 `cowork_config`；应用 KV 在 SQLite `kv` 表。
 

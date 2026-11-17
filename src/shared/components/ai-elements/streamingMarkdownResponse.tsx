@@ -197,13 +197,21 @@ const useThrottledStreamingContent = (content: string, isStreaming: boolean): st
   const [visibleContent, setVisibleContent] = useState(content);
   const previousContentRef = useRef(content);
   const lastUpdateAtRef = useRef(0);
+  const wasThrottledRef = useRef(false);
   const previous = previousContentRef.current;
   const isRewrite = !content.startsWith(previous);
+  const shouldThrottle = isStreaming && !isRewrite && content.length >= LARGE_STREAMING_CHARACTERS;
 
   useEffect(() => {
     previousContentRef.current = content;
-    if (!isStreaming || isRewrite || content.length < LARGE_STREAMING_CHARACTERS) {
+    if (!shouldThrottle) {
+      wasThrottledRef.current = false;
       lastUpdateAtRef.current = 0;
+      return;
+    }
+    if (!wasThrottledRef.current) {
+      wasThrottledRef.current = true;
+      lastUpdateAtRef.current = performance.now();
       setVisibleContent(content);
       return;
     }
@@ -216,11 +224,9 @@ const useThrottledStreamingContent = (content: string, isStreaming: boolean): st
       Math.max(0, LARGE_STREAMING_UPDATE_MS - elapsed),
     );
     return () => window.clearTimeout(timer);
-  }, [content, isRewrite, isStreaming]);
+  }, [content, shouldThrottle]);
 
-  return !isStreaming || isRewrite || content.length < LARGE_STREAMING_CHARACTERS
-    ? content
-    : visibleContent;
+  return shouldThrottle ? visibleContent : content;
 };
 
 export const StreamingMarkdownResponse = ({

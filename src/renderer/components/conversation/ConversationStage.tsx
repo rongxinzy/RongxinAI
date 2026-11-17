@@ -38,7 +38,6 @@ import SecurityStatusIndicator from '../cowork/SecurityStatusIndicator';
 import { useAgentSelectedModel } from '../cowork/agentModelSelection';
 import { CoworkRunStatus } from '../cowork/components/CoworkRunStatus';
 import { useCoworkSessionActions } from '../cowork/hooks/useCoworkSessionActions';
-import { resolveStableSessionKey } from '../cowork/hooks/usePersistentToggle';
 import type { CoworkPromptInputProps, CoworkPromptInputRef } from '../cowork/promptInput/types';
 import { useUnmanagedWorkingDirectory } from '../cowork/useUnmanagedWorkingDirectory';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
@@ -50,13 +49,16 @@ import type { SettingsOpenOptions } from '../settings/types';
 import { StageComposer } from './composer/StageComposer';
 
 // Keep Streamdown, Shiki, KaTeX, Mermaid and @pierre/diffs out of the cold Home startup bundle.
-const loadSessionStage = () => import('./SessionStage');
-const sessionStagePromise = loadSessionStage();
+let sessionStagePromise: Promise<typeof import('./SessionStage')> | null = null;
+const loadSessionStage = () => {
+  sessionStagePromise ??= import('./SessionStage');
+  return sessionStagePromise;
+};
 const SessionTranscriptStage = React.lazy(() =>
-  sessionStagePromise.then(module => ({ default: module.SessionTranscriptStage })),
+  loadSessionStage().then(module => ({ default: module.SessionTranscriptStage })),
 );
 const SessionArtifactSidePane = React.lazy(() =>
-  sessionStagePromise.then(module => ({ default: module.SessionArtifactSidePane })),
+  loadSessionStage().then(module => ({ default: module.SessionArtifactSidePane })),
 );
 
 export interface ConversationStageProps {
@@ -364,7 +366,6 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
       !currentSession);
   const isArtifactWorkspace = artifactLayoutMode === ArtifactLayoutMode.Workspace;
   const isTranscriptHidden = !isHome && !isWaitingSession && isArtifactWorkspace;
-  const stableSessionKey = resolveStableSessionKey(currentSession?.id);
   const sessionTitle = currentSession
     ? resolveSessionDisplayTitle(currentSession, i18nService.getLanguage()) ||
       i18nService.t('coworkNewSession')
@@ -395,7 +396,7 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
       runIndicator={
         isWaitingSession || !currentSession ? null : (
           <CoworkRunStatus
-            key={stableSessionKey}
+            key={currentSession.id}
             sessionId={currentSession.id}
             isStreaming={isStreaming}
           />
@@ -440,7 +441,6 @@ const ConversationStage: React.FC<ConversationStageProps> = ({
                 <React.Suspense fallback={<CoworkConversationLoadingSkeleton />}>
                   <SessionTranscriptStage
                     scrollContainerRef={scrollContainerRef}
-                    detailRootRef={detailRootRef}
                     promptInputRef={promptInputRef}
                     inlineQuestionPermission={inlineQuestionPermission}
                     onRespondToInlineQuestion={onRespondToInlineQuestion}
