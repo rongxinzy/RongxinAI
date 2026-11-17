@@ -1,3 +1,8 @@
+import type { OrbState } from 'thinking-orbs';
+
+// This chooses only the library's sphere geometry, not a product search state.
+export const THINKING_ORB_STATE = 'searching' satisfies OrbState;
+
 export const ThinkingIndicatorVariant = {
   Inline: 'inline',
   Companion: 'companion',

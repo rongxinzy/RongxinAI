@@ -4,7 +4,8 @@ import { ThinkingOrb } from 'thinking-orbs';
 
 import { readIndicatorPaint, subscribeIndicatorAppearance } from './appearance';
 import type { ThinkingIndicatorPaint } from './appearance';
-import { THINKING_ORB_PRESETS, ThinkingIndicatorVariant } from './constants';
+import { THINKING_ORB_PRESETS, THINKING_ORB_STATE, ThinkingIndicatorVariant } from './constants';
+import { ROUND_GLOBE_OPTIONS, settledThinkingFrame } from './frames';
 
 interface ThinkingIndicatorProps {
   variant?: ThinkingIndicatorVariant;
@@ -43,11 +44,13 @@ export const ThinkingIndicator = memo(function ThinkingIndicator({
     >
       {paint ? (
         <ThinkingOrb
-          state="working"
+          state={THINKING_ORB_STATE}
           size={THINKING_ORB_PRESETS[variant]}
           color={paint.color}
           theme={paint.theme}
           paused={paused}
+          opts={ROUND_GLOBE_OPTIONS}
+          frame={paused ? settledThinkingFrame : undefined}
           style={{ width: '100%', height: '100%' }}
           aria-hidden="true"
         />
