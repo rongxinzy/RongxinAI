@@ -241,6 +241,17 @@ export function conversationAppearances() {
     'conversation-image': recipe({ base: { 'border-radius': 'var(--zy-style-radius-xl)' } }),
     'conversation-image-status': recipe({ base: { ...meta, padding: '1rem' } }),
     'conversation-image-stage': recipe({ base: { padding: '1rem' } }),
+    'html-preview-stage': recipe({
+      base: { padding: '0.5rem', 'background-color': 'var(--zy-surface)' },
+      wide: { padding: '0.75rem' },
+    }),
+    'html-preview-viewport': recipe({
+      base: {
+        ...border,
+        'border-radius': '8px',
+        'background-color': 'var(--background)',
+      },
+    }),
     'conversation-notice': recipe({
       base: {
         ...meta,

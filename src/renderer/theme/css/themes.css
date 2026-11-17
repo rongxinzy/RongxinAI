@@ -4192,6 +4192,17 @@
 :where(:root, [data-theme]) :where(.theme-conversation-image-stage) {
   padding: 1rem;
 }
+:where(:root, [data-theme]) :where(.theme-html-preview-stage[data-inset="true"]) {
+  padding: 0.5rem;
+  background-color: var(--zy-surface);
+}
+:where(:root, [data-theme]) :where(.theme-html-preview-viewport[data-inset="true"]) {
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border);
+  border-radius: 8px;
+  background-color: var(--background);
+}
 :where(:root, [data-theme]) :where(.theme-conversation-notice) {
   font-size: var(--zy-component-text-xs);
   color: var(--muted-foreground);
@@ -5875,6 +5886,11 @@
 :where(:root, [data-theme]) :where(.theme-textarea) {
   font-size: var(--zy-component-text-sm);
   line-height: var(--zy-component-text-sm--line-height);
+}
+}
+@media (min-width: 48rem) {
+:where(:root, [data-theme]) :where(.theme-html-preview-stage[data-inset="true"]) {
+  padding: 0.75rem;
 }
 }
 :where(:root, [data-theme]) :where(.theme-input)::file-selector-button {
@@ -8620,6 +8636,8 @@ to {
 :where(:root, [data-theme]) :where(.theme-conversation-image),
 :where(:root, [data-theme]) :where(.theme-conversation-image-status),
 :where(:root, [data-theme]) :where(.theme-conversation-image-stage),
+:where(:root, [data-theme]) :where(.theme-html-preview-stage[data-inset="true"]),
+:where(:root, [data-theme]) :where(.theme-html-preview-viewport[data-inset="true"]),
 :where(:root, [data-theme]) :where(.theme-conversation-notice),
 :where(:root, [data-theme]) :where(.theme-conversation-drop),
 :where(:root, [data-theme]) :where(.theme-conversation-toolbar-pending),

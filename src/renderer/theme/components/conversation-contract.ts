@@ -38,6 +38,8 @@ export const CONVERSATION_SELECTORS = {
   'conversation-image': '.theme-conversation-image',
   'conversation-image-status': '.theme-conversation-image-status',
   'conversation-image-stage': '.theme-conversation-image-stage',
+  'html-preview-stage': '.theme-html-preview-stage[data-inset="true"]',
+  'html-preview-viewport': '.theme-html-preview-viewport[data-inset="true"]',
   'conversation-notice': '.theme-conversation-notice',
   'conversation-drop': '.theme-conversation-drop',
   'conversation-toolbar-pending': '.theme-conversation-toolbar-pending',

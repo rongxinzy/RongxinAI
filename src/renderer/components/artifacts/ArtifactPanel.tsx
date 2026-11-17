@@ -54,6 +54,7 @@ import { useArtifactPreviewContent } from './useArtifactPreviewContent';
 import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
 import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
+import { HtmlPreviewFrame } from './HtmlPreviewFrame';
 
 const t = (key: string) => i18nService.t(key);
 
@@ -479,28 +480,33 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
               key={`${selectedArtifact.id}-${displayedTab}`}
               className="flex-1 min-h-0 overflow-hidden animate-fade-in"
             >
-              {loadingArtifactId === selectedArtifact.id ? (
-                <div className="h-full min-h-0 p-4" aria-busy="true">
-                  <Skeleton className="theme-scene-preview-loading h-full w-full" />
-                </div>
-              ) : artifactLoadError && artifactLoadError === selectedArtifact.id ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                  {t('artifactDocumentError')}
-                </div>
-              ) : displayedTab === 'preview' ? (
-                <ArtifactRenderer
-                  artifact={
-                    isDelimitedArtifact(selectedArtifact)
-                      ? { ...selectedArtifact, type: 'document' }
-                      : selectedArtifact
-                  }
-                  sessionArtifacts={artifacts}
-                  cwd={cwd}
-                  imageRevision={imageRevision}
-                />
-              ) : (
-                <ArtifactSourcePreview artifact={selectedArtifact} />
-              )}
+              <HtmlPreviewFrame
+                enabled={selectedArtifact.type === 'html' && !isCodeView}
+                inset={layoutMode === ArtifactLayoutMode.Split && !isFullscreen}
+              >
+                {loadingArtifactId === selectedArtifact.id ? (
+                  <div className="h-full min-h-0 p-4" aria-busy="true">
+                    <Skeleton className="theme-scene-preview-loading h-full w-full" />
+                  </div>
+                ) : artifactLoadError && artifactLoadError === selectedArtifact.id ? (
+                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                    {t('artifactDocumentError')}
+                  </div>
+                ) : displayedTab === 'preview' ? (
+                  <ArtifactRenderer
+                    artifact={
+                      isDelimitedArtifact(selectedArtifact)
+                        ? { ...selectedArtifact, type: 'document' }
+                        : selectedArtifact
+                    }
+                    sessionArtifacts={artifacts}
+                    cwd={cwd}
+                    imageRevision={imageRevision}
+                  />
+                ) : (
+                  <ArtifactSourcePreview artifact={selectedArtifact} />
+                )}
+              </HtmlPreviewFrame>
             </div>
           </div>
         ) : (
