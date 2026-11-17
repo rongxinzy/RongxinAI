@@ -2,7 +2,7 @@ import { ModelPicker } from '@shared/components/model-picker/ModelPicker';
 import { Button } from '@shared/components/ui/button';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import type { AISphereSnapshot } from '../../../../shared/aisphere';
 import type {
@@ -54,6 +54,7 @@ export function ModelsPage({
   const { preferences, update: updatePreferences } = useMagpiePreferences(running);
 
   const [providers, setProviders] = useState<MagpieProviderSummary[]>([]);
+  const providersRevisionRef = useRef(0);
   const [orgSnapshot, setOrgSnapshot] = useState<AISphereSnapshot | null>(null);
   const [providerErrors, setProviderErrors] = useState<Record<string, ClassifiedProviderError>>({});
   const [testingProviderId, setTestingProviderId] = useState<string | null>(null);
@@ -66,12 +67,13 @@ export function ModelsPage({
   const [subsBusy, setSubsBusy] = useState(false);
 
   const refreshAll = useCallback(async () => {
+    const providersRevision = providersRevisionRef.current;
     try {
       const [nextProviders, nextOrg] = await Promise.all([
         window.electron?.magpie?.providers?.().catch(() => []) ?? [],
         window.electron?.managedProviders?.aisphereSnapshot?.().catch(() => null) ?? null,
       ]);
-      setProviders(nextProviders);
+      if (providersRevision === providersRevisionRef.current) setProviders(nextProviders);
       setOrgSnapshot(nextOrg);
       await refreshMagpieModels();
     } catch (error) {
@@ -118,12 +120,40 @@ export function ModelsPage({
     input: MagpieSaveProviderInput,
     defaultModelToSelect?: string,
   ) => {
-    const savedList = await window.electron.magpie.saveProvider(input);
+    if (!running) {
+      const started = await retryStart();
+      if (started?.state !== 'running') {
+        throw new Error(i18nService.t('magpieGatewayStartFailedHint'));
+      }
+    }
+    // Know the new provider's identity before saving so duplicate model names
+    // cannot redirect its default selection to an existing provider.
+    const id = `provider-${crypto.randomUUID()}`;
+    const savedList = await window.electron.magpie.saveProvider({ ...input, id });
+    // Starting the service also refreshes the page. Its pre-save provider read
+    // must not overwrite the newly persisted list when it finishes later.
+    providersRevisionRef.current += 1;
     setProviders(savedList);
-    await refreshMagpieModels();
-    if (defaultModelToSelect) {
-      await selectMagpieDefaultModel(defaultModelToSelect);
-      recordRecentModelId(defaultModelToSelect);
+    try {
+      const catalog = await refreshMagpieModels();
+      if (defaultModelToSelect) {
+        const ownedModels = catalog.models.filter(model => model.owned_by === id);
+        const model =
+          ownedModels.find(model => model.id === `${id}/${defaultModelToSelect}`) ??
+          ownedModels.find(model => model.id === defaultModelToSelect);
+        if (!model) throw new Error('Saved provider model is unavailable in the catalog');
+        await selectMagpieDefaultModel(model.id);
+        recordRecentModelId(model.id);
+      }
+    } catch (error) {
+      // The provider is already persisted. Resolve the form's save so retrying
+      // a catalog/default failure cannot create another copy of the provider.
+      console.warn(`[ModelsPage] Provider ${id} saved but model setup failed:`, error);
+      showAppToast({
+        message: i18nService.t('providerWizardSavedSetupIncomplete'),
+        isError: false,
+      });
+      return;
     }
     showAppToast(i18nService.t('savedSuccessfully'));
   };

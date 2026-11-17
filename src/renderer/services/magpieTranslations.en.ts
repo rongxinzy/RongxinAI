@@ -362,6 +362,8 @@ export const magpieTranslationsEn = {
   providerWizardClearSelection: 'Clear',
   providerWizardSetDefaultModel: 'Switch default model to this provider right after saving',
   providerWizardSaveAndEnable: 'Save & enable',
+  providerWizardSavedSetupIncomplete:
+    'Provider saved, but refreshing models or switching the default model did not finish. Reopen model settings to check.',
   providerWizardNext: 'Next',
   providerWizardBack: 'Back',
   providerWizardTestFirst: 'Test connection',

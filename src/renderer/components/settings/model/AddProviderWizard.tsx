@@ -18,6 +18,7 @@ import {
   CONSOLIDATED_PROVIDER_PRESETS,
   type ConsolidatedProviderPreset,
 } from '../../../services/modelSettings/providerPresets';
+import { showAppToast } from '../../../services/toastNotification';
 import {
   WizardStepConfigureConnection,
   WizardStepSelectModels,
@@ -224,6 +225,9 @@ export function AddProviderWizard({
       };
       await onSave(payload, setAsDefault ? selectedModels[0] : undefined);
       onOpenChange(false);
+    } catch (error) {
+      console.error(`[AddProviderWizard] Provider ${preset.key} save failed:`, error);
+      showAppToast({ message: i18nService.t('saveFailed'), isError: true });
     } finally {
       setSaving(false);
     }
