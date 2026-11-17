@@ -125,7 +125,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         label: i18nService.t('activityFilterAll'),
         badge:
           runs.length > 0 ? (
-            <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
+            <Badge variant="secondary" className="ml-1.5">
               {runs.length}
             </Badge>
           ) : undefined,
@@ -135,7 +135,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         label: i18nService.t('activityTriggerChannel'),
         badge:
           channelCount > 0 ? (
-            <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
+            <Badge variant="secondary" className="ml-1.5">
               {channelCount}
             </Badge>
           ) : undefined,
@@ -145,7 +145,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         label: i18nService.t('activityTriggerCron'),
         badge:
           cronCount > 0 ? (
-            <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
+            <Badge variant="secondary" className="ml-1.5">
               {cronCount}
             </Badge>
           ) : undefined,

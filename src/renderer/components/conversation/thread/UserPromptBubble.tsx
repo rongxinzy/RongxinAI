@@ -121,7 +121,7 @@ export const UserPromptBubble: React.FC<UserPromptBubbleProps> = React.memo(
       <div
         data-export-role="user-message"
         data-conversation-anchor={`message:${message.id}`}
-        className="group/turn w-full py-2 focus:outline-none"
+        className="group/turn w-full pt-3 pb-1 focus:outline-none"
       >
         <div className="mx-auto flex w-full max-w-4xl min-w-[320px] flex-col items-end">
           {hasTextOrSkill && (

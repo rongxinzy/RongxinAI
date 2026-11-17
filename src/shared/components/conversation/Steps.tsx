@@ -54,7 +54,7 @@ export function StepsTrigger({
   return (
     <CollapsibleTrigger
       className={cn(
-        'theme-chat-tool-trigger theme-conversation-steps-trigger group flex w-full cursor-pointer items-center justify-between gap-2 text-left',
+        'theme-chat-tool-trigger theme-conversation-steps-trigger group -mx-2 flex w-full cursor-pointer items-center justify-between gap-2 text-left',
         className,
       )}
       {...props}
@@ -79,8 +79,8 @@ export function StepsContent({
   className?: string;
 }) {
   return (
-    <CollapsibleContent className={cn('overflow-hidden pt-1', className)}>
-      <div className="theme-conversation-steps-rail ml-2 flex min-w-0 flex-col gap-1">
+    <CollapsibleContent className={cn('overflow-hidden pt-1 pb-1', className)}>
+      <div className="theme-conversation-steps-rail ml-2 flex min-w-0 flex-col gap-0.5">
         {children}
       </div>
     </CollapsibleContent>

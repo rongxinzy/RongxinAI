@@ -460,17 +460,19 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
               </Button>
             </div>
 
-            <div className="flex shrink-0 border-b border-border px-2 py-1.5">
-              <FluidTabs<ArtifactActiveTab>
-                aria-label={t('artifactViewMode')}
-                value={displayedTab}
-                onValueChange={value => dispatch(setActiveTab(value))}
-                items={availableTabs.map(value => ({
-                  value,
-                  label: t(value === 'preview' ? 'artifactPreview' : 'artifactCode'),
-                }))}
-              />
-            </div>
+            {availableTabs.length > 1 ? (
+              <div className="flex shrink-0 border-b border-border px-2 py-1.5">
+                <FluidTabs<ArtifactActiveTab>
+                  aria-label={t('artifactViewMode')}
+                  value={displayedTab}
+                  onValueChange={value => dispatch(setActiveTab(value))}
+                  items={availableTabs.map(value => ({
+                    value,
+                    label: t(value === 'preview' ? 'artifactPreview' : 'artifactCode'),
+                  }))}
+                />
+              </div>
+            ) : null}
 
             {/* Render area */}
             <div

@@ -11,7 +11,7 @@ const GoalModeChip: React.FC<{ onRemove: () => void; compact?: boolean }> = ({
 }) => (
   <span
     className={cn(
-      'inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)',
+      'inline-flex h-8 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-foreground transition-colors duration-120 hover:bg-accent',
       compact && 'px-1',
     )}
     title={i18nService.t('goalMode')}
@@ -25,8 +25,8 @@ const GoalModeChip: React.FC<{ onRemove: () => void; compact?: boolean }> = ({
       title={i18nService.t('clearGoalMode')}
       className="theme-page-cowork-prompt-input-button-1 group/goal relative ml-0.5"
     >
-      <Target className="size-3.5 transition-opacity group-hover/goal:opacity-0" />
-      <X className="absolute size-3.5 opacity-0 transition-opacity group-hover/goal:opacity-100" />
+      <Target className="size-4 text-muted-foreground transition-opacity group-hover/goal:opacity-0" />
+      <X className="absolute size-4 text-foreground opacity-0 transition-opacity group-hover/goal:opacity-100" />
     </Button>
     {!compact && <span className="max-w-24 truncate">{i18nService.t('goalMode')}</span>}
   </span>

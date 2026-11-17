@@ -1,5 +1,12 @@
 import { ToolState } from '@shared/components/ai-elements/constants';
 import {
+  CodeBlock,
+  CodeBlockActions,
+  CodeBlockCopyButton,
+  CodeBlockHeader,
+  CodeBlockTitle,
+} from '@shared/components/ai-elements/code-block';
+import {
   Tool,
   ToolContent,
   ToolHeader,
@@ -9,7 +16,9 @@ import {
 } from '@shared/components/ai-elements/tool';
 import {
   Terminal,
+  TerminalActions,
   TerminalContent,
+  TerminalCopyButton,
   TerminalHeader,
   TerminalTitle,
 } from '@shared/components/ai-elements/terminal';
@@ -123,14 +132,18 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
       part.category === 'shell' && typeof part.input?.command === 'string'
         ? part.input.command
         : null;
-
-    const streamingChars = part.phase === 'input-streaming' ? part.progress?.argsChars : undefined;
-    const statusLabel =
-      typeof streamingChars === 'number' && streamingChars > 0
-        ? i18nService
-            .t('coworkExecutionGeneratedChars')
-            .replace('{chars}', streamingChars.toLocaleString())
-        : undefined;
+    const pythonCode =
+      part.category === 'python' && typeof part.input?.code === 'string' ? part.input.code : null;
+    const pythonCollapse = useMemo(
+      () => (pythonCode ? collapseToolText(pythonCode) : { preview: '', collapsible: false }),
+      [pythonCode],
+    );
+    const visiblePythonCode =
+      pythonCode === null
+        ? null
+        : pythonCollapse.collapsible && !showFull
+          ? pythonCollapse.preview
+          : pythonCode;
 
     return (
       <div
@@ -150,7 +163,6 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
             state={PHASE_TO_TOOL_STATE[part.phase]}
             title={getToolDisplayName(part.toolName)}
             summary={summary ?? undefined}
-            statusLabel={statusLabel}
             icon={CATEGORY_ICONS[part.category]}
             statusAtEnd
           />
@@ -168,9 +180,31 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
               >
                 <TerminalHeader>
                   <TerminalTitle>{`$ ${bashCommand}`}</TerminalTitle>
+                  {visibleOutput ? (
+                    <TerminalActions>
+                      <TerminalCopyButton />
+                    </TerminalActions>
+                  ) : null}
                 </TerminalHeader>
                 <TerminalContent />
               </Terminal>
+            ) : visiblePythonCode !== null ? (
+              <>
+                <CodeBlock compact code={visiblePythonCode} language="python" showLineNumbers>
+                  <CodeBlockHeader>
+                    <CodeBlockTitle>
+                      <FileCode2 className="size-3.5" />
+                      <span className="font-mono text-xs text-muted-foreground">python</span>
+                    </CodeBlockTitle>
+                    <CodeBlockActions>
+                      <CodeBlockCopyButton />
+                    </CodeBlockActions>
+                  </CodeBlockHeader>
+                </CodeBlock>
+                {!part.isError && part.output !== undefined && (
+                  <ToolOutput output={visibleOutput || undefined} errorText={undefined} />
+                )}
+              </>
             ) : (
               <>
                 {part.input != null && <ToolInput input={part.input} displayText={visibleInput} />}
@@ -188,7 +222,9 @@ export const ToolPartView: React.FC<ToolPartViewProps> = React.memo(
               />
             )}
 
-            {((inputCollapse.collapsible && !diffSpec) || outputCollapse.collapsible) &&
+            {(pythonCollapse.collapsible ||
+              (inputCollapse.collapsible && !diffSpec && pythonCode === null) ||
+              outputCollapse.collapsible) &&
               !forceExpand && (
                 <Button
                   type="button"

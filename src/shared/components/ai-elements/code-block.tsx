@@ -104,6 +104,8 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
   showLineNumbers?: boolean;
   /** Defer Shiki tokenization while a streamed fence is still open. */
   skipHighlight?: boolean;
+  /** Compact density (12px font / 12px padding) for tool detail blocks. */
+  compact?: boolean;
 };
 
 interface TokenizedCode {
@@ -271,10 +273,12 @@ const CodeBlockBody = memo(
   ({
     tokenized,
     showLineNumbers,
+    compact = false,
     className,
   }: {
     tokenized: TokenizedCode;
     showLineNumbers: boolean;
+    compact?: boolean;
     className?: string;
   }) => {
     const preStyle = useMemo(
@@ -290,14 +294,16 @@ const CodeBlockBody = memo(
     return (
       <pre
         className={cn(
-          'dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)! m-0 p-4 text-sm',
+          'dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)! m-0',
+          compact ? 'p-3 text-xs leading-[1.6]' : 'p-4 text-sm',
           className,
         )}
         style={preStyle}
       >
         <code
           className={cn(
-            'font-mono text-sm',
+            'font-mono',
+            compact ? 'text-xs leading-[1.6]' : 'text-sm',
             showLineNumbers && '[counter-increment:line_0] [counter-reset:line]',
           )}
         >
@@ -311,6 +317,7 @@ const CodeBlockBody = memo(
   (prevProps, nextProps) =>
     prevProps.tokenized === nextProps.tokenized &&
     prevProps.showLineNumbers === nextProps.showLineNumbers &&
+    prevProps.compact === nextProps.compact &&
     prevProps.className === nextProps.className,
 );
 
@@ -324,7 +331,7 @@ const CodeBlockContainer = ({
 }: HTMLAttributes<HTMLDivElement> & { language: string }) => (
   <div
     className={cn(
-      'group relative w-full overflow-hidden rounded-md border bg-background text-foreground',
+      'group relative w-full overflow-hidden rounded-lg border bg-background text-foreground',
       className,
     )}
     data-language={language}
@@ -387,11 +394,13 @@ const CodeBlockContent = ({
   language,
   showLineNumbers = false,
   skipHighlight = false,
+  compact = false,
 }: {
   code: string;
   language: string;
   showLineNumbers?: boolean;
   skipHighlight?: boolean;
+  compact?: boolean;
 }) => {
   // Memoized raw tokens for immediate display
   const rawTokens = useMemo(() => createRawTokens(code), [code]);
@@ -431,7 +440,7 @@ const CodeBlockContent = ({
 
   return (
     <div className="relative overflow-auto">
-      <CodeBlockBody showLineNumbers={showLineNumbers} tokenized={tokenized} />
+      <CodeBlockBody showLineNumbers={showLineNumbers} compact={compact} tokenized={tokenized} />
     </div>
   );
 };
@@ -441,6 +450,7 @@ export const CodeBlock = ({
   language,
   showLineNumbers = false,
   skipHighlight = false,
+  compact = false,
   className,
   children,
   ...props
@@ -456,6 +466,7 @@ export const CodeBlock = ({
           language={language}
           showLineNumbers={showLineNumbers}
           skipHighlight={skipHighlight}
+          compact={compact}
         />
       </CodeBlockContainer>
     </CodeBlockContext.Provider>

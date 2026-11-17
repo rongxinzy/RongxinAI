@@ -155,11 +155,11 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
     >
       <div
         ref={attachScrollElement}
-        className="cowork-conversation-scroll relative flex-1 min-h-0 overflow-y-auto pt-3"
+        className="cowork-conversation-scroll relative flex-1 min-h-0 overflow-y-auto pt-4"
         style={{ overflowAnchor: 'none' }}
       >
         {isExporting ? (
-          <div className="mx-auto w-full max-w-4xl">
+          <div className="mx-auto w-full max-w-[calc(56rem+2rem)] px-4">
             {turns.map(turn => (
               <TurnView
                 key={turn.id}
@@ -174,7 +174,7 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({
             ))}
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-4xl">
+          <div className="mx-auto w-full max-w-[calc(56rem+2rem)] px-4">
             <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
               {virtualItems.map(virtualRow => {
                 const turn = turns[virtualRow.index];

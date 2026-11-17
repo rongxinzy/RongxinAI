@@ -41,33 +41,38 @@ export function classicConditionalControls() {
     'page-workspace-tree-node-button-variant-2': recipe({ base: { opacity: '0.46' } }),
     'page-artifact-badge-button-variant-1': recipe({
       base: {
-        'border-color': 'var(--zy-primary)',
-        'background-color': 'color-mix(in oklab, var(--zy-primary) 10%, transparent)',
-        color: 'var(--zy-primary)',
+        'border-color': 'var(--zy-input-border)',
+        'background-color': 'var(--sidebar-accent)',
+        color: 'var(--foreground)',
       },
       hover: {
-        'background-color': 'color-mix(in oklab, var(--zy-primary) 10%, transparent)',
-        color: 'var(--zy-primary)',
+        'background-color': 'var(--sidebar-accent)',
+        'border-color': 'var(--zy-input-border)',
+        color: 'var(--foreground)',
       },
     }),
     'page-artifact-badge-button-variant-2': recipe({
       base: {
         'border-color': 'var(--zy-border)',
-        'background-color': 'var(--zy-surface)',
-        color: 'var(--zy-foreground)',
+        'background-color': 'var(--card)',
+        color: 'var(--muted-foreground)',
       },
-      hover: { 'background-color': 'var(--zy-surface-raised)' },
+      hover: {
+        'background-color': 'var(--accent)',
+        'border-color': 'var(--zy-input-border)',
+        color: 'var(--foreground)',
+      },
     }),
     'page-artifact-badge-button-variant-3': recipe({
       base: {
-        gap: '0.5rem',
-        'padding-inline': '0.75rem',
-        'padding-block': '0.375rem',
+        gap: '0.375rem',
+        'padding-inline': '0.625rem',
         'border-radius': 'var(--zy-style-radius-lg)',
         'font-size': 'var(--zy-component-text-sm)',
-        'transition-property': 'color, background-color, border-color, box-shadow',
-        'transition-duration': '150ms',
-        height: 'auto',
+        'transition-property': 'color, background-color, border-color',
+        'transition-duration': '120ms',
+        'transition-timing-function': 'cubic-bezier(0.2, 0, 0, 1)',
+        height: '2rem',
       },
     }),
     'page-artifact-panel-button-variant-1': recipe({
@@ -734,17 +739,17 @@ export function classicConditionalControls() {
       base: { 'border-radius': '9999px', 'padding-inline': '1rem' },
     }),
     'page-terminal-button-variant-1': recipe({
-      base: { height: '1.75rem', width: '1.75rem', color: 'var(--zy-component-palette-zinc-400)' },
+      base: { height: '1.5rem', width: '1.5rem', color: 'var(--zy-text-muted)' },
       hover: {
-        'background-color': 'var(--zy-component-palette-zinc-800)',
-        color: 'var(--zy-component-palette-zinc-100)',
+        'background-color': 'var(--accent)',
+        color: 'var(--foreground)',
       },
     }),
     'page-terminal-button-variant-2': recipe({
-      base: { height: '1.75rem', width: '1.75rem', color: 'var(--zy-component-palette-zinc-400)' },
+      base: { height: '1.5rem', width: '1.5rem', color: 'var(--zy-text-muted)' },
       hover: {
-        'background-color': 'var(--zy-component-palette-zinc-800)',
-        color: 'var(--zy-component-palette-zinc-100)',
+        'background-color': 'var(--accent)',
+        color: 'var(--foreground)',
       },
     }),
     'page-command-dialog-content-variant-1': recipe({

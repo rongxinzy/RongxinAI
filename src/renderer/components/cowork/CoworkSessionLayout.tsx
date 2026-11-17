@@ -99,18 +99,23 @@ export function CoworkSessionLayout({
           isHome ? (
             homeActions
           ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleArtifactPanel}
-              aria-label={i18nService.t('artifactPanelToggle')}
-              aria-hidden={!isConversationView}
-              tabIndex={isConversationView ? 0 : -1}
-              disabled={isSessionSwitching || !isConversationView}
-              className={cn(!isConversationView && 'invisible')}
-            >
-              <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isArtifactPanelOpen} />
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {runIndicator}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggleArtifactPanel}
+                aria-label={i18nService.t('artifactPanelToggle')}
+                aria-hidden={!isConversationView}
+                tabIndex={isConversationView ? 0 : -1}
+                disabled={isSessionSwitching || !isConversationView}
+                className={cn(!isConversationView && 'invisible')}
+              >
+                <ArtifactPanelAnimatedToggleIcon
+                  open={!isSessionSwitching && isArtifactPanelOpen}
+                />
+              </Button>
+            </div>
           )
         }
         tabs={
@@ -134,8 +139,6 @@ export function CoworkSessionLayout({
           )
         }
       />
-
-      {isHome ? null : runIndicator}
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <TabsContent

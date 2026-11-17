@@ -70,15 +70,45 @@ const statusIcons: Record<ToolPart['state'], ReactNode> = {
   [ToolState.OutputError]: <XCircleIcon />,
 };
 
-const getStatusBadge = (
-  status: ToolPart['state'],
-  label = i18nService.t(statusLabelKeys[status]),
-) => (
-  <Badge className="theme-chat-tool-status" variant="secondary" data-tool-state={status}>
-    {statusIcons[status]}
-    {label}
-  </Badge>
-);
+const getStatusBadge = (status: ToolPart['state'], customLabel?: string) => {
+  const label = customLabel ?? i18nService.t(statusLabelKeys[status]);
+  const iconOnly = status === ToolState.OutputAvailable && customLabel === undefined;
+  return (
+    <Badge
+      className="theme-chat-tool-status"
+      variant="secondary"
+      data-tool-state={status}
+      aria-label={iconOnly ? label : undefined}
+      title={iconOnly ? label : undefined}
+    >
+      {statusIcons[status]}
+      {iconOnly ? null : label}
+    </Badge>
+  );
+};
+
+const getCompactInputEntries = (input: ToolPart['input']): Array<[string, string]> | null => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const entries = Object.entries(input as Record<string, unknown>).filter(
+    ([, val]) => val !== undefined,
+  );
+  if (entries.length === 0 || entries.length > 6) return null;
+  const formatted: Array<[string, string]> = [];
+  for (const [key, val] of entries) {
+    if (
+      val !== null &&
+      typeof val !== 'string' &&
+      typeof val !== 'number' &&
+      typeof val !== 'boolean'
+    ) {
+      return null;
+    }
+    const text = String(val);
+    if (text.includes('\n') || text.length > 160) return null;
+    formatted.push([key, text]);
+  }
+  return formatted;
+};
 
 export const ToolHeader = ({
   className,
@@ -98,7 +128,7 @@ export const ToolHeader = ({
   return (
     <CollapsibleTrigger
       className={cn(
-        'theme-chat-tool-trigger group/trigger flex w-full items-center gap-2',
+        'theme-chat-tool-trigger group/trigger -mx-2 flex w-full items-center gap-2',
         className,
       )}
       {...props}
@@ -107,7 +137,7 @@ export const ToolHeader = ({
         <span className="theme-chat-tool-icon flex shrink-0 items-center justify-center">
           {icon ?? <WrenchIcon className="theme-chat-tool-icon" />}
         </span>
-        <span className="theme-chat-tool-title min-w-0 truncate">{title ?? derivedName}</span>
+        <span className="theme-chat-tool-title shrink-0 truncate">{title ?? derivedName}</span>
         {summary && (
           <span className="theme-chat-tool-summary min-w-0 flex-1 truncate" title={summary}>
             {summary}
@@ -127,7 +157,7 @@ export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
 
 export const ToolContent = ({ className, ...props }: ToolContentProps) => (
   <CollapsibleContent
-    className={cn('theme-chat-tool-content ml-4 flex min-w-0 flex-col gap-3', className)}
+    className={cn('theme-chat-tool-content ml-2 flex min-w-0 flex-col gap-2', className)}
     {...props}
   />
 );
@@ -138,12 +168,26 @@ export type ToolInputProps = ComponentProps<'div'> & {
   displayText?: string;
 };
 
-export const ToolInput = ({ className, input, displayText, ...props }: ToolInputProps) => (
-  <div className={cn('flex min-w-0 flex-col gap-2 overflow-hidden', className)} {...props}>
-    <h4 className="theme-chat-tool-label">{i18nService.t('coworkToolInput')}</h4>
-    <CodeBlock code={displayText ?? JSON.stringify(input, null, 2)} language="json" />
-  </div>
-);
+export const ToolInput = ({ className, input, displayText, ...props }: ToolInputProps) => {
+  const compactEntries = displayText ? null : getCompactInputEntries(input);
+  return (
+    <div className={cn('flex min-w-0 flex-col gap-1.5 overflow-hidden', className)} {...props}>
+      <h4 className="theme-chat-tool-label">{i18nService.t('coworkToolInput')}</h4>
+      {compactEntries ? (
+        <dl className="theme-conversation-tool-params grid min-w-0 grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+          {compactEntries.map(([key, val]) => (
+            <div key={key} className="contents">
+              <dt className="font-mono text-muted-foreground">{key}</dt>
+              <dd className="min-w-0 wrap-anywhere font-mono text-foreground">{val}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <CodeBlock compact code={displayText ?? JSON.stringify(input, null, 2)} language="json" />
+      )}
+    </div>
+  );
+};
 
 export type ToolOutputProps = ComponentProps<'div'> & {
   output: ToolPart['output'];
@@ -158,25 +202,26 @@ export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutpu
   let Output: ReactNode = null;
 
   if (typeof output === 'object' && !isValidElement(output)) {
-    Output = <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />;
+    Output = <CodeBlock compact code={JSON.stringify(output, null, 2)} language="json" />;
   } else if (typeof output === 'string') {
-    Output = <CodeBlock code={output} language="text" />;
+    Output = <CodeBlock compact code={output} language="text" />;
   } else if (output) {
     Output = <div>{output as ReactNode}</div>;
   }
 
   return (
-    <div className={cn('flex min-w-0 flex-col gap-2', className)} {...props}>
-      <h4 className="theme-chat-tool-label">
-        {i18nService.t(errorText ? 'codingAgentToolFailed' : 'coworkToolResult')}
-      </h4>
-      <div
-        className={cn(
-          'overflow-x-auto whitespace-pre-wrap [&_table]:w-full',
-          errorText && 'theme-chat-tool-output-error',
+    <div className={cn('flex min-w-0 flex-col gap-1.5', className)} {...props}>
+      {(!errorText || Output) && (
+        <h4 className="theme-chat-tool-label">
+          {i18nService.t(errorText ? 'codingAgentToolFailed' : 'coworkToolResult')}
+        </h4>
+      )}
+      <div className="flex min-w-0 flex-col gap-2 overflow-x-auto [&_table]:w-full">
+        {errorText && (
+          <div className="theme-conversation-tool-error whitespace-pre-wrap wrap-anywhere">
+            {errorText}
+          </div>
         )}
-      >
-        {errorText && <div>{errorText}</div>}
         {Output}
       </div>
     </div>
