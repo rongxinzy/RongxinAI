@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -84,6 +84,13 @@ describe('ConversationThread', () => {
     expect(log).not.toBeNull();
     const scroller = container.querySelector('[role="log"] .cowork-conversation-scroll');
     expect(scroller).not.toBeNull();
+
+    const collapsedGroupTrigger = container.querySelector('[data-slot="tool"]');
+    expect(collapsedGroupTrigger).not.toBeNull();
+    expect(collapsedGroupTrigger?.getAttribute('aria-expanded')).toBe('false');
+    expect(collapsedGroupTrigger?.getAttribute('data-has-reasoning')).toBe('true');
+
+    fireEvent.click(collapsedGroupTrigger!);
 
     const orderedNodes = Array.from(
       container.querySelectorAll(

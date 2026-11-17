@@ -182,6 +182,7 @@ export const zhCowork: Record<string, string> = {
   coworkToolNoErrorDetail: '执行失败（无详细错误输出）',
   coworkStepsExploring: '正在探索',
   coworkStepsExploredCount: '已探索 {count} 个步骤',
+  coworkActivityGroupSteps: '{count} 步',
   coworkTurnJumpLabel: '跳转到此轮',
   coworkTodosTitle: '待办事项',
   coworkTodoItems: '项',
