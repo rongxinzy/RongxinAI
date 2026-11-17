@@ -64,7 +64,14 @@ const PiPythonExecuteParameters = Type.Object({
 });
 
 const PiPythonInstallParameters = Type.Object({
-  packages: Type.Array(Type.String({ maxLength: 200 }), { maxItems: 40 }),
+  packages: Type.Array(
+    Type.String({
+      maxLength: 200,
+      description:
+        'PyPI package name or version constraints, such as packaging or requests>=2.31,<3.',
+    }),
+    { maxItems: 40 },
+  ),
   rebuild: Type.Optional(Type.Boolean()),
 });
 
@@ -106,12 +113,9 @@ export function buildPiPythonTools(options: PiPythonToolsOptions): ToolDefinitio
     name: PiPythonToolName.Execute,
     label: 'Python Execute',
     description:
-      'Product interface python.execute: execute Python code in this workspace using its isolated managed Python environment. Returns stdout, stderr and exit code. This is local execution with user permissions, not a filesystem sandbox. Use python_install (python.install) for pinned packages.',
+      "Product interface python.execute: execute Python code using this workspace's managed environment, including the bundled office/PDF core and its workspace-specific packages. Returns stdout, stderr and exit code. This is local execution with user permissions, not a filesystem sandbox. Use python_install (python.install) for additional packages.",
     promptSnippet:
-      'Execute Python code in this workspace using its isolated managed Python environment.',
-    promptGuidelines: [
-      'Prefer `python_execute` to run Python code in the current workspace using its isolated managed Python environment.',
-    ],
+      "Execute Python code using the bundled core and this workspace's additional packages.",
     parameters: PiPythonExecuteParameters,
     outputSchema: PiPythonOutputSchema,
     annotations: PiPythonExecuteAnnotations,
@@ -142,10 +146,10 @@ export function buildPiPythonTools(options: PiPythonToolsOptions): ToolDefinitio
     name: PiPythonToolName.Install,
     label: 'Python Install',
     description:
-      'Product interface python.install: install exact pinned PyPI wheel packages (for example numpy==2.3.4) into this workspace only. Installation creates a new environment and switches only after success. Set rebuild=true only when the user explicitly asks to rebuild; existing environment directories are retained.',
-    promptSnippet: 'Install exact pinned PyPI wheel packages into this workspace only.',
+      'Product interface python.install: install PyPI wheel packages into this workspace only. Accepts package names or version constraints and locks resolved versions. URLs, local paths and command-line flags are not supported. Installation creates a new environment and switches only after success. Set rebuild=true only when the user explicitly asks to rebuild; existing environment directories are retained.',
+    promptSnippet:
+      'Install PyPI wheel packages by name or version constraints into this workspace.',
     promptGuidelines: [
-      'Use `python_install` to atomically install exact pinned PyPI wheel packages (such as `numpy==2.3.4`) into this workspace.',
       'Set `rebuild=true` only when the user explicitly asks to rebuild; existing environment directories are retained.',
     ],
     parameters: PiPythonInstallParameters,

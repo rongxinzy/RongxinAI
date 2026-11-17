@@ -29,6 +29,7 @@ type ExecutableTool = {
 
 for (const allow of [false, true]) {
   test(`native Python tool ${allow ? 'executes after approval' : 'cannot start Runner after denial'}`, async () => {
+    const packages = ['packaging', 'requests>=2.31,<3'];
     const service = new PythonRuntimeService({
       storageRoot: '/unused',
       runnerPath: '/must-not-run',
@@ -72,7 +73,7 @@ for (const allow of [false, true]) {
     try {
       if (allow) {
         const result = await installTool.execute('python-call', {
-          packages: ['packaging==25.0'],
+          packages,
         });
         expect(JSON.parse(result.content[0].text)).toMatchObject({
           stdout: 'installed',
@@ -85,9 +86,7 @@ for (const allow of [false, true]) {
           environmentId: 'fixture',
         });
       } else {
-        await expect(
-          installTool.execute('python-call', { packages: ['packaging==25.0'] }),
-        ).rejects.toThrow('denied');
+        await expect(installTool.execute('python-call', { packages })).rejects.toThrow('denied');
       }
       expect(authorize).toHaveBeenCalledOnce();
       expect(authorize.mock.calls[0][0]).toMatchObject({ toolName: 'python_install' });
@@ -95,7 +94,7 @@ for (const allow of [false, true]) {
       if (allow) {
         expect(install.mock.calls[0][0]).toEqual({
           workspace: '/workspace',
-          packages: ['packaging==25.0'],
+          packages,
         });
       }
     } finally {
