@@ -11,7 +11,7 @@
  */
 import { SessionSummarySystemPrompt } from '../../sessionSummary/tool';
 import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
-import { getPiPythonEnvSystemPrompt, PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
+import { PiPythonEnvSystemPrompt } from './piPythonEnvGuidelines';
 
 export interface PiSystemPromptContext {
   /** Whether the session is a direct Chat lane without Work orchestration. */
@@ -21,8 +21,6 @@ export interface PiSystemPromptContext {
   fileToolsEnabled: boolean;
   /** Resolved session output budget. */
   maxOutputTokens: number;
-  /** Runtime platform, used for platform-specific tool contracts. */
-  platform?: NodeJS.Platform;
   /** Whether the current run has no foreground user interaction. */
   unattended?: boolean;
 }
@@ -50,8 +48,7 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     id: 'python-runtime',
     requiresHostTools: true,
     requiresFileTools: true,
-    prompt: context =>
-      context.platform ? getPiPythonEnvSystemPrompt(context.platform) : PiPythonEnvSystemPrompt,
+    prompt: PiPythonEnvSystemPrompt,
   },
   {
     id: 'session-summary',

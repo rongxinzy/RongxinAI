@@ -82,8 +82,8 @@ Node >=24 <25，Bun >=1.4 <1.5（与 `package.json` 的 `packageManager` 一致�
 
 ### 托管 Python 运行时
 
-- **独立工作区 Python 运行时**（`src/main/pythonRuntime/`）：由独立子进程 `dist-electron/python-runtime-runner.js`（`runner.ts`）管理版本锁定的 `python-build-standalone` CPython + `uv`（`manifest.json` 校验 SHA-256），按工作区哈希创建原子交换 `venv`（`userData/python-runtime/envs/<sha256>/venv`），暴露 `python_execute` 与 `python_install` 工具（`src/main/libs/agentEngine/piPythonTools.ts`）。POSIX 用 detached 进程组（`-pid`）清理子进程，Windows 用 `resources/python-runtime/job-runner.exe`（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）。
-- **内置 Skill 共享 Python 环境**：首启同步到 `userData/runtimes/`，`resources/python-win|mac|linux` + `resources/skill-python/layers/shared` 经 `applyManagedPythonEnv`（`src/main/libs/managedPythonEnv.ts`）注入 shell PATH；`run_skill_script` 经 `findSkillPythonExecutable` 解析并强制 per-Skill `requirementsSha256` manifest 门。
+- **独立工作区 Python 运行时**（`src/main/pythonRuntime/`）：独立子进程 `dist-electron/python-runtime-runner.js`（`runner.ts`）使用随包 CPython + `uv`，按规范化工作区路径哈希管理 `userData/python-runtime/workspaces-v2/<sha256>/` 的版本化 `venv` 与原子切换的 `current.json`。首次离线复制内置办公/PDF 依赖基线，后续安装从当前环境复制独立候选；不使用硬链接共享可写包，不读取旧 `workspaces/`。`python_execute` / `python_install` 接受代码或包名/版本范围，解析锁定后检查依赖，失败保留原环境；安装仅接受兼容 wheel。POSIX 由独立 supervisor 监视 Runner 并清理进程组，Windows 用 `resources/python-runtime/job-runner.exe`（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）。
+- **内置 Skill 与工作区共用 Python 链路**：`resources/python-win|mac|linux` 与 `resources/skill-python/layers/shared` 为随包基线，首启同步到 `userData/runtimes/`，shell 由 `applyManagedPythonEnv` 注入其核心库；Python `run_skill_script` 经 `PythonRuntimeService.execute/prepare` 使用与 `python_execute` 相同的工作区环境，包装脚本与长驻进程先 prepare。Runner 强制核对 per-Skill `requirementsSha256`；v3 按需依赖同时校验 `locks/` 内 delta lock 的 SHA-256，大下载保留确认门，缺失/过期 manifest 直接失败，不走 `uv run` 回退。工作区与 Skill 安装共用索引默认值和 uv 缓存。
 - **模型面策略三处必须同步**：`SYSTEM_PROMPT.md`（托管环境与工具节）、`piPythonEnvGuidelines.ts`（`python-runtime` contribution，用户覆盖系统提示后仍生效）、`piBashToolGuidelines.ts` 的 `getPiBashPythonEnvViolation`（拦截在 bash 中直接用 `python` 调内置 `$SKILLS_ROOT` 脚本，引导改用 `run_skill_script`）。
 
 ### 记忆系统

@@ -1,5 +1,6 @@
 import { fork, spawn, type ChildProcess } from 'node:child_process';
 import { access } from 'node:fs/promises';
+import { applyUvPackageIndexDefaults } from '../libs/pythonPackageIndexes';
 
 export type ProcessResult = {
   stdout: string;
@@ -140,6 +141,10 @@ export function isolatedEnvironment(root: string): NodeJS.ProcessEnv {
     'LC_ALL',
     'COMSPEC',
     'PATHEXT',
+    'ZHIYUAN_ELECTRON_PATH',
+    'ZHIYUAN_NPM_BIN_DIR',
+    'ZHIYUAN_NODE_SHIM_ACTIVE',
+    'NODE_PATH',
   ]) {
     if (process.env[key]) env[key] = process.env[key];
   }
@@ -170,9 +175,12 @@ export function runtimeNetworkEnvironment(root: string): NodeJS.ProcessEnv {
     'SSL_CERT_FILE',
     'SSL_CERT_DIR',
     'NODE_EXTRA_CA_CERTS',
+    'UV_INDEX',
+    'UV_DEFAULT_INDEX',
   ])
     if (process.env[key]) env[key] = process.env[key];
   env.NODE_USE_ENV_PROXY = '1';
+  applyUvPackageIndexDefaults(env);
   return env;
 }
 

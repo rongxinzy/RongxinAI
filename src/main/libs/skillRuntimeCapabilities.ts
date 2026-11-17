@@ -38,7 +38,7 @@ const MAX_PROBE_OUTPUT_BYTES = 64 * 1024;
 function probe(
   executable: string | null,
   args: string[],
-  versionArgs = args,
+  env?: NodeJS.ProcessEnv,
 ): Promise<SkillRuntimeCapability> {
   if (!executable) {
     return Promise.resolve({
@@ -74,7 +74,8 @@ function probe(
 
     let child: ChildProcess;
     try {
-      child = spawn(executable, versionArgs, {
+      child = spawn(executable, args, {
+        env,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false,
         windowsHide: true,
@@ -182,7 +183,7 @@ export async function probeSkillRuntimeCapabilities(): Promise<SkillRuntimeCapab
     probe(bash, ['--version']),
     probe(python, ['--version']),
     probe(uv, ['--version']),
-    probe(node, ['--version'], ['--version']),
+    probe(node, ['--version'], { ...process.env, ELECTRON_RUN_AS_NODE: '1' }),
     probe(powershell, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()']),
     skillPythonCapabilities(),
   ]);

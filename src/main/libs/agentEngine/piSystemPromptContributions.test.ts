@@ -71,11 +71,13 @@ describe('piSystemPromptContributions', () => {
     }
   });
 
-  it('adapts the managed Python shell hint for Windows PowerShell vs POSIX Bash', () => {
-    const winPrompts = collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'win32' });
-    const macPrompts = collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'darwin' });
-    expect(winPrompts.join('\n')).toContain('In PowerShell');
-    expect(macPrompts.join('\n')).toContain('In Bash');
+  it('describes one workspace Python environment for native tools and Skill execution', () => {
+    const prompt = collectPiSystemPromptContributions(FULL_CONTEXT).join('\n');
+    expect(prompt).toContain('`python_execute` and Python scripts run through `run_skill_script`');
+    expect(prompt).toContain('same managed environment for this workspace');
+    expect(prompt).toContain('`python_install` adds wheel packages to that workspace environment');
+    expect(prompt).not.toContain('In PowerShell');
+    expect(prompt).not.toContain('In Bash');
   });
 
   it('gates file-tool policies off when file tools are disabled', () => {
