@@ -3960,6 +3960,18 @@
   height: 1rem;
   color: var(--muted-foreground);
 }
+:where(:root, [data-theme]) :where(.theme-thinking-indicator[data-variant="inline"]) {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--muted-foreground);
+  transition-property: none;
+}
+:where(:root, [data-theme]) :where(.theme-thinking-indicator[data-variant="companion"]) {
+  width: 2rem;
+  height: 2rem;
+  color: var(--muted-foreground);
+  transition-property: none;
+}
 :where(:root, [data-theme]) :where(.theme-conversation-avatar) {
   width: 1.75rem;
   height: 1.75rem;
@@ -8576,6 +8588,8 @@ to {
 :where(:root, [data-theme]) :where(.theme-conversation-status),
 :where(:root, [data-theme]) :where(.theme-conversation-heading),
 :where(:root, [data-theme]) :where(.theme-conversation-icon),
+:where(:root, [data-theme]) :where(.theme-thinking-indicator[data-variant="inline"]),
+:where(:root, [data-theme]) :where(.theme-thinking-indicator[data-variant="companion"]),
 :where(:root, [data-theme]) :where(.theme-conversation-avatar),
 :where(:root, [data-theme]) :where(.theme-conversation-editor),
 :where(:root, [data-theme]) :where(.theme-conversation-editor .is-editor-empty:first-child)::before,

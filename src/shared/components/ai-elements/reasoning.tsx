@@ -21,10 +21,10 @@ import React, {
   useState,
 } from 'react';
 import { Streamdown, type StreamdownProps } from 'streamdown';
-import { ThinkingOrb } from 'thinking-orbs';
 
 import { LinkSafetyModal } from './linkSafetyModal';
 import { Shimmer } from './shimmer';
+import { ThinkingIndicator } from './thinking-indicator';
 
 // Same on-demand pipeline as MessageResponse: plain reasoning text never
 // pays for the Shiki/KaTeX/Mermaid runtimes (issue #141).
@@ -190,7 +190,7 @@ export const ReasoningTrigger = memo(
       >
         {children ?? (
           <>
-            <ThinkingOrb state="working" size={20} paused={!isStreaming} aria-hidden="true" />
+            <ThinkingIndicator paused={!isStreaming} />
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
               className={cn('theme-chat-tool-chevron shrink-0', isOpen ? 'rotate-180' : 'rotate-0')}

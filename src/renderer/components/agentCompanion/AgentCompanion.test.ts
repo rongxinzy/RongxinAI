@@ -50,6 +50,6 @@ test('resolves active, successful, and incomplete turn outcomes', () => {
 });
 
 test('uses a compact orb that pauses outside the active state', () => {
-  expect(source).toContain('size={32}');
+  expect(source).toContain('variant={ThinkingIndicatorVariant.Companion}');
   expect(source).toContain('paused={!isThinking}');
 });

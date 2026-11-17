@@ -1,6 +1,7 @@
 import { cn } from '@shared/lib/utils';
+import { ThinkingIndicator } from '@shared/components/ai-elements/thinking-indicator';
+import { ThinkingIndicatorVariant } from '@shared/components/ai-elements/thinking-indicator/constants';
 import { memo, useSyncExternalStore } from 'react';
-import { ThinkingOrb } from 'thinking-orbs';
 
 import { i18nService } from '../../services/i18n';
 import { AgentCompanionState, type AgentCompanionState as CompanionState } from './constants';
@@ -33,7 +34,7 @@ export const AgentCompanion = memo(function AgentCompanion({
       role="img"
       aria-label={label}
     >
-      <ThinkingOrb state="working" size={32} paused={!isThinking} aria-hidden="true" />
+      <ThinkingIndicator variant={ThinkingIndicatorVariant.Companion} paused={!isThinking} />
     </span>
   );
 });

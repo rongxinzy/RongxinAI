@@ -4,6 +4,8 @@ export const CONVERSATION_SELECTORS = {
   'conversation-status': '.theme-conversation-status',
   'conversation-heading': '.theme-conversation-heading',
   'conversation-icon': '.theme-conversation-icon',
+  'thinking-indicator-inline': '.theme-thinking-indicator[data-variant="inline"]',
+  'thinking-indicator-companion': '.theme-thinking-indicator[data-variant="companion"]',
   'conversation-avatar': '.theme-conversation-avatar',
   'conversation-editor': '.theme-conversation-editor',
   'conversation-editor-placeholder':

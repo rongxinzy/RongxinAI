@@ -8,6 +8,12 @@ import { WorkingIndicator } from '../cowork/components/WorkingIndicator';
 import { AgentCompanion } from './AgentCompanion';
 import { AgentCompanionState } from './constants';
 
+// These tests isolate label subscriptions and memoization; canvas pixels are
+// exercised by the browser preview regression tests.
+vi.mock('@shared/components/ai-elements/thinking-indicator', () => ({
+  ThinkingIndicator: () => null,
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.useRealTimers();

@@ -34,6 +34,23 @@ export function conversationAppearances() {
     'conversation-icon': recipe({
       base: { width: '1rem', height: '1rem', color: 'var(--muted-foreground)' },
     }),
+    'thinking-indicator-inline': recipe({
+      base: {
+        width: '1.25rem',
+        height: '1.25rem',
+        color: 'var(--muted-foreground)',
+        // Canvas ink is sampled once per theme update, not CSS transition frame.
+        'transition-property': 'none',
+      },
+    }),
+    'thinking-indicator-companion': recipe({
+      base: {
+        width: '2rem',
+        height: '2rem',
+        color: 'var(--muted-foreground)',
+        'transition-property': 'none',
+      },
+    }),
     'conversation-avatar': recipe({
       base: { width: '1.75rem', height: '1.75rem', 'border-radius': '9999px', 'border-width': '0' },
     }),
