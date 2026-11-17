@@ -8,7 +8,7 @@ import {
 } from '@shared/components/ui/collapsible';
 import { cn } from '@shared/lib/utils';
 import { cjk } from '@streamdown/cjk';
-import { BrainIcon, ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import React, {
   createContext,
@@ -21,6 +21,7 @@ import React, {
   useState,
 } from 'react';
 import { Streamdown, type StreamdownProps } from 'streamdown';
+import { ThinkingOrb } from 'thinking-orbs';
 
 import { LinkSafetyModal } from './linkSafetyModal';
 import { Shimmer } from './shimmer';
@@ -189,7 +190,7 @@ export const ReasoningTrigger = memo(
       >
         {children ?? (
           <>
-            <BrainIcon className="theme-conversation-icon shrink-0" />
+            <ThinkingOrb state="working" size={20} paused={!isStreaming} aria-hidden="true" />
             {getThinkingMessage(isStreaming, duration)}
             <ChevronDownIcon
               className={cn('theme-chat-tool-chevron shrink-0', isOpen ? 'rotate-180' : 'rotate-0')}
