@@ -336,6 +336,8 @@ export const magpieTranslationsZh = {
   providerWizardClearSelection: '清空',
   providerWizardSetDefaultModel: '将此服务商设为可用后，立即切换默认模型',
   providerWizardSaveAndEnable: '保存并启用',
+  providerWizardSavedSetupIncomplete:
+    '服务商已保存，但模型列表刷新或默认模型切换未完成。请重新打开模型设置检查。',
   providerWizardNext: '下一步',
   providerWizardBack: '上一步',
   providerWizardTestFirst: '测试连接',

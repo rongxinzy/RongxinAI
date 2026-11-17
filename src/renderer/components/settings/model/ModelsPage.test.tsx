@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { AISphereStatus } from '../../../../shared/aisphere';
+import type {
+  MagpieModelCatalog,
+  MagpieProviderSummary,
+  MagpieSaveProviderInput,
+} from '../../../../shared/magpie/types';
+import { showAppToast } from '../../../services/toastNotification';
 import { ModelsPage } from './ModelsPage';
 
 let mockAvailableModels: Array<{ id: string; name: string; providerKey?: string }> = [];
@@ -35,12 +41,58 @@ vi.mock('../../../services/toastNotification', () => ({
 const mockProviders = vi.fn();
 const mockAisphereStatus = vi.fn();
 const mockAisphereDisconnect = vi.fn();
+const mockStatus = vi.fn();
+const mockStart = vi.fn();
+const mockSaveProvider = vi.fn();
+let savedProvider: MagpieProviderSummary | null = null;
+let savedCatalog: MagpieModelCatalog;
+
+async function openFirstProviderWizard() {
+  render(<ModelsPage />);
+  await waitFor(() => expect(mockStatus).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole('button', { name: /DeepSeek/i }));
+  fireEvent.change(screen.getByPlaceholderText('magpieProviderKeyPlaceholder'), {
+    target: { value: 'sk-test' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'providerWizardNext' }));
+}
+
+function saveWizard() {
+  fireEvent.click(screen.getByRole('button', { name: 'providerWizardSaveAndEnable' }));
+}
+
+async function expectWizardClosed() {
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  expect(mockSaveProvider).toHaveBeenCalledOnce();
+}
 
 describe('ModelsPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mockAvailableModels = [];
     mockDefaultSelectedModel = null;
+    savedProvider = null;
+    savedCatalog = {
+      status: { state: 'running', version: '1.0.0' },
+      models: [],
+      defaultModelId: null,
+    };
+    mockStatus.mockResolvedValue({ state: 'running', version: '1.0.0' });
+    mockStart.mockResolvedValue({ state: 'running', version: '1.0.0' });
+    mockSaveProvider.mockImplementation(async (input: MagpieSaveProviderInput) => {
+      const id = input.id ?? 'created-provider';
+      savedProvider = { ...input, id, off: false, hasKey: Boolean(input.key) };
+      savedCatalog.models = input.models.map(model => ({ id: `${id}/${model}`, owned_by: id }));
+      return [savedProvider];
+    });
+    refreshMagpieModels.mockImplementation(async () => savedCatalog);
+    selectMagpieDefaultModel.mockImplementation(async (id: string) => {
+      if (!savedCatalog.models.some(model => model.id === id)) {
+        throw new Error('The selected model is unavailable');
+      }
+      savedCatalog.defaultModelId = id;
+      return savedCatalog;
+    });
     mockProviders.mockResolvedValue([]);
     mockAisphereStatus.mockResolvedValue({ status: AISphereStatus.Unconfigured, address: '' });
     mockAisphereDisconnect.mockResolvedValue({ status: AISphereStatus.Unconfigured, address: '' });
@@ -49,8 +101,8 @@ describe('ModelsPage', () => {
       configurable: true,
       value: {
         magpie: {
-          status: async () => ({ state: 'running', version: '1.0.0' }),
-          start: async () => ({ state: 'running', version: '1.0.0' }),
+          status: () => mockStatus(),
+          start: () => mockStart(),
           providers: () => mockProviders(),
           preferences: async () => ({
             proxy: '',
@@ -75,7 +127,7 @@ describe('ModelsPage', () => {
           updatePreferences: async () => ({}),
           setProviderEnabled: async () => [],
           deleteProvider: async () => [],
-          saveProvider: async () => [],
+          saveProvider: (input: MagpieSaveProviderInput) => mockSaveProvider(input),
           testProvider: async () => ({ ok: true }),
           setSubscriptionAccounts: async () => ({ state: 'running', version: '1.0.0' }),
         },
@@ -154,4 +206,189 @@ describe('ModelsPage', () => {
     expect(startSpy).not.toHaveBeenCalled();
     expect(screen.queryByText('magpieGatewayStartFailedHint')).not.toBeInTheDocument();
   });
+
+  test('starts a never-enabled service before saving the first provider', async () => {
+    mockStatus.mockResolvedValue({ state: 'stopped', enabled: false, version: '1.0.0' });
+    let finishStart!: (status: MagpieModelCatalog['status']) => void;
+    mockStart.mockImplementation(
+      () =>
+        new Promise(resolve => {
+          finishStart = resolve;
+        }),
+    );
+
+    await openFirstProviderWizard();
+    expect(mockStart).not.toHaveBeenCalled();
+    saveWizard();
+    await waitFor(() => expect(mockStart).toHaveBeenCalledOnce());
+    expect(mockSaveProvider).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'providerWizardSaveAndEnable' })).toBeDisabled();
+
+    finishStart({ state: 'running', enabled: true, version: '1.0.0' });
+    await expectWizardClosed();
+    expect(selectMagpieDefaultModel).toHaveBeenCalledWith(`${savedProvider?.id}/deepseek-chat`);
+  });
+
+  test('selects the saved provider catalog id and closes after persistence', async () => {
+    await openFirstProviderWizard();
+    saveWizard();
+    await expectWizardClosed();
+    expect(mockStart).not.toHaveBeenCalled();
+    expect(selectMagpieDefaultModel).toHaveBeenCalledExactlyOnceWith(
+      `${savedProvider?.id}/deepseek-chat`,
+    );
+    expect(showAppToast).toHaveBeenCalledWith('savedSuccessfully');
+  });
+
+  test('keeps the first saved provider visible when a pre-save startup refresh finishes later', async () => {
+    mockStatus.mockResolvedValue({ state: 'stopped', enabled: false, version: '1.0.0' });
+    let finishOldRead!: (providers: MagpieProviderSummary[]) => void;
+    mockProviders.mockResolvedValueOnce([]).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          finishOldRead = resolve;
+        }),
+    );
+    let finishSave!: () => void;
+    const pendingSave = new Promise<void>(resolve => {
+      finishSave = resolve;
+    });
+    const persistProvider = mockSaveProvider.getMockImplementation()!;
+    mockSaveProvider.mockImplementation(async (input: MagpieSaveProviderInput) => {
+      await pendingSave;
+      return persistProvider(input);
+    });
+
+    await openFirstProviderWizard();
+    saveWizard();
+    await waitFor(() => expect(mockProviders).toHaveBeenCalledTimes(2));
+    await act(async () => finishSave());
+    await expectWizardClosed();
+    expect(screen.getByRole('switch', { name: 'DeepSeek' })).toBeChecked();
+
+    await act(async () => finishOldRead([]));
+    expect(screen.getByRole('switch', { name: 'DeepSeek' })).toBeChecked();
+    expect(mockSaveProvider).toHaveBeenCalledOnce();
+  });
+
+  test('uses a bare catalog id only when it belongs to the newly saved provider', async () => {
+    await openFirstProviderWizard();
+    refreshMagpieModels.mockImplementation(async () => ({
+      ...savedCatalog,
+      models: [{ id: 'deepseek-chat', owned_by: savedProvider?.id }],
+    }));
+    selectMagpieDefaultModel.mockResolvedValue(savedCatalog);
+    saveWizard();
+    await expectWizardClosed();
+    expect(selectMagpieDefaultModel).toHaveBeenCalledExactlyOnceWith('deepseek-chat');
+  });
+
+  test('does not select another provider model with the same raw id', async () => {
+    await openFirstProviderWizard();
+    refreshMagpieModels.mockImplementation(async () => ({
+      ...savedCatalog,
+      models: [{ id: 'deepseek-chat', owned_by: 'another-provider' }, ...savedCatalog.models],
+    }));
+    saveWizard();
+    await expectWizardClosed();
+    expect(selectMagpieDefaultModel).toHaveBeenCalledExactlyOnceWith(
+      `${savedProvider?.id}/deepseek-chat`,
+    );
+  });
+
+  test('prefers the owned canonical id when the catalog also contains an owned bare alias', async () => {
+    await openFirstProviderWizard();
+    refreshMagpieModels.mockImplementation(async () => ({
+      ...savedCatalog,
+      models: [{ id: 'deepseek-chat', owned_by: savedProvider?.id }, ...savedCatalog.models],
+    }));
+    saveWizard();
+    await expectWizardClosed();
+    expect(selectMagpieDefaultModel).toHaveBeenCalledExactlyOnceWith(
+      `${savedProvider?.id}/deepseek-chat`,
+    );
+    expect(showAppToast).toHaveBeenCalledWith('savedSuccessfully');
+  });
+
+  test('closes with a follow-up notice when only another provider has the selected model', async () => {
+    await openFirstProviderWizard();
+    refreshMagpieModels.mockImplementation(async () => ({
+      ...savedCatalog,
+      models: [{ id: 'deepseek-chat', owned_by: 'another-provider' }],
+    }));
+    saveWizard();
+    await expectWizardClosed();
+    expect(selectMagpieDefaultModel).not.toHaveBeenCalled();
+    expect(showAppToast).toHaveBeenCalledWith({
+      message: 'providerWizardSavedSetupIncomplete',
+      isError: false,
+    });
+    expect(showAppToast).not.toHaveBeenCalledWith('savedSuccessfully');
+  });
+
+  test('leaves the current default unchanged when set-as-default is unchecked', async () => {
+    await openFirstProviderWizard();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'providerWizardSetDefaultModel' }));
+    saveWizard();
+    await expectWizardClosed();
+    expect(selectMagpieDefaultModel).not.toHaveBeenCalled();
+  });
+
+  test('keeps the form on startup failure and retries without losing the key', async () => {
+    mockStatus.mockResolvedValue({ state: 'stopped', enabled: false, version: '1.0.0' });
+    mockStart.mockRejectedValueOnce(new Error('startup failed'));
+    await openFirstProviderWizard();
+    saveWizard();
+    await waitFor(() =>
+      expect(showAppToast).toHaveBeenCalledWith({
+        message: 'saveFailed',
+        isError: true,
+      }),
+    );
+    expect(mockSaveProvider).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    saveWizard();
+    await expectWizardClosed();
+    expect(mockSaveProvider).toHaveBeenCalledWith(expect.objectContaining({ key: 'sk-test' }));
+    expect(mockStart).toHaveBeenCalledTimes(2);
+  });
+
+  test('keeps the form on persistence failure and allows a successful retry', async () => {
+    mockSaveProvider.mockRejectedValueOnce(new Error('write failed'));
+    await openFirstProviderWizard();
+    saveWizard();
+    await waitFor(() =>
+      expect(showAppToast).toHaveBeenCalledWith({
+        message: 'saveFailed',
+        isError: true,
+      }),
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(selectMagpieDefaultModel).not.toHaveBeenCalled();
+
+    saveWizard();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(mockSaveProvider).toHaveBeenCalledTimes(2);
+    expect(mockSaveProvider).toHaveBeenLastCalledWith(expect.objectContaining({ key: 'sk-test' }));
+  });
+
+  test.each(['catalog', 'selection'])(
+    'closes after persistence when the %s follow-up fails without creating duplicates',
+    async failure => {
+      await openFirstProviderWizard();
+      if (failure === 'catalog') {
+        refreshMagpieModels.mockRejectedValue(new Error('catalog unavailable'));
+      } else {
+        selectMagpieDefaultModel.mockRejectedValue(new Error('selection unavailable'));
+      }
+      saveWizard();
+      await expectWizardClosed();
+      expect(showAppToast).toHaveBeenCalledWith({
+        message: 'providerWizardSavedSetupIncomplete',
+        isError: false,
+      });
+      expect(showAppToast).not.toHaveBeenCalledWith('savedSuccessfully');
+    },
+  );
 });
